@@ -1,0 +1,24 @@
+{
+  "name": "finance",
+  "version": "0.0.0",
+  "description": "",
+  "homepage": "https://github.com/fjs-dev/finance#readme",
+  "bugs": {
+    "url": "https://github.com/fjs-dev/finance/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fjs-dev/finance.git"
+  },
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "test": "tsc && node --test"
+  },
+  "dependencies": {
+    "functionalscript": "^0.39.0"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2"
+  }
+}
