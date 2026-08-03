@@ -34,7 +34,7 @@ a new report is a new program, not new engine code.
 
 ### Active
 
-- [ ] MCP server exposing finance tools over stdio, following the `fjs/cas/mcp`
+- [ ] MCP server exposing finance tools over stdio, following the `fjs/mcp`
       `casMcpServer` pattern
 - [ ] Store financial documents in CAS as Evo objects (subject + revision + snapshot)
 - [ ] Store raw PDF statement bytes without parsing them
@@ -156,16 +156,16 @@ the single most likely failure mode — an agent writing a program that reaches 
 network — undebuggable. Per AGENTS.md this is reported upstream rather than worked around
 locally, once the shape is known.
 
-**What fjs already provides.** `functionalscript@0.39.0` ships most of the
+**What fjs already provides.** `functionalscript@0.40.0` ships most of the
 infrastructure, so the finance-specific work is domain logic, not plumbing:
 
 | Module | What it gives us |
 |---|---|
-| `fjs/mcp` | MCP session state machine (`mcpStep`), RTTI-validated tool registry (`toolEntry`, `fromRegistry`), JSON-RPC responses |
-| `fjs/mcp/stdio` | `stdioTransport` — read→parse→dispatch→write loop, testable against mock stdin/stdout with no real process |
+| `fjs/protocol/mcp` | MCP session state machine (`mcpStep`), RTTI-validated tool registry (`toolEntry`, `fromRegistry`), JSON-RPC responses |
+| `fjs/protocol/mcp/stdio` | `stdioTransport` — read→parse→dispatch→write loop, testable against mock stdin/stdout with no real process |
 | `fjs/cas` | `FileCas` — streaming SHA-2 content store, 128 KiB chunks, lock-free staging writes |
 | `fjs/cas/evo` | Evo — subjects and revision heads (a DAG) cached over the CAS |
-| `fjs/cas/mcp` | `casMcpServer(home)` — a complete working seven-tool CAS+Evo MCP server (`cas_add`, `cas_get`, `cas_list`, `evo_list`, `evo_head`, `evo_revision`, `evo_add`). **This is the template to follow.** |
+| `fjs/mcp` | `casMcpServer(home)` — a complete working seven-tool CAS+Evo MCP server (`cas_add`, `cas_get`, `cas_list`, `evo_list`, `evo_head`, `evo_revision`, `evo_add`), with its tool registries at `fjs/mcp/cas` and `fjs/mcp/evo`. **This is the template to follow.** |
 | `fjs/media/revision` | The `vnd.fjs.revision` blob format and its validation |
 | `fjs/effects` | `Effect<O,T>` as data plus the runners that interpret it — `effects/node` (real process), `effects/mock` (`run(o)`, honoring only the effects handler `o` implements) |
 
@@ -267,7 +267,7 @@ supersede rather than overwrite.
 | Scenarios modeled as Evo branches (v2), designed for in v1 | A what-if is a revision branched off a head that never merges; multiple heads *are* competing scenarios, with provenance for free — nothing new to build later if v1 models documents this way | — Pending |
 | All three amendment kinds use one mechanism | Corrected source docs, 1040-X returns, and user corrections are all "new revision, old as parent" — one model, not three | — Pending |
 | Traceability is a storage-layer property | If every extracted value carries the CAS hash it came from, line-by-line provenance is structural, not a reporting feature bolted on afterward | — Pending |
-| Follow `fjs/cas/mcp` `casMcpServer` as the server template | A complete working CAS+Evo MCP server already exists in the dependency; the finance server is that pattern plus domain tools | — Pending |
+| Follow `fjs/mcp` `casMcpServer` as the server template | A complete working CAS+Evo MCP server already exists in the dependency; the finance server is that pattern plus domain tools | — Pending |
 | Specs/issues as MarkDown in `**/todo/` | Keeps the specification next to the code it describes, versioned with it, readable by both humans and agents with no tracker to sync (README `## Conventions And Technical Principles`) | — Pending |
 | New formats use the `vnd.fjs.<name>` dialect convention | One naming rule for every format we add, matching `vnd.fjs.revision`, so media types derive mechanically as `application/vnd.fjs.<name>+json` (README `## Conventions And Technical Principles`) | — Pending |
 | Defer PDF parsing; store raw bytes in v1 | No PDF library in fjs; writing one would dominate v1 and blocks nothing else — storage and versioning can be proven end-to-end without it | — Pending |

@@ -24,25 +24,26 @@ The last two are deliberate Week 1 deferrals, revisited in Week 5.
 
 ## What already exists
 
-`functionalscript@0.39.0`. Note the MCP helpers are at `fjs/mcp/`, **not**
-`fjs/protocol/mcp`.
+`functionalscript@0.40.0`. Note the split: the generic protocol helpers are at
+`fjs/protocol/mcp/`, while `fjs/mcp/` is the *CAS server* built on top of them.
+(0.39.0 had no `fjs/protocol/` at all and put both under `fjs/mcp/`.)
 
 | Need | Reuse |
 |---|---|
-| Tool declaration + arg schema | `toolEntry(name, description, inputRtti, handle)` — `fjs/mcp/module.f.js` |
+| Tool declaration + arg schema | `toolEntry(name, description, inputRtti, handle)` — `fjs/protocol/mcp/module.f.js` |
 | Tool results | `okResult(text)` / `errorResult(text)` — same module |
 | Registry → handlers | `fromRegistry(registry)` — same module |
 | Protocol state machine | `mcpStep(config)(handlers)(stateKey)` — same module |
-| stdio loop | `stdioTransport(handler)` — `fjs/mcp/stdio/module.f.js` |
-| CAS tools | `casToolRegistry(home)(cacheKey)` — `fjs/cas/mcp/module.f.js` |
-| Evo tools | `evoToolRegistry(evo(cas)(cacheKey))` — `fjs/cas/evo/mcp/module.f.js` |
+| stdio loop | `stdioTransport(handler)` — `fjs/protocol/mcp/stdio/module.f.js` |
+| CAS tools | `casToolRegistry(home)(cacheKey)` — `fjs/mcp/cas/module.f.js` |
+| Evo tools | `evoToolRegistry(evo(cas)(cacheKey))` — `fjs/mcp/evo/module.f.js` |
 | Store / cache setup | `fileCas(sha256)(home)`, `initEvo(cas)` |
-| Server config | `casConfig` — `fjs/cas/mcp/module.f.js` (exported; reuse or replace) |
+| Server config | `casConfig` — `fjs/mcp/module.f.js` (exported; reuse or replace) |
 | Arg types | `string`, `option`, `array` — `fjs/types/rtti/module.f.js` |
 | Effect runner | `asyncRun(operationMap)` — `fjs/effects/module.js` |
 
 FunctionalScript's own assembly, for reference —
-[`fjs/cas/mcp/module.f.js:245`](https://github.com/functionalscript/functionalscript/blob/main/fjs/cas/mcp/module.f.js):
+`casMcpHandlers` in [`fjs/mcp/module.f.js`](https://github.com/functionalscript/functionalscript/blob/main/fjs/mcp/module.f.js):
 
 ```js
 export const casMcpHandlers = home => cacheKey => fromRegistry([
