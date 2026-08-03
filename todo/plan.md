@@ -2,7 +2,7 @@
 
 ## Settled Decisions
 
-Established 2026-08-03. These constrain everything below.
+These constrain everything below.
 
 | Area | Decision |
 |---|---|
@@ -40,7 +40,7 @@ Step 3 is the real work; 1 and 4 are assembly over existing FunctionalScript exp
 
 **Track B — document ingestion**
 
-5. **One document format**, as a `vnd.fjs.*` JSON dialect following the [Revision](https://github.com/functionalscript/functionalscript/blob/main/fjs/media/revision/README.md) precedent. Exactly one type to start (e.g. `vnd.fjs.1099`), not a family.
+5. **The document base format**, as a `vnd.fjs.*` JSON dialect following the [Revision](https://github.com/functionalscript/functionalscript/blob/main/fjs/media/revision/README.md) precedent. Every document type shares one base — `{ "dialect": "vnd.fjs.<name>", … }` — with `dialect` as the type discriminant, exactly as `vnd.fjs.revision` does it. Week 1 implements one concrete type on that base (e.g. `vnd.fjs.1099`); designing the base for the family up front is what lets Week 3 add types without reopening it.
 6. **The OCR format** — the intermediate the agent's vision pass emits, before it is narrowed into a specific document type. Open question: whether this is a distinct stored artifact or just a transient step.
 7. **Ingestion loop.** Agent reads the document by vision → emits the dialect → stores via `evo_add` under the agreed subject model (see open question 2).
 
@@ -58,7 +58,7 @@ Start with a single unambiguous aggregate before anything involving brackets, de
 
 ## Week 3
 
-Goal: **breadth in documents.** Additional `vnd.fjs.*` types beyond the first (W-2, 1099-DIV, …), and the multi-document, multi-form aggregation the real question requires. Whatever the tax scope decision demands.
+Goal: **breadth in documents.** Additional `vnd.fjs.*` types on the Week 1 base (W-2, 1099-DIV, …), and the multi-document, multi-form aggregation the real question requires. Whatever the tax scope decision demands. If a new type forces a change to the base, that is a signal the base was under-designed in Week 1 — worth noting rather than absorbing silently.
 
 ## Week 4
 

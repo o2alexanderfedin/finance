@@ -41,8 +41,13 @@ a new report is a new program, not new engine code.
 - [ ] Accept agent-supplied JSON as an extracted-document input — the settled v1
       ingestion path (agent vision reads the document → emits a `vnd.fjs.*` dialect →
       stored via `evo_add`)
-- [ ] Exactly one document format first (e.g. `vnd.fjs.1099`), not a family — additional
-      types (W-2, 1099-DIV, …) come later, per `todo/plan.md` Week 3
+- [ ] One common document base shared by every document type — `{ "dialect":
+      "vnd.fjs.<name>", … }`, with `dialect` as the type discriminant, matched as an exact
+      literal so structural validation alone rejects another type's blob (the
+      `vnd.fjs.revision` precedent)
+- [ ] One concrete type implemented first (e.g. `vnd.fjs.1099`) — a scheduling choice, not
+      a format constraint. The base is designed for a family from the start; further types
+      (W-2, 1099-DIV, …) land per `todo/plan.md` Week 3 without reopening it
 - [ ] An OCR format — the intermediate the vision pass emits before it is narrowed into a
       specific document type (open question 3: stored artifact or transient step)
 - [ ] Parse structured exports (CSV / OFX / QFX) — *not in the five-week plan*; retained
