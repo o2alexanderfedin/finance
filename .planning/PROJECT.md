@@ -50,6 +50,14 @@ a new report is a new program, not new engine code.
       derived from it via `Ts<typeof schema>` — never declared twice. Refinements RTTI
       cannot express structurally (currency exactness, date forms, cbase32 hashes) go in a
       separate semantic check, as `checkReferences` is separate from `revisionSchema`
+- [ ] **No floating point for exact quantities.** Money, percentages, and interest rates
+      are never JS `number`s — in documents, tax-year parameters, intermediates, or
+      reports. In a document they are JSON *strings* (a JSON number is an IEEE 754 double),
+      RTTI-typed as `string` and decoded by a semantic check into an exact value, the way
+      `vnd.fjs.revision` carries a hash as a string validated by `isHash`
+- [ ] An exact-decimal module for those values — parse, compare, add/subtract, multiply by
+      a rate, and round explicitly where a form demands it. Written here as a standalone
+      `fjs/`-shaped module so it can move upstream later, per the AGENTS.md staging rule
 - [ ] One concrete type implemented first (e.g. `vnd.fjs.1099`) — a scheduling choice, not
       a format constraint. The base is designed for a family from the start; further types
       (W-2, 1099-DIV, …) land per `todo/plan.md` Week 3 without reopening it
@@ -320,8 +328,17 @@ supersede rather than overwrite.
   version and a missing app-specific one is a reason to write it here — and a third-party
   parser would break the purity model besides. Chiefly relevant to document parsing, where
   reaching for an existing library is the obvious temptation.
-- **Correctness**: Tax math must be exact. Beware floating-point on currency and the
-  `Number.isSafeInteger` bound that `fjs/media/revision` already enforces on generations.
+- **No floating point for money, ever.** Currencies, percentages, interest rates, and any
+  other exact quantity must never be represented as a JS `number` — not in a parsed
+  document, not in tax-year parameters, not in an intermediate, not in a report. This is
+  absolute, and it constrains the document format directly: a JSON *number* is an IEEE 754
+  double by the time it reaches us, so these values are carried as JSON **strings** and
+  decoded to an exact representation, exactly as `vnd.fjs.revision` carries a hash as a
+  string with `isHash` enforcing what the schema cannot. `0.1 + 0.2 !== 0.3` is a rounding
+  error in a tax return; the whole point of the project is that its numbers can be
+  trusted.
+- **Correctness**: Beyond the above, mind the `Number.isSafeInteger` bound that
+  `fjs/media/revision` already enforces on generations.
 
 ## Key Decisions
 
@@ -379,7 +396,7 @@ file does not own.
    how much of the "Compute a full line-by-line 1040" requirement is really v1.
 2. **Evo subject model** — one subject per uploaded document with parsed representations
    as revisions, and what the naming scheme is. Annoying to change once documents exist,
-   so it wants deciding before Track B ships. Cited by `todo/plan.md` Week 1 step 7.
+   so it wants deciding before Track B ships. Cited by `todo/plan.md` Week 1 step 8.
 3. **OCR format** — is the raw vision output a stored artifact in its own right, or a
    transient step? The auditability rationale in Core Value argues for storing it: it is
    the record of what the model actually saw, before interpretation.

@@ -29,6 +29,7 @@
 - The entry point's pure logic lives in `index.f.js` and exports a `main` typed as `NodeProgram`.
 - Specifications, issues, bug reports, and feature requests are MarkDown files in a `todo/` directory next to the code they concern — e.g. [./fjs/todo/implement-mcp-server.md](./fjs/todo/implement-mcp-server.md). Project-level planning lives in [./todo/plan.md](./todo/plan.md). Write the spec there before implementing; don't open a tracker.
 - New file formats follow the [Revision](https://github.com/functionalscript/functionalscript/blob/main/fjs/media/revision/README.md) precedent: JSON plus a dialect tag. Name the dialect `vnd.fjs.<name>`, which yields the media type `application/vnd.fjs.<name>+json`.
+- **Never use floating point for money, percentages, or interest rates.** No JS `number` for an exact quantity — anywhere, at any stage: parsed documents, tax-year parameters, intermediates, reports. In a JSON document these are **strings**, because a JSON number is an IEEE 754 double by the time it is parsed; type the field as rtti `string` and decode it in the semantic check, the way `vnd.fjs.revision` types a hash as `string` and enforces the rest in `isHash`. Use the repo's exact-decimal module (bigint-backed) for arithmetic, and round only where a form explicitly requires it.
 
 ## Code style
 
