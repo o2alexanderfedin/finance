@@ -269,8 +269,12 @@ supersede rather than overwrite.
   - If fjs is missing something *generic* — a reusable helper, not app-specific logic —
     add it to this repo as a separate file/directory so it can be moved upstream into
     FunctionalScript later. This directly shapes where parsers and numeric helpers live.
-  - If you find a bug in FunctionalScript, **tell the user** so it can be fixed and a new
-    fjs version released. Do not silently work around it here.
+  - If you find a bug or gap in FunctionalScript, **tell the user** so it can be fixed and
+    a new fjs version released. Working around it locally is allowed and should not block
+    progress — but never silently: record it in `fjs/todo/upstream-<short-name>.md`, which
+    is also the Week 5 upstreaming queue. Two are open already
+    ([`match`](../fjs/todo/upstream-match-partial-operation-map.md), [media dialect
+    registry](../fjs/todo/upstream-media-dialect-registry.md)).
 - **Typing**: JSDoc comments only, validated by TypeScript 7 with `noEmit`. No `.ts`
   source files. `tsconfig.json` is maximally strict (`strict`,
   `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, `noUnusedLocals`,
