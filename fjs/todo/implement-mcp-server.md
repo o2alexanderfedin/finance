@@ -26,7 +26,6 @@ The last two are deliberate Week 1 deferrals, revisited in Week 5.
 
 `functionalscript@0.40.0`. Note the split: the generic protocol helpers are at
 `fjs/protocol/mcp/`, while `fjs/mcp/` is the *CAS server* built on top of them.
-(0.39.0 had no `fjs/protocol/` at all and put both under `fjs/mcp/`.)
 
 | Need | Reuse |
 |---|---|
