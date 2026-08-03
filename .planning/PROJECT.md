@@ -114,15 +114,20 @@ fjs/index.f.js    — pure main, typed as NodeProgram
 fjs/proof.f.js    — a passing proof: assert(2 + 2 === 4)
 todo/plan.md      — settled decisions, five-week critical path, open questions
 fjs/todo/implement-mcp-server.md — Week 1 Track A spec (not implemented)
+fjs/todo/upstream-*.md — known fjs gaps awaiting an upstream fix (Week 5 queue)
 .github/workflows/node.js.yml — CI: npm ci && npm test on Node 26
 ```
+
+Dependencies are `functionalscript` (runtime) and `typescript` (typecheck only) — the
+entire approved set; see Constraints.
 
 `npm test` passes (1 test, exit 0), `tsc` is clean, and both `npm start` and
 `npm run fjs-start` print `hello world!`.
 
-**The goal statement.** The `## Goal` section of README.md is the authoritative statement
-of intent that this document is built from. It was rewritten in PR #1 "Update the MVP."
-(commit `c7a9cce`) and now reads:
+**The goal statement.** Intent is now owned by *this* document — **What This Is** and
+**Core Value** above are authoritative, and README.md is a brief description plus links.
+That was not always so: this document was originally built from a `## Goal` section in
+README.md, rewritten in PR #1 "Update the MVP." (commit `c7a9cce`), which read:
 
 > The main target is that a user was able to upload their documents to a personal CAS and
 > then using ChatGPT (or other clients) to compute tax and other financial reports.
@@ -143,18 +148,34 @@ that the agent authors *programs* rather than answers — which is why "execute
 FunctionalScript in CAS" is now a first-class MVP requirement above, and why "other
 financial reports" became reachable without new engine code.
 
-The same PR added the conventions section to README.md — since renamed
-`## Conventions And Technical Principles`; those conventions are folded into Constraints
-below and into AGENTS.md, which is what agents actually load.
+The quote is kept because the wording is the origin of the "programs, not answers"
+constraint, not because README still holds it.
 
-**Where the planning lives.** Three documents, deliberately not overlapping — keep each
-fact in exactly one of them:
+The same PR added a conventions section to README.md — later renamed
+`## Conventions And Technical Principles`, and since removed. Those conventions now live
+in AGENTS.md, which is what agents actually load, and are reflected in Constraints below.
+
+**Where the planning lives.** Three planning documents, deliberately not overlapping —
+keep each fact in exactly one of them:
 
 | Document | Owns |
 |---|---|
 | `.planning/PROJECT.md` (this file) | *Why* and *what* — intent, requirements, constraints, decisions, success criteria |
 | [`todo/plan.md`](../todo/plan.md) | *When* — settled decisions, the five-week critical path, and the project-level open questions |
 | [`fjs/todo/implement-mcp-server.md`](../fjs/todo/implement-mcp-server.md) | *How*, for Week 1 Track A — server assembly, `fjs_run`, the restricted runner, what to reuse from fjs |
+
+Two supporting files sit outside that split and are not planning documents:
+
+| File | Role |
+|---|---|
+| [`AGENTS.md`](../AGENTS.md) | *How to work here* — conventions, file layout, code style, testing, commands. The only one agents load automatically |
+| [`README.md`](../README.md) | The front door: a short description of the project and links to the documents above |
+
+README necessarily restates the project description this file owns — that is what a README
+is for. Keep it to that: a paraphrase short enough that it stays true as details change,
+and links for everything else. Anything with a specific, checkable value — status, file
+layout, commands, conventions — belongs in the owning document and is linked to, not
+copied, so there is never a second copy to drift.
 
 Both `todo/` documents arrived in PR #1 (`f57fd50`). Where this file and `todo/plan.md`
 disagreed on execution safety, `todo/plan.md` won — it is the more concrete and more
@@ -164,8 +185,10 @@ honest account, and Constraints below were corrected to match it.
 `map[command]` is `undefined` for an absent operation, so it throws
 `TypeError: map[command] is not a function` rather than reporting a refusal. That makes
 the single most likely failure mode — an agent writing a program that reaches for the
-network — undebuggable. Per AGENTS.md this is reported upstream rather than worked around
-locally, once the shape is known.
+network — undebuggable. Per AGENTS.md, working around it locally is fine so long as the
+workaround is recorded rather than silent; tracked in
+[`fjs/todo/upstream-match-partial-operation-map.md`](../fjs/todo/upstream-match-partial-operation-map.md)
+for upstreaming.
 
 **What fjs already provides.** `functionalscript@0.40.0` ships most of the
 infrastructure, so the finance-specific work is domain logic, not plumbing:
@@ -211,10 +234,12 @@ irrelevant here.)
 `decodeText`/`mediaType` from `fjs/media/revision` directly and performs exactly one
 check, so `vnd.fjs.revision` is the only dialect it can ever recognize — its own docstring
 says "currently just `vnd.fjs.revision`", so growth is anticipated but unimplemented.
-Nothing lets a downstream package contribute a dialect. Per AGENTS.md this is an fjs
-change (take a list of dialect decoders, fall through when none match), not local glue —
-the same disposition as the `match` gap above. Not Week 1 blocking: our own validation
-does not need `detect`, which matters only for classifying a blob of unknown provenance.
+Nothing lets a downstream package contribute a dialect. The fix belongs upstream (take a
+list of dialect decoders, fall through when none match) — same disposition as the `match`
+gap above, and tracked in
+[`fjs/todo/upstream-media-dialect-registry.md`](../fjs/todo/upstream-media-dialect-registry.md).
+Not Week 1 blocking: our own validation does not need `detect`, which matters only for
+classifying a blob of unknown provenance.
 
 **Program execution is half-built already.** There is no "evaluate this FunctionalScript
 source" module in fjs — `fjs/fsc` covers compile workflows and `fjs/djs` transpiles data,
@@ -248,8 +273,12 @@ supersede rather than overwrite.
   - If fjs is missing something *generic* — a reusable helper, not app-specific logic —
     add it to this repo as a separate file/directory so it can be moved upstream into
     FunctionalScript later. This directly shapes where parsers and numeric helpers live.
-  - If you find a bug in FunctionalScript, **tell the user** so it can be fixed and a new
-    fjs version released. Do not silently work around it here.
+  - If you find a bug or gap in FunctionalScript, **tell the user** so it can be fixed and
+    a new fjs version released. Working around it locally is allowed and should not block
+    progress — but never silently: record it in `fjs/todo/upstream-<short-name>.md`, which
+    is also the Week 5 upstreaming queue. Two are open already
+    ([`match`](../fjs/todo/upstream-match-partial-operation-map.md), [media dialect
+    registry](../fjs/todo/upstream-media-dialect-registry.md)).
 - **Typing**: JSDoc comments only, validated by TypeScript 7 with `noEmit`. No `.ts`
   source files. `tsconfig.json` is maximally strict (`strict`,
   `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, `noUnusedLocals`,
@@ -281,17 +310,21 @@ supersede rather than overwrite.
   permanent design — the input chain is *untrusted document → LLM → generated program →
   execution*, so if the audience ever widens past one local user, it is a blocker, not a
   cleanup task.
-- **Specs and issues live in `todo/` directories** (from README `## Conventions And Technical Principles`):
+- **Specs and issues live in `todo/` directories** (from AGENTS.md `## File conventions`):
   specifications, issues, bug reports, and feature requests are MarkDown files under
   `**/todo/`, next to the code they concern — e.g. `./fjs/todo/implement-mcp-server.md`.
-- **New formats follow the `revision` pattern** (from README `## Conventions And Technical Principles`): JSON
+- **New formats follow the `revision` pattern** (from AGENTS.md `## File conventions`): JSON
   encoding plus a dialect tag. Name the dialect `vnd.fjs.<name>`; the media type derives
   from it as `application/vnd.fjs.<name>+json` (see `fjs/media/revision/module.f.js`,
   where `dialect = 'vnd.fjs.revision'` yields `application/vnd.fjs.revision+json`).
-- **Dependencies**: `functionalscript` only. Adding a third-party parser would break the
-  purity model and the FunctionalScript constraint. Corollary from README `## Conventions And Technical Principles`:
-  we own fjs, so a missing generic capability is a reason to release a new fjs version —
-  not a reason to add a dependency or write app-specific glue here.
+- **Dependencies**: `functionalscript` at runtime, `typescript` for typechecking — and
+  **nothing else may be added to `dependencies` or `devDependencies` without approval from
+  all owners** (AGENTS.md `## Requirements`). A governance rule, not only a technical one:
+  the decision is not a contributor's to make, so an unapproved dependency is a blocker
+  regardless of merit. It rarely binds, because a missing *generic* capability is a reason
+  to release a new fjs version and a missing app-specific one is a reason to write it here
+  — and a third-party parser would break the purity model besides. Chiefly relevant to
+  document parsing, where reaching for an existing library is the obvious temptation.
 - **Correctness**: Tax math must be exact. Beware floating-point on currency and the
   `Number.isSafeInteger` bound that `fjs/media/revision` already enforces on generations.
 
@@ -313,8 +346,10 @@ supersede rather than overwrite.
 | All three amendment kinds use one mechanism | Corrected source docs, 1040-X returns, and user corrections are all "new revision, old as parent" — one model, not three | — Pending |
 | Traceability is a storage-layer property | If every extracted value carries the CAS hash it came from, line-by-line provenance is structural, not a reporting feature bolted on afterward | — Pending |
 | Follow `fjs/mcp` `casMcpServer` as the server template | A complete working CAS+Evo MCP server already exists in the dependency; the finance server is that pattern plus domain tools | — Pending |
-| Specs/issues as MarkDown in `**/todo/` | Keeps the specification next to the code it describes, versioned with it, readable by both humans and agents with no tracker to sync (README `## Conventions And Technical Principles`) | — Pending |
-| New formats use the `vnd.fjs.<name>` dialect convention | One naming rule for every format we add, matching `vnd.fjs.revision`, so media types derive mechanically as `application/vnd.fjs.<name>+json` (README `## Conventions And Technical Principles`) | — Pending |
+| Specs/issues as MarkDown in `**/todo/` | Keeps the specification next to the code it describes, versioned with it, readable by both humans and agents with no tracker to sync (AGENTS.md `## File conventions`) | — Pending |
+| New formats use the `vnd.fjs.<name>` dialect convention | One naming rule for every format we add, matching `vnd.fjs.revision`, so media types derive mechanically as `application/vnd.fjs.<name>+json` (AGENTS.md `## File conventions`) | — Pending |
+| No third-party `dependencies`/`devDependencies` without approval from all owners | Keeps the dependency surface a deliberate, owner-level decision rather than an implementation detail settled in a commit. Reinforces the purity model and the "release a new fjs version instead" rule, but stands on its own as governance: approved set is `functionalscript` + `typescript` (AGENTS.md `## Requirements`) | — Standing |
+| FJS gaps may be worked around locally, but never silently | A workaround must not block progress, and must not be forgotten either; each one gets an `fjs/todo/upstream-*.md` file recording the gap, the local workaround, and the intended upstream fix — which doubles as the Week 5 upstreaming queue (AGENTS.md `## Requirements`) | — Standing |
 | Defer PDF parsing; store raw bytes in v1 | No PDF library in fjs; writing one would dominate v1 and blocks nothing else — storage and versioning can be proven end-to-end without it | — Pending |
 | Defer what-if to v2 | v1 must first compute one real 1040 correctly; scenarios are worthless on top of an unverified engine. Revisited after PR #1: with agent-authored programs, a scenario may need no feature work at all — the deferral now covers only shipping it as a named, tested capability | — Pending |
 | Generic helpers written to be upstreamable into fjs | AGENTS.md policy: anything reusable and non-app-specific belongs in its own file/directory so it can move into FunctionalScript later. Affects where parsers and numeric utilities live from day one | — Pending |
