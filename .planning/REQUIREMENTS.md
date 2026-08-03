@@ -391,11 +391,119 @@ to be written down with its consequences rather than left implicit.
 
 ## Traceability
 
-Populated by the roadmapper. Every v1 requirement maps to exactly one phase.
+Populated by the roadmapper from [`.planning/ROADMAP.md`](ROADMAP.md).
+**All 79 v1 requirements map to exactly one phase. No orphans, no duplicates.**
 
-| REQ-ID | Phase | Status |
-|--------|-------|--------|
-| *(pending roadmap)* | | |
+Milestones are `todo/plan.md`'s weeks and keep its names; phases are sliced underneath
+them. Week 0 is research's addition in front of the plan's Week 1.
+
+| REQ-ID | Tier | Phase | Milestone | Status |
+|--------|------|-------|-----------|--------|
+| DOCC-01 | T0 | Phase 1 - Planning-Document Corrections | Week 0 | Pending |
+| DOCC-02 | T0 | Phase 1 - Planning-Document Corrections | Week 0 | Pending |
+| DOCC-03 | T0 | Phase 1 - Planning-Document Corrections | Week 0 | Pending |
+| DOCC-04 | T0 | Phase 1 - Planning-Document Corrections | Week 0 | Pending |
+| DOCC-05 | T0 | Phase 1 - Planning-Document Corrections | Week 0 | Pending |
+| DOCC-06 | T0 | Phase 1 - Planning-Document Corrections | Week 0 | Pending |
+| MCP-01 | T0 | Phase 2 - Server Skeleton and Registration | Week 0 | Pending |
+| MCP-02 | T0 | Phase 2 - Server Skeleton and Registration | Week 0 | Pending |
+| MCP-03 | T0 | Phase 2 - Server Skeleton and Registration | Week 0 | Pending |
+| MCP-04 | T0 | Phase 2 - Server Skeleton and Registration | Week 0 | Pending |
+| MCP-05 | T0 | Phase 2 - Server Skeleton and Registration | Week 0 | Pending |
+| MCP-06 | T1 | Phase 7 - `fjs_run` and Run Records | Week 1 | Pending |
+| MCP-07 | T1 | Phase 8 - TY2025 Parameters and Tax Table | Week 2 | Pending |
+| MCP-08 | T2 | Phase 11 - Wage, Retirement, Benefit Documents | Week 3 | Pending |
+| MCP-09 | T3 | Phase 15 - Realism Polish and Upstream | Week 5 | Pending |
+| EXEC-01 | T0 | Phase 3 - The Restricted Interpreter | Week 1 | Pending |
+| EXEC-02 | T0 | Phase 3 - The Restricted Interpreter | Week 1 | Pending |
+| EXEC-03 | T0 | Phase 3 - The Restricted Interpreter | Week 1 | Pending |
+| EXEC-04 | T0 | Phase 3 - The Restricted Interpreter | Week 1 | Pending |
+| EXEC-05 | T0 | Phase 3 - The Restricted Interpreter | Week 1 | Pending |
+| EXEC-06 | T0 | Phase 3 - The Restricted Interpreter | Week 1 | Pending |
+| EXEC-07 | T0 | Phase 6 - Guest ABI and Materialization | Week 1 | Pending |
+| EXEC-08 | T1 | Phase 7 - `fjs_run` and Run Records | Week 1 | Pending |
+| EXEC-09 | T1 | Phase 6 - Guest ABI and Materialization | Week 1 | Pending |
+| EXEC-10 | T1 | Phase 7 - `fjs_run` and Run Records | Week 1 | Pending |
+| EXEC-11 | T1 | Phase 7 - `fjs_run` and Run Records | Week 1 | Pending |
+| EXEC-12 | T1 | Phase 7 - `fjs_run` and Run Records | Week 1 | Pending |
+| EXEC-13 | T2 | Phase 14 - Acceptance | Week 4 | Pending |
+| DOC-00 | T0 | Phase 5 - Document Base and First Dialects | Week 1 | Pending |
+| DOC-01 | T0 | Phase 5 - Document Base and First Dialects | Week 1 | Pending |
+| DOC-02 | T0 | Phase 2 - Server Skeleton and Registration | Week 0 | Pending |
+| DOC-03 | T1 | Phase 5 - Document Base and First Dialects | Week 1 | Pending |
+| DOC-04 | T1 | Phase 5 - Document Base and First Dialects | Week 1 | Pending |
+| DOC-05 | T2 | Phase 11 - Wage, Retirement, Benefit Documents | Week 3 | Pending |
+| DOC-06 | T2 | Phase 12 - Brokerage and Capital-Gain Chain | Week 3 | Pending |
+| DOC-07 | T2 | Phase 12 - Brokerage and Capital-Gain Chain | Week 3 | Pending |
+| DOC-08 | T2 | Phase 11 - Wage, Retirement, Benefit Documents | Week 3 | Pending |
+| DOC-09 | T2 | Phase 11 - Wage, Retirement, Benefit Documents | Week 3 | Pending |
+| DOC-10 | T1 | Phase 5 - Document Base and First Dialects | Week 1 | Pending |
+| DOC-11 | T1 | Phase 5 - Document Base and First Dialects | Week 1 | Pending |
+| DOC-12 | T1 | Phase 5 - Document Base and First Dialects | Week 1 | Pending |
+| DOC-13 | T2 | Phase 12 - Brokerage and Capital-Gain Chain | Week 3 | Pending |
+| DOC-14 | T1 | Phase 5 - Document Base and First Dialects | Week 1 | Pending |
+| DOC-15 | T2 | Phase 11 - Wage, Retirement, Benefit Documents | Week 3 | Pending |
+| DOC-16 | T3 | Phase 15 - Realism Polish and Upstream | Week 5 | Pending |
+| EXACT-01 | T0 | Phase 4 - Exact Arithmetic | Week 1 | Pending |
+| EXACT-02 | T0 | Phase 4 - Exact Arithmetic | Week 1 | Pending |
+| EXACT-03 | T0 | Phase 4 - Exact Arithmetic | Week 1 | Pending |
+| EXACT-04 | T0 | Phase 4 - Exact Arithmetic | Week 1 | Pending |
+| EXACT-05 | T1 | Phase 4 - Exact Arithmetic | Week 1 | Pending |
+| TAX-01 | T1 | Phase 8 - TY2025 Parameters and Tax Table | Week 2 | Pending |
+| TAX-02 | T1 | Phase 8 - TY2025 Parameters and Tax Table | Week 2 | Pending |
+| TAX-03 | T1 | Phase 10 - 1040 Core and Scope Guard | Week 2 | Pending |
+| TAX-04 | T1 | Phase 8 - TY2025 Parameters and Tax Table | Week 2 | Pending |
+| TAX-05 | T1 | Phase 10 - 1040 Core and Scope Guard | Week 2 | Pending |
+| TAX-06 | T1 | Phase 10 - 1040 Core and Scope Guard | Week 2 | Pending |
+| TAX-07 | T2 | Phase 12 - Brokerage and Capital-Gain Chain | Week 3 | Pending |
+| TAX-08 | T2 | Phase 12 - Brokerage and Capital-Gain Chain | Week 3 | Pending |
+| TAX-09 | T2 | Phase 13 - The 65+ Profile and Schedules | Week 3 | Pending |
+| TAX-10 | T2 | Phase 13 - The 65+ Profile and Schedules | Week 3 | Pending |
+| TAX-11 | T2 | Phase 12 - Brokerage and Capital-Gain Chain | Week 3 | Pending |
+| TAX-12 | T2 | Phase 13 - The 65+ Profile and Schedules | Week 3 | Pending |
+| TAX-13 | T2 | Phase 13 - The 65+ Profile and Schedules | Week 3 | Pending |
+| TAX-14 | T2 | Phase 13 - The 65+ Profile and Schedules | Week 3 | Pending |
+| TAX-15 | T2 | Phase 12 - Brokerage and Capital-Gain Chain | Week 3 | Pending |
+| TAX-16 | T1 | Phase 10 - 1040 Core and Scope Guard | Week 2 | Pending |
+| TAX-17 | T3 | Phase 15 - Realism Polish and Upstream | Week 5 | Pending |
+| PROV-01 | T1 | Phase 9 - Traceable Report Lines | Week 2 | Pending |
+| PROV-02 | T1 | Phase 9 - Traceable Report Lines | Week 2 | Pending |
+| PROV-03 | T1 | Phase 7 - `fjs_run` and Run Records | Week 1 | Pending |
+| PROV-04 | T2 | Phase 14 - Acceptance | Week 4 | Pending |
+| PROV-05 | T2 | Phase 14 - Acceptance | Week 4 | Pending |
+| PROV-06 | T3 | Phase 15 - Realism Polish and Upstream | Week 5 | Pending |
+| PROV-07 | T2 | Phase 9 - Traceable Report Lines | Week 2 | Pending |
+| PROV-08 | T3 | Phase 15 - Realism Polish and Upstream | Week 5 | Pending |
+| SEC-01 | T0 | Phase 2 - Server Skeleton and Registration | Week 0 | Pending |
+| SEC-02 | T1 | Phase 6 - Guest ABI and Materialization | Week 1 | Pending |
+| SEC-03 | T1 | Phase 6 - Guest ABI and Materialization | Week 1 | Pending |
+| SEC-04 | T0 | Phase 1 - Planning-Document Corrections | Week 0 | Pending |
+
+### Coverage by phase
+
+| Phase | Milestone | Requirements | Count | Tiers |
+|-------|-----------|--------------|-------|-------|
+| 1. Planning-Document Corrections | Week 0 | DOCC-01, DOCC-02, DOCC-03, DOCC-04, DOCC-05, DOCC-06, SEC-04 | 7 | T0 |
+| 2. Server Skeleton and Registration | Week 0 | MCP-01, MCP-02, MCP-03, MCP-04, MCP-05, SEC-01, DOC-02 | 7 | T0 |
+| 3. The Restricted Interpreter | Week 1 | EXEC-01, EXEC-02, EXEC-03, EXEC-04, EXEC-05, EXEC-06 | 6 | T0 |
+| 4. Exact Arithmetic | Week 1 | EXACT-01, EXACT-02, EXACT-03, EXACT-04, EXACT-05 | 5 | T0, T1 |
+| 5. Document Base and First Dialects | Week 1 | DOC-00, DOC-01, DOC-03, DOC-04, DOC-10, DOC-11, DOC-12, DOC-14 | 8 | T0, T1 |
+| 6. Guest ABI and Materialization | Week 1 | EXEC-07, EXEC-09, SEC-02, SEC-03 | 4 | T0, T1 |
+| 7. `fjs_run` and Run Records | Week 1 | EXEC-08, EXEC-10, EXEC-11, EXEC-12, PROV-03, MCP-06 | 6 | T1 |
+| 8. TY2025 Parameters and Tax Table | Week 2 | TAX-01, TAX-02, TAX-04, MCP-07 | 4 | T1 |
+| 9. Traceable Report Lines | Week 2 | PROV-01, PROV-02, PROV-07 | 3 | T1, T2 |
+| 10. 1040 Core and Scope Guard | Week 2 | TAX-03, TAX-05, TAX-06, TAX-16 | 4 | T1 |
+| 11. Wage, Retirement, Benefit Documents | Week 3 | DOC-05, DOC-08, DOC-09, DOC-15, MCP-08 | 5 | T2 |
+| 12. Brokerage and Capital-Gain Chain | Week 3 | DOC-06, DOC-07, DOC-13, TAX-07, TAX-08, TAX-11, TAX-15 | 7 | T2 |
+| 13. The 65+ Profile and Schedules | Week 3 | TAX-09, TAX-10, TAX-12, TAX-13, TAX-14 | 5 | T2 |
+| 14. Acceptance | Week 4 | EXEC-13, PROV-04, PROV-05 | 3 | T2 |
+| 15. Realism Polish and Upstream | Week 5 | MCP-09, DOC-16, TAX-17, PROV-06, PROV-08 | 5 | T3 |
+
+**Cut line.** Phases 1-10 constitute a defensible v1 - the scope guard (TAX-16) is what
+makes a partial 1040 honest rather than quietly wrong. Phases 11-13 complete the declared
+taxpayer profile, and Phase 14's acceptance test cannot pass without them: a 65+ TY2025
+return that omits Schedule 1-A is structurally wrong, not merely incomplete. See
+ROADMAP.md "Scope Honesty and the Cut Line".
 
 ---
 *Scoped 2026-08-03 from PROJECT.md, todo/plan.md, and the research corpus. Tier labels
