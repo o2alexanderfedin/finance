@@ -170,10 +170,20 @@ infrastructure, so the finance-specific work is domain logic, not plumbing:
 | `fjs/media/revision` | The `vnd.fjs.revision` blob format and its validation |
 | `fjs/effects` | `Effect<O,T>` as data plus the runners that interpret it — `effects/node` (real process), `effects/mock` (`run(o)`, honoring only the effects handler `o` implements) |
 
-**What is genuinely net-new:** document parsers (fjs `media` knows only `json`, `html`,
-and `revision` — no financial formats exist), the report/tax computation programs,
-per-year tax parameter data, the finance-specific MCP tools and RTTI schemas, and the
-script execution path.
+**What is genuinely net-new:** document parsers (as of 0.40.0 fjs `media` carries `json`,
+`html`, `revision`, `nix`, and `type` — no financial formats exist), the report/tax
+computation programs, per-year tax parameter data, the finance-specific MCP tools and
+RTTI schemas, and the script execution path.
+
+**`fjs/media/type` is worth a look before building ingestion** — it arrived in 0.40.0 and
+nothing in the plan accounts for it yet. It does magic-byte MIME detection: `detect` is a
+pure table lookup over a `Vec`'s leading bytes returning a MIME type or `null`, with
+`detectStream` as the byte-accepting streaming counterpart. The ingestion path currently
+assumes the agent asserts what an uploaded document is; this would let the server derive
+it from the bytes instead — relevant to storing raw PDF bytes and to deciding which
+`vnd.fjs.*` dialect a document should narrow into. Being a pure table lookup, it also
+costs nothing to adopt. (`fjs/media/nix`, the other 0.40.0 addition, is a Nix expression
+eDSL and is irrelevant here.)
 
 **Program execution is half-built already.** There is no "evaluate this FunctionalScript
 source" module in fjs — `fjs/fsc` covers compile workflows and `fjs/djs` transpiles data,
