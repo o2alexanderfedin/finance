@@ -118,9 +118,6 @@ fjs/todo/upstream-*.md — known fjs gaps awaiting an upstream fix (Week 5 queue
 .github/workflows/node.js.yml — CI: npm ci && npm test on Node 26
 ```
 
-Dependencies are `functionalscript` (runtime) and `typescript` (typecheck only) — the
-entire approved set; see Constraints.
-
 `npm test` passes (1 test, exit 0), `tsc` is clean, and both `npm start` and
 `npm run fjs-start` print `hello world!`.
 
@@ -279,10 +276,9 @@ supersede rather than overwrite.
     is also the Week 5 upstreaming queue. Two are open already
     ([`match`](../fjs/todo/upstream-match-partial-operation-map.md), [media dialect
     registry](../fjs/todo/upstream-media-dialect-registry.md)).
-- **Typing**: JSDoc comments only, validated by TypeScript 7 with `noEmit`. No `.ts`
-  source files. `tsconfig.json` is maximally strict (`strict`,
-  `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, `noUnusedLocals`,
-  `noUnusedParameters`, `noPropertyAccessFromIndexSignature`, `verbatimModuleSyntax`).
+- **Typing**: JSDoc comments only, validated by TypeScript with `noEmit`. No `.ts` source
+  files. `tsconfig.json` is maximally strict and is the record of which flags — don't
+  relax one to silence an error.
   Per AGENTS.md: do not relax flags to silence errors.
 - **Testing**: fjs Emergent Testing. Any `.f.js` may export a `proof` — a tree of
   zero-argument functions; a leaf passes if it doesn't throw, and leaves under a `throw`
@@ -317,14 +313,14 @@ supersede rather than overwrite.
   encoding plus a dialect tag. Name the dialect `vnd.fjs.<name>`; the media type derives
   from it as `application/vnd.fjs.<name>+json` (see `fjs/media/revision/module.f.js`,
   where `dialect = 'vnd.fjs.revision'` yields `application/vnd.fjs.revision+json`).
-- **Dependencies**: `functionalscript` at runtime, `typescript` for typechecking — and
-  **nothing else may be added to `dependencies` or `devDependencies` without approval from
-  all owners** (AGENTS.md `## Requirements`). A governance rule, not only a technical one:
-  the decision is not a contributor's to make, so an unapproved dependency is a blocker
-  regardless of merit. It rarely binds, because a missing *generic* capability is a reason
-  to release a new fjs version and a missing app-specific one is a reason to write it here
-  — and a third-party parser would break the purity model besides. Chiefly relevant to
-  document parsing, where reaching for an existing library is the obvious temptation.
+- **Dependencies**: nothing may be added to `dependencies` or `devDependencies` without
+  approval from all owners (AGENTS.md `## Requirements`); `package.json` is the record of
+  what is approved. A governance rule, not only a technical one: the decision is not a
+  contributor's to make, so an unapproved dependency is a blocker regardless of merit. It
+  rarely binds, because a missing *generic* capability is a reason to release a new fjs
+  version and a missing app-specific one is a reason to write it here — and a third-party
+  parser would break the purity model besides. Chiefly relevant to document parsing, where
+  reaching for an existing library is the obvious temptation.
 - **Correctness**: Tax math must be exact. Beware floating-point on currency and the
   `Number.isSafeInteger` bound that `fjs/media/revision` already enforces on generations.
 
@@ -348,7 +344,7 @@ supersede rather than overwrite.
 | Follow `fjs/mcp` `casMcpServer` as the server template | A complete working CAS+Evo MCP server already exists in the dependency; the finance server is that pattern plus domain tools | — Pending |
 | Specs/issues as MarkDown in `**/todo/` | Keeps the specification next to the code it describes, versioned with it, readable by both humans and agents with no tracker to sync (AGENTS.md `## File conventions`) | — Pending |
 | New formats use the `vnd.fjs.<name>` dialect convention | One naming rule for every format we add, matching `vnd.fjs.revision`, so media types derive mechanically as `application/vnd.fjs.<name>+json` (AGENTS.md `## File conventions`) | — Pending |
-| No third-party `dependencies`/`devDependencies` without approval from all owners | Keeps the dependency surface a deliberate, owner-level decision rather than an implementation detail settled in a commit. Reinforces the purity model and the "release a new fjs version instead" rule, but stands on its own as governance: approved set is `functionalscript` + `typescript` (AGENTS.md `## Requirements`) | — Standing |
+| No third-party `dependencies`/`devDependencies` without approval from all owners | Keeps the dependency surface a deliberate, owner-level decision rather than an implementation detail settled in a commit. Reinforces the purity model and the "release a new fjs version instead" rule, but stands on its own as governance — the decision belongs to the owners, not to whoever is writing the commit (AGENTS.md `## Requirements`) | — Standing |
 | FJS gaps may be worked around locally, but never silently | A workaround must not block progress, and must not be forgotten either; each one gets an `fjs/todo/upstream-*.md` file recording the gap, the local workaround, and the intended upstream fix — which doubles as the Week 5 upstreaming queue (AGENTS.md `## Requirements`) | — Standing |
 | Defer PDF parsing; store raw bytes in v1 | No PDF library in fjs; writing one would dominate v1 and blocks nothing else — storage and versioning can be proven end-to-end without it | — Pending |
 | Defer what-if to v2 | v1 must first compute one real 1040 correctly; scenarios are worthless on top of an unverified engine. Revisited after PR #1: with agent-authored programs, a scenario may need no feature work at all — the deferral now covers only shipping it as a named, tested capability | — Pending |
