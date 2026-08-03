@@ -44,7 +44,7 @@ a new report is a new program, not new engine code.
 - [ ] Exactly one document format first (e.g. `vnd.fjs.1099`), not a family — additional
       types (W-2, 1099-DIV, …) come later, per `todo/plan.md` Week 3
 - [ ] An OCR format — the intermediate the vision pass emits before it is narrowed into a
-      specific document type (open question 4: stored artifact or transient step)
+      specific document type (open question 3: stored artifact or transient step)
 - [ ] Parse structured exports (CSV / OFX / QFX) — *not in the five-week plan*; retained
       as a requirement but unscheduled, since vision-to-dialect covers v1 ingestion
 - [ ] Execute agent-authored FunctionalScript programs in content-addressable space —
@@ -298,20 +298,36 @@ All four must hold:
 Owned by [`todo/plan.md`](../todo/plan.md) — listed here only where they affect this
 document's claims. Do not answer them here; answer them there and update this file.
 
+**Numbering is `todo/plan.md`'s and must stay that way.** Both that file and
+`fjs/todo/implement-mcp-server.md` cite questions by number ("see open question 2",
+"plan open question 5"), so renumbering here silently breaks references in documents this
+file does not own.
+
 1. **Tax scope** — jurisdiction, year, forms, and whether the output is authoritative or a
    reviewed estimate. The only genuinely unbounded item; it drives Weeks 2–3 and decides
    how much of the "Compute a full line-by-line 1040" requirement is really v1.
-2. **`fjs_run` result disposition** — returned inline, or written back to CAS and answered
+2. **Evo subject model** — one subject per uploaded document with parsed representations
+   as revisions, and what the naming scheme is. Annoying to change once documents exist,
+   so it wants deciding before Track B ships. Cited by `todo/plan.md` Week 1 step 7.
+3. **OCR format** — is the raw vision output a stored artifact in its own right, or a
+   transient step? The auditability rationale in Core Value argues for storing it: it is
+   the record of what the model actually saw, before interpretation.
+4. **Deadline and definition of done** — whether an external date drives the five weeks.
+5. **`fjs_run` result disposition** — returned inline, or written back to CAS and answered
    with a hash? **Blocking for the execution boundary above:** it decides whether the
    whitelist includes CAS *writes*. Writing results back is what would make Success
    Criterion 3 (every number traces to a source) structural rather than best-effort.
-3. **Evo subject model** — one subject per uploaded document with parsed representations
-   as revisions, and what the naming scheme is. Annoying to change once documents exist,
-   so it wants deciding before Track B ships.
-4. **OCR format** — is the raw vision output a stored artifact in its own right, or a
-   transient step? The auditability rationale in Core Value argues for storing it: it is
-   the record of what the model actually saw, before interpretation.
-5. **Deadline and definition of done** — whether an external date drives the five weeks.
+   Cited three times by `fjs/todo/implement-mcp-server.md` — the most referenced open
+   question in the corpus, and the one to answer first.
+
+Additionally, owned by [`fjs/todo/implement-mcp-server.md`](../fjs/todo/implement-mcp-server.md)
+and decidable during implementation — recorded here so they are not lost, not to be
+answered here:
+
+- Does `fjs_run` take arguments for the program beyond the hash?
+- Reuse `casConfig`, or declare our own server identity?
+- Is the program's entry point `main` (matching `fjs run`), or something narrower that
+  cannot express a long-running effect like `forever`?
 
 ## Evolution
 
