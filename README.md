@@ -1,25 +1,36 @@
 # Finance
 
-## Goal
+A user uploads their financial documents to a personal CAS, then uses ChatGPT (or any
+other MCP client) to compute tax and other financial reports over them.
 
-The main target is that a user is able to upload their documents to a personal CAS and then use ChatGPT (or other clients) to compute tax and other financial reports.
+The agent does **not** produce the numbers itself. It writes a
+[FunctionalScript](https://github.com/functionalscript/functionalscript) program that
+computes the report, and the MCP server executes that program in content-addressable
+space — so every figure is reproducible, reviewable, and traceable to the hash of the
+document it came from.
 
-MVP:
-- store financial documents in CAS (using Evo objects, see FunctionalScript repo).
-- parse documents
-- compute taxes for specified year.
-- ChatGPT (or other agent) shouldn't form financial reports directly, it should create a FunctionalScript program that computes the report. It means the MCP server should support execution of FunctionalScript in content-addressable space. As the first implementation, the MCP server will use Node (or other JavaScript engine) to execute the scripts. Later, `fjs` should replace it. We should also define Effects for CAS.
+Built for personal use, on top of the `fjs` CAS, Evo, and MCP modules.
 
-## Conventions And Technical Principles
+Status: **early.** The repo is a working FunctionalScript skeleton; the MCP server is
+specified but not yet implemented.
 
-### FunctionalScript
+## Documentation
 
-As contributors and owners of [FunctionalScript](https://github.com/functionalscript/functionalscript) we will use it and our code should be mostly `fjs/*.f.js` files. Consider FunctionalScript as an open source part of the project, we update and release a new version of FunctionalScript at any time. For example, if we need a new Node effect.
+| Document | What it covers |
+|---|---|
+| [AGENTS.md](./AGENTS.md) | Conventions, file layout, code style, testing, and commands — start here to work in the repo |
+| [.planning/PROJECT.md](./.planning/PROJECT.md) | *Why* and *what* — intent, requirements, constraints, decisions, success criteria |
+| [todo/plan.md](./todo/plan.md) | *When* — settled decisions, the five-week critical path, and the open questions |
+| [fjs/todo/implement-mcp-server.md](./fjs/todo/implement-mcp-server.md) | *How* — the MCP server spec: assembly, `fjs_run`, and the restricted runner |
 
-### Specifications And Issues
+Specifications and issues live as MarkDown in `**/todo/` directories next to the code they
+concern; there is no separate tracker.
 
-Keep specifications, issues, bug reports, feature requests etc in `**/todo/` directories as MarkDown files, e.g. `./fjs/todo/implement-mcp-server.md`
+## Commands
 
-### New File Formats
+```
+npm test   # tsc, then all FunctionalScript proofs via node --test
+npm start  # run the app
+```
 
-Currently, FunctionalScript declares at least one new format [Revision](https://github.com/functionalscript/functionalscript/blob/main/fjs/media/revision/README.md). Use the same principles to define new format: JSON, dialect. Name the dialect `vnd.fjs.<name>`; the media type derives from it as `application/vnd.fjs.<name>+json` — as `vnd.fjs.revision` yields `application/vnd.fjs.revision+json`.
+See [AGENTS.md](./AGENTS.md) for the full list.

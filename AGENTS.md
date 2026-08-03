@@ -16,8 +16,10 @@
 - TypeScript is used to validate the typing without emitting.
 - We use FunctionalScript to run tests.
 - Use FunctionalScript itself as much as possible instead of writing new plain-JS/TS logic.
+- **We are contributors and owners of FunctionalScript.** Treat it as an open-source part of this project, not a third-party dependency: we can update it and release a new version at any time — for example, if we need a new Node effect. This is why a missing generic capability is a reason to release a new fjs version, never a reason to add a third-party dependency or write app-specific glue here.
 - If FunctionalScript is missing something generic (a reusable helper, not app-specific logic), add it into this repo as a separate file/directory, so it can be moved into FunctionalScript later.
-- If you find a bug in FunctionalScript, tell the user so they can fix it and release a new FJS version — don't just work around it silently in this repo.
+- If you find a bug or a gap in FunctionalScript, tell the user so they can fix it and release a new FJS version — don't just work around it silently in this repo.
+- `functionalscript` is the only runtime dependency. Adding a third-party parser or helper would break the purity model.
 
 ## File conventions
 
