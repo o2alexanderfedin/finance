@@ -144,10 +144,13 @@ Two requirements:
    the single most common failure mode (an agent writing a program that reaches
    for the network) is undebuggable.
 
-Requirement 2 is a genuine gap in FunctionalScript, not something to work around
-locally — `match` has no notion of a partial map. Worth raising upstream once
-the shape is known; the AGENTS.md rule is to report FJS gaps rather than paper
-over them.
+Requirement 2 is a genuine gap in FunctionalScript — `match` has no notion of a
+partial map. Per AGENTS.md, working around it here is fine and should not block
+Week 1; what is not fine is doing so silently. The gap is recorded in
+[upstream-match-partial-operation-map.md](./upstream-match-partial-operation-map.md),
+which also carries the candidate upstream shapes. Update that file with whatever
+the local workaround turns out to be — it is the thing that gets upstreamed in
+Week 5.
 
 ### Known limitation: import-time execution
 

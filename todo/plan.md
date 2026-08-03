@@ -73,6 +73,7 @@ Goal: **the full path works on the user's own documents.**
 ## Week 5 (Technical Debt)
 
 - Upstream whatever has stabilized into FunctionalScript (per AGENTS.md staging rule) — most likely the CAS effects, and `fjs_run` if its shape has settled.
+- **Work the `fjs/todo/upstream-*.md` queue.** Every FJS bug or gap worked around locally has a file there stating the gap, the workaround, and the intended upstream fix; this is where they get fixed upstream, released, and the local workarounds deleted. Open at the start of Week 1: [`upstream-match-partial-operation-map.md`](../fjs/todo/upstream-match-partial-operation-map.md) (blocking a clean refusal message from the restricted runner) and [`upstream-media-dialect-registry.md`](../fjs/todo/upstream-media-dialect-registry.md) (blocks `fjs/media` detection of our document types; may be wanted as early as Week 3).
 - Revisit execution safety: validating source as genuine FunctionalScript before `import()`, and/or Worker isolation with hard limits. Week 1 deliberately defers both.
 - Whatever the first four weeks accumulated.
 
