@@ -7,3 +7,4 @@
 - JSDoc comments are used for strong typing.
 - TypeScript is used to validate the typing without emitting.
 
+
