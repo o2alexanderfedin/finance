@@ -360,15 +360,24 @@ file does not own.
    Criterion 3 (every number traces to a source) structural rather than best-effort.
    Cited three times by `fjs/todo/implement-mcp-server.md` — the most referenced open
    question in the corpus, and the one to answer first.
+6. **`fjs_run` entry point convention** — what a stored report program exports, and with
+   what signature. Promoted from the implementation-detail list below: it is not a naming
+   choice. `main` is `(options) => Effect<NodeOp, number>`, and `NodeOp` includes
+   `Fetch`/`Http`/`Fs`/`Forever`, so a program typed that way *declares* the very
+   operations the whitelist denies. A signature shaped `(args) => Effect<CasOp, T>` would
+   instead put the execution boundary in the type, making the runner's runtime refusal a
+   backstop rather than the sole defense — which bears directly on the sandbox constraint
+   above. Downstream of question 5 (it fixes `T` and whether writes are in `CasOp`), and
+   expensive to revisit once programs are stored, since each blob is frozen against the
+   convention in force when it was written.
 
 Additionally, owned by [`fjs/todo/implement-mcp-server.md`](../fjs/todo/implement-mcp-server.md)
 and decidable during implementation — recorded here so they are not lost, not to be
 answered here:
 
-- Does `fjs_run` take arguments for the program beyond the hash?
+- Does `fjs_run` take arguments for the program beyond the hash? (Overlaps question 6 —
+  the argument shape is half of that signature.)
 - Reuse `casConfig`, or declare our own server identity?
-- Is the program's entry point `main` (matching `fjs run`), or something narrower that
-  cannot express a long-running effect like `forever`?
 
 ## Evolution
 
