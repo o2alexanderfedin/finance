@@ -277,9 +277,8 @@ supersede rather than overwrite.
     ([`match`](../fjs/todo/upstream-match-partial-operation-map.md), [media dialect
     registry](../fjs/todo/upstream-media-dialect-registry.md)).
 - **Typing**: JSDoc comments only, validated by TypeScript with `noEmit`. No `.ts` source
-  files. `tsconfig.json` is maximally strict and is the record of which flags — don't
-  relax one to silence an error.
-  Per AGENTS.md: do not relax flags to silence errors.
+  files. `tsconfig.json` is maximally strict and is the record of which flags are set;
+  per AGENTS.md, don't relax one to silence an error.
 - **Testing**: fjs Emergent Testing. Any `.f.js` may export a `proof` — a tree of
   zero-argument functions; a leaf passes if it doesn't throw, and leaves under a `throw`
   key must throw. `all.test.js` auto-discovers them, so `node --test` picks up new tests
