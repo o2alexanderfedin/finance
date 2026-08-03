@@ -6,5 +6,4 @@
 - The files can be used as normal ESM files.
 - JSDoc comments are used for strong typing.
 - TypeScript is used to validate the typing without emitting.
-
-
+- We use FunctionalScript to run tests.
