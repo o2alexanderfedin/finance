@@ -105,7 +105,12 @@ a new report is a new program, not new engine code.
 - **Business / self-employment tax** (Schedule C, depreciation, quarterly estimates) —
   personal income tax only.
 - **Multi-user / multi-client operation** — personal use, so no auth, tenancy isolation,
-  or liability surface.
+  or liability surface. **⚠️ Under review:** the definition of done in
+  [issue #16](https://github.com/fjs-dev/finance/issues/16#issuecomment-5171851184) says
+  "multiple users can add their raw documents to CAS." If that means one deployment
+  serving several people rather than several people each running their own, this entry is
+  wrong and the execution boundary below becomes a v1 blocker. Tracked as `todo/plan.md`
+  open question 7 — do not treat this exclusion as settled until it is answered.
 - **Filing or transmission** — the output is numbers to transcribe, not an e-filed
   return.
 
@@ -391,6 +396,13 @@ document's claims. Do not answer them here; answer them there and update this fi
 "plan open question 5"), so renumbering here silently breaks references in documents this
 file does not own.
 
+A separate register lives in [issue #16](https://github.com/fjs-dev/finance/issues/16) —
+open questions and *unverified assumptions* from the research pass behind #14 (scope
+versus schedule, unread worksheets, contradicted Tax Table band widths, thin-evidence
+assumptions). Different in kind from the list below: these are design decisions, those are
+research facts nobody has checked. Sergey's answers there settled question 4 and raised
+question 7.
+
 1. **Tax scope** — jurisdiction, year, forms, and whether the output is authoritative or a
    reviewed estimate. The only genuinely unbounded item; it drives Weeks 2–3 and decides
    how much of the "Compute a full line-by-line 1040" requirement is really v1.
@@ -400,7 +412,12 @@ file does not own.
 3. **OCR format** — is the raw vision output a stored artifact in its own right, or a
    transient step? The auditability rationale in Core Value argues for storing it: it is
    the record of what the model actually saw, before interpretation.
-4. **Deadline and definition of done** — whether an external date drives the five weeks.
+4. ~~**Deadline and definition of done**~~ — **answered** in
+   [issue #16](https://github.com/fjs-dev/finance/issues/16#issuecomment-5171851184): five
+   weeks, externally driven. Reports are **updated as new Evo revisions** when one already
+   exists for that year and user — so reports get the same versioning as documents, which
+   is a requirement this document did not previously state. Scope stays a deliberately
+   small subset, narrowed during development with a running covered/not-covered list.
 5. **`fjs_run` result disposition** — returned inline, or written back to CAS and answered
    with a hash? **Blocking for the execution boundary above:** it decides whether the
    whitelist includes CAS *writes*. Writing results back is what would make Success
@@ -417,6 +434,15 @@ file does not own.
    above. Downstream of question 5 (it fixes `T` and whether writes are in `CasOp`), and
    expensive to revisit once programs are stored, since each blob is frozen against the
    convention in force when it was written.
+7. **Single user, or multiple?** — raised by the same
+   [issue #16 answer](https://github.com/fjs-dev/finance/issues/16#issuecomment-5171851184)
+   that settled question 4, and it **contradicts** the Out of Scope entry above and the
+   Key Decision "stdio only, single local user". If "multiple users" means one deployment
+   serving several people, then per-user isolation, auth, and a real fix for import-time
+   execution all enter v1 scope — and the accepted `import()` limitation stops being a
+   Week 5 revisit. If it means several people each running their own personal CAS and
+   server, nothing changes. **Answer before Track A**: it decides whether the restricted
+   runner is sufficient or merely the first of two layers.
 
 Additionally, owned by [`fjs/todo/implement-mcp-server.md`](../fjs/todo/implement-mcp-server.md)
 and decidable during implementation — recorded here so they are not lost, not to be
