@@ -9,13 +9,9 @@
     // See also https://aka.ms/tsconfig/module
     "module": "nodenext",
     "target": "esnext",
-    "types": [],
+    "types": ["node"],
     "allowJs": true,
     "checkJs": true,
-    // For nodejs:
-    // "lib": ["esnext"],
-    // "types": ["node"],
-    // and npm install -D @types/node
 
     // Other Outputs
     "noEmit": true,
@@ -47,5 +43,8 @@
     "noUncheckedSideEffectImports": true,
     "moduleDetection": "force",
     "skipLibCheck": true,
-  }
+  },
+  // Source files live under .fjs/, a dot-directory that the default "**/*"
+  // include would silently skip.
+  "include": [".fjs/**/*"]
 }

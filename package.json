@@ -11,16 +11,17 @@
     "url": "git+https://github.com/fjs-dev/finance.git"
   },
   "type": "module",
-  "main": "index.js",
+  "main": ".fjs/index.js",
   "scripts": {
-    "test": "tsc && node --test",
-    "start": "node index.js",
-    "fjs-start": "fjs r ./index.f.js"
+    "test": "tsc && node --test .fjs/all.test.js",
+    "start": "node .fjs/index.js",
+    "fjs-start": "fjs r ./.fjs/index.f.js"
   },
   "dependencies": {
     "functionalscript": "^0.39.0"
   },
   "devDependencies": {
+    "@types/node": "^26.1.2",
     "typescript": "^7.0.2"
   }
 }
