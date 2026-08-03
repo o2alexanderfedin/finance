@@ -2,7 +2,7 @@
 
 ## Settled Decisions
 
-Established 2026-08-03. These constrain everything below.
+These constrain everything below.
 
 | Area | Decision |
 |---|---|
@@ -40,7 +40,9 @@ Step 3 is the real work; 1 and 4 are assembly over existing FunctionalScript exp
 
 **Track B — document ingestion**
 
-5. **One document format**, as a `vnd.fjs.*` JSON dialect following the [Revision](https://github.com/functionalscript/functionalscript/blob/main/fjs/media/revision/README.md) precedent. Exactly one type to start (e.g. `vnd.fjs.1099`), not a family.
+5. **The document base format**, as a `vnd.fjs.*` JSON dialect following the [Revision](https://github.com/functionalscript/functionalscript/blob/main/fjs/media/revision/README.md) precedent. Every document type shares one base — `{ "dialect": "vnd.fjs.<name>", … }` — with `dialect` as the type discriminant, exactly as `vnd.fjs.revision` does it. Week 1 implements one concrete type on that base (e.g. `vnd.fjs.1099`); designing the base for the family up front is what lets Week 3 add types without reopening it.
+
+   Each type's fields beyond `dialect` are an **fjs RTTI schema**, mirroring `revisionSchema` in `fjs/media/revision`: schema first, TypeScript type derived from it as `Ts<typeof schema>`, and a separate semantic check for the refinements RTTI cannot express structurally (as `checkReferences` sits beside `revisionSchema`). Since an RTTI `Struct` is just a string map of types, the base is spread into each type — `{ ...base('vnd.fjs.1099'), ...fields }` — rather than needing schema inheritance the type system doesn't have.
 6. **The OCR format** — the intermediate the agent's vision pass emits, before it is narrowed into a specific document type. Open question: whether this is a distinct stored artifact or just a transient step.
 7. **Ingestion loop.** Agent reads the document by vision → emits the dialect → stores via `evo_add` under the agreed subject model (see open question 2).
 
@@ -58,7 +60,7 @@ Start with a single unambiguous aggregate before anything involving brackets, de
 
 ## Week 3
 
-Goal: **breadth in documents.** Additional `vnd.fjs.*` types beyond the first (W-2, 1099-DIV, …), and the multi-document, multi-form aggregation the real question requires. Whatever the tax scope decision demands.
+Goal: **breadth in documents.** Additional `vnd.fjs.*` types on the Week 1 base (W-2, 1099-DIV, …), and the multi-document, multi-form aggregation the real question requires. Whatever the tax scope decision demands. If a new type forces a change to the base, that is a signal the base was under-designed in Week 1 — worth noting rather than absorbing silently.
 
 ## Week 4
 
@@ -83,3 +85,4 @@ Proposed defaults below are suggestions, not decisions.
 3. **OCR format.** Is the raw vision output a stored artifact in its own right (auditable: what the model actually saw, before interpretation), or a transient step that only the narrowed `vnd.fjs.*` document persists from? The auditability rationale argues for storing it.
 4. **Deadline and definition of done.** Is an external date driving five weeks, or is it a self-imposed cadence? What must be demonstrably working for the MVP to count?
 5. **`fjs_run` result disposition.** Return the result inline, or write it back to CAS (possibly as an Evo revision) and return its hash? Writing it back gives a permanent audit trail and suits the stated rationale; returning inline is simpler and lets `fjs_run` stay read-only over CAS.
+6. **`fjs_run` entry point convention.** What does a stored report program export, and with what signature? FunctionalScript names entry points by role — `proof` for tests, `main` for Node CLI programs (`(options) => Effect<NodeOp, number>`) — so a report program is a third role. Reusing `main` buys CLI runnability for debugging, but its signature returns an exit code, takes CLI options we have no use for, and is typed over `NodeOp`, which includes `Fetch`/`Http`/`Fs`/`Forever` — the very operations the restricted runner denies. *Proposed default: a distinct name with a signature shaped `(args) => Effect<CasOp, T>`, so the whitelist is expressed in the type rather than only enforced at runtime.* Downstream of question 5, which fixes `T` and whether writes are in `CasOp`. Expensive to change later: every program already stored in CAS follows whatever convention was current when it was written. Detail in [fjs/todo/implement-mcp-server.md](../fjs/todo/implement-mcp-server.md).
