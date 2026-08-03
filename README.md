@@ -1,11 +1,8 @@
 # Finance
 
-## Requirements
+## Goal
 
-- All source files are [FunctionalScript](https://github.com/functionalscript/functionalscript) files with an extension `.f.js`. Except these two files:
-  - [./index.js](./index.js), used to start the app,
-  - [./all.test.js](./all.test.js), used to initialize FunctionalScript Emergent Testing Framework.
-- The files can be used as normal ESM files.
-- JSDoc comments are used for strong typing.
-- TypeScript is used to validate the typing without emitting.
-- We use FunctionalScript to run tests.
+The main target is an MCP server that interacts with CAS. The agent that uses the MCP server should be able to:
+- store financial documents in CAS (using Evo objects, see FunctionalScript repo).
+- parse documents
+- compute taxes for specified year.
