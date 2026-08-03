@@ -4,7 +4,7 @@
 
 We should find a critical path and implement it. Some elements:
 
-- Running the MCP.
+- Running the MCP (local, stdio).
 - Parsing documents and storing parsed information in the MCP.
   - OCR format
   - Specific document type. For example, `vnd.fjs.1099`.
