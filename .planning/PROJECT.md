@@ -213,8 +213,8 @@ supersede rather than overwrite.
 - **Testing**: fjs Emergent Testing. Any `.f.js` may export a `proof` — a tree of
   zero-argument functions; a leaf passes if it doesn't throw, and leaves under a `throw`
   key must throw. `all.test.js` auto-discovers them, so `node --test` picks up new tests
-  with no registration. Helpers in `fjs/asserts`: `assert`, `assertEq`,
-  `assertNotNullish`, `todo`.
+  with no registration. Helpers in `functionalscript/fjs/asserts`: `assert`, `assertEq`,
+  `assertNotNullish`, `todo` — upstream, not a directory in our own `fjs/`.
 - **Style**: Never use `l` as an identifier. Import types with a top-level
   `@import { Name } from '...'` JSDoc, not inline `@type {import('...')...}`. Never nest
   steps — bind each link to its own name so chains read top-to-bottom; use `historyStep`
@@ -236,15 +236,15 @@ supersede rather than overwrite.
   permanent design — the input chain is *untrusted document → LLM → generated program →
   execution*, so if the audience ever widens past one local user, it is a blocker, not a
   cleanup task.
-- **Specs and issues live in `todo/` directories** (from README `## Conventions`):
+- **Specs and issues live in `todo/` directories** (from README `## Conventions And Technical Principles`):
   specifications, issues, bug reports, and feature requests are MarkDown files under
   `**/todo/`, next to the code they concern — e.g. `./fjs/todo/implement-mcp-server.md`.
-- **New formats follow the `revision` pattern** (from README `## Conventions`): JSON
+- **New formats follow the `revision` pattern** (from README `## Conventions And Technical Principles`): JSON
   encoding plus a dialect tag. Name the dialect `vnd.fjs.<name>`; the media type derives
   from it as `application/vnd.fjs.<name>+json` (see `fjs/media/revision/module.f.js`,
   where `dialect = 'vnd.fjs.revision'` yields `application/vnd.fjs.revision+json`).
 - **Dependencies**: `functionalscript` only. Adding a third-party parser would break the
-  purity model and the FunctionalScript constraint. Corollary from README `## Conventions`:
+  purity model and the FunctionalScript constraint. Corollary from README `## Conventions And Technical Principles`:
   we own fjs, so a missing generic capability is a reason to release a new fjs version —
   not a reason to add a dependency or write app-specific glue here.
 - **Correctness**: Tax math must be exact. Beware floating-point on currency and the
@@ -268,8 +268,8 @@ supersede rather than overwrite.
 | All three amendment kinds use one mechanism | Corrected source docs, 1040-X returns, and user corrections are all "new revision, old as parent" — one model, not three | — Pending |
 | Traceability is a storage-layer property | If every extracted value carries the CAS hash it came from, line-by-line provenance is structural, not a reporting feature bolted on afterward | — Pending |
 | Follow `fjs/cas/mcp` `casMcpServer` as the server template | A complete working CAS+Evo MCP server already exists in the dependency; the finance server is that pattern plus domain tools | — Pending |
-| Specs/issues as MarkDown in `**/todo/` | Keeps the specification next to the code it describes, versioned with it, readable by both humans and agents with no tracker to sync (README `## Conventions`) | — Pending |
-| New formats use the `vnd.fjs.<name>` dialect convention | One naming rule for every format we add, matching `vnd.fjs.revision`, so media types derive mechanically as `application/vnd.fjs.<name>+json` (README `## Conventions`) | — Pending |
+| Specs/issues as MarkDown in `**/todo/` | Keeps the specification next to the code it describes, versioned with it, readable by both humans and agents with no tracker to sync (README `## Conventions And Technical Principles`) | — Pending |
+| New formats use the `vnd.fjs.<name>` dialect convention | One naming rule for every format we add, matching `vnd.fjs.revision`, so media types derive mechanically as `application/vnd.fjs.<name>+json` (README `## Conventions And Technical Principles`) | — Pending |
 | Defer PDF parsing; store raw bytes in v1 | No PDF library in fjs; writing one would dominate v1 and blocks nothing else — storage and versioning can be proven end-to-end without it | — Pending |
 | Defer what-if to v2 | v1 must first compute one real 1040 correctly; scenarios are worthless on top of an unverified engine. Revisited after PR #1: with agent-authored programs, a scenario may need no feature work at all — the deferral now covers only shipping it as a named, tested capability | — Pending |
 | Generic helpers written to be upstreamable into fjs | AGENTS.md policy: anything reusable and non-app-specific belongs in its own file/directory so it can move into FunctionalScript later. Affects where parsers and numeric utilities live from day one | — Pending |

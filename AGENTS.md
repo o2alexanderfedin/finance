@@ -6,9 +6,11 @@
 
 ## Requirements
 
-- All source files live under [./fjs/](./fjs/) and are [FunctionalScript](https://github.com/functionalscript/functionalscript) files with an extension `.f.js`. Except these two root-level files, which are plain (impure) JS by necessity:
+- All source files live under [./fjs/](./fjs/) and are [FunctionalScript](https://github.com/functionalscript/functionalscript) files with an extension `.f.js`. The only exceptions are root-level entry points that are plain (impure) JS by necessity — keep this set as small as possible, currently:
   - [./index.js](./index.js), used to start the app,
   - [./all.test.js](./all.test.js), used to initialize FunctionalScript Emergent Testing Framework.
+
+  [./fjs/todo/implement-mcp-server.md](./fjs/todo/implement-mcp-server.md) plans one more: the impure entry point that `claude mcp add` launches. Anything beyond a launcher belongs in a `.f.js` module that the launcher calls.
 - The files can be used as normal ESM files.
 - JSDoc comments are used for strong typing.
 - TypeScript is used to validate the typing without emitting.
@@ -21,6 +23,8 @@
 
 - `tsconfig.json` is configured maximally strict (`strict`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, `noUnusedLocals/Parameters`, etc.). Keep new code passing under it; don't relax flags to silence errors.
 - The entry point's pure logic lives in `index.f.js` and exports a `main` typed as `NodeProgram`.
+- Specifications, issues, bug reports, and feature requests are MarkDown files in a `todo/` directory next to the code they concern — e.g. [./fjs/todo/implement-mcp-server.md](./fjs/todo/implement-mcp-server.md). Project-level planning lives in [./todo/plan.md](./todo/plan.md). Write the spec there before implementing; don't open a tracker.
+- New file formats follow the [Revision](https://github.com/functionalscript/functionalscript/blob/main/fjs/media/revision/README.md) precedent: JSON plus a dialect tag. Name the dialect `vnd.fjs.<name>`, which yields the media type `application/vnd.fjs.<name>+json`.
 
 ## Code style
 

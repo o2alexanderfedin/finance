@@ -42,7 +42,7 @@ The last two are deliberate Week 1 deferrals, revisited in Week 5.
 | Effect runner | `asyncRun(operationMap)` — `fjs/effects/module.js` |
 
 FunctionalScript's own assembly, for reference —
-[`fjs/cas/mcp/module.f.js:245`](../../node_modules/functionalscript/fjs/cas/mcp/module.f.js):
+[`fjs/cas/mcp/module.f.js:245`](https://github.com/functionalscript/functionalscript/blob/main/fjs/cas/mcp/module.f.js):
 
 ```js
 export const casMcpHandlers = home => cacheKey => fromRegistry([
