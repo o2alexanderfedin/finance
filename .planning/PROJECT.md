@@ -151,16 +151,27 @@ The same PR added a conventions section to README.md — later renamed
 `## Conventions And Technical Principles`, and since removed. Those conventions now live
 in AGENTS.md, which is what agents actually load, and are reflected in Constraints below.
 
-**Where the planning lives.** Three documents, deliberately not overlapping — keep each
-fact in exactly one of them:
+**Where the planning lives.** Three planning documents, deliberately not overlapping —
+keep each fact in exactly one of them:
 
 | Document | Owns |
 |---|---|
 | `.planning/PROJECT.md` (this file) | *Why* and *what* — intent, requirements, constraints, decisions, success criteria |
 | [`todo/plan.md`](../todo/plan.md) | *When* — settled decisions, the five-week critical path, and the project-level open questions |
 | [`fjs/todo/implement-mcp-server.md`](../fjs/todo/implement-mcp-server.md) | *How*, for Week 1 Track A — server assembly, `fjs_run`, the restricted runner, what to reuse from fjs |
+
+Two supporting files sit outside that split and are not planning documents:
+
+| File | Role |
+|---|---|
 | [`AGENTS.md`](../AGENTS.md) | *How to work here* — conventions, file layout, code style, testing, commands. The only one agents load automatically |
-| [`README.md`](../README.md) | A brief description and links to the four above. Deliberately holds no facts of its own, so nothing here can go stale |
+| [`README.md`](../README.md) | The front door: a short description of the project and links to the documents above |
+
+README necessarily restates the project description this file owns — that is what a README
+is for. Keep it to that: a paraphrase short enough that it stays true as details change,
+and links for everything else. Anything with a specific, checkable value — status, file
+layout, commands, conventions — belongs in the owning document and is linked to, not
+copied, so there is never a second copy to drift.
 
 Both `todo/` documents arrived in PR #1 (`f57fd50`). Where this file and `todo/plan.md`
 disagreed on execution safety, `todo/plan.md` won — it is the more concrete and more

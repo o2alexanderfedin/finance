@@ -9,10 +9,8 @@ computes the report, and the MCP server executes that program in content-address
 space — so every figure is reproducible, reviewable, and traceable to the hash of the
 document it came from.
 
-Built for personal use, on top of the `fjs` CAS, Evo, and MCP modules.
-
-Status: **early.** The repo is a working FunctionalScript skeleton; the MCP server is
-specified but not yet implemented.
+Built for personal use, on top of the `fjs` CAS, Evo, and MCP modules. Early — see the
+documents below for what is settled, what is planned, and what is still open.
 
 ## Documentation
 
@@ -22,15 +20,3 @@ specified but not yet implemented.
 | [.planning/PROJECT.md](./.planning/PROJECT.md) | *Why* and *what* — intent, requirements, constraints, decisions, success criteria |
 | [todo/plan.md](./todo/plan.md) | *When* — settled decisions, the five-week critical path, and the open questions |
 | [fjs/todo/implement-mcp-server.md](./fjs/todo/implement-mcp-server.md) | *How* — the MCP server spec: assembly, `fjs_run`, and the restricted runner |
-
-Specifications and issues live as MarkDown in `**/todo/` directories next to the code they
-concern; there is no separate tracker.
-
-## Commands
-
-```
-npm test   # tsc, then all FunctionalScript proofs via node --test
-npm start  # run the app
-```
-
-See [AGENTS.md](./AGENTS.md) for the full list.
