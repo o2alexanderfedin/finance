@@ -133,8 +133,9 @@ that the agent authors *programs* rather than answers — which is why "execute
 FunctionalScript in CAS" is now a first-class MVP requirement above, and why "other
 financial reports" became reachable without new engine code.
 
-The same PR added `## Conventions And Technical Principals` to README.md; those
-conventions are folded into Constraints below.
+The same PR added the conventions section to README.md — since renamed
+`## Conventions And Technical Principles`; those conventions are folded into Constraints
+below and into AGENTS.md, which is what agents actually load.
 
 **Where the planning lives.** Three documents, deliberately not overlapping — keep each
 fact in exactly one of them:
@@ -192,8 +193,11 @@ supersede rather than overwrite.
 
 ## Constraints
 
-- **Layout**: All FunctionalScript source lives under `fjs/`. Only `index.js` and
-  `all.test.js` stay at the root, and they are the only impure files.
+- **Layout**: All FunctionalScript source lives under `fjs/`. The only exceptions are
+  root-level entry points that must be plain impure JS — `index.js` and `all.test.js`
+  today, plus the MCP server launcher that `claude mcp add` will invoke
+  (`fjs/todo/implement-mcp-server.md`). Keep that set as small as possible: anything
+  beyond a launcher belongs in a `.f.js` module the launcher calls.
 - **Language**: All source is FunctionalScript (`.f.js`) — pure, no side effects, ESM.
   Effects are data (`Effect<O,T>` descriptions interpreted by a runner), never direct
   actions.
