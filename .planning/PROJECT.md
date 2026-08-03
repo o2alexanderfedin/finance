@@ -181,8 +181,10 @@ honest account, and Constraints below were corrected to match it.
 `map[command]` is `undefined` for an absent operation, so it throws
 `TypeError: map[command] is not a function` rather than reporting a refusal. That makes
 the single most likely failure mode — an agent writing a program that reaches for the
-network — undebuggable. Per AGENTS.md this is reported upstream rather than worked around
-locally, once the shape is known.
+network — undebuggable. Per AGENTS.md, working around it locally is fine so long as the
+workaround is recorded rather than silent; tracked in
+[`fjs/todo/upstream-match-partial-operation-map.md`](../fjs/todo/upstream-match-partial-operation-map.md)
+for upstreaming.
 
 **What fjs already provides.** `functionalscript@0.40.0` ships most of the
 infrastructure, so the finance-specific work is domain logic, not plumbing:
@@ -228,10 +230,12 @@ irrelevant here.)
 `decodeText`/`mediaType` from `fjs/media/revision` directly and performs exactly one
 check, so `vnd.fjs.revision` is the only dialect it can ever recognize — its own docstring
 says "currently just `vnd.fjs.revision`", so growth is anticipated but unimplemented.
-Nothing lets a downstream package contribute a dialect. Per AGENTS.md this is an fjs
-change (take a list of dialect decoders, fall through when none match), not local glue —
-the same disposition as the `match` gap above. Not Week 1 blocking: our own validation
-does not need `detect`, which matters only for classifying a blob of unknown provenance.
+Nothing lets a downstream package contribute a dialect. The fix belongs upstream (take a
+list of dialect decoders, fall through when none match) — same disposition as the `match`
+gap above, and tracked in
+[`fjs/todo/upstream-media-dialect-registry.md`](../fjs/todo/upstream-media-dialect-registry.md).
+Not Week 1 blocking: our own validation does not need `detect`, which matters only for
+classifying a blob of unknown provenance.
 
 **Program execution is half-built already.** There is no "evaluate this FunctionalScript
 source" module in fjs — `fjs/fsc` covers compile workflows and `fjs/djs` transpiles data,

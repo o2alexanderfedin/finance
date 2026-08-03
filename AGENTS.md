@@ -18,7 +18,7 @@
 - Use FunctionalScript itself as much as possible instead of writing new plain-JS/TS logic.
 - **We are contributors and owners of FunctionalScript.** Treat it as an open-source part of this project, not a third-party dependency: we can update it and release a new version at any time — for example, if we need a new Node effect. This is why a missing generic capability is a reason to release a new fjs version, never a reason to add a third-party dependency or write app-specific glue here.
 - If FunctionalScript is missing something generic (a reusable helper, not app-specific logic), add it into this repo as a separate file/directory, so it can be moved into FunctionalScript later.
-- If you find a bug or a gap in FunctionalScript, tell the user so they can fix it and release a new FJS version — don't just work around it silently in this repo.
+- If you find a bug or a gap in FunctionalScript, tell the user so they can fix it and release a new FJS version. A local workaround is fine — it should not block progress — but it must never be *silent*: whenever you work around an FJS bug or gap, also write a todo file recording it, named `fjs/todo/upstream-<short-name>.md`. State what is missing or broken, the workaround in place here, and what the upstream fix should look like. These are the candidates to upstream and delete once a new FJS version ships (see [./todo/plan.md](./todo/plan.md) Week 5).
 - `functionalscript` is the only runtime dependency. Adding a third-party parser or helper would break the purity model.
 
 ## File conventions
