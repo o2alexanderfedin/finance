@@ -15,7 +15,7 @@
   "scripts": {
     "test": "tsc && node --test",
     "start": "node index.js",
-    "fjs-start": "fjs r ./index.f.js"
+    "fjs-start": "fjs r ./fjs/index.f.js"
   },
   "dependencies": {
     "functionalscript": "^0.39.0"
