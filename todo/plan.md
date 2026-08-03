@@ -41,6 +41,8 @@ Step 3 is the real work; 1 and 4 are assembly over existing FunctionalScript exp
 **Track B — document ingestion**
 
 5. **The document base format**, as a `vnd.fjs.*` JSON dialect following the [Revision](https://github.com/functionalscript/functionalscript/blob/main/fjs/media/revision/README.md) precedent. Every document type shares one base — `{ "dialect": "vnd.fjs.<name>", … }` — with `dialect` as the type discriminant, exactly as `vnd.fjs.revision` does it. Week 1 implements one concrete type on that base (e.g. `vnd.fjs.1099`); designing the base for the family up front is what lets Week 3 add types without reopening it.
+
+   Each type's fields beyond `dialect` are an **fjs RTTI schema**, mirroring `revisionSchema` in `fjs/media/revision`: schema first, TypeScript type derived from it as `Ts<typeof schema>`, and a separate semantic check for the refinements RTTI cannot express structurally (as `checkReferences` sits beside `revisionSchema`). Since an RTTI `Struct` is just a string map of types, the base is spread into each type — `{ ...base('vnd.fjs.1099'), ...fields }` — rather than needing schema inheritance the type system doesn't have.
 6. **The OCR format** — the intermediate the agent's vision pass emits, before it is narrowed into a specific document type. Open question: whether this is a distinct stored artifact or just a transient step.
 7. **Ingestion loop.** Agent reads the document by vision → emits the dialect → stores via `evo_add` under the agreed subject model (see open question 2).
 

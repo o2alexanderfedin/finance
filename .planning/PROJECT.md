@@ -45,6 +45,11 @@ a new report is a new program, not new engine code.
       "vnd.fjs.<name>", … }`, with `dialect` as the type discriminant, matched as an exact
       literal so structural validation alone rejects another type's blob (the
       `vnd.fjs.revision` precedent)
+- [ ] Each type's remaining fields defined as an **fjs RTTI schema**, following
+      `revisionSchema`: the schema is the single source of truth and the TypeScript type is
+      derived from it via `Ts<typeof schema>` — never declared twice. Refinements RTTI
+      cannot express structurally (currency exactness, date forms, cbase32 hashes) go in a
+      separate semantic check, as `checkReferences` is separate from `revisionSchema`
 - [ ] One concrete type implemented first (e.g. `vnd.fjs.1099`) — a scheduling choice, not
       a format constraint. The base is designed for a family from the start; further types
       (W-2, 1099-DIV, …) land per `todo/plan.md` Week 3 without reopening it
@@ -180,15 +185,36 @@ infrastructure, so the finance-specific work is domain logic, not plumbing:
 computation programs, per-year tax parameter data, the finance-specific MCP tools and
 RTTI schemas, and the script execution path.
 
-**`fjs/media/type` is worth a look before building ingestion** — it arrived in 0.40.0 and
-nothing in the plan accounts for it yet. It does magic-byte MIME detection: `detect` is a
-pure table lookup over a `Vec`'s leading bytes returning a MIME type or `null`, with
-`detectStream` as the byte-accepting streaming counterpart. The ingestion path currently
-assumes the agent asserts what an uploaded document is; this would let the server derive
-it from the bytes instead — relevant to storing raw PDF bytes and to deciding which
-`vnd.fjs.*` dialect a document should narrow into. Being a pure table lookup, it also
-costs nothing to adopt. (`fjs/media/nix`, the other 0.40.0 addition, is a Nix expression
-eDSL and is irrelevant here.)
+**`fjs/media` is worth a look before building ingestion** — it arrived in 0.40.0 and
+nothing in the plan accounts for it yet. It is two layers:
+
+- `fjs/media/type` — magic-byte MIME detection. `detectVec` is a pure table lookup over a
+  `Vec`'s leading bytes; `detectStream` is the byte-accepting streaming counterpart. No
+  notion of JSON dialects.
+- `fjs/media` (root) — *dialect-aware* detection layered on top. When `fjs/media/type`
+  says a whole buffered `Vec` is valid UTF-8 text, it JSON-parses it and validates against
+  a known dialect's rtti schema, reporting that dialect's media type on a match and
+  falling through unchanged otherwise. Detection is **semantic, not syntactic**: any JSON
+  satisfying the schema is recognized regardless of key order or whitespace — there is
+  deliberately no `{"dialect":` prefix shortcut.
+
+This is the layer our document types belong in. It also bounds itself naturally: dialect
+detection only runs on a single already-buffered `Vec` (capped at 128 KiB, the same bound
+as inline content), because validation needs the whole parsed value; the unbounded
+`detectStream` stays dialect-unaware.
+
+Relevant to storing raw PDF bytes, and to deciding which `vnd.fjs.*` dialect a document
+narrows into. (`fjs/media/nix`, the other 0.40.0 addition, is a Nix expression eDSL and is
+irrelevant here.)
+
+**Upstream gap: `fjs/media` `detect` has no dialect registry.** It imports
+`decodeText`/`mediaType` from `fjs/media/revision` directly and performs exactly one
+check, so `vnd.fjs.revision` is the only dialect it can ever recognize — its own docstring
+says "currently just `vnd.fjs.revision`", so growth is anticipated but unimplemented.
+Nothing lets a downstream package contribute a dialect. Per AGENTS.md this is an fjs
+change (take a list of dialect decoders, fall through when none match), not local glue —
+the same disposition as the `match` gap above. Not Week 1 blocking: our own validation
+does not need `detect`, which matters only for classifying a blob of unknown provenance.
 
 **Program execution is half-built already.** There is no "evaluate this FunctionalScript
 source" module in fjs — `fjs/fsc` covers compile workflows and `fjs/djs` transpiles data,
