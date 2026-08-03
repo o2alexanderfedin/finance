@@ -76,9 +76,40 @@ Open: whether the result is returned inline or written back to CAS and answered
 with its hash (plan open question 5). This changes whether `fjs_run` needs CAS
 *write* access at all, so resolve it before implementing.
 
-The program's entry point convention should match `fjs run`'s: a module
-exporting `main`. Reusing that convention means a program is runnable both
-through the MCP tool and directly from the CLI, which matters for debugging.
+### Entry point convention — open
+
+**Open, and it is not just a naming choice** (plan open question 6). FunctionalScript
+names an entry point after its *role*, one signature per role:
+
+| Role | Export | Shape |
+|---|---|---|
+| Test | `proof` | a value tree of thunks, walked by Emergent Testing; throws to fail |
+| Node CLI program | `main` | `(options: NodeProgramOptions) => Effect<NodeOp, number>` |
+
+Report programs are a third role, so on that precedent they get a third name rather than
+borrowing one. `fjs r` resolves `main` literally — `step(import_(file), x =>
+unwrap(x).main({ ...options, args }))` in `fjs/module.f.js:46` — so reusing the name
+buys CLI runnability for debugging, which is the one real argument for it.
+
+Against it, `main`'s signature is wrong for us in both directions:
+
+- **It returns an exit code.** `Program<O> = (options) => Effect<O, number>`. We want the
+  computed report back, not a `number`.
+- **`NodeProgram` is `Program<NodeOp>`, and `NodeOp` includes `Fetch | Http | Fs |
+  Sandbox | Forever | Import`** — precisely what the restricted runner exists to deny. A
+  program typed `NodeProgram` *declares* it may reach the network.
+- **`NodeProgramOptions` is CLI furniture** — `args`, `env`, `home`, `std`,
+  `testContext`, `engine`. None of it applies.
+
+The useful half is that `Program<O>` is already generic in exactly the dimension we care
+about — the operation set. An entry point shaped `(args) => Effect<CasOp, T>`, with
+`CasOp` the whitelist, **puts the sandbox in the type**: `tsc` rejects a program reaching
+for `fetch` before it is ever stored, and the runner's runtime refusal becomes a backstop
+rather than the only defense. It also settles the `forever` sub-question structurally,
+since `Forever` is a `NodeOp` and simply would not be in `CasOp`.
+
+Deciding this needs open question 5 resolved first (result disposition fixes `T`, and
+whether writes are in `CasOp`).
 
 ### The restricted runner
 
@@ -155,12 +186,15 @@ Blocking:
 
 - **Result disposition** (plan open question 5) — determines whether the
   whitelist includes CAS writes.
+- **Entry point convention** (plan open question 6) — its name and its
+  signature, per [the section above](#entry-point-convention--open). Downstream
+  of question 5, and expensive to change once programs are stored in CAS, since
+  every stored blob follows whatever convention was current when it was written.
 
 Non-blocking, decide during implementation:
 
-- Does `fjs_run` take arguments for the program beyond the hash?
+- Does `fjs_run` take arguments for the program beyond the hash? (Overlaps the
+  entry point question — the argument shape *is* half of that signature.)
 - Reuse `casConfig`, or declare our own server identity? Our own is probably
   right, since this is not FunctionalScript's server, but it costs nothing to
   start with `casConfig`.
-- Is the program's entry point `main` (matching `fjs run`), or something
-  narrower that cannot express a long-running effect like `forever`?
