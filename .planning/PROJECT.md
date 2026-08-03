@@ -38,14 +38,24 @@ a new report is a new program, not new engine code.
       `casMcpServer` pattern
 - [ ] Store financial documents in CAS as Evo objects (subject + revision + snapshot)
 - [ ] Store raw PDF statement bytes without parsing them
-- [ ] Parse structured exports (CSV / OFX / QFX)
-- [ ] Parse tax forms (1099, W-2, K-1) from structured input
-- [ ] Accept agent-supplied JSON as an extracted-document input
+- [ ] Accept agent-supplied JSON as an extracted-document input — the settled v1
+      ingestion path (agent vision reads the document → emits a `vnd.fjs.*` dialect →
+      stored via `evo_add`)
+- [ ] Exactly one document format first (e.g. `vnd.fjs.1099`), not a family — additional
+      types (W-2, 1099-DIV, …) come later, per `todo/plan.md` Week 3
+- [ ] An OCR format — the intermediate the vision pass emits before it is narrowed into a
+      specific document type (open question 4: stored artifact or transient step)
+- [ ] Parse structured exports (CSV / OFX / QFX) — *not in the five-week plan*; retained
+      as a requirement but unscheduled, since vision-to-dialect covers v1 ingestion
 - [ ] Execute agent-authored FunctionalScript programs in content-addressable space —
       the MCP server runs the program, the agent does not compute reports directly
 - [ ] Define Effects for CAS — the effect vocabulary an executed program may express
-- [ ] Executed programs reach the outside world *only* through CAS effects — no
-      filesystem, network, or process access
+- [ ] Restricted runner: an `OperationMap` holding only whitelisted CAS/Evo operations,
+      driven by `asyncRun` — a program requesting `fetch`/`readFile` finds no entry
+- [ ] Unknown operations fail as a clean, reported error (`operation not permitted:
+      fetch`), not the raw `TypeError` that `match` produces today
+- [ ] An `fjs_run` MCP tool: `{ hash }` → read blob → `import()` → call entry point →
+      interpret under the restricted runner → return the result
 - [ ] Node (or another JavaScript engine) as the first script runner, replaceable by
       `fjs` later without changing the programs it runs
 - [ ] Tax-year parameters (brackets, standard deduction, thresholds) stored as data,
@@ -60,10 +70,14 @@ a new report is a new program, not new engine code.
 
 ### Out of Scope
 
-- **PDF text extraction** — deferred to a later milestone. v1 stores raw PDF bytes in
-  CAS; nothing parses them. There is no PDF library in fjs, and writing one (xref
-  tables, object streams, FlateDecode, font encodings) is a project in its own right
-  that would dominate v1.
+- **PDF text extraction *in code*** — still out, and now permanently rather than
+  "deferred." There is no PDF library in fjs and writing one (xref tables, object
+  streams, FlateDecode, font encodings) would dominate v1. **Superseded in effect:**
+  `todo/plan.md` settles OCR as *the agent's own vision* — it reads the document and
+  emits structured JSON, which is stored back through CAS/Evo. So v1 does extract
+  document content; no code we write parses a PDF to get it. This is what makes the
+  "accept agent-supplied JSON as an extracted-document input" requirement central rather
+  than a fallback.
 - **"What if" scenario modeling as a named feature** — deferred to v2. Note that program
   execution largely dissolves this: a scenario is just another agent-authored program
   over branched inputs, so there may be nothing left to "build." v1 ships no scenario
@@ -88,6 +102,8 @@ index.js          — impure launcher: run(main) from functionalscript/fjs/effec
 all.test.js       — Emergent Testing bootstrap for node --test
 fjs/index.f.js    — pure main, typed as NodeProgram
 fjs/proof.f.js    — a passing proof: assert(2 + 2 === 4)
+todo/plan.md      — settled decisions, five-week critical path, open questions
+fjs/todo/implement-mcp-server.md — Week 1 Track A spec (not implemented)
 .github/workflows/node.js.yml — CI: npm ci && npm test on Node 26
 ```
 
@@ -119,6 +135,26 @@ financial reports" became reachable without new engine code.
 
 The same PR added `## Conventions And Technical Principals` to README.md; those
 conventions are folded into Constraints below.
+
+**Where the planning lives.** Three documents, deliberately not overlapping — keep each
+fact in exactly one of them:
+
+| Document | Owns |
+|---|---|
+| `.planning/PROJECT.md` (this file) | *Why* and *what* — intent, requirements, constraints, decisions, success criteria |
+| [`todo/plan.md`](../todo/plan.md) | *When* — settled decisions, the five-week critical path, and the project-level open questions |
+| [`fjs/todo/implement-mcp-server.md`](../fjs/todo/implement-mcp-server.md) | *How*, for Week 1 Track A — server assembly, `fjs_run`, the restricted runner, what to reuse from fjs |
+
+Both `todo/` documents arrived in PR #1 (`f57fd50`). Where this file and `todo/plan.md`
+disagreed on execution safety, `todo/plan.md` won — it is the more concrete and more
+honest account, and Constraints below were corrected to match it.
+
+**Known upstream fjs gap.** `match` has no notion of a partial `OperationMap`:
+`map[command]` is `undefined` for an absent operation, so it throws
+`TypeError: map[command] is not a function` rather than reporting a refusal. That makes
+the single most likely failure mode — an agent writing a program that reaches for the
+network — undebuggable. Per AGENTS.md this is reported upstream rather than worked around
+locally, once the shape is known.
 
 **What fjs already provides.** `functionalscript@0.39.0` ships most of the
 infrastructure, so the finance-specific work is domain logic, not plumbing:
@@ -183,14 +219,23 @@ supersede rather than overwrite.
   `@import { Name } from '...'` JSDoc, not inline `@type {import('...')...}`. Never nest
   steps — bind each link to its own name so chains read top-to-bottom; use `historyStep`
   when a later link needs an earlier link's value.
-- **Execution boundary** (from the MVP's script-execution requirement): agent-authored
-  programs are pure FunctionalScript, so their only reach into the world is the effects
-  the runner chooses to honor. The runner honors CAS effects and nothing else — no
-  filesystem, network, or process access. This matters because the input chain is
-  *untrusted document → LLM → generated program → execution*: a prompt-injected statement
-  from a bank or brokerage is the realistic attack, and personal-use scope lowers the
-  stakes without removing them. Node is an implementation detail behind that boundary,
-  not an escape from it — do not reach for `eval`/`vm` with ambient globals.
+- **Execution boundary** — governs the *effect layer only*. A FunctionalScript program
+  returns a description of its effects; `match` dispatches each one through an
+  `OperationMap` (`fjs/effects/module.f.js:282`). Restricting a program is therefore
+  exactly "build a map holding only the permitted operations" — a program asking for
+  `fetch` or `readFile` finds no entry, so nothing needs intercepting or patching. The
+  v1 map holds CAS/Evo operations only.
+- **`import()` is outside that boundary — a known, accepted v1 hole.** `todo/plan.md`
+  settles on unrestricted Node via `import()`, which executes a blob's top-level module
+  body with full Node privileges *before* any effect is interpreted. An empty operation
+  map does not stop a module that calls `fs.rmSync` at module scope. Genuine
+  FunctionalScript modules are side-effect-free by construction, but nothing verifies
+  that for an arbitrary blob out of CAS. Accepted for Week 1 **only** because the sole
+  user is trusted and local; `todo/plan.md` Week 5 revisits it, most plausibly by parsing
+  the source with `djs/parser` before importing. This must not silently become the
+  permanent design — the input chain is *untrusted document → LLM → generated program →
+  execution*, so if the audience ever widens past one local user, it is a blocker, not a
+  cleanup task.
 - **Specs and issues live in `todo/` directories** (from README `## Conventions`):
   specifications, issues, bug reports, and feature requests are MarkDown files under
   `**/todo/`, next to the code they concern — e.g. `./fjs/todo/implement-mcp-server.md`.
@@ -212,7 +257,11 @@ supersede rather than overwrite.
 | The agent emits a program, not an answer | A generated number is opaque and unverifiable; a generated program is reviewable, re-runnable, diffable, and storable in CAS next to its result. This is what makes an LLM acceptable in front of tax math (PR #1) | — Pending |
 | MCP server executes FunctionalScript in content-addressable space | Follows from the above — something must run the emitted program, and running it over CAS keeps inputs, program, and output in one addressable space (PR #1) | — Pending |
 | Node first as the script runner, `fjs` later | Ships the capability without waiting on `fjs` to become self-hosting; the runner is swappable because the programs it runs are unchanged either way (PR #1) | — Pending |
-| Executed programs get CAS effects only | fjs effects are data interpreted by a runner, so the runner *is* the sandbox — an effects-only boundary costs nothing to build and closes the untrusted-document → LLM → execution path | — Pending |
+| Executed programs get CAS/Evo effects only | fjs effects are data interpreted by a runner, so the runner *is* the sandbox — an effects-only whitelist costs nothing to build because `match` already dispatches through an `OperationMap` | — Pending |
+| Unrestricted Node `import()` accepted for v1, despite the above | `import()` runs a blob's module body before any effect is interpreted, so the whitelist does not cover it. Taken knowingly: sole user is trusted and local, and closing it properly (source validation or Worker isolation) would dominate Week 1 (`todo/plan.md`) | — Pending, revisit Week 5 |
+| stdio only, single local user | No HTTP, no auth, no hosting, no per-user isolation — the deployment model that makes the `import()` limitation tolerable (`todo/plan.md`) | — Pending |
+| OCR is the agent's own vision, not an engine | The agent reads the document and emits structured JSON, stored back through CAS/Evo. No OCR library, no third-party service — consistent with the functionalscript-only dependency rule (`todo/plan.md`) | — Pending |
+| Our own MCP server composing fjs registries | `casToolRegistry` + `evoToolRegistry` + ours, via exported `fromRegistry`/`mcpStep`/`stdioTransport`. Everything needed is already exported, so no fork and no fjs release is required to iterate | — Pending |
 | Tax engine is a pure function of documents + year parameters | Makes what-if additive rather than a rewrite; makes every computation reproducible and testable as a `proof` | — Pending |
 | Tax-year parameters stored as data, not code | Adding a future year costs no engine changes; supports multi-year out of the box | — Pending |
 | Scenarios modeled as Evo branches (v2), designed for in v1 | A what-if is a revision branched off a head that never merges; multiple heads *are* competing scenarios, with provenance for free — nothing new to build later if v1 models documents this way | — Pending |
@@ -240,6 +289,26 @@ All four must hold:
    executed it, and re-running that stored program over the same documents reproduces
    the same report exactly. No line of the report is an LLM-authored number.
 
+## Open Questions
+
+Owned by [`todo/plan.md`](../todo/plan.md) — listed here only where they affect this
+document's claims. Do not answer them here; answer them there and update this file.
+
+1. **Tax scope** — jurisdiction, year, forms, and whether the output is authoritative or a
+   reviewed estimate. The only genuinely unbounded item; it drives Weeks 2–3 and decides
+   how much of the "Compute a full line-by-line 1040" requirement is really v1.
+2. **`fjs_run` result disposition** — returned inline, or written back to CAS and answered
+   with a hash? **Blocking for the execution boundary above:** it decides whether the
+   whitelist includes CAS *writes*. Writing results back is what would make Success
+   Criterion 3 (every number traces to a source) structural rather than best-effort.
+3. **Evo subject model** — one subject per uploaded document with parsed representations
+   as revisions, and what the naming scheme is. Annoying to change once documents exist,
+   so it wants deciding before Track B ships.
+4. **OCR format** — is the raw vision output a stored artifact in its own right, or a
+   transient step? The auditability rationale in Core Value argues for storing it: it is
+   the record of what the model actually saw, before interpretation.
+5. **Deadline and definition of done** — whether an external date drives the five weeks.
+
 ## Evolution
 
 This document evolves at phase transitions and milestone boundaries.
@@ -258,5 +327,7 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-08-03 — merged PR #1 "Update the MVP." (`c7a9cce`): agent-authored
-programs, script execution in CAS, and the README conventions section.*
+*Last updated: 2026-08-03 — reconciled with `todo/plan.md` and
+`fjs/todo/implement-mcp-server.md` after PR #1 merged (`78f8f55`). Corrected the execution
+boundary: the `OperationMap` whitelist governs effects only, and `import()` runs outside
+it. Recorded OCR-by-vision, which supersedes the PDF-parsing deferral in practice.*
