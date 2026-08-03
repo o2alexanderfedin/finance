@@ -11,7 +11,7 @@
     "phase_branch_template": "feature/phase-{phase}-{slug}",
     "milestone_branch_template": "feature/{milestone}-{slug}",
     "quick_branch_template": "feature/{phase}-{name}",
-    "use_git_flow": true
+    "use_git_flow": false
   },
   "workflow": {
     "research": true,
