@@ -62,15 +62,22 @@ from that one property.
 ## Context
 
 **Existing code.** The repo is a working FunctionalScript hello-world skeleton at commit
-`662aa9e`: `index.f.js` (pure `main` typed as `NodeProgram`), `index.js` (impure
-launcher), `all.test.js` (Emergent Testing bootstrap), and `proof.f.js` (a deliberately
-failing `throw "not implemented"` placeholder — a red test marking the TDD starting
-line). `npm test` currently exits 1 because of it; `tsc` passes clean and `npm start`
-prints `hello world!`.
+`89e1128`. All FunctionalScript source lives under `fjs/`; only two impure files sit at
+the root:
 
-**The goal statement.** The `## Goal` section of README.md — the authoritative statement
-of intent that this document is built from — exists only on a collaborator's machine and
-has not been pushed to `origin/main` as of initialization. It reads:
+```
+index.js          — impure launcher: run(main) from functionalscript/fjs/effects/node/module.js
+all.test.js       — Emergent Testing bootstrap for node --test
+fjs/index.f.js    — pure main, typed as NodeProgram
+fjs/proof.f.js    — a passing proof: assert(2 + 2 === 4)
+.github/workflows/node.js.yml — CI: npm ci && npm test on Node 26
+```
+
+`npm test` passes (1 test, exit 0), `tsc` is clean, and both `npm start` and
+`npm run fjs-start` print `hello world!`.
+
+**The goal statement.** The `## Goal` section of README.md is the authoritative statement
+of intent that this document is built from (commit `a03b454`). It reads:
 
 > The main target is an MCP server that interacts with CAS. The agent that uses the MCP
 > server should be able to: store financial documents in CAS (using Evo objects, see
@@ -103,9 +110,19 @@ supersede rather than overwrite.
 
 ## Constraints
 
+- **Layout**: All FunctionalScript source lives under `fjs/`. Only `index.js` and
+  `all.test.js` stay at the root, and they are the only impure files.
 - **Language**: All source is FunctionalScript (`.f.js`) — pure, no side effects, ESM.
-  Only `index.js` and `all.test.js` are exempt. Effects are data (`Effect<O,T>`
-  descriptions interpreted by a runner), never direct actions.
+  Effects are data (`Effect<O,T>` descriptions interpreted by a runner), never direct
+  actions.
+- **Upstream-first** (from AGENTS.md, and load-bearing for how this project is built):
+  - Use FunctionalScript itself as much as possible rather than writing new plain-JS/TS
+    logic.
+  - If fjs is missing something *generic* — a reusable helper, not app-specific logic —
+    add it to this repo as a separate file/directory so it can be moved upstream into
+    FunctionalScript later. This directly shapes where parsers and numeric helpers live.
+  - If you find a bug in FunctionalScript, **tell the user** so it can be fixed and a new
+    fjs version released. Do not silently work around it here.
 - **Typing**: JSDoc comments only, validated by TypeScript 7 with `noEmit`. No `.ts`
   source files. `tsconfig.json` is maximally strict (`strict`,
   `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, `noUnusedLocals`,
@@ -137,6 +154,8 @@ supersede rather than overwrite.
 | Follow `fjs/cas/mcp` `casMcpServer` as the server template | A complete working CAS+Evo MCP server already exists in the dependency; the finance server is that pattern plus domain tools | — Pending |
 | Defer PDF parsing; store raw bytes in v1 | No PDF library in fjs; writing one would dominate v1 and blocks nothing else — storage and versioning can be proven end-to-end without it | — Pending |
 | Defer what-if to v2 | v1 must first compute one real 1040 correctly; scenarios are worthless on top of an unverified engine | — Pending |
+| Generic helpers written to be upstreamable into fjs | AGENTS.md policy: anything reusable and non-app-specific belongs in its own file/directory so it can move into FunctionalScript later. Affects where parsers and numeric utilities live from day one | — Pending |
+| git-flow with `main`/`develop`, protected by a pre-commit hook | Direct commits to `main` and `develop` are blocked; all work goes through `feature/*`, `release/*`, `hotfix/*`, `bugfix/*` | — Pending |
 
 ## Success Criteria
 
