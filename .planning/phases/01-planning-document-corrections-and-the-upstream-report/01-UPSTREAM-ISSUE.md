@@ -67,7 +67,12 @@ console.log('verdict:', guardedOwn(map2)('__defineGetter__', 'pwned', () => {})[
 console.log('polluted:', Object.hasOwn(map2, 'pwned'))
 ```
 
-Actual output, run on `functionalscript@0.40.0`:
+The script is standalone — it imports nothing, and demonstrates the property-lookup
+semantics `match` relies on rather than calling `match` itself. `match` has no guard at
+all (`map[command](...payload)` dispatches directly), so `__defineGetter__` reaches it
+unconditionally; the `in` / `!== undefined` arms below are what a caller would plausibly
+add in front of `match` to build a whitelist, and they do not close it. Actual output on
+Node:
 
 ```
 guard behaviour on a PLAIN-OBJECT whitelist
