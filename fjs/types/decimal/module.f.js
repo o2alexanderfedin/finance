@@ -49,8 +49,15 @@ const decimalPattern = /^(-)?(\d+)(?:\.(\d+))?$/
  * @type {(scale: number) => (s: string) => bigint}
  */
 export const parse = scale => s => {
-    void scale; void s; void decimalPattern; void assertNotNullish
-    throw 'not implemented'
+    const m = decimalPattern.exec(s)
+    assert(m !== null, 'not a decimal number: ' + s)
+    const [, sign, intPart, fracPart] = m
+    const intDigits = assertNotNullish(intPart, 'not a decimal number: ' + s)
+    const frac = fracPart ?? ''
+    assert(frac.length <= scale, 'more than ' + scale + ' fractional digits: ' + s)
+    const padded = frac.padEnd(scale, '0')
+    const magnitude = BigInt(intDigits) * 10n ** BigInt(scale) + (padded === '' ? 0n : BigInt(padded))
+    return sign === '-' ? -magnitude : magnitude
 }
 
 /**
@@ -61,8 +68,12 @@ export const parse = scale => s => {
  * @type {(scale: number) => (n: bigint) => string}
  */
 export const format = scale => n => {
-    void scale; void n
-    throw 'not implemented'
+    const sign = n < 0n ? '-' : ''
+    const magnitude = n < 0n ? -n : n
+    const digits = magnitude.toString().padStart(scale + 1, '0')
+    return scale === 0
+        ? sign + digits
+        : sign + digits.slice(0, digits.length - scale) + '.' + digits.slice(digits.length - scale)
 }
 
 // ── Tests ────────────────────────────────────────────────────────────────────
