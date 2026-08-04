@@ -236,7 +236,7 @@ infrastructure, so the finance-specific work is domain logic, not plumbing:
 | `fjs/protocol/mcp/stdio` | `stdioTransport` — read→parse→dispatch→write loop, testable against mock stdin/stdout with no real process |
 | `fjs/cas` | `FileCas` — streaming SHA-2 content store, 128 KiB chunks, lock-free staging writes |
 | `fjs/cas/evo` | Evo — subjects and revision heads (a DAG) cached over the CAS |
-| `fjs/mcp` | `casMcpServer(home)` — a complete working seven-tool CAS+Evo MCP server (`cas_add`, `cas_get`, `cas_list`, `evo_list`, `evo_head`, `evo_revision`, `evo_add`), with its tool registries at `fjs/mcp/cas` and `fjs/mcp/evo`. **This is the template to follow.** |
+| `fjs/mcp` | `casMcpServer(home)` — a complete working seven-tool CAS+Evo MCP server (`cas_add`, `cas_get`, `cas_list`, `evo_list`, `evo_head`, `evo_revision`, `evo_add`), with its tool registries at `fjs/mcp/cas` and `fjs/mcp/evo`. **This is the template to follow.** Note as of 0.41.0 `evo_list` takes an optional `archived?: true` and lists *active* subjects by default — those with at least one non-archived head — rather than every subject; our own listing tools should follow that default rather than reinventing it. |
 | `fjs/media/revision` | The `vnd.fjs.revision` blob format and its validation |
 | `fjs/effects` | `Effect<O,T>` as data plus the runners that interpret it — `effects/node` (real process), `effects/mock` (`run(o)`, honoring only the effects handler `o` implements) |
 
