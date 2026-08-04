@@ -437,7 +437,7 @@ them. Week 0 is research's addition in front of the plan's Week 1.
 | MCP-08 | T2 | Phase 11 - Wage, Retirement, Benefit Documents | Week 3 | Pending |
 | MCP-09 | T3 | Phase 15 - Realism Polish and Upstream | Week 5 | Pending |
 | EXEC-01 | T0 | Phase 3 - The Restricted Interpreter | Week 1 | Pending |
-| EXEC-02 | T0 | Phase 3 - The Restricted Interpreter | Week 1 | Pending |
+| EXEC-02 | T0 | Delivered upstream (fjs 0.41.0, functionalscript#1419) | Week 1 | Done |
 | EXEC-03 | T0 | Phase 3 - The Restricted Interpreter | Week 1 | Pending |
 | EXEC-04 | T0 | Phase 3 - The Restricted Interpreter | Week 1 | Pending |
 | EXEC-05 | T0 | Phase 3 - The Restricted Interpreter | Week 1 | Pending |
