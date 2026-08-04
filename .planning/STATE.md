@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
-status: verifying
-stopped_at: Completed 04-02-PLAN.md
-last_updated: "2026-08-04T07:29:02.253Z"
+status: executing
+stopped_at: Completed 05-03-PLAN.md — Phase 5 complete
+last_updated: "2026-08-04T17:20:00.000Z"
 last_activity: 2026-08-04
 progress:
   total_phases: 15
-  completed_phases: 3
-  total_plans: 10
-  completed_plans: 9
-  percent: 90
+  completed_phases: 5
+  total_plans: 14
+  completed_plans: 14
+  percent: 33
 ---
 
 # Project State
@@ -22,19 +22,17 @@ See: .planning/PROJECT.md (updated 2026-08-03)
 
 **Core value:** The report is a program, not an answer — the agent emits FunctionalScript;
 the server executes it as a pure function of `(documents, tax-year parameters) → report`.
-**Current focus:** Phase 1 — Planning-Document Corrections and the Upstream Report
+**Current focus:** Phase 6 — Guest ABI Freeze and Safe Materialization (not yet planned)
 
 ## Current Position
 
-Phase: 4 of 15 (Exact Arithmetic and the Money Layering)
-Plan: 2 of 2 in current phase
-Status: Phase complete — ready for verification
+Phase: 5 of 15 complete (Document Base, Subject Model, and the First Two Dialects)
+Plan: 4 of 4 in that phase
+Status: Phase 5 complete and verified against all five success criteria; next phase not yet planned
 
-Progress: [█████████░] 90%
+Progress: [███░░░░░░░] 33% (5 of 15 phases)
 Last activity: 2026-08-04
-(Sergey: absolute no-floating-point rule, exact-decimal module as Week 1 step 6)
-
-Progress: [░░░░░░░░░░] 0%
+`npm test` 82 pass / 0 fail; `npx tsc --noEmit` clean; fjs 0.41.0.
 
 ## Performance Metrics
 
@@ -98,6 +96,21 @@ Full log in PROJECT.md Key Decisions. Recent decisions affecting current work:
 - [Phase 04-02]: parse refuses over-precision and non-numeric input via assert, never rounds/truncates/coerces
 - [Phase 04-02]: no Money/Cents wrapper type: cents are exactly what centsFromString returns, a plain bigint with no construction path that could round
 
+- [Phase 05-01]: `base` is generic (`<D extends string>`) so the dialect **literal** survives into
+  the derived type. The non-generic `(dialect: string)` form let a deliberately wrong literal pass
+  `tsc` — without the generic form, criterion 1's structural rejection is unprovable.
+
+- [Phase 05-02]: `corrected: option(true)` mirrors revision's `archived`. A `corrected: false` blob
+  is rejected structurally; absence is the only way to say "not corrected". One representation.
+
+- [Phase 05-03]: comma degrouping lives in `fjs/document/ocr_amount`, one step OUTSIDE
+  `fjs/types/decimal`, which keeps refusing `"1,234.56"`. That module is generic and staged for
+  upstreaming; comma grouping is a US printed-form presentation convention. Teaching the generic
+  parser about it would ship a locale convention upstream.
+
+- [Phase 05-03]: identity fields come from the caller's `meta`, never re-parsed from `ocr.fields`.
+  Deriving a TIN or tax year from unstructured OCR text is inference; this phase stores and reads.
+
 ### Pending Todos
 
 None yet.
@@ -148,6 +161,14 @@ None yet.
   the identical file. AGENTS.md line 51 said the opposite and is corrected. **Only ever trust
   `npm test` / `node --test all.test.js`.**
 
+- **NEW (Phase 5): `exactOptionalPropertyTypes` does NOT catch a spread carrying `undefined`.**
+  Mutating `convert` to `...{ corrected: meta.corrected }` (where `meta.corrected` is
+  `true | undefined`) passed `npx tsc --noEmit` cleanly and was caught only by a runtime proof —
+  the key was present holding `undefined`, which `'corrected' in result` sees. Every `option(...)`
+  field in every future dialect conversion depends on the conditional-spread discipline
+  (`...(x === undefined ? {} : { k: x })`), and **the compiler will not tell you when it slips.**
+  DOC-11's absent-vs-zero rule rests on this.
+
 - **NEW: the `finance-mcp` registration points at the worktree path.** After this branch merges,
   run `claude mcp remove finance-mcp -s local` and re-register against the main checkout, or a
   stale duplicate accumulates.
@@ -185,9 +206,10 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-08-04T07:29:02.231Z
-Stopped at: Completed 04-02-PLAN.md
-Resume file: None
+Last session: 2026-08-04T17:20:00.000Z
+Stopped at: Completed 05-03-PLAN.md; wrote the missing 05-04-SUMMARY.md; Phase 5 verified and
+bookkeeping synced (DOC-00/01/03/04/10/11/12/14 all marked Complete).
+Resume file: None — the Phase 5 `.continue-here.md` is now spent; next action is planning Phase 6.
 (they were one-shot artifacts, written to `feature/planning-requirements-roadmap` seven
 minutes after PR #14 merged, so they never reached `main`; nothing else on that branch is
 unmerged and it can be deleted)

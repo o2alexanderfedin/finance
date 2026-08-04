@@ -188,7 +188,7 @@ All dialects follow the `vnd.fjs.revision` precedent: JSON plus a dialect tag, t
 as an exact literal in the schema, media type derived mechanically, validation split into
 structural (RTTI) and semantic passes.
 
-- [ ] **DOC-00** *(T0)*: **One common document base shared by every type** —
+- [x] **DOC-00** *(T0)*: **One common document base shared by every type** —
       `{ "dialect": "vnd.fjs.<name>", … }` with `dialect` as an exact-literal discriminant,
       so structural validation alone rejects another type's blob. Each type's remaining
       fields are an **fjs RTTI schema** mirroring `revisionSchema`: the schema is the single
@@ -201,7 +201,7 @@ structural (RTTI) and semantic passes.
       up front is what lets later types land without reopening it**; if a new type forces a
       base change, that is a signal the base was under-designed, worth noting rather than
       absorbing silently.
-- [ ] **DOC-01** *(T0)*: Evo subject convention — the artifact chain (raw bytes → OCR →
+- [x] **DOC-01** *(T0)*: Evo subject convention — the artifact chain (raw bytes → OCR →
       typed) is rooted at the **cBase32 hash of the original artifact**; each extracted form
       instance gets its own subject keyed on `(payerTin, recipientTin, accountNumber,
       taxYear, formType)`. Human labels live inside snapshots, never in subjects. A subject
@@ -209,12 +209,12 @@ structural (RTTI) and semantic passes.
       document exists.
 - [x] **DOC-02** *(T0)*: A **project-local CAS home**, gitignored — not the shared
       `~/.cas`. There is no delete; real SSNs in a shared store cannot be taken back.
-- [ ] **DOC-03** *(T1)*: `vnd.fjs.ocr` — near-verbatim page-oriented transcription from the
+- [x] **DOC-03** *(T1)*: `vnd.fjs.ocr` — near-verbatim page-oriented transcription from the
       agent's vision pass, numbers kept as **printed strings** (`"1,234.56"`). Stored as a
       first-class artifact, not a transient step: it is the only record of what the model
       actually saw, and it lets reclassification branch without a second, nondeterministic
       vision pass.
-- [ ] **DOC-04** *(T1)*: `vnd.fjs.1099int` — typed fields, integer cents, `Number.isSafeInteger`
+- [x] **DOC-04** *(T1)*: `vnd.fjs.1099int` — typed fields, integer cents, `Number.isSafeInteger`
       guarded. The `"1,234.56" → 123456` conversion happens on exactly one revision
       boundary.
 - [ ] **DOC-05** *(T2)*: `vnd.fjs.w2` — box 12 as a list of `(code, amount)` pairs (box-12
@@ -227,14 +227,14 @@ structural (RTTI) and semantic passes.
       means "basis not reported", which is **not** zero.
 - [ ] **DOC-08** *(T2)*: `vnd.fjs.ssa1099` — required by the 65+ profile.
 - [ ] **DOC-09** *(T2)*: `vnd.fjs.1099r` — required by the 65+ profile.
-- [ ] **DOC-10** *(T1)*: Every dialect carries the **form revision**, not merely the tax
+- [x] **DOC-10** *(T1)*: Every dialect carries the **form revision**, not merely the tax
       year. Box semantics drift between revisions.
-- [ ] **DOC-11** *(T1)*: Every box is explicitly absent-able. Blank is not zero.
-- [ ] **DOC-12** *(T1)*: The `CORRECTED` checkbox is modelled as data. It is printed on the
+- [x] **DOC-11** *(T1)*: Every box is explicitly absent-able. Blank is not zero.
+- [x] **DOC-12** *(T1)*: The `CORRECTED` checkbox is modelled as data. It is printed on the
       form itself, so amendment is a read signal, not an inference.
 - [ ] **DOC-13** *(T2)*: A consolidated brokerage 1099 yields *N* typed documents from one
       PDF. One uploaded file is not one document.
-- [ ] **DOC-14** *(T1)*: Documented CLI ingestion route for artifacts over 128 KiB
+- [x] **DOC-14** *(T1)*: Documented CLI ingestion route for artifacts over 128 KiB
       (`npx functionalscript cas add`), plus a cache-refresh path so a store mutated by
       another process is visible to the running server without a restart.
 - [ ] **DOC-15** *(T2)*: A retraction story via the `archived` flag, and a decision recorded
@@ -449,21 +449,21 @@ them. Week 0 is research's addition in front of the plan's Week 1.
 | EXEC-11 | T1 | Phase 7 - `fjs_run` and Run Records | Week 1 | Pending |
 | EXEC-12 | T1 | Phase 7 - `fjs_run` and Run Records | Week 1 | Pending |
 | EXEC-13 | T2 | Phase 14 - Acceptance | Week 4 | Pending |
-| DOC-00 | T0 | Phase 5 - Document Base and First Dialects | Week 1 | Pending |
-| DOC-01 | T0 | Phase 5 - Document Base and First Dialects | Week 1 | Pending |
+| DOC-00 | T0 | Phase 5 - Document Base and First Dialects | Week 1 | Complete |
+| DOC-01 | T0 | Phase 5 - Document Base and First Dialects | Week 1 | Complete |
 | DOC-02 | T0 | Phase 2 - Server Skeleton and Registration | Week 0 | Done |
-| DOC-03 | T1 | Phase 5 - Document Base and First Dialects | Week 1 | Pending |
-| DOC-04 | T1 | Phase 5 - Document Base and First Dialects | Week 1 | Pending |
+| DOC-03 | T1 | Phase 5 - Document Base and First Dialects | Week 1 | Complete |
+| DOC-04 | T1 | Phase 5 - Document Base and First Dialects | Week 1 | Complete |
 | DOC-05 | T2 | Phase 11 - Wage, Retirement, Benefit Documents | Week 3 | Pending |
 | DOC-06 | T2 | Phase 12 - Brokerage and Capital-Gain Chain | Week 3 | Pending |
 | DOC-07 | T2 | Phase 12 - Brokerage and Capital-Gain Chain | Week 3 | Pending |
 | DOC-08 | T2 | Phase 11 - Wage, Retirement, Benefit Documents | Week 3 | Pending |
 | DOC-09 | T2 | Phase 11 - Wage, Retirement, Benefit Documents | Week 3 | Pending |
-| DOC-10 | T1 | Phase 5 - Document Base and First Dialects | Week 1 | Pending |
-| DOC-11 | T1 | Phase 5 - Document Base and First Dialects | Week 1 | Pending |
-| DOC-12 | T1 | Phase 5 - Document Base and First Dialects | Week 1 | Pending |
+| DOC-10 | T1 | Phase 5 - Document Base and First Dialects | Week 1 | Complete |
+| DOC-11 | T1 | Phase 5 - Document Base and First Dialects | Week 1 | Complete |
+| DOC-12 | T1 | Phase 5 - Document Base and First Dialects | Week 1 | Complete |
 | DOC-13 | T2 | Phase 12 - Brokerage and Capital-Gain Chain | Week 3 | Pending |
-| DOC-14 | T1 | Phase 5 - Document Base and First Dialects | Week 1 | Pending |
+| DOC-14 | T1 | Phase 5 - Document Base and First Dialects | Week 1 | Complete |
 | DOC-15 | T2 | Phase 11 - Wage, Retirement, Benefit Documents | Week 3 | Pending |
 | DOC-16 | T3 | Phase 15 - Realism Polish and Upstream | Week 5 | Pending |
 | EXACT-01 | T0 | Phase 4 - Exact Arithmetic | Week 1 | Done |
