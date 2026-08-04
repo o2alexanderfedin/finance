@@ -10,9 +10,11 @@ the server executes it as a pure function of `(documents, tax-year parameters) �
 
 ## Current Position
 
-Phase: 1 of 15 (Planning-Document Corrections and the Upstream Report)
+Phase: 2 of 15 (Server Skeleton, Safe Registration, Project-Local Store)
 Plan: 0 of TBD in current phase
-Status: Ready to plan
+Status: Ready to plan — Phase 1 complete and verified (11/11 must-haves)
+
+Progress: [█░░░░░░░░░] 1/15 phases
 Last activity: 2026-08-03 — PR #14 merged (planning corpus on `main`); PR #17 merged
 (Sergey: absolute no-floating-point rule, exact-decimal module as Week 1 step 6)
 
@@ -73,18 +75,22 @@ None yet.
 
 ### Blockers/Concerns
 
-- **Live contradiction between AGENTS.md and the roadmap (new, Phase 1 scope).** PR #17
-  makes "money in JSON is a string" absolute; three places still specify integer cents as a
-  JSON *number* at the storage boundary — `REQUIREMENTS.md:249` (EXACT-05),
-  `ROADMAP.md:214` (Phase 4 success criterion 4), `ROADMAP.md:221` (Phase 5 depends-on).
-  Only the storage layer flips; exact rationals in computation and decimal strings on the
-  MCP wire are unaffected. Folds into Phase 1 as a seventh correction.
-- **HEAD moves externally — now characterized.** Reflog shows the pattern is
-  `checkout: moving from feature/… to main` immediately followed by
-  `merge origin/main: Fast-forward` — i.e. something runs `git checkout main && git pull`
-  after each upstream merge. Not corruption, and no work has ever been lost, but it will
-  discard uncommitted edits. Mitigation: commit early, keep multi-step git in one atomic
+- **RESOLVED (Phase 1): the AGENTS.md / roadmap money contradiction.** Corrected as DOCC-07.
+  Storage boundary is now a decimal string in both REQUIREMENTS.md and ROADMAP.md;
+  rationals-in-computation and strings-on-the-MCP-wire verified unchanged.
+- **RESOLVED: what moves HEAD.** Not a daemon and not corruption — **a second author works
+  in this same checkout**. `feature/link-issue-16` appeared mid-session and became PR #19.
+  Still a live hazard for uncommitted edits: commit early, keep multi-step git in one atomic
   invocation, and re-verify `git branch --show-current` at the start of every command block.
+  The guard has caught it every time; nothing has been lost.
+- **NEW (Phase 2): fjs's `mcpStep` does not negotiate the protocol version.** The
+  `initialize` handler validates the client's params then discards the client's
+  `protocolVersion`, returning the configured string unconditionally
+  (`fjs/protocol/mcp/module.f.js`). `McpConfig.protocolVersion` is an unvalidated `string`.
+  Whatever we pin is what every client is told. Decision: pin `2025-11-25` per MCP-03 and
+  settle it with the roadmap's budgeted empirical check against a real client, escalating
+  only if that fails. Note `2026-07-28` is now the current spec revision. This is an
+  upstream gap AGENTS.md requires reporting rather than silently working around.
 - **Scope vs schedule (open, deliberate).** The selected taxpayer profile makes v1 roughly
   4–5× research's recommended scope. The five-week plan realistically delivers Phases 1–10.
   Phase 14 (acceptance against the filed return) is gated on Phases 11–13 and cannot pass
