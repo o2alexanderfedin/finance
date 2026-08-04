@@ -225,7 +225,7 @@ These were established by execution, not inference. Any replan must preserve the
 **Research**: Not needed.
 **Plans**: 2 plans
 - [ ] 04-01-PLAN.md — Exact rational arithmetic and IRS half-up rounding (fjs/types/rational/module.f.js)
-- [ ] 04-02-PLAN.md — Fixed-scale decimal string <-> bigint layer, composed cents module, and the three-layer demonstration (fjs/types/decimal, fjs/exact)
+- [x] 04-02-PLAN.md — Fixed-scale decimal string <-> bigint layer, composed cents module, and the three-layer demonstration (fjs/types/decimal, fjs/exact)
 
 ### Phase 5: Document Base, Subject Model, and the First Two Dialects
 **Milestone**: Week 1 — First Working Prototype

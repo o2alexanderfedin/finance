@@ -250,19 +250,19 @@ structural (RTTI) and semantic passes.
 
 ### Exact Arithmetic (EXACT)
 
-- [ ] **EXACT-01** *(T0)*: An upstreamable exact-arithmetic module — integer cents, exact
+- [x] **EXACT-01** *(T0)*: An upstreamable exact-arithmetic module — integer cents, exact
       rationals, and named rounding modes. fjs has none of this: `bigfloat` is a
       decimal→binary literal helper with two exports, `prime_field` is crypto modular
       arithmetic, and `divUp`/`roundUp` round up only and truncate rather than floor on
       negatives. Tax lines carry losses.
-- [ ] **EXACT-02** *(T0)*: Floating-point never touches tax math. Verified hazards:
+- [x] **EXACT-02** *(T0)*: Floating-point never touches tax math. Verified hazards:
       `1.005 * 100 === 100.49999999999999`, `(1.005).toFixed(2) === "1.00"`.
 - [ ] **EXACT-03** *(T0)*: IRS half-up rounding, explicitly not `Math.round`, which is
       asymmetric (`Math.round(-2.5) === -2`) on a form full of negatives.
 - [ ] **EXACT-04** *(T0)*: Rounding is a property of a **1040 line**, not of a value —
       `round(sum(x))`, never `sum(round(x))`. A money type that rounds on construction is
       wrong by construction.
-- [ ] **EXACT-05** *(T1)*: Layering fixed deliberately: money as a decimal **string** in
+- [x] **EXACT-05** *(T1)*: Layering fixed deliberately: money as a decimal **string** in
       JSON at the storage boundary (never a JSON number — decoded to exact cents by the
       semantic check, per AGENTS.md), rationals inside computation, decimal **strings**
       on the MCP wire — fjs's JSON `Primitive` has no `bigint`, so a bigint schema cannot
