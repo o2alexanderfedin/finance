@@ -28,17 +28,41 @@ take `<O1 extends O, T>(e: Effect<O1, T>)`, `asyncRun` pairs `Effect<O, T>` with
 it.** Partiality is not missing from fjs; the design has no place for it, and we do not
 need it.
 
-**A `TypeError` on an absent command is fine.** Refusal reaching `fjs_run` as an exception
-costs nothing — that boundary must catch anyway, since an agent-authored program can throw
-for a hundred unrelated reasons. The only concrete complaint was that the message
-(`map[command] is not a function`) does not name the operation, and that is ours to fix by
-guarding at the boundary, not fjs's to fix by changing `match`.
+**Throwing on an absent command is fine.** Refusal reaching `fjs_run` as an exception costs
+nothing — that boundary must catch anyway, since an agent-authored program can throw for a
+hundred unrelated reasons. The only concrete complaint was that the old message did not
+name the operation, and 0.41.0 fixed that too.
 
-The one genuine fjs bug in this area is unrelated to partiality: `map[command]` is an
-ordinary property lookup, so it resolves inherited `Object.prototype` members —
-`__defineGetter__`, `constructor`, `toString` — and invokes them with the payload. Filed
-upstream as
-[functionalscript#1419](https://github.com/functionalscript/functionalscript/pull/1419).
+The one genuine fjs bug in this area was unrelated to partiality: `map[command]` was an
+ordinary property lookup, so it resolved inherited `Object.prototype` members —
+`__defineGetter__`, `constructor`, `toString` — and invoked them with the payload. Reported
+as [functionalscript#1419](https://github.com/functionalscript/functionalscript/pull/1419).
+
+## Fixed upstream in 0.41.0
+
+`match` now does an own-property lookup and names the refused command:
+
+```js
+const handler = at(command)(map)
+assert(handler !== null, command)
+return ['cont', handler(...payload), continuation]
+```
+
+`at` (`fjs/types/object`) is `getOwnPropertyDescriptor`-based, so the prototype chain is
+never consulted. Verified against 0.41.0 — `fetch`, `__defineGetter__`, `constructor`, and
+`toString` all now throw, and permitted operations still dispatch. The `__defineGetter__`
+escalation (install a getter for a denied command, then call it) is closed with them.
+
+**Two consequences for our runner:**
+
+1. **We no longer need our own `Object.hasOwn` guard.** fjs does the own-property lookup.
+   A null-prototype map is still cheap defence in depth and worth keeping, but it is no
+   longer load-bearing.
+2. **The thrown value is a bare string, not an `Error`.** `assert` is
+   `(v, msg) => { if (!v) throw msg }`, so `catch (e)` yields `e === 'fetch'` and
+   `e.message` is `undefined`. Formatting `operation not permitted: <command>` means using
+   the caught value directly — code reaching for `e.message` gets `undefined`, and a
+   `catch (e) { if (e instanceof Error) … }` branch silently misses every refusal.
 
 ## The trap: do not whitelist `FileCasOperation`
 
@@ -98,18 +122,25 @@ disposition). If results are returned inline, the program's vocabulary can be re
    before the blob is ever stored. This is also why the entry point convention (open
    question 6) is a security decision and not a naming one — typing programs as
    `NodeProgram` would declare `Fetch | Http | Fs | Forever` as expressible.
-2. **A guard where untyped data enters.** A stored blob is arbitrary JS and can emit any
+2. **Catching and reporting the refusal.** A stored blob is arbitrary JS and can emit any
    `command` string regardless of what its types claim; the type system does not reach
-   across CAS. Guard dispatch with `Object.hasOwn` (or build the map with a `null`
-   prototype), and turn a miss into `operation not permitted: <command>`. This also closes
-   the #1419 prototype hole locally, ahead of any upstream release.
+   across CAS. Since 0.41.0 the *detection* is fjs's — `at` + `assert` — so what remains is
+   ours at the `fjs_run` boundary: catch, and render the caught **string** as
+   `operation not permitted: <command>` in an `errorResult`. Do not reach for `e.message`
+   (see above). A null-prototype map remains worthwhile as defence in depth.
 
 ## Testing
 
+Still write these, even though 0.41.0 closes the hole upstream — they are regression cover
+for *our* refusal path, and they pin behaviour we now depend on rather than merely hope for.
+
 The refusal proof must include the inherited names — `constructor`, `toString`, `valueOf`,
 `hasOwnProperty`, `__defineGetter__` — not only `fetch`/`readFile`/`exec`. A suite testing
-only genuinely-absent commands passes while the prototype path is wide open.
+only genuinely-absent commands would have passed while the prototype path was wide open.
 
 Add one adversarial case specifically: a `__defineGetter__` step that installs a getter for
 a denied command, followed by a call to that command. It must still be refused. That tests
 the security property rather than the error message.
+
+Assert on the reported text (`operation not permitted: fetch`), not on the raw throw — that
+covers our string-not-`Error` handling, which is the part most likely to regress.

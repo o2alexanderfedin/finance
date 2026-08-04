@@ -3,7 +3,8 @@
 Status: **reported, not fixed upstream.** No local workaround needed yet — see
 [Local workaround](#local-workaround).
 
-Target: `functionalscript` `fjs/media/module.f.js`. Present in 0.40.0.
+Target: `functionalscript` `fjs/media/module.f.js`. Still present in 0.41.0 (re-checked —
+0.41.0 fixed `match`, not this).
 
 ## The gap
 
@@ -28,7 +29,7 @@ downstream package contribute another. The module's own docstring says "currentl
 ## Why it matters here
 
 Every finance document type is a `vnd.fjs.*` JSON dialect on a shared base (see
-[../../todo/plan.md](../../todo/plan.md) Week 1 step 5). Under 0.40.0, none of them can
+[../../todo/plan.md](../../todo/plan.md) Week 1 step 5). Under 0.41.0, none of them can
 participate in media detection: a stored `vnd.fjs.1099` blob classifies as `text/plain`.
 
 The severity is limited, and worth being precise about. Our ingestion path validates a

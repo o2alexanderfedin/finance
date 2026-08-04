@@ -8,7 +8,7 @@
 
 1. **The `import()` hole is real, but the *stated justification* for accepting it ("sole user is trusted and local") defends against the wrong threat.** The trust boundary in this system is the document, not the user. See Pitfall 1.
 2. **The named Week 5 remedy — "parse the source with `djs/parser` before importing" — cannot work.** DJS is a data-only language; its AST module literally cannot represent a function. Verified in the vendored source. See Pitfall 2.
-3. **The claim that "the runner *is* the sandbox — an operation not in the map simply cannot happen" is false as written**, and I have a working escape from a whitelist containing exactly one operation. Verified by execution. See Pitfall 3. This one matters *more* after the `import()` hole is closed, not less.
+3. ~~**The claim that "the runner *is* the sandbox — an operation not in the map simply cannot happen" is false as written**~~ — true when written against 0.40.0, with a working escape from a one-operation whitelist. **Fixed upstream in fjs 0.41.0** ([#1419](https://github.com/functionalscript/functionalscript/pull/1419)); the claim now holds as written. See Pitfall 3.
 
 ---
 
@@ -115,7 +115,17 @@ So the planned mitigation would require writing a FunctionalScript parser first 
 
 ### Pitfall 3: `match`'s `OperationMap` reaches `Object.prototype` — the whitelist is not a whitelist
 
-**What goes wrong:**
+> **RESOLVED — fixed upstream in fjs 0.41.0.** Reported as
+> [functionalscript#1419](https://github.com/functionalscript/functionalscript/pull/1419).
+> `match` now looks the handler up with `at(command)(map)`
+> (`getOwnPropertyDescriptor`-based, so the prototype chain is never consulted) and
+> `assert(handler !== null, command)`. Re-verified against 0.41.0: `constructor`,
+> `toString`, `valueOf`, `__defineGetter__`, and `fetch` all throw, and the
+> `__defineGetter__` escalation below no longer works. No local guard is needed.
+> The analysis below is retained as the record of the finding; the *tests* it
+> prescribes are still worth writing, as regression cover for behaviour we now depend on.
+
+**What goes wrong** (as of 0.40.0, when this was written):
 The project's central sandbox claim, repeated in `PROJECT.md` Key Decisions and the MCP spec, is: *"a program requesting `fetch`, `readFile`, or `exec` finds no entry. Nothing needs to be intercepted or patched — an operation that is not in the map simply cannot happen."*
 
 That is false, because `fjs/effects/module.f.js:282` does a plain bracket lookup on a plain object:
@@ -637,7 +647,7 @@ Calibrated to this project's actual scale — a single person's tax records. Mos
 |---|---|---|
 | 1. `import()` justified against the wrong threat | **Week 1** (controls) / **Week 5** (isolation) | `--permission` flags present in the registered launcher; a test blob whose module body calls `fs.rmSync` gets `ERR_ACCESS_DENIED`; input-provenance rule written into `AGENTS.md` |
 | 2. `djs/parser` cannot validate programs | **Week 1** (docs correction) | The claim is removed from all three planning documents and replaced with the isolation plan |
-| 3. `match` reaches `Object.prototype` | **Week 1** Track A step 3 | A `proof` asserting `constructor`, `toString`, `valueOf`, `hasOwnProperty`, `__defineGetter__`, and `fetch` all yield `operation not permitted`. Upstream issue filed |
+| 3. `match` reaches `Object.prototype` — **RESOLVED in fjs 0.41.0** (#1419) | **Week 1** Track A step 3 — now only the *reporting* half | A `proof` asserting `constructor`, `toString`, `valueOf`, `hasOwnProperty`, `__defineGetter__`, and `fetch` all yield `operation not permitted`. Still worth writing as regression cover |
 | 4. No step limit / timeout | **Week 1** Track A step 4 | A `proof` that a non-terminating effect chain returns a bounded error |
 | 5. Tax Table vs rate schedule | **Week 2** | Line 16 matches the printed table for a sub-$100,000 case with real cents; a QDCGT case matches the worksheet |
 | 6. Float currency and rounding | **Week 1** (`Cents` + rounding fn) / **Week 2** (round-only-the-total) | Boundary proofs on the rounding function including negatives; `.toFixed`/`Math.round`/`parseFloat` absent from tax logic |

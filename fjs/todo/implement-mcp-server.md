@@ -24,7 +24,7 @@ The last two are deliberate Week 1 deferrals, revisited in Week 5.
 
 ## What already exists
 
-`functionalscript@0.40.0`. Note the split: the generic protocol helpers are at
+`functionalscript@0.41.0`. Note the split: the generic protocol helpers are at
 `fjs/protocol/mcp/`, while `fjs/mcp/` is the *CAS server* built on top of them.
 
 | Need | Reuse |
@@ -119,13 +119,19 @@ A FunctionalScript program does not perform effects — it *returns a descriptio
 of them. `match` dispatches each requested operation through an `OperationMap`:
 
 ```js
-// fjs/effects/module.f.js:282
+// fjs/effects/module.f.js — as of 0.41.0
 export const match = map => e => {
     if (typeof e === 'function') { return ['done', e()] }
     const { command, payload, continuation } = e
-    return ['cont', map[command](...payload), continuation]
+    const handler = at(command)(map)
+    assert(handler !== null, command)
+    return ['cont', handler(...payload), continuation]
 }
 ```
+
+`at` is `getOwnPropertyDescriptor`-based, so inherited names never resolve, and
+`assert` throws the command string when there is no handler. Before 0.41.0 this
+was a bare `map[command](...payload)`, which reached `Object.prototype`.
 
 So restricting what a program can do is exactly: **define the operation
 vocabulary it may express, and implement that vocabulary totally.** A program
@@ -146,20 +152,23 @@ Two requirements:
    locked down. `Cas<O>` is generic in its underlying operation set precisely so
    the filesystem can stay server-side, inside the handlers. Whether `casWrite`
    is in the vocabulary at all depends on open question 5.
-2. **Guard the boundary.** A stored blob is arbitrary JS and can emit any
-   `command` string regardless of its declared type, since the type system does
-   not reach across CAS. Guard dispatch with `Object.hasOwn` (or build the map
-   with a `null` prototype) and turn a miss into
-   `operation not permitted: <command>` as an `errorResult`.
+2. **Report the refusal at the boundary.** A stored blob is arbitrary JS and can
+   emit any `command` string regardless of its declared type, since the type
+   system does not reach across CAS. Since 0.41.0 fjs *detects* this for us, so
+   what remains is catching it in `fjs_run` and rendering
+   `operation not permitted: <command>` as an `errorResult`. **The thrown value
+   is a bare string, not an `Error`** — `assert` is `(v, msg) => { if (!v) throw
+   msg }` — so use the caught value directly; `e.message` is `undefined`, and an
+   `e instanceof Error` branch misses every refusal.
 
-Neither needs anything from FunctionalScript. Rationale and the corrected
+Neither needs anything further from FunctionalScript. Rationale and the corrected
 analysis — including why "partial `OperationMap`" was a false requirement — are
 in [restricted-runner-operation-map.md](./restricted-runner-operation-map.md).
 
-Requirement 2 also closes, locally, the one real fjs bug here: `map[command]`
-resolves inherited `Object.prototype` members and invokes them with the payload.
-Filed upstream as
-[functionalscript#1419](https://github.com/functionalscript/functionalscript/pull/1419).
+The one real fjs bug here — `map[command]` resolving inherited `Object.prototype`
+members and invoking them with the payload — was reported as
+[functionalscript#1419](https://github.com/functionalscript/functionalscript/pull/1419)
+and is **fixed in 0.41.0**, which this repo now uses.
 
 ### Known limitation: import-time execution
 
