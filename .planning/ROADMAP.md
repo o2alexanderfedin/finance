@@ -161,7 +161,7 @@ These were established by execution, not inference. Any replan must preserve the
 **Milestone**: Week 0 — Corrections and Integration Smoke Test
 **Goal**: Every planning document states only things that are true, so no later phase is planned against text that dissolves on contact.
 **Depends on**: Nothing (first phase) — runs concurrently with Phase 2
-**Requirements**: DOCC-01, DOCC-02, DOCC-03, DOCC-04, DOCC-05, DOCC-06, SEC-04
+**Requirements**: DOCC-01, DOCC-02, DOCC-03, DOCC-04, DOCC-05, DOCC-06, DOCC-07, SEC-04
 **Tier**: T0
 **Success Criteria** (what must be TRUE):
   1. The two false mechanism claims are gone: `grep -rn "djs/parser" .planning todo fjs README.md` returns no proposal of it as a validation remedy, and no document still says an operation not in the map "simply cannot happen" without stating the guard condition that makes it true — now satisfied by fjs 0.41.0's own-property lookup rather than by a local guard.
@@ -170,7 +170,10 @@ These were established by execution, not inference. Any replan must preserve the
   4. ~~A FunctionalScript issue exists for the `match` prototype-dispatch soundness hole~~ — **done**: [functionalscript#1419](https://github.com/functionalscript/functionalscript/pull/1419), fixed in 0.41.0, with the URL recorded in `PROJECT.md` and `todo/plan.md`.
   5. The TY2025 parameter-sourcing rule (Rev. Proc. 2024-40 **as modified by Rev. Proc. 2025-32**) is written where Phase 8 will read it, with the original 2025 inflation release named as the wrong source.
 **Research**: Not needed — every correction is already established.
-**Plans**: TBD
+**Plans**: 3 plans
+- [ ] 01-01-PLAN.md — Correct false mechanism/trust/audience claims (PROJECT.md, README.md, todo/plan.md, fjs/todo/implement-mcp-server.md)
+- [ ] 01-02-PLAN.md — Reconcile storage-boundary money representation (REQUIREMENTS.md, ROADMAP.md)
+- [ ] 01-03-PLAN.md — Correct Sergey's upstream file, file the FunctionalScript issue, record its URL
 
 ### Phase 2: Server Skeleton, Safe Registration, Project-Local Store
 **Milestone**: Week 0 — Corrections and Integration Smoke Test
@@ -185,7 +188,10 @@ These were established by execution, not inference. Any replan must preserve the
   4. A CI assertion confirms stdout carries only JSON-RPC across a full session; all diagnostics go to stderr.
   5. The CAS home is project-local and `git check-ignore` confirms it is ignored; `~/.cas` is untouched, and the root launcher `.js` contains nothing but the launcher line.
 **Research**: Not needed — assembly over verified fjs exports, plus a 10-minute empirical protocol-version diff.
-**Plans**: TBD
+**Plans**: 3 plans
+- [ ] 02-01-PLAN.md — Assemble financeConfig/financeMcpServer over casToolRegistry+evoToolRegistry; wire the launcher; gitignore the project-local store
+- [ ] 02-02-PLAN.md — Full-session virtual-harness proof (protocol conformance, non-negotiation, stdout purity); record the mcpStep upstream gap
+- [ ] 02-03-PLAN.md — Register with node --permission scoping, prove ERR_ACCESS_DENIED, and drive a real client to an observed tools/call
 
 **── Milestone: Week 1 — First Working Prototype ──**
 
@@ -201,7 +207,9 @@ These were established by execution, not inference. Any replan must preserve the
   3. The interpreter returns the accumulated read set alongside the result; a proof asserts the observed reads are what the program actually requested, independent of anything the program declares.
   4. Every proof in this phase runs under `fjs/effects/mock` with no CAS, no Evo, no MCP, and no filesystem — the module imports `fjs/effects` and nothing else.
 **Research**: Not needed — a working prototype of `interpret` under `mock` already exists, and the dispatch guard now comes from fjs 0.41.0 (verified against it).
-**Plans**: TBD
+**Plans**: 2 plans
+- [ ] 03-01-PLAN.md — interpret's dispatch and refusal reporting (EXEC-01/03/04): the six prototype-inherited names plus the two-step `__defineGetter__` escalation, refused as a Result with the exact permitted-set text
+- [ ] 03-02-PLAN.md — interpret's step budget and observed read set (EXEC-05/06): a bounded dispatch loop and the accumulated reads returned alongside the result, plus the import-boundary check
 
 ### Phase 4: Exact Arithmetic and the Money Layering
 **Milestone**: Week 1 — First Working Prototype
@@ -213,15 +221,17 @@ These were established by execution, not inference. Any replan must preserve the
   1. Proofs cover integer cents, exact rationals, and IRS half-up rounding **including negatives**; a proof asserts the chosen rule differs from `Math.round`, which returns `-2` for `-2.5` on a form full of losses.
   2. `grep -rn "toFixed\|parseFloat\|Math.round" fjs/` returns nothing inside arithmetic or tax code.
   3. A proof exhibits a case where `round(sum(x)) ≠ sum(round(x))`, and the module exposes only the former as the line-level operation — a money type that rounds on construction does not exist here.
-  4. A proof demonstrates all three layers on one value: `isSafeInteger`-guarded integer cents in JSON at the storage boundary, exact rationals inside computation, decimal **strings** on the MCP wire (fjs's JSON `Primitive` has no `bigint`).
+  4. A proof demonstrates all three layers on one value: a decimal **string** in JSON at the storage boundary (never a JSON number — a JSON number is an IEEE 754 double before any arithmetic happens), exact rationals inside computation, decimal **strings** on the MCP wire (fjs's JSON `Primitive` has no `bigint`).
 **Research**: Not needed.
-**Plans**: TBD
+**Plans**: 2 plans
+- [x] 04-01-PLAN.md — Exact rational arithmetic and IRS half-up rounding (fjs/types/rational/module.f.js)
+- [x] 04-02-PLAN.md — Fixed-scale decimal string <-> bigint layer, composed cents module, and the three-layer demonstration (fjs/types/decimal, fjs/exact)
 
 ### Phase 5: Document Base, Subject Model, and the First Two Dialects
 **Milestone**: Week 1 — First Working Prototype
 **Goal**: A document can be stored, versioned, and read back under an identity that can never be wrong, with the vision transcription preserved as its own artifact.
-**Depends on**: Phase 2 (project-local store), Phase 4 (cents at the storage boundary) — **runs concurrently with Phase 3**
-**Requirements**: DOC-00, DOC-01, DOC-03, DOC-04, DOC-10, DOC-11, DOC-12, DOC-14
+**Depends on**: Phase 2 (project-local store), Phase 4 (money as a string at the storage boundary) — **runs concurrently with Phase 3**
+**Requirements**: DOC-00, DOC-01, DOC-03, DOC-04, DOC-05, DOC-10, DOC-11, DOC-12, DOC-14, DOC-17
 **Tier**: T0 → T1
 **Success Criteria** (what must be TRUE):
   1. A `vnd.fjs.ocr` blob fails `vnd.fjs.1099int` validation on **structure alone** — the exact-literal `dialect` discriminant does the work, proven, with no `{"dialect":` prefix shortcut.
@@ -230,7 +240,20 @@ These were established by execution, not inference. Any replan must preserve the
   4. Re-adding the same artifact resolves to the same subject rather than creating a parallel history; a proof shows a blank box decodes as **absent, not zero**, that each dialect carries the form *revision* and not merely the tax year, and that `CORRECTED` is readable data.
   5. A >128 KiB PDF added via `npx functionalscript cas add` from another process becomes visible to `evo_head` in the running server **without a restart**.
 **Research**: Not needed — `fjs/media/revision` is a literal 123-line template and every payload field was read from a current IRS PDF.
-**Plans**: TBD
+**Plans**: 4 plans
+- [x] 05-01-PLAN.md — Document base spread helper (DOC-00) and Evo subject derivation (DOC-01)
+- [x] 05-02-PLAN.md — vnd.fjs.ocr and vnd.fjs.1099int dialects (DOC-03/10/11/12), Success Criteria 1 and 2
+- [x] 05-03-PLAN.md — OCR-to-cents conversion boundary and full-instance conversion, Success Criteria 3 and 4
+- [x] 05-04-PLAN.md — cas_refresh tool and cross-process CLI ingestion proof, Success Criterion 5 (DOC-14)
+- [x] 05-05 (no PLAN — user-directed scope addition, mid-phase) — `vnd.fjs.w2` (DOC-05, pulled
+      forward from Phase 11) and `vnd.fjs.medical_expenses` (DOC-17, new), plus the shared
+      `fjs/document/money_field` check the third dialect made worth extracting. See
+      05-05-SUMMARY.md.
+
+**Scope note:** the two dialects above were added on user instruction after the phase's four
+planned plans were complete. The base was designed for the family (05-CONTEXT deferred W-2
+saying "the base is designed for the family now so those land without reopening it"), and that
+held — neither dialect required reopening `fjs/document/base` or the subject convention.
 
 ### Phase 6: Guest ABI Freeze and Safe Materialization
 **Milestone**: Week 1 — First Working Prototype
@@ -314,10 +337,10 @@ These were established by execution, not inference. Any replan must preserve the
 **Milestone**: Week 3 — Breadth in Documents
 **Goal**: Every non-brokerage document the declared profile produces can be stored, listed, and retracted.
 **Depends on**: Phase 5 — **runs concurrently with Phase 12**
-**Requirements**: DOC-05, DOC-08, DOC-09, DOC-15, MCP-08
+**Requirements**: DOC-08, DOC-09, DOC-15, MCP-08 *(DOC-05 delivered early, in Phase 5)*
 **Tier**: T2
 **Success Criteria** (what must be TRUE):
-  1. `vnd.fjs.w2` stores box 12 as a list of `(code, amount)` pairs — box-12 confusion is a documented model failure — and boxes 15–20 faithfully as a repeating array that no computation reads.
+  1. ~~`vnd.fjs.w2` stores box 12 as a list of `(code, amount)` pairs — box-12 confusion is a documented model failure — and boxes 15–20 faithfully as a repeating array that no computation reads.~~ **Delivered in Phase 5.** The "no computation reads them" half remains a live constraint on the phases that compute.
   2. `vnd.fjs.ssa1099` and `vnd.fjs.1099r` round-trip with every box explicitly absent-able, each box list read from the current IRS PDF rather than from recall.
   3. `finance_documents_list` enumerates stored documents with dialect, tax year, and subject.
   4. A wrongly ingested document can be marked `archived`, and the recorded decision on whether report programs filter archived revisions is enforced by a `proof` — there is a documented answer to "I uploaded the wrong document."
@@ -397,10 +420,10 @@ These were established by execution, not inference. Any replan must preserve the
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 1. Planning-Document Corrections | Week 0 | 0/TBD | Not started | - |
-| 2. Server Skeleton and Registration | Week 0 | 0/TBD | Not started | - |
-| 3. The Restricted Interpreter | Week 1 | 0/TBD | Not started | - |
-| 4. Exact Arithmetic | Week 1 | 0/TBD | Not started | - |
+| 1. Planning-Document Corrections | Week 0 | 3/3 | Complete | verified 11/11 |
+| 2. Server Skeleton and Registration | Week 0 | 3/3 | Complete | verified 11/11 |
+| 3. The Restricted Interpreter | Week 1 | 2/2 | Complete | verified 11/11 |
+| 4. Exact Arithmetic | Week 1 | 2/2 | Complete | verified 10/10 |
 | 5. Document Base and First Dialects | Week 1 | 0/TBD | Not started | - |
 | 6. Guest ABI and Materialization | Week 1 | 0/TBD | Not started | - |
 | 7. `fjs_run` and Run Records | Week 1 | 0/TBD | Not started | - |
@@ -419,7 +442,7 @@ These were established by execution, not inference. Any replan must preserve the
 
 | Category | Count | Phases |
 |---|---|---|
-| DOCC (documentation corrections) | 6 | 1 |
+| DOCC (documentation corrections) | 7 | 1 |
 | MCP (server and tools) | 9 | 2, 7, 8, 11, 15 |
 | EXEC (execution spine) | 13 | 3, 6, 7, 14 |
 | DOC (formats and ingestion) | 17 | 2, 5, 11, 12, 15 |

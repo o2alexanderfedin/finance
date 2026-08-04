@@ -58,7 +58,7 @@ false. These are hours of work and every one of them is more expensive to discov
 They come first because subsequent phases would otherwise be planned against text that
 dissolves on contact.
 
-- [ ] **DOCC-01** *(T0)*: Remove the "validate source with `djs/parser`" remedy from
+- [x] **DOCC-01** *(T0)*: Remove the "validate source with `djs/parser`" remedy from
       `PROJECT.md`, `todo/plan.md`, and `fjs/todo/implement-mcp-server.md`. DJS is a data
       language with no function node; the remedy does not exist. Replace with the deferred
       hardening path.
@@ -66,33 +66,39 @@ dissolves on contact.
       claim to state the guard condition that makes it true.~~ **Done** — and the condition
       is now satisfied by fjs itself as of 0.41.0 (`at` + `assert` in `match`), so the claim
       is true as written. `PROJECT.md` Context records why.
-- [ ] **DOCC-03** *(T0)*: Amend the README `## Goal` and `PROJECT.md` Success Criterion 2
+- [x] **DOCC-03** *(T0)*: Amend the README `## Goal` and `PROJECT.md` Success Criterion 2
       to name Claude Code / Claude Desktop as the demonstration client, and record remote
       transport as a v2 milestone.
-- [ ] **DOCC-04** *(T0)*: Correct `fjs/todo/implement-mcp-server.md`'s claim that the
+- [x] **DOCC-04** *(T0)*: Correct `fjs/todo/implement-mcp-server.md`'s claim that the
       server cannot be proof-tested — true of `casMcpServer`, false of `fjs_run`, because
       `import` is already an effect with a virtual interpreter.
-- [ ] **DOCC-05** *(T0)*: Rewrite the `import()` deferral justification in `PROJECT.md` so
+- [x] **DOCC-05** *(T0)*: Rewrite the `import()` deferral justification in `PROJECT.md` so
       it rests on schedule grounds with named compensating controls, not on "the sole user
       is trusted and local" — the untrusted party is the document, not the user.
-- [ ] **DOCC-06** *(T0)*: Record the TY2025 parameter-churn hazard: parameters must come
+- [x] **DOCC-06** *(T0)*: Record the TY2025 parameter-churn hazard: parameters must come
       from Rev. Proc. 2024-40 **as modified by Rev. Proc. 2025-32**, never from the
       original 2025 inflation-adjustment release.
+- [x] **DOCC-07** *(T0)*: Reconcile the storage-layer money representation with
+      AGENTS.md's absolute rule that money in a stored JSON document is a string, never a
+      JSON number. Correct EXACT-05's text above and `ROADMAP.md`'s Phase 4 success
+      criterion 4 and Phase 5 depends-on line, all of which still specified integer cents
+      as a JSON *number* at the storage boundary. Only the storage layer flips — exact
+      rationals inside computation and decimal strings on the MCP wire are unaffected.
 
 ### MCP Server (MCP)
 
-- [ ] **MCP-01** *(T0)*: An MCP server over stdio composing fjs's `casToolRegistry` and
+- [x] **MCP-01** *(T0)*: An MCP server over stdio composing fjs's `casToolRegistry` and
       `evoToolRegistry` plus our own, via the exported `fromRegistry` / `mcpStep` /
       `stdioTransport`. No fork of FunctionalScript.
-- [ ] **MCP-02** *(T0)*: The server registers successfully with `claude mcp add` and
+- [x] **MCP-02** *(T0)*: The server registers successfully with `claude mcp add` and
       completes a full `initialize` → `notifications/initialized` → `tools/list` →
       `tools/call` session.
-- [ ] **MCP-03** *(T0)*: Declare our own `McpConfig` pinned to protocol version
+- [x] **MCP-03** *(T0)*: Declare our own `McpConfig` pinned to protocol version
       `2025-11-25`. Do not reuse `casConfig`, which pins `2024-11-05` and identifies the
       server as `functionalscript-cas`.
-- [ ] **MCP-04** *(T0)*: The impure launcher is a thin root-level `.js` file; all logic
+- [x] **MCP-04** *(T0)*: The impure launcher is a thin root-level `.js` file; all logic
       lives in `.f.js` modules it calls.
-- [ ] **MCP-05** *(T0)*: stdout carries JSON-RPC and nothing else, asserted in CI across a
+- [x] **MCP-05** *(T0)*: stdout carries JSON-RPC and nothing else, asserted in CI across a
       full session. Any diagnostic output goes to stderr.
 - [ ] **MCP-06** *(T1)*: `finance_schema(dialect)` returns the RTTI schema for a document
       dialect, so the agent reads field names rather than guessing them.
@@ -107,7 +113,7 @@ dissolves on contact.
 
 ### Execution Spine (EXEC)
 
-- [ ] **EXEC-01** *(T0)*: A restricted effect interpreter, `interpret(map)(effect)`,
+- [x] **EXEC-01** *(T0)*: A restricted effect interpreter, `interpret(map)(effect)`,
       translating a guest effect into a host effect. Depends on `fjs/effects` only — not
       CAS, not Evo, not MCP — so it is fully proof-testable in isolation.
 - [x] **EXEC-02** *(T0)*: ~~Operation lookup uses `Object.hasOwn` and the operation map has
@@ -116,24 +122,24 @@ dissolves on contact.
       consulted) and `assert`s the handler exists. Verified — the `__defineGetter__` escape
       now throws. Keep a null-prototype map as cheap defence in depth, but it is no longer
       load-bearing and no local guard is required.
-- [ ] **EXEC-03** *(T0)*: A non-whitelisted operation is refused with a message naming the
+- [x] **EXEC-03** *(T0)*: A non-whitelisted operation is refused with a message naming the
       operation *and* the permitted set (`operation not permitted: fetch; permitted:
       casRead, evoList, evoHead, evoRevision`). Agents self-correct from actionable errors
       and cannot from opaque ones. Still ours: 0.41.0 throws the command name but knows
       nothing of the permitted set. **The throw is a bare string, not an `Error`** (`assert`
       throws its message), so the catch must use the caught value directly — `e.message` is
       `undefined` and an `e instanceof Error` branch misses every refusal.
-- [ ] **EXEC-04** *(T0)*: Regression proofs for prototype-inherited names specifically:
+- [x] **EXEC-04** *(T0)*: Regression proofs for prototype-inherited names specifically:
       `constructor`, `toString`, `valueOf`, `hasOwnProperty`, `__defineGetter__`. These are
       the cases a naive `in` or `!== undefined` guard admits. Still wanted after the 0.41.0
       fix — they now pin behaviour we depend on rather than merely hope for, and they cover
       our refusal *reporting*, which is still ours. Assert on the reported text, not the raw
       throw. Include the two-step `__defineGetter__` escalation (install a getter for a
       denied command, then call it).
-- [ ] **EXEC-05** *(T0)*: The interpreter accumulates the read set as it dispatches, so a
+- [x] **EXEC-05** *(T0)*: The interpreter accumulates the read set as it dispatches, so a
       run record's `inputs[]` is **observed rather than declared**. A program cannot forget
       to cite, or misreport, what it read.
-- [ ] **EXEC-06** *(T0)*: A step budget bounds execution. `asyncRun` is an unbounded
+- [x] **EXEC-06** *(T0)*: A step budget bounds execution. `asyncRun` is an unbounded
       `while(true)`; a generated loop with a wrong termination condition otherwise hangs
       the single-process server silently, with no response and no way to cancel.
 - [ ] **EXEC-07** *(T0)*: A frozen guest ABI. Two constraints fix its shape:
@@ -182,7 +188,7 @@ All dialects follow the `vnd.fjs.revision` precedent: JSON plus a dialect tag, t
 as an exact literal in the schema, media type derived mechanically, validation split into
 structural (RTTI) and semantic passes.
 
-- [ ] **DOC-00** *(T0)*: **One common document base shared by every type** —
+- [x] **DOC-00** *(T0)*: **One common document base shared by every type** —
       `{ "dialect": "vnd.fjs.<name>", … }` with `dialect` as an exact-literal discriminant,
       so structural validation alone rejects another type's blob. Each type's remaining
       fields are an **fjs RTTI schema** mirroring `revisionSchema`: the schema is the single
@@ -195,25 +201,25 @@ structural (RTTI) and semantic passes.
       up front is what lets later types land without reopening it**; if a new type forces a
       base change, that is a signal the base was under-designed, worth noting rather than
       absorbing silently.
-- [ ] **DOC-01** *(T0)*: Evo subject convention — the artifact chain (raw bytes → OCR →
+- [x] **DOC-01** *(T0)*: Evo subject convention — the artifact chain (raw bytes → OCR →
       typed) is rooted at the **cBase32 hash of the original artifact**; each extracted form
       instance gets its own subject keyed on `(payerTin, recipientTin, accountNumber,
       taxYear, formType)`. Human labels live inside snapshots, never in subjects. A subject
       can never be renamed, and CAS has no delete, so this is decided before any real
       document exists.
-- [ ] **DOC-02** *(T0)*: A **project-local CAS home**, gitignored — not the shared
+- [x] **DOC-02** *(T0)*: A **project-local CAS home**, gitignored — not the shared
       `~/.cas`. There is no delete; real SSNs in a shared store cannot be taken back.
-- [ ] **DOC-03** *(T1)*: `vnd.fjs.ocr` — near-verbatim page-oriented transcription from the
+- [x] **DOC-03** *(T1)*: `vnd.fjs.ocr` — near-verbatim page-oriented transcription from the
       agent's vision pass, numbers kept as **printed strings** (`"1,234.56"`). Stored as a
       first-class artifact, not a transient step: it is the only record of what the model
       actually saw, and it lets reclassification branch without a second, nondeterministic
       vision pass.
-- [ ] **DOC-04** *(T1)*: `vnd.fjs.1099int` — typed fields, integer cents, `Number.isSafeInteger`
+- [x] **DOC-04** *(T1)*: `vnd.fjs.1099int` — typed fields, integer cents, `Number.isSafeInteger`
       guarded. The `"1,234.56" → 123456` conversion happens on exactly one revision
       boundary.
-- [ ] **DOC-05** *(T2)*: `vnd.fjs.w2` — box 12 as a list of `(code, amount)` pairs (box-12
-      confusion is a documented model failure); boxes 15–20 stored faithfully as a repeating
-      array and never computed on.
+- [x] **DOC-05** *(T2 → pulled forward to Phase 5)*: `vnd.fjs.w2` — box 12 as a list of
+      `(code, amount)` pairs (box-12 confusion is a documented model failure); boxes 15–20
+      stored faithfully as a repeating array and never computed on.
 - [ ] **DOC-06** *(T2)*: `vnd.fjs.1099div`. **Adding this dialect forces the QDCGT
       worksheet** (box 1b > 0) and the Schedule D Tax Worksheet (boxes 2b/2d) — schedule
       the worksheet with the dialect, not after it.
@@ -221,14 +227,15 @@ structural (RTTI) and semantic passes.
       means "basis not reported", which is **not** zero.
 - [ ] **DOC-08** *(T2)*: `vnd.fjs.ssa1099` — required by the 65+ profile.
 - [ ] **DOC-09** *(T2)*: `vnd.fjs.1099r` — required by the 65+ profile.
-- [ ] **DOC-10** *(T1)*: Every dialect carries the **form revision**, not merely the tax
+- [x] **DOC-10** *(T1)*: Every dialect that transcribes a printed IRS form carries the
+      **form revision**, not merely the tax
       year. Box semantics drift between revisions.
-- [ ] **DOC-11** *(T1)*: Every box is explicitly absent-able. Blank is not zero.
-- [ ] **DOC-12** *(T1)*: The `CORRECTED` checkbox is modelled as data. It is printed on the
+- [x] **DOC-11** *(T1)*: Every box is explicitly absent-able. Blank is not zero.
+- [x] **DOC-12** *(T1)*: The `CORRECTED` checkbox is modelled as data. It is printed on the
       form itself, so amendment is a read signal, not an inference.
 - [ ] **DOC-13** *(T2)*: A consolidated brokerage 1099 yields *N* typed documents from one
       PDF. One uploaded file is not one document.
-- [ ] **DOC-14** *(T1)*: Documented CLI ingestion route for artifacts over 128 KiB
+- [x] **DOC-14** *(T1)*: Documented CLI ingestion route for artifacts over 128 KiB
       (`npx functionalscript cas add`), plus a cache-refresh path so a store mutated by
       another process is visible to the running server without a restart.
 - [ ] **DOC-15** *(T2)*: A retraction story via the `archived` flag, and a decision recorded
@@ -237,6 +244,15 @@ structural (RTTI) and semantic passes.
       `decodeText`/`mediaType` from `fjs/media/revision` directly and performs exactly one
       check, so `vnd.fjs.revision` is the only dialect it can recognize — its own docstring
       says "currently just `vnd.fjs.revision`", so growth is anticipated but unimplemented.
+- [x] **DOC-17** *(T2, added Phase 5)*: `vnd.fjs.medical_expenses` — the substantiation record
+      behind Schedule A's medical and dental deduction. Unlike every other dialect it is
+      taxpayer-asserted rather than transcribed from an information return: no IRS form
+      reports out-of-pocket medical spend. Each entry carries `datePaid` (the deductible year
+      is the year PAID), provider, category, amount, and an absent-able `reimbursed` — only
+      unreimbursed expense is deductible, and "no reimbursement recorded" must stay
+      distinguishable from "the insurer paid nothing". No stored total and no 7.5%-of-AGI
+      floor: both need an AGI this document cannot see, and belong to the phase that computes
+      Schedule A.
       Per AGENTS.md this is an **fjs change** (take a list of dialect decoders, fall through
       when none match), not local glue — same disposition as the `match` gap. Not blocking:
       our own validation does not need `detect`, which matters only for classifying a blob
@@ -244,20 +260,21 @@ structural (RTTI) and semantic passes.
 
 ### Exact Arithmetic (EXACT)
 
-- [ ] **EXACT-01** *(T0)*: An upstreamable exact-arithmetic module — integer cents, exact
+- [x] **EXACT-01** *(T0)*: An upstreamable exact-arithmetic module — integer cents, exact
       rationals, and named rounding modes. fjs has none of this: `bigfloat` is a
       decimal→binary literal helper with two exports, `prime_field` is crypto modular
       arithmetic, and `divUp`/`roundUp` round up only and truncate rather than floor on
       negatives. Tax lines carry losses.
-- [ ] **EXACT-02** *(T0)*: Floating-point never touches tax math. Verified hazards:
+- [x] **EXACT-02** *(T0)*: Floating-point never touches tax math. Verified hazards:
       `1.005 * 100 === 100.49999999999999`, `(1.005).toFixed(2) === "1.00"`.
-- [ ] **EXACT-03** *(T0)*: IRS half-up rounding, explicitly not `Math.round`, which is
+- [x] **EXACT-03** *(T0)*: IRS half-up rounding, explicitly not `Math.round`, which is
       asymmetric (`Math.round(-2.5) === -2`) on a form full of negatives.
-- [ ] **EXACT-04** *(T0)*: Rounding is a property of a **1040 line**, not of a value —
+- [x] **EXACT-04** *(T0)*: Rounding is a property of a **1040 line**, not of a value —
       `round(sum(x))`, never `sum(round(x))`. A money type that rounds on construction is
       wrong by construction.
-- [ ] **EXACT-05** *(T1)*: Layering fixed deliberately: integer cents in JSON at the storage
-      boundary (`isSafeInteger`-guarded), rationals inside computation, decimal **strings**
+- [x] **EXACT-05** *(T1)*: Layering fixed deliberately: money as a decimal **string** in
+      JSON at the storage boundary (never a JSON number — decoded to exact cents by the
+      semantic check, per AGENTS.md), rationals inside computation, decimal **strings**
       on the MCP wire — fjs's JSON `Primitive` has no `bigint`, so a bigint schema cannot
       cross JSON-RPC.
 
@@ -332,7 +349,7 @@ structural (RTTI) and semantic passes.
 Deferred by explicit decision. What remains here is what costs essentially nothing and
 would be materially more expensive to retrofit.
 
-- [ ] **SEC-01** *(T0)*: The registered `claude mcp add` launcher carries
+- [x] **SEC-01** *(T0)*: The registered `claude mcp add` launcher carries
       `node --permission` with scoped `--allow-fs-*` from the **first** registration.
       Registering later means the unsafe configuration is the one everyone already has.
 - [ ] **SEC-02** *(T1)*: A textual import-specifier allow-list enforced before a program is
@@ -344,7 +361,10 @@ would be materially more expensive to retrofit.
 - [x] **SEC-04** *(T0)*: ~~An upstream bug report to FunctionalScript for the `match`
       prototype-dispatch soundness hole.~~ **Done and closed** —
       [functionalscript#1419](https://github.com/functionalscript/functionalscript/pull/1419),
-      fixed in 0.41.0.
+      fixed in 0.41.0. Note
+      [functionalscript#1420](https://github.com/functionalscript/functionalscript/issues/1420)
+      is a duplicate of the same defect, filed independently from this branch before #1419
+      was known here; it is closed as such.
 
 ---
 
@@ -410,27 +430,28 @@ them. Week 0 is research's addition in front of the plan's Week 1.
 
 | REQ-ID | Tier | Phase | Milestone | Status |
 |--------|------|-------|-----------|--------|
-| DOCC-01 | T0 | Phase 1 - Planning-Document Corrections | Week 0 | Pending |
-| DOCC-02 | T0 | Phase 1 - Planning-Document Corrections | Week 0 | Pending |
-| DOCC-03 | T0 | Phase 1 - Planning-Document Corrections | Week 0 | Pending |
-| DOCC-04 | T0 | Phase 1 - Planning-Document Corrections | Week 0 | Pending |
-| DOCC-05 | T0 | Phase 1 - Planning-Document Corrections | Week 0 | Pending |
-| DOCC-06 | T0 | Phase 1 - Planning-Document Corrections | Week 0 | Pending |
-| MCP-01 | T0 | Phase 2 - Server Skeleton and Registration | Week 0 | Pending |
-| MCP-02 | T0 | Phase 2 - Server Skeleton and Registration | Week 0 | Pending |
-| MCP-03 | T0 | Phase 2 - Server Skeleton and Registration | Week 0 | Pending |
-| MCP-04 | T0 | Phase 2 - Server Skeleton and Registration | Week 0 | Pending |
-| MCP-05 | T0 | Phase 2 - Server Skeleton and Registration | Week 0 | Pending |
+| DOCC-01 | T0 | Phase 1 - Planning-Document Corrections | Week 0 | Done |
+| DOCC-02 | T0 | Phase 1 - Planning-Document Corrections | Week 0 | Done |
+| DOCC-03 | T0 | Phase 1 - Planning-Document Corrections | Week 0 | Done |
+| DOCC-04 | T0 | Phase 1 - Planning-Document Corrections | Week 0 | Done |
+| DOCC-05 | T0 | Phase 1 - Planning-Document Corrections | Week 0 | Done |
+| DOCC-06 | T0 | Phase 1 - Planning-Document Corrections | Week 0 | Done |
+| DOCC-07 | T0 | Phase 1 - Planning-Document Corrections | Week 0 | Done |
+| MCP-01 | T0 | Phase 2 - Server Skeleton and Registration | Week 0 | Done |
+| MCP-02 | T0 | Phase 2 - Server Skeleton and Registration | Week 0 | Done |
+| MCP-03 | T0 | Phase 2 - Server Skeleton and Registration | Week 0 | Done |
+| MCP-04 | T0 | Phase 2 - Server Skeleton and Registration | Week 0 | Done |
+| MCP-05 | T0 | Phase 2 - Server Skeleton and Registration | Week 0 | Done |
 | MCP-06 | T1 | Phase 7 - `fjs_run` and Run Records | Week 1 | Pending |
 | MCP-07 | T1 | Phase 8 - TY2025 Parameters and Tax Table | Week 2 | Pending |
 | MCP-08 | T2 | Phase 11 - Wage, Retirement, Benefit Documents | Week 3 | Pending |
 | MCP-09 | T3 | Phase 15 - Realism Polish and Upstream | Week 5 | Pending |
-| EXEC-01 | T0 | Phase 3 - The Restricted Interpreter | Week 1 | Pending |
-| EXEC-02 | T0 | Phase 3 - The Restricted Interpreter | Week 1 | Pending |
-| EXEC-03 | T0 | Phase 3 - The Restricted Interpreter | Week 1 | Pending |
-| EXEC-04 | T0 | Phase 3 - The Restricted Interpreter | Week 1 | Pending |
-| EXEC-05 | T0 | Phase 3 - The Restricted Interpreter | Week 1 | Pending |
-| EXEC-06 | T0 | Phase 3 - The Restricted Interpreter | Week 1 | Pending |
+| EXEC-01 | T0 | Phase 3 - The Restricted Interpreter | Week 1 | Done |
+| EXEC-02 | T0 | Delivered upstream (fjs 0.41.0, functionalscript#1419) | Week 1 | Done |
+| EXEC-03 | T0 | Phase 3 - The Restricted Interpreter | Week 1 | Done |
+| EXEC-04 | T0 | Phase 3 - The Restricted Interpreter | Week 1 | Done |
+| EXEC-05 | T0 | Phase 3 - The Restricted Interpreter | Week 1 | Done |
+| EXEC-06 | T0 | Phase 3 - The Restricted Interpreter | Week 1 | Done |
 | EXEC-07 | T0 | Phase 6 - Guest ABI and Materialization | Week 1 | Pending |
 | EXEC-08 | T1 | Phase 7 - `fjs_run` and Run Records | Week 1 | Pending |
 | EXEC-09 | T1 | Phase 6 - Guest ABI and Materialization | Week 1 | Pending |
@@ -438,28 +459,29 @@ them. Week 0 is research's addition in front of the plan's Week 1.
 | EXEC-11 | T1 | Phase 7 - `fjs_run` and Run Records | Week 1 | Pending |
 | EXEC-12 | T1 | Phase 7 - `fjs_run` and Run Records | Week 1 | Pending |
 | EXEC-13 | T2 | Phase 14 - Acceptance | Week 4 | Pending |
-| DOC-00 | T0 | Phase 5 - Document Base and First Dialects | Week 1 | Pending |
-| DOC-01 | T0 | Phase 5 - Document Base and First Dialects | Week 1 | Pending |
-| DOC-02 | T0 | Phase 2 - Server Skeleton and Registration | Week 0 | Pending |
-| DOC-03 | T1 | Phase 5 - Document Base and First Dialects | Week 1 | Pending |
-| DOC-04 | T1 | Phase 5 - Document Base and First Dialects | Week 1 | Pending |
-| DOC-05 | T2 | Phase 11 - Wage, Retirement, Benefit Documents | Week 3 | Pending |
+| DOC-00 | T0 | Phase 5 - Document Base and First Dialects | Week 1 | Complete |
+| DOC-01 | T0 | Phase 5 - Document Base and First Dialects | Week 1 | Complete |
+| DOC-02 | T0 | Phase 2 - Server Skeleton and Registration | Week 0 | Done |
+| DOC-03 | T1 | Phase 5 - Document Base and First Dialects | Week 1 | Complete |
+| DOC-04 | T1 | Phase 5 - Document Base and First Dialects | Week 1 | Complete |
+| DOC-05 | T2 | Phase 5 - Document Base and First Dialects (pulled forward) | Week 1 | Complete |
 | DOC-06 | T2 | Phase 12 - Brokerage and Capital-Gain Chain | Week 3 | Pending |
 | DOC-07 | T2 | Phase 12 - Brokerage and Capital-Gain Chain | Week 3 | Pending |
 | DOC-08 | T2 | Phase 11 - Wage, Retirement, Benefit Documents | Week 3 | Pending |
 | DOC-09 | T2 | Phase 11 - Wage, Retirement, Benefit Documents | Week 3 | Pending |
-| DOC-10 | T1 | Phase 5 - Document Base and First Dialects | Week 1 | Pending |
-| DOC-11 | T1 | Phase 5 - Document Base and First Dialects | Week 1 | Pending |
-| DOC-12 | T1 | Phase 5 - Document Base and First Dialects | Week 1 | Pending |
+| DOC-10 | T1 | Phase 5 - Document Base and First Dialects | Week 1 | Complete |
+| DOC-11 | T1 | Phase 5 - Document Base and First Dialects | Week 1 | Complete |
+| DOC-12 | T1 | Phase 5 - Document Base and First Dialects | Week 1 | Complete |
 | DOC-13 | T2 | Phase 12 - Brokerage and Capital-Gain Chain | Week 3 | Pending |
-| DOC-14 | T1 | Phase 5 - Document Base and First Dialects | Week 1 | Pending |
+| DOC-14 | T1 | Phase 5 - Document Base and First Dialects | Week 1 | Complete |
 | DOC-15 | T2 | Phase 11 - Wage, Retirement, Benefit Documents | Week 3 | Pending |
 | DOC-16 | T3 | Phase 15 - Realism Polish and Upstream | Week 5 | Pending |
-| EXACT-01 | T0 | Phase 4 - Exact Arithmetic | Week 1 | Pending |
-| EXACT-02 | T0 | Phase 4 - Exact Arithmetic | Week 1 | Pending |
-| EXACT-03 | T0 | Phase 4 - Exact Arithmetic | Week 1 | Pending |
-| EXACT-04 | T0 | Phase 4 - Exact Arithmetic | Week 1 | Pending |
-| EXACT-05 | T1 | Phase 4 - Exact Arithmetic | Week 1 | Pending |
+| DOC-17 | T2 | Phase 5 - Document Base and First Dialects (added) | Week 1 | Complete |
+| EXACT-01 | T0 | Phase 4 - Exact Arithmetic | Week 1 | Done |
+| EXACT-02 | T0 | Phase 4 - Exact Arithmetic | Week 1 | Done |
+| EXACT-03 | T0 | Phase 4 - Exact Arithmetic | Week 1 | Done |
+| EXACT-04 | T0 | Phase 4 - Exact Arithmetic | Week 1 | Done |
+| EXACT-05 | T1 | Phase 4 - Exact Arithmetic | Week 1 | Done |
 | TAX-01 | T1 | Phase 8 - TY2025 Parameters and Tax Table | Week 2 | Pending |
 | TAX-02 | T1 | Phase 8 - TY2025 Parameters and Tax Table | Week 2 | Pending |
 | TAX-03 | T1 | Phase 10 - 1040 Core and Scope Guard | Week 2 | Pending |
@@ -485,26 +507,26 @@ them. Week 0 is research's addition in front of the plan's Week 1.
 | PROV-06 | T3 | Phase 15 - Realism Polish and Upstream | Week 5 | Pending |
 | PROV-07 | T2 | Phase 9 - Traceable Report Lines | Week 2 | Pending |
 | PROV-08 | T3 | Phase 15 - Realism Polish and Upstream | Week 5 | Pending |
-| SEC-01 | T0 | Phase 2 - Server Skeleton and Registration | Week 0 | Pending |
+| SEC-01 | T0 | Phase 2 - Server Skeleton and Registration | Week 0 | Done |
 | SEC-02 | T1 | Phase 6 - Guest ABI and Materialization | Week 1 | Pending |
 | SEC-03 | T1 | Phase 6 - Guest ABI and Materialization | Week 1 | Pending |
-| SEC-04 | T0 | Phase 1 - Planning-Document Corrections | Week 0 | Pending |
+| SEC-04 | T0 | Phase 1 - Planning-Document Corrections | Week 0 | Done |
 
 ### Coverage by phase
 
 | Phase | Milestone | Requirements | Count | Tiers |
 |-------|-----------|--------------|-------|-------|
-| 1. Planning-Document Corrections | Week 0 | DOCC-01, DOCC-02, DOCC-03, DOCC-04, DOCC-05, DOCC-06, SEC-04 | 7 | T0 |
+| 1. Planning-Document Corrections | Week 0 | DOCC-01, DOCC-02, DOCC-03, DOCC-04, DOCC-05, DOCC-06, DOCC-07, SEC-04 | 8 | T0 |
 | 2. Server Skeleton and Registration | Week 0 | MCP-01, MCP-02, MCP-03, MCP-04, MCP-05, SEC-01, DOC-02 | 7 | T0 |
 | 3. The Restricted Interpreter | Week 1 | EXEC-01, EXEC-02, EXEC-03, EXEC-04, EXEC-05, EXEC-06 | 6 | T0 |
 | 4. Exact Arithmetic | Week 1 | EXACT-01, EXACT-02, EXACT-03, EXACT-04, EXACT-05 | 5 | T0, T1 |
-| 5. Document Base and First Dialects | Week 1 | DOC-00, DOC-01, DOC-03, DOC-04, DOC-10, DOC-11, DOC-12, DOC-14 | 8 | T0, T1 |
+| 5. Document Base and First Dialects | Week 1 | DOC-00, DOC-01, DOC-03, DOC-04, DOC-05, DOC-10, DOC-11, DOC-12, DOC-14, DOC-17 | 10 | T0, T1, T2 |
 | 6. Guest ABI and Materialization | Week 1 | EXEC-07, EXEC-09, SEC-02, SEC-03 | 4 | T0, T1 |
 | 7. `fjs_run` and Run Records | Week 1 | EXEC-08, EXEC-10, EXEC-11, EXEC-12, PROV-03, MCP-06 | 6 | T1 |
 | 8. TY2025 Parameters and Tax Table | Week 2 | TAX-01, TAX-02, TAX-04, MCP-07 | 4 | T1 |
 | 9. Traceable Report Lines | Week 2 | PROV-01, PROV-02, PROV-07 | 3 | T1, T2 |
 | 10. 1040 Core and Scope Guard | Week 2 | TAX-03, TAX-05, TAX-06, TAX-16 | 4 | T1 |
-| 11. Wage, Retirement, Benefit Documents | Week 3 | DOC-05, DOC-08, DOC-09, DOC-15, MCP-08 | 5 | T2 |
+| 11. Wage, Retirement, Benefit Documents | Week 3 | DOC-08, DOC-09, DOC-15, MCP-08 | 4 | T2 |
 | 12. Brokerage and Capital-Gain Chain | Week 3 | DOC-06, DOC-07, DOC-13, TAX-07, TAX-08, TAX-11, TAX-15 | 7 | T2 |
 | 13. The 65+ Profile and Schedules | Week 3 | TAX-09, TAX-10, TAX-12, TAX-13, TAX-14 | 5 | T2 |
 | 14. Acceptance | Week 4 | EXEC-13, PROV-04, PROV-05 | 3 | T2 |

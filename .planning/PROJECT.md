@@ -2,8 +2,10 @@
 
 ## What This Is
 
-A user uploads their financial documents to a personal CAS, then uses ChatGPT (or any
-other MCP client) to compute tax and other financial reports over them.
+A user uploads their financial documents to a personal CAS, then uses Claude Code or
+Claude Desktop (or any other MCP client that supports local stdio servers) to compute tax
+and other financial reports over them. Remote transport (HTTPS + OAuth) — required for a
+browser-hosted client such as ChatGPT — is a v2 milestone.
 
 The agent does **not** produce the numbers itself. It writes a FunctionalScript program
 that computes the report, and the MCP server executes that program in content-addressable
@@ -88,7 +90,9 @@ a new report is a new program, not new engine code.
 - [ ] Node (or another JavaScript engine) as the first script runner, replaceable by
       `fjs` later without changing the programs it runs
 - [ ] Tax-year parameters (brackets, standard deduction, thresholds) stored as data,
-      keyed by year — never hardcoded in the engine
+      keyed by year — never hardcoded in the engine. TY2025 values come from Rev. Proc.
+      2024-40 as modified by Rev. Proc. 2025-32, not the original 2025 inflation-adjustment
+      release
 - [ ] Compute a full line-by-line 1040 plus relevant schedules for a specified year
 - [ ] Financial reports beyond the 1040, expressed as programs over the same documents
 - [ ] Every computed line traceable to the CAS hash of its source document
@@ -344,19 +348,26 @@ supersede rather than overwrite.
   returns a description of its effects; `match` dispatches each one through an
   `OperationMap` (`fjs/effects/module.f.js:282`). Restricting a program is therefore
   exactly "build a map holding only the permitted operations" — a program asking for
-  `fetch` or `readFile` finds no entry, so nothing needs intercepting or patching. The
-  v1 map holds CAS/Evo operations only.
+  `fetch` or `readFile` finds no entry, so nothing needs intercepting or patching.
+  **As of fjs 0.41.0 that is true as written**, because `match` looks the handler up with
+  `at` (`getOwnPropertyDescriptor`-based, so the prototype chain is never consulted) and
+  `assert`s it exists. Under 0.40.0 it was not: a bare `map[command]` admitted
+  `Object.prototype` members, and `__defineGetter__` installed an attacker-controlled
+  getter on the whitelist object itself — a reproduced full escape, closed by
+  functionalscript#1419. **No local guard is required.** A null-prototype map remains cheap
+  defence in depth but is no longer load-bearing. The v1 map holds CAS/Evo operations only.
 - **`import()` is outside that boundary — a known, accepted v1 hole.** `todo/plan.md`
   settles on unrestricted Node via `import()`, which executes a blob's top-level module
   body with full Node privileges *before* any effect is interpreted. An empty operation
   map does not stop a module that calls `fs.rmSync` at module scope. Genuine
   FunctionalScript modules are side-effect-free by construction, but nothing verifies
-  that for an arbitrary blob out of CAS. Accepted for Week 1 **only** because the sole
-  user is trusted and local; `todo/plan.md` Week 5 revisits it, most plausibly by parsing
-  the source with `djs/parser` before importing. This must not silently become the
-  permanent design — the input chain is *untrusted document → LLM → generated program →
-  execution*, so if the audience ever widens past one local user, it is a blocker, not a
-  cleanup task.
+  that for an arbitrary blob out of CAS. Accepted for v1 on schedule grounds — the
+  untrusted party is the document, not the user; compensating controls are `--permission`
+  (SEC-01), an import-specifier allow-list (SEC-02), and content-hash-derived filenames
+  (SEC-03). `djs/parser` cannot validate a program — it is a data-only language with no
+  function node. This must not silently become the permanent design — the input chain is
+  *untrusted document → LLM → generated program → execution*, so if the audience ever
+  widens past one local user, it is a blocker, not a cleanup task.
 - **Specs and issues live in `todo/` directories** (from AGENTS.md `## File conventions`):
   specifications, issues, bug reports, and feature requests are MarkDown files under
   `**/todo/`, next to the code they concern — e.g. `./fjs/todo/implement-mcp-server.md`.
@@ -391,8 +402,8 @@ supersede rather than overwrite.
 | The agent emits a program, not an answer | A generated number is opaque and unverifiable; a generated program is reviewable, re-runnable, diffable, and storable in CAS next to its result. This is what makes an LLM acceptable in front of tax math (PR #1) | — Pending |
 | MCP server executes FunctionalScript in content-addressable space | Follows from the above — something must run the emitted program, and running it over CAS keeps inputs, program, and output in one addressable space (PR #1) | — Pending |
 | Node first as the script runner, `fjs` later | Ships the capability without waiting on `fjs` to become self-hosting; the runner is swappable because the programs it runs are unchanged either way (PR #1) | — Pending |
-| Executed programs get CAS/Evo effects only | fjs effects are data interpreted by a runner, so the runner *is* the sandbox — an effects-only whitelist costs nothing to build because `match` already dispatches through an `OperationMap` | — Pending |
-| Unrestricted Node `import()` accepted for v1, despite the above | `import()` runs a blob's module body before any effect is interpreted, so the whitelist does not cover it. Taken knowingly: sole user is trusted and local, and closing it properly (source validation or Worker isolation) would dominate Week 1 (`todo/plan.md`) | — Pending, revisit Week 5 |
+| Executed programs get CAS/Evo effects only | fjs effects are data interpreted by a runner, so the runner *is* the sandbox — an effects-only whitelist costs nothing to build because `match` already dispatches through an `OperationMap`. Sound as written since fjs 0.41.0, whose `at`-based lookup never consults the prototype chain (functionalscript#1419). Under 0.40.0 it was not: `__defineGetter__` escaped a one-operation whitelist. No local guard is required; a null-prototype map is defence in depth only | — Holds; guard delivered upstream in 0.41.0 |
+| Unrestricted Node `import()` accepted for v1, despite the above | `import()` runs a blob's module body before any effect is interpreted, so the whitelist does not cover it. Accepted on schedule grounds, not trust grounds — the untrusted party is the document, not the user; compensating controls are `--permission` (SEC-01), an import-specifier allow-list (SEC-02), and content-hash-derived filenames (SEC-03). `djs/parser` cannot validate a program — it is a data-only language with no function node (`todo/plan.md`) | — Pending, revisit v2 |
 | stdio only, single local user | No HTTP, no auth, no hosting, no per-user isolation — the deployment model that makes the `import()` limitation tolerable (`todo/plan.md`) | — Pending |
 | OCR is the agent's own vision, not an engine | The agent reads the document and emits structured JSON, stored back through CAS/Evo. No OCR library, no third-party service — consistent with the functionalscript-only dependency rule (`todo/plan.md`) | — Pending |
 | Our own MCP server composing fjs registries | `casToolRegistry` + `evoToolRegistry` + ours, via exported `fromRegistry`/`mcpStep`/`stdioTransport`. Everything needed is already exported, so no fork and no fjs release is required to iterate | — Pending |
@@ -417,8 +428,9 @@ All four must hold:
 
 1. **Matches a real filed return.** Feed it a year already filed; every 1040 line
    matches. This is the acceptance test.
-2. **Works conversationally.** Point an agent at the MCP server, hand it documents in
-   chat, ask "what do I owe for 2025?" — it works end to end without touching code.
+2. **Works conversationally.** Point Claude Code or Claude Desktop at the MCP server, hand
+   it documents in chat, ask "what do I owe for 2025?" — it works end to end without
+   touching code.
 3. **Every number traces to a source.** Any 1040 line walks back to the exact document
    and field it came from, via CAS hashes.
 4. **The answer came from a program.** The agent produced FunctionalScript, the server
