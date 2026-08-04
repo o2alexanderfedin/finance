@@ -1,3 +1,8 @@
+# Project-local CAS/Evo content store (fjs/server/module.f.js). CAS has no
+# delete operation, so this must never be committed: a real secret written
+# into a shared, tracked store can never be taken back (DOC-02).
+/.cas
+
 # Logs
 logs
 *.log
