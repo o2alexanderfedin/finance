@@ -168,7 +168,10 @@ These were established by execution, not inference. Any replan must preserve the
   4. A FunctionalScript issue exists for the `match` prototype-dispatch soundness hole with the `__defineGetter__` reproduction attached, and its URL is recorded in the repo.
   5. The TY2025 parameter-sourcing rule (Rev. Proc. 2024-40 **as modified by Rev. Proc. 2025-32**) is written where Phase 8 will read it, with the original 2025 inflation release named as the wrong source.
 **Research**: Not needed — every correction is already established.
-**Plans**: TBD
+**Plans**: 3 plans
+- [ ] 01-01-PLAN.md — Correct false mechanism/trust/audience claims (PROJECT.md, README.md, todo/plan.md, fjs/todo/implement-mcp-server.md)
+- [ ] 01-02-PLAN.md — Reconcile storage-boundary money representation (REQUIREMENTS.md, ROADMAP.md)
+- [ ] 01-03-PLAN.md — Correct Sergey's upstream file, file the FunctionalScript issue, record its URL
 
 ### Phase 2: Server Skeleton, Safe Registration, Project-Local Store
 **Milestone**: Week 0 — Corrections and Integration Smoke Test
