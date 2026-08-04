@@ -37,6 +37,11 @@ a new report is a new program, not new engine code.
 - [ ] MCP server exposing finance tools over stdio, following the `fjs/mcp`
       `casMcpServer` pattern
 - [ ] Store financial documents in CAS as Evo objects (subject + revision + snapshot)
+- [ ] **Many entities under one user, from stage one.** One controlling user owns the whole
+      store, but documents and reports belong to distinct entities — a taxpayer that may be
+      personal or business. The Evo subject model must carry an entity dimension from the
+      first stored document (open question 2); retrofitting it means renaming subjects that
+      already exist. Independent of multi-*user*, which stays out of scope
 - [ ] Store raw PDF statement bytes without parsing them
 - [ ] Accept agent-supplied JSON as an extracted-document input — the settled v1
       ingestion path (agent vision reads the document → emits a `vnd.fjs.*` dialect →
@@ -108,8 +113,13 @@ a new report is a new program, not new engine code.
   *feature*, but must not foreclose it (pure programs, parameters as data, scenarios as
   Evo branches).
 - **Non-US tax jurisdictions** — one jurisdiction's rules are enough scope for v1.
-- **Business / self-employment tax** (Schedule C, depreciation, quarterly estimates) —
-  personal income tax only.
+- **Business / self-employment tax computation** (Schedule C, depreciation, quarterly
+  estimates) — personal income tax only. **Note the seam:** a business *entity* is
+  representable from stage one (see the multi-entity requirement), because the entity axis
+  is a data-model decision. Computing business returns is a separate, still-excluded scope
+  decision. The two are consistent, but the gap is visible to a user: once the store can
+  hold a business taxpayer, asking for its return is the obvious next request. Worth
+  confirming against open question 1 (tax scope) rather than leaving implied.
 - **Multi-user / multi-client operation** — personal use, so no auth, tenancy isolation,
   or liability surface. **Confirmed** by the answer to `todo/plan.md` open question 7:
   target a single user. The "multiple users" phrasing in
@@ -119,6 +129,12 @@ a new report is a new program, not new engine code.
   serving several users is in progress separately — so this is **deferred, not rejected**:
   v1 ships no multi-user feature but should avoid decisions that would have to be undone,
   the same posture as scenario modeling above.
+
+  **Do not confuse this with multi-*entity*, which is in scope from stage one.** One user
+  controls the store; the documents inside it belong to different entities (a personal or
+  business taxpayer). Access is single-user; the data model is multi-entity. Excluding
+  tenancy does not license a single-taxpayer data model — see the requirement above and
+  open question 2.
 - **Filing or transmission** — the output is numbers to transcribe, not an e-filed
   return.
 
@@ -228,7 +244,7 @@ is unchanged from 0.40.0 — verified; 0.41.0's change here is the `match` fix a
 | `fjs/protocol/mcp/stdio` | `stdioTransport` — read→parse→dispatch→write loop, testable against mock stdin/stdout with no real process |
 | `fjs/cas` | `FileCas` — streaming SHA-2 content store, 128 KiB chunks, lock-free staging writes |
 | `fjs/cas/evo` | Evo — subjects and revision heads (a DAG) cached over the CAS |
-| `fjs/mcp` | `casMcpServer(home)` — a complete working seven-tool CAS+Evo MCP server (`cas_add`, `cas_get`, `cas_list`, `evo_list`, `evo_head`, `evo_revision`, `evo_add`), with its tool registries at `fjs/mcp/cas` and `fjs/mcp/evo`. **This is the template to follow.** |
+| `fjs/mcp` | `casMcpServer(home)` — a complete working seven-tool CAS+Evo MCP server (`cas_add`, `cas_get`, `cas_list`, `evo_list`, `evo_head`, `evo_revision`, `evo_add`), with its tool registries at `fjs/mcp/cas` and `fjs/mcp/evo`. **This is the template to follow.** Note as of 0.41.0 `evo_list` takes an optional `archived?: true` and lists *active* subjects by default — those with at least one non-archived head — rather than every subject; our own listing tools should follow that default rather than reinventing it. |
 | `fjs/media/revision` | The `vnd.fjs.revision` blob format and its validation |
 | `fjs/effects` | `Effect<O,T>` as data plus the runners that interpret it — `effects/node` (real process), `effects/mock` (`run(o)`, where the handler `o` *defines* the operation universe) |
 
@@ -432,15 +448,23 @@ question 7, which has since been answered too.
 2. **Evo subject model** — one subject per uploaded document with parsed representations
    as revisions, and what the naming scheme is. Annoying to change once documents exist,
    so it wants deciding before Track B ships. Cited by `todo/plan.md` Week 1 step 8.
+   **Now partly constrained:** the scheme must carry an entity dimension, since one store
+   holds documents for several entities (personal or business taxpayers). Open within that:
+   whether an entity is itself an Evo subject with its own revision chain — probably yes,
+   since entity attributes change over time and that is how this project versions
+   everything — and whether the entity appears in the document body or only in the Evo
+   envelope. This is also where the deferred multi-user design is most easily foreclosed.
 3. **OCR format** — is the raw vision output a stored artifact in its own right, or a
    transient step? The auditability rationale in Core Value argues for storing it: it is
    the record of what the model actually saw, before interpretation.
 4. ~~**Deadline and definition of done**~~ — **answered** in
    [issue #16](https://github.com/fjs-dev/finance/issues/16#issuecomment-5171851184): five
    weeks, externally driven. Reports are **updated as new Evo revisions** when one already
-   exists for that year and user — so reports get the same versioning as documents, which
-   is a requirement this document did not previously state. Scope stays a deliberately
-   small subset, narrowed during development with a running covered/not-covered list.
+   exists for that year and **entity** — so reports get the same versioning as documents,
+   which is a requirement this document did not previously state. (#16 said "year and
+   user"; since one user's store holds several entities, the entity is the axis that
+   varies — see the multi-entity requirement.) Scope stays a deliberately small subset,
+   narrowed during development with a running covered/not-covered list.
 5. **`fjs_run` result disposition** — returned inline, or written back to CAS and answered
    with a hash? **Blocking for the execution boundary above:** it decides whether the
    whitelist includes CAS *writes*. Writing results back is what would make Success
