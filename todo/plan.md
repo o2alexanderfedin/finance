@@ -6,12 +6,19 @@ These constrain everything below.
 
 | Area | Decision |
 |---|---|
-| Transport / audience | stdio only, single local user. No HTTP, no auth, no hosting. |
+| Transport / audience | stdio only, single local user. No HTTP, no auth, no hosting. Confirmed by the answer to open question 7 — several people each run their own personal CAS and server; one deployment serving several users is a separate design effort, not this project. |
+| **User vs entity** | **One controlling user, many entities — from stage one.** The single user owns and accesses the whole store; the *documents* belong to different entities, e.g. a taxpayer that may be personal or business. These are independent axes and must not be conflated: "one user" is an access/deployment fact, "many entities" is a data-model fact. Multi-entity is **in scope now**, multi-user is not. |
 | Execution engine | Unrestricted Node via `import()`. The *runner* interprets a whitelisted operation set (CAS/EVO); non-whitelisted ops are refused. |
-| Import-time safety | Accepted limitation. A blob's top-level module body runs with full Node privileges before any effect is interpreted. Accepted on schedule grounds, not trust grounds — the untrusted party is the document, not the user; compensating controls are `--permission` (SEC-01), an import-specifier allow-list (SEC-02), content-hash-derived filenames (SEC-03). |
+| Import-time safety | Accepted limitation. A blob's top-level module body runs with full Node privileges before any effect is interpreted. Tolerable only because the sole user is trusted and local. |
 | OCR | The agent's own vision. It reads the document and emits structured JSON, which is stored back through CAS/Evo. No OCR engine, no third-party service. |
 | Server location | Our own MCP server in this repo, composing FunctionalScript's exported registries. No fork, no FJS release needed to iterate. |
 | Why programs, not answers | Correctness and auditability. LLM arithmetic is unreliable; a stored program is deterministic, reviewable, and re-runnable. |
+| Deadline | Five weeks, externally driven ([#16](https://github.com/fjs-dev/finance/issues/16#issuecomment-5171851184)). This is what makes the scope questions below real rather than academic. |
+| Definition of done | Users add raw documents to CAS via their AI agent and ask for reports. A report already held for a given year and **entity** is **updated as a new Evo revision**, not rewritten — so reports are versioned exactly like documents. Each tax year may carry different rules and forms. (Issue #16 said "year and user"; per the User-vs-entity row, the axis that varies within one store is the entity.) |
+| Scope discipline | Deliberately a small subset of reports and documents, narrowed *during* development rather than fixed up front, with a running list of what is covered and what is not. Coverage grows incrementally as real situations appear. |
+| Not in these five weeks | A dynamic system where the AI itself adds new document types. The aim, but explicitly beyond this project. |
+| Domain facts go to a specialist | Where a tax rule is unverified — worksheet line ordering, Tax Table band widths, 1099-R / SSA-1099 box lists, MAGI add-back lists — the answer is a **list of questions for our tax specialist and advisor**, not our own reading of IRS PDFs ([#16](https://github.com/fjs-dev/finance/issues/16) B1–B4). |
+| Vetted script utilities in CAS | Report programs draw on a shared library of utilities published into CAS, rather than each agent authoring tax logic from scratch — the answer to "determinism makes a wrong *method* reproducible too" ([#16](https://github.com/fjs-dev/finance/issues/16) D1). Publishing predefined scripts across CAS systems is its own task. |
 
 Consequence worth designing for deliberately: the program *and* its inputs are both content-addressed, so every report can cite `programHash` + input hashes and be exactly reproducible. Auditability being the driver, this should be part of `fjs_run`'s contract rather than an accident.
 
@@ -32,8 +39,8 @@ Two independent tracks. The execution spine carries nearly all the technical ris
 **Track A — execution spine** (spec: [fjs/todo/implement-mcp-server.md](../fjs/todo/implement-mcp-server.md))
 
 1. **Our MCP server entry point.** Compose `casToolRegistry` + `evoToolRegistry` + our new registry via the exported `fromRegistry` / `mcpStep` / `stdioTransport`. Registers with `claude mcp add`.
-2. **CAS/EVO effects.** Decide which operations a stored program may request. `Cas<O>`/`Evo<O>` are already effect-based, so this is largely choosing the surface and wiring it into an operation map.
-3. **The restricted runner.** An `OperationMap` holding only whitelisted ops, driven by `asyncRun`. Unknown ops must fail as a clean, reported error — not the raw `TypeError` that `match` produces today.
+2. **CAS/EVO effects.** Define the *semantic* vocabulary a stored program may express — `casRead`, `casList`, `evoHead`, … — **not** `FileCasOperation`, which is `Rm | WriteBytes | Rename | Mkdir | …` and would hand the program raw filesystem mutation. `Cas<O>` is generic in its underlying operation set exactly so the filesystem stays server-side inside the handlers. This step is the sandbox; step 3 only enforces it.
+3. **The restricted runner.** A **total** `ToAsyncOperationMap` over that vocabulary, driven by `asyncRun` — total over a narrow set, not a wide set with entries removed. Detection of an out-of-vocabulary command is fjs's since 0.41.0 (`match` does an own-property lookup and throws the command name), so our part is catching it at the `fjs_run` boundary and reporting `operation not permitted: <command>`. Note the throw is a bare **string**, not an `Error`. Spec: [`fjs/todo/implement-mcp-server.md`](../fjs/todo/implement-mcp-server.md).
 4. **The `fjs_run` tool.** `{ hash }` → read blob → `import()` → call its entry point → interpret its effect under the restricted runner → return the result.
 
 Step 3 is the real work; 1 and 4 are assembly over existing FunctionalScript exports.
@@ -60,10 +67,6 @@ If the week runs short, Track A is what must land: without it the project has no
 
 Goal: **a report program produces a correct figure over real parsed documents.**
 
-TY2025 figures (standard deduction, brackets, thresholds) must be sourced from Rev. Proc.
-2024-40 as modified by Rev. Proc. 2025-32, never the original 2025 inflation-adjustment
-release.
-
 Scope depends on the tax question below. The shape does not: the agent authors a FunctionalScript program, it runs under the restricted runner, and the output is reproducible from stored hashes.
 
 Start with a single unambiguous aggregate before anything involving brackets, deductions, or filing status.
@@ -83,17 +86,38 @@ Goal: **the full path works on the user's own documents.**
 ## Week 5 (Technical Debt)
 
 - Upstream whatever has stabilized into FunctionalScript (per AGENTS.md staging rule) — most likely the CAS effects, and `fjs_run` if its shape has settled.
-- **Work the `fjs/todo/upstream-*.md` queue.** Every FJS bug or gap worked around locally has a file there stating the gap, the workaround, and the intended upstream fix; this is where they get fixed upstream, released, and the local workarounds deleted. Open at the start of Week 1: [`upstream-match-partial-operation-map.md`](../fjs/todo/upstream-match-partial-operation-map.md) (blocking a clean refusal message from the restricted runner) and [`upstream-media-dialect-registry.md`](../fjs/todo/upstream-media-dialect-registry.md) (blocks `fjs/media` detection of our document types; may be wanted as early as Week 3).
-- `djs/parser` cannot validate an agent-authored program (data-only language, no function node); a genuine source validator, if ever wanted, is v2 work, not Week 5. Worker/child-process isolation is the other v2 candidate.
+- **Work the `fjs/todo/upstream-*.md` queue.** Every FJS bug or gap worked around locally has a file there stating the gap, the workaround, and the intended upstream fix; this is where they get fixed upstream, released, and the local workarounds deleted. Open at the start of Week 1: [`upstream-media-dialect-registry.md`](../fjs/todo/upstream-media-dialect-registry.md) (blocks `fjs/media` detection of our document types; may be wanted as early as Week 3). Closed: [functionalscript#1419](https://github.com/functionalscript/functionalscript/pull/1419), `match` dispatching through the prototype chain — **fixed in 0.41.0**, which this repo now uses, so no local guard is needed.
+- Revisit execution safety: validating source as genuine FunctionalScript before `import()`, and/or Worker isolation with hard limits. Week 1 deliberately defers both.
 - Whatever the first four weeks accumulated.
 
 ## Open Questions
 
 Proposed defaults below are suggestions, not decisions.
 
+Related: [issue #16](https://github.com/fjs-dev/finance/issues/16) is the register of open
+questions and unverified assumptions from the research pass behind #14 — scope/schedule
+tension, unverified domain facts, and thin-evidence assumptions. It is a different list
+from this one (that one is *research* assumptions, this one is *design* decisions), and
+answering question 4 there answered it here.
+
 1. **Tax scope.** Jurisdiction, tax year, and which forms? Is the output authoritative, or an estimate the user reviews? The only genuinely unbounded item in the plan, and it drives Weeks 2–3 entirely. *Proposed default: US federal, TY2025, W-2 and 1099-INT/DIV only, explicitly a reviewed estimate — narrow enough to finish, real enough to be useful.*
 2. **Evo subject model.** Is each uploaded document its own subject, with parsed representations as successive revisions? What is the naming scheme — user-facing (`doc/2025/1099-int/chase`), content-derived, or otherwise? Blocks Week 1 Track B, and is annoying to change once documents exist.
+
+   **Now constrained: the scheme must carry an entity dimension** (Settled Decisions, *User vs entity*). Every document and every report belongs to some entity — a personal or business taxpayer — and one store holds several. So a name like `doc/2025/1099-int/chase` is already insufficient; it needs the entity, e.g. `<entity>/doc/2025/1099-int/chase`. Two sub-questions this raises, both cheap now and expensive later:
+   - **Is an entity itself an Evo subject?** It plausibly should be — an entity has attributes that change over time (name, address, filing status, EIN/SSN reference) and a revision chain is exactly how this project versions everything else. Then a document's subject references the entity's subject rather than embedding a string.
+   - **Does the entity live in the document body or only in the Evo layer?** Consistent with money-vs-provenance elsewhere, it belongs in the envelope, not duplicated into every `vnd.fjs.*` payload. Worth confirming when the base format is settled (Week 1 step 5).
+
+   This is also the main place the deferred multi-user design could be foreclosed. An entity that already has its own identity is straightforward to associate with an owner later; entity-as-a-path-prefix-string is much less so.
 3. **OCR format.** Is the raw vision output a stored artifact in its own right (auditable: what the model actually saw, before interpretation), or a transient step that only the narrowed `vnd.fjs.*` document persists from? The auditability rationale argues for storing it.
-4. **Deadline and definition of done.** Is an external date driving five weeks, or is it a self-imposed cadence? What must be demonstrably working for the MVP to count?
+4. ~~**Deadline and definition of done.**~~ **Answered** in [issue #16](https://github.com/fjs-dev/finance/issues/16#issuecomment-5171851184): the deadline is **five weeks**, externally driven. Minimal definition of done — users add raw documents to CAS through their AI agent, then ask for reports; when CAS already holds a report for that year and entity (#16 said "user"; see the User-vs-entity row), the agent **updates** it as a new Evo revision rather than writing a fresh one; each tax year may carry different rules and forms. Scope is deliberately a small subset of reports and documents, narrowed during development rather than fixed up front, with a running list of what is covered and what still needs implementing. A dynamic system where the AI adds new document types is the eventual aim but **out of scope for these five weeks**. See the Settled Decisions table above; the "multiple users" part of it is resolved in question 7.
 5. **`fjs_run` result disposition.** Return the result inline, or write it back to CAS (possibly as an Evo revision) and return its hash? Writing it back gives a permanent audit trail and suits the stated rationale; returning inline is simpler and lets `fjs_run` stay read-only over CAS.
 6. **`fjs_run` entry point convention.** What does a stored report program export, and with what signature? FunctionalScript names entry points by role — `proof` for tests, `main` for Node CLI programs (`(options) => Effect<NodeOp, number>`) — so a report program is a third role. Reusing `main` buys CLI runnability for debugging, but its signature returns an exit code, takes CLI options we have no use for, and is typed over `NodeOp`, which includes `Fetch`/`Http`/`Fs`/`Forever` — the very operations the restricted runner denies. *Proposed default: a distinct name with a signature shaped `(args) => Effect<CasOp, T>`, so the whitelist is expressed in the type rather than only enforced at runtime.* Downstream of question 5, which fixes `T` and whether writes are in `CasOp`. Expensive to change later: every program already stored in CAS follows whatever convention was current when it was written. Detail in [fjs/todo/implement-mcp-server.md](../fjs/todo/implement-mcp-server.md).
+7. ~~**Single user, or multiple?**~~ **Answered: target a single user.** A design for multiple users is being worked on separately and is not part of this project. This is the cheap reading of the two below, so the Settled Decisions above are confirmed rather than contradicted: *Transport / audience* stays "stdio only, single local user", per-user isolation and auth stay out of v1, and the `import()` limitation stays a Week 5 revisit rather than becoming a v1 blocker. The "that year **and user**" phrasing in [issue #16](https://github.com/fjs-dev/finance/issues/16#issuecomment-5171851184) is therefore a subject-naming detail, feeding question 2 — not multi-tenancy. Refined further by the *User vs entity* decision: one store does hold documents for several **entities** (personal or business taxpayers), so that axis is real and in scope from stage one; it is *users* that stay singular.
+
+   The two readings, kept because the distinction is what makes the answer load-bearing:
+   - **Several users, each with their own personal CAS and their own stdio server.** ← *this one.* "Personal CAS" already implies one per person. Nothing changes.
+   - **One deployment serving several users.** Would have pulled per-user isolation, authentication, and a real answer to import-time execution into v1 scope.
+
+   **Does not settle the `import()` justification.** "Single local user" answers *who may connect*; it does not establish that unrestricted `import()` is safe, because the untrusted party in this system is the **document**, not the user (see `.planning/research/PITFALLS.md` Pitfall 1). The deferral still needs re-grounding on schedule grounds with explicit compensating controls — tracked separately in `.planning/ROADMAP.md`. Do not read this answer as closing that.
+
+   Since multi-user is an active design effort rather than a rejected idea, v1 should avoid foreclosing it — the same posture as scenario modeling: no multi-user *feature*, but no decision that would have to be undone.

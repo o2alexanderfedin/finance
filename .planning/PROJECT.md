@@ -39,6 +39,11 @@ a new report is a new program, not new engine code.
 - [ ] MCP server exposing finance tools over stdio, following the `fjs/mcp`
       `casMcpServer` pattern
 - [ ] Store financial documents in CAS as Evo objects (subject + revision + snapshot)
+- [ ] **Many entities under one user, from stage one.** One controlling user owns the whole
+      store, but documents and reports belong to distinct entities — a taxpayer that may be
+      personal or business. The Evo subject model must carry an entity dimension from the
+      first stored document (open question 2); retrofitting it means renaming subjects that
+      already exist. Independent of multi-*user*, which stays out of scope
 - [ ] Store raw PDF statement bytes without parsing them
 - [ ] Accept agent-supplied JSON as an extracted-document input — the settled v1
       ingestion path (agent vision reads the document → emits a `vnd.fjs.*` dialect →
@@ -70,10 +75,16 @@ a new report is a new program, not new engine code.
 - [ ] Execute agent-authored FunctionalScript programs in content-addressable space —
       the MCP server runs the program, the agent does not compute reports directly
 - [ ] Define Effects for CAS — the effect vocabulary an executed program may express
-- [ ] Restricted runner: an `OperationMap` holding only whitelisted CAS/Evo operations,
-      driven by `asyncRun` — a program requesting `fetch`/`readFile` finds no entry
-- [ ] Unknown operations fail as a clean, reported error (`operation not permitted:
-      fetch`), not the raw `TypeError` that `match` produces today
+- [ ] Restricted runner: a **total** `ToAsyncOperationMap` over a purpose-built *semantic*
+      CAS/Evo vocabulary (`casRead`, `casList`, `evoHead`, …), driven by `asyncRun`.
+      **Not** `FileCasOperation` — that is `Rm | WriteBytes | Rename | Mkdir | …`, raw
+      filesystem mutation, and whitelisting it would leave the sandbox open while looking
+      closed. Filesystem operations stay server-side inside the handlers, never in the
+      program's operation set — `Cas<O>` is generic in its underlying operation set exactly
+      so this is possible. Specified in `fjs/todo/implement-mcp-server.md`
+- [ ] Unknown operations reported as `operation not permitted: <command>`. Detection is
+      fjs's since 0.41.0 (own-property lookup, throws the command name); ours is catching
+      it at the `fjs_run` boundary — noting the throw is a bare string, not an `Error`
 - [ ] An `fjs_run` MCP tool: `{ hash }` → read blob → `import()` → call entry point →
       interpret under the restricted runner → return the result
 - [ ] Node (or another JavaScript engine) as the first script runner, replaceable by
@@ -106,10 +117,28 @@ a new report is a new program, not new engine code.
   *feature*, but must not foreclose it (pure programs, parameters as data, scenarios as
   Evo branches).
 - **Non-US tax jurisdictions** — one jurisdiction's rules are enough scope for v1.
-- **Business / self-employment tax** (Schedule C, depreciation, quarterly estimates) —
-  personal income tax only.
+- **Business / self-employment tax computation** (Schedule C, depreciation, quarterly
+  estimates) — personal income tax only. **Note the seam:** a business *entity* is
+  representable from stage one (see the multi-entity requirement), because the entity axis
+  is a data-model decision. Computing business returns is a separate, still-excluded scope
+  decision. The two are consistent, but the gap is visible to a user: once the store can
+  hold a business taxpayer, asking for its return is the obvious next request. Worth
+  confirming against open question 1 (tax scope) rather than leaving implied.
 - **Multi-user / multi-client operation** — personal use, so no auth, tenancy isolation,
-  or liability surface.
+  or liability surface. **Confirmed** by the answer to `todo/plan.md` open question 7:
+  target a single user. The "multiple users" phrasing in
+  [issue #16](https://github.com/fjs-dev/finance/issues/16#issuecomment-5171851184) means
+  several people each running their own personal CAS and server, so "that year and user"
+  is a subject-naming detail (open question 2), not tenancy. A design for one deployment
+  serving several users is in progress separately — so this is **deferred, not rejected**:
+  v1 ships no multi-user feature but should avoid decisions that would have to be undone,
+  the same posture as scenario modeling above.
+
+  **Do not confuse this with multi-*entity*, which is in scope from stage one.** One user
+  controls the store; the documents inside it belong to different entities (a personal or
+  business taxpayer). Access is single-user; the data model is multi-entity. Excluding
+  tenancy does not license a single-taxpayer data model — see the requirement above and
+  open question 2.
 - **Filing or transmission** — the output is numbers to transcribe, not an e-filed
   return.
 
@@ -190,17 +219,28 @@ Both `todo/` documents arrived in PR #1 (`f57fd50`). Where this file and `todo/p
 disagreed on execution safety, `todo/plan.md` won — it is the more concrete and more
 honest account, and Constraints below were corrected to match it.
 
-**Known upstream fjs gap.** `match` has no notion of a partial `OperationMap`:
-`map[command]` is `undefined` for an absent operation, so it throws
-`TypeError: map[command] is not a function` rather than reporting a refusal. That makes
-the single most likely failure mode — an agent writing a program that reaches for the
-network — undebuggable. Per AGENTS.md, working around it locally is fine so long as the
-workaround is recorded rather than silent; tracked in
-[`fjs/todo/upstream-match-partial-operation-map.md`](../fjs/todo/upstream-match-partial-operation-map.md)
-for upstreaming.
+**Upstream fjs gap — closed in 0.41.0.** `match` used to dispatch with
+`map[command](...payload)`, an ordinary property lookup that resolved inherited
+`Object.prototype` members (`__defineGetter__`, `constructor`, `toString`) and invoked them
+with the payload, whatever the map contained — so the bound was escapable by naming an
+inherited property. Reported as
+[functionalscript#1419](https://github.com/functionalscript/functionalscript/pull/1419).
+0.41.0 replaces the lookup with `at(command)(map)` (`getOwnPropertyDescriptor`-based, so
+the prototype chain is never consulted) plus `assert(handler !== null, command)`, which
+also names the refused command. Verified against 0.41.0, which this repo now uses; **no
+local guard is required**. One detail that survives into our code: `assert` throws its
+message, so a refusal arrives as a bare **string**, not an `Error`.
 
-**What fjs already provides.** `functionalscript@0.40.0` ships most of the
-infrastructure, so the finance-specific work is domain logic, not plumbing:
+An earlier version of this section claimed a second gap — that `match` "has no notion of a
+partial `OperationMap`" — and that was wrong. `OperationMap`, `ToAsyncOperationMap`, and
+`MemOperationMap` are all mapped types over their operation union (`[K in O[0]]`), hence
+total by construction, and every runner constrains the effect to a subset of the map
+(`<O1 extends O, T>(e: Effect<O1, T>)`). The map defines the operation universe; we need no
+partiality and fjs offers none. Recorded here so it is not re-derived.
+
+**What fjs already provides.** `functionalscript@0.41.0` ships most of the
+infrastructure, so the finance-specific work is domain logic, not plumbing. (Module layout
+is unchanged from 0.40.0 — verified; 0.41.0's change here is the `match` fix above.)
 
 | Module | What it gives us |
 |---|---|
@@ -208,11 +248,11 @@ infrastructure, so the finance-specific work is domain logic, not plumbing:
 | `fjs/protocol/mcp/stdio` | `stdioTransport` — read→parse→dispatch→write loop, testable against mock stdin/stdout with no real process |
 | `fjs/cas` | `FileCas` — streaming SHA-2 content store, 128 KiB chunks, lock-free staging writes |
 | `fjs/cas/evo` | Evo — subjects and revision heads (a DAG) cached over the CAS |
-| `fjs/mcp` | `casMcpServer(home)` — a complete working seven-tool CAS+Evo MCP server (`cas_add`, `cas_get`, `cas_list`, `evo_list`, `evo_head`, `evo_revision`, `evo_add`), with its tool registries at `fjs/mcp/cas` and `fjs/mcp/evo`. **This is the template to follow.** |
+| `fjs/mcp` | `casMcpServer(home)` — a complete working seven-tool CAS+Evo MCP server (`cas_add`, `cas_get`, `cas_list`, `evo_list`, `evo_head`, `evo_revision`, `evo_add`), with its tool registries at `fjs/mcp/cas` and `fjs/mcp/evo`. **This is the template to follow.** Note as of 0.41.0 `evo_list` takes an optional `archived?: true` and lists *active* subjects by default — those with at least one non-archived head — rather than every subject; our own listing tools should follow that default rather than reinventing it. |
 | `fjs/media/revision` | The `vnd.fjs.revision` blob format and its validation |
-| `fjs/effects` | `Effect<O,T>` as data plus the runners that interpret it — `effects/node` (real process), `effects/mock` (`run(o)`, honoring only the effects handler `o` implements) |
+| `fjs/effects` | `Effect<O,T>` as data plus the runners that interpret it — `effects/node` (real process), `effects/mock` (`run(o)`, where the handler `o` *defines* the operation universe) |
 
-**What is genuinely net-new:** document parsers (as of 0.40.0 fjs `media` carries `json`,
+**What is genuinely net-new:** document parsers (fjs `media` carries `json`,
 `html`, `revision`, `nix`, and `type` — no financial formats exist), the report/tax
 computation programs, per-year tax parameter data, the finance-specific MCP tools and
 RTTI schemas, and the script execution path.
@@ -253,9 +293,12 @@ classifying a blob of unknown provenance.
 **Program execution is half-built already.** There is no "evaluate this FunctionalScript
 source" module in fjs — `fjs/fsc` covers compile workflows and `fjs/djs` transpiles data,
 so loading agent-authored source is net-new work. But the *interpretation* half exists:
-`fjs/effects/mock`'s `run(o)` walks an effect chain and honors only what the handler `o`
-implements. A CAS-only runner is that same shape with a CAS handler — which is why the
-sandbox constraint below is structural rather than something to bolt on.
+`fjs/effects/mock`'s `run(o)` walks an effect chain, and the handler `o` *defines* the
+operation universe — `run: <O, S>(o: MemOperationMap<O, S>) => (state) => <O1 extends O,
+T>(effect: Effect<O1, T>)`, so an effect may only request operations the handler covers.
+(Not "honors what it implements and ignores the rest", as this said previously — there is
+no partial handler.) A CAS-only runner is that same shape with a CAS vocabulary, which is
+why the sandbox constraint below is structural rather than something to bolt on.
 
 **How Evo models the domain.** A subject is the identity of a mutable thing; a revision
 is an immutable blob `{dialect, subject, parents[], snapshot, generation, archived?}`
@@ -285,9 +328,10 @@ supersede rather than overwrite.
   - If you find a bug or gap in FunctionalScript, **tell the user** so it can be fixed and
     a new fjs version released. Working around it locally is allowed and should not block
     progress — but never silently: record it in `fjs/todo/upstream-<short-name>.md`, which
-    is also the Week 5 upstreaming queue. Two are open already
-    ([`match`](../fjs/todo/upstream-match-partial-operation-map.md), [media dialect
-    registry](../fjs/todo/upstream-media-dialect-registry.md)).
+    is also the Week 5 upstreaming queue. One is open
+    ([media dialect registry](../fjs/todo/upstream-media-dialect-registry.md)); the
+    [`match` prototype lookup](https://github.com/functionalscript/functionalscript/pull/1419)
+    was reported and fixed in 0.41.0 — the intended lifecycle, start to finish.
 - **Typing**: JSDoc comments only, validated by TypeScript with `noEmit`. No `.ts` source
   files. `tsconfig.json` is maximally strict and is the record of which flags are set;
   per AGENTS.md, don't relax one to silence an error.
@@ -401,16 +445,36 @@ document's claims. Do not answer them here; answer them there and update this fi
 "plan open question 5"), so renumbering here silently breaks references in documents this
 file does not own.
 
+A separate register lives in [issue #16](https://github.com/fjs-dev/finance/issues/16) —
+open questions and *unverified assumptions* from the research pass behind #14 (scope
+versus schedule, unread worksheets, contradicted Tax Table band widths, thin-evidence
+assumptions). Different in kind from the list below: these are design decisions, those are
+research facts nobody has checked. The answers there settled question 4 and raised
+question 7, which has since been answered too.
+
 1. **Tax scope** — jurisdiction, year, forms, and whether the output is authoritative or a
    reviewed estimate. The only genuinely unbounded item; it drives Weeks 2–3 and decides
    how much of the "Compute a full line-by-line 1040" requirement is really v1.
 2. **Evo subject model** — one subject per uploaded document with parsed representations
    as revisions, and what the naming scheme is. Annoying to change once documents exist,
    so it wants deciding before Track B ships. Cited by `todo/plan.md` Week 1 step 8.
+   **Now partly constrained:** the scheme must carry an entity dimension, since one store
+   holds documents for several entities (personal or business taxpayers). Open within that:
+   whether an entity is itself an Evo subject with its own revision chain — probably yes,
+   since entity attributes change over time and that is how this project versions
+   everything — and whether the entity appears in the document body or only in the Evo
+   envelope. This is also where the deferred multi-user design is most easily foreclosed.
 3. **OCR format** — is the raw vision output a stored artifact in its own right, or a
    transient step? The auditability rationale in Core Value argues for storing it: it is
    the record of what the model actually saw, before interpretation.
-4. **Deadline and definition of done** — whether an external date drives the five weeks.
+4. ~~**Deadline and definition of done**~~ — **answered** in
+   [issue #16](https://github.com/fjs-dev/finance/issues/16#issuecomment-5171851184): five
+   weeks, externally driven. Reports are **updated as new Evo revisions** when one already
+   exists for that year and **entity** — so reports get the same versioning as documents,
+   which is a requirement this document did not previously state. (#16 said "year and
+   user"; since one user's store holds several entities, the entity is the axis that
+   varies — see the multi-entity requirement.) Scope stays a deliberately small subset,
+   narrowed during development with a running covered/not-covered list.
 5. **`fjs_run` result disposition** — returned inline, or written back to CAS and answered
    with a hash? **Blocking for the execution boundary above:** it decides whether the
    whitelist includes CAS *writes*. Writing results back is what would make Success
@@ -427,6 +491,19 @@ file does not own.
    above. Downstream of question 5 (it fixes `T` and whether writes are in `CasOp`), and
    expensive to revisit once programs are stored, since each blob is frozen against the
    convention in force when it was written.
+7. ~~**Single user, or multiple?**~~ **Answered: a single user.** Several people each run
+   their own personal CAS and server; one deployment serving several users is a separate
+   design effort still in progress, not this project. So the Out of Scope entry and the
+   Key Decision "stdio only, single local user" are confirmed rather than contradicted,
+   per-user isolation and auth stay out of v1, and the restricted runner is sufficient for
+   v1 rather than the first of two layers. Multi-user is deferred, not rejected — avoid
+   decisions that would foreclose it.
+
+   This does **not** settle the `import()` deferral. "Single local user" answers who may
+   connect; it does not make unrestricted `import()` safe, because the untrusted party is
+   the document, not the user (`research/PITFALLS.md` Pitfall 1). That justification still
+   needs re-grounding on schedule grounds with named compensating controls, per
+   `ROADMAP.md`.
 
 Additionally, owned by [`fjs/todo/implement-mcp-server.md`](../fjs/todo/implement-mcp-server.md)
 and decidable during implementation — recorded here so they are not lost, not to be

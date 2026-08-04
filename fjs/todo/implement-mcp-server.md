@@ -24,7 +24,7 @@ The last two are deliberate Week 1 deferrals, revisited in Week 5.
 
 ## What already exists
 
-`functionalscript@0.40.0`. Note the split: the generic protocol helpers are at
+`functionalscript@0.41.0`. Note the split: the generic protocol helpers are at
 `fjs/protocol/mcp/`, while `fjs/mcp/` is the *CAS server* built on top of them.
 
 | Need | Reuse |
@@ -119,41 +119,75 @@ A FunctionalScript program does not perform effects — it *returns a descriptio
 of them. `match` dispatches each requested operation through an `OperationMap`:
 
 ```js
-// fjs/effects/module.f.js:282
+// fjs/effects/module.f.js — as of 0.41.0
 export const match = map => e => {
     if (typeof e === 'function') { return ['done', e()] }
     const { command, payload, continuation } = e
-    return ['cont', map[command](...payload), continuation]
+    const handler = at(command)(map)
+    assert(handler !== null, command)
+    return ['cont', handler(...payload), continuation]
 }
 ```
 
-So restricting what a program can do is exactly: **build an `OperationMap`
-containing only the permitted operations.** A program requesting `fetch`,
-`readFile`, or `exec` finds no entry — true only if the lookup guard is
-`Object.hasOwn` against a null-prototype map. A naive `in` or `!== undefined`
-guard admits `Object.prototype` members, and `__defineGetter__` against such a
-guard installs an attacker-controlled getter on the whitelist object itself — a
-reproduced full escape (see `upstream-match-partial-operation-map.md`).
+`at` is `getOwnPropertyDescriptor`-based, so inherited names never resolve, and
+`assert` throws the command string when there is no handler. Before 0.41.0 this
+was a bare `map[command](...payload)`, which reached `Object.prototype`.
+
+So restricting what a program can do is exactly: **define the operation
+vocabulary it may express, and implement that vocabulary totally.** A program
+requesting `fetch`, `readFile`, or `exec` finds no entry. Nothing needs to be
+intercepted or patched — an operation outside the vocabulary cannot happen.
+
+Note the emphasis: the map is *total over a narrow vocabulary*, not a wide map
+with entries removed. Security by construction fails closed; security by
+subtraction fails open on whatever was forgotten.
 
 Two requirements:
 
-1. **Decide the whitelist.** CAS reads and Evo queries at minimum. Whether
-   writes are included depends on open question 5.
-2. **Refuse unknown operations cleanly.** Today `map[command]` is `undefined`
-   for an absent op, so `match` throws `TypeError: map[command] is not a
-   function` — an opaque failure that tells the agent nothing. The runner must
-   detect the missing entry and surface something like
-   `operation not permitted: fetch`, returned as an `errorResult`. Without this,
-   the single most common failure mode (an agent writing a program that reaches
-   for the network) is undebuggable.
+1. **Define the vocabulary** — a *semantic* CAS/Evo operation set (`casRead`,
+   `casList`, `evoHead`, …). **Not `FileCasOperation`**, which is `ReadBytes |
+   Mkdir | Readdir | Access | Rename | Rm | RandomInt | Now | CreateExclusive |
+   WriteBytes | Stat` — raw filesystem mutation. Whitelisting "the operations
+   CAS needs" would hand a program `rm` on any path while the map still looks
+   locked down: nothing in it is named `fetch` or `exec`, so the mistake
+   survives review. Whether `casWrite` is in the vocabulary at all depends on
+   open question 5.
 
-Requirement 2 is a genuine gap in FunctionalScript — `match` has no notion of a
-partial map. Per AGENTS.md, working around it here is fine and should not block
-Week 1; what is not fine is doing so silently. The gap is recorded in
-[upstream-match-partial-operation-map.md](./upstream-match-partial-operation-map.md),
-which also carries the candidate upstream shapes. Update that file with whatever
-the local workaround turns out to be — it is the thing that gets upstreamed in
-Week 5.
+   `Cas<O>` is generic in its underlying operation set precisely so this is
+   possible — the interface is three semantic methods, and the filesystem is one
+   *implementation* choice behind them:
+
+   ```ts
+   export type Cas<O extends Operation> = {
+       readonly read:  (hash: Vec) => List<O, IoResult<Vec>>
+       readonly write: <O1 extends Operation>(payload: List<O1, IoResult<Vec>>) => Effect<O | O1, IoResult<Vec>>
+       readonly list:  () => Effect<O, readonly Vec[]>
+   }
+   ```
+
+   `FileCas` is merely `Cas<FileCasOperation>`. So the filesystem operations stay
+   server-side inside the handlers and never enter the program's operation set.
+2. **Report the refusal at the boundary.** A stored blob is arbitrary JS and can
+   emit any `command` string regardless of its declared type, since the type
+   system does not reach across CAS. Since 0.41.0 fjs *detects* this for us, so
+   what remains is catching it in `fjs_run` and rendering
+   `operation not permitted: <command>` as an `errorResult`. **The thrown value
+   is a bare string, not an `Error`** — `assert` is `(v, msg) => { if (!v) throw
+   msg }` — so use the caught value directly; `e.message` is `undefined`, and an
+   `e instanceof Error` branch misses every refusal.
+
+Neither needs anything further from FunctionalScript, and in particular **no
+"partial `OperationMap`" is required** — an earlier draft of this spec claimed
+one was. `OperationMap`, `ToAsyncOperationMap`, and `MemOperationMap` are all
+mapped types over their operation union (`{ readonly [K in O[0]]: … }`), hence
+total by construction, and every runner constrains the effect to a *subset* of
+the map (`<O1 extends O, T>(e: Effect<O1, T>)`). The map defines the operation
+universe; effects must fit inside it. Noted so it is not re-derived.
+
+The one real fjs bug here — `map[command]` resolving inherited `Object.prototype`
+members and invoking them with the payload — was reported as
+[functionalscript#1419](https://github.com/functionalscript/functionalscript/pull/1419)
+and is **fixed in 0.41.0**, which this repo now uses.
 
 ### Known limitation: import-time execution
 
@@ -163,12 +197,10 @@ is interpreted. A blob that runs `fs.rmSync` at module scope is not stopped by
 an empty operation map.
 
 Genuine FunctionalScript modules are side-effect-free by construction, but
-nothing verifies that for an arbitrary blob pulled out of CAS. Accepted for v1
-on schedule grounds — the untrusted party is the document, not the user;
-compensating controls are `--permission` (SEC-01), an import-specifier
-allow-list (SEC-02), content-hash-derived filenames (SEC-03). `djs/parser`
-cannot close this — it is a data-only language with no function node. A
-genuine source validator, if ever wanted, is v2 work, not Week 5.
+nothing verifies that for an arbitrary blob pulled out of CAS. Accepted for
+Week 1 because the only user is trusted and local. Week 5 revisits it — most
+plausibly by parsing the source with FunctionalScript's own `djs/parser` before
+importing, which would enforce the language subset rather than assume it.
 
 This must not silently become the permanent design. If the audience ever widens
 beyond one local user, it is a blocker.
@@ -176,16 +208,19 @@ beyond one local user, it is a blocker.
 ## Testing
 
 Per AGENTS.md, tests are `proof` exports discovered by the root
-[../../all.test.js](../../all.test.js). The stdio server *process* itself
-cannot be proof-tested directly — `casMcpServer` has the same problem, and
-FunctionalScript's own proof for it only checks that it constructs. This does
-not extend to `fjs_run`: `import()` is reached through the `import_` effect,
-which `fjs/effects/node/virtual` interprets in-memory, so the whole
-materialize-and-run path is fully proof-testable with no real filesystem. Test
-the pieces instead:
+[../../all.test.js](../../all.test.js). The server itself cannot be proof-tested
+directly — `casMcpServer` has the same problem, and FunctionalScript's own proof
+for it only checks that it constructs. Test the pieces instead:
 
 - the restricted runner, against a hand-built operation map — including the
-  refusal path for an operation outside the whitelist;
+  refusal path. Name the **inherited** commands explicitly (`constructor`,
+  `toString`, `valueOf`, `hasOwnProperty`, `__defineGetter__`), not just
+  `fetch`/`readFile`/`exec`: a suite testing only genuinely-absent commands would
+  have passed against 0.40.0 while the prototype path was wide open. Add the
+  two-step escalation as its own case — a `__defineGetter__` installing a getter
+  for a denied command, then calling it — and assert on the *reported text*
+  (`operation not permitted: fetch`) rather than the raw throw, since the
+  string-not-`Error` handling is ours and the likeliest thing to regress;
 - `fjs_run`'s tool handler, over a mock CAS rather than `~/.cas/`;
 - format encode/decode round-trips once document types exist.
 

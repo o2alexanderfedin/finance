@@ -9,8 +9,6 @@
 - All source files live under [./fjs/](./fjs/) and are [FunctionalScript](https://github.com/functionalscript/functionalscript) files with an extension `.f.js`. The only exceptions are root-level entry points that are plain (impure) JS by necessity — keep this set as small as possible, currently:
   - [./index.js](./index.js), used to start the app,
   - [./all.test.js](./all.test.js), used to initialize FunctionalScript Emergent Testing Framework.
-
-  [./fjs/todo/implement-mcp-server.md](./fjs/todo/implement-mcp-server.md) plans one more: the impure entry point that `claude mcp add` launches. Anything beyond a launcher belongs in a `.f.js` module that the launcher calls.
 - The files can be used as normal ESM files.
 - JSDoc comments are used for strong typing.
 - TypeScript is used to validate the typing without emitting.
@@ -23,13 +21,19 @@
 
   This rarely binds in practice, because the rules above already point elsewhere: a missing generic capability is a reason to release a new fjs version, and a missing app-specific one is a reason to write it here. Adding a third-party parser or helper would also break the purity model. If a dependency still looks necessary, that is a signal worth raising explicitly rather than resolving in a commit.
 
+## Design discipline
+
+religiously adhere to SOLID/KISS/DRY/YAGNI/TRIZ/TDD/Code-by-Intent, use rival agents,
+facilitate Emergent Design sessions
+
 ## File conventions
 
 - `tsconfig.json` is configured maximally strict (`strict`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, `noUnusedLocals/Parameters`, etc.). Keep new code passing under it; don't relax flags to silence errors.
 - The entry point's pure logic lives in `index.f.js` and exports a `main` typed as `NodeProgram`.
-- Specifications, issues, bug reports, and feature requests are MarkDown files in a `todo/` directory next to the code they concern — e.g. [./fjs/todo/implement-mcp-server.md](./fjs/todo/implement-mcp-server.md). Project-level planning lives in [./todo/plan.md](./todo/plan.md). Write the spec there before implementing; don't open a tracker.
+- Specifications, issues, bug reports, and feature requests are MarkDown files in a `todo/` directory next to the code they concern — e.g. [./fjs/todo/](./fjs/todo/). Project-level planning lives in [./todo/](./todo/). Write the spec there before implementing; don't open a tracker.
+
+  **This file points at `todo/`; it never restates what a `todo/` file says.** Design decisions and their rationale live in those files and are read from there. A rule copied into AGENTS.md is a second copy that will drift from the one that gets edited.
 - New file formats follow the [Revision](https://github.com/functionalscript/functionalscript/blob/main/fjs/media/revision/README.md) precedent: JSON plus a dialect tag. Name the dialect `vnd.fjs.<name>`, which yields the media type `application/vnd.fjs.<name>+json`.
-- **Never use floating point for money, percentages, or interest rates.** No JS `number` for an exact quantity — anywhere, at any stage: parsed documents, tax-year parameters, intermediates, reports. In a JSON document these are **strings**, because a JSON number is an IEEE 754 double by the time it is parsed; type the field as rtti `string` and decode it in the semantic check, the way `vnd.fjs.revision` types a hash as `string` and enforces the rest in `isHash`. Use the repo's exact-decimal module (bigint-backed) for arithmetic, and round only where a form explicitly requires it.
 
 ## Code style
 

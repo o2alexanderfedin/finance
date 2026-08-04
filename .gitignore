@@ -147,5 +147,5 @@ vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
 
-# Claude Code worktrees — a full checkout lives here; never commit it
+# Worktrees created by Claude Code sessions — never part of the repo
 .claude/worktrees/
