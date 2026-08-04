@@ -136,21 +136,27 @@ Two requirements:
 
 1. **Decide the whitelist.** CAS reads and Evo queries at minimum. Whether
    writes are included depends on open question 5.
-2. **Refuse unknown operations cleanly.** Today `map[command]` is `undefined`
-   for an absent op, so `match` throws `TypeError: map[command] is not a
-   function` — an opaque failure that tells the agent nothing. The runner must
-   detect the missing entry and surface something like
-   `operation not permitted: fetch`, returned as an `errorResult`. Without this,
-   the single most common failure mode (an agent writing a program that reaches
-   for the network) is undebuggable.
+2. **A refused operation returns an error, it does not throw.** fjs already
+   settles the shape: every fallible operation returns
+   `IoResult<T> = Result<T, unknown>` — `Fetch` is
+   `['fetch', (url: string) => IoResult<Vec>]`. So a refused `fetch` returns
+   `error('operation not permitted: fetch')`, which is a well-typed
+   `IoResult<Vec>`, and refusal lands in the same channel as any other IO
+   failure. Build the map **total** over the operations we decode, with refusal
+   entries rather than omissions; then `map[command]` is never `undefined`, and
+   there is no `TypeError` to report around.
 
-Requirement 2 is a genuine gap in FunctionalScript — `match` has no notion of a
-partial map. Per AGENTS.md, working around it here is fine and should not block
-Week 1; what is not fine is doing so silently. The gap is recorded in
-[upstream-match-partial-operation-map.md](./upstream-match-partial-operation-map.md),
-which also carries the candidate upstream shapes. Update that file with whatever
-the local workaround turns out to be — it is the thing that gets upstreamed in
-Week 5.
+Requirement 2 needs **nothing from FunctionalScript** — `OperationMap` is a
+mapped type over the operation union, hence total by construction, and the
+`IoResult` convention already carries errors as values.
+
+What *is* an fjs bug is narrower and more serious: `map[command]` walks the
+prototype chain, so `__defineGetter__`, `constructor`, `toString`, and `valueOf`
+resolve to real functions and get invoked with the payload no matter what the map
+holds. A total map does not close that; `Object.hasOwn` (or a null-prototype map)
+does. Recorded in
+[upstream-match-prototype-lookup.md](./upstream-match-prototype-lookup.md) —
+update it with whatever guard the runner ends up using.
 
 ### Known limitation: import-time execution
 

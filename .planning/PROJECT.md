@@ -70,8 +70,11 @@ a new report is a new program, not new engine code.
 - [ ] Define Effects for CAS — the effect vocabulary an executed program may express
 - [ ] Restricted runner: an `OperationMap` holding only whitelisted CAS/Evo operations,
       driven by `asyncRun` — a program requesting `fetch`/`readFile` finds no entry
-- [ ] Unknown operations fail as a clean, reported error (`operation not permitted:
-      fetch`), not the raw `TypeError` that `match` produces today
+- [ ] Refused operations **return** an error `IoResult` (`operation not permitted: fetch`),
+      never throw — the operation map is total over the operations it decodes, with refusal
+      entries rather than omissions, matching fjs's own `IoResult` convention for every
+      fallible operation. Dispatch is guarded so inherited `Object.prototype` names cannot
+      resolve to a callable
 - [ ] An `fjs_run` MCP tool: `{ hash }` → read blob → `import()` → call entry point →
       interpret under the restricted runner → return the result
 - [ ] Node (or another JavaScript engine) as the first script runner, replaceable by
@@ -193,14 +196,19 @@ Both `todo/` documents arrived in PR #1 (`f57fd50`). Where this file and `todo/p
 disagreed on execution safety, `todo/plan.md` won — it is the more concrete and more
 honest account, and Constraints below were corrected to match it.
 
-**Known upstream fjs gap.** `match` has no notion of a partial `OperationMap`:
-`map[command]` is `undefined` for an absent operation, so it throws
-`TypeError: map[command] is not a function` rather than reporting a refusal. That makes
-the single most likely failure mode — an agent writing a program that reaches for the
-network — undebuggable. Per AGENTS.md, working around it locally is fine so long as the
-workaround is recorded rather than silent; tracked in
-[`fjs/todo/upstream-match-partial-operation-map.md`](../fjs/todo/upstream-match-partial-operation-map.md)
-for upstreaming.
+**Known upstream fjs gap.** `match` dispatches with `map[command](...payload)`, an ordinary
+property lookup that walks the prototype chain — so `__defineGetter__`, `constructor`,
+`toString`, and `valueOf` all resolve to real functions and are *invoked with the payload*,
+regardless of what the map contains. In a module documented as an isolation mechanism, the
+bound is escapable by naming an inherited property; `Object.hasOwn` is the fix. Tracked in
+[`fjs/todo/upstream-match-prototype-lookup.md`](../fjs/todo/upstream-match-prototype-lookup.md).
+
+Note what is *not* a gap, since an earlier version of this document claimed it was:
+`OperationMap` is a mapped type over the operation union and therefore total by
+construction, and fjs already returns `IoResult<T> = Result<T, unknown>` from every
+fallible operation. So a refused `fetch` should **return an error result**, exactly as a
+failed `fetch` does — our map is built total, with refusal entries instead of omissions,
+and no `match` change is needed for clean refusal. Only the prototype hole is upstream's.
 
 **What fjs already provides.** `functionalscript@0.40.0` ships most of the
 infrastructure, so the finance-specific work is domain logic, not plumbing:
@@ -289,7 +297,7 @@ supersede rather than overwrite.
     a new fjs version released. Working around it locally is allowed and should not block
     progress — but never silently: record it in `fjs/todo/upstream-<short-name>.md`, which
     is also the Week 5 upstreaming queue. Two are open already
-    ([`match`](../fjs/todo/upstream-match-partial-operation-map.md), [media dialect
+    ([`match`](../fjs/todo/upstream-match-prototype-lookup.md), [media dialect
     registry](../fjs/todo/upstream-media-dialect-registry.md)).
 - **Typing**: JSDoc comments only, validated by TypeScript with `noEmit`. No `.ts` source
   files. `tsconfig.json` is maximally strict and is the record of which flags are set;
