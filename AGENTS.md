@@ -25,43 +25,8 @@
 
 ## Design discipline
 
-Adhere **religiously** to **SOLID**, **KISS**, **DRY**, **YAGNI**, **TRIZ**, **TDD**, and
-**Code-by-Intent**. Use **rival agents**. Facilitate **Emergent Design sessions**.
-
-These are not aspirations to cite after the fact — they are how work is done here.
-
-- **SOLID** — one reason to change per module; depend on the narrow interface you need,
-  never the wide one you were handed. In a language where effects are data, this mostly
-  shows up as: take the operation set you actually use as a parameter, the way `Cas<O>` is
-  generic in `O` rather than hardwiring the filesystem.
-- **KISS** — the simplest thing that could possibly work, then stop. Complexity must be
-  argued for in a `todo/` file, not introduced quietly in a commit.
-- **DRY** — one fact, one home. Everything else links to it. A second copy is a future
-  contradiction: state, file layout, commands, conventions, dependency lists all live in
-  exactly one document and are referenced from the rest.
-- **YAGNI** — build what a settled requirement demands. Speculative generality is a defect,
-  not foresight. Where a decision is genuinely open, record it as an open question in
-  [./todo/plan.md](./todo/plan.md) rather than building for every branch of it.
-- **TRIZ** — resolve the contradiction instead of trading off against it, and prefer the
-  *ideal final result*: the best module is the one that does not need to exist. That is
-  already this repo's strongest habit — the answer to a missing capability is upstream fjs,
-  not new code here. When two goals appear to conflict, look for the reframing that
-  dissolves the conflict before you split the difference.
-- **TDD** — write the failing `proof` first, make it pass, then refactor. Never the reverse.
-  A `proof` written after the implementation tests what you built, not what was required.
-- **Code-by-Intent** — code states *what* it means, never *how* the machine achieves it.
-  Name for the domain (`qualifiedDividends`, not `calc2`), and if a reader must trace the
-  body to learn the intent, rename or decompose until they don't.
-- **Rival agents** — for any consequential design, run independent agents *against* each
-  other: one proposes, another tries to refute, a third reviews without seeing the first
-  two. Adversarial review, not confirmation. This applies hardest to security boundaries
-  and tax correctness, where a plausible-and-wrong answer is the failure mode and a single
-  agent agreeing with itself proves nothing.
-- **Emergent Design sessions** — let the design fall out of the constraints and the tests
-  rather than being drawn up front. Facilitate them deliberately: state the forces, try the
-  smallest thing, let the shape appear, and record what emerged in a `todo/` file so the
-  next session inherits the reasoning rather than the conclusion alone. Big design up front
-  is how YAGNI violations get institutionalized.
+religiously adhere to SOLID/KISS/DRY/YAGNI/TRIZ/TDD/Code-by-Intent, use rival agents,
+facilitate Emergent Design sessions
 
 ## File conventions
 
