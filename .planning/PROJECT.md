@@ -105,12 +105,14 @@ a new report is a new program, not new engine code.
 - **Business / self-employment tax** (Schedule C, depreciation, quarterly estimates) —
   personal income tax only.
 - **Multi-user / multi-client operation** — personal use, so no auth, tenancy isolation,
-  or liability surface. **⚠️ Under review:** the definition of done in
-  [issue #16](https://github.com/fjs-dev/finance/issues/16#issuecomment-5171851184) says
-  "multiple users can add their raw documents to CAS." If that means one deployment
-  serving several people rather than several people each running their own, this entry is
-  wrong and the execution boundary below becomes a v1 blocker. Tracked as `todo/plan.md`
-  open question 7 — do not treat this exclusion as settled until it is answered.
+  or liability surface. **Confirmed** by the answer to `todo/plan.md` open question 7:
+  target a single user. The "multiple users" phrasing in
+  [issue #16](https://github.com/fjs-dev/finance/issues/16#issuecomment-5171851184) means
+  several people each running their own personal CAS and server, so "that year and user"
+  is a subject-naming detail (open question 2), not tenancy. A design for one deployment
+  serving several users is in progress separately — so this is **deferred, not rejected**:
+  v1 ships no multi-user feature but should avoid decisions that would have to be undone,
+  the same posture as scenario modeling above.
 - **Filing or transmission** — the output is numbers to transcribe, not an e-filed
   return.
 
@@ -400,8 +402,8 @@ A separate register lives in [issue #16](https://github.com/fjs-dev/finance/issu
 open questions and *unverified assumptions* from the research pass behind #14 (scope
 versus schedule, unread worksheets, contradicted Tax Table band widths, thin-evidence
 assumptions). Different in kind from the list below: these are design decisions, those are
-research facts nobody has checked. Sergey's answers there settled question 4 and raised
-question 7.
+research facts nobody has checked. The answers there settled question 4 and raised
+question 7, which has since been answered too.
 
 1. **Tax scope** — jurisdiction, year, forms, and whether the output is authoritative or a
    reviewed estimate. The only genuinely unbounded item; it drives Weeks 2–3 and decides
@@ -434,15 +436,19 @@ question 7.
    above. Downstream of question 5 (it fixes `T` and whether writes are in `CasOp`), and
    expensive to revisit once programs are stored, since each blob is frozen against the
    convention in force when it was written.
-7. **Single user, or multiple?** — raised by the same
-   [issue #16 answer](https://github.com/fjs-dev/finance/issues/16#issuecomment-5171851184)
-   that settled question 4, and it **contradicts** the Out of Scope entry above and the
-   Key Decision "stdio only, single local user". If "multiple users" means one deployment
-   serving several people, then per-user isolation, auth, and a real fix for import-time
-   execution all enter v1 scope — and the accepted `import()` limitation stops being a
-   Week 5 revisit. If it means several people each running their own personal CAS and
-   server, nothing changes. **Answer before Track A**: it decides whether the restricted
-   runner is sufficient or merely the first of two layers.
+7. ~~**Single user, or multiple?**~~ **Answered: a single user.** Several people each run
+   their own personal CAS and server; one deployment serving several users is a separate
+   design effort still in progress, not this project. So the Out of Scope entry and the
+   Key Decision "stdio only, single local user" are confirmed rather than contradicted,
+   per-user isolation and auth stay out of v1, and the restricted runner is sufficient for
+   v1 rather than the first of two layers. Multi-user is deferred, not rejected — avoid
+   decisions that would foreclose it.
+
+   This does **not** settle the `import()` deferral. "Single local user" answers who may
+   connect; it does not make unrestricted `import()` safe, because the untrusted party is
+   the document, not the user (`research/PITFALLS.md` Pitfall 1). That justification still
+   needs re-grounding on schedule grounds with named compensating controls, per
+   `ROADMAP.md`.
 
 Additionally, owned by [`fjs/todo/implement-mcp-server.md`](../fjs/todo/implement-mcp-server.md)
 and decidable during implementation — recorded here so they are not lost, not to be
