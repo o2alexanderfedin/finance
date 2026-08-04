@@ -104,9 +104,11 @@ These were established by execution, not inference. Any replan must preserve the
 6. **The Evo subject model before any real document is stored.** CAS has no delete;
    recovery is permanent, not merely expensive. → Phase 5 (DOC-01), and the project-local
    store lands even earlier, in Phase 2 (DOC-02).
-7. **The `Object.hasOwn` guard IS the "clean refusal" work.** EXEC-02 and EXEC-03 are one
-   change with two outcomes — the security fix and the agent-actionable error message.
-   They stay in the same phase and must not be split. → Phase 3.
+7. ~~**The `Object.hasOwn` guard IS the "clean refusal" work.**~~ **Superseded by fjs
+   0.41.0**, which delivers the guard upstream (`at` + `assert` in `match`). EXEC-02 is
+   closed; EXEC-03 remains, but is now only the *reporting* half — catching the refusal and
+   naming the permitted set. Smaller than planned, and no longer coupled to a security fix.
+   → Phase 3.
 
 ---
 
@@ -162,10 +164,10 @@ These were established by execution, not inference. Any replan must preserve the
 **Requirements**: DOCC-01, DOCC-02, DOCC-03, DOCC-04, DOCC-05, DOCC-06, SEC-04
 **Tier**: T0
 **Success Criteria** (what must be TRUE):
-  1. The two false mechanism claims are gone: `grep -rn "djs/parser" .planning todo fjs README.md` returns no proposal of it as a validation remedy, and no document still says an operation not in the map "simply cannot happen" without stating the `Object.hasOwn` + null-prototype guard condition.
+  1. The two false mechanism claims are gone: `grep -rn "djs/parser" .planning todo fjs README.md` returns no proposal of it as a validation remedy, and no document still says an operation not in the map "simply cannot happen" without stating the guard condition that makes it true — now satisfied by fjs 0.41.0's own-property lookup rather than by a local guard.
   2. README `## Goal` and PROJECT.md Success Criterion 2 name Claude Code / Claude Desktop as the demonstration client, and remote HTTPS + OAuth transport is recorded as a v2 milestone.
   3. PROJECT.md's `import()` deferral rests on schedule grounds with named compensating controls, and no longer on "the sole user is trusted and local" — and `fjs/todo/implement-mcp-server.md` no longer claims `fjs_run` cannot be proof-tested.
-  4. A FunctionalScript issue exists for the `match` prototype-dispatch soundness hole with the `__defineGetter__` reproduction attached, and its URL is recorded in the repo.
+  4. ~~A FunctionalScript issue exists for the `match` prototype-dispatch soundness hole~~ — **done**: [functionalscript#1419](https://github.com/functionalscript/functionalscript/pull/1419), fixed in 0.41.0, with the URL recorded in `PROJECT.md` and `todo/plan.md`.
   5. The TY2025 parameter-sourcing rule (Rev. Proc. 2024-40 **as modified by Rev. Proc. 2025-32**) is written where Phase 8 will read it, with the original 2025 inflation release named as the wrong source.
 **Research**: Not needed — every correction is already established.
 **Plans**: TBD
@@ -198,7 +200,7 @@ These were established by execution, not inference. Any replan must preserve the
   2. A non-terminating effect chain returns a bounded step-budget error instead of hanging the process — verified by a proof, not by observation.
   3. The interpreter returns the accumulated read set alongside the result; a proof asserts the observed reads are what the program actually requested, independent of anything the program declares.
   4. Every proof in this phase runs under `fjs/effects/mock` with no CAS, no Evo, no MCP, and no filesystem — the module imports `fjs/effects` and nothing else.
-**Research**: Not needed — a working prototype of `interpret` under `mock` already exists and both guard fixes are verified.
+**Research**: Not needed — a working prototype of `interpret` under `mock` already exists, and the dispatch guard now comes from fjs 0.41.0 (verified against it).
 **Plans**: TBD
 
 ### Phase 4: Exact Arithmetic and the Money Layering

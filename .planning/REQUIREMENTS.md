@@ -62,9 +62,10 @@ dissolves on contact.
       `PROJECT.md`, `todo/plan.md`, and `fjs/todo/implement-mcp-server.md`. DJS is a data
       language with no function node; the remedy does not exist. Replace with the deferred
       hardening path.
-- [ ] **DOCC-02** *(T0)*: Correct the "an operation not in the map simply cannot happen"
-      claim in `PROJECT.md` and `fjs/todo/implement-mcp-server.md` to state the guard
-      condition (`Object.hasOwn` + null-prototype map) that makes it true.
+- [x] **DOCC-02** *(T0)*: ~~Correct the "an operation not in the map simply cannot happen"
+      claim to state the guard condition that makes it true.~~ **Done** — and the condition
+      is now satisfied by fjs itself as of 0.41.0 (`at` + `assert` in `match`), so the claim
+      is true as written. `PROJECT.md` Context records why.
 - [ ] **DOCC-03** *(T0)*: Amend the README `## Goal` and `PROJECT.md` Success Criterion 2
       to name Claude Code / Claude Desktop as the demonstration client, and record remote
       transport as a v2 milestone.
@@ -109,17 +110,26 @@ dissolves on contact.
 - [ ] **EXEC-01** *(T0)*: A restricted effect interpreter, `interpret(map)(effect)`,
       translating a guest effect into a host effect. Depends on `fjs/effects` only — not
       CAS, not Evo, not MCP — so it is fully proof-testable in isolation.
-- [ ] **EXEC-02** *(T0)*: Operation lookup uses `Object.hasOwn` and the operation map has a
-      null prototype. Both, as defence in depth. **This is the security fix for the
-      verified `__defineGetter__` escape and simultaneously the "clean refusal" feature —
-      one change, both outcomes.**
+- [x] **EXEC-02** *(T0)*: ~~Operation lookup uses `Object.hasOwn` and the operation map has
+      a null prototype.~~ **Delivered upstream in fjs 0.41.0**, which this repo now uses:
+      `match` looks up via `at` (`getOwnPropertyDescriptor`-based, prototype chain never
+      consulted) and `assert`s the handler exists. Verified — the `__defineGetter__` escape
+      now throws. Keep a null-prototype map as cheap defence in depth, but it is no longer
+      load-bearing and no local guard is required.
 - [ ] **EXEC-03** *(T0)*: A non-whitelisted operation is refused with a message naming the
       operation *and* the permitted set (`operation not permitted: fetch; permitted:
       casRead, evoList, evoHead, evoRevision`). Agents self-correct from actionable errors
-      and cannot from opaque ones.
+      and cannot from opaque ones. Still ours: 0.41.0 throws the command name but knows
+      nothing of the permitted set. **The throw is a bare string, not an `Error`** (`assert`
+      throws its message), so the catch must use the caught value directly — `e.message` is
+      `undefined` and an `e instanceof Error` branch misses every refusal.
 - [ ] **EXEC-04** *(T0)*: Regression proofs for prototype-inherited names specifically:
       `constructor`, `toString`, `valueOf`, `hasOwnProperty`, `__defineGetter__`. These are
-      the cases a naive `in` or `!== undefined` guard admits.
+      the cases a naive `in` or `!== undefined` guard admits. Still wanted after the 0.41.0
+      fix — they now pin behaviour we depend on rather than merely hope for, and they cover
+      our refusal *reporting*, which is still ours. Assert on the reported text, not the raw
+      throw. Include the two-step `__defineGetter__` escalation (install a getter for a
+      denied command, then call it).
 - [ ] **EXEC-05** *(T0)*: The interpreter accumulates the read set as it dispatches, so a
       run record's `inputs[]` is **observed rather than declared**. A program cannot forget
       to cite, or misreport, what it read.
@@ -331,9 +341,10 @@ would be materially more expensive to retrofit.
 - [ ] **SEC-03** *(T1)*: Programs materialized under **content-hash-derived filenames**. The
       ESM cache is keyed by URL and never evicts, so a reused temp filename silently re-runs
       the *first* program.
-- [ ] **SEC-04** *(T0)*: An upstream bug report to FunctionalScript for the `match`
-      prototype-dispatch soundness hole, with the reproduction attached. Required by
-      AGENTS.md: report fjs bugs rather than working around them silently.
+- [x] **SEC-04** *(T0)*: ~~An upstream bug report to FunctionalScript for the `match`
+      prototype-dispatch soundness hole.~~ **Done and closed** —
+      [functionalscript#1419](https://github.com/functionalscript/functionalscript/pull/1419),
+      fixed in 0.41.0.
 
 ---
 

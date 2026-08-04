@@ -78,9 +78,11 @@ a new report is a new program, not new engine code.
       **Not** `FileCasOperation` — that is `Rm | WriteBytes | Rename | Mkdir | …`, raw
       filesystem mutation, and whitelisting it would leave the sandbox open while looking
       closed. Filesystem operations stay server-side inside the handlers, never in the
-      program's operation set. See `fjs/todo/restricted-runner-operation-map.md`
-- [ ] Unknown operations fail as a clean, reported error (`operation not permitted:
-      fetch`), not the raw `TypeError` that `match` produces today
+      program's operation set — `Cas<O>` is generic in its underlying operation set exactly
+      so this is possible. Specified in `fjs/todo/implement-mcp-server.md`
+- [ ] Unknown operations reported as `operation not permitted: <command>`. Detection is
+      fjs's since 0.41.0 (own-property lookup, throws the command name); ours is catching
+      it at the `fjs_run` boundary — noting the throw is a bare string, not an `Error`
 - [ ] An `fjs_run` MCP tool: `{ hash }` → read blob → `import()` → call entry point →
       interpret under the restricted runner → return the result
 - [ ] Node (or another JavaScript engine) as the first script runner, replaceable by
@@ -213,22 +215,28 @@ Both `todo/` documents arrived in PR #1 (`f57fd50`). Where this file and `todo/p
 disagreed on execution safety, `todo/plan.md` won — it is the more concrete and more
 honest account, and Constraints below were corrected to match it.
 
-**Known upstream fjs gap.** `match` dispatches with `map[command](...payload)` — an
-ordinary property lookup, so it resolves inherited `Object.prototype` members
-(`__defineGetter__`, `constructor`, `toString`) and invokes them with the payload,
-whatever the map contains. In a module whose job is to bound what an effect may do, the
-bound is escapable by naming an inherited property. Filed upstream as
-[functionalscript#1419](https://github.com/functionalscript/functionalscript/pull/1419);
-`Object.hasOwn` closes it, and we guard locally regardless.
+**Upstream fjs gap — closed in 0.41.0.** `match` used to dispatch with
+`map[command](...payload)`, an ordinary property lookup that resolved inherited
+`Object.prototype` members (`__defineGetter__`, `constructor`, `toString`) and invoked them
+with the payload, whatever the map contained — so the bound was escapable by naming an
+inherited property. Reported as
+[functionalscript#1419](https://github.com/functionalscript/functionalscript/pull/1419).
+0.41.0 replaces the lookup with `at(command)(map)` (`getOwnPropertyDescriptor`-based, so
+the prototype chain is never consulted) plus `assert(handler !== null, command)`, which
+also names the refused command. Verified against 0.41.0, which this repo now uses; **no
+local guard is required**. One detail that survives into our code: `assert` throws its
+message, so a refusal arrives as a bare **string**, not an `Error`.
 
 An earlier version of this section claimed a second gap — that `match` "has no notion of a
-partial `OperationMap`" — and that was wrong. Every fjs dispatch map is a mapped type over
-its operation union, hence total by construction, and every runner constrains the effect to
-a subset of the map. The map defines the operation universe; we need no partiality and fjs
-offers none. See [`fjs/todo/restricted-runner-operation-map.md`](../fjs/todo/restricted-runner-operation-map.md).
+partial `OperationMap`" — and that was wrong. `OperationMap`, `ToAsyncOperationMap`, and
+`MemOperationMap` are all mapped types over their operation union (`[K in O[0]]`), hence
+total by construction, and every runner constrains the effect to a subset of the map
+(`<O1 extends O, T>(e: Effect<O1, T>)`). The map defines the operation universe; we need no
+partiality and fjs offers none. Recorded here so it is not re-derived.
 
-**What fjs already provides.** `functionalscript@0.40.0` ships most of the
-infrastructure, so the finance-specific work is domain logic, not plumbing:
+**What fjs already provides.** `functionalscript@0.41.0` ships most of the
+infrastructure, so the finance-specific work is domain logic, not plumbing. (Module layout
+is unchanged from 0.40.0 — verified; 0.41.0's change here is the `match` fix above.)
 
 | Module | What it gives us |
 |---|---|
@@ -238,9 +246,9 @@ infrastructure, so the finance-specific work is domain logic, not plumbing:
 | `fjs/cas/evo` | Evo — subjects and revision heads (a DAG) cached over the CAS |
 | `fjs/mcp` | `casMcpServer(home)` — a complete working seven-tool CAS+Evo MCP server (`cas_add`, `cas_get`, `cas_list`, `evo_list`, `evo_head`, `evo_revision`, `evo_add`), with its tool registries at `fjs/mcp/cas` and `fjs/mcp/evo`. **This is the template to follow.** Note as of 0.41.0 `evo_list` takes an optional `archived?: true` and lists *active* subjects by default — those with at least one non-archived head — rather than every subject; our own listing tools should follow that default rather than reinventing it. |
 | `fjs/media/revision` | The `vnd.fjs.revision` blob format and its validation |
-| `fjs/effects` | `Effect<O,T>` as data plus the runners that interpret it — `effects/node` (real process), `effects/mock` (`run(o)`, honoring only the effects handler `o` implements) |
+| `fjs/effects` | `Effect<O,T>` as data plus the runners that interpret it — `effects/node` (real process), `effects/mock` (`run(o)`, where the handler `o` *defines* the operation universe) |
 
-**What is genuinely net-new:** document parsers (as of 0.40.0 fjs `media` carries `json`,
+**What is genuinely net-new:** document parsers (fjs `media` carries `json`,
 `html`, `revision`, `nix`, and `type` — no financial formats exist), the report/tax
 computation programs, per-year tax parameter data, the finance-specific MCP tools and
 RTTI schemas, and the script execution path.
@@ -316,9 +324,10 @@ supersede rather than overwrite.
   - If you find a bug or gap in FunctionalScript, **tell the user** so it can be fixed and
     a new fjs version released. Working around it locally is allowed and should not block
     progress — but never silently: record it in `fjs/todo/upstream-<short-name>.md`, which
-    is also the Week 5 upstreaming queue. Two are open already
-    ([`match` prototype lookup](https://github.com/functionalscript/functionalscript/pull/1419), [media dialect
-    registry](../fjs/todo/upstream-media-dialect-registry.md)).
+    is also the Week 5 upstreaming queue. One is open
+    ([media dialect registry](../fjs/todo/upstream-media-dialect-registry.md)); the
+    [`match` prototype lookup](https://github.com/functionalscript/functionalscript/pull/1419)
+    was reported and fixed in 0.41.0 — the intended lifecycle, start to finish.
 - **Typing**: JSDoc comments only, validated by TypeScript with `noEmit`. No `.ts` source
   files. `tsconfig.json` is maximally strict and is the record of which flags are set;
   per AGENTS.md, don't relax one to silence an error.
