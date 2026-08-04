@@ -257,9 +257,9 @@ structural (RTTI) and semantic passes.
       negatives. Tax lines carry losses.
 - [x] **EXACT-02** *(T0)*: Floating-point never touches tax math. Verified hazards:
       `1.005 * 100 === 100.49999999999999`, `(1.005).toFixed(2) === "1.00"`.
-- [ ] **EXACT-03** *(T0)*: IRS half-up rounding, explicitly not `Math.round`, which is
+- [x] **EXACT-03** *(T0)*: IRS half-up rounding, explicitly not `Math.round`, which is
       asymmetric (`Math.round(-2.5) === -2`) on a form full of negatives.
-- [ ] **EXACT-04** *(T0)*: Rounding is a property of a **1040 line**, not of a value —
+- [x] **EXACT-04** *(T0)*: Rounding is a property of a **1040 line**, not of a value —
       `round(sum(x))`, never `sum(round(x))`. A money type that rounds on construction is
       wrong by construction.
 - [x] **EXACT-05** *(T1)*: Layering fixed deliberately: money as a decimal **string** in
@@ -466,11 +466,11 @@ them. Week 0 is research's addition in front of the plan's Week 1.
 | DOC-14 | T1 | Phase 5 - Document Base and First Dialects | Week 1 | Pending |
 | DOC-15 | T2 | Phase 11 - Wage, Retirement, Benefit Documents | Week 3 | Pending |
 | DOC-16 | T3 | Phase 15 - Realism Polish and Upstream | Week 5 | Pending |
-| EXACT-01 | T0 | Phase 4 - Exact Arithmetic | Week 1 | Pending |
-| EXACT-02 | T0 | Phase 4 - Exact Arithmetic | Week 1 | Pending |
-| EXACT-03 | T0 | Phase 4 - Exact Arithmetic | Week 1 | Pending |
-| EXACT-04 | T0 | Phase 4 - Exact Arithmetic | Week 1 | Pending |
-| EXACT-05 | T1 | Phase 4 - Exact Arithmetic | Week 1 | Pending |
+| EXACT-01 | T0 | Phase 4 - Exact Arithmetic | Week 1 | Done |
+| EXACT-02 | T0 | Phase 4 - Exact Arithmetic | Week 1 | Done |
+| EXACT-03 | T0 | Phase 4 - Exact Arithmetic | Week 1 | Done |
+| EXACT-04 | T0 | Phase 4 - Exact Arithmetic | Week 1 | Done |
+| EXACT-05 | T1 | Phase 4 - Exact Arithmetic | Week 1 | Done |
 | TAX-01 | T1 | Phase 8 - TY2025 Parameters and Tax Table | Week 2 | Pending |
 | TAX-02 | T1 | Phase 8 - TY2025 Parameters and Tax Table | Week 2 | Pending |
 | TAX-03 | T1 | Phase 10 - 1040 Core and Scope Guard | Week 2 | Pending |

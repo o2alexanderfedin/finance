@@ -19,10 +19,15 @@
  *
  * Per AGENTS.md's staging rule (a missing generic capability is written here
  * first, then lifted upstream unchanged — mirroring `fjs/types/rational`'s
- * Plan 01 precedent), this file is generic and liftable as-is: `scale` is a
- * parameter, never hardcoded, and there is zero finance-specific content
- * anywhere in it. The project's own scale-2 ("cents") instantiation lives in
- * `fjs/exact/module.f.js`, not here.
+ * Plan 01 precedent), this file's *code* is generic and liftable as-is:
+ * `scale` is a parameter, never hardcoded, no export or type names a currency
+ * or a tax concept, and it imports nothing from this repo. The scale-2
+ * instantiation lives in `fjs/exact/module.f.js`, not here.
+ *
+ * The prose does cite money, deliberately — the precision hazard that
+ * motivates fixed-scale parsing is easiest to state in the terms where it
+ * actually bites. A lift upstream should generalise the comment rather than
+ * drop the rationale.
  *
  * @module
  */

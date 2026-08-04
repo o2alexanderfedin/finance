@@ -17,11 +17,16 @@
  * and the whole point of separating exact arithmetic from named rounding
  * would be lost.
  *
- * This file is written to be lifted into FunctionalScript unchanged (see
- * AGENTS.md's staging rule): it has zero finance-specific content — no
- * "cents", no "money", no tax terms anywhere in this file. That framing
- * lives in Plan 02's `fjs/exact/module.f.js`, which builds on top of this
- * one.
+ * This file is written to be lifted into FunctionalScript (see AGENTS.md's
+ * staging rule). Its *code* is generic: no cents, no money type, no currency
+ * or tax concept appears in any export or type here, and it imports nothing
+ * from this repo. The scale-2 instantiation lives in `fjs/exact/module.f.js`.
+ *
+ * The prose above is not generic, deliberately. `halfUp` exists because a
+ * specific rule was needed — ties away from zero at both signs — and the
+ * reason it is not the built-in rounding is worth stating where the function
+ * is defined rather than losing it. A lift upstream should generalise this
+ * comment; it should not silently drop the rationale.
  *
  * Deliberately absent: any per-item-rounding convenience (no `roundEach`,
  * no `mapRound`). Composing `halfUp(sum(list))` directly at the call site

@@ -224,7 +224,7 @@ These were established by execution, not inference. Any replan must preserve the
   4. A proof demonstrates all three layers on one value: a decimal **string** in JSON at the storage boundary (never a JSON number — a JSON number is an IEEE 754 double before any arithmetic happens), exact rationals inside computation, decimal **strings** on the MCP wire (fjs's JSON `Primitive` has no `bigint`).
 **Research**: Not needed.
 **Plans**: 2 plans
-- [ ] 04-01-PLAN.md — Exact rational arithmetic and IRS half-up rounding (fjs/types/rational/module.f.js)
+- [x] 04-01-PLAN.md — Exact rational arithmetic and IRS half-up rounding (fjs/types/rational/module.f.js)
 - [x] 04-02-PLAN.md — Fixed-scale decimal string <-> bigint layer, composed cents module, and the three-layer demonstration (fjs/types/decimal, fjs/exact)
 
 ### Phase 5: Document Base, Subject Model, and the First Two Dialects
@@ -410,7 +410,7 @@ These were established by execution, not inference. Any replan must preserve the
 | 1. Planning-Document Corrections | Week 0 | 3/3 | Complete | verified 11/11 |
 | 2. Server Skeleton and Registration | Week 0 | 3/3 | Complete | verified 11/11 |
 | 3. The Restricted Interpreter | Week 1 | 2/2 | Complete | verified 11/11 |
-| 4. Exact Arithmetic | Week 1 | 0/2 | Not started | - |
+| 4. Exact Arithmetic | Week 1 | 2/2 | Complete | verified 10/10 |
 | 5. Document Base and First Dialects | Week 1 | 0/TBD | Not started | - |
 | 6. Guest ABI and Materialization | Week 1 | 0/TBD | Not started | - |
 | 7. `fjs_run` and Run Records | Week 1 | 0/TBD | Not started | - |
