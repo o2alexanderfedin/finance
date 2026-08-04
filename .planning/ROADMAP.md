@@ -186,7 +186,10 @@ These were established by execution, not inference. Any replan must preserve the
   4. A CI assertion confirms stdout carries only JSON-RPC across a full session; all diagnostics go to stderr.
   5. The CAS home is project-local and `git check-ignore` confirms it is ignored; `~/.cas` is untouched, and the root launcher `.js` contains nothing but the launcher line.
 **Research**: Not needed — assembly over verified fjs exports, plus a 10-minute empirical protocol-version diff.
-**Plans**: TBD
+**Plans**: 3 plans
+- [ ] 02-01-PLAN.md — Assemble financeConfig/financeMcpServer over casToolRegistry+evoToolRegistry; wire the launcher; gitignore the project-local store
+- [ ] 02-02-PLAN.md — Full-session virtual-harness proof (protocol conformance, non-negotiation, stdout purity); record the mcpStep upstream gap
+- [ ] 02-03-PLAN.md — Register with node --permission scoping, prove ERR_ACCESS_DENIED, and drive a real client to an observed tools/call
 
 **── Milestone: Week 1 — First Working Prototype ──**
 
@@ -399,7 +402,7 @@ These were established by execution, not inference. Any replan must preserve the
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
 | 1. Planning-Document Corrections | Week 0 | 0/TBD | Not started | - |
-| 2. Server Skeleton and Registration | Week 0 | 0/TBD | Not started | - |
+| 2. Server Skeleton and Registration | Week 0 | 0/3 | Not started | - |
 | 3. The Restricted Interpreter | Week 1 | 0/TBD | Not started | - |
 | 4. Exact Arithmetic | Week 1 | 0/TBD | Not started | - |
 | 5. Document Base and First Dialects | Week 1 | 0/TBD | Not started | - |
