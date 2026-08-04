@@ -39,9 +39,20 @@ Requirements: MCP-01, MCP-02, MCP-03, MCP-04, MCP-05, SEC-01, DOC-02.
   green `tools/list`.
 - **`2026-07-28` is now the current spec revision** (shipped July 2026). MCP-03 predates it.
   Noted, not adopted — revisit only if the empirical check on `2025-11-25` fails.
-- **Upstream obligation:** the missing negotiation is an fjs gap. Per AGENTS.md, record it in
-  `fjs/todo/upstream-*.md` rather than working around it silently. Recording costs nothing and
-  is not a workaround; **writing a wrapper around `mcpStep` is out of scope for this phase.**
+- **Upstream obligation — and note who "upstream" is.** AGENTS.md line 19: *we are
+  contributors and owners of FunctionalScript*, so it is an open-source part of this project,
+  not a third-party dependency. A missing **generic** capability is therefore a reason to
+  release a new fjs version, **never** a reason to write app-specific glue here.
+  Protocol-version negotiation is exactly such a generic capability — it belongs in fjs's
+  `initialize` handler, not in a wrapper of ours.
+- So: record the gap in `fjs/todo/upstream-<short-name>.md` per AGENTS.md line 21 (a
+  workaround may be fine, but never a *silent* one), and if the empirical check fails, the
+  answer is **a new fjs release**, not local glue. **Writing a wrapper around `mcpStep` is out
+  of scope for this phase** either way.
+- **No new dependencies.** AGENTS.md line 22 is a hard stop: nothing enters `dependencies` or
+  `devDependencies` without approval from every repo owner — not temporarily, not vendored.
+  Whatever is in `package.json` today is the approved set. If something looks necessary, raise
+  it rather than resolving it in a commit.
 
 ### Server Identity
 
