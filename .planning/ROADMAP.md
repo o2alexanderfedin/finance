@@ -240,7 +240,11 @@ These were established by execution, not inference. Any replan must preserve the
   4. Re-adding the same artifact resolves to the same subject rather than creating a parallel history; a proof shows a blank box decodes as **absent, not zero**, that each dialect carries the form *revision* and not merely the tax year, and that `CORRECTED` is readable data.
   5. A >128 KiB PDF added via `npx functionalscript cas add` from another process becomes visible to `evo_head` in the running server **without a restart**.
 **Research**: Not needed — `fjs/media/revision` is a literal 123-line template and every payload field was read from a current IRS PDF.
-**Plans**: TBD
+**Plans**: 4 plans
+- [ ] 05-01-PLAN.md — Document base spread helper (DOC-00) and Evo subject derivation (DOC-01)
+- [ ] 05-02-PLAN.md — vnd.fjs.ocr and vnd.fjs.1099int dialects (DOC-03/10/11/12), Success Criteria 1 and 2
+- [ ] 05-03-PLAN.md — OCR-to-cents conversion boundary and full-instance conversion, Success Criteria 3 and 4
+- [ ] 05-04-PLAN.md — cas_refresh tool and cross-process CLI ingestion proof, Success Criterion 5 (DOC-14)
 
 ### Phase 6: Guest ABI Freeze and Safe Materialization
 **Milestone**: Week 1 — First Working Prototype
