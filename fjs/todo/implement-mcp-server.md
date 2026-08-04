@@ -127,30 +127,39 @@ export const match = map => e => {
 }
 ```
 
-So restricting what a program can do is exactly: **build an `OperationMap`
-containing only the permitted operations.** A program requesting `fetch`,
-`readFile`, or `exec` finds no entry. Nothing needs to be intercepted or
-patched — an operation that is not in the map simply cannot happen.
+So restricting what a program can do is exactly: **define the operation
+vocabulary it may express, and implement that vocabulary totally.** A program
+requesting `fetch`, `readFile`, or `exec` finds no entry. Nothing needs to be
+intercepted or patched — an operation outside the vocabulary cannot happen.
+
+Note the emphasis: the map is *total over a narrow vocabulary*, not a wide map
+with entries removed. Security by construction fails closed; security by
+subtraction fails open on whatever was forgotten.
 
 Two requirements:
 
-1. **Decide the whitelist.** CAS reads and Evo queries at minimum. Whether
-   writes are included depends on open question 5.
-2. **Refuse unknown operations cleanly.** Today `map[command]` is `undefined`
-   for an absent op, so `match` throws `TypeError: map[command] is not a
-   function` — an opaque failure that tells the agent nothing. The runner must
-   detect the missing entry and surface something like
-   `operation not permitted: fetch`, returned as an `errorResult`. Without this,
-   the single most common failure mode (an agent writing a program that reaches
-   for the network) is undebuggable.
+1. **Define the vocabulary** — a *semantic* CAS/Evo operation set (`casRead`,
+   `casList`, `evoHead`, …). **Not `FileCasOperation`**, which is `ReadBytes |
+   Mkdir | Readdir | Access | Rename | Rm | RandomInt | Now | CreateExclusive |
+   WriteBytes | Stat` — raw filesystem mutation. Whitelisting "the operations
+   CAS needs" would hand a program `rm` on any path while the map still looks
+   locked down. `Cas<O>` is generic in its underlying operation set precisely so
+   the filesystem can stay server-side, inside the handlers. Whether `casWrite`
+   is in the vocabulary at all depends on open question 5.
+2. **Guard the boundary.** A stored blob is arbitrary JS and can emit any
+   `command` string regardless of its declared type, since the type system does
+   not reach across CAS. Guard dispatch with `Object.hasOwn` (or build the map
+   with a `null` prototype) and turn a miss into
+   `operation not permitted: <command>` as an `errorResult`.
 
-Requirement 2 is a genuine gap in FunctionalScript — `match` has no notion of a
-partial map. Per AGENTS.md, working around it here is fine and should not block
-Week 1; what is not fine is doing so silently. The gap is recorded in
-[upstream-match-partial-operation-map.md](./upstream-match-partial-operation-map.md),
-which also carries the candidate upstream shapes. Update that file with whatever
-the local workaround turns out to be — it is the thing that gets upstreamed in
-Week 5.
+Neither needs anything from FunctionalScript. Rationale and the corrected
+analysis — including why "partial `OperationMap`" was a false requirement — are
+in [restricted-runner-operation-map.md](./restricted-runner-operation-map.md).
+
+Requirement 2 also closes, locally, the one real fjs bug here: `map[command]`
+resolves inherited `Object.prototype` members and invokes them with the payload.
+Filed upstream as
+[functionalscript#1419](https://github.com/functionalscript/functionalscript/pull/1419).
 
 ### Known limitation: import-time execution
 

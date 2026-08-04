@@ -38,8 +38,8 @@ Two independent tracks. The execution spine carries nearly all the technical ris
 **Track A — execution spine** (spec: [fjs/todo/implement-mcp-server.md](../fjs/todo/implement-mcp-server.md))
 
 1. **Our MCP server entry point.** Compose `casToolRegistry` + `evoToolRegistry` + our new registry via the exported `fromRegistry` / `mcpStep` / `stdioTransport`. Registers with `claude mcp add`.
-2. **CAS/EVO effects.** Decide which operations a stored program may request. `Cas<O>`/`Evo<O>` are already effect-based, so this is largely choosing the surface and wiring it into an operation map.
-3. **The restricted runner.** An `OperationMap` holding only whitelisted ops, driven by `asyncRun`. Unknown ops must fail as a clean, reported error — not the raw `TypeError` that `match` produces today.
+2. **CAS/EVO effects.** Define the *semantic* vocabulary a stored program may express — `casRead`, `casList`, `evoHead`, … — **not** `FileCasOperation`, which is `Rm | WriteBytes | Rename | Mkdir | …` and would hand the program raw filesystem mutation. `Cas<O>` is generic in its underlying operation set exactly so the filesystem stays server-side inside the handlers. This step is the sandbox; step 3 only enforces it.
+3. **The restricted runner.** A **total** `ToAsyncOperationMap` over that vocabulary, driven by `asyncRun` — total over a narrow set, not a wide set with entries removed. Guard dispatch with `Object.hasOwn` (a stored blob can emit any `command` string whatever its declared type) and report a miss as `operation not permitted: <command>`. See [`fjs/todo/restricted-runner-operation-map.md`](../fjs/todo/restricted-runner-operation-map.md).
 4. **The `fjs_run` tool.** `{ hash }` → read blob → `import()` → call its entry point → interpret its effect under the restricted runner → return the result.
 
 Step 3 is the real work; 1 and 4 are assembly over existing FunctionalScript exports.
@@ -85,7 +85,7 @@ Goal: **the full path works on the user's own documents.**
 ## Week 5 (Technical Debt)
 
 - Upstream whatever has stabilized into FunctionalScript (per AGENTS.md staging rule) — most likely the CAS effects, and `fjs_run` if its shape has settled.
-- **Work the `fjs/todo/upstream-*.md` queue.** Every FJS bug or gap worked around locally has a file there stating the gap, the workaround, and the intended upstream fix; this is where they get fixed upstream, released, and the local workarounds deleted. Open at the start of Week 1: [`upstream-match-partial-operation-map.md`](../fjs/todo/upstream-match-partial-operation-map.md) (blocking a clean refusal message from the restricted runner) and [`upstream-media-dialect-registry.md`](../fjs/todo/upstream-media-dialect-registry.md) (blocks `fjs/media` detection of our document types; may be wanted as early as Week 3).
+- **Work the `fjs/todo/upstream-*.md` queue.** Every FJS bug or gap worked around locally has a file there stating the gap, the workaround, and the intended upstream fix; this is where they get fixed upstream, released, and the local workarounds deleted. Open at the start of Week 1: [`upstream-media-dialect-registry.md`](../fjs/todo/upstream-media-dialect-registry.md) (blocks `fjs/media` detection of our document types; may be wanted as early as Week 3). Filed upstream already: [functionalscript#1419](https://github.com/functionalscript/functionalscript/pull/1419), `match` dispatching through the prototype chain — we guard locally regardless, so a release is not blocking.
 - Revisit execution safety: validating source as genuine FunctionalScript before `import()`, and/or Worker isolation with hard limits. Week 1 deliberately defers both.
 - Whatever the first four weeks accumulated.
 

@@ -68,8 +68,12 @@ a new report is a new program, not new engine code.
 - [ ] Execute agent-authored FunctionalScript programs in content-addressable space —
       the MCP server runs the program, the agent does not compute reports directly
 - [ ] Define Effects for CAS — the effect vocabulary an executed program may express
-- [ ] Restricted runner: an `OperationMap` holding only whitelisted CAS/Evo operations,
-      driven by `asyncRun` — a program requesting `fetch`/`readFile` finds no entry
+- [ ] Restricted runner: a **total** `ToAsyncOperationMap` over a purpose-built *semantic*
+      CAS/Evo vocabulary (`casRead`, `casList`, `evoHead`, …), driven by `asyncRun`.
+      **Not** `FileCasOperation` — that is `Rm | WriteBytes | Rename | Mkdir | …`, raw
+      filesystem mutation, and whitelisting it would leave the sandbox open while looking
+      closed. Filesystem operations stay server-side inside the handlers, never in the
+      program's operation set. See `fjs/todo/restricted-runner-operation-map.md`
 - [ ] Unknown operations fail as a clean, reported error (`operation not permitted:
       fetch`), not the raw `TypeError` that `match` produces today
 - [ ] An `fjs_run` MCP tool: `{ hash }` → read blob → `import()` → call entry point →
@@ -193,14 +197,19 @@ Both `todo/` documents arrived in PR #1 (`f57fd50`). Where this file and `todo/p
 disagreed on execution safety, `todo/plan.md` won — it is the more concrete and more
 honest account, and Constraints below were corrected to match it.
 
-**Known upstream fjs gap.** `match` has no notion of a partial `OperationMap`:
-`map[command]` is `undefined` for an absent operation, so it throws
-`TypeError: map[command] is not a function` rather than reporting a refusal. That makes
-the single most likely failure mode — an agent writing a program that reaches for the
-network — undebuggable. Per AGENTS.md, working around it locally is fine so long as the
-workaround is recorded rather than silent; tracked in
-[`fjs/todo/upstream-match-partial-operation-map.md`](../fjs/todo/upstream-match-partial-operation-map.md)
-for upstreaming.
+**Known upstream fjs gap.** `match` dispatches with `map[command](...payload)` — an
+ordinary property lookup, so it resolves inherited `Object.prototype` members
+(`__defineGetter__`, `constructor`, `toString`) and invokes them with the payload,
+whatever the map contains. In a module whose job is to bound what an effect may do, the
+bound is escapable by naming an inherited property. Filed upstream as
+[functionalscript#1419](https://github.com/functionalscript/functionalscript/pull/1419);
+`Object.hasOwn` closes it, and we guard locally regardless.
+
+An earlier version of this section claimed a second gap — that `match` "has no notion of a
+partial `OperationMap`" — and that was wrong. Every fjs dispatch map is a mapped type over
+its operation union, hence total by construction, and every runner constrains the effect to
+a subset of the map. The map defines the operation universe; we need no partiality and fjs
+offers none. See [`fjs/todo/restricted-runner-operation-map.md`](../fjs/todo/restricted-runner-operation-map.md).
 
 **What fjs already provides.** `functionalscript@0.40.0` ships most of the
 infrastructure, so the finance-specific work is domain logic, not plumbing:
@@ -256,9 +265,12 @@ classifying a blob of unknown provenance.
 **Program execution is half-built already.** There is no "evaluate this FunctionalScript
 source" module in fjs — `fjs/fsc` covers compile workflows and `fjs/djs` transpiles data,
 so loading agent-authored source is net-new work. But the *interpretation* half exists:
-`fjs/effects/mock`'s `run(o)` walks an effect chain and honors only what the handler `o`
-implements. A CAS-only runner is that same shape with a CAS handler — which is why the
-sandbox constraint below is structural rather than something to bolt on.
+`fjs/effects/mock`'s `run(o)` walks an effect chain, and the handler `o` *defines* the
+operation universe — `run: <O, S>(o: MemOperationMap<O, S>) => (state) => <O1 extends O,
+T>(effect: Effect<O1, T>)`, so an effect may only request operations the handler covers.
+(Not "honors what it implements and ignores the rest", as this said previously — there is
+no partial handler.) A CAS-only runner is that same shape with a CAS vocabulary, which is
+why the sandbox constraint below is structural rather than something to bolt on.
 
 **How Evo models the domain.** A subject is the identity of a mutable thing; a revision
 is an immutable blob `{dialect, subject, parents[], snapshot, generation, archived?}`
@@ -289,7 +301,7 @@ supersede rather than overwrite.
     a new fjs version released. Working around it locally is allowed and should not block
     progress — but never silently: record it in `fjs/todo/upstream-<short-name>.md`, which
     is also the Week 5 upstreaming queue. Two are open already
-    ([`match`](../fjs/todo/upstream-match-partial-operation-map.md), [media dialect
+    ([`match` prototype lookup](https://github.com/functionalscript/functionalscript/pull/1419), [media dialect
     registry](../fjs/todo/upstream-media-dialect-registry.md)).
 - **Typing**: JSDoc comments only, validated by TypeScript with `noEmit`. No `.ts` source
   files. `tsconfig.json` is maximally strict and is the record of which flags are set;
