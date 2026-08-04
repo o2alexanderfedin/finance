@@ -42,6 +42,10 @@ import { initEvo, evo } from 'functionalscript/fjs/cas/evo/module.f.js'
 import { sha256 } from 'functionalscript/fjs/crypto/sha2/module.f.js'
 import { casToolRegistry } from 'functionalscript/fjs/mcp/cas/module.f.js'
 import { evoToolRegistry } from 'functionalscript/fjs/mcp/evo/module.f.js'
+import { emptyState, virtual } from 'functionalscript/fjs/effects/node/virtual/module.f.js'
+import { fromVec } from 'functionalscript/fjs/types/uint8array/module.f.js'
+import { utf8 } from 'functionalscript/fjs/text/module.f.js'
+import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
 
 /** @import { McpConfig, McpHandlers } from 'functionalscript/fjs/protocol/mcp/module.f.js' */
 /** @import { Effect } from 'functionalscript/fjs/effects/module.f.js' */
@@ -96,10 +100,118 @@ export const financeMcpServer = home => step(
 )
 
 // ── Tests ────────────────────────────────────────────────────────────────────
+/**
+ * UTF-8 bytes of `s` as a plain array — the virtual stdin byte stream, same
+ * helper `fjs/protocol/mcp/stdio/proof.f.js` and `fjs/mcp/proof.f.js` use.
+ * @type {(s: string) => readonly number[]}
+ */
+const toBytes = s => [...fromVec(utf8(s))]
+
+/**
+ * The `protocolVersion` the simulated client asks for in `initialize` —
+ * deliberately **not** `financeConfig.protocolVersion` (`2025-11-25`). The
+ * whole point of `proof.session` is observing, empirically, that `mcpStep`
+ * still answers with our pinned version regardless of this request (see
+ * `fjs/todo/upstream-mcp-protocol-version-negotiation.md`).
+ */
+const requestedProtocolVersion = '2025-06-18'
+
+const initializeRequest = {
+    jsonrpc: '2.0',
+    method: 'initialize',
+    id: 1,
+    params: {
+        protocolVersion: requestedProtocolVersion,
+        capabilities: {},
+        clientInfo: { name: 'finance-proof-client', version: '0.0.1' },
+    },
+}
+const initializedNotification = { jsonrpc: '2.0', method: 'notifications/initialized' }
+const toolsListRequest = { jsonrpc: '2.0', method: 'tools/list', id: 2 }
+const toolsCallRequest = {
+    jsonrpc: '2.0',
+    method: 'tools/call',
+    id: 3,
+    params: { name: 'evo_list', arguments: {} },
+}
+
+/**
+ * Drives the full `initialize` -> `notifications/initialized` -> `tools/list`
+ * -> `tools/call` session against the real assembled `financeMcpServer` over
+ * the virtual Node interpreter — no real process, no real filesystem, no
+ * `Promise`. Returns the resulting virtual `State` so each proof leaf below
+ * can assert on `stdout`/`stderr` independently.
+ * @type {() => import('functionalscript/fjs/effects/node/virtual/module.f.js').State}
+ */
+const runSession = () => {
+    const input = [initializeRequest, initializedNotification, toolsListRequest, toolsCallRequest]
+        .map(m => JSON.stringify(m))
+        .join('\n') + '\n'
+    const [state] = virtual({ ...emptyState, stdin: toBytes(input) })(financeMcpServer('/'))
+    return state
+}
+
+/**
+ * Non-empty stdout lines from a session `State`, parsed as JSON-RPC. Typed
+ * `any` deliberately: these are raw decoded JSON-RPC envelopes, not values
+ * carried through fjs's own typed effect system.
+ * @type {(state: import('functionalscript/fjs/effects/node/virtual/module.f.js').State) => any[]}
+ */
+const responsesOf = state => state.stdout.split('\n').filter((/** @type {string} */ line) => line !== '').map((/** @type {string} */ line) => JSON.parse(line))
+
 export const proof = {
     // financeMcpServer is never called in integration tests because it drives
     // a real stdio server; call it here to cover its Effect-building body —
     // the stdio server *process* cannot be proof-tested directly (see
     // fjs/todo/implement-mcp-server.md).
     financeMcpServer: () => { financeMcpServer('/') },
+    // Full-session proof (MCP-05): initialize -> notifications/initialized ->
+    // tools/list -> tools/call, driven against financeMcpServer through the
+    // virtual Node interpreter. See fjs/todo/upstream-mcp-protocol-version-negotiation.md
+    // for the non-negotiation gap this proof demonstrates empirically. A
+    // virtual harness proves the pieces speak correctly to each other; it
+    // cannot prove a real client will call a tool — that is Plan 03's job.
+    session: {
+        // Every stdout line across the whole session is valid JSON-RPC, and
+        // exactly one per request (the notification gets none) — the
+        // stdout-purity assertion (MCP-05). If anything non-JSON-RPC were
+        // ever written to stdout, this parse would throw and the leaf would
+        // fail.
+        stdoutIsPureJsonRpc: () => {
+            const responses = responsesOf(runSession())
+            assertEq(responses.length, 3)
+            for (const r of responses) {
+                assertEq(r.jsonrpc, '2.0')
+            }
+        },
+        // No diagnostics were emitted anywhere in the session.
+        stderrIsEmpty: () => {
+            assertEq(runSession().stderr, '')
+        },
+        // Empirical, proof-backed non-negotiation: the client asked for
+        // `requestedProtocolVersion` ('2025-06-18'), but the response still
+        // carries our pinned '2025-11-25' and our own server identity —
+        // mcpStep never inspects what the client requested.
+        initializeIgnoresRequestedProtocolVersion: () => {
+            const [initResponse] = responsesOf(runSession())
+            assertEq(initResponse.result.protocolVersion, '2025-11-25')
+            assertEq(initResponse.result.serverInfo.name, 'finance-mcp')
+        },
+        // Both registries composed: tools/list enumerates a non-empty set
+        // that includes evo_list.
+        toolsListEnumeratesComposedRegistry: () => {
+            const [, listResponse] = responsesOf(runSession())
+            const tools = listResponse.result.tools
+            assert(tools.length > 0)
+            assert(tools.some((/** @type {any} */ t) => t.name === 'evo_list'))
+        },
+        // A real registered handler answers tools/call — a green tools/call,
+        // not merely a green tools/list (the documented silent-failure mode
+        // this proof and Plan 03's live check both target).
+        toolsCallReachesRealHandler: () => {
+            const [, , callResponse] = responsesOf(runSession())
+            assert(!('error' in callResponse))
+            assertEq(callResponse.result.content[0].type, 'text')
+        },
+    },
 }
