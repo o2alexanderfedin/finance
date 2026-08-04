@@ -13,7 +13,7 @@
  *
  * @module
  */
-import { match, do_ } from 'functionalscript/fjs/effects/module.f.js'
+import { match, do_, step } from 'functionalscript/fjs/effects/module.f.js'
 import { ok, error } from 'functionalscript/fjs/types/result/module.f.js'
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
 
@@ -63,6 +63,13 @@ const unsafeDo = /** @type {any} */ (do_)
  */
 const readDo = do_('casRead')
 
+/**
+ * `do_` narrowed to `evoHead`, for the two-step read-set proof below — same
+ * under-constraining reason as `readDo`.
+ * @type {(a: string) => Effect<EvoHead, string>}
+ */
+const evoHeadDo = do_('evoHead')
+
 // ── interpret ────────────────────────────────────────────────────────────────
 
 /**
@@ -74,13 +81,42 @@ const readDo = do_('casRead')
 const refusalMessage = (command, map) => `operation not permitted: ${command}; permitted: ${Object.keys(map).join(', ')}`
 
 /**
- * Dispatches a guest `Effect` through `map`, one command at a time.
+ * One command `interpret` actually dispatched: its name and the payload it
+ * was called with. Observed by `interpret` as it dispatches, never declared
+ * or supplied by the guest effect (EXEC-05) — see `reads` below.
+ * @typedef {readonly [string, readonly unknown[]]} Read
+ */
+
+/**
+ * An interpreted effect's outcome: the effect's value paired with every
+ * command actually dispatched to reach it, in dispatch order — or a
+ * refusal (EXEC-03's actionable text, or the step-budget refusal, EXEC-06).
+ * @template T
+ * @typedef {Result<readonly [T, readonly Read[]], string>} Interpreted
+ */
+
+/**
+ * Bounds `interpret`'s dispatch loop (EXEC-06). `asyncRun` elsewhere in fjs
+ * is an unbounded `while (true)` — a generated effect chain with a wrong
+ * termination condition would otherwise hang the single-process server
+ * silently, with no response and no way to cancel. 10,000 is a runaway
+ * guard, not a tuned limit — a named, exported constant so it can be
+ * changed without hunting a literal (03-CONTEXT.md).
+ * @type {number}
+ */
+export const stepBudget = 10_000
+
+/**
+ * Dispatches a guest `Effect` through `map`, one command at a time, bounded
+ * by `stepBudget` and accumulating the read set it actually observes.
  *
- * A `Pure` effect is already-computed per its contract — `ok(effect())`
- * forces it directly, no dispatch involved. A `Do` node goes through
- * `match(map)(effect)`: on `'cont'`, apply the continuation to the
- * operation's output and recurse into the rest of the effect; `match` never
- * returns `'done'` here, since that case is the `Pure` branch above.
+ * A `Pure` effect is already-computed per its contract — `e()` forces it
+ * directly, no dispatch involved, and the loop returns with everything
+ * dispatched so far alongside the value. A `Do` node goes through
+ * `match(map)(e)`: on `'cont'`, the dispatched command and its payload are
+ * appended to `reads` **after** the dispatch succeeds, never before — a
+ * refused attempt was never read, per EXEC-05 — and the loop continues with
+ * the continuation applied to the operation's output.
  *
  * `match` refuses any command that is not an own property of `map` by
  * throwing the **bare command string** — not an `Error`, no `.message`
@@ -89,27 +125,36 @@ const refusalMessage = (command, map) => `operation not permitted: ${command}; p
  * per `match`'s documented contract, and reports it as a `Result`, never a
  * throw — a refusal is a routine, correctable outcome here, not a crash.
  *
- * No loop, no step budget, no read-set tracking: single-command and short
- * chains dispatch or refuse correctly. Plan 02 (wave 2, same file) replaces
- * this recursive body with an iterative, budget-bounded, read-accumulating
- * version (EXEC-05/EXEC-06).
+ * If the loop exhausts `stepBudget` without reaching a `Pure` node, the
+ * chain is treated as non-terminating and refused the same way a denied
+ * command is — a value, never a thrown error or an unbounded hang
+ * (EXEC-06).
  * @template {Operation} O
  * @template T
  * @param {OperationMap<O, Return<O>>} map
- * @returns {(effect: Effect<O, T>) => Result<T, string>}
+ * @returns {(effect: Effect<O, T>) => Interpreted<T>}
  */
 export const interpret = map => effect => {
-    if (typeof effect === 'function') {
-        return ok(effect())
+    /** @type {Effect<O, T>} */
+    let e = effect
+    /** @type {readonly Read[]} */
+    let reads = []
+    for (let count = 0; count < stepBudget; count++) {
+        if (typeof e === 'function') {
+            return ok(/** @type {readonly [T, readonly Read[]]} */ ([e(), reads]))
+        }
+        const { command, payload } = e
+        try {
+            const result = match(map)(e)
+            assert(result[0] === 'cont')
+            reads = [...reads, [command, payload]]
+            e = result[2](result[1])
+        } catch (thrown) {
+            assert(typeof thrown === 'string')
+            return error(refusalMessage(thrown, map))
+        }
     }
-    try {
-        const result = match(map)(effect)
-        assert(result[0] === 'cont')
-        return interpret(map)(result[2](result[1]))
-    } catch (thrown) {
-        assert(typeof thrown === 'string')
-        return error(refusalMessage(thrown, map))
-    }
+    return error(`step budget exceeded: ${stepBudget}`)
 }
 
 // ── Tests ────────────────────────────────────────────────────────────────────
@@ -118,7 +163,53 @@ export const proof = {
     dispatch: () => {
         const result = interpret(map)(readDo('doc-a'))
         assertEq(result[0], 'ok')
-        assertEq(result[1], 'casRead:doc-a')
+        const [value, reads] = result[1]
+        assertEq(value, 'casRead:doc-a')
+        assertEq(JSON.stringify(reads), JSON.stringify([['casRead', ['doc-a']]]))
+    },
+    // EXEC-06: a self-referential chain that never reaches a `Pure` node
+    // must not hang `interpret` — it returns a bounded step-budget refusal
+    // within `stepBudget` iterations. `step`'s `Do` case defers, so
+    // constructing `forever()` terminates immediately; only interpreting it
+    // drives the (otherwise infinite) chain, and the budget bounds that.
+    stepBudgetBoundsNonTerminatingChain: () => {
+        /** @type {() => Effect<CasRead, never>} */
+        const forever = () => step(readDo('spin'), forever)
+        const result = interpret(map)(forever())
+        assertEq(result[0], 'error')
+        assertEq(result[1], 'step budget exceeded: 10000')
+    },
+    // EXEC-05: the read set is observed as interpret dispatches, never
+    // declared by the effect chain itself.
+    readSetReflectsActualDispatch: () => {
+        const chain = step(readDo('doc-a'), () => evoHeadDo('subject-b'))
+        const result = interpret(map)(chain)
+        assertEq(result[0], 'ok')
+        const [, reads] = result[1]
+        assertEq(
+            JSON.stringify(reads),
+            JSON.stringify([['casRead', ['doc-a']], ['evoHead', ['subject-b']]]))
+    },
+    // A refusal partway through a chain must still refuse, and must report the
+    // refused command — not the successful one before it. Every other refusal
+    // proof denies on the *first* command, so without this leaf nothing covers
+    // a denial reached after real work.
+    //
+    // Note what this deliberately does NOT claim. Whether `reads` is extended
+    // before or after `match` dispatches is unobservable from outside: the
+    // refusal path returns `error(message)` and discards the read set. Both
+    // orderings pass every proof here. The append sits after the dispatch
+    // because a refused operation was never read, but that is an invariant of
+    // the implementation, not something the current API can witness. If a later
+    // phase returns partial reads alongside a refusal, this becomes testable and
+    // should be pinned then.
+    refusalPartwayThroughAChainReportsTheRefusedCommand: () => {
+        const denied = step(readDo('doc-a'), () => unsafeDo('fetch')('https://evil'))
+        const result = interpret(map)(denied)
+        assertEq(result[0], 'error')
+        assertEq(
+            result[1],
+            'operation not permitted: fetch; permitted: casRead, evoList, evoHead, evoRevision')
     },
     refusals: {
         constructor: () => {
