@@ -207,7 +207,9 @@ These were established by execution, not inference. Any replan must preserve the
   3. The interpreter returns the accumulated read set alongside the result; a proof asserts the observed reads are what the program actually requested, independent of anything the program declares.
   4. Every proof in this phase runs under `fjs/effects/mock` with no CAS, no Evo, no MCP, and no filesystem — the module imports `fjs/effects` and nothing else.
 **Research**: Not needed — a working prototype of `interpret` under `mock` already exists, and the dispatch guard now comes from fjs 0.41.0 (verified against it).
-**Plans**: TBD
+**Plans**: 2 plans
+- [ ] 03-01-PLAN.md — interpret's dispatch and refusal reporting (EXEC-01/03/04): the six prototype-inherited names plus the two-step `__defineGetter__` escalation, refused as a Result with the exact permitted-set text
+- [ ] 03-02-PLAN.md — interpret's step budget and observed read set (EXEC-05/06): a bounded dispatch loop and the accumulated reads returned alongside the result, plus the import-boundary check
 
 ### Phase 4: Exact Arithmetic and the Money Layering
 **Milestone**: Week 1 — First Working Prototype
@@ -405,7 +407,7 @@ These were established by execution, not inference. Any replan must preserve the
 |-------|-----------|----------------|--------|-----------|
 | 1. Planning-Document Corrections | Week 0 | 3/3 | Complete | verified 11/11 |
 | 2. Server Skeleton and Registration | Week 0 | 3/3 | Complete | verified 11/11 |
-| 3. The Restricted Interpreter | Week 1 | 0/TBD | Not started | - |
+| 3. The Restricted Interpreter | Week 1 | 0/2 | Not started | - |
 | 4. Exact Arithmetic | Week 1 | 0/TBD | Not started | - |
 | 5. Document Base and First Dialects | Week 1 | 0/TBD | Not started | - |
 | 6. Guest ABI and Materialization | Week 1 | 0/TBD | Not started | - |
