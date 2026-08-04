@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
 status: executing
-stopped_at: Phase 5 complete + user-directed w2/medical_expenses dialects
+stopped_at: Phases 1-5 MERGED to main (PR #20). Phase 6 not yet planned.
 last_updated: "2026-08-04T17:20:00.000Z"
 last_activity: 2026-08-04
 progress:
@@ -156,9 +156,17 @@ None yet.
   now pinning behaviour we depend on rather than hoping for it), EXEC-05 (observed read set), and
   EXEC-06 (step budget).
 
-- **Minor: the `functionalscript` submodule is not initialized** in this worktree (`git submodule
-  status` shows a leading `-`). Nothing depends on it today — `tsconfig.json` excludes it and the
-  suite is green — but `git submodule update --init` is needed for workflows that read it.
+- **The `functionalscript` submodule is initialized in the MAIN checkout but not in this
+  worktree**, and that changes the test count: `npm test` reports **118** here and **2295** on
+  main (2177 of them upstream's own, all passing). Neither number is wrong; know which tree you
+  are measuring before comparing runs. `tsconfig.json` excludes the submodule either way.
+
+- **Leftover remote branches, not ours to delete.** `origin/wtf` and
+  `origin/revert-14-feature/planning-requirements-roadmap` are Sergey's and each carry one
+  commit not in main. `origin/ok` is fully merged (0 unmerged) and is safe to drop.
+  `origin/feature/planning-requirements-roadmap` holds one superseded WIP commit
+  ("paused at 8/15 — Phase 1 not started") — obsolete, but deleting unmerged work is the
+  user's call.
 
 - **RESOLVED (Phase 2): the protocol-version pin works.** A real `claude -p` client issued an
   actual `tools/call` (`mcp__finance-mcp__evo_list` -> non-error `tool_result`) against the
@@ -185,9 +193,12 @@ None yet.
   (`...(x === undefined ? {} : { k: x })`), and **the compiler will not tell you when it slips.**
   DOC-11's absent-vs-zero rule rests on this.
 
-- **NEW: the `finance-mcp` registration points at the worktree path.** After this branch merges,
-  run `claude mcp remove finance-mcp -s local` and re-register against the main checkout, or a
-  stale duplicate accumulates.
+- **RESOLVED: PR #20 merged** (2026-08-04, merge commit `2c4eb2e`) — 41 commits, +10386/-131,
+  Phases 1-5. Merged unreviewed at the user's explicit direction after a long wait for review.
+  Its title said "Phases 1-2" while carrying five phases; corrected before merging.
+
+- **RESOLVED: the `finance-mcp` registration** now points at the main checkout
+  (`/Volumes/.../sergey-shandar/finance`), re-registered post-merge and verified Connected.
 
 - **Superseded (Phase 2): fjs's `mcpStep` does not negotiate the protocol version.** The
   `initialize` handler validates the client's params then discards the client's
