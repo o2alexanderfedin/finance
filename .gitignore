@@ -141,3 +141,6 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+
+# Worktrees created by Claude Code sessions — never part of the repo
+.claude/worktrees/

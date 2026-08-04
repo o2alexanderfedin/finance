@@ -47,5 +47,11 @@
     "noUncheckedSideEffectImports": true,
     "moduleDetection": "force",
     "skipLibCheck": true,
-  }
+  },
+
+  // The `functionalscript` submodule is upstream's own checkout, not our source. It
+  // builds under its own tsconfig; type-checking it under ours reports ~1500 errors that
+  // are not ours to fix. Excluding it scopes the project to our code — it does not relax
+  // a flag. `node_modules` is listed because naming `exclude` at all replaces the default.
+  "exclude": ["functionalscript", "node_modules"],
 }
