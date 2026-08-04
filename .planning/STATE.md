@@ -10,11 +10,11 @@ the server executes it as a pure function of `(documents, tax-year parameters) �
 
 ## Current Position
 
-Phase: 3 of 15 (The Restricted Interpreter)
+Phase: 4 of 15 (Exact Arithmetic and the Money Layering)
 Plan: 0 of TBD in current phase
-Status: Ready to plan — Phases 1 and 2 complete, each verified 11/11
+Status: Ready to plan — Phases 1-3 complete, each verified 11/11
 
-Progress: [██░░░░░░░░] 2/15 phases (15 of 79 requirements Done)
+Progress: [███░░░░░░░] 3/15 phases (20 of 79 requirements Done)
 Last activity: 2026-08-03 — PR #14 merged (planning corpus on `main`); PR #17 merged
 (Sergey: absolute no-floating-point rule, exact-decimal module as Week 1 step 6)
 

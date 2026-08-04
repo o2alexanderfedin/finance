@@ -407,7 +407,7 @@ These were established by execution, not inference. Any replan must preserve the
 |-------|-----------|----------------|--------|-----------|
 | 1. Planning-Document Corrections | Week 0 | 3/3 | Complete | verified 11/11 |
 | 2. Server Skeleton and Registration | Week 0 | 3/3 | Complete | verified 11/11 |
-| 3. The Restricted Interpreter | Week 1 | 0/2 | Not started | - |
+| 3. The Restricted Interpreter | Week 1 | 2/2 | Complete | verified 11/11 |
 | 4. Exact Arithmetic | Week 1 | 0/TBD | Not started | - |
 | 5. Document Base and First Dialects | Week 1 | 0/TBD | Not started | - |
 | 6. Guest ABI and Materialization | Week 1 | 0/TBD | Not started | - |

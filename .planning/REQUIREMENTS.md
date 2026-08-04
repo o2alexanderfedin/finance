@@ -113,7 +113,7 @@ dissolves on contact.
 
 ### Execution Spine (EXEC)
 
-- [ ] **EXEC-01** *(T0)*: A restricted effect interpreter, `interpret(map)(effect)`,
+- [x] **EXEC-01** *(T0)*: A restricted effect interpreter, `interpret(map)(effect)`,
       translating a guest effect into a host effect. Depends on `fjs/effects` only — not
       CAS, not Evo, not MCP — so it is fully proof-testable in isolation.
 - [x] **EXEC-02** *(T0)*: ~~Operation lookup uses `Object.hasOwn` and the operation map has
@@ -122,24 +122,24 @@ dissolves on contact.
       consulted) and `assert`s the handler exists. Verified — the `__defineGetter__` escape
       now throws. Keep a null-prototype map as cheap defence in depth, but it is no longer
       load-bearing and no local guard is required.
-- [ ] **EXEC-03** *(T0)*: A non-whitelisted operation is refused with a message naming the
+- [x] **EXEC-03** *(T0)*: A non-whitelisted operation is refused with a message naming the
       operation *and* the permitted set (`operation not permitted: fetch; permitted:
       casRead, evoList, evoHead, evoRevision`). Agents self-correct from actionable errors
       and cannot from opaque ones. Still ours: 0.41.0 throws the command name but knows
       nothing of the permitted set. **The throw is a bare string, not an `Error`** (`assert`
       throws its message), so the catch must use the caught value directly — `e.message` is
       `undefined` and an `e instanceof Error` branch misses every refusal.
-- [ ] **EXEC-04** *(T0)*: Regression proofs for prototype-inherited names specifically:
+- [x] **EXEC-04** *(T0)*: Regression proofs for prototype-inherited names specifically:
       `constructor`, `toString`, `valueOf`, `hasOwnProperty`, `__defineGetter__`. These are
       the cases a naive `in` or `!== undefined` guard admits. Still wanted after the 0.41.0
       fix — they now pin behaviour we depend on rather than merely hope for, and they cover
       our refusal *reporting*, which is still ours. Assert on the reported text, not the raw
       throw. Include the two-step `__defineGetter__` escalation (install a getter for a
       denied command, then call it).
-- [ ] **EXEC-05** *(T0)*: The interpreter accumulates the read set as it dispatches, so a
+- [x] **EXEC-05** *(T0)*: The interpreter accumulates the read set as it dispatches, so a
       run record's `inputs[]` is **observed rather than declared**. A program cannot forget
       to cite, or misreport, what it read.
-- [ ] **EXEC-06** *(T0)*: A step budget bounds execution. `asyncRun` is an unbounded
+- [x] **EXEC-06** *(T0)*: A step budget bounds execution. `asyncRun` is an unbounded
       `while(true)`; a generated loop with a wrong termination condition otherwise hangs
       the single-process server silently, with no response and no way to cancel.
 - [ ] **EXEC-07** *(T0)*: A frozen guest ABI. Two constraints fix its shape:
@@ -436,12 +436,12 @@ them. Week 0 is research's addition in front of the plan's Week 1.
 | MCP-07 | T1 | Phase 8 - TY2025 Parameters and Tax Table | Week 2 | Pending |
 | MCP-08 | T2 | Phase 11 - Wage, Retirement, Benefit Documents | Week 3 | Pending |
 | MCP-09 | T3 | Phase 15 - Realism Polish and Upstream | Week 5 | Pending |
-| EXEC-01 | T0 | Phase 3 - The Restricted Interpreter | Week 1 | Pending |
+| EXEC-01 | T0 | Phase 3 - The Restricted Interpreter | Week 1 | Done |
 | EXEC-02 | T0 | Delivered upstream (fjs 0.41.0, functionalscript#1419) | Week 1 | Done |
-| EXEC-03 | T0 | Phase 3 - The Restricted Interpreter | Week 1 | Pending |
-| EXEC-04 | T0 | Phase 3 - The Restricted Interpreter | Week 1 | Pending |
-| EXEC-05 | T0 | Phase 3 - The Restricted Interpreter | Week 1 | Pending |
-| EXEC-06 | T0 | Phase 3 - The Restricted Interpreter | Week 1 | Pending |
+| EXEC-03 | T0 | Phase 3 - The Restricted Interpreter | Week 1 | Done |
+| EXEC-04 | T0 | Phase 3 - The Restricted Interpreter | Week 1 | Done |
+| EXEC-05 | T0 | Phase 3 - The Restricted Interpreter | Week 1 | Done |
+| EXEC-06 | T0 | Phase 3 - The Restricted Interpreter | Week 1 | Done |
 | EXEC-07 | T0 | Phase 6 - Guest ABI and Materialization | Week 1 | Pending |
 | EXEC-08 | T1 | Phase 7 - `fjs_run` and Run Records | Week 1 | Pending |
 | EXEC-09 | T1 | Phase 6 - Guest ABI and Materialization | Week 1 | Pending |
