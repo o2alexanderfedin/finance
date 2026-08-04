@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
 status: executing
-stopped_at: Phases 1-5 MERGED to main (PR #20). Phase 6 not yet planned.
+stopped_at: Phase 6 complete (EXEC-07/09, SEC-02/03). Phase 7 not yet planned.
 last_updated: "2026-08-04T17:20:00.000Z"
 last_activity: 2026-08-04
 progress:
   total_phases: 15
-  completed_phases: 5
-  total_plans: 14
-  completed_plans: 14
-  percent: 33
+  completed_phases: 6
+  total_plans: 16
+  completed_plans: 16
+  percent: 40
 ---
 
 # Project State
@@ -22,17 +22,17 @@ See: .planning/PROJECT.md (updated 2026-08-03)
 
 **Core value:** The report is a program, not an answer — the agent emits FunctionalScript;
 the server executes it as a pure function of `(documents, tax-year parameters) → report`.
-**Current focus:** Phase 6 — Guest ABI Freeze and Safe Materialization (not yet planned)
+**Current focus:** Phase 7 — `fjs_run`, Run Records, and the Week 1 Convergence (not yet planned)
 
 ## Current Position
 
-Phase: 5 of 15 complete (Document Base, Subject Model, and the First Two Dialects)
-Plan: 4 of 4 in that phase
-Status: Phase 5 complete and verified against all five success criteria; next phase not yet planned
+Phase: 6 of 15 complete (Guest ABI Freeze and Safe Materialization)
+Plan: 2 of 2 in that phase
+Status: Phase 6 complete, all five success criteria proven; Phase 7 not yet planned
 
-Progress: [███░░░░░░░] 33% (5 of 15 phases)
+Progress: [████░░░░░░] 40% (6 of 15 phases)
 Last activity: 2026-08-04
-`npm test` 118 pass / 0 fail (runs `tsc && node --test` — tsc is already inside it); fjs 0.41.0.
+`npm test` 135 pass / 0 fail (runs `tsc && node --test` — tsc is already inside it); fjs 0.41.0.
 
 ## Performance Metrics
 
@@ -122,6 +122,21 @@ Full log in PROJECT.md Key Decisions. Recent decisions affecting current work:
   the requirement being silently violated. No stored total, no 7.5% floor: both need an AGI the
   document cannot see.
 
+- [Phase 06-01]: `CasOp` is OURS, not fjs's. The roadmap and REQUIREMENTS both write
+  `Effect<CasOp, T>` as though it were upstream; it is not. fjs has `FileCasOperation`, which
+  contains `WriteBytes`/`Rename`/`Rm` — handing it to a guest hands it the store.
+
+- [Phase 06-01]: the entry point is `report`, curried `ctx => args => Effect<CasOp, T>`. EXEC-07's
+  `(args) => …` and criterion 2's "injected ctx, zero imports" reconcile only if ctx is a
+  parameter — a CAS blob cannot resolve bare specifiers.
+
+- [Phase 06-01]: a negative TYPE property is asserted as a conditional type inside the passing
+  build, never as a negative-compile harness. Verified by widening `CasOp` to include `Fetch`:
+  TS2322 at the assertion, plus TS2741 on the host map. No second tsconfig, no `@ts-nocheck`.
+
+- [Phase 06-02]: an ORDERING guarantee is proven by observing the side effect the ordering
+  prevents, never by which error message came back. See the blocker note below.
+
 ### Pending Todos
 
 None yet.
@@ -179,6 +194,15 @@ None yet.
   `tests 8, pass 7, fail 1`; `node --test fjs/server/module.f.js` gave `tests 1, pass 1, fail 0` on
   the identical file. AGENTS.md line 51 said the opposite and is corrected. **Only ever trust
   `npm test` / `node --test all.test.js`.**
+
+- **NEW (Phase 6): a "which error message" assertion cannot prove an ORDERING.** SEC-02's gate
+  must run before `import_`, and the first proof asserted that a dirty source returned a specifier
+  message rather than an import error. Both orderings return that message when the module loads,
+  so moving the gate after `import_` left the suite green at 134 pass. Only observing whether the
+  module BODY was evaluated distinguishes them — which is also the actual security property,
+  since `import()` runs the body immediately with full Node privileges. A `JsModule` fixture under
+  `virtual` recording its own invocation is the mechanism; pair it with a control leaf so the
+  assertion is about the gate and not about a spy that never fires.
 
 - **NEW (Phase 5): a mutation that fails to COMPILE proves nothing.** `npm test` is
   `tsc && node --test`, so `allowUnreachableCode: false` rejected an `if (false)` mutation

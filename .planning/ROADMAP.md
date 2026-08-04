@@ -268,7 +268,9 @@ held — neither dialect required reopening `fjs/document/base` or the subject c
   4. Two distinct programs materialize under distinct content-hash-derived filenames; re-running the same hash reuses the cached module rather than silently re-running a different first program under a reused temp name.
   5. The whole materialize-and-run path is proof-tested under `fjs/effects/node/virtual` with a `JsModule` at the CAS path and **no real filesystem** — `import` is reached through the `import_` effect, never a raw expression.
 **Research**: Not needed — the `import()` mechanics (extensionless, `data:`, bare specifiers, never-evicting URL-keyed ESM cache) were all executed.
-**Plans**: TBD
+**Plans**: 2 plans
+- [x] 06-01-PLAN.md — the frozen guest ABI: CasOp, guestCtx, `report`, and the compile-time whitelist (EXEC-07), Success Criteria 1 and 2
+- [x] 06-02-PLAN.md — specifier gate, hash-derived filenames, import via effect (SEC-02/03, EXEC-09), Success Criteria 3, 4 and 5
 
 ### Phase 7: `fjs_run`, Run Records, and the Week 1 Convergence
 **Milestone**: Week 1 — First Working Prototype
