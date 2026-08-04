@@ -1,7 +1,10 @@
 # Upstream: `match` has no notion of a partial `OperationMap`
 
-Status: **reported, not fixed upstream.** No local workaround yet — there is no runner
-code. Update the [Local workaround](#local-workaround) section as soon as there is one.
+Status: **filed upstream, not fixed.**
+[functionalscript/functionalscript#1420](https://github.com/functionalscript/functionalscript/issues/1420)
+— covers both this ergonomics gap and the soundness hole below, with the reproduction
+attached. No local workaround yet — there is no runner code. Update the
+[Local workaround](#local-workaround) section as soon as there is one.
 
 Target: `functionalscript` `fjs/effects/module.f.js`. Present in 0.40.0.
 
