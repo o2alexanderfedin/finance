@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
 status: executing
-stopped_at: Completed 05-03-PLAN.md — Phase 5 complete
+stopped_at: Phase 5 complete + user-directed w2/medical_expenses dialects
 last_updated: "2026-08-04T17:20:00.000Z"
 last_activity: 2026-08-04
 progress:
@@ -32,7 +32,7 @@ Status: Phase 5 complete and verified against all five success criteria; next ph
 
 Progress: [███░░░░░░░] 33% (5 of 15 phases)
 Last activity: 2026-08-04
-`npm test` 82 pass / 0 fail; `npx tsc --noEmit` clean; fjs 0.41.0.
+`npm test` 118 pass / 0 fail (runs `tsc && node --test` — tsc is already inside it); fjs 0.41.0.
 
 ## Performance Metrics
 
@@ -111,6 +111,17 @@ Full log in PROJECT.md Key Decisions. Recent decisions affecting current work:
 - [Phase 05-03]: identity fields come from the caller's `meta`, never re-parsed from `ocr.fields`.
   Deriving a TIN or tax year from unstructured OCR text is inference; this phase stores and reads.
 
+- [Phase 05-05, user-directed]: W-2 box 12 is a list of `(code, amount)` pairs, never four slot
+  fields — the slot carries no meaning, the code does, and a code can legitimately repeat.
+  Boxes 15-20 are a repeating array stored faithfully and never computed on; the "never computed
+  on" half is a live constraint on every phase that computes, enforceable only there.
+
+- [Phase 05-05, user-directed]: `vnd.fjs.medical_expenses` is taxpayer-asserted, not transcribed
+  — no IRS form reports out-of-pocket medical spend. It therefore has NO `formRevision`, and
+  DOC-10's text was narrowed to "every dialect that transcribes a printed IRS form" rather than
+  the requirement being silently violated. No stored total, no 7.5% floor: both need an AGI the
+  document cannot see.
+
 ### Pending Todos
 
 None yet.
@@ -160,6 +171,11 @@ None yet.
   `tests 8, pass 7, fail 1`; `node --test fjs/server/module.f.js` gave `tests 1, pass 1, fail 0` on
   the identical file. AGENTS.md line 51 said the opposite and is corrected. **Only ever trust
   `npm test` / `node --test all.test.js`.**
+
+- **NEW (Phase 5): a mutation that fails to COMPILE proves nothing.** `npm test` is
+  `tsc && node --test`, so `allowUnreachableCode: false` rejected an `if (false)` mutation
+  before a single test ran. Mutations must be rewritten into forms that typecheck but never
+  fire, or the run is measuring the compiler rather than the suite.
 
 - **NEW (Phase 5): `exactOptionalPropertyTypes` does NOT catch a spread carrying `undefined`.**
   Mutating `convert` to `...{ corrected: meta.corrected }` (where `meta.corrected` is

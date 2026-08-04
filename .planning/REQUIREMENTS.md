@@ -217,9 +217,9 @@ structural (RTTI) and semantic passes.
 - [x] **DOC-04** *(T1)*: `vnd.fjs.1099int` — typed fields, integer cents, `Number.isSafeInteger`
       guarded. The `"1,234.56" → 123456` conversion happens on exactly one revision
       boundary.
-- [ ] **DOC-05** *(T2)*: `vnd.fjs.w2` — box 12 as a list of `(code, amount)` pairs (box-12
-      confusion is a documented model failure); boxes 15–20 stored faithfully as a repeating
-      array and never computed on.
+- [x] **DOC-05** *(T2 → pulled forward to Phase 5)*: `vnd.fjs.w2` — box 12 as a list of
+      `(code, amount)` pairs (box-12 confusion is a documented model failure); boxes 15–20
+      stored faithfully as a repeating array and never computed on.
 - [ ] **DOC-06** *(T2)*: `vnd.fjs.1099div`. **Adding this dialect forces the QDCGT
       worksheet** (box 1b > 0) and the Schedule D Tax Worksheet (boxes 2b/2d) — schedule
       the worksheet with the dialect, not after it.
@@ -227,7 +227,8 @@ structural (RTTI) and semantic passes.
       means "basis not reported", which is **not** zero.
 - [ ] **DOC-08** *(T2)*: `vnd.fjs.ssa1099` — required by the 65+ profile.
 - [ ] **DOC-09** *(T2)*: `vnd.fjs.1099r` — required by the 65+ profile.
-- [x] **DOC-10** *(T1)*: Every dialect carries the **form revision**, not merely the tax
+- [x] **DOC-10** *(T1)*: Every dialect that transcribes a printed IRS form carries the
+      **form revision**, not merely the tax
       year. Box semantics drift between revisions.
 - [x] **DOC-11** *(T1)*: Every box is explicitly absent-able. Blank is not zero.
 - [x] **DOC-12** *(T1)*: The `CORRECTED` checkbox is modelled as data. It is printed on the
@@ -243,6 +244,15 @@ structural (RTTI) and semantic passes.
       `decodeText`/`mediaType` from `fjs/media/revision` directly and performs exactly one
       check, so `vnd.fjs.revision` is the only dialect it can recognize — its own docstring
       says "currently just `vnd.fjs.revision`", so growth is anticipated but unimplemented.
+- [x] **DOC-17** *(T2, added Phase 5)*: `vnd.fjs.medical_expenses` — the substantiation record
+      behind Schedule A's medical and dental deduction. Unlike every other dialect it is
+      taxpayer-asserted rather than transcribed from an information return: no IRS form
+      reports out-of-pocket medical spend. Each entry carries `datePaid` (the deductible year
+      is the year PAID), provider, category, amount, and an absent-able `reimbursed` — only
+      unreimbursed expense is deductible, and "no reimbursement recorded" must stay
+      distinguishable from "the insurer paid nothing". No stored total and no 7.5%-of-AGI
+      floor: both need an AGI this document cannot see, and belong to the phase that computes
+      Schedule A.
       Per AGENTS.md this is an **fjs change** (take a list of dialect decoders, fall through
       when none match), not local glue — same disposition as the `match` gap. Not blocking:
       our own validation does not need `detect`, which matters only for classifying a blob
@@ -454,7 +464,7 @@ them. Week 0 is research's addition in front of the plan's Week 1.
 | DOC-02 | T0 | Phase 2 - Server Skeleton and Registration | Week 0 | Done |
 | DOC-03 | T1 | Phase 5 - Document Base and First Dialects | Week 1 | Complete |
 | DOC-04 | T1 | Phase 5 - Document Base and First Dialects | Week 1 | Complete |
-| DOC-05 | T2 | Phase 11 - Wage, Retirement, Benefit Documents | Week 3 | Pending |
+| DOC-05 | T2 | Phase 5 - Document Base and First Dialects (pulled forward) | Week 1 | Complete |
 | DOC-06 | T2 | Phase 12 - Brokerage and Capital-Gain Chain | Week 3 | Pending |
 | DOC-07 | T2 | Phase 12 - Brokerage and Capital-Gain Chain | Week 3 | Pending |
 | DOC-08 | T2 | Phase 11 - Wage, Retirement, Benefit Documents | Week 3 | Pending |
@@ -466,6 +476,7 @@ them. Week 0 is research's addition in front of the plan's Week 1.
 | DOC-14 | T1 | Phase 5 - Document Base and First Dialects | Week 1 | Complete |
 | DOC-15 | T2 | Phase 11 - Wage, Retirement, Benefit Documents | Week 3 | Pending |
 | DOC-16 | T3 | Phase 15 - Realism Polish and Upstream | Week 5 | Pending |
+| DOC-17 | T2 | Phase 5 - Document Base and First Dialects (added) | Week 1 | Complete |
 | EXACT-01 | T0 | Phase 4 - Exact Arithmetic | Week 1 | Done |
 | EXACT-02 | T0 | Phase 4 - Exact Arithmetic | Week 1 | Done |
 | EXACT-03 | T0 | Phase 4 - Exact Arithmetic | Week 1 | Done |
@@ -509,13 +520,13 @@ them. Week 0 is research's addition in front of the plan's Week 1.
 | 2. Server Skeleton and Registration | Week 0 | MCP-01, MCP-02, MCP-03, MCP-04, MCP-05, SEC-01, DOC-02 | 7 | T0 |
 | 3. The Restricted Interpreter | Week 1 | EXEC-01, EXEC-02, EXEC-03, EXEC-04, EXEC-05, EXEC-06 | 6 | T0 |
 | 4. Exact Arithmetic | Week 1 | EXACT-01, EXACT-02, EXACT-03, EXACT-04, EXACT-05 | 5 | T0, T1 |
-| 5. Document Base and First Dialects | Week 1 | DOC-00, DOC-01, DOC-03, DOC-04, DOC-10, DOC-11, DOC-12, DOC-14 | 8 | T0, T1 |
+| 5. Document Base and First Dialects | Week 1 | DOC-00, DOC-01, DOC-03, DOC-04, DOC-05, DOC-10, DOC-11, DOC-12, DOC-14, DOC-17 | 10 | T0, T1, T2 |
 | 6. Guest ABI and Materialization | Week 1 | EXEC-07, EXEC-09, SEC-02, SEC-03 | 4 | T0, T1 |
 | 7. `fjs_run` and Run Records | Week 1 | EXEC-08, EXEC-10, EXEC-11, EXEC-12, PROV-03, MCP-06 | 6 | T1 |
 | 8. TY2025 Parameters and Tax Table | Week 2 | TAX-01, TAX-02, TAX-04, MCP-07 | 4 | T1 |
 | 9. Traceable Report Lines | Week 2 | PROV-01, PROV-02, PROV-07 | 3 | T1, T2 |
 | 10. 1040 Core and Scope Guard | Week 2 | TAX-03, TAX-05, TAX-06, TAX-16 | 4 | T1 |
-| 11. Wage, Retirement, Benefit Documents | Week 3 | DOC-05, DOC-08, DOC-09, DOC-15, MCP-08 | 5 | T2 |
+| 11. Wage, Retirement, Benefit Documents | Week 3 | DOC-08, DOC-09, DOC-15, MCP-08 | 4 | T2 |
 | 12. Brokerage and Capital-Gain Chain | Week 3 | DOC-06, DOC-07, DOC-13, TAX-07, TAX-08, TAX-11, TAX-15 | 7 | T2 |
 | 13. The 65+ Profile and Schedules | Week 3 | TAX-09, TAX-10, TAX-12, TAX-13, TAX-14 | 5 | T2 |
 | 14. Acceptance | Week 4 | EXEC-13, PROV-04, PROV-05 | 3 | T2 |

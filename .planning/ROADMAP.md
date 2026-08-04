@@ -231,7 +231,7 @@ These were established by execution, not inference. Any replan must preserve the
 **Milestone**: Week 1 — First Working Prototype
 **Goal**: A document can be stored, versioned, and read back under an identity that can never be wrong, with the vision transcription preserved as its own artifact.
 **Depends on**: Phase 2 (project-local store), Phase 4 (money as a string at the storage boundary) — **runs concurrently with Phase 3**
-**Requirements**: DOC-00, DOC-01, DOC-03, DOC-04, DOC-10, DOC-11, DOC-12, DOC-14
+**Requirements**: DOC-00, DOC-01, DOC-03, DOC-04, DOC-05, DOC-10, DOC-11, DOC-12, DOC-14, DOC-17
 **Tier**: T0 → T1
 **Success Criteria** (what must be TRUE):
   1. A `vnd.fjs.ocr` blob fails `vnd.fjs.1099int` validation on **structure alone** — the exact-literal `dialect` discriminant does the work, proven, with no `{"dialect":` prefix shortcut.
@@ -245,6 +245,15 @@ These were established by execution, not inference. Any replan must preserve the
 - [x] 05-02-PLAN.md — vnd.fjs.ocr and vnd.fjs.1099int dialects (DOC-03/10/11/12), Success Criteria 1 and 2
 - [x] 05-03-PLAN.md — OCR-to-cents conversion boundary and full-instance conversion, Success Criteria 3 and 4
 - [x] 05-04-PLAN.md — cas_refresh tool and cross-process CLI ingestion proof, Success Criterion 5 (DOC-14)
+- [x] 05-05 (no PLAN — user-directed scope addition, mid-phase) — `vnd.fjs.w2` (DOC-05, pulled
+      forward from Phase 11) and `vnd.fjs.medical_expenses` (DOC-17, new), plus the shared
+      `fjs/document/money_field` check the third dialect made worth extracting. See
+      05-05-SUMMARY.md.
+
+**Scope note:** the two dialects above were added on user instruction after the phase's four
+planned plans were complete. The base was designed for the family (05-CONTEXT deferred W-2
+saying "the base is designed for the family now so those land without reopening it"), and that
+held — neither dialect required reopening `fjs/document/base` or the subject convention.
 
 ### Phase 6: Guest ABI Freeze and Safe Materialization
 **Milestone**: Week 1 — First Working Prototype
@@ -328,10 +337,10 @@ These were established by execution, not inference. Any replan must preserve the
 **Milestone**: Week 3 — Breadth in Documents
 **Goal**: Every non-brokerage document the declared profile produces can be stored, listed, and retracted.
 **Depends on**: Phase 5 — **runs concurrently with Phase 12**
-**Requirements**: DOC-05, DOC-08, DOC-09, DOC-15, MCP-08
+**Requirements**: DOC-08, DOC-09, DOC-15, MCP-08 *(DOC-05 delivered early, in Phase 5)*
 **Tier**: T2
 **Success Criteria** (what must be TRUE):
-  1. `vnd.fjs.w2` stores box 12 as a list of `(code, amount)` pairs — box-12 confusion is a documented model failure — and boxes 15–20 faithfully as a repeating array that no computation reads.
+  1. ~~`vnd.fjs.w2` stores box 12 as a list of `(code, amount)` pairs — box-12 confusion is a documented model failure — and boxes 15–20 faithfully as a repeating array that no computation reads.~~ **Delivered in Phase 5.** The "no computation reads them" half remains a live constraint on the phases that compute.
   2. `vnd.fjs.ssa1099` and `vnd.fjs.1099r` round-trip with every box explicitly absent-able, each box list read from the current IRS PDF rather than from recall.
   3. `finance_documents_list` enumerates stored documents with dialect, tax year, and subject.
   4. A wrongly ingested document can be marked `archived`, and the recorded decision on whether report programs filter archived revisions is enforced by a `proof` — there is a documented answer to "I uploaded the wrong document."

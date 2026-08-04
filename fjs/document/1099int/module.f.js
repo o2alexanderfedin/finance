@@ -45,7 +45,7 @@ import { validate as rttiValidate } from 'functionalscript/fjs/types/rtti/valida
 import { error, ok } from 'functionalscript/fjs/types/result/module.f.js'
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
 import { base } from '../base/module.f.js'
-import { centsFromString } from '../../exact/module.f.js'
+import { moneyFieldError } from '../money_field/module.f.js'
 import { dialect as ocrDialect, ocrSchema, validate as ocrValidate } from '../ocr/module.f.js'
 
 /**
@@ -101,9 +101,6 @@ const moneyBoxFields = /** @type {const} */ ([
     'box8TaxExemptInterest',
 ])
 
-/** `Number.MAX_SAFE_INTEGER` as a bigint, compared bigint-to-bigint — never through `Number()`. */
-const maxSafeCents = BigInt(Number.MAX_SAFE_INTEGER)
-
 /** Either a structural validation error or a semantic (string) error message. */
 /** @typedef {import('functionalscript/fjs/types/rtti/validate/module.f.js').ValidationError | string} OneZeroNineNineIntError */
 
@@ -131,16 +128,9 @@ export const checkReferences = r => {
         if (printed === undefined) {
             continue
         }
-        /** @type {bigint} */
-        let cents
-        try {
-            cents = centsFromString(printed)
-        } catch (e) {
-            return error(`${field} is not an exact decimal: ${String(e)}`)
-        }
-        const magnitude = cents < 0n ? -cents : cents
-        if (magnitude > maxSafeCents) {
-            return error(`${field} exceeds safe integer magnitude: ${printed}`)
+        const message = moneyFieldError(field)(printed)
+        if (message !== undefined) {
+            return error(message)
         }
     }
     return ok(r)
