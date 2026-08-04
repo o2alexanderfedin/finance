@@ -10,11 +10,11 @@ the server executes it as a pure function of `(documents, tax-year parameters) �
 
 ## Current Position
 
-Phase: 2 of 15 (Server Skeleton, Safe Registration, Project-Local Store)
+Phase: 3 of 15 (The Restricted Interpreter)
 Plan: 0 of TBD in current phase
-Status: Ready to plan — Phase 1 complete and verified (11/11 must-haves)
+Status: Ready to plan — Phases 1 and 2 complete, each verified 11/11
 
-Progress: [█░░░░░░░░░] 1/15 phases
+Progress: [██░░░░░░░░] 2/15 phases (15 of 79 requirements Done)
 Last activity: 2026-08-03 — PR #14 merged (planning corpus on `main`); PR #17 merged
 (Sergey: absolute no-floating-point rule, exact-decimal module as Week 1 step 6)
 
@@ -83,7 +83,20 @@ None yet.
   Still a live hazard for uncommitted edits: commit early, keep multi-step git in one atomic
   invocation, and re-verify `git branch --show-current` at the start of every command block.
   The guard has caught it every time; nothing has been lost.
-- **NEW (Phase 2): fjs's `mcpStep` does not negotiate the protocol version.** The
+- **RESOLVED (Phase 2): the protocol-version pin works.** A real `claude -p` client issued an
+  actual `tools/call` (`mcp__finance-mcp__evo_list` -> non-error `tool_result`) against the
+  registered server, so the documented silent-failure mode did not occur and `2026-07-28` stays a
+  recorded fallback rather than a needed change. The underlying gap remains real and is filed in
+  `fjs/todo/upstream-mcp-protocol-version-negotiation.md`.
+- **NEW: `node --test <source-file>` reports a FAKE PASS.** Emergent Testing only registers when
+  root `all.test.js` is imported. Verified by injecting a proof leaf that throws: `npm test` gave
+  `tests 8, pass 7, fail 1`; `node --test fjs/server/module.f.js` gave `tests 1, pass 1, fail 0` on
+  the identical file. AGENTS.md line 51 said the opposite and is corrected. **Only ever trust
+  `npm test` / `node --test all.test.js`.**
+- **NEW: the `finance-mcp` registration points at the worktree path.** After this branch merges,
+  run `claude mcp remove finance-mcp -s local` and re-register against the main checkout, or a
+  stale duplicate accumulates.
+- **Superseded (Phase 2): fjs's `mcpStep` does not negotiate the protocol version.** The
   `initialize` handler validates the client's params then discards the client's
   `protocolVersion`, returning the configured string unconditionally
   (`fjs/protocol/mcp/module.f.js`). `McpConfig.protocolVersion` is an unvalidated `string`.

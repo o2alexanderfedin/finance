@@ -58,26 +58,26 @@ false. These are hours of work and every one of them is more expensive to discov
 They come first because subsequent phases would otherwise be planned against text that
 dissolves on contact.
 
-- [ ] **DOCC-01** *(T0)*: Remove the "validate source with `djs/parser`" remedy from
+- [x] **DOCC-01** *(T0)*: Remove the "validate source with `djs/parser`" remedy from
       `PROJECT.md`, `todo/plan.md`, and `fjs/todo/implement-mcp-server.md`. DJS is a data
       language with no function node; the remedy does not exist. Replace with the deferred
       hardening path.
-- [ ] **DOCC-02** *(T0)*: Correct the "an operation not in the map simply cannot happen"
+- [x] **DOCC-02** *(T0)*: Correct the "an operation not in the map simply cannot happen"
       claim in `PROJECT.md` and `fjs/todo/implement-mcp-server.md` to state the guard
       condition (`Object.hasOwn` + null-prototype map) that makes it true.
-- [ ] **DOCC-03** *(T0)*: Amend the README `## Goal` and `PROJECT.md` Success Criterion 2
+- [x] **DOCC-03** *(T0)*: Amend the README `## Goal` and `PROJECT.md` Success Criterion 2
       to name Claude Code / Claude Desktop as the demonstration client, and record remote
       transport as a v2 milestone.
-- [ ] **DOCC-04** *(T0)*: Correct `fjs/todo/implement-mcp-server.md`'s claim that the
+- [x] **DOCC-04** *(T0)*: Correct `fjs/todo/implement-mcp-server.md`'s claim that the
       server cannot be proof-tested — true of `casMcpServer`, false of `fjs_run`, because
       `import` is already an effect with a virtual interpreter.
-- [ ] **DOCC-05** *(T0)*: Rewrite the `import()` deferral justification in `PROJECT.md` so
+- [x] **DOCC-05** *(T0)*: Rewrite the `import()` deferral justification in `PROJECT.md` so
       it rests on schedule grounds with named compensating controls, not on "the sole user
       is trusted and local" — the untrusted party is the document, not the user.
-- [ ] **DOCC-06** *(T0)*: Record the TY2025 parameter-churn hazard: parameters must come
+- [x] **DOCC-06** *(T0)*: Record the TY2025 parameter-churn hazard: parameters must come
       from Rev. Proc. 2024-40 **as modified by Rev. Proc. 2025-32**, never from the
       original 2025 inflation-adjustment release.
-- [ ] **DOCC-07** *(T0)*: Reconcile the storage-layer money representation with
+- [x] **DOCC-07** *(T0)*: Reconcile the storage-layer money representation with
       AGENTS.md's absolute rule that money in a stored JSON document is a string, never a
       JSON number. Correct EXACT-05's text above and `ROADMAP.md`'s Phase 4 success
       criterion 4 and Phase 5 depends-on line, all of which still specified integer cents
@@ -86,18 +86,18 @@ dissolves on contact.
 
 ### MCP Server (MCP)
 
-- [ ] **MCP-01** *(T0)*: An MCP server over stdio composing fjs's `casToolRegistry` and
+- [x] **MCP-01** *(T0)*: An MCP server over stdio composing fjs's `casToolRegistry` and
       `evoToolRegistry` plus our own, via the exported `fromRegistry` / `mcpStep` /
       `stdioTransport`. No fork of FunctionalScript.
-- [ ] **MCP-02** *(T0)*: The server registers successfully with `claude mcp add` and
+- [x] **MCP-02** *(T0)*: The server registers successfully with `claude mcp add` and
       completes a full `initialize` → `notifications/initialized` → `tools/list` →
       `tools/call` session.
-- [ ] **MCP-03** *(T0)*: Declare our own `McpConfig` pinned to protocol version
+- [x] **MCP-03** *(T0)*: Declare our own `McpConfig` pinned to protocol version
       `2025-11-25`. Do not reuse `casConfig`, which pins `2024-11-05` and identifies the
       server as `functionalscript-cas`.
-- [ ] **MCP-04** *(T0)*: The impure launcher is a thin root-level `.js` file; all logic
+- [x] **MCP-04** *(T0)*: The impure launcher is a thin root-level `.js` file; all logic
       lives in `.f.js` modules it calls.
-- [ ] **MCP-05** *(T0)*: stdout carries JSON-RPC and nothing else, asserted in CI across a
+- [x] **MCP-05** *(T0)*: stdout carries JSON-RPC and nothing else, asserted in CI across a
       full session. Any diagnostic output goes to stderr.
 - [ ] **MCP-06** *(T1)*: `finance_schema(dialect)` returns the RTTI schema for a document
       dialect, so the agent reads field names rather than guessing them.
@@ -197,7 +197,7 @@ structural (RTTI) and semantic passes.
       taxYear, formType)`. Human labels live inside snapshots, never in subjects. A subject
       can never be renamed, and CAS has no delete, so this is decided before any real
       document exists.
-- [ ] **DOC-02** *(T0)*: A **project-local CAS home**, gitignored — not the shared
+- [x] **DOC-02** *(T0)*: A **project-local CAS home**, gitignored — not the shared
       `~/.cas`. There is no delete; real SSNs in a shared store cannot be taken back.
 - [ ] **DOC-03** *(T1)*: `vnd.fjs.ocr` — near-verbatim page-oriented transcription from the
       agent's vision pass, numbers kept as **printed strings** (`"1,234.56"`). Stored as a
@@ -329,7 +329,7 @@ structural (RTTI) and semantic passes.
 Deferred by explicit decision. What remains here is what costs essentially nothing and
 would be materially more expensive to retrofit.
 
-- [ ] **SEC-01** *(T0)*: The registered `claude mcp add` launcher carries
+- [x] **SEC-01** *(T0)*: The registered `claude mcp add` launcher carries
       `node --permission` with scoped `--allow-fs-*` from the **first** registration.
       Registering later means the unsafe configuration is the one everyone already has.
 - [ ] **SEC-02** *(T1)*: A textual import-specifier allow-list enforced before a program is
@@ -338,7 +338,7 @@ would be materially more expensive to retrofit.
 - [ ] **SEC-03** *(T1)*: Programs materialized under **content-hash-derived filenames**. The
       ESM cache is keyed by URL and never evicts, so a reused temp filename silently re-runs
       the *first* program.
-- [ ] **SEC-04** *(T0)*: An upstream bug report to FunctionalScript for the `match`
+- [x] **SEC-04** *(T0)*: An upstream bug report to FunctionalScript for the `match`
       prototype-dispatch soundness hole, with the reproduction attached. Required by
       AGENTS.md: report fjs bugs rather than working around them silently.
 
@@ -406,18 +406,18 @@ them. Week 0 is research's addition in front of the plan's Week 1.
 
 | REQ-ID | Tier | Phase | Milestone | Status |
 |--------|------|-------|-----------|--------|
-| DOCC-01 | T0 | Phase 1 - Planning-Document Corrections | Week 0 | Pending |
-| DOCC-02 | T0 | Phase 1 - Planning-Document Corrections | Week 0 | Pending |
-| DOCC-03 | T0 | Phase 1 - Planning-Document Corrections | Week 0 | Pending |
-| DOCC-04 | T0 | Phase 1 - Planning-Document Corrections | Week 0 | Pending |
-| DOCC-05 | T0 | Phase 1 - Planning-Document Corrections | Week 0 | Pending |
-| DOCC-06 | T0 | Phase 1 - Planning-Document Corrections | Week 0 | Pending |
-| DOCC-07 | T0 | Phase 1 - Planning-Document Corrections | Week 0 | Pending |
-| MCP-01 | T0 | Phase 2 - Server Skeleton and Registration | Week 0 | Pending |
-| MCP-02 | T0 | Phase 2 - Server Skeleton and Registration | Week 0 | Pending |
-| MCP-03 | T0 | Phase 2 - Server Skeleton and Registration | Week 0 | Pending |
-| MCP-04 | T0 | Phase 2 - Server Skeleton and Registration | Week 0 | Pending |
-| MCP-05 | T0 | Phase 2 - Server Skeleton and Registration | Week 0 | Pending |
+| DOCC-01 | T0 | Phase 1 - Planning-Document Corrections | Week 0 | Done |
+| DOCC-02 | T0 | Phase 1 - Planning-Document Corrections | Week 0 | Done |
+| DOCC-03 | T0 | Phase 1 - Planning-Document Corrections | Week 0 | Done |
+| DOCC-04 | T0 | Phase 1 - Planning-Document Corrections | Week 0 | Done |
+| DOCC-05 | T0 | Phase 1 - Planning-Document Corrections | Week 0 | Done |
+| DOCC-06 | T0 | Phase 1 - Planning-Document Corrections | Week 0 | Done |
+| DOCC-07 | T0 | Phase 1 - Planning-Document Corrections | Week 0 | Done |
+| MCP-01 | T0 | Phase 2 - Server Skeleton and Registration | Week 0 | Done |
+| MCP-02 | T0 | Phase 2 - Server Skeleton and Registration | Week 0 | Done |
+| MCP-03 | T0 | Phase 2 - Server Skeleton and Registration | Week 0 | Done |
+| MCP-04 | T0 | Phase 2 - Server Skeleton and Registration | Week 0 | Done |
+| MCP-05 | T0 | Phase 2 - Server Skeleton and Registration | Week 0 | Done |
 | MCP-06 | T1 | Phase 7 - `fjs_run` and Run Records | Week 1 | Pending |
 | MCP-07 | T1 | Phase 8 - TY2025 Parameters and Tax Table | Week 2 | Pending |
 | MCP-08 | T2 | Phase 11 - Wage, Retirement, Benefit Documents | Week 3 | Pending |
@@ -437,7 +437,7 @@ them. Week 0 is research's addition in front of the plan's Week 1.
 | EXEC-13 | T2 | Phase 14 - Acceptance | Week 4 | Pending |
 | DOC-00 | T0 | Phase 5 - Document Base and First Dialects | Week 1 | Pending |
 | DOC-01 | T0 | Phase 5 - Document Base and First Dialects | Week 1 | Pending |
-| DOC-02 | T0 | Phase 2 - Server Skeleton and Registration | Week 0 | Pending |
+| DOC-02 | T0 | Phase 2 - Server Skeleton and Registration | Week 0 | Done |
 | DOC-03 | T1 | Phase 5 - Document Base and First Dialects | Week 1 | Pending |
 | DOC-04 | T1 | Phase 5 - Document Base and First Dialects | Week 1 | Pending |
 | DOC-05 | T2 | Phase 11 - Wage, Retirement, Benefit Documents | Week 3 | Pending |
@@ -482,10 +482,10 @@ them. Week 0 is research's addition in front of the plan's Week 1.
 | PROV-06 | T3 | Phase 15 - Realism Polish and Upstream | Week 5 | Pending |
 | PROV-07 | T2 | Phase 9 - Traceable Report Lines | Week 2 | Pending |
 | PROV-08 | T3 | Phase 15 - Realism Polish and Upstream | Week 5 | Pending |
-| SEC-01 | T0 | Phase 2 - Server Skeleton and Registration | Week 0 | Pending |
+| SEC-01 | T0 | Phase 2 - Server Skeleton and Registration | Week 0 | Done |
 | SEC-02 | T1 | Phase 6 - Guest ABI and Materialization | Week 1 | Pending |
 | SEC-03 | T1 | Phase 6 - Guest ABI and Materialization | Week 1 | Pending |
-| SEC-04 | T0 | Phase 1 - Planning-Document Corrections | Week 0 | Pending |
+| SEC-04 | T0 | Phase 1 - Planning-Document Corrections | Week 0 | Done |
 
 ### Coverage by phase
 

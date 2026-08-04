@@ -401,8 +401,8 @@ These were established by execution, not inference. Any replan must preserve the
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 1. Planning-Document Corrections | Week 0 | 0/TBD | Not started | - |
-| 2. Server Skeleton and Registration | Week 0 | 0/3 | Not started | - |
+| 1. Planning-Document Corrections | Week 0 | 3/3 | Complete | verified 11/11 |
+| 2. Server Skeleton and Registration | Week 0 | 3/3 | Complete | verified 11/11 |
 | 3. The Restricted Interpreter | Week 1 | 0/TBD | Not started | - |
 | 4. Exact Arithmetic | Week 1 | 0/TBD | Not started | - |
 | 5. Document Base and First Dialects | Week 1 | 0/TBD | Not started | - |
