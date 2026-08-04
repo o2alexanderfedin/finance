@@ -348,12 +348,14 @@ supersede rather than overwrite.
   returns a description of its effects; `match` dispatches each one through an
   `OperationMap` (`fjs/effects/module.f.js:282`). Restricting a program is therefore
   exactly "build a map holding only the permitted operations" — a program asking for
-  `fetch` or `readFile` finds no entry, so nothing needs intercepting or patching,
-  **provided the lookup guard is `Object.hasOwn` against a null-prototype map.** A naive
-  `in` or `!== undefined` guard admits `Object.prototype` members
-  (`constructor`/`toString`/`valueOf`/`__defineGetter__`), and `__defineGetter__` against
-  such a guard installs an attacker-controlled getter on the whitelist object itself — a
-  reproduced full escape. The v1 map holds CAS/Evo operations only.
+  `fetch` or `readFile` finds no entry, so nothing needs intercepting or patching.
+  **As of fjs 0.41.0 that is true as written**, because `match` looks the handler up with
+  `at` (`getOwnPropertyDescriptor`-based, so the prototype chain is never consulted) and
+  `assert`s it exists. Under 0.40.0 it was not: a bare `map[command]` admitted
+  `Object.prototype` members, and `__defineGetter__` installed an attacker-controlled
+  getter on the whitelist object itself — a reproduced full escape, closed by
+  functionalscript#1419. **No local guard is required.** A null-prototype map remains cheap
+  defence in depth but is no longer load-bearing. The v1 map holds CAS/Evo operations only.
 - **`import()` is outside that boundary — a known, accepted v1 hole.** `todo/plan.md`
   settles on unrestricted Node via `import()`, which executes a blob's top-level module
   body with full Node privileges *before* any effect is interpreted. An empty operation
@@ -400,7 +402,7 @@ supersede rather than overwrite.
 | The agent emits a program, not an answer | A generated number is opaque and unverifiable; a generated program is reviewable, re-runnable, diffable, and storable in CAS next to its result. This is what makes an LLM acceptable in front of tax math (PR #1) | — Pending |
 | MCP server executes FunctionalScript in content-addressable space | Follows from the above — something must run the emitted program, and running it over CAS keeps inputs, program, and output in one addressable space (PR #1) | — Pending |
 | Node first as the script runner, `fjs` later | Ships the capability without waiting on `fjs` to become self-hosting; the runner is swappable because the programs it runs are unchanged either way (PR #1) | — Pending |
-| Executed programs get CAS/Evo effects only | fjs effects are data interpreted by a runner, so the runner *is* the sandbox — an effects-only whitelist costs nothing to build because `match` already dispatches through an `OperationMap`, provided the lookup guard is `Object.hasOwn` against a null-prototype map; a naive `in` or `!== undefined` guard admits `Object.prototype` members and enables a full escape via `__defineGetter__` | — Pending |
+| Executed programs get CAS/Evo effects only | fjs effects are data interpreted by a runner, so the runner *is* the sandbox — an effects-only whitelist costs nothing to build because `match` already dispatches through an `OperationMap`. Sound as written since fjs 0.41.0, whose `at`-based lookup never consults the prototype chain (functionalscript#1419). Under 0.40.0 it was not: `__defineGetter__` escaped a one-operation whitelist. No local guard is required; a null-prototype map is defence in depth only | — Holds; guard delivered upstream in 0.41.0 |
 | Unrestricted Node `import()` accepted for v1, despite the above | `import()` runs a blob's module body before any effect is interpreted, so the whitelist does not cover it. Accepted on schedule grounds, not trust grounds — the untrusted party is the document, not the user; compensating controls are `--permission` (SEC-01), an import-specifier allow-list (SEC-02), and content-hash-derived filenames (SEC-03). `djs/parser` cannot validate a program — it is a data-only language with no function node (`todo/plan.md`) | — Pending, revisit v2 |
 | stdio only, single local user | No HTTP, no auth, no hosting, no per-user isolation — the deployment model that makes the `import()` limitation tolerable (`todo/plan.md`) | — Pending |
 | OCR is the agent's own vision, not an engine | The agent reads the document and emits structured JSON, stored back through CAS/Evo. No OCR library, no third-party service — consistent with the functionalscript-only dependency rule (`todo/plan.md`) | — Pending |

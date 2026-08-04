@@ -6,7 +6,8 @@ not speculatively. See [Upstreaming](#upstreaming).
 
 Target: `functionalscript` `fjs/protocol/mcp/module.f.js`, the `mcpStep` state-machine step's
 `initialize` handler. Present in the version pinned in this repo's `package.json`
-(`functionalscript ^0.40.0`).
+(`functionalscript ^0.41.0`) — 0.41.0 changed `match`, not `mcpStep`, so this gap is
+unaffected by that release and remains open.
 
 ## The gap
 
