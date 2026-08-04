@@ -83,6 +83,24 @@ None yet.
   Still a live hazard for uncommitted edits: commit early, keep multi-step git in one atomic
   invocation, and re-verify `git branch --show-current` at the start of every command block.
   The guard has caught it every time; nothing has been lost.
+- **RESOLVED upstream: the prototype-dispatch escape is closed in fjs 0.41.0.** `match` now does
+  `at(command)(map)` + `assert(handler !== null, command)`; `at` is `getOwnPropertyDescriptor`-based,
+  so inherited names never resolve. Verified by execution against the installed 0.41.0, not assumed:
+  `casRead` dispatches; `fetch`, `constructor`, `toString`, `valueOf` and `__defineGetter__` are all
+  refused; re-running the 0.40.0 escape leaves the whitelist unpolluted with no getter installed.
+  The real fix was Sergey's functionalscript#1419. The issue filed from this branch, #1420, was a
+  duplicate and is closed.
+- **The ergonomics half SURVIVES and is still ours (EXEC-03).** `assert` throws the **bare command
+  string**, not an `Error` — `typeof e === 'string'`, `e instanceof Error === false`, `e.message`
+  `undefined`. A refusal handler must use the caught value directly; an `instanceof Error` branch
+  misses every refusal. 0.41.0 knows the command name but nothing of the permitted set.
+- **Phase 3 is smaller than planned.** EXEC-02 is delivered upstream. What remains is EXEC-01
+  (`interpret`), EXEC-03 (actionable refusal naming the permitted set), EXEC-04 (regression proofs —
+  now pinning behaviour we depend on rather than hoping for it), EXEC-05 (observed read set), and
+  EXEC-06 (step budget).
+- **Minor: the `functionalscript` submodule is not initialized** in this worktree (`git submodule
+  status` shows a leading `-`). Nothing depends on it today — `tsconfig.json` excludes it and the
+  suite is green — but `git submodule update --init` is needed for workflows that read it.
 - **RESOLVED (Phase 2): the protocol-version pin works.** A real `claude -p` client issued an
   actual `tools/call` (`mcp__finance-mcp__evo_list` -> non-error `tool_result`) against the
   registered server, so the documented silent-failure mode did not occur and `2026-07-28` stays a
