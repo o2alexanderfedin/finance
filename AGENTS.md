@@ -23,6 +23,11 @@
 
   This rarely binds in practice, because the rules above already point elsewhere: a missing generic capability is a reason to release a new fjs version, and a missing app-specific one is a reason to write it here. Adding a third-party parser or helper would also break the purity model. If a dependency still looks necessary, that is a signal worth raising explicitly rather than resolving in a commit.
 
+## Design discipline
+
+religiously adhere to SOLID/KISS/DRY/YAGNI/TRIZ/TDD/Code-by-Intent, use rival agents,
+facilitate Emergent Design sessions
+
 ## File conventions
 
 - `tsconfig.json` is configured maximally strict (`strict`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, `noUnusedLocals/Parameters`, etc.). Keep new code passing under it; don't relax flags to silence errors.
