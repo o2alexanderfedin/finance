@@ -149,9 +149,24 @@ Two requirements:
    Mkdir | Readdir | Access | Rename | Rm | RandomInt | Now | CreateExclusive |
    WriteBytes | Stat` — raw filesystem mutation. Whitelisting "the operations
    CAS needs" would hand a program `rm` on any path while the map still looks
-   locked down. `Cas<O>` is generic in its underlying operation set precisely so
-   the filesystem can stay server-side, inside the handlers. Whether `casWrite`
-   is in the vocabulary at all depends on open question 5.
+   locked down: nothing in it is named `fetch` or `exec`, so the mistake
+   survives review. Whether `casWrite` is in the vocabulary at all depends on
+   open question 5.
+
+   `Cas<O>` is generic in its underlying operation set precisely so this is
+   possible — the interface is three semantic methods, and the filesystem is one
+   *implementation* choice behind them:
+
+   ```ts
+   export type Cas<O extends Operation> = {
+       readonly read:  (hash: Vec) => List<O, IoResult<Vec>>
+       readonly write: <O1 extends Operation>(payload: List<O1, IoResult<Vec>>) => Effect<O | O1, IoResult<Vec>>
+       readonly list:  () => Effect<O, readonly Vec[]>
+   }
+   ```
+
+   `FileCas` is merely `Cas<FileCasOperation>`. So the filesystem operations stay
+   server-side inside the handlers and never enter the program's operation set.
 2. **Report the refusal at the boundary.** A stored blob is arbitrary JS and can
    emit any `command` string regardless of its declared type, since the type
    system does not reach across CAS. Since 0.41.0 fjs *detects* this for us, so
@@ -161,9 +176,13 @@ Two requirements:
    msg }` — so use the caught value directly; `e.message` is `undefined`, and an
    `e instanceof Error` branch misses every refusal.
 
-Neither needs anything further from FunctionalScript. Rationale and the corrected
-analysis — including why "partial `OperationMap`" was a false requirement — are
-in [restricted-runner-operation-map.md](./restricted-runner-operation-map.md).
+Neither needs anything further from FunctionalScript, and in particular **no
+"partial `OperationMap`" is required** — an earlier draft of this spec claimed
+one was. `OperationMap`, `ToAsyncOperationMap`, and `MemOperationMap` are all
+mapped types over their operation union (`{ readonly [K in O[0]]: … }`), hence
+total by construction, and every runner constrains the effect to a *subset* of
+the map (`<O1 extends O, T>(e: Effect<O1, T>)`). The map defines the operation
+universe; effects must fit inside it. Noted so it is not re-derived.
 
 The one real fjs bug here — `map[command]` resolving inherited `Object.prototype`
 members and invoking them with the payload — was reported as
@@ -194,7 +213,14 @@ directly — `casMcpServer` has the same problem, and FunctionalScript's own pro
 for it only checks that it constructs. Test the pieces instead:
 
 - the restricted runner, against a hand-built operation map — including the
-  refusal path for an operation outside the whitelist;
+  refusal path. Name the **inherited** commands explicitly (`constructor`,
+  `toString`, `valueOf`, `hasOwnProperty`, `__defineGetter__`), not just
+  `fetch`/`readFile`/`exec`: a suite testing only genuinely-absent commands would
+  have passed against 0.40.0 while the prototype path was wide open. Add the
+  two-step escalation as its own case — a `__defineGetter__` installing a getter
+  for a denied command, then calling it — and assert on the *reported text*
+  (`operation not permitted: fetch`) rather than the raw throw, since the
+  string-not-`Error` handling is ours and the likeliest thing to regress;
 - `fjs_run`'s tool handler, over a mock CAS rather than `~/.cas/`;
 - format encode/decode round-trips once document types exist.
 

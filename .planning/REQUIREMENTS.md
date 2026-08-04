@@ -65,7 +65,7 @@ dissolves on contact.
 - [x] **DOCC-02** *(T0)*: ~~Correct the "an operation not in the map simply cannot happen"
       claim to state the guard condition that makes it true.~~ **Done** — and the condition
       is now satisfied by fjs itself as of 0.41.0 (`at` + `assert` in `match`), so the claim
-      is true as written. `fjs/todo/restricted-runner-operation-map.md` records why.
+      is true as written. `PROJECT.md` Context records why.
 - [ ] **DOCC-03** *(T0)*: Amend the README `## Goal` and `PROJECT.md` Success Criterion 2
       to name Claude Code / Claude Desktop as the demonstration client, and record remote
       transport as a v2 milestone.

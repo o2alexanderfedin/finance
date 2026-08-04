@@ -73,7 +73,8 @@ a new report is a new program, not new engine code.
       **Not** `FileCasOperation` — that is `Rm | WriteBytes | Rename | Mkdir | …`, raw
       filesystem mutation, and whitelisting it would leave the sandbox open while looking
       closed. Filesystem operations stay server-side inside the handlers, never in the
-      program's operation set. See `fjs/todo/restricted-runner-operation-map.md`
+      program's operation set — `Cas<O>` is generic in its underlying operation set exactly
+      so this is possible. Specified in `fjs/todo/implement-mcp-server.md`
 - [ ] Unknown operations reported as `operation not permitted: <command>`. Detection is
       fjs's since 0.41.0 (own-property lookup, throws the command name); ours is catching
       it at the `fjs_run` boundary — noting the throw is a bare string, not an `Error`
@@ -211,10 +212,11 @@ local guard is required**. One detail that survives into our code: `assert` thro
 message, so a refusal arrives as a bare **string**, not an `Error`.
 
 An earlier version of this section claimed a second gap — that `match` "has no notion of a
-partial `OperationMap`" — and that was wrong. Every fjs dispatch map is a mapped type over
-its operation union, hence total by construction, and every runner constrains the effect to
-a subset of the map. The map defines the operation universe; we need no partiality and fjs
-offers none. See [`fjs/todo/restricted-runner-operation-map.md`](../fjs/todo/restricted-runner-operation-map.md).
+partial `OperationMap`" — and that was wrong. `OperationMap`, `ToAsyncOperationMap`, and
+`MemOperationMap` are all mapped types over their operation union (`[K in O[0]]`), hence
+total by construction, and every runner constrains the effect to a subset of the map
+(`<O1 extends O, T>(e: Effect<O1, T>)`). The map defines the operation universe; we need no
+partiality and fjs offers none. Recorded here so it is not re-derived.
 
 **What fjs already provides.** `functionalscript@0.41.0` ships most of the
 infrastructure, so the finance-specific work is domain logic, not plumbing. (Module layout

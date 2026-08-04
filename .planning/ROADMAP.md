@@ -167,7 +167,7 @@ These were established by execution, not inference. Any replan must preserve the
   1. The two false mechanism claims are gone: `grep -rn "djs/parser" .planning todo fjs README.md` returns no proposal of it as a validation remedy, and no document still says an operation not in the map "simply cannot happen" without stating the guard condition that makes it true — now satisfied by fjs 0.41.0's own-property lookup rather than by a local guard.
   2. README `## Goal` and PROJECT.md Success Criterion 2 name Claude Code / Claude Desktop as the demonstration client, and remote HTTPS + OAuth transport is recorded as a v2 milestone.
   3. PROJECT.md's `import()` deferral rests on schedule grounds with named compensating controls, and no longer on "the sole user is trusted and local" — and `fjs/todo/implement-mcp-server.md` no longer claims `fjs_run` cannot be proof-tested.
-  4. ~~A FunctionalScript issue exists for the `match` prototype-dispatch soundness hole~~ — **done**: [functionalscript#1419](https://github.com/functionalscript/functionalscript/pull/1419), fixed in 0.41.0 and the URL recorded in `fjs/todo/restricted-runner-operation-map.md`.
+  4. ~~A FunctionalScript issue exists for the `match` prototype-dispatch soundness hole~~ — **done**: [functionalscript#1419](https://github.com/functionalscript/functionalscript/pull/1419), fixed in 0.41.0, with the URL recorded in `PROJECT.md` and `todo/plan.md`.
   5. The TY2025 parameter-sourcing rule (Rev. Proc. 2024-40 **as modified by Rev. Proc. 2025-32**) is written where Phase 8 will read it, with the original 2025 inflation release named as the wrong source.
 **Research**: Not needed — every correction is already established.
 **Plans**: TBD
