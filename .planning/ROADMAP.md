@@ -159,7 +159,7 @@ These were established by execution, not inference. Any replan must preserve the
 **Milestone**: Week 0 — Corrections and Integration Smoke Test
 **Goal**: Every planning document states only things that are true, so no later phase is planned against text that dissolves on contact.
 **Depends on**: Nothing (first phase) — runs concurrently with Phase 2
-**Requirements**: DOCC-01, DOCC-02, DOCC-03, DOCC-04, DOCC-05, DOCC-06, SEC-04
+**Requirements**: DOCC-01, DOCC-02, DOCC-03, DOCC-04, DOCC-05, DOCC-06, DOCC-07, SEC-04
 **Tier**: T0
 **Success Criteria** (what must be TRUE):
   1. The two false mechanism claims are gone: `grep -rn "djs/parser" .planning todo fjs README.md` returns no proposal of it as a validation remedy, and no document still says an operation not in the map "simply cannot happen" without stating the `Object.hasOwn` + null-prototype guard condition.
@@ -214,14 +214,14 @@ These were established by execution, not inference. Any replan must preserve the
   1. Proofs cover integer cents, exact rationals, and IRS half-up rounding **including negatives**; a proof asserts the chosen rule differs from `Math.round`, which returns `-2` for `-2.5` on a form full of losses.
   2. `grep -rn "toFixed\|parseFloat\|Math.round" fjs/` returns nothing inside arithmetic or tax code.
   3. A proof exhibits a case where `round(sum(x)) ≠ sum(round(x))`, and the module exposes only the former as the line-level operation — a money type that rounds on construction does not exist here.
-  4. A proof demonstrates all three layers on one value: `isSafeInteger`-guarded integer cents in JSON at the storage boundary, exact rationals inside computation, decimal **strings** on the MCP wire (fjs's JSON `Primitive` has no `bigint`).
+  4. A proof demonstrates all three layers on one value: a decimal **string** in JSON at the storage boundary (never a JSON number — a JSON number is an IEEE 754 double before any arithmetic happens), exact rationals inside computation, decimal **strings** on the MCP wire (fjs's JSON `Primitive` has no `bigint`).
 **Research**: Not needed.
 **Plans**: TBD
 
 ### Phase 5: Document Base, Subject Model, and the First Two Dialects
 **Milestone**: Week 1 — First Working Prototype
 **Goal**: A document can be stored, versioned, and read back under an identity that can never be wrong, with the vision transcription preserved as its own artifact.
-**Depends on**: Phase 2 (project-local store), Phase 4 (cents at the storage boundary) — **runs concurrently with Phase 3**
+**Depends on**: Phase 2 (project-local store), Phase 4 (money as a string at the storage boundary) — **runs concurrently with Phase 3**
 **Requirements**: DOC-00, DOC-01, DOC-03, DOC-04, DOC-10, DOC-11, DOC-12, DOC-14
 **Tier**: T0 → T1
 **Success Criteria** (what must be TRUE):
@@ -420,7 +420,7 @@ These were established by execution, not inference. Any replan must preserve the
 
 | Category | Count | Phases |
 |---|---|---|
-| DOCC (documentation corrections) | 6 | 1 |
+| DOCC (documentation corrections) | 7 | 1 |
 | MCP (server and tools) | 9 | 2, 7, 8, 11, 15 |
 | EXEC (execution spine) | 13 | 3, 6, 7, 14 |
 | DOC (formats and ingestion) | 17 | 2, 5, 11, 12, 15 |

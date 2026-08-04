@@ -77,6 +77,12 @@ dissolves on contact.
 - [ ] **DOCC-06** *(T0)*: Record the TY2025 parameter-churn hazard: parameters must come
       from Rev. Proc. 2024-40 **as modified by Rev. Proc. 2025-32**, never from the
       original 2025 inflation-adjustment release.
+- [ ] **DOCC-07** *(T0)*: Reconcile the storage-layer money representation with
+      AGENTS.md's absolute rule that money in a stored JSON document is a string, never a
+      JSON number. Correct EXACT-05's text above and `ROADMAP.md`'s Phase 4 success
+      criterion 4 and Phase 5 depends-on line, all of which still specified integer cents
+      as a JSON *number* at the storage boundary. Only the storage layer flips — exact
+      rationals inside computation and decimal strings on the MCP wire are unaffected.
 
 ### MCP Server (MCP)
 
@@ -246,8 +252,9 @@ structural (RTTI) and semantic passes.
 - [ ] **EXACT-04** *(T0)*: Rounding is a property of a **1040 line**, not of a value —
       `round(sum(x))`, never `sum(round(x))`. A money type that rounds on construction is
       wrong by construction.
-- [ ] **EXACT-05** *(T1)*: Layering fixed deliberately: integer cents in JSON at the storage
-      boundary (`isSafeInteger`-guarded), rationals inside computation, decimal **strings**
+- [ ] **EXACT-05** *(T1)*: Layering fixed deliberately: money as a decimal **string** in
+      JSON at the storage boundary (never a JSON number — decoded to exact cents by the
+      semantic check, per AGENTS.md), rationals inside computation, decimal **strings**
       on the MCP wire — fjs's JSON `Primitive` has no `bigint`, so a bigint schema cannot
       cross JSON-RPC.
 
@@ -405,6 +412,7 @@ them. Week 0 is research's addition in front of the plan's Week 1.
 | DOCC-04 | T0 | Phase 1 - Planning-Document Corrections | Week 0 | Pending |
 | DOCC-05 | T0 | Phase 1 - Planning-Document Corrections | Week 0 | Pending |
 | DOCC-06 | T0 | Phase 1 - Planning-Document Corrections | Week 0 | Pending |
+| DOCC-07 | T0 | Phase 1 - Planning-Document Corrections | Week 0 | Pending |
 | MCP-01 | T0 | Phase 2 - Server Skeleton and Registration | Week 0 | Pending |
 | MCP-02 | T0 | Phase 2 - Server Skeleton and Registration | Week 0 | Pending |
 | MCP-03 | T0 | Phase 2 - Server Skeleton and Registration | Week 0 | Pending |
@@ -483,7 +491,7 @@ them. Week 0 is research's addition in front of the plan's Week 1.
 
 | Phase | Milestone | Requirements | Count | Tiers |
 |-------|-----------|--------------|-------|-------|
-| 1. Planning-Document Corrections | Week 0 | DOCC-01, DOCC-02, DOCC-03, DOCC-04, DOCC-05, DOCC-06, SEC-04 | 7 | T0 |
+| 1. Planning-Document Corrections | Week 0 | DOCC-01, DOCC-02, DOCC-03, DOCC-04, DOCC-05, DOCC-06, DOCC-07, SEC-04 | 8 | T0 |
 | 2. Server Skeleton and Registration | Week 0 | MCP-01, MCP-02, MCP-03, MCP-04, MCP-05, SEC-01, DOC-02 | 7 | T0 |
 | 3. The Restricted Interpreter | Week 1 | EXEC-01, EXEC-02, EXEC-03, EXEC-04, EXEC-05, EXEC-06 | 6 | T0 |
 | 4. Exact Arithmetic | Week 1 | EXACT-01, EXACT-02, EXACT-03, EXACT-04, EXACT-05 | 5 | T0, T1 |

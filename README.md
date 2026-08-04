@@ -1,7 +1,9 @@
 # Finance
 
-A user uploads their financial documents to a personal CAS, then uses ChatGPT (or any
-other MCP client) to compute tax and other financial reports over them.
+A user uploads their financial documents to a personal CAS, then uses Claude Code or
+Claude Desktop (or any other MCP client that supports local stdio servers) to compute tax
+and other financial reports over them. Remote transport (HTTPS + OAuth) — required for a
+browser-hosted client such as ChatGPT — is a v2 milestone.
 
 The agent does **not** produce the numbers itself. It writes a
 [FunctionalScript](https://github.com/functionalscript/functionalscript) program that

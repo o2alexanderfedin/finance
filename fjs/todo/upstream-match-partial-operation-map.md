@@ -26,9 +26,15 @@ that was refused.
 
 The restricted runner ([implement-mcp-server.md](./implement-mcp-server.md)) is built on
 exactly this behavior: an `OperationMap` holding only whitelisted CAS/Evo operations is
-what stops an agent-authored program from reaching the network. That design is sound — an
-operation not in the map genuinely cannot happen — but its *failure mode* is a raw
-`TypeError`.
+what stops an agent-authored program from reaching the network. That design is sound
+**only if** the lookup guard is `Object.hasOwn(map, command)` against a null-prototype map
+(`{ __proto__: null, ... }`). A naive `command in map` or `map[command] !== undefined`
+guard is *not* sound: both return `true` for `constructor`, `toString`, `valueOf`, and
+`__defineGetter__`, none of which are whitelisted operations. Dispatching
+`__defineGetter__` against such a guard installs an attacker-controlled getter on the
+whitelist object itself — reading that property then runs arbitrary code. This is a
+reproduced, full escape, not a theoretical one. Even with a sound guard, the failure mode
+for a refused operation is still a raw `TypeError`.
 
 So the single most likely thing to go wrong (an agent writes a program that calls `fetch`)
 produces an error that tells the agent nothing about what it did wrong or how to fix it.
@@ -53,10 +59,17 @@ Option 1 or 2 keeps refusal in the value domain, which is the point.
 
 ## Local workaround
 
+**Warning:** a `command in map` guard is not safe — `in` traverses the prototype chain, so
+it admits `constructor`, `__defineGetter__`, `toString`, and `valueOf` alongside any
+genuinely whitelisted operation. Against a plain-object map, dispatching
+`__defineGetter__` under an `in` guard installs an attacker-controlled getter on the
+whitelist object itself; reading it then executes arbitrary code. The correct guard is
+`Object.hasOwn(map, command)` against a null-prototype map (`{ __proto__: null, ... }`).
+
 *None yet.* When the runner is written, it will most likely wrap or replace `match` with a
-version that checks `command in map` before dispatching and returns an `errorResult` like
-`operation not permitted: fetch`. Record here what was actually done, so Week 5 knows what
-to lift.
+version that checks `Object.hasOwn(map, command)` before dispatching and returns an
+`errorResult` like `operation not permitted: fetch`. Record here what was actually done,
+so Week 5 knows what to lift.
 
 ## Upstreaming
 

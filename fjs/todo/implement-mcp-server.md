@@ -129,8 +129,11 @@ export const match = map => e => {
 
 So restricting what a program can do is exactly: **build an `OperationMap`
 containing only the permitted operations.** A program requesting `fetch`,
-`readFile`, or `exec` finds no entry. Nothing needs to be intercepted or
-patched — an operation that is not in the map simply cannot happen.
+`readFile`, or `exec` finds no entry — true only if the lookup guard is
+`Object.hasOwn` against a null-prototype map. A naive `in` or `!== undefined`
+guard admits `Object.prototype` members, and `__defineGetter__` against such a
+guard installs an attacker-controlled getter on the whitelist object itself — a
+reproduced full escape (see `upstream-match-partial-operation-map.md`).
 
 Two requirements:
 
@@ -160,10 +163,12 @@ is interpreted. A blob that runs `fs.rmSync` at module scope is not stopped by
 an empty operation map.
 
 Genuine FunctionalScript modules are side-effect-free by construction, but
-nothing verifies that for an arbitrary blob pulled out of CAS. Accepted for
-Week 1 because the only user is trusted and local. Week 5 revisits it — most
-plausibly by parsing the source with FunctionalScript's own `djs/parser` before
-importing, which would enforce the language subset rather than assume it.
+nothing verifies that for an arbitrary blob pulled out of CAS. Accepted for v1
+on schedule grounds — the untrusted party is the document, not the user;
+compensating controls are `--permission` (SEC-01), an import-specifier
+allow-list (SEC-02), content-hash-derived filenames (SEC-03). `djs/parser`
+cannot close this — it is a data-only language with no function node. A
+genuine source validator, if ever wanted, is v2 work, not Week 5.
 
 This must not silently become the permanent design. If the audience ever widens
 beyond one local user, it is a blocker.
@@ -171,9 +176,13 @@ beyond one local user, it is a blocker.
 ## Testing
 
 Per AGENTS.md, tests are `proof` exports discovered by the root
-[../../all.test.js](../../all.test.js). The server itself cannot be proof-tested
-directly — `casMcpServer` has the same problem, and FunctionalScript's own proof
-for it only checks that it constructs. Test the pieces instead:
+[../../all.test.js](../../all.test.js). The stdio server *process* itself
+cannot be proof-tested directly — `casMcpServer` has the same problem, and
+FunctionalScript's own proof for it only checks that it constructs. This does
+not extend to `fjs_run`: `import()` is reached through the `import_` effect,
+which `fjs/effects/node/virtual` interprets in-memory, so the whole
+materialize-and-run path is fully proof-testable with no real filesystem. Test
+the pieces instead:
 
 - the restricted runner, against a hand-built operation map — including the
   refusal path for an operation outside the whitelist;

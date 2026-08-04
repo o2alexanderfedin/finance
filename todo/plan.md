@@ -8,7 +8,7 @@ These constrain everything below.
 |---|---|
 | Transport / audience | stdio only, single local user. No HTTP, no auth, no hosting. |
 | Execution engine | Unrestricted Node via `import()`. The *runner* interprets a whitelisted operation set (CAS/EVO); non-whitelisted ops are refused. |
-| Import-time safety | Accepted limitation. A blob's top-level module body runs with full Node privileges before any effect is interpreted. Tolerable only because the sole user is trusted and local. |
+| Import-time safety | Accepted limitation. A blob's top-level module body runs with full Node privileges before any effect is interpreted. Accepted on schedule grounds, not trust grounds — the untrusted party is the document, not the user; compensating controls are `--permission` (SEC-01), an import-specifier allow-list (SEC-02), content-hash-derived filenames (SEC-03). |
 | OCR | The agent's own vision. It reads the document and emits structured JSON, which is stored back through CAS/Evo. No OCR engine, no third-party service. |
 | Server location | Our own MCP server in this repo, composing FunctionalScript's exported registries. No fork, no FJS release needed to iterate. |
 | Why programs, not answers | Correctness and auditability. LLM arithmetic is unreliable; a stored program is deterministic, reviewable, and re-runnable. |
@@ -60,6 +60,10 @@ If the week runs short, Track A is what must land: without it the project has no
 
 Goal: **a report program produces a correct figure over real parsed documents.**
 
+TY2025 figures (standard deduction, brackets, thresholds) must be sourced from Rev. Proc.
+2024-40 as modified by Rev. Proc. 2025-32, never the original 2025 inflation-adjustment
+release.
+
 Scope depends on the tax question below. The shape does not: the agent authors a FunctionalScript program, it runs under the restricted runner, and the output is reproducible from stored hashes.
 
 Start with a single unambiguous aggregate before anything involving brackets, deductions, or filing status.
@@ -80,7 +84,7 @@ Goal: **the full path works on the user's own documents.**
 
 - Upstream whatever has stabilized into FunctionalScript (per AGENTS.md staging rule) — most likely the CAS effects, and `fjs_run` if its shape has settled.
 - **Work the `fjs/todo/upstream-*.md` queue.** Every FJS bug or gap worked around locally has a file there stating the gap, the workaround, and the intended upstream fix; this is where they get fixed upstream, released, and the local workarounds deleted. Open at the start of Week 1: [`upstream-match-partial-operation-map.md`](../fjs/todo/upstream-match-partial-operation-map.md) (blocking a clean refusal message from the restricted runner) and [`upstream-media-dialect-registry.md`](../fjs/todo/upstream-media-dialect-registry.md) (blocks `fjs/media` detection of our document types; may be wanted as early as Week 3).
-- Revisit execution safety: validating source as genuine FunctionalScript before `import()`, and/or Worker isolation with hard limits. Week 1 deliberately defers both.
+- `djs/parser` cannot validate an agent-authored program (data-only language, no function node); a genuine source validator, if ever wanted, is v2 work, not Week 5. Worker/child-process isolation is the other v2 candidate.
 - Whatever the first four weeks accumulated.
 
 ## Open Questions
