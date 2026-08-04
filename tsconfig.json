@@ -49,9 +49,14 @@
     "skipLibCheck": true,
   },
 
-  // The `functionalscript` submodule is upstream's own checkout, not our source. It
-  // builds under its own tsconfig; type-checking it under ours reports ~1500 errors that
-  // are not ours to fix. Excluding it scopes the project to our code — it does not relax
-  // a flag. `node_modules` is listed because naming `exclude` at all replaces the default.
+  // The `functionalscript` submodule is upstream's own checkout, not our source, and it
+  // is configured differently on purpose: it enables `allowImportingTsExtensions`, which
+  // we do not, and leaves `noUnusedLocals`, `noUnusedParameters`,
+  // `noUncheckedIndexedAccess` and `noPropertyAccessFromIndexSignature` off, which we
+  // turn on. Checking it under our settings reports thousands of errors that are
+  // configuration mismatches, not defects — it compiles cleanly under its own tsconfig
+  // and its CI is green. Excluding it scopes this project to our code; it does not relax
+  // a flag for our code. `node_modules` is named because declaring `exclude` replaces the
+  // default rather than extending it.
   "exclude": ["functionalscript", "node_modules"],
 }
