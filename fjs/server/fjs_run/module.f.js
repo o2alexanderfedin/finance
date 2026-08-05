@@ -639,7 +639,7 @@ export const proof = {
                 }
                 return guestCtx.step(guestCtx.evoHead(subject), headsJson => {
                     const heads = /** @type {readonly string[]} */ (JSON.parse(headsJson))
-                    const headHash = /** @type {string} */ (heads[0])
+                    const headHash = assertNotNullish(heads[0], ['expected at least one head', subject])
                     return guestCtx.step(guestCtx.evoRevision(headHash), revJson => {
                         const rev = /** @type {{ readonly snapshot: string }} */ (JSON.parse(revJson))
                         return guestCtx.step(guestCtx.casRead(rev.snapshot), docJson => {
@@ -884,8 +884,9 @@ export const proof = {
                 assertEq(parsed['readCount'], 1)
                 assertEq(parsed['literalCount'], countNumericLiterals(programSource))
 
-                const resultHash = /** @type {string} */ (parsed['resultHash'])
-                const resultHashVec = cBase32ToVec(resultHash)
+                const resultHashValue = parsed['resultHash']
+                assert(typeof resultHashValue === 'string', ['expected resultHash to be a string', parsed])
+                const resultHashVec = cBase32ToVec(resultHashValue)
                 assert(resultHashVec !== null, 'expected resultHash to be resolvable even for a tiny value')
                 const [, resultRead] = virtual(state2)(collectRead(cas.read(/** @type {Vec} */ (resultHashVec))))
                 assert(resultRead[0] === 'ok', ['expected the tiny result to read back', resultRead])
@@ -1105,6 +1106,109 @@ export const proof = {
             assert(
                 bytes < BigInt(guardBytes),
                 ['expected the six-key envelope to stay well clear of guardBytes', bytes, guardBytes])
+        },
+    },
+
+    // ── PROV-07/Plan 09-04: the perturbation gate's real leg ─────────────
+    //
+    // ROADMAP criterion 4: a minimal, real ReportLine-shaped program's
+    // output moves when a stored document it actually reads changes. Task 2
+    // adds this gate's other half — the exact verbatim adversary and its
+    // control leaf, proving the SAME before/after methodology yields an
+    // IDENTICAL result for a program that reads nothing.
+    antiHardcodingGate: {
+        // The real leg: seed one document, run a minimal program that reads
+        // it and returns a ReportLine-shaped value, change the document,
+        // run again, and assert the output moved.
+        realProgramOutputMovesWhenTheInputDocumentChanges: () => {
+            const home = '/perturbation'
+            const cas = fileCas(sha256)(home)
+            const [state0, cacheKey] = virtual(emptyState)(initEvo(cas))
+            const e = evo(cas)(cacheKey)
+            const subject = 'perturbation-subject'
+
+            const [state1, docHash1] = virtual(state0)(seedText(cas)('{"box1InterestIncome":"10.00"}'))
+            const [state2, addResult1] = virtual(state1)(e.add({ parents: [], subject, snapshot: docHash1 }))
+            assert(addResult1[0] === 'ok', ['expected the first revision add to succeed', addResult1])
+            const rev1 = addResult1[1]
+
+            // The program's OWN stored source: zero imports, so
+            // checkSpecifiers passes. Its actual text is otherwise
+            // irrelevant to this proof — the loaded module comes from the
+            // JsModule fixture below, not from parsing this text.
+            const programSource = 'export const report = ctx => args => ctx.pure("unused")'
+            const [state3, programHash] = virtual(state2)(seedText(cas)(programSource))
+
+            // The smallest possible demonstration reading one real stored
+            // document: subject's head -> revision -> snapshot ->
+            // box1InterestIncome, the SAME chain
+            // multiDocumentSumAcrossTwoStoredDocuments (above) already
+            // establishes — then a value type-annotated against Plan
+            // 09-01's own ReportLine, projected to its JSON-safe wire form
+            // (never JSON.stringify on a bare bigint, EXACT-05).
+            /** @type {Report<string>} */
+            const demoReport = ctx => () => ctx.step(ctx.evoHead(subject), headsJson => {
+                const heads = /** @type {readonly string[]} */ (JSON.parse(headsJson))
+                const headHash = assertNotNullish(heads[0], ['expected at least one head for the perturbation subject', subject])
+                return ctx.step(ctx.evoRevision(headHash), revJson => {
+                    const rev = /** @type {{ readonly snapshot: string }} */ (JSON.parse(revJson))
+                    return ctx.step(ctx.casRead(rev.snapshot), docJson => {
+                        const doc = /** @type {{ readonly box1InterestIncome: string }} */ (JSON.parse(docJson))
+                        const raw = doc.box1InterestIncome
+                        /** @type {import('../../report/line/module.f.js').ReportLine} */
+                        const line = {
+                            value: ctx.centsFromString(raw),
+                            sources: [{ documentHash: rev.snapshot, boxPath: 'box1InterestIncome', value: raw }],
+                            rule: '1040 line 2b',
+                        }
+                        return ctx.pure(JSON.stringify({ value: ctx.centsToString(line.value), sources: line.sources, rule: line.rule }))
+                    })
+                })
+            })
+
+            const [state4, outcome1] = runExecuteRunViaFixture(home)(cas)(e)(programHash)(programSource)(demoReport)([])(undefined)(state3)
+            assert(outcome1.kind === 'ok', ['expected the first run to succeed', outcome1])
+            if (outcome1.kind === 'ok') {
+                const parsed1 = /** @type {{ readonly value: string, readonly sources: readonly [{ readonly documentHash: string, readonly boxPath: string, readonly value: string }], readonly rule: string }} */ (JSON.parse(String(outcome1.value)))
+                assertEq(parsed1.value, '10.00')
+                assertEq(parsed1.sources[0].boxPath, 'box1InterestIncome')
+                assertEq(parsed1.sources[0].documentHash, docHash1)
+                assertEq(parsed1.rule, '1040 line 2b')
+            }
+
+            // Perturb: a second revision naming rev1 as its parent becomes
+            // the subject's SOLE live head (headsOf's own rule, fjs/cas/evo/
+            // module.f.js: a hash filtered out of `hashes` once it appears
+            // in another revision's `parents`).
+            const [state5, docHash2] = virtual(state4)(seedText(cas)('{"box1InterestIncome":"20.00"}'))
+            const [state6, addResult2] = virtual(state5)(e.add({ parents: [rev1], subject, snapshot: docHash2 }))
+            assert(addResult2[0] === 'ok', ['expected the second revision add to succeed', addResult2])
+
+            // A second, functionally-identical program hash for the SECOND
+            // run: the SAME demoReport JsModule fixture is what actually
+            // executes either time (07-10's established materialize-write/
+            // JsModule-at-full-path split — the loaded module comes from the
+            // fixture, never from parsing this stored text). The stored
+            // source only needs one harmless extra byte to hash differently,
+            // because the first run's real materialize write already
+            // swapped the FIRST hash's path from raw bytes to a JsModule
+            // function — a second real write to that SAME path would
+            // collide (writeFile refuses a target that already holds
+            // anything other than an array,
+            // fjs/effects/node/virtual/module.f.js) — so the second run
+            // targets its own, fresh path instead.
+            const [state6b, programHash2] = virtual(state6)(seedText(cas)(programSource + '\n'))
+
+            const [, outcome2] = runExecuteRunViaFixture(home)(cas)(e)(programHash2)(programSource + '\n')(demoReport)([])(undefined)(state6b)
+            assert(outcome2.kind === 'ok', ['expected the second run to succeed', outcome2])
+            if (outcome2.kind === 'ok') {
+                const parsed2 = /** @type {{ readonly value: string, readonly sources: readonly [{ readonly documentHash: string, readonly boxPath: string, readonly value: string }], readonly rule: string }} */ (JSON.parse(String(outcome2.value)))
+                // "The output moved" — a real input changed and the
+                // program's own returned value strictly differs.
+                assertEq(parsed2.value, '20.00')
+                assert(parsed2.value !== '10.00', ['expected the output to move when the input document changed', parsed2])
+                assertEq(parsed2.sources[0].documentHash, docHash2)
+            }
         },
     },
 }

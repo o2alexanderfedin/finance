@@ -65,7 +65,7 @@ import { fromVec } from 'functionalscript/fjs/types/uint8array/module.f.js'
 import { utf8 } from 'functionalscript/fjs/text/module.f.js'
 import { array, option, string } from 'functionalscript/fjs/types/rtti/module.f.js'
 import { validate as rttiValidate } from 'functionalscript/fjs/types/rtti/validate/module.f.js'
-import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
+import { assert, assertEq, assertNotNullish } from 'functionalscript/fjs/asserts/module.f.js'
 import { dialect as revisionDialect } from 'functionalscript/fjs/media/revision/module.f.js'
 import { cBase32ToVec, vecToCBase32 } from 'functionalscript/fjs/basen/cbase32/module.f.js'
 import { vec8 } from 'functionalscript/fjs/types/bit_vec/module.f.js'
@@ -566,7 +566,7 @@ export const proof = {
                 }
                 return guestCtx.step(guestCtx.evoHead(subject), headsJson => {
                     const heads = /** @type {readonly string[]} */ (JSON.parse(headsJson))
-                    const headHash = /** @type {string} */ (heads[0])
+                    const headHash = assertNotNullish(heads[0], ['expected at least one head', subject])
                     return guestCtx.step(guestCtx.evoRevision(headHash), revJson => {
                         const rev = /** @type {{ readonly snapshot: string }} */ (JSON.parse(revJson))
                         return guestCtx.step(guestCtx.casRead(rev.snapshot), docJson => {
@@ -650,7 +650,7 @@ export const proof = {
 
             const runHashMatch = /run record: (\S+)\)/.exec(runText)
             assert(runHashMatch !== null, ['expected the error text to name a run record hash', runText])
-            const runHash = /** @type {string} */ (runHashMatch[1])
+            const runHash = assertNotNullish(runHashMatch[1], ['expected the run record hash capture group to be present', runText])
             const runHashVec = cBase32ToVec(runHash)
             assert(runHashVec !== null, ['expected a decodable runHash', runHash])
             const [, runRecordRead] = virtual(state12)(collectRead(cas.read(/** @type {Vec} */ (runHashVec))))
