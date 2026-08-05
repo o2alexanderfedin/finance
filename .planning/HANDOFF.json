@@ -1,0 +1,56 @@
+{
+  "version": "1.0",
+  "timestamp": "2026-08-05T16:08:32.208Z",
+  "phase": "07",
+  "phase_name": "fjs_run, Run Records, and the Week 1 Convergence",
+  "phase_dir": ".planning/phases/07-fjs-run-run-records-and-the-week-1-convergence",
+  "plan": 9,
+  "task": 9,
+  "total_tasks": 9,
+  "status": "phase_complete_paused_before_phase_8",
+  "completed_tasks": [
+    {"id": 1, "name": "07-01 guest ctx combinators + revise the two Phase 6 proofs", "status": "done", "commit": "9752eaf"},
+    {"id": 2, "name": "07-02 vnd.fjs.run document dialect", "status": "done", "commit": "2ed6243"},
+    {"id": 3, "name": "07-03 finance_schema MCP tool", "status": "done", "commit": "5d57ced"},
+    {"id": 4, "name": "07-04 size-guarded response envelope + ordering proof", "status": "done", "commit": "eb6b5de"},
+    {"id": 5, "name": "07-05 materializeProgram (first real CAS-blob-to-disk write) + synchronous snapshot host map", "status": "done", "commit": "824045d"},
+    {"id": 6, "name": "07-06 fjs_run handler, handler-performed writes, adversarial observed-reads proof", "status": "done", "commit": "0ea1a2e"},
+    {"id": 7, "name": "07-07 EXEC-12 error taxonomy, three classes, session survival", "status": "done", "commit": "944017e"},
+    {"id": 8, "name": "07-08 wire both tools into financeMcpHandlers; Week-1 finish line", "status": "done", "commit": "a97754d"},
+    {"id": 9, "name": "07-09 real-process integration test (added mid-phase at user direction)", "status": "done", "commit": "e24e930"},
+    {"id": 10, "name": "07-10 FIX: materialize-write/import path mismatch found by the integration test", "status": "done", "commit": "9f9a311"}
+  ],
+  "remaining_tasks": [
+    {"id": 11, "name": "MERGE DECISION: reconcile feature/phase-7-exec with feature/phase-7-fjs-run-and-run-records", "status": "not_started"},
+    {"id": 12, "name": "Phase 8: TY2025 Parameters and the Tax Table as Data (MCP-07, TAX-*)", "status": "not_started"}
+  ],
+  "blockers": [
+    {
+      "description": "Two divergent lines of Phase 7 work exist and are UNMERGED. This worktree's branch feature/phase-7-exec has 37 commits (all 9 plans + the path fix). The main checkout is on feature/phase-7-fjs-run-and-run-records, where a SECOND Claude Code session (session_01V9JGBQacxZPLJGmuHUaEzV) was independently committing.",
+      "type": "external",
+      "workaround": "Branch point is 5d57ced, which already contains the other session's commit 75d262b, so nothing of theirs is lost up to that point. Someone must decide whether to merge feature/phase-7-exec back, or keep them separate. Check `git log feature/phase-7-fjs-run-and-run-records ^feature/phase-7-exec` for anything the other session added after the split."
+    },
+    {
+      "description": "EXEC-03 ergonomics: fjs's assert/unwrap/match throw BARE values, not Errors. typeof e === 'string', e instanceof Error === false, e.message undefined. Still unfixed upstream; filed as functionalscript#1432.",
+      "type": "external",
+      "workaround": "Never branch on instanceof Error anywhere in this codebase. Read caught values directly."
+    }
+  ],
+  "human_actions_pending": [
+    {
+      "action": "Decide the merge strategy for the two Phase 7 branches",
+      "context": "A second Claude Code session was committing to the shared branch while this session executed. The user chose isolation via worktree; reconciliation was deferred.",
+      "blocking": true
+    }
+  ],
+  "decisions": [
+    {"decision": "guestCtx widened with step/pure and money helpers; CasOp stays exactly four commands", "rationale": "EXEC-07's own text specified 'combinators, read-only operation constructors, money helpers, args' and Phase 6 shipped only the constructors. Combinators never become a command and never reach match, so the whitelist and the Assert<Equal<CasOp[0],...>> pin are untouched. Verified by mutation: adding a fifth command to casOpNames still fails vocabularyIsFrozenAtFour.", "phase": "07"},
+    {"decision": "Materialized programs go in .fjs-run under the CAS home, gitignored", "rationale": "Nothing in this repo had ever written a CAS blob's bytes to a real file. In production home is the repo root, so hash-named .mjs files would land untracked. OS temp was rejected as it discards the project-local store property Phase 2 established.", "phase": "07"},
+    {"decision": "Phase gate counts PROJECT-LOCAL proofs, never npm test's total", "rationale": "The total includes ~2177 vendored functionalscript submodule proofs and varies by whether the submodule is initialized (2333 in main checkout vs 187 here). An earlier gate of 'total > 134' was already satisfied with zero Phase 7 code written.", "phase": "07"},
+    {"decision": "Added TEST-01..04 requirements mid-phase, plus plan 07-09", "rationale": "User directive. Audit found 185 project-local proofs and exactly ONE real-process test, and the product's central seam was untestable under virtual by construction.", "phase": "07"},
+    {"decision": "weekOneConvergence (virtual) now expects the error outcome; the integration test is the sole proof of the real success path", "rationale": "virtual's writeFile (array) and import_ (function) cannot both succeed at one path in one session. Once executeRun used the correct full path, the virtual harness could no longer model success. The integration test proves it better anyway: real process, real fs, computed total, existsSync on the materialized .mjs.", "phase": "07"}
+  ],
+  "uncommitted_files": [],
+  "next_action": "Resolve the merge question between feature/phase-7-exec and feature/phase-7-fjs-run-and-run-records, THEN run /gsd-autonomous (or /gsd-plan-phase 8) for Phase 8: TY2025 Parameters and the Tax Table as Data.",
+  "context_notes": "Phase 7 is complete and verified: tsc 0, 187/187 fast proofs (185 project-local), 1/1 integration. Week 1 milestone met. The single most important thing a resuming agent must internalize: this project's tests were 185 mocks and one real test, and that ratio hid a shipped bug in the milestone's headline feature (executeRun wrote the program to one path and imported it from another; real Node resolves a bare specifier against process.cwd()). The virtual proofs did not catch it because they keyed their JsModule fixture at the SAME wrong bare name the code asked for -- a tautology, not a specification. TEST-03 now makes real-process coverage a standing obligation, and the integration test's tool-coverage check is self-enforcing: it compares the set of tools called against the set tools/list advertises, so Phase 8's finance_tax_params will fail it until covered."
+}
