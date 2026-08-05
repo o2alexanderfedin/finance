@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
-status: executing
+status: verifying
 stopped_at: Completed 08-02-PLAN.md
-last_updated: "2026-08-05T20:03:50.421Z"
+last_updated: "2026-08-05T20:13:06.163Z"
 last_activity: 2026-08-05
 progress:
   total_phases: 15
-  completed_phases: 7
+  completed_phases: 8
   total_plans: 29
-  completed_plans: 30
+  completed_plans: 31
   percent: 100
 ---
 
@@ -28,7 +28,7 @@ the server executes it as a pure function of `(documents, tax-year parameters) �
 
 Phase: 8 of 15 in progress (TY2025 Parameters and the Tax Table as Data)
 Plan: 4 of 4 in that phase (08-01 complete; 08-02..08-04 remain)
-Status: Ready to execute
+Status: Phase complete — ready for verification
 
 Progress: [██████████] 100%
 Last activity: 2026-08-05
@@ -70,6 +70,7 @@ inside it); fjs 0.41.0. Project-local proof count
 | Phase 08 P01 | 25min | 2 tasks | 1 files |
 | Phase 08 P02 | 45min | 3 tasks | 1 files |
 | Phase 8 P03 | 25min | 2 tasks | 1 files |
+| Phase 08 P04 | 25min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -175,6 +176,8 @@ Full log in PROJECT.md Key Decisions. Recent decisions affecting current work:
 - [Phase 08]: generateRow rounds to the nearest whole dollar (Publication 1040's own printing convention), not nearest cent, before re-expressing in cents — The plan's literal formula would round at cents precision, reproducing $1,802.50 instead of the required $1,803.00 for the MFJ $18,000 row -- verified by hand against all ten transcribed rows before trusting it
 - [Phase 08]: T-08-01 mutation-verified: breaking the MFJ first bracket's rate (10 -> 11) turns the row-by-row diff red — Confirms the diff's expected side (hand-transcribed Pub. 1040 literals) is independent of the generator, not a tautology; reverted cleanly with an empty git status
 - [Phase ?]: TAX-04 boundary proofs are generated data-driven over a 42-entry threshold inventory (allThresholds), never hand-written per-threshold, via a generic segmentIndex counter sharing no code path with the Tax Table's own tax-computation functions
+- [Phase 08-04]: taxParamsByYear[2025] narrowed exactly once at module scope via assert; both the tool's taxParamsResponses map and the year2025Resolves proof leaf read from the single exported response2025 constant — Never a non-null assertion or cast (banned by AGENTS.md); keeps the response as the single source of truth for both the handler and its proof
+- [Phase 08-04]: Registry entry and fjs-run-integration.test.js call landed in one commit — 08-VALIDATION.md's ordering note: that test derives advertised/called tool sets from a live tools/list response at runtime, so a registry-only commit breaks npm test immediately
 
 ### Pending Todos
 
@@ -319,7 +322,7 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-08-05T20:02:02.308Z
+Last session: 2026-08-05T20:13:06.157Z
 Stopped at: Completed 08-02-PLAN.md
 (`npm test` 187/187, 185 project-local proofs, `tsc` clean, `test:integration` included and
 passing, tree clean). Merge blocker measured and dismissed — see Blockers. Awaiting the user's

@@ -102,7 +102,7 @@ dissolves on contact.
       full session. Any diagnostic output goes to stderr.
 - [x] **MCP-06** *(T1)*: `finance_schema(dialect)` returns the RTTI schema for a document
       dialect, so the agent reads field names rather than guessing them.
-- [ ] **MCP-07** *(T1)*: `finance_tax_params(year)` returns the tax-year parameter set, so
+- [x] **MCP-07** *(T1)*: `finance_tax_params(year)` returns the tax-year parameter set, so
       the agent reads parameters rather than recalling them.
 - [ ] **MCP-08** *(T2)*: `finance_documents_list` enumerates stored documents with their
       dialect, tax year, and subject.

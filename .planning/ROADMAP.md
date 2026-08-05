@@ -329,7 +329,7 @@ of it to Phase 14, whose criteria are about tax correctness rather than the exec
 - [x] 08-01-PLAN.md — TY2025 parameter data module with per-parameter citations (TAX-01)
 - [x] 08-02-PLAN.md — Tax Table band structure, exact cumulative-bracket generator, row-by-row diff against hand-transcribed literals, tiling proof, $100,000 refusal, and mutation-verification of the diff (TAX-02)
 - [x] 08-03-PLAN.md — Combined threshold inventory and generated threshold−1¢/threshold/threshold+1¢ boundary proofs (TAX-04)
-- [ ] 08-04-PLAN.md — finance_tax_params MCP tool, registry wiring, and the real-process integration-test call (MCP-07)
+- [x] 08-04-PLAN.md — finance_tax_params MCP tool, registry wiring, and the real-process integration-test call (MCP-07)
 
 ### Phase 9: Traceable Report Lines and the Anti-Hardcoding Gate
 **Milestone**: Week 2 — A Report Program Produces a Correct Figure
