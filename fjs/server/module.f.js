@@ -62,6 +62,8 @@ import { evoToolRegistry } from 'functionalscript/fjs/mcp/evo/module.f.js'
 import { emptyState, virtual } from 'functionalscript/fjs/effects/node/virtual/module.f.js'
 import { fromVec } from 'functionalscript/fjs/types/uint8array/module.f.js'
 import { utf8 } from 'functionalscript/fjs/text/module.f.js'
+import { array, string } from 'functionalscript/fjs/types/rtti/module.f.js'
+import { validate as rttiValidate } from 'functionalscript/fjs/types/rtti/validate/module.f.js'
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
 import { dialect as revisionDialect } from 'functionalscript/fjs/media/revision/module.f.js'
 import { vecToCBase32 } from 'functionalscript/fjs/basen/cbase32/module.f.js'
@@ -76,6 +78,9 @@ import { tryUtf8 } from 'functionalscript/fjs/text/module.f.js'
 /** @import { FileCasOperation } from 'functionalscript/fjs/cas/module.f.js' */
 /** @import { Cache } from 'functionalscript/fjs/cas/evo/module.f.js' */
 /** @import { Cas } from 'functionalscript/fjs/cas/module.f.js' */
+/** @import { Unknown } from 'functionalscript/fjs/media/json/module.f.js' */
+/** @import { Result } from 'functionalscript/fjs/types/result/module.f.js' */
+/** @import { ValidationError } from 'functionalscript/fjs/types/rtti/validate/module.f.js' */
 
 // ── cas_refresh (DOC-14) ────────────────────────────────────────────────────────
 /**
@@ -198,12 +203,84 @@ const runSession = () => {
 }
 
 /**
- * Non-empty stdout lines from a session `State`, parsed as JSON-RPC. Typed
- * `any` deliberately: these are raw decoded JSON-RPC envelopes, not values
- * carried through fjs's own typed effect system.
- * @type {(state: import('functionalscript/fjs/effects/node/virtual/module.f.js').State) => any[]}
+ * Non-empty stdout lines from a session `State`, decoded as JSON-RPC
+ * envelopes. Typed `Unknown` — fjs's JSON value type — rather than `any`:
+ * these arrive from outside the typed effect system, so nothing is known
+ * about their shape until a schema says so. `decode` below is how a leaf
+ * says so.
+ *
+ * `JSON.parse` is used directly rather than `fjs/media/json`'s `parse`
+ * because at fjs 0.41.0 the latter is literally `export const parse =
+ * JSON.parse` — the same function under another name, so importing it would
+ * be a rename dressed as a fix. Upstream is splitting that export into a
+ * total, tokenizer-backed `parse` returning a `Result` and a deprecated
+ * `parseNative` (functionalscript#1430); when that lands, this is the one
+ * line to revisit. Recorded in `fjs/todo/upstream-json-parse-split.md`.
+ * @type {(state: import('functionalscript/fjs/effects/node/virtual/module.f.js').State) => readonly Unknown[]}
  */
-const responsesOf = state => state.stdout.split('\n').filter((/** @type {string} */ line) => line !== '').map((/** @type {string} */ line) => JSON.parse(line))
+const responsesOf = state => state.stdout
+    .split('\n')
+    .filter((/** @type {string} */ line) => line !== '')
+    .map((/** @type {string} */ line) => JSON.parse(line))
+
+/**
+ * Turns an rtti validator into a narrowing decoder: it yields the validated
+ * value, or throws the validation error if the response is not the shape the
+ * caller expects. Also absorbs the `| undefined` that
+ * `noUncheckedIndexedAccess` puts on every destructured response, so a leaf
+ * that indexes past the end fails here with a clear message instead of
+ * further along.
+ *
+ * The type parameter is inferred from the VALIDATOR's own result rather than
+ * recomputed as `Ts<typeof schema>`. That is not a style choice: the generic
+ * form `<T extends Type>(schema: T) => … => Ts<T>` makes `tsc` give up with
+ * `TS2589: Type instantiation is excessively deep and possibly infinite`,
+ * because rtti's `Unknown` is recursive. Letting `rttiValidate` compute the
+ * type once, at its own call site, keeps the instantiation shallow.
+ *
+ * This is what replaced `any`. The difference is not ceremony: under `any`,
+ * `callResponse.result.content[0].type` failed with a `TypeError` about
+ * reading a property of `undefined`, naming neither the response nor the
+ * field that was wrong. A schema failure names the path. It also makes each
+ * leaf declare the response shape it depends on, so a server change that
+ * altered that shape fails at the decode rather than somewhere downstream.
+ *
+ * rtti permits properties a schema does not mention — verified — so each
+ * schema below names only what its own leaf reads, and a full JSON-RPC
+ * envelope validates against a partial one.
+ * @type {<T>(validator: (value: Unknown) => Result<T, ValidationError>) => (value: Unknown | undefined) => T}
+ */
+const decoder = validator => value => {
+    assert(value !== undefined, 'expected a JSON-RPC response, got none')
+    const [t, v] = validator(value)
+    if (t === 'error') {
+        throw ['unexpected JSON-RPC response shape', v]
+    }
+    return v
+}
+
+/** Every response carries this, whatever else it carries. */
+const envelopeSchema = /** @type {const} */ ({ jsonrpc: string })
+
+/** What `initializeIgnoresRequestedProtocolVersion` reads. */
+const initResultSchema = /** @type {const} */ ({
+    result: { protocolVersion: string, serverInfo: { name: string } },
+})
+
+/** What `toolsListEnumeratesComposedRegistry` reads. */
+const toolsListResultSchema = /** @type {const} */ ({
+    result: { tools: array({ name: string }) },
+})
+
+/** What the `tools/call` leaves read, here and in the DOC-14 proof below. */
+const callResultSchema = /** @type {const} */ ({
+    result: { content: array({ type: string, text: string }) },
+})
+
+const asEnvelope = decoder(rttiValidate(envelopeSchema))
+const asInitResult = decoder(rttiValidate(initResultSchema))
+const asToolsListResult = decoder(rttiValidate(toolsListResultSchema))
+const asCallResult = decoder(rttiValidate(callResultSchema))
 
 export const proof = {
     // financeMcpServer is never called in integration tests because it drives
@@ -227,7 +304,7 @@ export const proof = {
             const responses = responsesOf(runSession())
             assertEq(responses.length, 3)
             for (const r of responses) {
-                assertEq(r.jsonrpc, '2.0')
+                assertEq(asEnvelope(r).jsonrpc, '2.0')
             }
         },
         // No diagnostics were emitted anywhere in the session.
@@ -240,25 +317,28 @@ export const proof = {
         // mcpStep never inspects what the client requested.
         initializeIgnoresRequestedProtocolVersion: () => {
             const [initResponse] = responsesOf(runSession())
-            assertEq(initResponse.result.protocolVersion, '2025-11-25')
-            assertEq(initResponse.result.serverInfo.name, 'finance-mcp')
+            const init = asInitResult(initResponse)
+            assertEq(init.result.protocolVersion, '2025-11-25')
+            assertEq(init.result.serverInfo.name, 'finance-mcp')
         },
         // Both registries composed: tools/list enumerates a non-empty set
         // that includes evo_list and cas_refresh (DOC-14).
         toolsListEnumeratesComposedRegistry: () => {
             const [, listResponse] = responsesOf(runSession())
-            const tools = listResponse.result.tools
+            const tools = asToolsListResult(listResponse).result.tools
             assert(tools.length > 0)
-            assert(tools.some((/** @type {any} */ t) => t.name === 'evo_list'))
-            assert(tools.some((/** @type {any} */ t) => t.name === 'cas_refresh'))
+            assert(tools.some(t => t.name === 'evo_list'))
+            assert(tools.some(t => t.name === 'cas_refresh'))
         },
         // A real registered handler answers tools/call — a green tools/call,
         // not merely a green tools/list (the documented silent-failure mode
         // this proof and Plan 03's live check both target).
         toolsCallReachesRealHandler: () => {
             const [, , callResponse] = responsesOf(runSession())
-            assert(!('error' in callResponse))
-            assertEq(callResponse.result.content[0].type, 'text')
+            // A schema that requires `result` already excludes an error
+            // response: a JSON-RPC error envelope carries `error` and no
+            // `result`, so decoding is itself the "not an error" assertion.
+            assertEq(asCallResult(callResponse).result.content[0]?.type, 'text')
         },
     },
     // DOC-14 (Success Criterion 5's mechanism, proven in-process): a
@@ -307,7 +387,7 @@ export const proof = {
              * while carrying every other field of `state` (crucially
              * `memoryValues`/`memoryNext`, so the session and cache slots
              * persist across batches) forward.
-             * @type {(state: import('functionalscript/fjs/effects/node/virtual/module.f.js').State, messages: readonly unknown[]) => readonly [import('functionalscript/fjs/effects/node/virtual/module.f.js').State, any[]]}
+             * @type {(state: import('functionalscript/fjs/effects/node/virtual/module.f.js').State, messages: readonly unknown[]) => readonly [import('functionalscript/fjs/effects/node/virtual/module.f.js').State, readonly Unknown[]]}
              */
             const runBatch = (state, messages) => {
                 const input = messages.map(m => JSON.stringify(m)).join('\n') + '\n'
@@ -323,13 +403,17 @@ export const proof = {
             const [state3] = runBatch(state2, [initializeRequest, initializedNotification])
             // BEFORE cas_refresh: the cache from step 1 never saw the seed.
             const [state4, beforeResponses] = runBatch(state3, [evoHeadCall(10)])
-            assertEq(beforeResponses[0].result.content[0].text, '')
+            assertEq(asCallResult(beforeResponses[0]).result.content[0]?.text, '')
             const [state5, refreshResponses] = runBatch(state4, [{ jsonrpc: '2.0', method: 'tools/call', id: 11, params: { name: 'cas_refresh', arguments: {} } }])
-            assert(!('error' in refreshResponses[0]))
+            // Decoding against a schema that requires `result` is itself the
+            // "not an error" assertion — a JSON-RPC error envelope carries
+            // `error` and no `result`. It also pins what the tool actually
+            // answered, which `!('error' in …)` never did.
+            assertEq(asCallResult(refreshResponses[0]).result.content[0]?.text, 'refreshed')
             // AFTER cas_refresh: the same subject now resolves to the
             // seeded revision's own hash (its only, zero-parent head).
             const [, afterResponses] = runBatch(state5, [evoHeadCall(12)])
-            assertEq(afterResponses[0].result.content[0].text, seededHash)
+            assertEq(asCallResult(afterResponses[0]).result.content[0]?.text, seededHash)
         },
     },
 }
