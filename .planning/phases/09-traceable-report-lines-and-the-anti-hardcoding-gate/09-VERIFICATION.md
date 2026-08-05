@@ -1,8 +1,8 @@
 ---
 phase: 09-traceable-report-lines-and-the-anti-hardcoding-gate
 verified: 2026-08-05T00:00:00Z
-status: gaps_found
-score: 3/4 must-haves verified
+status: passed
+score: 4/4 must-haves verified (criterion 4 closed by Plan 09-05, mutation-proven)
 overrides_applied: 0
 gaps:
   - truth: "A perturbation gate: changing one input document moves the output, AND `() => pure({ line16: 9137 })` — which satisfies every other criterion — fails."
@@ -54,7 +54,7 @@ deferred: []
 **Phase Goal:** A report line cannot exist without the sources it came from, and a program
 that contains the answer instead of computing it is caught mechanically.
 **Verified:** 2026-08-05
-**Status:** gaps_found
+**Status:** passed (blocker closed by Plan 09-05 — see "Gap Closed" below)
 **Re-verification:** No — initial verification
 
 ## Goal Achievement
@@ -164,3 +164,61 @@ Three of four ROADMAP success criteria are solidly verified, including independe
 
 *Verified: 2026-08-05*
 *Verifier: Claude (gsd-verifier)*
+
+
+---
+
+## Gap Closed — Plan 09-05
+
+The blocker above was real and is now fixed. Recorded here rather than left in a chat log.
+
+### What was wrong
+
+`fjs/server/fjs_run/module.f.js` implemented the zero-read kill condition twice — once in the
+production `executeRun` (what `fjsRunTool` runs, so what a real `fjs_run` call executes) and once in
+the test-only `runExecuteRunViaFixture`. Byte-identical bodies. Every proof, including the leaf
+written specifically to defeat `() => pure({ line16: 9137 })`, exercised only the test copy.
+
+The helper itself was never the mistake: `fjs/effects/node/virtual` genuinely cannot compose a real
+`writeFile` with a real `import_` in one session, a structural property documented since Phase 7. The
+mistake was that the helper also **re-implemented the rule** instead of sharing it. Duplicating a
+rule to route around an unrelated limitation is what created the untested path.
+
+### The fix
+
+1. `classifyRunOutcome` extracted as the single place the rule lives. `reads.length === 0` and the
+   zero-read message each now appear exactly **once** in the file; both call sites use it.
+2. A real-process assertion: the verbatim adversary is stored and invoked through an actual
+   `node index.js` stdio session, refused with a message naming the zero-read condition, and the
+   session is asserted to survive and serve a following `cas_list` call.
+
+### Mutation evidence — run by the orchestrator, not inherited from the executor
+
+`reads.length === 0` → `reads.length === -1` inside `classifyRunOutcome`:
+
+```
+tsc: clean (the mutation typechecks — a genuine behavioural mutation, not a compile error)
+
+✖ proof.zeroReadGate.zeroReadOutcomeBecomesAnErrorResult
+✖ proof.antiHardcodingGate.hardcodedAdversaryFailsAndIsInvariantToInputChange
+✖ TEST-01/TEST-02: fjs_run end to end through a real separate node index.js process
+
+ℹ pass 255
+ℹ fail 3
+```
+
+Reverted: `pass 258, fail 0`, `git status --porcelain` empty.
+
+**Before the fix, the equivalent mutation of the production path left all 258 tests green.** After
+it, the same mutation is caught three ways, including through a real server process. The decisive
+proofs are now bound to the code that ships.
+
+### The lesson, stated for the next phase
+
+09-CONTEXT.md contained the exact warning this phase then violated: *"a gate built for an adversary
+that is never actually run against it is a claim, not a proof."* Writing a principle down does not
+enforce it. **Mutating the shipped code and watching the suite go red is the only thing that does** —
+and the mutation must target the production path by name, because a duplicated rule means a green
+mutation run can be measuring the wrong copy.
+
+**Status raised from `gaps_found` to `passed`.**
