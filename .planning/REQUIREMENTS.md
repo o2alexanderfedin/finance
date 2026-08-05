@@ -176,7 +176,7 @@ dissolves on contact.
       inline preview, with an **explicit size check** before writing the response. The
       stdio line cap is 128 KiB and overflow degrades to a silent `-32603` with no
       indication that size was the problem.
-- [ ] **EXEC-12** *(T1)*: Total error capture — including non-`Error` throws, missing
+- [x] **EXEC-12** *(T1)*: Total error capture — including non-`Error` throws, missing
       hashes, and import failures — surfaced as a tool-level `errorResult`, never as a
       process crash.
 - [ ] **EXEC-13** *(T2)*: Run records mark `pinned: true|false`. Only pinned runs count
