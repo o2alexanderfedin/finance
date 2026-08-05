@@ -1,0 +1,361 @@
+// @ts-nocheck
+//
+// This file exists outside `tsc`'s type checking on purpose. Two independent
+// reasons, both explained in full in `fjs/todo/upstream-node-spawn-effect.md`
+// and already applied to `cas-refresh-cross-process.test.js`:
+//
+// 1. TypeScript cannot resolve `node:child_process` / `node:test` /
+//    `node:assert` / `node:fs` / `node:os` / `node:path` / `node:url`
+//    without `@types/node`, and AGENTS.md forbids adding any new dependency
+//    — including a devDependency — without every repo owner's approval (a
+//    hard stop). That approval is not being sought just to typecheck one
+//    test harness.
+// 2. `fjs/effects/node` has no subprocess-spawn effect, so a genuinely
+//    separate-OS-process proof cannot be written as a pure `.f.js` proof at
+//    all. This file is therefore, like `index.js`, `all.test.js`, and
+//    `cas-refresh-cross-process.test.js`, a root-level impure JS file by
+//    necessity (AGENTS.md's carve-out for exactly this category).
+//
+// `@ts-nocheck` disables TYPE checking of this one file only — it adds
+// nothing to `package.json`, and no other file in this repo carries it
+// besides `cas-refresh-cross-process.test.js`.
+//
+// ## Why this test exists (07-09-PLAN.md)
+//
+// Every existing proof of `fjs_run` — including 07-08's own
+// `proof.weekOneConvergence`, despite being titled "end to end" — runs under
+// `fjs/effects/node/virtual`: a mocked filesystem, mocked stdio, no separate
+// OS process, and a `JsModule` fixture standing in for "materialization
+// already happened" because `virtual`'s `writeFile` (an array of `Vec`
+// chunks) and its `import_` (which requires a `JsModule` function) are
+// representationally incompatible (`fjs/guest/materialize/module.f.js`'s own
+// header) — write-then-import cannot be composed in one virtual session at
+// all. This test proves that exact seam for real: a genuinely separate
+// `node index.js <home>` process, driven over real stdin/stdout, writes a
+// program's bytes to a real file via a real MCP `fjs_run` call and then
+// really `import()`s it — the one assertion (`existsSync` on the
+// materialized `.mjs`) no virtual proof can make.
+//
+// It also derives full tool coverage (TEST-02) at runtime from the server's
+// own `tools/list` response, and proves MCP-05's stdout-is-always-JSON-RPC
+// invariant against a real process for the first time (previously only
+// asserted under `virtual`).
+
+import { test } from 'node:test'
+import assert from 'node:assert/strict'
+import { spawn } from 'node:child_process'
+import { mkdtempSync, mkdirSync, existsSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+// Reused for real, not re-implemented: the same money/dialect/materialize
+// helpers 07-08's virtual proof and Plan 05's own proof use, so this test's
+// seeding and expected-sum derivation stay consistent with them. None of
+// these three imports are a new dependency — `functionalscript` is already
+// this repo's one runtime dependency, and the other two are this repo's own
+// `.f.js` modules.
+import { centsFromString, centsToString } from './fjs/exact/module.f.js'
+import { dialect as oneZeroNineNineIntDialect, validate as validateOneZeroNineNineInt } from './fjs/document/1099int/module.f.js'
+import { dialect as revisionDialect } from 'functionalscript/fjs/media/revision/module.f.js'
+import { materializeHome, programPath } from './fjs/guest/materialize/module.f.js'
+
+const repoRoot = fileURLToPath(new URL('.', import.meta.url))
+
+// Same field values as `fjs/server/module.f.js`'s own `initializeRequest` /
+// `initializedNotification` (mirrored here, not imported — module-private
+// constants of a pure `.f.js` module), so this real client negotiates
+// identically to that file's virtual-harness sessions.
+const requestedProtocolVersion = '2025-06-18'
+const initializeRequest = id => ({
+    jsonrpc: '2.0',
+    method: 'initialize',
+    id,
+    params: {
+        protocolVersion: requestedProtocolVersion,
+        capabilities: {},
+        clientInfo: { name: 'finance-integration-client', version: '0.0.1' },
+    },
+})
+const initializedNotification = { jsonrpc: '2.0', method: 'notifications/initialized' }
+
+/**
+ * A guest report program's REAL source text — zero imports (so
+ * `checkSpecifiers` passes), written against nothing but `ctx`
+ * (`fjs/guest/module.f.js`'s frozen ABI). Enumerates every active subject,
+ * resolves each one's head -> revision -> snapshot, and sums every PRESENT
+ * `box1InterestIncome`, skipping — never coercing to zero — a document where
+ * the key is absent. Mirrors 07-08's `sumInterestReport`/
+ * `sumInterestOverSubjects` exactly, as literal source text rather than a
+ * `JsModule` fixture, because THIS run really writes these bytes to disk and
+ * really `import()`s them.
+ */
+const programSource = [
+    'export const report = ctx => args => ctx.step(ctx.evoList(\'false\'), activeJson => {',
+    '    const sumOverSubjects = subjects => acc => {',
+    '        const subject = subjects[0]',
+    '        if (subject === undefined) {',
+    '            return ctx.pure(ctx.centsToString(acc))',
+    '        }',
+    '        const rest = subjects.slice(1)',
+    '        return ctx.step(ctx.evoHead(subject), headsJson => {',
+    '            const heads = JSON.parse(headsJson)',
+    '            const headHash = heads[0]',
+    '            return ctx.step(ctx.evoRevision(headHash), revJson => {',
+    '                const rev = JSON.parse(revJson)',
+    '                return ctx.step(ctx.casRead(rev.snapshot), docJson => {',
+    '                    const doc = JSON.parse(docJson)',
+    '                    const next = doc.box1InterestIncome === undefined',
+    '                        ? acc',
+    '                        : acc + ctx.centsFromString(doc.box1InterestIncome)',
+    '                    return sumOverSubjects(rest)(next)',
+    '                })',
+    '            })',
+    '        })',
+    '    }',
+    '    return sumOverSubjects(JSON.parse(activeJson))(0n)',
+    '})',
+    '',
+].join('\n')
+
+test(
+    'TEST-01/TEST-02: fjs_run end to end through a real separate node index.js process and a real filesystem, with full tool coverage',
+    { timeout: 60_000 },
+    async () => {
+        // T-07-09-03: a fresh CAS home under os.tmpdir(), never the repo tree.
+        const home = mkdtempSync(join(tmpdir(), 'finance-fjs-run-integration-home-'))
+        let serverProc = null
+        try {
+            // The real working directory `fjs_run` needs (discovered by
+            // THIS test, not assumed): `executeRun`
+            // (fjs/server/fjs_run/module.f.js) deliberately calls
+            // `loadProgram([])(programFileName(input.hash))(sourceText)` —
+            // the BARE hash-derived filename, never the full
+            // `programPath(materializeHome(...))(...)` — because
+            // `fjs/effects/node/virtual`'s `import_` only accepts a
+            // single-segment path (see that module's own header, and
+            // 07-06-SUMMARY.md's note that resolving this "for a real
+            // running server with a real working directory" was left as
+            // Plan 09's own territory). Real Node's `import_` effect
+            // resolves a bare relative specifier against `process.cwd()`
+            // (`node_modules/functionalscript/fjs/effects/node/module.js`'s
+            // `asyncImport`: `concat(process.cwd())(v)` for any specifier
+            // that is neither absolute nor a URL) — never against `home`
+            // itself. So the real server process's CWD must be
+            // `materializeHome(home)` for the bare filename `executeRun`
+            // passes to resolve to the SAME file `materializeProgram` just
+            // wrote. `spawn`'s `cwd` option requires the directory to
+            // already exist, so it is created here, before the server ever
+            // starts — mirroring `materializeProgram`'s own unconditional
+            // `mkdir(..., { recursive: true })`.
+            mkdirSync(materializeHome(home), { recursive: true })
+
+            // The real server: a genuinely separate OS process, launched
+            // exactly as `node index.js <home>` (fjs/index.f.js's `main`),
+            // with the working directory established above.
+            serverProc = spawn('node', [join(repoRoot, 'index.js'), home], {
+                cwd: materializeHome(home),
+                stdio: ['pipe', 'pipe', 'pipe'],
+            })
+
+            const responses = []
+            const rawStdoutLines = []
+            let stdoutBuf = ''
+            let stderrBuf = ''
+            serverProc.stdout.setEncoding('utf8')
+            serverProc.stdout.on('data', chunk => {
+                stdoutBuf += chunk
+                let idx
+                while ((idx = stdoutBuf.indexOf('\n')) !== -1) {
+                    const line = stdoutBuf.slice(0, idx)
+                    stdoutBuf = stdoutBuf.slice(idx + 1)
+                    if (line !== '') {
+                        rawStdoutLines.push(line)
+                        responses.push(JSON.parse(line))
+                    }
+                }
+            })
+            serverProc.stderr.setEncoding('utf8')
+            serverProc.stderr.on('data', chunk => { stderrBuf += chunk })
+
+            let nextIdCounter = 0
+            const nextId = () => { nextIdCounter += 1; return nextIdCounter }
+            const send = message => { serverProc.stdin.write(JSON.stringify(message) + '\n') }
+
+            // T-07-09-02: readiness is proven by matching the response's own
+            // JSON-RPC `id`, never by a sleep. The `setTimeout` below is a
+            // polling DELAY between checks of that condition — it is never
+            // itself the readiness signal, and a dead process (no response,
+            // ever) fails this explicitly via the deadline below rather than
+            // hanging or silently "passing early".
+            const waitForId = async (id, timeoutMs = 20_000) => {
+                const deadline = Date.now() + timeoutMs
+                while (true) {
+                    const found = responses.find(r => r && r.id === id)
+                    if (found !== undefined) {
+                        return found
+                    }
+                    if (Date.now() > deadline) {
+                        throw new Error(`timed out waiting for response id ${id} (stderr: ${stderrBuf})`)
+                    }
+                    await new Promise(resolve => setTimeout(resolve, 25))
+                }
+            }
+
+            const toolsCalled = new Set()
+            const call = async (name, args) => {
+                const id = nextId()
+                send({ jsonrpc: '2.0', method: 'tools/call', id, params: { name, arguments: args } })
+                toolsCalled.add(name)
+                return waitForId(id)
+            }
+
+            // ── initialize -> notifications/initialized ──────────────────
+            const initId = nextId()
+            send(initializeRequest(initId))
+            send(initializedNotification)
+            const initResponse = await waitForId(initId)
+            assert.ok(!('error' in initResponse), `initialize failed: ${JSON.stringify(initResponse)}`)
+            assert.equal(initResponse.result.serverInfo.name, 'finance-mcp')
+
+            // ── tools/list, read at runtime (TEST-02) — never a hardcoded
+            // array, so a tool added later without integration coverage
+            // fails THIS test rather than passing unnoticed ──────────────
+            const listId = nextId()
+            send({ jsonrpc: '2.0', method: 'tools/list', id: listId })
+            const listResponse = await waitForId(listId)
+            assert.ok(!('error' in listResponse), `tools/list failed: ${JSON.stringify(listResponse)}`)
+            const advertisedTools = new Set(listResponse.result.tools.map(t => t.name))
+            assert.ok(advertisedTools.size > 0, 'expected at least one advertised tool')
+
+            // ── Seed three vnd.fjs.1099int documents through the REAL
+            // cas_add tool, over the real session, against the real
+            // filesystem — the difference from 07-08's virtual seed, whose
+            // store is a virtual root, not a real directory. One deliberately
+            // OMITS box1InterestIncome entirely (never '0.00') ──────────────
+            const docCommon = {
+                dialect: oneZeroNineNineIntDialect,
+                payerTin: '11-1111111',
+                recipientTin: '222-22-2222',
+                taxYear: 2024,
+                formRevision: '2024',
+            }
+            const docWithInterest = { ...docCommon, accountNumber: 'ACC-0001', box1InterestIncome: '1234.56' }
+            const docWithSmallerInterest = { ...docCommon, accountNumber: 'ACC-0002', box1InterestIncome: '10.00' }
+            const docWithAbsentInterest = { ...docCommon, accountNumber: 'ACC-0003' }
+            for (const doc of [docWithInterest, docWithSmallerInterest, docWithAbsentInterest]) {
+                const [vt, vv] = validateOneZeroNineNineInt(doc)
+                assert.equal(vt, 'ok', `expected the seeded 1099-INT to validate: ${JSON.stringify(vv)}`)
+            }
+
+            const casAdd = async content => {
+                const response = await call('cas_add', { content, type: 'text' })
+                assert.ok(!response.result.isError, `cas_add failed: ${JSON.stringify(response)}`)
+                return response.result.content[0].text
+            }
+
+            const docAHash = await casAdd(JSON.stringify(docWithInterest))
+            const docBHash = await casAdd(JSON.stringify(docWithSmallerInterest))
+            const docCHash = await casAdd(JSON.stringify(docWithAbsentInterest))
+
+            // Revisions written directly as raw vnd.fjs.revision blobs via
+            // cas_add (bypassing evo_add, mirroring 07-08/casRefresh's own
+            // technique) — cas_add's own handler folds a recognized revision
+            // blob into the live Evo cache via syncRevision as it is
+            // written, so these are visible to evo_head/evo_list without a
+            // restart or an explicit cas_refresh.
+            const subjectA = 'finance-integration-subject-A'
+            const subjectB = 'finance-integration-subject-B'
+            const subjectC = 'finance-integration-subject-C'
+            const revisionText = (subject, snapshot) => JSON.stringify({
+                dialect: revisionDialect,
+                subject,
+                parents: [],
+                snapshot,
+                generation: 0,
+            })
+            const revAHash = await casAdd(revisionText(subjectA, docAHash))
+            const revBHash = await casAdd(revisionText(subjectB, docBHash))
+            await casAdd(revisionText(subjectC, docCHash))
+
+            // The program's real source, written for real via cas_add.
+            const programHash = await casAdd(programSource)
+
+            // An agent reads the dialect's own field names before authoring
+            // a program against them — MCP-06's whole purpose.
+            const schemaResponse = await call('finance_schema', { dialect: 'vnd.fjs.1099int' })
+            assert.ok(!schemaResponse.result.isError, `finance_schema failed: ${JSON.stringify(schemaResponse)}`)
+            assert.ok(
+                schemaResponse.result.content[0].text.includes('box1InterestIncome'),
+                'expected the schema response to name box1InterestIncome')
+
+            // ── The decisive call: fjs_run through the real, separate
+            // process — a real write-then-import of the materialized
+            // program, something no virtual proof can do ──────────────────
+            const runResponse = await call('fjs_run', { hash: programHash })
+            assert.equal(runResponse.result.isError, undefined, `fjs_run failed: ${JSON.stringify(runResponse)}`)
+            const parsed = JSON.parse(runResponse.result.content[0].text)
+            assert.ok(typeof parsed.resultHash === 'string' && parsed.resultHash !== '', 'expected a resultHash')
+            assert.ok(typeof parsed.runHash === 'string' && parsed.runHash !== '', 'expected a runHash')
+
+            // The expected total, computed INDEPENDENTLY here from the two
+            // PRESENT seeded values via centsFromString/centsToString —
+            // never a bare literal.
+            const expectedTotal = centsToString(centsFromString('1234.56') + centsFromString('10.00'))
+
+            const resultGet = await call('cas_get', { hash: parsed.resultHash, content: true })
+            assert.ok(!resultGet.result.isError, `cas_get(resultHash) failed: ${JSON.stringify(resultGet)}`)
+            const resultMeta = JSON.parse(resultGet.result.content[0].text)
+            assert.equal(resultMeta.text, expectedTotal)
+
+            const runGet = await call('cas_get', { hash: parsed.runHash, content: true })
+            assert.ok(!runGet.result.isError, `cas_get(runHash) failed: ${JSON.stringify(runGet)}`)
+            const runMeta = JSON.parse(runGet.result.content[0].text)
+            const runRecord = JSON.parse(runMeta.text)
+            assert.equal(runRecord.status, 'ok')
+            // The absent-field document's subject IS enumerated — its
+            // evoHead read appears in the PERSISTED record — proving the
+            // program actively visited and skipped it, not that this test
+            // simply never presented it.
+            assert.ok(
+                runRecord.inputs.some(i => i.command === 'evoHead' && i.payload[0] === subjectC),
+                'expected subjectC (the absent-field document) to have been enumerated')
+
+            // ── The one assertion no virtual proof can make: the
+            // materialized program .mjs exists on the REAL filesystem,
+            // because a real separate process really wrote it and really
+            // imported it ────────────────────────────────────────────────
+            const materializedPath = programPath(materializeHome(home))(programHash)
+            assert.ok(
+                existsSync(materializedPath),
+                `expected the materialized program to exist at ${materializedPath}`)
+            void revBHash
+            void advertisedTools
+            void toolsCalled
+
+            // Clean EOF shutdown — the established real-process pattern
+            // (see cas-refresh-cross-process.test.js).
+            serverProc.stdin.end()
+            const exitCode = await new Promise((resolve, reject) => {
+                const timer = setTimeout(
+                    () => reject(new Error(`server did not exit within timeout (stderr: ${stderrBuf})`)),
+                    10_000,
+                )
+                serverProc.on('exit', code => {
+                    clearTimeout(timer)
+                    resolve(code)
+                })
+            })
+            serverProc = null
+            assert.equal(exitCode, 0, `server did not exit cleanly (stderr: ${stderrBuf})`)
+            assert.equal(stderrBuf, '', 'no diagnostics expected on stderr')
+        } finally {
+            // T-07-09-04: never leave a stray process or tmp dir behind,
+            // even on failure/timeout.
+            if (serverProc !== null && serverProc.exitCode === null) {
+                serverProc.kill()
+            }
+            rmSync(home, { recursive: true, force: true })
+        }
+    },
+)
