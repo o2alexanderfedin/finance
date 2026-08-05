@@ -44,7 +44,7 @@ write this
 
 ```ts
 /**
- * @typedef {StringMap<BoxKey, string>} MoneyBoxes
+ * @typedef {StringMap<BoxKey, string | undefined>} MoneyBoxes
  */
 ```
 
@@ -84,7 +84,7 @@ The only difference is `ocr` vs `w2`.
 
 ## 9. Remove `Object.setPrototypeOf(map, null)`
 
-## 10. More declarative definitions, less imperative 
+## 10. More declarative definitions, less imperative
 
 ## 11. One source of truth
 
@@ -105,6 +105,6 @@ should be something like this
             newCache => write(cacheKey, newCache))
         return mapStep(
             step1,
-            okResult('refreshed')))
+            () => okResult('refreshed')))
     },
 ```
