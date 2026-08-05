@@ -100,7 +100,7 @@ dissolves on contact.
       lives in `.f.js` modules it calls.
 - [x] **MCP-05** *(T0)*: stdout carries JSON-RPC and nothing else, asserted in CI across a
       full session. Any diagnostic output goes to stderr.
-- [ ] **MCP-06** *(T1)*: `finance_schema(dialect)` returns the RTTI schema for a document
+- [x] **MCP-06** *(T1)*: `finance_schema(dialect)` returns the RTTI schema for a document
       dialect, so the agent reads field names rather than guessing them.
 - [ ] **MCP-07** *(T1)*: `finance_tax_params(year)` returns the tax-year parameter set, so
       the agent reads parameters rather than recalling them.
