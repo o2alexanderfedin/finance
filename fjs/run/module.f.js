@@ -1,0 +1,267 @@
+/**
+ * `vnd.fjs.run` — PROV-03: the persisted record of one `fjs_run` invocation.
+ *
+ * **This is a dialect, not a bespoke record shape.** 07-CONTEXT.md's decision
+ * is explicit: follow `fjs/media/revision` / `fjs/document/1099int`'s
+ * precedent exactly — tag `vnd.fjs.run`, media type
+ * `application/vnd.fjs.run+json` derived mechanically, the dialect spread
+ * first via `base` (so structural validation reports it as the first
+ * failing field on a mismatched blob, same as every other document dialect),
+ * and validation split structural (RTTI) / semantic (`checkReferences`). A
+ * run record sits in the same CAS as every other stored document and reads
+ * back through the same `finance_schema`/dialect-detection machinery — giving
+ * it a parallel, one-off shape outside that system would mean two things to
+ * maintain where one already exists.
+ *
+ * **`inputs[]` is populated exclusively from `interpret`'s OBSERVED reads,
+ * never from a program's own declared citation list.** `fjs/exec`'s
+ * `interpret` returns `Result<[T, readonly Read[]], string>` where
+ * `Read = readonly [string, readonly unknown[]]` is the command and payload
+ * *actually dispatched*, appended only after a dispatch succeeds (EXEC-05).
+ * This module's schema shapes `inputs[]` entries as exactly
+ * `{ command, payload }` and nothing else — no `cited` flag, no free-form
+ * metadata — so there is no field for a program's own citation list to reach.
+ * This is an invariant for whoever calls this module's `validate`/writes a
+ * record later (Plan 06's handler): populate `inputs[]` from the `Read[]`
+ * `interpret` returns, never from anything the guest program itself claims
+ * to have read. `checkReferences` below narrows `inputs[].command` to the
+ * frozen four (`casOpNames`, from `fjs/guest`) as the read-back-time backstop
+ * — a hand-crafted or corrupted record naming a command outside that set is
+ * rejected on read-back, closing T-07-02-01.
+ *
+ * **`status` is exactly `'ok' | 'error'`, mirroring `Result`'s two arms.** A
+ * richer enum (`refused`/`crashed`/`budget`) was rejected in 07-CONTEXT.md:
+ * the distinguishing detail belongs in the `error` message, and a two-arm
+ * status keeps the record aligned with the `Result` the interpreter actually
+ * returns. A failed run still gets a record (`status: 'error'`) — provenance
+ * that covers only successes is not provenance, and `checkReferences` below
+ * enforces the cross-field consistency this implies: an `ok` record always
+ * has a `resultHash` and never an `error`; an `error` record always has an
+ * `error` message and never a `resultHash` (T-07-02-02) — a record cannot
+ * claim both an answer and a failure.
+ *
+ * **No field here stores a computed monetary figure as anything but a
+ * hash/string.** `resultHash` names where the actual result lives in CAS;
+ * EXACT-05's decimal-string wire rule is not re-litigated in this file
+ * because this record carries no numeric value directly — the money lives in
+ * the document dialects (`1099int`, `w2`, …) and in the CAS-stored result
+ * blob `resultHash` points at, not here.
+ *
+ * @module
+ */
+import { array, boolean, option, or, string } from 'functionalscript/fjs/types/rtti/module.f.js'
+import { validate as rttiValidate } from 'functionalscript/fjs/types/rtti/validate/module.f.js'
+import { error, ok } from 'functionalscript/fjs/types/result/module.f.js'
+import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
+import { base } from '../document/base/module.f.js'
+import { casOpNames } from '../guest/module.f.js'
+
+/**
+ * Format tag: names the dialect of this BLOB. The media type it is served
+ * with is derived mechanically: `application/` + `dialect` + `+json`.
+ */
+export const dialect = 'vnd.fjs.run'
+/** The media type derived from {@link dialect}: `application/vnd.fjs.run+json`. */
+export const mediaType = `application/${dialect}+json`
+
+/**
+ * One command `interpret` actually dispatched while running the program,
+ * carried straight from `fjs/exec`'s `Read` tuple (`readonly [string,
+ * readonly unknown[]]`) into a named struct. `payload` is modelled as
+ * `array(string)` (not `array(unknown)`) because every one of the frozen
+ * four commands (`fjs/guest`'s `CasOp`) takes a single string argument —
+ * matching the actual shape observed reads carry, not a wider placeholder.
+ */
+const inputEntry = /** @type {const} */ ({
+    command: string,
+    payload: array(string),
+})
+
+/**
+ * rtti schema for a `run` BLOB. `dialect` is spread first (via `base`) so
+ * structural validation reports it as the first failing field on a
+ * mismatched blob (DOC-00's discriminant, same guarantee every other
+ * document dialect gets).
+ *
+ * - `programHash`/`args` — the program identity and invocation the record
+ *   is *about*; non-empty `programHash` is a semantic check (below), since
+ *   RTTI's `string` alone accepts `''`.
+ * - `pinned` — EXEC-08/07-CONTEXT.md: every run, pinned or not, gets a
+ *   record with this flag; refusing unpinned runs would implement a later
+ *   (T2) requirement early.
+ * - `subject`/`parents` — `option`, since an unpinned or subject-less run
+ *   has neither a resolved subject nor a parent-revision snapshot to record.
+ * - `status` — exactly the two-arm union described in the module docstring.
+ * - `inputs` — the observed read set; see the module docstring for the
+ *   observed-not-declared invariant this field exists to carry.
+ * - `resultHash`/`error` — `option`, cross-field-constrained by `status` in
+ *   `checkReferences` below (RTTI alone cannot express "present iff X").
+ */
+export const runSchema = /** @type {const} */ ({
+    ...base(dialect),
+    programHash: string,
+    args: array(string),
+    pinned: boolean,
+    subject: option(string),
+    parents: option(array(string)),
+    status: or('ok', 'error'),
+    inputs: array(inputEntry),
+    resultHash: option(string),
+    error: option(string),
+})
+
+/** @typedef {import('functionalscript/fjs/types/rtti/ts/module.f.js').Ts<typeof runSchema>} Run */
+
+/** Structural-only validator: checks the shape, not the semantic refinements below. */
+const validateShape = rttiValidate(runSchema)
+
+/** Either a structural validation error or a semantic (string) error message. */
+/** @typedef {import('functionalscript/fjs/types/rtti/validate/module.f.js').ValidationError | string} RunError */
+
+/**
+ * Checks the semantic refinements the structural schema can't express on an
+ * already shape-valid `run` value:
+ * - `programHash` (trimmed) must not be empty — a run record with nothing to
+ *   identify the program is not a usable record.
+ * - Every `inputs[].command` must be one of `casOpNames` (`fjs/guest`'s
+ *   frozen four) — T-07-02-01: an unrecognized command name means this
+ *   record was hand-crafted or corrupted, since a genuine run can never have
+ *   observed a command outside that set.
+ * - If `status === 'ok'`: `resultHash` must be present (non-empty) and
+ *   `error` must be absent.
+ * - If `status === 'error'`: `error` must be present (non-empty) and
+ *   `resultHash` must be absent.
+ *   (T-07-02-02: a record cannot claim both an answer and a failure.)
+ * @type {(r: Run) => import('functionalscript/fjs/types/result/module.f.js').Result<Run, RunError>}
+ */
+export const checkReferences = r => {
+    if (r.programHash.trim() === '') {
+        return error('programHash must not be empty or whitespace-only')
+    }
+    for (const input of r.inputs) {
+        if (!casOpNames.includes(input.command)) {
+            return error(`inputs[].command is not one of the frozen four: ${input.command}`)
+        }
+    }
+    if (r.status === 'ok') {
+        if (r.resultHash === undefined || r.resultHash.trim() === '') {
+            return error('an ok run record must have a non-empty resultHash')
+        }
+        if (r.error !== undefined) {
+            return error('an ok run record must not have an error field')
+        }
+    } else {
+        if (r.error === undefined || r.error.trim() === '') {
+            return error('an error run record must have a non-empty error message')
+        }
+        if (r.resultHash !== undefined) {
+            return error('an error run record must not have a resultHash')
+        }
+    }
+    return ok(r)
+}
+
+/**
+ * Validates an already-parsed JSON value as a `run` BLOB: structural (rtti)
+ * validation followed by the semantic checks in {@link checkReferences}.
+ * Same composed shape as every other document dialect's `validate`.
+ * @type {(value: import('functionalscript/fjs/types/rtti/ts/module.f.js').Unknown) => import('functionalscript/fjs/types/result/module.f.js').Result<Run, RunError>}
+ */
+export const validate = value => {
+    const [t, v] = validateShape(value)
+    if (t === 'error') {
+        return error(v)
+    }
+    return checkReferences(v)
+}
+
+// ── Tests ────────────────────────────────────────────────────────────────────
+
+/** @type {Run} */
+const minimalOk = {
+    dialect,
+    programHash: 'sha256-program1',
+    args: [],
+    pinned: false,
+    status: 'ok',
+    inputs: [],
+    resultHash: 'sha256-result1',
+}
+
+/** @type {Run} */
+const minimalError = {
+    dialect,
+    programHash: 'sha256-program1',
+    args: [],
+    pinned: false,
+    status: 'error',
+    inputs: [],
+    error: 'refused: operation not permitted: fetch',
+}
+
+export const proof = {
+    dialectAndMediaType: () => {
+        assertEq(dialect, 'vnd.fjs.run')
+        assertEq(mediaType, 'application/vnd.fjs.run+json')
+    },
+    // Spread-order proof, mirroring `base`'s own `spreadOrder` proof: `dialect`
+    // is `runSchema`'s first key, the property `checkReferences.wrongDialectRejected`-
+    // style proofs across every other dialect depend on.
+    runSchemaSpreadsDialectFirst: () => {
+        assertEq(Object.keys(runSchema)[0], 'dialect')
+    },
+    validate: {
+        fullyPopulatedOkValidates: () => {
+            /** @type {Run} */
+            const r = {
+                ...minimalOk,
+                args: ['2024'],
+                pinned: true,
+                subject: 'form:1099int:11-1111111:222-22-2222:ACC-0001:2024',
+                parents: ['sha256-parent1'],
+                inputs: [
+                    { command: 'casRead', payload: ['doc-a'] },
+                    { command: 'evoHead', payload: ['subject-b'] },
+                ],
+            }
+            const [t, v] = validate(r)
+            assert(t === 'ok', ['expected ok', t, v])
+        },
+        fullyPopulatedErrorValidates: () => {
+            /** @type {Run} */
+            const r = {
+                ...minimalError,
+                args: ['2024'],
+                pinned: true,
+                subject: 'form:1099int:11-1111111:222-22-2222:ACC-0001:2024',
+                parents: ['sha256-parent1'],
+                inputs: [{ command: 'evoList', payload: ['active'] }],
+            }
+            const [t, v] = validate(r)
+            assert(t === 'ok', ['expected ok', t, v])
+        },
+    },
+    checkReferences: {
+        // Task 1 acceptance criterion: `inputs[0].command === 'fetch'` is not
+        // one of the frozen four and is rejected — T-07-02-01's read-back
+        // backstop.
+        unrecognizedInputsCommandRejected: () => {
+            const [t] = validate({ ...minimalOk, inputs: [{ command: 'fetch', payload: ['https://evil'] }] })
+            assertEq(t, 'error')
+        },
+        // Task 1 acceptance criterion: `status: 'ok'` with NO `resultHash`
+        // is rejected — an ok record must point at an answer.
+        okWithoutResultHashRejected: () => {
+            const { resultHash: _resultHash, ...withoutResultHash } = minimalOk
+            const [t] = validate(withoutResultHash)
+            assertEq(t, 'error')
+        },
+        // Task 1 acceptance criterion: `status: 'error'` with `resultHash`
+        // present is rejected — a failed run cannot also point at an answer
+        // (T-07-02-02).
+        errorWithResultHashRejected: () => {
+            const [t] = validate({ ...minimalError, resultHash: 'sha256-result1' })
+            assertEq(t, 'error')
+        },
+    },
+}
