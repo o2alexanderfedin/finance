@@ -302,6 +302,13 @@ test(
             const parsed = JSON.parse(runResponse.result.content[0].text)
             assert.ok(typeof parsed.resultHash === 'string' && parsed.resultHash !== '', 'expected a resultHash')
             assert.ok(typeof parsed.runHash === 'string' && parsed.runHash !== '', 'expected a runHash')
+            // PROV-07 (09-CONTEXT.md): the read count and numeric-literal
+            // count surface beside the two hashes. This run's own program
+            // dispatches evoList plus, per seeded subject, evoHead/
+            // evoRevision/casRead — several observed reads; its own stored
+            // source text contains at least the `0n` accumulator literal.
+            assert.ok(typeof parsed.readCount === 'number' && parsed.readCount > 0, 'expected a positive readCount')
+            assert.ok(typeof parsed.literalCount === 'number' && parsed.literalCount >= 1, 'expected literalCount to be at least 1')
 
             // The expected total, computed INDEPENDENTLY here from the two
             // PRESENT seeded values via centsFromString/centsToString —
