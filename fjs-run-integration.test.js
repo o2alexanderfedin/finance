@@ -44,7 +44,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
-import { mkdtempSync, mkdirSync, existsSync, rmSync } from 'node:fs'
+import { mkdtempSync, existsSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -126,35 +126,27 @@ test(
         const home = mkdtempSync(join(tmpdir(), 'finance-fjs-run-integration-home-'))
         let serverProc = null
         try {
-            // The real working directory `fjs_run` needs (discovered by
-            // THIS test, not assumed): `executeRun`
-            // (fjs/server/fjs_run/module.f.js) deliberately calls
-            // `loadProgram([])(programFileName(input.hash))(sourceText)` —
-            // the BARE hash-derived filename, never the full
-            // `programPath(materializeHome(...))(...)` — because
-            // `fjs/effects/node/virtual`'s `import_` only accepts a
-            // single-segment path (see that module's own header, and
-            // 07-06-SUMMARY.md's note that resolving this "for a real
-            // running server with a real working directory" was left as
-            // Plan 09's own territory). Real Node's `import_` effect
-            // resolves a bare relative specifier against `process.cwd()`
+            // No special working directory is required (07-10): `executeRun`
+            // (fjs/server/fjs_run/module.f.js) now imports from the FULL
+            // `programPath(materializeHome(materializeHomeRoot))(hash)` path
+            // — the SAME path `materializeProgram` itself just wrote,
+            // composed from the SAME expressions so the two can never drift
+            // apart. Real Node's `import_` effect only resolves a specifier
+            // against `process.cwd()` when the specifier is bare/relative
             // (`node_modules/functionalscript/fjs/effects/node/module.js`'s
-            // `asyncImport`: `concat(process.cwd())(v)` for any specifier
-            // that is neither absolute nor a URL) — never against `home`
-            // itself. So the real server process's CWD must be
-            // `materializeHome(home)` for the bare filename `executeRun`
-            // passes to resolve to the SAME file `materializeProgram` just
-            // wrote. `spawn`'s `cwd` option requires the directory to
-            // already exist, so it is created here, before the server ever
-            // starts — mirroring `materializeProgram`'s own unconditional
-            // `mkdir(..., { recursive: true })`.
-            mkdirSync(materializeHome(home), { recursive: true })
+            // `asyncImport`: `concat(process.cwd())(v)` only for a specifier
+            // that is neither absolute nor a URL); an absolute path is used
+            // as-is regardless of the launcher's own cwd. The server below
+            // is therefore spawned from this test file's own ordinary
+            // working directory — never a bespoke `cwd` — which is the
+            // decisive proof that production's real launcher (`claude mcp
+            // add`, or any other invocation) needs no special working
+            // directory either.
 
             // The real server: a genuinely separate OS process, launched
             // exactly as `node index.js <home>` (fjs/index.f.js's `main`),
-            // with the working directory established above.
+            // with no special working directory.
             serverProc = spawn('node', [join(repoRoot, 'index.js'), home], {
-                cwd: materializeHome(home),
                 stdio: ['pipe', 'pipe', 'pipe'],
             })
 
