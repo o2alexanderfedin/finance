@@ -38,9 +38,10 @@
  *
  * @module
  */
-import { do_ } from 'functionalscript/fjs/effects/module.f.js'
+import { do_, step, pure } from 'functionalscript/fjs/effects/module.f.js'
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
 import { interpret } from '../exec/module.f.js'
+import { centsFromString, centsToString } from '../exact/module.f.js'
 
 /** @import { Effect, OperationMap } from 'functionalscript/fjs/effects/module.f.js' */
 /** @import { Assert } from 'functionalscript/fjs/asserts/module.f.js' */
@@ -92,12 +93,31 @@ const evoRevision = do_('evoRevision')
  * upstream in fjs 0.41.0). Re-stating the guarantee here with
  * `setPrototypeOf` implies the upstream fix is not trusted, and leaves two
  * places to reason about instead of one.
+ *
+ * **Widened per 07-CONTEXT.md Decision 1, not per this module's own
+ * docstring above (yet).** EXEC-07's original requirement text is *"A `ctx`
+ * object carries the vocabulary — combinators, read-only operation
+ * constructors, money helpers, `args`."* Phase 6 shipped only the four
+ * operation constructors; `step`/`pure` (composition combinators) and
+ * `centsFromString`/`centsToString` (money helpers) are added here to
+ * deliver the rest of that sentence. This is a widening of `ctx`, **not** of
+ * the operation vocabulary: `step` and `pure` are re-exported directly from
+ * `functionalscript/fjs/effects/module.f.js` and are pure data composition —
+ * they build an `Effect` value, they never themselves become a `command`,
+ * and they never reach `match`. `CasOp` (four commands) and `casOpNames`
+ * are untouched below; `proof.vocabularyIsFrozenAtFour` and
+ * `proof.combinatorsAreNeverOperations` are the runtime guards that this
+ * distinction stays true.
  */
 export const guestCtx = {
     casRead,
     evoList,
     evoHead,
     evoRevision,
+    step,
+    pure,
+    centsFromString,
+    centsToString,
 }
 
 /** @typedef {typeof guestCtx} GuestCtx */
@@ -163,6 +183,23 @@ const hostMap = {
 }
 
 export const proof = {
+    // Task 1's own delivered behavior (07-CONTEXT.md Decision 1): `step`/
+    // `pure` are re-exported directly — the same function object, never
+    // wrapped — and the money helpers are `fjs/exact`'s own exports with no
+    // re-implementation or re-rounding. `Object.is` is the direct check for
+    // "same function object"; `typeof ... === 'function'` alone would also
+    // pass for a wrapper, which is exactly what this must rule out.
+    guestCtxReExportsCombinatorsAndMoneyHelpers: () => {
+        assert(Object.is(guestCtx.step, step), ['guestCtx.step must be the same function object as step'])
+        assert(Object.is(guestCtx.pure, pure), ['guestCtx.pure must be the same function object as pure'])
+        assert(
+            Object.is(guestCtx.centsFromString, centsFromString),
+            ['guestCtx.centsFromString must be the same function object as fjs/exact\'s centsFromString'])
+        assert(
+            Object.is(guestCtx.centsToString, centsToString),
+            ['guestCtx.centsToString must be the same function object as fjs/exact\'s centsToString'])
+        assertEq(guestCtx.centsFromString('1234.56'), 123456n)
+    },
     // The RUNTIME half of Success Criterion 1. The type half is the
     // `Assert<Equal<…>>` above, which `tsc` has already checked by the time
     // this runs; this pins the value side to the same four names, so the
