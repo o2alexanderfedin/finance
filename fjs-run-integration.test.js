@@ -329,9 +329,62 @@ test(
             assert.ok(
                 existsSync(materializedPath),
                 `expected the materialized program to exist at ${materializedPath}`)
+
+            // ── Full tool coverage (TEST-02): every remaining advertised
+            // tool reached at least once in this SAME real session ────────
+            const evoListResponse = await call('evo_list', {})
+            assert.ok(!evoListResponse.result.isError, `evo_list failed: ${JSON.stringify(evoListResponse)}`)
+
+            const evoHeadResponse = await call('evo_head', { subject: subjectA })
+            assert.ok(!evoHeadResponse.result.isError, `evo_head failed: ${JSON.stringify(evoHeadResponse)}`)
+
+            const evoRevisionResponse = await call('evo_revision', { hash: revAHash })
+            assert.ok(!evoRevisionResponse.result.isError, `evo_revision failed: ${JSON.stringify(evoRevisionResponse)}`)
             void revBHash
-            void advertisedTools
-            void toolsCalled
+
+            const casListResponse = await call('cas_list', {})
+            assert.ok(!casListResponse.result.isError, `cas_list failed: ${JSON.stringify(casListResponse)}`)
+
+            // A distinct evo_add call (not cas_add's own auto-sync path),
+            // pointed at an already-stored snapshot so it needs no separate
+            // seed write of its own. Runs AFTER the decisive fjs_run call
+            // above, so the new subject it creates never perturbs that
+            // call's already-made assertions.
+            const evoAddResponse = await call('evo_add', {
+                parents: [],
+                subject: 'finance-integration-coverage-subject',
+                snapshot: docAHash,
+            })
+            assert.ok(!evoAddResponse.result.isError, `evo_add failed: ${JSON.stringify(evoAddResponse)}`)
+
+            const casRefreshResponse = await call('cas_refresh', {})
+            assert.ok(!casRefreshResponse.result.isError, `cas_refresh failed: ${JSON.stringify(casRefreshResponse)}`)
+
+            // The self-enforcing check (TEST-02): the set of tools actually
+            // called must equal the set tools/list advertised. A tool added
+            // in a later phase without integration coverage fails HERE,
+            // rather than passing unnoticed.
+            assert.equal(
+                [...toolsCalled].sort().join(','),
+                [...advertisedTools].sort().join(','),
+                `expected every advertised tool to be called at least once: ` +
+                `called=[${[...toolsCalled].sort()}] advertised=[${[...advertisedTools].sort()}]`)
+
+            // MCP-05's invariant, proven against a real process for the
+            // first time (previously only asserted under virtual): every
+            // line the server wrote to stdout, across the WHOLE session,
+            // parses as JSON-RPC. Each line was already JSON.parsed as it
+            // arrived (the `serverProc.stdout.on('data', ...)` handler
+            // above) — a parse failure there would already have thrown and
+            // failed this test — so this re-checks explicitly, by line,
+            // naming the offending line rather than surfacing only as an
+            // opaque parse crash mid-session.
+            assert.ok(rawStdoutLines.length > 0, 'expected at least one stdout line')
+            for (const line of rawStdoutLines) {
+                assert.doesNotThrow(
+                    () => JSON.parse(line),
+                    `expected every stdout line to parse as JSON-RPC, got: ${line}`)
+            }
 
             // Clean EOF shutdown — the established real-process pattern
             // (see cas-refresh-cross-process.test.js).
