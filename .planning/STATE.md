@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
-status: verifying
-stopped_at: Completed 07-09-PLAN.md
-last_updated: "2026-08-05T06:48:15.012Z"
+status: executing
+stopped_at: Completed 08-01-PLAN.md
+last_updated: "2026-08-05T19:35:17.804Z"
 last_activity: 2026-08-05
 progress:
   total_phases: 15
   completed_phases: 7
-  total_plans: 25
-  completed_plans: 26
-  percent: 100
+  total_plans: 29
+  completed_plans: 28
+  percent: 97
 ---
 
 # Project State
@@ -22,17 +22,20 @@ See: .planning/PROJECT.md (updated 2026-08-03)
 
 **Core value:** The report is a program, not an answer — the agent emits FunctionalScript;
 the server executes it as a pure function of `(documents, tax-year parameters) → report`.
-**Current focus:** Phase 7 — `fjs_run`, Run Records, and the Week 1 Convergence (planned, executing — Wave 1)
+**Current focus:** Phase 8 — TY2025 Parameters and the Tax Table as Data (planned, executing — Wave 1)
 
 ## Current Position
 
-Phase: 7 of 15 in progress (`fjs_run`, Run Records, and the Week 1 Convergence)
-Plan: 9 of 9 in that phase (07-01 complete; 07-02..07-09 remain across Waves 1-5)
-Status: Phase complete — ready for verification
+Phase: 8 of 15 in progress (TY2025 Parameters and the Tax Table as Data)
+Plan: 2 of 4 in that phase (08-01 complete; 08-02..08-04 remain)
+Status: Ready to execute
 
-Progress: [██████████] 100%
+Progress: [██████████] 97%
 Last activity: 2026-08-05
-`npm test` 2314 pass / 0 fail (runs `tsc && node --test` — tsc is already inside it); fjs 0.41.0. Project-local proof count (`node --test 2>&1 | grep -c '^✔ import("./fjs/'`): 136.
+`npm test` 192 pass / 0 fail in this worktree (runs `tsc && node --test` — tsc is already
+inside it); fjs 0.41.0. Project-local proof count
+(`node --test 2>&1 | grep -c '^✔ import("./fjs/'`): 190 (185 Phase-7 baseline + 5 new
+08-01 leaves).
 
 ## Performance Metrics
 
@@ -64,6 +67,7 @@ Last activity: 2026-08-05
 | Phase 07 P07 | 40min | 2 tasks | 1 files |
 | Phase 07 P08 | 50min | 2 tasks | 1 files |
 | Phase 07 P09 | 20min | 2 tasks | 2 files |
+| Phase 08 P01 | 25min | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -164,6 +168,8 @@ Full log in PROJECT.md Key Decisions. Recent decisions affecting current work:
 - [Phase 07]: 07-08: Verified the absent-vs-coerced-to-zero distinction is load-bearing — Temporarily forced centsFromString(undefined) by removing the skip check, confirmed the leaf fails with isError:true, then reverted — proves the leaf checks skip logic, not merely the final sum
 - [Phase 07-09]: Fixed fjs_run's real working-directory gap at the test-harness spawn level (cwd = materializeHome(home)), not in executeRun, to avoid breaking every existing virtual proof of executeRun/fjsRunTool
 - [Phase 07-09]: Seeded CAS content through the real cas_add MCP tool over the live session rather than a separate CLI subprocess; cas_add auto-syncs recognized vnd.fjs.revision blobs into the live Evo cache
+- [Phase 08-01]: Standard deduction cites Rev. Proc. 2025-32 §3.01 (OBBBA revision); aged/blind additional, dependent cap, ordinary brackets, and capital-gains breakpoints cite Rev. Proc. 2024-40 alone, unmodified
+- [Phase 08-01]: ratePercent stored as a plain number, not a decimal string — it is a rate, not a dollar amount crossing the money boundary
 
 ### Pending Todos
 
@@ -308,12 +314,12 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-08-05T16:24:00Z
-Stopped at: Session resumed from HANDOFF.json. Phase 7 re-verified green at `9d625db`
+Last session: 2026-08-05T19:35:17.798Z
+Stopped at: Completed 08-01-PLAN.md
 (`npm test` 187/187, 185 project-local proofs, `tsc` clean, `test:integration` included and
 passing, tree clean). Merge blocker measured and dismissed — see Blockers. Awaiting the user's
 choice on push/PR strategy and on Phase 8.
-Resume file: None (HANDOFF.json and .continue-here.md consumed and deleted on resume)
+Resume file: None
 (they were one-shot artifacts, written to `feature/planning-requirements-roadmap` seven
 minutes after PR #14 merged, so they never reached `main`; nothing else on that branch is
 unmerged and it can be deleted)
