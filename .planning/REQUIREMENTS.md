@@ -366,6 +366,46 @@ would be materially more expensive to retrofit.
       is a duplicate of the same defect, filed independently from this branch before #1419
       was known here; it is closed as such.
 
+### Integration and End-to-End Testing (TEST)
+
+Added mid-Phase-7, at the user's direction, after an audit found the project had **133
+project-local proofs and exactly one real-process test**. Every other proof runs under
+`fjs/effects/node/virtual` — mocked filesystem, mocked stdio, no separate OS process.
+
+The audit's finding that forced this section: **the product's central seam cannot be tested in
+the virtual harness at all.** `virtual`'s `writeFile` stores a file as an array of `Vec` chunks
+while its `import_` requires the entry at a path to be a `JsModule` function — verified against
+upstream source. So "write a program's bytes to disk, then `import()` and run them" is
+*structurally uncomposable* in a virtual session. Phase 7's own end-to-end plan therefore used a
+`JsModule` stand-in for materialization, which means `fjs_run` — the product — would have shipped
+with its central seam evidenced only by a mock.
+
+`cas-refresh-cross-process.test.js` already established the pattern and the precedent, and its
+header states the principle these requirements generalise: *"an in-process simulation does not
+test the thing that breaks."* It was a one-off; this section makes it a practice.
+
+- [ ] **TEST-01** *(T1)*: A real-process integration test for `fjs_run`: a genuinely separate
+      `node index.js <home>` OS process, driven over **real stdin/stdout JSON-RPC** through a
+      full `initialize` → `notifications/initialized` → `tools/list` → `tools/call` session,
+      against a real temporary CAS home on a real filesystem. It must assert the returned figure
+      and the result/run-record hashes, **and** that the materialized `.mjs` actually reached
+      disk — the one assertion no virtual proof can make.
+- [ ] **TEST-02** *(T1)*: Every MCP tool this project exposes is exercised at least once through
+      that real stdio session, not only through `virtual`. A tool proven solely in-process has
+      not been proven to be reachable by a client.
+- [ ] **TEST-03** *(T2)*: Each subsequent phase that adds a tool, a dialect, or a new seam adds
+      real-process coverage for it in the same session harness. The standing rule: a phase is not
+      complete when its virtual proofs are green — it is complete when the thing a client would
+      actually call has been called.
+- [ ] **TEST-04** *(T2)*: The integration suite is separable from the fast proof suite, so the
+      per-commit loop stays fast while the integration layer still runs before a phase is marked
+      complete. Real-process tests cost seconds each; the 133 virtual proofs cost milliseconds
+      in total, and conflating them would push developers to skip both.
+
+Scope note, deliberately: these requirements do **not** ask for the virtual proofs to be
+replaced. The virtual harness is fast, deterministic, and proves logic well. What it cannot do is
+prove that two real subsystems meet. Both layers are wanted; only one of them currently exists.
+
 ---
 
 ## v2 (Deferred)
@@ -446,6 +486,10 @@ them. Week 0 is research's addition in front of the plan's Week 1.
 | MCP-07 | T1 | Phase 8 - TY2025 Parameters and Tax Table | Week 2 | Pending |
 | MCP-08 | T2 | Phase 11 - Wage, Retirement, Benefit Documents | Week 3 | Pending |
 | MCP-09 | T3 | Phase 15 - Realism Polish and Upstream | Week 5 | Pending |
+| TEST-01 | T1 | Phase 7 - `fjs_run` and Run Records | Week 1 | Pending |
+| TEST-02 | T1 | Phase 7 - `fjs_run` and Run Records | Week 1 | Pending |
+| TEST-03 | T2 | Phases 8-15 - standing, per phase | Weeks 2-5 | Pending |
+| TEST-04 | T2 | Phase 7 - `fjs_run` and Run Records | Week 1 | Pending |
 | EXEC-01 | T0 | Phase 3 - The Restricted Interpreter | Week 1 | Done |
 | EXEC-02 | T0 | Delivered upstream (fjs 0.41.0, functionalscript#1419) | Week 1 | Done |
 | EXEC-03 | T0 | Phase 3 - The Restricted Interpreter | Week 1 | Done |

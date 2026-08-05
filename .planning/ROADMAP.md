@@ -294,6 +294,21 @@ held — neither dialect required reopening `fjs/document/base` or the subject c
 - [ ] 07-06-PLAN.md — fjs_run handler: executeRun orchestration, handler-performed CAS writes, the run record, adversarial proof (EXEC-08, EXEC-10, EXEC-11, PROV-03)
 - [ ] 07-07-PLAN.md — EXEC-12 error taxonomy: non-Error throw, missing hash, import failure, each through the full handler with session-survival proof
 - [ ] 07-08-PLAN.md — Wire finance_schema/fjs_run into financeMcpHandlers; the Week-1 finish line end to end (all six requirements converge)
+- [ ] 07-09-PLAN.md — Real-process integration test: separate `node index.js` OS process, full JSON-RPC session over real stdio, real filesystem (TEST-01, TEST-02, TEST-04)
+
+**Plan 07-09 was added mid-phase at the user's direction.** An audit found this project had 133
+project-local proofs and exactly **one** real-process test; everything else runs under
+`fjs/effects/node/virtual` — mocked filesystem, mocked stdio, no separate OS process. The forcing
+finding: the product's central seam is untestable in that harness *by construction*. `virtual`'s
+`writeFile` stores `[Vec]` chunks while its `import_` requires a `JsModule` function, so
+write-then-import cannot compose in a virtual session — which is why Plan 07-08, despite being
+titled "end to end", substitutes a `JsModule` stand-in for materialization. `fjs_run` would have
+shipped with its central seam evidenced only by a mock.
+
+Plan 07-09 proves it for real and asserts the materialized `.mjs` actually reached disk — the one
+assertion no virtual proof can make. Per **TEST-03** this becomes a standing obligation: each
+later phase adds real-process coverage for the tools and seams it ships, rather than deferring all
+of it to Phase 14, whose criteria are about tax correctness rather than the execution seam.
 
 **── Milestone: Week 2 — A Report Program Produces a Correct Figure ──**
 
