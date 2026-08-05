@@ -384,20 +384,20 @@ with its central seam evidenced only by a mock.
 header states the principle these requirements generalise: *"an in-process simulation does not
 test the thing that breaks."* It was a one-off; this section makes it a practice.
 
-- [ ] **TEST-01** *(T1)*: A real-process integration test for `fjs_run`: a genuinely separate
+- [x] **TEST-01** *(T1)*: A real-process integration test for `fjs_run`: a genuinely separate
       `node index.js <home>` OS process, driven over **real stdin/stdout JSON-RPC** through a
       full `initialize` → `notifications/initialized` → `tools/list` → `tools/call` session,
       against a real temporary CAS home on a real filesystem. It must assert the returned figure
       and the result/run-record hashes, **and** that the materialized `.mjs` actually reached
       disk — the one assertion no virtual proof can make.
-- [ ] **TEST-02** *(T1)*: Every MCP tool this project exposes is exercised at least once through
+- [x] **TEST-02** *(T1)*: Every MCP tool this project exposes is exercised at least once through
       that real stdio session, not only through `virtual`. A tool proven solely in-process has
       not been proven to be reachable by a client.
 - [ ] **TEST-03** *(T2)*: Each subsequent phase that adds a tool, a dialect, or a new seam adds
       real-process coverage for it in the same session harness. The standing rule: a phase is not
       complete when its virtual proofs are green — it is complete when the thing a client would
       actually call has been called.
-- [ ] **TEST-04** *(T2)*: The integration suite is separable from the fast proof suite, so the
+- [x] **TEST-04** *(T2)*: The integration suite is separable from the fast proof suite, so the
       per-commit loop stays fast while the integration layer still runs before a phase is marked
       complete. Real-process tests cost seconds each; the 133 virtual proofs cost milliseconds
       in total, and conflating them would push developers to skip both.

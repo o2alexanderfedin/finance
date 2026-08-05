@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
-status: executing
-stopped_at: Completed 07-08-PLAN.md
-last_updated: "2026-08-05T06:14:19.856Z"
+status: verifying
+stopped_at: Completed 07-09-PLAN.md
+last_updated: "2026-08-05T06:48:15.012Z"
 last_activity: 2026-08-05
 progress:
   total_phases: 15
-  completed_phases: 6
+  completed_phases: 7
   total_plans: 25
-  completed_plans: 25
+  completed_plans: 26
   percent: 100
 ---
 
@@ -28,7 +28,7 @@ the server executes it as a pure function of `(documents, tax-year parameters) �
 
 Phase: 7 of 15 in progress (`fjs_run`, Run Records, and the Week 1 Convergence)
 Plan: 9 of 9 in that phase (07-01 complete; 07-02..07-09 remain across Waves 1-5)
-Status: Ready to execute
+Status: Phase complete — ready for verification
 
 Progress: [██████████] 100%
 Last activity: 2026-08-05
@@ -63,6 +63,7 @@ Last activity: 2026-08-05
 | Phase 07 P06 | 55min | 2 tasks | 1 files |
 | Phase 07 P07 | 40min | 2 tasks | 1 files |
 | Phase 07 P08 | 50min | 2 tasks | 1 files |
+| Phase 07 P09 | 20min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -161,6 +162,8 @@ Full log in PROJECT.md Key Decisions. Recent decisions affecting current work:
 - [Phase 07]: 07-08: Flat registry concatenation — financeSchemaTool/fjsRunTool unify into financeMcpHandlers's operation union with zero casts — Confirms the plan's own expectation that the two tools' operation types unify cleanly; no widened signature beyond fjsRunTool's own declared Mkdir|WriteFile|Import
 - [Phase 07]: 07-08: weekOneConvergence seeds all three 1099-INT revisions before building the Evo cache — Opposite ordering from casRefresh's own proof (which builds the cache before its seed to demonstrate invisibility) — this proof's goal is an ordinary already-populated store, not the refresh-lever scenario
 - [Phase 07]: 07-08: Verified the absent-vs-coerced-to-zero distinction is load-bearing — Temporarily forced centsFromString(undefined) by removing the skip check, confirmed the leaf fails with isError:true, then reverted — proves the leaf checks skip logic, not merely the final sum
+- [Phase 07-09]: Fixed fjs_run's real working-directory gap at the test-harness spawn level (cwd = materializeHome(home)), not in executeRun, to avoid breaking every existing virtual proof of executeRun/fjsRunTool
+- [Phase 07-09]: Seeded CAS content through the real cas_add MCP tool over the live session rather than a separate CLI subprocess; cas_add auto-syncs recognized vnd.fjs.revision blobs into the live Evo cache
 
 ### Pending Todos
 
@@ -274,6 +277,8 @@ None yet.
   widths, QDCGT and Schedule D Tax Worksheets, 1099-R/SSA-1099 box lists, MAGI add-back
   lists, Schedule 1-A mechanics, child-process isolation.
 
+- Production's real claude mcp add registration for finance-mcp does not set the working directory fjs_run needs (materializeHome(home)); real fjs_run calls will currently fail against the registered server. Follow-up: update index.js/fjs/index.f.js launcher or the registered command line to establish this cwd (07-09-SUMMARY.md).
+
 ## Deferred Items
 
 | Category | Item | Status | Deferred At |
@@ -282,8 +287,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-08-05T06:14:19.838Z
-Stopped at: Completed 07-08-PLAN.md
+Last session: 2026-08-05T06:48:14.558Z
+Stopped at: Completed 07-09-PLAN.md
 bookkeeping synced (DOC-00/01/03/04/10/11/12/14 all marked Complete).
 Resume file: None
 (they were one-shot artifacts, written to `feature/planning-requirements-roadmap` seven
