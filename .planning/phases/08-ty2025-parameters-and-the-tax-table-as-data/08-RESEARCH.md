@@ -482,9 +482,10 @@ export const financeSchemaTool = toolEntry(
 stored data (TAX-01/02/04/MCP-07), only forward-looking notes for Phase 13 and implementation
 detail choices left to the planner.
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **Should the Tax Table be stored per-filing-status or once, with status as a lookup dimension?**
+1. **RESOLVED — one row, four tax columns.** Should the Tax Table be stored per-filing-status or
+   once, with status as a lookup dimension?
    - What we know: band boundaries are identical across all four statuses; only the printed tax
      amount differs per status per row.
    - What's unclear: whether `finance_tax_params`'s response shape should return one table with
@@ -493,9 +494,12 @@ detail choices left to the planner.
    - Recommendation: mirror the printed page's own row shape (one row, four tax columns) — this
      keeps the row-by-row diff against the printed table a literal, unreshuffled comparison, which
      is the most defensible form of "diffed row by row against the published Publication 1040."
+   - **Resolution adopted:** 08-CONTEXT.md's Decisions section locks this — "one row with four tax
+     columns, mirroring the printed page" — and 08-02-PLAN.md's `rowFor`/`lookupTaxTable` implement
+     exactly this shape (Estates & Trusts excluded, since it is not a printed Tax Table column).
 
-2. **Does `finance_tax_params` need a `parameterSetHash` in its response for downstream provenance
-   (PROV-04, Phase 14)?**
+2. **RESOLVED — deferred to Phase 14, not added speculatively.** Does `finance_tax_params` need a
+   `parameterSetHash` in its response for downstream provenance (PROV-04, Phase 14)?
    - What we know: PROV-04 (Phase 14) wants "the parameter-set hash" alongside report figures.
    - What's unclear: whether that hash should be computed and exposed starting in Phase 8 (so it
      exists before Phase 14 needs it) or added later when PROV-04 is actually implemented.
@@ -503,6 +507,9 @@ detail choices left to the planner.
      Phase 8's own requirements (TAX-01/02/04/MCP-07) do not name a hash, and speculative fields
      that later requirements might want are exactly the kind of "widen the base" AGENTS.md's DOC-00
      precedent says to defer until a real, present need forces it.
+   - **Resolution adopted:** 08-CONTEXT.md's Deferred Ideas section locks this — "`parameterSetHash`
+     in the tool response — Phase 14 (PROV-04)" — and none of this phase's four plans (08-01
+     through 08-04) add it.
 
 ## Environment Availability
 

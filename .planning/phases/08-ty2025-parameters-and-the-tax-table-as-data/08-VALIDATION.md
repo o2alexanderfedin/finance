@@ -2,7 +2,7 @@
 phase: 8
 slug: ty2025-parameters-and-the-tax-table-as-data
 status: draft
-nyquist_compliant: false
+nyquist_compliant: true
 wave_0_complete: false
 created: 2026-08-05
 ---
@@ -130,13 +130,20 @@ Every other phase behavior has automated verification.
 
 ## Validation Sign-Off
 
-- [ ] All tasks have `<automated>` verify or Wave 0 dependencies
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all MISSING references
-- [ ] No watch-mode flags
-- [ ] Feedback latency < 5s
-- [ ] Project-local proof count strictly greater than **185**
-- [ ] T-08-01 mutation-tested: breaking the generator turns the diff red
-- [ ] `nyquist_compliant: true` set in frontmatter
+- [x] All tasks have `<automated>` verify or Wave 0 dependencies — confirmed against the four
+      08-0N-PLAN.md files (every task carries `<verify><automated>...</automated></verify>`)
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify — confirmed, every
+      single task has one
+- [x] Wave 0 covers all MISSING references — all five Wave 0 gaps listed above are each covered
+      by a plan (08-01 through 08-04)
+- [x] No watch-mode flags — confirmed, every automated command is a one-shot `npx tsc`/`npm test`/
+      `npm run test:integration`
+- [x] Feedback latency < 5s — confirmed, unchanged from the ~2.2s baseline measured above
+- [ ] Project-local proof count strictly greater than **185** — execution-time only, proven when
+      the plans actually run, not during planning
+- [ ] T-08-01 mutation-tested: breaking the generator turns the diff red — execution-time only,
+      proven by 08-02-PLAN.md's Task 3 during execution, not during planning
+- [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending
+**Approval:** plan set approved for execution; the two unticked items above are proven during
+execution, not planning.

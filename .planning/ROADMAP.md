@@ -325,7 +325,11 @@ of it to Phase 14, whose criteria are about tax correctness rather than the exec
   4. Every threshold in the parameter data has proofs at `threshold − 1¢`, `threshold`, and `threshold + 1¢`.
   5. The standard deduction values are the OBBBA-revised ones ($15,750 / $31,500 / $23,625), traceable to Rev. Proc. 2025-32 and not to the original 2025 inflation release.
 **Research**: **YES** — the Tax Table's low-end band structure was not read line by line by any researcher, and two research files disagree ($50 uniform vs $5/$10/$25/$50). Highest-value research in the project.
-**Plans**: TBD
+**Plans**: 4 plans
+- [ ] 08-01-PLAN.md — TY2025 parameter data module with per-parameter citations (TAX-01)
+- [ ] 08-02-PLAN.md — Tax Table band structure, exact cumulative-bracket generator, row-by-row diff against hand-transcribed literals, tiling proof, $100,000 refusal, and mutation-verification of the diff (TAX-02)
+- [ ] 08-03-PLAN.md — Combined threshold inventory and generated threshold−1¢/threshold/threshold+1¢ boundary proofs (TAX-04)
+- [ ] 08-04-PLAN.md — finance_tax_params MCP tool, registry wiring, and the real-process integration-test call (MCP-07)
 
 ### Phase 9: Traceable Report Lines and the Anti-Hardcoding Gate
 **Milestone**: Week 2 — A Report Program Produces a Correct Figure
@@ -452,7 +456,7 @@ of it to Phase 14, whose criteria are about tax correctness rather than the exec
 | 5. Document Base and First Dialects | Week 1 | 0/TBD | Not started | - |
 | 6. Guest ABI and Materialization | Week 1 | 0/TBD | Not started | - |
 | 7. `fjs_run` and Run Records | Week 1 | 0/8 | Planned | - |
-| 8. TY2025 Parameters and Tax Table | Week 2 | 0/TBD | Not started | - |
+| 8. TY2025 Parameters and Tax Table | Week 2 | 0/4 | Planned | - |
 | 9. Traceable Report Lines | Week 2 | 0/TBD | Not started | - |
 | 10. 1040 Core and Scope Guard | Week 2 | 0/TBD | Not started | - |
 | 11. Wage, Retirement, Benefit Documents | Week 3 | 0/TBD | Not started | - |
