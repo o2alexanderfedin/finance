@@ -121,7 +121,7 @@ import { buildRunSnapshot, buildHostMap } from './snapshot/module.f.js'
 import { dialect, validate as validateRun } from '../../run/module.f.js'
 import { sizeGuard, previewBytes, guardBytes } from '../response/module.f.js'
 import { readUtf8File } from 'functionalscript/fjs/effects/node/module.f.js'
-import { vec8 } from 'functionalscript/fjs/types/bit_vec/module.f.js'
+import { vec8, length as bitLength } from 'functionalscript/fjs/types/bit_vec/module.f.js'
 import { parse } from 'functionalscript/fjs/path/module.f.js'
 
 /** @import { Effect, Operation } from 'functionalscript/fjs/effects/module.f.js' */
@@ -292,7 +292,19 @@ const handleRunOutcome = cas => programHash => programArgs => pinned => pinField
             assert(vt === 'ok', ['fjs_run assembled an invalid ok run record - executor bug', vv])
             return step(writeTextToCas(cas)(JSON.stringify(vv)), runHash => {
                 const { preview, truncated } = sizeGuard(guardBytes)(previewBytes)(text, resultHash)
-                return pure(okResult(JSON.stringify({ resultHash, runHash, preview, truncated })))
+                // PROV-07: readCount derives from `inputs` — the SAME array
+                // just persisted into the run record above, never a second
+                // counter (09-CONTEXT.md). literalCount is outcome's own
+                // count, computed once in executeRun/runExecuteRunViaFixture
+                // at the point the source text was already in hand.
+                return pure(okResult(JSON.stringify({
+                    resultHash,
+                    runHash,
+                    preview,
+                    truncated,
+                    readCount: inputs.length,
+                    literalCount: outcome.literalCount,
+                })))
             })
         })
     }
@@ -329,9 +341,13 @@ export const fjsRunInputSchema = /** @type {const} */ ({
 /**
  * The `fjs_run` MCP tool: runs a stored report program against pinned
  * inputs, writes the result and the `vnd.fjs.run` record to CAS (the
- * handler, never the guest — see the module header), and returns
- * `{ resultHash, runHash, preview, truncated }` — the same four keys
- * regardless of outcome shape or size.
+ * handler, never the guest — see the module header), and, on success,
+ * returns `{ resultHash, runHash, preview, truncated, readCount,
+ * literalCount }` — the same six keys regardless of outcome size. `readCount`
+ * and `literalCount` (PROV-07, 09-CONTEXT.md) surface beside the two hashes:
+ * `readCount` is `inputs.length` (the SAME observed-read array the run
+ * record persists), `literalCount` is the numeric-literal count of the
+ * program's own source text (`fjs/report/audit`'s `countNumericLiterals`).
  * @type {(materializeHomeRoot: string) => (cas: Cas<FileCasOperation>) => (evoApi: Evo<FileCasOperation>) => ToolEntry<FileCasOperation | Mkdir | WriteFile | Import | MemOp>}
  */
 export const fjsRunTool = materializeHomeRoot => cas => evoApi => toolEntry(
@@ -825,11 +841,12 @@ export const proof = {
                 assertEq(vt, 'ok')
             },
         },
-        // A successful run's response has exactly the four uniform keys,
+        // A successful run's response has exactly the six uniform keys
+        // (PROV-07 added readCount/literalCount beside the original four),
         // and the result is written to CAS even for a trivially small
         // value (truncated === false, but resultHash still resolves).
         responseShape: {
-            fourKeysExactlyAndResultAlwaysResolvable: () => {
+            sixKeysExactlyAndResultAlwaysResolvable: () => {
                 const home = '/shape'
                 const cas = fileCas(sha256)(home)
                 const [state0, cacheKey] = virtual(emptyState)(initEvo(cas))
@@ -854,8 +871,18 @@ export const proof = {
                     throw ['expected a text content item', callResult]
                 }
                 const parsed = /** @type {Record<string, unknown>} */ (JSON.parse(first.text))
-                assertEq(JSON.stringify(Object.keys(parsed).sort()), JSON.stringify(['preview', 'resultHash', 'runHash', 'truncated']))
+                assertEq(
+                    JSON.stringify(Object.keys(parsed).sort()),
+                    JSON.stringify(['literalCount', 'preview', 'readCount', 'resultHash', 'runHash', 'truncated']))
                 assertEq(parsed['truncated'], false)
+                // PROV-07: tinyReport (repaired in Task 1) dispatches
+                // exactly one evoList read; readCount derives from the SAME
+                // inputs[] the run record persists. literalCount is
+                // countNumericLiterals of this report's own stored source
+                // text (programSource, above) — 0, since it contains no
+                // numeric literal.
+                assertEq(parsed['readCount'], 1)
+                assertEq(parsed['literalCount'], countNumericLiterals(programSource))
 
                 const resultHash = /** @type {string} */ (parsed['resultHash'])
                 const resultHashVec = cBase32ToVec(resultHash)
@@ -1021,6 +1048,63 @@ export const proof = {
                 // threaded state still succeeds.
                 assertSessionSurvivesAFollowingCall(home)(cas)(e)(state3)(goodHash)
             },
+        },
+    },
+
+    // ── PROV-07's decisive proof: zero observed reads becomes an error ───
+    zeroReadGate: {
+        // A purpose-built zero-read report — distinct from Plan 09-04's own
+        // verbatim `() => pure({ line16: 9137 })` adversary fixture — proves
+        // the gate itself: a report that dispatches NO CAS/Evo read is
+        // refused as an error result, never returned as a silent 'ok'.
+        zeroReadOutcomeBecomesAnErrorResult: () => {
+            const home = '/zero-read-gate'
+            const cas = fileCas(sha256)(home)
+            const [state0, cacheKey] = virtual(emptyState)(initEvo(cas))
+            const e = evo(cas)(cacheKey)
+            const programSource = 'export const report = ctx => args => ctx.pure("unused")'
+            const [state1, programHash] = virtual(state0)(seedText(cas)(programSource))
+            /** @type {import('../../guest/module.f.js').Report<string>} */
+            const zeroReadReport = ctx => () => ctx.pure('unused')
+
+            const [state1b, outcome] = runExecuteRunViaFixture(home)(cas)(e)(programHash)(programSource)(zeroReadReport)([])(undefined)(state1)
+            assertEq(outcome.kind, 'error')
+
+            const [state2, callResult] = virtual(state1b)(handleRunOutcome(cas)(programHash)([])(false)({})(outcome))
+            assertEq(callResult.isError, true)
+            const first = callResult.content[0]
+            if (first === undefined || first.type !== 'text') {
+                throw ['expected a text content item', callResult]
+            }
+            assert(first.text.includes('zero observed reads'), ['expected the zero-read refusal named', first.text])
+            assertPersistedErrorRunRecord(cas)(state2)(first.text)
+        },
+    },
+
+    // ── PROV-07's size-guard proof: the two new fields stay well clear ───
+    sizeGuard: {
+        // A maximal-length preview (previewBytes bytes of a repeated
+        // single-byte character) plus the two new integer fields, measured
+        // via the SAME tryUtf8 + bit_vec length sizeGuard itself uses (never
+        // content.length), stays strictly under guardBytes (64 KiB) — proof
+        // that readCount/literalCount cannot push a maximal-preview response
+        // anywhere near the guard.
+        newFieldsStayWellClearOfTheGuard: () => {
+            const preview = 'x'.repeat(previewBytes)
+            const envelope = JSON.stringify({
+                resultHash: 'a'.repeat(64),
+                runHash: 'b'.repeat(64),
+                preview,
+                truncated: true,
+                readCount: 999999,
+                literalCount: 999999,
+            })
+            const encoded = tryUtf8(envelope)
+            assert(encoded !== null, ['expected the envelope to encode as UTF-8', envelope])
+            const bytes = bitLength(encoded) / 8n
+            assert(
+                bytes < BigInt(guardBytes),
+                ['expected the six-key envelope to stay well clear of guardBytes', bytes, guardBytes])
         },
     },
 }
