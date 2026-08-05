@@ -105,6 +105,6 @@ should be something like this
             newCache => write(cacheKey, newCache))
         return mapStep(
             step1,
-            () => okResult('refreshed')))
+            () => okResult('refreshed'))
     },
 ```
