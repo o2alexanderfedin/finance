@@ -4,14 +4,14 @@ milestone: v1.1
 milestone_name: milestone
 status: executing
 stopped_at: Completed 07-03-PLAN.md
-last_updated: "2026-08-05T04:19:15.122Z"
+last_updated: "2026-08-05T04:37:41.435Z"
 last_activity: 2026-08-05
 progress:
   total_phases: 15
   completed_phases: 6
   total_plans: 25
-  completed_plans: 20
-  percent: 80
+  completed_plans: 21
+  percent: 84
 ---
 
 # Project State
@@ -27,10 +27,10 @@ the server executes it as a pure function of `(documents, tax-year parameters) �
 ## Current Position
 
 Phase: 7 of 15 in progress (`fjs_run`, Run Records, and the Week 1 Convergence)
-Plan: 4 of 9 in that phase (07-01 complete; 07-02..07-09 remain across Waves 1-5)
+Plan: 5 of 9 in that phase (07-01 complete; 07-02..07-09 remain across Waves 1-5)
 Status: Ready to execute
 
-Progress: [████████░░] 80%
+Progress: [████████░░] 84%
 Last activity: 2026-08-05
 `npm test` 2314 pass / 0 fail (runs `tsc && node --test` — tsc is already inside it); fjs 0.41.0. Project-local proof count (`node --test 2>&1 | grep -c '^✔ import("./fjs/'`): 136.
 
@@ -58,6 +58,7 @@ Last activity: 2026-08-05
 | Phase 07 P01 | 20min | 2 tasks | 1 files |
 | Phase 07 P02 | 25min | 2 tasks | 1 files |
 | Phase 07 P03 | 20min | 2 tasks | 1 files |
+| Phase 07 P04 | 13min | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -145,6 +146,8 @@ Full log in PROJECT.md Key Decisions. Recent decisions affecting current work:
 - [Phase 07]: vnd.fjs.run's status is exactly or('ok','error'), mirroring Result's two arms, per 07-CONTEXT.md
 - [Phase 07]: inputs[].payload modelled as array(string) since every frozen CasOp command takes a single string argument
 - [Phase 07]: finance_schema's dialectSchemas map is typed as an open string-keyed map ({ readonly [dialect: string]: Type }), not the narrower literal-key type TS infers from computed properties — indexing the inferred/unknown-cast lookup by a request-supplied string produced TS's lossy '{} | null' type, which toJsonSchema rejects
+- [Phase 07]: sizeGuard measures byte length via tryUtf8 + bit_vec length/8 (matching writeResponse's own byte-cap measurement), never content.length
+- [Phase 07]: Ordering proof asserts absence of raw oversized content in stdout, not just presence of the too-large message (SEC-02-before-import_ lesson)
 
 ### Pending Todos
 
@@ -266,7 +269,7 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-08-05T04:19:15.114Z
+Last session: 2026-08-05T04:33:54.689Z
 Stopped at: Completed 07-03-PLAN.md
 bookkeeping synced (DOC-00/01/03/04/10/11/12/14 all marked Complete).
 Resume file: None

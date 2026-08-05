@@ -172,7 +172,7 @@ dissolves on contact.
 - [ ] **EXEC-10** *(T1)*: The **tool handler** writes the result and run record to CAS —
       not the program. The guest whitelist stays read-only; `casWrite`/`evoAdd` are never
       in it. This makes provenance structural rather than a program-authorship convention.
-- [ ] **EXEC-11** *(T1)*: `fjs_run` returns result and run-record hashes plus a bounded
+- [x] **EXEC-11** *(T1)*: `fjs_run` returns result and run-record hashes plus a bounded
       inline preview, with an **explicit size check** before writing the response. The
       stdio line cap is 128 KiB and overflow degrades to a silent `-32603` with no
       indication that size was the problem.
