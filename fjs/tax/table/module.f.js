@@ -51,7 +51,7 @@
  *
  * @module
  */
-import { assert } from 'functionalscript/fjs/asserts/module.f.js'
+import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
 import { of, add, multiply, halfUp } from '../../types/rational/module.f.js'
 import { centsFromString, centsToString } from '../../exact/module.f.js'
 import { taxParamsByYear } from '../params/module.f.js'
@@ -238,3 +238,156 @@ export const lookupTaxTable = taxParamSet => incomeCents => {
  */
 const taxParams2025 = taxParamsByYear[2025]
 assert(taxParams2025 !== undefined, 'expected TY2025 parameters to be present in taxParamsByYear')
+
+// ── Tests ────────────────────────────────────────────────────────────────────
+
+/**
+ * One row hand-transcribed directly from the printed Tax Table. Every
+ * printed amount is a whole-dollar `number` (the table never prints
+ * cents); `rowByRowDiffMatchesPublishedTable` converts to this project's
+ * cents convention before comparing against `lookupTaxTable`'s output.
+ * @typedef {{
+ *   readonly atLeast: string,
+ *   readonly lessThan: string,
+ *   readonly single: number,
+ *   readonly marriedFilingJointly: number,
+ *   readonly marriedFilingSeparately: number,
+ *   readonly headOfHousehold: number,
+ * }} TranscribedRow
+ */
+
+/**
+ * Ten rows hand-transcribed directly from Publication 1040 (2025)'s own
+ * printed Tax Table — the independent side of T-08-01's diff. These share
+ * NO code path with `generateRow`/`cumulativeBracketTaxCents`: every
+ * figure below was read off the printed page, never computed by the code
+ * under test (08-VALIDATION.md, T-08-01; mutation-verified in this
+ * plan's Task 3). The sample spans every band-width region, both width
+ * transitions (the $10->$25 narrowing at $25, and the $25->$50 widening
+ * at $3,000), Success Criterion 3's own $18,000 MFJ row, and the table's
+ * final row immediately before the $100,000 refusal boundary.
+ * @type {readonly TranscribedRow[]}
+ */
+export const handTranscribedRows = [
+    // Publication 1040 (2025), Tax and Earned Income Credit Tables, read directly.
+    { atLeast: '0.00', lessThan: '5.00', single: 0, marriedFilingJointly: 0, marriedFilingSeparately: 0, headOfHousehold: 0 },
+    { atLeast: '5.00', lessThan: '15.00', single: 1, marriedFilingJointly: 1, marriedFilingSeparately: 1, headOfHousehold: 1 },
+    { atLeast: '15.00', lessThan: '25.00', single: 2, marriedFilingJointly: 2, marriedFilingSeparately: 2, headOfHousehold: 2 },
+    { atLeast: '25.00', lessThan: '50.00', single: 4, marriedFilingJointly: 4, marriedFilingSeparately: 4, headOfHousehold: 4 },
+    // Publication 1040 (2025), page 2, read from the printed table -- these
+    // two rows are NOT given literal values anywhere in 08-RESEARCH.md, and
+    // deriving them from generateRow/cumulativeBracketTaxCents would
+    // reintroduce T-08-01's tautology for these two rows specifically, so
+    // they were transcribed independently, character by character, from
+    // the printed page rather than computed.
+    { atLeast: '975.00', lessThan: '1000.00', single: 99, marriedFilingJointly: 99, marriedFilingSeparately: 99, headOfHousehold: 99 },
+    { atLeast: '1000.00', lessThan: '1025.00', single: 101, marriedFilingJointly: 101, marriedFilingSeparately: 101, headOfHousehold: 101 },
+    // Publication 1040 (2025), Tax and Earned Income Credit Tables, read
+    // directly -- the $25->$50 band-width transition.
+    { atLeast: '2975.00', lessThan: '3000.00', single: 299, marriedFilingJointly: 299, marriedFilingSeparately: 299, headOfHousehold: 299 },
+    { atLeast: '3000.00', lessThan: '3050.00', single: 303, marriedFilingJointly: 303, marriedFilingSeparately: 303, headOfHousehold: 303 },
+    // Publication 1040 (2025), Tax and Earned Income Credit Tables, read
+    // directly -- Success Criterion 3's own row.
+    { atLeast: '18000.00', lessThan: '18050.00', single: 1925, marriedFilingJointly: 1803, marriedFilingSeparately: 1925, headOfHousehold: 1823 },
+    // Publication 1040 (2025), Tax and Earned Income Credit Tables, read
+    // directly -- the table's last row, immediately followed on the
+    // printed page by "$100,000 or over, use the Tax Computation
+    // Worksheet".
+    { atLeast: '99950.00', lessThan: '100000.00', single: 16909, marriedFilingJointly: 11823, marriedFilingSeparately: 16909, headOfHousehold: 15170 },
+]
+
+export const proof = {
+    // T-08-01: every generated row matches the independently-transcribed
+    // published figure, across every band-width region and both width
+    // transitions. Four separate assertEq calls per row -- never one
+    // aggregate deep comparison -- so a single wrong column names itself
+    // (mirroring fjs/document/1099int/module.f.js's per-field assertion
+    // pattern).
+    rowByRowDiffMatchesPublishedTable: () => {
+        for (const transcribed of handTranscribedRows) {
+            const row = lookupTaxTable(taxParams2025)(centsFromString(transcribed.atLeast))
+            assertEq(
+                row.single,
+                BigInt(transcribed.single) * 100n,
+                ['single column mismatch', transcribed.atLeast],
+            )
+            assertEq(
+                row.marriedFilingJointly,
+                BigInt(transcribed.marriedFilingJointly) * 100n,
+                ['marriedFilingJointly column mismatch', transcribed.atLeast],
+            )
+            assertEq(
+                row.marriedFilingSeparately,
+                BigInt(transcribed.marriedFilingSeparately) * 100n,
+                ['marriedFilingSeparately column mismatch', transcribed.atLeast],
+            )
+            assertEq(
+                row.headOfHousehold,
+                BigInt(transcribed.headOfHousehold) * 100n,
+                ['headOfHousehold column mismatch', transcribed.atLeast],
+            )
+        }
+    },
+    // Success Criterion 3, isolated: the MFJ $18,000 row is $1,803 by table
+    // lookup (the midpoint rule), explicitly NOT $1,800 -- the naive
+    // bracket-arithmetic answer at the row's own lower bound that training
+    // data teaches, and the exact mistake this phase exists to prevent.
+    mfjEighteenThousandRowIsEighteenOhThree: () => {
+        const row = lookupTaxTable(taxParams2025)(centsFromString('18000.00'))
+        assertEq(row.marriedFilingJointly, 180300n)
+        assert(
+            row.marriedFilingJointly !== 180000n,
+            ['expected the midpoint-rounded table value, not naive bracket arithmetic at the lower bound', row.marriedFilingJointly],
+        )
+    },
+    // The band structure alone (no row generation) tiles $0 -> $100,000
+    // with no gap and no overlap, and every region's width is even --
+    // re-confirming generateRow's own documented invariant from the stored
+    // data itself, not assumed.
+    bandStructureTilesWithNoGapOrOverlap: () => {
+        const first = taxTableBandStructure[0]
+        assert(first !== undefined, 'expected at least one band region')
+        assertEq(first.atLeast, '0.00')
+        const last = taxTableBandStructure[taxTableBandStructure.length - 1]
+        assert(last !== undefined, 'expected at least one band region')
+        assertEq(last.lessThan, '100000.00')
+        /** @type {string | undefined} */
+        let previousLessThan = undefined
+        for (const region of taxTableBandStructure) {
+            if (previousLessThan !== undefined) {
+                assertEq(
+                    region.atLeast,
+                    previousLessThan,
+                    ['expected no gap or overlap between adjacent band regions', region.atLeast],
+                )
+            }
+            const regionSpanCents = centsFromString(region.lessThan) - centsFromString(region.atLeast)
+            const widthCents = centsFromString(region.width)
+            assertEq(
+                regionSpanCents % widthCents,
+                0n,
+                ['region span must divide evenly by its own row width', region.atLeast],
+            )
+            assertEq(widthCents % 2n, 0n, ['expected an even band width', region.atLeast])
+            previousLessThan = region.lessThan
+        }
+    },
+    // T-08-03: a lookup at exactly $100,000.00 is refused (the bare thrown
+    // string is asserted directly -- never an `Error`, never
+    // `instanceof Error`), naming the Tax Computation Worksheet; a lookup
+    // one cent below still resolves, to the table's own last row.
+    tableRefusesAtOneHundredThousandAndAbove: () => {
+        let threw = false
+        try {
+            lookupTaxTable(taxParams2025)(centsFromString('100000.00'))
+        } catch (e) {
+            threw = true
+            assert(typeof e === 'string' || Array.isArray(e), ['expected a bare thrown value, not an Error', e])
+            assert(!(e instanceof Error), ['must never throw an Error instance', e])
+        }
+        assert(threw, 'expected lookupTaxTable to refuse a $100,000.00 lookup')
+        const lastRow = lookupTaxTable(taxParams2025)(centsFromString('99999.99'))
+        assertEq(lastRow.atLeastCents, centsFromString('99950.00'))
+        assertEq(lastRow.lessThanCents, centsFromString('100000.00'))
+    },
+}
