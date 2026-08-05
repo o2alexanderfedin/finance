@@ -23,14 +23,15 @@
  * `fjs/todo/upstream-mcp-protocol-version-negotiation.md`. Do not wrap or
  * replace `mcpStep` here to work around it.
  *
- * ## Registry composition — a small local third registry, and a larger one still to come
+ * ## Registry composition — the full Week 1 registry
  *
  * `financeMcpHandlers` composes `casToolRegistry` + `evoToolRegistry` +
- * `casRefreshTool` (DOC-14's `cas_refresh` — see below). Phase 6/7's
- * `fjs_run` tool will be a further, larger registry concatenated into this
- * same array; that seam is still left as a comment, not as code, because
- * building it now would be out of scope for this plan (see
- * `fjs/todo/implement-mcp-server.md`).
+ * `casRefreshTool` (DOC-14's `cas_refresh` — see below) + `financeSchemaTool`
+ * (MCP-06's `finance_schema`, Plan 03) + `fjsRunTool` (EXEC-08/EXEC-10/
+ * EXEC-11/PROV-03's `fjs_run`, Plans 05-07). This is the seam this module's
+ * header used to reserve as a comment — it is wired now, not future work
+ * (see `proof.weekOneConvergence` below for the end-to-end proof this
+ * composition exists to make possible).
  *
  * ## `cas_refresh` — the DOC-14 cache-refresh lever
  *
@@ -70,11 +71,13 @@ import { vecToCBase32 } from 'functionalscript/fjs/basen/cbase32/module.f.js'
 import { vec8 } from 'functionalscript/fjs/types/bit_vec/module.f.js'
 import { ok } from 'functionalscript/fjs/types/result/module.f.js'
 import { tryUtf8 } from 'functionalscript/fjs/text/module.f.js'
+import { financeSchemaTool } from './finance_schema/module.f.js'
+import { fjsRunTool } from './fjs_run/module.f.js'
 
 /** @import { McpConfig, McpHandlers, ToolEntry } from 'functionalscript/fjs/protocol/mcp/module.f.js' */
 /** @import { Effect, Operation } from 'functionalscript/fjs/effects/module.f.js' */
 /** @import { MemOp, Key } from 'functionalscript/fjs/effects/memory/module.f.js' */
-/** @import { Read, Write } from 'functionalscript/fjs/effects/node/module.f.js' */
+/** @import { Read, Write, Mkdir, WriteFile, Import } from 'functionalscript/fjs/effects/node/module.f.js' */
 /** @import { FileCasOperation } from 'functionalscript/fjs/cas/module.f.js' */
 /** @import { Cache } from 'functionalscript/fjs/cas/evo/module.f.js' */
 /** @import { Cas } from 'functionalscript/fjs/cas/module.f.js' */
@@ -109,14 +112,20 @@ export const casRefreshTool = cas => cacheKey => toolEntry(
 // ── Handlers ────────────────────────────────────────────────────────────────────
 /**
  * MCP handlers for `FileCas` (`casToolRegistry`) plus the Evo API
- * (`evoToolRegistry`) layered on it, plus `casRefreshTool` (DOC-14), bound to
- * `home` and an already-built Evo cache slot (see `initEvo`).
- * @type {(home: string) => (cacheKey: Key<Cache>) => McpHandlers<FileCasOperation | MemOp>}
+ * (`evoToolRegistry`) layered on it, plus `casRefreshTool` (DOC-14),
+ * `financeSchemaTool` (MCP-06), and `fjsRunTool` (EXEC-08/EXEC-10/EXEC-11/
+ * PROV-03), bound to `home` and an already-built Evo cache slot (see
+ * `initEvo`). `financeSchemaTool` and `fjsRunTool` concatenate straight into
+ * the same flat array `casRefreshTool` already established the pattern for —
+ * no separate composition mechanism, per this file's own precedent.
+ * @type {(home: string) => (cacheKey: Key<Cache>) => McpHandlers<FileCasOperation | MemOp | Mkdir | WriteFile | Import>}
  */
 export const financeMcpHandlers = home => cacheKey => fromRegistry([
     ...casToolRegistry(home)(cacheKey),
     ...evoToolRegistry(evo(fileCas(sha256)(home))(cacheKey)),
     casRefreshTool(fileCas(sha256)(home))(cacheKey),
+    financeSchemaTool,
+    fjsRunTool(home)(fileCas(sha256)(home))(evo(fileCas(sha256)(home))(cacheKey)),
 ])
 
 // ── Session configuration ───────────────────────────────────────────────────────
@@ -140,7 +149,7 @@ export const financeConfig = {
  * read → parse → dispatch → write loop until stdin EOF. Mirrors fjs's own
  * `casMcpServer` exactly, substituting `financeConfig`/`financeMcpHandlers`
  * for `casConfig`/`casMcpHandlers`.
- * @type {(home: string) => Effect<Read | Write | MemOp | FileCasOperation, void>}
+ * @type {(home: string) => Effect<Read | Write | MemOp | FileCasOperation | Mkdir | WriteFile | Import, void>}
  */
 export const financeMcpServer = home => step(
     initEvo(fileCas(sha256)(home)),
@@ -321,14 +330,18 @@ export const proof = {
             assertEq(init.result.protocolVersion, '2025-11-25')
             assertEq(init.result.serverInfo.name, 'finance-mcp')
         },
-        // Both registries composed: tools/list enumerates a non-empty set
-        // that includes evo_list and cas_refresh (DOC-14).
+        // All five registries composed: tools/list enumerates a non-empty set
+        // that includes evo_list and cas_refresh (DOC-14), plus finance_schema
+        // (MCP-06) and fjs_run (EXEC-08/EXEC-10/EXEC-11/PROV-03) — the two
+        // tools this plan wires in.
         toolsListEnumeratesComposedRegistry: () => {
             const [, listResponse] = responsesOf(runSession())
             const tools = asToolsListResult(listResponse).result.tools
             assert(tools.length > 0)
             assert(tools.some(t => t.name === 'evo_list'))
             assert(tools.some(t => t.name === 'cas_refresh'))
+            assert(tools.some(t => t.name === 'finance_schema'))
+            assert(tools.some(t => t.name === 'fjs_run'))
         },
         // A real registered handler answers tools/call — a green tools/call,
         // not merely a green tools/list (the documented silent-failure mode
