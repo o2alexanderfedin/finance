@@ -48,12 +48,13 @@
  * @module
  */
 import { number } from 'functionalscript/fjs/types/rtti/module.f.js'
-import { pure } from 'functionalscript/fjs/effects/module.f.js'
+import { pure, runPure } from 'functionalscript/fjs/effects/module.f.js'
 import { toolEntry, okResult, errorResult } from 'functionalscript/fjs/protocol/mcp/module.f.js'
-import { assert } from 'functionalscript/fjs/asserts/module.f.js'
+import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
 import { taxParamsByYear } from '../../tax/params/module.f.js'
 import { taxTableBandStructure } from '../../tax/table/module.f.js'
 
+/** @import { ToolsCallResult } from 'functionalscript/fjs/protocol/mcp/module.f.js' */
 /** @import { TaxParamSet } from '../../tax/params/module.f.js' */
 /** @import { BandRegion } from '../../tax/table/module.f.js' */
 
@@ -143,3 +144,63 @@ export const financeTaxParamsTool = toolEntry(
         return pure(okResult(JSON.stringify(response)))
     },
 )
+
+// ── Tests ────────────────────────────────────────────────────────────────────
+
+/**
+ * Runs `financeTaxParamsTool.handle` for `year` and returns the resulting
+ * `ToolsCallResult` — every call resolves via `pure`, so `runPure` always
+ * yields exactly one value; a genuinely empty result here would mean the
+ * handler unexpectedly issued a command, which `assert` below catches.
+ * @type {(year: number) => ToolsCallResult}
+ */
+const call = year => {
+    const [result] = runPure(financeTaxParamsTool.handle({ year }))
+    assert(result !== undefined, 'expected finance_tax_params to resolve via pure, not a command')
+    return result
+}
+
+/**
+ * Narrows a `ToolsCallResult`'s first content item to its `text` field.
+ * `content[0]` is a `TextContent | EmbeddedResource` union; `financeTaxParamsTool`
+ * only ever returns `textContent` items (via `okResult`/`errorResult`), so
+ * asserting `type === 'text'` here is a proof-time sanity check, not a cast.
+ * @type {(result: ToolsCallResult) => string}
+ */
+const textOf = result => {
+    const item = result.content[0]
+    assert(item !== undefined && item.type === 'text', ['expected a text content item', item])
+    return item.text
+}
+
+export const proof = {
+    // year2025Resolves: the round trip compares against response2025 —
+    // this module's own already-narrowed constant — never a second,
+    // hand-typed literal, and never a fresh taxParamsResponses[2025] index
+    // (which would be TaxParamsResponse | undefined again under this
+    // project's noUncheckedIndexedAccess).
+    year2025Resolves: () => {
+        const result = call(2025)
+        assertEq(result.isError, undefined)
+        assertEq(
+            JSON.stringify(JSON.parse(textOf(result))),
+            JSON.stringify(response2025),
+        )
+    },
+    // The no-generated-rows design holds in PRACTICE, not only in intent:
+    // the returned text stays comfortably inside the 64KB MCP size guard.
+    responseStaysUnderSizeGuard: () => {
+        const result = call(2025)
+        assert(textOf(result).length < 65536, ['expected the response to stay under the 64KB size guard', textOf(result).length])
+    },
+    // An unknown tax year is a tool-level errorResult, never a throw —
+    // names both the offending year and the known set, mirroring
+    // finance_schema's unknownDialectRefused leaf.
+    unknownYearRefused: () => {
+        const result = call(2024)
+        assertEq(result.isError, true)
+        const text = textOf(result)
+        assert(text.includes('2024'), ['expected the offending year named', text])
+        assert(text.includes('2025'), ['expected the known year named', text])
+    },
+}

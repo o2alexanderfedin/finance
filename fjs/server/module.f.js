@@ -73,6 +73,7 @@ import { ok } from 'functionalscript/fjs/types/result/module.f.js'
 import { tryUtf8, utf8ToString } from 'functionalscript/fjs/text/module.f.js'
 import { collectRead } from 'functionalscript/fjs/cas/module.f.js'
 import { financeSchemaTool } from './finance_schema/module.f.js'
+import { financeTaxParamsTool } from './finance_tax_params/module.f.js'
 import { fjsRunTool, placeJsModuleFixture } from './fjs_run/module.f.js'
 import { guestCtx } from '../guest/module.f.js'
 import { programPath, materializeHome } from '../guest/materialize/module.f.js'
@@ -121,10 +122,11 @@ export const casRefreshTool = cas => cacheKey => toolEntry(
 /**
  * MCP handlers for `FileCas` (`casToolRegistry`) plus the Evo API
  * (`evoToolRegistry`) layered on it, plus `casRefreshTool` (DOC-14),
- * `financeSchemaTool` (MCP-06), and `fjsRunTool` (EXEC-08/EXEC-10/EXEC-11/
- * PROV-03), bound to `home` and an already-built Evo cache slot (see
- * `initEvo`). `financeSchemaTool` and `fjsRunTool` concatenate straight into
- * the same flat array `casRefreshTool` already established the pattern for —
+ * `financeSchemaTool` (MCP-06), `financeTaxParamsTool` (MCP-07), and
+ * `fjsRunTool` (EXEC-08/EXEC-10/EXEC-11/PROV-03), bound to `home` and an
+ * already-built Evo cache slot (see `initEvo`). `financeSchemaTool`,
+ * `financeTaxParamsTool`, and `fjsRunTool` concatenate straight into the
+ * same flat array `casRefreshTool` already established the pattern for —
  * no separate composition mechanism, per this file's own precedent.
  * @type {(home: string) => (cacheKey: Key<Cache>) => McpHandlers<FileCasOperation | MemOp | Mkdir | WriteFile | Import>}
  */
@@ -133,6 +135,7 @@ export const financeMcpHandlers = home => cacheKey => fromRegistry([
     ...evoToolRegistry(evo(fileCas(sha256)(home))(cacheKey)),
     casRefreshTool(fileCas(sha256)(home))(cacheKey),
     financeSchemaTool,
+    financeTaxParamsTool,
     fjsRunTool(home)(fileCas(sha256)(home))(evo(fileCas(sha256)(home))(cacheKey)),
 ])
 
@@ -344,10 +347,10 @@ export const proof = {
             assertEq(init.result.protocolVersion, '2025-11-25')
             assertEq(init.result.serverInfo.name, 'finance-mcp')
         },
-        // All five registries composed: tools/list enumerates a non-empty set
+        // All six registries composed: tools/list enumerates a non-empty set
         // that includes evo_list and cas_refresh (DOC-14), plus finance_schema
-        // (MCP-06) and fjs_run (EXEC-08/EXEC-10/EXEC-11/PROV-03) — the two
-        // tools this plan wires in.
+        // (MCP-06), finance_tax_params (MCP-07, Plan 08-04), and fjs_run
+        // (EXEC-08/EXEC-10/EXEC-11/PROV-03).
         toolsListEnumeratesComposedRegistry: () => {
             const [, listResponse] = responsesOf(runSession())
             const tools = asToolsListResult(listResponse).result.tools
@@ -355,6 +358,7 @@ export const proof = {
             assert(tools.some(t => t.name === 'evo_list'))
             assert(tools.some(t => t.name === 'cas_refresh'))
             assert(tools.some(t => t.name === 'finance_schema'))
+            assert(tools.some(t => t.name === 'finance_tax_params'))
             assert(tools.some(t => t.name === 'fjs_run'))
         },
         // A real registered handler answers tools/call — a green tools/call,

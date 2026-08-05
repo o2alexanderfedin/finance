@@ -281,6 +281,19 @@ test(
                 schemaResponse.result.content[0].text.includes('box1InterestIncome'),
                 'expected the schema response to name box1InterestIncome')
 
+            // MCP-07: an agent reads TY2025's parameters through a real tool
+            // call rather than recalling them — the decisive reachability
+            // proof 08-VALIDATION.md (T-08-04) requires alongside the
+            // financeMcpHandlers registry entry, in this SAME real session.
+            const taxParamsResponse = await call('finance_tax_params', { year: 2025 })
+            assert.ok(!taxParamsResponse.result.isError, `finance_tax_params failed: ${JSON.stringify(taxParamsResponse)}`)
+            assert.ok(
+                taxParamsResponse.result.content[0].text.includes('31500.00'),
+                'expected the finance_tax_params response to name the MFJ standard deduction amount')
+            assert.ok(
+                taxParamsResponse.result.content[0].text.includes('2025-32'),
+                'expected the finance_tax_params response to name its own Rev. Proc. citation')
+
             // ── The decisive call: fjs_run through the real, separate
             // process — a real write-then-import of the materialized
             // program, something no virtual proof can do ──────────────────
