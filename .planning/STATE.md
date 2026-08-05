@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
 status: executing
-stopped_at: Completed 08-01-PLAN.md
-last_updated: "2026-08-05T19:35:17.804Z"
+stopped_at: Completed 08-02-PLAN.md
+last_updated: "2026-08-05T19:53:52.442Z"
 last_activity: 2026-08-05
 progress:
   total_phases: 15
   completed_phases: 7
   total_plans: 29
-  completed_plans: 28
-  percent: 97
+  completed_plans: 29
+  percent: 100
 ---
 
 # Project State
@@ -27,10 +27,10 @@ the server executes it as a pure function of `(documents, tax-year parameters) �
 ## Current Position
 
 Phase: 8 of 15 in progress (TY2025 Parameters and the Tax Table as Data)
-Plan: 2 of 4 in that phase (08-01 complete; 08-02..08-04 remain)
+Plan: 3 of 4 in that phase (08-01 complete; 08-02..08-04 remain)
 Status: Ready to execute
 
-Progress: [██████████] 97%
+Progress: [██████████] 100%
 Last activity: 2026-08-05
 `npm test` 192 pass / 0 fail in this worktree (runs `tsc && node --test` — tsc is already
 inside it); fjs 0.41.0. Project-local proof count
@@ -68,6 +68,7 @@ inside it); fjs 0.41.0. Project-local proof count
 | Phase 07 P08 | 50min | 2 tasks | 1 files |
 | Phase 07 P09 | 20min | 2 tasks | 2 files |
 | Phase 08 P01 | 25min | 2 tasks | 1 files |
+| Phase 08 P02 | 45min | 3 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -170,6 +171,8 @@ Full log in PROJECT.md Key Decisions. Recent decisions affecting current work:
 - [Phase 07-09]: Seeded CAS content through the real cas_add MCP tool over the live session rather than a separate CLI subprocess; cas_add auto-syncs recognized vnd.fjs.revision blobs into the live Evo cache
 - [Phase 08-01]: Standard deduction cites Rev. Proc. 2025-32 §3.01 (OBBBA revision); aged/blind additional, dependent cap, ordinary brackets, and capital-gains breakpoints cite Rev. Proc. 2024-40 alone, unmodified
 - [Phase 08-01]: ratePercent stored as a plain number, not a decimal string — it is a rate, not a dollar amount crossing the money boundary
+- [Phase 08]: generateRow rounds to the nearest whole dollar (Publication 1040's own printing convention), not nearest cent, before re-expressing in cents — The plan's literal formula would round at cents precision, reproducing $1,802.50 instead of the required $1,803.00 for the MFJ $18,000 row -- verified by hand against all ten transcribed rows before trusting it
+- [Phase 08]: T-08-01 mutation-verified: breaking the MFJ first bracket's rate (10 -> 11) turns the row-by-row diff red — Confirms the diff's expected side (hand-transcribed Pub. 1040 literals) is independent of the generator, not a tautology; reverted cleanly with an empty git status
 
 ### Pending Todos
 
@@ -314,8 +317,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-08-05T19:35:17.798Z
-Stopped at: Completed 08-01-PLAN.md
+Last session: 2026-08-05T19:53:52.436Z
+Stopped at: Completed 08-02-PLAN.md
 (`npm test` 187/187, 185 project-local proofs, `tsc` clean, `test:integration` included and
 passing, tree clean). Merge blocker measured and dismissed — see Blockers. Awaiting the user's
 choice on push/PR strategy and on Phase 8.

@@ -327,7 +327,7 @@ of it to Phase 14, whose criteria are about tax correctness rather than the exec
 **Research**: **YES** — the Tax Table's low-end band structure was not read line by line by any researcher, and two research files disagree ($50 uniform vs $5/$10/$25/$50). Highest-value research in the project.
 **Plans**: 4 plans
 - [x] 08-01-PLAN.md — TY2025 parameter data module with per-parameter citations (TAX-01)
-- [ ] 08-02-PLAN.md — Tax Table band structure, exact cumulative-bracket generator, row-by-row diff against hand-transcribed literals, tiling proof, $100,000 refusal, and mutation-verification of the diff (TAX-02)
+- [x] 08-02-PLAN.md — Tax Table band structure, exact cumulative-bracket generator, row-by-row diff against hand-transcribed literals, tiling proof, $100,000 refusal, and mutation-verification of the diff (TAX-02)
 - [ ] 08-03-PLAN.md — Combined threshold inventory and generated threshold−1¢/threshold/threshold+1¢ boundary proofs (TAX-04)
 - [ ] 08-04-PLAN.md — finance_tax_params MCP tool, registry wiring, and the real-process integration-test call (MCP-07)
 

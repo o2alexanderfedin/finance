@@ -283,7 +283,7 @@ structural (RTTI) and semantic passes.
 - [x] **TAX-01** *(T1)*: TY2025 parameters stored as **data**, keyed by year, each carrying
       a source citation (Rev. Proc. number and section) and an effective date. Sourced from
       Rev. Proc. 2024-40 **as modified by Rev. Proc. 2025-32**.
-- [ ] **TAX-02** *(T1)*: The IRS Tax Table stored as data and diffed **row by row** against
+- [x] **TAX-02** *(T1)*: The IRS Tax Table stored as data and diffed **row by row** against
       the published Publication 1040 as a `proof`. Rows print tax on the interval midpoint,
       so the table disagrees with bracket arithmetic — MFJ $18,000 taxable gives $1,803 by
       table and $1,800 by brackets.
