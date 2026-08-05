@@ -2,7 +2,7 @@
 
 **Milestone:** v1
 **Granularity:** fine (15 phases — see "Granularity Note" below)
-**Coverage:** 79 / 79 v1 requirements mapped
+**Coverage:** 83 / 83 v1 requirements mapped (79 original + TEST-01..04 added mid-Phase-7)
 **Created:** 2026-08-03
 
 ## Overview
