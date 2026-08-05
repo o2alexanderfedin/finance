@@ -129,4 +129,42 @@ export const proof = {
     countsMultipleDistinctLiterals: () => {
         assertEq(countNumericLiterals('const a = 1; const b = 2.5; const c = 3n'), 3)
     },
+
+    // ── Task 2's honesty proofs ──────────────────────────────────────────
+    // A digit embedded in an identifier is never counted: no word boundary
+    // sits between `box1`'s `x` and `1`.
+    digitInsideIdentifierNotCounted: () => {
+        assertEq(countNumericLiterals('const box1InterestIncome = ctx.casRead(a)'), 0)
+    },
+    // A digit inside a single-quoted string is stripped before counting.
+    digitInsideSingleQuotedStringNotCounted: () => {
+        assertEq(countNumericLiterals("const s = '2024 tax year'"), 0)
+    },
+    // A digit inside a template literal is stripped before counting (the
+    // accepted-risk note on templateLiteralPattern documents the one case
+    // this also undercounts on purpose: a literal legitimately inside a
+    // `${...}` expression).
+    digitInsideTemplateLiteralNotCounted: () => {
+        assertEq(countNumericLiterals('const s = `rev ${x} 2024`'), 0)
+    },
+    // A digit inside a `//` line comment is stripped; the real literal on
+    // the next line still counts.
+    digitInsideLineCommentNotCountedButRealLiteralCounted: () => {
+        assertEq(countNumericLiterals('// 2024\nconst x = 1'), 1)
+    },
+    // A digit inside a `/* */` block comment is stripped; the real literal
+    // alongside it still counts.
+    digitInsideBlockCommentNotCountedButRealLiteralCounted: () => {
+        assertEq(countNumericLiterals('/* 2024 */ const x = 1'), 1)
+    },
+    // The exact verbatim adversary fixture 09-CONTEXT.md names — `() => pure({
+    // line16: 9137 })`, adapted to this project's `ctx`-based entry point —
+    // is the same string Plan 09-04 later stores and runs for real (kept
+    // byte-for-byte identical here for that reason). It must count EXACTLY
+    // 1: the `16` inside `line16` is never counted (no word boundary between
+    // the letter and the digit); only `9137` is.
+    countsTheVerbatimAdversaryFixtureLiteralExactlyOnce: () => {
+        const fixture = 'export const report = ctx => () => ctx.pure({ line16: 9137 })'
+        assertEq(countNumericLiterals(fixture), 1)
+    },
 }
