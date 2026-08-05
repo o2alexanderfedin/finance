@@ -63,16 +63,21 @@ import { evoToolRegistry } from 'functionalscript/fjs/mcp/evo/module.f.js'
 import { emptyState, virtual } from 'functionalscript/fjs/effects/node/virtual/module.f.js'
 import { fromVec } from 'functionalscript/fjs/types/uint8array/module.f.js'
 import { utf8 } from 'functionalscript/fjs/text/module.f.js'
-import { array, string } from 'functionalscript/fjs/types/rtti/module.f.js'
+import { array, option, string } from 'functionalscript/fjs/types/rtti/module.f.js'
 import { validate as rttiValidate } from 'functionalscript/fjs/types/rtti/validate/module.f.js'
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
 import { dialect as revisionDialect } from 'functionalscript/fjs/media/revision/module.f.js'
-import { vecToCBase32 } from 'functionalscript/fjs/basen/cbase32/module.f.js'
+import { cBase32ToVec, vecToCBase32 } from 'functionalscript/fjs/basen/cbase32/module.f.js'
 import { vec8 } from 'functionalscript/fjs/types/bit_vec/module.f.js'
 import { ok } from 'functionalscript/fjs/types/result/module.f.js'
-import { tryUtf8 } from 'functionalscript/fjs/text/module.f.js'
+import { tryUtf8, utf8ToString } from 'functionalscript/fjs/text/module.f.js'
+import { collectRead } from 'functionalscript/fjs/cas/module.f.js'
 import { financeSchemaTool } from './finance_schema/module.f.js'
 import { fjsRunTool } from './fjs_run/module.f.js'
+import { guestCtx } from '../guest/module.f.js'
+import { programFileName } from '../guest/materialize/module.f.js'
+import { dialect as oneZeroNineNineIntDialect, validate as validateOneZeroNineNineInt } from '../document/1099int/module.f.js'
+import { centsFromString, centsToString } from '../exact/module.f.js'
 
 /** @import { McpConfig, McpHandlers, ToolEntry } from 'functionalscript/fjs/protocol/mcp/module.f.js' */
 /** @import { Effect, Operation } from 'functionalscript/fjs/effects/module.f.js' */
@@ -84,6 +89,9 @@ import { fjsRunTool } from './fjs_run/module.f.js'
 /** @import { Unknown } from 'functionalscript/fjs/media/json/module.f.js' */
 /** @import { Result } from 'functionalscript/fjs/types/result/module.f.js' */
 /** @import { ValidationError } from 'functionalscript/fjs/types/rtti/validate/module.f.js' */
+/** @import { Vec } from 'functionalscript/fjs/types/bit_vec/module.f.js' */
+/** @import { Report, CasOp } from '../guest/module.f.js' */
+/** @import { State } from 'functionalscript/fjs/effects/node/virtual/module.f.js' */
 
 // ── cas_refresh (DOC-14) ────────────────────────────────────────────────────────
 /**
@@ -286,10 +294,16 @@ const callResultSchema = /** @type {const} */ ({
     result: { content: array({ type: string, text: string }) },
 })
 
+/** What `weekOneConvergence`'s `fjs_run` leaf reads — same as {@link callResultSchema} plus the optional `isError` flag a failed tool call carries. */
+const callResultWithIsErrorSchema = /** @type {const} */ ({
+    result: { content: array({ type: string, text: string }), isError: option(true) },
+})
+
 const asEnvelope = decoder(rttiValidate(envelopeSchema))
 const asInitResult = decoder(rttiValidate(initResultSchema))
 const asToolsListResult = decoder(rttiValidate(toolsListResultSchema))
 const asCallResult = decoder(rttiValidate(callResultSchema))
+const asCallResultWithIsError = decoder(rttiValidate(callResultWithIsErrorSchema))
 
 export const proof = {
     // financeMcpServer is never called in integration tests because it drives
@@ -427,6 +441,201 @@ export const proof = {
             // seeded revision's own hash (its only, zero-parent head).
             const [, afterResponses] = runBatch(state5, [evoHeadCall(12)])
             assertEq(asCallResult(afterResponses[0]).result.content[0]?.text, seededHash)
+        },
+    },
+    // ── The Week 1 Convergence (todo/plan.md's Week 1 finish line, Success
+    // Criterion 1) ───────────────────────────────────────────────────────
+    // The full path through the REAL financeMcpServer/mcpStep/stdioTransport
+    // stack, never a bespoke harness: an agent calls
+    // finance_schema('vnd.fjs.1099int'), a program stored via cas.write sums
+    // box1InterestIncome across every stored 1099-INT, fjs_run runs it, and
+    // the returned total is correct — with resultHash/runHash both present
+    // and resolvable back out of CAS.
+    weekOneConvergence: {
+        agentSumsInterestAcrossStoredDocumentsThroughTheRealServerStack: () => {
+            const home = '/week-one'
+            const cas = fileCas(sha256)(home)
+
+            // ── Seed three 1099-INT documents, each behind its own subject.
+            // Two carry box1InterestIncome; the third OMITS the key entirely
+            // (never '0.00') — the mandatory absent-is-skipped case, proven
+            // distinct from a present-zero case below.
+            const docCommon = /** @type {const} */ ({
+                dialect: oneZeroNineNineIntDialect,
+                payerTin: '11-1111111',
+                recipientTin: '222-22-2222',
+                taxYear: 2024,
+                formRevision: '2024',
+            })
+            const docWithInterest = { ...docCommon, accountNumber: 'ACC-0001', box1InterestIncome: '1234.56' }
+            const docWithSmallerInterest = { ...docCommon, accountNumber: 'ACC-0002', box1InterestIncome: '10.00' }
+            const docWithAbsentInterest = { ...docCommon, accountNumber: 'ACC-0003' }
+            for (const doc of [docWithInterest, docWithSmallerInterest, docWithAbsentInterest]) {
+                const [vt, vv] = validateOneZeroNineNineInt(doc)
+                assert(vt === 'ok', ['expected the seeded 1099-INT to validate', vt, vv])
+            }
+
+            /**
+             * Single-chunk UTF-8 CAS write, returning the resulting content
+             * hash — the same `cas.write(pure({first: ok(bytes), tail:
+             * pure(undefined)}))` pattern `casRefresh.seedInvisibleUntilRefreshed`
+             * (above) uses, factored here so the seven sequential writes below
+             * (three documents, three revisions, one program) don't repeat it
+             * seven times.
+             * @type {(state: State) => (text: string) => readonly [State, string]}
+             */
+            const seedText = state => text => {
+                const bytes = tryUtf8(text)
+                assert(bytes !== null, ['expected seed text to encode as UTF-8', text])
+                const [nextState, w] = virtual(state)(cas.write(pure({ first: ok(bytes), tail: pure(undefined) })))
+                assert(w[0] === 'ok', ['expected the seed write to succeed', w])
+                return [nextState, vecToCBase32(w[1])]
+            }
+
+            const [state0, docAHash] = seedText(emptyState)(JSON.stringify(docWithInterest))
+            const [state1, docBHash] = seedText(state0)(JSON.stringify(docWithSmallerInterest))
+            const [state2, docCHash] = seedText(state1)(JSON.stringify(docWithAbsentInterest))
+
+            // Revisions seeded directly into the store (bypassing evo_add),
+            // mirroring casRefresh.seedInvisibleUntilRefreshed's own
+            // technique — one per document, each behind its own subject.
+            const subjectA = vecToCBase32(vec8(0x01n))
+            const subjectB = vecToCBase32(vec8(0x02n))
+            const subjectC = vecToCBase32(vec8(0x03n))
+            /** @type {(subject: string, snapshot: string) => string} */
+            const revisionText = (subject, snapshot) =>
+                `{"dialect":"${revisionDialect}","subject":"${subject}","parents":[],"snapshot":"${snapshot}","generation":0}`
+            const [state3] = seedText(state2)(revisionText(subjectA, docAHash))
+            const [state4] = seedText(state3)(revisionText(subjectB, docBHash))
+            const [state5] = seedText(state4)(revisionText(subjectC, docCHash))
+
+            // Store the guest program's source via cas.write — the real
+            // content-addressed write an agent would perform (that WRITE
+            // mechanism was already independently proven in Plan 05; `virtual`
+            // cannot execute freshly-written bytes as code, so the
+            // established JsModule stand-in below is the correct technique
+            // for the EXECUTION half — see fjs/guest/materialize/module.f.js's
+            // own header). The stored source text is otherwise irrelevant:
+            // the JsModule fixture below is what actually runs.
+            const [state6, programHash] = seedText(state5)(
+                'export const report = ctx => args => ctx.pure("unused")')
+
+            /**
+             * Sums every PRESENT box1InterestIncome across `subjects`,
+             * skipping — never coercing to zero — a document where the key is
+             * absent. Enumerates each subject's head, resolves the revision,
+             * reads the snapshot, and recurses: the same evoHead ->
+             * evoRevision -> casRead chain
+             * `multiDocumentSumAcrossTwoStoredDocuments`
+             * (fjs/server/fjs_run/module.f.js) already proves at the
+             * executeRun layer, extended here to actually skip an absent
+             * field rather than assuming every document has one.
+             * @type {(subjects: readonly string[]) => (acc: bigint) => Effect<CasOp, string>}
+             */
+            const sumInterestOverSubjects = subjects => acc => {
+                const [subject, ...rest] = subjects
+                if (subject === undefined) {
+                    return guestCtx.pure(guestCtx.centsToString(acc))
+                }
+                return guestCtx.step(guestCtx.evoHead(subject), headsJson => {
+                    const heads = /** @type {readonly string[]} */ (JSON.parse(headsJson))
+                    const headHash = /** @type {string} */ (heads[0])
+                    return guestCtx.step(guestCtx.evoRevision(headHash), revJson => {
+                        const rev = /** @type {{ readonly snapshot: string }} */ (JSON.parse(revJson))
+                        return guestCtx.step(guestCtx.casRead(rev.snapshot), docJson => {
+                            const doc = /** @type {{ readonly box1InterestIncome?: string }} */ (JSON.parse(docJson))
+                            const next = doc.box1InterestIncome === undefined
+                                ? acc
+                                : acc + guestCtx.centsFromString(doc.box1InterestIncome)
+                            return sumInterestOverSubjects(rest)(next)
+                        })
+                    })
+                })
+            }
+            /** @type {Report<string>} */
+            const sumInterestReport = ctx => () => ctx.step(
+                ctx.evoList('false'),
+                activeJson => sumInterestOverSubjects(/** @type {readonly string[]} */ (JSON.parse(activeJson)))(0n))
+
+            const root = { ...state6.root, [programFileName(programHash)]: () => ({ report: sumInterestReport }) }
+            const state7 = { ...state6, root }
+
+            // Build the cache AFTER every document/revision/program above is
+            // already in the store, so the subjects are visible from the
+            // start — unlike casRefresh's own proof, which deliberately
+            // builds the cache BEFORE its seed to demonstrate invisibility.
+            // The session-state slot is allocated exactly as financeMcpServer
+            // allocates it.
+            const [state8, cacheKey] = virtual(state7)(initEvo(cas))
+            const [state9, sessionKey] = virtual(state8)(create(uninitializedState))
+            const handlers = financeMcpHandlers(home)(cacheKey)
+
+            /**
+             * Drives one NDJSON batch of `messages` against the composed
+             * handlers over the still-threaded memory state — the same
+             * technique `casRefresh.seedInvisibleUntilRefreshed` (above)
+             * establishes.
+             * @type {(state: State, messages: readonly unknown[]) => readonly [State, readonly Unknown[]]}
+             */
+            const runBatch = (state, messages) => {
+                const input = messages.map(m => JSON.stringify(m)).join('\n') + '\n'
+                const [nextState] = virtual({ ...state, stdout: '', stderr: '', stdin: toBytes(input) })(
+                    stdioTransport(mcpStep(financeConfig)(handlers)(sessionKey)))
+                return [nextState, responsesOf(nextState)]
+            }
+
+            const [state10] = runBatch(state9, [initializeRequest, initializedNotification])
+
+            // An agent reads the dialect's own field names before authoring a
+            // program against them — MCP-06's whole purpose.
+            const [state11, schemaResponses] = runBatch(state10, [
+                { jsonrpc: '2.0', method: 'tools/call', id: 20, params: { name: 'finance_schema', arguments: { dialect: 'vnd.fjs.1099int' } } },
+            ])
+            const schemaResult = asCallResult(schemaResponses[0])
+            assertEq(schemaResult.result.content[0]?.type, 'text')
+            assert(
+                (schemaResult.result.content[0]?.text ?? '').includes('box1InterestIncome'),
+                ['expected the schema response to name box1InterestIncome', schemaResult])
+
+            // The run itself.
+            const [state12, runResponses] = runBatch(state11, [
+                { jsonrpc: '2.0', method: 'tools/call', id: 21, params: { name: 'fjs_run', arguments: { hash: programHash } } },
+            ])
+            const runResult = asCallResultWithIsError(runResponses[0])
+            assertEq(runResult.result.isError, undefined)
+            const runText = runResult.result.content[0]?.text
+            assert(runText !== undefined, ['expected fjs_run to answer with text content', runResult])
+            const parsed = /** @type {{ readonly resultHash: string, readonly runHash: string, readonly preview: string, readonly truncated: boolean }} */ (JSON.parse(/** @type {string} */ (runText)))
+            assert(typeof parsed.resultHash === 'string' && parsed.resultHash !== '', ['expected a resultHash', parsed])
+            assert(typeof parsed.runHash === 'string' && parsed.runHash !== '', ['expected a runHash', parsed])
+
+            // The expected total, computed INDEPENDENTLY in the proof from
+            // the two PRESENT seeded values via centsFromString/centsToString
+            // — never a literal copied from having run the program once and
+            // observed the answer. This doubles as a lightweight perturbation
+            // check even though PROV-07 itself is a later phase.
+            const expectedTotal = centsToString(centsFromString('1234.56') + centsFromString('10.00'))
+
+            const resultHashVec = cBase32ToVec(parsed.resultHash)
+            assert(resultHashVec !== null, ['expected a decodable resultHash', parsed.resultHash])
+            const [, resultRead] = virtual(state12)(collectRead(cas.read(/** @type {Vec} */ (resultHashVec))))
+            assert(resultRead[0] === 'ok', ['expected the result to read back from CAS', resultRead])
+            assertEq(utf8ToString(resultRead[1]), expectedTotal)
+
+            const runHashVec = cBase32ToVec(parsed.runHash)
+            assert(runHashVec !== null, ['expected a decodable runHash', parsed.runHash])
+            const [, runRecordRead] = virtual(state12)(collectRead(cas.read(/** @type {Vec} */ (runHashVec))))
+            assert(runRecordRead[0] === 'ok', ['expected the run record to read back from CAS', runRecordRead])
+            const runRecord = /** @type {{ readonly status: string, readonly inputs: readonly { readonly command: string, readonly payload: readonly string[] }[] }} */ (
+                JSON.parse(utf8ToString(runRecordRead[1])))
+            assertEq(runRecord.status, 'ok')
+            // The absent-field document's subject IS enumerated — its
+            // evoHead read appears in the PERSISTED inputs[] — proving the
+            // program actively visited and skipped it, not that the proof
+            // simply never presented it.
+            assert(
+                runRecord.inputs.some(i => i.command === 'evoHead' && i.payload[0] === subjectC),
+                ['expected subjectC (the absent-field document) to have been read', runRecord.inputs])
         },
     },
 }
