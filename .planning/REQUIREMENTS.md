@@ -324,7 +324,7 @@ structural (RTTI) and semantic passes.
       **does not typecheck**. Traceability enforced by the type system, not by convention.
 - [ ] **PROV-02** *(T1)*: Every computed line carries `(documentHash, boxPath, value)`
       tuples plus the rule or worksheet line it implements.
-- [ ] **PROV-03** *(T1)*: A `vnd.fjs.run` record — program hash, observed inputs, result
+- [x] **PROV-03** *(T1)*: A `vnd.fjs.run` record — program hash, observed inputs, result
       hash, status, pinned flag — written by the tool handler on every run.
 - [ ] **PROV-04** *(T2)*: Report output states the tax year, the parameter-set hash, and the
       program hash alongside the figures.

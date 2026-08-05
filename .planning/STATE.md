@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
 status: executing
-stopped_at: Completed 07-01-PLAN.md (guestCtx widened with step/pure/money helpers, EXEC-08 precursor). Phase 7 Wave 1 continues with 07-02/07-03/07-04.
-last_updated: "2026-08-05T03:48:28.780Z"
+stopped_at: "Completed 07-02-PLAN.md (vnd.fjs.run document dialect: dialect, mediaType, runSchema, checkReferences, validate, PROV-03). Phase 7 Wave 1 continues with 07-03/07-04."
+last_updated: "2026-08-05T04:04:41.508Z"
 last_activity: 2026-08-05
 progress:
   total_phases: 15
   completed_phases: 6
   total_plans: 25
-  completed_plans: 18
-  percent: 72
+  completed_plans: 19
+  percent: 76
 ---
 
 # Project State
@@ -27,10 +27,10 @@ the server executes it as a pure function of `(documents, tax-year parameters) �
 ## Current Position
 
 Phase: 7 of 15 in progress (`fjs_run`, Run Records, and the Week 1 Convergence)
-Plan: 1 of 9 in that phase (07-01 complete; 07-02..07-09 remain across Waves 1-5)
-Status: Executing — Wave 1 (07-01 done; 07-02/07-03/07-04 are also Wave 1, independent, zero-dependency plans)
+Plan: 3 of 9 in that phase (07-01 complete; 07-02..07-09 remain across Waves 1-5)
+Status: Ready to execute
 
-Progress: [████░░░░░░] 40% (6 of 15 phases; Phase 7 in progress, 1 of 9 plans complete)
+Progress: [████████░░] 76%
 Last activity: 2026-08-05
 `npm test` 2314 pass / 0 fail (runs `tsc && node --test` — tsc is already inside it); fjs 0.41.0. Project-local proof count (`node --test 2>&1 | grep -c '^✔ import("./fjs/'`): 136.
 
@@ -56,6 +56,7 @@ Last activity: 2026-08-05
 *Updated after each plan completion*
 | Phase 04 P02 | 25min | 3 tasks | 2 files |
 | Phase 07 P01 | 20min | 2 tasks | 1 files |
+| Phase 07 P02 | 25min | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -140,6 +141,8 @@ Full log in PROJECT.md Key Decisions. Recent decisions affecting current work:
 
 - [Phase 07-01]: guestCtx widened with step/pure/centsFromString/centsToString per 07-CONTEXT.md Decision 1; CasOp and casOpNames stay byte-for-byte unchanged — The widening is additive to ctx only, never to the operation vocabulary match dispatches on; step/pure are pure data composition and never become a command.
 - [Phase 07-01]: vocabularyIsFrozenAtFour split into three independently falsifiable assertion groups instead of one collapsed equality — A single Object.keys(guestCtx) === casOpNames check would fail forever once ctx grew; the fix keeps casOpNames.join(',') a live, unchanged equality (a fifth command name still fails it) while separately asserting per-name presence and per-combinator typeof.
+- [Phase 07]: vnd.fjs.run's status is exactly or('ok','error'), mirroring Result's two arms, per 07-CONTEXT.md
+- [Phase 07]: inputs[].payload modelled as array(string) since every frozen CasOp command takes a single string argument
 
 ### Pending Todos
 
@@ -261,8 +264,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-08-05T03:48:10.246Z
-Stopped at: Completed 07-01-PLAN.md (guestCtx widened with step/pure/money helpers, EXEC-08 precursor). Phase 7 Wave 1 continues with 07-02/07-03/07-04.
+Last session: 2026-08-05T04:04:41.496Z
+Stopped at: Completed 07-02-PLAN.md (vnd.fjs.run document dialect: dialect, mediaType, runSchema, checkReferences, validate, PROV-03). Phase 7 Wave 1 continues with 07-03/07-04.
 bookkeeping synced (DOC-00/01/03/04/10/11/12/14 all marked Complete).
 Resume file: None
 (they were one-shot artifacts, written to `feature/planning-requirements-roadmap` seven
