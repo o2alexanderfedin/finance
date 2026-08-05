@@ -320,9 +320,9 @@ structural (RTTI) and semantic passes.
 
 ### Provenance and Reporting (PROV)
 
-- [ ] **PROV-01** *(T1)*: A report line type in which `{ value }` without `{ sources }`
+- [x] **PROV-01** *(T1)*: A report line type in which `{ value }` without `{ sources }`
       **does not typecheck**. Traceability enforced by the type system, not by convention.
-- [ ] **PROV-02** *(T1)*: Every computed line carries `(documentHash, boxPath, value)`
+- [x] **PROV-02** *(T1)*: Every computed line carries `(documentHash, boxPath, value)`
       tuples plus the rule or worksheet line it implements.
 - [x] **PROV-03** *(T1)*: A `vnd.fjs.run` record — program hash, observed inputs, result
       hash, status, pinned flag — written by the tool handler on every run.

@@ -344,7 +344,7 @@ of it to Phase 14, whose criteria are about tax correctness rather than the exec
   4. A perturbation gate: changing one input document moves the output, and a program shaped `() => pure({ line16: 9137 })` — which satisfies every other stated criterion — **fails**.
 **Research**: Not needed.
 **Plans**: 4 plans
-- [ ] 09-01-PLAN.md — Report-line type: Source/ReportLine, the PROV-01 compile-time assertion, verified by widen/revert (PROV-01, PROV-02)
+- [x] 09-01-PLAN.md — Report-line type: Source/ReportLine, the PROV-01 compile-time assertion, verified by widen/revert (PROV-01, PROV-02)
 - [ ] 09-02-PLAN.md — Numeric-literal audit: countNumericLiterals, proven immune to digits in identifiers/strings/comments (PROV-07)
 - [ ] 09-03-PLAN.md — Zero-observed-reads kill condition and the six-key fjs_run response envelope (PROV-07)
 - [ ] 09-04-PLAN.md — Perturbation gate real leg, the verbatim `() => pure({ line16: 9137 })` adversary with its control leaf, integration-test envelope assertions (PROV-07)
@@ -461,7 +461,7 @@ of it to Phase 14, whose criteria are about tax correctness rather than the exec
 | 6. Guest ABI and Materialization | Week 1 | 0/TBD | Not started | - |
 | 7. `fjs_run` and Run Records | Week 1 | 0/8 | Planned | - |
 | 8. TY2025 Parameters and Tax Table | Week 2 | 3/4 | In Progress|  |
-| 9. Traceable Report Lines | Week 2 | 0/4 | Planned | - |
+| 9. Traceable Report Lines | Week 2 | 1/4 | In Progress|  |
 | 10. 1040 Core and Scope Guard | Week 2 | 0/TBD | Not started | - |
 | 11. Wage, Retirement, Benefit Documents | Week 3 | 0/TBD | Not started | - |
 | 12. Brokerage and Capital-Gain Chain | Week 3 | 0/TBD | Not started | - |
