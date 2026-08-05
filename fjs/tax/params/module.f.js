@@ -60,6 +60,8 @@
  *
  * @module
  */
+import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
+import { centsFromString, centsToString } from '../../exact/module.f.js'
 
 /**
  * A single parameter's own citation: the exact Rev. Proc. number, its
@@ -326,5 +328,122 @@ export const taxParamsByYear = {
         dependentStandardDeductionCap,
         ordinaryBrackets,
         capitalGainsBreakpoints,
+    },
+}
+
+// ── Tests ────────────────────────────────────────────────────────────────────
+
+/**
+ * Type-predicate filter: narrows a `string | undefined` list down to
+ * just the defined `string` entries — used once to gather every stored
+ * bracket ceiling that actually exists (the last bracket's `undefined`
+ * ceiling is skipped, never treated as an amount).
+ * @type {(value: string | undefined) => value is string}
+ */
+const isDefinedString = value => value !== undefined
+
+/**
+ * Every dollar-string field this module exports, gathered once so the
+ * round-trip check below (`everyDollarAmountIsAStringAndRoundTrips`)
+ * walks the data instead of a second, hand-written list that could
+ * drift from it.
+ * @type {readonly string[]}
+ */
+const everyDollarStringField = [
+    ...individualFilingStatuses.map(status => standardDeduction[status].amount),
+    agedOrBlindAdditional.married.amount,
+    agedOrBlindAdditional.unmarried.amount,
+    dependentStandardDeductionCap.minimum.amount,
+    dependentStandardDeductionCap.earnedIncomeAddOn.amount,
+    ...allFilingStatuses.flatMap(status =>
+        ordinaryBrackets[status].brackets
+            .map(bracket => bracket.ceiling)
+            .filter(isDefinedString),
+    ),
+    ...allFilingStatuses.flatMap(status => [
+        capitalGainsBreakpoints[status].zeroRateMax,
+        capitalGainsBreakpoints[status].fifteenRateMax,
+    ]),
+]
+
+export const proof = {
+    // T-08-05: the standard deduction is the OBBBA-revised figure, citing
+    // Rev. Proc. 2025-32 §3.01 — never the original 2024-40 release.
+    standardDeductionCitesObbbaRevision: () => {
+        /** @type {Record<IndividualFilingStatus, string>} */
+        const expectedAmounts = {
+            single: '15750.00',
+            marriedFilingJointly: '31500.00',
+            marriedFilingSeparately: '15750.00',
+            headOfHousehold: '23625.00',
+        }
+        for (const status of individualFilingStatuses) {
+            const entry = standardDeduction[status]
+            assertEq(entry.citation.revProc, '2025-32')
+            assertEq(entry.citation.section, '§3.01')
+            assertEq(entry.amount, expectedAmounts[status])
+        }
+    },
+    // T-08-05 (the other direction): every parameter Rev. Proc. 2025-32
+    // did NOT touch cites Rev. Proc. 2024-40 alone — a citation copied
+    // verbatim from the standard deduction onto these would fail here.
+    unmodifiedParametersCite2024_40Only: () => {
+        assertEq(agedOrBlindAdditional.married.citation.revProc, '2024-40')
+        assertEq(agedOrBlindAdditional.unmarried.citation.revProc, '2024-40')
+        assertEq(dependentStandardDeductionCap.minimum.citation.revProc, '2024-40')
+        assertEq(dependentStandardDeductionCap.earnedIncomeAddOn.citation.revProc, '2024-40')
+        for (const status of allFilingStatuses) {
+            assertEq(ordinaryBrackets[status].citation.revProc, '2024-40')
+            assertEq(capitalGainsBreakpoints[status].citation.revProc, '2024-40')
+        }
+    },
+    // T-08-02: every stored dollar amount is a `string`, never a JSON
+    // number, and round-trips exactly through
+    // `centsFromString`/`centsToString` — mirroring `fjs/exact`'s own
+    // `proof.threeLayersOnOneValue`.
+    everyDollarAmountIsAStringAndRoundTrips: () => {
+        for (const value of everyDollarStringField) {
+            assert(typeof value === 'string', ['expected a decimal string', value])
+            assertEq(centsToString(centsFromString(value)), value)
+        }
+    },
+    // Estates & Trusts uses only 4 rates (10/24/35/37%) — no
+    // 12%/22%/32% bracket for this status; not an omission.
+    estatesAndTrustsHasExactlyFourBrackets: () => {
+        const { brackets } = ordinaryBrackets.estatesAndTrusts
+        assertEq(brackets.length, 4)
+        assertEq(
+            JSON.stringify(brackets.map(bracket => bracket.ratePercent)),
+            JSON.stringify([10, 24, 35, 37]),
+        )
+        const last = brackets[brackets.length - 1]
+        assert(last !== undefined, 'expected a last bracket')
+        assertEq(last.ceiling, undefined)
+    },
+    // Every status's bracket array is ordered ascending by ceiling, and
+    // `ceiling` is `undefined` if and only if it is the array's last
+    // entry — never a gap, never a second undefined ceiling.
+    bracketsAreSortedAscendingWithOnlyTheLastCeilingUndefined: () => {
+        for (const status of allFilingStatuses) {
+            const { brackets } = ordinaryBrackets[status]
+            let previousCeilingCents = -1n
+            for (const [index, bracket] of brackets.entries()) {
+                const isLast = index === brackets.length - 1
+                if (isLast) {
+                    assertEq(bracket.ceiling, undefined)
+                    continue
+                }
+                assert(
+                    bracket.ceiling !== undefined,
+                    ['expected a defined ceiling on a non-last bracket', status, index],
+                )
+                const ceilingCents = centsFromString(bracket.ceiling)
+                assert(
+                    ceilingCents > previousCeilingCents,
+                    ['expected strictly increasing ceilings', status, index],
+                )
+                previousCeilingCents = ceilingCents
+            }
+        }
     },
 }
