@@ -114,12 +114,11 @@ const textOf = result => {
 }
 
 export const proof = {
-    // Task 1's acceptance criteria, minimally: the 1099int round-trip check
-    // proven against `toJsonSchema` directly (never a hand-written JSON
-    // literal, which would reintroduce the second-source-of-truth MCP-06
-    // forbids), every known dialect resolving without error, and the unknown
-    // dialect refusal naming the offending tag. Task 2 expands the middle
-    // leaf below into one full round-trip assertion per dialect.
+    // Task 2: one full round-trip leaf per known dialect (the returned
+    // text, JSON-parsed, deep-equals `toJsonSchema` called directly on that
+    // dialect's own schema const — never a hand-written JSON literal, which
+    // would reintroduce the second-source-of-truth MCP-06 forbids), plus one
+    // leaf for the unknown-dialect refusal. Five leaves total.
     oneZeroNineNineIntResolves: () => {
         const result = call('vnd.fjs.1099int')
         assertEq(result.isError, undefined)
@@ -128,11 +127,29 @@ export const proof = {
             JSON.stringify(toJsonSchema(oneZeroNineNineIntSchema)),
         )
     },
-    allKnownDialectsResolveWithoutError: () => {
-        for (const known of knownDialects) {
-            const result = call(known)
-            assertEq(result.isError, undefined)
-        }
+    ocrResolves: () => {
+        const result = call('vnd.fjs.ocr')
+        assertEq(result.isError, undefined)
+        assertEq(
+            JSON.stringify(JSON.parse(textOf(result))),
+            JSON.stringify(toJsonSchema(ocrSchema)),
+        )
+    },
+    w2Resolves: () => {
+        const result = call('vnd.fjs.w2')
+        assertEq(result.isError, undefined)
+        assertEq(
+            JSON.stringify(JSON.parse(textOf(result))),
+            JSON.stringify(toJsonSchema(w2Schema)),
+        )
+    },
+    medicalExpensesResolves: () => {
+        const result = call('vnd.fjs.medical_expenses')
+        assertEq(result.isError, undefined)
+        assertEq(
+            JSON.stringify(JSON.parse(textOf(result))),
+            JSON.stringify(toJsonSchema(medicalExpensesSchema)),
+        )
     },
     // An unknown dialect is a tool-level errorResult, never a throw — names
     // the offending tag in the message (T-07-03-02).
