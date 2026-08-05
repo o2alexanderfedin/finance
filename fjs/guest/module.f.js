@@ -39,7 +39,7 @@
  * @module
  */
 import { do_, step, pure } from 'functionalscript/fjs/effects/module.f.js'
-import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
+import { assert, assertEq, assertNotNullish } from 'functionalscript/fjs/asserts/module.f.js'
 import { interpret } from '../exec/module.f.js'
 import { centsFromString, centsToString } from '../exact/module.f.js'
 
@@ -182,6 +182,20 @@ const hostMap = {
     evoRevision: (/** @type {string} */ a) => `evoRevision:${a}`,
 }
 
+/**
+ * The four frozen commands, keyed by name — the same function references
+ * `guestCtx` holds. `everyConstructorDispatches` (below) looks a command up
+ * by name out of `casOpNames` rather than iterating
+ * `Object.entries(guestCtx)`: now that `guestCtx` also carries `step`,
+ * `pure`, and the money helpers, that union no longer has one shared call
+ * shape (`tsc` rejects `construct('x')` over it directly — a fifth, mixed
+ * value type does not have a single unary `string -> Effect` signature).
+ * This record exists only to give the lookup a single, uniform call shape
+ * to type against.
+ * @type {Readonly<Record<string, (a: string) => Effect<CasOp, string>>>}
+ */
+const commandConstructorsByName = { casRead, evoList, evoHead, evoRevision }
+
 export const proof = {
     // Task 1's own delivered behavior (07-CONTEXT.md Decision 1): `step`/
     // `pure` are re-exported directly — the same function object, never
@@ -205,13 +219,58 @@ export const proof = {
     // this runs; this pins the value side to the same four names, so the
     // vocabulary cannot drift between what the type permits and what the
     // context actually offers.
+    //
+    // Revised for 07-CONTEXT.md Decision 1. The original version asserted
+    // `Object.keys(guestCtx).join(',') === casOpNames.join(',')` — a single
+    // exact-equality check that doubled as "ctx has only the four commands"
+    // and "the four commands are exactly casOpNames". Widening `guestCtx`
+    // with `step`/`pure`/the money helpers breaks the first half forever,
+    // by design. The fix is deliberately NOT to weaken the check to "ctx's
+    // keys are a superset of casOpNames" or "at least four" — either would
+    // also pass if a FIFTH *command* were slipped into `guestCtx` alongside
+    // a fifth name added to `casOpNames`, which is exactly the widening this
+    // proof exists to catch (07-RESEARCH.md Pitfall 5). Instead the single
+    // check is split into three independently falsifiable assertion groups:
+    // `casOpNames.join(',')` stays a live, unchanged string-equality literal
+    // (a fifth command name still fails this line, precisely as before);
+    // each of the four frozen names is separately asserted to still be
+    // `guestCtx`'s own property; and the four new combinator/helper members
+    // are separately asserted to exist and be callable. No group can
+    // silently subsume another.
     vocabularyIsFrozenAtFour: () => {
         assertEq(casOpNames.join(','), 'casRead,evoList,evoHead,evoRevision')
-        assertEq(Object.keys(guestCtx).join(','), casOpNames.join(','))
+        for (const name of casOpNames) {
+            assert(Object.hasOwn(guestCtx, name), [name, 'missing from guestCtx'])
+        }
+        assertEq(typeof guestCtx.step, 'function')
+        assertEq(typeof guestCtx.pure, 'function')
+        assertEq(typeof guestCtx.centsFromString, 'function')
+        assertEq(typeof guestCtx.centsToString, 'function')
+    },
+    // The regression guard T-07-01-02 names: nothing may silently promote a
+    // combinator or a money helper into the dispatched-operation set. Unlike
+    // `vocabularyIsFrozenAtFour` (which asserts the four commands are still
+    // present), this asserts the four non-commands are still absent from
+    // `casOpNames` — the two checks are complementary, not redundant.
+    combinatorsAreNeverOperations: () => {
+        assert(!casOpNames.includes('step'), ['step must never be listed as a command'])
+        assert(!casOpNames.includes('pure'), ['pure must never be listed as a command'])
+        assert(!casOpNames.includes('centsFromString'), ['centsFromString must never be listed as a command'])
+        assert(!casOpNames.includes('centsToString'), ['centsToString must never be listed as a command'])
     },
     // Every constructor dispatches through the REAL interpreter.
+    //
+    // Revised for 07-CONTEXT.md Decision 1: re-scoped from
+    // `Object.entries(guestCtx)` to the command subset (`casOpNames`) only.
+    // `step` is binary and `pure` takes a value, not a command payload
+    // string — neither is a unary `string -> Effect` operation constructor,
+    // so calling either the way a command is called does not typecheck
+    // (confirmed: `tsc` rejects `construct('x')` over the mixed union
+    // before this revision). Behavior for the four commands themselves is
+    // byte-for-byte unchanged from before this plan.
     everyConstructorDispatches: () => {
-        for (const [name, construct] of Object.entries(guestCtx)) {
+        for (const name of casOpNames) {
+            const construct = assertNotNullish(commandConstructorsByName[name], [name, 'unknown command'])
             const [t, v] = interpret(hostMap)(construct('x'))
             assert(t === 'ok', [name, 'expected ok', t, v])
             const [value, reads] = v
@@ -219,6 +278,23 @@ export const proof = {
             assertEq(reads.length, 1)
             assertEq(reads[0]?.[0], name)
         }
+    },
+    // The proof that composition actually works end to end, not just that
+    // `step`/`pure` are present as values: two dispatched commands chained
+    // through `ctx.step`, interpreted by the REAL interpreter, asserting
+    // both the final value and that both commands were actually dispatched,
+    // in order. This is Success Criterion 1's enabling primitive — summing
+    // a field across every stored document requires exactly this shape,
+    // repeated.
+    stepComposesTwoDispatchedCommands: () => {
+        const chain = guestCtx.step(guestCtx.casRead('doc-a'), value => guestCtx.evoHead(value))
+        const [t, v] = interpret(hostMap)(chain)
+        assert(t === 'ok', ['expected ok', t, v])
+        const [value, reads] = v
+        assertEq(value, 'evoHead:casRead:doc-a')
+        assertEq(reads.length, 2)
+        assertEq(reads[0]?.[0], 'casRead')
+        assertEq(reads[1]?.[0], 'evoHead')
     },
     // A `report`-shaped program composed only from ctx runs end to end, with
     // no import of any kind inside it — Success Criterion 2's shape.
