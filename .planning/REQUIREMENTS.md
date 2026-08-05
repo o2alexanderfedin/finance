@@ -336,7 +336,7 @@ structural (RTTI) and semantic passes.
       literally a three-column diff (A original, B net change, C correct), so corrected
       document → new revision → re-run → diff yields Columns A/B/C with per-line source
       hashes already attached. No new mechanism required.
-- [ ] **PROV-07** *(T2)*: An anti-hardcoding check — CAS read count and numeric-literal
+- [x] **PROV-07** *(T2)*: An anti-hardcoding check — CAS read count and numeric-literal
       audit reported with each run, plus a perturbation gate (change an input, assert the
       output moves). `main = () => pure({ line16: 9137 })` satisfies every other criterion
       while defeating the entire thesis.

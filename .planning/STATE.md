@@ -4,14 +4,14 @@ milestone: v1.1
 milestone_name: milestone
 status: executing
 stopped_at: Completed 09-01-PLAN.md
-last_updated: "2026-08-05T21:36:34.815Z"
+last_updated: "2026-08-05T21:48:38.746Z"
 last_activity: 2026-08-05
 progress:
   total_phases: 15
   completed_phases: 8
   total_plans: 33
-  completed_plans: 32
-  percent: 97
+  completed_plans: 33
+  percent: 100
 ---
 
 # Project State
@@ -27,10 +27,10 @@ the server executes it as a pure function of `(documents, tax-year parameters) �
 ## Current Position
 
 Phase: 9 (Traceable Report Lines and the Anti-Hardcoding Gate) — EXECUTING
-Plan: 2 of 4
+Plan: 3 of 4
 Status: Ready to execute
 
-Progress: [██████████] 97%
+Progress: [██████████] 100%
 Last activity: 2026-08-05
 `npm test` 245 pass / 0 fail in this worktree (runs `tsc && node --test` — tsc is already
 inside it); fjs 0.41.0. Project-local proof count
@@ -78,6 +78,7 @@ existed.
 | Phase 8 P03 | 25min | 2 tasks | 1 files |
 | Phase 08 P04 | 25min | 2 tasks | 3 files |
 | Phase 09 P01 | 20min | 2 tasks | 1 files |
+| Phase 09 P02 | 15min | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -187,6 +188,9 @@ Full log in PROJECT.md Key Decisions. Recent decisions affecting current work:
 - [Phase 08-04]: Registry entry and fjs-run-integration.test.js call landed in one commit — 08-VALIDATION.md's ordering note: that test derives advertised/called tool sets from a live tools/list response at runtime, so a registry-only commit breaks npm test immediately
 - [Phase 09]: [Phase 09-01]: ReportLine.sources is a non-empty TUPLE type, never a plain array — sources: [] also fails tsc, satisfying PROV-02's plural 'tuples' at the type level
 - [Phase 09]: [Phase 09-01]: Extends<A, B> is defined locally in fjs/report/line/module.f.js, not reused from fjs/guest/module.f.js — that module's assertion tests exact union equality via Equal alone; this module's PROV-01 assertion tests structural assignability, which needs the tuple-wrapped [A] extends [B] conditional
+- [Phase 09]: countNumericLiterals is REPORTED, never refused - always returns a plain number, never a Result, never throws on a program's own account
+- [Phase 09]: A numeric literal inside a template literal's ${...} expression is undercounted (accepted risk) - harmless because this audit is reported-only, not the anti-hardcoding kill condition
+- [Phase 09]: Each honesty case (identifier/string/template/comment/adversary) is its own proof leaf, never one aggregate assertion
 
 ### Pending Todos
 
@@ -331,7 +335,7 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-08-05T21:36:09.250Z
+Last session: 2026-08-05T21:42:47.467Z
 Stopped at: Completed 09-01-PLAN.md
 (`npm test` 187/187, 185 project-local proofs, `tsc` clean, `test:integration` included and
 passing, tree clean). Merge blocker measured and dismissed — see Blockers. Awaiting the user's

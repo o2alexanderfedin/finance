@@ -345,7 +345,7 @@ of it to Phase 14, whose criteria are about tax correctness rather than the exec
 **Research**: Not needed.
 **Plans**: 4 plans
 - [x] 09-01-PLAN.md — Report-line type: Source/ReportLine, the PROV-01 compile-time assertion, verified by widen/revert (PROV-01, PROV-02)
-- [ ] 09-02-PLAN.md — Numeric-literal audit: countNumericLiterals, proven immune to digits in identifiers/strings/comments (PROV-07)
+- [x] 09-02-PLAN.md — Numeric-literal audit: countNumericLiterals, proven immune to digits in identifiers/strings/comments (PROV-07)
 - [ ] 09-03-PLAN.md — Zero-observed-reads kill condition and the six-key fjs_run response envelope (PROV-07)
 - [ ] 09-04-PLAN.md — Perturbation gate real leg, the verbatim `() => pure({ line16: 9137 })` adversary with its control leaf, integration-test envelope assertions (PROV-07)
 
