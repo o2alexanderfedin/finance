@@ -163,7 +163,7 @@ dissolves on contact.
       The ABI and the sandbox are the same object, and every stored program is frozen
       against the convention in force when it was written — so this is decided before the
       first program exists, not after.
-- [ ] **EXEC-08** *(T1)*: An `fjs_run` MCP tool taking `{ hash, args?, subject?, parents? }`
+- [x] **EXEC-08** *(T1)*: An `fjs_run` MCP tool taking `{ hash, args?, subject?, parents? }`
       — **pinned inputs, not just a program hash.** Evo heads resolve at read time, so a
       program that resolves its own heads is not reproducible.
 - [x] **EXEC-09** *(T1)*: `fjs_run` reaches `import()` through the `import_` **effect**, not
