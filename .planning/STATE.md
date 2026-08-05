@@ -32,10 +32,16 @@ Status: Ready to execute
 
 Progress: [██████████] 97%
 Last activity: 2026-08-05
-`npm test` 192 pass / 0 fail in this worktree (runs `tsc && node --test` — tsc is already
+`npm test` 245 pass / 0 fail in this worktree (runs `tsc && node --test` — tsc is already
 inside it); fjs 0.41.0. Project-local proof count
-(`node --test 2>&1 | grep -c '^✔ import("./fjs/'`): 190 (185 Phase-7 baseline + 5 new
-08-01 leaves).
+(`node --test 2>&1 | grep -c '^✔ import("./fjs/'`): **243** — 185 Phase-7 baseline, +55 across
+Phase 8 (240), +3 from Plan 09-01.
+
+**These two numbers go stale every plan.** They were last measured at Plan 09-01's completion.
+Re-measure before quoting them; do not inherit them into a phase gate. Never gate on `npm test`'s
+total — it includes ~2,100 vendored `functionalscript` submodule proofs and moves with submodule
+state, which is how a Phase 7 gate ("total > 134") came to be satisfied before any phase code
+existed.
 
 ## Performance Metrics
 
