@@ -1,8 +1,8 @@
 /**
- * SEC-02, SEC-03 and EXEC-09 — turning a stored blob into an executable
- * module without inheriting the ways that go wrong.
+ * SEC-02, SEC-03, EXEC-08 and EXEC-09 — turning a stored blob into an
+ * executable module without inheriting the ways that go wrong.
  *
- * Three separable concerns, kept separable because each fails differently:
+ * Four separable concerns, kept separable because each fails differently:
  *
  * - **{@link checkSpecifiers} (SEC-02)** runs *before* materialization.
  *   After it, the check is worthless: `import()` evaluates the module body
@@ -17,6 +17,38 @@
  *   program's bytes are never executed and nothing reports an error. A
  *   hash-derived name makes that failure mode unreachable — two different
  *   programs cannot collide, and the same program deliberately does.
+ * - **{@link materializeProgram} (EXEC-08's precondition)** is the fourth
+ *   concern, added in Phase 7: actually writing a CAS blob's bytes to a real
+ *   file at `programPath(materializeHome(home))(hash)`, which nothing in
+ *   this repo did before now. `loadProgram` (below) has always *assumed*
+ *   the file at its target path already exists — every Phase 6 proof
+ *   exercised it under `fjs/effects/node/virtual` with a `JsModule` fixture
+ *   standing in for "materialization already happened," never a real byte
+ *   write. In production `home` is the project root, so without this write
+ *   step (and without a dedicated subdirectory), a real `fjs_run` call would
+ *   either fail to find the file or, once the write existed, would scatter
+ *   untracked hash-named `.mjs` files across the repo root
+ *   (07-CONTEXT.md's "Two gaps research surfaced", #2). `materializeDir`
+ *   (`.fjs-run`) is a dedicated, `.gitignore`d sibling of `.cas` under
+ *   `home`, and `materializeHome` is the only thing that changes:
+ *   `programPath`'s own `(home)(hash)` contract is reused UNCHANGED by
+ *   passing `materializeHome(home)` as its `home` argument.
+ *
+ *   `fjs/effects/node/virtual`'s `writeFile` stores a file as an array of
+ *   `Vec` chunks, while `import_` requires the entry at its path to be a
+ *   `JsModule` (a plain function) — verified by reading
+ *   `node_modules/functionalscript/fjs/effects/node/virtual/module.f.js`
+ *   directly. `virtual` has no JS parser and cannot execute freshly-written
+ *   bytes as a module, so write-then-import cannot be composed in one
+ *   virtual session; this module's own proof therefore verifies the write
+ *   mechanism on its own terms (write, then read the same bytes back),
+ *   while `underVirtual.cleanProgramImportsAndRuns` (below, unchanged)
+ *   remains the evidence that import-from-a-materialized-path works, using
+ *   its established `JsModule` stand-in for "materialization already
+ *   succeeded." Real Node's `import()` reads whatever `writeFile` actually
+ *   wrote to disk, so production performs both steps for real — Plan 06/09
+ *   compose the two established techniques side by side rather than
+ *   pretending `virtual` can do both in one call.
  * - **{@link loadProgram} (EXEC-09)** reaches `import()` through fjs's
  *   `import_` **effect** rather than as a raw expression, which is what
  *   makes the whole path proof-testable under `fjs/effects/node/virtual`
@@ -25,7 +57,7 @@
  * @module
  */
 import { step, pure } from 'functionalscript/fjs/effects/module.f.js'
-import { import_ } from 'functionalscript/fjs/effects/node/module.f.js'
+import { import_, mkdir, writeUtf8File, readUtf8File } from 'functionalscript/fjs/effects/node/module.f.js'
 import { error, ok } from 'functionalscript/fjs/types/result/module.f.js'
 import { join } from 'functionalscript/fjs/path/module.f.js'
 import { emptyState, virtual } from 'functionalscript/fjs/effects/node/virtual/module.f.js'
@@ -34,7 +66,7 @@ import { guestCtx } from '../module.f.js'
 import { interpret } from '../../exec/module.f.js'
 
 /** @import { Effect } from 'functionalscript/fjs/effects/module.f.js' */
-/** @import { Import, Module } from 'functionalscript/fjs/effects/node/module.f.js' */
+/** @import { Import, Module, Mkdir, WriteFile } from 'functionalscript/fjs/effects/node/module.f.js' */
 /** @import { Result } from 'functionalscript/fjs/types/result/module.f.js' */
 
 // ── SEC-02: the specifier allow-list ─────────────────────────────────────────
@@ -132,6 +164,67 @@ export const programFileName = hash => `${hash}.mjs`
  * @type {(home: string) => (hash: string) => string}
  */
 export const programPath = home => hash => join(home, programFileName(hash))
+
+// ── EXEC-08's precondition: writing the blob's bytes to a real file ──────────
+
+/**
+ * The dedicated subdirectory materialized programs live under, sibling to
+ * `.cas` directly under the CAS/Evo store `home` — never a direct child of
+ * `home` itself. Locked in 07-CONTEXT.md: the repo root stays clean and the
+ * `.gitignore` rule (below) is deliberate rather than incidental. The OS
+ * temp directory was rejected because it discards the project-local store
+ * property Phase 2 established on purpose.
+ * @type {string}
+ */
+export const materializeDir = '.fjs-run'
+
+/**
+ * The directory {@link materializeProgram} writes into. `programPath`'s
+ * existing `(home)(hash)` contract is reused UNCHANGED by passing this
+ * function's result as its `home` argument — `programPath` and
+ * `programFileName` themselves are never altered.
+ * @type {(home: string) => string}
+ */
+export const materializeHome = home => join(home, materializeDir)
+
+/**
+ * Writes a stored program's `source` bytes to
+ * `programPath(materializeHome(home))(hash)`, ensuring the directory exists
+ * first. This is the write step Pitfall 1 (07-RESEARCH.md) names: nothing
+ * else in this repo has ever performed it, and {@link loadProgram} below has
+ * always assumed the file at its target path already exists.
+ *
+ * `mkdir(..., { recursive: true })` runs UNCONDITIONALLY on every call, with
+ * no existence check first — mirroring this module's own documented
+ * "unconditional overwrite over check-then-write" convention for
+ * {@link programFileName}: the target directory is fixed and idempotent to
+ * create, so a check-then-create step would only add a race against a
+ * concurrent call for a different hash, never prevent one.
+ *
+ * The write itself is also an unconditional overwrite, for the same reason
+ * `programFileName` is content-hash-derived: the SAME hash always names the
+ * SAME bytes, so calling this twice with the same `hash`/`source` is
+ * idempotent by construction — there is nothing a check could refuse that
+ * the hash does not already guarantee is identical.
+ *
+ * Converts the effect's `IoResult<void>` outcome into this project's
+ * `Result<void, string>` convention on both steps, so a caller never sees a
+ * raw thrown value or an unconverted upstream error type cross this
+ * function's boundary.
+ * @type {(home: string) => (hash: string) => (source: string) => Effect<Mkdir | WriteFile, Result<void, string>>}
+ */
+export const materializeProgram = home => hash => source => step(
+    mkdir(materializeHome(home), { recursive: true }),
+    mkdirResult => {
+        if (mkdirResult[0] === 'error') {
+            return pure(error(String(mkdirResult[1])))
+        }
+        return step(
+            writeUtf8File(programPath(materializeHome(home))(hash), source),
+            writeResult => pure(writeResult[0] === 'error' ? error(String(writeResult[1])) : ok(undefined)),
+        )
+    },
+)
 
 // ── EXEC-09: import through the effect, never a raw expression ───────────────
 
@@ -262,6 +355,50 @@ export const proof = {
         nameIsExactlyTheHash: () => {
             assertEq(programFileName('AAAA'), 'AAAA.mjs')
             assert(programPath('/store')('AAAA').endsWith('AAAA.mjs'), programPath('/store')('AAAA'))
+        },
+    },
+
+    // ── EXEC-08's precondition — the new disk-materialization write step ────
+    // Under `fjs/effects/node/virtual`'s REAL `Fs` operation set (`mkdir`,
+    // `writeFile`, `readFile`) — never a `JsModule` fixture, which is what
+    // `underVirtual` below exercises for a DIFFERENT concern (import). The
+    // module header explains why write-then-import cannot be composed in one
+    // virtual session; this proves the write mechanism on its own terms.
+    materialize: {
+        // The write-then-readback equality the plan's acceptance criteria
+        // name directly: starting from an empty root, the exact bytes that
+        // went in via materializeProgram come back out via readUtf8File at
+        // the SAME path.
+        writeThenReadbackEqualsSource: () => {
+            const home = '/store'
+            const hash = 'CONTENTHASH'
+            const source = cleanSource
+            const [state] = virtual(emptyState)(materializeProgram(home)(hash)(source))
+            const [, readResult] = virtual(state)(readUtf8File(programPath(materializeHome(home))(hash)))
+            assert(readResult[0] === 'ok', ['expected the materialized file to read back', readResult])
+            assertEq(readResult[1], source)
+        },
+        // The materialized path is a child of materializeHome, never a
+        // direct child of home itself (07-CONTEXT.md Decision 2).
+        pathIsUnderTheDedicatedSubdirectory: () => {
+            const path = programPath(materializeHome('/x'))('H')
+            assert(path.startsWith('/x/.fjs-run'), path)
+        },
+        // Calling materializeProgram twice with the SAME hash and SAME
+        // source is idempotent: no error on the second call, and the
+        // readback afterward still equals source — the unconditional
+        // mkdir/overwrite convention this module documents elsewhere.
+        sameHashSameSourceIsIdempotent: () => {
+            const home = '/store'
+            const hash = 'CONTENTHASH'
+            const source = cleanSource
+            const [state1, first] = virtual(emptyState)(materializeProgram(home)(hash)(source))
+            assert(first[0] === 'ok', ['expected the first materialize to succeed', first])
+            const [state2, second] = virtual(state1)(materializeProgram(home)(hash)(source))
+            assert(second[0] === 'ok', ['expected the second materialize to succeed too', second])
+            const [, readResult] = virtual(state2)(readUtf8File(programPath(materializeHome(home))(hash)))
+            assert(readResult[0] === 'ok', ['expected readback after the second call to succeed', readResult])
+            assertEq(readResult[1], source)
         },
     },
 
