@@ -29,7 +29,7 @@ Work items to land in FunctionalScript itself, driven by what `finance` needs.
    > reference stays reversible; full-SSN does not.
 
 2. FJS Runner:
-   - Types (CAS permissions are out-of-scope for this types):
+   - Types (CAS permissions are out of scope for these types):
      - Pure. Subtypes:
        - No imports and no reading
        - Importing by hash
@@ -41,9 +41,19 @@ Work items to land in FunctionalScript itself, driven by what `finance` needs.
          At the same time, the first run without a lock file can generate one, which we
          then supply on later runs to reproduce.
    - Design a URL format for hashes and revision subjects. Our runner should be able to intercept `import`. For example
-     - hash URL: `import a from 'sha256-3902j2sye...'`
-     - subject (mutable) URL: `import a from 'revision-3902j2sye...'`
-     The reason that we use `-` instead of, for example `:`, so we can create a flat directory with the files and any JS engine runner (Node, Deno, Bun, etc) can execute the script. If we use `/` instead of `-`, we will need to write like this `../revision/xxx`, `../sha256/xxx` because imported files should be able to import other files w/o changes in the import.
+     - hash URL: `import a from './sha256-3902j2sye__.f.js'`
+     - subject (mutable) URL: `import a from './revision-3902j2sye__.f.js'`
+     The reason we use `-` rather than, say, `:` is that we can then materialize a flat
+     directory of files, and any JS engine (Node, Deno, Bun, etc.) can execute the script
+     as-is. If we used `/` instead of `-`, we would have to write `../revision/xxx__.f.js` and
+     `../sha256/xxx__.f.js`, because an imported file must be able to import other files without
+     changing the specifier.
+
+     The file extension is added when we generate the structure. **Open — flat vs sharded.**
+     A flat directory may hold too many files, so we may prefer `../sha256/xxx__.f.js`, or
+     sharding the hash: `../../../sha256/ab/cd/efg__.f.js`. Either works as long as every
+     module sits at the *same* depth, so the `../` prefix is a constant and specifiers stay
+     position-independent.
 
    > **Note.** These types and the CAS whitelist compose but stay separate, as the
    > parenthetical says: the type is what a program *may express*, the operation map is what
@@ -55,25 +65,51 @@ Work items to land in FunctionalScript itself, driven by what `finance` needs.
    > That is why the lock file works — it pins the resolution, and the run becomes
    > reproducible without the program changing.
    >
-   > **Note on the URL scheme.** `sha2:` vs `revision:` is a good design because *the
-   > specifier itself carries the purity*: a module graph reachable only through `sha2:`
-   > is immutable by construction and needs no lock file, and a lock file is exactly a map
-   > from every `revision:` specifier to the `sha2:` it resolved to. So the two features
-   > are one mechanism, and "which subtype is this program" becomes a syntactic property of
-   > its imports rather than something to track separately.
+   > **Note on the naming scheme.** The prefix carries the purity: a module graph reachable
+   > only through `sha256-` is immutable by construction and needs no lock file, and a lock
+   > file is exactly a map from every `revision-` specifier to the `sha256-` it resolved to.
+   > So the two features are one mechanism, and "which subtype is this program" becomes a
+   > syntactic property of its imports rather than something tracked separately.
    >
-   > **Note.** Intercepting `import` is also the first real lever on the import-time
-   > execution hole in `fjs/todo/implement-mcp-server.md` — that limitation exists because
-   > `import()` runs a module body with full privileges before any effect is interpreted.
-   > A runner that owns resolution can at least *bound the surface*: only `sha2:` and
-   > `revision:` resolve, so `node:fs` and `https:` do not. It does not make the module
-   > body safe, but it stops the body from reaching anything new.
+   > **Verified on Node 26.5.1, Deno 2.5.6, and Bun 1.3.14.** Both layouts execute with no
+   > loader hooks and no `package.json`: flat (`./sha256-abc__.f.js`) and sharded
+   > (a module at `sha256/ab/cd/x__.f.js` importing `../../../sha256/wx/yz/y__.f.js`).
+   > Extensions are optional too — extensionless files resolve on all three — so
+   > `__.f.js` is a free choice rather than a requirement.
    >
-   > **Open.** Custom schemes need Node's module customization hooks (`module.register()`
-   > with `resolve`/`load`), which are per-process and asynchronous. Worth confirming early
-   > that hooks can be registered in the MCP server process without disturbing fjs's own
-   > module loading — this is the kind of thing that works in a spike and fights the host
-   > application later.
+   > One correction: the specifier must be **relative**. `import a from 'sha256-abc'` is a
+   > *bare* specifier and resolves as a package — `ERR_MODULE_NOT_FOUND: Cannot find package
+   > 'sha256-abc'`. It has to be `./sha256-abc`. The examples above are written correctly.
+   >
+   > **On sharding: fjs already does exactly this, so the layout is not a new decision.**
+   > `toPath` in `fjs/cas/module.f.js` is `join('.cas', a, b, c)` with `split2 = splitAt(2)`
+   > over the cbase32 hash — i.e. `.cas/ab/cd/<rest>`, the same shape as the proposal. A
+   > materialized tree can mirror the store 1:1, which makes materialization close to a copy
+   > (or a link farm) rather than a translation.
+   >
+   > **But sharding freezes the layout into immutable content — this is the real trade-off.**
+   > A specifier like `../../../sha256/ab/cd/x__.f.js` encodes that the importer sits exactly
+   > three levels down. That text is inside the module, and the module is content-addressed,
+   > so the shard depth becomes part of the hash and can never be rewritten. Consequences:
+   > if the depth ever changes (2 levels instead of 3, or 3-char shards), modules stored
+   > before and after cannot coexist in one materialized tree, because each expects a
+   > different `../` count. Flat `./sha256-abc__.f.js` encodes no depth at all and has no
+   > such problem — any two modules, stored years apart, always materialize together.
+   >
+   > The escape is that *runner mode owns resolution*, so it can place files wherever it
+   > likes regardless of the specifier. The freezing only bites in the portable
+   > no-interception mode — which is the mode sharding was introduced to serve. Worth being
+   > deliberate about, because "too many files in one directory" is a performance concern
+   > with several fixes, and this one is permanent.
+   >
+   > **Two execution modes with different security properties — worth naming.** In *flat*
+   > mode nothing is intercepted, so ordinary resolution applies and `node:fs`, `https:`,
+   > and everything else resolve normally. In *runner* mode, where we own resolution, only
+   > `sha256-` and `revision-` need resolve, which bounds what a module body can reach —
+   > the first real lever on the import-time execution hole in
+   > `fjs/todo/implement-mcp-server.md`. So flat mode is a portability and debugging
+   > affordance, not a sandbox, and the same bytes are safe in one mode and not the other.
+   > Whatever the MCP server executes should be runner mode.
    >
    > **Open.** Generate-then-pin is trust-on-first-use: the first run is unpinned by
    > construction, so whatever the heads happened to be is what gets recorded. Fine for a
@@ -100,9 +136,11 @@ Work items to land in FunctionalScript itself, driven by what `finance` needs.
    > *loopback-bound, unauthenticated, started and stopped with the server* versus a
    > network service — otherwise the next reader sees a contradiction.
    >
-   > **Open.** Serving CAS blobs as MCP resources needs a URI scheme the client can hold
-   > onto. If that ends up being the same `sha2:` scheme as item 2's import specifiers,
-   > they should be designed together rather than arrived at twice.
+   > **Open.** Serving CAS blobs as MCP resources needs a URI the client can hold onto —
+   > and here a real URI scheme is unavoidable, since MCP resource URIs are not module
+   > specifiers and gain nothing from item 2's `-` trick. So the two naming schemes are
+   > likely to differ (`sha256-abc` as a filename, something like `cas://sha256/abc` as a
+   > resource URI). Worth deciding whether one derives mechanically from the other.
 
 4. Decimals and BigIntegers for finance. Proposed solution:
    Type-aware JSON parser:
@@ -115,14 +153,12 @@ Work items to land in FunctionalScript itself, driven by what `finance` needs.
    3. Our "type-aware JSON parser" will use the extended parser.
 
    Our forms will use ONLY integers for currencies (cents), percentages, etc. No
-   big fixed-point decimals for now. If needed, a form may specify fixed-point positions
-   for some values for the whole JSON. For example, if by default a form assumes that our
-   units are percent, but a particular form requires hundredths of a percent, then we
-   should fall back to strings: `{"interest": "3.45%"}`. We should select a
-   default value for all forms. Most likely,
-   - for currencies we should use cents (the
-   minimal unit), `$100.23 = 10023`.
-   - for percentages hundredths of a percents: `3.45% = 345`.
+   big fixed-point decimals for now. We select one default scale for all forms:
+   - for currencies, cents (the minimal unit): `$100.23 = 10023`
+   - for percentages, hundredths of a percent: `3.45% = 345`
+
+   Where a form needs finer precision than the default scale, fall back to a string:
+   `{"interest": "3.45%"}`.
 
    > **This supersedes a settled decision.** `todo/plan.md` Week 1 step 5 and the PROJECT.md
    > requirement both say money fields must be JSON **strings**, "never JSON numbers",
