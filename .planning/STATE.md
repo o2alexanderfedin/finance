@@ -290,6 +290,16 @@ None yet.
   `07-10-FIX-SUMMARY.md` for the full account, including why 185 virtual proofs never caught this
   (they keyed their `JsModule` fixtures at the same bare name the buggy code asked for).
 
+- **RESOLVED (resume, 2026-08-05): the two Phase 7 branches were never divergent.**
+  The pause-work handoff flagged a blocking human merge decision between
+  `feature/phase-7-exec` (this worktree) and `feature/phase-7-fjs-run-and-run-records`
+  (where a second Claude session was committing). Measured on resume:
+  `git rev-list --count feature/phase-7-fjs-run-and-run-records ^feature/phase-7-exec` = **0**,
+  and the same count against `origin/feature/phase-7-fjs-run-and-run-records` and `origin/main`
+  is also **0**. `feature/phase-7-exec` is a strict superset — 22 commits ahead of the other
+  branch, 90 ahead of `develop`. Nothing to reconcile; any merge is a fast-forward. The branch
+  is **not yet pushed** to origin, which is the only remaining action.
+
 ## Deferred Items
 
 | Category | Item | Status | Deferred At |
@@ -298,10 +308,12 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-08-05T06:48:14.558Z
-Stopped at: Completed 07-09-PLAN.md
-bookkeeping synced (DOC-00/01/03/04/10/11/12/14 all marked Complete).
-Resume file: None
+Last session: 2026-08-05T16:24:00Z
+Stopped at: Session resumed from HANDOFF.json. Phase 7 re-verified green at `9d625db`
+(`npm test` 187/187, 185 project-local proofs, `tsc` clean, `test:integration` included and
+passing, tree clean). Merge blocker measured and dismissed — see Blockers. Awaiting the user's
+choice on push/PR strategy and on Phase 8.
+Resume file: None (HANDOFF.json and .continue-here.md consumed and deleted on resume)
 (they were one-shot artifacts, written to `feature/planning-requirements-roadmap` seven
 minutes after PR #14 merged, so they never reached `main`; nothing else on that branch is
 unmerged and it can be deleted)
