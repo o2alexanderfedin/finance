@@ -1109,13 +1109,19 @@ export const proof = {
         },
     },
 
-    // ── PROV-07/Plan 09-04: the perturbation gate's real leg ─────────────
+    // ── PROV-07/Plan 09-04: the perturbation gate, and the verbatim
+    // adversary ROADMAP criterion 4 names ───────────────────────────────────
     //
-    // ROADMAP criterion 4: a minimal, real ReportLine-shaped program's
-    // output moves when a stored document it actually reads changes. Task 2
-    // adds this gate's other half — the exact verbatim adversary and its
-    // control leaf, proving the SAME before/after methodology yields an
-    // IDENTICAL result for a program that reads nothing.
+    // A gate built against an adversary it is never actually run against is a
+    // claim, not a proof (09-CONTEXT.md). This section runs the decisive
+    // comparison both ways: a real, minimal ReportLine-shaped program whose
+    // output MOVES when a stored document changes (the leaf above), and the
+    // exact adversary `() => pure({ line16: 9137 })`, written verbatim, whose
+    // failure does NOT move under the identical perturbation (the leaf
+    // below, `hardcodedAdversaryFailsAndIsInvariantToInputChange`) — the
+    // control that makes the assertion about the gate itself rather than
+    // about a fixture that would have moved regardless (STATE.md's Phase-6
+    // lesson).
     antiHardcodingGate: {
         // The real leg: seed one document, run a minimal program that reads
         // it and returns a ReportLine-shaped value, change the document,
@@ -1209,6 +1215,89 @@ export const proof = {
                 assert(parsed2.value !== '10.00', ['expected the output to move when the input document changed', parsed2])
                 assertEq(parsed2.sources[0].documentHash, docHash2)
             }
+        },
+
+        // The control leg: the exact adversary ROADMAP criterion 4 names,
+        // written verbatim, run against the state BEFORE and AFTER the
+        // identical perturbation the real leg above applies — proven to
+        // fail both times, with an IDENTICAL message, because it never
+        // reads the document at all.
+        hardcodedAdversaryFailsAndIsInvariantToInputChange: () => {
+            const home = '/adversary-perturbation'
+            const cas = fileCas(sha256)(home)
+            const [state0, cacheKey] = virtual(emptyState)(initEvo(cas))
+            const e = evo(cas)(cacheKey)
+            const subject = 'adversary-subject'
+
+            // Even though the adversary never reads it, the control needs a
+            // real document to perturb — the SAME perturbation the real leg
+            // above applies.
+            const [state1, docHash1] = virtual(state0)(seedText(cas)('{"box1InterestIncome":"10.00"}'))
+            const [state2, addResult1] = virtual(state1)(e.add({ parents: [], subject, snapshot: docHash1 }))
+            assert(addResult1[0] === 'ok', ['expected the first revision add to succeed', addResult1])
+            const rev1 = addResult1[1]
+
+            // The adversary's stored source text, written VERBATIM —
+            // 09-CONTEXT.md's own quoted phrase, adapted only by the
+            // unavoidable `ctx.` prefix (a stored program has zero imports,
+            // EXEC-07, and cannot reach a bare `pure` any other way).
+            const adversarySource = 'export const report = ctx => () => ctx.pure({ line16: 9137 })'
+            const [state3, adversaryHash] = virtual(state2)(seedText(cas)(adversarySource))
+            /** @type {Report<{ readonly line16: number }>} */
+            const adversaryReport = ctx => () => ctx.pure({ line16: 9137 })
+
+            const [state4, outcome1] = runExecuteRunViaFixture(home)(cas)(e)(adversaryHash)(adversarySource)(adversaryReport)([])(undefined)(state3)
+            assert(outcome1.kind === 'error', ['expected the verbatim adversary to be refused', outcome1])
+            // The literal count is computed by calling countNumericLiterals
+            // directly on this exact adversary source — never hand-computed
+            // — so the assertion cannot silently drift from the audit's own
+            // logic.
+            const expectedLiteralCount = countNumericLiterals(adversarySource)
+            if (outcome1.kind === 'error') {
+                assert(outcome1.message.includes('zero observed reads'), ['expected the zero-read refusal', outcome1.message])
+                assert(
+                    outcome1.message.includes(`${expectedLiteralCount} numeric literal`),
+                    ['expected the literal count named in the refusal', outcome1.message, expectedLiteralCount])
+            }
+
+            // Perturb the SAME document exactly as the real leg does.
+            const [state5, docHash2] = virtual(state4)(seedText(cas)('{"box1InterestIncome":"20.00"}'))
+            const [state6, addResult2] = virtual(state5)(e.add({ parents: [rev1], subject, snapshot: docHash2 }))
+            assert(addResult2[0] === 'ok', ['expected the second revision add to succeed', addResult2])
+
+            // A second, functionally-identical adversary hash for the
+            // SECOND run — same reasoning as the real leg above: the first
+            // run's real materialize write already swapped the FIRST hash's
+            // path from raw bytes to a JsModule function, so a second real
+            // write to that SAME path would collide. One harmless extra
+            // byte on the stored source (never on `adversarySource` itself,
+            // which stays exactly verbatim) gives the second run its own
+            // fresh path; `countNumericLiterals` still counts the SAME one
+            // literal either way, so the control's identical-message
+            // assertion below is unaffected.
+            const [state6b, adversaryHash2] = virtual(state6)(seedText(cas)(adversarySource + '\n'))
+
+            const [state7, outcome2] = runExecuteRunViaFixture(home)(cas)(e)(adversaryHash2)(adversarySource + '\n')(adversaryReport)([])(undefined)(state6b)
+            assert(outcome2.kind === 'error', ['expected the verbatim adversary to be refused again', outcome2])
+            // The control: the document changed; the adversary's outcome
+            // did not, character for character, because it never read the
+            // document at all. This is what makes the assertion about the
+            // gate rather than about a fixture that would have moved
+            // anyway.
+            if (outcome1.kind === 'error' && outcome2.kind === 'error') {
+                assertEq(outcome2.message, outcome1.message)
+            }
+
+            // PROV-03: provenance that covers only successes is not
+            // provenance — a status:'error' run record is still persisted
+            // for a zero-read refusal.
+            const [state8, callResult] = virtual(state7)(handleRunOutcome(cas)(adversaryHash)([])(false)({})(outcome2))
+            assertEq(callResult.isError, true)
+            const first = callResult.content[0]
+            if (first === undefined || first.type !== 'text') {
+                throw ['expected a text content item', callResult]
+            }
+            assertPersistedErrorRunRecord(cas)(state8)(first.text)
         },
     },
 }
