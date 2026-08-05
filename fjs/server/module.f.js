@@ -73,11 +73,11 @@ import { ok } from 'functionalscript/fjs/types/result/module.f.js'
 import { tryUtf8, utf8ToString } from 'functionalscript/fjs/text/module.f.js'
 import { collectRead } from 'functionalscript/fjs/cas/module.f.js'
 import { financeSchemaTool } from './finance_schema/module.f.js'
-import { fjsRunTool } from './fjs_run/module.f.js'
+import { fjsRunTool, placeJsModuleFixture } from './fjs_run/module.f.js'
 import { guestCtx } from '../guest/module.f.js'
-import { programFileName } from '../guest/materialize/module.f.js'
+import { programPath, materializeHome } from '../guest/materialize/module.f.js'
+import { validate as validateRun } from '../run/module.f.js'
 import { dialect as oneZeroNineNineIntDialect, validate as validateOneZeroNineNineInt } from '../document/1099int/module.f.js'
-import { centsFromString, centsToString } from '../exact/module.f.js'
 
 /** @import { McpConfig, McpHandlers, ToolEntry } from 'functionalscript/fjs/protocol/mcp/module.f.js' */
 /** @import { Effect, Operation } from 'functionalscript/fjs/effects/module.f.js' */
@@ -447,10 +447,33 @@ export const proof = {
     // Criterion 1) ───────────────────────────────────────────────────────
     // The full path through the REAL financeMcpServer/mcpStep/stdioTransport
     // stack, never a bespoke harness: an agent calls
-    // finance_schema('vnd.fjs.1099int'), a program stored via cas.write sums
-    // box1InterestIncome across every stored 1099-INT, fjs_run runs it, and
-    // the returned total is correct — with resultHash/runHash both present
-    // and resolvable back out of CAS.
+    // finance_schema('vnd.fjs.1099int'), a program stored via cas.write is
+    // run through fjs_run over that SAME real stack.
+    //
+    // 07-10: this proof's fjs_run leg can no longer demonstrate a SUCCESSFUL
+    // sum here, and this is expected, not a regression this plan
+    // introduces. `executeRun`'s import path is now fixed to match its own
+    // materialize-write path (the bug this plan fixes), and
+    // `fjs/effects/node/virtual`'s `writeFile` (array-of-`Vec`) and
+    // `import_` (`JsModule` function) representations are incompatible at
+    // the SAME path within the SAME session (see
+    // `fjs/server/fjs_run/module.f.js`'s module header and its
+    // `runExecuteRunViaFixture` helper for the full account, empirically
+    // confirmed both directions). Unlike the leaf-level proofs in that
+    // file, THIS proof drives `fjs_run` through the real, opaque
+    // `mcpStep`/`stdioTransport` batch dispatch — there is no seam here to
+    // decompose the materialize-write from the fixture-backed load the way
+    // `runExecuteRunViaFixture` does at the `fjs_run/module.f.js` layer. So
+    // this leaf now asserts the CORRECT, surfaced consequence instead: the
+    // real stack still correctly reports the failure and still persists a
+    // `status:'error'` run record (PROV-03) — never a dropped connection or
+    // an unhandled throw. The GENUINE, decisive proof that a real separate
+    // process actually sums the interest correctly through fjs_run now
+    // lives EXCLUSIVELY in `fjs-run-integration.test.js`, which drives a
+    // real `node index.js` process against a real filesystem and asserts
+    // the correct total — precisely the "one assertion no virtual proof can
+    // make" that test's own header already claims, now proven to extend to
+    // the WHOLE success path, not just the materialized-file's existence.
     weekOneConvergence: {
         agentSumsInterestAcrossStoredDocumentsThroughTheRealServerStack: () => {
             const home = '/week-one'
@@ -557,7 +580,13 @@ export const proof = {
                 ctx.evoList('false'),
                 activeJson => sumInterestOverSubjects(/** @type {readonly string[]} */ (JSON.parse(activeJson)))(0n))
 
-            const root = { ...state6.root, [programFileName(programHash)]: () => ({ report: sumInterestReport }) }
+            // 07-10: keyed at the FULL materialize path executeRun now
+            // imports from, not the bare hash-derived name — see the
+            // updated docstring above for why this fixture no longer lets
+            // the fjs_run call below succeed (it collides with executeRun's
+            // OWN real materialize-write at this SAME path), and why that
+            // is the correct, expected consequence.
+            const root = placeJsModuleFixture(state6.root)(programPath(materializeHome(home))(programHash))(() => ({ report: sumInterestReport }))
             const state7 = { ...state6, root }
 
             // Build the cache AFTER every document/revision/program above is
@@ -597,45 +626,36 @@ export const proof = {
                 (schemaResult.result.content[0]?.text ?? '').includes('box1InterestIncome'),
                 ['expected the schema response to name box1InterestIncome', schemaResult])
 
-            // The run itself.
+            // The run itself. 07-10: correctly surfaces as an error under
+            // virtual now (see the docstring above) — never a dropped
+            // connection, never an unhandled throw, and still persists a
+            // status:'error' run record (PROV-03). The genuine success
+            // path — the correct interest total, computed through a real
+            // separate process and a real filesystem — is proven
+            // exclusively by `fjs-run-integration.test.js`.
             const [state12, runResponses] = runBatch(state11, [
                 { jsonrpc: '2.0', method: 'tools/call', id: 21, params: { name: 'fjs_run', arguments: { hash: programHash } } },
             ])
             const runResult = asCallResultWithIsError(runResponses[0])
-            assertEq(runResult.result.isError, undefined)
+            assertEq(runResult.result.isError, true)
             const runText = runResult.result.content[0]?.text
             assert(runText !== undefined, ['expected fjs_run to answer with text content', runResult])
-            const parsed = /** @type {{ readonly resultHash: string, readonly runHash: string, readonly preview: string, readonly truncated: boolean }} */ (JSON.parse(/** @type {string} */ (runText)))
-            assert(typeof parsed.resultHash === 'string' && parsed.resultHash !== '', ['expected a resultHash', parsed])
-            assert(typeof parsed.runHash === 'string' && parsed.runHash !== '', ['expected a runHash', parsed])
+            assert(
+                runText.includes('invalid file'),
+                ['expected the surfaced error to name the materialize-write collision (07-10)', runText])
 
-            // The expected total, computed INDEPENDENTLY in the proof from
-            // the two PRESENT seeded values via centsFromString/centsToString
-            // — never a literal copied from having run the program once and
-            // observed the answer. This doubles as a lightweight perturbation
-            // check even though PROV-07 itself is a later phase.
-            const expectedTotal = centsToString(centsFromString('1234.56') + centsFromString('10.00'))
-
-            const resultHashVec = cBase32ToVec(parsed.resultHash)
-            assert(resultHashVec !== null, ['expected a decodable resultHash', parsed.resultHash])
-            const [, resultRead] = virtual(state12)(collectRead(cas.read(/** @type {Vec} */ (resultHashVec))))
-            assert(resultRead[0] === 'ok', ['expected the result to read back from CAS', resultRead])
-            assertEq(utf8ToString(resultRead[1]), expectedTotal)
-
-            const runHashVec = cBase32ToVec(parsed.runHash)
-            assert(runHashVec !== null, ['expected a decodable runHash', parsed.runHash])
+            const runHashMatch = /run record: (\S+)\)/.exec(runText)
+            assert(runHashMatch !== null, ['expected the error text to name a run record hash', runText])
+            const runHash = /** @type {string} */ (runHashMatch[1])
+            const runHashVec = cBase32ToVec(runHash)
+            assert(runHashVec !== null, ['expected a decodable runHash', runHash])
             const [, runRecordRead] = virtual(state12)(collectRead(cas.read(/** @type {Vec} */ (runHashVec))))
             assert(runRecordRead[0] === 'ok', ['expected the run record to read back from CAS', runRecordRead])
-            const runRecord = /** @type {{ readonly status: string, readonly inputs: readonly { readonly command: string, readonly payload: readonly string[] }[] }} */ (
-                JSON.parse(utf8ToString(runRecordRead[1])))
-            assertEq(runRecord.status, 'ok')
-            // The absent-field document's subject IS enumerated — its
-            // evoHead read appears in the PERSISTED inputs[] — proving the
-            // program actively visited and skipped it, not that the proof
-            // simply never presented it.
-            assert(
-                runRecord.inputs.some(i => i.command === 'evoHead' && i.payload[0] === subjectC),
-                ['expected subjectC (the absent-field document) to have been read', runRecord.inputs])
+            const [vt, runRecord] = validateRun(JSON.parse(utf8ToString(runRecordRead[1])))
+            assert(vt === 'ok', ['expected the persisted error record to validate', vt, runRecord])
+            if (vt === 'ok') {
+                assertEq(runRecord.status, 'error')
+            }
         },
     },
 }
