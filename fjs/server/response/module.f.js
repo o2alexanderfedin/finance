@@ -60,12 +60,20 @@
  *
  * @module
  */
-import { tryUtf8, utf8ToString } from 'functionalscript/fjs/text/module.f.js'
+import { tryUtf8, utf8, utf8ToString } from 'functionalscript/fjs/text/module.f.js'
 import { length as bitLength, maxLengthBytes, msb, u8List, u8ListToVec } from 'functionalscript/fjs/types/bit_vec/module.f.js'
 import { take } from 'functionalscript/fjs/types/list/module.f.js'
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
+import { fromVec } from 'functionalscript/fjs/types/uint8array/module.f.js'
+import { pure } from 'functionalscript/fjs/effects/module.f.js'
+import { create } from 'functionalscript/fjs/effects/memory/module.f.js'
+import { emptyState, virtual } from 'functionalscript/fjs/effects/node/virtual/module.f.js'
+import { fromRegistry, mcpStep, okResult, toolEntry, uninitializedState } from 'functionalscript/fjs/protocol/mcp/module.f.js'
+import { stdioTransport } from 'functionalscript/fjs/protocol/mcp/stdio/module.f.js'
+import { internalError, jsonrpc } from 'functionalscript/fjs/protocol/json_rpc/module.f.js'
 
 /** @import { Vec } from 'functionalscript/fjs/types/bit_vec/module.f.js' */
+/** @import { McpConfig } from 'functionalscript/fjs/protocol/mcp/module.f.js' */
 
 /**
  * The inline-preview threshold (8 KiB, in bytes): a result whose UTF-8
@@ -137,6 +145,107 @@ export const sizeGuard = guardBytes => previewBytes => (content, hash) => {
     return { preview: tooLargeMessage(hash), truncated: true }
 }
 
+// ── Task 2: the ordering proof, and the transport-fallback contrast ─────────
+//
+// The rest of this module has no dependency on MCP or stdio at all — it is
+// pure. Everything below exists solely to PROVE the ordering claim in the
+// module header: that `sizeGuard`'s decision is made before a response ever
+// reaches the transport, not merely that the right-looking text comes back.
+// This mirrors `fjs/server/module.f.js`'s own `financeMcpServer` proof
+// harness (a minimal registry driven through `virtual` + `stdioTransport`),
+// scaled down to exactly what these two leaves need.
+
+/** A minimal `McpConfig` for driving a session through `mcpStep`, distinct from `financeConfig` (this is a proof harness, not the real server identity). @type {McpConfig} */
+const harnessConfig = {
+    serverInfo: { name: 'size-guard-proof-harness', version: '0.0.0' },
+    capabilities: { tools: {} },
+    protocolVersion: 'size-guard-proof',
+}
+
+/** UTF-8 bytes of `s` as a plain array — the virtual stdin byte stream, same helper `fjs/server/module.f.js` uses. @type {(s: string) => readonly number[]} */
+const toBytes = s => [...fromVec(utf8(s))]
+
+/** Non-empty stdout lines from a session `State`, parsed as JSON-RPC envelopes. @type {(state: import('functionalscript/fjs/effects/node/virtual/module.f.js').State) => readonly unknown[]} */
+const responsesOf = state => state.stdout
+    .split('\n')
+    .filter((/** @type {string} */ line) => line !== '')
+    .map((/** @type {string} */ line) => JSON.parse(line))
+
+const initializeRequest = {
+    jsonrpc: '2.0',
+    method: 'initialize',
+    id: 1,
+    params: {
+        protocolVersion: 'size-guard-proof-client',
+        capabilities: {},
+        clientInfo: { name: 'size-guard-proof-client', version: '0.0.0' },
+    },
+}
+const initializedNotification = { jsonrpc: '2.0', method: 'notifications/initialized' }
+
+/**
+ * Drives `initialize` -> `notifications/initialized` -> `tools/call` against a
+ * single-tool `registry` over the virtual Node interpreter, and returns the
+ * resulting `State` so a proof leaf can assert on `stdout` directly. `toolId`
+ * is the id the `tools/call` request itself carries, so a leaf can pick its
+ * own response out of the (at least two) response lines a session produces.
+ * @type {(registry: readonly import('functionalscript/fjs/protocol/mcp/module.f.js').ToolEntry<never>[]) => (toolName: string) => (toolId: number) => import('functionalscript/fjs/effects/node/virtual/module.f.js').State}
+ */
+const runToolCallSession = registry => toolName => toolId => {
+    const handlers = fromRegistry(registry)
+    const [state0, sessionKey] = virtual(emptyState)(create(uninitializedState))
+    const toolsCallRequest = { jsonrpc: '2.0', method: 'tools/call', id: toolId, params: { name: toolName, arguments: {} } }
+    const input = [initializeRequest, initializedNotification, toolsCallRequest]
+        .map(m => JSON.stringify(m))
+        .join('\n') + '\n'
+    const [state1] = virtual({ ...state0, stdin: toBytes(input) })(
+        stdioTransport(mcpStep(harnessConfig)(handlers)(sessionKey)))
+    return state1
+}
+
+/**
+ * The oversized content the ordering proof runs `sizeGuard` on — well over
+ * the tiny 8-byte guard the tool below configures, and containing a marker
+ * substring distinctive enough that its absence from `stdout` is a real
+ * assertion, not a coincidence. Deliberately small (a few dozen bytes): the
+ * whole point of parameterizing `sizeGuard` on tiny thresholds (module
+ * header) is that tripping the "too large" band never requires a real 64 KiB
+ * or 128 KiB payload.
+ */
+const orderingProofRawContent = 'RAW-CONTENT-MARKER-must-never-reach-stdout-in-full'
+const orderingProofHash = 'ORDERING-PROOF-HASH'
+
+/**
+ * A test-only tool applying `sizeGuard` (tiny thresholds: an 8-byte guard, a
+ * 4-byte preview — both far below `orderingProofRawContent`'s length) to
+ * oversized content before ever returning it, exactly the shape a real
+ * `fjs_run`-style handler would use. `okResult` wraps only the ALREADY-SIZED
+ * `preview`, never the raw content.
+ * @type {import('functionalscript/fjs/protocol/mcp/module.f.js').ToolEntry<never>}
+ */
+const orderingProofTool = toolEntry(
+    'size_guard_ordering_probe',
+    'Test-only: applies sizeGuard to oversized content before returning it.',
+    {},
+    () => pure(okResult(sizeGuard(8)(4)(orderingProofRawContent, orderingProofHash).preview)),
+)
+
+/** The oversized content the contrast leaf returns WITHOUT `sizeGuard` — a real payload over the transport's own 128 KiB line cap, reproducing `writeResponse`'s own generic fallback (see that module's `proof.f.js`, which uses the identical technique to prove the fallback exists). */
+const contrastRawContent = 'Y'.repeat(Number(maxLengthBytes) + 1)
+
+/**
+ * A test-only tool returning an oversized result directly, with no
+ * `sizeGuard` in front of it — the failure mode this whole module exists to
+ * prevent, reproduced directly rather than argued about.
+ * @type {import('functionalscript/fjs/protocol/mcp/module.f.js').ToolEntry<never>}
+ */
+const contrastTool = toolEntry(
+    'size_guard_contrast_probe',
+    'Test-only: returns an oversized result WITHOUT sizeGuard.',
+    {},
+    () => pure(okResult(contrastRawContent)),
+)
+
 // ── Tests ────────────────────────────────────────────────────────────────────
 
 export const proof = {
@@ -188,6 +297,45 @@ export const proof = {
             assert(BigInt(previewBytes) < maxLengthBytes, 'previewBytes must stay under the stdio cap')
             assert(BigInt(guardBytes) < maxLengthBytes, 'guardBytes must stay under the stdio cap')
             assertEq(maxLengthBytes, 131072n)
+        },
+    },
+    // Task 2, leaf 1: the ordering proof. The point is NOT that the short
+    // message comes back — it is that the raw oversized content is ABSENT
+    // from stdout, which a "which message came back" proof cannot establish
+    // (the STATE.md lesson from SEC-02-before-`import_`, Phase 6): a response
+    // built from `sizeGuard`'s output and one built from the raw content and
+    // then coincidentally truncated somewhere downstream would both produce
+    // the same returned text, but only the first is actually SAFE.
+    orderingProof: {
+        tooLargeMessageReachesStdoutButRawContentNeverDoes: () => {
+            const state = runToolCallSession([orderingProofTool])('size_guard_ordering_probe')(2)
+            assert(
+                state.stdout.includes(tooLargeMessage(orderingProofHash)),
+                ['expected the too-large message in stdout', state.stdout])
+            assert(
+                !state.stdout.includes(orderingProofRawContent),
+                'the raw oversized content leaked into stdout — sizeGuard did not run before the transport')
+        },
+    },
+    // Task 2, leaf 2: the contrast. Directly reproduces the failure mode
+    // EXEC-11 exists to prevent — an oversized result with NO sizeGuard in
+    // front of it hits `writeResponse`'s own generic `-32603` fallback, which
+    // carries no size-specific text at all. This is the failure a caller
+    // sees with no `sizeGuard`; demonstrating it directly (not by argument)
+    // is what makes the ordering proof above meaningful by comparison.
+    contrastLeaf: {
+        unsizedOversizedResultReproducesGenericInternalErrorFallback: () => {
+            const state = runToolCallSession([contrastTool])('size_guard_contrast_probe')(2)
+            const responses = /** @type {readonly { readonly jsonrpc: string, readonly id?: unknown, readonly error?: { readonly code: number, readonly message: string } }[]} */ (responsesOf(state))
+            const toolCallResponse = responses.find(r => r.id === 2)
+            assert(toolCallResponse !== undefined, ['expected a tools/call response', responses])
+            assert(toolCallResponse.error !== undefined, ['expected an error response', toolCallResponse])
+            assertEq(toolCallResponse.jsonrpc, jsonrpc)
+            assertEq(toolCallResponse.error.code, internalError.code)
+            assertEq(toolCallResponse.error.message, internalError.message)
+            assert(
+                !JSON.stringify(toolCallResponse).toLowerCase().includes('too large'),
+                ['expected the generic fallback, not a size-specific message', toolCallResponse])
         },
     },
 }
