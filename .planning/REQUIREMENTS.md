@@ -290,7 +290,7 @@ structural (RTTI) and semantic passes.
 - [ ] **TAX-03** *(T1)*: Explicit line-16 method dispatch across all branches — Tax Table,
       Tax Computation Worksheet, QDCGT worksheet, Schedule D Tax Worksheet — with a proof
       per branch. Line 16 is not bracket arithmetic.
-- [ ] **TAX-04** *(T1)*: Boundary proofs at `threshold − 1¢`, `threshold`, `threshold + 1¢`
+- [x] **TAX-04** *(T1)*: Boundary proofs at `threshold − 1¢`, `threshold`, `threshold + 1¢`
       for every threshold in the parameter data.
 - [ ] **TAX-05** *(T1)*: Form 1040 core lines 1a–37.
 - [ ] **TAX-06** *(T1)*: Standard deduction with age and blindness increments.

@@ -328,7 +328,7 @@ of it to Phase 14, whose criteria are about tax correctness rather than the exec
 **Plans**: 4 plans
 - [x] 08-01-PLAN.md — TY2025 parameter data module with per-parameter citations (TAX-01)
 - [x] 08-02-PLAN.md — Tax Table band structure, exact cumulative-bracket generator, row-by-row diff against hand-transcribed literals, tiling proof, $100,000 refusal, and mutation-verification of the diff (TAX-02)
-- [ ] 08-03-PLAN.md — Combined threshold inventory and generated threshold−1¢/threshold/threshold+1¢ boundary proofs (TAX-04)
+- [x] 08-03-PLAN.md — Combined threshold inventory and generated threshold−1¢/threshold/threshold+1¢ boundary proofs (TAX-04)
 - [ ] 08-04-PLAN.md — finance_tax_params MCP tool, registry wiring, and the real-process integration-test call (MCP-07)
 
 ### Phase 9: Traceable Report Lines and the Anti-Hardcoding Gate
@@ -456,7 +456,7 @@ of it to Phase 14, whose criteria are about tax correctness rather than the exec
 | 5. Document Base and First Dialects | Week 1 | 0/TBD | Not started | - |
 | 6. Guest ABI and Materialization | Week 1 | 0/TBD | Not started | - |
 | 7. `fjs_run` and Run Records | Week 1 | 0/8 | Planned | - |
-| 8. TY2025 Parameters and Tax Table | Week 2 | 1/4 | In Progress|  |
+| 8. TY2025 Parameters and Tax Table | Week 2 | 3/4 | In Progress|  |
 | 9. Traceable Report Lines | Week 2 | 0/TBD | Not started | - |
 | 10. 1040 Core and Scope Guard | Week 2 | 0/TBD | Not started | - |
 | 11. Wage, Retirement, Benefit Documents | Week 3 | 0/TBD | Not started | - |
