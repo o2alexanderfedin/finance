@@ -333,6 +333,40 @@ test(
                 runRecord.inputs.some(i => i.command === 'evoHead' && i.payload[0] === subjectC),
                 'expected subjectC (the absent-field document) to have been enumerated')
 
+            // ── 09-05: the zero-read adversary through the REAL server —
+            // the exact verbatim ROADMAP adversary, `() => pure({ line16:
+            // 9137 })`, stored for real via THIS SAME live session's cas_add
+            // and run through THIS SAME session's fjs_run call. Every other
+            // proof of this gate (fjs/server/fjs_run/module.f.js's
+            // antiHardcodingGate/zeroReadGate proofs) drives the adversary
+            // only under fjs/effects/node/virtual, through
+            // runExecuteRunViaFixture — a test-only helper that shares the
+            // gate (classifyRunOutcome, 09-05) with the production
+            // `executeRun` fjsRunTool actually calls, but has still never,
+            // until now, been run against a genuinely separate process. This
+            // is the assertion no virtual proof can make: the adversary is
+            // refused by the actual shipped code path, in a real process,
+            // against a real filesystem ──────────────────────────────────
+            const adversarySource = 'export const report = ctx => () => ctx.pure({ line16: 9137 })'
+            const adversaryHash = await casAdd(adversarySource)
+            const adversaryRunResponse = await call('fjs_run', { hash: adversaryHash })
+            assert.equal(
+                adversaryRunResponse.result.isError, true,
+                `expected the zero-read adversary to be refused: ${JSON.stringify(adversaryRunResponse)}`)
+            const adversaryText = adversaryRunResponse.result.content[0].text
+            assert.ok(
+                adversaryText.includes('zero observed reads'),
+                `expected the refusal to name the zero-read condition: ${adversaryText}`)
+
+            // EXEC-12 session survival, proven for the refused call, not
+            // merely the successful one above: the SAME live process still
+            // answers a FOLLOWING request rather than dying or dropping the
+            // connection.
+            const survivesAdversaryResponse = await call('cas_list', {})
+            assert.ok(
+                !survivesAdversaryResponse.result.isError,
+                `cas_list after the refused adversary call failed: ${JSON.stringify(survivesAdversaryResponse)}`)
+
             // ── The one assertion no virtual proof can make: the
             // materialized program .mjs exists on the REAL filesystem,
             // because a real separate process really wrote it and really
