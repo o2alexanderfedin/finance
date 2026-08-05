@@ -41,8 +41,9 @@ Work items to land in FunctionalScript itself, driven by what `finance` needs.
          At the same time, the first run without a lock file can generate one, which we
          then supply on later runs to reproduce.
    - Design a URL format for hashes and revision subjects. Our runner should be able to intercept `import`. For example
-     - hash URL: `import a from 'sha2:3902j2sye...'`
-     - subject (mutable) URL: `import a from 'revision:3902j2sye...'`
+     - hash URL: `import a from 'sha256-3902j2sye...'`
+     - subject (mutable) URL: `import a from 'revision-3902j2sye...'`
+     The reason that we use `-` instead of, for example `:`, so we can create a flat directory with the files and any JS engine runner (Node, Deno, Bun, etc) can execute the script. If we use `/` instead of `-`, we will need to write like this `../revision/xxx`, `../sha256/xxx` because imported files should be able to import other files w/o changes in the import.
 
    > **Note.** These types and the CAS whitelist compose but stay separate, as the
    > parenthetical says: the type is what a program *may express*, the operation map is what
