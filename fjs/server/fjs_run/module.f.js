@@ -114,6 +114,7 @@ import { initEvo, evo } from 'functionalscript/fjs/cas/evo/module.f.js'
 import { emptyState, virtual } from 'functionalscript/fjs/effects/node/virtual/module.f.js'
 import { assert, assertEq, assertNotNullish } from 'functionalscript/fjs/asserts/module.f.js'
 import { interpret } from '../../exec/module.f.js'
+import { countNumericLiterals } from '../../report/audit/module.f.js'
 import { guestCtx } from '../../guest/module.f.js'
 import { materializeProgram, loadProgram, materializeHome, programPath } from '../../guest/materialize/module.f.js'
 import { buildRunSnapshot, buildHostMap } from './snapshot/module.f.js'
@@ -140,10 +141,17 @@ import { parse } from 'functionalscript/fjs/path/module.f.js'
 
 /**
  * One `executeRun` invocation's outcome: the program's value plus every
- * command `interpret` actually dispatched to reach it, or a refusal message
- * (whose `reads` is `[]` for a mid-chain refusal — see the module header).
+ * command `interpret` actually dispatched to reach it, plus the numeric-
+ * literal count of its own source text (PROV-07's REPORTED half —
+ * `countNumericLiterals`, 09-CONTEXT.md/Plan 09-02), or a refusal message
+ * (whose `reads` is `[]` for a mid-chain refusal — see the module header). A
+ * program whose `interpret` run dispatched ZERO observed reads is never
+ * expressed as an `'ok'` outcome — see the zero-read gate in {@link
+ * executeRun} and {@link runExecuteRunViaFixture} below (PROV-07's actual
+ * kill condition, 09-CONTEXT.md: "Zero observed CAS reads is an error
+ * result").
  * @template T
- * @typedef {{ readonly kind: 'ok', readonly value: T, readonly reads: readonly Read[] } | { readonly kind: 'error', readonly message: string, readonly reads: readonly Read[] }} RunOutcome
+ * @typedef {{ readonly kind: 'ok', readonly value: T, readonly reads: readonly Read[], readonly literalCount: number } | { readonly kind: 'error', readonly message: string, readonly reads: readonly Read[] }} RunOutcome
  */
 
 /**
@@ -164,6 +172,10 @@ export const executeRun = materializeHomeRoot => cas => evoApi => input => {
             return pure(/** @type {RunOutcome<unknown>} */ ({ kind: 'error', message: `program not found: ${input.hash}`, reads: [] }))
         }
         const sourceText = utf8ToString(readResult[1])
+        // PROV-07 (the reported half): computed HERE, at the exact point
+        // checkSpecifiers will read this SAME string from moments later
+        // (inside loadProgram) — never a second reading of the source.
+        const literalCount = countNumericLiterals(sourceText)
         return step(materializeProgram(materializeHomeRoot)(input.hash)(sourceText), materializeResult => {
             if (materializeResult[0] === 'error') {
                 return pure(/** @type {RunOutcome<unknown>} */ ({ kind: 'error', message: materializeResult[1], reads: [] }))
@@ -183,7 +195,20 @@ export const executeRun = materializeHomeRoot => cas => evoApi => input => {
                         return pure(/** @type {RunOutcome<unknown>} */ ({ kind: 'error', message: v, reads: [] }))
                     }
                     const [value, reads] = v
-                    return pure(/** @type {RunOutcome<unknown>} */ ({ kind: 'ok', value, reads }))
+                    // PROV-07's actual kill condition (09-CONTEXT.md): a
+                    // program whose run dispatched ZERO observed reads
+                    // computed nothing from any stored document, and is
+                    // refused as an error result rather than returned as a
+                    // silent 'ok' — this is what defeats
+                    // `() => pure({ line16: 9137 })`.
+                    if (reads.length === 0) {
+                        return pure(/** @type {RunOutcome<unknown>} */ ({
+                            kind: 'error',
+                            message: `report produced zero observed reads over any stored document (source contains ${literalCount} numeric literal(s)) — a computed report must read at least one stored document`,
+                            reads: [],
+                        }))
+                    }
+                    return pure(/** @type {RunOutcome<unknown>} */ ({ kind: 'ok', value, reads, literalCount }))
                 })
             })
         })
@@ -414,6 +439,9 @@ export const placeJsModuleFixture = root => path => fn => {
  * @type {(home: string) => (cas: Cas<FileCasOperation>) => (evoApi: Evo<FileCasOperation>) => (hash: string) => (source: string) => (report: Report<unknown>) => (args: readonly string[]) => (pin: { readonly subject: string, readonly parents: readonly string[] } | undefined) => (state: State) => readonly [State, RunOutcome<unknown>]}
  */
 const runExecuteRunViaFixture = home => cas => evoApi => hash => source => report => args => pin => state => {
+    // PROV-07: mirrors executeRun's own literalCount computation, from the
+    // SAME `source` parameter this helper already receives.
+    const literalCount = countNumericLiterals(source)
     const [state1, materializeResult] = virtual(state)(materializeProgram(home)(hash)(source))
     assert(materializeResult[0] === 'ok', ['expected the real materialize write to succeed', materializeResult])
     const path = programPath(materializeHome(home))(hash)
@@ -432,7 +460,15 @@ const runExecuteRunViaFixture = home => cas => evoApi => hash => source => repor
                     return pure(/** @type {RunOutcome<unknown>} */ ({ kind: 'error', message: v, reads: [] }))
                 }
                 const [value, reads] = v
-                return pure(/** @type {RunOutcome<unknown>} */ ({ kind: 'ok', value, reads }))
+                // PROV-07: mirrors executeRun's own zero-read gate.
+                if (reads.length === 0) {
+                    return pure(/** @type {RunOutcome<unknown>} */ ({
+                        kind: 'error',
+                        message: `report produced zero observed reads over any stored document (source contains ${literalCount} numeric literal(s)) — a computed report must read at least one stored document`,
+                        reads: [],
+                    }))
+                }
+                return pure(/** @type {RunOutcome<unknown>} */ ({ kind: 'ok', value, reads, literalCount }))
             })
         }),
     )
@@ -480,13 +516,18 @@ const assertPersistedErrorRunRecord = cas => state => errorText => {
 }
 
 /**
- * A trivial, well-behaved report program's source (`ctx.pure('ok')`, zero
- * reads) — the SAME text {@link seedGoodProgram} stores into CAS and
- * {@link assertSessionSurvivesAFollowingCall} materializes/loads via
- * {@link runExecuteRunViaFixture}.
+ * A trivial, well-behaved report program's source — one harmless `evoList`
+ * dispatch (PROV-07's zero-read gate: `reads.length === 0` is now an error
+ * outcome, so even this plumbing fixture must dispatch at least one real
+ * read) then `ctx.pure('ok')` — the SAME text {@link seedGoodProgram} stores
+ * into CAS and {@link assertSessionSurvivesAFollowingCall} materializes/loads
+ * via {@link runExecuteRunViaFixture}. Kept in sync with {@link goodReport}'s
+ * own actual body (which is what really runs, per this file's established
+ * write/JsModule split) so this stored text never misleadingly describes a
+ * different program than the one that executes.
  * @type {string}
  */
-const goodProgramSource = 'export const report = ctx => args => ctx.pure("ok")'
+const goodProgramSource = 'export const report = ctx => args => ctx.step(ctx.evoList("false"), () => ctx.pure("ok"))'
 
 /**
  * Seeds {@link goodProgramSource} into `state`'s CAS store, returning its
@@ -531,8 +572,12 @@ const seedGoodProgram = cas => state => {
  * @type {(materializeHomeRoot: string) => (cas: Cas<FileCasOperation>) => (evoApi: Evo<FileCasOperation>) => (state: State) => (goodHash: string) => void}
  */
 const assertSessionSurvivesAFollowingCall = home => cas => e => state => goodHash => {
+    // PROV-07: one harmless evoList dispatch, even against an empty store,
+    // gives reads.length === 1 — required now that a zero-read outcome is
+    // refused as an error rather than returned as 'ok' (see the module's
+    // RunOutcome typedef and the zero-read gate in executeRun above).
     /** @type {Report<string>} */
-    const goodReport = ctx => () => ctx.pure('ok')
+    const goodReport = ctx => () => ctx.step(ctx.evoList('false'), () => ctx.pure('ok'))
     const [state1, outcome] = runExecuteRunViaFixture(home)(cas)(e)(goodHash)(goodProgramSource)(goodReport)([])(undefined)(state)
     const [, followUp] = virtual(state1)(handleRunOutcome(cas)(goodHash)([])(false)({})(outcome))
     assertEq(followUp.isError, undefined)
@@ -737,8 +782,11 @@ export const proof = {
                 const e = evo(cas)(cacheKey)
                 const programSource = 'export const report = ctx => args => ctx.pure("answer-42")'
                 const [state1, programHash] = virtual(state0)(seedText(cas)(programSource))
+                // PROV-07: one harmless evoList dispatch gives
+                // reads.length === 1, required now that a zero-read outcome
+                // is refused as an error instead of returned as 'ok'.
                 /** @type {import('../../guest/module.f.js').Report<string>} */
-                const trivialReport = ctx => () => ctx.pure('answer-42')
+                const trivialReport = ctx => () => ctx.step(ctx.evoList('false'), () => ctx.pure('answer-42'))
 
                 const [, hashesBefore] = virtual(state1)(cas.list())
                 const hashesBeforeSet = new Set(hashesBefore.map(vecToCBase32))
@@ -788,8 +836,11 @@ export const proof = {
                 const e = evo(cas)(cacheKey)
                 const programSource = 'export const report = ctx => args => ctx.pure("tiny")'
                 const [state1, programHash] = virtual(state0)(seedText(cas)(programSource))
+                // PROV-07: one harmless evoList dispatch gives
+                // reads.length === 1, required now that a zero-read outcome
+                // is refused as an error instead of returned as 'ok'.
                 /** @type {import('../../guest/module.f.js').Report<string>} */
-                const tinyReport = ctx => () => ctx.pure('tiny')
+                const tinyReport = ctx => () => ctx.step(ctx.evoList('false'), () => ctx.pure('tiny'))
 
                 // 07-10: decomposed via runExecuteRunViaFixture/
                 // handleRunOutcome — see the adversarial proof above for
