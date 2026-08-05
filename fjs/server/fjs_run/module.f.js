@@ -146,13 +146,36 @@ import { parse } from 'functionalscript/fjs/path/module.f.js'
  * `countNumericLiterals`, 09-CONTEXT.md/Plan 09-02), or a refusal message
  * (whose `reads` is `[]` for a mid-chain refusal — see the module header). A
  * program whose `interpret` run dispatched ZERO observed reads is never
- * expressed as an `'ok'` outcome — see the zero-read gate in {@link
- * executeRun} and {@link runExecuteRunViaFixture} below (PROV-07's actual
- * kill condition, 09-CONTEXT.md: "Zero observed CAS reads is an error
- * result").
+ * expressed as an `'ok'` outcome — see {@link classifyRunOutcome} below
+ * (PROV-07's actual kill condition, 09-CONTEXT.md: "Zero observed CAS reads
+ * is an error result").
  * @template T
  * @typedef {{ readonly kind: 'ok', readonly value: T, readonly reads: readonly Read[], readonly literalCount: number } | { readonly kind: 'error', readonly message: string, readonly reads: readonly Read[] }} RunOutcome
  */
+
+/**
+ * PROV-07's actual kill condition (09-CONTEXT.md): a program whose
+ * `interpret` run dispatched ZERO observed reads computed nothing from any
+ * stored document, and is refused as an error result rather than returned
+ * as a silent `'ok'` — this is what defeats `() => pure({ line16: 9137 })`.
+ *
+ * 09-05: this is the ONLY place in this file the observed-read count is
+ * checked against zero, and the ONLY place the zero-read error message is
+ * built. Both
+ * {@link executeRun} (the production path a real `fjs_run` MCP call
+ * actually executes) and {@link runExecuteRunViaFixture} (the test-only
+ * decomposition `fjs/effects/node/virtual`'s write/import split requires —
+ * see that helper's own header) call this SAME function, so mutating this
+ * one body is the only way to change the rule either path enforces.
+ * @type {(literalCount: number) => (value: unknown, reads: readonly Read[]) => RunOutcome<unknown>}
+ */
+export const classifyRunOutcome = literalCount => (value, reads) => reads.length === 0
+    ? {
+        kind: 'error',
+        message: `report produced zero observed reads over any stored document (source contains ${literalCount} numeric literal(s)) — a computed report must read at least one stored document`,
+        reads: [],
+    }
+    : { kind: 'ok', value, reads, literalCount }
 
 /**
  * Runs a stored program (by CAS hash) against `input.args`, optionally
@@ -195,20 +218,9 @@ export const executeRun = materializeHomeRoot => cas => evoApi => input => {
                         return pure(/** @type {RunOutcome<unknown>} */ ({ kind: 'error', message: v, reads: [] }))
                     }
                     const [value, reads] = v
-                    // PROV-07's actual kill condition (09-CONTEXT.md): a
-                    // program whose run dispatched ZERO observed reads
-                    // computed nothing from any stored document, and is
-                    // refused as an error result rather than returned as a
-                    // silent 'ok' — this is what defeats
-                    // `() => pure({ line16: 9137 })`.
-                    if (reads.length === 0) {
-                        return pure(/** @type {RunOutcome<unknown>} */ ({
-                            kind: 'error',
-                            message: `report produced zero observed reads over any stored document (source contains ${literalCount} numeric literal(s)) — a computed report must read at least one stored document`,
-                            reads: [],
-                        }))
-                    }
-                    return pure(/** @type {RunOutcome<unknown>} */ ({ kind: 'ok', value, reads, literalCount }))
+                    // 09-05: the zero-read kill condition lives once, in
+                    // classifyRunOutcome — this is the production call site.
+                    return pure(classifyRunOutcome(literalCount)(value, reads))
                 })
             })
         })
@@ -476,15 +488,9 @@ const runExecuteRunViaFixture = home => cas => evoApi => hash => source => repor
                     return pure(/** @type {RunOutcome<unknown>} */ ({ kind: 'error', message: v, reads: [] }))
                 }
                 const [value, reads] = v
-                // PROV-07: mirrors executeRun's own zero-read gate.
-                if (reads.length === 0) {
-                    return pure(/** @type {RunOutcome<unknown>} */ ({
-                        kind: 'error',
-                        message: `report produced zero observed reads over any stored document (source contains ${literalCount} numeric literal(s)) — a computed report must read at least one stored document`,
-                        reads: [],
-                    }))
-                }
-                return pure(/** @type {RunOutcome<unknown>} */ ({ kind: 'ok', value, reads, literalCount }))
+                // 09-05: shares executeRun's OWN classifyRunOutcome — no
+                // second copy of the zero-read rule.
+                return pure(classifyRunOutcome(literalCount)(value, reads))
             })
         }),
     )
@@ -533,9 +539,10 @@ const assertPersistedErrorRunRecord = cas => state => errorText => {
 
 /**
  * A trivial, well-behaved report program's source — one harmless `evoList`
- * dispatch (PROV-07's zero-read gate: `reads.length === 0` is now an error
- * outcome, so even this plumbing fixture must dispatch at least one real
- * read) then `ctx.pure('ok')` — the SAME text {@link seedGoodProgram} stores
+ * dispatch ({@link classifyRunOutcome}'s zero-read gate: a zero-length
+ * observed-read set is now an error outcome, so even this plumbing fixture
+ * must dispatch at least one real read) then `ctx.pure('ok')` — the SAME
+ * text {@link seedGoodProgram} stores
  * into CAS and {@link assertSessionSurvivesAFollowingCall} materializes/loads
  * via {@link runExecuteRunViaFixture}. Kept in sync with {@link goodReport}'s
  * own actual body (which is what really runs, per this file's established
