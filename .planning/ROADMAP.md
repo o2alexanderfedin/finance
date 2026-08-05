@@ -286,7 +286,7 @@ held — neither dialect required reopening `fjs/document/base` or the subject c
   5. An oversized result returns `result too large; stored at <hash>` from an **explicit size check before `writeResponse`**, rather than inheriting the silent `-32603` the 128 KiB stdio line cap produces.
 **Research**: Not needed.
 **Plans**: 8 plans
-- [ ] 07-01-PLAN.md — Guest ctx combinators (step/pure) and money helpers; revise the two Phase 6 proofs distinguishing commands from combinators (EXEC-08 precursor, per 07-CONTEXT.md Decision 1)
+- [x] 07-01-PLAN.md — Guest ctx combinators (step/pure) and money helpers; revise the two Phase 6 proofs distinguishing commands from combinators (EXEC-08 precursor, per 07-CONTEXT.md Decision 1)
 - [ ] 07-02-PLAN.md — vnd.fjs.run document dialect: schema, checkReferences, validate (PROV-03)
 - [ ] 07-03-PLAN.md — finance_schema MCP tool: dialect lookup + toJsonSchema serialization (MCP-06)
 - [ ] 07-04-PLAN.md — Size-guarded response envelope: sizeGuard, constants, ordering proof (EXEC-11)
