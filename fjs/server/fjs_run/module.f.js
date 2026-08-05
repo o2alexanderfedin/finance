@@ -102,99 +102,16 @@
  *
  * ## PROV-07's anti-hardcoding design, in plain words
  *
- * The premise of this whole project is that the agent does not tell you the
- * answer — it writes a program that COMPUTES the answer, which you can read,
- * re-run, and check.
- *
- * An agent writing that program can cheat, and the cheat is nearly invisible:
- *
- * ```js
- * export const report = ctx => () => ctx.pure({ line16: 9137 })
- * ```
- *
- * That is a valid program. It compiles, it returns a plausible tax figure, and
- * it satisfies essentially every rule one would think to write. It is also a
- * lie: the model recalled a number from training data and dressed it in
- * program's clothing. Nothing was computed from any actual document. PROV-07
- * names this program specifically, because it "satisfies every other criterion
- * while defeating the entire thesis."
- *
- * Three mechanisms catch it, and they do different jobs.
- *
- * ### 1. The zero-read kill condition — {@link classifyRunOutcome}
- *
- * Look at what the program TOUCHED, not at what it says. A guest gets a tiny
- * read-only vocabulary (the frozen four in `fjs/guest/module.f.js`), and
- * `interpret` records every read actually dispatched — not declared, not
- * imported: dispatched. If that list is empty, the run is refused.
- *
- * That is the whole rule. A report about stored documents that opened none of
- * them did not compute; it recited. The fake program above never dispatches a
- * read, so its list is empty and it dies. Nothing here needs tuning: no
- * "suspicious number" detector, no threshold, no heuristic anyone must trust.
- * Just: did you look at anything?
- *
- * ### 2. The two counts in the response — `readCount` and `literalCount`
- *
- * Show the user the evidence rather than only acting on it. Every run returns
- * how many documents it read and how many numbers are written literally in its
- * source.
- *
- * `readCount` is derived from the SAME observed-read set the kill condition
- * uses, so there is no second source of truth that could disagree with the
- * first.
- *
- * `literalCount` is REPORTED and never enforced, deliberately. Real programs
- * contain numbers — a zero, an index, a rate — so refusing on literals would
- * reject honest work and degenerate into an argument about thresholds. But a
- * report claiming a large figure from 1 read and 40 literals smells, and now
- * that is visible. Making the count honest was the fiddly part: in
- * `line16: 9137` exactly ONE number must count, since the `16` in `line16` is
- * part of a name, not a value — likewise digits inside strings, template
- * literals, and comments. `fjs/report/audit/module.f.js` proves each of those
- * cases separately rather than as one combined check, because a combined check
- * that totals correctly can hide two errors that cancel.
- *
- * ### 3. The perturbation gate, and why it needs a control leg
- *
- * If the answer really came from the documents, changing a document must change
- * the answer. So: store documents, run, change one box, run again — the output
- * must MOVE. A program that computed will move; a program with the answer baked
- * in returns 9137 no matter what happens to the store.
- *
- * The control leg is the part that is easy to skip and is the actual point.
- * Running only the real program proves little: the output might have moved for
- * some incidental reason, and a green test cannot tell you it passed for the
- * reason you think. So the SAME test runs the fake program through identical
- * steps and asserts its output does NOT move:
- *
- * - real program, document changed -> output moves    (it computed)
- * - fake program, document changed -> output frozen   (it recited)
- *
- * Together they show the test can distinguish the two cases; either alone
- * cannot. Phase 6 of this project learned that the hard way — a test asserting
- * a security check ran in the right ORDER passed under both orderings. Green
- * and meaningless. A control leg is the cheap insurance.
- *
- * ### The failure this file already had, kept here as a warning
- *
- * All of the above was built and every test passed — while the kill condition
- * existed in TWO places: the shipped path in {@link executeRun}, and a
- * near-identical copy inside {@link runExecuteRunViaFixture}. Every proof
- * exercised the copy. The shipped rule had no coverage at all.
- *
- * Reading cannot show you that. Only breaking the shipped code on purpose and
- * checking whether anything screams can: when that was done, all 258 tests
- * stayed green, and the gate was decorative. Plan 09-05 fixed it by making the
- * rule exist exactly once, shared by both paths. The same mutation now fails
- * three tests, including one driving a real server process end to end.
- *
- * The uncomfortable footnote: this phase's own context document contained the
- * sentence "a gate built for an adversary that is never actually run against it
- * is a claim, not a proof" — and the phase built one anyway. Writing the
- * principle down enforced nothing. Mutating the shipped code and watching tests
- * fail is what enforced it. If you touch {@link classifyRunOutcome}, mutate it
- * and confirm the suite goes red before you trust it.
+ * The zero-read kill condition ({@link classifyRunOutcome}, imported from
+ * `fjs/report/guard/module.f.js`) is the mechanism that defeats
+ * `() => pure({ line16: 9137 })` — a program that recites an answer instead
+ * of computing one from a stored document. This file no longer defines that
+ * rule; it CONSUMES it, at the two call sites below ({@link executeRun} and
+ * {@link runExecuteRunViaFixture}). The full plain-words account of all
+ * three PROV-07 mechanisms (the kill condition, the two reported counts, and
+ * the perturbation gate with its control leg), plus the history of the
+ * duplicate-copy defect this file used to carry, now lives in
+ * `fjs/report/guard/module.f.js`'s own module header — read it there.
  *
  * @module
  */
@@ -211,6 +128,7 @@ import { emptyState, virtual } from 'functionalscript/fjs/effects/node/virtual/m
 import { assert, assertEq, assertNotNullish } from 'functionalscript/fjs/asserts/module.f.js'
 import { interpret } from '../../exec/module.f.js'
 import { countNumericLiterals } from '../../report/audit/module.f.js'
+import { classifyRunOutcome } from '../../report/guard/module.f.js'
 import { guestCtx } from '../../guest/module.f.js'
 import { materializeProgram, loadProgram, materializeHome, programPath } from '../../guest/materialize/module.f.js'
 import { buildRunSnapshot, buildHostMap } from './snapshot/module.f.js'
@@ -229,49 +147,18 @@ import { parse } from 'functionalscript/fjs/path/module.f.js'
 /** @import { Vec } from 'functionalscript/fjs/types/bit_vec/module.f.js' */
 /** @import { CasOp } from '../../guest/module.f.js' */
 /** @import { State, Dir, JsModule } from 'functionalscript/fjs/effects/node/virtual/module.f.js' */
-/** @import { Read } from '../../exec/module.f.js' */
 /** @import { Report } from '../../guest/module.f.js' */
 /** @import { Run } from '../../run/module.f.js' */
+/** @import { RunOutcome } from '../../report/guard/module.f.js' */
 
 // ── executeRun ────────────────────────────────────────────────────────────────
-
-/**
- * One `executeRun` invocation's outcome: the program's value plus every
- * command `interpret` actually dispatched to reach it, plus the numeric-
- * literal count of its own source text (PROV-07's REPORTED half —
- * `countNumericLiterals`, 09-CONTEXT.md/Plan 09-02), or a refusal message
- * (whose `reads` is `[]` for a mid-chain refusal — see the module header). A
- * program whose `interpret` run dispatched ZERO observed reads is never
- * expressed as an `'ok'` outcome — see {@link classifyRunOutcome} below
- * (PROV-07's actual kill condition, 09-CONTEXT.md: "Zero observed CAS reads
- * is an error result").
- * @template T
- * @typedef {{ readonly kind: 'ok', readonly value: T, readonly reads: readonly Read[], readonly literalCount: number } | { readonly kind: 'error', readonly message: string, readonly reads: readonly Read[] }} RunOutcome
- */
-
-/**
- * PROV-07's actual kill condition (09-CONTEXT.md): a program whose
- * `interpret` run dispatched ZERO observed reads computed nothing from any
- * stored document, and is refused as an error result rather than returned
- * as a silent `'ok'` — this is what defeats `() => pure({ line16: 9137 })`.
- *
- * 09-05: this is the ONLY place in this file the observed-read count is
- * checked against zero, and the ONLY place the zero-read error message is
- * built. Both
- * {@link executeRun} (the production path a real `fjs_run` MCP call
- * actually executes) and {@link runExecuteRunViaFixture} (the test-only
- * decomposition `fjs/effects/node/virtual`'s write/import split requires —
- * see that helper's own header) call this SAME function, so mutating this
- * one body is the only way to change the rule either path enforces.
- * @type {(literalCount: number) => (value: unknown, reads: readonly Read[]) => RunOutcome<unknown>}
- */
-export const classifyRunOutcome = literalCount => (value, reads) => reads.length === 0
-    ? {
-        kind: 'error',
-        message: `report produced zero observed reads over any stored document (source contains ${literalCount} numeric literal(s)) — a computed report must read at least one stored document`,
-        reads: [],
-    }
-    : { kind: 'ok', value, reads, literalCount }
+//
+// 09-06: `RunOutcome` and `classifyRunOutcome` — PROV-07's zero-read kill
+// condition — no longer live in this file. They are imported from
+// `fjs/report/guard/module.f.js`, above; see that module's header for the
+// full account. This file consumes the rule at the two call sites below
+// ({@link executeRun} and {@link runExecuteRunViaFixture}), it does not
+// define it.
 
 /**
  * Runs a stored program (by CAS hash) against `input.args`, optionally
@@ -314,8 +201,10 @@ export const executeRun = materializeHomeRoot => cas => evoApi => input => {
                         return pure(/** @type {RunOutcome<unknown>} */ ({ kind: 'error', message: v, reads: [] }))
                     }
                     const [value, reads] = v
-                    // 09-05: the zero-read kill condition lives once, in
-                    // classifyRunOutcome — this is the production call site.
+                    // 09-06: classifyRunOutcome (imported from
+                    // fjs/report/guard/module.f.js) is the zero-read kill
+                    // condition's ONLY definition — this is the production
+                    // call site.
                     return pure(classifyRunOutcome(literalCount)(value, reads))
                 })
             })
@@ -584,8 +473,9 @@ const runExecuteRunViaFixture = home => cas => evoApi => hash => source => repor
                     return pure(/** @type {RunOutcome<unknown>} */ ({ kind: 'error', message: v, reads: [] }))
                 }
                 const [value, reads] = v
-                // 09-05: shares executeRun's OWN classifyRunOutcome — no
-                // second copy of the zero-read rule.
+                // 09-06: shares the SAME imported classifyRunOutcome
+                // executeRun calls above — no second copy of the zero-read
+                // rule.
                 return pure(classifyRunOutcome(literalCount)(value, reads))
             })
         }),

@@ -38,13 +38,14 @@
  * perturbation gate with its control leg.
  *
  * **The plain-language account of all three, and of why the design is shaped
- * this way, lives in `fjs/server/fjs_run/module.f.js`'s module header, section
+ * this way, lives in `fjs/report/guard/module.f.js`'s module header, section
  * "PROV-07's anti-hardcoding design, in plain words."** It is written there
  * rather than duplicated here so the three parts are explained together and in
- * one place — and because that file is where the mechanism that actually
- * refuses a program lives. Read it before changing this counter's behaviour:
- * this module's freedom to be a weak heuristic is a direct consequence of the
- * kill condition being something else entirely.
+ * one place — and because that module is where the mechanism that actually
+ * refuses a program lives (Plan 09-06 moved it there out of
+ * `fjs/server/fjs_run/module.f.js`, its former home). Read it before changing
+ * this counter's behaviour: this module's freedom to be a weak heuristic is a
+ * direct consequence of the kill condition being something else entirely.
  *
  * @module
  */
