@@ -90,7 +90,7 @@
  *
  * @module
  */
-import { step, pure, mapStep } from 'functionalscript/fjs/effects/module.f.js'
+import { step, pure, mapStep, do_ } from 'functionalscript/fjs/effects/module.f.js'
 import { collectRead, fileCas } from 'functionalscript/fjs/cas/module.f.js'
 import { cBase32ToVec, vecToCBase32 } from 'functionalscript/fjs/basen/cbase32/module.f.js'
 import { utf8ToString, tryUtf8 } from 'functionalscript/fjs/text/module.f.js'
@@ -103,10 +103,12 @@ import { emptyState, virtual } from 'functionalscript/fjs/effects/node/virtual/m
 import { assert, assertEq, assertNotNullish } from 'functionalscript/fjs/asserts/module.f.js'
 import { interpret } from '../../exec/module.f.js'
 import { guestCtx } from '../../guest/module.f.js'
-import { materializeProgram, programFileName, loadProgram } from '../../guest/materialize/module.f.js'
+import { materializeProgram, programFileName, loadProgram, materializeHome, programPath } from '../../guest/materialize/module.f.js'
 import { buildRunSnapshot, buildHostMap } from './snapshot/module.f.js'
 import { dialect, validate as validateRun } from '../../run/module.f.js'
 import { sizeGuard, previewBytes, guardBytes } from '../response/module.f.js'
+import { readUtf8File } from 'functionalscript/fjs/effects/node/module.f.js'
+import { vec8 } from 'functionalscript/fjs/types/bit_vec/module.f.js'
 
 /** @import { Effect, Operation } from 'functionalscript/fjs/effects/module.f.js' */
 /** @import { MemOp } from 'functionalscript/fjs/effects/memory/module.f.js' */
@@ -115,6 +117,8 @@ import { sizeGuard, previewBytes, guardBytes } from '../response/module.f.js'
 /** @import { Evo } from 'functionalscript/fjs/cas/evo/module.f.js' */
 /** @import { ToolEntry } from 'functionalscript/fjs/protocol/mcp/module.f.js' */
 /** @import { Vec } from 'functionalscript/fjs/types/bit_vec/module.f.js' */
+/** @import { CasOp } from '../../guest/module.f.js' */
+/** @import { State } from 'functionalscript/fjs/effects/node/virtual/module.f.js' */
 /** @import { Read } from '../../exec/module.f.js' */
 /** @import { Report } from '../../guest/module.f.js' */
 /** @import { Run } from '../../run/module.f.js' */
@@ -298,6 +302,47 @@ const seedText = cas => text => {
         assert(w[0] === 'ok', ['expected the seed write to succeed', w])
         return vecToCBase32(w[1])
     })
+}
+
+// ── EXEC-12: error-taxonomy proof support ────────────────────────────────────
+
+/**
+ * `fjs/exec`'s own test-fixture escape hatch (`fjs/exec/module.f.js`),
+ * reproduced locally rather than imported: constructing a probe outside
+ * `CasOp`'s frozen vocabulary requires casting `do_` to `any`, and that
+ * module's own comment confines the cast to ITS OWN test-fixture section —
+ * so this file builds an equivalent local escape hatch instead of importing
+ * across that boundary. A real `CasOp`-typed `Report` cannot construct this
+ * (`tsc` refuses a literal `'fetch'` command), which is exactly why
+ * `nonErrorThrowBecomesErrorResult` (below) needs it: it stands in for a
+ * stored/generated program whose command string bypassed `tsc` before ever
+ * reaching `interpret`'s runtime refusal.
+ * @type {(command: string) => (...payload: readonly unknown[]) => Effect<CasOp, string>}
+ */
+const unsafeDo = /** @type {any} */ (do_)
+
+/**
+ * Extracts the run-record hash embedded in `fjsRunTool`'s own error text
+ * (`... (run record: <hash>)`), reads that record back OUT of `cas` — never
+ * the in-process outcome — and asserts it validates with `status: 'error'`.
+ * All three error-taxonomy leaves below make this identical assertion
+ * (PROV-03: a failed run still gets a run record), so it is factored here
+ * once rather than repeated three times.
+ * @type {(cas: Cas<FileCasOperation>) => (state: State) => (errorText: string) => void}
+ */
+const assertPersistedErrorRunRecord = cas => state => errorText => {
+    const match = /run record: (\S+)\)/.exec(errorText)
+    assert(match !== null, ['expected the error text to name a run record hash', errorText])
+    const runHash = assertNotNullish(match[1], 'expected the run record hash capture group to be present')
+    const runHashVec = cBase32ToVec(runHash)
+    assert(runHashVec !== null, 'expected a decodable runHash')
+    const [, runRead] = virtual(state)(collectRead(cas.read(/** @type {Vec} */ (runHashVec))))
+    assert(runRead[0] === 'ok', ['expected the error run record to read back', runRead])
+    const [vt, record] = validateRun(JSON.parse(utf8ToString(runRead[1])))
+    assert(vt === 'ok', ['expected the error record to validate', vt, record])
+    if (vt === 'ok') {
+        assertEq(record.status, 'error')
+    }
 }
 
 export const proof = {
@@ -603,6 +648,81 @@ export const proof = {
                     assert(record.error !== undefined && record.error.includes('not-a-real-hash'), record.error)
                     assertEq(record.resultHash, undefined)
                 }
+            },
+        },
+        // EXEC-12, Success Criterion 4: three named failure classes, each
+        // its own leaf so a regression localizes — a combined loop cannot
+        // say WHICH class broke. Each leaf drives the FULL fjsRunTool.handle
+        // (never executeRun/loadProgram in isolation — those are already
+        // proven at their own layer, Plan 06 Task 1 and Phase 6
+        // respectively) and asserts the returned ToolsCallResult's OWN
+        // isError:true, plus that a status:'error' run record was
+        // persisted and reads back (PROV-03: provenance that covers only
+        // successes is not provenance).
+        errorTaxonomy: {
+            // Failure class 1: a guest program that refuses via a
+            // non-`Error`, non-`CasOp` command. `interpret`'s own refusal
+            // path (fjs/exec/module.f.js) reads the caught bare value
+            // directly, never `instanceof Error` — this leaf proves that
+            // refusal surfaces as fjsRunTool.handle's OWN isError:true.
+            nonErrorThrowBecomesErrorResult: () => {
+                const home = '/error-taxonomy-non-error-throw'
+                const cas = fileCas(sha256)(home)
+                const [state0, cacheKey] = virtual(emptyState)(initEvo(cas))
+                const e = evo(cas)(cacheKey)
+
+                // The stored SOURCE is a clean, zero-import stand-in — the
+                // JsModule fixture below is what actually runs, per the
+                // module header's documented materialize-write/JsModule-at-
+                // hash-path split every proof in this file uses.
+                const [state1, escapingHash] = virtual(state0)(
+                    seedText(cas)('export const report = ctx => args => ctx.pure("unused")'))
+                const escapingName = programFileName(escapingHash)
+                /** @type {Report<string>} */
+                const escapingReport = () => () => unsafeDo('fetch')('https://evil')
+                const root = { ...state1.root, [escapingName]: () => ({ report: escapingReport }) }
+
+                const [state2, callResult] = virtual({ ...state1, root })(
+                    fjsRunTool(home)(cas)(e).handle({ hash: escapingHash }))
+                assertEq(callResult.isError, true)
+                const first = callResult.content[0]
+                if (first === undefined || first.type !== 'text') {
+                    throw ['expected a text content item', callResult]
+                }
+                assert(first.text.includes('fetch'), ['expected the refused operation to be named', first.text])
+                assertPersistedErrorRunRecord(cas)(state2)(first.text)
+            },
+            // Failure class 2: a syntactically valid cBase32 hash that was
+            // never written to THIS store — the genuine CAS-miss branch
+            // (`collectRead(cas.read(...))` failing), distinct from
+            // executeRun's own already-proven malformed-hash branch
+            // (07-06's missingHashShortCircuitsBeforeMaterializeOrInterpret,
+            // which never even reaches cas.read).
+            missingHashBecomesErrorResult: () => {
+                const home = '/error-taxonomy-missing-hash'
+                const cas = fileCas(sha256)(home)
+                const [state0, cacheKey] = virtual(emptyState)(initEvo(cas))
+                const e = evo(cas)(cacheKey)
+                const missingHash = vecToCBase32(vec8(0xabn))
+
+                const [state1, callResult] = virtual(state0)(
+                    fjsRunTool(home)(cas)(e).handle({ hash: missingHash }))
+                assertEq(callResult.isError, true)
+                const first = callResult.content[0]
+                if (first === undefined || first.type !== 'text') {
+                    throw ['expected a text content item', callResult]
+                }
+                assert(first.text.includes(missingHash), ['expected the missing hash to be named', first.text])
+                assertPersistedErrorRunRecord(cas)(state1)(first.text)
+
+                // Materialization was never attempted: a real behavioral
+                // check against the SAME virtual Fs materializeProgram
+                // itself writes through (readUtf8File at the exact path
+                // materializeProgram would have used), not an inference
+                // from the returned message text alone.
+                const [, readAttempt] = virtual(state1)(
+                    readUtf8File(programPath(materializeHome(home))(missingHash)))
+                assertEq(readAttempt[0], 'error')
             },
         },
     },
