@@ -240,8 +240,27 @@ export const proof = {
             const [t, v] = validate(r)
             assert(t === 'ok', ['expected ok', t, v])
         },
+        // Wrong dialect: structural rejection, `dialect` first — same
+        // guarantee every other document dialect gets from `base`.
+        wrongDialectRejected: () => {
+            const [t, v] = validate({ ...minimalOk, dialect: 'vnd.fjs.wrong' })
+            assertEq(t, 'error')
+            if (t !== 'error') {
+                throw ['expected error', t, v]
+            }
+            if (typeof v === 'string') {
+                throw ['expected a structural ValidationError, got a checkReferences string', v]
+            }
+            assertEq(v.path[0], 'dialect')
+        },
     },
     checkReferences: {
+        // Task 1 acceptance criterion: empty `programHash` (the identity of
+        // the record) is rejected — a record naming no program is unusable.
+        emptyProgramHashRejected: () => {
+            const [t] = validate({ ...minimalOk, programHash: '' })
+            assertEq(t, 'error')
+        },
         // Task 1 acceptance criterion: `inputs[0].command === 'fetch'` is not
         // one of the frozen four and is rejected — T-07-02-01's read-back
         // backstop.
@@ -262,6 +281,57 @@ export const proof = {
         errorWithResultHashRejected: () => {
             const [t] = validate({ ...minimalError, resultHash: 'sha256-result1' })
             assertEq(t, 'error')
+        },
+        // Behavior spec (symmetric to the previous case): `status: 'error'`
+        // with NO `error` message is rejected — a failed run must say why.
+        errorWithoutErrorMessageRejected: () => {
+            const { error: _errorField, ...withoutError } = minimalError
+            const [t] = validate(withoutError)
+            assertEq(t, 'error')
+        },
+        // Bonus (belt-and-suspenders, not separately named in Task 1's
+        // acceptance criteria, but implied by the same cross-field rule): an
+        // `ok` record carrying an `error` field is also rejected — a record
+        // cannot claim both an answer and a failure, in either direction.
+        okWithErrorFieldRejected: () => {
+            const [t] = validate({ ...minimalOk, error: 'should not be here' })
+            assertEq(t, 'error')
+        },
+        canonicalOkAccepted: () => {
+            const [t] = validate(minimalOk)
+            assertEq(t, 'ok')
+        },
+        canonicalErrorAccepted: () => {
+            const [t] = validate(minimalError)
+            assertEq(t, 'ok')
+        },
+    },
+    // Cross-dialect proof, mirroring `1099int`'s own `crossDialect` leaves —
+    // reuses the same discriminant-first guarantee DOC-00 established.
+    crossDialect: {
+        // A fully-valid `vnd.fjs.1099int` value, constructed as a parsed JS
+        // object (never a JSON string — proves rejection is structural, not
+        // text/prefix-based), fails `vnd.fjs.run`'s `validate`, and the
+        // failure's `path` is exactly `['dialect']`.
+        oneZeroNineNineIntShapeRejectedByRun: () => {
+            const oneZeroNineNineIntValue = {
+                dialect: 'vnd.fjs.1099int',
+                payerTin: '11-1111111',
+                recipientTin: '222-22-2222',
+                accountNumber: 'ACC-0001',
+                taxYear: 2024,
+                formRevision: '2024',
+            }
+            const [t, v] = validate(oneZeroNineNineIntValue)
+            assertEq(t, 'error')
+            if (t !== 'error') {
+                throw ['expected error', t, v]
+            }
+            if (typeof v === 'string') {
+                throw ['expected a structural ValidationError, got a checkReferences string', v]
+            }
+            assertEq(v.path.length, 1)
+            assertEq(v.path[0], 'dialect')
         },
     },
 }
