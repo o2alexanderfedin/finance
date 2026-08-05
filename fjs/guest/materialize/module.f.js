@@ -43,14 +43,22 @@ import { interpret } from '../../exec/module.f.js'
  * Every form that names a module specifier in ESM source: a static
  * `import`/`export ... from 'x'`, a bare side-effect `import 'x'`, and a
  * dynamic `import('x')`. Each alternative anchors on its own keyword and
- * captures the quoted specifier, single or double quoted.
+ * captures the specifier that follows it.
  *
- * Both quote bodies are negated character classes (`[^'"]*`) rather than
- * lazy wildcards, so matching is linear in input length with no
+ * A specifier may be quoted three ways, and the third is not like the other
+ * two. Group 1 captures a `'`- or `"`-quoted specifier, whose text is exactly
+ * what the source says. Group 2 captures a backtick-quoted one — legal in a
+ * dynamic `import()` — whose text may be assembled at runtime by a `${...}`
+ * substitution and so is *not* knowable from the source. The two are captured
+ * separately because they get different answers, not because they differ in
+ * shape: see {@link checkSpecifiers}.
+ *
+ * Every quote body is a negated character class (`[^'"]*`, `` [^`]* ``)
+ * rather than a lazy wildcard, so matching is linear in input length with no
  * catastrophic-backtracking shape.
  * @type {RegExp}
  */
-const specifierPattern = /(?:\bfrom\s*|\bimport\s*\(?\s*|\bexport\s*\(?\s*)['"]([^'"]*)['"]/g
+const specifierPattern = /(?:\bfrom\s*|\bimport\s*\(?\s*|\bexport\s*\(?\s*)(?:['"]([^'"]*)['"]|`([^`]*)`)/g
 
 /**
  * Refuses a program whose source names any specifier outside `allowed`,
@@ -67,11 +75,29 @@ const specifierPattern = /(?:\bfrom\s*|\bimport\s*\(?\s*|\bexport\s*\(?\s*)['"](
  * because the parameter costs one line, and a function named for an
  * allow-list that cannot express one is a name that stops being true the
  * first time somebody needs it to.
+ *
+ * A backtick-quoted specifier is refused **unconditionally**, never compared
+ * against `allowed`. `` import(`${x}`) `` names a module whose text this
+ * function cannot know: the substitution is evaluated at import time, long
+ * after the gate has run. Comparing whatever literal text sits between the
+ * backticks would be checking a string the program never uses. Since this
+ * gate exists precisely because everything after it is too late (see the
+ * module header), the only sound answer to a specifier it cannot read is to
+ * refuse — a gate that cannot decide must not pass.
+ *
+ * The refusal is unconditional even for a substitution-free `` `node:fs` ``,
+ * which is in principle readable. Distinguishing the two would mean deciding
+ * which template literals are static, and that decision is the beginning of
+ * writing a JavaScript parser here rather than a gate.
  * @type {(allowed: readonly string[]) => (source: string) => Result<string, string>}
  */
 export const checkSpecifiers = allowed => source => {
     for (const m of source.matchAll(specifierPattern)) {
         const specifier = m[1]
+        const templateSpecifier = m[2]
+        if (templateSpecifier !== undefined) {
+            return error('import specifier not permitted: a template-literal specifier cannot be checked statically')
+        }
         if (specifier !== undefined && !allowed.includes(specifier)) {
             return error(`import specifier not permitted: ${specifier}`)
         }
@@ -180,6 +206,20 @@ export const proof = {
                 `export { x } from 'https://evil/y.js'`,
                 `await import("data:text/javascript,globalThis.x=1")`,
                 `import x from '../../etc/passwd'`,
+            ]) {
+                assertEq(checkSpecifiers([])(src)[0], 'error')
+            }
+        },
+        // A dynamic `import()` may quote its specifier with a backtick, and a
+        // template literal may interpolate — so its text is not knowable by
+        // reading the source at all. Neither form can be checked against an
+        // allow-list, so both are refused outright rather than parsed: a gate
+        // that cannot decide must not pass.
+        templateLiteralSpecifierRejected: () => {
+            for (const src of [
+                'await import(`node:fs`)',
+                'await import(`${globalThis.pick()}`)',
+                'export { x } from `https://evil/y.js`',
             ]) {
                 assertEq(checkSpecifiers([])(src)[0], 'error')
             }
