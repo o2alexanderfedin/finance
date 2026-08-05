@@ -43,7 +43,8 @@ import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
 import { interpret } from '../exec/module.f.js'
 
 /** @import { Effect, OperationMap } from 'functionalscript/fjs/effects/module.f.js' */
-/** @import { Fetch, Forever, Fs, Http, Rm, WriteBytes } from 'functionalscript/fjs/effects/node/module.f.js' */
+/** @import { Assert } from 'functionalscript/fjs/asserts/module.f.js' */
+/** @import { Equal } from 'functionalscript/fjs/types/ts/module.f.js' */
 
 // ── The frozen vocabulary ────────────────────────────────────────────────────
 
@@ -84,10 +85,13 @@ const evoRevision = do_('evoRevision')
 /**
  * Everything a stored program can do, handed to it as a parameter.
  *
- * Null-prototyped as defence in depth. It is **not** the security mechanism
- * — `match`'s own-property-only `at` lookup is (EXEC-02, delivered upstream
- * in fjs 0.41.0). It costs one line and removes a class of inherited-name
- * confusion regardless.
+ * Deliberately a plain object literal. An earlier version null-prototyped it
+ * as "defence in depth"; that is removed because the defence already exists
+ * where it belongs — `match` resolves handlers through an own-property-only
+ * `at` lookup, so an inherited name never dispatches (EXEC-02, fixed
+ * upstream in fjs 0.41.0). Re-stating the guarantee here with
+ * `setPrototypeOf` implies the upstream fix is not trusted, and leaves two
+ * places to reason about instead of one.
  */
 export const guestCtx = {
     casRead,
@@ -95,7 +99,6 @@ export const guestCtx = {
     evoHead,
     evoRevision,
 }
-Object.setPrototypeOf(guestCtx, null)
 
 /** @typedef {typeof guestCtx} GuestCtx */
 
@@ -119,48 +122,27 @@ export const casOpNames = ['casRead', 'evoList', 'evoHead', 'evoRevision']
 // ── The whitelist, in the type system (Success Criterion 1) ──────────────────
 
 /**
- * `true` when `A` is assignable to `B`. Tuple-wrapped so a union `A` is
- * tested as a whole rather than distributing member-by-member — without the
- * wrapping, `Extends<CasOp, X>` would silently mean "every member
- * separately", which is a different and weaker claim.
- * @template A
- * @template B
- * @typedef {[A] extends [B] ? true : false} Extends
- */
-
-/**
- * Each assertion below is a compile-time proof that a forbidden operation is
- * NOT part of the guest vocabulary. If one ever became assignable, its
- * annotation resolves to `never`, `= true` stops compiling, and `npm test`
- * fails at its `tsc` step — before a single test runs.
+ * Success Criterion 1, as a single compile-time assertion: the guest
+ * vocabulary is **exactly** these four command names.
  *
- * This is deliberately not a negative-compile harness that spawns `tsc` on
- * fixtures outside the build. Such a harness needs a second tsconfig, a
- * third root-level impure file, and `@ts-nocheck`; it runs only when
- * invoked; and an assertion of "exit code != 0" passes just as happily on a
- * typo in the fixture as on the property holding. Expressing the negative as
- * a conditional type inside the passing build costs none of that and is
- * checked on every run.
+ * `CasOp[0]` distributes over the union and collects each operation's name
+ * literal, so this pins the whole vocabulary rather than probing it. Add
+ * `Fetch` to `CasOp` and `CasOp[0]` gains `'fetch'`, `Equal` becomes
+ * `false`, and `Assert` fails its `T extends true` constraint — the build
+ * stops at `tsc`, before a single test runs.
  *
- * `Fetch`, `Fs`, `Http` and `Forever` are the four the roadmap names.
- * `WriteBytes` and `Rm` are added because they are what an over-eager
- * widening would actually reach for — `FileCasOperation` contains both, and
- * it is the type someone would plausibly mistake for the guest vocabulary.
+ * This replaces an earlier version that enumerated forbidden operations
+ * (`Extends<Fetch, CasOp> extends false ? true : never`, once each for
+ * `Fetch`/`Fs`/`Http`/`Forever`/`WriteBytes`/`Rm`) behind a locally defined
+ * `Extends` helper. Equality against the permitted set is strictly stronger
+ * and much shorter: it catches a widening by ANY operation rather than only
+ * the six somebody thought to list, and it also catches accidental
+ * *narrowing* — dropping a command — which the enumeration missed entirely.
+ * `Equal` and `Assert` are FunctionalScript's own (`fjs/types/ts`,
+ * `fjs/asserts`), following the `Assert<Equal<…>>` idiom used throughout
+ * `fjs/types/rtti`'s proofs, so no bespoke type helper is defined here.
+ * @typedef {Assert<Equal<CasOp[0], 'casRead' | 'evoList' | 'evoHead' | 'evoRevision'>>} _CasOpIsExactlyTheFourCommands
  */
-const notPermitted = {
-    /** @type {Extends<Fetch, CasOp> extends false ? true : never} */
-    fetch: true,
-    /** @type {Extends<Fs, CasOp> extends false ? true : never} */
-    fs: true,
-    /** @type {Extends<Http, CasOp> extends false ? true : never} */
-    http: true,
-    /** @type {Extends<Forever, CasOp> extends false ? true : never} */
-    forever: true,
-    /** @type {Extends<WriteBytes, CasOp> extends false ? true : never} */
-    writeBytes: true,
-    /** @type {Extends<Rm, CasOp> extends false ? true : never} */
-    rm: true,
-}
 
 // ── Tests ────────────────────────────────────────────────────────────────────
 
@@ -179,24 +161,16 @@ const hostMap = {
     evoHead: (/** @type {string} */ a) => `evoHead:${a}`,
     evoRevision: (/** @type {string} */ a) => `evoRevision:${a}`,
 }
-Object.setPrototypeOf(hostMap, null)
 
 export const proof = {
-    // The compile-time whitelist assertions above are the actual Criterion-1
-    // evidence; `tsc` has already checked them by the time this runs. This
-    // leaf exists so `noUnusedLocals` sees them used, and so a reader
-    // grepping the proofs finds the guarantee rather than only the types.
-    forbiddenOperationsAreNotAssignable: () => {
-        assertEq(Object.values(notPermitted).every(v => v === true), true)
-        assertEq(Object.keys(notPermitted).length, 6)
-    },
+    // The RUNTIME half of Success Criterion 1. The type half is the
+    // `Assert<Equal<…>>` above, which `tsc` has already checked by the time
+    // this runs; this pins the value side to the same four names, so the
+    // vocabulary cannot drift between what the type permits and what the
+    // context actually offers.
     vocabularyIsFrozenAtFour: () => {
-        assertEq(casOpNames.length, 4)
+        assertEq(casOpNames.join(','), 'casRead,evoList,evoHead,evoRevision')
         assertEq(Object.keys(guestCtx).join(','), casOpNames.join(','))
-    },
-    // Defence in depth, not the mechanism — but assert it rather than claim it.
-    ctxHasNullPrototype: () => {
-        assertEq(Object.getPrototypeOf(guestCtx), null)
     },
     // Every constructor dispatches through the REAL interpreter.
     everyConstructorDispatches: () => {
