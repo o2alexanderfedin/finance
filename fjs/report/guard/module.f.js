@@ -123,6 +123,8 @@
  *
  * @module
  */
+import { assertEq, assert } from 'functionalscript/fjs/asserts/module.f.js'
+
 /** @import { Read } from '../../exec/module.f.js' */
 
 // ── The rule ─────────────────────────────────────────────────────────────────
@@ -164,3 +166,50 @@ export const classifyRunOutcome = literalCount => (value, reads) => reads.length
         reads: [],
     }
     : { kind: 'ok', value, reads, literalCount }
+
+// ── Tests ────────────────────────────────────────────────────────────────────
+
+export const proof = {
+    // An empty reads array is the kill condition's whole trigger — the
+    // exact shape a program that never dispatched a real read produces.
+    emptyReadsProducesAnErrorOutcome: () => {
+        const outcome = classifyRunOutcome(0)('unused', [])
+        assertEq(outcome.kind, 'error')
+    },
+    // A non-empty reads array carries the value, the reads, AND the
+    // literalCount straight through — each field asserted individually so a
+    // regression localizes to the specific field that broke.
+    nonEmptyReadsProducesAnOkOutcomeCarryingValueReadsAndLiteralCount: () => {
+        /** @type {readonly Read[]} */
+        const reads = [['casRead', ['some-hash']]]
+        const outcome = classifyRunOutcome(3)('the-value', reads)
+        assertEq(outcome.kind, 'ok')
+        if (outcome.kind === 'ok') {
+            assertEq(outcome.value, 'the-value')
+            assertEq(outcome.reads.length, 1)
+            assertEq(JSON.stringify(outcome.reads[0]), JSON.stringify(reads[0]))
+            assertEq(outcome.literalCount, 3)
+        }
+    },
+    // The refusal message names the EXACT literalCount it was constructed
+    // with — a wrong literalCount threaded through cannot pass unnoticed.
+    refusalMessageNamesTheLiteralCountItWasConstructedWith: () => {
+        const outcome = classifyRunOutcome(7)('unused', [])
+        assertEq(outcome.kind, 'error')
+        if (outcome.kind === 'error') {
+            assert(outcome.message.includes('7 numeric literal'), outcome.message)
+        }
+    },
+    // The 'ok' arm's literalCount is exactly the number passed in, not a
+    // recomputed or rounded value — asserted independently of the previous
+    // leaf's value/reads assertions.
+    okArmCarriesLiteralCountThroughUnchanged: () => {
+        /** @type {readonly Read[]} */
+        const reads = [['evoList', ['false']]]
+        const outcome = classifyRunOutcome(42)('value', reads)
+        assertEq(outcome.kind, 'ok')
+        if (outcome.kind === 'ok') {
+            assertEq(outcome.literalCount, 42)
+        }
+    },
+}
