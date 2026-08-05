@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
 status: executing
-stopped_at: Completed 07-06-PLAN.md
-last_updated: "2026-08-05T05:46:45.292Z"
+stopped_at: Completed 07-08-PLAN.md
+last_updated: "2026-08-05T06:14:19.856Z"
 last_activity: 2026-08-05
 progress:
   total_phases: 15
   completed_phases: 6
   total_plans: 25
-  completed_plans: 24
-  percent: 96
+  completed_plans: 25
+  percent: 100
 ---
 
 # Project State
@@ -27,10 +27,10 @@ the server executes it as a pure function of `(documents, tax-year parameters) �
 ## Current Position
 
 Phase: 7 of 15 in progress (`fjs_run`, Run Records, and the Week 1 Convergence)
-Plan: 8 of 9 in that phase (07-01 complete; 07-02..07-09 remain across Waves 1-5)
+Plan: 9 of 9 in that phase (07-01 complete; 07-02..07-09 remain across Waves 1-5)
 Status: Ready to execute
 
-Progress: [██████████] 96%
+Progress: [██████████] 100%
 Last activity: 2026-08-05
 `npm test` 2314 pass / 0 fail (runs `tsc && node --test` — tsc is already inside it); fjs 0.41.0. Project-local proof count (`node --test 2>&1 | grep -c '^✔ import("./fjs/'`): 136.
 
@@ -62,6 +62,7 @@ Last activity: 2026-08-05
 | Phase 07 P05 | 45min | 2 tasks | 3 files |
 | Phase 07 P06 | 55min | 2 tasks | 1 files |
 | Phase 07 P07 | 40min | 2 tasks | 1 files |
+| Phase 07 P08 | 50min | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -157,6 +158,9 @@ Full log in PROJECT.md Key Decisions. Recent decisions affecting current work:
 - [Phase 07-06]: executeRun/fjsRunTool typed against concrete FileCasOperation, not a generic <O extends Operation> — curried generics resolve O at the first application; the plan's curry order puts a non-O parameter first, which empirically defeats inference
 - [Phase 07-07]: Session survival for EXEC-12 is proven via a second fjsRunTool.handle call against the SAME threaded virtual State, not a full financeMcpServer session -- fjsRunTool is not yet wired into that server (Plan 09's follow-up)
 - [Phase 07-07]: missingHashBecomesErrorResult uses a syntactically valid but unwritten cBase32 hash, distinct from 07-06's own malformed-hash proof, to exercise the genuine CAS-miss branch rather than duplicate the null-hashVec short-circuit
+- [Phase 07]: 07-08: Flat registry concatenation — financeSchemaTool/fjsRunTool unify into financeMcpHandlers's operation union with zero casts — Confirms the plan's own expectation that the two tools' operation types unify cleanly; no widened signature beyond fjsRunTool's own declared Mkdir|WriteFile|Import
+- [Phase 07]: 07-08: weekOneConvergence seeds all three 1099-INT revisions before building the Evo cache — Opposite ordering from casRefresh's own proof (which builds the cache before its seed to demonstrate invisibility) — this proof's goal is an ordinary already-populated store, not the refresh-lever scenario
+- [Phase 07]: 07-08: Verified the absent-vs-coerced-to-zero distinction is load-bearing — Temporarily forced centsFromString(undefined) by removing the skip check, confirmed the leaf fails with isError:true, then reverted — proves the leaf checks skip logic, not merely the final sum
 
 ### Pending Todos
 
@@ -278,8 +282,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-08-05T05:44:23.143Z
-Stopped at: Completed 07-06-PLAN.md
+Last session: 2026-08-05T06:14:19.838Z
+Stopped at: Completed 07-08-PLAN.md
 bookkeeping synced (DOC-00/01/03/04/10/11/12/14 all marked Complete).
 Resume file: None
 (they were one-shot artifacts, written to `feature/planning-requirements-roadmap` seven
