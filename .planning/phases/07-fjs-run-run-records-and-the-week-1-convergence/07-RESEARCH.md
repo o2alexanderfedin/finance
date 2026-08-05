@@ -444,7 +444,7 @@ Not applicable in the external sense (no third-party ecosystem here), but one in
 | A3 | Materialized program files should land in a new, gitignored location rather than bare `home` root, OR the team accepts root-level `.mjs` accumulation as-is. | Pitfall 2 | Low risk either way for correctness, but affects repo hygiene and whether a `.gitignore` edit is in scope for this phase. `[ASSUMED]` — no CONTEXT.md text addresses this. |
 | A4 | `finance_schema`'s dialect→schema lookup is a small local object map (`{ 'vnd.fjs.1099int': oneZeroNineNineIntSchema, ... }`), not a dependency on the deferred `fjs/media` dialect registry (`fjs/todo/upstream-media-dialect-registry.md`). | Existing Code Map / Don't Hand-Roll | Low risk — CONTEXT.md explicitly defers the registry resolution as optional/non-blocking, and a lookup map over already-exported schema consts introduces no second source of truth. `[ASSUMED]` but low-consequence. |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Does the guest ABI need `step`/`pure` (and money helpers) to make a real Week-1 program authorable?**
    - What we know: `guestCtx` today has exactly four operation constructors and nothing else (verified). Composing more than one dispatched operation with zero imports requires *some* sequencing primitive.
@@ -577,3 +577,25 @@ None — every claim above traces to a file read directly in this session; nothi
 
 **Research date:** 2026-08-04
 **Valid until:** Should be re-checked if `functionalscript` is upgraded past 0.41.0 before this phase is planned/executed (the 128 KiB constant, `errorResult`, and `toJsonSchema` locations are all upstream and could move); otherwise stable — no external ecosystem to go stale.
+
+---
+
+### Resolution of the three open questions (recorded during /gsd-plan-phase)
+
+1. **Does the guest ABI need `step`/`pure`, and is revising `vocabularyIsFrozenAtFour` acceptable?**
+   **RESOLVED** — see `07-CONTEXT.md`, "Two gaps research surfaced". Yes to both, decided with the
+   user. `guestCtx` gains the combinators and money helpers EXEC-07 already specified; `CasOp`
+   stays exactly four commands so `match`'s whitelist and the `Assert<Equal<CasOp[0], ...>>` pin
+   are untouched. The two Phase 6 proofs are revised to separate *commands* from *combinators*,
+   with the four-command freeze kept as a live equality assertion. Delivered by Plan 07-01.
+
+2. **Should the synchronous host-map snapshot resolve every hash in `cas.list()`, or something
+   narrower?** **RESOLVED** — Plan 07-05 adopts this document's own whole-store recommendation via
+   `buildRunSnapshot`. Lowest risk at this project's scale, and the pinning decision already
+   requires exactly one snapshot built before `interpret` runs.
+
+3. **Should materialized program files move out of `home` root, or be gitignored in place?**
+   **RESOLVED** — see `07-CONTEXT.md`. A dedicated subdirectory under the project-local CAS home,
+   plus an explicit `.gitignore` entry. Decided with the user; the OS temp directory was rejected
+   because it discards the project-local store property Phase 2 established deliberately.
+   Delivered by Plan 07-05.

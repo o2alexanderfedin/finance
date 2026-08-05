@@ -59,7 +59,8 @@ Per-task table below is renumbered against the actual 07-01..07-08 plan IDs.
 never imported by anything `all.test.js` walks registers **zero tests and passes silently**.
 `node --test <some/other/file>` is a documented **fake pass** (AGENTS.md, STATE.md). Every proof
 added in this phase must be reachable from root discovery, and each plan's verification step must
-confirm the phase's total test count actually *rose* — not merely that the suite is green.
+confirm the phase's PROJECT-LOCAL proof count actually *rose* (see the gate below) — not merely
+that the suite is green, and not the `npm test` total.
 
 ---
 
@@ -68,9 +69,31 @@ confirm the phase's total test count actually *rose* — not merely that the sui
 - **After every task commit:** `npm test`
 - **After every plan wave:** `npm test` (there is no separate fuller suite — `tsc && node --test`
   already runs everything)
-- **Before `/gsd-verify-work`:** full suite green **and** total test count strictly greater than
-  the 134 that pass on `main` today
-- **Max feedback latency:** ~15 seconds including `tsc`
+- **Before `/gsd-verify-work`:** full suite green **and** the *project-local* proof count strictly
+  greater than the **133** that pass under `./fjs/` on `main` today
+- **Max feedback latency:** ~20 seconds including `tsc`
+
+### Do not gate on `npm test`'s total — it is not a project metric
+
+An earlier draft of this document gated on "total pass count > 134". That number was measured in
+the Phase 6 worktree, where the `functionalscript` submodule was **uninitialized**. In a worktree
+where it *is* initialized, root discovery walks the submodule too and `npm test` reports **2311**
+passing: 133 project-local proofs plus ~2177 vendored ones.
+
+That makes the total actively dangerous as a gate. `2311 > 134` is true with **zero** Phase 7 code
+written, so a proof that is never reached by root discovery — the precise "registers zero tests and
+passes silently" hazard this gate exists to catch — would still show the gate as satisfied. A check
+that cannot fail is not a check.
+
+Use the project-local count instead, which is invariant to submodule state:
+
+```
+node --test 2>&1 | grep -c '^✔ import("./fjs/'
+```
+
+Baseline: **133** on `main` today, verified by execution in this worktree. Every plan's verification
+step compares against the count measured immediately before it, not against a literal carried
+across worktrees.
 
 ---
 
@@ -99,7 +122,7 @@ confirm the phase's total test count actually *rose* — not merely that the sui
 ## Wave 0 Requirements
 
 Existing infrastructure covers the framework itself — `all.test.js`, `tsc`, and the emergent
-testing runner are all in place and green at 134 tests. Wave 0 for this phase is therefore not a
+testing runner are all in place and green at 133 project-local proofs. Wave 0 for this phase is therefore not a
 framework install but the **fixture** work every later proof depends on:
 
 - [ ] A virtual-filesystem session helper that threads one `State` across multiple
@@ -134,7 +157,7 @@ real filesystem, so nothing here needs a live server.
 - [ ] Wave 0 covers all MISSING references (session helper, seeded docs, materialize-write fixture)
 - [ ] No watch-mode flags
 - [ ] Feedback latency < 15s
-- [ ] Total test count strictly greater than 134 (guards against the silent-zero-tests discovery hazard)
+- [ ] Project-local proof count (`node --test 2>&1 | grep -c '^✔ import("./fjs/'`) strictly greater than 133 — NOT `npm test`'s total, which includes ~2177 vendored submodule proofs and cannot detect the silent-zero-tests hazard
 - [ ] `nyquist_compliant: true` set in frontmatter
 
 **Approval:** pending
