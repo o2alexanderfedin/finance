@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
 status: verifying
-stopped_at: Completed 09-04-PLAN.md
-last_updated: "2026-08-05T22:30:46.287Z"
+stopped_at: Completed 09-05-PLAN.md
+last_updated: "2026-08-05T22:56:48.800Z"
 last_activity: 2026-08-05
 progress:
   total_phases: 15
   completed_phases: 9
-  total_plans: 33
-  completed_plans: 35
+  total_plans: 34
+  completed_plans: 36
   percent: 100
 ---
 
@@ -81,6 +81,7 @@ existed.
 | Phase 09 P02 | 15min | 2 tasks | 1 files |
 | Phase 09 P03 | 35min | 2 tasks | 1 files |
 | Phase 09 P04 | 50min | 3 tasks | 3 files |
+| Phase 09 P05 | 35min | 3 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -197,6 +198,7 @@ Full log in PROJECT.md Key Decisions. Recent decisions affecting current work:
 - [Phase 09-03]: vnd.fjs.run gained no new fields; readCount/literalCount are envelope-only fields in fjs_run's response, derived from data that already exists
 - [Phase 09-04]: [Phase 09-04] Running the SAME JsModule fixture twice against evolving CAS state needs a second, functionally-identical program hash: runExecuteRunViaFixture always performs a real materialize write, which collides with the prior run's already-swapped-in JsModule function at the SAME path
 - [Phase 09-04]: [Phase 09-04] The adversary () => pure({ line16: 9137 }) is stored VERBATIM as the perturbation gate's control fixture, proven to fail and to fail identically whether or not the document changes
+- [Phase 09-05]: classifyRunOutcome extracted as one exported function (literalCount => (value, reads) => RunOutcome); executeRun and runExecuteRunViaFixture both call it — mutating it to reads.length === -1 turns antiHardcodingGate/zeroReadGate proofs RED (pass 256, fail 2), closing 09-VERIFICATION.md's BLOCKER
 
 ### Pending Todos
 
@@ -341,8 +343,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-08-05T22:30:46.276Z
-Stopped at: Completed 09-04-PLAN.md
+Last session: 2026-08-05T22:56:48.790Z
+Stopped at: Completed 09-05-PLAN.md
 (`npm test` 187/187, 185 project-local proofs, `tsc` clean, `test:integration` included and
 passing, tree clean). Merge blocker measured and dismissed — see Blockers. Awaiting the user's
 choice on push/PR strategy and on Phase 8.
