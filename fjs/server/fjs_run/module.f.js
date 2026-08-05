@@ -345,6 +345,48 @@ const assertPersistedErrorRunRecord = cas => state => errorText => {
     }
 }
 
+/**
+ * Seeds a trivial, well-behaved report program (`ctx.pure('ok')`, zero
+ * reads) into `state`'s CAS store, placing its JsModule fixture at its own
+ * hash-derived bare name in `state.root` — the same materialize-write/
+ * JsModule-at-hash-path split every proof in this file already uses. Used
+ * only as the KNOWN-GOOD follow-up call each error-taxonomy leaf drives
+ * after its own failing call, to prove the session survives.
+ * @type {(cas: Cas<FileCasOperation>) => (state: State) => readonly [State, string]}
+ */
+const seedGoodProgram = cas => state => {
+    const [state1, hash] = virtual(state)(seedText(cas)('export const report = ctx => args => ctx.pure("ok")'))
+    const name = programFileName(hash)
+    /** @type {Report<string>} */
+    const goodReport = ctx => () => ctx.pure('ok')
+    const root = { ...state1.root, [name]: () => ({ report: goodReport }) }
+    return [{ ...state1, root }, hash]
+}
+
+/**
+ * Drives a KNOWN-GOOD `fjsRunTool.handle` call against `state` and asserts
+ * it succeeds — the "never a dropped connection" half of EXEC-12's
+ * criterion 4, not merely "never a process crash": a caller that survives a
+ * refusal but leaves the session unable to answer a FOLLOWING call has only
+ * proven half the claim.
+ *
+ * A full `financeMcpServer`-style multi-batch session
+ * (`fjs/server/module.f.js`'s own `casRefresh.seedInvisibleUntilRefreshed`
+ * pattern, threading `State` across `runBatch` calls) is heavier than
+ * needed here: `fjsRunTool` is not yet wired into `financeMcpServer` — that
+ * wiring is Plan 09's own documented follow-up (07-06-SUMMARY.md's "Next
+ * Phase Readiness") — so there is no assembled registry/transport to drive
+ * a `tools/list` or `ping` through yet. Driving `fjsRunTool.handle` a
+ * second time against the SAME threaded virtual `State` is the smaller-
+ * scoped equivalent Task 2's own plan text explicitly permits, documented
+ * here rather than silently substituted.
+ * @type {(materializeHomeRoot: string) => (cas: Cas<FileCasOperation>) => (evoApi: Evo<FileCasOperation>) => (state: State) => (goodHash: string) => void}
+ */
+const assertSessionSurvivesAFollowingCall = home => cas => e => state => goodHash => {
+    const [, followUp] = virtual(state)(fjsRunTool(home)(cas)(e).handle({ hash: goodHash }))
+    assertEq(followUp.isError, undefined)
+}
+
 export const proof = {
     // ── Task 1: executeRun ──────────────────────────────────────────────
     executeRun: {
@@ -670,19 +712,20 @@ export const proof = {
                 const cas = fileCas(sha256)(home)
                 const [state0, cacheKey] = virtual(emptyState)(initEvo(cas))
                 const e = evo(cas)(cacheKey)
+                const [state1, goodHash] = seedGoodProgram(cas)(state0)
 
                 // The stored SOURCE is a clean, zero-import stand-in — the
                 // JsModule fixture below is what actually runs, per the
                 // module header's documented materialize-write/JsModule-at-
                 // hash-path split every proof in this file uses.
-                const [state1, escapingHash] = virtual(state0)(
+                const [state2, escapingHash] = virtual(state1)(
                     seedText(cas)('export const report = ctx => args => ctx.pure("unused")'))
                 const escapingName = programFileName(escapingHash)
                 /** @type {Report<string>} */
                 const escapingReport = () => () => unsafeDo('fetch')('https://evil')
-                const root = { ...state1.root, [escapingName]: () => ({ report: escapingReport }) }
+                const root = { ...state2.root, [escapingName]: () => ({ report: escapingReport }) }
 
-                const [state2, callResult] = virtual({ ...state1, root })(
+                const [state3, callResult] = virtual({ ...state2, root })(
                     fjsRunTool(home)(cas)(e).handle({ hash: escapingHash }))
                 assertEq(callResult.isError, true)
                 const first = callResult.content[0]
@@ -690,7 +733,12 @@ export const proof = {
                     throw ['expected a text content item', callResult]
                 }
                 assert(first.text.includes('fetch'), ['expected the refused operation to be named', first.text])
-                assertPersistedErrorRunRecord(cas)(state2)(first.text)
+                assertPersistedErrorRunRecord(cas)(state3)(first.text)
+
+                // Session survives: a FOLLOWING call against the SAME
+                // threaded state still succeeds — never a dropped
+                // connection, not merely never a crash.
+                assertSessionSurvivesAFollowingCall(home)(cas)(e)(state3)(goodHash)
             },
             // Failure class 2: a syntactically valid cBase32 hash that was
             // never written to THIS store — the genuine CAS-miss branch
@@ -703,9 +751,10 @@ export const proof = {
                 const cas = fileCas(sha256)(home)
                 const [state0, cacheKey] = virtual(emptyState)(initEvo(cas))
                 const e = evo(cas)(cacheKey)
+                const [state1, goodHash] = seedGoodProgram(cas)(state0)
                 const missingHash = vecToCBase32(vec8(0xabn))
 
-                const [state1, callResult] = virtual(state0)(
+                const [state2, callResult] = virtual(state1)(
                     fjsRunTool(home)(cas)(e).handle({ hash: missingHash }))
                 assertEq(callResult.isError, true)
                 const first = callResult.content[0]
@@ -713,16 +762,56 @@ export const proof = {
                     throw ['expected a text content item', callResult]
                 }
                 assert(first.text.includes(missingHash), ['expected the missing hash to be named', first.text])
-                assertPersistedErrorRunRecord(cas)(state1)(first.text)
+                assertPersistedErrorRunRecord(cas)(state2)(first.text)
 
                 // Materialization was never attempted: a real behavioral
                 // check against the SAME virtual Fs materializeProgram
                 // itself writes through (readUtf8File at the exact path
                 // materializeProgram would have used), not an inference
                 // from the returned message text alone.
-                const [, readAttempt] = virtual(state1)(
+                const [, readAttempt] = virtual(state2)(
                     readUtf8File(programPath(materializeHome(home))(missingHash)))
                 assertEq(readAttempt[0], 'error')
+
+                // Session survives: a FOLLOWING call against the SAME
+                // threaded state still succeeds.
+                assertSessionSurvivesAFollowingCall(home)(cas)(e)(state2)(goodHash)
+            },
+            // Failure class 3: a program whose stored SOURCE is clean (zero
+            // imports, so checkSpecifiers passes) and whose bytes ARE
+            // materialized for real by executeRun — but with NO JsModule
+            // fixture placed at its bare hash-derived name, reusing Phase
+            // 6's own `underVirtual.missingModuleIsAnErrorValue` technique
+            // (fjs/guest/materialize/module.f.js) at the fjsRunTool layer.
+            // This exercises loadProgram's OWN `import_` effect actually
+            // failing — a genuinely different failure than the dirty-
+            // specifier leaf 07-06 already proves at the executeRun layer
+            // (that one fails checkSpecifiers before import_ ever runs).
+            importFailureBecomesErrorResult: () => {
+                const home = '/error-taxonomy-import-failure'
+                const cas = fileCas(sha256)(home)
+                const [state0, cacheKey] = virtual(emptyState)(initEvo(cas))
+                const e = evo(cas)(cacheKey)
+                const [state1, goodHash] = seedGoodProgram(cas)(state0)
+
+                const [state2, unimportableHash] = virtual(state1)(
+                    seedText(cas)('export const report = ctx => args => ctx.pure("unused")'))
+                // Deliberately no `root[programFileName(unimportableHash)]`
+                // entry — the whole point of this leaf.
+
+                const [state3, callResult] = virtual(state2)(
+                    fjsRunTool(home)(cas)(e).handle({ hash: unimportableHash }))
+                assertEq(callResult.isError, true)
+                const first = callResult.content[0]
+                if (first === undefined || first.type !== 'text') {
+                    throw ['expected a text content item', callResult]
+                }
+                assert(first.text.includes('import failed'), ['expected an import failure to be named', first.text])
+                assertPersistedErrorRunRecord(cas)(state3)(first.text)
+
+                // Session survives: a FOLLOWING call against the SAME
+                // threaded state still succeeds.
+                assertSessionSurvivesAFollowingCall(home)(cas)(e)(state3)(goodHash)
             },
         },
     },
