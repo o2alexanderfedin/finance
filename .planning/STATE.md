@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
 status: executing
-stopped_at: Completed 07-05-PLAN.md
-last_updated: "2026-08-05T04:53:34.960Z"
+stopped_at: Completed 07-06-PLAN.md
+last_updated: "2026-08-05T05:29:48.193Z"
 last_activity: 2026-08-05
 progress:
   total_phases: 15
   completed_phases: 6
   total_plans: 25
-  completed_plans: 22
-  percent: 88
+  completed_plans: 23
+  percent: 92
 ---
 
 # Project State
@@ -27,10 +27,10 @@ the server executes it as a pure function of `(documents, tax-year parameters) �
 ## Current Position
 
 Phase: 7 of 15 in progress (`fjs_run`, Run Records, and the Week 1 Convergence)
-Plan: 6 of 9 in that phase (07-01 complete; 07-02..07-09 remain across Waves 1-5)
+Plan: 7 of 9 in that phase (07-01 complete; 07-02..07-09 remain across Waves 1-5)
 Status: Ready to execute
 
-Progress: [█████████░] 88%
+Progress: [█████████░] 92%
 Last activity: 2026-08-05
 `npm test` 2314 pass / 0 fail (runs `tsc && node --test` — tsc is already inside it); fjs 0.41.0. Project-local proof count (`node --test 2>&1 | grep -c '^✔ import("./fjs/'`): 136.
 
@@ -60,6 +60,7 @@ Last activity: 2026-08-05
 | Phase 07 P03 | 20min | 2 tasks | 1 files |
 | Phase 07 P04 | 13min | 2 tasks | 1 files |
 | Phase 07 P05 | 45min | 2 tasks | 3 files |
+| Phase 07 P06 | 55min | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -151,6 +152,8 @@ Full log in PROJECT.md Key Decisions. Recent decisions affecting current work:
 - [Phase 07]: Ordering proof asserts absence of raw oversized content in stdout, not just presence of the too-large message (SEC-02-before-import_ lesson)
 - [Phase 07-05]: evoList's guest argument is 'true' selects archived, else active (mirroring Evo.list default)
 - [Phase 07-05]: buildRunSnapshot resolves every hash cas.list() returns (whole-store), not a narrower reachability subset
+- [Phase 07-06]: loadProgram is called with the bare programFileName(hash), not the full materialize path — matches fjs/guest/materialize's documented virtual-harness limitation; production wiring is Plan 09's follow-up
+- [Phase 07-06]: executeRun/fjsRunTool typed against concrete FileCasOperation, not a generic <O extends Operation> — curried generics resolve O at the first application; the plan's curry order puts a non-O parameter first, which empirically defeats inference
 
 ### Pending Todos
 
@@ -272,8 +275,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-08-05T04:53:34.952Z
-Stopped at: Completed 07-05-PLAN.md
+Last session: 2026-08-05T05:29:48.102Z
+Stopped at: Completed 07-06-PLAN.md
 bookkeeping synced (DOC-00/01/03/04/10/11/12/14 all marked Complete).
 Resume file: None
 (they were one-shot artifacts, written to `feature/planning-requirements-roadmap` seven

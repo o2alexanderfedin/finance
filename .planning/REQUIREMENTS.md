@@ -169,7 +169,7 @@ dissolves on contact.
 - [x] **EXEC-09** *(T1)*: `fjs_run` reaches `import()` through the `import_` **effect**, not
       a raw expression, making it proof-testable under `fjs/effects/node/virtual` with no
       filesystem.
-- [ ] **EXEC-10** *(T1)*: The **tool handler** writes the result and run record to CAS —
+- [x] **EXEC-10** *(T1)*: The **tool handler** writes the result and run record to CAS —
       not the program. The guest whitelist stays read-only; `casWrite`/`evoAdd` are never
       in it. This makes provenance structural rather than a program-authorship convention.
 - [x] **EXEC-11** *(T1)*: `fjs_run` returns result and run-record hashes plus a bounded
