@@ -10,8 +10,8 @@ Work items to land in FunctionalScript itself, driven by what `finance` needs.
    - Forms: W-2, 1099-*
    - Bank Statements
    - Expenses (Receipts)
-   - Tax Return Config:
-     - Entity (SSN)
+   - Tax Return Config, the config doesn't have any base document and we are free to extend the config as needed:
+     - Entity (SSN, name, etc), it can be a full identity (full SSN) or a last 4 digits or another solution. We don't have a solid decision yet.
      - Status (filing status — single, married filing jointly, …)
      - All other fields; it may include references to other files and entities.
 
@@ -30,7 +30,7 @@ Work items to land in FunctionalScript itself, driven by what `finance` needs.
    > or storing only a last-4 plus a reference.
 
 2. FJS Runner:
-   - Types:
+   - Types (CAS permissions are out-of-scope for this types):
      - Pure. Subtypes:
        - No imports and no reading
        - Importing by hash
@@ -41,7 +41,9 @@ Work items to land in FunctionalScript itself, driven by what `finance` needs.
          that we may not know in advance which revision subjects the script will ask for.
          At the same time, the first run without a lock file can generate one, which we
          then supply on later runs to reproduce.
-   - Design a URL format.
+   - Design a URL format for hashes and revision subjects. Our runner should be able to intercept `import`. For example
+     - hash URL: `import a from 'sha2:3902j2sye...'`
+     - subject (mutable) URL: `import a from 'revision:3902j2sye...'`
 
    > **Note.** The three pure subtypes form a genuine lattice — each strictly more
    > permissive than the last — and it maps onto the operation vocabulary in
@@ -58,9 +60,9 @@ Work items to land in FunctionalScript itself, driven by what `finance` needs.
    > unpinned by construction, so whatever the heads happened to be is what gets recorded.
    > Fine for a local single user; worth naming as a limitation rather than discovering it.
 
-3. Big file uploader. Solutions:
+3. Big file uploader. The problem is that if we use MCP `cas_upload`, we burn tokens, also it has a limit for file size. We also need to provide big CAS files as MCP resources. Solutions:
    - CLI. Actually, we can just use `fjs cas add ...`
-   - Web Server
+   - Local Web Server.
 
    > **Note.** `casAddFile` and `casUpload` already exist in `fjs/cas`, and `casUpload`
    > streams from `~/cas_upload/` and deletes the source on success. Chunking is 128 KiB
@@ -75,7 +77,7 @@ Work items to land in FunctionalScript itself, driven by what `finance` needs.
 4. Decimals and BigIntegers for finance. Proposed solution:
    Type-aware JSON parser:
    ```ts
-   const parse: <T extends rtti.Type>(type: T) => (s: string) => Ts<T>
+   const parse: <T extends rtti.Type>(type: T) => (s: string) => Result<Ts<T>>
    ```
    Implementation:
    1. Extend the JSON parser to recognize integer values and return them as bigints.
@@ -85,11 +87,11 @@ Work items to land in FunctionalScript itself, driven by what `finance` needs.
    Our forms will use ONLY integers for currencies (cents), percentages, etc. No
    big fixed-point decimals for now. If needed, a form may specify fixed-point positions
    for some values for the whole JSON. For example, if by default a form assumes that our
-   units are percent, but a particular form requires hundredths of a percent, then the form
-   may specify something like `{"percentage-point-position":2}`. We may also select a
-   default value for all forms. Most likely, for currencies we should use cents (the
-   minimal unit), and for percentages hundredths of a percent. `$100.23 = 10023`,
-   `3.45% = 345`.
+   units are percent, but a particular form requires hundredths of a percent, then we should fall back to strings `"interest": "3.45%"}`. We should select a
+   default value for all forms. Most likely,
+   - for currencies we should use cents (the
+   minimal unit), `$100.23 = 10023`.
+   - for percentages hundredths of a percents: `3.45% = 345`.
 
    > **Signature fix.** The original read `(type: rtti.Type)`, which makes `T`
    > uninferrable — every call would return `Ts<rtti.Type>`. It has to be `(type: T)`.
@@ -154,7 +156,9 @@ Work items to land in FunctionalScript itself, driven by what `finance` needs.
       in both `functionalscript@0.41.0` and the submodule at `main`: `fjs/protocol/json_rpc`
       exists and `fjs/media/json/rpc` is gone. Note it landed as `json_rpc` (snake_case),
       matching the sibling `fjs/protocol/mcp`, not `jsonrpc`.
-   2. Generic partial structures for `scan` state.
+   2. Generic partial structures for `scan` state. For example, when `scan` creates a partial object, such as JSON object or an array, we should use a generic type. There should be two main functions for the partial/unfinished structure:
+      - `create`, for example when we see `{` or `[`
+      - `end` close the structure and return a new complete structure. For example when we see `}` or `]`.
 
       > **Open.** `fjs/types/list` has three variants already — `scan` (`Scan<I,O> =
       > (input: I) => [O, Scan<I,O>]`), `stateScan` (`StateScan<I,S,O> = (input: I, prior:
