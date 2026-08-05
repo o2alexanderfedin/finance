@@ -285,7 +285,15 @@ held — neither dialect required reopening `fjs/document/base` or the subject c
   4. A program throwing a non-`Error` value, a missing hash, and an import failure each return a tool-level `errorResult` — never a process crash, never a dropped connection.
   5. An oversized result returns `result too large; stored at <hash>` from an **explicit size check before `writeResponse`**, rather than inheriting the silent `-32603` the 128 KiB stdio line cap produces.
 **Research**: Not needed.
-**Plans**: TBD
+**Plans**: 8 plans
+- [ ] 07-01-PLAN.md — Guest ctx combinators (step/pure) and money helpers; revise the two Phase 6 proofs distinguishing commands from combinators (EXEC-08 precursor, per 07-CONTEXT.md Decision 1)
+- [ ] 07-02-PLAN.md — vnd.fjs.run document dialect: schema, checkReferences, validate (PROV-03)
+- [ ] 07-03-PLAN.md — finance_schema MCP tool: dialect lookup + toJsonSchema serialization (MCP-06)
+- [ ] 07-04-PLAN.md — Size-guarded response envelope: sizeGuard, constants, ordering proof (EXEC-11)
+- [ ] 07-05-PLAN.md — materializeProgram (disk write, gitignored subdir) + synchronous snapshot/host-map with pinning (EXEC-08)
+- [ ] 07-06-PLAN.md — fjs_run handler: executeRun orchestration, handler-performed CAS writes, the run record, adversarial proof (EXEC-08, EXEC-10, EXEC-11, PROV-03)
+- [ ] 07-07-PLAN.md — EXEC-12 error taxonomy: non-Error throw, missing hash, import failure, each through the full handler with session-survival proof
+- [ ] 07-08-PLAN.md — Wire finance_schema/fjs_run into financeMcpHandlers; the Week-1 finish line end to end (all six requirements converge)
 
 **── Milestone: Week 2 — A Report Program Produces a Correct Figure ──**
 
@@ -428,7 +436,7 @@ held — neither dialect required reopening `fjs/document/base` or the subject c
 | 4. Exact Arithmetic | Week 1 | 2/2 | Complete | verified 10/10 |
 | 5. Document Base and First Dialects | Week 1 | 0/TBD | Not started | - |
 | 6. Guest ABI and Materialization | Week 1 | 0/TBD | Not started | - |
-| 7. `fjs_run` and Run Records | Week 1 | 0/TBD | Not started | - |
+| 7. `fjs_run` and Run Records | Week 1 | 0/8 | Planned | - |
 | 8. TY2025 Parameters and Tax Table | Week 2 | 0/TBD | Not started | - |
 | 9. Traceable Report Lines | Week 2 | 0/TBD | Not started | - |
 | 10. 1040 Core and Scope Guard | Week 2 | 0/TBD | Not started | - |
