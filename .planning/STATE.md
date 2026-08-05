@@ -277,7 +277,18 @@ None yet.
   widths, QDCGT and Schedule D Tax Worksheets, 1099-R/SSA-1099 box lists, MAGI add-back
   lists, Schedule 1-A mechanics, child-process isolation.
 
-- Production's real claude mcp add registration for finance-mcp does not set the working directory fjs_run needs (materializeHome(home)); real fjs_run calls will currently fail against the registered server. Follow-up: update index.js/fjs/index.f.js launcher or the registered command line to establish this cwd (07-09-SUMMARY.md).
+- **RESOLVED (07-10):** the prior note here ("production's real `claude mcp add` registration does
+  not set the working directory `fjs_run` needs") was a misdiagnosis of the actual root cause.
+  `executeRun` (`fjs/server/fjs_run/module.f.js`) wrote the materialized program to
+  `programPath(materializeHome(home))(hash)` but imported it via the BARE hash-derived filename —
+  a real Node `import()` of a bare specifier resolves against `process.cwd()`, not `home`, so the
+  import missed the file `materializeProgram` had just written. The fix composes the import path
+  from the SAME `materializeHome`/`programPath` expressions the write uses, so the two paths can
+  never drift apart again. The launcher needs NO special working directory: proven by
+  `fjs-run-integration.test.js`, which now spawns the real server from an ordinary working
+  directory (the `cwd: materializeHome(home)` workaround has been removed) and still passes. See
+  `07-10-FIX-SUMMARY.md` for the full account, including why 185 virtual proofs never caught this
+  (they keyed their `JsModule` fixtures at the same bare name the buggy code asked for).
 
 ## Deferred Items
 
