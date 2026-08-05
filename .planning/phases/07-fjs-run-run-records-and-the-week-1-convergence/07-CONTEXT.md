@@ -108,6 +108,67 @@ Phase 7 is the composition and the handler around them — not a re-litigation o
   is a second source of truth that drifts from the schema the validator actually uses, which
   would defeat MCP-06's purpose of letting the agent stop guessing.
 
+### Two gaps research surfaced, resolved with the user before planning
+
+Research (`07-RESEARCH.md`) found three architecture gaps that Phase 6 left open. Two needed a
+decision because they revise or extend work already marked complete; both were verified against
+the code before being put to the user, and both are now locked.
+
+**1. `guestCtx` gains combinators. `CasOp` does not.**
+
+Phase 6 shipped `guestCtx` with exactly four operation constructors. EXEC-07's own requirement
+text specifies more than that — *"A `ctx` object carries the vocabulary — **combinators**,
+read-only operation constructors, money helpers, `args`."* The combinators and money helpers were
+never delivered. That is a Phase 6 under-delivery, not Phase 7 scope creep, and it blocks
+success criterion 1: a program that sums interest across *every* stored 1099-INT must sequence
+one read per document, and with zero imports and no combinator it has nothing to sequence with.
+
+**The security property is untouched, and this is the reason the decision is safe.** `match`
+gates on `CasOp` — the *operation* union. `step` and `pure` are pure composition; they never
+become a `command` and never reach `match`. `CasOp[0]` stays exactly
+`'casRead' | 'evoList' | 'evoHead' | 'evoRevision'`, so the type-level pin
+`Assert<Equal<CasOp[0], …>>` still holds unchanged, and `casWrite`/`evoAdd` remain absent
+(criterion 3).
+
+What must change is narrower than it first appears — two runtime proofs in `fjs/guest`:
+
+| Proof | Why it breaks | Required revision |
+|---|---|---|
+| `vocabularyIsFrozenAtFour` | asserts `Object.keys(guestCtx)` equals `casOpNames` | Assert the **command** subset equals `casOpNames`, and assert the combinator set separately. The four-command freeze must remain a live assertion, not be weakened into "at least four". |
+| `everyConstructorDispatches` | iterates every ctx entry calling `construct('x')`; `step` is not unary and is not an operation | Iterate the command subset only. |
+
+The rejected alternative — leaving ctx at four and letting each guest hand-roll its own `step`
+from `Effect`'s raw shape — is *possible* (an `Effect` is a `Pure` thunk or a plain
+`{command, payload, continuation}` object, both constructible without imports) but was rejected:
+it couples every stored program to `Effect`'s internals, which is exactly what a frozen ABI
+exists to hide, and stored programs are frozen against the convention in force when they were
+written.
+
+Scope note: add the combinators EXEC-07 names and the money helpers it names. Do not add
+anything else to `ctx` opportunistically — every addition is frozen for every future program.
+
+**2. Materialized programs go in a dedicated, gitignored subdirectory.**
+
+Research found that **nothing in the repo has ever written a CAS blob's bytes to a real file**.
+`loadProgram` assumes the file already exists at `programPath(home)(hash)`, and every Phase 6
+proof exercised it under `fjs/effects/node/virtual` with a `JsModule` fixture. The write step is
+new work in this phase, and in production `home` is the project root — so hash-named `.mjs` files
+would land in the repo, untracked by `.gitignore`.
+
+Decision: materialize into a dedicated subdirectory under the project-local CAS home, and add an
+explicit `.gitignore` entry for it. The repo root stays clean and the ignore rule is deliberate
+rather than incidental. The OS temp directory was rejected because it discards the project-local
+store property Phase 2 established on purpose.
+
+**3. The host `OperationMap` must be synchronous — no decision needed, but it constrains design.**
+
+`interpret`'s `OperationMap<O, Return<O>>` requires plain synchronous handlers, never
+`Effect`-returning ones. The host map for the four commands therefore cannot be thin wrappers
+around `Cas`/`Evo`'s effect-returning methods. It must be closures over data already resolved by
+ordinary `step`/`pure` effects **before** `interpret` runs — which is the same snapshot the
+pinning decision above already requires. The two constraints agree; build one snapshot and use it
+for both.
+
 ### Claude's Discretion
 
 - Module placement and file naming within `fjs/` for the new handler and dialect, following
