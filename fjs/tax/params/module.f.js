@@ -381,20 +381,37 @@ export const proof = {
             const entry = standardDeduction[status]
             assertEq(entry.citation.revProc, '2025-32')
             assertEq(entry.citation.section, '§3.01')
+            assertEq(entry.citation.effectiveDate, '2025-01-01')
             assertEq(entry.amount, expectedAmounts[status])
         }
     },
     // T-08-05 (the other direction): every parameter Rev. Proc. 2025-32
     // did NOT touch cites Rev. Proc. 2024-40 alone — a citation copied
     // verbatim from the standard deduction onto these would fail here.
+    // T-08-06-03: extended beyond `revProc` to also assert `section` and
+    // `effectiveDate` — mutating a citation's section (e.g. §2.15(3) →
+    // §2.15(9)) or effectiveDate (2025-01-01 → 2026-01-01) previously
+    // survived undetected because only `revProc` was ever read.
     unmodifiedParametersCite2024_40Only: () => {
         assertEq(agedOrBlindAdditional.married.citation.revProc, '2024-40')
+        assertEq(agedOrBlindAdditional.married.citation.section, '§2.15(3)')
+        assertEq(agedOrBlindAdditional.married.citation.effectiveDate, '2025-01-01')
         assertEq(agedOrBlindAdditional.unmarried.citation.revProc, '2024-40')
+        assertEq(agedOrBlindAdditional.unmarried.citation.section, '§2.15(3)')
+        assertEq(agedOrBlindAdditional.unmarried.citation.effectiveDate, '2025-01-01')
         assertEq(dependentStandardDeductionCap.minimum.citation.revProc, '2024-40')
+        assertEq(dependentStandardDeductionCap.minimum.citation.section, '§2.15(2)')
+        assertEq(dependentStandardDeductionCap.minimum.citation.effectiveDate, '2025-01-01')
         assertEq(dependentStandardDeductionCap.earnedIncomeAddOn.citation.revProc, '2024-40')
+        assertEq(dependentStandardDeductionCap.earnedIncomeAddOn.citation.section, '§2.15(2)')
+        assertEq(dependentStandardDeductionCap.earnedIncomeAddOn.citation.effectiveDate, '2025-01-01')
         for (const status of allFilingStatuses) {
             assertEq(ordinaryBrackets[status].citation.revProc, '2024-40')
+            assertEq(ordinaryBrackets[status].citation.section, '§2.01')
+            assertEq(ordinaryBrackets[status].citation.effectiveDate, '2025-01-01')
             assertEq(capitalGainsBreakpoints[status].citation.revProc, '2024-40')
+            assertEq(capitalGainsBreakpoints[status].citation.section, '§2.03')
+            assertEq(capitalGainsBreakpoints[status].citation.effectiveDate, '2025-01-01')
         }
     },
     // T-08-02: every stored dollar amount is a `string`, never a JSON
