@@ -120,20 +120,20 @@ These were established by execution, not inference. Any replan must preserve the
 
 ### Week 0 — Corrections and Integration Smoke Test *(research addition, in front of the plan)*
 
-- [ ] **Phase 1: Planning-Document Corrections and the Upstream Report** - Delete every claim research proved false, and file the fjs soundness hole
-- [ ] **Phase 2: Server Skeleton, Safe Registration, Project-Local Store** - A registered, protocol-correct, permission-scoped server with no logic of ours in it
+- [x] **Phase 1: Planning-Document Corrections and the Upstream Report** - Delete every claim research proved false, and file the fjs soundness hole (completed 2026-08-03)
+- [x] **Phase 2: Server Skeleton, Safe Registration, Project-Local Store** - A registered, protocol-correct, permission-scoped server with no logic of ours in it (completed 2026-08-03)
 
 ### Week 1 — First Working Prototype
 
-- [ ] **Phase 3: The Restricted Interpreter** - The whitelist that is actually a whitelist, with observed reads and a step budget
-- [ ] **Phase 4: Exact Arithmetic and the Money Layering** - Integer cents, exact rationals, IRS half-up rounding at line boundaries
-- [ ] **Phase 5: Document Base, Subject Model, and the First Two Dialects** - `vnd.fjs.ocr` and `vnd.fjs.1099int` on one base, rooted at permanent subjects
-- [ ] **Phase 6: Guest ABI Freeze and Safe Materialization** - The whitelist expressed in the type, and a blob that becomes a module safely
-- [ ] **Phase 7: `fjs_run`, Run Records, and the Week 1 Convergence** - A stored program reads real documents and returns a real figure
+- [x] **Phase 3: The Restricted Interpreter** - The whitelist that is actually a whitelist, with observed reads and a step budget (completed 2026-08-03)
+- [x] **Phase 4: Exact Arithmetic and the Money Layering** - Integer cents, exact rationals, IRS half-up rounding at line boundaries (completed 2026-08-04)
+- [x] **Phase 5: Document Base, Subject Model, and the First Two Dialects** - `vnd.fjs.ocr` and `vnd.fjs.1099int` on one base, rooted at permanent subjects (completed 2026-08-04)
+- [x] **Phase 6: Guest ABI Freeze and Safe Materialization** - The whitelist expressed in the type, and a blob that becomes a module safely (completed 2026-08-04)
+- [x] **Phase 7: `fjs_run`, Run Records, and the Week 1 Convergence** - A stored program reads real documents and returns a real figure (completed 2026-08-05)
 
 ### Week 2 — A Report Program Produces a Correct Figure
 
-- [ ] **Phase 8: TY2025 Parameters and the Tax Table as Data** - Cited parameters and a row-by-row-verified Tax Table
+- [x] **Phase 8: TY2025 Parameters and the Tax Table as Data** - Cited parameters and a row-by-row-verified Tax Table (completed 2026-08-05)
 - [x] **Phase 9: Traceable Report Lines and the Anti-Hardcoding Gate** - A line without sources does not typecheck; a constant answer fails the gate (completed 2026-08-05)
 - [ ] **Phase 10: Form 1040 Core, Line-16 Dispatch, and the Scope Guard** - Lines 1a–37, four-way line-16 branch, loud refusal outside scope
 

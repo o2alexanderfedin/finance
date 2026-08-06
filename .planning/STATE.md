@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
-status: verifying
-stopped_at: Completed 09-06-PLAN.md
+status: ready_for_phase_10
+stopped_at: Phase 9 complete and verified; Phase 10 not started
 last_updated: "2026-08-05T23:37:04.339Z"
 last_activity: 2026-08-05
 progress:
   total_phases: 15
   completed_phases: 9
   total_plans: 35
-  completed_plans: 37
-  percent: 100
+  completed_plans: 35
+  percent: 60
 ---
 
 # Project State
@@ -26,22 +26,35 @@ the server executes it as a pure function of `(documents, tax-year parameters) �
 
 ## Current Position
 
-Phase: 9 (Traceable Report Lines and the Anti-Hardcoding Gate) — EXECUTING
-Plan: 4 of 4
-Status: Phase complete — ready for verification
+Phase: 9 of 15 — COMPLETE and verified (`09-VERIFICATION.md` status `passed`)
+Plan: 6 of 6 complete (09-05 closed a verification gap; 09-06 was a user-directed refactor)
+Status: Between phases. Phase 10 not started — no CONTEXT.md, no plans.
 
-Progress: [██████████] 100%
+Progress: [██████░░░░] 9 of 15 phases
 Last activity: 2026-08-05
-`npm test` 245 pass / 0 fail in this worktree (runs `tsc && node --test` — tsc is already
-inside it); fjs 0.41.0. Project-local proof count
-(`node --test 2>&1 | grep -c '^✔ import("./fjs/'`): **243** — 185 Phase-7 baseline, +55 across
-Phase 8 (240), +3 from Plan 09-01.
 
-**These two numbers go stale every plan.** They were last measured at Plan 09-01's completion.
-Re-measure before quoting them; do not inherit them into a phase gate. Never gate on `npm test`'s
-total — it includes ~2,100 vendored `functionalscript` submodule proofs and moves with submodule
-state, which is how a Phase 7 gate ("total > 134") came to be satisfied before any phase code
-existed.
+### Test metrics — MEASURE, do not read
+
+**Do not quote a test count from this file.** Run the commands:
+
+```
+npm test                                        # tsc && node --test
+node --test 2>&1 | grep -c '^✔ import("./fjs/'  # project-local proofs — the ONLY honest metric
+npm run test:integration                        # real-process subset (also included in npm test)
+```
+
+Pasted counts were kept here through Phases 7-9 and went stale every single time, including once
+*after* a note was added saying they go stale. The note did not help; removing the numbers does.
+Only two figures are worth recording, because they are historical facts rather than current state:
+
+| Landmark | Project-local proofs |
+|---|---|
+| End of Phase 7 | 185 |
+| End of Phase 9 | 260 |
+
+**Never gate on `npm test`'s total.** It includes ~2,100 vendored `functionalscript` submodule
+proofs and moves with submodule initialization state — which is exactly how a Phase 7 gate
+("total > 134") came to be satisfied before a single line of that phase's code was written.
 
 ## Performance Metrics
 
