@@ -30,43 +30,55 @@ It should be
  */
 ```
 
-## 2. Use `StringMap` from FunctionalScript
+## 2. Use `StringMap` / `OptionalMap` / `RequiredMap` from FunctionalScript
 
-Reach for `StringMap` wherever the key set is **open** — an arbitrary string
-keys the map — instead of hand-writing an index signature:
-
-```ts
-/** @typedef {{ readonly [k: string]: Module | undefined }} ModuleMap */  // don't
-/** @typedef {StringMap<string, Module>} ModuleMap */                     // do
-```
-
-`StringMap` branches on its key parameter, and only the open case is optional:
+Never hand-write a record type. Since `0.43.0`
+(`functionalscript/fjs/types/object/module.f.js`) the three shapes are separate
+types, so the one you pick *is* the statement about the key set:
 
 ```ts
-export type StringMap<K extends string, T> =
-    string extends K
-    ? { readonly[k in string]?: T }     // K is exactly `string` — keys optional
-    : { readonly[k in K]: T }           // K is a literal union — keys REQUIRED
+/** A record over the keys of `K`, each value possibly missing at runtime. */
+export type OptionalMap<K extends string, T> = { readonly[k in K]?: T }
+
+/** A record over the keys of `K`, each value required. `never` when `K` is `string`. */
+export type RequiredMap<K extends string, T> =
+    string extends K ? never : { readonly[k in K]: T }
+
+/** A record with an open key set. Every value can be missing at runtime. */
+export type StringMap<T> = OptionalMap<string, T>
 ```
 
-So a **closed** set of optional keys still needs a mapped type, and
-`MoneyBoxes` stays as it is:
+Which to reach for:
 
-```ts
-/**
- * @typedef {{ readonly [K in BoxKey]?: string }} MoneyBoxes
- */
-```
+- **Open key set** — an arbitrary string keys the map: `StringMap<T>`. It is now
+  **one parameter**; the old two-parameter `StringMap<K, T>` is gone.
 
-`StringMap<BoxKey, string>` would make all six boxes mandatory, and
-`StringMap<BoxKey, string | undefined>` does too — widening the value type does
-not change whether a key is required. Neither expresses "an absent box is an
-absent key", and `tsconfig.json`'s `exactOptionalPropertyTypes` makes that
-distinction load-bearing: under it, `{ interestIncome: undefined }` is rejected
-by the mapped type, which is the whole point of writing it that way.
+  ```ts
+  /** @typedef {{ readonly [k: string]: Module | undefined }} ModuleMap */  // don't
+  /** @typedef {StringMap<string, Module>} ModuleMap */                     // stale — 0.42.0 spelling
+  /** @typedef {StringMap<Module>} ModuleMap */                             // do
+  ```
 
-If `StringMap` should grow an optional-literal-key form, that is an upstream
-change to propose, not something to work around here.
+- **Closed set, keys optional**: `OptionalMap<K, T>`. This is what `MoneyBoxes`
+  in `fjs/document/1099int/from_ocr/module.f.js` is, and it should now say so
+  rather than spelling the mapped type by hand:
+
+  ```ts
+  /** @typedef {{ readonly [K in BoxKey]?: string }} MoneyBoxes */  // don't
+  /** @typedef {OptionalMap<BoxKey, string>} MoneyBoxes */          // do
+  ```
+
+  This is the upstream change the `0.42.0` version of this note asked for — the
+  optional-literal-key form now exists, so the local mapped type is the
+  workaround to delete. The meaning is unchanged: an absent box is an absent
+  key, and under `tsconfig.json`'s `exactOptionalPropertyTypes`
+  `{ interestIncome: undefined }` stays rejected.
+
+- **Closed set, keys required**: `RequiredMap<K, T>`. Keep `K` a finite union of
+  string literals. `RequiredMap<string, T>` is `never` by design — no object can
+  carry every string as a key — but that guard is only an approximation: a
+  template literal such as `` `x-${string}` `` slips through as a template index
+  signature whose reads are typed `T` while the runtime value is `undefined`.
 
 ## 3. External Proofs
 
