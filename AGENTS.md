@@ -171,6 +171,36 @@ the next feedback pass does not revert it back.
 runs the script in the current working directory, so it will happily report a different tree green.
 Use `( cd <dir> && npm test )` — in a subshell, because a bare `cd` persists across later commands.
 
+## Verifying a claim before you record it
+
+Three rules from the project-initialization session, each earned by a failure there. They were
+written into a planning handoff that no longer sits on any branch, which is why they are here
+instead: a rule nobody reads while editing code prevents nothing.
+
+- **Chase a security finding to code execution — never stop at "the value returned looks
+  harmless".** The `match` prototype hazard was first assessed as *moderate, not critical*,
+  because only dispatch was tested. Chaining turned it into a working arbitrary-code escape:
+  against a whitelist holding exactly one operation, dispatching `__defineGetter__` installs an
+  attacker-controlled getter **on the whitelist object itself**, and reading that property runs
+  arbitrary code — no `import()` anywhere. The guard comparison is worth memorising, since two of
+  the three obvious checks are wrong: for `constructor`, `'in'` → `true`, `!== undefined` →
+  `true`, `Object.hasOwn` → **`false`**. Only `Object.hasOwn` is correct. (Closed upstream in fjs
+  0.41.0 by an `at`/`getOwnPropertyDescriptor` lookup — functionalscript#1419 — so no local guard
+  is required today. `fjs/exec`'s `refusals.*` proofs pin it.)
+- **Reproduce a subagent's finding before recording it.** Research agents return high-confidence
+  claims, and several were load-bearing and wrong. Re-execute anything that will change a
+  decision. This generalises the testing rule above: a report is not evidence, and neither is a
+  green suite you did not watch fail.
+- **Never assume the branch you were on is the branch you are on.** During project
+  initialization, git HEAD moved **four times** from outside the session — twice mid-command-block
+  — and `.planning/config.json` and `.planning/research/` vanished from disk between two
+  consecutive tool calls. **The cause was never identified**, so this is a live hazard, not
+  history. Check `git branch --show-current` at the start of a block, and run any multi-step git
+  sequence (checkout → merge → verify → push) inside **one** invocation rather than chaining it
+  across separate tool calls. The related trap: a bare `cd` persists across later commands in some
+  harnesses — `cd ./functionalscript` silently redirects everything after it into the submodule.
+  Use `git -C` and absolute paths, and put any `cd` inside a subshell.
+
 ## Commands
 
 - `npm test` — `tsc` (typecheck) then `node --test` (runs all FunctionalScript proofs via root `all.test.js`).
