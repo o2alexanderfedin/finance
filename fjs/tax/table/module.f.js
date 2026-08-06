@@ -73,7 +73,7 @@
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
 import { of, add, multiply, halfUp } from '../../types/rational/module.f.js'
 import { centsFromString, centsToString } from '../../exact/module.f.js'
-import { taxParamsByYear } from '../params/module.f.js'
+import { taxParamsByYear, individualFilingStatuses } from '../params/module.f.js'
 
 /** @import { TaxParamSet, Bracket, IndividualFilingStatus } from '../params/module.f.js' */
 /** @import { Rational } from '../../types/rational/module.f.js' */
@@ -292,6 +292,105 @@ export const taxComputationWorksheet = brackets => incomeCents => {
 }
 
 /**
+ * The four money columns Publication 1040's printed Tax Table actually
+ * has — and therefore the four money keys of a `Row`. There is no
+ * qualifying-surviving-spouse column on the printed page.
+ * @typedef {'single' | 'marriedFilingJointly' | 'marriedFilingSeparately' | 'headOfHousehold'} TaxTableColumn
+ */
+
+/**
+ * Which printed Tax Table column each individual filing status reads.
+ * Four statuses read their own; a QUALIFYING SURVIVING SPOUSE reads the
+ * married-filing-jointly column, because Publication 1040's Tax Table
+ * prints no QSS column at all. The Tax Computation Worksheet says the
+ * same thing in its own words — its Section B is headed "Married filing
+ * jointly or Qualifying surviving spouse" (see
+ * `handTranscribedTaxComputationWorksheetRows`) — so this is the primary
+ * source's mapping, not an inference from the two statuses happening to
+ * share dollar amounts.
+ *
+ * This is the ONE place that mapping exists. A call site must never
+ * re-decide it: QSS is a filing status in its own right in
+ * `fjs/tax/params` (10-CONTEXT.md Decision 6, because its maximum
+ * age/blindness box count is 2 where MFJ's is 4), so "QSS is just MFJ"
+ * is true of exactly this lookup and false in general — precisely the
+ * kind of half-truth that gets copied to a second site and then applied
+ * where it does not hold.
+ *
+ * Typed as a `Record` over the whole `IndividualFilingStatus` union
+ * deliberately: a sixth filing status added to `fjs/tax/params` later
+ * fails `tsc` HERE, at the one place that must decide what column it
+ * reads, rather than falling through silently to a wrong number.
+ * @type {Record<IndividualFilingStatus, TaxTableColumn>}
+ */
+export const taxTableColumnFor = {
+    single: 'single',
+    marriedFilingJointly: 'marriedFilingJointly',
+    marriedFilingSeparately: 'marriedFilingSeparately',
+    headOfHousehold: 'headOfHousehold',
+    qualifyingSurvivingSpouse: 'marriedFilingJointly',
+}
+
+/**
+ * Which of Form 1040 line 16's two BASE methods produced an amount — the
+ * Tax Table, or the Tax Computation Worksheet. (The QDCGT worksheet and
+ * the Schedule D Tax Worksheet sit a level ABOVE this and are the
+ * dispatcher's business, not this lookup's; both of the former call back
+ * DOWN into this one.)
+ * @typedef {'taxTable' | 'taxComputationWorksheet'} Line16BaseMethod
+ */
+
+/**
+ * A base-tax answer: the cents, and which method produced them.
+ * @typedef {{ readonly method: Line16BaseMethod, readonly cents: bigint }} BaseTaxResult
+ */
+
+/**
+ * The level-3 base lookup (TAX-03): tax on an amount, by the Tax Table
+ * below $100,000.00 and by the Tax Computation Worksheet at or above it —
+ * decided in ONE place, which returns WHICH method it used rather than
+ * only a number.
+ *
+ * ## Why the tag exists at all
+ *
+ * Because a proof asserting only `cents` cannot distinguish "chose the
+ * QDCGT worksheet and got the right answer" from "chose the Tax Table and
+ * got the right answer because the taxpayer had no preferential income."
+ * Those are the same number and different engines, and only one of them
+ * stays right when the taxpayer's facts change. The tag is what makes
+ * TAX-03's "explicit dispatch" testable instead of merely asserted.
+ *
+ * It also pins the $100,000 seam, where the two methods genuinely
+ * disagree: one more cent of taxable income moves a single filer from
+ * $16,909 to $16,914 — a $5 jump — because the Tax Table prices the
+ * MIDPOINT of a $50 band while the worksheet prices the income itself.
+ * Nothing above line 16 can see that discontinuity, so it is pinned here.
+ *
+ * ## The structural fact Plan 10-06 depends on
+ *
+ * The QDCGT worksheet's lines 22 and 24 call this function SEPARATELY,
+ * with DIFFERENT amounts. One execution of one return can therefore
+ * legitimately use the Tax Table for one of them and the Tax Computation
+ * Worksheet for the other — so neither the method nor the cents may be
+ * computed once and reused for both.
+ * @type {(taxParamSet: TaxParamSet) => (status: IndividualFilingStatus) => (incomeCents: bigint) => BaseTaxResult}
+ */
+export const baseTaxForAmount = taxParamSet => status => incomeCents => {
+    if (incomeCents < tableUpperBoundCents) {
+        // `taxTableColumnFor` is a `Record` keyed by the status union and
+        // `Row` is a concrete object type, so both lookups below are total
+        // and neither needs a cast or a non-null assertion — the shape of
+        // the types is what makes AGENTS.md's ban on those affordable here.
+        const column = taxTableColumnFor[status]
+        return { method: 'taxTable', cents: lookupTaxTable(taxParamSet)(incomeCents)[column] }
+    }
+    return {
+        method: 'taxComputationWorksheet',
+        cents: taxComputationWorksheet(taxParamSet.ordinaryBrackets[status].brackets)(incomeCents),
+    }
+}
+
+/**
  * TY2025's parameter set, narrowed exactly ONCE at module scope. This
  * project's `tsconfig.json` sets `noUncheckedIndexedAccess: true`, so
  * indexing the lookup map below by the literal year yields
@@ -455,6 +554,19 @@ const openTopRowProbeOffsetCents = centsFromString('100000.00')
 
 /** One dollar in cents — the step back from a row's exclusive upper bound. */
 const oneDollarCents = centsFromString('1.00')
+
+/**
+ * The four money columns Publication 1040's Tax Table prints, hand-typed
+ * from the printed page rather than read off `taxTableColumnFor`'s own
+ * values or off a `Row`'s keys — `everyIndividualFilingStatusMapsToAPrintedColumn`
+ * compares the mapping against THIS, so deriving it from the mapping
+ * would make that leaf compare the mapping with itself.
+ * @type {readonly TaxTableColumn[]}
+ */
+const printedTaxTableColumns = ['single', 'marriedFilingJointly', 'marriedFilingSeparately', 'headOfHousehold']
+
+/** The printed Tax Table's column count, hand-typed — not `printedTaxTableColumns.length`. */
+const expectedPrintedTaxTableColumnCount = 4
 
 export const proof = {
     // T-08-01: every generated row matches the independently-transcribed
@@ -693,5 +805,74 @@ export const proof = {
             taxComputationWorksheet(taxParams2025.ordinaryBrackets.single.brackets)(tableUpperBoundCents),
             1691400n,
         )
+    },
+    // T-10-03-02: the $100,000.00 seam, pinned on BOTH sides and in BOTH
+    // dimensions. One cent of extra taxable income changes the answer by
+    // $5.00 AND changes the method that produced it, and a proof that
+    // asserted only `cents` would be blind to a dispatcher that returned
+    // the right number by the wrong route.
+    //
+    // Both expected amounts are hand-typed from the printed pages, never
+    // computed here: $16,909 is the single column of the Tax Table's last
+    // printed row ($99,950-$100,000, i1040gi p79) and $16,914 is Section
+    // A's first Tax Computation Worksheet row (p80, 22% x 100,000.00 -
+    // 5,086.00). The $5.00 gap between them is asserted too, because that
+    // discontinuity is the thing itself — it is real, it is invisible
+    // anywhere above line 16, and it is what a "simplify the seam"
+    // refactor would quietly erase.
+    seamAtOneHundredThousandChangesBothTheNumberAndTheMethod: () => {
+        const oneCentBelow = baseTaxForAmount(taxParams2025)('single')(centsFromString('99999.99'))
+        assertEq(oneCentBelow.method, 'taxTable', 'expected the Tax Table one cent below the bound')
+        assertEq(oneCentBelow.cents, 1690900n, 'expected the printed table\'s last single-column row')
+        const atTheBound = baseTaxForAmount(taxParams2025)('single')(centsFromString('100000.00'))
+        assertEq(
+            atTheBound.method,
+            'taxComputationWorksheet',
+            'expected the Tax Computation Worksheet at exactly the bound',
+        )
+        assertEq(atTheBound.cents, 1691400n, 'expected Section A\'s first printed worksheet row')
+        assertEq(
+            atTheBound.cents - oneCentBelow.cents,
+            500n,
+            'expected the printed $5.00 discontinuity across the $100,000 seam',
+        )
+    },
+    // T-10-03-03: a qualifying surviving spouse reads the printed
+    // MARRIED-FILING-JOINTLY column. The expected $2,562.00 is the IRS's
+    // OWN worked Tax Table Example (i1040gi p68: "Mr. and Mrs. Brown are
+    // filing a joint return. Their taxable income is $25,300"), hand-typed
+    // from the page and read here through the QSS status — so this leaf
+    // fails if QSS is ever pointed at any other column, and it fails with
+    // a real published number rather than one this module produced.
+    qualifyingSurvivingSpouseReadsTheMarriedFilingJointlyColumn: () => {
+        assertEq(taxTableColumnFor.qualifyingSurvivingSpouse, 'marriedFilingJointly')
+        const result = baseTaxForAmount(taxParams2025)('qualifyingSurvivingSpouse')(centsFromString('25300.00'))
+        assertEq(result.method, 'taxTable')
+        assertEq(result.cents, 256200n, 'expected the printed Tax Table Example\'s own answer')
+    },
+    // The `Record` over the status union is a `tsc` guarantee that every
+    // status is MAPPED; this leaf is the runtime half it cannot give —
+    // that every status is mapped to a column the printed table actually
+    // HAS, and that a `Row` really carries that key. A mapping to a
+    // plausible-looking name that is not a `Row` money key would typecheck
+    // against a wider column type and then read `undefined` in production.
+    everyIndividualFilingStatusMapsToAPrintedColumn: () => {
+        assertEq(
+            printedTaxTableColumns.length,
+            expectedPrintedTaxTableColumnCount,
+            'Publication 1040 prints four Tax Table money columns',
+        )
+        const row = lookupTaxTable(taxParams2025)(centsFromString('25300.00'))
+        for (const status of individualFilingStatuses) {
+            const column = taxTableColumnFor[status]
+            assert(
+                printedTaxTableColumns.includes(column),
+                ['expected a column Publication 1040 actually prints', status, column],
+            )
+            assert(
+                Object.hasOwn(row, column),
+                ['expected a Row to carry this money key', status, column],
+            )
+        }
     },
 }
