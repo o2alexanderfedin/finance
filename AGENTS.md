@@ -90,10 +90,32 @@ Nothing was found by reading. All three were found by mutating.
   moves with submodule state. Use `node --test 2>&1 | grep -c '^✔ import("./fjs/'`. A Phase 7 gate
   of "total > 134" was already satisfied before that phase's first line was written.
 
-To sweep for untested code rather than guess at it: copy the repo (`cp -a . /tmp/sweep` — the
+**Sweep for untested code rather than guessing at it.** Copy the repo (`cp -a . /tmp/sweep` — the
 `node_modules` symlink is absolute, so it still resolves), then mutate values, comparisons and
 returned shapes one at a time, reverting each. Every mutation that leaves the suite green is
-uncovered code.
+uncovered code. Two cautions learned by doing it: a copy shares the real repo's git directory, so
+never run a *writing* git command from inside one (`git checkout --` to revert is safe and operates
+on the copy; a `git commit` would record the copy's state — including files it lacks — into the real
+repo). And once a proof hand-types an expected value, that literal exists twice: mutate by line
+number and check `git diff --numstat` shows exactly `1` insertion and `1` deletion, or you will edit
+the expectation alongside the code and confirm nothing.
+
+The first such sweep ran 95 mutations across the project. **24 survived** — each one code that could
+have gone wrong in production with the suite fully green. All are now covered. What it found is a
+better guide to where risk actually lives than intuition was:
+
+- The security-shaped code was **solid**. The import-specifier check, its ordering relative to the
+  import, the template-literal refusal, the frozen operation vocabulary, `fjs/run`'s cross-field
+  validation and `money_field`'s safe-integer boundary were all caught, several by a dozen or more
+  failing leaves at once.
+- The gaps were in **data-shaping code that ships real financial values**: a 1099-INT box mapping
+  that could be transposed silently, money boxes droppable from a dialect's exactness loop, bracket
+  data above $100,000 with no verification at all, `formSubject`'s encoding unpinned (a refactor
+  could have forked every stored document's history), and `fjs_run`'s pin — which could be
+  disconnected entirely while the run record still claimed the run was pinned.
+- Several assertions checked the wrong thing: that a refusal *threw*, rather than what it threw.
+
+Nothing on that list was found by reading the code.
 
 ## Commands
 
