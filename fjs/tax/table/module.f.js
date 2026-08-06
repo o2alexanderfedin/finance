@@ -376,16 +376,20 @@ export const proof = {
     // string is asserted directly -- never an `Error`, never
     // `instanceof Error`), naming the Tax Computation Worksheet; a lookup
     // one cent below still resolves, to the table's own last row.
-    tableRefusesAtOneHundredThousandAndAbove: () => {
-        let threw = false
-        try {
+    // The refusal, under a `throw` key — the leaf passes only by throwing,
+    // so no `try`/`catch` is needed (AGENTS.md §6.5). As in
+    // `fjs/server/fjs_run/snapshot`, the bare-value half of the discipline is
+    // not asserted here: reading a thrown value means catching it, and a
+    // `.f.js` module may not.
+    throw: {
+        tableRefusesAtOneHundredThousand: () => {
             lookupTaxTable(taxParams2025)(centsFromString('100000.00'))
-        } catch (e) {
-            threw = true
-            assert(typeof e === 'string' || Array.isArray(e), ['expected a bare thrown value, not an Error', e])
-            assert(!(e instanceof Error), ['must never throw an Error instance', e])
-        }
-        assert(threw, 'expected lookupTaxTable to refuse a $100,000.00 lookup')
+        },
+    },
+    // One cent below still resolves, to the table's own last row — the
+    // control that makes the refusal above a boundary rather than a blanket
+    // failure.
+    tableResolvesOneCentBelowOneHundredThousand: () => {
         const lastRow = lookupTaxTable(taxParams2025)(centsFromString('99999.99'))
         assertEq(lastRow.atLeastCents, centsFromString('99950.00'))
         assertEq(lastRow.lessThanCents, centsFromString('100000.00'))

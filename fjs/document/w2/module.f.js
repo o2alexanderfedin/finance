@@ -36,8 +36,12 @@ import { array, number, option, string } from 'functionalscript/fjs/types/rtti/m
 import { validate as rttiValidate } from 'functionalscript/fjs/types/rtti/validate/module.f.js'
 import { error, ok } from 'functionalscript/fjs/types/result/module.f.js'
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
-import { base } from '../base/module.f.js'
+import { base, mediaTypeOf } from '../base/module.f.js'
 import { moneyFieldError } from '../money_field/module.f.js'
+
+/** @import { Result } from 'functionalscript/fjs/types/result/module.f.js' */
+/** @import { Ts, Unknown } from 'functionalscript/fjs/types/rtti/ts/module.f.js' */
+/** @import { ValidationError } from 'functionalscript/fjs/types/rtti/validate/module.f.js' */
 
 /**
  * Format tag: names the dialect of this BLOB. The media type it is served
@@ -45,7 +49,7 @@ import { moneyFieldError } from '../money_field/module.f.js'
  */
 export const dialect = 'vnd.fjs.w2'
 /** The media type derived from {@link dialect}: `application/vnd.fjs.w2+json`. */
-export const mediaType = `application/${dialect}+json`
+export const mediaType = mediaTypeOf(dialect)
 
 /**
  * One box-12 entry: the printed code and its amount. `code` is the IRS
@@ -113,7 +117,7 @@ export const w2Schema = /** @type {const} */ ({
     employeeName: option(string),
 })
 
-/** @typedef {import('functionalscript/fjs/types/rtti/ts/module.f.js').Ts<typeof w2Schema>} W2 */
+/** @typedef {Ts<typeof w2Schema>} W2 */
 
 /** Structural-only validator: checks the shape, not the semantic refinements below. */
 const validateShape = rttiValidate(w2Schema)
@@ -139,8 +143,10 @@ const moneyBoxFields = /** @type {const} */ ([
     'box11NonqualifiedPlans',
 ])
 
-/** Either a structural validation error or a semantic (string) error message. */
-/** @typedef {import('functionalscript/fjs/types/rtti/validate/module.f.js').ValidationError | string} W2Error */
+/**
+ * Either a structural validation error or a semantic (string) error message.
+ * @typedef {ValidationError | string} W2Error
+ */
 
 /**
  * Checks the semantic refinements the structural schema cannot express:
@@ -151,7 +157,7 @@ const moneyBoxFields = /** @type {const} */ ([
  * A box-12 entry's `code` must also be non-empty: an amount attached to no
  * code is unattributable, and box 12's entire meaning is carried by the
  * code rather than by position.
- * @type {(r: W2) => import('functionalscript/fjs/types/result/module.f.js').Result<W2, W2Error>}
+ * @type {(r: W2) => Result<W2, W2Error>}
  */
 export const checkReferences = r => {
     if (r.formRevision.trim() === '') {
@@ -201,7 +207,7 @@ export const checkReferences = r => {
  * Dialect discrimination happens exclusively through the schema's
  * exact-literal `dialect` constant — the serialized JSON text is never
  * inspected.
- * @type {(value: import('functionalscript/fjs/types/rtti/ts/module.f.js').Unknown) => import('functionalscript/fjs/types/result/module.f.js').Result<W2, W2Error>}
+ * @type {(value: Unknown) => Result<W2, W2Error>}
  */
 export const validate = value => {
     const [t, v] = validateShape(value)

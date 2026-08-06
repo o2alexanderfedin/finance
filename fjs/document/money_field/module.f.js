@@ -15,7 +15,7 @@
  * @module
  */
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
-import { centsFromString, centsToString } from '../../exact/module.f.js'
+import { centsToString, tryCentsFromString } from '../../exact/module.f.js'
 
 /**
  * `Number.MAX_SAFE_INTEGER` as a bigint, so the bound is compared
@@ -30,23 +30,19 @@ export const maxSafeCents = BigInt(Number.MAX_SAFE_INTEGER)
  * Checks one present money string. `undefined` means it is fine; a string
  * is the reason it is not.
  *
- * `centsFromString` refuses via `assert`, which throws a bare string rather
- * than an `Error`, so the throw is caught and converted here — it must
- * never escape a dialect's `validate`. A comma-grouped value reaches this
+ * `tryCentsFromString` refuses with an `error` value, so nothing throws and
+ * this file needs no `try` — which `.f.js` files may not use (AGENTS.md
+ * §6.5). The refusal must never escape a dialect's `validate`, and now it
+ * cannot: there is no throw to escape. A comma-grouped value reaches this
  * check only if it bypassed the OCR conversion boundary, and is refused
  * rather than repaired: repairing it here would be the second conversion
  * path DOC-04 exists to prevent.
  * @type {(label: string) => (printed: string) => string | undefined}
  */
 export const moneyFieldError = label => printed => {
-    /** @type {bigint} */
-    let cents
-    try {
-        cents = centsFromString(printed)
-    } catch (thrown) {
-        return `${label} is not an exact decimal: ${String(thrown)}`
-    }
-    const magnitude = cents < 0n ? -cents : cents
+    const [t, v] = tryCentsFromString(printed)
+    if (t === 'error') { return `${label} is not an exact decimal: ${v}` }
+    const magnitude = v < 0n ? -v : v
     return magnitude > maxSafeCents ? `${label} exceeds safe integer magnitude: ${printed}` : undefined
 }
 

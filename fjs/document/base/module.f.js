@@ -44,6 +44,24 @@ import { assertEq } from 'functionalscript/fjs/asserts/module.f.js'
  */
 export const base = dialect => ({ dialect })
 
+/**
+ * The media type a dialect tag derives, mechanically:
+ * `application/` + tag + `+json`, the `fjs/media/revision` convention
+ * AGENTS.md points at.
+ *
+ * Five modules wrote this same template literal by hand, differing only in
+ * which `dialect` const was in scope. The derivation is one rule, so it is
+ * written once — and it lives beside {@link base} because both express the
+ * same thing: what a dialect tag *implies*.
+ *
+ * The return type is the template literal type, not plain `string`, so a
+ * caller's `mediaType` keeps the exact value in its type the way the
+ * hand-written spelling did.
+ *
+ * @type {<D extends string>(dialect: D) => `application/${D}+json`}
+ */
+export const mediaTypeOf = dialect => `application/${dialect}+json`
+
 // ── Tests ────────────────────────────────────────────────────────────────────
 
 // Type-level negative case (documents the literal-preservation requirement

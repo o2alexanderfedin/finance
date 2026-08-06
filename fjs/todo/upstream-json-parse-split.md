@@ -1,10 +1,16 @@
 # Upstream: `fjs/media/json`'s `parse` is being split into a total parser and a deprecated `parseNative`
 
-Status: **tracked upstream, no action needed here yet.** Recorded per AGENTS.md's rule that a
-dependency on upstream behaviour must never be implicit.
+Status: **landed upstream and adopted here.** `parse` is total as of `0.42.0`
+(`functionalscript#1433` removed `parseNative`), and this repo is on `0.43.0`. Every
+production serialization site now goes through `fjs/json/module.f.js`, which binds
+`fjs/media/json`'s `stringify` once and re-exports its total `parse`.
+
+What is left is the proof-side use of the host's `JSON` for assertion messages and
+expected-output comparison. That is deliberate: those sites are not serializing anything the
+program depends on, and upstream treats the same class as a separate migration.
 
 Target: `functionalscript` `fjs/media/json/module.f.ts`. Checked against the version pinned in
-this repo's `package.json` (`functionalscript ^0.41.0`) and against upstream `origin/main`.
+this repo's `package.json`.
 
 ## What is actually true at 0.41.0
 
@@ -19,9 +25,10 @@ So at the version we compile against, importing `parse` from `fjs/media/json` in
 `SyntaxError` on malformed input, same `any` return. Verified by execution, not by reading the
 type: `parse('not json')` throws `SyntaxError`, exactly as the host does.
 
-That is why `fjs/server/module.f.js`'s `responsesOf` still calls `JSON.parse` directly. Switching
-to the fjs export today would look like an improvement while changing nothing, which is worse than
-leaving it visible.
+`fjs/server/module.f.js`'s `responsesOf` (and its twin in `fjs/server/response`) now call the
+total `parse` through `fjs/json`, which is the one-line change the "What we do when we bump"
+section below prescribed. `unwrap` still throws on malformed input, as that section warned —
+acceptable in a proof harness, where a malformed response *is* the failure.
 
 ## What upstream is changing
 

@@ -53,8 +53,12 @@ import { array, boolean, option, or, string } from 'functionalscript/fjs/types/r
 import { validate as rttiValidate } from 'functionalscript/fjs/types/rtti/validate/module.f.js'
 import { error, ok } from 'functionalscript/fjs/types/result/module.f.js'
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
-import { base } from '../document/base/module.f.js'
+import { base, mediaTypeOf } from '../document/base/module.f.js'
 import { casOpNames } from '../guest/module.f.js'
+
+/** @import { Result } from 'functionalscript/fjs/types/result/module.f.js' */
+/** @import { Ts, Unknown } from 'functionalscript/fjs/types/rtti/ts/module.f.js' */
+/** @import { ValidationError } from 'functionalscript/fjs/types/rtti/validate/module.f.js' */
 
 /**
  * Format tag: names the dialect of this BLOB. The media type it is served
@@ -62,7 +66,7 @@ import { casOpNames } from '../guest/module.f.js'
  */
 export const dialect = 'vnd.fjs.run'
 /** The media type derived from {@link dialect}: `application/vnd.fjs.run+json`. */
-export const mediaType = `application/${dialect}+json`
+export const mediaType = mediaTypeOf(dialect)
 
 /**
  * One command `interpret` actually dispatched while running the program,
@@ -110,13 +114,15 @@ export const runSchema = /** @type {const} */ ({
     error: option(string),
 })
 
-/** @typedef {import('functionalscript/fjs/types/rtti/ts/module.f.js').Ts<typeof runSchema>} Run */
+/** @typedef {Ts<typeof runSchema>} Run */
 
 /** Structural-only validator: checks the shape, not the semantic refinements below. */
 const validateShape = rttiValidate(runSchema)
 
-/** Either a structural validation error or a semantic (string) error message. */
-/** @typedef {import('functionalscript/fjs/types/rtti/validate/module.f.js').ValidationError | string} RunError */
+/**
+ * Either a structural validation error or a semantic (string) error message.
+ * @typedef {ValidationError | string} RunError
+ */
 
 /**
  * Checks the semantic refinements the structural schema can't express on an
@@ -140,7 +146,7 @@ const validateShape = rttiValidate(runSchema)
  * - If `status === 'error'`: `error` must be present (non-empty) and
  *   `resultHash` must be absent.
  *   (T-07-02-02: a record cannot claim both an answer and a failure.)
- * @type {(r: Run) => import('functionalscript/fjs/types/result/module.f.js').Result<Run, RunError>}
+ * @type {(r: Run) => Result<Run, RunError>}
  */
 export const checkReferences = r => {
     if (r.programHash.trim() === '') {
@@ -180,7 +186,7 @@ export const checkReferences = r => {
  * Validates an already-parsed JSON value as a `run` BLOB: structural (rtti)
  * validation followed by the semantic checks in {@link checkReferences}.
  * Same composed shape as every other document dialect's `validate`.
- * @type {(value: import('functionalscript/fjs/types/rtti/ts/module.f.js').Unknown) => import('functionalscript/fjs/types/result/module.f.js').Result<Run, RunError>}
+ * @type {(value: Unknown) => Result<Run, RunError>}
  */
 export const validate = value => {
     const [t, v] = validateShape(value)

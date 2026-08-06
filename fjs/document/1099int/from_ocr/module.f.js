@@ -59,8 +59,10 @@ const boxLabels = /** @type {const} */ ([
     ['Box 8 Tax-exempt interest', 'box8TaxExemptInterest'],
 ])
 
-/** The six schema field names {@link boxLabels} maps onto. */
-/** @typedef {(typeof boxLabels)[number][1]} BoxKey */
+/**
+ * The six schema field names {@link boxLabels} maps onto.
+ * @typedef {(typeof boxLabels)[number][1]} BoxKey
+ */
 
 /**
  * The money-box half of a converted document. Every key optional, in the

@@ -65,9 +65,10 @@ import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
 import { guestCtx } from '../module.f.js'
 import { interpret } from '../../exec/module.f.js'
 
-/** @import { Effect } from 'functionalscript/fjs/effects/module.f.js' */
+/** @import { Effect, OperationMap } from 'functionalscript/fjs/effects/module.f.js' */
 /** @import { Import, Module, Mkdir, WriteFile } from 'functionalscript/fjs/effects/node/module.f.js' */
 /** @import { Result } from 'functionalscript/fjs/types/result/module.f.js' */
+/** @import { CasOp, Report } from '../module.f.js' */
 
 // ── SEC-02: the specifier allow-list ─────────────────────────────────────────
 
@@ -352,19 +353,18 @@ const cleanSource = 'export const report = ctx => args => ctx.casRead(args[0])'
  * The `report` entry point a materialized module exposes — the runtime
  * counterpart of {@link cleanSource}, used as the JsModule fixture's export
  * so the proof exercises a real entry point rather than an empty object.
- * @type {import('../module.f.js').Report<string>}
+ * @type {Report<string>}
  */
 const guestReport = ctx => args => ctx.casRead(args[0] ?? '')
 
 /** A host map for the frozen vocabulary, so a loaded program can be RUN. */
-/** @type {import('functionalscript/fjs/effects/module.f.js').OperationMap<import('../module.f.js').CasOp, string>} */
+/** @type {OperationMap<CasOp, string>} */
 const hostMap = {
     casRead: a => `casRead:${a}`,
     evoList: a => `evoList:${a}`,
     evoHead: a => `evoHead:${a}`,
     evoRevision: a => `evoRevision:${a}`,
 }
-Object.setPrototypeOf(hostMap, null)
 
 export const proof = {
     // ── Success Criterion 3 ─────────────────────────────────────────────
@@ -572,7 +572,7 @@ export const proof = {
             // Phase 3's interpreter. Asserting the export is a function
             // would prove the fixture was returned; running it proves the
             // materialize -> import -> execute path end to end.
-            const loaded = /** @type {{ readonly report: import('../module.f.js').Report<string> }} */ (v)
+            const loaded = /** @type {{ readonly report: Report<string> }} */ (v)
             const [rt, rv] = interpret(hostMap)(loaded.report(guestCtx)(['abc']))
             assert(rt === 'ok', ['expected the loaded program to run', rt, rv])
             assertEq(rv[0], 'casRead:abc')

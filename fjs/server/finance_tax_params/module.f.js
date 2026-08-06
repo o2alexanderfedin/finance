@@ -53,10 +53,12 @@ import { toolEntry, okResult, errorResult } from 'functionalscript/fjs/protocol/
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
 import { taxParamsByYear } from '../../tax/params/module.f.js'
 import { taxTableBandStructure } from '../../tax/table/module.f.js'
+import { stringify as jsonText } from '../../json/module.f.js'
 
-/** @import { ToolsCallResult } from 'functionalscript/fjs/protocol/mcp/module.f.js' */
+/** @import { ToolEntry, ToolsCallResult } from 'functionalscript/fjs/protocol/mcp/module.f.js' */
 /** @import { TaxParamSet } from '../../tax/params/module.f.js' */
 /** @import { BandRegion } from '../../tax/table/module.f.js' */
+/** @import { StringMap } from 'functionalscript/fjs/types/object/module.f.js' */
 
 /**
  * The shape `finance_tax_params` actually returns: every Plan 08-01
@@ -134,7 +136,7 @@ export const knownYears = Object.keys(taxParamsResponses).map(Number)
  * {@link taxParamsResponses} and returns `okResult` of that year's response
  * as JSON text, or an `errorResult` naming the unknown year and the known
  * set.
- * @type {import('functionalscript/fjs/protocol/mcp/module.f.js').ToolEntry<never>}
+ * @type {ToolEntry<never>}
  */
 export const financeTaxParamsTool = toolEntry(
     'finance_tax_params',
@@ -152,7 +154,7 @@ export const financeTaxParamsTool = toolEntry(
                 `unknown tax year: ${args.year}; known: ${knownYears.join(', ')}`,
             ))
         }
-        return pure(okResult(JSON.stringify(response)))
+        return pure(okResult(jsonText(response)))
     },
 )
 
@@ -275,7 +277,7 @@ export const proof = {
         // amount, each citing the OBBBA-revised Rev. Proc. 2025-32 §3.01
         // — never the pre-OBBBA 2024-40 figure.
         const standardDeduction = asObject(field(root, 'standardDeduction'), 'standardDeduction')
-        /** @type {{ readonly [status: string]: string }} */
+        /** @type {StringMap<string>} */
         const expectedStandardDeduction = {
             single: '15750.00',
             marriedFilingJointly: '31500.00',

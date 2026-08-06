@@ -140,19 +140,22 @@ import { sizeGuard, previewBytes, guardBytes } from '../response/module.f.js'
 import { readUtf8File } from 'functionalscript/fjs/effects/node/module.f.js'
 import { vec8, length as bitLength } from 'functionalscript/fjs/types/bit_vec/module.f.js'
 import { parse } from 'functionalscript/fjs/path/module.f.js'
+import { stringify as jsonText } from '../../json/module.f.js'
 
 /** @import { Effect, Operation } from 'functionalscript/fjs/effects/module.f.js' */
 /** @import { MemOp } from 'functionalscript/fjs/effects/memory/module.f.js' */
 /** @import { Mkdir, WriteFile, Import } from 'functionalscript/fjs/effects/node/module.f.js' */
 /** @import { Cas, FileCasOperation } from 'functionalscript/fjs/cas/module.f.js' */
 /** @import { Evo } from 'functionalscript/fjs/cas/evo/module.f.js' */
-/** @import { ToolEntry } from 'functionalscript/fjs/protocol/mcp/module.f.js' */
+/** @import { ToolEntry, ToolsCallResult } from 'functionalscript/fjs/protocol/mcp/module.f.js' */
 /** @import { Vec } from 'functionalscript/fjs/types/bit_vec/module.f.js' */
-/** @import { CasOp } from '../../guest/module.f.js' */
+/** @import { CasOp, Report } from '../../guest/module.f.js' */
 /** @import { State, Dir, JsModule } from 'functionalscript/fjs/effects/node/virtual/module.f.js' */
-/** @import { Report } from '../../guest/module.f.js' */
 /** @import { Run } from '../../run/module.f.js' */
 /** @import { RunOutcome } from '../../report/guard/module.f.js' */
+/** @import { ReportLine } from '../../report/line/module.f.js' */
+/** @import { Unknown as JsonUnknown } from 'functionalscript/fjs/media/json/module.f.js' */
+/** @import { Ts, Unknown as RttiUnknown } from 'functionalscript/fjs/types/rtti/ts/module.f.js' */
 
 // ── executeRun ────────────────────────────────────────────────────────────────
 //
@@ -303,16 +306,16 @@ const withResultText = o => {
     // validator; the narrowing one below is what the validator just earned,
     // `rtti`'s `Unknown` differing from `json`'s only by admitting `undefined`,
     // which `jsonUnknown` is precisely what rejects.
-    const [t, v] = validateJsonValue(/** @type {import('functionalscript/fjs/types/rtti/ts/module.f.js').Unknown} */ (o.value))
+    const [t, v] = validateJsonValue(/** @type {RttiUnknown} */ (o.value))
     return t === 'error'
         ? {
             kind: 'error',
-            message: `the report returned a value that is not representable as JSON: ${JSON.stringify(v)}`,
+            message: `the report returned a value that is not representable as JSON: ${jsonText(v)}`,
             reads: o.reads,
         }
         : {
             ...rest,
-            text: stringifyJsonValue(/** @type {import('functionalscript/fjs/media/json/module.f.js').Unknown} */ (v)),
+            text: stringifyJsonValue(/** @type {JsonUnknown} */ (v)),
         }
 }
 
@@ -342,7 +345,7 @@ const withResultText = o => {
  * case. Real Node has no such limitation — `fjsRunTool` itself is
  * unchanged, and `fjs-run-integration.test.js` proves the real, single-call
  * round trip end to end against a genuinely separate process.
- * @type {(cas: Cas<FileCasOperation>) => (programHash: string) => (programArgs: readonly string[]) => (pinned: boolean) => (pinFields: { readonly subject?: string, readonly parents?: readonly string[] }) => (outcome: RunOutcome<unknown>) => Effect<FileCasOperation | MemOp, import('functionalscript/fjs/protocol/mcp/module.f.js').ToolsCallResult>}
+ * @type {(cas: Cas<FileCasOperation>) => (programHash: string) => (programArgs: readonly string[]) => (pinned: boolean) => (pinFields: { readonly subject?: string, readonly parents?: readonly string[] }) => (outcome: RunOutcome<unknown>) => Effect<FileCasOperation | MemOp, ToolsCallResult>}
  */
 const handleRunOutcome = cas => programHash => programArgs => pinned => pinFields => rawOutcome => {
     const outcome = withResultText(rawOutcome)
@@ -366,14 +369,14 @@ const handleRunOutcome = cas => programHash => programArgs => pinned => pinField
             }
             const [vt, vv] = validateRun(record)
             assert(vt === 'ok', ['fjs_run assembled an invalid ok run record - executor bug', vv])
-            return step(writeTextToCas(cas)(JSON.stringify(vv)), runHash => {
+            return step(writeTextToCas(cas)(jsonText(vv)), runHash => {
                 const { preview, truncated } = sizeGuard(guardBytes)(previewBytes)(text, resultHash)
                 // PROV-07: readCount derives from `inputs` — the SAME array
                 // just persisted into the run record above, never a second
                 // counter (09-CONTEXT.md). literalCount is outcome's own
                 // count, computed once in executeRun/runExecuteRunViaFixture
                 // at the point the source text was already in hand.
-                return pure(okResult(JSON.stringify({
+                return pure(okResult(jsonText({
                     resultHash,
                     runHash,
                     preview,
@@ -397,7 +400,7 @@ const handleRunOutcome = cas => programHash => programArgs => pinned => pinField
     }
     const [vt, vv] = validateRun(record)
     assert(vt === 'ok', ['fjs_run assembled an invalid error run record - executor bug', vv])
-    return step(writeTextToCas(cas)(JSON.stringify(vv)), runHash =>
+    return step(writeTextToCas(cas)(jsonText(vv)), runHash =>
         pure(errorResult(`fjs_run failed: ${outcome.message} (run record: ${runHash})`)))
 }
 
@@ -432,7 +435,7 @@ export const fjsRunTool = materializeHomeRoot => cas => evoApi => toolEntry(
     'the result and run-record hashes. Supply subject and parents together to pin ' +
     'the snapshot the program\'s evoHead reads; omit both for an ordinary unpinned run.',
     fjsRunInputSchema,
-    /** @type {(args: import('functionalscript/fjs/types/rtti/ts/module.f.js').Ts<typeof fjsRunInputSchema>) => Effect<FileCasOperation | Mkdir | WriteFile | Import | MemOp, import('functionalscript/fjs/protocol/mcp/module.f.js').ToolsCallResult>} */
+    /** @type {(args: Ts<typeof fjsRunInputSchema>) => Effect<FileCasOperation | Mkdir | WriteFile | Import | MemOp, ToolsCallResult>} */
     (args => {
         const programArgs = args.args ?? []
         const pinned = args.subject !== undefined && args.parents !== undefined
@@ -707,7 +710,7 @@ export const proof = {
             const programSource = 'export const report = ctx => args => ctx.pure("0.00")'
             const [state5, programHash] = virtual(state4)(seedText(cas)(programSource))
 
-            /** @type {(subjects: readonly string[]) => (acc: bigint) => import('functionalscript/fjs/effects/module.f.js').Effect<import('../../guest/module.f.js').CasOp, string>} */
+            /** @type {(subjects: readonly string[]) => (acc: bigint) => Effect<CasOp, string>} */
             const sumOverSubjects = subjects => acc => {
                 const [subject, ...rest] = subjects
                 if (subject === undefined) {
@@ -725,7 +728,7 @@ export const proof = {
                     })
                 })
             }
-            /** @type {import('../../guest/module.f.js').Report<string>} */
+            /** @type {Report<string>} */
             const sumReport = ctx => () => ctx.step(
                 ctx.evoList('false'),
                 activeJson => sumOverSubjects(/** @type {readonly string[]} */ (JSON.parse(activeJson)))(0n))
@@ -788,7 +791,7 @@ export const proof = {
 
             const programSource = 'export const report = ctx => args => ctx.pure("unused")'
             const [state3, programHash] = virtual(state2)(seedText(cas)(programSource))
-            /** @type {import('../../guest/module.f.js').Report<string>} */
+            /** @type {Report<string>} */
             const pinReport = ctx => runArgs => ctx.evoHead(runArgs[0] ?? '')
 
             const [, outcome] = runExecuteRunViaFixture(home)(cas)(e)(programHash)(programSource)(pinReport)(['subjectS'])(
@@ -829,7 +832,7 @@ export const proof = {
                 const programSource = 'export const report = ctx => args => ctx.pure("unused")'
                 const [state3, programHash] = virtual(state2)(seedText(cas)(programSource))
 
-                /** @type {import('../../guest/module.f.js').Report<string>} */
+                /** @type {Report<string>} */
                 const adversarialReport = ctx => () => ctx.step(
                     ctx.casRead(citedHash),
                     citedValue => ctx.step(ctx.casRead(uncitedHash), () => ctx.pure(citedValue)))
@@ -877,7 +880,7 @@ export const proof = {
                 // PROV-07: one harmless evoList dispatch gives
                 // reads.length === 1, required now that a zero-read outcome
                 // is refused as an error instead of returned as 'ok'.
-                /** @type {import('../../guest/module.f.js').Report<string>} */
+                /** @type {Report<string>} */
                 const trivialReport = ctx => () => ctx.step(ctx.evoList('false'), () => ctx.pure('answer-42'))
 
                 const [, hashesBefore] = virtual(state1)(cas.list())
@@ -1059,7 +1062,7 @@ export const proof = {
                 // PROV-07: one harmless evoList dispatch gives
                 // reads.length === 1, required now that a zero-read outcome
                 // is refused as an error instead of returned as 'ok'.
-                /** @type {import('../../guest/module.f.js').Report<string>} */
+                /** @type {Report<string>} */
                 const tinyReport = ctx => () => ctx.step(ctx.evoList('false'), () => ctx.pure('tiny'))
 
                 // 07-10: decomposed via runExecuteRunViaFixture/
@@ -1268,7 +1271,7 @@ export const proof = {
             const e = evo(cas)(cacheKey)
             const programSource = 'export const report = ctx => args => ctx.pure("unused")'
             const [state1, programHash] = virtual(state0)(seedText(cas)(programSource))
-            /** @type {import('../../guest/module.f.js').Report<string>} */
+            /** @type {Report<string>} */
             const zeroReadReport = ctx => () => ctx.pure('unused')
 
             const [state1b, outcome] = runExecuteRunViaFixture(home)(cas)(e)(programHash)(programSource)(zeroReadReport)([])(undefined)(state1)
@@ -1364,7 +1367,7 @@ export const proof = {
                     return ctx.step(ctx.casRead(rev.snapshot), docJson => {
                         const doc = /** @type {{ readonly box1InterestIncome: string }} */ (JSON.parse(docJson))
                         const raw = doc.box1InterestIncome
-                        /** @type {import('../../report/line/module.f.js').ReportLine} */
+                        /** @type {ReportLine} */
                         const line = {
                             value: ctx.centsFromString(raw),
                             sources: [{ documentHash: rev.snapshot, boxPath: 'box1InterestIncome', value: raw }],

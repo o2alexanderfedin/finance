@@ -30,6 +30,7 @@
  * @module
  */
 import { assertEq } from 'functionalscript/fjs/asserts/module.f.js'
+import { stringify as jsonText } from '../../json/module.f.js'
 
 /**
  * The subject for an artifact's own revision chain: the identity function on
@@ -86,7 +87,7 @@ export const artifactSubject = hash => hash
  * @type {(key: FormKey) => string}
  */
 export const formSubject = ({ payerTin, recipientTin, accountNumber, taxYear, formType }) =>
-    JSON.stringify([formType, String(taxYear), payerTin, recipientTin, accountNumber])
+    jsonText([formType, String(taxYear), payerTin, recipientTin, accountNumber])
 
 // ── Tests ────────────────────────────────────────────────────────────────────
 

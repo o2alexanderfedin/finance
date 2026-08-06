@@ -38,9 +38,12 @@ import { dialect as oneZeroNineNineIntDialect, oneZeroNineNineIntSchema } from '
 import { dialect as ocrDialect, ocrSchema } from '../../document/ocr/module.f.js'
 import { dialect as w2Dialect, w2Schema } from '../../document/w2/module.f.js'
 import { dialect as medicalExpensesDialect, medicalExpensesSchema } from '../../document/medical_expenses/module.f.js'
+import { stringify as jsonText } from '../../json/module.f.js'
 
 /** @import { Type } from 'functionalscript/fjs/types/rtti/module.f.js' */
-/** @import { ToolsCallResult } from 'functionalscript/fjs/protocol/mcp/module.f.js' */
+/** @import { ToolEntry, ToolsCallResult } from 'functionalscript/fjs/protocol/mcp/module.f.js' */
+/** @import { Unknown as JsonUnknown } from 'functionalscript/fjs/media/json/module.f.js' */
+/** @import { StringMap } from 'functionalscript/fjs/types/object/module.f.js' */
 
 /**
  * Every known document dialect tag, mapped to its OWN exported RTTI schema
@@ -49,7 +52,7 @@ import { dialect as medicalExpensesDialect, medicalExpensesSchema } from '../../
  * TypeScript would otherwise infer) so looking it up by an arbitrary
  * request-supplied `dialect` string yields a clean `Type | undefined`,
  * never the lossy `{} | null` an `unknown`-cast lookup produces.
- * @type {{ readonly [dialect: string]: Type }}
+ * @type {StringMap<Type>}
  */
 const dialectSchemas = {
     [oneZeroNineNineIntDialect]: oneZeroNineNineIntSchema,
@@ -66,7 +69,7 @@ const knownDialects = /** @type {readonly string[]} */ (Object.keys(dialectSchem
  * {@link dialectSchemas} and returns `okResult` of that schema's own
  * `toJsonSchema` serialization as JSON text, or an `errorResult` naming the
  * unknown tag and the known set.
- * @type {import('functionalscript/fjs/protocol/mcp/module.f.js').ToolEntry<never>}
+ * @type {ToolEntry<never>}
  */
 export const financeSchemaTool = toolEntry(
     'finance_schema',
@@ -81,7 +84,10 @@ export const financeSchemaTool = toolEntry(
                 `unknown dialect: ${args.dialect}; known: ${knownDialects.join(', ')}`,
             ))
         }
-        return pure(okResult(JSON.stringify(toJsonSchema(schema))))
+        // `toJsonSchema` returns rtti's `UnknownConst`, which differs from
+        // `json`'s `Unknown` only by admitting `undefined` — and a JSON Schema
+        // never holds one, since `toJsonSchema` builds every field it emits.
+        return pure(okResult(jsonText(/** @type {JsonUnknown} */ (toJsonSchema(schema)))))
     },
 )
 
@@ -92,7 +98,7 @@ export const financeSchemaTool = toolEntry(
  * `ToolsCallResult` — every call resolves via `pure`, so `runPure` always
  * yields exactly one value; a genuinely empty result here would mean the
  * handler unexpectedly issued a command, which `assert` below catches.
- * @type {(dialect: string) => import('functionalscript/fjs/protocol/mcp/module.f.js').ToolsCallResult}
+ * @type {(dialect: string) => ToolsCallResult}
  */
 const call = dialect => {
     const [result] = runPure(financeSchemaTool.handle({ dialect }))
