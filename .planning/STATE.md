@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
-status: verifying
-stopped_at: Phases 8 and 9 complete and verified. CONSOLIDATION DONE — the six overlapping PRs were not divergent lineages; they shared history and collapsed into one branch with a single merge of origin/chore/apply-feedback. Now on functionalscript 0.43.0. Backlog phases 16-18 recorded.
-last_updated: "2026-08-06T18:00:00.000Z"
+status: executing
+stopped_at: Phase 10 in execution. Wave 1 complete (10-01 QSS filing status, 10-02 whole-dollar election); waves 2-6 remain, 8 plans. Plans passed two adversarial review rounds after a BLOCKER verdict.
+last_updated: "2026-08-06T20:30:00.000Z"
 last_activity: 2026-08-06
 progress:
   total_phases: 18
@@ -22,15 +22,18 @@ See: .planning/PROJECT.md (updated 2026-08-03)
 
 **Core value:** The report is a program, not an answer — the agent emits FunctionalScript;
 the server executes it as a pure function of `(documents, tax-year parameters) → report`.
-**Current focus:** Phase 9 — Traceable Report Lines and the Anti-Hardcoding Gate
+**Current focus:** Phase 10 — Form 1040 Core, Line-16 Dispatch, and the Scope Guard
 
 ## Current Position
 
-Phase: 9 of 15 — gap-closure plans added after the original `09-VERIFICATION.md` pass
-  (a systematic mutation sweep found 7 more undetected gaps); 09-07 closes them, 09-08
-  covers a separate exec/guest/document batch from the same sweep and is not yet started.
-Plan: 8 of 8 complete (09-07 closed 7 mutation-sweep gaps in server/report; 09-08 pending)
-Status: Phase complete — ready for verification
+Phase: 10 of 18 — Form 1040 Core, Line-16 Dispatch, and the Scope Guard (TAX-03/05/06/16).
+  Ten plans across six waves. The plan set was returned BLOCKER by `gsd-plan-checker`
+  (four blockers, ten warnings), revised, re-checked, and only then executed.
+Plan: 2 of 10 complete — wave 1 (10-01 QSS as a stored filing status, 10-02 the IRS
+  whole-dollar election). Waves 2-6 remain: 10-03 TCW, 10-04 return profile, 10-05
+  standard deduction, 10-06 QDCGT, 10-07 scope classifier, 10-08 dispatcher,
+  10-09 lines 1a-15, 10-10 lines 16-37 + whole-report refusal.
+Status: Executing
 
 Progress: [██████████] 100%
   in this file's frontmatter for the raw plan/summary counts — the percent figure here is

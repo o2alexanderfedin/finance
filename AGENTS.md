@@ -171,6 +171,29 @@ the next feedback pass does not revert it back.
 runs the script in the current working directory, so it will happily report a different tree green.
 Use `( cd <dir> && npm test )` — in a subshell, because a bare `cd` persists across later commands.
 
+### Concurrent work invalidates a mutation observation
+
+`npm test` is `tsc && node --test`, and **`tsc` is repo-wide**. So when two agents work in the same
+checkout, one agent's half-finished file fails the typecheck, `node --test` never runs, and the
+other agent's `npm test` goes red for a reason that has nothing to do with the mutation it is
+measuring. Observed: a wave-1 executor saw `TS6133: 'assertNotNullish' is declared but never read`
+from a sibling's in-flight file while mutating a module it did not share a single line with.
+
+**A red you did not cause confirms a mutation that never worked** — which is worse than a missed
+failure, because it gets written down as evidence.
+
+If you must measure while someone else is mid-edit, run the *gated command only* against a
+snapshot, and keep the mutation edit and every `git diff --numstat` on the real tracked file:
+
+```
+tar --exclude=.git -cf - . | (mkdir -p /tmp/snap && tar -xf - -C /tmp/snap)
+( cd /tmp/snap && npm test )
+```
+
+`--exclude=.git` matters. The `cp -a` recipe above shares the real repo's git directory, so a git
+command run inside that copy writes to the real repo; a `tar` snapshot has no git directory at all
+and cannot. Confirm the result in the real tree once the other agent commits.
+
 ## Verifying a claim before you record it
 
 Three rules from the project-initialization session, each earned by a failure there. They were
