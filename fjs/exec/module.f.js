@@ -35,6 +35,12 @@ import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
  * The null prototype below is cheap defence in depth (03-CONTEXT.md); it is
  * not the security mechanism — `match`'s own-property-only `at` lookup is
  * (EXEC-02, delivered upstream, not reimplemented here).
+ * A plain object literal, deliberately not null-prototyped. The
+ * `constructor`/`toString`/`hasOwnProperty` probes below are the reason: with
+ * a null prototype they would pass because the inherited names were absent,
+ * which proves nothing about `interpret`. Leaving `Object.prototype` in place
+ * means they pass only if the own-property-only `at` lookup is what refuses
+ * them — the guarantee actually being claimed.
  * @type {OperationMap<TestOp, string>}
  */
 const map = {
@@ -43,7 +49,6 @@ const map = {
     evoHead: a => `evoHead:${a}`,
     evoRevision: a => `evoRevision:${a}`,
 }
-Object.setPrototypeOf(map, null)
 
 /**
  * Simulates a stored/generated program whose command string bypassed `tsc` —

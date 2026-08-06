@@ -50,6 +50,7 @@ import { ok } from 'functionalscript/fjs/types/result/module.f.js'
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
 import { interpret } from '../../../exec/module.f.js'
 import { guestCtx } from '../../../guest/module.f.js'
+import { stringify as jsonText } from '../../../json/module.f.js'
 
 /** @import { Effect, Operation, OperationMap } from 'functionalscript/fjs/effects/module.f.js' */
 /** @import { MemOp } from 'functionalscript/fjs/effects/memory/module.f.js' */
@@ -73,7 +74,7 @@ import { guestCtx } from '../../../guest/module.f.js'
  * - `revisions` maps every hash that `evo.revision(hash)` successfully
  *   decodes (skipped, not errored, for a hash that is not a valid revision —
  *   mirroring `buildCache`'s own "ignore non-revision blobs" precedent) to
- *   `JSON.stringify(RevisionData)`.
+ *   `jsonText(RevisionData)`.
  * @typedef {{
  *   readonly blobs: Readonly<Record<string, string>>,
  *   readonly activeSubjects: readonly string[],
@@ -126,7 +127,7 @@ export const buildRunSnapshot = cas => evoApi => pin => {
                             ...state,
                             blobs,
                             revisions: revResult[0] === 'ok'
-                                ? { ...state.revisions, [hashStr]: JSON.stringify(revResult[1]) }
+                                ? { ...state.revisions, [hashStr]: jsonText(revResult[1]) }
                                 : state.revisions,
                         }),
                     )
@@ -190,9 +191,9 @@ export const buildHostMap = snapshot => ({
         }
         return blob
     },
-    evoList: archivedFlag => JSON.stringify(
+    evoList: archivedFlag => jsonText(
         archivedFlag === 'true' ? snapshot.archivedSubjects : snapshot.activeSubjects),
-    evoHead: subject => JSON.stringify(snapshot.heads[subject] ?? []),
+    evoHead: subject => jsonText(snapshot.heads[subject] ?? []),
     evoRevision: hash => {
         const revision = snapshot.revisions[hash]
         if (revision === undefined) {
@@ -256,9 +257,19 @@ export const proof = {
             assertEq(v[0], JSON.stringify(['PINNED_HASH']))
             assert(v[0] !== JSON.stringify(snapshot.heads['subjectS']), 'must not answer with the live head')
         },
-        // A hash absent from the snapshot refuses with a plain thrown
-        // string, never an Error — this codebase's bare-throw discipline
-        // (never `instanceof Error`, per 07-CONTEXT.md).
+        // A hash absent from the snapshot refuses, and does so by throwing
+        // (this codebase's bare-throw discipline, 07-CONTEXT.md).
+        //
+        // MERGE NOTE (do not re-revert). A feedback pass rewrote this as a bare
+        // `throw: { casReadOnAbsentHash }` leaf, dropping all three assertions
+        // below, on the stated grounds that "reading a thrown value requires
+        // catching it, and a `.f.js` module may not". That premise is false —
+        // `fjs/exec/module.f.js` catches in shipped production code, and this
+        // proof passes under `npm test`. The `throw:` form is strictly weaker:
+        // it passes for ANY throw, including one raised by an unrelated path
+        // before `casRead` is ever consulted. Asserting WHAT was thrown, not
+        // merely that something was, is the specific gap the mutation sweep
+        // found across this codebase, so the assertions stay.
         casReadOnAbsentHashThrowsAPlainString: () => {
             const map = buildHostMap(twoBlobSnapshot)
             try {

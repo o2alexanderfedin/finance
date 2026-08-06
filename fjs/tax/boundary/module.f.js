@@ -42,6 +42,7 @@ import { taxParamsByYear, allFilingStatuses } from '../params/module.f.js'
 import { taxTableBandStructure } from '../table/module.f.js'
 
 /** @import { Bracket } from '../params/module.f.js' */
+/** @import { StringMap } from 'functionalscript/fjs/types/object/module.f.js' */
 
 /**
  * A pure, generic, tax-agnostic boundary counter: given a sorted-ascending list of boundary
@@ -181,7 +182,7 @@ const sortedCents = [...new Set(allThresholds.map(threshold => threshold.cents))
  * own cent: one cent before must count strictly fewer boundaries reached than the threshold
  * itself, and the threshold must count the same number of boundaries reached as one cent after
  * (i.e. the count does not change again a second time, one cent late).
- * @type {{ readonly [label: string]: () => void }}
+ * @type {StringMap<() => void>}
  */
 const generatedThresholdProof = Object.fromEntries(
     allThresholds.map(threshold => [

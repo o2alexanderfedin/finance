@@ -13,9 +13,11 @@
  *
  * @module
  */
-import { parse, format } from '../types/decimal/module.f.js'
+import { parse, tryParse, format } from '../types/decimal/module.f.js'
 import { ofInt, multiply, of, halfUp } from '../types/rational/module.f.js'
 import { assertEq } from 'functionalscript/fjs/asserts/module.f.js'
+
+/** @import { Result } from 'functionalscript/fjs/types/result/module.f.js' */
 
 /**
  * This project's money scale: 2 fractional digits, i.e. cents.
@@ -30,6 +32,15 @@ export const centsScale = 2
  * @type {(s: string) => bigint}
  */
 export const centsFromString = parse(centsScale)
+
+/**
+ * {@link centsFromString}'s total form — the same parse at this project's
+ * money scale, refusing with an `error` value instead of a throw. What a
+ * dialect's `validate` calls, since it must report bad input rather than
+ * propagate it and `.f.js` files have no `try`.
+ * @type {(s: string) => Result<bigint, string>}
+ */
+export const tryCentsFromString = tryParse(centsScale)
 
 /**
  * Formats exact bigint cents back into a decimal string at this

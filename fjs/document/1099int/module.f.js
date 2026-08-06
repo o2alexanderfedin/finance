@@ -44,9 +44,13 @@ import { number, option, string } from 'functionalscript/fjs/types/rtti/module.f
 import { validate as rttiValidate } from 'functionalscript/fjs/types/rtti/validate/module.f.js'
 import { error, ok } from 'functionalscript/fjs/types/result/module.f.js'
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
-import { base } from '../base/module.f.js'
+import { base, mediaTypeOf } from '../base/module.f.js'
 import { moneyFieldError } from '../money_field/module.f.js'
 import { dialect as ocrDialect, ocrSchema, validate as ocrValidate } from '../ocr/module.f.js'
+
+/** @import { Result } from 'functionalscript/fjs/types/result/module.f.js' */
+/** @import { Ts, Unknown } from 'functionalscript/fjs/types/rtti/ts/module.f.js' */
+/** @import { ValidationError } from 'functionalscript/fjs/types/rtti/validate/module.f.js' */
 
 /**
  * Format tag: names the dialect of this BLOB. The media type it is served
@@ -54,7 +58,7 @@ import { dialect as ocrDialect, ocrSchema, validate as ocrValidate } from '../oc
  */
 export const dialect = 'vnd.fjs.1099int'
 /** The media type derived from {@link dialect}: `application/vnd.fjs.1099int+json`. */
-export const mediaType = `application/${dialect}+json`
+export const mediaType = mediaTypeOf(dialect)
 
 /**
  * rtti schema for a `1099int` BLOB. `dialect` is spread first (via `base`)
@@ -80,7 +84,7 @@ export const oneZeroNineNineIntSchema = /** @type {const} */ ({
     recipientName: option(string),
 })
 
-/** @typedef {import('functionalscript/fjs/types/rtti/ts/module.f.js').Ts<typeof oneZeroNineNineIntSchema>} OneZeroNineNineInt */
+/** @typedef {Ts<typeof oneZeroNineNineIntSchema>} OneZeroNineNineInt */
 
 /** Structural-only validator: checks the shape, not the semantic refinements below. */
 const validateShape = rttiValidate(oneZeroNineNineIntSchema)
@@ -101,8 +105,10 @@ const moneyBoxFields = /** @type {const} */ ([
     'box8TaxExemptInterest',
 ])
 
-/** Either a structural validation error or a semantic (string) error message. */
-/** @typedef {import('functionalscript/fjs/types/rtti/validate/module.f.js').ValidationError | string} OneZeroNineNineIntError */
+/**
+ * Either a structural validation error or a semantic (string) error message.
+ * @typedef {ValidationError | string} OneZeroNineNineIntError
+ */
 
 /**
  * Checks the semantic refinements the structural schema can't express on an
@@ -117,7 +123,7 @@ const moneyBoxFields = /** @type {const} */ ([
  *   within `Number.MAX_SAFE_INTEGER`, compared bigint-to-bigint — never
  *   converted through `Number()`, which would reintroduce the precision
  *   hazard `fjs/types/decimal`'s docstring warns about.
- * @type {(r: OneZeroNineNineInt) => import('functionalscript/fjs/types/result/module.f.js').Result<OneZeroNineNineInt, OneZeroNineNineIntError>}
+ * @type {(r: OneZeroNineNineInt) => Result<OneZeroNineNineInt, OneZeroNineNineIntError>}
  */
 export const checkReferences = r => {
     if (r.formRevision.trim() === '') {
@@ -151,7 +157,7 @@ export const checkReferences = r => {
  * `proof.crossDialect` below for the runtime proof (Task 3), and this
  * module's `<verify>` grep gate for the static guarantee that no such
  * shortcut has been (re-)introduced.
- * @type {(value: import('functionalscript/fjs/types/rtti/ts/module.f.js').Unknown) => import('functionalscript/fjs/types/result/module.f.js').Result<OneZeroNineNineInt, OneZeroNineNineIntError>}
+ * @type {(value: Unknown) => Result<OneZeroNineNineInt, OneZeroNineNineIntError>}
  */
 export const validate = value => {
     const [t, v] = validateShape(value)
@@ -305,7 +311,7 @@ export const proof = {
         // and the failure's `path` is exactly `['dialect']` — the
         // discriminant catches it first, not some unrelated missing field.
         ocrShapeRejectedByOneZeroNineNineInt: () => {
-            /** @type {import('functionalscript/fjs/types/rtti/ts/module.f.js').Ts<typeof ocrSchema>} */
+            /** @type {Ts<typeof ocrSchema>} */
             const ocrValue = {
                 dialect: ocrDialect,
                 pages: ['Form 1099-INT, Box 1 Interest income: 1,234.56'],

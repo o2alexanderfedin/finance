@@ -71,9 +71,12 @@ import { emptyState, virtual } from 'functionalscript/fjs/effects/node/virtual/m
 import { fromRegistry, mcpStep, okResult, toolEntry, uninitializedState } from 'functionalscript/fjs/protocol/mcp/module.f.js'
 import { stdioTransport } from 'functionalscript/fjs/protocol/mcp/stdio/module.f.js'
 import { internalError, jsonrpc } from 'functionalscript/fjs/protocol/json_rpc/module.f.js'
+import { parse as jsonParse } from '../../json/module.f.js'
+import { unwrap } from 'functionalscript/fjs/types/result/module.f.js'
 
 /** @import { Vec } from 'functionalscript/fjs/types/bit_vec/module.f.js' */
-/** @import { McpConfig } from 'functionalscript/fjs/protocol/mcp/module.f.js' */
+/** @import { McpConfig, ToolEntry } from 'functionalscript/fjs/protocol/mcp/module.f.js' */
+/** @import { State } from 'functionalscript/fjs/effects/node/virtual/module.f.js' */
 
 /**
  * The inline-preview threshold (8 KiB, in bytes): a result whose UTF-8
@@ -165,11 +168,11 @@ const harnessConfig = {
 /** UTF-8 bytes of `s` as a plain array — the virtual stdin byte stream, same helper `fjs/server/module.f.js` uses. @type {(s: string) => readonly number[]} */
 const toBytes = s => [...fromVec(utf8(s))]
 
-/** Non-empty stdout lines from a session `State`, parsed as JSON-RPC envelopes. @type {(state: import('functionalscript/fjs/effects/node/virtual/module.f.js').State) => readonly unknown[]} */
+/** Non-empty stdout lines from a session `State`, parsed as JSON-RPC envelopes. @type {(state: State) => readonly unknown[]} */
 const responsesOf = state => state.stdout
     .split('\n')
     .filter((/** @type {string} */ line) => line !== '')
-    .map((/** @type {string} */ line) => JSON.parse(line))
+    .map((/** @type {string} */ line) => unwrap(jsonParse(line)))
 
 const initializeRequest = {
     jsonrpc: '2.0',
@@ -189,7 +192,7 @@ const initializedNotification = { jsonrpc: '2.0', method: 'notifications/initial
  * resulting `State` so a proof leaf can assert on `stdout` directly. `toolId`
  * is the id the `tools/call` request itself carries, so a leaf can pick its
  * own response out of the (at least two) response lines a session produces.
- * @type {(registry: readonly import('functionalscript/fjs/protocol/mcp/module.f.js').ToolEntry<never>[]) => (toolName: string) => (toolId: number) => import('functionalscript/fjs/effects/node/virtual/module.f.js').State}
+ * @type {(registry: readonly ToolEntry<never>[]) => (toolName: string) => (toolId: number) => State}
  */
 const runToolCallSession = registry => toolName => toolId => {
     const handlers = fromRegistry(registry)
@@ -221,7 +224,7 @@ const orderingProofHash = 'ORDERING-PROOF-HASH'
  * oversized content before ever returning it, exactly the shape a real
  * `fjs_run`-style handler would use. `okResult` wraps only the ALREADY-SIZED
  * `preview`, never the raw content.
- * @type {import('functionalscript/fjs/protocol/mcp/module.f.js').ToolEntry<never>}
+ * @type {ToolEntry<never>}
  */
 const orderingProofTool = toolEntry(
     'size_guard_ordering_probe',
@@ -237,7 +240,7 @@ const contrastRawContent = 'Y'.repeat(Number(maxLengthBytes) + 1)
  * A test-only tool returning an oversized result directly, with no
  * `sizeGuard` in front of it — the failure mode this whole module exists to
  * prevent, reproduced directly rather than argued about.
- * @type {import('functionalscript/fjs/protocol/mcp/module.f.js').ToolEntry<never>}
+ * @type {ToolEntry<never>}
  */
 const contrastTool = toolEntry(
     'size_guard_contrast_probe',

@@ -44,8 +44,12 @@ import { array, number, option, string } from 'functionalscript/fjs/types/rtti/m
 import { validate as rttiValidate } from 'functionalscript/fjs/types/rtti/validate/module.f.js'
 import { error, ok } from 'functionalscript/fjs/types/result/module.f.js'
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
-import { base } from '../base/module.f.js'
+import { base, mediaTypeOf } from '../base/module.f.js'
 import { moneyFieldError } from '../money_field/module.f.js'
+
+/** @import { Result } from 'functionalscript/fjs/types/result/module.f.js' */
+/** @import { Ts, Unknown } from 'functionalscript/fjs/types/rtti/ts/module.f.js' */
+/** @import { ValidationError } from 'functionalscript/fjs/types/rtti/validate/module.f.js' */
 
 /**
  * Format tag: names the dialect of this BLOB. The media type it is served
@@ -53,7 +57,7 @@ import { moneyFieldError } from '../money_field/module.f.js'
  */
 export const dialect = 'vnd.fjs.medical_expenses'
 /** The media type derived from {@link dialect}: `application/vnd.fjs.medical_expenses+json`. */
-export const mediaType = `application/${dialect}+json`
+export const mediaType = mediaTypeOf(dialect)
 
 /**
  * One expense. `datePaid` is the deductible-year determinant — medical
@@ -82,13 +86,15 @@ export const medicalExpensesSchema = /** @type {const} */ ({
     entries: array(expenseEntry),
 })
 
-/** @typedef {import('functionalscript/fjs/types/rtti/ts/module.f.js').Ts<typeof medicalExpensesSchema>} MedicalExpenses */
+/** @typedef {Ts<typeof medicalExpensesSchema>} MedicalExpenses */
 
 /** Structural-only validator: checks the shape, not the semantic refinements below. */
 const validateShape = rttiValidate(medicalExpensesSchema)
 
-/** Either a structural validation error or a semantic (string) error message. */
-/** @typedef {import('functionalscript/fjs/types/rtti/validate/module.f.js').ValidationError | string} MedicalExpensesError */
+/**
+ * Either a structural validation error or a semantic (string) error message.
+ * @typedef {ValidationError | string} MedicalExpensesError
+ */
 
 /**
  * An ISO calendar date, `YYYY-MM-DD`. Fixed-width digit groups with no
@@ -111,7 +117,7 @@ const isoDate = /^(\d{4})-(\d{2})-(\d{2})$/
  * entry filed under the wrong year is a wrong deduction that no later stage
  * can detect, because by then the year is simply what the document says it
  * is. Comparing the digits costs nothing and refuses it at the boundary.
- * @type {(r: MedicalExpenses) => import('functionalscript/fjs/types/result/module.f.js').Result<MedicalExpenses, MedicalExpensesError>}
+ * @type {(r: MedicalExpenses) => Result<MedicalExpenses, MedicalExpensesError>}
  */
 export const checkReferences = r => {
     for (const entry of r.entries) {
@@ -146,7 +152,7 @@ export const checkReferences = r => {
  * structural (rtti) validation followed by {@link checkReferences}. Dialect
  * discrimination happens exclusively through the schema's exact-literal
  * `dialect` constant — the serialized JSON text is never inspected.
- * @type {(value: import('functionalscript/fjs/types/rtti/ts/module.f.js').Unknown) => import('functionalscript/fjs/types/result/module.f.js').Result<MedicalExpenses, MedicalExpensesError>}
+ * @type {(value: Unknown) => Result<MedicalExpenses, MedicalExpensesError>}
  */
 export const validate = value => {
     const [t, v] = validateShape(value)

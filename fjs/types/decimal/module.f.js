@@ -31,7 +31,10 @@
  *
  * @module
  */
-import { assert, assertNotNullish } from 'functionalscript/fjs/asserts/module.f.js'
+import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
+import { error, ok, unwrap } from 'functionalscript/fjs/types/result/module.f.js'
+
+/** @import { Result } from 'functionalscript/fjs/types/result/module.f.js' */
 
 /**
  * Matches a full decimal string: an optional leading `-`, one or more
@@ -53,16 +56,30 @@ const decimalPattern = /^(-)?(\d+)(?:\.(\d+))?$/
  * zero-padding, not an error.
  * @type {(scale: number) => (s: string) => bigint}
  */
-export const parse = scale => s => {
+export const parse = scale => s => unwrap(tryParse(scale)(s))
+
+/**
+ * {@link parse}'s total form: the same rules, refusing with an `error` value
+ * instead of a throw.
+ *
+ * This is the primitive and `parse` is the wrapper, not the other way round.
+ * A caller that must not throw — a dialect's `validate`, which turns bad
+ * input into a reported message — otherwise has to wrap the call in
+ * `try`/`catch`, and `.f.js` files have none (AGENTS.md §6.5): FunctionalScript
+ * itself has no `try`, so a module that needs one is a module whose dependency
+ * refuses in the wrong shape.
+ * @type {(scale: number) => (s: string) => Result<bigint, string>}
+ */
+export const tryParse = scale => s => {
     const m = decimalPattern.exec(s)
-    assert(m !== null, 'not a decimal number: ' + s)
+    if (m === null) { return error('not a decimal number: ' + s) }
     const [, sign, intPart, fracPart] = m
-    const intDigits = assertNotNullish(intPart, 'not a decimal number: ' + s)
+    if (intPart === undefined) { return error('not a decimal number: ' + s) }
     const frac = fracPart ?? ''
-    assert(frac.length <= scale, 'more than ' + scale + ' fractional digits: ' + s)
+    if (frac.length > scale) { return error('more than ' + scale + ' fractional digits: ' + s) }
     const padded = frac.padEnd(scale, '0')
-    const magnitude = BigInt(intDigits) * 10n ** BigInt(scale) + (padded === '' ? 0n : BigInt(padded))
-    return sign === '-' ? -magnitude : magnitude
+    const magnitude = BigInt(intPart) * 10n ** BigInt(scale) + (padded === '' ? 0n : BigInt(padded))
+    return ok(sign === '-' ? -magnitude : magnitude)
 }
 
 /**
@@ -84,6 +101,25 @@ export const format = scale => n => {
 // ── Tests ────────────────────────────────────────────────────────────────────
 
 export const proof = {
+    // `tryParse` is the primitive; these pin that it refuses with a value
+    // rather than a throw, and that `parse` still throws on the same input —
+    // the pair has to keep both behaviours, since callers depend on each.
+    tryParse: {
+        acceptsWhatParseAccepts: () => {
+            assertEq(unwrap(tryParse(2)('1234.56')), 123456n)
+            assertEq(unwrap(tryParse(2)('-0.05')), -5n)
+            assertEq(unwrap(tryParse(2)('7')), 700n)
+        },
+        refusesWithAValueNotAThrow: () => {
+            assertEq(tryParse(2)('not a number')[0], 'error')
+            assertEq(tryParse(2)('1.234')[0], 'error')
+            assertEq(tryParse(2)('1,234.56')[0], 'error')
+        },
+        errorNamesTheInput: () => {
+            const [, v] = tryParse(2)('1.234')
+            assert(String(v).includes('1.234'), String(v))
+        },
+    },
     roundTrip: {
         positive: () => {
             const result = format(2)(parse(2)('1234.56'))
@@ -112,6 +148,9 @@ export const proof = {
             assert(format(2)(-5n) === '-0.05', 'format negative small')
         },
     },
+    // `parse` is `unwrap(tryParse(...))`, so these also pin that the wrapper
+    // still throws where the total form returns an error — the pair has to
+    // keep both behaviours.
     throw: {
         overPrecision: () => parse(2)('1234.567'),
         garbage: () => parse(2)('abc'),

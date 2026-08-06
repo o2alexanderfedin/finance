@@ -126,6 +126,9 @@ import { sha256 } from 'functionalscript/fjs/crypto/sha2/module.f.js'
 import { initEvo, evo } from 'functionalscript/fjs/cas/evo/module.f.js'
 import { emptyState, virtual } from 'functionalscript/fjs/effects/node/virtual/module.f.js'
 import { assert, assertEq, assertNotNullish } from 'functionalscript/fjs/asserts/module.f.js'
+import { validate as rttiValidate } from 'functionalscript/fjs/types/rtti/validate/module.f.js'
+import { unknown as jsonUnknown, stringify as jsonStringify } from 'functionalscript/fjs/media/json/module.f.js'
+import { identity } from 'functionalscript/fjs/types/function/module.f.js'
 import { interpret } from '../../exec/module.f.js'
 import { countNumericLiterals } from '../../report/audit/module.f.js'
 import { classifyRunOutcome } from '../../report/guard/module.f.js'
@@ -137,19 +140,22 @@ import { sizeGuard, previewBytes, guardBytes } from '../response/module.f.js'
 import { readUtf8File } from 'functionalscript/fjs/effects/node/module.f.js'
 import { vec8, length as bitLength } from 'functionalscript/fjs/types/bit_vec/module.f.js'
 import { parse } from 'functionalscript/fjs/path/module.f.js'
+import { stringify as jsonText } from '../../json/module.f.js'
 
 /** @import { Effect, Operation } from 'functionalscript/fjs/effects/module.f.js' */
 /** @import { MemOp } from 'functionalscript/fjs/effects/memory/module.f.js' */
 /** @import { Mkdir, WriteFile, Import } from 'functionalscript/fjs/effects/node/module.f.js' */
 /** @import { Cas, FileCasOperation } from 'functionalscript/fjs/cas/module.f.js' */
 /** @import { Evo } from 'functionalscript/fjs/cas/evo/module.f.js' */
-/** @import { ToolEntry } from 'functionalscript/fjs/protocol/mcp/module.f.js' */
+/** @import { ToolEntry, ToolsCallResult } from 'functionalscript/fjs/protocol/mcp/module.f.js' */
 /** @import { Vec } from 'functionalscript/fjs/types/bit_vec/module.f.js' */
-/** @import { CasOp } from '../../guest/module.f.js' */
+/** @import { CasOp, Report } from '../../guest/module.f.js' */
 /** @import { State, Dir, JsModule } from 'functionalscript/fjs/effects/node/virtual/module.f.js' */
-/** @import { Report } from '../../guest/module.f.js' */
 /** @import { Run } from '../../run/module.f.js' */
 /** @import { RunOutcome } from '../../report/guard/module.f.js' */
+/** @import { ReportLine } from '../../report/line/module.f.js' */
+/** @import { Unknown as JsonUnknown } from 'functionalscript/fjs/media/json/module.f.js' */
+/** @import { Ts, Unknown as RttiUnknown } from 'functionalscript/fjs/types/rtti/ts/module.f.js' */
 
 // ── executeRun ────────────────────────────────────────────────────────────────
 //
@@ -238,6 +244,81 @@ const writeTextToCas = cas => text => {
     )
 }
 
+/** rtti validator for "is this a JSON value", from `fjs/media/json`'s own schema. */
+const validateJsonValue = rttiValidate(jsonUnknown)
+
+/** `JSON.stringify`'s rules, in FunctionalScript — property order left as-is. */
+const stringifyJsonValue = jsonStringify(identity)
+
+/**
+ * One outcome with its result already reduced to the text that gets hashed,
+ * stored, and previewed — `value` swapped for `text`, everything else carried
+ * through unchanged.
+ *
+ * **Derived from `RunOutcome` rather than restated.** An earlier spelling wrote
+ * the field list out by hand, and when phase 9 added `literalCount` to
+ * `RunOutcome`'s `'ok'` arm the two drifted: the rebuilt object silently
+ * dropped the field, and the anti-hardcoding audit would have written
+ * `literalCount: undefined` into every run record. Deriving with `Omit`/
+ * `Extract` means a field added to `RunOutcome` cannot go missing here without
+ * `tsc` saying so — which is how that drift was caught.
+ * @template T
+ * @typedef {(Omit<Extract<RunOutcome<T>, { kind: 'ok' }>, 'value'> & { readonly text: string }) | Extract<RunOutcome<T>, { kind: 'error' }>} TextOutcome
+ */
+
+/**
+ * Reduces a run's result to the exact bytes CAS should hold.
+ *
+ * The guest ABI is `Report<T>` with `T` unconstrained (`fjs/guest`), so a
+ * report may legitimately return a structured value — and one asked to compute
+ * a total will. `String(value)` turns every such value into `'[object
+ * Object]'`, which then gets hashed, stored, and named by the run record's
+ * `resultHash`: the answer is destroyed and the provenance record attests to
+ * the destruction, with nothing reporting an error. That is the one outcome
+ * this repository's whole traceability claim cannot survive.
+ *
+ * Three cases, in the order they are checked:
+ *
+ * - **A string is passed through byte-for-byte.** Not `stringify`d — quoting a
+ *   string that was already the answer would change every existing program's
+ *   result hash for no gain. This keeps the common case identical to before.
+ * - **Any other JSON value is serialized by `fjs/media/json`'s `stringify`**,
+ *   which is FunctionalScript rather than the host (AGENTS.md's "use
+ *   FunctionalScript itself as much as possible") and is reversible: the stored
+ *   bytes parse back to the value the program computed.
+ * - **Anything else becomes an error outcome**, carrying its observed reads, so
+ *   it still gets a `status: 'error'` run record. `fjs/media/json`'s own
+ *   `unknown` schema decides which values are representable, so this module
+ *   does not maintain a second opinion about what JSON is. A report returning a
+ *   `bigint`, a function, or `undefined` is a broken report; saying so is the
+ *   only answer that does not silently corrupt the result.
+ * @type {(o: RunOutcome<unknown>) => TextOutcome<unknown>}
+ */
+const withResultText = o => {
+    if (o.kind === 'error') { return o }
+    // Everything except `value` is carried through by spreading the outcome
+    // rather than by naming its fields — `literalCount` reaches the run record
+    // that way, and so does whatever a later phase adds.
+    const { value: _value, ...rest } = o
+    if (typeof o.value === 'string') { return { ...rest, text: o.value } }
+    // The guest's result is `unknown` — it crossed the ABI from a stored blob,
+    // so nothing has constrained it. The widening cast only hands it to the
+    // validator; the narrowing one below is what the validator just earned,
+    // `rtti`'s `Unknown` differing from `json`'s only by admitting `undefined`,
+    // which `jsonUnknown` is precisely what rejects.
+    const [t, v] = validateJsonValue(/** @type {RttiUnknown} */ (o.value))
+    return t === 'error'
+        ? {
+            kind: 'error',
+            message: `the report returned a value that is not representable as JSON: ${jsonText(v)}`,
+            reads: o.reads,
+        }
+        : {
+            ...rest,
+            text: stringifyJsonValue(/** @type {JsonUnknown} */ (v)),
+        }
+}
+
 /**
  * `fjsRunTool`'s OWN post-outcome logic (the writes, the record, never a raw
  * throw — see the module header), factored out of {@link fjsRunTool}'s
@@ -264,15 +345,16 @@ const writeTextToCas = cas => text => {
  * case. Real Node has no such limitation — `fjsRunTool` itself is
  * unchanged, and `fjs-run-integration.test.js` proves the real, single-call
  * round trip end to end against a genuinely separate process.
- * @type {(cas: Cas<FileCasOperation>) => (programHash: string) => (programArgs: readonly string[]) => (pinned: boolean) => (pinFields: { readonly subject?: string, readonly parents?: readonly string[] }) => (outcome: RunOutcome<unknown>) => Effect<FileCasOperation | MemOp, import('functionalscript/fjs/protocol/mcp/module.f.js').ToolsCallResult>}
+ * @type {(cas: Cas<FileCasOperation>) => (programHash: string) => (programArgs: readonly string[]) => (pinned: boolean) => (pinFields: { readonly subject?: string, readonly parents?: readonly string[] }) => (outcome: RunOutcome<unknown>) => Effect<FileCasOperation | MemOp, ToolsCallResult>}
  */
-const handleRunOutcome = cas => programHash => programArgs => pinned => pinFields => outcome => {
+const handleRunOutcome = cas => programHash => programArgs => pinned => pinFields => rawOutcome => {
+    const outcome = withResultText(rawOutcome)
     const inputs = outcome.reads.map(([command, payload]) => ({
         command,
         payload: payload.map(String),
     }))
     if (outcome.kind === 'ok') {
-        const text = String(outcome.value)
+        const { text } = outcome
         return step(writeTextToCas(cas)(text), resultHash => {
             /** @type {Run} */
             const record = {
@@ -287,14 +369,14 @@ const handleRunOutcome = cas => programHash => programArgs => pinned => pinField
             }
             const [vt, vv] = validateRun(record)
             assert(vt === 'ok', ['fjs_run assembled an invalid ok run record - executor bug', vv])
-            return step(writeTextToCas(cas)(JSON.stringify(vv)), runHash => {
+            return step(writeTextToCas(cas)(jsonText(vv)), runHash => {
                 const { preview, truncated } = sizeGuard(guardBytes)(previewBytes)(text, resultHash)
                 // PROV-07: readCount derives from `inputs` — the SAME array
                 // just persisted into the run record above, never a second
                 // counter (09-CONTEXT.md). literalCount is outcome's own
                 // count, computed once in executeRun/runExecuteRunViaFixture
                 // at the point the source text was already in hand.
-                return pure(okResult(JSON.stringify({
+                return pure(okResult(jsonText({
                     resultHash,
                     runHash,
                     preview,
@@ -318,7 +400,7 @@ const handleRunOutcome = cas => programHash => programArgs => pinned => pinField
     }
     const [vt, vv] = validateRun(record)
     assert(vt === 'ok', ['fjs_run assembled an invalid error run record - executor bug', vv])
-    return step(writeTextToCas(cas)(JSON.stringify(vv)), runHash =>
+    return step(writeTextToCas(cas)(jsonText(vv)), runHash =>
         pure(errorResult(`fjs_run failed: ${outcome.message} (run record: ${runHash})`)))
 }
 
@@ -353,14 +435,18 @@ export const fjsRunTool = materializeHomeRoot => cas => evoApi => toolEntry(
     'the result and run-record hashes. Supply subject and parents together to pin ' +
     'the snapshot the program\'s evoHead reads; omit both for an ordinary unpinned run.',
     fjsRunInputSchema,
-    /** @type {(args: import('functionalscript/fjs/types/rtti/ts/module.f.js').Ts<typeof fjsRunInputSchema>) => Effect<FileCasOperation | Mkdir | WriteFile | Import | MemOp, import('functionalscript/fjs/protocol/mcp/module.f.js').ToolsCallResult>} */
+    /** @type {(args: Ts<typeof fjsRunInputSchema>) => Effect<FileCasOperation | Mkdir | WriteFile | Import | MemOp, ToolsCallResult>} */
     (args => {
         const programArgs = args.args ?? []
         const pinned = args.subject !== undefined && args.parents !== undefined
-        const pinFields = /** @type {{ readonly subject?: string, readonly parents?: readonly string[] }} */ ({
-            ...(args.subject === undefined ? {} : { subject: args.subject }),
-            ...(args.parents === undefined ? {} : { parents: args.parents }),
-        })
+        // Both or neither. A half-supplied pin is an ordinary unpinned run
+        // (07-CONTEXT.md), and an unpinned run has no subject to record — so
+        // the lone field is dropped rather than carried into the record, where
+        // it would name a subject the run was never pinned to. `checkReferences`
+        // rejects that combination, so carrying it would also make the executor
+        // assemble a record its own validator refuses.
+        const pinFields = /** @type {{ readonly subject?: string, readonly parents?: readonly string[] }} */ (
+            pinned ? { subject: args.subject, parents: args.parents } : {})
         return step(
             executeRun(materializeHomeRoot)(cas)(evoApi)({
                 hash: args.hash,
@@ -624,7 +710,7 @@ export const proof = {
             const programSource = 'export const report = ctx => args => ctx.pure("0.00")'
             const [state5, programHash] = virtual(state4)(seedText(cas)(programSource))
 
-            /** @type {(subjects: readonly string[]) => (acc: bigint) => import('functionalscript/fjs/effects/module.f.js').Effect<import('../../guest/module.f.js').CasOp, string>} */
+            /** @type {(subjects: readonly string[]) => (acc: bigint) => Effect<CasOp, string>} */
             const sumOverSubjects = subjects => acc => {
                 const [subject, ...rest] = subjects
                 if (subject === undefined) {
@@ -642,7 +728,7 @@ export const proof = {
                     })
                 })
             }
-            /** @type {import('../../guest/module.f.js').Report<string>} */
+            /** @type {Report<string>} */
             const sumReport = ctx => () => ctx.step(
                 ctx.evoList('false'),
                 activeJson => sumOverSubjects(/** @type {readonly string[]} */ (JSON.parse(activeJson)))(0n))
@@ -705,7 +791,7 @@ export const proof = {
 
             const programSource = 'export const report = ctx => args => ctx.pure("unused")'
             const [state3, programHash] = virtual(state2)(seedText(cas)(programSource))
-            /** @type {import('../../guest/module.f.js').Report<string>} */
+            /** @type {Report<string>} */
             const pinReport = ctx => runArgs => ctx.evoHead(runArgs[0] ?? '')
 
             const [, outcome] = runExecuteRunViaFixture(home)(cas)(e)(programHash)(programSource)(pinReport)(['subjectS'])(
@@ -746,7 +832,7 @@ export const proof = {
                 const programSource = 'export const report = ctx => args => ctx.pure("unused")'
                 const [state3, programHash] = virtual(state2)(seedText(cas)(programSource))
 
-                /** @type {import('../../guest/module.f.js').Report<string>} */
+                /** @type {Report<string>} */
                 const adversarialReport = ctx => () => ctx.step(
                     ctx.casRead(citedHash),
                     citedValue => ctx.step(ctx.casRead(uncitedHash), () => ctx.pure(citedValue)))
@@ -794,7 +880,7 @@ export const proof = {
                 // PROV-07: one harmless evoList dispatch gives
                 // reads.length === 1, required now that a zero-read outcome
                 // is refused as an error instead of returned as 'ok'.
-                /** @type {import('../../guest/module.f.js').Report<string>} */
+                /** @type {Report<string>} */
                 const trivialReport = ctx => () => ctx.step(ctx.evoList('false'), () => ctx.pure('answer-42'))
 
                 const [, hashesBefore] = virtual(state1)(cas.list())
@@ -833,6 +919,133 @@ export const proof = {
                 const [vt] = validateRun(JSON.parse(utf8ToString(runRead[1])))
                 assertEq(vt, 'ok')
             },
+            // The ABI is `Report<T>` with `T` unconstrained, so a report may
+            // return a structured value — and one asked to compute a total
+            // will. `String(value)` used to reduce every such value to
+            // '[object Object]', which was then hashed, stored, and named by
+            // the run record's `resultHash`: the answer destroyed, and the
+            // provenance record attesting to the destruction, with nothing
+            // reporting an error. The stored bytes must be the value.
+            objectResultIsSerializedNotStringified: () => {
+                const home = '/objectresult'
+                const cas = fileCas(sha256)(home)
+                const [state0, cacheKey] = virtual(emptyState)(initEvo(cas))
+                const e = evo(cas)(cacheKey)
+                const programSource = 'export const report = ctx => args => ctx.step(ctx.evoList("false"), () => ctx.pure({ total: "1234.56" }))'
+                const [state1, programHash] = virtual(state0)(seedText(cas)(programSource))
+                // One dispatched read, so the zero-read gate (09-03) lets the
+                // outcome through as 'ok' — this leaf is about serialization,
+                // not about that gate.
+                /** @type {Report<unknown>} */
+                const objectReport = ctx => () => ctx.step(ctx.evoList('false'), () => ctx.pure({ total: '1234.56' }))
+
+                const [state1b, outcome] = runExecuteRunViaFixture(home)(cas)(e)(programHash)(programSource)(objectReport)([])(undefined)(state1)
+                const [state2, callResult] = virtual(state1b)(handleRunOutcome(cas)(programHash)([])(false)({})(outcome))
+                assertEq(callResult.isError, undefined)
+                const first = callResult.content[0]
+                if (first === undefined || first.type !== 'text') {
+                    throw ['expected a text content item', callResult]
+                }
+                const parsed = /** @type {{ readonly resultHash: string }} */ (JSON.parse(first.text))
+                const resultHashVec = cBase32ToVec(parsed.resultHash)
+                assert(resultHashVec !== null, 'expected a decodable resultHash')
+                const [, resultRead] = virtual(state2)(collectRead(cas.read(/** @type {Vec} */ (resultHashVec))))
+                assert(resultRead[0] === 'ok', ['expected the result to read back', resultRead])
+                // Not '[object Object]', and not merely "different" — the exact
+                // bytes, which parse back to the value the program computed.
+                const stored = utf8ToString(resultRead[1])
+                assertEq(stored, '{"total":"1234.56"}')
+                assertEq(JSON.parse(stored).total, '1234.56')
+            },
+            // Merge regression. `withResultText` swaps `value` for `text` and
+            // carries the rest of the outcome through. When phase 9 added
+            // `literalCount` to `RunOutcome`, an earlier spelling that rebuilt
+            // the object field-by-field dropped it — the response envelope
+            // would have reported `literalCount: undefined`, disabling the
+            // anti-hardcoding audit without failing anything. The field has to
+            // survive the serialization step, so assert it on the envelope
+            // that step feeds.
+            literalCountSurvivesResultSerialization: () => {
+                const home = '/literalcount'
+                const cas = fileCas(sha256)(home)
+                const [state0, cacheKey] = virtual(emptyState)(initEvo(cas))
+                const e = evo(cas)(cacheKey)
+                // Three numeric literals in the source, and a structured
+                // result — so the value goes through `stringify`, the path
+                // that rebuilds the outcome.
+                const programSource = 'export const report = ctx => args => ctx.step(ctx.evoList("false"), () => ctx.pure({ a: 1, b: 2, c: 3 }))'
+                const [state1, programHash] = virtual(state0)(seedText(cas)(programSource))
+                /** @type {Report<unknown>} */
+                const countedReport = ctx => () => ctx.step(ctx.evoList('false'), () => ctx.pure({ a: 1, b: 2, c: 3 }))
+
+                const [state1b, outcome] = runExecuteRunViaFixture(home)(cas)(e)(programHash)(programSource)(countedReport)([])(undefined)(state1)
+                assert(outcome.kind === 'ok', ['expected an ok outcome', outcome])
+                const expected = outcome.literalCount
+                assert(expected > 0, ['the fixture must have numeric literals to count', expected])
+
+                const [, callResult] = virtual(state1b)(handleRunOutcome(cas)(programHash)([])(false)({})(outcome))
+                const first = callResult.content[0]
+                if (first === undefined || first.type !== 'text') {
+                    throw ['expected a text content item', callResult]
+                }
+                const parsed = /** @type {{ readonly literalCount: number }} */ (JSON.parse(first.text))
+                assertEq(parsed.literalCount, expected)
+            },
+            // A string result is passed through byte-for-byte, never quoted.
+            // Serializing it would change the result hash of every program
+            // written so far, for a value that was already the answer.
+            stringResultIsUnquoted: () => {
+                const home = '/stringresult'
+                const cas = fileCas(sha256)(home)
+                const [state0, cacheKey] = virtual(emptyState)(initEvo(cas))
+                const e = evo(cas)(cacheKey)
+                const programSource = 'export const report = ctx => args => ctx.step(ctx.evoList("false"), () => ctx.pure("0.00"))'
+                const [state1, programHash] = virtual(state0)(seedText(cas)(programSource))
+                /** @type {Report<unknown>} */
+                const stringReport = ctx => () => ctx.step(ctx.evoList('false'), () => ctx.pure('0.00'))
+
+                const [state1b, outcome] = runExecuteRunViaFixture(home)(cas)(e)(programHash)(programSource)(stringReport)([])(undefined)(state1)
+                const [state2, callResult] = virtual(state1b)(handleRunOutcome(cas)(programHash)([])(false)({})(outcome))
+                const first = callResult.content[0]
+                if (first === undefined || first.type !== 'text') {
+                    throw ['expected a text content item', callResult]
+                }
+                const parsed = /** @type {{ readonly resultHash: string }} */ (JSON.parse(first.text))
+                const [, resultRead] = virtual(state2)(collectRead(cas.read(/** @type {Vec} */ (assertNotNullish(cBase32ToVec(parsed.resultHash), 'decodable resultHash')))))
+                assert(resultRead[0] === 'ok', ['expected the result to read back', resultRead])
+                assertEq(utf8ToString(resultRead[1]), '0.00')
+            },
+            // A value JSON cannot represent is a broken report, and saying so
+            // is the only answer that does not silently corrupt the result. It
+            // still gets a run record — provenance that covers only successes
+            // is not provenance.
+            nonJsonResultBecomesAnErrorRecord: () => {
+                const home = '/bigintresult'
+                const cas = fileCas(sha256)(home)
+                const [state0, cacheKey] = virtual(emptyState)(initEvo(cas))
+                const e = evo(cas)(cacheKey)
+                const programSource = 'export const report = ctx => args => ctx.step(ctx.evoList("false"), () => ctx.pure(1n))'
+                const [state1, programHash] = virtual(state0)(seedText(cas)(programSource))
+                /** @type {Report<unknown>} */
+                const bigintReport = ctx => () => ctx.step(ctx.evoList('false'), () => ctx.pure(1n))
+
+                const [state1b, outcome] = runExecuteRunViaFixture(home)(cas)(e)(programHash)(programSource)(bigintReport)([])(undefined)(state1)
+                const [state2, callResult] = virtual(state1b)(handleRunOutcome(cas)(programHash)([])(false)({})(outcome))
+                assertEq(callResult.isError, true)
+                const first = callResult.content[0]
+                if (first === undefined || first.type !== 'text') {
+                    throw ['expected a text content item', callResult]
+                }
+                assert(first.text.includes('not representable as JSON'), first.text)
+                // The record exists, says `error`, and validates.
+                const runHash = assertNotNullish(
+                    /^.*\(run record: (.*)\)$/.exec(first.text)?.[1], ['expected a run record hash in the message', first.text])
+                const [, runRead] = virtual(state2)(collectRead(cas.read(/** @type {Vec} */ (assertNotNullish(cBase32ToVec(runHash), 'decodable runHash')))))
+                assert(runRead[0] === 'ok', ['expected the run record to read back', runRead])
+                const record = /** @type {{ readonly status: string }} */ (JSON.parse(utf8ToString(runRead[1])))
+                assertEq(record.status, 'error')
+                assertEq(validateRun(record)[0], 'ok')
+            },
         },
         // A successful run's response has exactly the six uniform keys
         // (PROV-07 added readCount/literalCount beside the original four),
@@ -849,7 +1062,7 @@ export const proof = {
                 // PROV-07: one harmless evoList dispatch gives
                 // reads.length === 1, required now that a zero-read outcome
                 // is refused as an error instead of returned as 'ok'.
-                /** @type {import('../../guest/module.f.js').Report<string>} */
+                /** @type {Report<string>} */
                 const tinyReport = ctx => () => ctx.step(ctx.evoList('false'), () => ctx.pure('tiny'))
 
                 // 07-10: decomposed via runExecuteRunViaFixture/
@@ -967,7 +1180,17 @@ export const proof = {
                     // make this `true` instead, since `subject` alone is
                     // truthy for its own half of the condition.
                     assertEq(record.pinned, false)
-                    assertEq(record.subject, 'someSubject')
+                    // `subject` is deliberately NOT persisted here. A
+                    // half-supplied pin is an ordinary unpinned run, and a
+                    // record that says `pinned: false` while naming a
+                    // `subject` would name a subject the run was never pinned
+                    // to — the review finding PR #38 closed. This assertion
+                    // was written against the pre-#38 behaviour and now pins
+                    // the corrected one; it also still kills the `||`
+                    // mutation independently of the `pinned` check above,
+                    // because under `||` the whole pin snapshot would be
+                    // written and `subject` would come back set.
+                    assertEq(record.subject, undefined)
                     assertEq(record.parents, undefined)
                 }
             },
@@ -1235,7 +1458,7 @@ export const proof = {
             const e = evo(cas)(cacheKey)
             const programSource = 'export const report = ctx => args => ctx.pure("unused")'
             const [state1, programHash] = virtual(state0)(seedText(cas)(programSource))
-            /** @type {import('../../guest/module.f.js').Report<string>} */
+            /** @type {Report<string>} */
             const zeroReadReport = ctx => () => ctx.pure('unused')
 
             const [state1b, outcome] = runExecuteRunViaFixture(home)(cas)(e)(programHash)(programSource)(zeroReadReport)([])(undefined)(state1)
@@ -1331,7 +1554,7 @@ export const proof = {
                     return ctx.step(ctx.casRead(rev.snapshot), docJson => {
                         const doc = /** @type {{ readonly box1InterestIncome: string }} */ (JSON.parse(docJson))
                         const raw = doc.box1InterestIncome
-                        /** @type {import('../../report/line/module.f.js').ReportLine} */
+                        /** @type {ReportLine} */
                         const line = {
                             value: ctx.centsFromString(raw),
                             sources: [{ documentHash: rev.snapshot, boxPath: 'box1InterestIncome', value: raw }],

@@ -51,7 +51,7 @@
  *
  * @module
  */
-import { pure, step } from 'functionalscript/fjs/effects/module.f.js'
+import { mapStep, pure, step } from 'functionalscript/fjs/effects/module.f.js'
 import { create, write } from 'functionalscript/fjs/effects/memory/module.f.js'
 import { stdioTransport } from 'functionalscript/fjs/protocol/mcp/stdio/module.f.js'
 import { mcpStep, uninitializedState, fromRegistry, toolEntry, okResult } from 'functionalscript/fjs/protocol/mcp/module.f.js'
@@ -79,6 +79,8 @@ import { guestCtx } from '../guest/module.f.js'
 import { programPath, materializeHome } from '../guest/materialize/module.f.js'
 import { validate as validateRun } from '../run/module.f.js'
 import { dialect as oneZeroNineNineIntDialect, validate as validateOneZeroNineNineInt } from '../document/1099int/module.f.js'
+import { parse as jsonParse } from '../json/module.f.js'
+import { unwrap } from 'functionalscript/fjs/types/result/module.f.js'
 
 /** @import { McpConfig, McpHandlers, ToolEntry } from 'functionalscript/fjs/protocol/mcp/module.f.js' */
 /** @import { Effect, Operation } from 'functionalscript/fjs/effects/module.f.js' */
@@ -115,7 +117,13 @@ export const casRefreshTool = cas => cacheKey => toolEntry(
     'refreshed; call this after externally adding a revision blob so ' +
     'evo_head/evo_list see it without a restart.',
     {},
-    () => step(buildCache(cas), newCache => step(write(cacheKey, newCache), () => pure(okResult('refreshed')))),
+    // Two sequential effects, written as a chain rather than as a nest: the
+    // rebuild feeds the write, and the write's result is replaced by the
+    // response. `mapStep(e, () => v)` is the constant form — upstream's own
+    // docstring explains why no `constStep` exists.
+    () => mapStep(
+        step(buildCache(cas), newCache => write(cacheKey, newCache)),
+        () => okResult('refreshed')),
 )
 
 // ── Handlers ────────────────────────────────────────────────────────────────────
@@ -212,7 +220,7 @@ const toolsCallRequest = {
  * the virtual Node interpreter — no real process, no real filesystem, no
  * `Promise`. Returns the resulting virtual `State` so each proof leaf below
  * can assert on `stdout`/`stderr` independently.
- * @type {() => import('functionalscript/fjs/effects/node/virtual/module.f.js').State}
+ * @type {() => State}
  */
 const runSession = () => {
     const input = [initializeRequest, initializedNotification, toolsListRequest, toolsCallRequest]
@@ -236,12 +244,12 @@ const runSession = () => {
  * total, tokenizer-backed `parse` returning a `Result` and a deprecated
  * `parseNative` (functionalscript#1430); when that lands, this is the one
  * line to revisit. Recorded in `fjs/todo/upstream-json-parse-split.md`.
- * @type {(state: import('functionalscript/fjs/effects/node/virtual/module.f.js').State) => readonly Unknown[]}
+ * @type {(state: State) => readonly Unknown[]}
  */
 const responsesOf = state => state.stdout
     .split('\n')
     .filter((/** @type {string} */ line) => line !== '')
-    .map((/** @type {string} */ line) => JSON.parse(line))
+    .map((/** @type {string} */ line) => unwrap(jsonParse(line)))
 
 /**
  * Turns an rtti validator into a narrowing decoder: it yields the validated
@@ -418,7 +426,7 @@ export const proof = {
              * while carrying every other field of `state` (crucially
              * `memoryValues`/`memoryNext`, so the session and cache slots
              * persist across batches) forward.
-             * @type {(state: import('functionalscript/fjs/effects/node/virtual/module.f.js').State, messages: readonly unknown[]) => readonly [import('functionalscript/fjs/effects/node/virtual/module.f.js').State, readonly Unknown[]]}
+             * @type {(state: State, messages: readonly unknown[]) => readonly [State, readonly Unknown[]]}
              */
             const runBatch = (state, messages) => {
                 const input = messages.map(m => JSON.stringify(m)).join('\n') + '\n'

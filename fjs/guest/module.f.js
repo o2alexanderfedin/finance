@@ -49,14 +49,22 @@ import { centsFromString, centsToString } from '../exact/module.f.js'
 
 // ── The frozen vocabulary ────────────────────────────────────────────────────
 
-/** Reads a stored blob by cBase32 hash; yields its content as text. */
-/** @typedef {readonly ['casRead', (a: string) => string]} CasRead */
-/** Lists subjects; the argument selects active or archived. Yields JSON. */
-/** @typedef {readonly ['evoList', (a: string) => string]} EvoList */
-/** Yields a subject's head hashes, as JSON. */
-/** @typedef {readonly ['evoHead', (a: string) => string]} EvoHead */
-/** Yields one revision by hash, decoded, as JSON. */
-/** @typedef {readonly ['evoRevision', (a: string) => string]} EvoRevision */
+/**
+ * Reads a stored blob by cBase32 hash; yields its content as text.
+ * @typedef {readonly ['casRead', (a: string) => string]} CasRead
+ */
+/**
+ * Lists subjects; the argument selects active or archived. Yields JSON.
+ * @typedef {readonly ['evoList', (a: string) => string]} EvoList
+ */
+/**
+ * Yields a subject's head hashes, as JSON.
+ * @typedef {readonly ['evoHead', (a: string) => string]} EvoHead
+ */
+/**
+ * Yields one revision by hash, decoded, as JSON.
+ * @typedef {readonly ['evoRevision', (a: string) => string]} EvoRevision
+ */
 
 /**
  * The complete guest operation set. Four read-only commands and nothing

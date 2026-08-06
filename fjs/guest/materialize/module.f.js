@@ -65,32 +65,90 @@ import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
 import { guestCtx } from '../module.f.js'
 import { interpret } from '../../exec/module.f.js'
 
-/** @import { Effect } from 'functionalscript/fjs/effects/module.f.js' */
+/** @import { Effect, OperationMap } from 'functionalscript/fjs/effects/module.f.js' */
 /** @import { Import, Module, Mkdir, WriteFile } from 'functionalscript/fjs/effects/node/module.f.js' */
 /** @import { Result } from 'functionalscript/fjs/types/result/module.f.js' */
+/** @import { CasOp, Report } from '../module.f.js' */
 
 // ── SEC-02: the specifier allow-list ─────────────────────────────────────────
 
 /**
- * Every form that names a module specifier in ESM source: a static
- * `import`/`export ... from 'x'`, a bare side-effect `import 'x'`, and a
- * dynamic `import('x')`. Each alternative anchors on its own keyword and
- * captures the specifier that follows it.
+ * The keywords a module specifier can follow in ESM source. `import` covers
+ * the bare side-effect form, the bound form, and the dynamic call; `from`
+ * covers the tail of `import … from 'x'` and of `export … from 'x'`.
  *
- * A specifier may be quoted three ways, and the third is not like the other
- * two. Group 1 captures a `'`- or `"`-quoted specifier, whose text is exactly
- * what the source says. Group 2 captures a backtick-quoted one — legal in a
- * dynamic `import()` — whose text may be assembled at runtime by a `${...}`
- * substitution and so is *not* knowable from the source. The two are captured
- * separately because they get different answers, not because they differ in
- * shape: see {@link checkSpecifiers}.
- *
- * Every quote body is a negated character class (`[^'"]*`, `` [^`]* ``)
- * rather than a lazy wildcard, so matching is linear in input length with no
- * catastrophic-backtracking shape.
+ * `export` is deliberately absent: every stored program exports its `report`
+ * entry point, so anchoring on it would match constantly. An `export … from`
+ * re-export is reached through its `from` instead.
  * @type {RegExp}
  */
-const specifierPattern = /(?:\bfrom\s*|\bimport\s*\(?\s*|\bexport\s*\(?\s*)(?:['"]([^'"]*)['"]|`([^`]*)`)/g
+const specifierKeyword = /\b(?:import|from)\b/g
+
+/**
+ * Whitespace, `// …` to end of line, and `/* … *\/` — everything that may sit
+ * between a keyword and its specifier. Returns the index of the first
+ * character that is none of those, or the end of input.
+ * @type {(source: string, i: number) => number}
+ */
+const skipTrivia = (source, i) => {
+    while (i < source.length) {
+        const c = source[i]
+        if (c === ' ' || c === '\t' || c === '\n' || c === '\r') { i += 1; continue }
+        if (c !== '/') { return i }
+        const next = source[i + 1]
+        if (next === '/') {
+            const end = source.indexOf('\n', i)
+            if (end === -1) { return source.length }
+            i = end + 1
+            continue
+        }
+        if (next === '*') {
+            const end = source.indexOf('*/', i + 2)
+            if (end === -1) { return source.length }
+            i = end + 2
+            continue
+        }
+        return i
+    }
+    return i
+}
+
+/**
+ * The complete `'`/`"`-quoted specifier starting at `i`, or `null` when what
+ * is there is not one.
+ *
+ * "Complete" is the point: the quoted text is only the specifier if nothing
+ * continues the expression after it. `import('node:' + 'fs')` starts with a
+ * readable `'node:'`, and treating that as the specifier would check a string
+ * the program never imports — so the character after the closing quote must
+ * end the specifier (`)`, `;`, end of line, end of input, or a trailing
+ * comment). Only spaces and tabs are skipped while looking for it; a newline
+ * *is* one of the terminators.
+ * @type {(source: string, i: number) => string | null}
+ */
+const quotedAt = (source, i) => {
+    const quote = source[i]
+    if (quote !== `'` && quote !== '"') { return null }
+    const end = source.indexOf(quote, i + 1)
+    if (end === -1) { return null }
+    let j = end + 1
+    while (source[j] === ' ' || source[j] === '\t') { j += 1 }
+    const after = source[j]
+    const terminated = after === undefined || after === ')' || after === ';'
+        || after === '\n' || after === '\r' || after === '/'
+    return terminated ? source.slice(i + 1, end) : null
+}
+
+/**
+ * Whether `c` can start an import binding — `import x`, `import { x }`,
+ * `import * as x`. Such an `import` names no specifier itself; the `from`
+ * that follows does. `(` is excluded on purpose: that is a dynamic import,
+ * whose specifier has to be readable right there.
+ * @type {(c: string | undefined) => boolean}
+ */
+const isBindingStart = c =>
+    c !== undefined && (c === '{' || c === '*' || c === '_' || c === '$'
+        || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z'))
 
 /**
  * Refuses a program whose source names any specifier outside `allowed`,
@@ -108,31 +166,64 @@ const specifierPattern = /(?:\bfrom\s*|\bimport\s*\(?\s*|\bexport\s*\(?\s*)(?:['
  * allow-list that cannot express one is a name that stops being true the
  * first time somebody needs it to.
  *
- * A backtick-quoted specifier is refused **unconditionally**, never compared
- * against `allowed`. `` import(`${x}`) `` names a module whose text this
- * function cannot know: the substitution is evaluated at import time, long
- * after the gate has run. Comparing whatever literal text sits between the
- * backticks would be checking a string the program never uses. Since this
- * gate exists precisely because everything after it is too late (see the
- * module header), the only sound answer to a specifier it cannot read is to
- * refuse — a gate that cannot decide must not pass.
+ * **The gate fails closed: anything it cannot read as a plain quoted
+ * specifier is refused.** This is the whole design, and an earlier version
+ * had it backwards. That version matched the specifier with a regular
+ * expression requiring a quote to follow the keyword across whitespace only,
+ * and *passed* whatever it failed to match — so `` await import(('node:fs')) ``
+ * sailed through on a redundant paren, as did a comment in the same position
+ * (`` import(/*x*\/'node:fs') ``, `` import fs from/*x*\/'node:fs' ``). None of
+ * those needs any cleverness; they are ordinary JavaScript. A gate whose
+ * failure mode is "allow" is not a gate.
  *
- * The refusal is unconditional even for a substitution-free `` `node:fs` ``,
- * which is in principle readable. Distinguishing the two would mean deciding
- * which template literals are static, and that decision is the beginning of
- * writing a JavaScript parser here rather than a gate.
+ * So each `import`/`from` keyword is resolved to exactly one of three answers:
+ *
+ * - it is followed by a plain `'`/`"`-quoted specifier — check that against
+ *   `allowed`;
+ * - it is `import` followed by a binding (`import x from …`, `import { x } …`,
+ *   `import * as x …`) — no specifier here, the `from` that follows carries it;
+ * - **anything else — refuse.** A backtick (`` import(`${x}`) ``) names a
+ *   module whose text is assembled at import time and cannot be known by
+ *   reading the source. A paren, an identifier, `import.meta.resolve(…)`, a
+ *   call — each hides the specifier behind evaluation that happens after this
+ *   gate has run. Since the gate exists precisely because everything after it
+ *   is too late (see the module header), the only sound answer to a specifier
+ *   it cannot read is to refuse: a gate that cannot decide must not pass.
+ *
+ * Scanning text rather than parsing costs some over-refusal: a `from` used as
+ * an ordinary identifier (`const from = 1`) is refused, and so is an import
+ * *statement* quoted inside a string or a comment. It is narrower than
+ * "mentions the word", though — prose containing `import` is followed by
+ * ordinary text rather than a specifier, so it reads as a binding with no
+ * `from` and passes. All of it errs toward refusal, which is the direction
+ * this gate is allowed to be wrong in, and none of it costs a stored report
+ * program anything: such a program imports nothing at all.
  * @type {(allowed: readonly string[]) => (source: string) => Result<string, string>}
  */
 export const checkSpecifiers = allowed => source => {
-    for (const m of source.matchAll(specifierPattern)) {
-        const specifier = m[1]
-        const templateSpecifier = m[2]
-        if (templateSpecifier !== undefined) {
-            return error('import specifier not permitted: a template-literal specifier cannot be checked statically')
+    for (const m of source.matchAll(specifierKeyword)) {
+        const keyword = m[0]
+        let i = skipTrivia(source, m.index + keyword.length)
+        // `import ( 'x' )` is a call, and its parentheses may be redundant —
+        // `import(('x'))` imports `'x'` too. Read through them so the specifier
+        // is checked rather than missed.
+        let call = false
+        while (keyword === 'import' && source[i] === '(') {
+            call = true
+            i = skipTrivia(source, i + 1)
         }
-        if (specifier !== undefined && !allowed.includes(specifier)) {
-            return error(`import specifier not permitted: ${specifier}`)
+        const specifier = quotedAt(source, i)
+        if (specifier !== null) {
+            if (!allowed.includes(specifier)) {
+                return error(`import specifier not permitted: ${specifier}`)
+            }
+            continue
         }
+        // `import` before a binding names no specifier; its `from` does. A
+        // dynamic call has no such excuse — its specifier belongs right here.
+        if (keyword === 'import' && !call && isBindingStart(source[i])) { continue }
+        return error(
+            `import specifier not permitted: \`${keyword}\` is not followed by a quoted specifier, so it cannot be checked statically`)
     }
     return ok(source)
 }
@@ -262,19 +353,18 @@ const cleanSource = 'export const report = ctx => args => ctx.casRead(args[0])'
  * The `report` entry point a materialized module exposes — the runtime
  * counterpart of {@link cleanSource}, used as the JsModule fixture's export
  * so the proof exercises a real entry point rather than an empty object.
- * @type {import('../module.f.js').Report<string>}
+ * @type {Report<string>}
  */
 const guestReport = ctx => args => ctx.casRead(args[0] ?? '')
 
 /** A host map for the frozen vocabulary, so a loaded program can be RUN. */
-/** @type {import('functionalscript/fjs/effects/module.f.js').OperationMap<import('../module.f.js').CasOp, string>} */
+/** @type {OperationMap<CasOp, string>} */
 const hostMap = {
     casRead: a => `casRead:${a}`,
     evoList: a => `evoList:${a}`,
     evoHead: a => `evoHead:${a}`,
     evoRevision: a => `evoRevision:${a}`,
 }
-Object.setPrototypeOf(hostMap, null)
 
 export const proof = {
     // ── Success Criterion 3 ─────────────────────────────────────────────
@@ -317,6 +407,35 @@ export const proof = {
                 assertEq(checkSpecifiers([])(src)[0], 'error')
             }
         },
+        // The forms that defeated the regex this gate replaced. None needs any
+        // cleverness — `import(('node:fs'))` is ordinary JavaScript, and the
+        // rest are a comment in a position the pattern could not see past.
+        // They passed because that gate's failure mode was "allow"; they are
+        // refused now because this one's is "refuse".
+        unreadableSpecifierPositionsRejected: () => {
+            for (const src of [
+                `await import(('node:fs'))`,
+                `await import(  (  ( 'node:fs' ) )  )`,
+                `await import(/*x*/'node:fs')`,
+                'await import(//x\n\'node:fs\')',
+                `import fs from/*x*/'node:fs'`,
+                `await import/*x*/('node:fs')`,
+                `await import(import.meta.resolve('node:fs'))`,
+                `const m = await import(g ? 'a' : 'b')`,
+            ]) {
+                assertEq(checkSpecifiers([])(src)[0], 'error')
+            }
+        },
+        // A specifier the gate can read only part of is not a specifier it can
+        // check: `'node:'` is what the source shows, `'node:fs'` is what gets
+        // imported. Checking the readable prefix against the allow-list would
+        // be checking a string the program never uses, so the concatenation is
+        // refused outright — including when its prefix IS allowed.
+        concatenatedSpecifierRejectedEvenWhenPrefixIsAllowed: () => {
+            const src = `await import('node:' + 'fs')`
+            assertEq(checkSpecifiers([])(src)[0], 'error')
+            assertEq(checkSpecifiers(['node:'])(src)[0], 'error')
+        },
         // A program that imports nothing passes — the gate rejects
         // specifiers, not programs.
         cleanProgramAccepted: () => {
@@ -325,11 +444,41 @@ export const proof = {
             assertEq(v, cleanSource)
         },
         // The allow-list is a real allow-list, not a reject-all wearing the
-        // name: the same specifier passes when it is listed.
+        // name: the same specifier passes when it is listed. All three forms
+        // that carry a readable specifier reach the list — the static one via
+        // its `from`, the dynamic one directly, and the dynamic one through
+        // redundant parens, which is the form that used to be invisible.
         allowListActuallyAllows: () => {
-            const src = `import x from 'permitted-thing'`
-            assertEq(checkSpecifiers([])(src)[0], 'error')
-            assertEq(checkSpecifiers(['permitted-thing'])(src)[0], 'ok')
+            for (const src of [
+                `import x from 'permitted-thing'`,
+                `await import('permitted-thing')`,
+                `await import(('permitted-thing'))`,
+            ]) {
+                assertEq(checkSpecifiers([])(src)[0], 'error')
+                assertEq(checkSpecifiers(['permitted-thing'])(src)[0], 'ok')
+            }
+        },
+        // Scanning text rather than parsing costs some over-refusal, recorded
+        // here rather than left to be discovered. All of it errs toward
+        // refusal — the one direction this gate is allowed to be wrong in —
+        // and none of it costs a stored report program anything, since such a
+        // program imports nothing at all.
+        knownOverRefusals: () => {
+            for (const src of [
+                `const from = 1`,                       // `from` as an identifier
+                `// import 'node:fs'`,                  // an import statement inside a comment
+                `const s = "import 'node:fs'"`,         // …and inside a string
+            ]) {
+                assertEq(checkSpecifiers([])(src)[0], 'error')
+            }
+        },
+        // The over-refusal is narrower than "mentions the word": prose that
+        // happens to contain `import` is followed by ordinary text, not by a
+        // specifier, so it reads as a binding with no `from` and passes. Worth
+        // pinning — it is the difference between a gate that is merely strict
+        // and one that rejects the comments people write.
+        proseMentionOfImportIsNotRefused: () => {
+            assertEq(checkSpecifiers([])(`// we do not import anything here`)[0], 'ok')
         },
     },
 
@@ -423,7 +572,7 @@ export const proof = {
             // Phase 3's interpreter. Asserting the export is a function
             // would prove the fixture was returned; running it proves the
             // materialize -> import -> execute path end to end.
-            const loaded = /** @type {{ readonly report: import('../module.f.js').Report<string> }} */ (v)
+            const loaded = /** @type {{ readonly report: Report<string> }} */ (v)
             const [rt, rv] = interpret(hostMap)(loaded.report(guestCtx)(['abc']))
             assert(rt === 'ok', ['expected the loaded program to run', rt, rv])
             assertEq(rv[0], 'casRead:abc')

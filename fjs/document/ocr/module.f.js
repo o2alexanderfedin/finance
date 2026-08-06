@@ -24,7 +24,9 @@
 import { array, record, string } from 'functionalscript/fjs/types/rtti/module.f.js'
 import { validate as rttiValidate } from 'functionalscript/fjs/types/rtti/validate/module.f.js'
 import { assertEq } from 'functionalscript/fjs/asserts/module.f.js'
-import { base } from '../base/module.f.js'
+import { base, mediaTypeOf } from '../base/module.f.js'
+
+/** @import { Ts } from 'functionalscript/fjs/types/rtti/ts/module.f.js' */
 
 /**
  * Format tag: names the dialect of this BLOB. The media type it is served
@@ -32,7 +34,7 @@ import { base } from '../base/module.f.js'
  */
 export const dialect = 'vnd.fjs.ocr'
 /** The media type derived from {@link dialect}: `application/vnd.fjs.ocr+json`. */
-export const mediaType = `application/${dialect}+json`
+export const mediaType = mediaTypeOf(dialect)
 
 /**
  * rtti schema for an `ocr` BLOB. `dialect` is spread first (via `base`) so
@@ -45,7 +47,7 @@ export const ocrSchema = /** @type {const} */ ({
     fields: record(string),
 })
 
-/** @typedef {import('functionalscript/fjs/types/rtti/ts/module.f.js').Ts<typeof ocrSchema>} Ocr */
+/** @typedef {Ts<typeof ocrSchema>} Ocr */
 
 /**
  * Structural-only validator: checks the shape, nothing more (see module

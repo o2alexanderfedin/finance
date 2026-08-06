@@ -401,6 +401,22 @@ export const proof = {
             )
         }
         assert(threw, 'expected lookupTaxTable to refuse a $100,000.00 lookup')
+    },
+    // One cent below still resolves, to the table's own last row — the
+    // control that makes the refusal above a boundary rather than a blanket
+    // failure.
+    //
+    // MERGE NOTE (do not re-revert). A feedback pass rewrote the refusal above
+    // as a bare `throw: { ... }` leaf, on the stated grounds that "reading a
+    // thrown value means catching it, and a `.f.js` module may not". That is
+    // not true — `fjs/exec/module.f.js` catches in shipped production code, and
+    // this proof passes under `npm test`. The `throw:` form is also strictly
+    // weaker: it passes for ANY throw, and mutating the refusal's `<` to `<=`
+    // still throws at exactly $100,000.00, just via the unrelated "outside
+    // every stored band region" path. That is the precise gap the mutation
+    // sweep found ("assertions checked THAT a refusal threw, not WHAT it
+    // threw"), so the content assertion stays.
+    tableResolvesOneCentBelowOneHundredThousand: () => {
         const lastRow = lookupTaxTable(taxParams2025)(centsFromString('99999.99'))
         assertEq(lastRow.atLeastCents, centsFromString('99950.00'))
         assertEq(lastRow.lessThanCents, centsFromString('100000.00'))
