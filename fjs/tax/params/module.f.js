@@ -407,6 +407,100 @@ export const proof = {
             assertEq(centsToString(centsFromString(value)), value)
         }
     },
+    // T-08-06-01: every ordinary bracket ceiling AND rate, for all five
+    // filing statuses, asserted against Rev. Proc. 2024-40 §2.01, Tables
+    // 1-5, read directly from the published PDF (rp-24-40.pdf, pages
+    // 5-7) — independent of this module's own stored data, so a wrong
+    // stored figure cannot pass by comparing against itself. Asserted per
+    // status, per bracket index (rate AND ceiling separately) — never one
+    // aggregate deep comparison — so a single wrong figure names itself.
+    // Includes the structural facts the printed tables show: estates &
+    // trusts has exactly four brackets (10/24/35/37, no 12/22/32), every
+    // status's final bracket has ceiling `undefined` (no ceiling), and
+    // single/MFS are identical through 32% (250,525) but diverge at 35%
+    // (626,350 vs 375,800), while HoH's 32% ceiling (250,500) is $25 below
+    // single/MFS's.
+    everyOrdinaryBracketMatchesRevProc202440Tables1Through5: () => {
+        /**
+         * @type {Record<FilingStatus, readonly { readonly ratePercent: number, readonly ceiling: string | undefined }[]>}
+         */
+        const expected = {
+            marriedFilingJointly: [
+                { ratePercent: 10, ceiling: '23850.00' },
+                { ratePercent: 12, ceiling: '96950.00' },
+                { ratePercent: 22, ceiling: '206700.00' },
+                { ratePercent: 24, ceiling: '394600.00' },
+                { ratePercent: 32, ceiling: '501050.00' },
+                { ratePercent: 35, ceiling: '751600.00' },
+                { ratePercent: 37, ceiling: undefined },
+            ],
+            headOfHousehold: [
+                { ratePercent: 10, ceiling: '17000.00' },
+                { ratePercent: 12, ceiling: '64850.00' },
+                { ratePercent: 22, ceiling: '103350.00' },
+                { ratePercent: 24, ceiling: '197300.00' },
+                { ratePercent: 32, ceiling: '250500.00' },
+                { ratePercent: 35, ceiling: '626350.00' },
+                { ratePercent: 37, ceiling: undefined },
+            ],
+            single: [
+                { ratePercent: 10, ceiling: '11925.00' },
+                { ratePercent: 12, ceiling: '48475.00' },
+                { ratePercent: 22, ceiling: '103350.00' },
+                { ratePercent: 24, ceiling: '197300.00' },
+                { ratePercent: 32, ceiling: '250525.00' },
+                { ratePercent: 35, ceiling: '626350.00' },
+                { ratePercent: 37, ceiling: undefined },
+            ],
+            marriedFilingSeparately: [
+                { ratePercent: 10, ceiling: '11925.00' },
+                { ratePercent: 12, ceiling: '48475.00' },
+                { ratePercent: 22, ceiling: '103350.00' },
+                { ratePercent: 24, ceiling: '197300.00' },
+                { ratePercent: 32, ceiling: '250525.00' },
+                { ratePercent: 35, ceiling: '375800.00' },
+                { ratePercent: 37, ceiling: undefined },
+            ],
+            estatesAndTrusts: [
+                { ratePercent: 10, ceiling: '3150.00' },
+                { ratePercent: 24, ceiling: '11450.00' },
+                { ratePercent: 35, ceiling: '15650.00' },
+                { ratePercent: 37, ceiling: undefined },
+            ],
+        }
+        for (const status of allFilingStatuses) {
+            const { brackets } = ordinaryBrackets[status]
+            const expectedBrackets = expected[status]
+            assertEq(brackets.length, expectedBrackets.length, ['unexpected bracket count', status])
+            for (const [index, expectedBracket] of expectedBrackets.entries()) {
+                const bracket = brackets[index]
+                assert(bracket !== undefined, ['expected a bracket at this index', status, index])
+                assertEq(bracket.ratePercent, expectedBracket.ratePercent, ['bracket rate mismatch', status, index])
+                assertEq(bracket.ceiling, expectedBracket.ceiling, ['bracket ceiling mismatch', status, index])
+            }
+        }
+    },
+    // T-08-06-01 (capital gains side): every capital-gains breakpoint —
+    // both the zero-rate and 15%-rate maximum — for all five filing
+    // statuses, asserted against Rev. Proc. 2024-40 §2.03, read directly
+    // from the published PDF (rp-24-40.pdf, pages 7-8). Asserted per
+    // status, per field, so a single wrong figure names itself.
+    everyCapitalGainsBreakpointMatchesRevProc202440Section203: () => {
+        /** @type {Record<FilingStatus, { readonly zeroRateMax: string, readonly fifteenRateMax: string }>} */
+        const expected = {
+            marriedFilingJointly: { zeroRateMax: '96700.00', fifteenRateMax: '600050.00' },
+            marriedFilingSeparately: { zeroRateMax: '48350.00', fifteenRateMax: '300000.00' },
+            headOfHousehold: { zeroRateMax: '64750.00', fifteenRateMax: '566700.00' },
+            single: { zeroRateMax: '48350.00', fifteenRateMax: '533400.00' },
+            estatesAndTrusts: { zeroRateMax: '3250.00', fifteenRateMax: '15900.00' },
+        }
+        for (const status of allFilingStatuses) {
+            const entry = capitalGainsBreakpoints[status]
+            const expectedEntry = expected[status]
+            assertEq(entry.zeroRateMax, expectedEntry.zeroRateMax, ['zero-rate max mismatch', status])
+            assertEq(entry.fifteenRateMax, expectedEntry.fifteenRateMax, ['fifteen-rate max mismatch', status])
+        }
+    },
     // Estates & Trusts uses only 4 rates (10/24/35/37%) — no
     // 12%/22%/32% bracket for this status; not an omission.
     estatesAndTrustsHasExactlyFourBrackets: () => {
