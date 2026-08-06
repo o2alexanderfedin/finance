@@ -142,6 +142,35 @@ better guide to where risk actually lives than intuition was:
 
 Nothing on that list was found by reading the code.
 
+### A clean merge with a green suite can still have dropped coverage
+
+Merging the PR stack silently replaced a refusal proof in `fjs/server/fjs_run/snapshot` with a
+weaker one. **There was no conflict** — git took one side, the suite stayed green, and nothing
+flagged it. Two proofs had been rewritten from content assertions into bare `throw: { ... }` leaves
+on the stated grounds that "reading a thrown value means catching it, and a `.f.js` module may
+not". That premise is false: `fjs/exec/module.f.js` catches in shipped production code. The
+`throw:` form passes for *any* throw — mutating `fjs/tax/table`'s refusal from `<` to `<=` still
+throws at exactly $100,000.00, just via the unrelated "outside every stored band region" path.
+
+So after any non-trivial merge, verify coverage rather than trusting the exit code:
+
+```
+# 1. both parents' proof-leaf sets must be subsets of the result
+node --test 2>&1 | grep -o '^✔ import("\./fjs/[^ ]*' | sort -u   # run in each parent and in the result
+comm -23 parent.txt result.txt      # must be empty, or every line individually explained
+
+# 2. a name-set diff is NOT sufficient — a leaf can keep its name and lose its assertions
+grep -cE '\bassert(Eq|NotNullish)?\(' <changed file>   # before vs after; a drop is a regression
+```
+
+Step 1 caught the dropped leaf; step 2 is what catches the case step 1 cannot see. Where a merge
+deliberately replaces a proof with a stronger one, say so in a `MERGE NOTE` comment at the site, so
+the next feedback pass does not revert it back.
+
+**`npm test --prefix <dir>` does not run that directory's tests.** It sets the package location but
+runs the script in the current working directory, so it will happily report a different tree green.
+Use `( cd <dir> && npm test )` — in a subshell, because a bare `cd` persists across later commands.
+
 ## Commands
 
 - `npm test` — `tsc` (typecheck) then `node --test` (runs all FunctionalScript proofs via root `all.test.js`).

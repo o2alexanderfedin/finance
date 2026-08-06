@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
 status: verifying
-stopped_at: Phases 8 and 9 complete and verified (299/299, 297 project-local). PAUSED: six open PRs cover overlapping work from divergent lineages; code changes held pending a consolidation decision. Backlog phases 16-18 recorded.
-last_updated: "2026-08-06T04:30:40.387Z"
+stopped_at: Phases 8 and 9 complete and verified. CONSOLIDATION DONE — the six overlapping PRs were not divergent lineages; they shared history and collapsed into one branch with a single merge of origin/chore/apply-feedback. Now on functionalscript 0.43.0. Backlog phases 16-18 recorded.
+last_updated: "2026-08-06T18:00:00.000Z"
 last_activity: 2026-08-06
 progress:
   total_phases: 18

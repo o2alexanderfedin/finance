@@ -1,67 +1,43 @@
 {
   "version": "1.0",
-  "timestamp": "2026-08-06T17:05:00.000Z",
+  "timestamp": "2026-08-06T18:00:00.000Z",
   "phase": "09",
   "phase_name": "Traceable Report Lines and the Anti-Hardcoding Gate",
   "phase_dir": ".planning/phases/09-traceable-report-lines-and-the-anti-hardcoding-gate",
   "plan": 8,
   "task": 8,
   "total_tasks": 8,
-  "status": "phases_8_and_9_complete_blocked_on_branch_consolidation",
+  "status": "phases_8_and_9_complete_pr_stack_consolidated",
   "branch": "feature/phase-08-ty2025-parameters-and-the-tax-table-as-data",
-  "head": "56f9f32",
+  "head": "6e220e4",
   "verified_at_head": {
-    "npm_test": "299 pass / 0 fail",
-    "project_local_proofs": 297,
+    "npm_test": "320 pass / 0 fail",
+    "tsc": "clean",
+    "project_local_proofs": 318,
     "integration": "1 pass / 0 fail",
-    "tree": "clean",
+    "functionalscript": "0.43.0",
     "note": "Do not quote these later. Re-measure: node --test 2>&1 | grep -c '^✔ import(\"./fjs/'"
   },
   "completed_this_session": [
-    {"id": "08-01..08-04", "name": "Phase 8: TY2025 parameters, Tax Table, boundary proofs, finance_tax_params", "status": "done"},
-    {"id": "08-05", "name": "FIX: finance_tax_params content proof was a tautology", "status": "done"},
-    {"id": "08-06", "name": "GAP: 9 mutation-sweep gaps in tax/types", "status": "done"},
-    {"id": "09-01..09-04", "name": "Phase 9: ReportLine type, literal audit, zero-read gate, perturbation gate", "status": "done"},
-    {"id": "09-05", "name": "GAP: zero-read rule existed twice; proofs bound to the non-shipping copy", "status": "done"},
-    {"id": "09-06", "name": "REFACTOR: guard extracted to fjs/report/guard (user-directed)", "status": "done"},
-    {"id": "09-07", "name": "GAP: 7 mutation-sweep gaps in server/report, incl. the disconnected pin", "status": "done"},
-    {"id": "09-08", "name": "GAP: 8 mutation-sweep gaps in exec/guest/documents", "status": "done"},
-    {"id": "backlog", "name": "Phases 16-18 + MAINT-01..08 recorded for the deferred judgments", "status": "done"}
+    {"id": "consolidation", "name": "Merged the whole PR stack (#32, #38, #39, #40, #41) into this branch; took fjs 0.43.0", "status": "done"},
+    {"id": "merge-fix-1", "name": "Reconciled subjectOnlyWithoutParentsPersistsPinnedFalse with #38's corrected pin semantics", "status": "done"},
+    {"id": "merge-fix-2", "name": "Restored the tax/table $100,000 refusal content assertion the feedback pass had weakened", "status": "done"},
+    {"id": "merge-fix-3", "name": "Restored the fjs_run/snapshot absent-hash content assertion, weakened silently with no textual conflict", "status": "done"}
   ],
-  "blockers": [
-    {
-      "description": "SIX open PRs cover overlapping work from divergent lineages. This branch is 23 commits behind its own PR base (origin/feature/phase-7-exec), and two functionalscript minor versions behind main (0.41.0 vs 0.43.0). PRs #39 and #40 cover Phases 8 and 9 from a DIFFERENT branch line, each carrying 25-26 commits this branch does not have. #41 (31 commits) applies todo/feedback.md and retires the file. #38 (24 commits) fixes three review findings on my own PR #32.",
-      "type": "external",
-      "blocking": true,
-      "workaround": "None. Every additional commit here widens a merge surface someone reconciles by hand. Code changes are deliberately HELD; only documentation was touched after this was discovered."
-    },
-    {
-      "description": "A real bug ships on this branch and this branch's own tests protect it. fjs/server/fjs_run/module.f.js:275 serializes results with String(outcome.value). The guest ABI is Report<T> with T unconstrained, so a structured result becomes '[object Object]', which is then hashed, stored, and attested by the run record's resultHash. PR #38 already fixes it properly (withResultText).",
-      "type": "code",
-      "blocking": false,
-      "workaround": "Do NOT fix it here — #38's fix is better and a third implementation would conflict. Note the trap: the mutation sweep tested String -> JSON.stringify, saw 3 tests fail, and recorded it CAUGHT. The proofs use fixtures returning JSON strings, so stringify double-encodes and breaks them. The tests pin the bug. A red mutation means tests and code AGREE, not that the code is right."
-    }
-  ],
+  "blockers": [],
   "human_actions_pending": [
     {
-      "action": "Decide the consolidation across PRs #32, #38, #39, #40, #41, #42",
-      "context": "Recommended order: merge #38 into #32 (it targets that branch); choose between #39/#40 and #42 for phases 8-9; take fjs 0.43.0 during the merge. This branch's unique value is the 24 mutation-sweep gap closures and the AGENTS.md testing rules; the rest likely overlaps.",
-      "blocking": true
-    },
-    {
       "action": "Phases 16-18 are recorded but undecided",
-      "context": "MAINT-01 (orphan ingestion island: wire or delete), MAINT-02..05 (documentation truth), MAINT-06..08 (fjs 0.43.0, duplicated step sequence, copy-pasted checks). All T3, none blocking v1.",
+      "context": "MAINT-01 (orphan ingestion island: wire or delete), MAINT-02..05 (documentation truth), MAINT-06..08 (duplicated step sequence, copy-pasted checks). fjs 0.43.0 is now done. All T3, none blocking v1.",
       "blocking": false
     }
   ],
   "decisions": [
-    {"decision": "Zero observed CAS reads is an error result", "rationale": "PROV-07's kill condition for () => pure({ line16: 9137 }). Not a literal-count heuristic — a report that read nothing computed nothing. Accepted risk recorded in 09-CONTEXT.md: it rejects any program that legitimately computes without reading. None exists in scope.", "phase": "09"},
-    {"decision": "The literal audit is REPORTED, never refused", "rationale": "Every real program contains a zero or an index. Criterion 3 asks for visibility; criterion 4's failure is the perturbation gate's separate job.", "phase": "09"},
-    {"decision": "The guard lives in fjs/report/guard, not inside fjs/server/fjs_run", "rationale": "User-directed. Its only dependency is the Read type. The defect this phase shipped was a DUPLICATION, and a guard in its own module makes a second copy conspicuous — you would have to import it and then not use it.", "phase": "09"},
-    {"decision": "Bracket assertions cite Rev. Proc. 2024-40 read from the PDF, not 08-RESEARCH.md", "rationale": "Asserting against our own research notes only catches drift between research and code. Reading the governing document also catches an error in the research.", "phase": "08"},
-    {"decision": "Code changes HELD once branch divergence was discovered", "rationale": "Six overlapping PRs. Fixing things here makes consolidation worse, not better. Documentation-only changes continued since they merge cleanly.", "phase": "09"}
+    {"decision": "The six PRs were consolidated by merging origin/chore/apply-feedback, not by choosing between lineages", "rationale": "They were never divergent implementations. merge-base(HEAD, phase-09 lineage) is this branch's own 08-05 commit, and shared modules were byte-identical. chore/apply-feedback transitively contained main, #32, #38, #39 and #40, so a single merge collapsed the stack.", "phase": "09"},
+    {"decision": "A refusal proof asserts WHAT was thrown, never merely THAT something was", "rationale": "A feedback pass rewrote two refusal proofs as bare `throw: {}` leaves on the false premise that a .f.js module cannot catch — fjs/exec/module.f.js catches in shipped production code. The `throw:` form passes for any throw: mutating the tax-table refusal's `<` to `<=` still throws, via an unrelated path. Both content assertions are restored and carry MERGE NOTEs.", "phase": "09"},
+    {"decision": "A clean merge is verified by diffing proof-leaf sets of both parents against the result", "rationale": "The snapshot regression carried NO textual conflict and merged silently. A name-set diff is necessary but not sufficient — a leaf can keep its name and lose its assertions — so an assertion-count delta per changed file is checked too.", "phase": "09"}
   ],
   "uncommitted_files": [],
-  "next_action": "Resolve the PR consolidation (human). Then rebase onto the updated base, take fjs 0.43.0, and either continue to Phase 10 (Form 1040 Core — needs research per ROADMAP) or clear backlog Phases 16-18.",
-  "context_notes": "The single most valuable thing to carry forward: this project shipped the same defect FOUR times — a proof whose expected side was not independent of the code under test — and every time the suite was fully green. A systematic mutation sweep (95 mutations, isolated /tmp copies) found 24 more; all are now closed. The rule and the technique are in AGENTS.md, because the same lesson had already been written into phase CONTEXT files and module docstrings and did not prevent a single recurrence. Two mechanical traps the sweep itself surfaced are documented there too: a repo copy shares the real .git (a commit from inside one is destructive), and once a proof hand-types an expected value that literal exists twice, so a careless sed mutates both and confirms nothing. What the sweep found is also worth carrying: the security-shaped code held under attack; the gaps were all in data-shaping code that ships real financial values."
+  "next_action": "Phase 10 — Form 1040 Core, Line-16 Dispatch, and the Scope Guard (TAX-03/05/06/16). ROADMAP marks Research: YES (QDCGT and Schedule D Tax Worksheets). Alternatively clear backlog Phases 16-18.",
+  "context_notes": "The consolidation blocker dissolved under measurement rather than needing a decision — the same way the earlier phase-7 merge question did. The lesson worth carrying: when branches look divergent, compute the merge-base and hash the shared files before treating it as a judgment call. The session's other finding is a refinement of the project's central rule: a green suite after a clean merge proves nothing either. Coverage can be lost with zero conflicts, so both parents' proof sets and per-file assertion counts are compared against the result. Still true and still the most valuable thing here: a red mutation means the tests and the code AGREE, not that the code is right."
 }
