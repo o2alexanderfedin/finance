@@ -51,15 +51,17 @@ import { dialect as w2Dialect } from '../../document/w2/module.f.js'
 import { dialect as oneZeroNineNineIntDialect } from '../../document/1099int/module.f.js'
 import {
     dialect as returnProfileDialect,
+    kindVocabulary,
     validate as validateReturnProfile,
 } from '../../return/profile/module.f.js'
+import { classifyScope } from '../../return/scope/module.f.js'
 import { standardDeductionCents } from '../../tax/deduction/module.f.js'
 import { individualFilingStatuses, taxParamsByYear } from '../../tax/params/module.f.js'
 
 /** @import { ReportLine, Source } from '../../report/line/module.f.js' */
 /** @import { W2 } from '../../document/w2/module.f.js' */
 /** @import { OneZeroNineNineInt } from '../../document/1099int/module.f.js' */
-/** @import { ReturnProfile } from '../../return/profile/module.f.js' */
+/** @import { Kind, ReturnProfile } from '../../return/profile/module.f.js' */
 /** @import { IndividualFilingStatus, TaxParamSet } from '../../tax/params/module.f.js' */
 /** @import { Line16Method } from '../../tax/line16/module.f.js' */
 /** @import { UnmodeledKind } from '../../return/scope/module.f.js' */
@@ -864,6 +866,104 @@ const computeForm1040 = taxParamSet => inputs => {
     }
 }
 
+// ── The whole return ─────────────────────────────────────────────────────────
+
+/**
+ * Recovers the profile's `declaredKinds` — stored as plain `string`s, because
+ * a JSON blob's array field is an array of strings (`array(string)`) — as the
+ * {@link Kind} union the scope guard is written against.
+ *
+ * **This is a narrowing, not a second validation rule**, and it is the same
+ * device {@link storedFilingStatusNamed} uses one field over, for the same
+ * reason: what flows onward is the MEMBER OF THE FROZEN VOCABULARY that
+ * matched, not the string off the blob. The RULE that a declared kind must be
+ * in the vocabulary lives in `fjs/return/profile`'s `checkReferences` check 4,
+ * and a profile reaching this module has already passed it, so the `assert`
+ * below is unreachable for a validated profile.
+ *
+ * **Why the narrowing lives here rather than in the guard.** The obvious
+ * alternative — widen the guard to take `readonly string[]` — was considered
+ * and rejected deliberately when that module shipped, and the reason is the
+ * whole point of TAX-16: a typo'd kind would then simply fail to match
+ * anything the engine models, be classified as "not unmodeled", and produce a
+ * degenerate refusal — or worse, no refusal at all — instead of a loud one.
+ * The frozen vocabulary is what makes an unmodeled input LOUD, and a widened
+ * parameter would hand that guarantee back. AGENTS.md also bans a cast and a
+ * `!` over the result, so `assert` is the only compliant path.
+ * @type {(profile: Stored<ReturnProfile>) => readonly Kind[]}
+ */
+const declaredKindsOf = profile => {
+    const declared = profile.value.declaredKinds.flatMap(name => {
+        const kind = kindVocabulary.find(candidate => candidate === name)
+        return kind === undefined ? [] : [kind]
+    })
+    assert(
+        declared.length === profile.value.declaredKinds.length,
+        [
+            'the return profile declares a kind outside the frozen vocabulary',
+            profile.value.declaredKinds,
+        ],
+    )
+    return declared
+}
+
+/**
+ * **The whole-return entry point.** Form 1040 lines 1a through 37 for a return
+ * inside the declared scope, and a refusal NAMING what is unmodeled for one
+ * that is not.
+ *
+ * ## 10-CONTEXT.md Decision 2, which governs the shape of everything here
+ *
+ * An unmodeled declared input makes the ENTIRE report an error result naming
+ * what is unmodeled. **A partial 1040 is never returned**, so there is no way
+ * to mistake one for a complete return. The rejected alternative — a per-line
+ * refusal inside a returned report — is more informative for debugging and
+ * ships a document that LOOKS like a 1040 while being incomplete, which is the
+ * exact failure mode TAX-16 exists to prevent.
+ *
+ * The error arm of {@link Form1040Outcome} therefore has **no `lines` field at
+ * all**, and that is a type-level property rather than a convention: adding
+ * one back does not compile. A caller cannot accidentally render a partial
+ * 1040 because there is nothing to render — strictly stronger than returning
+ * an empty array, which a renderer would happily draw as a form of zeros.
+ *
+ * ## The order of the body IS the rule
+ *
+ * 1. Classify the DECLARED kinds, **before any line is computed**, and return
+ *    the refusal immediately. Not one number is figured for a return this
+ *    engine cannot finish. Nothing here builds a refusal of its own: the one
+ *    place a scope refusal is constructed is `fjs/return/scope`, for the
+ *    reason recorded there — the zero-read kill condition once existed in two
+ *    places, every proof bound to the copy that did not ship, and 258 tests
+ *    were green over a rule with no coverage at all.
+ * 2. Compute lines 1a-37. Line 16's own refusing arm comes back out as the
+ *    whole report's outcome by the same rule.
+ * 3. Apply the taxpayer's whole-dollar election ONCE, over the whole line
+ *    list, at the end. The election is all-or-nothing for the entire return
+ *    (i1040gi p23, "If you do round to whole dollars, you must round all
+ *    amounts"), and applying it here — to the exact cents values, once — is
+ *    what makes the report `round(sum)` rather than `sum(round)`. Rounding
+ *    twice is not rounding once, and the difference is $4 on ten $1.39
+ *    documents.
+ * @type {(taxParamSet: TaxParamSet) => (inputs: Form1040Inputs) => Form1040Outcome}
+ */
+export const form1040Report = taxParamSet => inputs => {
+    const { profile } = inputs
+    const scope = classifyScope(declaredKindsOf(profile))
+    if (scope.kind === 'error') {
+        return { kind: 'error', message: scope.message, unmodeled: scope.unmodeled }
+    }
+    const computed = computeForm1040(taxParamSet)(inputs)
+    if (computed.kind === 'error') {
+        return computed
+    }
+    return {
+        kind: 'ok',
+        lines: applyWholeDollarElection(profile.value.wholeDollarElection === true)(computed.lines),
+        line16Method: computed.line16Method,
+    }
+}
+
 // ── Tests ────────────────────────────────────────────────────────────────────
 
 /**
@@ -1125,6 +1225,54 @@ const computedLines = inputs => {
     assert(rest.kind === 'ok', ['expected this return to compute lines 16-37', rest])
     return { income, tax: rest.tax, line16Method: rest.line16Method }
 }
+
+/**
+ * **The DECLARED profile this whole phase was written for**: 65+, married
+ * filing jointly, two dependents — and therefore declaring two kinds this
+ * engine does not model, Schedule 1-A's enhanced deduction for seniors (line
+ * 13b, TAX-09) and the child tax credit (line 19, Schedule 8812, TAX-12).
+ *
+ * ROADMAP.md already states the consequence: "a 65+ TY2025 return omitting
+ * Schedule 1-A is structurally wrong, not merely incomplete." Phase 10's
+ * acceptance is that this profile produces a LOUD, NAMED refusal — not that it
+ * computes. Both kinds must be named: a guard reporting only the first would
+ * still ship a return missing a line.
+ * @type {ReturnProfile}
+ */
+const sixtyFivePlusProfile = {
+    ...marriedFilingJointlyProfile,
+    taxpayerBornBeforeJan2_1961: true,
+    spouseBornBeforeJan2_1961: true,
+    dependentCount: 2,
+    declaredKinds: [
+        'wages',
+        'taxableInterest',
+        'seniorAndOtherScheduleOneADeductions',
+        'childTaxCreditOrOtherDependents',
+    ],
+}
+
+/**
+ * THE CONTROL profile: {@link sixtyFivePlusProfile} with the two unmodeled
+ * kinds removed and **everything else identical** — both age boxes still
+ * checked, both dependents still declared. Same taxpayer, a narrower
+ * declaration, and it computes lines 1a-37 end to end.
+ * @type {ReturnProfile}
+ */
+const sixtyFivePlusProfileWithinScope = {
+    ...sixtyFivePlusProfile,
+    declaredKinds: ['wages', 'taxableInterest'],
+}
+
+/**
+ * Finds the one report line implementing a printed rule, by the PREFIX of its
+ * `rule` string — line 16's rule also names the method that produced it, so an
+ * exact match would bind this helper to a particular branch.
+ * @type {(lines: readonly ReportLine[]) => (rulePrefix: string) => ReportLine}
+ */
+const lineRuled = lines => rulePrefix => assertNotNullish(
+    lines.find(line => line.rule.startsWith(rulePrefix)),
+    `expected the report to carry ${rulePrefix}`)
 
 /**
  * A test-only {@link ReportLine} for the line-22 floor leaves — the one rule
@@ -1680,6 +1828,217 @@ export const proof = {
                 assert(line.rule !== '', 'a line must name the rule it implements')
             }
             assertEq(outcome.line16Method, 'taxTable', 'no taxable income is still a tagged method')
+        },
+    },
+    form1040Report: {
+        // ROADMAP criterion 4, on the profile this phase was written for. The
+        // 65+ joint return with dependents declares two kinds this engine does
+        // not model, and the WHOLE report is an error naming both — not a 1040
+        // with two quiet zeros on it.
+        //
+        // THE CONTROL for this leaf is
+        // `controlTheSixtyFivePlusProfileWithoutThoseTwoKindsComputesLinesOneAToThirtySeven`
+        // immediately below: the same taxpayer with those two kinds removed
+        // computes end to end. Without it, a guard that refused every return
+        // would pass this leaf and every other refusal leaf in this file.
+        //
+        // The four message fragments are FOUR separate `includes` calls, never
+        // one combined match: a single match can hide two errors that cancel,
+        // and a failure here names which part went missing (AGENTS.md, and
+        // Phase 9's sweep, which found assertions checking THAT a refusal
+        // happened rather than what it said).
+        theSixtyFivePlusProfileRefusesTheWholeReportNamingBothUnmodeledKinds: () => {
+            const outcome = form1040Report(taxParams2025)(
+                inputsOf(storedProfile(sixtyFivePlusProfile))([
+                    w2Document('sha256-w2-01')('60000.00'),
+                ])([]))
+            assert(
+                outcome.kind === 'error',
+                ['the 65+ declared profile must refuse the whole report', outcome],
+            )
+            assertEq(outcome.unmodeled.length, 2, ['expected BOTH unmodeled kinds', outcome.unmodeled])
+            assertEq(
+                outcome.unmodeled[0],
+                'seniorAndOtherScheduleOneADeductions',
+                ['expected line 13b\'s kind named first, in 1040 form order', outcome.unmodeled],
+            )
+            assertEq(
+                outcome.unmodeled[1],
+                'childTaxCreditOrOtherDependents',
+                ['expected line 19\'s kind named second', outcome.unmodeled],
+            )
+            assert(
+                outcome.message.includes('1040 line 13b'),
+                ['expected the refusal to name the senior deduction\'s line', outcome.message],
+            )
+            assert(
+                outcome.message.includes('Schedule 1-A'),
+                ['expected the refusal to name Schedule 1-A', outcome.message],
+            )
+            assert(
+                outcome.message.includes('1040 line 19'),
+                ['expected the refusal to name the child tax credit\'s line', outcome.message],
+            )
+            assert(
+                outcome.message.includes('Schedule 8812'),
+                ['expected the refusal to name Schedule 8812', outcome.message],
+            )
+        },
+        // THE CONTROL for `theSixtyFivePlusProfileRefusesTheWholeReportNamingBothUnmodeledKinds`:
+        // the SAME taxpayer — both age boxes checked, both dependents declared
+        // — with only the two unmodeled kinds removed from the declaration.
+        // Lines 1a-37 compute end to end.
+        //
+        // $60,000.00 of wages less the two-box joint standard deduction
+        // ($31,500 + 2 x $1,600 = $34,700) is $25,300.00 of taxable income,
+        // which is the IRS's own printed Tax Table Example again: $2,562.00.
+        // Every figure hand-typed.
+        controlTheSixtyFivePlusProfileWithoutThoseTwoKindsComputesLinesOneAToThirtySeven: () => {
+            const inputs = inputsOf(storedProfile(sixtyFivePlusProfileWithinScope))([
+                w2Document('sha256-w2-01')('60000.00'),
+            ])([])
+            const outcome = form1040Report(taxParams2025)(inputs)
+            assert(outcome.kind === 'ok', ['the same profile within scope must compute', outcome])
+            assertEq(
+                outcome.lines.length,
+                expectedWholeReportLineCount,
+                ['the control must produce the FULL line set, not a partial one', outcome.lines.length],
+            )
+            assertEq(outcome.line16Method, 'taxTable')
+            assertEq(lineRuled(outcome.lines)('1040 line 12e').value, 3470000n, 'two age boxes, $34,700.00')
+            assertEq(lineRuled(outcome.lines)('1040 line 15').value, 2530000n, 'taxable income of $25,300.00')
+            assertEq(lineRuled(outcome.lines)('1040 line 16').value, 256200n, 'the printed example, $2,562.00')
+            assertEq(lineRuled(outcome.lines)('1040 line 37').value, 256200n, 'and all of it is owed')
+            // Line 15 is unchanged from what the income lines alone produce:
+            // the guard decides WHETHER a return is computed, never WHAT it
+            // computes.
+            assertEq(
+                lineRuled(outcome.lines)('1040 line 15').value,
+                form1040IncomeLines(taxParams2025)(inputs).line15.value,
+            )
+        },
+        // A second, independent refusal, on a kind whose remedy is a missing
+        // DIALECT rather than a missing worksheet: social security benefits
+        // need `vnd.fjs.ssa1099`, which no phase has shipped. Its control is
+        // `controlTheSameDeclarationWithoutSocialSecurityBenefitsComputes`
+        // immediately below.
+        socialSecurityBenefitsRefuseTheWholeReportNamingTheLineAndTheDialect: () => {
+            const outcome = form1040Report(taxParams2025)(inputsOf(storedProfile({
+                ...singleProfile,
+                declaredKinds: ['wages', 'taxableInterest', 'socialSecurityBenefits'],
+            }))([w2Document('sha256-w2-01')('50000.00')])([]))
+            assert(outcome.kind === 'error', ['a declared unmodeled kind must refuse', outcome])
+            assertEq(outcome.unmodeled.length, 1, ['expected exactly one unmodeled kind', outcome.unmodeled])
+            assertEq(outcome.unmodeled[0], 'socialSecurityBenefits', ['expected the declared kind named', outcome.unmodeled])
+            assert(
+                outcome.message.includes('1040 lines 6a/6b'),
+                ['expected the refusal to name the 1040 lines', outcome.message],
+            )
+            assert(
+                outcome.message.includes('vnd.fjs.ssa1099'),
+                ['expected the refusal to name the missing dialect', outcome.message],
+            )
+        },
+        // THE CONTROL for the leaf above: the same return with social security
+        // benefits removed from the declaration computes, and its lines 6a and
+        // 6b are legitimately zero rather than refused. That distinction — a
+        // zero the taxpayer declared versus an input the engine cannot model —
+        // is the entire reason the return profile exists (Decision 4).
+        controlTheSameDeclarationWithoutSocialSecurityBenefitsComputes: () => {
+            const outcome = form1040Report(taxParams2025)(
+                inputsOf(storedProfile(singleProfile))([
+                    w2Document('sha256-w2-01')('50000.00'),
+                ])([]))
+            assert(outcome.kind === 'ok', ['dropping the unmodeled kind must compute', outcome])
+            assertEq(lineRuled(outcome.lines)('1040 line 6b').value, 0n, 'legitimately zero, not refused')
+            assertEq(lineRuled(outcome.lines)('1040 line 15').value, 3425000n, '$50,000 less $15,750')
+        },
+        // T-10-10-02, asserted STRUCTURALLY rather than by inspecting a
+        // length: the error arm carries no `lines` key AT ALL. An empty array
+        // would be a partial 1040 a renderer would happily draw as a form of
+        // zeros; the absence of the key means there is nothing to draw.
+        //
+        // `Object.hasOwn`, not `in` and not `!== undefined` — the guard
+        // comparison AGENTS.md records from the `match` prototype hazard,
+        // where two of the three obvious checks answer the wrong question.
+        // The `ok` half in the same leaf is its control: the key IS present
+        // there, so this is a property of the ERROR arm and not of the
+        // predicate.
+        theErrorArmCarriesNoLinesFieldAtAll: () => {
+            const refused = form1040Report(taxParams2025)(
+                inputsOf(storedProfile(sixtyFivePlusProfile))([])([]))
+            assert(refused.kind === 'error', ['expected a refusal', refused])
+            assert(
+                !Object.hasOwn(refused, 'lines'),
+                ['a refused return must carry no line list at all', Object.keys(refused)],
+            )
+            const computed = form1040Report(taxParams2025)(
+                inputsOf(storedProfile(sixtyFivePlusProfileWithinScope))([])([]))
+            assert(computed.kind === 'ok', ['expected the control to compute', computed])
+            assert(
+                Object.hasOwn(computed, 'lines'),
+                ['a computed return must carry its line list', Object.keys(computed)],
+            )
+        },
+        // ROADMAP criterion 5 through the ENTRY POINT, with the election read
+        // off the taxpayer's own profile box. Ten stored 1099-INTs at the
+        // IRS's printed example amount of `'1.39'`: the exact cents sum is
+        // $13.90, and the election rounds that ONCE to $14.
+        //
+        // The all-or-nothing half is asserted over every line of the report,
+        // not only line 2b — p23 makes the election apply to the whole return,
+        // so a report where one line kept its cents would not be a rounded
+        // return.
+        theWholeDollarElectionRoundsEveryLineOfTheReportOnce: () => {
+            const outcome = form1040Report(taxParams2025)(inputsOf(storedProfile({
+                ...singleProfile,
+                wholeDollarElection: true,
+            }))([])(tenInterestDocumentsAtOneThirtyNine))
+            assert(outcome.kind === 'ok', ['expected the elected return to compute', outcome])
+            assertEq(lineRuled(outcome.lines)('1040 line 2b').value, 1400n, '$14, rounded once')
+            for (const line of outcome.lines) {
+                assertEq(
+                    line.value % 100n,
+                    0n,
+                    ['the election is all-or-nothing for the whole return', line.rule, line.value],
+                )
+            }
+        },
+        // THE CONTROL for the leaf above: the same ten documents WITHOUT the
+        // election keep their cents — $13.90 — so the election is an election
+        // and not something the report does anyway. `1390n` and `1400n` are
+        // both hand-typed and neither is derived from the other.
+        controlWithoutTheElectionTheSameTenDocumentsKeepTheirCents: () => {
+            const outcome = form1040Report(taxParams2025)(
+                inputsOf(storedProfile(singleProfile))([])(tenInterestDocumentsAtOneThirtyNine))
+            assert(outcome.kind === 'ok', ['expected the unelected return to compute', outcome])
+            assertEq(lineRuled(outcome.lines)('1040 line 2b').value, 1390n, '$13.90, cents intact')
+        },
+        // The two guards are SIBLINGS and neither subsumes the other.
+        //
+        // A profile-only return — no W-2, no 1099-INT — still READS the
+        // profile document, so it passes `fjs/report/guard`'s zero-observed-
+        // reads kill condition (proven there, not restated here) and then
+        // either computes with every line legitimately zero, or refuses on
+        // scope. This asserts the computing case, and asserts the read that
+        // makes it pass the other gate: the profile is cited by real lines.
+        //
+        // `classifyRunOutcome` catches "computed nothing"; the scope guard
+        // catches "computed only part of the return and said nothing". Both
+        // must keep passing; neither can stand in for the other.
+        scopeGuardAndZeroReadGuardAreOrthogonal: () => {
+            const outcome = form1040Report(taxParams2025)(
+                inputsOf(storedProfile(singleProfile))([])([]))
+            assert(outcome.kind === 'ok', ['a return of legitimate zeros must compute', outcome])
+            assertEq(outcome.lines.length, expectedWholeReportLineCount)
+            const readsOfTheProfile = outcome.lines.filter(
+                line => line.sources.some(source => source.documentHash === profileHash))
+            assert(
+                readsOfTheProfile.length > 0,
+                ['a profile-only return still observes a read, so the zero-read gate does not fire', readsOfTheProfile.length],
+            )
+            assertEq(lineRuled(outcome.lines)('1040 line 1a').value, 0n)
+            assertEq(lineRuled(outcome.lines)('1040 line 12e').value, 1575000n, 'the deduction is not zero')
         },
     },
     // ROADMAP criterion 5, on a REAL line aggregating ten REAL documents.
