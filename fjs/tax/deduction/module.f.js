@@ -133,6 +133,63 @@ export const maxAgedOrBlindBoxes = {
  */
 
 /**
+ * The **Standard Deduction Worksheet for Dependents** (i1040gi.pdf p35) —
+ * exception 1, which REPLACES the chart for a taxpayer someone else can
+ * claim as a dependent, rather than capping the chart's result afterwards.
+ *
+ * Transcribed line for line, with the printed line numbers as the local
+ * names (TAX-15), so a diff against the page is possible:
+ *
+ * - `line1` — the number of age/blindness boxes checked on line 12d.
+ * - `line2` — earned income above the worksheet's threshold, plus the $450
+ *   add-on; otherwise the flat $1,350 minimum.
+ * - `line3` — the filing status's basic standard deduction.
+ * - `line4a` — the SMALLER of `line2` and `line3`. (The printed worksheet
+ *   says STOP here for a filer born after January 1, 1961 and not blind,
+ *   which is the `line1 === 0` case: `line4b` is then zero and `line4c`
+ *   equals `line4a`, so the stop is expressed by the arithmetic rather than
+ *   by a second code path.)
+ * - `line4b` — `line1` × the status's aged/blind increment.
+ * - `line4c` — `line4a` plus `line4b`, which is Form 1040 line 12e.
+ *
+ * The printed worksheet's line 3 lists only single/MFS, MFJ and HoH — it
+ * does not name a qualifying surviving spouse. Research assumption **A3**:
+ * QSS reads $31,500 there, by parity with the Standard Deduction Chart and
+ * the Form 1040 face margin, which is what `standardDeduction` already
+ * stores. Recorded here so it is findable if Phase 14's acceptance
+ * disagrees.
+ * @type {(taxParamSet: TaxParamSet) => (status: IndividualFilingStatus, agedOrBlindBoxes: number, earnedIncomeCents: bigint) => bigint}
+ */
+export const dependentStandardDeduction = taxParamSet => (status, agedOrBlindBoxes, earnedIncomeCents) => {
+    const { minimum, earnedIncomeAddOn } = taxParamSet.dependentStandardDeductionCap
+    const minimumCents = centsFromString(minimum.amount)
+    const addOnCents = centsFromString(earnedIncomeAddOn.amount)
+    // Research assumption A5. The worksheet prints its line 2 threshold as
+    // $900, which is arithmetically twice the stored $450 add-on for TY2025;
+    // the worksheet states it as its own restatement, not as a separately
+    // governed parameter with its own Rev. Proc. citation. So it is DERIVED
+    // from the stored add-on rather than hand-typed as a bare literal that
+    // would be a second, uncited constant able to drift from it.
+    //
+    // The threshold is invisible from the outside: at exactly the threshold
+    // both arms give the same $1,350, precisely because the add-on is half
+    // the minimum. Only one cent above it can distinguish the arms, which is
+    // what this module's three boundary probes exist to pin.
+    const earnedIncomeThresholdCents = addOnCents * 2n
+    const line1 = agedOrBlindBoxes
+    const line2 = earnedIncomeCents > earnedIncomeThresholdCents
+        ? earnedIncomeCents + addOnCents
+        : minimumCents
+    const line3 = centsFromString(taxParamSet.standardDeduction[status].amount)
+    const line4a = line2 < line3 ? line2 : line3
+    const line4b = BigInt(line1) * centsFromString(
+        taxParamSet.agedOrBlindAdditional[agedOrBlindIncrementFor[status]].amount,
+    )
+    const line4c = line4a + line4b
+    return line4c
+}
+
+/**
  * Form 1040 line 12e in exact cents.
  *
  * The ORDER of the four steps below is the rule, not an optimisation:
@@ -180,7 +237,7 @@ export const standardDeductionCents = taxParamSet => input => {
         return 0n
     }
     if (claimedAsDependent) {
-        assert(false, ['the Standard Deduction Worksheet for Dependents is not implemented yet', status])
+        return dependentStandardDeduction(taxParamSet)(status, agedOrBlindBoxes, input.earnedIncomeCents)
     }
     const basicCents = centsFromString(taxParamSet.standardDeduction[status].amount)
     const incrementCents = centsFromString(
@@ -393,6 +450,158 @@ export const proof = {
                 ['expected the refusal to name the negative box count as the reason', message],
             )
             assert(message.includes('boxes=-1'), ['expected the refusal to name the offending count', message])
+        })
+    },
+    // ── Exception 1: the Standard Deduction Worksheet for Dependents ─────
+    //
+    // Every expectation below is hand-typed from the printed worksheet
+    // (i1040gi.pdf p35), never computed here. The CONTROL for this whole
+    // group is the generated chart proof: `single_0Boxes` shows the same
+    // filer WITHOUT `claimedAsDependent` getting the full $15,750, so these
+    // leaves measure the worksheet replacing the chart rather than a
+    // function that returns a small number for everyone.
+    //
+    // Line 2's minimum arm: $500 of earned income is below the worksheet's
+    // threshold, so line 2 is the flat $1,350 minimum.
+    dependentWithFiveHundredEarnedIncomeTakesTheMinimumArm: () => {
+        assertEq(
+            standardDeductionCents(taxParams2025)({
+                ...chartInput('single', 0),
+                claimedAsDependent: true,
+                earnedIncomeCents: 50000n,
+            }),
+            135000n,
+        )
+    },
+    // Line 2's earned-income arm: $2,000 is above the threshold, so line 2
+    // is earned income plus the $450 add-on = $2,450.
+    dependentWithTwoThousandEarnedIncomeTakesTheEarnedIncomeArm: () => {
+        assertEq(
+            standardDeductionCents(taxParams2025)({
+                ...chartInput('single', 0),
+                claimedAsDependent: true,
+                earnedIncomeCents: 200000n,
+            }),
+            245000n,
+        )
+    },
+    // Line 4a's cap binds: $20,000 of earned income would make line 2
+    // $20,450, but line 4a takes the SMALLER of line 2 and line 3, and line
+    // 3 is single's $15,750.
+    dependentEarnedIncomeIsCappedByLine4aAtTheBasicDeduction: () => {
+        assertEq(
+            standardDeductionCents(taxParams2025)({
+                ...chartInput('single', 0),
+                claimedAsDependent: true,
+                earnedIncomeCents: 2000000n,
+            }),
+            1575000n,
+        )
+    },
+    // Line 4b stacks on top of line 4a: $2,450 plus two $2,000 boxes.
+    dependentEarnedIncomeArmStacksTwoAgedOrBlindBoxes: () => {
+        assertEq(
+            standardDeductionCents(taxParams2025)({
+                ...chartInput('single', 2),
+                claimedAsDependent: true,
+                earnedIncomeCents: 200000n,
+            }),
+            645000n,
+        )
+    },
+    // The three-probe boundary around line 2's threshold. The threshold
+    // itself is INVISIBLE — both arms yield $1,350 at exactly the threshold,
+    // because the add-on is exactly half the minimum for TY2025 — so only
+    // the third probe, one cent above, can tell the two arms apart.
+    dependentEarnedIncomeOneCentBelowTheThresholdIsTheMinimum: () => {
+        assertEq(
+            standardDeductionCents(taxParams2025)({
+                ...chartInput('single', 0),
+                claimedAsDependent: true,
+                earnedIncomeCents: 89999n,
+            }),
+            135000n,
+        )
+    },
+    dependentEarnedIncomeExactlyAtTheThresholdIsTheMinimum: () => {
+        assertEq(
+            standardDeductionCents(taxParams2025)({
+                ...chartInput('single', 0),
+                claimedAsDependent: true,
+                earnedIncomeCents: 90000n,
+            }),
+            135000n,
+        )
+    },
+    dependentEarnedIncomeOneCentAboveTheThresholdMovesOffTheMinimum: () => {
+        assertEq(
+            standardDeductionCents(taxParams2025)({
+                ...chartInput('single', 0),
+                claimedAsDependent: true,
+                earnedIncomeCents: 90001n,
+            }),
+            135001n,
+        )
+    },
+    // ── Exceptions 2 and 3: hard zeros that SURVIVE age and blindness ────
+    //
+    // T-10-05-03. Both leaves check the exception with the MAXIMUM number of
+    // boxes set, because the failure mode is a blind 70-year-old MFS filer
+    // being handed $22,150 instead of $0 — and a leaf that tested the
+    // exception with zero boxes could not see it. The controls are
+    // `marriedFilingSeparately_4Boxes` (2215000n) and `single_2Boxes`
+    // (1975000n): the identical inputs without the exception flag produce
+    // those non-zero amounts, so a zero here is the exception acting, not a
+    // function that returns zero for everything.
+    spouseItemizesIsZeroEvenWithFourBoxesChecked: () => {
+        assertEq(
+            standardDeductionCents(taxParams2025)({
+                ...chartInput('marriedFilingSeparately', 4),
+                spouseItemizes: true,
+            }),
+            0n,
+        )
+    },
+    dualStatusAlienIsZeroEvenWithTwoBoxesChecked: () => {
+        assertEq(
+            standardDeductionCents(taxParams2025)({
+                ...chartInput('single', 2),
+                dualStatusAlien: true,
+            }),
+            0n,
+        )
+    },
+    // Exception 2 also beats exception 1: a dependent whose spouse itemizes
+    // gets zero, not a Dependents-worksheet amount.
+    spouseItemizesIsZeroEvenForADependentWithFourBoxesChecked: () => {
+        assertEq(
+            standardDeductionCents(taxParams2025)({
+                ...chartInput('marriedFilingSeparately', 4),
+                spouseItemizes: true,
+                claimedAsDependent: true,
+                earnedIncomeCents: 200000n,
+            }),
+            0n,
+        )
+    },
+    // T-10-05-02, the precedence leaf: box-count validation runs BEFORE the
+    // hard-zero exceptions, so an impossible five-box return is REFUSED
+    // rather than quietly answered `0n`. This is the genuinely
+    // order-sensitive property of {@link standardDeductionCents} — an
+    // exception must never mask invalid input.
+    fiveBoxesIsRefusedEvenWhenAnExceptionWouldHaveZeroedTheResult: () => {
+        refuses(() =>
+            standardDeductionCents(taxParams2025)({
+                ...chartInput('marriedFilingSeparately', 5),
+                spouseItemizes: true,
+            }),
+        )(message => {
+            assert(
+                message.includes('marriedFilingSeparately'),
+                ['expected the refusal to name the filing status', message],
+            )
+            assert(message.includes('boxes=5'), ['expected the refusal to name the offending count', message])
+            assert(message.includes('maximum=4'), ['expected the refusal to name the maximum', message])
         })
     },
 }
