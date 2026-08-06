@@ -406,6 +406,64 @@ Scope note, deliberately: these requirements do **not** ask for the virtual proo
 replaced. The virtual harness is fast, deterministic, and proves logic well. What it cannot do is
 prove that two real subsystems meet. Both layers are wanted; only one of them currently exists.
 
+### Deferred Judgments (MAINT)
+
+Decisions that surfaced during Phases 7-9 and were deliberately **not** taken in the moment, because
+each is a maintainer's call rather than an implementation detail. They are recorded as requirements
+so they are scheduled rather than remembered. All are T3 — none blocks the v1 tax result.
+
+- [ ] **MAINT-01** *(T3)*: Decide whether the OCR-conversion island is wired or removed.
+      `fjs/document/1099int/from_ocr`, `fjs/document/ocr_amount` and `fjs/document/subject` are
+      **unreachable from the running server** — an import graph from `index.js` never touches them,
+      and a guest program cannot reach them either, since EXEC-07 forbids imports inside a stored
+      program. Either an ingest tool is still planned and they are pre-built, or `todo/plan.md`'s
+      Track B (the agent reads by vision, emits the dialect, stores via the already-registered
+      `evo_add`) supersedes them. Tested code that nothing can execute is worse than either outcome.
+
+- [ ] **MAINT-02** *(T3)*: Reconcile TEST-04 with reality — either meet it or amend it. It is
+      marked complete and claims the integration layer is separable "so the per-commit loop stays
+      fast", but `npm test` is an unfiltered `tsc && node --test` that runs both real-process tests
+      alongside the proofs, for ~15s. There is no proofs-only path. Either add one, or amend the
+      requirement to say what the project actually decided.
+
+- [ ] **MAINT-03** *(T3)*: Correct the requirement and roadmap claims that overstate what shipped.
+      Known: TAX-02 says the Tax Table is "diffed row by row against Publication 1040" when ten rows
+      are hand-transcribed and the remaining ~2,000 are checked against invariants that share code
+      with the generator; DOC-04 describes `Number.isSafeInteger`-guarded integer cents when storage
+      is canonical decimal strings; the v1 requirement total is written as 79 in one place and 83 in
+      another while **85** IDs are defined.
+
+- [ ] **MAINT-04** *(T3)*: Fix the documentation that contradicts the code. DOCC-01 is checked and
+      its own verification document asserts a grep is clean, but `fjs/todo/implement-mcp-server.md`
+      still carries the `djs/parser` remedy verbatim along with the "sole user is trusted and local"
+      rationale DOCC-05 was meant to remove. Separately, that file still reads "Status: spec, not
+      implemented" and marks two questions "blocking, resolve before implementing" that are shipped
+      and proven.
+
+- [ ] **MAINT-05** *(T3)*: Repair `fjs/todo/upstream-mcp-protocol-version-negotiation.md`'s proposed
+      fix, which does not work as written. It compares "the now-already-validated
+      `pr.protocolVersion`", but `mcpStep` destructures `const [pr] = validate(...)` — binding only
+      the result tag, so `pr.protocolVersion` is `undefined` and the comparison is vacuous. A note
+      whose remedy is wrong is worse than no note.
+
+- [ ] **MAINT-06** *(T3)*: Take `functionalscript` 0.43.0. The project is pinned to `^0.41.0` while
+      `main` has moved two minor versions. Re-run the upstream-gap notes in `fjs/todo/` against the
+      new version — one such note has already been retired by an upstream fix once.
+
+- [ ] **MAINT-07** *(T3)*: Share `executeRun`'s step sequence with `runExecuteRunViaFixture`.
+      The rule duplication was removed in 09-05/09-06 (`classifyRunOutcome` now lives once, in
+      `fjs/report/guard`), but the ORDER of `loadProgram` → `buildRunSnapshot` → `buildHostMap` →
+      `interpret` is still written out twice. Reorder or insert a step in `executeRun` and the
+      fixture helper will not follow; only the integration test would notice, and only if the change
+      is observable end to end. The helper itself must stay — `fjs/effects/node/virtual` genuinely
+      cannot compose a write with an import in one session.
+
+- [ ] **MAINT-08** *(T3)*: Remove or share the two small duplications a dead-code audit found: the
+      `formRevision must not be empty` check written out byte-identically in
+      `fjs/document/1099int` and `fjs/document/w2` (conspicuous because its sibling money-box rule
+      *is* correctly shared via `moneyFieldError`), and `artifactSubject` in
+      `fjs/document/subject`, which is the identity function with zero callers.
+
 ---
 
 ## v2 (Deferred)
@@ -490,6 +548,14 @@ them. Week 0 is research's addition in front of the plan's Week 1.
 | TEST-02 | T1 | Phase 7 - `fjs_run` and Run Records | Week 1 | Pending |
 | TEST-03 | T2 | Phases 8-15 - standing, per phase | Weeks 2-5 | Pending |
 | TEST-04 | T2 | Phase 7 - `fjs_run` and Run Records | Week 1 | Pending |
+| MAINT-01 | T3 | Phase 16 - Orphan Ingestion Island | Backlog | Pending |
+| MAINT-02 | T3 | Phase 17 - Documentation Truth Pass | Backlog | Pending |
+| MAINT-03 | T3 | Phase 17 - Documentation Truth Pass | Backlog | Pending |
+| MAINT-04 | T3 | Phase 17 - Documentation Truth Pass | Backlog | Pending |
+| MAINT-05 | T3 | Phase 17 - Documentation Truth Pass | Backlog | Pending |
+| MAINT-06 | T3 | Phase 18 - Dependency and Duplication Debt | Backlog | Pending |
+| MAINT-07 | T3 | Phase 18 - Dependency and Duplication Debt | Backlog | Pending |
+| MAINT-08 | T3 | Phase 18 - Dependency and Duplication Debt | Backlog | Pending |
 | EXEC-01 | T0 | Phase 3 - The Restricted Interpreter | Week 1 | Done |
 | EXEC-02 | T0 | Delivered upstream (fjs 0.41.0, functionalscript#1419) | Week 1 | Done |
 | EXEC-03 | T0 | Phase 3 - The Restricted Interpreter | Week 1 | Done |
