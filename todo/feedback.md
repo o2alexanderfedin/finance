@@ -123,8 +123,9 @@ inherited function and then supply its arguments.
 
 That is closed upstream — `match` looks the handler up through `at`, which
 reads via `getOwnPropertyDescriptor` and therefore only ever sees own
-properties, yielding `null` (and an `assert`) for an inherited name. Since we
-are on `0.42.0` the null-prototype calls are redundant and can go.
+properties, yielding `null` (and an `assert`) for an inherited name. It was
+closed in `0.42.0` and we are on `0.43.0`, so the null-prototype calls are
+redundant and can go.
 
 Recorded here so nobody reintroduces them later, reasoning from the old hazard.
 
