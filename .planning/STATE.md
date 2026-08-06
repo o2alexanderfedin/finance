@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
-status: executing
-stopped_at: Phase 6 complete (EXEC-07/09, SEC-02/03). Phase 7 not yet planned.
-last_updated: "2026-08-04T17:20:00.000Z"
-last_activity: 2026-08-04
+status: verifying
+stopped_at: Phases 8 and 9 complete and verified. CONSOLIDATION DONE — the six overlapping PRs were not divergent lineages; they shared history and collapsed into one branch with a single merge of origin/chore/apply-feedback. Now on functionalscript 0.43.0. Backlog phases 16-18 recorded.
+last_updated: "2026-08-06T18:00:00.000Z"
+last_activity: 2026-08-06
 progress:
-  total_phases: 15
-  completed_phases: 6
-  total_plans: 16
-  completed_plans: 16
-  percent: 40
+  total_phases: 18
+  completed_phases: 9
+  total_plans: 38
+  completed_plans: 41
+  percent: 100
 ---
 
 # Project State
@@ -22,17 +22,44 @@ See: .planning/PROJECT.md (updated 2026-08-03)
 
 **Core value:** The report is a program, not an answer — the agent emits FunctionalScript;
 the server executes it as a pure function of `(documents, tax-year parameters) → report`.
-**Current focus:** Phase 7 — `fjs_run`, Run Records, and the Week 1 Convergence (not yet planned)
+**Current focus:** Phase 9 — Traceable Report Lines and the Anti-Hardcoding Gate
 
 ## Current Position
 
-Phase: 6 of 15 complete (Guest ABI Freeze and Safe Materialization)
-Plan: 2 of 2 in that phase
-Status: Phase 6 complete, all five success criteria proven; Phase 7 not yet planned
+Phase: 9 of 15 — gap-closure plans added after the original `09-VERIFICATION.md` pass
+  (a systematic mutation sweep found 7 more undetected gaps); 09-07 closes them, 09-08
+  covers a separate exec/guest/document batch from the same sweep and is not yet started.
+Plan: 8 of 8 complete (09-07 closed 7 mutation-sweep gaps in server/report; 09-08 pending)
+Status: Phase complete — ready for verification
 
-Progress: [████░░░░░░] 40% (6 of 15 phases)
-Last activity: 2026-08-04
-`npm test` 135 pass / 0 fail (runs `tsc && node --test` — tsc is already inside it); fjs 0.41.0.
+Progress: [██████████] 100%
+  in this file's frontmatter for the raw plan/summary counts — the percent figure here is
+  phase-based, not plan-based, because two phases carry an extra FIX-SUMMARY.md alongside a
+  plan's own summary, which would otherwise round the plan-based figure to a misleading 100%)
+Last activity: 2026-08-06
+
+### Test metrics — MEASURE, do not read
+
+**Do not quote a test count from this file.** Run the commands:
+
+```
+npm test                                        # tsc && node --test
+node --test 2>&1 | grep -c '^✔ import("./fjs/'  # project-local proofs — the ONLY honest metric
+npm run test:integration                        # real-process subset (also included in npm test)
+```
+
+Pasted counts were kept here through Phases 7-9 and went stale every single time, including once
+*after* a note was added saying they go stale. The note did not help; removing the numbers does.
+Only two figures are worth recording, because they are historical facts rather than current state:
+
+| Landmark | Project-local proofs |
+|---|---|
+| End of Phase 7 | 185 |
+| End of Phase 9 | 260 |
+
+**Never gate on `npm test`'s total.** It includes ~2,100 vendored `functionalscript` submodule
+proofs and moves with submodule initialization state — which is exactly how a Phase 7 gate
+("total > 134") came to be satisfied before a single line of that phase's code was written.
 
 ## Performance Metrics
 
@@ -55,6 +82,28 @@ Last activity: 2026-08-04
 
 *Updated after each plan completion*
 | Phase 04 P02 | 25min | 3 tasks | 2 files |
+| Phase 07 P01 | 20min | 2 tasks | 1 files |
+| Phase 07 P02 | 25min | 2 tasks | 1 files |
+| Phase 07 P03 | 20min | 2 tasks | 1 files |
+| Phase 07 P04 | 13min | 2 tasks | 1 files |
+| Phase 07 P05 | 45min | 2 tasks | 3 files |
+| Phase 07 P06 | 55min | 2 tasks | 1 files |
+| Phase 07 P07 | 40min | 2 tasks | 1 files |
+| Phase 07 P08 | 50min | 2 tasks | 1 files |
+| Phase 07 P09 | 20min | 2 tasks | 2 files |
+| Phase 08 P01 | 25min | 2 tasks | 1 files |
+| Phase 08 P02 | 45min | 3 tasks | 1 files |
+| Phase 8 P03 | 25min | 2 tasks | 1 files |
+| Phase 08 P04 | 25min | 2 tasks | 3 files |
+| Phase 09 P01 | 20min | 2 tasks | 1 files |
+| Phase 09 P02 | 15min | 2 tasks | 1 files |
+| Phase 09 P03 | 35min | 2 tasks | 1 files |
+| Phase 09 P04 | 50min | 3 tasks | 3 files |
+| Phase 09 P05 | 35min | 3 tasks | 2 files |
+| Phase 09 P06 | 25min | 3 tasks | 3 files |
+| Phase 09 P07 | 65min | 3 tasks | 4 files |
+| Phase 08 P06 | 65min | 3 tasks | 3 files |
+| Phase 09 P08 | 45min | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -136,6 +185,48 @@ Full log in PROJECT.md Key Decisions. Recent decisions affecting current work:
 
 - [Phase 06-02]: an ORDERING guarantee is proven by observing the side effect the ordering
   prevents, never by which error message came back. See the blocker note below.
+
+- [Phase 07-01]: guestCtx widened with step/pure/centsFromString/centsToString per 07-CONTEXT.md Decision 1; CasOp and casOpNames stay byte-for-byte unchanged — The widening is additive to ctx only, never to the operation vocabulary match dispatches on; step/pure are pure data composition and never become a command.
+- [Phase 07-01]: vocabularyIsFrozenAtFour split into three independently falsifiable assertion groups instead of one collapsed equality — A single Object.keys(guestCtx) === casOpNames check would fail forever once ctx grew; the fix keeps casOpNames.join(',') a live, unchanged equality (a fifth command name still fails it) while separately asserting per-name presence and per-combinator typeof.
+- [Phase 07]: vnd.fjs.run's status is exactly or('ok','error'), mirroring Result's two arms, per 07-CONTEXT.md
+- [Phase 07]: inputs[].payload modelled as array(string) since every frozen CasOp command takes a single string argument
+- [Phase 07]: finance_schema's dialectSchemas map is typed as an open string-keyed map ({ readonly [dialect: string]: Type }), not the narrower literal-key type TS infers from computed properties — indexing the inferred/unknown-cast lookup by a request-supplied string produced TS's lossy '{} | null' type, which toJsonSchema rejects
+- [Phase 07]: sizeGuard measures byte length via tryUtf8 + bit_vec length/8 (matching writeResponse's own byte-cap measurement), never content.length
+- [Phase 07]: Ordering proof asserts absence of raw oversized content in stdout, not just presence of the too-large message (SEC-02-before-import_ lesson)
+- [Phase 07-05]: evoList's guest argument is 'true' selects archived, else active (mirroring Evo.list default)
+- [Phase 07-05]: buildRunSnapshot resolves every hash cas.list() returns (whole-store), not a narrower reachability subset
+- [Phase 07-06]: loadProgram is called with the bare programFileName(hash), not the full materialize path — matches fjs/guest/materialize's documented virtual-harness limitation; production wiring is Plan 09's follow-up
+- [Phase 07-06]: executeRun/fjsRunTool typed against concrete FileCasOperation, not a generic <O extends Operation> — curried generics resolve O at the first application; the plan's curry order puts a non-O parameter first, which empirically defeats inference
+- [Phase 07-07]: Session survival for EXEC-12 is proven via a second fjsRunTool.handle call against the SAME threaded virtual State, not a full financeMcpServer session -- fjsRunTool is not yet wired into that server (Plan 09's follow-up)
+- [Phase 07-07]: missingHashBecomesErrorResult uses a syntactically valid but unwritten cBase32 hash, distinct from 07-06's own malformed-hash proof, to exercise the genuine CAS-miss branch rather than duplicate the null-hashVec short-circuit
+- [Phase 07]: 07-08: Flat registry concatenation — financeSchemaTool/fjsRunTool unify into financeMcpHandlers's operation union with zero casts — Confirms the plan's own expectation that the two tools' operation types unify cleanly; no widened signature beyond fjsRunTool's own declared Mkdir|WriteFile|Import
+- [Phase 07]: 07-08: weekOneConvergence seeds all three 1099-INT revisions before building the Evo cache — Opposite ordering from casRefresh's own proof (which builds the cache before its seed to demonstrate invisibility) — this proof's goal is an ordinary already-populated store, not the refresh-lever scenario
+- [Phase 07]: 07-08: Verified the absent-vs-coerced-to-zero distinction is load-bearing — Temporarily forced centsFromString(undefined) by removing the skip check, confirmed the leaf fails with isError:true, then reverted — proves the leaf checks skip logic, not merely the final sum
+- [Phase 07-09]: Fixed fjs_run's real working-directory gap at the test-harness spawn level (cwd = materializeHome(home)), not in executeRun, to avoid breaking every existing virtual proof of executeRun/fjsRunTool
+- [Phase 07-09]: Seeded CAS content through the real cas_add MCP tool over the live session rather than a separate CLI subprocess; cas_add auto-syncs recognized vnd.fjs.revision blobs into the live Evo cache
+- [Phase 08-01]: Standard deduction cites Rev. Proc. 2025-32 §3.01 (OBBBA revision); aged/blind additional, dependent cap, ordinary brackets, and capital-gains breakpoints cite Rev. Proc. 2024-40 alone, unmodified
+- [Phase 08-01]: ratePercent stored as a plain number, not a decimal string — it is a rate, not a dollar amount crossing the money boundary
+- [Phase 08]: generateRow rounds to the nearest whole dollar (Publication 1040's own printing convention), not nearest cent, before re-expressing in cents — The plan's literal formula would round at cents precision, reproducing $1,802.50 instead of the required $1,803.00 for the MFJ $18,000 row -- verified by hand against all ten transcribed rows before trusting it
+- [Phase 08]: T-08-01 mutation-verified: breaking the MFJ first bracket's rate (10 -> 11) turns the row-by-row diff red — Confirms the diff's expected side (hand-transcribed Pub. 1040 literals) is independent of the generator, not a tautology; reverted cleanly with an empty git status
+- [Phase ?]: TAX-04 boundary proofs are generated data-driven over a 42-entry threshold inventory (allThresholds), never hand-written per-threshold, via a generic segmentIndex counter sharing no code path with the Tax Table's own tax-computation functions
+- [Phase 08-04]: taxParamsByYear[2025] narrowed exactly once at module scope via assert; both the tool's taxParamsResponses map and the year2025Resolves proof leaf read from the single exported response2025 constant — Never a non-null assertion or cast; keeps the response as the single source of truth for both the handler and its proof. **Correction (Phase 09):** an earlier version of this line attributed the no-cast rule to AGENTS.md. It is NOT in AGENTS.md — that file mentions `@type` only to prefer `@import` over inline `@type {import(...)}`. The rule is a standing engineering directive for this work and it stands on its own merits (a cast over an indexed access discards the `| undefined` that `noUncheckedIndexedAccess` exists to compute), but citing AGENTS.md for it sends the next reader hunting for text that is not there
+- [Phase 08-04]: Registry entry and fjs-run-integration.test.js call landed in one commit — 08-VALIDATION.md's ordering note: that test derives advertised/called tool sets from a live tools/list response at runtime, so a registry-only commit breaks npm test immediately
+- [Phase 09]: [Phase 09-01]: ReportLine.sources is a non-empty TUPLE type, never a plain array — sources: [] also fails tsc, satisfying PROV-02's plural 'tuples' at the type level
+- [Phase 09]: [Phase 09-01]: Extends<A, B> is defined locally in fjs/report/line/module.f.js, not reused from fjs/guest/module.f.js — that module's assertion tests exact union equality via Equal alone; this module's PROV-01 assertion tests structural assignability, which needs the tuple-wrapped [A] extends [B] conditional
+- [Phase 09]: countNumericLiterals is REPORTED, never refused - always returns a plain number, never a Result, never throws on a program's own account
+- [Phase 09]: A numeric literal inside a template literal's ${...} expression is undercounted (accepted risk) - harmless because this audit is reported-only, not the anti-hardcoding kill condition
+- [Phase 09]: Each honesty case (identifier/string/template/comment/adversary) is its own proof leaf, never one aggregate assertion
+- [Phase 09-03]: Zero-read gate implemented identically in executeRun and its test-mirror runExecuteRunViaFixture, computed at the point sourceText/source is already in hand
+- [Phase 09-03]: vnd.fjs.run gained no new fields; readCount/literalCount are envelope-only fields in fjs_run's response, derived from data that already exists
+- [Phase 09-04]: [Phase 09-04] Running the SAME JsModule fixture twice against evolving CAS state needs a second, functionally-identical program hash: runExecuteRunViaFixture always performs a real materialize write, which collides with the prior run's already-swapped-in JsModule function at the SAME path
+- [Phase 09-04]: [Phase 09-04] The adversary () => pure({ line16: 9137 }) is stored VERBATIM as the perturbation gate's control fixture, proven to fail and to fail identically whether or not the document changes
+- [Phase 09-05]: classifyRunOutcome extracted as one exported function (literalCount => (value, reads) => RunOutcome); executeRun and runExecuteRunViaFixture both call it — mutating it to reads.length === -1 turns antiHardcodingGate/zeroReadGate proofs RED (pass 256, fail 2), closing 09-VERIFICATION.md's BLOCKER
+- [Phase 09-06]: classifyRunOutcome and RunOutcome moved to fjs/report/guard/module.f.js, joining line and audit as the three PROV-07 mechanisms fjs/report/ now holds together — the rule's only type dependency (Read from fjs/exec) had nothing to do with fjs_run's own CAS/MCP/orchestration concerns; mutation from the new home re-proved the antiHardcodingGate/zeroReadGate/integration-test binding survived the move
+- [Phase 09-07]: E2's decisive pin-through-the-shipped-tool proof lives in fjs-run-integration.test.js, not the virtual proof file — fjsRunTool.handle cannot reach an 'ok' RunOutcome under fjs/effects/node/virtual in one call (the write/import representational split), so only a real separate process can exercise the shipped executeRun(...) call with subject+parents end to end
+- [Phase 09-07]: E12's proof constructs a synthetic RunOutcome with a non-empty error-arm reads array rather than reproducing a real mid-chain refusal — no current production path retains reads on refusal (fjs/exec discards them), but handleRunOutcome's own contract to persist whatever reads it is given is independent of that fact
+- [Phase 08]: Closed 9 mutation-sweep coverage gaps in fjs/tax/params, fjs/tax/table, and fjs/types/rational (08-06); all figures confirmed correct against Rev. Proc. 2024-40, no stored values changed
+- [Phase 09-08]: Per-box exactness proofs generated from moneyBoxFields/stateLocalMoneyFields themselves (so a box added later is auto-covered), paired with an independently hand-typed expected count (so a box removed is still caught) -- mirrors fjs/tax/boundary's allThresholds/expectedThresholdCount idiom
+- [Phase 09-08]: interpret's step-budget boundary measured empirically before writing the proof: chainOfLength(stepBudget-1) completes, chainOfLength(stepBudget) is refused, because completing it needs one more loop iteration than the budget allows to notice the chain went Pure
 
 ### Pending Todos
 
@@ -249,6 +340,29 @@ None yet.
   widths, QDCGT and Schedule D Tax Worksheets, 1099-R/SSA-1099 box lists, MAGI add-back
   lists, Schedule 1-A mechanics, child-process isolation.
 
+- **RESOLVED (07-10):** the prior note here ("production's real `claude mcp add` registration does
+  not set the working directory `fjs_run` needs") was a misdiagnosis of the actual root cause.
+  `executeRun` (`fjs/server/fjs_run/module.f.js`) wrote the materialized program to
+  `programPath(materializeHome(home))(hash)` but imported it via the BARE hash-derived filename —
+  a real Node `import()` of a bare specifier resolves against `process.cwd()`, not `home`, so the
+  import missed the file `materializeProgram` had just written. The fix composes the import path
+  from the SAME `materializeHome`/`programPath` expressions the write uses, so the two paths can
+  never drift apart again. The launcher needs NO special working directory: proven by
+  `fjs-run-integration.test.js`, which now spawns the real server from an ordinary working
+  directory (the `cwd: materializeHome(home)` workaround has been removed) and still passes. See
+  `07-10-FIX-SUMMARY.md` for the full account, including why 185 virtual proofs never caught this
+  (they keyed their `JsModule` fixtures at the same bare name the buggy code asked for).
+
+- **RESOLVED (resume, 2026-08-05): the two Phase 7 branches were never divergent.**
+  The pause-work handoff flagged a blocking human merge decision between
+  `feature/phase-7-exec` (this worktree) and `feature/phase-7-fjs-run-and-run-records`
+  (where a second Claude session was committing). Measured on resume:
+  `git rev-list --count feature/phase-7-fjs-run-and-run-records ^feature/phase-7-exec` = **0**,
+  and the same count against `origin/feature/phase-7-fjs-run-and-run-records` and `origin/main`
+  is also **0**. `feature/phase-7-exec` is a strict superset — 22 commits ahead of the other
+  branch, 90 ahead of `develop`. Nothing to reconcile; any merge is a fast-forward. The branch
+  is **not yet pushed** to origin, which is the only remaining action.
+
 ## Deferred Items
 
 | Category | Item | Status | Deferred At |
@@ -257,10 +371,12 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-08-04T17:20:00.000Z
-Stopped at: Completed 05-03-PLAN.md; wrote the missing 05-04-SUMMARY.md; Phase 5 verified and
-bookkeeping synced (DOC-00/01/03/04/10/11/12/14 all marked Complete).
-Resume file: None — the Phase 5 `.continue-here.md` is now spent; next action is planning Phase 6.
+Last session: 2026-08-06T04:30:40.381Z
+Stopped at: Completed 09-08-PLAN.md (gap closure -- 8 mutation-sweep gaps closed in fjs/exec and fjs/document, all verified RED before this plan and reverted after)
+(`npm test` 187/187, 185 project-local proofs, `tsc` clean, `test:integration` included and
+passing, tree clean). Merge blocker measured and dismissed — see Blockers. Awaiting the user's
+choice on push/PR strategy and on Phase 8.
+Resume file: None
 (they were one-shot artifacts, written to `feature/planning-requirements-roadmap` seven
 minutes after PR #14 merged, so they never reached `main`; nothing else on that branch is
 unmerged and it can be deleted)

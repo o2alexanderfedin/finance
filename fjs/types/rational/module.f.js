@@ -151,6 +151,14 @@ export const proof = {
         },
     },
     arithmetic: {
+        // T-08-06-03: `negate` has zero callers and, until this proof, zero
+        // coverage — reducing it to the identity function (`a => a`) left
+        // the suite green. Covers both a positive and a negative numerator,
+        // and that the denominator is left untouched.
+        negate: () => {
+            assertEq(show(negate(of(3n)(4n))), show([-3n, 4n]))
+            assertEq(show(negate(of(-3n)(4n))), show([3n, 4n]))
+        },
         add: () => {
             assertEq(show(add(of(1n)(3n))(of(1n)(6n))), show([9n, 18n]))
         },

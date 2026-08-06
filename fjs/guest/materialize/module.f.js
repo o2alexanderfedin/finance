@@ -1,8 +1,8 @@
 /**
- * SEC-02, SEC-03 and EXEC-09 — turning a stored blob into an executable
- * module without inheriting the ways that go wrong.
+ * SEC-02, SEC-03, EXEC-08 and EXEC-09 — turning a stored blob into an
+ * executable module without inheriting the ways that go wrong.
  *
- * Three separable concerns, kept separable because each fails differently:
+ * Four separable concerns, kept separable because each fails differently:
  *
  * - **{@link checkSpecifiers} (SEC-02)** runs *before* materialization.
  *   After it, the check is worthless: `import()` evaluates the module body
@@ -17,6 +17,38 @@
  *   program's bytes are never executed and nothing reports an error. A
  *   hash-derived name makes that failure mode unreachable — two different
  *   programs cannot collide, and the same program deliberately does.
+ * - **{@link materializeProgram} (EXEC-08's precondition)** is the fourth
+ *   concern, added in Phase 7: actually writing a CAS blob's bytes to a real
+ *   file at `programPath(materializeHome(home))(hash)`, which nothing in
+ *   this repo did before now. `loadProgram` (below) has always *assumed*
+ *   the file at its target path already exists — every Phase 6 proof
+ *   exercised it under `fjs/effects/node/virtual` with a `JsModule` fixture
+ *   standing in for "materialization already happened," never a real byte
+ *   write. In production `home` is the project root, so without this write
+ *   step (and without a dedicated subdirectory), a real `fjs_run` call would
+ *   either fail to find the file or, once the write existed, would scatter
+ *   untracked hash-named `.mjs` files across the repo root
+ *   (07-CONTEXT.md's "Two gaps research surfaced", #2). `materializeDir`
+ *   (`.fjs-run`) is a dedicated, `.gitignore`d sibling of `.cas` under
+ *   `home`, and `materializeHome` is the only thing that changes:
+ *   `programPath`'s own `(home)(hash)` contract is reused UNCHANGED by
+ *   passing `materializeHome(home)` as its `home` argument.
+ *
+ *   `fjs/effects/node/virtual`'s `writeFile` stores a file as an array of
+ *   `Vec` chunks, while `import_` requires the entry at its path to be a
+ *   `JsModule` (a plain function) — verified by reading
+ *   `node_modules/functionalscript/fjs/effects/node/virtual/module.f.js`
+ *   directly. `virtual` has no JS parser and cannot execute freshly-written
+ *   bytes as a module, so write-then-import cannot be composed in one
+ *   virtual session; this module's own proof therefore verifies the write
+ *   mechanism on its own terms (write, then read the same bytes back),
+ *   while `underVirtual.cleanProgramImportsAndRuns` (below, unchanged)
+ *   remains the evidence that import-from-a-materialized-path works, using
+ *   its established `JsModule` stand-in for "materialization already
+ *   succeeded." Real Node's `import()` reads whatever `writeFile` actually
+ *   wrote to disk, so production performs both steps for real — Plan 06/09
+ *   compose the two established techniques side by side rather than
+ *   pretending `virtual` can do both in one call.
  * - **{@link loadProgram} (EXEC-09)** reaches `import()` through fjs's
  *   `import_` **effect** rather than as a raw expression, which is what
  *   makes the whole path proof-testable under `fjs/effects/node/virtual`
@@ -25,7 +57,7 @@
  * @module
  */
 import { step, pure } from 'functionalscript/fjs/effects/module.f.js'
-import { import_ } from 'functionalscript/fjs/effects/node/module.f.js'
+import { import_, mkdir, writeUtf8File, readUtf8File } from 'functionalscript/fjs/effects/node/module.f.js'
 import { error, ok } from 'functionalscript/fjs/types/result/module.f.js'
 import { join } from 'functionalscript/fjs/path/module.f.js'
 import { emptyState, virtual } from 'functionalscript/fjs/effects/node/virtual/module.f.js'
@@ -33,32 +65,90 @@ import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
 import { guestCtx } from '../module.f.js'
 import { interpret } from '../../exec/module.f.js'
 
-/** @import { Effect } from 'functionalscript/fjs/effects/module.f.js' */
-/** @import { Import, Module } from 'functionalscript/fjs/effects/node/module.f.js' */
+/** @import { Effect, OperationMap } from 'functionalscript/fjs/effects/module.f.js' */
+/** @import { Import, Module, Mkdir, WriteFile } from 'functionalscript/fjs/effects/node/module.f.js' */
 /** @import { Result } from 'functionalscript/fjs/types/result/module.f.js' */
+/** @import { CasOp, Report } from '../module.f.js' */
 
 // ── SEC-02: the specifier allow-list ─────────────────────────────────────────
 
 /**
- * Every form that names a module specifier in ESM source: a static
- * `import`/`export ... from 'x'`, a bare side-effect `import 'x'`, and a
- * dynamic `import('x')`. Each alternative anchors on its own keyword and
- * captures the specifier that follows it.
+ * The keywords a module specifier can follow in ESM source. `import` covers
+ * the bare side-effect form, the bound form, and the dynamic call; `from`
+ * covers the tail of `import … from 'x'` and of `export … from 'x'`.
  *
- * A specifier may be quoted three ways, and the third is not like the other
- * two. Group 1 captures a `'`- or `"`-quoted specifier, whose text is exactly
- * what the source says. Group 2 captures a backtick-quoted one — legal in a
- * dynamic `import()` — whose text may be assembled at runtime by a `${...}`
- * substitution and so is *not* knowable from the source. The two are captured
- * separately because they get different answers, not because they differ in
- * shape: see {@link checkSpecifiers}.
- *
- * Every quote body is a negated character class (`[^'"]*`, `` [^`]* ``)
- * rather than a lazy wildcard, so matching is linear in input length with no
- * catastrophic-backtracking shape.
+ * `export` is deliberately absent: every stored program exports its `report`
+ * entry point, so anchoring on it would match constantly. An `export … from`
+ * re-export is reached through its `from` instead.
  * @type {RegExp}
  */
-const specifierPattern = /(?:\bfrom\s*|\bimport\s*\(?\s*|\bexport\s*\(?\s*)(?:['"]([^'"]*)['"]|`([^`]*)`)/g
+const specifierKeyword = /\b(?:import|from)\b/g
+
+/**
+ * Whitespace, `// …` to end of line, and `/* … *\/` — everything that may sit
+ * between a keyword and its specifier. Returns the index of the first
+ * character that is none of those, or the end of input.
+ * @type {(source: string, i: number) => number}
+ */
+const skipTrivia = (source, i) => {
+    while (i < source.length) {
+        const c = source[i]
+        if (c === ' ' || c === '\t' || c === '\n' || c === '\r') { i += 1; continue }
+        if (c !== '/') { return i }
+        const next = source[i + 1]
+        if (next === '/') {
+            const end = source.indexOf('\n', i)
+            if (end === -1) { return source.length }
+            i = end + 1
+            continue
+        }
+        if (next === '*') {
+            const end = source.indexOf('*/', i + 2)
+            if (end === -1) { return source.length }
+            i = end + 2
+            continue
+        }
+        return i
+    }
+    return i
+}
+
+/**
+ * The complete `'`/`"`-quoted specifier starting at `i`, or `null` when what
+ * is there is not one.
+ *
+ * "Complete" is the point: the quoted text is only the specifier if nothing
+ * continues the expression after it. `import('node:' + 'fs')` starts with a
+ * readable `'node:'`, and treating that as the specifier would check a string
+ * the program never imports — so the character after the closing quote must
+ * end the specifier (`)`, `;`, end of line, end of input, or a trailing
+ * comment). Only spaces and tabs are skipped while looking for it; a newline
+ * *is* one of the terminators.
+ * @type {(source: string, i: number) => string | null}
+ */
+const quotedAt = (source, i) => {
+    const quote = source[i]
+    if (quote !== `'` && quote !== '"') { return null }
+    const end = source.indexOf(quote, i + 1)
+    if (end === -1) { return null }
+    let j = end + 1
+    while (source[j] === ' ' || source[j] === '\t') { j += 1 }
+    const after = source[j]
+    const terminated = after === undefined || after === ')' || after === ';'
+        || after === '\n' || after === '\r' || after === '/'
+    return terminated ? source.slice(i + 1, end) : null
+}
+
+/**
+ * Whether `c` can start an import binding — `import x`, `import { x }`,
+ * `import * as x`. Such an `import` names no specifier itself; the `from`
+ * that follows does. `(` is excluded on purpose: that is a dynamic import,
+ * whose specifier has to be readable right there.
+ * @type {(c: string | undefined) => boolean}
+ */
+const isBindingStart = c =>
+    c !== undefined && (c === '{' || c === '*' || c === '_' || c === '$'
+        || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z'))
 
 /**
  * Refuses a program whose source names any specifier outside `allowed`,
@@ -76,31 +166,64 @@ const specifierPattern = /(?:\bfrom\s*|\bimport\s*\(?\s*|\bexport\s*\(?\s*)(?:['
  * allow-list that cannot express one is a name that stops being true the
  * first time somebody needs it to.
  *
- * A backtick-quoted specifier is refused **unconditionally**, never compared
- * against `allowed`. `` import(`${x}`) `` names a module whose text this
- * function cannot know: the substitution is evaluated at import time, long
- * after the gate has run. Comparing whatever literal text sits between the
- * backticks would be checking a string the program never uses. Since this
- * gate exists precisely because everything after it is too late (see the
- * module header), the only sound answer to a specifier it cannot read is to
- * refuse — a gate that cannot decide must not pass.
+ * **The gate fails closed: anything it cannot read as a plain quoted
+ * specifier is refused.** This is the whole design, and an earlier version
+ * had it backwards. That version matched the specifier with a regular
+ * expression requiring a quote to follow the keyword across whitespace only,
+ * and *passed* whatever it failed to match — so `` await import(('node:fs')) ``
+ * sailed through on a redundant paren, as did a comment in the same position
+ * (`` import(/*x*\/'node:fs') ``, `` import fs from/*x*\/'node:fs' ``). None of
+ * those needs any cleverness; they are ordinary JavaScript. A gate whose
+ * failure mode is "allow" is not a gate.
  *
- * The refusal is unconditional even for a substitution-free `` `node:fs` ``,
- * which is in principle readable. Distinguishing the two would mean deciding
- * which template literals are static, and that decision is the beginning of
- * writing a JavaScript parser here rather than a gate.
+ * So each `import`/`from` keyword is resolved to exactly one of three answers:
+ *
+ * - it is followed by a plain `'`/`"`-quoted specifier — check that against
+ *   `allowed`;
+ * - it is `import` followed by a binding (`import x from …`, `import { x } …`,
+ *   `import * as x …`) — no specifier here, the `from` that follows carries it;
+ * - **anything else — refuse.** A backtick (`` import(`${x}`) ``) names a
+ *   module whose text is assembled at import time and cannot be known by
+ *   reading the source. A paren, an identifier, `import.meta.resolve(…)`, a
+ *   call — each hides the specifier behind evaluation that happens after this
+ *   gate has run. Since the gate exists precisely because everything after it
+ *   is too late (see the module header), the only sound answer to a specifier
+ *   it cannot read is to refuse: a gate that cannot decide must not pass.
+ *
+ * Scanning text rather than parsing costs some over-refusal: a `from` used as
+ * an ordinary identifier (`const from = 1`) is refused, and so is an import
+ * *statement* quoted inside a string or a comment. It is narrower than
+ * "mentions the word", though — prose containing `import` is followed by
+ * ordinary text rather than a specifier, so it reads as a binding with no
+ * `from` and passes. All of it errs toward refusal, which is the direction
+ * this gate is allowed to be wrong in, and none of it costs a stored report
+ * program anything: such a program imports nothing at all.
  * @type {(allowed: readonly string[]) => (source: string) => Result<string, string>}
  */
 export const checkSpecifiers = allowed => source => {
-    for (const m of source.matchAll(specifierPattern)) {
-        const specifier = m[1]
-        const templateSpecifier = m[2]
-        if (templateSpecifier !== undefined) {
-            return error('import specifier not permitted: a template-literal specifier cannot be checked statically')
+    for (const m of source.matchAll(specifierKeyword)) {
+        const keyword = m[0]
+        let i = skipTrivia(source, m.index + keyword.length)
+        // `import ( 'x' )` is a call, and its parentheses may be redundant —
+        // `import(('x'))` imports `'x'` too. Read through them so the specifier
+        // is checked rather than missed.
+        let call = false
+        while (keyword === 'import' && source[i] === '(') {
+            call = true
+            i = skipTrivia(source, i + 1)
         }
-        if (specifier !== undefined && !allowed.includes(specifier)) {
-            return error(`import specifier not permitted: ${specifier}`)
+        const specifier = quotedAt(source, i)
+        if (specifier !== null) {
+            if (!allowed.includes(specifier)) {
+                return error(`import specifier not permitted: ${specifier}`)
+            }
+            continue
         }
+        // `import` before a binding names no specifier; its `from` does. A
+        // dynamic call has no such excuse — its specifier belongs right here.
+        if (keyword === 'import' && !call && isBindingStart(source[i])) { continue }
+        return error(
+            `import specifier not permitted: \`${keyword}\` is not followed by a quoted specifier, so it cannot be checked statically`)
     }
     return ok(source)
 }
@@ -132,6 +255,67 @@ export const programFileName = hash => `${hash}.mjs`
  * @type {(home: string) => (hash: string) => string}
  */
 export const programPath = home => hash => join(home, programFileName(hash))
+
+// ── EXEC-08's precondition: writing the blob's bytes to a real file ──────────
+
+/**
+ * The dedicated subdirectory materialized programs live under, sibling to
+ * `.cas` directly under the CAS/Evo store `home` — never a direct child of
+ * `home` itself. Locked in 07-CONTEXT.md: the repo root stays clean and the
+ * `.gitignore` rule (below) is deliberate rather than incidental. The OS
+ * temp directory was rejected because it discards the project-local store
+ * property Phase 2 established on purpose.
+ * @type {string}
+ */
+export const materializeDir = '.fjs-run'
+
+/**
+ * The directory {@link materializeProgram} writes into. `programPath`'s
+ * existing `(home)(hash)` contract is reused UNCHANGED by passing this
+ * function's result as its `home` argument — `programPath` and
+ * `programFileName` themselves are never altered.
+ * @type {(home: string) => string}
+ */
+export const materializeHome = home => join(home, materializeDir)
+
+/**
+ * Writes a stored program's `source` bytes to
+ * `programPath(materializeHome(home))(hash)`, ensuring the directory exists
+ * first. This is the write step Pitfall 1 (07-RESEARCH.md) names: nothing
+ * else in this repo has ever performed it, and {@link loadProgram} below has
+ * always assumed the file at its target path already exists.
+ *
+ * `mkdir(..., { recursive: true })` runs UNCONDITIONALLY on every call, with
+ * no existence check first — mirroring this module's own documented
+ * "unconditional overwrite over check-then-write" convention for
+ * {@link programFileName}: the target directory is fixed and idempotent to
+ * create, so a check-then-create step would only add a race against a
+ * concurrent call for a different hash, never prevent one.
+ *
+ * The write itself is also an unconditional overwrite, for the same reason
+ * `programFileName` is content-hash-derived: the SAME hash always names the
+ * SAME bytes, so calling this twice with the same `hash`/`source` is
+ * idempotent by construction — there is nothing a check could refuse that
+ * the hash does not already guarantee is identical.
+ *
+ * Converts the effect's `IoResult<void>` outcome into this project's
+ * `Result<void, string>` convention on both steps, so a caller never sees a
+ * raw thrown value or an unconverted upstream error type cross this
+ * function's boundary.
+ * @type {(home: string) => (hash: string) => (source: string) => Effect<Mkdir | WriteFile, Result<void, string>>}
+ */
+export const materializeProgram = home => hash => source => step(
+    mkdir(materializeHome(home), { recursive: true }),
+    mkdirResult => {
+        if (mkdirResult[0] === 'error') {
+            return pure(error(String(mkdirResult[1])))
+        }
+        return step(
+            writeUtf8File(programPath(materializeHome(home))(hash), source),
+            writeResult => pure(writeResult[0] === 'error' ? error(String(writeResult[1])) : ok(undefined)),
+        )
+    },
+)
 
 // ── EXEC-09: import through the effect, never a raw expression ───────────────
 
@@ -169,19 +353,18 @@ const cleanSource = 'export const report = ctx => args => ctx.casRead(args[0])'
  * The `report` entry point a materialized module exposes — the runtime
  * counterpart of {@link cleanSource}, used as the JsModule fixture's export
  * so the proof exercises a real entry point rather than an empty object.
- * @type {import('../module.f.js').Report<string>}
+ * @type {Report<string>}
  */
 const guestReport = ctx => args => ctx.casRead(args[0] ?? '')
 
 /** A host map for the frozen vocabulary, so a loaded program can be RUN. */
-/** @type {import('functionalscript/fjs/effects/module.f.js').OperationMap<import('../module.f.js').CasOp, string>} */
+/** @type {OperationMap<CasOp, string>} */
 const hostMap = {
     casRead: a => `casRead:${a}`,
     evoList: a => `evoList:${a}`,
     evoHead: a => `evoHead:${a}`,
     evoRevision: a => `evoRevision:${a}`,
 }
-Object.setPrototypeOf(hostMap, null)
 
 export const proof = {
     // ── Success Criterion 3 ─────────────────────────────────────────────
@@ -224,6 +407,35 @@ export const proof = {
                 assertEq(checkSpecifiers([])(src)[0], 'error')
             }
         },
+        // The forms that defeated the regex this gate replaced. None needs any
+        // cleverness — `import(('node:fs'))` is ordinary JavaScript, and the
+        // rest are a comment in a position the pattern could not see past.
+        // They passed because that gate's failure mode was "allow"; they are
+        // refused now because this one's is "refuse".
+        unreadableSpecifierPositionsRejected: () => {
+            for (const src of [
+                `await import(('node:fs'))`,
+                `await import(  (  ( 'node:fs' ) )  )`,
+                `await import(/*x*/'node:fs')`,
+                'await import(//x\n\'node:fs\')',
+                `import fs from/*x*/'node:fs'`,
+                `await import/*x*/('node:fs')`,
+                `await import(import.meta.resolve('node:fs'))`,
+                `const m = await import(g ? 'a' : 'b')`,
+            ]) {
+                assertEq(checkSpecifiers([])(src)[0], 'error')
+            }
+        },
+        // A specifier the gate can read only part of is not a specifier it can
+        // check: `'node:'` is what the source shows, `'node:fs'` is what gets
+        // imported. Checking the readable prefix against the allow-list would
+        // be checking a string the program never uses, so the concatenation is
+        // refused outright — including when its prefix IS allowed.
+        concatenatedSpecifierRejectedEvenWhenPrefixIsAllowed: () => {
+            const src = `await import('node:' + 'fs')`
+            assertEq(checkSpecifiers([])(src)[0], 'error')
+            assertEq(checkSpecifiers(['node:'])(src)[0], 'error')
+        },
         // A program that imports nothing passes — the gate rejects
         // specifiers, not programs.
         cleanProgramAccepted: () => {
@@ -232,11 +444,41 @@ export const proof = {
             assertEq(v, cleanSource)
         },
         // The allow-list is a real allow-list, not a reject-all wearing the
-        // name: the same specifier passes when it is listed.
+        // name: the same specifier passes when it is listed. All three forms
+        // that carry a readable specifier reach the list — the static one via
+        // its `from`, the dynamic one directly, and the dynamic one through
+        // redundant parens, which is the form that used to be invisible.
         allowListActuallyAllows: () => {
-            const src = `import x from 'permitted-thing'`
-            assertEq(checkSpecifiers([])(src)[0], 'error')
-            assertEq(checkSpecifiers(['permitted-thing'])(src)[0], 'ok')
+            for (const src of [
+                `import x from 'permitted-thing'`,
+                `await import('permitted-thing')`,
+                `await import(('permitted-thing'))`,
+            ]) {
+                assertEq(checkSpecifiers([])(src)[0], 'error')
+                assertEq(checkSpecifiers(['permitted-thing'])(src)[0], 'ok')
+            }
+        },
+        // Scanning text rather than parsing costs some over-refusal, recorded
+        // here rather than left to be discovered. All of it errs toward
+        // refusal — the one direction this gate is allowed to be wrong in —
+        // and none of it costs a stored report program anything, since such a
+        // program imports nothing at all.
+        knownOverRefusals: () => {
+            for (const src of [
+                `const from = 1`,                       // `from` as an identifier
+                `// import 'node:fs'`,                  // an import statement inside a comment
+                `const s = "import 'node:fs'"`,         // …and inside a string
+            ]) {
+                assertEq(checkSpecifiers([])(src)[0], 'error')
+            }
+        },
+        // The over-refusal is narrower than "mentions the word": prose that
+        // happens to contain `import` is followed by ordinary text, not by a
+        // specifier, so it reads as a binding with no `from` and passes. Worth
+        // pinning — it is the difference between a gate that is merely strict
+        // and one that rejects the comments people write.
+        proseMentionOfImportIsNotRefused: () => {
+            assertEq(checkSpecifiers([])(`// we do not import anything here`)[0], 'ok')
         },
     },
 
@@ -265,6 +507,50 @@ export const proof = {
         },
     },
 
+    // ── EXEC-08's precondition — the new disk-materialization write step ────
+    // Under `fjs/effects/node/virtual`'s REAL `Fs` operation set (`mkdir`,
+    // `writeFile`, `readFile`) — never a `JsModule` fixture, which is what
+    // `underVirtual` below exercises for a DIFFERENT concern (import). The
+    // module header explains why write-then-import cannot be composed in one
+    // virtual session; this proves the write mechanism on its own terms.
+    materialize: {
+        // The write-then-readback equality the plan's acceptance criteria
+        // name directly: starting from an empty root, the exact bytes that
+        // went in via materializeProgram come back out via readUtf8File at
+        // the SAME path.
+        writeThenReadbackEqualsSource: () => {
+            const home = '/store'
+            const hash = 'CONTENTHASH'
+            const source = cleanSource
+            const [state] = virtual(emptyState)(materializeProgram(home)(hash)(source))
+            const [, readResult] = virtual(state)(readUtf8File(programPath(materializeHome(home))(hash)))
+            assert(readResult[0] === 'ok', ['expected the materialized file to read back', readResult])
+            assertEq(readResult[1], source)
+        },
+        // The materialized path is a child of materializeHome, never a
+        // direct child of home itself (07-CONTEXT.md Decision 2).
+        pathIsUnderTheDedicatedSubdirectory: () => {
+            const path = programPath(materializeHome('/x'))('H')
+            assert(path.startsWith('/x/.fjs-run'), path)
+        },
+        // Calling materializeProgram twice with the SAME hash and SAME
+        // source is idempotent: no error on the second call, and the
+        // readback afterward still equals source — the unconditional
+        // mkdir/overwrite convention this module documents elsewhere.
+        sameHashSameSourceIsIdempotent: () => {
+            const home = '/store'
+            const hash = 'CONTENTHASH'
+            const source = cleanSource
+            const [state1, first] = virtual(emptyState)(materializeProgram(home)(hash)(source))
+            assert(first[0] === 'ok', ['expected the first materialize to succeed', first])
+            const [state2, second] = virtual(state1)(materializeProgram(home)(hash)(source))
+            assert(second[0] === 'ok', ['expected the second materialize to succeed too', second])
+            const [, readResult] = virtual(state2)(readUtf8File(programPath(materializeHome(home))(hash)))
+            assert(readResult[0] === 'ok', ['expected readback after the second call to succeed', readResult])
+            assertEq(readResult[1], source)
+        },
+    },
+
     // ── Success Criterion 5 ─────────────────────────────────────────────
     // The whole materialize-and-run path under `fjs/effects/node/virtual`,
     // with a `JsModule` at the CAS path and NO real filesystem. `import_` is
@@ -286,7 +572,7 @@ export const proof = {
             // Phase 3's interpreter. Asserting the export is a function
             // would prove the fixture was returned; running it proves the
             // materialize -> import -> execute path end to end.
-            const loaded = /** @type {{ readonly report: import('../module.f.js').Report<string> }} */ (v)
+            const loaded = /** @type {{ readonly report: Report<string> }} */ (v)
             const [rt, rv] = interpret(hostMap)(loaded.report(guestCtx)(['abc']))
             assert(rt === 'ok', ['expected the loaded program to run', rt, rv])
             assertEq(rv[0], 'casRead:abc')

@@ -3,6 +3,13 @@
 # into a shared, tracked store can never be taken back (DOC-02).
 /.cas
 
+# Materialized report programs (fjs/guest/materialize/module.f.js,
+# materializeProgram — Phase 7, 07-CONTEXT.md "Materialized programs go in a
+# dedicated, gitignored subdirectory"). A CAS blob's bytes are written here,
+# hash-named, so import() can run them; the CAS itself is the durable copy,
+# so this directory is disposable and must never be committed.
+/.fjs-run
+
 # Logs
 logs
 *.log

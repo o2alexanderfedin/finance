@@ -13,7 +13,7 @@
  *
  * @module
  */
-import { match, do_, step } from 'functionalscript/fjs/effects/module.f.js'
+import { match, do_, pure, step } from 'functionalscript/fjs/effects/module.f.js'
 import { ok, error } from 'functionalscript/fjs/types/result/module.f.js'
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
 
@@ -35,6 +35,12 @@ import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
  * The null prototype below is cheap defence in depth (03-CONTEXT.md); it is
  * not the security mechanism — `match`'s own-property-only `at` lookup is
  * (EXEC-02, delivered upstream, not reimplemented here).
+ * A plain object literal, deliberately not null-prototyped. The
+ * `constructor`/`toString`/`hasOwnProperty` probes below are the reason: with
+ * a null prototype they would pass because the inherited names were absent,
+ * which proves nothing about `interpret`. Leaving `Object.prototype` in place
+ * means they pass only if the own-property-only `at` lookup is what refuses
+ * them — the guarantee actually being claimed.
  * @type {OperationMap<TestOp, string>}
  */
 const map = {
@@ -43,7 +49,6 @@ const map = {
     evoHead: a => `evoHead:${a}`,
     evoRevision: a => `evoRevision:${a}`,
 }
-Object.setPrototypeOf(map, null)
 
 /**
  * Simulates a stored/generated program whose command string bypassed `tsc` —
@@ -69,6 +74,22 @@ const readDo = do_('casRead')
  * @type {(a: string) => Effect<EvoHead, string>}
  */
 const evoHeadDo = do_('evoHead')
+
+/**
+ * Builds a chain of exactly `remaining` `casRead` dispatches followed by a
+ * `Pure` completion — the fixed-length sibling of `forever` below, used to
+ * pin `interpret`'s step-budget boundary at an EXACT dispatch count rather
+ * than merely demonstrate it eventually refuses an unbounded chain. Like
+ * `forever`, each call returns immediately (`step`'s `Do` case defers), so
+ * building this costs no stack depth regardless of `remaining` — only
+ * interpreting it drives the chain, one dispatch per `interpret` loop
+ * iteration.
+ * @type {(remaining: number) => Effect<CasRead, string>}
+ */
+const chainOfLength = remaining =>
+    remaining <= 0
+        ? pure('done')
+        : step(readDo('spin'), () => chainOfLength(remaining - 1))
 
 // ── interpret ────────────────────────────────────────────────────────────────
 
@@ -178,6 +199,30 @@ export const proof = {
         const result = interpret(map)(forever())
         assertEq(result[0], 'error')
         assertEq(result[1], 'step budget exceeded: 10000')
+    },
+    // T-09-08-04: `stepBudgetBoundsNonTerminatingChain` above only reads the
+    // refusal MESSAGE, which is derived from the same `stepBudget` constant
+    // either way — a `count < stepBudget` -> `count <= stepBudget` mutation
+    // does not move that string at all, so that leaf alone cannot catch it.
+    // This leaf counts ACTUAL dispatches instead, pinning the true boundary
+    // of `interpret`'s loop (confirmed empirically against this module, not
+    // assumed): a chain dispatching exactly `stepBudget` operations before
+    // reaching `Pure` is refused — completing it needs one more loop
+    // iteration than the budget allows, to notice the chain went `Pure` —
+    // while a chain one dispatch SHORTER completes, because that one extra
+    // iteration is exactly what remains. `count <= stepBudget` admits the
+    // extra iteration and lets the longer chain wrongly complete.
+    stepBudgetPinsExactDispatchBoundary: () => {
+        const oneShortOfBudget = interpret(map)(chainOfLength(stepBudget - 1))
+        assertEq(
+            oneShortOfBudget[0],
+            'ok',
+            ['expected one dispatch short of the budget to complete', oneShortOfBudget])
+        const exactlyAtBudget = interpret(map)(chainOfLength(stepBudget))
+        assertEq(
+            exactlyAtBudget[0],
+            'error',
+            ['expected exactly stepBudget dispatches to be refused, not admitted', exactlyAtBudget])
     },
     // EXEC-05: the read set is observed as interpret dispatches, never
     // declared by the effect chain itself.

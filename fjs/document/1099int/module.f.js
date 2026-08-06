@@ -44,9 +44,13 @@ import { number, option, string } from 'functionalscript/fjs/types/rtti/module.f
 import { validate as rttiValidate } from 'functionalscript/fjs/types/rtti/validate/module.f.js'
 import { error, ok } from 'functionalscript/fjs/types/result/module.f.js'
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
-import { base } from '../base/module.f.js'
+import { base, mediaTypeOf } from '../base/module.f.js'
 import { moneyFieldError } from '../money_field/module.f.js'
 import { dialect as ocrDialect, ocrSchema, validate as ocrValidate } from '../ocr/module.f.js'
+
+/** @import { Result } from 'functionalscript/fjs/types/result/module.f.js' */
+/** @import { Ts, Unknown } from 'functionalscript/fjs/types/rtti/ts/module.f.js' */
+/** @import { ValidationError } from 'functionalscript/fjs/types/rtti/validate/module.f.js' */
 
 /**
  * Format tag: names the dialect of this BLOB. The media type it is served
@@ -54,7 +58,7 @@ import { dialect as ocrDialect, ocrSchema, validate as ocrValidate } from '../oc
  */
 export const dialect = 'vnd.fjs.1099int'
 /** The media type derived from {@link dialect}: `application/vnd.fjs.1099int+json`. */
-export const mediaType = `application/${dialect}+json`
+export const mediaType = mediaTypeOf(dialect)
 
 /**
  * rtti schema for a `1099int` BLOB. `dialect` is spread first (via `base`)
@@ -80,7 +84,7 @@ export const oneZeroNineNineIntSchema = /** @type {const} */ ({
     recipientName: option(string),
 })
 
-/** @typedef {import('functionalscript/fjs/types/rtti/ts/module.f.js').Ts<typeof oneZeroNineNineIntSchema>} OneZeroNineNineInt */
+/** @typedef {Ts<typeof oneZeroNineNineIntSchema>} OneZeroNineNineInt */
 
 /** Structural-only validator: checks the shape, not the semantic refinements below. */
 const validateShape = rttiValidate(oneZeroNineNineIntSchema)
@@ -101,8 +105,10 @@ const moneyBoxFields = /** @type {const} */ ([
     'box8TaxExemptInterest',
 ])
 
-/** Either a structural validation error or a semantic (string) error message. */
-/** @typedef {import('functionalscript/fjs/types/rtti/validate/module.f.js').ValidationError | string} OneZeroNineNineIntError */
+/**
+ * Either a structural validation error or a semantic (string) error message.
+ * @typedef {ValidationError | string} OneZeroNineNineIntError
+ */
 
 /**
  * Checks the semantic refinements the structural schema can't express on an
@@ -117,7 +123,7 @@ const moneyBoxFields = /** @type {const} */ ([
  *   within `Number.MAX_SAFE_INTEGER`, compared bigint-to-bigint — never
  *   converted through `Number()`, which would reintroduce the precision
  *   hazard `fjs/types/decimal`'s docstring warns about.
- * @type {(r: OneZeroNineNineInt) => import('functionalscript/fjs/types/result/module.f.js').Result<OneZeroNineNineInt, OneZeroNineNineIntError>}
+ * @type {(r: OneZeroNineNineInt) => Result<OneZeroNineNineInt, OneZeroNineNineIntError>}
  */
 export const checkReferences = r => {
     if (r.formRevision.trim() === '') {
@@ -151,7 +157,7 @@ export const checkReferences = r => {
  * `proof.crossDialect` below for the runtime proof (Task 3), and this
  * module's `<verify>` grep gate for the static guarantee that no such
  * shortcut has been (re-)introduced.
- * @type {(value: import('functionalscript/fjs/types/rtti/ts/module.f.js').Unknown) => import('functionalscript/fjs/types/result/module.f.js').Result<OneZeroNineNineInt, OneZeroNineNineIntError>}
+ * @type {(value: Unknown) => Result<OneZeroNineNineInt, OneZeroNineNineIntError>}
  */
 export const validate = value => {
     const [t, v] = validateShape(value)
@@ -172,6 +178,44 @@ const minimal = {
     taxYear: 2024,
     formRevision: '2024',
 }
+
+/**
+ * T-09-08-02: a money box's name could be quietly dropped from
+ * {@link moneyBoxFields} without anyone noticing — the field stays
+ * `option(string)` structurally, so a comma-grouped or otherwise inexact
+ * amount in a dropped box would then validate as ok. One generated leaf per
+ * NAMED box supplies a comma-grouped value to that box alone and asserts
+ * `validate` refuses, built by mapping {@link moneyBoxFields} itself into
+ * `[field, assertion]` pairs (never as six hand-written near-identical
+ * leaves) — the same idiom `fjs/tax/boundary`'s generated threshold leaves
+ * use — so a box added to the list later is covered automatically.
+ *
+ * A box's own generated leaf disappears WITH it if the box is dropped from
+ * the list, so this alone cannot catch a removal — {@link
+ * expectedMoneyBoxFieldCount} below pairs it with an independently
+ * hand-typed count, exactly as `fjs/tax/boundary`'s `expectedThresholdCount`
+ * guards `allThresholds`. The duplication is the mechanism (AGENTS.md: "a
+ * proof's expected value must not be produced by the code under test").
+ * @type {{ readonly [field: string]: () => void }}
+ */
+const generatedMoneyBoxExactnessProof = Object.fromEntries(
+    moneyBoxFields.map(field => [
+        field,
+        () => {
+            const [t, v] = validate({ ...minimal, [field]: '1,234.56' })
+            assertEq(t, 'error', ['expected a comma-grouped amount in this box to be refused', field, t, v])
+        },
+    ]),
+)
+
+/**
+ * Independently hand-typed: the number of money boxes {@link moneyBoxFields}
+ * is expected to name today. Deliberately NOT derived from
+ * `moneyBoxFields.length` — if it were, dropping a box from the list would
+ * shrink both sides together and this check could never fail.
+ * @type {number}
+ */
+const expectedMoneyBoxFieldCount = 6
 
 export const proof = {
     dialectAndMediaType: () => {
@@ -241,6 +285,23 @@ export const proof = {
             const [t] = validate({ ...minimal, box1InterestIncome: '1234.56' })
             assertEq(t, 'ok')
         },
+        // T-09-08-02: every money box named in `moneyBoxFields` is proven to
+        // actually be walked by the exactness loop, not merely assumed
+        // because `box1InterestIncome` happens to be covered above.
+        moneyBoxExactness: {
+            ...generatedMoneyBoxExactnessProof,
+            everyMoneyBoxIsCovered: () => {
+                assertEq(
+                    moneyBoxFields.length,
+                    expectedMoneyBoxFieldCount,
+                    [
+                        'expected exactly the independently-stated money box count',
+                        moneyBoxFields.length,
+                        expectedMoneyBoxFieldCount,
+                    ],
+                )
+            },
+        },
     },
     // Task 3 — Success Criteria 1 and 2's runtime evidence.
     crossDialect: {
@@ -250,7 +311,7 @@ export const proof = {
         // and the failure's `path` is exactly `['dialect']` — the
         // discriminant catches it first, not some unrelated missing field.
         ocrShapeRejectedByOneZeroNineNineInt: () => {
-            /** @type {import('functionalscript/fjs/types/rtti/ts/module.f.js').Ts<typeof ocrSchema>} */
+            /** @type {Ts<typeof ocrSchema>} */
             const ocrValue = {
                 dialect: ocrDialect,
                 pages: ['Form 1099-INT, Box 1 Interest income: 1,234.56'],

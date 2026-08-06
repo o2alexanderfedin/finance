@@ -36,8 +36,12 @@ import { array, number, option, string } from 'functionalscript/fjs/types/rtti/m
 import { validate as rttiValidate } from 'functionalscript/fjs/types/rtti/validate/module.f.js'
 import { error, ok } from 'functionalscript/fjs/types/result/module.f.js'
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
-import { base } from '../base/module.f.js'
+import { base, mediaTypeOf } from '../base/module.f.js'
 import { moneyFieldError } from '../money_field/module.f.js'
+
+/** @import { Result } from 'functionalscript/fjs/types/result/module.f.js' */
+/** @import { Ts, Unknown } from 'functionalscript/fjs/types/rtti/ts/module.f.js' */
+/** @import { ValidationError } from 'functionalscript/fjs/types/rtti/validate/module.f.js' */
 
 /**
  * Format tag: names the dialect of this BLOB. The media type it is served
@@ -45,7 +49,7 @@ import { moneyFieldError } from '../money_field/module.f.js'
  */
 export const dialect = 'vnd.fjs.w2'
 /** The media type derived from {@link dialect}: `application/vnd.fjs.w2+json`. */
-export const mediaType = `application/${dialect}+json`
+export const mediaType = mediaTypeOf(dialect)
 
 /**
  * One box-12 entry: the printed code and its amount. `code` is the IRS
@@ -113,7 +117,7 @@ export const w2Schema = /** @type {const} */ ({
     employeeName: option(string),
 })
 
-/** @typedef {import('functionalscript/fjs/types/rtti/ts/module.f.js').Ts<typeof w2Schema>} W2 */
+/** @typedef {Ts<typeof w2Schema>} W2 */
 
 /** Structural-only validator: checks the shape, not the semantic refinements below. */
 const validateShape = rttiValidate(w2Schema)
@@ -139,8 +143,25 @@ const moneyBoxFields = /** @type {const} */ ([
     'box11NonqualifiedPlans',
 ])
 
-/** Either a structural validation error or a semantic (string) error message. */
-/** @typedef {import('functionalscript/fjs/types/rtti/validate/module.f.js').ValidationError | string} W2Error */
+/**
+ * The four money-carrying fields of one boxes-15-through-20 row (`state` is
+ * an identity label, not an amount, so it is excluded). Named once, at
+ * module scope, so `checkReferences`' own loop below and this module's
+ * generated exactness proof (further down) walk the identical list rather
+ * than the check and its test being free to drift apart (AGENTS.md, "one
+ * rule, one place").
+ */
+const stateLocalMoneyFields = /** @type {const} */ ([
+    'stateWagesTipsEtc',
+    'stateIncomeTax',
+    'localWagesTipsEtc',
+    'localIncomeTax',
+])
+
+/**
+ * Either a structural validation error or a semantic (string) error message.
+ * @typedef {ValidationError | string} W2Error
+ */
 
 /**
  * Checks the semantic refinements the structural schema cannot express:
@@ -151,7 +172,7 @@ const moneyBoxFields = /** @type {const} */ ([
  * A box-12 entry's `code` must also be non-empty: an amount attached to no
  * code is unattributable, and box 12's entire meaning is carried by the
  * code rather than by position.
- * @type {(r: W2) => import('functionalscript/fjs/types/result/module.f.js').Result<W2, W2Error>}
+ * @type {(r: W2) => Result<W2, W2Error>}
  */
 export const checkReferences = r => {
     if (r.formRevision.trim() === '') {
@@ -177,16 +198,12 @@ export const checkReferences = r => {
         }
     }
     for (const entry of r.box15Through20 ?? []) {
-        for (const [label, printed] of /** @type {const} */ ([
-            ['stateWagesTipsEtc', entry.stateWagesTipsEtc],
-            ['stateIncomeTax', entry.stateIncomeTax],
-            ['localWagesTipsEtc', entry.localWagesTipsEtc],
-            ['localIncomeTax', entry.localIncomeTax],
-        ])) {
+        for (const field of stateLocalMoneyFields) {
+            const printed = entry[field]
             if (printed === undefined) {
                 continue
             }
-            const message = moneyFieldError(`${entry.state} ${label}`)(printed)
+            const message = moneyFieldError(`${entry.state} ${field}`)(printed)
             if (message !== undefined) {
                 return error(message)
             }
@@ -201,7 +218,7 @@ export const checkReferences = r => {
  * Dialect discrimination happens exclusively through the schema's
  * exact-literal `dialect` constant — the serialized JSON text is never
  * inspected.
- * @type {(value: import('functionalscript/fjs/types/rtti/ts/module.f.js').Unknown) => import('functionalscript/fjs/types/result/module.f.js').Result<W2, W2Error>}
+ * @type {(value: Unknown) => Result<W2, W2Error>}
  */
 export const validate = value => {
     const [t, v] = validateShape(value)
@@ -222,6 +239,71 @@ const minimal = {
     taxYear: 2025,
     formRevision: '2025',
 }
+
+/**
+ * T-09-08-02: a money box's name could be quietly dropped from
+ * {@link moneyBoxFields} without anyone noticing — the field stays
+ * `option(string)` structurally, so a comma-grouped amount in a dropped box
+ * would then validate as ok. One generated leaf per NAMED scalar box
+ * supplies a comma-grouped value to that box alone and asserts `validate`
+ * refuses, built by mapping `moneyBoxFields` itself into `[field,
+ * assertion]` pairs — the same idiom `fjs/tax/boundary`'s generated
+ * threshold leaves use — so a box added to the list later is covered
+ * automatically.
+ *
+ * A box's own generated leaf disappears WITH it if the box is dropped from
+ * the list, so this alone cannot catch a removal — {@link
+ * expectedMoneyBoxFieldCount} below pairs it with an independently
+ * hand-typed count, exactly as `fjs/tax/boundary`'s `expectedThresholdCount`
+ * guards `allThresholds`. The duplication is the mechanism (AGENTS.md: "a
+ * proof's expected value must not be produced by the code under test").
+ * @type {{ readonly [field: string]: () => void }}
+ */
+const generatedScalarMoneyBoxExactnessProof = Object.fromEntries(
+    moneyBoxFields.map(field => [
+        field,
+        () => {
+            const [t, v] = validate({ ...minimal, [field]: '1,234.56' })
+            assertEq(t, 'error', ['expected a comma-grouped amount in this box to be refused', field, t, v])
+        },
+    ]),
+)
+
+/**
+ * Independently hand-typed: the number of scalar money boxes
+ * {@link moneyBoxFields} is expected to name today. Deliberately NOT derived
+ * from `moneyBoxFields.length` — see {@link generatedScalarMoneyBoxExactnessProof}.
+ * @type {number}
+ */
+const expectedMoneyBoxFieldCount = 10
+
+/**
+ * Same idiom as {@link generatedScalarMoneyBoxExactnessProof}, for the four
+ * boxes-15-through-20 money fields named in {@link stateLocalMoneyFields}
+ * instead of the scalar {@link moneyBoxFields}.
+ * @type {{ readonly [field: string]: () => void }}
+ */
+const generatedStateLocalMoneyExactnessProof = Object.fromEntries(
+    stateLocalMoneyFields.map(field => [
+        field,
+        () => {
+            const [t, v] = validate({ ...minimal, box15Through20: [{ state: 'CA', [field]: '1,234.56' }] })
+            assertEq(
+                t,
+                'error',
+                ['expected a comma-grouped amount in this box15Through20 field to be refused', field, t, v])
+        },
+    ]),
+)
+
+/**
+ * Independently hand-typed: the number of boxes-15-through-20 money fields
+ * {@link stateLocalMoneyFields} is expected to name today. Deliberately NOT
+ * derived from `stateLocalMoneyFields.length` — see
+ * {@link generatedScalarMoneyBoxExactnessProof}.
+ * @type {number}
+ */
+const expectedStateLocalMoneyFieldCount = 4
 
 export const proof = {
     dialectAndMediaType: () => {
@@ -343,6 +425,38 @@ export const proof = {
         },
         commaGroupedMoneyRejected: () => {
             assertEq(validate({ ...minimal, box1WagesTipsOtherCompensation: '85,000.00' })[0], 'error')
+        },
+        // T-09-08-02: every money box named in `moneyBoxFields` and
+        // `stateLocalMoneyFields` is proven to actually be walked by the
+        // exactness loops, not merely assumed because
+        // `box1WagesTipsOtherCompensation` happens to be covered above.
+        scalarMoneyBoxExactness: {
+            ...generatedScalarMoneyBoxExactnessProof,
+            everyMoneyBoxIsCovered: () => {
+                assertEq(
+                    moneyBoxFields.length,
+                    expectedMoneyBoxFieldCount,
+                    [
+                        'expected exactly the independently-stated money box count',
+                        moneyBoxFields.length,
+                        expectedMoneyBoxFieldCount,
+                    ],
+                )
+            },
+        },
+        stateLocalMoneyExactness: {
+            ...generatedStateLocalMoneyExactnessProof,
+            everyFieldIsCovered: () => {
+                assertEq(
+                    stateLocalMoneyFields.length,
+                    expectedStateLocalMoneyFieldCount,
+                    [
+                        'expected exactly the independently-stated box15Through20 money field count',
+                        stateLocalMoneyFields.length,
+                        expectedStateLocalMoneyFieldCount,
+                    ],
+                )
+            },
         },
     },
 }

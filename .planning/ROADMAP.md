@@ -1,8 +1,11 @@
 # Roadmap: Finance
 
 **Milestone:** v1
-**Granularity:** fine (15 phases — see "Granularity Note" below)
-**Coverage:** 79 / 79 v1 requirements mapped
+**Granularity:** fine (15 phases on the critical path, plus 3 backlog phases — see "Granularity Note" below)
+**Coverage:** 85 v1 requirements mapped across Phases 1-15, plus 8 MAINT backlog requirements in Phases 16-18.
+**Count note:** older totals of 79 and 83 survive further down this file and in the coverage table; they
+predate TEST-01..04 and the MAINT set. MAINT-03 owns reconciling them. Recompute rather than trust prose:
+`grep -oE '\*\*[A-Z]+-[0-9]+\*\*' .planning/REQUIREMENTS.md | sort -u | wc -l`
 **Created:** 2026-08-03
 
 ## Overview
@@ -120,21 +123,21 @@ These were established by execution, not inference. Any replan must preserve the
 
 ### Week 0 — Corrections and Integration Smoke Test *(research addition, in front of the plan)*
 
-- [ ] **Phase 1: Planning-Document Corrections and the Upstream Report** - Delete every claim research proved false, and file the fjs soundness hole
-- [ ] **Phase 2: Server Skeleton, Safe Registration, Project-Local Store** - A registered, protocol-correct, permission-scoped server with no logic of ours in it
+- [x] **Phase 1: Planning-Document Corrections and the Upstream Report** - Delete every claim research proved false, and file the fjs soundness hole (completed 2026-08-03)
+- [x] **Phase 2: Server Skeleton, Safe Registration, Project-Local Store** - A registered, protocol-correct, permission-scoped server with no logic of ours in it (completed 2026-08-03)
 
 ### Week 1 — First Working Prototype
 
-- [ ] **Phase 3: The Restricted Interpreter** - The whitelist that is actually a whitelist, with observed reads and a step budget
-- [ ] **Phase 4: Exact Arithmetic and the Money Layering** - Integer cents, exact rationals, IRS half-up rounding at line boundaries
-- [ ] **Phase 5: Document Base, Subject Model, and the First Two Dialects** - `vnd.fjs.ocr` and `vnd.fjs.1099int` on one base, rooted at permanent subjects
-- [ ] **Phase 6: Guest ABI Freeze and Safe Materialization** - The whitelist expressed in the type, and a blob that becomes a module safely
-- [ ] **Phase 7: `fjs_run`, Run Records, and the Week 1 Convergence** - A stored program reads real documents and returns a real figure
+- [x] **Phase 3: The Restricted Interpreter** - The whitelist that is actually a whitelist, with observed reads and a step budget (completed 2026-08-03)
+- [x] **Phase 4: Exact Arithmetic and the Money Layering** - Integer cents, exact rationals, IRS half-up rounding at line boundaries (completed 2026-08-04)
+- [x] **Phase 5: Document Base, Subject Model, and the First Two Dialects** - `vnd.fjs.ocr` and `vnd.fjs.1099int` on one base, rooted at permanent subjects (completed 2026-08-04)
+- [x] **Phase 6: Guest ABI Freeze and Safe Materialization** - The whitelist expressed in the type, and a blob that becomes a module safely (completed 2026-08-04)
+- [x] **Phase 7: `fjs_run`, Run Records, and the Week 1 Convergence** - A stored program reads real documents and returns a real figure (completed 2026-08-05)
 
 ### Week 2 — A Report Program Produces a Correct Figure
 
-- [ ] **Phase 8: TY2025 Parameters and the Tax Table as Data** - Cited parameters and a row-by-row-verified Tax Table
-- [ ] **Phase 9: Traceable Report Lines and the Anti-Hardcoding Gate** - A line without sources does not typecheck; a constant answer fails the gate
+- [x] **Phase 8: TY2025 Parameters and the Tax Table as Data** - Cited parameters and a row-by-row-verified Tax Table (completed 2026-08-05)
+- [x] **Phase 9: Traceable Report Lines and the Anti-Hardcoding Gate** - A line without sources does not typecheck; a constant answer fails the gate (completed 2026-08-05)
 - [ ] **Phase 10: Form 1040 Core, Line-16 Dispatch, and the Scope Guard** - Lines 1a–37, four-way line-16 branch, loud refusal outside scope
 
 ### Week 3 — Breadth in Documents
@@ -150,6 +153,15 @@ These were established by execution, not inference. Any replan must preserve the
 ### Week 5 — Technical Debt
 
 - [ ] **Phase 15: Realism Polish and Upstream** - Multi-year, mechanical 1040-X, a second report, and the fjs contributions
+
+### Backlog — Deferred Judgments
+
+Not on the critical path. Each is a maintainer's decision that surfaced during Phases 7-9 and was
+deliberately left untaken, so that discovering it did not become a reason to stop.
+
+- [ ] **Phase 16: The Orphan Ingestion Island** - Wire the OCR conversion pipeline into the server, or remove it
+- [ ] **Phase 17: Documentation Truth Pass** - Every claim a reader would act on is true, or is deleted
+- [ ] **Phase 18: Dependency and Duplication Debt** - fjs 0.43.0, the duplicated step sequence, two copy-pasted checks
 
 ---
 
@@ -285,7 +297,30 @@ held — neither dialect required reopening `fjs/document/base` or the subject c
   4. A program throwing a non-`Error` value, a missing hash, and an import failure each return a tool-level `errorResult` — never a process crash, never a dropped connection.
   5. An oversized result returns `result too large; stored at <hash>` from an **explicit size check before `writeResponse`**, rather than inheriting the silent `-32603` the 128 KiB stdio line cap produces.
 **Research**: Not needed.
-**Plans**: TBD
+**Plans**: 8 plans
+- [x] 07-01-PLAN.md — Guest ctx combinators (step/pure) and money helpers; revise the two Phase 6 proofs distinguishing commands from combinators (EXEC-08 precursor, per 07-CONTEXT.md Decision 1)
+- [x] 07-02-PLAN.md — vnd.fjs.run document dialect: schema, checkReferences, validate (PROV-03)
+- [x] 07-03-PLAN.md — finance_schema MCP tool: dialect lookup + toJsonSchema serialization (MCP-06)
+- [x] 07-04-PLAN.md — Size-guarded response envelope: sizeGuard, constants, ordering proof (EXEC-11)
+- [x] 07-05-PLAN.md — materializeProgram (disk write, gitignored subdir) + synchronous snapshot/host-map with pinning (EXEC-08)
+- [x] 07-06-PLAN.md — fjs_run handler: executeRun orchestration, handler-performed CAS writes, the run record, adversarial proof (EXEC-08, EXEC-10, EXEC-11, PROV-03)
+- [x] 07-07-PLAN.md — EXEC-12 error taxonomy: non-Error throw, missing hash, import failure, each through the full handler with session-survival proof
+- [x] 07-08-PLAN.md — Wire finance_schema/fjs_run into financeMcpHandlers; the Week-1 finish line end to end (all six requirements converge)
+- [x] 07-09-PLAN.md — Real-process integration test: separate `node index.js` OS process, full JSON-RPC session over real stdio, real filesystem (TEST-01, TEST-02, TEST-04)
+
+**Plan 07-09 was added mid-phase at the user's direction.** An audit found this project had 133
+project-local proofs and exactly **one** real-process test; everything else runs under
+`fjs/effects/node/virtual` — mocked filesystem, mocked stdio, no separate OS process. The forcing
+finding: the product's central seam is untestable in that harness *by construction*. `virtual`'s
+`writeFile` stores `[Vec]` chunks while its `import_` requires a `JsModule` function, so
+write-then-import cannot compose in a virtual session — which is why Plan 07-08, despite being
+titled "end to end", substitutes a `JsModule` stand-in for materialization. `fjs_run` would have
+shipped with its central seam evidenced only by a mock.
+
+Plan 07-09 proves it for real and asserts the materialized `.mjs` actually reached disk — the one
+assertion no virtual proof can make. Per **TEST-03** this becomes a standing obligation: each
+later phase adds real-process coverage for the tools and seams it ships, rather than deferring all
+of it to Phase 14, whose criteria are about tax correctness rather than the execution seam.
 
 **── Milestone: Week 2 — A Report Program Produces a Correct Figure ──**
 
@@ -302,7 +337,11 @@ held — neither dialect required reopening `fjs/document/base` or the subject c
   4. Every threshold in the parameter data has proofs at `threshold − 1¢`, `threshold`, and `threshold + 1¢`.
   5. The standard deduction values are the OBBBA-revised ones ($15,750 / $31,500 / $23,625), traceable to Rev. Proc. 2025-32 and not to the original 2025 inflation release.
 **Research**: **YES** — the Tax Table's low-end band structure was not read line by line by any researcher, and two research files disagree ($50 uniform vs $5/$10/$25/$50). Highest-value research in the project.
-**Plans**: TBD
+**Plans**: 4 plans
+- [x] 08-01-PLAN.md — TY2025 parameter data module with per-parameter citations (TAX-01)
+- [x] 08-02-PLAN.md — Tax Table band structure, exact cumulative-bracket generator, row-by-row diff against hand-transcribed literals, tiling proof, $100,000 refusal, and mutation-verification of the diff (TAX-02)
+- [x] 08-03-PLAN.md — Combined threshold inventory and generated threshold−1¢/threshold/threshold+1¢ boundary proofs (TAX-04)
+- [x] 08-04-PLAN.md — finance_tax_params MCP tool, registry wiring, and the real-process integration-test call (MCP-07)
 
 ### Phase 9: Traceable Report Lines and the Anti-Hardcoding Gate
 **Milestone**: Week 2 — A Report Program Produces a Correct Figure
@@ -316,7 +355,11 @@ held — neither dialect required reopening `fjs/document/base` or the subject c
   3. Every run reports a CAS-read count and a numeric-literal audit alongside its result, both visible to the user.
   4. A perturbation gate: changing one input document moves the output, and a program shaped `() => pure({ line16: 9137 })` — which satisfies every other stated criterion — **fails**.
 **Research**: Not needed.
-**Plans**: TBD
+**Plans**: 4 plans
+- [x] 09-01-PLAN.md — Report-line type: Source/ReportLine, the PROV-01 compile-time assertion, verified by widen/revert (PROV-01, PROV-02)
+- [x] 09-02-PLAN.md — Numeric-literal audit: countNumericLiterals, proven immune to digits in identifiers/strings/comments (PROV-07)
+- [x] 09-03-PLAN.md — Zero-observed-reads kill condition and the six-key fjs_run response envelope (PROV-07)
+- [x] 09-04-PLAN.md — Perturbation gate real leg, the verbatim `() => pure({ line16: 9137 })` adversary with its control leaf, integration-test envelope assertions (PROV-07)
 
 ### Phase 10: Form 1040 Core, Line-16 Dispatch, and the Scope Guard
 **Milestone**: Week 2 — A Report Program Produces a Correct Figure
@@ -415,10 +458,62 @@ held — neither dialect required reopening `fjs/document/base` or the subject c
 
 ---
 
+**── Backlog: Deferred Judgments ──**
+
+These three phases exist because a decision was found, not because work was scheduled. Each was
+surfaced by an audit during Phases 7-9 and each is a maintainer's call. None blocks the v1 tax
+result; all are T3. They are written down so they are decided deliberately rather than rediscovered.
+
+### Phase 16: The Orphan Ingestion Island
+**Milestone**: Backlog
+**Goal**: The OCR-conversion pipeline is either reachable from the running server or is gone. Tested code that nothing can execute is worse than either.
+**Depends on**: Nothing
+**Requirements**: MAINT-01
+**Tier**: T3
+**Success Criteria** (what must be TRUE):
+  1. An import graph from `index.js` either reaches `fjs/document/1099int/from_ocr`, or that module and its two dependants (`fjs/document/ocr_amount`, `fjs/document/subject`) no longer exist.
+  2. If wired: a real-process integration call exercises the conversion, per TEST-03's standing rule — the tool a client would call has actually been called.
+  3. If removed: `todo/plan.md`'s Track B is amended to state plainly that the agent authors the typed dialect JSON itself and stores it via the already-registered `evo_add`, so the next reader does not rebuild what was just deleted.
+**Research**: No — the decision needs the author's intent, not investigation.
+**Plans**: TBD
+
+### Phase 17: Documentation Truth Pass
+**Milestone**: Backlog
+**Goal**: Every claim a reader would act on is true, or it is deleted. A wrong remedy is worse than no remedy.
+**Depends on**: Nothing
+**Requirements**: MAINT-02, MAINT-03, MAINT-04, MAINT-05
+**Tier**: T3
+**Success Criteria** (what must be TRUE):
+  1. No requirement marked `[x]` is contradicted by a live file. Specifically DOCC-01, whose own verification document asserts a grep is clean while `fjs/todo/implement-mcp-server.md` still carries the `djs/parser` remedy verbatim.
+  2. `fjs/todo/upstream-mcp-protocol-version-negotiation.md`'s proposed fix works when applied. It currently compares `pr.protocolVersion` where `pr` is the destructured result *tag*, so the comparison is against `undefined`.
+  3. TEST-04 either holds or has been amended: `npm test` runs both real-process tests today, so there is no fast proofs-only loop for the requirement's stated rationale to protect.
+  4. TAX-02's wording matches what is proven — ten hand-transcribed Publication 1040 rows plus a structural tiling proof, not a row-by-row diff of ~2,000 generated rows.
+  5. One requirement count is stated, and it is right. The document currently says 79 in one place and 83 in another; the real figure moves whenever requirements are added, so state it where it can be recomputed rather than in prose.
+  6. `fjs/todo/implement-mcp-server.md` no longer reads "Status: spec, not implemented", and its two "blocking, resolve before implementing" questions are marked resolved with the answers that shipped.
+**Research**: No.
+**Plans**: TBD
+
+### Phase 18: Dependency and Duplication Debt
+**Milestone**: Backlog
+**Goal**: The vendored dependency is current, and the two remaining duplications are shared rather than copied.
+**Depends on**: Nothing
+**Requirements**: MAINT-06, MAINT-07, MAINT-08
+**Tier**: T3
+**Success Criteria** (what must be TRUE):
+  1. `package.json` takes `functionalscript` 0.43.0, the suite is green on it, and each `fjs/todo/upstream-*.md` note has been re-checked against the new version — one such note was already retired by an upstream fix.
+  2. `executeRun`'s step sequence is shared with `runExecuteRunViaFixture` rather than written twice. Proven the only way that counts: reorder or insert a step, and both the virtual proofs and the integration test go red. The helper itself stays — `fjs/effects/node/virtual` cannot compose a write with an import in one session.
+  3. The `formRevision must not be empty` check exists once, shared the way `moneyFieldError` already is, rather than byte-identically in two dialect files.
+  4. `artifactSubject` is either called by something or deleted.
+**Research**: No.
+**Plans**: TBD
+
+---
+
 ## Progress
 
 **Execution Order:** Phases execute in numeric order, with the concurrency sets in
 "Parallelism" above run together: 1 ∥ 2 → 3 ∥ (4 → 5) → 6 → 7 → 8 ∥ 9 → 10 → 11 ∥ 12 → 13 → 14 → 15
+Phases 16-18 are backlog: unordered, independent of each other and of the critical path.
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -428,9 +523,9 @@ held — neither dialect required reopening `fjs/document/base` or the subject c
 | 4. Exact Arithmetic | Week 1 | 2/2 | Complete | verified 10/10 |
 | 5. Document Base and First Dialects | Week 1 | 0/TBD | Not started | - |
 | 6. Guest ABI and Materialization | Week 1 | 0/TBD | Not started | - |
-| 7. `fjs_run` and Run Records | Week 1 | 0/TBD | Not started | - |
-| 8. TY2025 Parameters and Tax Table | Week 2 | 0/TBD | Not started | - |
-| 9. Traceable Report Lines | Week 2 | 0/TBD | Not started | - |
+| 7. `fjs_run` and Run Records | Week 1 | 0/8 | Planned | - |
+| 8. TY2025 Parameters and Tax Table | Week 2 | 3/4 | In Progress|  |
+| 9. Traceable Report Lines | Week 2 | 8/8 | Complete   | 2026-08-06 |
 | 10. 1040 Core and Scope Guard | Week 2 | 0/TBD | Not started | - |
 | 11. Wage, Retirement, Benefit Documents | Week 3 | 0/TBD | Not started | - |
 | 12. Brokerage and Capital-Gain Chain | Week 3 | 0/TBD | Not started | - |

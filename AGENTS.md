@@ -56,6 +56,121 @@ facilitate Emergent Design sessions
   - `node --test fjs` — Node resolves the bare directory to `fjs/index.js` and runs the whole app as one fake "test".
   - `node --test fjs/some/module.f.js` — targeting a source file by explicit path is **also** a fake pass. Node executes it as a plain script; no `proof` leaf runs. Verified by injecting a leaf that throws unconditionally: `npm test` reported `tests 8, pass 7, fail 1`, while `node --test fjs/server/module.f.js` reported `tests 1, pass 1, fail 0` on the identical file.
 
+## Hard rules
+
+These are cited by name throughout the source. They are stated here so the citations resolve.
+
+- **Money in a stored JSON document is a `string`, never a JSON number.** Documents, tax-year
+  parameters, intermediates and reports alike. A JSON number is an IEEE 754 double by the time
+  `media/json`'s `Unknown` sees it, so exactness dies at the boundary. The rtti field is `string`;
+  exactness is enforced in the semantic check, mirroring how `vnd.fjs.revision` types `hash` as
+  `string` and defers to `isHash`. In computation, money is integer cents as `bigint`.
+- **No type cast over an indexed access, no `any`, no non-null assertion.** `tsconfig.json` sets
+  `noUncheckedIndexedAccess`, so indexing yields `T | undefined` — that `undefined` is the
+  compiler telling you something true. Bind the lookup to a local and narrow it with `assert` /
+  `assertNotNullish`, as `fjs/server/finance_schema/module.f.js` does. A cast silences the check
+  rather than satisfying it. (`/** @type {const} */` annotations and casts over a `JSON.parse`
+  result are a different thing — they type an `any`, they do not discard a `| undefined`.)
+- **`assert`, `assertNotNullish`, `unwrap` and `match` throw BARE values, not `Error`s.**
+  `typeof e === 'string'` or an array; `e instanceof Error` is `false` and `e.message` is
+  `undefined`. Never branch on `instanceof Error` — such a branch misses every refusal this
+  codebase raises.
+- **No new dependency, including a devDependency, without every repo owner's approval.**
+- **A missing generic capability is written here in this project, shaped so it could be lifted
+  upstream unchanged** — no locale or domain assumptions baked into a generic module. See
+  `fjs/types/decimal` (scale as a parameter, zero finance-specific content) versus
+  `fjs/document/ocr_amount` (comma degrouping, a US printed-form convention, kept one layer out).
+
+## A proof is not known to work until you have watched it fail
+
+A green suite proves nothing on its own. **Break the code on purpose and confirm the suite goes
+red.** If it stays green, the proof is decoration and the code is unproven.
+
+This is not a style preference. This project has shipped the same defect three times — a proof whose
+expected side was not independent of the code under test — and each time the suite was fully green:
+
+| Phase | The defect | Suite when the shipped code was mutated |
+|---|---|---|
+| 7 | Every fixture was keyed at the same wrong path the buggy code asked for, so the proof mirrored the bug | 185 proofs, all green |
+| 9 | The zero-read rule existed twice; every proof exercised the copy that did not ship | 258 green |
+| 8 | `finance_tax_params` compared its output against the very object that produced it | 262 green |
+
+Nothing was found by reading. All three were found by mutating.
+
+**The rules that follow from it:**
+
+- A proof's **expected** value must not be produced by the code under test. Hand-type it, or derive
+  it from an independent source. The duplication is the mechanism, not a smell — do not "simplify"
+  it away. (`fjs/tax/table`'s Publication 1040 rows and `fjs/server/finance_tax_params`'s per-field
+  literals are the pattern to copy.)
+- **A mutation must still typecheck.** `npm test` is `tsc && node --test`, so a mutation that fails
+  to compile never reaches the tests and measures the compiler instead of the suite.
+- **One rule, one place.** If a check appears in both a production path and a test helper, the
+  proofs will bind to whichever the tests call, and the other can rot silently. Share it.
+- **Assert the effect, not the error message.** Two different orderings can return the same message;
+  only observing the side effect distinguishes them (Phase 6 learned this).
+- **A gate needs a control.** A proof that something is refused must be paired with one showing the
+  legitimate case is not — otherwise a gate that refuses everything passes.
+- **Never gate a phase on `npm test`'s total.** It includes ~2,100 vendored submodule proofs and
+  moves with submodule state. Use `node --test 2>&1 | grep -c '^✔ import("./fjs/'`. A Phase 7 gate
+  of "total > 134" was already satisfied before that phase's first line was written.
+
+**Sweep for untested code rather than guessing at it.** Copy the repo (`cp -a . /tmp/sweep` — the
+`node_modules` symlink is absolute, so it still resolves), then mutate values, comparisons and
+returned shapes one at a time, reverting each. Every mutation that leaves the suite green is
+uncovered code. Two cautions learned by doing it: a copy shares the real repo's git directory, so
+never run a *writing* git command from inside one (`git checkout --` to revert is safe and operates
+on the copy; a `git commit` would record the copy's state — including files it lacks — into the real
+repo). And once a proof hand-types an expected value, that literal exists twice: mutate by line
+number and check `git diff --numstat` shows exactly `1` insertion and `1` deletion, or you will edit
+the expectation alongside the code and confirm nothing.
+
+The first such sweep ran 95 mutations across the project. **24 survived** — each one code that could
+have gone wrong in production with the suite fully green. All are now covered. What it found is a
+better guide to where risk actually lives than intuition was:
+
+- The security-shaped code was **solid**. The import-specifier check, its ordering relative to the
+  import, the template-literal refusal, the frozen operation vocabulary, `fjs/run`'s cross-field
+  validation and `money_field`'s safe-integer boundary were all caught, several by a dozen or more
+  failing leaves at once.
+- The gaps were in **data-shaping code that ships real financial values**: a 1099-INT box mapping
+  that could be transposed silently, money boxes droppable from a dialect's exactness loop, bracket
+  data above $100,000 with no verification at all, `formSubject`'s encoding unpinned (a refactor
+  could have forked every stored document's history), and `fjs_run`'s pin — which could be
+  disconnected entirely while the run record still claimed the run was pinned.
+- Several assertions checked the wrong thing: that a refusal *threw*, rather than what it threw.
+
+Nothing on that list was found by reading the code.
+
+### A clean merge with a green suite can still have dropped coverage
+
+Merging the PR stack silently replaced a refusal proof in `fjs/server/fjs_run/snapshot` with a
+weaker one. **There was no conflict** — git took one side, the suite stayed green, and nothing
+flagged it. Two proofs had been rewritten from content assertions into bare `throw: { ... }` leaves
+on the stated grounds that "reading a thrown value means catching it, and a `.f.js` module may
+not". That premise is false: `fjs/exec/module.f.js` catches in shipped production code. The
+`throw:` form passes for *any* throw — mutating `fjs/tax/table`'s refusal from `<` to `<=` still
+throws at exactly $100,000.00, just via the unrelated "outside every stored band region" path.
+
+So after any non-trivial merge, verify coverage rather than trusting the exit code:
+
+```
+# 1. both parents' proof-leaf sets must be subsets of the result
+node --test 2>&1 | grep -o '^✔ import("\./fjs/[^ ]*' | sort -u   # run in each parent and in the result
+comm -23 parent.txt result.txt      # must be empty, or every line individually explained
+
+# 2. a name-set diff is NOT sufficient — a leaf can keep its name and lose its assertions
+grep -cE '\bassert(Eq|NotNullish)?\(' <changed file>   # before vs after; a drop is a regression
+```
+
+Step 1 caught the dropped leaf; step 2 is what catches the case step 1 cannot see. Where a merge
+deliberately replaces a proof with a stronger one, say so in a `MERGE NOTE` comment at the site, so
+the next feedback pass does not revert it back.
+
+**`npm test --prefix <dir>` does not run that directory's tests.** It sets the package location but
+runs the script in the current working directory, so it will happily report a different tree green.
+Use `( cd <dir> && npm test )` — in a subshell, because a bare `cd` persists across later commands.
+
 ## Commands
 
 - `npm test` — `tsc` (typecheck) then `node --test` (runs all FunctionalScript proofs via root `all.test.js`).
