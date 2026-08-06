@@ -162,6 +162,33 @@ export const proof = {
         assertEq(centsFromString(result.box1InterestIncome), 123456n)
     },
 
+    // ── T-09-08-01: the most consequential coverage gap the mutation sweep
+    // found. Every OTHER proof in this file uses only Box 1, Box 4 and Box 8
+    // — no proof anywhere exercised Box 2 or Box 3, so swapping their
+    // `boxLabels` targets left the suite fully green. Every one of the six
+    // boxes gets its own DISTINCT, non-round value here, and each field is
+    // asserted separately (never one aggregate comparison), so a
+    // transposition of any two boxes names both fields involved instead of
+    // failing silently.
+    everyBoxMapsToItsOwnDistinctField: () => {
+        const result = convert(
+            ocrOf({
+                'Box 1 Interest income': '111.11',
+                'Box 2 Early withdrawal penalty': '222.22',
+                'Box 3 Interest on U.S. Savings Bonds and Treasury obligations': '333.33',
+                'Box 4 Federal income tax withheld': '444.44',
+                'Box 6 Foreign tax paid': '555.55',
+                'Box 8 Tax-exempt interest': '666.66',
+            }),
+            meta)
+        assertEq(result.box1InterestIncome, '111.11')
+        assertEq(result.box2EarlyWithdrawalPenalty, '222.22')
+        assertEq(result.box3UsSavingsBondsAndTreasuryInterest, '333.33')
+        assertEq(result.box4FederalIncomeTaxWithheld, '444.44')
+        assertEq(result.box6ForeignTaxPaid, '555.55')
+        assertEq(result.box8TaxExemptInterest, '666.66')
+    },
+
     // ── Success Criterion 4, leaf 2 — DOC-11: blank is not zero ─────────
     // A box the form never printed is an ABSENT KEY, not a key holding
     // undefined and not a zero amount. This leaf was verified by mutation:
