@@ -139,6 +139,21 @@ const moneyBoxFields = /** @type {const} */ ([
     'box11NonqualifiedPlans',
 ])
 
+/**
+ * The four money-carrying fields of one boxes-15-through-20 row (`state` is
+ * an identity label, not an amount, so it is excluded). Named once, at
+ * module scope, so `checkReferences`' own loop below and this module's
+ * generated exactness proof (further down) walk the identical list rather
+ * than the check and its test being free to drift apart (AGENTS.md, "one
+ * rule, one place").
+ */
+const stateLocalMoneyFields = /** @type {const} */ ([
+    'stateWagesTipsEtc',
+    'stateIncomeTax',
+    'localWagesTipsEtc',
+    'localIncomeTax',
+])
+
 /** Either a structural validation error or a semantic (string) error message. */
 /** @typedef {import('functionalscript/fjs/types/rtti/validate/module.f.js').ValidationError | string} W2Error */
 
@@ -177,16 +192,12 @@ export const checkReferences = r => {
         }
     }
     for (const entry of r.box15Through20 ?? []) {
-        for (const [label, printed] of /** @type {const} */ ([
-            ['stateWagesTipsEtc', entry.stateWagesTipsEtc],
-            ['stateIncomeTax', entry.stateIncomeTax],
-            ['localWagesTipsEtc', entry.localWagesTipsEtc],
-            ['localIncomeTax', entry.localIncomeTax],
-        ])) {
+        for (const field of stateLocalMoneyFields) {
+            const printed = entry[field]
             if (printed === undefined) {
                 continue
             }
-            const message = moneyFieldError(`${entry.state} ${label}`)(printed)
+            const message = moneyFieldError(`${entry.state} ${field}`)(printed)
             if (message !== undefined) {
                 return error(message)
             }
@@ -222,6 +233,71 @@ const minimal = {
     taxYear: 2025,
     formRevision: '2025',
 }
+
+/**
+ * T-09-08-02: a money box's name could be quietly dropped from
+ * {@link moneyBoxFields} without anyone noticing — the field stays
+ * `option(string)` structurally, so a comma-grouped amount in a dropped box
+ * would then validate as ok. One generated leaf per NAMED scalar box
+ * supplies a comma-grouped value to that box alone and asserts `validate`
+ * refuses, built by mapping `moneyBoxFields` itself into `[field,
+ * assertion]` pairs — the same idiom `fjs/tax/boundary`'s generated
+ * threshold leaves use — so a box added to the list later is covered
+ * automatically.
+ *
+ * A box's own generated leaf disappears WITH it if the box is dropped from
+ * the list, so this alone cannot catch a removal — {@link
+ * expectedMoneyBoxFieldCount} below pairs it with an independently
+ * hand-typed count, exactly as `fjs/tax/boundary`'s `expectedThresholdCount`
+ * guards `allThresholds`. The duplication is the mechanism (AGENTS.md: "a
+ * proof's expected value must not be produced by the code under test").
+ * @type {{ readonly [field: string]: () => void }}
+ */
+const generatedScalarMoneyBoxExactnessProof = Object.fromEntries(
+    moneyBoxFields.map(field => [
+        field,
+        () => {
+            const [t, v] = validate({ ...minimal, [field]: '1,234.56' })
+            assertEq(t, 'error', ['expected a comma-grouped amount in this box to be refused', field, t, v])
+        },
+    ]),
+)
+
+/**
+ * Independently hand-typed: the number of scalar money boxes
+ * {@link moneyBoxFields} is expected to name today. Deliberately NOT derived
+ * from `moneyBoxFields.length` — see {@link generatedScalarMoneyBoxExactnessProof}.
+ * @type {number}
+ */
+const expectedMoneyBoxFieldCount = 10
+
+/**
+ * Same idiom as {@link generatedScalarMoneyBoxExactnessProof}, for the four
+ * boxes-15-through-20 money fields named in {@link stateLocalMoneyFields}
+ * instead of the scalar {@link moneyBoxFields}.
+ * @type {{ readonly [field: string]: () => void }}
+ */
+const generatedStateLocalMoneyExactnessProof = Object.fromEntries(
+    stateLocalMoneyFields.map(field => [
+        field,
+        () => {
+            const [t, v] = validate({ ...minimal, box15Through20: [{ state: 'CA', [field]: '1,234.56' }] })
+            assertEq(
+                t,
+                'error',
+                ['expected a comma-grouped amount in this box15Through20 field to be refused', field, t, v])
+        },
+    ]),
+)
+
+/**
+ * Independently hand-typed: the number of boxes-15-through-20 money fields
+ * {@link stateLocalMoneyFields} is expected to name today. Deliberately NOT
+ * derived from `stateLocalMoneyFields.length` — see
+ * {@link generatedScalarMoneyBoxExactnessProof}.
+ * @type {number}
+ */
+const expectedStateLocalMoneyFieldCount = 4
 
 export const proof = {
     dialectAndMediaType: () => {
@@ -343,6 +419,38 @@ export const proof = {
         },
         commaGroupedMoneyRejected: () => {
             assertEq(validate({ ...minimal, box1WagesTipsOtherCompensation: '85,000.00' })[0], 'error')
+        },
+        // T-09-08-02: every money box named in `moneyBoxFields` and
+        // `stateLocalMoneyFields` is proven to actually be walked by the
+        // exactness loops, not merely assumed because
+        // `box1WagesTipsOtherCompensation` happens to be covered above.
+        scalarMoneyBoxExactness: {
+            ...generatedScalarMoneyBoxExactnessProof,
+            everyMoneyBoxIsCovered: () => {
+                assertEq(
+                    moneyBoxFields.length,
+                    expectedMoneyBoxFieldCount,
+                    [
+                        'expected exactly the independently-stated money box count',
+                        moneyBoxFields.length,
+                        expectedMoneyBoxFieldCount,
+                    ],
+                )
+            },
+        },
+        stateLocalMoneyExactness: {
+            ...generatedStateLocalMoneyExactnessProof,
+            everyFieldIsCovered: () => {
+                assertEq(
+                    stateLocalMoneyFields.length,
+                    expectedStateLocalMoneyFieldCount,
+                    [
+                        'expected exactly the independently-stated box15Through20 money field count',
+                        stateLocalMoneyFields.length,
+                        expectedStateLocalMoneyFieldCount,
+                    ],
+                )
+            },
         },
     },
 }
