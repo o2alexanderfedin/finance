@@ -197,6 +197,26 @@ edit in a form that keeps the binding live, and record both the compile error an
 delete the `spouseItemizes` term  ->  (spouseItemizes && false)          // keeps the binding used
 ```
 
+### The equivalent mutant: a mutation a neighbouring operation absorbs
+
+The second way a written-down mutation turns out not to bite. It compiles, it applies cleanly, it
+changes the source — and it cannot turn red at **any** input, because an adjacent operation already
+enforces what the mutated token enforced.
+
+Found in QDCGT line 3, written as `s15 <= 0 || s16 <= 0 ? 0n : min(s15, s16)`. Weakening `<= 0n` to
+`< 0n` is a no-op: the `min` two tokens later already returns `0` when either amount is `0`, so the
+whole guard is just `max(min(s15, s16), 0n)` and the printed page's "blank or a loss" clause is
+absorbed by an operation the plan never considered.
+
+So when a mutation comes back green, **do not assume you mis-ran it.** Ask whether a neighbour makes
+it unobservable — and if so, say so at the site, because you have discovered a property of the code
+nobody had written down. Then re-run the same intent in a form that does bite (`(x <= 0n && false)`)
+to confirm the leaf is load-bearing after all.
+
+Three failure modes now, in the order they occur: the mutation does not compile (orphaned binding),
+the mutation compiles but is absorbed (equivalent mutant), or the mutation bites but on a different
+set of leaves than predicted.
+
 ### A mutation's predicted red set is itself a claim, and it is often wrong
 
 Predictions have been wrong in both directions, and each error was informative rather than
