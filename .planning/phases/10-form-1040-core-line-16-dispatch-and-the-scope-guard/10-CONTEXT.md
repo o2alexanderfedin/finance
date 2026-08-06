@@ -157,6 +157,30 @@ Worksheet, p36–38 line-16 instructions and the dispatch tree, **p38 the 25-lin
 worksheet**, p124 Tax Computation Worksheet. `i1040sd.pdf` (17pp) — p15–16 Schedule D Tax
 Worksheet. `f1040.pdf` — the form face. `p1040.pdf` — the Tax Table.
 
+## Standard deduction TY2025 — VERIFIED, and one correction
+
+Read from the **1040-SR Standard Deduction Chart** (`f1040s.pdf` p4) in full, after a first
+read was truncated and produced a wrong MFS box maximum. The chart, not the inference:
+
+| Filing status | Base | Increment | **Max boxes** | Max deduction |
+|---|---|---|---|---|
+| Single | 15,750 | 2,000 | 2 | 19,750 |
+| Married filing jointly | 31,500 | 1,600 | **4** | 37,900 |
+| Qualifying surviving spouse | 31,500 | 1,600 | **2** | 34,700 |
+| Head of household | 23,625 | 2,000 | 2 | 27,625 |
+| Married filing separately | **15,750** | **1,600** | **4** | 22,150 |
+
+**The bases match `fjs/tax/params` exactly** (`15750.00 / 31500.00 / 23625.00`), so Decision 3's
+stop-and-report is not triggered.
+
+Two traps, both of which produce wrong money if missed:
+
+- **MFS takes single's base with married's increment.** Neither half is guessable from the other.
+- **MFS reaches 4 boxes but QSS stops at 2**, despite QSS sharing MFJ's amounts. The chart's
+  footnote gives the condition: an MFS filer may check the spouse's boxes only when *"your
+  spouse had no income, isn't filing a return, and can't be claimed as a dependent on another
+  person's return."* The 4th box is conditional, not unconditional.
+
 ## The criterion-2 regression pair — INDEPENDENTLY VERIFIED
 
 Produced by research, then **recomputed from the worksheet and the bracket parameters by a
