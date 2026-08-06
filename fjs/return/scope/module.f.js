@@ -1,6 +1,7 @@
 /**
- * TAX-16's scope guard: the FROZEN modeled set, the refusal table, and (Task 2)
- * `scopeRefusal` / `classifyScope` — the one place a scope refusal is built.
+ * TAX-16's scope guard: the FROZEN modeled set, the refusal table,
+ * {@link classifyScope}, and {@link scopeRefusal} — the one place a scope
+ * refusal is built.
  *
  * ## Why a declared set and not the store
  *
@@ -210,6 +211,110 @@ export const unmodeledKindRefusals = /** @type {const} */ ([
  * @typedef {Assert<Equal<Kind, ModeledKind | UnmodeledKind>>} _EveryKindIsEitherModeledOrRefused
  */
 
+// ── The rule ─────────────────────────────────────────────────────────────────
+
+/**
+ * One scope decision. `10-CONTEXT.md` Decision 2 fixes the shape: an unmodeled
+ * declared input makes the ENTIRE report an error result naming what is
+ * unmodeled. A partial 1040 is never returned, so there is no way to mistake
+ * one for a complete return — the strictest reading of criterion 4's "never a
+ * silently omitted line".
+ *
+ * The discriminated `kind` is `fjs/report/guard`'s `RunOutcome` shape,
+ * deliberately WITHOUT its `reads` field: a scope refusal is decided before any
+ * read happens, and inventing an empty `reads` would claim a run that never
+ * occurred — and would collide with the one value `classifyRunOutcome` treats
+ * as its own kill condition. The two guards are siblings and neither subsumes
+ * the other: `classifyRunOutcome` catches "computed nothing"; this catches
+ * "computed only part of the return and said nothing".
+ * @typedef {{ readonly kind: 'ok' } | { readonly kind: 'error', readonly message: string, readonly unmodeled: readonly UnmodeledKind[] }} ScopeOutcome
+ */
+
+/**
+ * The ERROR member of {@link ScopeOutcome}, extracted so {@link scopeRefusal}
+ * can return exactly it.
+ *
+ * This is not tidiness. Plan 10-08's line-16 dispatcher spreads the result
+ * into its own `Line16Outcome` error arm; if {@link scopeRefusal} returned the
+ * whole union, that call site could reach `message` and `unmodeled` only
+ * through a cast or a `!`, both banned by AGENTS.md, and the one remaining
+ * compliant option — an `assert` at every call site — would move the narrowing
+ * out of the single place the rule lives and into each consumer.
+ * @typedef {Extract<ScopeOutcome, { readonly kind: 'error' }>} ScopeError
+ */
+
+/**
+ * **The ONLY place a scope refusal is built.** Plan 10-08's Schedule D Tax
+ * Worksheet arm and its three line-16 wrapper arms import this function; they
+ * do not construct a `{ kind: 'error' }` of their own. Mutating this one body
+ * is therefore the only way to change what any call site refuses with.
+ *
+ * That sentence is copied from `fjs/report/guard`'s `classifyRunOutcome`
+ * deliberately, and so is the reason: the zero-read kill condition once existed
+ * in two places, every proof bound to the copy that did not ship, and the
+ * shipped rule had no coverage at all while 258 tests were green. A second,
+ * parallel scope-refusal builder would reproduce that defect exactly.
+ *
+ * The message names, for each kind, the 1040 line that cannot be computed, the
+ * human label, and the remedy — because a refusal that does not say WHAT is
+ * unmodeled is no better than the silence it replaces. Nothing but this
+ * module's compiled-in strings reaches the message: no taxpayer amount, name or
+ * document hash can be carried out through it (T-10-07-04), which the
+ * hand-typed {@link expectedSocialSecurityRefusalMessage} pins exactly.
+ *
+ * The order is {@link kindVocabulary}'s (1040 form order), obtained by walking
+ * {@link unmodeledKindRefusals} rather than by sorting the argument, so two
+ * profiles declaring the same kinds in different orders produce byte-identical
+ * messages. That walk is also what makes the lookup total: the entry and its
+ * `kind` come from the same record, so there is no indexed access to narrow and
+ * no cast to be tempted by.
+ *
+ * A refusal that names nothing would be precisely the silent partial return
+ * this module exists to prevent, so an empty argument throws a bare value
+ * rather than producing one.
+ * @type {(kinds: readonly UnmodeledKind[]) => ScopeError}
+ */
+export const scopeRefusal = kinds => {
+    assert(
+        kinds.length !== 0,
+        ['a scope refusal must name at least one unmodeled kind', kinds],
+    )
+    const entries = unmodeledKindRefusals.filter(r => kinds.includes(r.kind))
+    return {
+        kind: 'error',
+        message: `scope refusal: this return declares ${entries.length} kind(s) this engine does not model, so no Form 1040 is produced; `
+            + entries.map(r => `${r.kind} at ${r.line} (${r.label}): ${r.remedy}`).join(' | '),
+        unmodeled: entries.map(r => r.kind),
+    }
+}
+
+/**
+ * TAX-16, in one comparison: the kinds the taxpayer DECLARED against the kinds
+ * this engine MODELS. Declaring nothing is in scope and yields a return of
+ * zeros; declaring only modeled kinds is in scope; declaring anything else
+ * refuses the whole return through {@link scopeRefusal}.
+ *
+ * The two filters are not redundant. The first is the rule itself — declared
+ * MINUS modeled — and is what makes the guard's inversion break the `'ok'` path
+ * as well as the refusal path, which is what a control leg is for. The second
+ * re-expresses that same set through {@link unmodeledKindRefusals}, the typed
+ * carrier of {@link UnmodeledKind}; the two sets are equal because
+ * {@link _EveryKindIsEitherModeledOrRefused} says so at `tsc` level, which is
+ * why the second filter needs neither a cast nor a fallback.
+ * @type {(declaredKinds: readonly Kind[]) => ScopeOutcome}
+ */
+export const classifyScope = declaredKinds => {
+    const declaredAndNotModeled = declaredKinds.filter(kind => !modeledKindNames.includes(kind))
+    if (declaredAndNotModeled.length === 0) {
+        return { kind: 'ok' }
+    }
+    return scopeRefusal(
+        unmodeledKindRefusals
+            .map(r => r.kind)
+            .filter(kind => declaredAndNotModeled.includes(kind)),
+    )
+}
+
 // ── Tests ────────────────────────────────────────────────────────────────────
 
 /**
@@ -236,6 +341,25 @@ const expectedModeledKindCount = 6
  * @type {number}
  */
 const expectedUnmodeledKindCount = 44
+
+/**
+ * The complete refusal message for a return declaring exactly
+ * `socialSecurityBenefits` — hand-typed here, character for character, from
+ * the fields the refusal table carries rather than produced by running
+ * {@link scopeRefusal} and pasting what came out.
+ *
+ * It is the strongest single statement of two properties at once. It pins the
+ * message FORMAT, so the line, the label and the remedy cannot silently swap
+ * places or be dropped; and it pins T-10-07-04, the information-disclosure
+ * disposition — the refusal a user sees is exactly this compiled-in sentence,
+ * with no room for a taxpayer amount, name or document hash to ride along.
+ * @type {string}
+ */
+const expectedSocialSecurityRefusalMessage
+    = 'scope refusal: this return declares 1 kind(s) this engine does not model, '
+    + 'so no Form 1040 is produced; socialSecurityBenefits at 1040 lines 6a/6b '
+    + '(social security benefits): requires vnd.fjs.ssa1099 and the Social '
+    + 'Security Benefits Worksheet (TAX-10, Phase 13)'
 
 export const proof = {
     partition: {
@@ -311,6 +435,215 @@ export const proof = {
                     )
                     return position
                 }, -1)
+        },
+    },
+    scope: {
+        // Declaring nothing is IN SCOPE. This is the leaf that keeps the guard
+        // from degenerating into "refuse anything unusual": a return with no
+        // declared kinds computes a 1040 of zeros, it does not refuse.
+        emptyDeclarationIsInScope: () => {
+            const outcome = classifyScope([])
+            assertEq(outcome.kind, 'ok', ['declaring nothing must be in scope', outcome])
+        },
+        // The six modeled kinds, hand-typed rather than read from
+        // `modeledKinds`, so this leaf states independently what the engine
+        // claims to be able to compute.
+        allSixModeledKindsDeclaredTogetherAreInScope: () => {
+            const outcome = classifyScope([
+                'wages',
+                'taxExemptInterest',
+                'taxableInterest',
+                'federalTaxWithheldOnW2',
+                'federalTaxWithheldOn1099Int',
+                'estimatedTaxPayments',
+            ])
+            assertEq(outcome.kind, 'ok', ['the six modeled kinds must be in scope', outcome])
+        },
+        // The gate. Its control is the leaf immediately below, which is this
+        // same declaration with `socialSecurityBenefits` removed -- without it,
+        // a guard that refused EVERY profile would pass this leaf.
+        //
+        // Content, not merely refusal (AGENTS.md, and Phase 9's sweep, which
+        // found several assertions checking THAT a refusal happened rather than
+        // what it said): the structured `unmodeled` field is asserted element
+        // by element, and the line, the label and the remedy are three separate
+        // `includes` calls so a failure names which part went missing.
+        socialSecurityBenefitsRefusesNamingItsLineLabelAndRemedy: () => {
+            const outcome = classifyScope(['wages', 'taxableInterest', 'socialSecurityBenefits'])
+            assert(
+                outcome.kind === 'error',
+                ['a declared unmodeled kind must refuse the whole return', outcome],
+            )
+            assertEq(outcome.unmodeled.length, 1, ['expected exactly one unmodeled kind', outcome.unmodeled])
+            assertEq(outcome.unmodeled[0], 'socialSecurityBenefits', ['expected the declared kind named', outcome.unmodeled])
+            assert(
+                outcome.message.includes('1040 lines 6a/6b'),
+                ['expected the refusal to name the 1040 line', outcome.message],
+            )
+            assert(
+                outcome.message.includes('social security benefits'),
+                ['expected the refusal to name the human label', outcome.message],
+            )
+            assert(
+                outcome.message.includes('vnd.fjs.ssa1099'),
+                ['expected the refusal to name the remedy', outcome.message],
+            )
+        },
+        // THE CONTROL for the leaf above: the same declaration minus the one
+        // unmodeled kind computes. A gate that refuses everything passes every
+        // refusal proof ever written and nothing else; this is what
+        // distinguishes this guard from that one.
+        controlTheSameDeclarationWithoutSocialSecurityBenefitsIsInScope: () => {
+            const outcome = classifyScope(['wages', 'taxableInterest'])
+            assertEq(outcome.kind, 'ok', ['the same profile minus the unmodeled kind must compute', outcome])
+        },
+        // The exact sentence, against a hand-typed expectation. See
+        // {@link expectedSocialSecurityRefusalMessage} for why a whole-message
+        // assertion earns its brittleness twice over.
+        theRefusalMessageIsExactlyTheHandTypedSentence: () => {
+            const outcome = classifyScope(['socialSecurityBenefits'])
+            assert(outcome.kind === 'error', ['expected a refusal', outcome])
+            assertEq(
+                outcome.message,
+                expectedSocialSecurityRefusalMessage,
+                ['the refusal message must be exactly the hand-typed sentence', outcome.message],
+            )
+        },
+        // The declared profile this phase was written for: 65+, with
+        // dependents. `10-RESEARCH.md` records that this profile makes two
+        // refusals unavoidable -- Schedule 1-A's senior deduction (line 13b)
+        // and Schedule 8812 (line 19) -- and ROADMAP.md accepts loud refusals
+        // rather than a computed return. BOTH must be named: a guard that
+        // reported only the first would still ship a return missing a line.
+        //
+        // Deliberately asserts lines and labels but NOT remedies, so that
+        // dropping the remedy term from the message localizes to the one leaf
+        // above that does assert it.
+        theSixtyFivePlusProfileRefusesNamingBothUnmodeledKinds: () => {
+            const outcome = classifyScope([
+                'wages',
+                'taxableInterest',
+                'seniorAndOtherScheduleOneADeductions',
+                'childTaxCreditOrOtherDependents',
+            ])
+            assert(outcome.kind === 'error', ['the 65+ profile must refuse', outcome])
+            assertEq(outcome.unmodeled.length, 2, ['expected both unmodeled kinds', outcome.unmodeled])
+            assertEq(outcome.unmodeled[0], 'seniorAndOtherScheduleOneADeductions', ['expected line 13b named first', outcome.unmodeled])
+            assertEq(outcome.unmodeled[1], 'childTaxCreditOrOtherDependents', ['expected line 19 named second', outcome.unmodeled])
+            assert(
+                outcome.message.includes('1040 line 13b'),
+                ['expected Schedule 1-A\'s line named', outcome.message],
+            )
+            assert(
+                outcome.message.includes('1040 line 19'),
+                ['expected Schedule 8812\'s line named', outcome.message],
+            )
+        },
+        // THE CONTROL for the 65+ gate: the same declaration with those two
+        // kinds removed computes.
+        controlTheSixtyFivePlusProfileWithoutThoseTwoKindsIsInScope: () => {
+            const outcome = classifyScope(['wages', 'taxableInterest'])
+            assertEq(outcome.kind, 'ok', ['dropping the two unmodeled kinds must compute', outcome])
+        },
+        // `unmodeled` is ordered by 1040 form order, not by declaration order,
+        // so the refusal two taxpayers see for the same two kinds is the same
+        // sentence. The expected order is hand-typed; the two messages are then
+        // compared to each other, which is what actually pins the stability.
+        unmodeledFollowsFormOrderNotDeclarationOrder: () => {
+            const declaredOneWay = classifyScope([
+                'childTaxCreditOrOtherDependents',
+                'seniorAndOtherScheduleOneADeductions',
+            ])
+            const declaredTheOther = classifyScope([
+                'seniorAndOtherScheduleOneADeductions',
+                'childTaxCreditOrOtherDependents',
+            ])
+            assert(declaredOneWay.kind === 'error', ['expected a refusal', declaredOneWay])
+            assert(declaredTheOther.kind === 'error', ['expected a refusal', declaredTheOther])
+            assertEq(
+                declaredOneWay.unmodeled.join(','),
+                'seniorAndOtherScheduleOneADeductions,childTaxCreditOrOtherDependents',
+                ['expected 1040 form order, not declaration order', declaredOneWay.unmodeled],
+            )
+            assertEq(
+                declaredOneWay.message,
+                declaredTheOther.message,
+                ['the same declared kinds must produce the same message', declaredOneWay.message, declaredTheOther.message],
+            )
+        },
+        // Every one of the forty-four refuses on its own, naming its own line
+        // and label -- so no entry can be present in the table yet unreachable
+        // through the guard.
+        //
+        // This loop iterates the code under test, which by itself could never
+        // notice the table SHRINKING: an entry deleted disappears from the loop
+        // in the same instant (the project's fourth signature defect, found
+        // this phase in a proof looping `Object.keys(dialectSchemas)`). Two
+        // things stand behind it, both independent of this table:
+        // `unmodeledRefusalsIsExactlyFortyFour`'s hand-typed count, and
+        // `_EveryKindIsEitherModeledOrRefused`, which makes a deletion a `tsc`
+        // failure. What the loop adds is reachability, which neither of those
+        // can see; the CONTENT of two entries is pinned by the hand-typed
+        // leaves above.
+        everyUnmodeledKindRefusesNamingItsOwnLineAndLabel: () => {
+            for (const r of unmodeledKindRefusals) {
+                const outcome = classifyScope([r.kind])
+                assert(outcome.kind === 'error', ['expected this kind to be refused', r.kind, outcome])
+                assertEq(outcome.unmodeled.length, 1, ['expected exactly this kind named', r.kind, outcome.unmodeled])
+                assertEq(outcome.unmodeled[0], r.kind, ['expected exactly this kind named', r.kind, outcome.unmodeled])
+                assert(
+                    outcome.message.includes(r.line),
+                    ['expected the refusal to name this kind\'s 1040 line', r.kind, outcome.message],
+                )
+                assert(
+                    outcome.message.includes(r.label),
+                    ['expected the refusal to name this kind\'s label', r.kind, outcome.message],
+                )
+            }
+        },
+        // The distinction the whole return-profile document exists to carry. A
+        // return declaring only wages is IN SCOPE even though the engine will
+        // report zero for interest, dividends, pensions and everything else --
+        // those lines are legitimately zero, not unmodeled. Nothing about the
+        // CAS store is consulted to tell the two apart; only the declared set
+        // can, which is why a store-driven guard was unsound (Decision 4).
+        deliberateOmissionIsNotARefusal: () => {
+            const outcome = classifyScope(['wages'])
+            assertEq(outcome.kind, 'ok', ['a legitimately empty line is not a refusal', outcome])
+        },
+        // AGENTS.md: refusals in this codebase are BARE VALUES. A consumer
+        // branching on an `Error` instance would miss every one of them, so
+        // this pins the shape the consumers in Plans 10-08 and 10-10 may rely
+        // on: a plain object, a string message, a real array.
+        refusalIsABareValueShapeNotAnError: () => {
+            const outcome = classifyScope(['socialSecurityBenefits'])
+            assert(outcome.kind === 'error', ['expected a refusal', outcome])
+            assertEq(typeof outcome.message, 'string', ['message must be a string', outcome])
+            assert(Array.isArray(outcome.unmodeled), ['unmodeled must be an array', outcome])
+            assert(
+                !(outcome instanceof Error),
+                ['a scope refusal is a bare value, never an Error instance', outcome],
+            )
+        },
+        // A refusal naming nothing IS the silent partial return this module
+        // exists to prevent, so building one throws -- and the thrown value's
+        // CONTENT is asserted, not merely that something was thrown: a bare
+        // `throw:` leaf would pass for any failure, including one raised before
+        // this code was reached.
+        refusalNamingNothingIsItselfRefused: () => {
+            let threw = false
+            try {
+                scopeRefusal([])
+            } catch (e) {
+                threw = true
+                assert(typeof e === 'string' || Array.isArray(e), ['expected a bare thrown value, not an Error', e])
+                const message = typeof e === 'string' ? e : Array.isArray(e) ? e.join(' ') : ''
+                assert(
+                    message.includes('must name at least one unmodeled kind'),
+                    ['expected the thrown value to say what was missing', e],
+                )
+            }
+            assert(threw, 'expected scopeRefusal to refuse building a refusal that names nothing')
         },
     },
 }
