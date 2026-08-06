@@ -1,8 +1,8 @@
 /**
- * Form 1040 lines 1a through 15 (TAX-05, first half): income, adjusted gross
- * income, the standard deduction, and taxable income — every line a
- * {@link ReportLine} citing the documents it derived from (ROADMAP criterion
- * 1).
+ * Form 1040 lines 1a through 37 (TAX-05): income, adjusted gross income, the
+ * standard deduction, taxable income, the tax itself, credits, payments, and
+ * the refund or amount owed — every line a {@link ReportLine} citing the
+ * documents it derived from (ROADMAP criterion 1).
  *
  * ## The property that makes this honest rather than decorative
  *
@@ -32,11 +32,21 @@
  * PROV-01's guarantee — but `tsc` cannot see that through `Array.prototype`,
  * which is why {@link unionSources} ends in an `assert` rather than a cast.
  *
+ * ## Line 16 is never bracket arithmetic
+ *
+ * TAX-03 exists because the obvious implementation — run the taxable income
+ * through the marginal brackets — is wrong for every return the printed Tax
+ * Table covers, by up to a few dollars per return, and wrong SILENTLY. Line 16
+ * here is whatever `fjs/tax/line16`'s four-way dispatcher returns, and the
+ * report carries the selected method out with it, so a caller can assert which
+ * branch produced the number rather than re-deriving it and hoping.
+ *
  * @module
  */
 import { assert, assertEq, assertNotNullish } from 'functionalscript/fjs/asserts/module.f.js'
 import { centsFromString } from '../../exact/module.f.js'
 import { applyWholeDollarElection } from '../../report/line/module.f.js'
+import { dispatchLine16 } from '../../tax/line16/module.f.js'
 import { dialect as w2Dialect } from '../../document/w2/module.f.js'
 import { dialect as oneZeroNineNineIntDialect } from '../../document/1099int/module.f.js'
 import {
@@ -51,6 +61,8 @@ import { individualFilingStatuses, taxParamsByYear } from '../../tax/params/modu
 /** @import { OneZeroNineNineInt } from '../../document/1099int/module.f.js' */
 /** @import { ReturnProfile } from '../../return/profile/module.f.js' */
 /** @import { IndividualFilingStatus, TaxParamSet } from '../../tax/params/module.f.js' */
+/** @import { Line16Method } from '../../tax/line16/module.f.js' */
+/** @import { UnmodeledKind } from '../../return/scope/module.f.js' */
 
 // ── Inputs ───────────────────────────────────────────────────────────────────
 
@@ -497,6 +509,361 @@ export const form1040IncomeLines = taxParamSet => inputs => {
     }
 }
 
+// ── Lines 16 through 37 ──────────────────────────────────────────────────────
+
+/**
+ * Form 1040 lines 16 through 37, each a {@link ReportLine}, keyed by the
+ * printed line label — the tax, the credits, the payments, and the refund or
+ * amount owed that closes the return.
+ *
+ * The same record-not-array reasoning as {@link Form1040IncomeLines}, and the
+ * same printed-label naming (TAX-15), so page 2 of the form face can be
+ * diffed against this list.
+ * @typedef {{
+ *   readonly line16: ReportLine,
+ *   readonly line17: ReportLine,
+ *   readonly line18: ReportLine,
+ *   readonly line19: ReportLine,
+ *   readonly line20: ReportLine,
+ *   readonly line21: ReportLine,
+ *   readonly line22: ReportLine,
+ *   readonly line23: ReportLine,
+ *   readonly line24: ReportLine,
+ *   readonly line25a: ReportLine,
+ *   readonly line25b: ReportLine,
+ *   readonly line25c: ReportLine,
+ *   readonly line25d: ReportLine,
+ *   readonly line26: ReportLine,
+ *   readonly line27a: ReportLine,
+ *   readonly line28: ReportLine,
+ *   readonly line29: ReportLine,
+ *   readonly line30: ReportLine,
+ *   readonly line31: ReportLine,
+ *   readonly line32: ReportLine,
+ *   readonly line33: ReportLine,
+ *   readonly line34: ReportLine,
+ *   readonly line35a: ReportLine,
+ *   readonly line36: ReportLine,
+ *   readonly line37: ReportLine,
+ * }} Form1040TaxAndPaymentLines
+ */
+
+/**
+ * The WHOLE return, as one outcome — 10-CONTEXT.md Decision 2.
+ *
+ * An unmodeled declared input makes the entire report an error result naming
+ * what is unmodeled, and **the error arm carries no `lines` field at all**. A
+ * caller cannot accidentally render a partial 1040, because there is nothing
+ * to render — which is strictly stronger than returning an empty array, and it
+ * is a property `tsc` enforces rather than a convention a later edit could
+ * quietly drop.
+ *
+ * The discriminated `kind` is `fjs/report/guard`'s `RunOutcome` shape and
+ * `fjs/return/scope`'s `ScopeOutcome` shape, deliberately: one refusal
+ * vocabulary for the whole engine, not a third parallel one.
+ *
+ * `line16Method` rides on the `ok` arm because a report that states a tax
+ * without stating HOW it was figured cannot be checked. Two of line 16's four
+ * methods produce the same cents on a return with no preferential income, so
+ * the number alone cannot say which engine ran.
+ * @typedef {{
+ *   readonly kind: 'ok',
+ *   readonly lines: readonly ReportLine[],
+ *   readonly line16Method: Line16Method,
+ * } | {
+ *   readonly kind: 'error',
+ *   readonly message: string,
+ *   readonly unmodeled: readonly UnmodeledKind[],
+ * }} Form1040Outcome
+ */
+
+/**
+ * The ERROR member of {@link Form1040Outcome}, extracted so the functions that
+ * can only refuse can say exactly that in their own return type — the same
+ * device, and the same reason, as `fjs/return/scope`'s `ScopeError`.
+ * @typedef {Extract<Form1040Outcome, { readonly kind: 'error' }>} Form1040Error
+ */
+
+/**
+ * The printed NAME of each line-16 method, for line 16's `rule` string.
+ *
+ * A `Record` over the method union rather than a lookup with a fallback: the
+ * keys are the union's own members, so a method added to `fjs/tax/line16`
+ * without a name here stops the build at `tsc`. There is deliberately no
+ * default string — a default is how a new branch would ship reported as
+ * something it is not.
+ * @type {Record<Line16Method, string>}
+ */
+const line16MethodNames = {
+    taxTable: 'Tax Table',
+    taxComputationWorksheet: 'Tax Computation Worksheet',
+    qdcgt: 'Qualified Dividends and Capital Gain Tax Worksheet',
+    scheduleDTaxWorksheet: 'Schedule D Tax Worksheet',
+    foreignEarnedIncomeTaxWorksheet: 'Foreign Earned Income Tax Worksheet',
+    form8615: 'Form 8615',
+    scheduleJ: 'Schedule J',
+}
+
+/**
+ * Line 22 — the tax on line 18 less the nonrefundable credits on line 21,
+ * `max(18 - 21, 0n)`. The printed form says "If zero or less, enter -0-", so
+ * the floor is the form's own instruction, not a defensive clamp.
+ *
+ * **Why line 22 is a named function while lines 34 and 37 are written inline.**
+ * The floor is UNREACHABLE through a whole report in this phase, and that is a
+ * property of the scope guard rather than of this line: line 21 is `19 + 20`,
+ * both of which are profile-declared zeros, because a return declaring
+ * `childTaxCreditOrOtherDependents` (line 19) or
+ * `scheduleThreeNonrefundableCredits` (line 20) is refused whole. So line 21
+ * is always `0n` here and `18 - 21` can never go negative — a neighbouring
+ * rule ABSORBS the floor exactly the way `fjs/tax/line16/qdcgt`'s line 3 guard
+ * is absorbed by the `min` below it (AGENTS.md, "the equivalent mutant"). A
+ * proof driven only through the report could therefore never watch this floor
+ * work, and deleting it would leave the suite green. Naming the rule puts it
+ * in one place a proof can call directly, which is what
+ * `line22.creditsExceedingTaxFloorAtZero` does. Phase 13's Schedule 8812 and
+ * Schedule 3 are what make it reachable end to end.
+ * @type {(line18: ReportLine) => (line21: ReportLine) => ReportLine}
+ */
+const line22TaxLessNonrefundableCredits = line18 => line21 => {
+    const difference = line18.value - line21.value
+    return {
+        value: difference > 0n ? difference : 0n,
+        sources: unionSources([line18, line21]),
+        rule: '1040 line 22',
+    }
+}
+
+/**
+ * One of the return profile's own money boxes as a {@link BoxSum} — present
+ * means one citation at that box carrying the box's raw decimal string;
+ * ABSENT means no reading at all.
+ *
+ * DOC-11 governs the absent case: an absent box is absent, never a stored
+ * `'0.00'`. Emitting a citation quoting `'0.00'` at a box the taxpayer left
+ * blank would put a value in the report's provenance that no document
+ * contains. {@link documentLine} turns the no-reading case into a
+ * profile-declared zero instead, so the line still cites the profile — the
+ * same document, a different box, and an honest one.
+ * @type {(profile: Stored<ReturnProfile>) => (boxPath: 'line26EstimatedTaxPayments' | 'line35aRefundRequested' | 'line36AppliedToNextYear') => BoxSum}
+ */
+const profileMoneyBox = profile => boxPath => {
+    const printed = profile.value[boxPath]
+    return printed === undefined
+        ? { value: 0n, sources: [] }
+        : {
+            value: centsFromString(printed),
+            sources: [{ documentHash: profile.documentHash, boxPath, value: printed }],
+        }
+}
+
+/**
+ * Form 1040 lines 16 through 37 for an in-scope return, given lines 1a-15.
+ *
+ * Refuses — as the WHOLE report's outcome, never as a line — when line 16's
+ * dispatcher refuses. See the comment at line 16 for why that arm is
+ * unreachable today and why it is not dead code.
+ * @type {(taxParamSet: TaxParamSet) => (inputs: Form1040Inputs) => (income: Form1040IncomeLines) => { readonly kind: 'ok', readonly tax: Form1040TaxAndPaymentLines, readonly line16Method: Line16Method } | Form1040Error}
+ */
+const form1040TaxAndPaymentLines = taxParamSet => inputs => income => {
+    const { profile, w2s, interestForms } = inputs
+    const declaredZero = profileDeclaredZeroLine(profile)
+    const fromDocuments = documentLine(profile)
+    const status = storedFilingStatusNamed(profile.value.filingStatus)
+    assert(
+        status !== undefined,
+        [
+            'the return profile carries a filing status this engine has no parameters for',
+            profile.value.filingStatus,
+        ],
+    )
+
+    // 16 — the tax. Every preferential input is zero and every wrapper form is
+    // absent, and that is not an assumption: each one is a declared kind the
+    // scope guard refuses the whole report for, so a return reaching here has
+    // none of them. The dispatcher still receives them as FACTS rather than a
+    // pre-decided method, because TAX-03's whole point is that the selection is
+    // made in one place from the printed conditions.
+    //
+    // WHAT LINE 16 DOES NOT INCLUDE. `[VERIFIED: i1040gi.pdf p34, "Line 16
+    // Tax"]` — line 16 is a SUM, not merely the dispatch result: "Include in
+    // the total on the entry space on line 16 all of the following taxes that
+    // apply." Its six add-ons — Forms 8814 and 4972, the section 962 election,
+    // an education-credit recapture, Form 8621 line 16e and Form 8978 line 14 —
+    // are each a declared kind that refuses the whole report (`fjs/return/scope`).
+    // An engine that models line 16 as "the dispatch result" and silently omits
+    // the add-ons is exactly TAX-16's failure mode: every line above 16 agrees
+    // with the taxpayer's own return, line 16 is quietly short, and nothing in
+    // the report says why. That is what those nine vocabulary entries are for.
+    const line16Outcome = dispatchLine16(taxParamSet)({
+        status,
+        taxableIncomeCents: income.line15.value,
+        qualifiedDividendsCents: 0n,
+        capitalGainDistributionsCents: 0n,
+        filingScheduleD: false,
+        scheduleD15Cents: 0n,
+        scheduleD16Cents: 0n,
+        scheduleD18Cents: 0n,
+        scheduleD19Cents: 0n,
+        filingForm4952: false,
+        form4952Line4gCents: 0n,
+        filingForm2555: false,
+        form8615Applies: false,
+        scheduleJElected: false,
+    })
+    // The refusing arm, returned as the WHOLE report's outcome (Decision 2).
+    //
+    // `tsc` is what forces this to be handled: `Line16Outcome` is a union and
+    // reading `.cents` without narrowing does not compile. It is UNREACHABLE
+    // today — every input that could select a refusing arm is a declared kind
+    // the scope guard already refuses — and it is deliberately not deleted as
+    // dead code. Phase 12 brings the brokerage documents that make Schedule D
+    // line 19 non-zero for a return that is otherwise in scope, and on that day
+    // this arm starts firing. The type is what keeps the intervening year
+    // honest: nobody can quietly turn line 16 into "the number" without
+    // deleting this branch on purpose.
+    if (line16Outcome.kind === 'error') {
+        return {
+            kind: 'error',
+            message: line16Outcome.message,
+            unmodeled: line16Outcome.unmodeled,
+        }
+    }
+    const line16 = {
+        value: line16Outcome.cents,
+        sources: unionSources([income.line15]),
+        rule: `1040 line 16 (${line16MethodNames[line16Outcome.method]})`,
+    }
+    const line17 = declaredZero('1040 line 17')  // Schedule 2, part I
+    const line18 = totalLine('1040 line 18')([line16, line17])
+    const line19 = declaredZero('1040 line 19')  // child tax credit, Schedule 8812
+    const line20 = declaredZero('1040 line 20')  // Schedule 3, part I
+    const line21 = totalLine('1040 line 21')([line19, line20])
+    const line22 = line22TaxLessNonrefundableCredits(line18)(line21)
+    const line23 = declaredZero('1040 line 23')  // other taxes, Schedule 2 part II
+    const line24 = totalLine('1040 line 24')([line22, line23])
+
+    // 25a/25b — federal income tax withheld, read off the forms themselves:
+    // W-2 box 2 and 1099-INT box 4. 25c is every other form, which no dialect
+    // models. 25d is the total the printed form adds.
+    const line25a = fromDocuments('1040 line 25a')(
+        sumBoxOverDocuments(w2s)('box2FederalIncomeTaxWithheld')(
+            w2 => w2.box2FederalIncomeTaxWithheld))
+    const line25b = fromDocuments('1040 line 25b')(
+        sumBoxOverDocuments(interestForms)('box4FederalIncomeTaxWithheld')(
+            form => form.box4FederalIncomeTaxWithheld))
+    const line25c = declaredZero('1040 line 25c')
+    const line25d = totalLine('1040 line 25d')([line25a, line25b, line25c])
+
+    // 26 — estimated tax payments, declared on the profile rather than read off
+    // a form: there is no IRS document for "I sent four cheques". The profile's
+    // own cross-field check refuses the amount unless `estimatedTaxPayments` is
+    // declared, so an amount here can never be an input the scope guard did not
+    // see.
+    const line26 = fromDocuments('1040 line 26')(
+        profileMoneyBox(profile)('line26EstimatedTaxPayments'))
+    const line27a = declaredZero('1040 line 27a') // earned income credit
+    const line28 = declaredZero('1040 line 28')   // additional child tax credit
+    const line29 = declaredZero('1040 line 29')   // American opportunity credit
+    const line30 = declaredZero('1040 line 30')   // refundable adoption credit
+    const line31 = declaredZero('1040 line 31')   // Schedule 3, part II
+    const line32 = totalLine('1040 line 32')([line27a, line28, line29, line30, line31])
+    const line33 = totalLine('1040 line 33')([line25d, line26, line32])
+
+    // 34 and 37 — the two directions of one comparison, and they are never both
+    // non-zero: when payments equal the tax exactly, both are `0n`. Written as
+    // the printed form writes them, one per line, rather than as one signed
+    // difference — the form has an overpayment line and an amount-owed line,
+    // and a report that put a negative number on either would not be a 1040.
+    const line34 = {
+        value: line33.value > line24.value ? line33.value - line24.value : 0n,
+        sources: unionSources([line33, line24]),
+        rule: '1040 line 34',
+    }
+    // 35a and 36 — how the taxpayer wants an overpayment split: refunded now,
+    // or applied to next year's estimated tax. Both are declarations, so both
+    // come off the profile.
+    const line35a = fromDocuments('1040 line 35a')(
+        profileMoneyBox(profile)('line35aRefundRequested'))
+    const line36 = fromDocuments('1040 line 36')(
+        profileMoneyBox(profile)('line36AppliedToNextYear'))
+    const line37 = {
+        value: line24.value > line33.value ? line24.value - line33.value : 0n,
+        sources: unionSources([line24, line33]),
+        rule: '1040 line 37',
+    }
+
+    return {
+        kind: 'ok',
+        line16Method: line16Outcome.method,
+        tax: {
+            line16, line17, line18, line19, line20, line21, line22, line23, line24,
+            line25a, line25b, line25c, line25d,
+            line26,
+            line27a, line28, line29, line30, line31, line32, line33, line34,
+            line35a, line36,
+            line37,
+        },
+    }
+}
+
+/**
+ * The whole return as one flat list, in PRINTED ORDER — the shape a report
+ * renders and the shape the whole-dollar election is applied over.
+ *
+ * Enumerated rather than produced by walking the two records, because printed
+ * order is the property being asserted and an object's key order is not a
+ * thing worth resting a tax form on. A line present in a record but missing
+ * here is caught by {@link expectedWholeReportLineCount}.
+ * @type {(income: Form1040IncomeLines) => (tax: Form1040TaxAndPaymentLines) => readonly ReportLine[]}
+ */
+const orderedLines = income => tax => [
+    income.line1a, income.line1b, income.line1c, income.line1d, income.line1e,
+    income.line1f, income.line1g, income.line1h, income.line1i, income.line1z,
+    income.line2a, income.line2b,
+    income.line3a, income.line3b,
+    income.line4a, income.line4b,
+    income.line5a, income.line5b,
+    income.line6a, income.line6b,
+    income.line7a,
+    income.line8,
+    income.line9,
+    income.line10,
+    income.line11a, income.line11b,
+    income.line12e,
+    income.line13a, income.line13b,
+    income.line14,
+    income.line15,
+    tax.line16, tax.line17, tax.line18, tax.line19, tax.line20, tax.line21,
+    tax.line22, tax.line23, tax.line24,
+    tax.line25a, tax.line25b, tax.line25c, tax.line25d,
+    tax.line26,
+    tax.line27a, tax.line28, tax.line29, tax.line30, tax.line31,
+    tax.line32, tax.line33, tax.line34,
+    tax.line35a, tax.line36,
+    tax.line37,
+]
+
+/**
+ * Lines 1a through 37 for a return **already known to be in scope** — no scope
+ * guard here. `form1040Report` is the entry point that runs the guard first;
+ * this is the computation it guards, kept separate so the guard's ordering is
+ * visible at one call site rather than buried inside the arithmetic.
+ * @type {(taxParamSet: TaxParamSet) => (inputs: Form1040Inputs) => Form1040Outcome}
+ */
+const computeForm1040 = taxParamSet => inputs => {
+    const income = form1040IncomeLines(taxParamSet)(inputs)
+    const rest = form1040TaxAndPaymentLines(taxParamSet)(inputs)(income)
+    if (rest.kind === 'error') {
+        return rest
+    }
+    return {
+        kind: 'ok',
+        lines: orderedLines(income)(rest.tax),
+        line16Method: rest.line16Method,
+    }
+}
+
 // ── Tests ────────────────────────────────────────────────────────────────────
 
 /**
@@ -523,7 +890,28 @@ assert(taxParams2025 !== undefined, 'expected TY2025 parameters to be present in
  * `expectedMoneyBoxFieldCount` idiom.
  * @type {number}
  */
-const expectedLineCount = 31
+const expectedIncomeLineCount = 31
+
+/**
+ * Independently HAND-TYPED: the number of printed money lines the WHOLE report
+ * emits, 1a through 37.
+ *
+ * Counted off the form face, in two groups so the arithmetic is checkable
+ * without re-reading the code: lines 1a-15 are the 31 of
+ * {@link expectedIncomeLineCount}, and lines 16-37 add 25 — 16, 17, 18, 19,
+ * 20, 21, 22, 23, 24 (9), 25a, 25b, 25c, 25d (4), 26 (1), 27a, 28, 29, 30, 31
+ * (5), 32, 33, 34 (3), 35a, 36 (2), 37 (1). `31 + 25 = 56`.
+ *
+ * Lines 12a-12d and 7b are NOT money lines — they are checkboxes, carried on
+ * the return profile — and line 38 (the estimated tax penalty) is outside
+ * "1a-37". Neither is counted.
+ *
+ * Written out rather than derived from `orderedLines(...).length`, for the
+ * reason on {@link expectedIncomeLineCount}: a count read from the code under
+ * test moves with it and can never fail.
+ * @type {number}
+ */
+const expectedWholeReportLineCount = 56
 
 /** The profile document every fixture below is built on: a single filer. */
 const profileHash = 'sha256-profile-01'
@@ -572,11 +960,27 @@ const w2Document = documentHash => box1WagesTipsOtherCompensation => ({
 })
 
 /**
- * The 1099-INT money boxes lines 2a and 2b read. A box the fixture OMITS is
- * absent in the DOC-11 sense — the point of the absent-box leaf.
+ * A W-2 that also carries box 2 withholding, built ON TOP of
+ * {@link w2Document} rather than beside it, so the two fixtures cannot drift
+ * in their identity fields.
+ * @type {(documentHash: string) => (box1WagesTipsOtherCompensation: string) => (box2FederalIncomeTaxWithheld: string) => Stored<W2>}
+ */
+const w2WithWithholding = documentHash => box1WagesTipsOtherCompensation =>
+    box2FederalIncomeTaxWithheld => {
+        const withoutWithholding = w2Document(documentHash)(box1WagesTipsOtherCompensation)
+        return {
+            ...withoutWithholding,
+            value: { ...withoutWithholding.value, box2FederalIncomeTaxWithheld },
+        }
+    }
+
+/**
+ * The 1099-INT money boxes lines 2a, 2b and 25b read. A box the fixture OMITS
+ * is absent in the DOC-11 sense — the point of the absent-box leaf.
  * @typedef {{
  *   readonly box1InterestIncome?: string,
  *   readonly box3UsSavingsBondsAndTreasuryInterest?: string,
+ *   readonly box4FederalIncomeTaxWithheld?: string,
  *   readonly box8TaxExemptInterest?: string,
  * }} InterestBoxes
  */
@@ -677,6 +1081,62 @@ const tenInterestDocumentsAtOneThirtyNine = [
  */
 const linesForProfile = value => form1040IncomeLines(taxParams2025)(
     inputsOf(storedProfile(value))([])([]))
+
+/**
+ * A married-filing-jointly filer with no checked boxes, declaring the same two
+ * kinds as {@link singleProfile}. The status the IRS's own printed Tax Table
+ * Example uses ("Mr. and Mrs. Brown are filing a joint return").
+ * @type {ReturnProfile}
+ */
+const marriedFilingJointlyProfile = {
+    ...singleProfile,
+    filingStatus: 'marriedFilingJointly',
+}
+
+/**
+ * The same joint filer, additionally declaring the two withholding kinds this
+ * engine models. Withholding read off a form the taxpayer did not declare
+ * would be an input the scope guard never saw, so the declaration is part of
+ * the fixture rather than an afterthought.
+ * @type {ReturnProfile}
+ */
+const withholdingProfile = {
+    ...marriedFilingJointlyProfile,
+    declaredKinds: [
+        'wages',
+        'taxableInterest',
+        'federalTaxWithheldOnW2',
+        'federalTaxWithheldOn1099Int',
+    ],
+}
+
+/**
+ * Runs the WHOLE line assembly — 1a-15 and then 16-37 — and hands back both
+ * records plus the selected line-16 method, asserting that the return
+ * computed.
+ *
+ * Test-only, and it builds no expected value: every number a leaf asserts is
+ * hand-typed at the assertion.
+ * @type {(inputs: Form1040Inputs) => { readonly income: Form1040IncomeLines, readonly tax: Form1040TaxAndPaymentLines, readonly line16Method: Line16Method }}
+ */
+const computedLines = inputs => {
+    const income = form1040IncomeLines(taxParams2025)(inputs)
+    const rest = form1040TaxAndPaymentLines(taxParams2025)(inputs)(income)
+    assert(rest.kind === 'ok', ['expected this return to compute lines 16-37', rest])
+    return { income, tax: rest.tax, line16Method: rest.line16Method }
+}
+
+/**
+ * A test-only {@link ReportLine} for the line-22 floor leaves — the one rule
+ * in this module a whole report cannot reach (see
+ * {@link line22TaxLessNonrefundableCredits}). Builds INPUTS only.
+ * @type {(value: bigint) => (rule: string) => ReportLine}
+ */
+const flooringTestLine = value => rule => ({
+    value,
+    sources: [{ documentHash: profileHash, boxPath: 'declaredKinds', value: '[]' }],
+    rule,
+})
 
 /**
  * A test-only {@link Source}, so the {@link unionSources} leaves can be read
@@ -973,6 +1433,255 @@ export const proof = {
             assert(lines.line15.value >= 0n, ['taxable income must never be negative', lines.line15.value])
         },
     },
+    line16: {
+        // The IRS's OWN printed Tax Table Example (i1040gi p68: "Mr. and Mrs.
+        // Brown are filing a joint return. Their taxable income is $25,300"),
+        // reached THROUGH the whole line assembly rather than by handing the
+        // dispatcher a number: $56,800.00 of wages less the $31,500.00 joint
+        // standard deduction is $25,300.00 of taxable income, and the printed
+        // answer is $2,562.00. Every one of those four figures is hand-typed.
+        //
+        // The METHOD is asserted as well as the cents, and it is the load-
+        // bearing half. Bracket arithmetic on the same $25,300.00 gives
+        // $2,559.00 — three dollars low, silently — and the QDCGT would give
+        // the same $2,562.00 by a different route on a return with no
+        // preferential income. Only the tag says which engine ran.
+        marriedFilingJointlyTwentyFiveThreeHundredIsThePrintedTaxTableExample: () => {
+            const { income, tax, line16Method } = computedLines(
+                inputsOf(storedProfile(marriedFilingJointlyProfile))([
+                    w2Document('sha256-w2-01')('56800.00'),
+                ])([]))
+            assertEq(income.line14.value, 3150000n, 'the joint standard deduction, $31,500.00')
+            assertEq(income.line15.value, 2530000n, 'taxable income of $25,300.00')
+            assertEq(tax.line16.value, 256200n, 'the printed Tax Table Example\'s own answer, $2,562.00')
+            assertEq(line16Method, 'taxTable', 'the printed default below $100,000')
+            // The rule string names the method too, so a rendered report says
+            // which branch produced the number without a second lookup.
+            assertEq(tax.line16.rule, '1040 line 16 (Tax Table)')
+            // Line 16 cites everything line 15 cited: the wage box and the
+            // profile boxes the deduction came from.
+            assertEq(tax.line16.sources.length, income.line15.sources.length)
+            // 18 = 16 + 17, 21 = 19 + 20, 22 = 18 - 21, 24 = 22 + 23. With
+            // every credit and additional tax a declared zero, the tax carries
+            // through unchanged — which is the property that makes a wrong
+            // line 16 a wrong line 24.
+            assertEq(tax.line18.value, 256200n)
+            assertEq(tax.line21.value, 0n)
+            assertEq(tax.line22.value, 256200n)
+            assertEq(tax.line24.value, 256200n)
+        },
+        // The $100,000 seam, reached through the report: $115,750.00 of wages
+        // less the $15,750.00 single standard deduction is exactly $100,000.00
+        // of taxable income, where the Tax Table stops and the Tax Computation
+        // Worksheet takes over. $16,914.00 is Section A's first printed
+        // worksheet row (i1040gi p80, 22% x 100,000.00 - 5,086.00), hand-typed.
+        singleAtOneHundredThousandSelectsTheTaxComputationWorksheet: () => {
+            const { income, tax, line16Method } = computedLines(
+                inputsOf(storedProfile(singleProfile))([
+                    w2Document('sha256-w2-01')('115750.00'),
+                ])([]))
+            assertEq(income.line15.value, 10000000n, 'taxable income of exactly $100,000.00')
+            assertEq(tax.line16.value, 1691400n, 'Section A\'s first printed worksheet row, $16,914.00')
+            assertEq(line16Method, 'taxComputationWorksheet')
+            assertEq(tax.line16.rule, '1040 line 16 (Tax Computation Worksheet)')
+        },
+    },
+    line22: {
+        // The printed floor, at the one place a proof can reach it. Line 21 is
+        // `19 + 20` and both are profile-declared zeros in this phase, so no
+        // whole report can drive line 21 above line 18 — see
+        // {@link line22TaxLessNonrefundableCredits} for why that makes the
+        // floor an equivalent mutant when driven through the report alone.
+        //
+        // $1,000.00 of tax against $1,500.00 of nonrefundable credits is -$500
+        // before the floor, and the 1040 has no space for that.
+        creditsExceedingTaxFloorAtZeroNeverNegative: () => {
+            const line22 = line22TaxLessNonrefundableCredits(
+                flooringTestLine(100000n)('1040 line 18'))(
+                flooringTestLine(150000n)('1040 line 21'))
+            assertEq(line22.value, 0n)
+            assert(line22.value >= 0n, ['line 22 must never be negative', line22.value])
+            assertEq(line22.rule, '1040 line 22')
+        },
+        // THE CONTROL for the leaf above: when the tax exceeds the credits the
+        // difference passes through untouched. Without it, a line 22 that
+        // returned `0n` for every return would pass the floor leaf and nothing
+        // else — $1,500.00 of tax less $1,000.00 of credits is $500.00.
+        controlTaxExceedingCreditsPassesTheDifferenceThrough: () => {
+            const line22 = line22TaxLessNonrefundableCredits(
+                flooringTestLine(150000n)('1040 line 18'))(
+                flooringTestLine(100000n)('1040 line 21'))
+            assertEq(line22.value, 50000n)
+        },
+    },
+    withholding: {
+        // 25a is W-2 box 2 over every W-2; 25b is 1099-INT box 4 over every
+        // 1099-INT; 25d is their total with 25c. $5,000 + $2,500 = $7,500.00
+        // withheld on wages, $10.00 on interest, $7,510.00 in total — all
+        // hand-typed.
+        //
+        // The SOURCE COUNT is asserted alongside every value, and it is the
+        // half that sees a dropped term: 25d citing three boxes instead of
+        // four is a line that quietly stopped counting one of the taxpayer's
+        // forms. Four = two W-2 box-2 citations, one 1099-INT box-4 citation,
+        // and the profile's `declaredKinds` box behind the legitimately zero
+        // line 25c.
+        twentyFiveDSumsTwentyFiveAAndTwentyFiveBCitingEveryBox: () => {
+            const { tax } = computedLines(inputsOf(storedProfile(withholdingProfile))([
+                w2WithWithholding('sha256-w2-01')('50000.00')('5000.00'),
+                w2WithWithholding('sha256-w2-02')('25000.00')('2500.00'),
+            ])([
+                interestDocument('sha256-int-01')({
+                    box1InterestIncome: '100.00',
+                    box4FederalIncomeTaxWithheld: '10.00',
+                }),
+            ]))
+            assertEq(tax.line25a.value, 750000n, '$7,500.00 withheld on wages')
+            assertEq(tax.line25a.sources.length, 2)
+            const [firstW2Source] = tax.line25a.sources
+            assertEq(firstW2Source.documentHash, 'sha256-w2-01')
+            assertEq(firstW2Source.boxPath, 'box2FederalIncomeTaxWithheld')
+            assertEq(firstW2Source.value, '5000.00')
+            assertEq(tax.line25b.value, 1000n, '$10.00 withheld on interest')
+            assertEq(tax.line25b.sources.length, 1)
+            const [interestSource] = tax.line25b.sources
+            assertEq(interestSource.boxPath, 'box4FederalIncomeTaxWithheld')
+            assertEq(tax.line25c.value, 0n)
+            assertEq(tax.line25d.value, 751000n, '$7,510.00 of total withholding')
+            assertEq(tax.line25d.sources.length, 4)
+            // 33 = 25d + 26 + 32, and with no estimated payments and no
+            // refundable credits it is the withholding total.
+            assertEq(tax.line33.value, 751000n)
+        },
+    },
+    refundOrAmountOwed: {
+        // Payments exceeding the tax are an OVERPAYMENT on line 34, and line
+        // 37 is zero. $3,000.00 withheld against the printed example's
+        // $2,562.00 of tax leaves $438.00 — hand-typed, not computed here from
+        // the other two.
+        //
+        // Its control is `taxExceedingPaymentsIsTheAmountOwedOnLineThirtySeven`
+        // below, the same return with the withholding removed: without it, a
+        // report that put every difference on line 34 would pass this leaf.
+        paymentsExceedingTaxAreAnOverpaymentOnLineThirtyFour: () => {
+            const { tax } = computedLines(inputsOf(storedProfile(withholdingProfile))([
+                w2WithWithholding('sha256-w2-01')('56800.00')('3000.00'),
+            ])([]))
+            assertEq(tax.line24.value, 256200n, 'the printed example\'s $2,562.00 of tax')
+            assertEq(tax.line33.value, 300000n, '$3,000.00 of total payments')
+            assertEq(tax.line34.value, 43800n, 'an overpayment of $438.00')
+            assertEq(tax.line37.value, 0n, 'nothing is owed when the return overpaid')
+        },
+        // THE CONTROL for the leaf above, and the mirror case: the SAME wages
+        // with nothing withheld owes the whole $2,562.00 on line 37, and line
+        // 34 is zero. A report that swapped the two directions turns both this
+        // leaf and its partner red, which is what says the pair is testing the
+        // direction rather than the subtraction.
+        taxExceedingPaymentsIsTheAmountOwedOnLineThirtySeven: () => {
+            const { tax } = computedLines(
+                inputsOf(storedProfile(marriedFilingJointlyProfile))([
+                    w2Document('sha256-w2-01')('56800.00'),
+                ])([]))
+            assertEq(tax.line24.value, 256200n)
+            assertEq(tax.line33.value, 0n, 'nothing was withheld and nothing was paid in')
+            assertEq(tax.line34.value, 0n, 'a return that underpaid has no overpayment')
+            assertEq(tax.line37.value, 256200n, '$2,562.00 owed')
+        },
+        // The seam between them: payments EXACTLY equal to the tax leave both
+        // lines zero. The two can never both be non-zero, and this is the one
+        // input where a `>=` written for a `>` on either line would show.
+        paymentsExactlyEqualToTaxLeaveBothLinesZero: () => {
+            const { tax } = computedLines(inputsOf(storedProfile(withholdingProfile))([
+                w2WithWithholding('sha256-w2-01')('56800.00')('2562.00'),
+            ])([]))
+            assertEq(tax.line24.value, 256200n)
+            assertEq(tax.line33.value, 256200n)
+            assertEq(tax.line34.value, 0n)
+            assertEq(tax.line37.value, 0n)
+        },
+    },
+    profileDeclaredAmounts: {
+        // Lines 26, 35a and 36 have no IRS form behind them — there is no
+        // document for "I sent four cheques" or "apply my refund to next
+        // year" — so they come off the return profile's own money boxes, each
+        // citing the box it was read from with the raw string as stored.
+        //
+        // A profile-only return: $1,234.56 of estimated payments against a
+        // return with no income at all, so line 24 is zero and the whole
+        // payment is an overpayment. Every figure hand-typed.
+        linesTwentySixThirtyFiveAAndThirtySixComeOffTheProfilesOwnBoxes: () => {
+            const { tax } = computedLines(inputsOf(storedProfile({
+                ...marriedFilingJointlyProfile,
+                declaredKinds: ['wages', 'taxableInterest', 'estimatedTaxPayments'],
+                line26EstimatedTaxPayments: '1234.56',
+                line35aRefundRequested: '1000.00',
+                line36AppliedToNextYear: '234.56',
+            }))([])([]))
+            assertEq(tax.line26.value, 123456n)
+            assertEq(tax.line26.sources.length, 1)
+            const [estimatedSource] = tax.line26.sources
+            assertEq(estimatedSource.documentHash, profileHash)
+            assertEq(estimatedSource.boxPath, 'line26EstimatedTaxPayments')
+            // The raw stored string, quoted exactly — never re-formatted.
+            assertEq(estimatedSource.value, '1234.56')
+            assertEq(tax.line33.value, 123456n)
+            assertEq(tax.line24.value, 0n, 'no income, no tax')
+            assertEq(tax.line34.value, 123456n, 'the whole payment is an overpayment')
+            assertEq(tax.line35a.value, 100000n, '$1,000.00 refunded now')
+            assertEq(tax.line36.value, 23456n, '$234.56 applied to next year')
+        },
+        // DOC-11 at the profile's own boxes, and the CONTROL for the leaf
+        // above: an ABSENT box is absent, never a stored `'0.00'`. The value
+        // cannot see the difference — both are zero — so the citation is the
+        // only observer, and an absent box cites the DECLARATION that makes
+        // the line zero rather than quoting a box that carries nothing.
+        anAbsentProfileMoneyBoxIsAZeroCitingTheDeclaration: () => {
+            const { tax } = computedLines(
+                inputsOf(storedProfile(singleProfile))([])([]))
+            assertEq(tax.line26.value, 0n)
+            assertEq(tax.line26.sources.length, 1)
+            const [only] = tax.line26.sources
+            assertEq(only.boxPath, 'declaredKinds')
+            assertEq(only.value, singleProfileDeclaredKindsRendering)
+            assertEq(tax.line35a.value, 0n)
+            assertEq(tax.line36.value, 0n)
+        },
+    },
+    wholeReport: {
+        // ROADMAP criterion 1 over the WHOLE return: all 56 printed money
+        // lines, 1a through 37, each citing at least one document and each
+        // naming the rule it implements.
+        //
+        // The loop's iteration set comes from the produced list — i.e. from
+        // the code under test — so on its own it could never notice a line
+        // disappearing. {@link expectedWholeReportLineCount} is the
+        // independently hand-typed count that closes it, and the DISTINCT rule
+        // count closes the other direction: a line duplicated into the list in
+        // place of another keeps the length at 56 and would otherwise pass.
+        everyOneOfTheFiftySixLinesCitesADocumentAndNamesItsRule: () => {
+            const outcome = computeForm1040(taxParams2025)(
+                inputsOf(storedProfile(singleProfile))([])([]))
+            assert(outcome.kind === 'ok', ['an in-scope return must compute', outcome])
+            assertEq(
+                outcome.lines.length,
+                expectedWholeReportLineCount,
+                ['expected exactly the independently-stated printed line count', outcome.lines.length],
+            )
+            assertEq(
+                new Set(outcome.lines.map(line => line.rule)).size,
+                expectedWholeReportLineCount,
+                ['every printed line must name its OWN rule', outcome.lines.map(line => line.rule)],
+            )
+            for (const line of outcome.lines) {
+                assert(
+                    line.sources.length > 0,
+                    ['a line with no citation is a silently omitted line', line.rule],
+                )
+                assert(line.rule !== '', 'a line must name the rule it implements')
+            }
+            assertEq(outcome.line16Method, 'taxTable', 'no taxable income is still a tagged method')
+        },
+    },
     // ROADMAP criterion 5, on a REAL line aggregating ten REAL documents.
     //
     // Criterion 5 as written is a tautology: over `bigint` cents `round(sum)`
@@ -1038,7 +1747,7 @@ export const proof = {
         const entries = Object.entries(lines)
         assertEq(
             entries.length,
-            expectedLineCount,
+            expectedIncomeLineCount,
             ['expected exactly the independently-stated printed line count', entries.length],
         )
         for (const [name, line] of entries) {
