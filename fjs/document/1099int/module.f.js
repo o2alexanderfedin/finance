@@ -173,6 +173,44 @@ const minimal = {
     formRevision: '2024',
 }
 
+/**
+ * T-09-08-02: a money box's name could be quietly dropped from
+ * {@link moneyBoxFields} without anyone noticing — the field stays
+ * `option(string)` structurally, so a comma-grouped or otherwise inexact
+ * amount in a dropped box would then validate as ok. One generated leaf per
+ * NAMED box supplies a comma-grouped value to that box alone and asserts
+ * `validate` refuses, built by mapping {@link moneyBoxFields} itself into
+ * `[field, assertion]` pairs (never as six hand-written near-identical
+ * leaves) — the same idiom `fjs/tax/boundary`'s generated threshold leaves
+ * use — so a box added to the list later is covered automatically.
+ *
+ * A box's own generated leaf disappears WITH it if the box is dropped from
+ * the list, so this alone cannot catch a removal — {@link
+ * expectedMoneyBoxFieldCount} below pairs it with an independently
+ * hand-typed count, exactly as `fjs/tax/boundary`'s `expectedThresholdCount`
+ * guards `allThresholds`. The duplication is the mechanism (AGENTS.md: "a
+ * proof's expected value must not be produced by the code under test").
+ * @type {{ readonly [field: string]: () => void }}
+ */
+const generatedMoneyBoxExactnessProof = Object.fromEntries(
+    moneyBoxFields.map(field => [
+        field,
+        () => {
+            const [t, v] = validate({ ...minimal, [field]: '1,234.56' })
+            assertEq(t, 'error', ['expected a comma-grouped amount in this box to be refused', field, t, v])
+        },
+    ]),
+)
+
+/**
+ * Independently hand-typed: the number of money boxes {@link moneyBoxFields}
+ * is expected to name today. Deliberately NOT derived from
+ * `moneyBoxFields.length` — if it were, dropping a box from the list would
+ * shrink both sides together and this check could never fail.
+ * @type {number}
+ */
+const expectedMoneyBoxFieldCount = 6
+
 export const proof = {
     dialectAndMediaType: () => {
         assertEq(dialect, 'vnd.fjs.1099int')
@@ -240,6 +278,23 @@ export const proof = {
         canonicalMoneyBoxAccepted: () => {
             const [t] = validate({ ...minimal, box1InterestIncome: '1234.56' })
             assertEq(t, 'ok')
+        },
+        // T-09-08-02: every money box named in `moneyBoxFields` is proven to
+        // actually be walked by the exactness loop, not merely assumed
+        // because `box1InterestIncome` happens to be covered above.
+        moneyBoxExactness: {
+            ...generatedMoneyBoxExactnessProof,
+            everyMoneyBoxIsCovered: () => {
+                assertEq(
+                    moneyBoxFields.length,
+                    expectedMoneyBoxFieldCount,
+                    [
+                        'expected exactly the independently-stated money box count',
+                        moneyBoxFields.length,
+                        expectedMoneyBoxFieldCount,
+                    ],
+                )
+            },
         },
     },
     // Task 3 — Success Criteria 1 and 2's runtime evidence.
