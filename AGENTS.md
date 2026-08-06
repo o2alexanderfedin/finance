@@ -56,6 +56,45 @@ facilitate Emergent Design sessions
   - `node --test fjs` — Node resolves the bare directory to `fjs/index.js` and runs the whole app as one fake "test".
   - `node --test fjs/some/module.f.js` — targeting a source file by explicit path is **also** a fake pass. Node executes it as a plain script; no `proof` leaf runs. Verified by injecting a leaf that throws unconditionally: `npm test` reported `tests 8, pass 7, fail 1`, while `node --test fjs/server/module.f.js` reported `tests 1, pass 1, fail 0` on the identical file.
 
+## A proof is not known to work until you have watched it fail
+
+A green suite proves nothing on its own. **Break the code on purpose and confirm the suite goes
+red.** If it stays green, the proof is decoration and the code is unproven.
+
+This is not a style preference. This project has shipped the same defect three times — a proof whose
+expected side was not independent of the code under test — and each time the suite was fully green:
+
+| Phase | The defect | Suite when the shipped code was mutated |
+|---|---|---|
+| 7 | Every fixture was keyed at the same wrong path the buggy code asked for, so the proof mirrored the bug | 185 proofs, all green |
+| 9 | The zero-read rule existed twice; every proof exercised the copy that did not ship | 258 green |
+| 8 | `finance_tax_params` compared its output against the very object that produced it | 262 green |
+
+Nothing was found by reading. All three were found by mutating.
+
+**The rules that follow from it:**
+
+- A proof's **expected** value must not be produced by the code under test. Hand-type it, or derive
+  it from an independent source. The duplication is the mechanism, not a smell — do not "simplify"
+  it away. (`fjs/tax/table`'s Publication 1040 rows and `fjs/server/finance_tax_params`'s per-field
+  literals are the pattern to copy.)
+- **A mutation must still typecheck.** `npm test` is `tsc && node --test`, so a mutation that fails
+  to compile never reaches the tests and measures the compiler instead of the suite.
+- **One rule, one place.** If a check appears in both a production path and a test helper, the
+  proofs will bind to whichever the tests call, and the other can rot silently. Share it.
+- **Assert the effect, not the error message.** Two different orderings can return the same message;
+  only observing the side effect distinguishes them (Phase 6 learned this).
+- **A gate needs a control.** A proof that something is refused must be paired with one showing the
+  legitimate case is not — otherwise a gate that refuses everything passes.
+- **Never gate a phase on `npm test`'s total.** It includes ~2,100 vendored submodule proofs and
+  moves with submodule state. Use `node --test 2>&1 | grep -c '^✔ import("./fjs/'`. A Phase 7 gate
+  of "total > 134" was already satisfied before that phase's first line was written.
+
+To sweep for untested code rather than guess at it: copy the repo (`cp -a . /tmp/sweep` — the
+`node_modules` symlink is absolute, so it still resolves), then mutate values, comparisons and
+returned shapes one at a time, reverting each. Every mutation that leaves the suite green is
+uncovered code.
+
 ## Commands
 
 - `npm test` — `tsc` (typecheck) then `node --test` (runs all FunctionalScript proofs via root `all.test.js`).
