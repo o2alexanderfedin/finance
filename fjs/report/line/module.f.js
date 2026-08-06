@@ -146,8 +146,9 @@ const wholeDollarCentsFromCents = cents => halfUp(of(cents)(100n)) * 100n
  * structurally by *where* this runs: a `ReportLine.value` is already the
  * exact cents sum of its `sources`, so projecting the line rounds the
  * total once. Applying this to per-item values and then adding them is the
- * error the rule names, and `proof.roundSumIsFourteenDollarsWhileSumRound
- * IsTenOnTenIrsExampleAmounts` prices it at $4 on ten $1.39 amounts.
+ * error the rule names, and this module's
+ * `roundSumIsFourteenDollarsWhileSumRoundIsTenOnTenIrsExampleAmounts` leaf
+ * prices that error at $4 on ten $1.39 amounts.
  * Nothing here re-rounds an already-rounded value either: the projection is
  * applied once, at report time, to the exact cents figure.
  *
@@ -342,5 +343,82 @@ export const proof = {
         assertEq(thirdSource.boxPath, 'box1InterestIncome')
         assertEq(thirdSource.value, '1.39')
         assertEq(third.rule, '1040 line 2b')
+    },
+
+    // ROADMAP criterion 5, made non-vacuous. Over `bigint` cents `round` is
+    // the identity, so `round(sum)` and `sum(round)` are trivially equal and
+    // proving it tests nothing. Rounding only bites at WHOLE DOLLARS, which
+    // is what the election introduces — and here the two orders visibly
+    // diverge by $4.
+    //
+    // Why ten amounts of `'1.39'`: that is i1040gi p23's OWN printed example
+    // of an amount that rounds down ("For example, $1.39 becomes $1"). Each
+    // item individually loses 39 cents to rounding and every loss falls the
+    // same way, so ten of them are the sharpest demonstration available that
+    // per-item rounding is wrong — which is precisely why the same paragraph
+    // ends "include cents when adding the amounts and round off only the
+    // total."
+    //
+    // `fjs/types/rational`'s `lineRoundingVsPerItemRounding` exhibits this
+    // mathematical fact abstractly on three halves; this leaf is its
+    // 1040-line-shaped instance and does not restate it. The ten `Source`
+    // entries below have the shape Plan 10-09 will build from ten REAL
+    // stored 1099-INT documents.
+    //
+    // `1390n`, `1400n`, `1000n` and `400n` are all hand-typed. None is
+    // computed by `wholeDollarCentsFromCents`, none is written as a product
+    // of the per-item amount and the item count, and none is derived from
+    // another: an expected value is worth exactly as much as its
+    // independence from the code it checks (AGENTS.md).
+    roundSumIsFourteenDollarsWhileSumRoundIsTenOnTenIrsExampleAmounts: () => {
+        // The IRS's way: ONE line whose value is already the exact cents sum
+        // of its ten sources, rounded once.
+        /** @type {ReportLine} */
+        const aggregateLine = {
+            value: 1390n,
+            sources: [
+                { documentHash: 'sha256-int-01', boxPath: 'box1InterestIncome', value: '1.39' },
+                { documentHash: 'sha256-int-02', boxPath: 'box1InterestIncome', value: '1.39' },
+                { documentHash: 'sha256-int-03', boxPath: 'box1InterestIncome', value: '1.39' },
+                { documentHash: 'sha256-int-04', boxPath: 'box1InterestIncome', value: '1.39' },
+                { documentHash: 'sha256-int-05', boxPath: 'box1InterestIncome', value: '1.39' },
+                { documentHash: 'sha256-int-06', boxPath: 'box1InterestIncome', value: '1.39' },
+                { documentHash: 'sha256-int-07', boxPath: 'box1InterestIncome', value: '1.39' },
+                { documentHash: 'sha256-int-08', boxPath: 'box1InterestIncome', value: '1.39' },
+                { documentHash: 'sha256-int-09', boxPath: 'box1InterestIncome', value: '1.39' },
+                { documentHash: 'sha256-int-10', boxPath: 'box1InterestIncome', value: '1.39' },
+            ],
+            rule: '1040 line 2b',
+        }
+        assertEq(aggregateLine.sources.length, 10)
+        assertEq(aggregateLine.value, 1390n)
+        const roundOfSum = assertNotNullish(
+            applyWholeDollarElection(true)([aggregateLine])[0],
+            'the projection of a one-line report must have a line 0').value
+        // $14 — the amount the IRS instructs the taxpayer to enter.
+        assertEq(roundOfSum, 1400n)
+
+        // The forbidden way: round each of the ten amounts FIRST, then add.
+        const perItemLines = [
+            electionTestLine('sha256-int-01')('1.39')(139n),
+            electionTestLine('sha256-int-02')('1.39')(139n),
+            electionTestLine('sha256-int-03')('1.39')(139n),
+            electionTestLine('sha256-int-04')('1.39')(139n),
+            electionTestLine('sha256-int-05')('1.39')(139n),
+            electionTestLine('sha256-int-06')('1.39')(139n),
+            electionTestLine('sha256-int-07')('1.39')(139n),
+            electionTestLine('sha256-int-08')('1.39')(139n),
+            electionTestLine('sha256-int-09')('1.39')(139n),
+            electionTestLine('sha256-int-10')('1.39')(139n),
+        ]
+        assertEq(perItemLines.length, 10)
+        const sumOfRounds = applyWholeDollarElection(true)(perItemLines)
+            .reduce((total, projected) => total + projected.value, 0n)
+        // $10 — thirty-nine cents lost ten times over.
+        assertEq(sumOfRounds, 1000n)
+
+        // Name the SIZE of the divergence, not merely one side of it: $4.
+        assertEq(roundOfSum - sumOfRounds, 400n)
+        assert(roundOfSum !== sumOfRounds, 'round(sum) must diverge from sum(round) at whole dollars')
     },
 }
