@@ -49,6 +49,25 @@
  * silent gap here would be invisible until that phase discovered it the
  * hard way.
  *
+ * ## The other side of that boundary: the Tax Computation Worksheet
+ *
+ * `taxComputationWorksheet` (TAX-03) is the mirror of `lookupTaxTable`:
+ * it refuses BELOW $100,000 and names the Tax Table as the remedy, exactly
+ * as `lookupTaxTable` refuses at or above and names the worksheet. It is
+ * not new arithmetic — the twenty rows Publication 1040's own worksheet
+ * prints (i1040gi printed page 80, NOT p124, which is the alphabetical
+ * index) are each `rate x taxableIncome - subtraction`, and every one of
+ * the twenty printed subtraction constants is exactly
+ * `rate x bracketLowerBound - taxAt(bracketLowerBound)`. So the printed
+ * worksheet IS `cumulativeBracketTaxCents`, and this module reuses that
+ * one bracket walk rather than growing a second one.
+ * `taxComputationWorksheetReproducesAllTwentyPrintedRows` proves that on
+ * all twenty rows against hand-transcribed printed constants rather than
+ * assuming it.
+ *
+ * The two are joined by `baseTaxForAmount`, the level-3 lookup that
+ * returns WHICH method it used, not only a number.
+ *
  * @module
  */
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
@@ -56,7 +75,7 @@ import { of, add, multiply, halfUp } from '../../types/rational/module.f.js'
 import { centsFromString, centsToString } from '../../exact/module.f.js'
 import { taxParamsByYear } from '../params/module.f.js'
 
-/** @import { TaxParamSet, Bracket } from '../params/module.f.js' */
+/** @import { TaxParamSet, Bracket, IndividualFilingStatus } from '../params/module.f.js' */
 /** @import { Rational } from '../../types/rational/module.f.js' */
 
 /**
@@ -224,6 +243,55 @@ export const lookupTaxTable = taxParamSet => incomeCents => {
 }
 
 /**
+ * The Tax Computation Worksheet (TAX-03) — the method Publication 1040
+ * directs a filer to at or above $100,000.00, and the exact mirror of
+ * `lookupTaxTable`: this function REFUSES below `tableUpperBoundCents`
+ * (throwing the bare value via `assert` — never an `Error`) and names the
+ * Tax Table as the remedy, just as `lookupTaxTable` refuses at or above
+ * and names this worksheet. Between them there is no income at which
+ * both answer, and none at which neither does.
+ *
+ * Not new arithmetic. See this module's docstring: the twenty printed
+ * rows are `rate x income - subtraction`, and each subtraction constant
+ * is `rate x bracketLowerBound - taxAt(bracketLowerBound)`, so the
+ * printed worksheet is `cumulativeBracketTaxCents` written in a form a
+ * human can evaluate with a pocket calculator. Reusing the existing
+ * bracket walk is therefore the accurate implementation, not a shortcut —
+ * a second, worksheet-shaped arithmetic path would be a duplicate rule
+ * that could rot against this one (AGENTS.md, "One rule, one place").
+ *
+ * ## Rounding: to the nearest CENT, never to whole dollars
+ *
+ * This is deliberate and it differs from the Tax Table's rule directly
+ * above. A worksheet line is a line boundary (EXACT-04), so it rounds to
+ * this project's own cents precision via `halfUp` — it must NOT call
+ * `roundToNearestDollarThenBackToCents`, which encodes the printed
+ * TABLE's convention (the printed page has no cents column, so its rows
+ * cannot carry cents; a worksheet the filer fills in by hand can and
+ * does). Whole dollars are the taxpayer's Form 1040 p23 ELECTION, applied
+ * once over the whole report by `applyWholeDollarElection` — a property
+ * of the return, not of this worksheet.
+ *
+ * Residual uncertainty, recorded honestly: 10-RESEARCH.md's assumption A2
+ * notes the IRS states no TCW-specific rounding rule, so the above
+ * follows the general p23 rule. Phase 14's acceptance against the user's
+ * own filed return is what resolves it. The leaf that would move if A2
+ * turns out wrong is the MFJ $700,000.00 one in this module's `proof`,
+ * whose exact answer ends in `.50`.
+ * @type {(brackets: readonly Bracket[]) => (incomeCents: bigint) => bigint}
+ */
+export const taxComputationWorksheet = brackets => incomeCents => {
+    assert(
+        incomeCents >= tableUpperBoundCents,
+        [
+            `income of ${centsToString(incomeCents)} is below $100,000`,
+            'use the Tax Table',
+        ],
+    )
+    return halfUp(cumulativeBracketTaxCents(brackets)(incomeCents))
+}
+
+/**
  * TY2025's parameter set, narrowed exactly ONCE at module scope. This
  * project's `tsconfig.json` sets `noUncheckedIndexedAccess: true`, so
  * indexing the lookup map below by the literal year yields
@@ -295,6 +363,98 @@ export const handTranscribedRows = [
     // Worksheet".
     { atLeast: '99950.00', lessThan: '100000.00', single: 16909, marriedFilingJointly: 11823, marriedFilingSeparately: 16909, headOfHousehold: 15170 },
 ]
+
+/**
+ * One row of the printed Tax Computation Worksheet: the section's filing
+ * status, the row's "At least"/"But less than" taxable-income band
+ * (`lessThan` is `undefined` on each section's last, open-ended row —
+ * absent, never a sentinel, mirroring `Bracket.ceiling`), the
+ * whole-number percentage the printed row multiplies by, and the printed
+ * SUBTRACTION constant as a decimal string (money is a string, never a
+ * JSON number — AGENTS.md).
+ *
+ * `ratePercent` is a rate, not money, so it is a plain `number`, exactly
+ * as `fjs/tax/params`' `Bracket.ratePercent` is.
+ * @typedef {{
+ *   readonly status: IndividualFilingStatus,
+ *   readonly atLeast: string,
+ *   readonly lessThan: string | undefined,
+ *   readonly ratePercent: number,
+ *   readonly subtraction: string,
+ * }} TranscribedWorksheetRow
+ */
+
+/**
+ * All twenty rows of the 2025 Tax Computation Worksheet, hand-transcribed
+ * from Form 1040 instructions `i1040gi.pdf`, **printed page 80** — the
+ * independent side of T-10-03-01's diff. (Printed page 80, NOT p124: p124
+ * is the alphabetical index. An earlier research note had this wrong and
+ * the correction is carried here so the citation is checkable.)
+ *
+ * These constants share NO code path with `cumulativeBracketTaxCents`:
+ * every figure below was read off the printed page. That independence is
+ * the entire mechanism of `taxComputationWorksheetReproducesAllTwentyPrintedRows`
+ * — the moment a subtraction constant here is computed rather than
+ * transcribed, the diff becomes the tautology AGENTS.md records this
+ * project shipping three times.
+ *
+ * Printed section B is headed "**Married filing jointly or Qualifying
+ * surviving spouse**". That heading is the primary source's OWN
+ * confirmation that a QSS filer reads the married-filing-jointly
+ * schedule (10-CONTEXT.md Decision 6), and it is what
+ * `taxTableColumnFor.qualifyingSurvivingSpouse` rests on — so the
+ * worksheet is transcribed with four sections, not five, exactly as
+ * printed. Section D (head of household) is where the schedules visibly
+ * diverge: its 32% row ends at $250,500.00, $25 below single/MFS's
+ * $250,525.00.
+ * @type {readonly TranscribedWorksheetRow[]}
+ */
+export const handTranscribedTaxComputationWorksheetRows = [
+    // Section A — Single
+    { status: 'single', atLeast: '100000.00', lessThan: '103350.00', ratePercent: 22, subtraction: '5086.00' },
+    { status: 'single', atLeast: '103350.00', lessThan: '197300.00', ratePercent: 24, subtraction: '7153.00' },
+    { status: 'single', atLeast: '197300.00', lessThan: '250525.00', ratePercent: 32, subtraction: '22937.00' },
+    { status: 'single', atLeast: '250525.00', lessThan: '626350.00', ratePercent: 35, subtraction: '30452.75' },
+    { status: 'single', atLeast: '626350.00', lessThan: undefined, ratePercent: 37, subtraction: '42979.75' },
+    // Section B — Married filing jointly or Qualifying surviving spouse
+    { status: 'marriedFilingJointly', atLeast: '100000.00', lessThan: '206700.00', ratePercent: 22, subtraction: '10172.00' },
+    { status: 'marriedFilingJointly', atLeast: '206700.00', lessThan: '394600.00', ratePercent: 24, subtraction: '14306.00' },
+    { status: 'marriedFilingJointly', atLeast: '394600.00', lessThan: '501050.00', ratePercent: 32, subtraction: '45874.00' },
+    { status: 'marriedFilingJointly', atLeast: '501050.00', lessThan: '751600.00', ratePercent: 35, subtraction: '60905.50' },
+    { status: 'marriedFilingJointly', atLeast: '751600.00', lessThan: undefined, ratePercent: 37, subtraction: '75937.50' },
+    // Section C — Married filing separately
+    { status: 'marriedFilingSeparately', atLeast: '100000.00', lessThan: '103350.00', ratePercent: 22, subtraction: '5086.00' },
+    { status: 'marriedFilingSeparately', atLeast: '103350.00', lessThan: '197300.00', ratePercent: 24, subtraction: '7153.00' },
+    { status: 'marriedFilingSeparately', atLeast: '197300.00', lessThan: '250525.00', ratePercent: 32, subtraction: '22937.00' },
+    { status: 'marriedFilingSeparately', atLeast: '250525.00', lessThan: '375800.00', ratePercent: 35, subtraction: '30452.75' },
+    { status: 'marriedFilingSeparately', atLeast: '375800.00', lessThan: undefined, ratePercent: 37, subtraction: '37968.75' },
+    // Section D — Head of household
+    { status: 'headOfHousehold', atLeast: '100000.00', lessThan: '103350.00', ratePercent: 22, subtraction: '6825.00' },
+    { status: 'headOfHousehold', atLeast: '103350.00', lessThan: '197300.00', ratePercent: 24, subtraction: '8892.00' },
+    { status: 'headOfHousehold', atLeast: '197300.00', lessThan: '250500.00', ratePercent: 32, subtraction: '24676.00' },
+    { status: 'headOfHousehold', atLeast: '250500.00', lessThan: '626350.00', ratePercent: 35, subtraction: '32191.00' },
+    { status: 'headOfHousehold', atLeast: '626350.00', lessThan: undefined, ratePercent: 37, subtraction: '44718.00' },
+]
+
+/**
+ * The printed worksheet's row count, hand-typed from the page: four
+ * sections of five rows. Deliberately NOT
+ * `handTranscribedTaxComputationWorksheetRows.length` — read off the
+ * transcription it is meant to police, this constant could never fail,
+ * and a row silently dropped in an edit would take the diff's coverage
+ * with it while every remaining row still passed.
+ */
+const expectedTaxComputationWorksheetRowCount = 20
+
+/**
+ * $100,000.00 above a section's last, open-ended row — the probe offset
+ * that reaches the 37% band without needing a second hand-typed income
+ * per section.
+ */
+const openTopRowProbeOffsetCents = centsFromString('100000.00')
+
+/** One dollar in cents — the step back from a row's exclusive upper bound. */
+const oneDollarCents = centsFromString('1.00')
 
 export const proof = {
     // T-08-01: every generated row matches the independently-transcribed
@@ -420,5 +580,118 @@ export const proof = {
         const lastRow = lookupTaxTable(taxParams2025)(centsFromString('99999.99'))
         assertEq(lastRow.atLeastCents, centsFromString('99950.00'))
         assertEq(lastRow.lessThanCents, centsFromString('100000.00'))
+    },
+    // T-10-03-01, and the verification of this plan's load-bearing claim:
+    // all twenty printed Tax Computation Worksheet rows are reproduced,
+    // to the cent, by the bracket walk this module already shipped for
+    // the Tax Table.
+    //
+    // The expected side is `ratePercent x income / 100 - subtraction`
+    // computed from `handTranscribedTaxComputationWorksheetRows` ALONE —
+    // hand-transcribed printed constants, sharing no code path with
+    // `cumulativeBracketTaxCents`. Two independent things are therefore
+    // on trial at once: the transcription, and the stored brackets in
+    // `fjs/tax/params`. Mutating a stored HoH ceiling (250500 -> 250525,
+    // the plausible copy-paste from single/MFS) turns this leaf red,
+    // which is what shows it checks the stored data rather than itself.
+    //
+    // Two probes per row: the row's own lower bound, and either one
+    // dollar below its exclusive upper bound or, for a section's
+    // open-ended last row, $100,000 above the lower bound. Both probes
+    // are whole-dollar incomes, and that is ASSERTED rather than assumed,
+    // because `BigInt(ratePercent) * incomeCents / 100n` is bigint
+    // division: at an income carrying cents it would truncate and the
+    // expected side would quietly stop being exact.
+    taxComputationWorksheetReproducesAllTwentyPrintedRows: () => {
+        assertEq(
+            handTranscribedTaxComputationWorksheetRows.length,
+            expectedTaxComputationWorksheetRowCount,
+            'expected four printed sections of five rows each',
+        )
+        for (const row of handTranscribedTaxComputationWorksheetRows) {
+            const { brackets } = taxParams2025.ordinaryBrackets[row.status]
+            const atLeastCents = centsFromString(row.atLeast)
+            const probesCents = row.lessThan === undefined
+                ? [atLeastCents, atLeastCents + openTopRowProbeOffsetCents]
+                : [atLeastCents, centsFromString(row.lessThan) - oneDollarCents]
+            for (const incomeCents of probesCents) {
+                assertEq(
+                    incomeCents % 100n,
+                    0n,
+                    ['probe income must be a whole-dollar amount', row.status, row.atLeast],
+                )
+                const expectedCents =
+                    BigInt(row.ratePercent) * incomeCents / 100n - centsFromString(row.subtraction)
+                assertEq(
+                    taxComputationWorksheet(brackets)(incomeCents),
+                    expectedCents,
+                    ['printed worksheet row mismatch', row.status, row.atLeast, centsToString(incomeCents)],
+                )
+            }
+        }
+    },
+    // The worksheet keeps CENTS. Every value below is hand-typed from
+    // `rate x income - subtraction` on the printed page, never computed
+    // by calling the code under test:
+    //   MFJ  $700,000.00: 35% x 700,000.00 - 60,905.50 = $184,094.50
+    //   HoH  $626,350.00: 37% x 626,350.00 - 44,718.00 = $187,031.50
+    // Both end in a half dollar, which is the point: rounding this
+    // worksheet to whole dollars the way the printed TABLE rounds its
+    // rows would move both by fifty cents. This is the leaf that would
+    // move if 10-RESEARCH.md's assumption A2 turns out wrong.
+    taxComputationWorksheetKeepsCentsAndNeverRoundsToWholeDollars: () => {
+        const mfjAtSevenHundredThousand =
+            taxComputationWorksheet(taxParams2025.ordinaryBrackets.marriedFilingJointly.brackets)(70000000n)
+        assertEq(mfjAtSevenHundredThousand, 18409450n)
+        assert(
+            mfjAtSevenHundredThousand !== 18409500n,
+            ['expected cent precision, not the whole-dollar rounding the printed Tax Table uses', mfjAtSevenHundredThousand],
+        )
+        const hohAtTopBracketFloor =
+            taxComputationWorksheet(taxParams2025.ordinaryBrackets.headOfHousehold.brackets)(62635000n)
+        assertEq(hohAtTopBracketFloor, 18703150n)
+        assert(
+            hohAtTopBracketFloor !== 18703200n,
+            ['expected cent precision, not the whole-dollar rounding the printed Tax Table uses', hohAtTopBracketFloor],
+        )
+    },
+    // The mirror of `tableRefusesAtOneHundredThousandAndAbove`, in the
+    // opposite direction: below $100,000.00 the worksheet refuses and
+    // names the Tax Table. The thrown value's CONTENT is asserted, never
+    // merely that it threw — the exact weakness the Phase 9 sweep found,
+    // and here it is load-bearing twice over, because
+    // `cumulativeBracketTaxCents` itself throws on a bracket list that
+    // cannot cover the income, so "it threw" alone cannot tell the
+    // boundary refusal apart from an unrelated data failure.
+    taxComputationWorksheetRefusesBelowOneHundredThousand: () => {
+        let threw = false
+        try {
+            taxComputationWorksheet(taxParams2025.ordinaryBrackets.single.brackets)(centsFromString('99999.99'))
+        } catch (e) {
+            threw = true
+            assert(typeof e === 'string' || Array.isArray(e), ['expected a bare thrown value, not an Error', e])
+            assert(!(e instanceof Error), ['must never throw an Error instance', e])
+            const message = typeof e === 'string' ? e : Array.isArray(e) ? e.join(' ') : ''
+            assert(
+                message.includes('100,000'),
+                ['expected the thrown message to name the $100,000 boundary', e],
+            )
+            assert(
+                message.includes('Tax Table'),
+                ['expected the thrown message to name the Tax Table', e],
+            )
+        }
+        assert(threw, 'expected taxComputationWorksheet to refuse an income below $100,000.00')
+    },
+    // The control leg the refusal above needs (AGENTS.md: "a gate needs a
+    // control"): at EXACTLY $100,000.00 the worksheet answers, and
+    // answers $16,914.00 — Section A's first printed row, 22% x
+    // 100,000.00 - 5,086.00, hand-typed from page 80. Weakening the
+    // gate's `>=` to `>` refuses here instead.
+    taxComputationWorksheetResolvesAtExactlyOneHundredThousand: () => {
+        assertEq(
+            taxComputationWorksheet(taxParams2025.ordinaryBrackets.single.brackets)(tableUpperBoundCents),
+            1691400n,
+        )
     },
 }
