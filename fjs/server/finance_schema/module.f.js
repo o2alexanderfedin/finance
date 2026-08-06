@@ -8,13 +8,20 @@
  *
  * ## The lookup map names WHICH schema, never re-describes it
  *
- * `dialectSchemas` below keys each of the four known dialect tag strings to
+ * `dialectSchemas` below keys each of the five known dialect tag strings to
  * that dialect's own exported schema const (`oneZeroNineNineIntSchema`,
- * `ocrSchema`, `w2Schema`, `medicalExpensesSchema`). It contributes no field
- * names of its own — `toJsonSchema` walks whichever schema constant the map
- * names, so every field an agent sees comes from the same RTTI the dialect's
- * own `validate` enforces. Per `07-CONTEXT.md`, a hand-written field list
- * would be exactly the second-source-of-truth MCP-06 exists to eliminate.
+ * `ocrSchema`, `w2Schema`, `medicalExpensesSchema`, `returnProfileSchema`).
+ * It contributes no field names of its own — `toJsonSchema` walks whichever
+ * schema constant the map names, so every field an agent sees comes from the
+ * same RTTI the dialect's own `validate` enforces. Per `07-CONTEXT.md`, a
+ * hand-written field list would be exactly the second-source-of-truth MCP-06
+ * exists to eliminate.
+ *
+ * `vnd.fjs.return_profile` is the fifth and is not a document read off a
+ * printed form at all — it is what the taxpayer DECLARES (10-CONTEXT.md
+ * Decision 4). It belongs here for the same reason as the other four: an
+ * agent authoring a program against the declared kind set must read the field
+ * names from the schema the validator enforces, never guess them.
  *
  * ## Unknown dialect: a tool-level `errorResult`, never a throw
  *
@@ -38,6 +45,7 @@ import { dialect as oneZeroNineNineIntDialect, oneZeroNineNineIntSchema } from '
 import { dialect as ocrDialect, ocrSchema } from '../../document/ocr/module.f.js'
 import { dialect as w2Dialect, w2Schema } from '../../document/w2/module.f.js'
 import { dialect as medicalExpensesDialect, medicalExpensesSchema } from '../../document/medical_expenses/module.f.js'
+import { dialect as returnProfileDialect, returnProfileSchema } from '../../return/profile/module.f.js'
 import { stringify as jsonText } from '../../json/module.f.js'
 
 /** @import { Type } from 'functionalscript/fjs/types/rtti/module.f.js' */
@@ -59,10 +67,34 @@ const dialectSchemas = {
     [ocrDialect]: ocrSchema,
     [w2Dialect]: w2Schema,
     [medicalExpensesDialect]: medicalExpensesSchema,
+    [returnProfileDialect]: returnProfileSchema,
 }
 
 /** The known dialect tags, in declaration order — used in the refusal message. */
 const knownDialects = /** @type {readonly string[]} */ (Object.keys(dialectSchemas))
+
+/**
+ * Independently hand-typed: how many dialects {@link dialectSchemas} registers
+ * today. Deliberately NOT `knownDialects.length`.
+ *
+ * `unknownDialectRefused` below loops over {@link knownDialects} asserting each
+ * tag is named in the refusal message, and it is tempting to conclude that a
+ * newly registered dialect is therefore covered "for free". **It is not.**
+ * `knownDialects` is `Object.keys(dialectSchemas)` — the code under test — so
+ * deleting an entry from the map deletes it from the loop's iteration set at
+ * the same instant, and that proof stays green over a dialect that quietly
+ * stopped being served. Verified by mutation: removing the
+ * `vnd.fjs.return_profile` entry reddened `returnProfileResolves` alone, and
+ * `unknownDialectRefused` passed.
+ *
+ * This is AGENTS.md's rule — "a proof's expected value must not be produced by
+ * the code under test" — and the same `expectedThresholdCount` /
+ * `expectedMoneyBoxFieldCount` idiom `fjs/tax/boundary` and
+ * `fjs/document/1099int` already use. Raise it in the same commit that
+ * registers a sixth dialect, and add that dialect's own `*Resolves` leaf.
+ * @type {number}
+ */
+const expectedKnownDialectCount = 5
 
 /**
  * `finance_schema(dialect)`: the MCP tool. Looks `dialect` up in
@@ -124,7 +156,8 @@ export const proof = {
     // text, JSON-parsed, deep-equals `toJsonSchema` called directly on that
     // dialect's own schema const — never a hand-written JSON literal, which
     // would reintroduce the second-source-of-truth MCP-06 forbids), plus one
-    // leaf for the unknown-dialect refusal. Five leaves total.
+    // leaf for the unknown-dialect refusal and one hand-typed count that the
+    // refusal loop cannot supply itself. Seven leaves total.
     oneZeroNineNineIntResolves: () => {
         const result = call('vnd.fjs.1099int')
         assertEq(result.isError, undefined)
@@ -157,6 +190,14 @@ export const proof = {
             JSON.stringify(toJsonSchema(medicalExpensesSchema)),
         )
     },
+    returnProfileResolves: () => {
+        const result = call('vnd.fjs.return_profile')
+        assertEq(result.isError, undefined)
+        assertEq(
+            JSON.stringify(JSON.parse(textOf(result))),
+            JSON.stringify(toJsonSchema(returnProfileSchema)),
+        )
+    },
     // An unknown dialect is a tool-level errorResult, never a throw — names
     // the offending tag in the message (T-07-03-02).
     unknownDialectRefused: () => {
@@ -167,5 +208,19 @@ export const proof = {
         for (const known of knownDialects) {
             assert(text.includes(known), ['expected known dialect named', known, text])
         }
+    },
+    // The independent half of the leaf above: the loop's iteration set is
+    // derived from `dialectSchemas`, so it cannot notice an entry going
+    // missing. This count is hand-typed and can.
+    everyRegisteredDialectIsCounted: () => {
+        assertEq(
+            knownDialects.length,
+            expectedKnownDialectCount,
+            [
+                'expected exactly the independently-stated dialect count',
+                knownDialects.length,
+                expectedKnownDialectCount,
+            ],
+        )
     },
 }
