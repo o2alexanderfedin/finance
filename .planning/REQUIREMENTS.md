@@ -312,7 +312,7 @@ structural (RTTI) and semantic passes.
       worksheet carrying the printed form's line numbers. **No variable named `magi`** — the
       MAGI for the IRA deduction, Roth eligibility, the Premium Tax Credit, IRMAA, and the
       student-loan-interest deduction have different add-back lists.
-- [ ] **TAX-16** *(T1)*: A **scope guard** — unmodeled input causes a loud refusal, never a
+- [x] **TAX-16** *(T1)*: A **scope guard** — unmodeled input causes a loud refusal, never a
       silently omitted line. This is what makes a partial 1040 honest instead of quietly
       wrong, and it is how REQ TAX-05's "full line-by-line" claim stays truthful.
 - [ ] **TAX-17** *(T3)*: Multi-year support, including capital loss carryover, which the

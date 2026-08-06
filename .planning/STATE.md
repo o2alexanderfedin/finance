@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
 status: executing
-stopped_at: Phase 10 in execution. Waves 1-2 complete (10-01 QSS status, 10-02 whole-dollar election, 10-03 Tax Computation Worksheet, 10-04 return-profile dialect, 10-05 standard deduction). Waves 3-6 remain: 10-06 QDCGT, 10-07 scope classifier, 10-08 dispatcher, 10-09 lines 1a-15, 10-10 lines 16-37.
-last_updated: "2026-08-06T20:55:00.000Z"
+stopped_at: "Completed 10-07-PLAN.md (classifyScope, the TAX-16 scope guard: the fifty declared kinds partitioned six modeled / forty-four refused, with the partition enforced at `tsc`)"
+last_updated: "2026-08-06T21:12:19.110Z"
 last_activity: 2026-08-06
 progress:
   total_phases: 18
   completed_phases: 9
-  total_plans: 38
-  completed_plans: 41
+  total_plans: 48
+  completed_plans: 48
   percent: 100
 ---
 
@@ -29,12 +29,13 @@ the server executes it as a pure function of `(documents, tax-year parameters) �
 Phase: 10 of 18 — Form 1040 Core, Line-16 Dispatch, and the Scope Guard (TAX-03/05/06/16).
   Ten plans across six waves. The plan set was returned BLOCKER by `gsd-plan-checker`
   (four blockers, ten warnings), revised, re-checked, and only then executed.
-Plan: 5 of 10 complete — wave 1 (10-01 QSS as a stored filing status, 10-02 the IRS
-  whole-dollar election) and wave 2 (10-03 Tax Computation Worksheet, 10-04 the
-  vnd.fjs.return_profile dialect, 10-05 the standard deduction chart). Waves 3-6
-  remain: 10-06 QDCGT, 10-07 scope classifier, 10-08 dispatcher, 10-09 lines
-  1a-15, 10-10 lines 16-37 + whole-report refusal.
-Status: Executing
+Plan: 7 of 10 complete — wave 1 (10-01 QSS as a stored filing status, 10-02 the IRS
+  whole-dollar election), wave 2 (10-03 Tax Computation Worksheet, 10-04 the
+  vnd.fjs.return_profile dialect, 10-05 the standard deduction chart) and wave 3
+  (10-06 QDCGT, 10-07 the classifyScope scope guard, executed in parallel). Waves
+  4-6 remain: 10-08 dispatcher, 10-09 lines 1a-15, 10-10 lines 16-37 +
+  whole-report refusal.
+Status: Ready to execute
 
 Progress: [██████████] 100%
   in this file's frontmatter for the raw plan/summary counts — the percent figure here is
@@ -108,6 +109,7 @@ proofs and moves with submodule initialization state — which is exactly how a 
 | Phase 09 P07 | 65min | 3 tasks | 4 files |
 | Phase 08 P06 | 65min | 3 tasks | 3 files |
 | Phase 09 P08 | 45min | 3 tasks | 5 files |
+| Phase 10 P07 | 35min | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -231,6 +233,8 @@ Full log in PROJECT.md Key Decisions. Recent decisions affecting current work:
 - [Phase 08]: Closed 9 mutation-sweep coverage gaps in fjs/tax/params, fjs/tax/table, and fjs/types/rational (08-06); all figures confirmed correct against Rev. Proc. 2024-40, no stored values changed
 - [Phase 09-08]: Per-box exactness proofs generated from moneyBoxFields/stateLocalMoneyFields themselves (so a box added later is auto-covered), paired with an independently hand-typed expected count (so a box removed is still caught) -- mirrors fjs/tax/boundary's allThresholds/expectedThresholdCount idiom
 - [Phase 09-08]: interpret's step-budget boundary measured empirically before writing the proof: chainOfLength(stepBudget-1) completes, chainOfLength(stepBudget) is refused, because completing it needs one more loop iteration than the budget allows to notice the chain went Pure
+- [Phase 10]: 10-07: the modeled/unmodeled partition is a tsc property — Assert<Equal<Kind, ModeledKind | UnmodeledKind>>, so a declared kind classified nowhere fails to compile — verified by adding a 51st kind and by deleting a refusal entry; both stop at TS2344 on that assertion
+- [Phase 10]: 10-07: scopeRefusal returns ScopeError, not the ScopeOutcome union — Plan 10-08 spreads it into its own error arm; the union would force a cast or a non-null assertion, both banned
 
 ### Pending Todos
 
@@ -375,11 +379,11 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-08-06T04:30:40.381Z
-Stopped at: Completed 09-08-PLAN.md (gap closure -- 8 mutation-sweep gaps closed in fjs/exec and fjs/document, all verified RED before this plan and reverted after)
-(`npm test` 187/187, 185 project-local proofs, `tsc` clean, `test:integration` included and
-passing, tree clean). Merge blocker measured and dismissed — see Blockers. Awaiting the user's
-choice on push/PR strategy and on Phase 8.
+Last session: 2026-08-06T21:12:19.104Z
+Stopped at: Completed 10-07-PLAN.md (classifyScope, the TAX-16 scope guard: the fifty declared kinds partitioned six modeled / forty-four refused, with the partition enforced at `tsc`)
+(measure the suite rather than quoting it — see "Test metrics" above. Phase 10 waves 3-6 are in
+flight; 10-06 QDCGT landed alongside this plan, and 10-08 dispatcher, 10-09 lines 1a-15 and 10-10
+lines 16-37 remain.)
 Resume file: None
 (they were one-shot artifacts, written to `feature/planning-requirements-roadmap` seven
 minutes after PR #14 merged, so they never reached `main`; nothing else on that branch is
