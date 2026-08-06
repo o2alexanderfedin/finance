@@ -461,7 +461,7 @@ of it to Phase 14, whose criteria are about tax correctness rather than the exec
 | 6. Guest ABI and Materialization | Week 1 | 0/TBD | Not started | - |
 | 7. `fjs_run` and Run Records | Week 1 | 0/8 | Planned | - |
 | 8. TY2025 Parameters and Tax Table | Week 2 | 3/4 | In Progress|  |
-| 9. Traceable Report Lines | Week 2 | 7/8 | In Progress|  |
+| 9. Traceable Report Lines | Week 2 | 8/8 | Complete   | 2026-08-06 |
 | 10. 1040 Core and Scope Guard | Week 2 | 0/TBD | Not started | - |
 | 11. Wage, Retirement, Benefit Documents | Week 3 | 0/TBD | Not started | - |
 | 12. Brokerage and Capital-Gain Chain | Week 3 | 0/TBD | Not started | - |
