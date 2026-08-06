@@ -917,6 +917,109 @@ export const proof = {
                 }
             },
         },
+        // 09-07: the pin path through fjsRunTool's OWN handler logic —
+        // E1 (`pinned`'s `&&` mutated to `||`) and E11 (the ok arm's
+        // `pinned` hardcoded to `false`) both survived because no proof
+        // in this file called `fjsRunTool.handle` with `subject`/`parents`
+        // at all; every pin proof drove `runExecuteRunViaFixture` (a
+        // decomposed replay of executeRun's OWN steps) directly instead.
+        // See the module header, and this plan's own SUMMARY, for why the
+        // THIRD mutation this task names (E2, dropping `...pinFields` from
+        // `fjsRunTool`'s own `executeRun(...)` call) needs an 'ok' outcome
+        // through `fjsRunTool.handle` itself — something `virtual` cannot
+        // produce in one call (07-10) — and is therefore proven in
+        // `fjs-run-integration.test.js` against a real, separate process
+        // instead.
+        pinIntegrity: {
+            // E1: a `subject`-only call (no `parents`) reaches
+            // `fjsRunTool.handle` itself — not `handleRunOutcome` in
+            // isolation — so `pinned`'s own `&&`-vs-`||` computation is
+            // exercised at its actual call site. A missing hash short-
+            // circuits `executeRun` before pin resolution ever runs, so
+            // this needs no materialize/import round trip: `pinned`/
+            // `pinFields` are computed from `args` before `executeRun` is
+            // even called.
+            subjectOnlyWithoutParentsPersistsPinnedFalse: () => {
+                const home = '/pin-subject-only'
+                const cas = fileCas(sha256)(home)
+                const [state0, cacheKey] = virtual(emptyState)(initEvo(cas))
+                const e = evo(cas)(cacheKey)
+                const [state1, callResult] = virtual(state0)(
+                    fjsRunTool(home)(cas)(e).handle({ hash: 'not-a-real-hash', subject: 'someSubject' }))
+                assertEq(callResult.isError, true)
+                const first = callResult.content[0]
+                if (first === undefined || first.type !== 'text') {
+                    throw ['expected a text content item', callResult]
+                }
+                const match = /run record: (\S+)\)/.exec(first.text)
+                assert(match !== null, ['expected the error text to name a run record hash', first.text])
+                const runHash = assertNotNullish(match[1], 'expected the run record hash capture group to be present')
+                const runHashVec = cBase32ToVec(runHash)
+                assert(runHashVec !== null, 'expected a decodable runHash')
+                const [, runRead] = virtual(state1)(collectRead(cas.read(/** @type {Vec} */ (runHashVec))))
+                assert(runRead[0] === 'ok', ['expected the run record to read back', runRead])
+                const [vt, record] = validateRun(JSON.parse(utf8ToString(runRead[1])))
+                assert(vt === 'ok', ['expected the record to validate', vt, record])
+                if (vt === 'ok') {
+                    // E1's own site: `args.subject !== undefined &&
+                    // args.parents !== undefined` must stay `false` when
+                    // only `subject` is supplied — an `||` mutation would
+                    // make this `true` instead, since `subject` alone is
+                    // truthy for its own half of the condition.
+                    assertEq(record.pinned, false)
+                    assertEq(record.subject, 'someSubject')
+                    assertEq(record.parents, undefined)
+                }
+            },
+            // E11: the ok arm's `pinned` field, read back from a
+            // PERSISTED record produced by a genuine `kind:'ok'` outcome.
+            // `handleRunOutcome` is `fjsRunTool.handle`'s OWN post-outcome
+            // logic (07-10's header: "unchanged, it now just delegates
+            // here"), so calling it directly with a real ok outcome and a
+            // `pinned: true` argument exercises the SAME record-assembly
+            // code a real pinned success would run through — it just
+            // reaches that code without the materialize/import round trip
+            // an 'ok' outcome through `fjsRunTool.handle` itself cannot
+            // complete under `virtual` (07-10).
+            successfulRunRecordsPinnedTrueWhenTheCallActuallyPinned: () => {
+                const home = '/pin-ok-arm'
+                const cas = fileCas(sha256)(home)
+                const [state0, cacheKey] = virtual(emptyState)(initEvo(cas))
+                const e = evo(cas)(cacheKey)
+                const programSource = 'export const report = ctx => args => ctx.pure("unused")'
+                const [state1, programHash] = virtual(state0)(seedText(cas)(programSource))
+                /** @type {Report<string>} */
+                const trivialReport = ctx => () => ctx.step(ctx.evoList('false'), () => ctx.pure('pinned-ok-value'))
+                const [state1b, outcome] = runExecuteRunViaFixture(home)(cas)(e)(programHash)(programSource)(trivialReport)([])(undefined)(state1)
+                assert(outcome.kind === 'ok', ['expected an ok outcome', outcome])
+                const pinFields = /** @type {{ readonly subject?: string, readonly parents?: readonly string[] }} */ ({ subject: 'pinnedSubject', parents: ['pinnedParent'] })
+                const [state2, callResult] = virtual(state1b)(handleRunOutcome(cas)(programHash)([])(true)(pinFields)(outcome))
+                assertEq(callResult.isError, undefined)
+                const first = callResult.content[0]
+                if (first === undefined || first.type !== 'text') {
+                    throw ['expected a text content item', callResult]
+                }
+                const parsed = /** @type {{ readonly runHash: string }} */ (JSON.parse(first.text))
+                const runHashVec = cBase32ToVec(parsed.runHash)
+                assert(runHashVec !== null, 'expected a decodable runHash')
+                const [, runRead] = virtual(state2)(collectRead(cas.read(/** @type {Vec} */ (runHashVec))))
+                assert(runRead[0] === 'ok', ['expected the run record to read back', runRead])
+                const [vt, record] = validateRun(JSON.parse(utf8ToString(runRead[1])))
+                assert(vt === 'ok', ['expected the record to validate', vt, record])
+                if (vt === 'ok') {
+                    // E11's own site: the ok arm's `pinned` field must be
+                    // the ACTUAL `pinned` argument (`true`, here) — a
+                    // hardcoded `false` would flip this assertion.
+                    assertEq(record.pinned, true)
+                    assertEq(record.subject, 'pinnedSubject')
+                    const parents = record.parents
+                    assert(parents !== undefined, 'expected parents to be present on a pinned record')
+                    if (parents !== undefined) {
+                        assertEq(parents[0], 'pinnedParent')
+                    }
+                }
+            },
+        },
         // EXEC-12, Success Criterion 4: three named failure classes, each
         // its own leaf so a regression localizes — a combined loop cannot
         // say WHICH class broke. Each leaf drives the FULL fjsRunTool.handle

@@ -333,6 +333,72 @@ test(
                 runRecord.inputs.some(i => i.command === 'evoHead' && i.payload[0] === subjectC),
                 'expected subjectC (the absent-field document) to have been enumerated')
 
+            // ── 09-07: the pin path through the SHIPPED fjs_run tool,
+            // against a real separate process — the assertion that fails
+            // when `...pinFields` is dropped from fjsRunTool's own
+            // `executeRun(...)` call (E2). No virtual proof can make this
+            // assertion at all: `fjsRunTool.handle` cannot reach an 'ok'
+            // outcome under `fjs/effects/node/virtual` in a single call
+            // (the write/import split `fjs/server/fjs_run/module.f.js`'s
+            // own header documents), so every virtual-level pin proof in
+            // that file drives `runExecuteRunViaFixture` — a decomposed
+            // replay of `executeRun`'s OWN steps — directly, bypassing
+            // `fjsRunTool.handle` entirely. This is the one place the gap
+            // can be closed for real: a genuinely separate process has no
+            // such limitation ──────────────────────────────────────────
+            const pinSubject = 'finance-integration-pin-subject'
+            const pinLiveRevResponse = await call('evo_add', {
+                parents: [],
+                subject: pinSubject,
+                snapshot: docAHash,
+            })
+            assert.ok(
+                !pinLiveRevResponse.result.isError,
+                `evo_add (pin setup) failed: ${JSON.stringify(pinLiveRevResponse)}`)
+            const pinLiveRevHash = pinLiveRevResponse.result.content[0].text
+
+            // A program that reads exactly one subject's head — the SAME
+            // shape `fjs/server/fjs_run/module.f.js`'s own
+            // `pinOverridesTheLiveHeadThroughFullExecuteRun` proof uses at
+            // the decomposed-fixture layer, written here as real source
+            // text a real process really writes and really imports.
+            const pinProgramSource = 'export const report = ctx => args => ctx.evoHead(args[0])'
+            const pinProgramHash = await casAdd(pinProgramSource)
+
+            const pinnedParents = ['PINNED-INSTEAD-OF-LIVE-HEAD']
+            const pinRunResponse = await call('fjs_run', {
+                hash: pinProgramHash,
+                args: [pinSubject],
+                subject: pinSubject,
+                parents: pinnedParents,
+            })
+            assert.equal(
+                pinRunResponse.result.isError, undefined,
+                `pinned fjs_run failed: ${JSON.stringify(pinRunResponse)}`)
+            const pinParsed = JSON.parse(pinRunResponse.result.content[0].text)
+
+            const pinResultGet = await call('cas_get', { hash: pinParsed.resultHash, content: true })
+            assert.ok(!pinResultGet.result.isError, `cas_get(pin resultHash) failed: ${JSON.stringify(pinResultGet)}`)
+            const pinResultMeta = JSON.parse(pinResultGet.result.content[0].text)
+            // The decisive assertion: the run's OWN result reflects the
+            // PINNED parents just supplied, never the live head `evo_add`
+            // established a moment ago. If `...pinFields` is ever dropped
+            // from `fjsRunTool`'s own `executeRun(...)` call, `executeRun`
+            // sees no pin at all and resolves the subject's LIVE head
+            // instead — this assertion is what catches that.
+            assert.equal(pinResultMeta.text, JSON.stringify(pinnedParents))
+            assert.notEqual(pinResultMeta.text, JSON.stringify([pinLiveRevHash]))
+
+            // The persisted run record itself claims the pin it actually
+            // applied — the same fields E1/E11's mutations would silently
+            // misreport (PROV-03: a record cannot lie about what ran).
+            const pinRunGet = await call('cas_get', { hash: pinParsed.runHash, content: true })
+            assert.ok(!pinRunGet.result.isError, `cas_get(pin runHash) failed: ${JSON.stringify(pinRunGet)}`)
+            const pinRunRecord = JSON.parse(JSON.parse(pinRunGet.result.content[0].text).text)
+            assert.equal(pinRunRecord.pinned, true)
+            assert.equal(pinRunRecord.subject, pinSubject)
+            assert.deepEqual(pinRunRecord.parents, pinnedParents)
+
             // ── 09-05: the zero-read adversary through the REAL server —
             // the exact verbatim ROADMAP adversary, `() => pure({ line16:
             // 9137 })`, stored for real via THIS SAME live session's cas_add
