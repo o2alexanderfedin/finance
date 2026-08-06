@@ -154,7 +154,9 @@ specifying `halfUp` at cent precision was caught and corrected during execution.
 
 `i1040gi.pdf` (127pp) — p32 Social Security Benefits Worksheet, p34–35 Standard Deduction
 Worksheet, p36–38 line-16 instructions and the dispatch tree, **p38 the 25-line QDCGT
-worksheet**, p124 Tax Computation Worksheet. `i1040sd.pdf` (17pp) — p15–16 Schedule D Tax
+worksheet**, **p80 Tax Computation Worksheet** (NOT p124 — that is the alphabetical index, and an
+earlier page-locate here matched it by mistake; the plans corrected it and this file did not follow
+until plan 10-03's executor reported the stale reference). `i1040sd.pdf` (17pp) — p15–16 Schedule D Tax
 Worksheet. `f1040.pdf` — the form face. `p1040.pdf` — the Tax Table.
 
 ## Standard deduction TY2025 — VERIFIED, and one correction
