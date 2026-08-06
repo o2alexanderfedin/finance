@@ -1443,7 +1443,15 @@ Phase 1's precedent — say so explicitly.
 
 ## Open Questions
 
-### 1. `ReportLine.sources` cannot express a parameter-derived line
+**All six were resolved by `10-CONTEXT.md` on 2026-08-06 and are recorded here so a later reader does
+not re-open them.** Two of the six were resolved AGAINST this document's own recommendation; those
+are flagged at the question. Where a plan implements the resolution, it is named.
+
+### 1. `ReportLine.sources` cannot express a parameter-derived line — **(RESOLVED: Decision 4)**
+
+**Resolution: option (a)**, as recommended. The return profile becomes a real CAS document and line
+12e cites its `filingStatus` and 12d checkbox boxes. Phase 9's type and its `tsc` guarantee are
+untouched. Implemented by Plan 10-04 (the dialect) and Plan 10-09 (line 12e's sources).
 
 - **What we know:** `sources` is `readonly [Source, ...Source[]]` where `Source =
   { documentHash, boxPath, value }`. Empty or omitted `sources` fails `tsc` — deliberately, and a
@@ -1457,7 +1465,10 @@ Phase 1's precedent — say so explicitly.
 - **Recommendation: (a).** It needs the profile document, which the scope guard needs anyway, and it
   leaves the Phase 9 type — and its `tsc`-level guarantee — untouched.
 
-### 2. Does Phase 10 introduce the return-profile dialect, or does it come from somewhere else?
+### 2. Does Phase 10 introduce the return-profile dialect? — **(RESOLVED: Decision 4)**
+
+**Resolution: Phase 10 introduces it**, as recommended, in Plan 10-04, registered in
+`finance_schema`'s `dialectSchemas`.
 
 - **What we know:** four dialects exist; none is a profile. Lines 12a–12d, the filing status, line 26,
   and the entire scope-guard input have no home.
@@ -1465,7 +1476,15 @@ Phase 1's precedent — say so explicitly.
 - **Recommendation:** Phase 10, first plan. Three of the four success criteria depend on it. It also
   needs registering in `fjs/server/finance_schema`'s `dialectSchemas`, which is a small, well-precedented change.
 
-### 3. How is the Schedule D Tax Worksheet branch satisfied in Phase 10?
+### 3. How is the Schedule D Tax Worksheet branch satisfied in Phase 10? — **(RESOLVED: Decision 1 — AGAINST this document's recommendation)**
+
+**Resolution: option (b)**, the named refusal — NOT option (a), which this section recommended. The
+branch is SELECTED by `dispatchLine16` (Plan 10-08) and then dispatches to a TAX-16 scope refusal
+naming unrecaptured §1250 gain and 28%-rate gain; the 47-line computation moves to Phase 12 with the
+brokerage documents that feed it. **Consequence for anyone reading further:** the
+degenerate-equivalence differential proof this document proposes (assumption A4) cannot be written
+in Phase 10 — there is no second transcription to differ against. It is Phase 12's proof. Plan 10-08
+records that at the site.
 
 - **What we know:** TAX-03 says "a proof per branch", including Sch D TW. Its inputs (Schedule D lines
   15/16/18/19) require Schedule D, which is Phase 12 (TAX-11).
@@ -1478,7 +1497,13 @@ Phase 1's precedent — say so explicitly.
   in this document), and the degenerate-equivalence proof makes it self-checking on day one. (b)
   defers the hardest work to a phase already carrying 1099-DIV, 1099-B, 8949, and Schedule D.
 
-### 4. How is `qualifyingSurvivingSpouse` modelled?
+### 4. How is `qualifyingSurvivingSpouse` modelled? — **(RESOLVED: Decision 6 — AGAINST this document's recommendation)**
+
+**Resolution: option (a)**, a real member of `IndividualFilingStatus` with its own stored parameter
+rows — NOT option (b), the call-site mapping this section recommended. The deciding fact is the one
+this section itself surfaced: QSS's maximum box count is 2 where MFJ's is 4, so a mapping would
+silently permit a four-box standard deduction no QSS filer can claim. Implemented by Plan 10-01;
+the Tax Table's missing QSS column is handled once, by `taxTableColumnFor` in Plan 10-03.
 
 - **What we know:** amounts equal MFJ's everywhere; the box-count maximum does not (2 vs 4); Pub. 1040's
   Tax Table prints no QSS column (QSS reads the MFJ column).
@@ -1488,13 +1513,24 @@ Phase 1's precedent — say so explicitly.
 - **Recommendation: (b)**, since the parameter data would otherwise carry a duplicate row that must be
   kept in sync — but this is a genuine judgement call and belongs in discuss.
 
-### 5. Cents regime or whole-dollar regime — and does the election live in the profile?
+### 5. Cents regime or whole-dollar regime — and does the election live in the profile? — **(RESOLVED: Decision 5)**
+
+**Resolution: the cents regime**, as recommended, with the whole-dollar election as a separate,
+explicit all-or-nothing projection applied at report time to the unrounded line values — and the
+election lives in the return profile (`wholeDollarElection`). Implemented by Plan 10-02
+(`applyWholeDollarElection`) and applied once, over the whole line list, by Plan 10-10. This is what
+makes criterion 5 non-vacuous; see Decision 5's own reasoning.
 
 See §"Rounding". Criterion 5 cannot be satisfied without the whole-dollar election existing somewhere.
 Phase 14's acceptance against a real filed return needs to match whatever the taxpayer actually
 elected, which argues for putting the election in the return profile.
 
-### 6. Do lines 26, 35a, and 36 need a source?
+### 6. Do lines 26, 35a, and 36 need a source? — **(RESOLVED: Decision 4)**
+
+**Resolution: they live in the return profile**, so `ReportLine.sources` is satisfied for free and
+this is not a second instance of Open Question 1. The profile carries
+`line26EstimatedTaxPayments`, `line35aRefundRequested` and `line36AppliedToNextYear` (Plan 10-04),
+consumed by Plan 10-10.
 
 Line 26 (estimated tax payments) and lines 35a/36 (refund elections) are taxpayer-supplied with no
 document. If they live in the return profile, `ReportLine.sources` is satisfied for free. If not, they
