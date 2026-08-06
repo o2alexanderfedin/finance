@@ -127,6 +127,14 @@ const validateShape = rttiValidate(runSchema)
  *   frozen four) — T-07-02-01: an unrecognized command name means this
  *   record was hand-crafted or corrupted, since a genuine run can never have
  *   observed a command outside that set.
+ * - `pinned` must agree with `subject`/`parents`: both present when it is
+ *   `true`, both absent when it is `false`. `runSchema`'s own docstring
+ *   already states this ("an unpinned or subject-less run has neither a
+ *   resolved subject nor a parent-revision snapshot to record"), and without
+ *   the check a record could name the subject a run was *about* while
+ *   recording that the run was never pinned to it — a reader cannot tell such
+ *   a record from a genuinely pinned one by looking at `subject` alone. The
+ *   `status` rule below is the same kind of check; this one was missing.
  * - If `status === 'ok'`: `resultHash` must be present (non-empty) and
  *   `error` must be absent.
  * - If `status === 'error'`: `error` must be present (non-empty) and
@@ -142,6 +150,13 @@ export const checkReferences = r => {
         if (!casOpNames.includes(input.command)) {
             return error(`inputs[].command is not one of the frozen four: ${input.command}`)
         }
+    }
+    if (r.pinned) {
+        if (r.subject === undefined || r.parents === undefined) {
+            return error('a pinned run record must have both subject and parents')
+        }
+    } else if (r.subject !== undefined || r.parents !== undefined) {
+        return error('an unpinned run record must have neither subject nor parents')
     }
     if (r.status === 'ok') {
         if (r.resultHash === undefined || r.resultHash.trim() === '') {
@@ -296,6 +311,38 @@ export const proof = {
         okWithErrorFieldRejected: () => {
             const [t] = validate({ ...minimalOk, error: 'should not be here' })
             assertEq(t, 'error')
+        },
+        // `pinned` and `subject`/`parents` must agree, in both directions —
+        // the same kind of cross-field rule `status` already had. Without it a
+        // record could name the subject a run was *about* while recording that
+        // the run was never pinned to it, and no reader could tell that record
+        // from a genuinely pinned one.
+        unpinnedWithSubjectRejected: () => {
+            const [t] = validate({ ...minimalOk, pinned: false, subject: 'form:1099int:11-1111111:222-22-2222:ACC-0001:2024' })
+            assertEq(t, 'error')
+        },
+        unpinnedWithParentsRejected: () => {
+            const [t] = validate({ ...minimalOk, pinned: false, parents: ['sha256-parent1'] })
+            assertEq(t, 'error')
+        },
+        pinnedWithoutSubjectRejected: () => {
+            const [t] = validate({ ...minimalOk, pinned: true, parents: ['sha256-parent1'] })
+            assertEq(t, 'error')
+        },
+        pinnedWithoutParentsRejected: () => {
+            const [t] = validate({ ...minimalOk, pinned: true, subject: 'form:1099int:11-1111111:222-22-2222:ACC-0001:2024' })
+            assertEq(t, 'error')
+        },
+        // The two consistent shapes still pass, so the rule above is a
+        // constraint and not a blanket refusal.
+        pinnedWithBothAccepted: () => {
+            const [t] = validate({
+                ...minimalOk,
+                pinned: true,
+                subject: 'form:1099int:11-1111111:222-22-2222:ACC-0001:2024',
+                parents: ['sha256-parent1'],
+            })
+            assertEq(t, 'ok')
         },
         canonicalOkAccepted: () => {
             const [t] = validate(minimalOk)
