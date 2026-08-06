@@ -185,4 +185,18 @@ export const proof = {
         const fixture = 'export const report = ctx => () => ctx.pure({ line16: 9137 })'
         assertEq(countNumericLiterals(fixture), 1)
     },
+
+    // A1 (09-07): `stripStringsAndComments`' own header states strings are
+    // stripped BEFORE comments deliberately, because a string containing
+    // `//` would otherwise be misread as starting a line comment mid-
+    // string. No existing case above contains such a string, so reversing
+    // that order survived undetected. A URL literal is the header's own
+    // example: with the documented (correct) order, the whole string is
+    // stripped first and `5` is the only literal left. Reversed, the line
+    // comment pattern fires on the `//` inside the still-present string
+    // literal and swallows everything to end of line — including the real
+    // `5` — undercounting to 0.
+    stringContainingSlashSlashIsNotMisreadAsACommentStart: () => {
+        assertEq(countNumericLiterals("const s = 'http://x.com'; const n = 5"), 1)
+    },
 }

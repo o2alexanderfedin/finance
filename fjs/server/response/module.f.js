@@ -278,6 +278,52 @@ export const proof = {
         tooLargeMessageIsTheContractString: () => {
             assertEq(tooLargeMessage('ABC123'), 'result too large; stored at ABC123')
         },
+        // R1/R2 (09-07): the three band proofs above all use content
+        // comfortably either side of a threshold, so `sizeGuard`'s `<=` at
+        // both `previewBytes` and `guardBytes` can be mutated to `<`
+        // undetected — nothing lands ON a boundary. These two land exactly
+        // on each one. Byte length is measured the SAME way `sizeGuard`
+        // itself measures it (`tryUtf8` + bit_vec `length`/8), never
+        // `.length`, so this proof and the code under test agree on what a
+        // byte is — a repeated single-byte ASCII character makes that
+        // measurement and `content`'s own `.length` coincide here, but the
+        // assertion below still goes through the shared measurement so it
+        // would still catch a change to how bytes are counted.
+        exactBoundaries: {
+            // Exactly `previewBytes`: still inlined in FULL, untruncated.
+            // `<=` keeps this band; a `<` mutation at `previewBytes` would
+            // push it into the truncated-preview band instead.
+            exactlyPreviewBytesInlinedInFullNotTruncated: () => {
+                const guard = 16
+                const preview = 8
+                const content = 'x'.repeat(preview)
+                const encoded = tryUtf8(content)
+                assert(encoded !== null, 'expected the boundary content to encode as UTF-8')
+                assertEq(bitLength(encoded) / 8n, BigInt(preview))
+                const result = sizeGuard(guard)(preview)(content, 'HASH')
+                assertEq(result.truncated, false)
+                assertEq(result.preview, content)
+            },
+            // Exactly `guardBytes` (and over `previewBytes`): a truncated
+            // PREVIEW, never the "too large" message. `<=` keeps this band;
+            // a `<` mutation at `guardBytes` would push it into the
+            // too-large band instead, even though the content is not over
+            // the guard at all.
+            exactlyGuardBytesTruncatedNotTooLarge: () => {
+                const guard = 16
+                const preview = 8
+                const content = 'x'.repeat(guard)
+                const encoded = tryUtf8(content)
+                assert(encoded !== null, 'expected the boundary content to encode as UTF-8')
+                assertEq(bitLength(encoded) / 8n, BigInt(guard))
+                const result = sizeGuard(guard)(preview)(content, 'HASH')
+                assertEq(result.truncated, true)
+                assertEq(result.preview, content.slice(0, preview))
+                assert(
+                    result.preview !== tooLargeMessage('HASH'),
+                    'expected a truncated preview, not the too-large message, exactly at guardBytes')
+            },
+        },
     },
     // A separate, trivial proof pinning the SHIPPED constants — kept apart
     // from the parameterized logic proof above so the two can never drift:
