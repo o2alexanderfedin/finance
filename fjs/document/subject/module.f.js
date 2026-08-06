@@ -116,6 +116,26 @@ export const proof = {
         assertEq(a === b, false)
         assertEq(formSubject(a), formSubject(b))
     },
+    // T-09-08-03: every `changingOneField` leaf below only asserts that
+    // reordering the encoded array's fields — or serializing `taxYear` as a
+    // raw number instead of `String(taxYear)` — CHANGES the result; a
+    // reordering or an un-stringified year would still change some field's
+    // effect and pass every one of those leaves. This leaf pins what the
+    // encoding actually IS: a HAND-TYPED golden literal, independent of
+    // `formSubject`'s own `JSON.stringify` call (AGENTS.md: "a proof's
+    // expected value must not be produced by the code under test").
+    //
+    // This literal is a stored artifact's shape, not an implementation
+    // detail: every subject already written under it is filed in Evo by
+    // this exact string. Changing this literal to make a future proof pass
+    // is a DATA MIGRATION for every document already stored, never a
+    // refactor to wave through on a green suite.
+    goldenEncodedSubjectValue: () => {
+        assertEq(
+            formSubject(baseline),
+            '["vnd.fjs.1099int","2024","11-1111111","222-22-2222","ACC-0001"]',
+        )
+    },
     // Changing exactly one of the five fields, holding the other four
     // fixed, changes the resulting subject — one leaf per field.
     changingOneField: {
