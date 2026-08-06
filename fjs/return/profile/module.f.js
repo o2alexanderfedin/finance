@@ -1,0 +1,648 @@
+/**
+ * `vnd.fjs.return_profile` — the taxpayer-DECLARED return profile
+ * (10-CONTEXT.md Decision 4).
+ *
+ * ## Why this document exists at all
+ *
+ * TAX-16 asks for a loud refusal whenever an input the engine does not model
+ * would change the return. The obvious implementation — refuse when the CAS
+ * store holds a document whose dialect we cannot read — **cannot work**:
+ *
+ * > The engine never sees the documents it cannot read.
+ *
+ * A taxpayer with a 1099-DIV in a drawer and none in CAS produces an empty
+ * dividend line. So does a taxpayer with no dividends at all. An absent
+ * document is indistinguishable from an absent income kind, so a store-driven
+ * guard stays silent in exactly the case TAX-16 exists for. The comparison has
+ * to be against something the taxpayer *declares* — which is this document.
+ *
+ * The same artefact resolves a second, unrelated defect. `ReportLine.sources`
+ * (`fjs/report/line`) is a NON-EMPTY tuple of `{documentHash, boxPath, value}`,
+ * enforced at `tsc` level, and the standard deduction (line 12e) derives from
+ * a filing status and a set of checked boxes rather than from any document —
+ * so line 12e could not be expressed at all. A stored profile is a real CAS
+ * document with a real hash, so line 12e cites it and Phase 9's `tsc`
+ * guarantee is left untouched rather than widened.
+ *
+ * ## Shape follows `fjs/document/1099int`'s four-stage template
+ *
+ * `dialect` -> `mediaType` -> schema -> structural `validateShape` -> semantic
+ * `checkReferences` -> composed `validate`. AGENTS.md: new file formats follow
+ * the `fjs/media/revision` precedent, so the tag is `vnd.fjs.return_profile`
+ * and its media type is DERIVED by `mediaTypeOf`, never hand-written.
+ *
+ * ## Three schema decisions worth stating
+ *
+ * - **Every checkbox is `option(true)`, never a two-valued primitive.** DOC-12's
+ *   rule, exactly as `corrected: option(true)` on the 1099-INT and
+ *   `archived: option(true)` on `vnd.fjs.revision`: an unchecked box is the
+ *   key's ABSENCE. `spouseIsBlind: false` is rejected structurally rather than
+ *   accepted as "not blind", so a serializer that helpfully materializes every
+ *   key cannot smuggle a checkbox in as data.
+ * - **Every money box is `option(string)`.** AGENTS.md: money in a stored JSON
+ *   document is a decimal string, never a JSON number — a JSON number is an
+ *   IEEE 754 double by the time `media/json`'s `Unknown` sees it. Exactness is
+ *   enforced in {@link checkReferences} via the shared
+ *   `fjs/document/money_field` check, mirroring how `vnd.fjs.revision` types
+ *   `hash` as a string and defers to `isHash`.
+ * - **There is deliberately no `formRevision` field.** DOC-10 exists because
+ *   printed IRS forms change box semantics between revisions of the same form,
+ *   so a stored instance must carry the revision it was read from. This is not
+ *   a printed form — nobody OCRs a return profile — and its versioning is the
+ *   dialect tag itself. Adding a revision here would be cargo-culting DOC-10
+ *   onto a document whose failure mode it does not describe.
+ *
+ * @module
+ */
+import { array, number, option, string } from 'functionalscript/fjs/types/rtti/module.f.js'
+import { validate as rttiValidate } from 'functionalscript/fjs/types/rtti/validate/module.f.js'
+import { error, ok } from 'functionalscript/fjs/types/result/module.f.js'
+import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
+import { base, mediaTypeOf } from '../../document/base/module.f.js'
+import { moneyFieldError } from '../../document/money_field/module.f.js'
+import {
+    dialect as oneZeroNineNineIntDialect,
+    oneZeroNineNineIntSchema,
+} from '../../document/1099int/module.f.js'
+import { individualFilingStatuses, taxParamsByYear } from '../../tax/params/module.f.js'
+
+/** @import { Result } from 'functionalscript/fjs/types/result/module.f.js' */
+/** @import { Ts, Unknown } from 'functionalscript/fjs/types/rtti/ts/module.f.js' */
+/** @import { ValidationError } from 'functionalscript/fjs/types/rtti/validate/module.f.js' */
+
+/**
+ * Format tag: names the dialect of this BLOB. The media type it is served
+ * with is derived mechanically: `application/` + `dialect` + `+json`.
+ */
+export const dialect = 'vnd.fjs.return_profile'
+/** The media type derived from {@link dialect}: `application/vnd.fjs.return_profile+json`. */
+export const mediaType = mediaTypeOf(dialect)
+
+/**
+ * The FROZEN vocabulary of income, deduction, credit and payment kinds a
+ * taxpayer may declare on a 2025 Form 1040, in FORM ORDER so a reviewer can
+ * diff this list against the printed face rather than against their memory of
+ * it. The trailing comment on each member is the 1040 line it feeds.
+ *
+ * Frozen in the same sense `fjs/guest`'s four commands are: Plan 10-07 adds a
+ * `tsc`-level assertion that every {@link Kind} is either modeled or carries a
+ * refusal entry, so adding a member here without classifying it there stops at
+ * `tsc`, before a test runs. That is the mechanism `fjs/guest`'s
+ * `_CasOpIsExactlyTheFourCommands` already establishes.
+ */
+export const kindVocabulary = /** @type {const} */ ([
+    'wages',                                // 1a
+    'householdEmployeeWages',               // 1b
+    'unreportedTips',                       // 1c
+    'medicaidWaiverPayments',               // 1d
+    'dependentCareBenefits',                // 1e
+    'adoptionBenefits',                     // 1f
+    'form8919Wages',                        // 1g
+    'otherEarnedIncome',                    // 1h
+    'nontaxableCombatPayElection',          // 1i
+    'taxExemptInterest',                    // 2a
+    'taxableInterest',                      // 2b
+    'qualifiedDividends',                   // 3a
+    'ordinaryDividends',                    // 3b
+    'iraDistributions',                     // 4a/4b
+    'pensionsAndAnnuities',                 // 5a/5b
+    'socialSecurityBenefits',               // 6a/6b
+    'capitalGainDistributions',             // 7a
+    'capitalGainsOrLosses',                 // 7a via Schedule D
+    'unrecaptured1250Gain',                 // Schedule D line 19
+    'collectibles28RateGain',               // Schedule D line 18
+    'section1202Gain',                      // 1099-DIV box 2c
+    'investmentInterestForm4952',           // Form 4952 line 4g
+    'scheduleOneAdditionalIncome',          // 8
+    'scheduleOneAdjustments',               // 10
+    'itemizedDeductions',                   // 12e
+    'netQualifiedDisasterLoss',             // 12e exception 5
+    'qualifiedBusinessIncomeDeduction',     // 13a
+    'seniorAndOtherScheduleOneADeductions', // 13b
+    'scheduleTwoTaxes',                     // 17 and 23
+    'childTaxCreditOrOtherDependents',      // 19
+    'scheduleThreeNonrefundableCredits',    // 20
+    'federalTaxWithheldOnW2',               // 25a
+    'federalTaxWithheldOn1099Int',          // 25b
+    'federalTaxWithheldOnOther1099',        // 25b
+    'federalTaxWithheldOnOtherForms',       // 25c
+    'estimatedTaxPayments',                 // 26
+    'earnedIncomeCredit',                   // 27a
+    'additionalChildTaxCredit',             // 28
+    'americanOpportunityCredit',            // 29
+    'refundableAdoptionCredit',             // 30
+    'scheduleThreeRefundableCredits',       // 31
+    'foreignEarnedIncomeForm2555',          // line 16 wrapper
+    'childsUnearnedIncomeForm8615',         // line 16 wrapper
+    'farmIncomeAveragingScheduleJ',         // line 16 wrapper
+    'form8814ChildInterestAndDividends',    // line 16 add-on
+    'form4972LumpSumDistribution',          // line 16 add-on
+    'section962Election',                   // line 16 add-on
+    'educationCreditRecapture',             // line 16 add-on
+    'form8621',                             // line 16 add-on
+    'form8978',                             // line 16 add-on
+])
+
+/** One member of {@link kindVocabulary}.
+ * @typedef {typeof kindVocabulary[number]} Kind
+ */
+
+/**
+ * rtti schema for a `return_profile` BLOB. `dialect` is spread first (via
+ * `base`) so structural validation reports it as the first failing field on a
+ * mismatched blob — DOC-00's criterion-1 discriminant, proven by
+ * `proof.crossDialect` below.
+ */
+export const returnProfileSchema = /** @type {const} */ ({
+    ...base(dialect),
+    taxYear: number,
+    filingStatus: string,
+    // Line 12a — someone can claim you (or your spouse) as a dependent.
+    claimedAsDependent: option(true),
+    // Line 12b — married filing separately and your spouse itemizes.
+    spouseItemizes: option(true),
+    // Line 12c — dual-status alien.
+    dualStatusAlien: option(true),
+    // Line 12d — the four age/blindness boxes.
+    taxpayerBornBeforeJan2_1961: option(true),
+    taxpayerIsBlind: option(true),
+    spouseBornBeforeJan2_1961: option(true),
+    spouseIsBlind: option(true),
+    // The i1040gi p33 footnote condition that alone permits a married-filing-
+    // separately filer to check the two SPOUSE boxes above. See check 5b.
+    spouseHadNoIncomeIsNotFilingAndIsNotADependent: option(true),
+    dependentCount: number,
+    declaredKinds: array(string),
+    // Decision 5 — the IRS whole-dollar election, all-or-nothing per return.
+    wholeDollarElection: option(true),
+    // Standard Deduction Worksheet for Dependents input.
+    earnedIncome: option(string),
+    line26EstimatedTaxPayments: option(string),
+    line35aRefundRequested: option(string),
+    line36AppliedToNextYear: option(string),
+})
+
+/** @typedef {Ts<typeof returnProfileSchema>} ReturnProfile */
+
+/** Structural-only validator: checks the shape, not the semantic refinements below. */
+const validateShape = rttiValidate(returnProfileSchema)
+
+/**
+ * The money-box field names this dialect carries, walked in a loop so the
+ * exactness re-parse (DRY) is written once rather than four times. Typed via
+ * `@type {const}` — not a wider `keyof ReturnProfile` annotation — so
+ * `r[field]` resolves to exactly `string | undefined` rather than the union of
+ * every field's type.
+ */
+const moneyBoxFields = /** @type {const} */ ([
+    'earnedIncome',
+    'line26EstimatedTaxPayments',
+    'line35aRefundRequested',
+    'line36AppliedToNextYear',
+])
+
+/**
+ * {@link kindVocabulary} widened to a plain string list. This is an ordinary
+ * widening ASSIGNMENT, not a cast: the tuple's literal member types are a
+ * subtype of `string`, so nothing is silenced. It exists because the value
+ * being tested arrives from an untrusted blob as a `string`, and
+ * `readonly ['wages', ...]`'s own `.includes` would reject that argument at
+ * compile time — which would be the compiler refusing to let us ask the
+ * question the check exists to answer.
+ * @type {readonly string[]}
+ */
+const kindNames = kindVocabulary
+
+/**
+ * The permitted `filingStatus` values, widened the same way and for the same
+ * reason. Read from `fjs/tax/params` rather than restated here: a status this
+ * dialect accepted but that module had no parameters for would be a profile
+ * the engine cannot compute.
+ * @type {readonly string[]}
+ */
+const filingStatusNames = individualFilingStatuses
+
+/**
+ * The filing statuses that may check NO spouse age/blindness box, because
+ * there is no spouse for a box to describe.
+ *
+ * `[i1040gi p33, Lines 12a-12d]` — "**Don't check any boxes for your spouse if
+ * your filing status is head of household.**" A `'single'` filer has no
+ * spouse, and a `'qualifyingSurvivingSpouse'` filer's spouse is deceased.
+ * These three statuses are exactly the ones the 1040-SR Standard Deduction
+ * Chart caps at TWO boxes, while `'marriedFilingJointly'` and
+ * `'marriedFilingSeparately'` reach FOUR — see 10-CONTEXT.md's chart, which
+ * records the same maxima read from `f1040s.pdf` p4.
+ * @type {readonly string[]}
+ */
+const statusesWithoutSpouseBoxes = ['single', 'headOfHousehold', 'qualifyingSurvivingSpouse']
+
+/**
+ * Either a structural validation error or a semantic (string) error message.
+ * @typedef {ValidationError | string} ReturnProfileError
+ */
+
+/**
+ * Checks the semantic refinements the structural schema cannot express, in a
+ * fixed order so a blob failing several reports the most fundamental first:
+ *
+ * 1. `filingStatus` names a status `fjs/tax/params` actually stores.
+ * 2. `taxYear` is an integer with a stored parameter set. An unsupported year
+ *    refuses LOUDLY at ingest instead of failing deep inside a computation
+ *    where the cause is no longer visible. The lookup is bound to a local and
+ *    compared against `undefined` (`noUncheckedIndexedAccess` makes that
+ *    `undefined` real) — no cast, no non-null assertion.
+ * 3. `dependentCount` is a non-negative integer.
+ * 4. Every declared kind is a member of {@link kindVocabulary} and appears
+ *    once. The refusal names the offending kind AND the known vocabulary,
+ *    mirroring `finance_schema`'s unknown-dialect refusal.
+ * 5. Spouse boxes are absent for the three statuses that have no spouse.
+ * 5b. Married filing separately's spouse boxes require the footnote condition.
+ * 6. Every PRESENT money box is an exact decimal string at the cents scale.
+ * 7. A present line-26 amount has `'estimatedTaxPayments'` declared.
+ *
+ * Nothing here throws: every refusal is an `error(...)` the caller unwraps, so
+ * a hostile blob can never escape `validate` as an exception.
+ * @type {(r: ReturnProfile) => Result<ReturnProfile, ReturnProfileError>}
+ */
+export const checkReferences = r => {
+    // 1 — a status with no stored parameters is not computable.
+    if (!filingStatusNames.includes(r.filingStatus)) {
+        return error(
+            `unknown filingStatus: ${r.filingStatus}; known: ${filingStatusNames.join(', ')}`,
+        )
+    }
+    // 2 — an unsupported tax year, refused at the boundary.
+    if (!Number.isInteger(r.taxYear)) {
+        return error(`taxYear must be a whole year: ${r.taxYear}`)
+    }
+    const params = taxParamsByYear[r.taxYear]
+    if (params === undefined) {
+        return error(`no stored tax parameters for taxYear ${r.taxYear}`)
+    }
+    // 3
+    if (!Number.isInteger(r.dependentCount) || r.dependentCount < 0) {
+        return error(`dependentCount must be a non-negative whole count: ${r.dependentCount}`)
+    }
+    // 4 — the frozen vocabulary, and no repeats. A repeated kind would make
+    // "declared once" and "declared twice" indistinguishable to any later
+    // set comparison, so it is refused rather than silently deduplicated.
+    for (const kind of r.declaredKinds) {
+        if (!kindNames.includes(kind)) {
+            return error(`unknown declared kind: ${kind}; known: ${kindNames.join(', ')}`)
+        }
+        if (r.declaredKinds.indexOf(kind) !== r.declaredKinds.lastIndexOf(kind)) {
+            return error(`duplicate declared kind: ${kind}`)
+        }
+    }
+    // 5 — see {@link statusesWithoutSpouseBoxes} for the primary source.
+    if (
+        statusesWithoutSpouseBoxes.includes(r.filingStatus)
+        && (r.spouseBornBeforeJan2_1961 !== undefined || r.spouseIsBlind !== undefined)
+    ) {
+        return error(
+            `filingStatus ${r.filingStatus} may not check a spouse age or blindness box`,
+        )
+    }
+    // 5b — married filing separately's third and fourth boxes are CONDITIONAL,
+    // and the condition is enforced here rather than assumed.
+    //
+    // `[i1040gi p33 / f1040s.pdf p4 footnote]` — a married-filing-separately
+    // filer may check the spouse boxes only "if your spouse had no income,
+    // isn't filing a return, and can't be claimed as a dependent on another
+    // person's return." Quoting that and then accepting both boxes
+    // unconditionally would hand an MFS return up to $3,200 (two boxes x
+    // $1,600) of standard deduction it may not be entitled to, silently —
+    // the same class of defect 10-CONTEXT.md Decision 6 exists to prevent for
+    // a qualifying surviving spouse, one status over.
+    //
+    // The flag is a taxpayer ASSERTION, not a derivation: this engine cannot
+    // observe the spouse's income or filing behaviour, so it records that the
+    // taxpayer claimed the condition. That is what makes the resulting
+    // deduction attributable to a declaration rather than to an assumption.
+    if (
+        r.filingStatus === 'marriedFilingSeparately'
+        && (r.spouseBornBeforeJan2_1961 !== undefined || r.spouseIsBlind !== undefined)
+        && r.spouseHadNoIncomeIsNotFilingAndIsNotADependent === undefined
+    ) {
+        return error(
+            'marriedFilingSeparately may check a spouse age or blindness box only when '
+            + 'spouseHadNoIncomeIsNotFilingAndIsNotADependent is declared',
+        )
+    }
+    // 6 — DOC-11: an absent box is skipped, never defaulted to zero.
+    for (const field of moneyBoxFields) {
+        const printed = r[field]
+        if (printed === undefined) {
+            continue
+        }
+        const message = moneyFieldError(field)(printed)
+        if (message !== undefined) {
+            return error(message)
+        }
+    }
+    // 7 — an amount with no declared kind is an input the scope guard never
+    // sees: the silent omission this whole phase exists to prevent, appearing
+    // inside the very document meant to prevent it.
+    if (
+        r.line26EstimatedTaxPayments !== undefined
+        && !r.declaredKinds.includes('estimatedTaxPayments')
+    ) {
+        return error(
+            'line26EstimatedTaxPayments is present but declaredKinds does not name '
+            + "'estimatedTaxPayments'",
+        )
+    }
+    return ok(r)
+}
+
+/**
+ * Validates an already-parsed JSON value as a `return_profile` BLOB:
+ * structural (rtti) validation followed by the semantic checks in
+ * {@link checkReferences}.
+ *
+ * Dialect discrimination happens exclusively through `validateShape`'s
+ * exact-literal match on `returnProfileSchema.dialect` — an already-parsed
+ * value's `dialect` field compared as a schema constant, the same machinery
+ * every other field goes through. Nothing in this file inspects serialized
+ * JSON text to decide a dialect; `proof.crossDialect` is the runtime evidence.
+ * @type {(value: Unknown) => Result<ReturnProfile, ReturnProfileError>}
+ */
+export const validate = value => {
+    const [t, v] = validateShape(value)
+    if (t === 'error') {
+        return error(v)
+    }
+    return checkReferences(v)
+}
+
+// ── Tests ────────────────────────────────────────────────────────────────────
+
+/**
+ * The smallest profile that validates: a single filer with no dependents, no
+ * declared kinds and no amounts. Every fixture below is this plus one
+ * deliberate change, so a leaf's failure localizes to that change.
+ * @type {ReturnProfile}
+ */
+const minimal = {
+    dialect,
+    taxYear: 2025,
+    filingStatus: 'single',
+    dependentCount: 0,
+    declaredKinds: [],
+}
+
+/**
+ * T-10-04-02, the shape T-09-08-02 already caught once on the 1099-INT: a
+ * money box's name could be quietly dropped from {@link moneyBoxFields}
+ * without anyone noticing — the field stays `option(string)` structurally, so
+ * a comma-grouped amount in a dropped box would then validate as ok. One
+ * generated leaf per NAMED box supplies a comma-grouped value to that box
+ * alone, asserts `validate` refuses, AND asserts the refusal names that box,
+ * so the leaf cannot pass because some unrelated check fired first.
+ *
+ * The fixture declares `'estimatedTaxPayments'` deliberately: without it, the
+ * `line26EstimatedTaxPayments` leaf would be satisfied by cross-field check 7
+ * rather than by the exactness loop it is meant to exercise.
+ *
+ * A box's own generated leaf disappears WITH it if the box is dropped, so this
+ * alone cannot catch a removal — {@link expectedMoneyBoxFieldCount} pairs it
+ * with an independently hand-typed count.
+ * @type {{ readonly [field: string]: () => void }}
+ */
+const generatedMoneyBoxExactnessProof = Object.fromEntries(
+    moneyBoxFields.map(field => [
+        field,
+        () => {
+            const [t, v] = validate({
+                ...minimal,
+                declaredKinds: ['estimatedTaxPayments'],
+                [field]: '1,234.56',
+            })
+            assertEq(t, 'error', ['expected a comma-grouped amount in this box to be refused', field, t, v])
+            assert(typeof v === 'string', ['expected a semantic string refusal', field, v])
+            assert(v.includes(field), ['expected the refusal to name the offending box', field, v])
+        },
+    ]),
+)
+
+/**
+ * Independently hand-typed: the number of money boxes
+ * {@link moneyBoxFields} names today. Deliberately NOT
+ * `moneyBoxFields.length` — if it were, dropping a box would shrink both
+ * sides together and this check could never fail. The duplication is the
+ * mechanism, not a smell (AGENTS.md).
+ * @type {number}
+ */
+const expectedMoneyBoxFieldCount = 4
+
+/**
+ * Independently hand-typed: the size of the frozen {@link kindVocabulary},
+ * counted off the 1040 face rather than read from `kindVocabulary.length`,
+ * for the same reason.
+ * @type {number}
+ */
+const expectedKindCount = 50
+
+export const proof = {
+    dialectAndMediaType: () => {
+        assertEq(dialect, 'vnd.fjs.return_profile')
+        assertEq(mediaType, 'application/vnd.fjs.return_profile+json')
+    },
+    kindVocabularyIsExactlyFifty: () => {
+        assertEq(kindVocabulary.length, expectedKindCount)
+        assertEq(new Set(kindVocabulary).size, kindVocabulary.length)
+    },
+    validate: {
+        minimalValidates: () => {
+            const [t] = validate(minimal)
+            assertEq(t, 'ok')
+        },
+        twoDeclaredKindsValidate: () => {
+            const [t] = validate({ ...minimal, declaredKinds: ['wages', 'taxableInterest'] })
+            assertEq(t, 'ok')
+        },
+        fullyPopulatedValidates: () => {
+            const [t] = validate({
+                ...minimal,
+                filingStatus: 'marriedFilingJointly',
+                taxpayerBornBeforeJan2_1961: true,
+                taxpayerIsBlind: true,
+                spouseBornBeforeJan2_1961: true,
+                spouseIsBlind: true,
+                dependentCount: 2,
+                declaredKinds: ['wages', 'taxableInterest', 'estimatedTaxPayments'],
+                wholeDollarElection: true,
+                earnedIncome: '50000.00',
+                line26EstimatedTaxPayments: '1234.56',
+                line35aRefundRequested: '100.00',
+                line36AppliedToNextYear: '0.00',
+            })
+            assertEq(t, 'ok')
+        },
+        wrongDialectRejected: () => {
+            const [t, v] = validate({ ...minimal, dialect: 'vnd.fjs.wrong' })
+            assertEq(t, 'error')
+            if (t !== 'error') {
+                throw ['expected error', t, v]
+            }
+            if (typeof v === 'string') {
+                throw ['expected a structural ValidationError, got a checkReferences string', v]
+            }
+            assertEq(v.path[0], 'dialect')
+        },
+    },
+    checkReferences: {
+        filingStatus: {
+            unknownFilingStatusRefusedByName: () => {
+                const [t] = validate({ ...minimal, filingStatus: 'marriedFilingSingly' })
+                assertEq(t, 'error')
+            },
+            everyStoredFilingStatusAccepted: () => {
+                for (const status of individualFilingStatuses) {
+                    const [t] = validate({ ...minimal, filingStatus: status })
+                    assertEq(t, 'ok', ['expected a stored filing status to validate', status])
+                }
+            },
+        },
+        taxYear: {
+            unsupportedYearRefused: () => {
+                const [t] = validate({ ...minimal, taxYear: 2024 })
+                assertEq(t, 'error')
+            },
+        },
+        dependentCount: {
+            negativeRefused: () => {
+                const [t] = validate({ ...minimal, dependentCount: -1 })
+                assertEq(t, 'error')
+            },
+            fractionalRefused: () => {
+                const [t] = validate({ ...minimal, dependentCount: 1.5 })
+                assertEq(t, 'error')
+            },
+        },
+        declaredKinds: {
+            unknownKindRefusedNamingItAndTheVocabulary: () => {
+                const [t, v] = validate({ ...minimal, declaredKinds: ['dogecoin'] })
+                assertEq(t, 'error')
+                assert(typeof v === 'string', ['expected a semantic string refusal', v])
+                assert(v.includes('dogecoin'), ['expected the offending kind named', v])
+                assert(v.includes('taxableInterest'), ['expected the known vocabulary named', v])
+            },
+            duplicateKindRefused: () => {
+                const [t] = validate({ ...minimal, declaredKinds: ['wages', 'wages'] })
+                assertEq(t, 'error')
+            },
+        },
+        spouseBoxes: {
+            headOfHouseholdSpouseBlindRefused: () => {
+                const [t] = validate({ ...minimal, filingStatus: 'headOfHousehold', spouseIsBlind: true })
+                assertEq(t, 'error')
+            },
+            marriedFilingJointlySpouseBlindAccepted: () => {
+                const [t] = validate({ ...minimal, filingStatus: 'marriedFilingJointly', spouseIsBlind: true })
+                assertEq(t, 'ok')
+            },
+            singleSpouseBornBeforeRefused: () => {
+                const [t] = validate({ ...minimal, spouseBornBeforeJan2_1961: true })
+                assertEq(t, 'error')
+            },
+            qualifyingSurvivingSpouseSpouseBlindRefused: () => {
+                const [t] = validate({
+                    ...minimal,
+                    filingStatus: 'qualifyingSurvivingSpouse',
+                    spouseIsBlind: true,
+                })
+                assertEq(t, 'error')
+            },
+            marriedFilingSeparatelySpouseBoxWithoutConditionRefused: () => {
+                const [t, v] = validate({
+                    ...minimal,
+                    filingStatus: 'marriedFilingSeparately',
+                    spouseIsBlind: true,
+                })
+                assertEq(t, 'error')
+                assert(typeof v === 'string', ['expected a semantic string refusal', v])
+                assert(
+                    v.includes('spouseHadNoIncomeIsNotFilingAndIsNotADependent'),
+                    ['expected the gating field named', v],
+                )
+            },
+            marriedFilingSeparatelySpouseBoxWithConditionAccepted: () => {
+                const [t] = validate({
+                    ...minimal,
+                    filingStatus: 'marriedFilingSeparately',
+                    spouseIsBlind: true,
+                    spouseHadNoIncomeIsNotFilingAndIsNotADependent: true,
+                })
+                assertEq(t, 'ok')
+            },
+            conditionFlagWithoutSpouseBoxesAccepted: () => {
+                const [t] = validate({
+                    ...minimal,
+                    filingStatus: 'marriedFilingSeparately',
+                    spouseHadNoIncomeIsNotFilingAndIsNotADependent: true,
+                })
+                assertEq(t, 'ok')
+            },
+        },
+        moneyBoxExactness: {
+            ...generatedMoneyBoxExactnessProof,
+            everyMoneyBoxIsCovered: () => {
+                assertEq(
+                    moneyBoxFields.length,
+                    expectedMoneyBoxFieldCount,
+                    [
+                        'expected exactly the independently-stated money box count',
+                        moneyBoxFields.length,
+                        expectedMoneyBoxFieldCount,
+                    ],
+                )
+            },
+        },
+        crossField: {
+            estimatedPaymentWithoutDeclaredKindRefused: () => {
+                const [t] = validate({ ...minimal, line26EstimatedTaxPayments: '1234.56' })
+                assertEq(t, 'error')
+            },
+            estimatedPaymentWithDeclaredKindAccepted: () => {
+                const [t] = validate({
+                    ...minimal,
+                    declaredKinds: ['estimatedTaxPayments'],
+                    line26EstimatedTaxPayments: '1234.56',
+                })
+                assertEq(t, 'ok')
+            },
+        },
+    },
+    crossDialect: {
+        // DOC-00 criterion 1: a fully-valid `vnd.fjs.1099int` value —
+        // constructed as a PARSED JS OBJECT, never a JSON string, so the
+        // rejection is proven structural rather than a prefix probe on the
+        // serialized text — fails this dialect's `validate`, and the failure's
+        // path is exactly `['dialect']`: the discriminant catches it first,
+        // not some unrelated missing field further down the schema.
+        oneZeroNineNineIntShapeRejectedByReturnProfile: () => {
+            /** @type {Ts<typeof oneZeroNineNineIntSchema>} */
+            const oneZeroNineNineIntValue = {
+                dialect: oneZeroNineNineIntDialect,
+                payerTin: '11-1111111',
+                recipientTin: '222-22-2222',
+                accountNumber: 'ACC-0001',
+                taxYear: 2025,
+                formRevision: '2025',
+                box1InterestIncome: '1234.56',
+            }
+            const [t, v] = validate(oneZeroNineNineIntValue)
+            assertEq(t, 'error')
+            if (t !== 'error') {
+                throw ['expected error', t, v]
+            }
+            if (typeof v === 'string') {
+                throw ['expected a structural ValidationError, got a checkReferences string', v]
+            }
+            assertEq(v.path.length, 1)
+            assertEq(v.path[0], 'dialect')
+        },
+    },
+}
