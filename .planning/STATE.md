@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
 status: executing
-stopped_at: Phase 10 in execution. Wave 1 complete (10-01 QSS filing status, 10-02 whole-dollar election); waves 2-6 remain, 8 plans. Plans passed two adversarial review rounds after a BLOCKER verdict.
-last_updated: "2026-08-06T20:30:00.000Z"
+stopped_at: Phase 10 in execution. Waves 1-2 complete (10-01 QSS status, 10-02 whole-dollar election, 10-03 Tax Computation Worksheet, 10-04 return-profile dialect, 10-05 standard deduction). Waves 3-6 remain: 10-06 QDCGT, 10-07 scope classifier, 10-08 dispatcher, 10-09 lines 1a-15, 10-10 lines 16-37.
+last_updated: "2026-08-06T20:55:00.000Z"
 last_activity: 2026-08-06
 progress:
   total_phases: 18
@@ -29,10 +29,11 @@ the server executes it as a pure function of `(documents, tax-year parameters) �
 Phase: 10 of 18 — Form 1040 Core, Line-16 Dispatch, and the Scope Guard (TAX-03/05/06/16).
   Ten plans across six waves. The plan set was returned BLOCKER by `gsd-plan-checker`
   (four blockers, ten warnings), revised, re-checked, and only then executed.
-Plan: 2 of 10 complete — wave 1 (10-01 QSS as a stored filing status, 10-02 the IRS
-  whole-dollar election). Waves 2-6 remain: 10-03 TCW, 10-04 return profile, 10-05
-  standard deduction, 10-06 QDCGT, 10-07 scope classifier, 10-08 dispatcher,
-  10-09 lines 1a-15, 10-10 lines 16-37 + whole-report refusal.
+Plan: 5 of 10 complete — wave 1 (10-01 QSS as a stored filing status, 10-02 the IRS
+  whole-dollar election) and wave 2 (10-03 Tax Computation Worksheet, 10-04 the
+  vnd.fjs.return_profile dialect, 10-05 the standard deduction chart). Waves 3-6
+  remain: 10-06 QDCGT, 10-07 scope classifier, 10-08 dispatcher, 10-09 lines
+  1a-15, 10-10 lines 16-37 + whole-report refusal.
 Status: Executing
 
 Progress: [██████████] 100%

@@ -86,7 +86,7 @@ These are cited by name throughout the source. They are stated here so the citat
 A green suite proves nothing on its own. **Break the code on purpose and confirm the suite goes
 red.** If it stays green, the proof is decoration and the code is unproven.
 
-This is not a style preference. This project has shipped the same defect three times — a proof whose
+This is not a style preference. This project has shipped the same defect four times — a proof whose
 expected side was not independent of the code under test — and each time the suite was fully green:
 
 | Phase | The defect | Suite when the shipped code was mutated |
@@ -94,8 +94,16 @@ expected side was not independent of the code under test — and each time the s
 | 7 | Every fixture was keyed at the same wrong path the buggy code asked for, so the proof mirrored the bug | 185 proofs, all green |
 | 9 | The zero-read rule existed twice; every proof exercised the copy that did not ship | 258 green |
 | 8 | `finance_tax_params` compared its output against the very object that produced it | 262 green |
+| 10 | `unknownDialectRefused` built its iteration set from `Object.keys(dialectSchemas)` — the code under test — so unregistering a dialect removed it from the proof's own loop in the same instant | caught by an executor's mutation before it shipped |
 
-Nothing was found by reading. All three were found by mutating.
+Nothing was found by reading. Every one was found by mutating.
+
+**The fourth is the subtlest, and the shape to watch for: a proof that iterates over a collection
+derived from the thing it is testing can never notice that collection shrinking.** `Object.keys`,
+`Object.entries`, `.map` over an exported list — each silently makes the test's coverage a function
+of the code's own contents. The fix is the same idiom already used by `expectedMoneyBoxFieldCount`
+and `expectedThresholdCount`: a **hand-typed count**, asserted alongside, so deleting an entry
+fails the count even when the loop happily iterates one item fewer.
 
 **The rules that follow from it:**
 
