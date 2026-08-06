@@ -293,7 +293,7 @@ structural (RTTI) and semantic passes.
 - [x] **TAX-04** *(T1)*: Boundary proofs at `threshold − 1¢`, `threshold`, `threshold + 1¢`
       for every threshold in the parameter data.
 - [ ] **TAX-05** *(T1)*: Form 1040 core lines 1a–37.
-- [ ] **TAX-06** *(T1)*: Standard deduction with age and blindness increments.
+- [x] **TAX-06** *(T1)*: Standard deduction with age and blindness increments.
 - [ ] **TAX-07** *(T2)*: Schedule B — interest and ordinary dividends, including the $1,500
       threshold and the foreign-account questions.
 - [ ] **TAX-08** *(T2)*: Qualified Dividends and Capital Gain Tax Worksheet (~25 lines),
@@ -597,7 +597,7 @@ them. Week 0 is research's addition in front of the plan's Week 1.
 | TAX-03 | T1 | Phase 10 - 1040 Core and Scope Guard | Week 2 | Complete |
 | TAX-04 | T1 | Phase 8 - TY2025 Parameters and Tax Table | Week 2 | Pending |
 | TAX-05 | T1 | Phase 10 - 1040 Core and Scope Guard | Week 2 | Pending |
-| TAX-06 | T1 | Phase 10 - 1040 Core and Scope Guard | Week 2 | Pending |
+| TAX-06 | T1 | Phase 10 - 1040 Core and Scope Guard | Week 2 | Complete |
 | TAX-07 | T2 | Phase 12 - Brokerage and Capital-Gain Chain | Week 3 | Pending |
 | TAX-08 | T2 | Phase 12 - Brokerage and Capital-Gain Chain | Week 3 | Pending |
 | TAX-09 | T2 | Phase 13 - The 65+ Profile and Schedules | Week 3 | Pending |

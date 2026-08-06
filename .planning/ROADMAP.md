@@ -383,7 +383,7 @@ of it to Phase 14, whose criteria are about tax correctness rather than the exec
 - [x] 10-06-PLAN.md — QDCGT's 25 lines and criterion 2's regression pair — $11,174 / $11,163 against a broken engine's $11,175 (TAX-03) *(wave 3, needs 10-03)*
 - [x] 10-07-PLAN.md — `classifyScope`: the 6/44 modeled partition as a `tsc` property, and `scopeRefusal` as the one place a refusal is built (TAX-16) *(wave 3, needs 10-04)*
 - [x] 10-08-PLAN.md — `dispatchLine16`: four branches plus three wrappers, tagged on both arms, with the Schedule D Tax Worksheet refusal (TAX-03, TAX-16) *(wave 4, needs 10-03, 10-06, 10-07)*
-- [ ] 10-09-PLAN.md — Form 1040 lines 1a–15 as `ReportLine`s with source union, and criterion 5 over ten real 1099-INT documents (TAX-05, TAX-06) *(wave 5, needs 10-02, 10-04, 10-05, 10-07)*
+- [x] 10-09-PLAN.md — Form 1040 lines 1a–15 as `ReportLine`s with source union, and criterion 5 over ten real 1099-INT documents (TAX-05, TAX-06) *(wave 5, needs 10-02, 10-04, 10-05, 10-07)*
 - [ ] 10-10-PLAN.md — Lines 16–37, the whole-report scope refusal, and the phase mutation sweep checkpoint (TAX-05, TAX-16, TAX-03) *(wave 6, needs 10-08, 10-09)*
 
 **── Milestone: Week 3 — Breadth in Documents ──**
@@ -536,7 +536,7 @@ Phases 16-18 are backlog: unordered, independent of each other and of the critic
 | 7. `fjs_run` and Run Records | Week 1 | 0/8 | Planned | - |
 | 8. TY2025 Parameters and Tax Table | Week 2 | 3/4 | In Progress|  |
 | 9. Traceable Report Lines | Week 2 | 8/8 | Complete   | 2026-08-06 |
-| 10. 1040 Core and Scope Guard | Week 2 | 8/10 | In Progress|  |
+| 10. 1040 Core and Scope Guard | Week 2 | 9/10 | In Progress|  |
 | 11. Wage, Retirement, Benefit Documents | Week 3 | 0/TBD | Not started | - |
 | 12. Brokerage and Capital-Gain Chain | Week 3 | 0/TBD | Not started | - |
 | 13. The 65+ Profile and Schedules | Week 3 | 0/TBD | Not started | - |
