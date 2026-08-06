@@ -32,7 +32,25 @@ It should be
 
 ## 2. Use `StringMap` from FunctionalScript
 
-Instead of
+Reach for `StringMap` wherever the key set is **open** — an arbitrary string
+keys the map — instead of hand-writing an index signature:
+
+```ts
+/** @typedef {{ readonly [k: string]: Module | undefined }} ModuleMap */  // don't
+/** @typedef {StringMap<string, Module>} ModuleMap */                     // do
+```
+
+`StringMap` branches on its key parameter, and only the open case is optional:
+
+```ts
+export type StringMap<K extends string, T> =
+    string extends K
+    ? { readonly[k in string]?: T }     // K is exactly `string` — keys optional
+    : { readonly[k in K]: T }           // K is a literal union — keys REQUIRED
+```
+
+So a **closed** set of optional keys still needs a mapped type, and
+`MoneyBoxes` stays as it is:
 
 ```ts
 /**
@@ -40,13 +58,15 @@ Instead of
  */
 ```
 
-write this
+`StringMap<BoxKey, string>` would make all six boxes mandatory, and
+`StringMap<BoxKey, string | undefined>` does too — widening the value type does
+not change whether a key is required. Neither expresses "an absent box is an
+absent key", and `tsconfig.json`'s `exactOptionalPropertyTypes` makes that
+distinction load-bearing: under it, `{ interestIncome: undefined }` is rejected
+by the mapped type, which is the whole point of writing it that way.
 
-```ts
-/**
- * @typedef {StringMap<BoxKey, string | undefined>} MoneyBoxes
- */
-```
+If `StringMap` should grow an optional-literal-key form, that is an upstream
+change to propose, not something to work around here.
 
 ## 3. External Proofs
 
@@ -84,11 +104,91 @@ The only difference is `ocr` vs `w2`.
 
 ## 9. Remove `Object.setPrototypeOf(map, null)`
 
+It was load-bearing when it was written: a plain `map[command]` index read
+resolves inherited names (`'constructor'`, `'toString'`) to `Object.prototype`
+members, so a command arriving as runtime data could select an arbitrary
+inherited function and then supply its arguments.
+
+That is closed upstream — `match` looks the handler up through `at`, which
+reads via `getOwnPropertyDescriptor` and therefore only ever sees own
+properties, yielding `null` (and an `assert`) for an inherited name. Since we
+are on `0.42.0` the null-prototype calls are redundant and can go.
+
+Recorded here so nobody reintroduces them later, reasoning from the old hazard.
+
 ## 10. More declarative definitions, less imperative
+
+Say *what* the answer is, not the steps that accumulate it. `checkReferences`
+in `fjs/document/w2/module.f.js` is the clearest case: three nested loops with
+`continue` and early `return`, all computing one thing — the first badly
+formatted money field.
+
+```js
+for (const field of moneyBoxFields) {
+    const printed = r[field]
+    if (printed === undefined) { continue }
+    const message = moneyFieldError(field)(printed)
+    if (message !== undefined) { return error(message) }
+}
+for (const entry of r.box12 ?? []) { /* … the same shape again … */ }
+for (const entry of r.box15Through20 ?? []) { /* … and again, nested twice … */ }
+```
+
+The three loops differ only in how they name their `(label, printed)` pairs. Name
+that, and the traversal disappears:
+
+```js
+const stateLocalFields = /** @type {const} */ ([
+    ['stateWagesTipsEtc', e => e.stateWagesTipsEtc],
+    ['stateIncomeTax', e => e.stateIncomeTax],
+    ['localWagesTipsEtc', e => e.localWagesTipsEtc],
+    ['localIncomeTax', e => e.localIncomeTax],
+])
+
+const labelledMoney = r => [
+    ...moneyBoxFields.map(f => /** @type {const} */ ([f, r[f]])),
+    ...(r.box12 ?? []).map(e => /** @type {const} */ ([`box12 code ${e.code}`, e.amount])),
+    ...(r.box15Through20 ?? []).flatMap(e => stateLocalFields.map(
+        ([name, pick]) => /** @type {const} */ ([`${e.state} ${name}`, pick(e)]))),
+]
+
+const firstMoneyError = r => labelledMoney(r)
+    .flatMap(([label, printed]) => printed === undefined ? [] : [moneyFieldError(label)(printed)])
+    .find(m => m !== undefined)
+```
+
+`checkReferences` then reads as its own specification: a formRevision check, a
+box12-code check, and "the first money error, if any". The gain is not brevity —
+it is that "which fields hold money" becomes a value you can print, test, and
+reuse, instead of control flow you can only execute.
 
 ## 11. One source of truth
 
-Similar to DRY, but more about grouping definitions
+Similar to DRY, but more about grouping definitions: when two things must agree,
+derive one from the other and let a proof hold them together, rather than
+writing both and hoping.
+
+`fjs/guest/module.f.js` already does this with the frozen CAS vocabulary. The
+four names are written **once**:
+
+```js
+export const casOpNames = ['casRead', 'evoList', 'evoHead', 'evoRevision']
+```
+
+and everything else derives from or is pinned to that list — the `guestCtx`
+object's keys, and any read-back validator that has to reject a command outside
+the set. A proof holds the value side to the type side:
+
+```js
+vocabularyIsFrozenAtFour: () => {
+    assertEq(casOpNames.join(','), 'casRead,evoList,evoHead,evoRevision')
+    assertEq(Object.keys(guestCtx).join(','), casOpNames.join(','))
+},
+```
+
+The test to apply: if adding a fifth operation means editing more than one
+place, the places that were not edited are the bug — and the proof above is what
+turns that from a latent bug into a failing test.
 
 ## 12. No nesting step
 
