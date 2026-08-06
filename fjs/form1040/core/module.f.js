@@ -554,11 +554,36 @@ export const form1040IncomeLines = taxParamSet => inputs => {
  * The WHOLE return, as one outcome — 10-CONTEXT.md Decision 2.
  *
  * An unmodeled declared input makes the entire report an error result naming
- * what is unmodeled, and **the error arm carries no `lines` field at all**. A
- * caller cannot accidentally render a partial 1040, because there is nothing
- * to render — which is strictly stronger than returning an empty array, and it
- * is a property `tsc` enforces rather than a convention a later edit could
- * quietly drop.
+ * what is unmodeled, and **the error arm carries no line list**. A caller
+ * cannot accidentally render a partial 1040, because there is nothing to
+ * render — strictly stronger than returning an empty array, which a renderer
+ * would happily draw as a form of zeros.
+ *
+ * ## `lines?: undefined` is load-bearing, and the obvious form does NOT work
+ *
+ * `[FINDING, this plan's Task 2 mutation 3]` The natural way to write this —
+ * simply OMIT `lines` from the error member — states the property but does not
+ * enforce it. This plan predicted that returning
+ * `{ kind: 'error', message, unmodeled, lines }` would fail to compile. **It
+ * compiled clean**, twice: with an empty array and with a genuinely partial
+ * line list. TypeScript's excess-property check against a UNION admits any
+ * property declared in ANY constituent, and `lines` is declared in the `ok`
+ * constituent, so the discriminant does not narrow the check.
+ *
+ * Declaring `lines?: undefined` here turns it from an excess-property question
+ * into an ASSIGNABILITY one: `readonly ReportLine[]` is not assignable to
+ * `undefined`, so the refusing arm cannot carry a line list at all — which is
+ * what T-10-10-02 asked for and what the omission alone did not deliver. The
+ * runtime shape is unchanged: nothing ever sets the key, and
+ * `theErrorArmCarriesNoLinesFieldAtAll` asserts its absence with
+ * `Object.hasOwn`.
+ *
+ * The cost, stated so it is not rediscovered as a bug: reading `outcome.lines`
+ * WITHOUT narrowing is now legal and yields `readonly ReportLine[] |
+ * undefined` where it used to be a compile error. That is the weaker of the
+ * two halves — a caller still cannot obtain a partial list, because none can
+ * be constructed — and `strictNullChecks` still forces the `undefined` to be
+ * handled.
  *
  * The discriminated `kind` is `fjs/report/guard`'s `RunOutcome` shape and
  * `fjs/return/scope`'s `ScopeOutcome` shape, deliberately: one refusal
@@ -576,6 +601,7 @@ export const form1040IncomeLines = taxParamSet => inputs => {
  *   readonly kind: 'error',
  *   readonly message: string,
  *   readonly unmodeled: readonly UnmodeledKind[],
+ *   readonly lines?: undefined,
  * }} Form1040Outcome
  */
 
