@@ -6,6 +6,13 @@ Status: **reported, not fixed upstream.** No local workaround needed yet — see
 Target: `functionalscript` `fjs/media/module.f.js`. Still present in 0.41.0 (re-checked —
 0.41.0 fixed `match`, not this).
 
+**Upstream report:** filed in the FunctionalScript repo as `fjs/media/todo/dialect-registry.md`,
+following the `fjs/effects/todo/match-prototype-property-access.md` precedent
+([#1419](https://github.com/functionalscript/functionalscript/pull/1419)). That file is the
+proposal and task list; this one stays the *finance-side* record — why we care, what it
+blocks here, and what we do locally in the meantime. Record the PR/issue URL here once it
+exists.
+
 ## The gap
 
 The root `fjs/media` `detect` adds dialect-tagged JSON recognition on top of
