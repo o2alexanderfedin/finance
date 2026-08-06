@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
 status: verifying
-stopped_at: Completed 09-08-PLAN.md (gap closure -- 8 mutation-sweep gaps closed in fjs/exec and fjs/document, all verified RED before this plan and reverted after)
+stopped_at: Phases 8 and 9 complete and verified (299/299, 297 project-local). PAUSED: six open PRs cover overlapping work from divergent lineages; code changes held pending a consolidation decision. Backlog phases 16-18 recorded.
 last_updated: "2026-08-06T04:30:40.387Z"
 last_activity: 2026-08-06
 progress:
