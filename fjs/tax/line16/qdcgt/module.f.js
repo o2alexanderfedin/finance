@@ -370,4 +370,265 @@ export const proof = {
         const gainResult = qdcgt(taxParams2025)(withTwoGains)
         assertEq(gainResult.line3, 100000n, 'two gains take the smaller of Schedule D lines 15 and 16')
     },
+    // ★ ROADMAP criterion 2, first half. MFJ, Form 1040 line 15 =
+    // $97,000.00, line 3a = $300.00, not filing Schedule D.
+    //
+    // Correct Form 1040 line 16 = $11,174.00. An engine that reports line
+    // 23 — that is, one that computes the whole preferential build-up and
+    // then forgets line 25's `min` — reports $11,175.00 instead.
+    //
+    // READ THIS BEFORE RE-AIMING THE LEAF. The defect pinned here is the
+    // omission of line 25's `min`, and nothing else. It is NOT "naive Tax
+    // Table use": an engine that simply looks line 1 up in the Tax Table
+    // returns $11,174.00 and is RIGHT on this case and on its partner
+    // below, because looking line 1 up in the Tax Table is exactly what
+    // line 24 computes and exactly what `min` then selects. A regression
+    // proof aimed at that misreading would pass while the real defect
+    // shipped. Only the PAIR distinguishes them: this case and the next
+    // differ by one dollar of taxable income and one dollar of qualified
+    // dividends, every Form 1040 line from 1a through 15 differs by
+    // exactly that dollar, the broken engine returns the same $11,175.00
+    // for both, and the correct engine returns $11,174.00 here and
+    // $11,163.00 there — an eleven-dollar swing out of a one-dollar
+    // change of input.
+    //
+    // All 25 values below are hand-typed from 10-CONTEXT.md's
+    // independently-reproduced table (research, planner and executor each
+    // recomputed them from i1040gi p38 and the stored brackets, and all
+    // three agree). None is computed by calling `qdcgt`, and case B's are
+    // not derived from case A's. Every printed line is asserted
+    // individually rather than line 25 alone, because a 25-line worksheet
+    // with two compensating transcription errors totals correctly —
+    // `fjs/tax/table`'s `rowByRowDiffMatchesPublishedTable` set the
+    // per-field precedent for exactly this reason.
+    regressionPairCaseAAllTwentyFiveLines: () => {
+        /** @type {QdcgtInput} */
+        const caseA = {
+            status: 'marriedFilingJointly',
+            line1Cents: 9700000n,
+            line2Cents: 30000n,
+            filingScheduleD: false,
+            scheduleD15Cents: 0n,
+            scheduleD16Cents: 0n,
+            line7aCents: 0n,
+        }
+        const r = qdcgt(taxParams2025)(caseA)
+        assertEq(r.line1, 9700000n, 'line 1 = $97,000.00')
+        assertEq(r.line2, 30000n, 'line 2 = $300.00')
+        assertEq(r.line3, 0n, 'line 3 = $0.00')
+        assertEq(r.line4, 30000n, 'line 4 = $300.00')
+        assertEq(r.line5, 9670000n, 'line 5 = $96,700.00')
+        assertEq(r.line6, 9670000n, 'line 6 = $96,700.00')
+        assertEq(r.line7, 9670000n, 'line 7 = $96,700.00')
+        assertEq(r.line8, 9670000n, 'line 8 = $96,700.00')
+        assertEq(r.line9, 0n, 'line 9 = $0.00')
+        assertEq(r.line10, 30000n, 'line 10 = $300.00')
+        assertEq(r.line11, 0n, 'line 11 = $0.00')
+        assertEq(r.line12, 30000n, 'line 12 = $300.00')
+        assertEq(r.line13, 60005000n, 'line 13 = $600,050.00')
+        assertEq(r.line14, 9700000n, 'line 14 = $97,000.00')
+        assertEq(r.line15, 9670000n, 'line 15 = $96,700.00')
+        assertEq(r.line16, 30000n, 'line 16 = $300.00')
+        assertEq(r.line17, 30000n, 'line 17 = $300.00')
+        assertEq(r.line18, 4500n, 'line 18 = $45.00')
+        assertEq(r.line19, 30000n, 'line 19 = $300.00')
+        assertEq(r.line20, 0n, 'line 20 = $0.00')
+        assertEq(r.line21, 0n, 'line 21 = $0.00')
+        assertEq(r.line22, 1113000n, 'line 22 = $11,130.00, printed MFJ row $96,700-$96,750')
+        assertEq(r.line23, 1117500n, 'line 23 = $11,175.00 — the value a min-less engine reports')
+        assertEq(r.line24, 1117400n, 'line 24 = $11,174.00, printed MFJ row $97,000-$97,050')
+        assertEq(r.line25, 1117400n, 'line 25 = $11,174.00 — Form 1040 line 16')
+        // The counterfactual, stated as its own assertion so the leaf
+        // fails in a way that NAMES the bug rather than merely reporting
+        // a wrong number.
+        assert(
+            r.line23 !== r.line25,
+            [
+                'line 25 must be the SMALLER of lines 23 and 24 — an engine that omits this min reports line 23',
+                r.line23,
+                r.line25,
+            ],
+        )
+        assertEq(r.line25, r.line24, 'here the min selects line 24')
+        assertEq(r.line23 - r.line25, 100n, 'omitting the min overstates this return by exactly $1.00')
+    },
+    // ★ ROADMAP criterion 2, second half — the partner one dollar away.
+    // MFJ, Form 1040 line 15 = $96,999.00, line 3a = $299.00, not filing
+    // Schedule D.
+    //
+    // Correct Form 1040 line 16 = $11,163.00. The same min-less engine
+    // still reports line 23 = $11,174.85, so it is over by $11.85 here
+    // while it was over by only $1.00 on case A — and it returns
+    // essentially the same number on both, which is the signature of the
+    // defect. See case A's docstring for why the pair, and not either
+    // case alone, is what pins the `min`.
+    //
+    // Where case B's $11.85 comes from, so a failure here can be
+    // diagnosed instead of merely observed:
+    //   line 22's row OVERSTATES the ordinary tax by $3.00 — the table
+    //     charges tax on the band midpoint $96,725, not on $96,700, and
+    //     that $25 sits in the 12% bracket;
+    //   line 24's row UNDERSTATES the total tax by $4.78 — the table
+    //     charges the midpoint $96,975, not $96,999; exact T(96,999) is
+    //     $11,167.78 against a printed $11,163;
+    //   bracket inversion costs $7.50 — $250 of the preferential slice
+    //     sits between the 0% ceiling $96,700 and the 12% ceiling
+    //     $96,950 and is charged 15% rather than 12%;
+    //   bracket alignment returns $3.43 — the remaining $49 above the
+    //     12% ceiling is charged 15% rather than 22%.
+    //   3.00 + 4.78 + 7.50 - 3.43 = 11.85 exactly, with no residual
+    //   rounding term, because 0.15 x 299 = 44.85 is already a whole
+    //   number of cents.
+    //
+    // What must never be asserted: the roadmap describes this symptom as
+    // an error of one to twelve dollars. That is a description, not a
+    // bound — MFJ with line 15 = $96,949.00 and line 3a = $249.00
+    // produces $13.35. Any range assertion would be false. These two
+    // specific returns are what is pinned.
+    regressionPairCaseBAllTwentyFiveLines: () => {
+        /** @type {QdcgtInput} */
+        const caseB = {
+            status: 'marriedFilingJointly',
+            line1Cents: 9699900n,
+            line2Cents: 29900n,
+            filingScheduleD: false,
+            scheduleD15Cents: 0n,
+            scheduleD16Cents: 0n,
+            line7aCents: 0n,
+        }
+        const r = qdcgt(taxParams2025)(caseB)
+        assertEq(r.line1, 9699900n, 'line 1 = $96,999.00')
+        assertEq(r.line2, 29900n, 'line 2 = $299.00')
+        assertEq(r.line3, 0n, 'line 3 = $0.00')
+        assertEq(r.line4, 29900n, 'line 4 = $299.00')
+        assertEq(r.line5, 9670000n, 'line 5 = $96,700.00')
+        assertEq(r.line6, 9670000n, 'line 6 = $96,700.00')
+        assertEq(r.line7, 9670000n, 'line 7 = $96,700.00')
+        assertEq(r.line8, 9670000n, 'line 8 = $96,700.00')
+        assertEq(r.line9, 0n, 'line 9 = $0.00')
+        assertEq(r.line10, 29900n, 'line 10 = $299.00')
+        assertEq(r.line11, 0n, 'line 11 = $0.00')
+        assertEq(r.line12, 29900n, 'line 12 = $299.00')
+        assertEq(r.line13, 60005000n, 'line 13 = $600,050.00')
+        assertEq(r.line14, 9699900n, 'line 14 = $96,999.00')
+        assertEq(r.line15, 9670000n, 'line 15 = $96,700.00')
+        assertEq(r.line16, 29900n, 'line 16 = $299.00')
+        assertEq(r.line17, 29900n, 'line 17 = $299.00')
+        assertEq(r.line18, 4485n, 'line 18 = $44.85')
+        assertEq(r.line19, 29900n, 'line 19 = $299.00')
+        assertEq(r.line20, 0n, 'line 20 = $0.00')
+        assertEq(r.line21, 0n, 'line 21 = $0.00')
+        assertEq(r.line22, 1113000n, 'line 22 = $11,130.00, printed MFJ row $96,700-$96,750')
+        assertEq(r.line23, 1117485n, 'line 23 = $11,174.85 — the value a min-less engine reports')
+        assertEq(r.line24, 1116300n, 'line 24 = $11,163.00, printed MFJ row $96,950-$97,000')
+        assertEq(r.line25, 1116300n, 'line 25 = $11,163.00 — Form 1040 line 16')
+        assert(
+            r.line23 !== r.line25,
+            [
+                'line 25 must be the SMALLER of lines 23 and 24 — an engine that omits this min reports line 23',
+                r.line23,
+                r.line25,
+            ],
+        )
+        assertEq(r.line25, r.line24, 'here too the min selects line 24')
+        assertEq(r.line23 - r.line25, 1185n, 'omitting the min overstates this return by exactly $11.85')
+    },
+    // The control leg the pair needs (AGENTS.md: "a gate needs a
+    // control"). A proof that `min` clamps must be paired with one
+    // showing it does NOT clamp when it should not, or an engine that
+    // always took line 24 would pass the pair above and still be wrong.
+    //
+    // MFJ, line 15 = $90,000.00, line 3a = $10,000.00. The whole $10,000
+    // of qualified dividends sits inside the 0% zone (line 9), so line 23
+    // = $9,126.00 is genuinely below line 24 = $10,326.00 and `min`
+    // selects line 23. An engine that always took line 24 would over-tax
+    // this return by exactly $1,200.00 — 12% of the $10,000 that belongs
+    // at 0% — which is the opposite failure and equally worth pinning.
+    //
+    // $9,126 and $10,326 are the printed MFJ Tax Table rows
+    // $80,000-$80,050 and $90,000-$90,050 (i1040gi p77), hand-typed.
+    controlMinSelectsLineTwentyThreeWhenLineTwentyThreeIsAlreadySmaller: () => {
+        /** @type {QdcgtInput} */
+        const control = {
+            status: 'marriedFilingJointly',
+            line1Cents: 9000000n,
+            line2Cents: 1000000n,
+            filingScheduleD: false,
+            scheduleD15Cents: 0n,
+            scheduleD16Cents: 0n,
+            line7aCents: 0n,
+        }
+        const r = qdcgt(taxParams2025)(control)
+        assertEq(r.line5, 8000000n, 'line 5 = $80,000.00')
+        assertEq(r.line9, 1000000n, 'line 9 = $10,000.00, the whole preferential slice at 0%')
+        assertEq(r.line17, 0n, 'line 17 = $0.00, nothing reaches the 15% rate')
+        assertEq(r.line22, 912600n, 'line 22 = $9,126.00, printed MFJ row $80,000-$80,050')
+        assertEq(r.line23, 912600n, 'line 23 = $9,126.00')
+        assertEq(r.line24, 1032600n, 'line 24 = $10,326.00, printed MFJ row $90,000-$90,050')
+        assertEq(r.line25, 912600n, 'line 25 = $9,126.00 — Form 1040 line 16')
+        assertEq(r.line25, r.line23, 'here the min selects line 23, not line 24')
+        assertEq(r.line24 - r.line25, 120000n, 'always taking line 24 would over-tax by $1,200.00')
+    },
+    // The split dispatch, asserted end to end: line 22 by the Tax Table
+    // and line 24 by the Tax Computation Worksheet, in ONE execution,
+    // with the resulting line 25. This is the case an implementation that
+    // decides the method once from line 15 gets wrong.
+    //
+    // $10,326 is the printed MFJ Tax Table row $90,000-$90,050 (p77);
+    // $16,228.00 is the printed Tax Computation Worksheet MFJ row,
+    // 22% x 120,000.00 - 10,172.00 (p80). Both hand-typed.
+    splitDispatchProducesLineSixteenOfThirteenThousandEightHundredTwentyOne: () => {
+        const r = qdcgt(taxParams2025)(splitDispatchInput)
+        assertEq(r.line5, 9000000n, 'line 5 = $90,000.00')
+        assertEq(r.line9, 670000n, 'line 9 = $6,700.00 at 0%')
+        assertEq(r.line17, 2330000n, 'line 17 = $23,300.00 at 15%')
+        assertEq(r.line18, 349500n, 'line 18 = $3,495.00')
+        assertEq(r.method22, 'taxTable', 'line 22 is priced by the Tax Table')
+        assertEq(r.line22, 1032600n, 'line 22 = $10,326.00')
+        assertEq(r.line23, 1382100n, 'line 23 = $13,821.00')
+        assertEq(r.method24, 'taxComputationWorksheet', 'line 24 is priced by the Tax Computation Worksheet')
+        assertEq(r.line24, 1622800n, 'line 24 = $16,228.00')
+        assertEq(r.line25, 1382100n, 'line 25 = $13,821.00 — Form 1040 line 16')
+    },
+    // All three preferential rates and both base lookups in a single
+    // execution: MFJ, line 15 = $700,000.00, line 3a = $0.00, not filing
+    // Schedule D, line 7a = $650,000.00. Line 9 is taxed at 0%, line 17
+    // at 15%, line 20 at 20%, line 22 comes from the Tax Table and line
+    // 24 from the Tax Computation Worksheet.
+    //
+    // $5,526 is the printed MFJ Tax Table row $50,000-$50,050 (p74).
+    // $184,094.50 is the printed Tax Computation Worksheet MFJ row for
+    // "over $501,050 but not over $751,600", 35% x 700,000.00 -
+    // 60,905.50 (p80).
+    //
+    // That $184,094.50 is the one value in this phase sensitive to
+    // 10-RESEARCH.md's assumption A2 — whether the Tax Computation
+    // Worksheet rounds to whole dollars. Plan 10-03 decided cent-exact
+    // and `fjs/tax/table` pins the same figure; if Phase 14's acceptance
+    // against a real filed return disagrees, this is the leaf that moves.
+    allThreePreferentialRatesWithBothBaseLookupsInOneExecution: () => {
+        /** @type {QdcgtInput} */
+        const allRates = {
+            status: 'marriedFilingJointly',
+            line1Cents: 70000000n,
+            line2Cents: 0n,
+            filingScheduleD: false,
+            scheduleD15Cents: 0n,
+            scheduleD16Cents: 0n,
+            line7aCents: 65000000n,
+        }
+        const r = qdcgt(taxParams2025)(allRates)
+        assertEq(r.line5, 5000000n, 'line 5 = $50,000.00')
+        assertEq(r.line9, 4670000n, 'line 9 = $46,700.00 at 0%')
+        assertEq(r.line17, 50335000n, 'line 17 = $503,350.00 at 15%')
+        assertEq(r.line18, 7550250n, 'line 18 = $75,502.50')
+        assertEq(r.line20, 9995000n, 'line 20 = $99,950.00 at 20%')
+        assertEq(r.line21, 1999000n, 'line 21 = $19,990.00')
+        assertEq(r.method22, 'taxTable', 'line 22 is priced by the Tax Table')
+        assertEq(r.line22, 552600n, 'line 22 = $5,526.00')
+        assertEq(r.line23, 10101850n, 'line 23 = $101,018.50')
+        assertEq(r.method24, 'taxComputationWorksheet', 'line 24 is priced by the Tax Computation Worksheet')
+        assertEq(r.line24, 18409450n, 'line 24 = $184,094.50, cent-exact')
+        assertEq(r.line25, 10101850n, 'line 25 = $101,018.50 — Form 1040 line 16')
+    },
 }
