@@ -69,6 +69,43 @@ anything.** Phase 8 cited Rev. Proc. 2025-32 §3.01 for `15750.00/31500.00/23625
 conflict would mean either that citation or the transcription is wrong. That is a correctness
 question about money, not a routine fix, and it invalidates Phase 8's proofs either way.
 
+### Decision 4 — A return-profile document drives the scope guard
+
+**Research proved the phase's original assumption false.** A scope guard driven by *store
+contents* cannot distinguish "the taxpayer has no brokerage income" from "the brokerage
+document was never ingested", so it stays silent in exactly the case TAX-16 exists for.
+
+A new `vnd.fjs.*` dialect — the **return profile** — carries what the taxpayer *declares*:
+filing status, age/blindness box counts, and the set of income kinds present. The guard
+compares the declared set against a **frozen modeled set** and refuses, naming every declared
+kind the engine does not model.
+
+This also resolves a separate defect research found: `ReportLine.sources` requires a non-empty
+tuple of `{documentHash, boxPath, value}`, and the standard deduction (line 12) derives from
+no document, so line 12 could not be expressed at all. With a return profile the standard
+deduction cites a real document with a real hash, leaving Phase 9's `tsc` guarantee untouched.
+
+Three of the four remaining success criteria depend on this document, so it is a Phase 10
+prerequisite rather than a Phase 11 nicety.
+
+### Decision 5 — Model the IRS whole-dollar election, because criterion 5 is otherwise vacuous
+
+**Criterion 5 as written is a tautology.** In the cents regime money is `bigint` cents, so
+`round(sum)` and `sum(round)` are both the identity and any proof of their equality tests
+nothing. Rounding only bites at *whole dollars*.
+
+Form 1040's instructions (p23) state the governing rule — *"include cents when adding the
+amounts and round off only the total"* — and make whole-dollar rounding an **election that is
+all-or-nothing for the whole return**. Phase 10 models that election, and proves criterion 5
+with the IRS's own example: ten 1099-INTs at `'1.39'` give `round(sum) = $14` against
+`sum(round) = $10`.
+
+### Decision 6 — `qualifyingSurvivingSpouse` becomes a real `IndividualFilingStatus`
+
+Its dollar amounts coincide with `marriedFilingJointly`, but its **maximum age/blindness box
+count is 2, not 4**. Mapping QSS onto MFJ would silently permit a 4-box standard deduction no
+QSS filer can claim — precisely the quietly-wrong number this architecture exists to prevent.
+
 ### Claude's Discretion
 
 Module layout, naming, and plan decomposition, provided they follow existing conventions:
@@ -119,6 +156,24 @@ specifying `halfUp` at cent precision was caught and corrected during execution.
 Worksheet, p36–38 line-16 instructions and the dispatch tree, **p38 the 25-line QDCGT
 worksheet**, p124 Tax Computation Worksheet. `i1040sd.pdf` (17pp) — p15–16 Schedule D Tax
 Worksheet. `f1040.pdf` — the form face. `p1040.pdf` — the Tax Table.
+
+## The criterion-2 regression pair — INDEPENDENTLY VERIFIED
+
+Produced by research, then **recomputed from the worksheet and the bracket parameters by a
+second party before being recorded here**. Both computations agree. MFJ, no Schedule D.
+
+| Case | line 15 | line 3a | line 22 | line 23 | line 24 | **correct line 16** | forgot-`min` | error |
+|---|---|---|---|---|---|---|---|---|
+| A | $97,000.00 | $300.00 | 11,130 | 11,175.00 | **11,174** | **$11,174** | 11,175.00 | **+$1.00** |
+| B | $96,999.00 | $299.00 | 11,130 | 11,174.85 | **11,163** | **$11,163** | 11,174.85 | **+$11.85** |
+
+**The bug this pins is omitting the `min` on line 25** — not naive Tax Table use. An engine
+that simply looks up line 1 in the Tax Table gets *both* cases right, because that is exactly
+what line 24 computes and `min` selects it. A regression proof aimed at the wrong bug would
+pass while the real one shipped.
+
+**"$1–$12" is not a bound and must never be asserted as a range.** Research found MFJ
+$96,949 / $249 produces $13.35. Pin these exact values.
 
 QDCGT anchors already read directly: line 6 (top of the 0% bracket) $48,350 single/MFS,
 $96,700 MFJ/QSS, $64,750 HoH; line 13 (top of the 15% bracket) $533,400 single, $300,000 MFS,
