@@ -56,6 +56,31 @@ facilitate Emergent Design sessions
   - `node --test fjs` — Node resolves the bare directory to `fjs/index.js` and runs the whole app as one fake "test".
   - `node --test fjs/some/module.f.js` — targeting a source file by explicit path is **also** a fake pass. Node executes it as a plain script; no `proof` leaf runs. Verified by injecting a leaf that throws unconditionally: `npm test` reported `tests 8, pass 7, fail 1`, while `node --test fjs/server/module.f.js` reported `tests 1, pass 1, fail 0` on the identical file.
 
+## Hard rules
+
+These are cited by name throughout the source. They are stated here so the citations resolve.
+
+- **Money in a stored JSON document is a `string`, never a JSON number.** Documents, tax-year
+  parameters, intermediates and reports alike. A JSON number is an IEEE 754 double by the time
+  `media/json`'s `Unknown` sees it, so exactness dies at the boundary. The rtti field is `string`;
+  exactness is enforced in the semantic check, mirroring how `vnd.fjs.revision` types `hash` as
+  `string` and defers to `isHash`. In computation, money is integer cents as `bigint`.
+- **No type cast over an indexed access, no `any`, no non-null assertion.** `tsconfig.json` sets
+  `noUncheckedIndexedAccess`, so indexing yields `T | undefined` — that `undefined` is the
+  compiler telling you something true. Bind the lookup to a local and narrow it with `assert` /
+  `assertNotNullish`, as `fjs/server/finance_schema/module.f.js` does. A cast silences the check
+  rather than satisfying it. (`/** @type {const} */` annotations and casts over a `JSON.parse`
+  result are a different thing — they type an `any`, they do not discard a `| undefined`.)
+- **`assert`, `assertNotNullish`, `unwrap` and `match` throw BARE values, not `Error`s.**
+  `typeof e === 'string'` or an array; `e instanceof Error` is `false` and `e.message` is
+  `undefined`. Never branch on `instanceof Error` — such a branch misses every refusal this
+  codebase raises.
+- **No new dependency, including a devDependency, without every repo owner's approval.**
+- **A missing generic capability is written here in this project, shaped so it could be lifted
+  upstream unchanged** — no locale or domain assumptions baked into a generic module. See
+  `fjs/types/decimal` (scale as a parameter, zero finance-specific content) versus
+  `fjs/document/ocr_amount` (comma degrouping, a US printed-form convention, kept one layer out).
+
 ## A proof is not known to work until you have watched it fail
 
 A green suite proves nothing on its own. **Break the code on purpose and confirm the suite goes
