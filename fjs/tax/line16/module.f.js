@@ -354,6 +354,166 @@ const nothingSwitchedOn = {
     scheduleJElected: false,
 }
 
+/**
+ * The DISCRIMINATING return, defined once and used by BOTH the ordering
+ * leaf and the branch table's `scheduleDTaxWorksheet` row.
+ *
+ * MFJ, Form 1040 line 15 = $97,000.00, line 3a = $300.00, filing Schedule
+ * D with lines 15 and 16 both $40,000.00 gains, line 19 = $10,000.00 and
+ * line 18 = $0.
+ *
+ * Every field is load-bearing and none may be "simplified":
+ * - line 3a > 0 is what lets level 2c COMPETE. With it at zero the two
+ *   orderings agree and no observation could tell them apart.
+ * - Schedule D line 19 > 0 is what makes them DISAGREE. It is the only
+ *   kind of input on which the Schedule D Tax Worksheet and the QDCGT
+ *   differ at all, because with lines 18 and 19 zero the two worksheets
+ *   are algebraically identical.
+ *
+ * Correct dispatch: `scheduleDTaxWorksheet`, refusing. Under a swapped
+ * 2a/2c order: `qdcgt`, computing an `ok` outcome.
+ * @type {Line16Inputs}
+ */
+const scheduleDWithUnrecapturedGainAndQualifiedDividends = {
+    ...nothingSwitchedOn,
+    taxableIncomeCents: 9700000n,
+    qualifiedDividendsCents: 30000n,
+    filingScheduleD: true,
+    scheduleD15Cents: 4000000n,
+    scheduleD16Cents: 4000000n,
+    scheduleD19Cents: 1000000n,
+}
+
+/** One row of the TAX-03 branch table.
+ * @typedef {{
+ *   readonly name: string,
+ *   readonly inputs: Line16Inputs,
+ *   readonly expectedMethod: Line16Method,
+ * }} BranchRow
+ */
+
+/**
+ * Independently hand-typed: the number of branches TAX-03 names — "Tax
+ * Table, Tax Computation Worksheet, QDCGT worksheet, Schedule D Tax
+ * Worksheet", counted off the requirement text, NOT read from
+ * `taxThreeBranches.length` and not derived from {@link Line16Method}
+ * (which also carries the three wrappers).
+ *
+ * This is the counterweight AGENTS.md's fourth signature defect calls
+ * for. A table-driven leaf whose iteration set came from the code under
+ * test could never notice a branch being removed — the entry would
+ * vanish from the loop in the same instant. The duplication is the
+ * mechanism, not a smell.
+ * @type {number}
+ */
+const expectedTaxThreeBranchCount = 4
+
+/**
+ * One input set per TAX-03 branch, with the method each must select.
+ *
+ * The `scheduleDTaxWorksheet` row deliberately reuses
+ * {@link scheduleDWithUnrecapturedGainAndQualifiedDividends} — the SAME
+ * discriminating input as `scheduleDConditionsOutrankQualifiedDividends`
+ * — so that a swapped 2a/2c order turns TWO independent leaves red, in
+ * two different proofs, rather than resting entirely on one. The ordering
+ * leaf is the one a later feedback pass is most likely to "simplify" into
+ * a cents or kind check; if it does, this table still fires. A single
+ * point of failure guarding the phase's least visible defect is not a
+ * place to economise.
+ * @type {readonly BranchRow[]}
+ */
+const taxThreeBranches = [
+    {
+        name: 'Tax Table',
+        inputs: { ...nothingSwitchedOn, taxableIncomeCents: 2530000n },
+        expectedMethod: 'taxTable',
+    },
+    {
+        name: 'Tax Computation Worksheet',
+        inputs: { ...nothingSwitchedOn, status: 'single', taxableIncomeCents: 10000000n },
+        expectedMethod: 'taxComputationWorksheet',
+    },
+    {
+        name: 'Qualified Dividends and Capital Gain Tax Worksheet',
+        inputs: { ...nothingSwitchedOn, taxableIncomeCents: 9700000n, qualifiedDividendsCents: 30000n },
+        expectedMethod: 'qdcgt',
+    },
+    {
+        name: 'Schedule D Tax Worksheet',
+        inputs: scheduleDWithUnrecapturedGainAndQualifiedDividends,
+        expectedMethod: 'scheduleDTaxWorksheet',
+    },
+]
+
+/** One row of the refusing-arm table.
+ * @typedef {{
+ *   readonly name: string,
+ *   readonly inputs: Line16Inputs,
+ *   readonly expectedMethod: Line16Method,
+ *   readonly expectedUnmodeled: readonly UnmodeledKind[],
+ *   readonly expectedLabels: readonly string[],
+ * }} RefusingRow
+ */
+
+/**
+ * Independently hand-typed: the number of arms of this dispatcher that
+ * REFUSE — the three level-0 wrappers, level 2a, and level 2b. Counted
+ * off the printed decision tree rather than read from the table below,
+ * for the reason on {@link expectedTaxThreeBranchCount}.
+ * @type {number}
+ */
+const expectedRefusingArmCount = 5
+
+/**
+ * Every refusing arm, with what its refusal must NAME.
+ *
+ * `expectedUnmodeled` and `expectedLabels` are hand-typed here rather
+ * than read from `fjs/return/scope`'s `unmodeledKindRefusals`. Reading
+ * them from that table would make this leaf agree with whatever the table
+ * happens to say, including after a label was silently changed — the
+ * expected side must not be produced by the code under test, and the
+ * refusal table is exactly the code this leaf is checking the dispatcher
+ * against.
+ * @type {readonly RefusingRow[]}
+ */
+const refusingArms = [
+    {
+        name: 'level 0a — Form 2555',
+        inputs: { ...nothingSwitchedOn, taxableIncomeCents: 9700000n, qualifiedDividendsCents: 30000n, filingForm2555: true },
+        expectedMethod: 'foreignEarnedIncomeTaxWorksheet',
+        expectedUnmodeled: ['foreignEarnedIncomeForm2555'],
+        expectedLabels: ['foreign earned income exclusion'],
+    },
+    {
+        name: 'level 0b — Form 8615',
+        inputs: { ...nothingSwitchedOn, taxableIncomeCents: 9700000n, qualifiedDividendsCents: 30000n, form8615Applies: true },
+        expectedMethod: 'form8615',
+        expectedUnmodeled: ['childsUnearnedIncomeForm8615'],
+        expectedLabels: ['a child\'s unearned income'],
+    },
+    {
+        name: 'level 0c — Schedule J',
+        inputs: { ...nothingSwitchedOn, taxableIncomeCents: 9700000n, qualifiedDividendsCents: 30000n, scheduleJElected: true },
+        expectedMethod: 'scheduleJ',
+        expectedUnmodeled: ['farmIncomeAveragingScheduleJ'],
+        expectedLabels: ['farm and fishing income averaging'],
+    },
+    {
+        name: 'level 2a — Schedule D lines 18 and 19 both non-zero',
+        inputs: { ...scheduleDWithUnrecapturedGainAndQualifiedDividends, scheduleD18Cents: 500000n },
+        expectedMethod: 'scheduleDTaxWorksheet',
+        expectedUnmodeled: ['unrecaptured1250Gain', 'collectibles28RateGain'],
+        expectedLabels: ['unrecaptured section 1250 gain', '28% rate gain'],
+    },
+    {
+        name: 'level 2b — Form 4952 line 4g',
+        inputs: { ...nothingSwitchedOn, taxableIncomeCents: 9700000n, qualifiedDividendsCents: 30000n, filingForm4952: true, form4952Line4gCents: 250000n },
+        expectedMethod: 'scheduleDTaxWorksheet',
+        expectedUnmodeled: ['investmentInterestForm4952'],
+        expectedLabels: ['investment interest expense election'],
+    },
+]
+
 export const proof = {
     branches: {
         // The IRS's OWN printed Tax Table Example (i1040gi p68: "Mr. and
@@ -688,4 +848,240 @@ export const proof = {
             assertEq(outcome.cents, 0n, 'no taxable income, no tax')
         },
     },
+    ordering: {
+        // ★ THE ORDERING PROOF. The one leaf in this phase that can see a
+        // swapped 2a/2c dispatch order.
+        //
+        // READ THIS BEFORE "SIMPLIFYING" THE LEAF. With Schedule D lines
+        // 18 and 19 zero and Form 4952 not filed, the Schedule D Tax
+        // Worksheet reduces EXACTLY to the QDCGT — 10-RESEARCH.md derived
+        // the line-by-line mapping from both printed worksheets (its
+        // assumption A4). So both orderings produce the same cents on
+        // every ordinary return, and a leaf rewritten into a cents check
+        // would pass under either order while appearing to test the
+        // dispatch.
+        //
+        // This leaf exists specifically because its input has a NON-ZERO
+        // Schedule D line 19 — the only kind of input the two orderings
+        // disagree on — AND a non-zero line 3a, without which level 2c
+        // could not compete at all. It asserts the SELECTED METHOD, which
+        // is the only observation that can see the disagreement. Under a
+        // swapped order the outcome is `{ kind: 'ok', method: 'qdcgt' }`
+        // and every assertion below fails.
+        //
+        // Its control is `controlSameInputsWithZeroEighteenAndNineteenSelectQdcgt`,
+        // immediately below: the same return with lines 18 and 19 at zero
+        // must still reach the QDCGT. Without it, a dispatcher that
+        // refused every Schedule D filer would pass this leaf.
+        scheduleDConditionsOutrankQualifiedDividends: () => {
+            const outcome = dispatchLine16(taxParams2025)(
+                scheduleDWithUnrecapturedGainAndQualifiedDividends,
+            )
+            assertEq(
+                outcome.method,
+                'scheduleDTaxWorksheet',
+                [
+                    'level 2a must be tested BEFORE level 2c: a return with both qualified dividends'
+                    + ' and unrecaptured section 1250 gain belongs to the Schedule D Tax Worksheet',
+                    outcome,
+                ],
+            )
+            assert(
+                outcome.kind === 'error',
+                ['that branch is selected and then refuses (10-CONTEXT.md Decision 1)', outcome],
+            )
+            assertEq(outcome.unmodeled.length, 1, ['expected exactly one unmodeled kind', outcome.unmodeled])
+            assertEq(
+                outcome.unmodeled[0],
+                'unrecaptured1250Gain',
+                ['expected Schedule D line 19\'s kind named', outcome.unmodeled],
+            )
+            assert(
+                outcome.message.includes('unrecaptured section 1250 gain'),
+                ['expected the refusal to name what is unmodeled', outcome.message],
+            )
+        },
+        // THE CONTROL for `scheduleDConditionsOutrankQualifiedDividends`.
+        // The identical return with Schedule D lines 18 and 19 both zero
+        // and Form 4952 not filed is a legitimate QDCGT return and must
+        // COMPUTE. A gate that refused every Schedule D filer would pass
+        // the ordering leaf and nothing else; this is what distinguishes
+        // this dispatcher from that one.
+        //
+        // $6,375.00 is hand-typed, derived from the printed worksheet and
+        // the stored TY2025 brackets BEFORE the code was run:
+        //   L3 = min(40,000, 40,000) = 40,000.00 ; L4 = 40,300.00
+        //   L5 = 97,000 - 40,300 = 56,700.00 ; L9 = 96,700 - 56,700 = 40,000.00 at 0%
+        //   L12 = L17 = 300.00 ; L18 = 15% x 300 = 45.00 ; L20 = L21 = 0
+        //   L22 = Tax Table MFJ band [56,700 , 56,750), midpoint 56,725:
+        //         10% x 23,850 = 2,385.00 plus 12% x 32,875 = 3,945.00 = 6,330.00
+        //   L23 = 45 + 6,330 = 6,375.00 ; L24 = 11,174.00 ; L25 = min = 6,375.00
+        //
+        // $11,174.00 is the printed MFJ Tax Table row $97,000-$97,050,
+        // and the comparison against it is what says the preferential
+        // treatment actually happened: this return pays $4,799.00 LESS
+        // than the same taxable income run straight through the table.
+        controlSameInputsWithZeroEighteenAndNineteenSelectQdcgt: () => {
+            const outcome = dispatchLine16(taxParams2025)({
+                ...scheduleDWithUnrecapturedGainAndQualifiedDividends,
+                scheduleD18Cents: 0n,
+                scheduleD19Cents: 0n,
+                filingForm4952: false,
+            })
+            assertEq(outcome.kind, 'ok', ['the legitimate Schedule D return must not be refused', outcome])
+            assertEq(outcome.method, 'qdcgt', ['expected the QDCGT worksheet', outcome])
+            assert(outcome.kind === 'ok', ['expected a computed outcome', outcome])
+            assertEq(outcome.cents, 637500n, 'Form 1040 line 16 = $6,375.00')
+            assert(
+                outcome.cents < 1117400n,
+                [
+                    'the preferential slice must be taxed below the straight Tax Table amount'
+                    + ' for $97,000.00 of taxable income',
+                    outcome.cents,
+                ],
+            )
+        },
+        // A return with no Schedule D, no qualified dividends and no
+        // capital gain distributions never reaches level 2 at all — on
+        // both sides of the $100,000 seam.
+        //
+        // Its own control is the third block: the SAME income with
+        // qualified dividends added does reach level 2. Without it this
+        // leaf would pass for a dispatcher that never selected a
+        // preferential worksheet under any circumstances.
+        profileWithNoPreferentialIncomeNeverReachesLevelTwo: () => {
+            /** @type {readonly Line16Method[]} */
+            const baseMethods = ['taxTable', 'taxComputationWorksheet']
+            const below = dispatchLine16(taxParams2025)({
+                ...nothingSwitchedOn,
+                taxableIncomeCents: 5000000n,
+            })
+            assert(
+                baseMethods.includes(below.method),
+                ['no preferential income must fall through to the base lookup', below],
+            )
+            assertEq(below.method, 'taxTable', ['$50,000.00 is a table lookup', below])
+            const above = dispatchLine16(taxParams2025)({
+                ...nothingSwitchedOn,
+                taxableIncomeCents: 25000000n,
+            })
+            assert(
+                baseMethods.includes(above.method),
+                ['no preferential income must fall through to the base lookup', above],
+            )
+            assertEq(
+                above.method,
+                'taxComputationWorksheet',
+                ['$250,000.00 is a Tax Computation Worksheet return', above],
+            )
+            const withDividends = dispatchLine16(taxParams2025)({
+                ...nothingSwitchedOn,
+                taxableIncomeCents: 5000000n,
+                qualifiedDividendsCents: 100000n,
+            })
+            assert(
+                !baseMethods.includes(withDividends.method),
+                ['the SAME income with qualified dividends must reach level 2', withDividends],
+            )
+            assertEq(withDividends.method, 'qdcgt', ['expected the QDCGT worksheet', withDividends])
+        },
+    },
+    exhaustiveness: {
+        // TAX-03 names FOUR branches and every one of them must be
+        // reachable. One input set per branch, each asserting the method
+        // the dispatcher selects, against a HAND-TYPED count — so a
+        // branch quietly removed from the dispatcher fails here rather
+        // than merely losing its own leaf and taking its own evidence
+        // with it.
+        //
+        // The `scheduleDTaxWorksheet` row uses the same discriminating
+        // input as the ordering leaf, deliberately: see
+        // {@link taxThreeBranches}.
+        dispatchIsExhaustiveOverTheFourTaxThreeBranches: () => {
+            assertEq(
+                taxThreeBranches.length,
+                expectedTaxThreeBranchCount,
+                ['TAX-03 names four line-16 branches', taxThreeBranches.length],
+            )
+            assertEq(
+                new Set(taxThreeBranches.map(row => row.expectedMethod)).size,
+                expectedTaxThreeBranchCount,
+                ['the four rows must name four DISTINCT methods', taxThreeBranches.map(row => row.expectedMethod)],
+            )
+            for (const row of taxThreeBranches) {
+                const outcome = dispatchLine16(taxParams2025)(row.inputs)
+                assertEq(
+                    outcome.method,
+                    row.expectedMethod,
+                    ['this input set must select this branch', row.name, outcome],
+                )
+            }
+        },
+        // Criterion 4: a refusal NAMES what is unmodeled. A leaf
+        // asserting only `kind === 'error'` would make it vacuous —
+        // exactly the weakness Phase 9's sweep found in several places,
+        // where assertions checked THAT a refusal threw rather than what
+        // it threw.
+        //
+        // The hand-typed count stands behind the loop for the same reason
+        // it stands behind the branch table: the rows are proof-owned,
+        // but a row silently deleted would still shrink the loop.
+        everyRefusingArmNamesWhatIsUnmodeled: () => {
+            assertEq(
+                refusingArms.length,
+                expectedRefusingArmCount,
+                ['this dispatcher has five refusing arms', refusingArms.length],
+            )
+            for (const row of refusingArms) {
+                const outcome = dispatchLine16(taxParams2025)(row.inputs)
+                assertEq(outcome.method, row.expectedMethod, ['expected this arm', row.name, outcome])
+                assert(outcome.kind === 'error', ['expected this arm to refuse', row.name, outcome])
+                assert(
+                    outcome.unmodeled.length > 0,
+                    ['a refusal that names nothing is the silence it replaces', row.name, outcome],
+                )
+                assertEq(
+                    outcome.unmodeled.length,
+                    row.expectedUnmodeled.length,
+                    ['expected exactly these unmodeled kinds', row.name, outcome.unmodeled],
+                )
+                for (const [index, kind] of row.expectedUnmodeled.entries()) {
+                    assertEq(
+                        outcome.unmodeled[index],
+                        kind,
+                        ['expected this kind at this position', row.name, index, outcome.unmodeled],
+                    )
+                }
+                for (const label of row.expectedLabels) {
+                    assert(
+                        outcome.message.includes(label),
+                        ['expected the refusal message to name this label', row.name, label, outcome.message],
+                    )
+                }
+            }
+        },
+    },
 }
+
+// ── What this phase deliberately does NOT prove, and where it moves ──────────
+//
+// 10-RESEARCH.md's DEGENERATE-EQUIVALENCE DIFFERENTIAL: on inputs where
+// Schedule D lines 18 and 19 are both zero, the Schedule D Tax Worksheet
+// and the QDCGT must return the SAME CENTS. That is the property behind
+// everything this module says about ordering — it is precisely why a
+// swapped 2a/2c order is invisible to the number — and it cannot be
+// written here, because 10-CONTEXT.md Decision 1 ships the Schedule D Tax
+// Worksheet as a REFUSAL rather than a computation. There is no second
+// number to compare against.
+//
+// It is Phase 12's proof, alongside the brokerage documents that give the
+// Schedule D Tax Worksheet something to compute over, and it is worth
+// writing there for a second reason: it validates BOTH transcriptions
+// against each other, and it goes red for a reason that names both
+// worksheets.
+//
+// Until then, the ordering is carried by the method tag on
+// `scheduleDConditionsOutrankQualifiedDividends` and by the
+// `scheduleDTaxWorksheet` row of `dispatchIsExhaustiveOverTheFourTaxThreeBranches`
+// — two independent leaves in two different proofs, over the same
+// discriminating input.
