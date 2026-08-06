@@ -372,10 +372,16 @@ export const proof = {
             previousLessThan = region.lessThan
         }
     },
-    // T-08-03: a lookup at exactly $100,000.00 is refused (the bare thrown
-    // string is asserted directly -- never an `Error`, never
-    // `instanceof Error`), naming the Tax Computation Worksheet; a lookup
-    // one cent below still resolves, to the table's own last row.
+    // T-08-03 (T-08-06-04, strengthened): a lookup at exactly $100,000.00
+    // is refused (the bare thrown value is asserted directly -- never an
+    // `Error`, never `instanceof Error`). Weakening the refusal's `<` to
+    // `<=` still throws at exactly $100,000.00 -- but via an unrelated
+    // path ("income falls outside every stored band region") instead of
+    // the intended refusal. Asserting only "did it throw" cannot tell
+    // these apart, so the thrown message's CONTENT is asserted: it must
+    // name the $100,000 boundary AND the Tax Computation Worksheet
+    // verbatim, exactly as Publication 1040 itself does. A lookup one
+    // cent below still resolves, to the table's own last row.
     tableRefusesAtOneHundredThousandAndAbove: () => {
         let threw = false
         try {
@@ -384,6 +390,15 @@ export const proof = {
             threw = true
             assert(typeof e === 'string' || Array.isArray(e), ['expected a bare thrown value, not an Error', e])
             assert(!(e instanceof Error), ['must never throw an Error instance', e])
+            const message = typeof e === 'string' ? e : Array.isArray(e) ? e.join(' ') : ''
+            assert(
+                message.includes('100,000'),
+                ['expected the thrown message to name the $100,000 boundary', e],
+            )
+            assert(
+                message.includes('Tax Computation Worksheet'),
+                ['expected the thrown message to name the Tax Computation Worksheet', e],
+            )
         }
         assert(threw, 'expected lookupTaxTable to refuse a $100,000.00 lookup')
         const lastRow = lookupTaxTable(taxParams2025)(centsFromString('99999.99'))
