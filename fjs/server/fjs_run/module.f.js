@@ -1020,6 +1020,80 @@ export const proof = {
                 }
             },
         },
+        // 09-07: what a run record claims about itself (E12, E14) —
+        // `handleRunOutcome`'s own `inputs`/`args` fields, read back from a
+        // PERSISTED record rather than trusted from the in-process value.
+        recordIntegrity: {
+            // E12: the error arm's `inputs` was hardcoded to `[]`. A
+            // `RunOutcome`'s `kind:'error'` arm structurally permits a
+            // non-empty `reads` (see `fjs/report/guard/module.f.js`'s own
+            // typedef) even though every PRODUCTION error path in this
+            // file's own `executeRun` currently discards it — this proof
+            // constructs that outcome directly and asserts
+            // `handleRunOutcome` still persists whatever `reads` it was
+            // actually given, never a hardcoded empty array. The module's
+            // own comment states the guarantee: "provenance that covers
+            // only successes is not provenance."
+            errorArmPersistsReadsObservedBeforeTheFailure: () => {
+                const home = '/error-arm-inputs'
+                const cas = fileCas(sha256)(home)
+                /** @type {RunOutcome<unknown>} */
+                const outcome = { kind: 'error', message: 'refused: fetch', reads: [['casRead', ['observed-before-failure-hash']]] }
+                const [state1, callResult] = virtual(emptyState)(
+                    handleRunOutcome(cas)('program-hash-error-arm-inputs')([])(false)({})(outcome))
+                assertEq(callResult.isError, true)
+                const first = callResult.content[0]
+                if (first === undefined || first.type !== 'text') {
+                    throw ['expected a text content item', callResult]
+                }
+                const match = /run record: (\S+)\)/.exec(first.text)
+                assert(match !== null, ['expected the error text to name a run record hash', first.text])
+                const runHash = assertNotNullish(match[1], 'expected the run record hash capture group to be present')
+                const runHashVec = cBase32ToVec(runHash)
+                assert(runHashVec !== null, 'expected a decodable runHash')
+                const [, runRead] = virtual(state1)(collectRead(cas.read(/** @type {Vec} */ (runHashVec))))
+                assert(runRead[0] === 'ok', ['expected the error run record to read back', runRead])
+                const [vt, record] = validateRun(JSON.parse(utf8ToString(runRead[1])))
+                assert(vt === 'ok', ['expected the error record to validate', vt, record])
+                if (vt === 'ok') {
+                    assert(
+                        record.inputs.some(i => i.command === 'casRead' && i.payload[0] === 'observed-before-failure-hash'),
+                        ['expected the error record to carry the read observed before the failure', record.inputs])
+                }
+            },
+            // E14: the ok arm's `args` was hardcoded to `[]`. A
+            // non-empty, distinctive args array so an empty-vs-populated
+            // confusion cannot pass.
+            okArmPersistsTheArgsActuallyPassedIn: () => {
+                const home = '/ok-arm-args'
+                const cas = fileCas(sha256)(home)
+                const [state0, cacheKey] = virtual(emptyState)(initEvo(cas))
+                const e = evo(cas)(cacheKey)
+                const programSource = 'export const report = ctx => args => ctx.pure("unused")'
+                const [state1, programHash] = virtual(state0)(seedText(cas)(programSource))
+                /** @type {Report<string>} */
+                const trivialReport = ctx => () => ctx.step(ctx.evoList('false'), () => ctx.pure('args-proof-value'))
+                const [state1b, outcome] = runExecuteRunViaFixture(home)(cas)(e)(programHash)(programSource)(trivialReport)([])(undefined)(state1)
+                assert(outcome.kind === 'ok', ['expected an ok outcome', outcome])
+                const distinctiveArgs = ['distinctive-arg-alpha', 'distinctive-arg-beta']
+                const [state2, callResult] = virtual(state1b)(handleRunOutcome(cas)(programHash)(distinctiveArgs)(false)({})(outcome))
+                assertEq(callResult.isError, undefined)
+                const first = callResult.content[0]
+                if (first === undefined || first.type !== 'text') {
+                    throw ['expected a text content item', callResult]
+                }
+                const parsed = /** @type {{ readonly runHash: string }} */ (JSON.parse(first.text))
+                const runHashVec = cBase32ToVec(parsed.runHash)
+                assert(runHashVec !== null, 'expected a decodable runHash')
+                const [, runRead] = virtual(state2)(collectRead(cas.read(/** @type {Vec} */ (runHashVec))))
+                assert(runRead[0] === 'ok', ['expected the run record to read back', runRead])
+                const [vt, record] = validateRun(JSON.parse(utf8ToString(runRead[1])))
+                assert(vt === 'ok', ['expected the record to validate', vt, record])
+                if (vt === 'ok') {
+                    assertEq(JSON.stringify(record.args), JSON.stringify(distinctiveArgs))
+                }
+            },
+        },
         // EXEC-12, Success Criterion 4: three named failure classes, each
         // its own leaf so a regression localizes — a combined loop cannot
         // say WHICH class broke. Each leaf drives the FULL fjsRunTool.handle
