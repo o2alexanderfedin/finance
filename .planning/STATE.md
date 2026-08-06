@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
-status: ready_for_09-08
-stopped_at: Completed 09-07-PLAN.md (gap closure — 7 mutation-sweep gaps closed, all verified RED before this plan and reverted after); 09-08 not started
-last_updated: "2026-08-06T03:54:39.805Z"
+status: executing
+stopped_at: Completed 08-06-PLAN.md (gap closure — 9 mutation-sweep gaps closed above ~$100k, all verified RED before this plan and reverted after)
+last_updated: "2026-08-06T04:11:27.704Z"
 last_activity: 2026-08-06
 progress:
   total_phases: 15
   completed_phases: 8
   total_plans: 38
-  completed_plans: 39
-  percent: 53
+  completed_plans: 40
+  percent: 100
 ---
 
 # Project State
@@ -29,10 +29,10 @@ the server executes it as a pure function of `(documents, tax-year parameters) �
 Phase: 9 of 15 — gap-closure plans added after the original `09-VERIFICATION.md` pass
   (a systematic mutation sweep found 7 more undetected gaps); 09-07 closes them, 09-08
   covers a separate exec/guest/document batch from the same sweep and is not yet started.
-Plan: 7 of 8 complete (09-07 closed 7 mutation-sweep gaps in server/report; 09-08 pending)
-Status: Between phases. Phase 9 not fully complete until 09-08 lands; Phase 10 not started.
+Plan: 8 of 8 complete (09-07 closed 7 mutation-sweep gaps in server/report; 09-08 pending)
+Status: Ready to execute
 
-Progress: [█████░░░░░] 8 of 15 phases complete (53%; see progress.total_plans/completed_plans
+Progress: [██████████] 100%
   in this file's frontmatter for the raw plan/summary counts — the percent figure here is
   phase-based, not plan-based, because two phases carry an extra FIX-SUMMARY.md alongside a
   plan's own summary, which would otherwise round the plan-based figure to a misleading 100%)
@@ -102,6 +102,7 @@ proofs and moves with submodule initialization state — which is exactly how a 
 | Phase 09 P05 | 35min | 3 tasks | 2 files |
 | Phase 09 P06 | 25min | 3 tasks | 3 files |
 | Phase 09 P07 | 65min | 3 tasks | 4 files |
+| Phase 08 P06 | 65min | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -222,6 +223,7 @@ Full log in PROJECT.md Key Decisions. Recent decisions affecting current work:
 - [Phase 09-06]: classifyRunOutcome and RunOutcome moved to fjs/report/guard/module.f.js, joining line and audit as the three PROV-07 mechanisms fjs/report/ now holds together — the rule's only type dependency (Read from fjs/exec) had nothing to do with fjs_run's own CAS/MCP/orchestration concerns; mutation from the new home re-proved the antiHardcodingGate/zeroReadGate/integration-test binding survived the move
 - [Phase 09-07]: E2's decisive pin-through-the-shipped-tool proof lives in fjs-run-integration.test.js, not the virtual proof file — fjsRunTool.handle cannot reach an 'ok' RunOutcome under fjs/effects/node/virtual in one call (the write/import representational split), so only a real separate process can exercise the shipped executeRun(...) call with subject+parents end to end
 - [Phase 09-07]: E12's proof constructs a synthetic RunOutcome with a non-empty error-arm reads array rather than reproducing a real mid-chain refusal — no current production path retains reads on refusal (fjs/exec discards them), but handleRunOutcome's own contract to persist whatever reads it is given is independent of that fact
+- [Phase 08]: Closed 9 mutation-sweep coverage gaps in fjs/tax/params, fjs/tax/table, and fjs/types/rational (08-06); all figures confirmed correct against Rev. Proc. 2024-40, no stored values changed
 
 ### Pending Todos
 
@@ -366,8 +368,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-08-06T03:54:34.503Z
-Stopped at: Completed 09-07-PLAN.md (gap closure — 7 mutation-sweep gaps closed, all verified RED before this plan and reverted after); 09-08 not started
+Last session: 2026-08-06T04:11:27.698Z
+Stopped at: Completed 08-06-PLAN.md (gap closure — 9 mutation-sweep gaps closed above ~$100k, all verified RED before this plan and reverted after)
 (`npm test` 187/187, 185 project-local proofs, `tsc` clean, `test:integration` included and
 passing, tree clean). Merge blocker measured and dismissed — see Blockers. Awaiting the user's
 choice on push/PR strategy and on Phase 8.
