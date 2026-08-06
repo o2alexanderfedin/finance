@@ -292,7 +292,7 @@ structural (RTTI) and semantic passes.
       per branch. Line 16 is not bracket arithmetic.
 - [x] **TAX-04** *(T1)*: Boundary proofs at `threshold − 1¢`, `threshold`, `threshold + 1¢`
       for every threshold in the parameter data.
-- [ ] **TAX-05** *(T1)*: Form 1040 core lines 1a–37.
+- [x] **TAX-05** *(T1)*: Form 1040 core lines 1a–37.
 - [x] **TAX-06** *(T1)*: Standard deduction with age and blindness increments.
 - [ ] **TAX-07** *(T2)*: Schedule B — interest and ordinary dividends, including the $1,500
       threshold and the foreign-account questions.

@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
 status: executing
-stopped_at: Completed 10-08-PLAN.md (dispatchLine16, the four-way tagged line-16 method dispatch — TAX-03 complete)
-last_updated: "2026-08-06T21:53:51.638Z"
+stopped_at: Completed 10-10-PLAN.md (lines 16-37 and the whole-report scope refusal). Task 3, the phase-level five-site mutation sweep, has been RUN and its transcript is in 10-10-SUMMARY.md — it is a blocking human-verify checkpoint and has NOT been self-approved.
+last_updated: "2026-08-06T22:31:27.027Z"
 last_activity: 2026-08-06
 progress:
   total_phases: 18
-  completed_phases: 9
+  completed_phases: 10
   total_plans: 48
-  completed_plans: 50
+  completed_plans: 51
   percent: 100
 ---
 
@@ -29,13 +29,14 @@ the server executes it as a pure function of `(documents, tax-year parameters) �
 Phase: 10 of 18 — Form 1040 Core, Line-16 Dispatch, and the Scope Guard (TAX-03/05/06/16).
   Ten plans across six waves. The plan set was returned BLOCKER by `gsd-plan-checker`
   (four blockers, ten warnings), revised, re-checked, and only then executed.
-Plan: 9 of 10 complete — wave 1 (10-01 QSS as a stored filing status, 10-02 the IRS
+Plan: 10 of 10 complete — wave 1 (10-01 QSS as a stored filing status, 10-02 the IRS
   whole-dollar election), wave 2 (10-03 Tax Computation Worksheet, 10-04 the
   vnd.fjs.return_profile dialect, 10-05 the standard deduction chart), wave 3
-  (10-06 QDCGT, 10-07 the classifyScope scope guard, executed in parallel) and
-  wave 4 (10-08 dispatchLine16). Waves 5-6 remain: 10-09 lines 1a-15, 10-10
-  lines 16-37 + whole-report refusal.
-Status: Ready to execute
+  (10-06 QDCGT, 10-07 the classifyScope scope guard, executed in parallel),
+  wave 4 (10-08 dispatchLine16), wave 5 (10-09 lines 1a-15) and wave 6 (10-10
+  lines 16-37 + the whole-report refusal).
+Status: Awaiting human verification of 10-10 Task 3, the phase mutation sweep
+  (blocking checkpoint; transcript in 10-10-SUMMARY.md)
 
 Progress: [██████████] 100%
   in this file's frontmatter for the raw plan/summary counts — the percent figure here is
@@ -112,6 +113,7 @@ proofs and moves with submodule initialization state — which is exactly how a 
 | Phase 10 P07 | 35min | 2 tasks | 1 files |
 | Phase 10 P08 | 55min | 2 tasks | 1 files |
 | Phase 10 P09 | 75min | 2 tasks | 1 files |
+| Phase 10 P10 | 95min | 3 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -243,6 +245,8 @@ Full log in PROJECT.md Key Decisions. Recent decisions affecting current work:
 - [Phase 10]: 10-09: sumBoxOverDocuments returns a BoxSum intermediate, not a ReportLine — line 2b must add two box sums before a line exists, and a box read over zero documents has no source, so PROV-01 forbids it being a line at all
 - [Phase 10]: 10-09: the filing status is recovered by finding it in individualFilingStatuses rather than by a type predicate — a @type-annotated predicate over .includes is rejected by tsc (TS2322), and find returns the STORED member rather than the blob's string
 - [Phase 10]: 10-09: line 12e cites filingStatus plus one box per checked 12d checkbox, exactly as planned; 12a-12c and earnedIncome determine the value but are cited only at document granularity — flagged for the phase owner, not widened, because 10-10 may pin the counts
+- [Phase 10]: 10-10: Form1040Outcome's error arm declares readonly lines?: undefined — omitting the field does NOT make adding it a tsc error, because TypeScript's excess-property check against a union admits any property declared in any constituent
+- [Phase 10]: 10-10: line 22's zero floor lives in its own named function: lines 19/20 are always profile-declared zeros in Phase 10, so the floor is unreachable through a whole report and would otherwise be an equivalent mutant
 
 ### Pending Todos
 
@@ -387,10 +391,12 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-08-06T21:53:45.202Z
-Stopped at: Completed 10-08-PLAN.md (dispatchLine16, the four-way tagged line-16 method dispatch — TAX-03 complete)
-(measure the suite rather than quoting it — see "Test metrics" above. Phase 10 waves 5-6 remain:
-10-09 lines 1a-15 and 10-10 lines 16-37 + the whole-report scope refusal.)
+Last session: 2026-08-06T22:31:21.916Z
+Stopped at: Completed 10-10-PLAN.md — all ten plans of Phase 10 have shipped.
+(measure the suite rather than quoting it — see "Test metrics" above. AWAITING HUMAN VERIFICATION of
+10-10 Task 3: the five-site phase mutation sweep was run in full and every failure set recorded in
+10-10-SUMMARY.md, including the two DIFFERENTIAL results the plan asked for. The executor did not
+self-approve the phase.)
 Resume file: None
 (they were one-shot artifacts, written to `feature/planning-requirements-roadmap` seven
 minutes after PR #14 merged, so they never reached `main`; nothing else on that branch is
