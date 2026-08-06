@@ -14,8 +14,9 @@
  *
  * @module
  */
-import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
+import { assert, assertEq, assertNotNullish } from 'functionalscript/fjs/asserts/module.f.js'
 import { centsToString } from '../../exact/module.f.js'
+import { of, halfUp } from '../../types/rational/module.f.js'
 
 /** @import { Assert } from 'functionalscript/fjs/asserts/module.f.js' */
 /** @import { Equal } from 'functionalscript/fjs/types/ts/module.f.js' */
@@ -76,7 +77,106 @@ import { centsToString } from '../../exact/module.f.js'
  * @typedef {Assert<Equal<Extends<{ readonly value: bigint, readonly rule: string }, ReportLine>, false>>} _ValueAndRuleWithoutSourcesDoesNotSatisfyReportLine
  */
 
+// ── The whole-dollar election (i1040gi p23) ─────────────────────────────────
+
+/**
+ * Rounds one already-exact cents value to a whole number of dollars, then
+ * re-expresses it in this project's cents convention (`× 100`), so a
+ * projected line stays comparable to every other stored cents amount.
+ *
+ * The governing rule, verbatim from the Form 1040 instructions
+ * (`i1040gi.pdf` p23, "Rounding Off to Whole Dollars"):
+ *
+ * > You can round off cents to whole dollars on your return and schedules.
+ * > If you do round to whole dollars, you must round all amounts. To round,
+ * > drop amounts under 50 cents and increase amounts from 50 to 99 cents to
+ * > the next dollar. For example, $1.39 becomes $1 and $2.50 becomes $3.
+ * >
+ * > If you have to add two or more amounts to figure the amount to enter on
+ * > a line, include cents when adding the amounts and round off only the
+ * > total.
+ *
+ * "Increase amounts from 50 to 99 cents to the next dollar" is a half-up
+ * rule, and `halfUp` is why the tie goes away from zero at BOTH signs: it
+ * breaks `-2.50` to `-3`, whereas JavaScript's built-in number rounding
+ * breaks it toward `+Infinity` (to `-2`) — a systematic bias in the
+ * taxpayer's favor on every loss (`fjs/types/rational`'s own docstring and
+ * its `rounding.tieAwayFromZeroNegativeDiffersFromMathRound` leaf pin that
+ * divergence). No floating point appears anywhere on this path: `of` builds
+ * an exact `Rational` over `bigint`s and `halfUp` consumes it.
+ *
+ * **Deliberately NOT shared with `fjs/tax/table`'s private
+ * `roundToNearestDollarThenBackToCents`, which computes the same numbers
+ * today.** That one implements Publication 1040's *printing* convention for
+ * the Tax Table — a property of the printed table, which simply has no
+ * cents column, and which applies whether or not the taxpayer elected
+ * anything. This one implements the taxpayer's own p23 *election*, which
+ * the taxpayer may decline. They are two different rules with two different
+ * justifications that happen to coincide numerically, and each would
+ * survive the IRS changing the other. A later "DRY these up" pass has to
+ * argue with that reason, not only with the duplication — merging them
+ * would make declining the election silently unable to stop the Tax Table
+ * from rounding, or make a change to the printed table's convention
+ * silently rewrite the election.
+ *
+ * Private on purpose: see `applyWholeDollarElection` for why no per-line
+ * variant is exported.
+ * @type {(cents: bigint) => bigint}
+ */
+const wholeDollarCentsFromCents = cents => halfUp(of(cents)(100n)) * 100n
+
+/**
+ * Applies (or declines) the taxpayer's whole-dollar election over a WHOLE
+ * report. `false` returns `lines` exactly as given — the same array, not a
+ * rebuilt copy. `true` projects every line's `value` to whole dollars,
+ * leaving `sources` and `rule` untouched, so provenance survives a rounding
+ * pass intact.
+ *
+ * **The signature is the point.** p23 makes the election all-or-nothing for
+ * the entire return — "If you do round to whole dollars, you must round
+ * **all** amounts" — so this takes the whole `ReportLine[]` and there is
+ * deliberately no exported per-line variant to partially apply
+ * (`wholeDollarCentsFromCents` is private for exactly this reason). A
+ * caller cannot round line 2b and leave line 1a alone without writing a
+ * second rounding mechanism of their own, which would be conspicuous in
+ * review rather than a one-character slip.
+ *
+ * **Round the total, never the items.** p23's second sentence — "include
+ * cents when adding the amounts and round off only the total" — is honored
+ * structurally by *where* this runs: a `ReportLine.value` is already the
+ * exact cents sum of its `sources`, so projecting the line rounds the
+ * total once. Applying this to per-item values and then adding them is the
+ * error the rule names, and `proof.roundSumIsFourteenDollarsWhileSumRound
+ * IsTenOnTenIrsExampleAmounts` prices it at $4 on ten $1.39 amounts.
+ * Nothing here re-rounds an already-rounded value either: the projection is
+ * applied once, at report time, to the exact cents figure.
+ *
+ * **Where `elected` comes from:** the return profile document's own
+ * `wholeDollarElection` box (Plan 10-04), never a host-side flag or a
+ * configuration default. The election is a fact the taxpayer supplies, and
+ * so it carries provenance like every other input — a report can say which
+ * document said to round.
+ * @type {(elected: boolean) => (lines: readonly ReportLine[]) => readonly ReportLine[]}
+ */
+export const applyWholeDollarElection = elected => lines => elected
+    ? lines.map(line => ({ ...line, value: wholeDollarCentsFromCents(line.value) }))
+    : lines
+
 // ── Tests ────────────────────────────────────────────────────────────────────
+
+/**
+ * Builds a one-source `ReportLine` for the election proofs: `valueCents` is
+ * the line's exact cents value, `rawValue` the decimal string as it would
+ * have been read at the box, `documentHash` a synthetic content hash.
+ * Builds only INPUTS — never an expected value, every one of which is
+ * hand-typed at its assertion (AGENTS.md). Test-only; not exported.
+ * @type {(documentHash: string) => (rawValue: string) => (valueCents: bigint) => ReportLine}
+ */
+const electionTestLine = documentHash => rawValue => valueCents => ({
+    value: valueCents,
+    sources: [{ documentHash, boxPath: 'box1InterestIncome', value: rawValue }],
+    rule: '1040 line 2b',
+})
 
 export const proof = {
     // PROV-02: a fully populated line carries `value`, its `sources` tuple,
@@ -140,5 +240,107 @@ export const proof = {
         assertEq(roundTrippedSource.documentHash, 'sha256-doc1')
         assertEq(roundTrippedSource.boxPath, 'box1InterestIncome')
         assertEq(roundTrippedSource.value, '1234.56')
+    },
+
+    // ── The whole-dollar election (i1040gi p23) ──────────────────────────
+    //
+    // `'1.39'` and `'2.50'` below are the IRS's OWN printed examples from
+    // that paragraph ("For example, $1.39 becomes $1 and $2.50 becomes
+    // $3"), which is why they are the values worth pinning. Every expected
+    // value in these leaves is hand-typed: none is produced by
+    // `wholeDollarCentsFromCents`, and none is derived from another
+    // (AGENTS.md — a proof's expected side must be independent of the code
+    // under test).
+
+    // The election is an election: not taken, the report comes back exactly
+    // as it went in — the same array, not a rebuilt copy — so "we did not
+    // elect" can never quietly cost a taxpayer cents.
+    electionNotMadeReturnsEveryLineValueUnchanged: () => {
+        const lines = [
+            electionTestLine('sha256-doc1')('13.90')(1390n),
+            electionTestLine('sha256-doc2')('2.50')(250n),
+            electionTestLine('sha256-doc3')('1.39')(139n),
+        ]
+        const projected = applyWholeDollarElection(false)(lines)
+        assert(projected === lines, 'an unelected projection must return its input unchanged')
+        assertEq(projected.length, 3)
+        assertEq(assertNotNullish(projected[0], 'unelected line 0').value, 1390n)
+        assertEq(assertNotNullish(projected[1], 'unelected line 1').value, 250n)
+        assertEq(assertNotNullish(projected[2], 'unelected line 2').value, 139n)
+    },
+    // $13.90 is above the half-dollar, so it rounds UP to $14 — the value
+    // Task 2's ten-`$1.39` line lands on when the sum is rounded once.
+    electedThirteenNinetyBecomesFourteenDollars: () => {
+        const line = electionTestLine('sha256-doc1')('13.90')(1390n)
+        const projected = assertNotNullish(
+            applyWholeDollarElection(true)([line])[0],
+            'the projection of a one-line report must have a line 0')
+        assertEq(projected.value, 1400n)
+    },
+    // The IRS's printed tie: "$2.50 becomes $3". Half rounds AWAY from
+    // zero, never to even and never toward +Infinity.
+    electedTwoFiftyTieBecomesThreeDollars: () => {
+        const line = electionTestLine('sha256-doc1')('2.50')(250n)
+        const projected = assertNotNullish(
+            applyWholeDollarElection(true)([line])[0],
+            'the projection of a one-line report must have a line 0')
+        assertEq(projected.value, 300n)
+    },
+    // The same tie at the other sign. JavaScript's built-in number rounding
+    // breaks -2.5 toward -2 (toward +Infinity), which on a form full of
+    // losses is a systematic bias; `halfUp` breaks it to -3. This leaf
+    // pins the direction, so a future "just use the built-in" refactor
+    // cannot pass. (`fjs/types/rational`'s
+    // `rounding.tieAwayFromZeroNegativeDiffersFromMathRound` pins the same
+    // divergence against the built-in directly; this is its 1040-line
+    // instance and does not restate it.)
+    electedNegativeTwoFiftyTieBecomesMinusThreeDollarsAwayFromZero: () => {
+        const line = electionTestLine('sha256-doc1')('-2.50')(-250n)
+        const projected = assertNotNullish(
+            applyWholeDollarElection(true)([line])[0],
+            'the projection of a one-line report must have a line 0')
+        assertEq(projected.value, -300n)
+    },
+    // "For example, $1.39 becomes $1." Rounding a single $1.39 amount is
+    // correct only when $1.39 IS the line total; doing it per item before
+    // adding is what p23 forbids. Exhibited here so Task 2's divergence
+    // leaf has both of its sides pinned separately.
+    electedOneThirtyNineBecomesOneDollar: () => {
+        const line = electionTestLine('sha256-doc1')('1.39')(139n)
+        const projected = assertNotNullish(
+            applyWholeDollarElection(true)([line])[0],
+            'the projection of a one-line report must have a line 0')
+        assertEq(projected.value, 100n)
+    },
+    // All-or-nothing, on a report with more than one line: EVERY line's
+    // value is projected — not merely the first — while `sources` and
+    // `rule` survive untouched on every line. Provenance is not something
+    // a rounding pass is allowed to spend.
+    electedProjectionRoundsEveryLineAndPreservesSourcesAndRule: () => {
+        const lines = [
+            electionTestLine('sha256-doc1')('13.90')(1390n),
+            electionTestLine('sha256-doc2')('2.50')(250n),
+            electionTestLine('sha256-doc3')('1.39')(139n),
+        ]
+        const projected = applyWholeDollarElection(true)(lines)
+        assertEq(projected.length, 3)
+        const first = assertNotNullish(projected[0], 'elected line 0')
+        const second = assertNotNullish(projected[1], 'elected line 1')
+        const third = assertNotNullish(projected[2], 'elected line 2')
+        assertEq(first.value, 1400n)
+        assertEq(second.value, 300n)
+        assertEq(third.value, 100n)
+        const [firstSource] = first.sources
+        assertEq(first.sources.length, 1)
+        assertEq(firstSource.documentHash, 'sha256-doc1')
+        assertEq(firstSource.boxPath, 'box1InterestIncome')
+        assertEq(firstSource.value, '13.90')
+        assertEq(first.rule, '1040 line 2b')
+        const [thirdSource] = third.sources
+        assertEq(third.sources.length, 1)
+        assertEq(thirdSource.documentHash, 'sha256-doc3')
+        assertEq(thirdSource.boxPath, 'box1InterestIncome')
+        assertEq(thirdSource.value, '1.39')
+        assertEq(third.rule, '1040 line 2b')
     },
 }
