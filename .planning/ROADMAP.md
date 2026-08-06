@@ -373,8 +373,18 @@ of it to Phase 14, whose criteria are about tax correctness rather than the exec
   3. The standard deduction applies age and blindness increments, with a proof at each combination the profile can produce.
   4. An unmodeled input produces a **loud refusal naming what is unmodeled**, never a silently omitted line — this is what makes REQ TAX-05's "full line-by-line" claim truthful for a partial engine.
   5. Rounding happens at line boundaries only (`round(sum)`, never `sum(round)`), verified on a line aggregating ten or more documents with real cents.
-**Research**: **YES** — the QDCGT worksheet (~25 lines, the largest single computation in v1) was not read line by line and lives inside `i1040gi` rather than as a standalone PDF.
-**Plans**: TBD
+**Research**: **YES** — the QDCGT worksheet (~25 lines, the largest single computation in v1) was not read line by line and lives inside `i1040gi` rather than as a standalone PDF. Done: `10-RESEARCH.md`.
+**Plans**: 10 plans in 6 waves
+- [ ] 10-01-PLAN.md — `qualifyingSurvivingSpouse` as a real filing status, with its stored TY2025 parameters and the threshold-inventory fan-out 42 → 50 (TAX-06) *(wave 1)*
+- [ ] 10-02-PLAN.md — The IRS whole-dollar election as an all-or-nothing report projection; `round(sum)` $14 vs `sum(round)` $10 (TAX-05, EXACT-04) *(wave 1)*
+- [ ] 10-03-PLAN.md — Tax Computation Worksheet, diffed against all twenty printed rows, plus the tagged level-3 base lookup and the $100,000 seam (TAX-03) *(wave 2, needs 10-01)*
+- [ ] 10-04-PLAN.md — `vnd.fjs.return_profile`: the declared return profile dialect, its frozen 50-kind vocabulary, and its `finance_schema` registration (TAX-16, TAX-05, TAX-06) *(wave 2, needs 10-01)*
+- [ ] 10-05-PLAN.md — Line 12e: all 19 chart combinations, the Dependents worksheet, and the two hard-zero exceptions (TAX-06) *(wave 2, needs 10-01)*
+- [ ] 10-06-PLAN.md — QDCGT's 25 lines and criterion 2's regression pair — $11,174 / $11,163 against a broken engine's $11,175 (TAX-03) *(wave 3, needs 10-03)*
+- [ ] 10-07-PLAN.md — `classifyScope`: the 6/44 modeled partition as a `tsc` property, and `scopeRefusal` as the one place a refusal is built (TAX-16) *(wave 3, needs 10-04)*
+- [ ] 10-08-PLAN.md — `dispatchLine16`: four branches plus three wrappers, tagged on both arms, with the Schedule D Tax Worksheet refusal (TAX-03, TAX-16) *(wave 4, needs 10-03, 10-06, 10-07)*
+- [ ] 10-09-PLAN.md — Form 1040 lines 1a–15 as `ReportLine`s with source union, and criterion 5 over ten real 1099-INT documents (TAX-05, TAX-06) *(wave 5, needs 10-02, 10-04, 10-05, 10-07)*
+- [ ] 10-10-PLAN.md — Lines 16–37, the whole-report scope refusal, and the phase mutation sweep checkpoint (TAX-05, TAX-16, TAX-03) *(wave 6, needs 10-08, 10-09)*
 
 **── Milestone: Week 3 — Breadth in Documents ──**
 
