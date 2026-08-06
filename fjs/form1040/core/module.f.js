@@ -34,18 +34,23 @@
  *
  * @module
  */
-import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
+import { assert, assertEq, assertNotNullish } from 'functionalscript/fjs/asserts/module.f.js'
 import { centsFromString } from '../../exact/module.f.js'
+import { applyWholeDollarElection } from '../../report/line/module.f.js'
 import { dialect as w2Dialect } from '../../document/w2/module.f.js'
 import { dialect as oneZeroNineNineIntDialect } from '../../document/1099int/module.f.js'
-import { dialect as returnProfileDialect } from '../../return/profile/module.f.js'
-import { taxParamsByYear } from '../../tax/params/module.f.js'
+import {
+    dialect as returnProfileDialect,
+    validate as validateReturnProfile,
+} from '../../return/profile/module.f.js'
+import { standardDeductionCents } from '../../tax/deduction/module.f.js'
+import { individualFilingStatuses, taxParamsByYear } from '../../tax/params/module.f.js'
 
 /** @import { ReportLine, Source } from '../../report/line/module.f.js' */
 /** @import { W2 } from '../../document/w2/module.f.js' */
 /** @import { OneZeroNineNineInt } from '../../document/1099int/module.f.js' */
 /** @import { ReturnProfile } from '../../return/profile/module.f.js' */
-/** @import { TaxParamSet } from '../../tax/params/module.f.js' */
+/** @import { IndividualFilingStatus, TaxParamSet } from '../../tax/params/module.f.js' */
 
 // ── Inputs ───────────────────────────────────────────────────────────────────
 
@@ -231,10 +236,51 @@ const totalLine = rule => lines => ({
     rule,
 })
 
-// ── Lines 1a through 11b ─────────────────────────────────────────────────────
+// ── Line 12d: the four age/blindness boxes ───────────────────────────────────
 
 /**
- * Form 1040 lines 1a through 11b, each a {@link ReportLine}, keyed by the
+ * The four line-12d checkboxes, in the order the printed form lists them.
+ * Typed via `@type {const}` — not a wider `keyof ReturnProfile` — so
+ * `profile[name]` resolves to exactly `true | undefined` rather than the union
+ * of every profile field's type, the same reason `fjs/return/profile`'s own
+ * `moneyBoxFields` is written this way.
+ *
+ * DOC-12: a checkbox is `option(true)`, so CHECKED is the key's PRESENCE and
+ * unchecked is its absence — there is no `false` to test against. The box
+ * count `fjs/tax/deduction` receives is therefore how many of these four keys
+ * are present, and nothing else. The per-status MAXIMUM is enforced there, and
+ * the spouse-box eligibility rule at ingest, in `fjs/return/profile`; this list
+ * only says which boxes exist.
+ */
+const agedOrBlindBoxNames = /** @type {const} */ ([
+    'taxpayerBornBeforeJan2_1961',
+    'taxpayerIsBlind',
+    'spouseBornBeforeJan2_1961',
+    'spouseIsBlind',
+])
+
+/**
+ * Recovers the profile's `filingStatus` — stored as a plain `string`, because
+ * a JSON blob's field is a string — as the union `fjs/tax/params` is keyed by,
+ * by FINDING it in that module's own stored list.
+ *
+ * **This is a narrowing, not a second validation rule.** The RULE that a
+ * filing status must be one this engine has parameters for lives in
+ * `fjs/return/profile`'s `checkReferences` check 1, and a value reaching this
+ * module has already passed it, so `undefined` here is unreachable for a
+ * validated profile. It exists because AGENTS.md bans a cast, and returning
+ * the MEMBER OF THE STORED LIST that matched is stronger than asserting a
+ * predicate over the incoming string: the value that flows onward came from
+ * `fjs/tax/params`, not from the blob.
+ * @type {(status: string) => IndividualFilingStatus | undefined}
+ */
+const storedFilingStatusNamed = status =>
+    individualFilingStatuses.find(candidate => candidate === status)
+
+// ── Lines 1a through 15 ──────────────────────────────────────────────────────
+
+/**
+ * Form 1040 lines 1a through 15, each a {@link ReportLine}, keyed by the
  * printed line label.
  * @typedef {{
  *   readonly line1a: ReportLine,
@@ -263,27 +309,29 @@ const totalLine = rule => lines => ({
  *   readonly line10: ReportLine,
  *   readonly line11a: ReportLine,
  *   readonly line11b: ReportLine,
+ *   readonly line12e: ReportLine,
+ *   readonly line13a: ReportLine,
+ *   readonly line13b: ReportLine,
+ *   readonly line14: ReportLine,
+ *   readonly line15: ReportLine,
  * }} Form1040IncomeLines
  */
 
 /**
- * Computes Form 1040 lines 1a through 11b for an in-scope return.
+ * Computes Form 1040 lines 1a through 15 for an in-scope return.
  *
- * Every `1b`-`1i`, `3a`-`8` and `10` line is a {@link profileDeclaredZeroLine}:
- * zero only because the corresponding kind was not declared. Had it been
- * declared, `fjs/return/scope` would already have refused the whole report, so
- * "declared but unmodeled" never reaches this function.
+ * Every `1b`-`1i`, `3a`-`8`, `10`, `13a` and `13b` line is a
+ * {@link profileDeclaredZeroLine}: zero only because the corresponding kind
+ * was not declared. Had it been declared, `fjs/return/scope` would already
+ * have refused the whole report, so "declared but unmodeled" never reaches
+ * this function.
  *
- * `taxParamSet` is not read by any line up to 11b — the standard deduction is
- * the first line that needs a parameter, and it is line 12e. The parameter is
- * carried on the outer arrow anyway so the SIGNATURE does not change when
- * lines 12e-15 arrive and every caller keeps working; the binding is spelled
- * `_taxParamSet` because `tsconfig` sets `noUnusedParameters` and the plan's
- * stated Task-1 signature fails `tsc` with TS6133 otherwise. The leading
- * underscore is TypeScript's own documented exemption, not a suppression.
+ * `taxParamSet` is read by exactly one line — 12e, the standard deduction. It
+ * is threaded through the outer arrow rather than looked up here, so the tax
+ * year in force is the caller's decision and never an implicit default.
  * @type {(taxParamSet: TaxParamSet) => (inputs: Form1040Inputs) => Form1040IncomeLines}
  */
-export const form1040IncomeLines = _taxParamSet => inputs => {
+export const form1040IncomeLines = taxParamSet => inputs => {
     const { profile, w2s, interestForms } = inputs
     const declaredZero = profileDeclaredZeroLine(profile)
     const fromDocuments = documentLine(profile)
@@ -351,6 +399,85 @@ export const form1040IncomeLines = _taxParamSet => inputs => {
     }
     const line11b = { ...line11a, rule: '1040 line 11b' }
 
+    // 12e — the standard deduction.
+    //
+    // Research found that PROV-01's `ReportLine` could not express this line
+    // AT ALL: `sources` is a non-empty tuple of `{documentHash, boxPath,
+    // value}`, and the standard deduction derives from a filing status and a
+    // set of checked boxes, which no document dialect modelled. The return
+    // profile (10-CONTEXT.md Decision 4) is what fixes that — it is a real CAS
+    // document with a real hash, so line 12e cites the profile's own
+    // `filingStatus` box and one box per checked 12d checkbox. Phase 9's
+    // `tsc`-level guarantee is left untouched rather than widened, and no
+    // synthetic hash is minted.
+    const status = storedFilingStatusNamed(profile.value.filingStatus)
+    assert(
+        status !== undefined,
+        [
+            'the return profile carries a filing status this engine has no parameters for',
+            profile.value.filingStatus,
+        ],
+    )
+    const checkedAgedOrBlindBoxes = agedOrBlindBoxNames.filter(
+        name => profile.value[name] !== undefined)
+    /** @type {Source} */
+    const filingStatusSource = {
+        documentHash: profile.documentHash,
+        boxPath: 'filingStatus',
+        value: status,
+    }
+    /** @type {readonly Source[]} */
+    const twelveDBoxSources = checkedAgedOrBlindBoxes.map(name =>
+        ({ documentHash: profile.documentHash, boxPath: name, value: 'true' }))
+    /**
+     * The filing-status box, then one box per CHECKED 12d checkbox. Annotated
+     * as the non-empty tuple `ReportLine.sources` demands: a spread of a plain
+     * array into an array literal infers a plain array, and the head element
+     * is what makes the tuple non-empty.
+     * @type {readonly [Source, ...(readonly Source[])]}
+     */
+    const twelveESources = [filingStatusSource, ...twelveDBoxSources]
+    const line12e = {
+        value: standardDeductionCents(taxParamSet)({
+            status,
+            agedOrBlindBoxes: checkedAgedOrBlindBoxes.length,
+            // Exceptions 1-3 (i1040gi p34). Each is `option(true)` on the
+            // profile, so CHECKED is the key's presence — never a stored
+            // `false` (DOC-12). Reading any of these as a hardcoded `false`
+            // would leave every one of `fjs/tax/deduction`'s own proofs green,
+            // because that module is called correctly there and only miswired
+            // here; the two dependent leaves below exist for exactly that.
+            claimedAsDependent: profile.value.claimedAsDependent !== undefined,
+            spouseItemizes: profile.value.spouseItemizes !== undefined,
+            dualStatusAlien: profile.value.dualStatusAlien !== undefined,
+            earnedIncomeCents: profile.value.earnedIncome === undefined
+                ? 0n
+                : centsFromString(profile.value.earnedIncome),
+        }),
+        sources: twelveESources,
+        rule: '1040 line 12e',
+    }
+    const line13a = declaredZero('1040 line 13a') // QBI deduction, Form 8995
+    // 13b — additional deductions from Schedule 1-A. For a profile that
+    // declares `seniorAndOtherScheduleOneADeductions`, this line is NOT
+    // legitimately zero: the OBBBA enhanced deduction for seniors is
+    // MANDATORY, not elective, so a zero here would understate the deduction
+    // and overstate the tax. That is exactly why the kind is unmodeled in
+    // `fjs/return/scope` and refuses the WHOLE report. Within scope the kind
+    // is undeclared, and only then is the zero honest.
+    const line13b = declaredZero('1040 line 13b')
+    const line14 = totalLine('1040 line 14')([line12e, line13a, line13b])
+
+    // 15 — taxable income. The printed form says "If zero or less, enter -0-",
+    // so the floor is the form's, not a defensive clamp: a negative taxable
+    // income is not a smaller tax, it is a figure the 1040 has no space for.
+    const line15BeforeFloor = line11b.value - line14.value
+    const line15 = {
+        value: line15BeforeFloor > 0n ? line15BeforeFloor : 0n,
+        sources: unionSources([line11b, line14]),
+        rule: '1040 line 15',
+    }
+
     return {
         line1a, line1b, line1c, line1d, line1e, line1f, line1g, line1h, line1i, line1z,
         line2a, line2b,
@@ -363,6 +490,10 @@ export const form1040IncomeLines = _taxParamSet => inputs => {
         line9,
         line10,
         line11a, line11b,
+        line12e,
+        line13a, line13b,
+        line14,
+        line15,
     }
 }
 
@@ -380,7 +511,8 @@ assert(taxParams2025 !== undefined, 'expected TY2025 parameters to be present in
 /**
  * Independently HAND-TYPED: the number of printed lines
  * {@link Form1040IncomeLines} carries today — 1a-1i and 1z (10), 2a/2b (2),
- * 3a/3b, 4a/4b, 5a/5b, 6a/6b (8), 7a, 8, 9, 10 (4), 11a/11b (2) = 26.
+ * 3a/3b, 4a/4b, 5a/5b, 6a/6b (8), 7a, 8, 9, 10 (4), 11a/11b (2), 12e, 13a/13b,
+ * 14, 15 (5) = 31.
  *
  * Deliberately NOT `Object.keys(...).length` of the produced record. The
  * fourth shipped instance of this project's recurring defect (AGENTS.md) was a
@@ -391,7 +523,7 @@ assert(taxParams2025 !== undefined, 'expected TY2025 parameters to be present in
  * `expectedMoneyBoxFieldCount` idiom.
  * @type {number}
  */
-const expectedLineCount = 26
+const expectedLineCount = 31
 
 /** The profile document every fixture below is built on: a single filer. */
 const profileHash = 'sha256-profile-01'
@@ -471,6 +603,80 @@ const interestDocument = documentHash => boxes => ({
  * @type {(profile: Stored<ReturnProfile>) => (w2s: readonly Stored<W2>[]) => (interestForms: readonly Stored<OneZeroNineNineInt>[]) => Form1040Inputs}
  */
 const inputsOf = profile => w2s => interestForms => ({ profile, w2s, interestForms })
+
+/**
+ * A qualifying surviving spouse with BOTH taxpayer age/blindness boxes
+ * checked — two boxes, which is the maximum the printed chart prints for this
+ * status (10-CONTEXT.md Decision 6). No spouse box: `fjs/return/profile`
+ * refuses those for QSS at ingest, which is the property
+ * `qualifyingSurvivingSpouseCanNeverExceedTwoBoxes` pins from both sides.
+ * @type {ReturnProfile}
+ */
+const qualifyingSurvivingSpouseTwoBoxProfile = {
+    ...singleProfile,
+    filingStatus: 'qualifyingSurvivingSpouse',
+    taxpayerBornBeforeJan2_1961: true,
+    taxpayerIsBlind: true,
+}
+
+/**
+ * A married-filing-jointly filer with all FOUR line-12d boxes checked — the
+ * only shape in which dropping one box from the tally is visible.
+ * @type {ReturnProfile}
+ */
+const marriedFilingJointlyFourBoxProfile = {
+    ...singleProfile,
+    filingStatus: 'marriedFilingJointly',
+    taxpayerBornBeforeJan2_1961: true,
+    taxpayerIsBlind: true,
+    spouseBornBeforeJan2_1961: true,
+    spouseIsBlind: true,
+}
+
+/**
+ * A filer someone else can claim as a dependent, with the earned income the
+ * Standard Deduction Worksheet for Dependents reads. Exception 1 REPLACES the
+ * chart, so these two profiles are the only ones whose line 12e is not a chart
+ * row.
+ * @type {(earnedIncome: string) => ReturnProfile}
+ */
+const dependentProfile = earnedIncome => ({
+    ...singleProfile,
+    claimedAsDependent: true,
+    earnedIncome,
+})
+
+/**
+ * Ten REAL stored 1099-INT documents with ten DISTINCT hashes, each carrying
+ * the IRS's own printed rounding example in box 1: `'1.39'` (i1040gi p23, "For
+ * example, $1.39 becomes $1").
+ *
+ * Written out ten times rather than generated from a count, so the fixture is
+ * ten separately-addressable documents a reader can check against the
+ * assertion of ten sources — and so no length is ever derived from the same
+ * expression the assertion reads.
+ * @type {readonly Stored<OneZeroNineNineInt>[]}
+ */
+const tenInterestDocumentsAtOneThirtyNine = [
+    interestDocument('sha256-int-01')({ box1InterestIncome: '1.39' }),
+    interestDocument('sha256-int-02')({ box1InterestIncome: '1.39' }),
+    interestDocument('sha256-int-03')({ box1InterestIncome: '1.39' }),
+    interestDocument('sha256-int-04')({ box1InterestIncome: '1.39' }),
+    interestDocument('sha256-int-05')({ box1InterestIncome: '1.39' }),
+    interestDocument('sha256-int-06')({ box1InterestIncome: '1.39' }),
+    interestDocument('sha256-int-07')({ box1InterestIncome: '1.39' }),
+    interestDocument('sha256-int-08')({ box1InterestIncome: '1.39' }),
+    interestDocument('sha256-int-09')({ box1InterestIncome: '1.39' }),
+    interestDocument('sha256-int-10')({ box1InterestIncome: '1.39' }),
+]
+
+/**
+ * Runs the real line assembly over one profile and no documents — the shape
+ * every line-12e leaf needs, since 12e reads the profile alone.
+ * @type {(value: ReturnProfile) => Form1040IncomeLines}
+ */
+const linesForProfile = value => form1040IncomeLines(taxParams2025)(
+    inputsOf(storedProfile(value))([])([]))
 
 /**
  * A test-only {@link Source}, so the {@link unionSources} leaves can be read
@@ -638,6 +844,186 @@ export const proof = {
             assertEq(lines.line11a.rule, '1040 line 11a')
             assertEq(lines.line11b.rule, '1040 line 11b')
         },
+    },
+    line12e: {
+        // The chart's plainest row, and the CONTROL for every leaf below it:
+        // the same filer with nothing checked takes the full $15,750 and cites
+        // exactly ONE box — its filing status. Every expected amount in this
+        // group is hand-typed from the printed Standard Deduction Chart
+        // (f1040s.pdf p4), never computed from a base plus increments.
+        singleWithNoCheckedBoxesIsFifteenSevenFiftyCitingFilingStatusAlone: () => {
+            const { line12e } = linesForProfile(singleProfile)
+            assertEq(line12e.value, 1575000n)
+            assertEq(line12e.sources.length, 1)
+            const [only] = line12e.sources
+            assertEq(only.documentHash, profileHash)
+            assertEq(only.boxPath, 'filingStatus')
+            assertEq(only.value, 'single')
+            assertEq(line12e.rule, '1040 line 12e')
+        },
+        // $31,500 + two $1,600 increments = $34,700, citing the filing status
+        // and BOTH checked boxes: one citation per box, so a reader can see
+        // which two the increments came from.
+        qualifyingSurvivingSpouseWithTwoBoxesIsThirtyFourSevenCitingThreeBoxes: () => {
+            const { line12e } = linesForProfile(qualifyingSurvivingSpouseTwoBoxProfile)
+            assertEq(line12e.value, 3470000n)
+            assertEq(line12e.sources.length, 3)
+            const [first, second, third] = line12e.sources
+            assertEq(first.boxPath, 'filingStatus')
+            assertEq(second?.boxPath, 'taxpayerBornBeforeJan2_1961')
+            assertEq(second?.value, 'true')
+            assertEq(third?.boxPath, 'taxpayerIsBlind')
+        },
+        // $31,500 + four $1,600 increments = $37,900. The only shape in which
+        // a box silently dropped from the tally changes an amount.
+        marriedFilingJointlyWithFourBoxesIsThirtySevenNineCitingFiveBoxes: () => {
+            const { line12e } = linesForProfile(marriedFilingJointlyFourBoxProfile)
+            assertEq(line12e.value, 3790000n)
+            assertEq(line12e.sources.length, 5)
+            const [, , , , fifth] = line12e.sources
+            assertEq(fifth?.boxPath, 'spouseIsBlind')
+        },
+        // Exception 1, reached THROUGH THE PROFILE rather than by calling
+        // `standardDeductionCents` directly. `fjs/tax/deduction`'s own 35
+        // leaves all call that function with a correct input record, so a
+        // wiring bug here — passing a constant `false` for
+        // `claimedAsDependent`, or losing `earnedIncome` — leaves every one of
+        // them green while this line ships the $15,750 chart amount to a
+        // dependent entitled to $1,350. These two leaves are the only thing
+        // that can see it, which is why they go through the profile.
+        //
+        // $500 of earned income is below the worksheet's threshold, so line 2
+        // is the flat $1,350 minimum. Hand-typed from i1040gi p35.
+        dependentBelowTheEarnedIncomeThresholdIsThirteenFiftyThroughTheProfile: () => {
+            const { line12e } = linesForProfile(dependentProfile('500.00'))
+            assertEq(line12e.value, 135000n)
+        },
+        // $2,000 is above the threshold, so line 2 is earned income plus the
+        // $450 add-on = $2,450.
+        dependentAboveTheEarnedIncomeThresholdIsTwentyFourFiftyThroughTheProfile: () => {
+            const { line12e } = linesForProfile(dependentProfile('2000.00'))
+            assertEq(line12e.value, 245000n)
+        },
+        // TWO gates at TWO layers, asserted from both sides. `fjs/tax/deduction`
+        // refuses a box count above the status maximum; `fjs/return/profile`
+        // refuses the spouse boxes for a QSS filer at INGEST. Because of the
+        // second, the count this module can ever derive for a QSS profile is at
+        // most two — so the first is a genuine second gate rather than the only
+        // one. A control-and-refusal pair, and the refusal asserts WHAT was
+        // refused, never merely that something was.
+        qualifyingSurvivingSpouseCanNeverExceedTwoBoxes: () => {
+            // The control: a VALID QSS profile, two boxes, the chart's own
+            // two-box row.
+            const { line12e } = linesForProfile(qualifyingSurvivingSpouseTwoBoxProfile)
+            assertEq(line12e.sources.length, 3)
+            assertEq(line12e.value, 3470000n)
+            // The gate: the blob that would have produced a third box never
+            // becomes a `ReturnProfile` at all.
+            const [t, v] = validateReturnProfile({
+                ...qualifyingSurvivingSpouseTwoBoxProfile,
+                spouseIsBlind: true,
+            })
+            assertEq(t, 'error')
+            assert(typeof v === 'string', ['expected a semantic string refusal', v])
+            assert(
+                v.includes('qualifyingSurvivingSpouse'),
+                ['expected the refusal to name the filing status', v],
+            )
+            assert(
+                v.includes('spouse age or blindness box'),
+                ['expected the refusal to name what was refused', v],
+            )
+        },
+    },
+    line14: {
+        // 12e + 13a + 13b. 13a and 13b are both profile-declared zeros citing
+        // the SAME `declaredKinds` box, so the union deduplicates them to one:
+        // the filing-status box plus one declaration box = 2.
+        sumsTwelveEAndThirteenAAndThirteenBDeduplicatingTheProfileCitation: () => {
+            const { line14 } = linesForProfile(singleProfile)
+            assertEq(line14.value, 1575000n)
+            assertEq(line14.sources.length, 2)
+            const [first, second] = line14.sources
+            assertEq(first.boxPath, 'filingStatus')
+            assertEq(second?.boxPath, 'declaredKinds')
+        },
+    },
+    line15: {
+        // $50,000 of wages less the $15,750 standard deduction = $34,250.
+        taxableIncomeIsElevenBMinusFourteen: () => {
+            const lines = form1040IncomeLines(taxParams2025)(inputsOf(storedProfile(singleProfile))([
+                w2Document('sha256-w2-01')('50000.00'),
+            ])([]))
+            assertEq(lines.line11b.value, 5000000n)
+            assertEq(lines.line14.value, 1575000n)
+            assertEq(lines.line15.value, 3425000n)
+        },
+        // The printed floor: "If zero or less, enter -0-". $5,000 of wages
+        // against a $15,750 deduction is -$10,750 before the floor, and the
+        // form has no space for that. The control is the leaf above, where the
+        // subtraction is positive and passes through untouched — so this is a
+        // floor, not a function that returns zero.
+        deductionExceedingAdjustedGrossIncomeIsZeroNotNegative: () => {
+            const lines = form1040IncomeLines(taxParams2025)(inputsOf(storedProfile(singleProfile))([
+                w2Document('sha256-w2-01')('5000.00'),
+            ])([]))
+            assertEq(lines.line11b.value, 500000n)
+            assertEq(lines.line14.value, 1575000n)
+            assertEq(lines.line15.value, 0n)
+            assert(lines.line15.value >= 0n, ['taxable income must never be negative', lines.line15.value])
+        },
+    },
+    // ROADMAP criterion 5, on a REAL line aggregating ten REAL documents.
+    //
+    // Criterion 5 as written is a tautology: over `bigint` cents `round(sum)`
+    // and `sum(round)` are both the identity, so proving them equal tests
+    // nothing (10-CONTEXT.md Decision 5). Rounding only bites at WHOLE
+    // DOLLARS, which is what the taxpayer's p23 election introduces — and here
+    // the two orders visibly diverge by $4 on money that came out of ten
+    // stored documents through the real line assembly.
+    //
+    // `fjs/report/line`'s
+    // `roundSumIsFourteenDollarsWhileSumRoundIsTenOnTenIrsExampleAmounts`
+    // proves the same divergence on a hand-built `ReportLine`; this leaf is
+    // the one criterion 5 actually asks for — "a line aggregating ten or more
+    // documents with real cents" — and it does not restate that one.
+    //
+    // `1390n`, `1400n`, `1000n`, `400n` and the count `10` are ALL hand-typed.
+    // None is computed from `139n`, none from another, and none by calling the
+    // election: an expected value is worth exactly as much as its independence
+    // from the code it checks (AGENTS.md).
+    criterionFiveRoundSumOverTenInterestDocuments: () => {
+        assertEq(tenInterestDocumentsAtOneThirtyNine.length, 10)
+        const profile = storedProfile(singleProfile)
+
+        // The IRS's way: ONE line whose value is the exact cents sum of its
+        // ten sources, rounded once.
+        const { line2b } = form1040IncomeLines(taxParams2025)(
+            inputsOf(profile)([])(tenInterestDocumentsAtOneThirtyNine))
+        assertEq(line2b.value, 1390n)
+        assertEq(line2b.sources.length, 10)
+        const roundOfSum = assertNotNullish(
+            applyWholeDollarElection(true)([line2b])[0],
+            'the projection of a one-line report must have a line 0').value
+        // $14 — the amount the IRS instructs the taxpayer to enter.
+        assertEq(roundOfSum, 1400n)
+
+        // The forbidden way, introduced where it would actually be introduced:
+        // assemble each document into its OWN line 2b, round each, then add.
+        const sumOfRounds = tenInterestDocumentsAtOneThirtyNine.reduce(
+            (total, document) => total + assertNotNullish(
+                applyWholeDollarElection(true)([
+                    form1040IncomeLines(taxParams2025)(
+                        inputsOf(profile)([])([document])).line2b,
+                ])[0],
+                'the projection of a one-document report must have a line 0').value,
+            0n)
+        // $10 — thirty-nine cents lost ten times over.
+        assertEq(sumOfRounds, 1000n)
+
+        // Name the SIZE of the divergence, not merely one side of it: $4.
+        assertEq(roundOfSum - sumOfRounds, 400n)
+        assert(roundOfSum !== sumOfRounds, 'round(sum) must diverge from sum(round) at whole dollars')
     },
     // ROADMAP criterion 1 at the report layer: EVERY line cites at least one
     // document, the legitimately zero ones included.
