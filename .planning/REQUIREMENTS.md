@@ -287,7 +287,7 @@ structural (RTTI) and semantic passes.
       the published Publication 1040 as a `proof`. Rows print tax on the interval midpoint,
       so the table disagrees with bracket arithmetic — MFJ $18,000 taxable gives $1,803 by
       table and $1,800 by brackets.
-- [ ] **TAX-03** *(T1)*: Explicit line-16 method dispatch across all branches — Tax Table,
+- [x] **TAX-03** *(T1)*: Explicit line-16 method dispatch across all branches — Tax Table,
       Tax Computation Worksheet, QDCGT worksheet, Schedule D Tax Worksheet — with a proof
       per branch. Line 16 is not bracket arithmetic.
 - [x] **TAX-04** *(T1)*: Boundary proofs at `threshold − 1¢`, `threshold`, `threshold + 1¢`
@@ -594,7 +594,7 @@ them. Week 0 is research's addition in front of the plan's Week 1.
 | EXACT-05 | T1 | Phase 4 - Exact Arithmetic | Week 1 | Done |
 | TAX-01 | T1 | Phase 8 - TY2025 Parameters and Tax Table | Week 2 | Pending |
 | TAX-02 | T1 | Phase 8 - TY2025 Parameters and Tax Table | Week 2 | Pending |
-| TAX-03 | T1 | Phase 10 - 1040 Core and Scope Guard | Week 2 | Pending |
+| TAX-03 | T1 | Phase 10 - 1040 Core and Scope Guard | Week 2 | Complete |
 | TAX-04 | T1 | Phase 8 - TY2025 Parameters and Tax Table | Week 2 | Pending |
 | TAX-05 | T1 | Phase 10 - 1040 Core and Scope Guard | Week 2 | Pending |
 | TAX-06 | T1 | Phase 10 - 1040 Core and Scope Guard | Week 2 | Pending |

@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
 status: executing
-stopped_at: Phase 10 in execution. Waves 1-3 complete (7 of 10 plans): QSS status, whole-dollar election, Tax Computation Worksheet, return-profile dialect, standard deduction, QDCGT + the regression pair, and the scope guard. Waves 4-6 remain: 10-08 dispatcher, 10-09 lines 1a-15, 10-10 lines 16-37.
-last_updated: "2026-08-06T21:20:00.000Z"
+stopped_at: "Completed 10-08-PLAN.md (dispatchLine16, the four-way tagged line-16 method dispatch: four TAX-03 branches plus three wrappers, `method` on both the ok and the error arm, and the Schedule D Tax Worksheet branch selected and then refusing by name)"
+last_updated: "2026-08-06T22:15:00.000Z"
 last_activity: 2026-08-06
 progress:
   total_phases: 18
@@ -29,12 +29,12 @@ the server executes it as a pure function of `(documents, tax-year parameters) �
 Phase: 10 of 18 — Form 1040 Core, Line-16 Dispatch, and the Scope Guard (TAX-03/05/06/16).
   Ten plans across six waves. The plan set was returned BLOCKER by `gsd-plan-checker`
   (four blockers, ten warnings), revised, re-checked, and only then executed.
-Plan: 7 of 10 complete — wave 1 (10-01 QSS as a stored filing status, 10-02 the IRS
+Plan: 8 of 10 complete — wave 1 (10-01 QSS as a stored filing status, 10-02 the IRS
   whole-dollar election), wave 2 (10-03 Tax Computation Worksheet, 10-04 the
-  vnd.fjs.return_profile dialect, 10-05 the standard deduction chart) and wave 3
-  (10-06 QDCGT, 10-07 the classifyScope scope guard, executed in parallel). Waves
-  4-6 remain: 10-08 dispatcher, 10-09 lines 1a-15, 10-10 lines 16-37 +
-  whole-report refusal.
+  vnd.fjs.return_profile dialect, 10-05 the standard deduction chart), wave 3
+  (10-06 QDCGT, 10-07 the classifyScope scope guard, executed in parallel) and
+  wave 4 (10-08 dispatchLine16). Waves 5-6 remain: 10-09 lines 1a-15, 10-10
+  lines 16-37 + whole-report refusal.
 Status: Ready to execute
 
 Progress: [██████████] 100%
@@ -110,6 +110,7 @@ proofs and moves with submodule initialization state — which is exactly how a 
 | Phase 08 P06 | 65min | 3 tasks | 3 files |
 | Phase 09 P08 | 45min | 3 tasks | 5 files |
 | Phase 10 P07 | 35min | 2 tasks | 1 files |
+| Phase 10 P08 | 55min | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -235,6 +236,9 @@ Full log in PROJECT.md Key Decisions. Recent decisions affecting current work:
 - [Phase 09-08]: interpret's step-budget boundary measured empirically before writing the proof: chainOfLength(stepBudget-1) completes, chainOfLength(stepBudget) is refused, because completing it needs one more loop iteration than the budget allows to notice the chain went Pure
 - [Phase 10]: 10-07: the modeled/unmodeled partition is a tsc property — Assert<Equal<Kind, ModeledKind | UnmodeledKind>>, so a declared kind classified nowhere fails to compile — verified by adding a 51st kind and by deleting a refusal entry; both stop at TS2344 on that assertion
 - [Phase 10]: 10-07: scopeRefusal returns ScopeError, not the ScopeOutcome union — Plan 10-08 spreads it into its own error arm; the union would force a cast or a non-null assertion, both banned
+- [Phase 10]: 10-08: Line16Outcome carries `method` on BOTH arms, and `tsc` enforces it (TS2322 when the tag is dropped) — the Schedule D branch refuses rather than computes, so without a tag on the error arm TAX-03's "a proof per branch" would be unprovable for one of its four branches
+- [Phase 10]: 10-08: Line16Error is `ScopeError & { method }`, an intersection with fjs/return/scope's own refusal type rather than a re-spelled object literal, so a second declaration of "what a refusal is" cannot appear beside the one place it is built
+- [Phase 10]: 10-08: level 2's three QDCGT bullets stay THREE separate `if` blocks sharing one closure — fusing them into one disjunction makes the dispatch-order mutation unrunnable, because 2e cannot be moved past 2a without reddening the very leaf that documents the swap's invisibility
 
 ### Pending Todos
 
@@ -379,11 +383,10 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-08-06T21:12:19.104Z
-Stopped at: Completed 10-07-PLAN.md (classifyScope, the TAX-16 scope guard: the fifty declared kinds partitioned six modeled / forty-four refused, with the partition enforced at `tsc`)
-(measure the suite rather than quoting it — see "Test metrics" above. Phase 10 waves 3-6 are in
-flight; 10-06 QDCGT landed alongside this plan, and 10-08 dispatcher, 10-09 lines 1a-15 and 10-10
-lines 16-37 remain.)
+Last session: 2026-08-06T22:15:00.000Z
+Stopped at: Completed 10-08-PLAN.md (dispatchLine16, the four-way tagged line-16 method dispatch — TAX-03 complete)
+(measure the suite rather than quoting it — see "Test metrics" above. Phase 10 waves 5-6 remain:
+10-09 lines 1a-15 and 10-10 lines 16-37 + the whole-report scope refusal.)
 Resume file: None
 (they were one-shot artifacts, written to `feature/planning-requirements-roadmap` seven
 minutes after PR #14 merged, so they never reached `main`; nothing else on that branch is
