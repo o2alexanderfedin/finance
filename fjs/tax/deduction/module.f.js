@@ -172,9 +172,13 @@ export const dependentStandardDeduction = taxParamSet => (status, agedOrBlindBox
     // would be a second, uncited constant able to drift from it.
     //
     // The threshold is invisible from the outside: at exactly the threshold
-    // both arms give the same $1,350, precisely because the add-on is half
-    // the minimum. Only one cent above it can distinguish the arms, which is
-    // what this module's three boundary probes exist to pin.
+    // the earned-income arm gives threshold + add-on = $900 + $450 = $1,350,
+    // which is exactly the minimum arm's answer. That coincidence holds
+    // because the TY2025 minimum is exactly three times the add-on
+    // (`2n * addOn + addOn === minimum`), NOT for any reason the statute
+    // guarantees — so `>` and `>=` are indistinguishable here today, and only
+    // one cent above the threshold can tell the two arms apart. That is what
+    // this module's three boundary probes exist to pin.
     const earnedIncomeThresholdCents = addOnCents * 2n
     const line1 = agedOrBlindBoxes
     const line2 = earnedIncomeCents > earnedIncomeThresholdCents
@@ -510,9 +514,15 @@ export const proof = {
         )
     },
     // The three-probe boundary around line 2's threshold. The threshold
-    // itself is INVISIBLE — both arms yield $1,350 at exactly the threshold,
-    // because the add-on is exactly half the minimum for TY2025 — so only
-    // the third probe, one cent above, can tell the two arms apart.
+    // itself is INVISIBLE: at exactly the threshold the earned-income arm
+    // gives threshold + add-on = $900 + $450 = $1,350, which is the minimum
+    // arm's answer as well. The invariant behind that coincidence is
+    // `2 x addOn + addOn === minimum` — i.e. the TY2025 minimum happens to be
+    // exactly THREE times the add-on — and it is the reason only the third
+    // probe, one cent above, can tell the two arms apart. If a future
+    // tax year broke that relation,
+    // `dependentEarnedIncomeExactlyAtTheThresholdIsTheMinimum` is the leaf
+    // that would start distinguishing `>` from `>=`.
     dependentEarnedIncomeOneCentBelowTheThresholdIsTheMinimum: () => {
         assertEq(
             standardDeductionCents(taxParams2025)({
