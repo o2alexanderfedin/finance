@@ -3,9 +3,10 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
 status: paused
-stopped_at: PAUSED 2026-08-06 22:20 PDT. Phase 10 complete, verified PASS 5/5, merged to main, CI green. The stakeholder showcase for 2026-08-07 is BUILT and verified — all eight steps, run it with ./demo/serve.sh. Public hosting is DEFERRED pending a decision with Sergey, because a demo that runs the real engine in a public page publishes the real engine (see demo/todo/showcase-demo.md). Phases 11-14 remain in the requested autonomous scope; Phase 11 is next and not started.
-last_updated: "2026-08-07T05:22:00.000Z"
-last_activity: 2026-08-06
+stopped_at: PAUSED 2026-08-07 14:11 PDT. Phase 10 complete and verified; RELEASED as v0.10.0 (9662736) — the repository's first tag. main and develop both at 8d2e0e6, CI green, 0 open PRs. The showcase is built, verified, demoed, and pinned to the release; run it with ./demo/serve.sh. Pre-1.0 deliberately: form1040Report has no production caller, so no server path produces a 1040 — that is Phase 14, and 1.0.0 is reserved for it. Public hosting remains DEFERRED pending one decision with Sergey covering both repo visibility and demo hosting, because a demo that runs the real engine in a public page publishes the real engine. Phases 11-14 remain in the requested autonomous scope; Phase 11 is next and not started.
+last_updated: "2026-08-07T21:11:00.000Z"
+last_activity: 2026-08-07
+released: v0.10.0
 progress:
   total_phases: 18
   completed_phases: 10

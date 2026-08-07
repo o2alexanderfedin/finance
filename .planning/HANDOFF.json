@@ -1,59 +1,63 @@
 {
   "version": "1.0",
-  "timestamp": "2026-08-07T02:00:00.000Z",
+  "timestamp": "2026-08-07T21:11:00.000Z",
   "phase": "10",
   "phase_name": "Form 1040 Core, Line-16 Dispatch, and the Scope Guard",
   "phase_dir": ".planning/phases/10-form-1040-core-line-16-dispatch-and-the-scope-guard",
   "plan": 10,
-  "task": 3,
+  "task": 10,
   "total_tasks": 10,
-  "status": "phase_10_complete_verified_and_merged",
-  "branch": "feature/phase-10-form-1040-core-and-scope-guard",
-  "head": "ca9b0bf",
+  "status": "phase_10_complete_verified_merged_and_released",
+  "branch": "main",
+  "head": "8d2e0e6",
+  "release": {
+    "tag": "v0.10.0",
+    "commit": "96627365f49f9ff7afa33ab11168697a1a383f8f",
+    "url": "https://github.com/fjs-dev/finance/releases/tag/v0.10.0",
+    "note": "The repository's first tag ever. Pre-1.0 deliberately: form1040Report has no production caller, so no server path produces a 1040. The minor position tracks the roadmap phase — 0.11.0 after Phase 11; 1.0.0 reserved for the release in which Phase 14 (Acceptance) lands that path."
+  },
   "verified_at_head": {
-    "npm_test": "494 pass / 0 fail",
     "tsc": "clean",
     "project_local_proofs": 492,
     "integration": "1 pass / 0 fail",
-    "ci_on_main": "build: success",
+    "ci_on_main": "success",
     "open_prs": 0,
-    "note": "Do not quote these later. Re-measure: node --test 2>&1 | grep -c '^✔ import(\"./fjs/'"
+    "note": "Measured at pause, not quoted. Re-measure with: node --test 2>&1 | grep -c '^✔ import(\"./fjs/'. NEVER gate on npm test's total — it is 494 or 2730 for the SAME commit depending on whether the functionalscript submodule is checked out."
   },
   "most_time_critical": {
-    "what": "The stakeholder demo (2026-08-07) is BUILT and verified. It is presented from a laptop: run ./demo/serve.sh and open http://localhost:8000/demo/. All eight steps shipped, not only the six 'must' ones.",
-    "spec": "demo/todo/showcase-demo.md",
-    "run": "./demo/serve.sh",
-    "open_decision": "Whether the engine repository and the demo become public — one decision, not two. See demo-hosting below.",
-    "ship_order": ["What this is", "Documents", "Line 16", "The Return", "Refusal", "All", "Exactness", "Parameters", "Sandbox"],
+    "what": "Nothing is time-critical. The stakeholder demo happened; the showcase is built, verified and released.",
+    "run_the_demo": "./demo/serve.sh   then http://localhost:8000/demo/",
+    "open_decision": "Whether the engine repository and the demo become public — one decision, not two. Needs Sergey.",
     "settled_do_not_relitigate": [
-      "The demo imports the REAL engine as ES modules — every fjs/ module is pure and functionalscript's virtual fs has no node: imports. Zero dependencies, zero build, static hosting.",
-      "WASM with a POSIX filesystem is the WRONG answer to the import() question: forbidden dependency, and it undermines the pitch by implying the jail is what makes it safe. The guest never calls import() — it EMITS an import effect, and a blob: URL satisfies it in ~10 lines.",
-      "The sandbox claim is narrower than 'it cannot reach the network' — see boundaries.",
-      "A demo that runs the real engine in a public page publishes the real engine. The browser has to download fjs/** to execute it, so no hosting arrangement — separate public repo, cross-repo token, vendored snapshot — avoids the disclosure. A read token for a private repo stored in a public repo is strictly worse: exfiltratable by any workflow edit, and it does not prevent what it appears to protect.",
-      "Every source/proof link and the build badge point at github.com/fjs-dev/finance, which is PRIVATE. They resolve for org members (so a laptop demo is fine) and 404 for everyone else. Repo visibility and demo hosting are therefore one decision."
+      "The demo imports the REAL engine as ES modules. Every fjs/ module is pure; the closure is 43 modules with zero node: imports. Zero dependencies, zero build step.",
+      "WASM with a POSIX filesystem is the WRONG answer to the import() question: forbidden dependency, and it undermines the pitch by implying the jail is what makes it safe. The guest never calls import() — it EMITS an import effect.",
+      "A demo that runs the real engine in a public page publishes the real engine. The browser must download fjs/** (37 files, ~950 KB, rationale comments included) to execute it. No hosting arrangement avoids this — not a separate public repo, not a vendored snapshot, and a cross-repo read token in a public repo is strictly worse (exfiltratable by any workflow edit, and it does not prevent the disclosure it appears to protect).",
+      "Every source/proof link and the build badge point at github.com/fjs-dev/finance, which is PRIVATE. They resolve for org members (a laptop demo is fine) and 404 for everyone else. Repo visibility and demo hosting are therefore one decision.",
+      "The demo's links carry the COMMIT, not the tag — a tag can be force-moved and a commit cannot — while the page displays v0.10.0, which is what means something to a reader.",
+      "The badge shows the PROJECT-LOCAL proof count only. npm test's total depends on the reader's checkout, so it must never appear on a page."
     ]
   },
   "completed_this_session": [
-    {"id": "10-01..10-10", "name": "Phase 10 — ten plans, six waves, 318 to 492 project-local proofs", "status": "done"},
-    {"id": "10-VERIFICATION", "name": "gsd-verifier PASS 5/5, 40 mutations in an isolated copy, every tax figure re-derived by hand", "status": "done"},
-    {"id": "gap-closure", "name": "spouseItemizes and dualStatusAlien reached standardDeductionCents unwatched — an MFS filer whose spouse itemizes could take $22,150 instead of $0 with the suite green. Two through-the-profile leaves, no production change.", "status": "done"},
-    {"id": "consolidation", "name": "PR #44 merged to main, CI green; all worktrees synced; 0 open PRs", "status": "done"},
-    {"id": "demo-spec", "name": "demo/todo/showcase-demo.md written and committed", "status": "done"},
-    {"id": "demo-build", "name": "The showcase is BUILT — all eight steps plus the All view, importing the real engine as ES modules. 494/494, tsc clean, zero console errors, 17/17 links verified to exist at the pinned commit. Run it with ./demo/serve.sh", "status": "done"},
-    {"id": "demo-hosting", "name": "Public hosting DEFERRED pending a decision with Sergey. Not a plumbing problem: the browser must download fjs/** to execute it, so any world-readable deployment publishes the engine source (37 files, ~950 KB, rationale comments included). A separate public repo does not avoid it — the same bytes must reach the browser. Reasoning is in demo/todo/showcase-demo.md and at the top of .github/workflows/pages.yml.", "status": "open"}
+    {"id": "demo-build", "name": "The showcase, built against the real engine: eight steps plus an All view, zero dependencies, no build step. 103 real type errors fixed rather than excluding demo/ from tsc.", "status": "done"},
+    {"id": "demo-serve", "name": "demo/serve.sh — one command, symlink staging, and a guard that refuses to start on a stale node_modules", "status": "done"},
+    {"id": "deps-0431", "name": "functionalscript 0.43.0 -> 0.43.1, both the npm pin and the submodule gitlink", "status": "done"},
+    {"id": "release-v0100", "name": "v0.10.0 released: tag, GitHub release, CHANGELOG.md, package.json off 0.0.0, develop fast-forwarded 261 commits", "status": "done"},
+    {"id": "demo-repin", "name": "Showcase re-pinned from a bare commit to the v0.10.0 release; the uncomparable 494/494 removed from the badge", "status": "done"},
+    {"id": "agents-hazards", "name": "AGENTS.md +47 lines: stale node_modules drift, git add discarding a staged gitlink, update-index accepting a nonexistent SHA, and two-references-to-one-dependency", "status": "done"}
   ],
   "blockers": [],
   "human_actions_pending": [
-    {"action": "Review demo/todo/showcase-demo.md, then build in ship order", "context": "Demo is tomorrow. The spec's testing section lists five checks that must pass before presenting, including a link check — a 404 on screen is worse than a missing link.", "blocking": false},
-    {"action": "Three claims nobody has checked against paper", "context": "(1) the 2025 Form 1040 face's 56-line inventory and printed labels; (2) the 19 chart amounts vs f1040s.pdf p4; (3) research assumption A2, that the Tax Computation Worksheet is cent-exact not whole-dollar — exactly one value moves, QDCGT case (iv) line 24, $184,094.50 vs $184,095.00.", "blocking": false},
-    {"action": "Two documentation errors found but not fixed", "context": "REQUIREMENTS.md TAX-10 says the Social Security Benefits Worksheet is 19 lines; it is 18. ROADMAP.md constraint 4 names 1099-DIV boxes 2b/2d as forcing Schedule D; i1040gi p31 Exception 1 names 2b, 2c AND 2d. Fix during Phase 11 or 13 planning.", "blocking": false}
+    {"action": "Decide public vs private, with Sergey", "context": "One decision covering both repo visibility and demo hosting — see settled_do_not_relitigate. pages.yml is workflow_dispatch only and has never been run.", "blocking": false},
+    {"action": "Two documentation errors, found and not fixed", "context": "REQUIREMENTS.md TAX-10 says the Social Security Benefits Worksheet is 19 lines; it is 18. ROADMAP.md constraint 4 names 1099-DIV boxes 2b/2d as forcing Schedule D; i1040gi p31 Exception 1 names 2b, 2c AND 2d. Both are also in CHANGELOG.md's 'Known documentation defects', so fixing means updating two places. Do it during Phase 11 or 13 planning.", "blocking": false},
+    {"action": "Three claims nobody has checked against paper", "context": "(1) the 2025 Form 1040 face's 56-line inventory and printed labels; (2) the 19 chart amounts vs f1040s.pdf p4; (3) research assumption A2, that the Tax Computation Worksheet is cent-exact not whole-dollar — exactly one value moves, QDCGT case (iv) line 24, $184,094.50 vs $184,095.00.", "blocking": false}
   ],
   "decisions": [
-    {"decision": "The demo tells the truth about three boundaries on slide one", "rationale": "The engine is proven but has no production caller (Phase 14 owns end-to-end); the Schedule D branch refuses by design (Phase 12); and guest bodies run with host privileges — effect-whitelist refusal and the pre-execution specifier gate are real, guest-body isolation is not. Step 7 was sketched as 'watch it refuse network access', checked before the spec was written, and the codebase turned out to be honest about not having it. Telling a finance audience what is not yet defended buys more credibility than a claim they can poke a hole in.", "phase": "demo"},
-    {"decision": "The spec lives in demo/todo/, not docs/superpowers/specs/", "rationale": "AGENTS.md puts specs in a todo/ next to the code they concern and warns that a second planning location drifts from the one people edit. It is also the first file in demo/, which is the prescribed order: write the spec there before implementing.", "phase": "demo"},
-    {"decision": "Source links pin a commit SHA, never a branch name", "rationale": "GitHub serves commit-pinned blobs permanently whether or not the branch is merged; a branch-name link rots on the next push.", "phase": "demo"}
+    {"decision": "v0.10.0, not v1.0.0", "rationale": "form1040Report has no production caller — no server path produces a Form 1040. A major version would claim what the code cannot do, and it is the exact boundary the demo states out loud on slide one. The minor position tracks the roadmap phase; 1.0.0 is reserved for the release in which Phase 14 lands the end-to-end path.", "phase": "release"},
+    {"decision": "The release notes carry 'What is NOT here' at the same volume as what is", "rationale": "No production caller, Schedule D selected-then-refusing, four unmodeled document types, guest bodies with host privileges. The demo already tells the truth about these; a release that did not would contradict it in front of the same audience.", "phase": "release"},
+    {"decision": "The MCP serverInfo.version is pinned to package.json by the integration test", "rationale": "Bumping it to 0.10.0 created the hazard: it is a literal because a pure module has no filesystem to read the manifest from, so it can drift, and a server advertising a version it is not is worse than one advertising none. The test reads the real manifest and compares. Verified load-bearing — set the server to 0.9.9, the test fails with that message.", "phase": "release"},
+    {"decision": "npm publish is off the table", "rationale": "The name `finance` is already taken on npm by someone else at 0.0.1, and the repository is private. Publishing would need a scoped name such as @fjs-dev/finance, which is a separate decision.", "phase": "release"}
   ],
   "uncommitted_files": [],
-  "next_action": "If the demo is still tomorrow: review demo/todo/showcase-demo.md and build in ship order. Otherwise resume /gsd-autonomous at Phase 11 (Wage, Retirement, and Benefit Documents — W-2, SSA-1099, 1099-R, the document library, the retraction story). Phases 11-14 remain in the requested scope.",
-  "context_notes": "Phase 10 found fourteen plan defects and NOT ONE was a wrong tax number — research, planning, two review rounds and six executors independently reproduced every figure without correction. Every defect was in the machinery that proves the arithmetic: mutations that could not compile because removing an expression orphaned its binding, mutations a neighbouring operation absorbed, mutations mandated at gates whose leaves did not exist yet, acceptance tallies that excluded the very mutation closing a blocker, and a type guard that only worked against fresh object literals. Verification machinery fails silently and in the direction of looking successful. Four AGENTS.md sections came out of this, including a FOURTH instance of the signature defect: a proof iterating Object.keys() of the code under test, which could never notice an entry being deleted. The sharpest single artifact: swapping the line-16 dispatcher's condition order returns IDENTICAL cents on every ordinary return — only the method tag catches it, so a suite of realistic test returns would have shipped it fully green."
+  "next_action": "Resume /gsd-autonomous at Phase 11 — Wage, Retirement, and Benefit Documents (W-2 extensions, SSA-1099, 1099-R, the document library, the retraction story). Not started: no CONTEXT, no plans. Phases 11-14 remain in the originally requested autonomous scope.",
+  "context_notes": "Phase 10's lesson was that verification machinery fails silently and in the direction of looking successful. This session produced the environment-and-process twin of it: four of nine commits exist only because something was checked rather than assumed, and in every case the symptom pointed away from the cause. Stale node_modules in two of three checkouts produced sixteen tsc errors INSIDE fjs/** that were not defects in fjs/**, plus a proof count ten short because modules that fail to import never register their proofs. `git add` on the uninitialized submodule silently reverted a staged gitlink, so a commit shipped without the change its own message described — caught only because git ls-tree AFTER the commit is a different check from git diff --cached before it. `git update-index --cacheinfo` accepts a SHA that does not exist. And re-pinning the demo, a path-exists sweep would have passed while an #L anchor pointed at the wrong line, which is worse than a 404 because nothing looks broken. The generalisation, now in AGENTS.md: THE CHECK THAT WOULD HAVE CAUGHT IT AND THE CHECK YOU RAN ARE RARELY THE SAME CHECK. Against that, not one wrong number reached a page: every figure in CHANGELOG.md was re-derived from the code while writing it, and the demo recomputes its own regression pair and re-hashes its own printed JSON, shouting on mismatch."
 }
