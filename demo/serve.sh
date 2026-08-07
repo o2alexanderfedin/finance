@@ -34,6 +34,25 @@ if [ ! -d "$repo/node_modules/functionalscript" ]; then
     exit 1
 fi
 
+# Check the INSTALLED version against the lockfile, not merely that a directory
+# exists.
+#
+# This is not defensive padding. Two of this repository's three checkouts were
+# found serving `functionalscript@0.41.0` while the lockfile pinned `0.43.0` —
+# `npm ci` had been run in one of them and not the others, and nothing said so.
+# In that state `tsc` reports sixteen errors in `fjs/**` that are not defects in
+# `fjs/**`, and the demo would load a different engine dependency than the one
+# every proof ran against. The failure is silent and it arrives at the worst
+# possible moment, so it is worth six lines to make it loud and to say exactly
+# what fixes it.
+installed=$(node -p "require('$repo/node_modules/functionalscript/package.json').version" 2>/dev/null || echo unknown)
+expected=$(node -p "require('$repo/package-lock.json').packages['node_modules/functionalscript'].version" 2>/dev/null || echo unknown)
+if [ "$installed" != "$expected" ]; then
+    echo "error: functionalscript is $installed but the lockfile pins $expected." >&2
+    echo "       this checkout's node_modules is stale — run 'npm ci' in $repo." >&2
+    exit 1
+fi
+
 rm -rf "$site"
 mkdir -p "$site"
 ln -s "$repo/demo" "$site/demo"
