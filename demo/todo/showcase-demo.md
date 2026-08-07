@@ -1,8 +1,47 @@
 # Spec: the stakeholder showcase demo
 
-**Status:** approved design, not yet implemented
+**Status:** BUILT — all eight steps plus the All view, 2026-08-06
 **Written:** 2026-08-06
 **Concerns:** `demo/` (this directory's parent)
+
+> **What shipped, and where it left the spec.** Recorded here rather than in a
+> commit message, because the next person to open this file needs it.
+>
+> - **All eight steps were built**, not only the six "must" ones. Exactness,
+>   Parameters and Sandbox turned out to be cheap once the engine was loading.
+> - **Source links pin `ca9b0bf`** — `main`'s tip after Phase 10 merged — and
+>   not `1309e8f` as written below. Same reasoning, better commit: it is the
+>   one the badge's "494/494 · 492 proofs" was actually measured at, and it
+>   contains `1309e8f`. Every linked path was verified to exist at it.
+> - **`functionalscript` is staged from `node_modules`, not the submodule.**
+>   The submodule is not checked out in this working tree; `npm ci` installs
+>   the same package `package.json` pins, which is what the 492 proofs run
+>   against. `.github/workflows/pages.yml` copies it beside `demo/` and
+>   `fjs/`. This is the spec's own stated fallback, reached for a reason the
+>   spec did not anticipate.
+> - **`tsc` type-checks `demo/` too**, which the spec did not account for.
+>   `npm test` is `tsc && node --test`, so the first working version turned the
+>   suite RED with 103 type errors — real ones: a filing status left as a bare
+>   `string`, a money field that could have been a number, `sources` typed as a
+>   plain array rather than a non-empty tuple. All fixed by typing the demo
+>   properly rather than by excluding the directory. Every fixture now carries
+>   its dialect's own type as a variable annotation, so a typo'd box name fails
+>   the build.
+> - **One `any` appears in the whole demo**, in `steps/07-sandbox.js`'s
+>   `deniedDo`, mirroring `fjs/exec/module.f.js`'s own `unsafeDo` for the same
+>   documented reason: a program typed against the guest vocabulary *cannot*
+>   construct a denied command, and the panel exists to show the runtime
+>   backstop for one that reached the interpreter anyway.
+> - **The Pages workflow is `workflow_dispatch` only.** Publishing puts the
+>   demo on a public URL; that is a person's decision, not a push's side
+>   effect. Pages must also be enabled with "Source: GitHub Actions".
+>
+> Two layout defects were found by looking at the rendered page, not the code:
+> step 3's headline silently dropped lines 1z, 2b, 11a and 16 because their
+> rules were matched by equality and line 16's rule carries its method
+> (`1040 line 16 (Tax Computation Worksheet)`); and step 7's two verdict
+> columns — the entire point of that panel — sat off the right edge of the
+> viewport behind a scrollbar.
 
 A wizard-style static site that demonstrates the finance engine to stakeholders. Its
 organising claim, and the reason for every decision below:
@@ -191,17 +230,45 @@ STATE.md's note on how every pasted count in this project went stale.
 ## Testing
 
 The demo is presentation code and ships no `proof` export; the engine it imports carries
-its own 492. What must be verified before the demo:
+its own 492. What must be verified before the demo — **all five were run on 2026-08-06,
+and all five pass**:
 
-1. **It loads from a static file server with no build step** — `python3 -m http.server`
-   from the repo root, open `demo/`, every step renders.
-2. **Every `source ↗` and `proof ↗` link resolves** — a link checker over the generated
-   hrefs, run once. A 404 in front of stakeholders is worse than a missing link.
-3. **The numbers on screen match the engine** — step 2's table is hand-typed in this spec
-   *and* computed live by the page; if they disagree, the page is wrong. Assert it in the
-   page itself and show a visible mismatch rather than failing silently.
-4. **No console errors on any step**, including the "All" view.
-5. **`npm test` still 494/494** — the demo must not touch `fjs/`.
+1. **It loads from a static file server with no build step.** ✓ Verified twice: against
+   the working tree, and against a byte-for-byte simulation of what the Pages workflow
+   stages (4.1 MB, root redirect included). All eight steps plus the All view render.
+2. **Every `source ↗` and `proof ↗` link resolves.** ✓ Seventeen distinct paths plus the
+   verification report, each checked with `git cat-file -e <sha>:<path>` **at the pinned
+   commit** rather than in the working tree — the two are not the same question, and only
+   the first one is what GitHub will serve.
+3. **The numbers on screen match the engine.** ✓ Step 2 recomputes both hand-typed
+   regression cases live and prints `✓ matches` per case; a disagreement paints a loud
+   red callout instead of silently preferring one. Step 1 does the same for CAS
+   addresses: it re-hashes the JSON it just printed and shouts if the address on screen
+   is not the address of the text on screen.
+4. **No console errors on any step**, including the "All" view. ✓ Zero, after adding an
+   inline `data:` favicon to remove the one 404.
+5. **`npm test` still 494/494.** ✓ 494 pass / 0 fail, 492 project-local proofs, `tsc`
+   clean. Nothing under `fjs/` was modified.
+
+### How to run it locally
+
+The demo needs `fjs/` and `functionalscript/` served BESIDE `demo/`, which the repository
+root does not provide (the submodule is not checked out). Stage the three the way the
+Pages workflow does:
+
+```sh
+mkdir -p /tmp/site && cd /tmp/site
+ln -s "$REPO/demo" demo && ln -s "$REPO/fjs" fjs
+ln -s "$REPO/node_modules/functionalscript" functionalscript
+python3 -m http.server 8000   # then open http://localhost:8000/demo/
+```
+
+### Presenting
+
+Arrow keys move between steps. Two moments carry the whole demo, and both are one
+gesture: on **Line 16**, drag qualified dividends off zero and the method tag flips from
+`taxTable` to `qdcgt` while **the cents do not change at all** — which is precisely the
+argument that page is making. On **Refusal**, tick one box and the entire return refuses.
 
 ---
 

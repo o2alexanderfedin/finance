@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>finance — a Form 1040 engine that shows its work</title>
+<meta name="description" content="Every number on screen is one click from the code that produced it and the proof that tests it.">
+<link rel="stylesheet" href="demo.css">
+<!-- Inline, so the page makes no request the CSP or an offline laptop could fail. -->
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ctext y='25' x='7' font-size='26' font-family='serif' font-style='italic' fill='%231c5d99'%3E%C6%92%3C/text%3E%3C/svg%3E">
+<!--
+  The whole build system.
+
+  Modules under `fjs/` import `functionalscript/...` as a bare specifier, which
+  the browser resolves through this map. There is no bundler, no transpiler and
+  no install step: the pages load the same `.f.js` files `npm test` runs its
+  492 proofs against.
+
+  `../functionalscript/` is the repository's git submodule. The GitHub Pages
+  workflow stages `node_modules/functionalscript` there, which is the same
+  approved dependency `package.json` already pins.
+-->
+<script type="importmap">
+{
+  "imports": {
+    "functionalscript/": "../functionalscript/"
+  }
+}
+</script>
+</head>
+<body>
+
+<a class="skip" href="#step">Skip to content</a>
+
+<header class="topbar">
+    <div class="brand">
+        <span class="brand-mark">ƒ</span>
+        <span class="brand-name">finance</span>
+        <span class="brand-tag">a Form 1040 engine that shows its work</span>
+    </div>
+    <a class="badge" id="badge" href="#" target="_blank" rel="noreferrer">
+        <span class="badge-dot"></span>
+        <span id="badge-text">494/494 · 492 proofs</span>
+    </a>
+</header>
+
+<nav class="steps" id="steps" aria-label="Demo steps"></nav>
+
+<main id="step" class="step" tabindex="-1"></main>
+
+<footer class="wizard">
+    <button id="prev" class="nav-button" type="button">← Prev</button>
+    <span id="position" class="position"></span>
+    <button id="next" class="nav-button nav-primary" type="button">Next →</button>
+</footer>
+
+<div id="boot-error" class="boot-error" hidden></div>
+
+<script type="module" src="demo.js"></script>
+<script type="module">
+// A module that fails to load leaves a blank page and a console nobody is
+// looking at during a demo. This puts the failure on screen instead.
+window.addEventListener('error', event => {
+    const box = document.getElementById('boot-error')
+    if (box === null) { return }
+    box.hidden = false
+    box.textContent = `Failed to load: ${event.message}`
+})
+</script>
+
+</body>
+</html>

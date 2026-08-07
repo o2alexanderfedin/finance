@@ -1,0 +1,88 @@
+# Publishes demo/ to GitHub Pages.
+#
+# MANUAL TRIGGER ONLY, deliberately. Publishing puts the demo on a public URL,
+# which is a decision for a person rather than a side effect of a push. Change
+# `on:` to include `push: { branches: [main] }` if continuous publishing is
+# what you want.
+#
+# GitHub Pages must also be enabled for the repository with "Source: GitHub
+# Actions" (Settings → Pages). Until it is, the deploy step fails and nothing
+# is published — which is the safe direction to fail in.
+#
+# ## What gets staged, and why it is not just `demo/`
+#
+# The demo imports the engine directly: `demo/index.html` resolves
+# `../fjs/...` and, through its import map, `../functionalscript/...`. Both
+# must sit BESIDE `demo/` in the published tree, so the site root is a staging
+# directory containing all three rather than `demo/` itself.
+#
+# `functionalscript` is a git submodule that this repository does not check
+# out — `npm ci` installs the same package from `package.json`, which is where
+# the engine resolves it from under test. Staging `node_modules/functionalscript`
+# therefore publishes THE EXACT DEPENDENCY THE SUITE RAN AGAINST, and adds
+# nothing new: no bundler, no transpiler, no second copy of anything.
+
+name: Demo (GitHub Pages)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deploy at a time; never cancel one mid-flight.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 26
+          cache: 'npm'
+
+      - run: npm ci
+
+      # The demo is presentation code and ships no proofs of its own, but it
+      # is type-checked with the engine's own strict settings and it imports
+      # the engine's modules. A red suite must not publish.
+      - run: npm test
+
+      - name: Stage the site
+        run: |
+          mkdir -p _site
+          cp -R demo _site/demo
+          cp -R fjs _site/fjs
+          cp -R node_modules/functionalscript _site/functionalscript
+          # The spec is developer documentation, not part of the demo.
+          rm -rf _site/demo/todo
+          # A bare visit to the site root should land on the demo.
+          printf '%s\n' \
+            '<!doctype html><meta charset="utf-8">' \
+            '<title>finance — demo</title>' \
+            '<meta http-equiv="refresh" content="0; url=./demo/">' \
+            '<link rel="canonical" href="./demo/">' \
+            '<p><a href="./demo/">finance — a Form 1040 engine that shows its work</a></p>' \
+            > _site/index.html
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
