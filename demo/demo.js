@@ -9,7 +9,7 @@
  *
  * @module
  */
-import { sha, shortSha, planningUrl } from './lib/github.js'
+import { sha, shortSha, release, proofCount, releaseUrl } from './lib/github.js'
 import { el } from './lib/dom.js'
 
 import * as about from './steps/00-about.js'
@@ -67,11 +67,16 @@ const position = required('position', HTMLElement)
 const badge = required('badge', HTMLAnchorElement)
 const badgeText = required('badge-text', HTMLElement)
 
-// The badge states a historical fact about a pinned commit — the only honest
-// way to put a test count on a page that outlives the count.
-badge.href = planningUrl('10-VERIFICATION.md')
-badge.title = `verified at ${shortSha}`
-badgeText.textContent = `494/494 · 492 proofs · ${shortSha}`
+// The badge names a RELEASE and a proof count, both facts about one pinned
+// commit — the only honest way to put a figure on a page that outlives it.
+//
+// The count is the project-local one, never `npm test`'s total: that total
+// includes the vendored functionalscript proofs and so depends on whether the
+// submodule is checked out (the same commit reports 494 without it and 2730
+// with it, both correct, neither comparable). See lib/github.js.
+badge.href = releaseUrl
+badge.title = `${release} — released from ${shortSha}`
+badgeText.textContent = `${release} · ${proofCount} proofs`
 
 /** Every routable id, in order. @type {readonly string[]} */
 const order = [...steps.map(step => step.id), allId]

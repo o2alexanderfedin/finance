@@ -9,7 +9,7 @@
  * @module
  */
 import { el, anchor, section, table, callout, code, note } from '../lib/dom.js'
-import { sourceFooter, shortSha, sourceUrl } from '../lib/github.js'
+import { sourceFooter, shortSha, release, sourceUrl } from '../lib/github.js'
 import { modeledKinds, kindVocabulary, unmodeledKindRefusals } from '../lib/engine.js'
 
 /** @import { Step } from '../demo.js' */
@@ -162,9 +162,12 @@ export const render = root => {
             + 'page for questions.',
     }))
     reading.append(el('p', {
-        html: `Every step ends with links into the repository, pinned to commit `
-            + `<code>${shortSha}</code> — a commit, never a branch, so they keep `
-            + `resolving. The badge at the top right is that commit's test run.`,
+        html: `Every step ends with links into the repository, pinned to the `
+            + `<strong>${release}</strong> release — commit <code>${shortSha}</code>. `
+            + `The href carries the commit rather than the tag, because a tag can be `
+            + `moved and a commit cannot, so the links keep resolving either way. The `
+            + `badge at the top right opens that release, which states what is in it `
+            + `and what is not.`,
     }))
     reading.append(code(
         '// the whole build system\n'
@@ -180,6 +183,7 @@ export const render = root => {
         { label: 'fjs/return/scope — the six modeled and forty-four refused kinds', path: 'fjs/return/scope/module.f.js', line: 306, proofLine: 364 },
         { label: 'fjs/return/profile — the frozen kind vocabulary', path: 'fjs/return/profile/module.f.js', line: 93, proofLine: 447 },
         { label: 'fjs/form1040/core — the whole-return entry point', path: 'fjs/form1040/core/module.f.js', line: 1002, proofLine: 1397 },
+        { label: `CHANGELOG.md — what is in ${release}, and what is not`, path: 'CHANGELOG.md' },
         { label: 'AGENTS.md — the rules this codebase is held to', path: 'AGENTS.md' },
         { label: 'README.md', path: 'README.md' },
     ]))
