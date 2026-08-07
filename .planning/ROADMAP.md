@@ -400,7 +400,13 @@ of it to Phase 14, whose criteria are about tax correctness rather than the exec
   3. `finance_documents_list` enumerates stored documents with dialect, tax year, and subject.
   4. A wrongly ingested document can be marked `archived`, and the recorded decision on whether report programs filter archived revisions is enforced by a `proof` — there is a documented answer to "I uploaded the wrong document."
 **Research**: **YES** — box lists for 1099-R and SSA-1099 are unverified and must be read from the IRS PDFs.
-**Plans**: TBD
+**Plans**: 5 plans in 2 waves
+Plans:
+- [ ] 11-01-PLAN.md — `vnd.fjs.1099r` and `vnd.fjs.ssa1099` document dialects (DOC-09, DOC-08) *(wave 1)*
+- [ ] 11-02-PLAN.md — `buildRunSnapshot` archived-revision filtering fix, adversarial+control proof, Mutation Gate M1 (DOC-15) *(wave 1)*
+- [ ] 11-03-PLAN.md — `finance_documents_list` MCP tool (MCP-08) *(wave 1)*
+- [ ] 11-04-PLAN.md — `finance_schema`'s atomic `dialectSchemas` bump to 7 (DOC-08, DOC-09) *(wave 2, needs 11-01)*
+- [ ] 11-05-PLAN.md — Register `finance_documents_list` + same-commit integration test coverage (MCP-08, TEST-03) *(wave 2, needs 11-03)*
 
 ### Phase 12: Brokerage Documents and the Capital-Gain Chain
 **Milestone**: Week 3 — Breadth in Documents
