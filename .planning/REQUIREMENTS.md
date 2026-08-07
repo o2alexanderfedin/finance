@@ -238,7 +238,7 @@ structural (RTTI) and semantic passes.
 - [x] **DOC-14** *(T1)*: Documented CLI ingestion route for artifacts over 128 KiB
       (`npx functionalscript cas add`), plus a cache-refresh path so a store mutated by
       another process is visible to the running server without a restart.
-- [ ] **DOC-15** *(T2)*: A retraction story via the `archived` flag, and a decision recorded
+- [x] **DOC-15** *(T2)*: A retraction story via the `archived` flag, and a decision recorded
       on whether report programs must filter archived revisions.
 - [ ] **DOC-16** *(T3)*: Dialect registration for `fjs/media`'s `detect`. It imports
       `decodeText`/`mediaType` from `fjs/media/revision` directly and performs exactly one

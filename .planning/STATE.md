@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
 status: executing
-stopped_at: Completed 11-01-PLAN.md
-last_updated: "2026-08-07T23:13:30.527Z"
+stopped_at: Completed 11-02-PLAN.md
+last_updated: "2026-08-07T23:33:20.832Z"
 last_activity: 2026-08-07
 progress:
   total_phases: 18
   completed_phases: 10
   total_plans: 53
-  completed_plans: 52
-  percent: 98
+  completed_plans: 53
+  percent: 100
 ---
 
 # Project State
@@ -29,7 +29,7 @@ the server executes it as a pure function of `(documents, tax-year parameters) �
 Phase: 11 (Wage, Retirement, and Benefit Documents) — EXECUTING
   Ten plans across six waves. The plan set was returned BLOCKER by `gsd-plan-checker`
   (four blockers, ten warnings), revised, re-checked, and only then executed.
-Plan: 2 of 5
+Plan: 3 of 5
   whole-dollar election), wave 2 (10-03 Tax Computation Worksheet, 10-04 the
   vnd.fjs.return_profile dialect, 10-05 the standard deduction chart), wave 3
   (10-06 QDCGT, 10-07 the classifyScope scope guard, executed in parallel),
@@ -41,7 +41,7 @@ Status: Ready to execute
   local carries `lines` past excess-property checking; only `lines?: undefined`
   stops it) and site 2's differential. Phase 11 not started.
 
-Progress: [██████████] 98%
+Progress: [██████████] 100%
   in this file's frontmatter for the raw plan/summary counts — the percent figure here is
   phase-based, not plan-based, because two phases carry an extra FIX-SUMMARY.md alongside a
   plan's own summary, which would otherwise round the plan-based figure to a misleading 100%)
@@ -118,6 +118,7 @@ proofs and moves with submodule initialization state — which is exactly how a 
 | Phase 10 P09 | 75min | 2 tasks | 1 files |
 | Phase 10 P10 | 95min | 3 tasks | 1 files |
 | Phase 11 P01 | 30min | 3 tasks | 2 files |
+| Phase 11 P02 | 20min | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -254,6 +255,8 @@ Full log in PROJECT.md Key Decisions. Recent decisions affecting current work:
 - [Phase 11-01]: 1099-R modeled against the fuller TY2026 box set (strict superset of TY2025); box 7c/7d and the 8a/8b split are documented as 2026-only, option-typed additions, harmless on a TY2025 document
 - [Phase 11-01]: SSA-1099's payerTin is always stored as '' (no printed payer TIN exists) and accountNumber maps to Box 8's Claim Number; both proven by a round-trip leaf, not just documented
 - [Phase 11-01]: Mutation Gate M2 confirmed: removing one entry from moneyBoxFields while leaving expectedMoneyBoxFieldCount unchanged is the correct mutation shape -- schema-generated coverage leaves cannot detect a removal on their own
+- [Phase 11-02]: buildRunSnapshot's withBlobsAndRevisions/withHeads now exclude archived-flagged revisions from heads/revisions, closing the guest-vocabulary path (evoList('true') -> evoHead -> evoRevision -> casRead) to a retracted document; blobs and buildHostMap stay untouched (the honest, documented boundary)
+- [Phase 11-02]: Mutation Gate M1 confirmed load-bearing: reverting the two filtering conditions reddens archivedRevisionUnreachable.adversarialAndControl with the predicted failure (archived hash resurfacing in heads); restored verbatim, suite green, git status clean
 
 ### Pending Todos
 
@@ -398,8 +401,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-08-07T23:13:30.520Z
-Stopped at: Completed 11-01-PLAN.md
+Last session: 2026-08-07T23:33:20.825Z
+Stopped at: Completed 11-02-PLAN.md
 sweep verified and APPROVED by the phase owner.
 (measure the suite rather than quoting it — see "Test metrics" above. Next: Phase 11. Verification of
 Phase 10 is dispatched separately and was NOT run by the executor.)
