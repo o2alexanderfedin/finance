@@ -250,18 +250,50 @@ and all five pass**:
 5. **`npm test` still 494/494.** ✓ 494 pass / 0 fail, 492 project-local proofs, `tsc`
    clean. Nothing under `fjs/` was modified.
 
-### How to run it locally
-
-The demo needs `fjs/` and `functionalscript/` served BESIDE `demo/`, which the repository
-root does not provide (the submodule is not checked out). Stage the three the way the
-Pages workflow does:
+### How to run it
 
 ```sh
-mkdir -p /tmp/site && cd /tmp/site
-ln -s "$REPO/demo" demo && ln -s "$REPO/fjs" fjs
-ln -s "$REPO/node_modules/functionalscript" functionalscript
-python3 -m http.server 8000   # then open http://localhost:8000/demo/
+./demo/serve.sh          # then open http://localhost:8000/demo/
 ```
+
+`serve.sh` stages `demo/`, `fjs/` and `functionalscript/` side by side under the system
+temp directory — with symlinks, so edits show up on reload — and serves them. It needs
+`npm ci` to have run, and it writes nothing inside the repository.
+
+The staging step is not incidental: `demo/index.html` resolves `../fjs/...` and, through
+its import map, `../functionalscript/...`, and in this working tree neither sits beside
+`demo/`. The repository root has `fjs/`, but its `functionalscript` submodule is not
+checked out and `npm ci` installs that package under `node_modules/` instead.
+
+## Hosting — deferred, and not for a plumbing reason
+
+**2026-08-06: the first showcase is presented from a laptop. Whether any of this becomes
+public is an open decision, to be taken with Sergey.**
+
+The blocker is not deployment mechanics. It is that this repository is private and
+
+> **a demo that runs the real engine in a public page publishes the real engine.**
+
+The browser has to download `fjs/**` in order to execute it — 37 `.f.js` files, about
+950 KB — so any world-readable deployment ships the engine source verbatim, including its
+design-rationale comments: `SEC-*` identifiers, `REQUIREMENTS.md` references, phase
+context, and the recorded accepted-risk note in `fjs/guest/materialize`. No configuration
+of `.github/workflows/pages.yml` avoids that, and neither does moving the demo into a
+separate public repository — the same bytes have to reach the browser either way.
+
+A cross-repository read token stored in a public repo is worse than useless here: it is
+exfiltratable by any workflow edit, and it does not prevent the disclosure it appears to
+be protecting.
+
+**A second consequence, which applies wherever this is hosted:** every `source ↗` and
+`proof ↗` link, and the build badge, points at `github.com/fjs-dev/finance`. Those
+resolve only for viewers inside the `fjs-dev` org. Presenting from a laptop while signed
+in, they work. On a public page they would 404 — which would break the demo's central
+claim on a page whose whole argument is that claim. Repo visibility and demo hosting are
+therefore one decision, not two.
+
+`.github/workflows/pages.yml` exists, is `workflow_dispatch` only, and carries this
+warning at the top of the file. It has never been run.
 
 ### Presenting
 

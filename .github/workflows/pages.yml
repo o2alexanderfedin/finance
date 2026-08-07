@@ -1,9 +1,31 @@
 # Publishes demo/ to GitHub Pages.
 #
-# MANUAL TRIGGER ONLY, deliberately. Publishing puts the demo on a public URL,
-# which is a decision for a person rather than a side effect of a push. Change
-# `on:` to include `push: { branches: [main] }` if continuous publishing is
-# what you want.
+# ┌──────────────────────────────────────────────────────────────────────────┐
+# │ DO NOT RUN THIS WITHOUT A DELIBERATE DECISION TO PUBLISH THE ENGINE.      │
+# │                                                                          │
+# │ This repository is PRIVATE. The demo executes the engine IN THE BROWSER,  │
+# │ so the browser must download it: staging copies ~950 KB of `fjs/**` — 37  │
+# │ `.f.js` files — into a world-readable site. That is the engine source     │
+# │ verbatim, including its design-rationale comments (SEC-* identifiers,     │
+# │ REQUIREMENTS references, phase context, and the recorded accepted-risk    │
+# │ notes in `fjs/guest/materialize`).                                        │
+# │                                                                          │
+# │ There is no configuration of this workflow that avoids that. A demo that  │
+# │ runs the real engine in a public page publishes the real engine. The only │
+# │ question is whether it happens on purpose.                               │
+# │                                                                          │
+# │ Related: every `source ↗` / `proof ↗` link the demo renders points at     │
+# │ github.com/fjs-dev/finance, which is private — those links 404 for any    │
+# │ viewer outside the org. Publishing the site without also resolving repo   │
+# │ visibility produces a public page whose central claim is broken.          │
+# │                                                                          │
+# │ Status 2026-08-06: DEFERRED. The first showcase is being presented from   │
+# │ a laptop; whether any of this becomes public is an open decision.         │
+# └──────────────────────────────────────────────────────────────────────────┘
+#
+# MANUAL TRIGGER ONLY, deliberately, and it should stay that way until the
+# above is settled. Publishing is a decision for a person rather than a side
+# effect of a push.
 #
 # GitHub Pages must also be enabled for the repository with "Source: GitHub
 # Actions" (Settings → Pages). Until it is, the deploy step fails and nothing
