@@ -179,6 +179,29 @@ the next feedback pass does not revert it back.
 runs the script in the current working directory, so it will happily report a different tree green.
 Use `( cd <dir> && npm test )` — in a subshell, because a bare `cd` persists across later commands.
 
+**Each worktree has its OWN `node_modules`, and they drift.** `npm ci` in one does nothing for the
+others, and nothing announces the difference. Two of this repo's three checkouts were found running
+`functionalscript@0.41.0` against a lockfile pinning `0.43.0`, at the same commit as a checkout that
+was green.
+
+What that looks like is the trap: **sixteen `tsc` errors inside `fjs/**` that are not defects in
+`fjs/**`** — `TS2314 Generic type 'StringMap' requires 2 type argument(s)`, `Type 'undefined' is not
+assignable to type 'Unknown'` — plus a project-local proof count ten short (482, not 492), because
+modules that fail to import never register their proofs. Every symptom points at your code. None of
+it is your code.
+
+So before believing a red result, and always before comparing two checkouts:
+
+```sh
+node -p "require('./node_modules/functionalscript/package.json').version"   # installed
+node -p "require('./package-lock.json').packages['node_modules/functionalscript'].version"
+```
+
+`demo/serve.sh` performs exactly this comparison and refuses to start on a mismatch, which is the
+cheapest place to catch it. Note also that the vendored-proof total differs between checkouts for
+the same reason (2717 in one, 494 in another, both correct) — a second reason the project-local
+`grep -c` count is the only comparable number.
+
 ### The mutation that deletes the last use of a binding does not compile
 
 By far the most common way a written-down mutation turns out to be unrunnable. `tsconfig` sets
