@@ -37,6 +37,61 @@
  * confirmation the design is right, not something to paper over with `any`
  * (T-07-05-02).
  *
+ * ## Retraction (DOC-15) — the documented `evo_add` call, and this file's part in it
+ *
+ * There is no separate "archive a document" tool. `finance_document_archive`
+ * was considered and rejected (11-CONTEXT.md): the already-registered
+ * `evo_add` tool already accepts `archived: option(true)` on its input shape,
+ * so retracting a wrongly-ingested document is exactly this call, made
+ * through `evo_add` like any other revision:
+ *
+ * ```json
+ * {
+ *   "name": "evo_add",
+ *   "arguments": {
+ *     "parents": ["<current head hash of the wrongly-ingested document's subject>"],
+ *     "subject": "<the subject>",
+ *     "archived": true
+ *   }
+ * }
+ * ```
+ *
+ * `snapshot` is deliberately OMITTED: with exactly one parent and no explicit
+ * `snapshot`, the new revision inherits the parent's own `snapshot` unchanged
+ * (`resolveSnapshot`'s single-parent rule) — the archived revision points at
+ * the SAME bytes, just flagged `archived: true`. The bytes remain in the
+ * store; `archived` means "no longer current", never "gone" (CAS has no
+ * delete — `REQUIREMENTS.md`'s Accepted Risks).
+ *
+ * This module enforces the OTHER half of DOC-15: once such a revision exists,
+ * `buildRunSnapshot` excludes it — and therefore its subject's now-superseded
+ * head — from what a guest report program's `ctx.evoHead`/`ctx.evoRevision`
+ * can resolve. Concretely: any hash whose decoded `RevisionData` carries
+ * `archived: true` is excluded from `revisions`, and any head hash for a
+ * subject is excluded from `heads` unless it survived that same filter — so
+ * an archived-only subject resolves to `heads[subject] === []`,
+ * indistinguishable from an unknown subject. `buildHostMap`'s `evoList`
+ * handler is untouched: `ctx.evoList('true')` still returns the archived
+ * subject's NAME (which reveals nothing about content) — it is the
+ * subsequent `evoHead`/`evoRevision` resolution this filtering closes off.
+ * This is exactly the mechanism the adversarial proof below (
+ * `archivedRevisionUnreachable`) seeds and exercises, so this docstring and
+ * that proof describe the same thing rather than two independently
+ * maintained accounts of it.
+ *
+ * **The honest boundary of this guarantee**: `blobs` (raw snapshot bytes by
+ * hash) stays completely unfiltered. A report program handed the exact
+ * SNAPSHOT hash (not the revision hash) through an external channel — e.g.
+ * obtained from `finance_documents_list`'s own `archived: true` response —
+ * can still `ctx.casRead` it directly. Closing that would
+ * need an access-control redesign far beyond CAS's content-addressable
+ * nature (anyone holding an exact hash can read it) and would contradict
+ * this project's own Accepted Risk that "retraction remains a policy
+ * question, not a capability." This module closes the discovery/resolution
+ * chain a report program actually walks (`evoList('true')` ->
+ * `evoHead`/`evoRevision`); it does not — and cannot — make retracted bytes
+ * unreadable to a party already holding their exact hash.
+ *
  * @module
  */
 import { step, mapStep, foldStep, pure } from 'functionalscript/fjs/effects/module.f.js'
@@ -126,7 +181,15 @@ export const buildRunSnapshot = cas => evoApi => pin => {
                         revResult => pure({
                             ...state,
                             blobs,
-                            revisions: revResult[0] === 'ok'
+                            // DOC-15: a revision flagged `archived: true` is
+                            // excluded from `revisions` here, at the exact
+                            // point its decoded RevisionData is already in
+                            // scope — the SAME accumulator step that builds
+                            // `revisions`, not a separate pass afterward. See
+                            // the module header's "Retraction (DOC-15)"
+                            // section for the full guarantee and its honest
+                            // boundary.
+                            revisions: revResult[0] === 'ok' && revResult[1].archived !== true
                                 ? { ...state.revisions, [hashStr]: jsonText(revResult[1]) }
                                 : state.revisions,
                         }),
@@ -152,7 +215,19 @@ export const buildRunSnapshot = cas => evoApi => pin => {
             state,
             subject => s => step(
                 evoApi.head(subject),
-                headHashes => pure({ ...s, heads: { ...s.heads, [subject]: headHashes } }),
+                headHashes => {
+                    // DOC-15: `state.revisions` (built by withBlobsAndRevisions,
+                    // which runs before withHeads in this chain) already
+                    // excludes any hash whose decoded revision carries
+                    // `archived: true`. Reuse that SAME filtered map to derive
+                    // which of this subject's head hashes are non-archived,
+                    // rather than re-deriving archived status a second way
+                    // (AGENTS.md "one rule, one place"). An archived-only
+                    // subject's activeHeadHashes is then `[]` — indistinguishable
+                    // from an unknown subject, to a report program.
+                    const activeHeadHashes = headHashes.filter(h => state.revisions[h] !== undefined)
+                    return pure({ ...s, heads: { ...s.heads, [subject]: activeHeadHashes } })
+                },
             ),
         ),
     )
