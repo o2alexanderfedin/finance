@@ -225,8 +225,8 @@ structural (RTTI) and semantic passes.
       the worksheet with the dialect, not after it.
 - [ ] **DOC-07** *(T2)*: `vnd.fjs.1099b` — including the distinction that a blank box 1e
       means "basis not reported", which is **not** zero.
-- [ ] **DOC-08** *(T2)*: `vnd.fjs.ssa1099` — required by the 65+ profile.
-- [ ] **DOC-09** *(T2)*: `vnd.fjs.1099r` — required by the 65+ profile.
+- [x] **DOC-08** *(T2)*: `vnd.fjs.ssa1099` — required by the 65+ profile.
+- [x] **DOC-09** *(T2)*: `vnd.fjs.1099r` — required by the 65+ profile.
 - [x] **DOC-10** *(T1)*: Every dialect that transcribes a printed IRS form carries the
       **form revision**, not merely the tax
       year. Box semantics drift between revisions.

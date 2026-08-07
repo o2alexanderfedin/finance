@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
 status: executing
-stopped_at: Phase 10 COMPLETE — all ten plans shipped, and 10-10 Task 3's five-site mutation
-last_updated: "2026-08-07T22:53:28.817Z"
-last_activity: 2026-08-07 -- Phase 11 planning complete
+stopped_at: Completed 11-01-PLAN.md
+last_updated: "2026-08-07T23:13:30.527Z"
+last_activity: 2026-08-07
 progress:
   total_phases: 18
   completed_phases: 10
   total_plans: 53
-  completed_plans: 51
-  percent: 96
+  completed_plans: 52
+  percent: 98
 ---
 
 # Project State
@@ -22,14 +22,14 @@ See: .planning/PROJECT.md (updated 2026-08-03)
 
 **Core value:** The report is a program, not an answer — the agent emits FunctionalScript;
 the server executes it as a pure function of `(documents, tax-year parameters) → report`.
-**Current focus:** Phase 10 — Form 1040 Core, Line-16 Dispatch, and the Scope Guard
+**Current focus:** Phase 11 — Wage, Retirement, and Benefit Documents
 
 ## Current Position
 
-Phase: 10 of 18 — Form 1040 Core, Line-16 Dispatch, and the Scope Guard (TAX-03/05/06/16).
+Phase: 11 (Wage, Retirement, and Benefit Documents) — EXECUTING
   Ten plans across six waves. The plan set was returned BLOCKER by `gsd-plan-checker`
   (four blockers, ten warnings), revised, re-checked, and only then executed.
-Plan: 10 of 10 complete — wave 1 (10-01 QSS as a stored filing status, 10-02 the IRS
+Plan: 2 of 5
   whole-dollar election), wave 2 (10-03 Tax Computation Worksheet, 10-04 the
   vnd.fjs.return_profile dialect, 10-05 the standard deduction chart), wave 3
   (10-06 QDCGT, 10-07 the classifyScope scope guard, executed in parallel),
@@ -41,11 +41,11 @@ Status: Ready to execute
   local carries `lines` past excess-property checking; only `lines?: undefined`
   stops it) and site 2's differential. Phase 11 not started.
 
-Progress: [██████████] 100%
+Progress: [██████████] 98%
   in this file's frontmatter for the raw plan/summary counts — the percent figure here is
   phase-based, not plan-based, because two phases carry an extra FIX-SUMMARY.md alongside a
   plan's own summary, which would otherwise round the plan-based figure to a misleading 100%)
-Last activity: 2026-08-07 -- Phase 11 planning complete
+Last activity: 2026-08-07
 
 ### Test metrics — MEASURE, do not read
 
@@ -117,6 +117,7 @@ proofs and moves with submodule initialization state — which is exactly how a 
 | Phase 10 P08 | 55min | 2 tasks | 1 files |
 | Phase 10 P09 | 75min | 2 tasks | 1 files |
 | Phase 10 P10 | 95min | 3 tasks | 1 files |
+| Phase 11 P01 | 30min | 3 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -250,6 +251,9 @@ Full log in PROJECT.md Key Decisions. Recent decisions affecting current work:
 - [Phase 10]: 10-09: line 12e cites filingStatus plus one box per checked 12d checkbox, exactly as planned; 12a-12c and earnedIncome determine the value but are cited only at document granularity — flagged for the phase owner, not widened, because 10-10 may pin the counts
 - [Phase 10]: 10-10: Form1040Outcome's error arm declares readonly lines?: undefined — omitting the field does NOT make adding it a tsc error, because TypeScript's excess-property check against a union admits any property declared in any constituent
 - [Phase 10]: 10-10: line 22's zero floor lives in its own named function: lines 19/20 are always profile-declared zeros in Phase 10, so the floor is unreachable through a whole report and would otherwise be an equivalent mutant
+- [Phase 11-01]: 1099-R modeled against the fuller TY2026 box set (strict superset of TY2025); box 7c/7d and the 8a/8b split are documented as 2026-only, option-typed additions, harmless on a TY2025 document
+- [Phase 11-01]: SSA-1099's payerTin is always stored as '' (no printed payer TIN exists) and accountNumber maps to Box 8's Claim Number; both proven by a round-trip leaf, not just documented
+- [Phase 11-01]: Mutation Gate M2 confirmed: removing one entry from moneyBoxFields while leaving expectedMoneyBoxFieldCount unchanged is the correct mutation shape -- schema-generated coverage leaves cannot detect a removal on their own
 
 ### Pending Todos
 
@@ -394,8 +398,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-08-06T22:31:21.916Z
-Stopped at: Phase 10 COMPLETE — all ten plans shipped, and 10-10 Task 3's five-site mutation
+Last session: 2026-08-07T23:13:30.520Z
+Stopped at: Completed 11-01-PLAN.md
 sweep verified and APPROVED by the phase owner.
 (measure the suite rather than quoting it — see "Test metrics" above. Next: Phase 11. Verification of
 Phase 10 is dispatched separately and was NOT run by the executor.)
