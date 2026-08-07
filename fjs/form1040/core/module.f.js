@@ -1203,6 +1203,49 @@ const dependentProfile = earnedIncome => ({
 })
 
 /**
+ * A married-filing-separately filer with all FOUR line-12d boxes checked and
+ * the i1040gi p33 footnote condition declared — without which
+ * `fjs/return/profile` check 5b refuses the two spouse boxes outright, so the
+ * profile could not carry four boxes at all.
+ *
+ * The base for the two exception fixtures below, and it is FOUR boxes rather
+ * than none on purpose: this is the largest amount the printed MFS column
+ * reaches ($22,150), so an exception that fails to fire is wrong by the widest
+ * margin the status can produce — and a leaf built on a no-box profile could
+ * not tell "the exception fired" apart from "an increment went missing".
+ * @type {ReturnProfile}
+ */
+const marriedFilingSeparatelyFourBoxProfile = {
+    ...singleProfile,
+    filingStatus: 'marriedFilingSeparately',
+    taxpayerBornBeforeJan2_1961: true,
+    taxpayerIsBlind: true,
+    spouseBornBeforeJan2_1961: true,
+    spouseIsBlind: true,
+    spouseHadNoIncomeIsNotFilingAndIsNotADependent: true,
+}
+
+/**
+ * Exception 2 (line 12b) — married filing separately and the spouse itemizes.
+ * @type {ReturnProfile}
+ */
+const spouseItemizesProfile = {
+    ...marriedFilingSeparatelyFourBoxProfile,
+    spouseItemizes: true,
+}
+
+/**
+ * Exception 3 (line 12c) — a dual-status alien. Carried on the SAME four-box
+ * base, so the two exception leaves differ in exactly one box and neither can
+ * pass on the other's account.
+ * @type {ReturnProfile}
+ */
+const dualStatusAlienProfile = {
+    ...marriedFilingSeparatelyFourBoxProfile,
+    dualStatusAlien: true,
+}
+
+/**
  * Ten REAL stored 1099-INT documents with ten DISTINCT hashes, each carrying
  * the IRS's own printed rounding example in box 1: `'1.39'` (i1040gi p23, "For
  * example, $1.39 becomes $1").
@@ -1563,6 +1606,35 @@ export const proof = {
         dependentAboveTheEarnedIncomeThresholdIsTwentyFourFiftyThroughTheProfile: () => {
             const { line12e } = linesForProfile(dependentProfile('2000.00'))
             assertEq(line12e.value, 245000n)
+        },
+        // Exceptions 2 and 3, reached THROUGH THE PROFILE for the same reason
+        // the two dependent leaves above are — and they were the gap the
+        // Phase 10 verification found: `fjs/tax/deduction`'s own
+        // `spouseItemizesIsZeroEvenWithFourBoxesChecked` and
+        // `dualStatusAlienIsZeroEvenWithTwoBoxesChecked` call
+        // `standardDeductionCents` with a correct input record, so hardcoding
+        // either flag to `false` AT THIS CALLER left all 33 of that module's
+        // leaves green while this line handed a married-filing-separately
+        // filer whose spouse itemizes the full four-box chart row. "Wired" and
+        // "proven wired" are different claims and only the second counts.
+        //
+        // `0n` is hand-typed from i1040gi p34, which states it twice: the
+        // standard deduction is zero "even if you were born before January 2,
+        // 1961, or were blind". It is NOT the chart row minus anything.
+        //
+        // Their CONTROL is
+        // `marriedFilingJointlyWithFourBoxesIsThirtySevenNineCitingFiveBoxes`
+        // above — also four checked boxes through this same caller, and
+        // non-zero — so a caller that hardcoded either flag to `true` (a gate
+        // that refuses everything) reddens there rather than passing here.
+        // Not restated as a fourth fixture: one rule, one place.
+        spouseItemizesIsZeroEvenWithFourBoxesCheckedThroughTheProfile: () => {
+            const { line12e } = linesForProfile(spouseItemizesProfile)
+            assertEq(line12e.value, 0n)
+        },
+        dualStatusAlienIsZeroEvenWithFourBoxesCheckedThroughTheProfile: () => {
+            const { line12e } = linesForProfile(dualStatusAlienProfile)
+            assertEq(line12e.value, 0n)
         },
         // TWO gates at TWO layers, asserted from both sides. `fjs/tax/deduction`
         // refuses a box count above the status maximum; `fjs/return/profile`
