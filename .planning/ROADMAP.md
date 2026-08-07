@@ -405,7 +405,7 @@ Plans:
 **Wave 1**
 - [x] 11-01-PLAN.md — `vnd.fjs.1099r` and `vnd.fjs.ssa1099` document dialects (DOC-09, DOC-08) *(wave 1)*
 - [x] 11-02-PLAN.md — `buildRunSnapshot` archived-revision filtering fix, adversarial+control proof, Mutation Gate M1 (DOC-15) *(wave 1)*
-- [ ] 11-03-PLAN.md — `finance_documents_list` MCP tool (MCP-08) *(wave 1)*
+- [x] 11-03-PLAN.md — `finance_documents_list` MCP tool (MCP-08) *(wave 1)*
 
 **Wave 2** *(blocked on Wave 1 completion)*
 - [ ] 11-04-PLAN.md — `finance_schema`'s atomic `dialectSchemas` bump to 7 (DOC-08, DOC-09) *(wave 2, needs 11-01)*
@@ -546,7 +546,7 @@ Phases 16-18 are backlog: unordered, independent of each other and of the critic
 | 8. TY2025 Parameters and Tax Table | Week 2 | 5/5 | Complete | verified 2026-08-05 |
 | 9. Traceable Report Lines | Week 2 | 8/8 | Complete   | verified 2026-08-06 |
 | 10. 1040 Core and Scope Guard | Week 2 | 10/10 | Complete   | verified 2026-08-06 5/5 |
-| 11. Wage, Retirement, Benefit Documents | Week 3 | 2/5 | In Progress|  |
+| 11. Wage, Retirement, Benefit Documents | Week 3 | 3/5 | In Progress|  |
 | 12. Brokerage and Capital-Gain Chain | Week 3 | 0/TBD | Not started | - |
 | 13. The 65+ Profile and Schedules | Week 3 | 0/TBD | Not started | - |
 | 14. Acceptance | Week 4 | 0/TBD | Not started | - |

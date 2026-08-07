@@ -104,7 +104,7 @@ dissolves on contact.
       dialect, so the agent reads field names rather than guessing them.
 - [x] **MCP-07** *(T1)*: `finance_tax_params(year)` returns the tax-year parameter set, so
       the agent reads parameters rather than recalling them.
-- [ ] **MCP-08** *(T2)*: `finance_documents_list` enumerates stored documents with their
+- [x] **MCP-08** *(T2)*: `finance_documents_list` enumerates stored documents with their
       dialect, tax year, and subject.
 - [ ] **MCP-09** *(T3)*: `fjs_check(hash)` smoke-checks a stored program — imports it and
       confirms it exports `main` returning an `Effect` — without running it to completion.

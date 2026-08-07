@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
 status: executing
-stopped_at: Completed 11-02-PLAN.md
-last_updated: "2026-08-07T23:33:20.832Z"
+stopped_at: Completed 11-03-PLAN.md
+last_updated: "2026-08-07T23:54:59.325Z"
 last_activity: 2026-08-07
 progress:
   total_phases: 18
   completed_phases: 10
   total_plans: 53
-  completed_plans: 53
+  completed_plans: 54
   percent: 100
 ---
 
@@ -29,7 +29,7 @@ the server executes it as a pure function of `(documents, tax-year parameters) �
 Phase: 11 (Wage, Retirement, and Benefit Documents) — EXECUTING
   Ten plans across six waves. The plan set was returned BLOCKER by `gsd-plan-checker`
   (four blockers, ten warnings), revised, re-checked, and only then executed.
-Plan: 3 of 5
+Plan: 4 of 5
   whole-dollar election), wave 2 (10-03 Tax Computation Worksheet, 10-04 the
   vnd.fjs.return_profile dialect, 10-05 the standard deduction chart), wave 3
   (10-06 QDCGT, 10-07 the classifyScope scope guard, executed in parallel),
@@ -119,6 +119,7 @@ proofs and moves with submodule initialization state — which is exactly how a 
 | Phase 10 P10 | 95min | 3 tasks | 1 files |
 | Phase 11 P01 | 30min | 3 tasks | 2 files |
 | Phase 11 P02 | 20min | 2 tasks | 1 files |
+| Phase 11 P03 | 30min | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -257,6 +258,9 @@ Full log in PROJECT.md Key Decisions. Recent decisions affecting current work:
 - [Phase 11-01]: Mutation Gate M2 confirmed: removing one entry from moneyBoxFields while leaving expectedMoneyBoxFieldCount unchanged is the correct mutation shape -- schema-generated coverage leaves cannot detect a removal on their own
 - [Phase 11-02]: buildRunSnapshot's withBlobsAndRevisions/withHeads now exclude archived-flagged revisions from heads/revisions, closing the guest-vocabulary path (evoList('true') -> evoHead -> evoRevision -> casRead) to a retracted document; blobs and buildHostMap stay untouched (the honest, documented boundary)
 - [Phase 11-02]: Mutation Gate M1 confirmed load-bearing: reverting the two filtering conditions reddens archivedRevisionUnreachable.adversarialAndControl with the predicted failure (archived hash resurfacing in heads); restored verbatim, suite green, git status clean
+- [Phase 11]: MCP-08: one row per (subject, head) pair, not one per subject -- concurrent heads yield multiple rows sharing a subject
+- [Phase 11]: MCP-08: 'unknown' is the sentinel dialect for a well-formed document with no dialect field (arbitrary, recorded pick per RESEARCH.md A2)
+- [Phase 11]: MCP-08: finance_documents_list never validates against finance_schema's dialect registry -- an unregistered dialect tag is listed verbatim
 
 ### Pending Todos
 
@@ -401,8 +405,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-08-07T23:33:20.825Z
-Stopped at: Completed 11-02-PLAN.md
+Last session: 2026-08-07T23:54:59.316Z
+Stopped at: Completed 11-03-PLAN.md
 sweep verified and APPROVED by the phase owner.
 (measure the suite rather than quoting it — see "Test metrics" above. Next: Phase 11. Verification of
 Phase 10 is dispatched separately and was NOT run by the executor.)
