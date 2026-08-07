@@ -179,6 +179,30 @@ the next feedback pass does not revert it back.
 runs the script in the current working directory, so it will happily report a different tree green.
 Use `( cd <dir> && npm test )` — in a subshell, because a bare `cd` persists across later commands.
 
+**`git add` on the uninitialized `functionalscript` submodule silently discards a staged gitlink.**
+That path's working tree is empty — the submodule is deliberately never checked out — so `git add`
+re-reads nothing and restores HEAD's value over whatever you staged. No error, no warning:
+
+```sh
+git update-index --cacheinfo 160000,cc93a3ca,functionalscript   # staged: cc93a3ca
+git add functionalscript                                        # staged: 5c5da3ac  <- back to HEAD
+```
+
+To move the pin: `git update-index --cacheinfo 160000,<sha>,functionalscript`, and **do not `git add`
+that path afterwards**. Two further cautions, both learned by getting them wrong in one commit:
+
+- **Verify with `git ls-tree HEAD functionalscript` AFTER committing**, never `git diff --cached`
+  before. The staged value is correct right up until the commit that drops it, so the pre-commit
+  check passes and the change is simply absent — visible only in `git show --stat`.
+- **`git update-index --cacheinfo` accepts a SHA that does not exist**, without complaint. The value
+  it stages is not evidence of anything; check it against upstream
+  (`gh api repos/functionalscript/functionalscript/commits/<sha>`).
+
+**Two references to one dependency drift apart.** `package.json`/`package-lock.json` name an npm
+version and the submodule names a commit. Nothing keeps them in step, and only the npm one is what
+actually runs. Move both in the same commit, and state which upstream release the submodule SHA
+corresponds to.
+
 **Each worktree has its OWN `node_modules`, and they drift.** `npm ci` in one does nothing for the
 others, and nothing announces the difference. Two of this repo's three checkouts were found running
 `functionalscript@0.41.0` against a lockfile pinning `0.43.0`, at the same commit as a checkout that
