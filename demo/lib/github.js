@@ -13,15 +13,38 @@
 import { el, anchor } from './dom.js'
 
 /**
- * `main` at the moment Phase 10 closed. The build badge's figures — 494 tests,
- * 492 project-local proofs — are a historical fact about THIS commit, which is
- * the only honest way to put a test count in a document that will outlive the
- * count.
+ * The commit tagged {@link release} — the first tagged release.
+ *
+ * **Links are built from the SHA; the badge displays the tag.** A tag is more
+ * meaningful to a reader, but a tag can be force-moved and a commit cannot, so
+ * what actually goes in an href is the immutable half.
+ *
+ * Nothing at runtime can check that this SHA is still what `v0.10.0` points
+ * at — the page has no network access to ask. That check belongs to the
+ * pre-demo procedure in `demo/todo/showcase-demo.md`, which resolves every
+ * generated href at this exact SHA, and it is the reason the SHA rather than
+ * the tag is what gets resolved.
  */
-export const sha = 'ca9b0bfab98ba9421fb168ab59c3cbe89b2dd4fb'
+export const sha = '96627365f49f9ff7afa33ab11168697a1a383f8f'
 
-/** The short form, for display. */
+/** The release this demo shows. Displayed wherever a version is named. */
+export const release = 'v0.10.0'
+
+/** The short form, for display next to the tag. */
 export const shortSha = sha.slice(0, 7)
+
+/**
+ * Project-local proofs at {@link sha} — the proofs living in this repository's
+ * own modules, counted with `node --test | grep -c '^✔ import("./fjs/'`.
+ *
+ * **Deliberately not `npm test`'s total.** That number includes the vendored
+ * `functionalscript` proofs and therefore depends on whether the submodule
+ * happens to be checked out: the same commit reports 494 in a worktree without
+ * it and 2730 in one with it, both correct and neither comparable. The
+ * project-local count is the only figure that means the same thing in every
+ * checkout, so it is the only one on the badge.
+ */
+export const proofCount = 492
 
 const repo = 'https://github.com/fjs-dev/finance'
 
@@ -47,6 +70,17 @@ export const proofUrl = (path, proofLine) => sourceUrl(path, proofLine)
  */
 export const planningUrl = name =>
     sourceUrl(`.planning/phases/10-form-1040-core-line-16-dispatch-and-the-scope-guard/${name}`)
+
+/**
+ * The GitHub release page for {@link release}.
+ *
+ * This is what the build badge points at, rather than a phase verification
+ * report. The release notes carry "What is NOT here" beside what is — the
+ * production caller that does not exist, the Schedule D branch that refuses,
+ * the unmodeled document types — which is the right thing to hand someone who
+ * clicks a badge on a page making claims.
+ */
+export const releaseUrl = `${repo}/releases/tag/${release}`
 
 /**
  * One entry in a step's source footer. A missing `proofLine` omits the proof

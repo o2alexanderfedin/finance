@@ -9,10 +9,10 @@
 >
 > - **All eight steps were built**, not only the six "must" ones. Exactness,
 >   Parameters and Sandbox turned out to be cheap once the engine was loading.
-> - **Source links pin `ca9b0bf`** — `main`'s tip after Phase 10 merged — and
->   not `1309e8f` as written below. Same reasoning, better commit: it is the
->   one the badge's "494/494 · 492 proofs" was actually measured at, and it
->   contains `1309e8f`. Every linked path was verified to exist at it.
+> - **Source links pin the `v0.10.0` release**, not `1309e8f` as originally
+>   written. They were `ca9b0bf` between the build and the release; re-pointing
+>   is described under "Re-pinning to a later release" below, including the
+>   `#L`-anchor check that a plain path-exists check misses.
 > - **`functionalscript` is staged from `node_modules`, not the submodule.**
 >   The submodule is not checked out in this working tree; `npm ci` installs
 >   the same package `package.json` pins, which is what the 492 proofs run
@@ -209,10 +209,8 @@ is much better that they hear them from us.
 
 Every page footers to `source ↗` and `proof ↗`.
 
-Pinned to **`1309e8f0a219d583bc48dc77a7a2f03aab39ce20`** on
-`feature/phase-10-form-1040-core-and-scope-guard`, in `fjs-dev/finance`. A commit SHA,
-never `main` — GitHub serves commit-pinned blobs permanently whether or not the branch is
-merged, and a branch-name link rots on the next push.
+Pinned to the **`v0.10.0`** release — commit
+`96627365f49f9ff7afa33ab11168697a1a383f8f` in `fjs-dev/finance`.
 
 ```js
 // lib/github.js
@@ -220,10 +218,36 @@ export const sourceUrl = (path, line) =>
     `https://github.com/fjs-dev/finance/blob/${SHA}/${path}${line ? `#L${line}` : ''}`
 ```
 
-The shell also shows a build badge reading **494/494 green, 492 project-local proofs**, at
-that SHA, linking to `10-VERIFICATION.md`. Those figures are a historical fact about a
-pinned commit, which is the only honest way to put a test count in a document — see
-STATE.md's note on how every pasted count in this project went stale.
+**The href carries the commit; the page displays the tag.** A tag is more meaningful to a
+reader, but a tag can be force-moved and a commit cannot, so the immutable half is what
+actually gets resolved. Never a branch name — `blob/main/...` rots on the next push.
+
+The build badge reads **`v0.10.0 · 492 proofs`** and opens the GitHub release, which
+states what is in it *and what is not* — the right thing to hand someone who clicks a
+badge on a page making claims.
+
+**The count is the project-local one, never `npm test`'s total.** That total includes the
+vendored `functionalscript` proofs and therefore depends on whether the submodule happens
+to be checked out: the same commit reports **494** in a worktree without it and **2730**
+in one with it, both correct and neither comparable. The project-local figure means the
+same thing in every checkout, which is the only reason it is safe to print.
+
+### Re-pinning to a later release
+
+Four things must be checked together, and the third is the one that gets forgotten:
+
+1. `sha`, `release` and `proofCount` in `demo/lib/github.js` — the single place all three
+   are stated.
+2. Every linked path exists **at the new commit**: `git cat-file -e <sha>:<path>`. Not in
+   the working tree, which is a different question.
+3. **Every `#L` anchor still points at what it claims.** A linked file that gained a line
+   above the anchor silently moves it, and the link still resolves — it just lands
+   somewhere wrong, which is worse than a 404 because nothing looks broken. Resolve each
+   `(path, line)` at the new SHA and read the line back. Moving from `ca9b0bf` to
+   `v0.10.0`, only `AGENTS.md` and `CHANGELOG.md` differed and neither carries an anchor,
+   so all 20 source anchors and all 15 proof anchors were unaffected — verified, not
+   assumed.
+4. The release URL resolves.
 
 ---
 
@@ -236,10 +260,12 @@ and all five pass**:
 1. **It loads from a static file server with no build step.** ✓ Verified twice: against
    the working tree, and against a byte-for-byte simulation of what the Pages workflow
    stages (4.1 MB, root redirect included). All eight steps plus the All view render.
-2. **Every `source ↗` and `proof ↗` link resolves.** ✓ Seventeen distinct paths plus the
-   verification report, each checked with `git cat-file -e <sha>:<path>` **at the pinned
-   commit** rather than in the working tree — the two are not the same question, and only
-   the first one is what GitHub will serve.
+2. **Every `source ↗` and `proof ↗` link resolves, and lands where it claims.** ✓ At
+   `v0.10.0`: 18 distinct paths plus the verification report, each checked with
+   `git cat-file -e <sha>:<path>` **at the pinned commit** rather than in the working
+   tree — not the same question, and only the first is what GitHub serves. Then all 20
+   source anchors and all 15 proof anchors resolved and read back, because a path that
+   exists says nothing about whether `#L159` is still `dispatchLine16`.
 3. **The numbers on screen match the engine.** ✓ Step 2 recomputes both hand-typed
    regression cases live and prints `✓ matches` per case; a disagreement paints a loud
    red callout instead of silently preferring one. Step 1 does the same for CAS
@@ -247,8 +273,10 @@ and all five pass**:
    is not the address of the text on screen.
 4. **No console errors on any step**, including the "All" view. ✓ Zero, after adding an
    inline `data:` favicon to remove the one 404.
-5. **`npm test` still 494/494.** ✓ 494 pass / 0 fail, 492 project-local proofs, `tsc`
-   clean. Nothing under `fjs/` was modified.
+5. **The suite is still green.** ✓ 492 project-local proofs and `tsc` clean, at
+   `v0.10.0`. Gate on the project-local count, never on `npm test`'s total — that total
+   is 494 or 2730 for the same commit depending on whether the `functionalscript`
+   submodule is checked out.
 
 ### How to run it
 
