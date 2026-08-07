@@ -138,7 +138,7 @@ These were established by execution, not inference. Any replan must preserve the
 
 - [x] **Phase 8: TY2025 Parameters and the Tax Table as Data** - Cited parameters and a row-by-row-verified Tax Table (completed 2026-08-05)
 - [x] **Phase 9: Traceable Report Lines and the Anti-Hardcoding Gate** - A line without sources does not typecheck; a constant answer fails the gate (completed 2026-08-05)
-- [ ] **Phase 10: Form 1040 Core, Line-16 Dispatch, and the Scope Guard** - Lines 1a–37, four-way line-16 branch, loud refusal outside scope
+- [x] **Phase 10: Form 1040 Core, Line-16 Dispatch, and the Scope Guard** - Lines 1a–37, four-way line-16 branch, loud refusal outside scope (completed 2026-08-06; 10-10 Task 3's five-site mutation sweep verified and approved by the phase owner, who independently reproduced the mutation-3 type hole and site 2's differential)
 
 ### Week 3 — Breadth in Documents
 
@@ -373,8 +373,18 @@ of it to Phase 14, whose criteria are about tax correctness rather than the exec
   3. The standard deduction applies age and blindness increments, with a proof at each combination the profile can produce.
   4. An unmodeled input produces a **loud refusal naming what is unmodeled**, never a silently omitted line — this is what makes REQ TAX-05's "full line-by-line" claim truthful for a partial engine.
   5. Rounding happens at line boundaries only (`round(sum)`, never `sum(round)`), verified on a line aggregating ten or more documents with real cents.
-**Research**: **YES** — the QDCGT worksheet (~25 lines, the largest single computation in v1) was not read line by line and lives inside `i1040gi` rather than as a standalone PDF.
-**Plans**: TBD
+**Research**: **YES** — the QDCGT worksheet (~25 lines, the largest single computation in v1) was not read line by line and lives inside `i1040gi` rather than as a standalone PDF. Done: `10-RESEARCH.md`.
+**Plans**: 10 plans in 6 waves
+- [x] 10-01-PLAN.md — `qualifyingSurvivingSpouse` as a real filing status, with its stored TY2025 parameters and the threshold-inventory fan-out 42 → 50 (TAX-06) *(wave 1)*
+- [x] 10-02-PLAN.md — The IRS whole-dollar election as an all-or-nothing report projection; `round(sum)` $14 vs `sum(round)` $10 (TAX-05, EXACT-04) *(wave 1)*
+- [x] 10-03-PLAN.md — Tax Computation Worksheet, diffed against all twenty printed rows, plus the tagged level-3 base lookup and the $100,000 seam (TAX-03) *(wave 2, needs 10-01)*
+- [x] 10-04-PLAN.md — `vnd.fjs.return_profile`: the declared return profile dialect, its frozen 50-kind vocabulary, and its `finance_schema` registration (TAX-16, TAX-05, TAX-06) *(wave 2, needs 10-01)*
+- [x] 10-05-PLAN.md — Line 12e: all 19 chart combinations, the Dependents worksheet, and the two hard-zero exceptions (TAX-06) *(wave 2, needs 10-01)*
+- [x] 10-06-PLAN.md — QDCGT's 25 lines and criterion 2's regression pair — $11,174 / $11,163 against a broken engine's $11,175 (TAX-03) *(wave 3, needs 10-03)*
+- [x] 10-07-PLAN.md — `classifyScope`: the 6/44 modeled partition as a `tsc` property, and `scopeRefusal` as the one place a refusal is built (TAX-16) *(wave 3, needs 10-04)*
+- [x] 10-08-PLAN.md — `dispatchLine16`: four branches plus three wrappers, tagged on both arms, with the Schedule D Tax Worksheet refusal (TAX-03, TAX-16) *(wave 4, needs 10-03, 10-06, 10-07)*
+- [x] 10-09-PLAN.md — Form 1040 lines 1a–15 as `ReportLine`s with source union, and criterion 5 over ten real 1099-INT documents (TAX-05, TAX-06) *(wave 5, needs 10-02, 10-04, 10-05, 10-07)*
+- [x] 10-10-PLAN.md — Lines 16–37, the whole-report scope refusal, and the phase mutation sweep checkpoint (TAX-05, TAX-16, TAX-03) *(wave 6, needs 10-08, 10-09)*
 
 **── Milestone: Week 3 — Breadth in Documents ──**
 
@@ -526,7 +536,7 @@ Phases 16-18 are backlog: unordered, independent of each other and of the critic
 | 7. `fjs_run` and Run Records | Week 1 | 0/8 | Planned | - |
 | 8. TY2025 Parameters and Tax Table | Week 2 | 3/4 | In Progress|  |
 | 9. Traceable Report Lines | Week 2 | 8/8 | Complete   | 2026-08-06 |
-| 10. 1040 Core and Scope Guard | Week 2 | 0/TBD | Not started | - |
+| 10. 1040 Core and Scope Guard | Week 2 | 10/10 | Complete   | 2026-08-06 |
 | 11. Wage, Retirement, Benefit Documents | Week 3 | 0/TBD | Not started | - |
 | 12. Brokerage and Capital-Gain Chain | Week 3 | 0/TBD | Not started | - |
 | 13. The 65+ Profile and Schedules | Week 3 | 0/TBD | Not started | - |

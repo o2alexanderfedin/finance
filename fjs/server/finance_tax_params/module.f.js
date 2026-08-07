@@ -283,6 +283,7 @@ export const proof = {
             marriedFilingJointly: '31500.00',
             marriedFilingSeparately: '15750.00',
             headOfHousehold: '23625.00',
+            qualifyingSurvivingSpouse: '31500.00',
         }
         for (const status of Object.keys(expectedStandardDeduction)) {
             const expectedAmount = expectedStandardDeduction[status]
@@ -344,12 +345,18 @@ export const proof = {
             '450.00',
         )
 
-        // ordinaryBrackets — all five filing statuses present (the four
+        // ordinaryBrackets — all six filing statuses present (the five
         // individual statuses plus estatesAndTrusts), and MFJ's first
         // bracket, whose $23,850 ceiling is the figure the whole Tax
         // Table's low end depends on.
+        //
+        // This length assertion, not the expectation loop above, is what
+        // makes an OMITTED status visible: that loop iterates
+        // `expectedStandardDeduction`'s own keys, so a status dropped from
+        // BOTH the response and the expectations would pass it silently.
+        // Confirmed by mutation (Plan 10-01, Task 2, mutation 2).
         const ordinaryBrackets = asObject(field(root, 'ordinaryBrackets'), 'ordinaryBrackets')
-        assertEq(Object.keys(ordinaryBrackets).length, 5)
+        assertEq(Object.keys(ordinaryBrackets).length, 6)
         const mfjBrackets = asObject(
             field(ordinaryBrackets, 'marriedFilingJointly'),
             'ordinaryBrackets.marriedFilingJointly',
@@ -371,10 +378,14 @@ export const proof = {
             '23850.00',
         )
 
-        // capitalGainsBreakpoints — all five statuses present, and one
-        // concrete breakpoint (MFJ).
+        // capitalGainsBreakpoints — all six statuses present, and two
+        // concrete breakpoints (MFJ and QSS), each hand-typed from
+        // fjs/tax/params/module.f.js and read back off the response the
+        // tool ACTUALLY serves — never compared against `response2025` or
+        // against `fjs/tax/params`' own exports, both of which this
+        // module's header records as unable to fail on content.
         const capitalGainsBreakpoints = asObject(field(root, 'capitalGainsBreakpoints'), 'capitalGainsBreakpoints')
-        assertEq(Object.keys(capitalGainsBreakpoints).length, 5)
+        assertEq(Object.keys(capitalGainsBreakpoints).length, 6)
         const mfjBreakpoints = asObject(
             field(capitalGainsBreakpoints, 'marriedFilingJointly'),
             'capitalGainsBreakpoints.marriedFilingJointly',
@@ -386,6 +397,14 @@ export const proof = {
         assertEq(
             asString(field(mfjBreakpoints, 'fifteenRateMax'), 'capitalGainsBreakpoints.marriedFilingJointly.fifteenRateMax'),
             '600050.00',
+        )
+        const qssBreakpoints = asObject(
+            field(capitalGainsBreakpoints, 'qualifyingSurvivingSpouse'),
+            'capitalGainsBreakpoints.qualifyingSurvivingSpouse',
+        )
+        assertEq(
+            asString(field(qssBreakpoints, 'zeroRateMax'), 'capitalGainsBreakpoints.qualifyingSurvivingSpouse.zeroRateMax'),
+            '96700.00',
         )
 
         // taxTableBandStructure — the length (5) AND every region's own

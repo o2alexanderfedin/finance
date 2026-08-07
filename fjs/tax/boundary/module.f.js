@@ -87,9 +87,10 @@ const hasDefinedCeiling = bracket => bracket.ceiling !== undefined
  */
 
 /**
- * Every DEFINED ordinary-bracket ceiling across every filing status -- 27 total (6 each for
- * single/marriedFilingJointly/marriedFilingSeparately/headOfHousehold, 3 for estatesAndTrusts,
- * which has only four brackets and therefore three defined ceilings).
+ * Every DEFINED ordinary-bracket ceiling across every filing status -- 33 total (6 each for the
+ * five individual statuses -- single/marriedFilingJointly/marriedFilingSeparately/headOfHousehold/
+ * qualifyingSurvivingSpouse -- plus 3 for estatesAndTrusts, which has only four brackets and
+ * therefore three defined ceilings).
  * @type {readonly Threshold[]}
  */
 const ordinaryBracketThresholds = allFilingStatuses.flatMap(status =>
@@ -103,7 +104,7 @@ const ordinaryBracketThresholds = allFilingStatuses.flatMap(status =>
 
 /**
  * Both capital-gains breakpoints (`zeroRateMax`, `fifteenRateMax`) across every filing status --
- * 10 total (2 x 5 statuses).
+ * 12 total (2 x 6 statuses).
  * @type {readonly Threshold[]}
  */
 const capitalGainsThresholds = allFilingStatuses.flatMap(status => {
@@ -153,14 +154,21 @@ export const allThresholds = [
 ]
 
 /**
- * The independently-stated expected count of thresholds assembled above -- 27 ordinary-bracket
- * ceilings (6 + 6 + 6 + 6 + 3 across the five filing statuses) + 10 capital-gains breakpoints
- * (2 x 5 statuses) + 5 Tax Table band edges = 42. This exists so a threshold silently dropped
- * during assembly fails an explicit assertion (`everyThresholdIsCovered` below) rather than
- * passing by omission.
+ * The independently-stated expected count of thresholds assembled above -- 33 ordinary-bracket
+ * ceilings (6 + 6 + 6 + 6 + 6 across the five individual filing statuses, + 3 for estates &
+ * trusts) + 12 capital-gains breakpoints (2 x 6 statuses) + 5 Tax Table band edges = 50. This
+ * exists so a threshold silently dropped during assembly fails an explicit assertion
+ * (`everyThresholdIsCovered` below) rather than passing by omission.
+ *
+ * `qualifyingSurvivingSpouse`'s thresholds duplicate `marriedFilingJointly`'s CENTS values while
+ * carrying distinct labels (10-CONTEXT.md Decision 6: the two statuses read the same Rev. Proc.
+ * rows). That leaves `sortedCents`'s de-duplication below unaffected -- it already had duplicate
+ * values to collapse, e.g. the $103,350.00 ceiling shared by `single` and `headOfHousehold` --
+ * and each of the eight new leaves still asserts a real boundary, since the assertion is about
+ * where the count changes, not about the label being unique in cents.
  * @type {number}
  */
-export const expectedThresholdCount = 42
+export const expectedThresholdCount = 50
 
 // ── Tests ────────────────────────────────────────────────────────────────────
 
@@ -177,7 +185,7 @@ const sortedCents = [...new Set(allThresholds.map(threshold => threshold.cents))
 
 /**
  * One generated proof leaf per stored threshold -- built by mapping `allThresholds` into
- * `[label, assertion]` pairs via `Object.fromEntries`, never as a hand-written literal with 42
+ * `[label, assertion]` pairs via `Object.fromEntries`, never as a hand-written literal with 50
  * manually authored keys. Each leaf asserts the boundary is crossed at EXACTLY the threshold's
  * own cent: one cent before must count strictly fewer boundaries reached than the threshold
  * itself, and the threshold must count the same number of boundaries reached as one cent after

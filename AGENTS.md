@@ -86,7 +86,7 @@ These are cited by name throughout the source. They are stated here so the citat
 A green suite proves nothing on its own. **Break the code on purpose and confirm the suite goes
 red.** If it stays green, the proof is decoration and the code is unproven.
 
-This is not a style preference. This project has shipped the same defect three times — a proof whose
+This is not a style preference. This project has shipped the same defect four times — a proof whose
 expected side was not independent of the code under test — and each time the suite was fully green:
 
 | Phase | The defect | Suite when the shipped code was mutated |
@@ -94,8 +94,16 @@ expected side was not independent of the code under test — and each time the s
 | 7 | Every fixture was keyed at the same wrong path the buggy code asked for, so the proof mirrored the bug | 185 proofs, all green |
 | 9 | The zero-read rule existed twice; every proof exercised the copy that did not ship | 258 green |
 | 8 | `finance_tax_params` compared its output against the very object that produced it | 262 green |
+| 10 | `unknownDialectRefused` built its iteration set from `Object.keys(dialectSchemas)` — the code under test — so unregistering a dialect removed it from the proof's own loop in the same instant | caught by an executor's mutation before it shipped |
 
-Nothing was found by reading. All three were found by mutating.
+Nothing was found by reading. Every one was found by mutating.
+
+**The fourth is the subtlest, and the shape to watch for: a proof that iterates over a collection
+derived from the thing it is testing can never notice that collection shrinking.** `Object.keys`,
+`Object.entries`, `.map` over an exported list — each silently makes the test's coverage a function
+of the code's own contents. The fix is the same idiom already used by `expectedMoneyBoxFieldCount`
+and `expectedThresholdCount`: a **hand-typed count**, asserted alongside, so deleting an entry
+fails the count even when the loop happily iterates one item fewer.
 
 **The rules that follow from it:**
 
@@ -170,6 +178,82 @@ the next feedback pass does not revert it back.
 **`npm test --prefix <dir>` does not run that directory's tests.** It sets the package location but
 runs the script in the current working directory, so it will happily report a different tree green.
 Use `( cd <dir> && npm test )` — in a subshell, because a bare `cd` persists across later commands.
+
+### The mutation that deletes the last use of a binding does not compile
+
+By far the most common way a written-down mutation turns out to be unrunnable. `tsconfig` sets
+`noUnusedLocals` and `noUnusedParameters`, so a mutation that removes an expression can orphan the
+import or `const` that fed it, and `tsc` stops at `TS6133`/`TS6192` — the tests never run and you
+have measured the compiler. It has happened repeatedly: replacing `halfUp(of(cents / 100n)(1n))`
+with `(cents / 100n)` orphaned two imports; dropping a `&&` term from a condition orphaned its
+destructured binding three separate times in one plan.
+
+**When specifying a mutation, check what stops being referenced.** When executing one that fails
+this way, do not abandon it and do not silently substitute — re-run the *semantically identical*
+edit in a form that keeps the binding live, and record both the compile error and the real result:
+
+```
+(cents / 100n) * 100n          ->  halfUp(of(cents / 100n)(1n)) * 100n   // keeps `of`/`halfUp` used
+delete the `spouseItemizes` term  ->  (spouseItemizes && false)          // keeps the binding used
+```
+
+### The equivalent mutant: a mutation a neighbouring operation absorbs
+
+The second way a written-down mutation turns out not to bite. It compiles, it applies cleanly, it
+changes the source — and it cannot turn red at **any** input, because an adjacent operation already
+enforces what the mutated token enforced.
+
+Found in QDCGT line 3, written as `s15 <= 0 || s16 <= 0 ? 0n : min(s15, s16)`. Weakening `<= 0n` to
+`< 0n` is a no-op: the `min` two tokens later already returns `0` when either amount is `0`, so the
+whole guard is just `max(min(s15, s16), 0n)` and the printed page's "blank or a loss" clause is
+absorbed by an operation the plan never considered.
+
+So when a mutation comes back green, **do not assume you mis-ran it.** Ask whether a neighbour makes
+it unobservable — and if so, say so at the site, because you have discovered a property of the code
+nobody had written down. Then re-run the same intent in a form that does bite (`(x <= 0n && false)`)
+to confirm the leaf is load-bearing after all.
+
+Three failure modes now, in the order they occur: the mutation does not compile (orphaned binding),
+the mutation compiles but is absorbed (equivalent mutant), or the mutation bites but on a different
+set of leaves than predicted.
+
+### A mutation's predicted red set is itself a claim, and it is often wrong
+
+Predictions have been wrong in both directions, and each error was informative rather than
+cosmetic:
+
+- `standardDeduction[status]` → `.single` was predicted to redden every non-single row (14) and
+  reddened **11**. Married-filing-separately stayed green — because MFS genuinely shares single's
+  `15,750` base. The failed prediction re-proved the trap the plan existed to guard.
+- Deleting `min(line23, line24)` was predicted to redden three worked cases and reddens **two**;
+  in the other three, line 23 is already the smaller, so the deletion is a no-op.
+
+So **record the leaves that stayed green, with the arithmetic that made them green.** A mutation
+turning everything red proves less than one turning exactly the predicted set red, and a surprise
+in either direction usually means the code has a property nobody had written down.
+
+### Concurrent work invalidates a mutation observation
+
+`npm test` is `tsc && node --test`, and **`tsc` is repo-wide**. So when two agents work in the same
+checkout, one agent's half-finished file fails the typecheck, `node --test` never runs, and the
+other agent's `npm test` goes red for a reason that has nothing to do with the mutation it is
+measuring. Observed: a wave-1 executor saw `TS6133: 'assertNotNullish' is declared but never read`
+from a sibling's in-flight file while mutating a module it did not share a single line with.
+
+**A red you did not cause confirms a mutation that never worked** — which is worse than a missed
+failure, because it gets written down as evidence.
+
+If you must measure while someone else is mid-edit, run the *gated command only* against a
+snapshot, and keep the mutation edit and every `git diff --numstat` on the real tracked file:
+
+```
+tar --exclude=.git -cf - . | (mkdir -p /tmp/snap && tar -xf - -C /tmp/snap)
+( cd /tmp/snap && npm test )
+```
+
+`--exclude=.git` matters. The `cp -a` recipe above shares the real repo's git directory, so a git
+command run inside that copy writes to the real repo; a `tar` snapshot has no git directory at all
+and cannot. Confirm the result in the real tree once the other agent commits.
 
 ## Verifying a claim before you record it
 

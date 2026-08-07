@@ -1,7 +1,7 @@
 /**
  * TY2025 tax parameters (TAX-01): the standard deduction, the aged/blind
  * additional amounts, the dependent standard-deduction cap, the ordinary
- * rate brackets for all five filing statuses, and the capital-gains rate
+ * rate brackets for all six filing statuses, and the capital-gains rate
  * breakpoints — stored as compiled-in reference data, each individual
  * parameter carrying its OWN citation object rather than one shared,
  * document-level citation string.
@@ -75,9 +75,15 @@ import { centsFromString, centsToString } from '../../exact/module.f.js'
  */
 
 /**
- * The four filing statuses Publication 1040's own Tax Table prints
- * columns for.
- * @typedef {'single' | 'marriedFilingJointly' | 'marriedFilingSeparately' | 'headOfHousehold'} IndividualFilingStatus
+ * The five individual filing statuses Form 1040 (2025) prints on its own
+ * face. Publication 1040's Tax Table prints only FOUR columns — there is
+ * no qualifying-surviving-spouse column — and a QSS filer reads the
+ * married-filing-jointly column. That mapping is `taxTableColumnFor` in
+ * `fjs/tax/table`, stated once there and never an implicit assumption
+ * here: QSS is a status in its own right in this module, with its own
+ * stored parameters (10-CONTEXT.md Decision 6), because its dollar
+ * amounts equal MFJ's while its maximum age/blindness box count does not.
+ * @typedef {'single' | 'marriedFilingJointly' | 'marriedFilingSeparately' | 'headOfHousehold' | 'qualifyingSurvivingSpouse'} IndividualFilingStatus
  */
 
 /**
@@ -112,10 +118,14 @@ import { centsFromString, centsToString } from '../../exact/module.f.js'
  */
 
 /**
- * The four filing statuses Publication 1040's own Tax Table prints
- * columns for (excludes `'estatesAndTrusts'`, which has no printed Tax
- * Table column). Exported so later modules iterate this list instead of
- * hand-typing the same four status names repeatedly.
+ * The five individual filing statuses Form 1040 (2025) prints on its own
+ * face (excludes `'estatesAndTrusts'`, which is not an individual filing
+ * status at all). Publication 1040's Tax Table prints only FOUR columns;
+ * a qualifying-surviving-spouse filer reads the married-filing-jointly
+ * column, via `taxTableColumnFor` in `fjs/tax/table` — never by this list
+ * being assumed to line up one-for-one with the printed columns.
+ * Exported so later modules iterate this list instead of hand-typing the
+ * same status names repeatedly.
  * @type {readonly IndividualFilingStatus[]}
  */
 export const individualFilingStatuses = [
@@ -123,6 +133,7 @@ export const individualFilingStatuses = [
     'marriedFilingJointly',
     'marriedFilingSeparately',
     'headOfHousehold',
+    'qualifyingSurvivingSpouse',
 ]
 
 /**
@@ -154,6 +165,18 @@ export const standardDeduction = {
     },
     headOfHousehold: {
         amount: '23625.00',
+        citation: { revProc: '2025-32', section: '§3.01', effectiveDate: '2025-01-01' },
+    },
+    // Rev. Proc. 2025-32 §3.01's table names one row "Married Individuals
+    // Filing Joint Returns and Surviving Spouses" — a qualifying surviving
+    // spouse reads THAT row, which is why the citation below is identical
+    // to marriedFilingJointly's rather than a new one. The amount is
+    // hand-typed from that table, deliberately NOT spread from
+    // `standardDeduction.marriedFilingJointly`: a spread would move QSS
+    // silently whenever MFJ's figure was mutated, so nothing could ever
+    // observe the two statuses drifting apart.
+    qualifyingSurvivingSpouse: {
+        amount: '31500.00',
         citation: { revProc: '2025-32', section: '§3.01', effectiveDate: '2025-01-01' },
     },
 }
@@ -256,6 +279,24 @@ export const ordinaryBrackets = {
             { ratePercent: 37, ceiling: undefined },
         ],
     },
+    // Rev. Proc. 2024-40 §2.01 Table 1 — the same table
+    // `marriedFilingJointly` above reads, since that table covers "Married
+    // Individuals Filing Joint Returns and Surviving Spouses". Every
+    // ceiling below is hand-typed from that table, deliberately NOT spread
+    // from `ordinaryBrackets.marriedFilingJointly`, for the reason stated
+    // on `standardDeduction.qualifyingSurvivingSpouse`.
+    qualifyingSurvivingSpouse: {
+        citation: { revProc: '2024-40', section: '§2.01', effectiveDate: '2025-01-01' },
+        brackets: [
+            { ratePercent: 10, ceiling: '23850.00' },
+            { ratePercent: 12, ceiling: '96950.00' },
+            { ratePercent: 22, ceiling: '206700.00' },
+            { ratePercent: 24, ceiling: '394600.00' },
+            { ratePercent: 32, ceiling: '501050.00' },
+            { ratePercent: 35, ceiling: '751600.00' },
+            { ratePercent: 37, ceiling: undefined },
+        ],
+    },
     estatesAndTrusts: {
         citation: { revProc: '2024-40', section: '§2.01', effectiveDate: '2025-01-01' },
         brackets: [
@@ -291,6 +332,14 @@ export const capitalGainsBreakpoints = {
     single: {
         zeroRateMax: '48350.00',
         fifteenRateMax: '533400.00',
+        citation: { revProc: '2024-40', section: '§2.03', effectiveDate: '2025-01-01' },
+    },
+    // Rev. Proc. 2024-40 §2.03 — hand-typed from the same "Married Filing
+    // Jointly and Surviving Spouses" row, deliberately NOT spread from
+    // `capitalGainsBreakpoints.marriedFilingJointly`.
+    qualifyingSurvivingSpouse: {
+        zeroRateMax: '96700.00',
+        fifteenRateMax: '600050.00',
         citation: { revProc: '2024-40', section: '§2.03', effectiveDate: '2025-01-01' },
     },
     estatesAndTrusts: {
@@ -376,6 +425,7 @@ export const proof = {
             marriedFilingJointly: '31500.00',
             marriedFilingSeparately: '15750.00',
             headOfHousehold: '23625.00',
+            qualifyingSurvivingSpouse: '31500.00',
         }
         for (const status of individualFilingStatuses) {
             const entry = standardDeduction[status]
@@ -424,7 +474,7 @@ export const proof = {
             assertEq(centsToString(centsFromString(value)), value)
         }
     },
-    // T-08-06-01: every ordinary bracket ceiling AND rate, for all five
+    // T-08-06-01: every ordinary bracket ceiling AND rate, for all six
     // filing statuses, asserted against Rev. Proc. 2024-40 §2.01, Tables
     // 1-5, read directly from the published PDF (rp-24-40.pdf, pages
     // 5-7) — independent of this module's own stored data, so a wrong
@@ -436,7 +486,10 @@ export const proof = {
     // status's final bracket has ceiling `undefined` (no ceiling), and
     // single/MFS are identical through 32% (250,525) but diverge at 35%
     // (626,350 vs 375,800), while HoH's 32% ceiling (250,500) is $25 below
-    // single/MFS's.
+    // single/MFS's. Rev. Proc. 2024-40 §2.01's Table 1 covers "Married
+    // Individuals Filing Joint Returns and Surviving Spouses", so MFJ and
+    // QSS are each transcribed from that one table INDEPENDENTLY below —
+    // both hand-typed, neither derived from the other.
     everyOrdinaryBracketMatchesRevProc202440Tables1Through5: () => {
         /**
          * @type {Record<FilingStatus, readonly { readonly ratePercent: number, readonly ceiling: string | undefined }[]>}
@@ -478,6 +531,15 @@ export const proof = {
                 { ratePercent: 35, ceiling: '375800.00' },
                 { ratePercent: 37, ceiling: undefined },
             ],
+            qualifyingSurvivingSpouse: [
+                { ratePercent: 10, ceiling: '23850.00' },
+                { ratePercent: 12, ceiling: '96950.00' },
+                { ratePercent: 22, ceiling: '206700.00' },
+                { ratePercent: 24, ceiling: '394600.00' },
+                { ratePercent: 32, ceiling: '501050.00' },
+                { ratePercent: 35, ceiling: '751600.00' },
+                { ratePercent: 37, ceiling: undefined },
+            ],
             estatesAndTrusts: [
                 { ratePercent: 10, ceiling: '3150.00' },
                 { ratePercent: 24, ceiling: '11450.00' },
@@ -498,7 +560,7 @@ export const proof = {
         }
     },
     // T-08-06-01 (capital gains side): every capital-gains breakpoint —
-    // both the zero-rate and 15%-rate maximum — for all five filing
+    // both the zero-rate and 15%-rate maximum — for all six filing
     // statuses, asserted against Rev. Proc. 2024-40 §2.03, read directly
     // from the published PDF (rp-24-40.pdf, pages 7-8). Asserted per
     // status, per field, so a single wrong figure names itself.
@@ -509,6 +571,7 @@ export const proof = {
             marriedFilingSeparately: { zeroRateMax: '48350.00', fifteenRateMax: '300000.00' },
             headOfHousehold: { zeroRateMax: '64750.00', fifteenRateMax: '566700.00' },
             single: { zeroRateMax: '48350.00', fifteenRateMax: '533400.00' },
+            qualifyingSurvivingSpouse: { zeroRateMax: '96700.00', fifteenRateMax: '600050.00' },
             estatesAndTrusts: { zeroRateMax: '3250.00', fifteenRateMax: '15900.00' },
         }
         for (const status of allFilingStatuses) {
@@ -517,6 +580,57 @@ export const proof = {
             assertEq(entry.zeroRateMax, expectedEntry.zeroRateMax, ['zero-rate max mismatch', status])
             assertEq(entry.fifteenRateMax, expectedEntry.fifteenRateMax, ['fifteen-rate max mismatch', status])
         }
+    },
+    // 10-CONTEXT.md Decision 6: a qualifying surviving spouse reads the
+    // SAME Rev. Proc. rows a married-filing-jointly filer does — Rev.
+    // Proc. 2025-32 §3.01's "Married Individuals Filing Joint Returns and
+    // Surviving Spouses" and Rev. Proc. 2024-40 §2.01 Table 1 / §2.03's
+    // matching row — so every dollar figure the two statuses carry here is
+    // equal.
+    //
+    // What this leaf is, and what it is NOT. It pins the RELATIONSHIP the
+    // Rev. Proc. tables state, not the values: the values are pinned
+    // independently, against the published tables, by the hand-typed
+    // expectations in `standardDeductionCitesObbbaRevision`,
+    // `everyOrdinaryBracketMatchesRevProc202440Tables1Through5` and
+    // `everyCapitalGainsBreakpointMatchesRevProc202440Section203` above.
+    // So this leaf comparing stored data against stored data is NOT the
+    // tautology AGENTS.md warns about — it is a second, deliberately
+    // weaker check layered on top of a primary-source one, and it is what
+    // catches the failure mode the primary-source checks cannot: a future
+    // edit that updates ONE of the two statuses (data and expectation
+    // together, consistently) and forgets the other. Equality is asserted
+    // field by field, never as one deep comparison, so a single divergence
+    // names itself.
+    //
+    // It is also why neither status is stored as a spread of the other:
+    // with a spread this leaf could never fail, and the drift it exists to
+    // detect would be unrepresentable.
+    qssParametersEqualMfjAndAreStoredIndependently: () => {
+        assertEq(
+            standardDeduction.qualifyingSurvivingSpouse.amount,
+            standardDeduction.marriedFilingJointly.amount,
+            'expected QSS and MFJ to share Rev. Proc. 2025-32 §3.01\'s standard deduction',
+        )
+        const qssBrackets = ordinaryBrackets.qualifyingSurvivingSpouse.brackets
+        const mfjBrackets = ordinaryBrackets.marriedFilingJointly.brackets
+        assertEq(qssBrackets.length, mfjBrackets.length, 'expected QSS and MFJ bracket counts to agree')
+        for (const [index, mfjBracket] of mfjBrackets.entries()) {
+            const qssBracket = qssBrackets[index]
+            assert(qssBracket !== undefined, ['expected a QSS bracket at this index', index])
+            assertEq(qssBracket.ratePercent, mfjBracket.ratePercent, ['QSS/MFJ bracket rate drift', index])
+            assertEq(qssBracket.ceiling, mfjBracket.ceiling, ['QSS/MFJ bracket ceiling drift', index])
+        }
+        assertEq(
+            capitalGainsBreakpoints.qualifyingSurvivingSpouse.zeroRateMax,
+            capitalGainsBreakpoints.marriedFilingJointly.zeroRateMax,
+            'QSS/MFJ zero-rate max drift',
+        )
+        assertEq(
+            capitalGainsBreakpoints.qualifyingSurvivingSpouse.fifteenRateMax,
+            capitalGainsBreakpoints.marriedFilingJointly.fifteenRateMax,
+            'QSS/MFJ fifteen-rate max drift',
+        )
     },
     // Estates & Trusts uses only 4 rates (10/24/35/37%) — no
     // 12%/22%/32% bracket for this status; not an omission.
