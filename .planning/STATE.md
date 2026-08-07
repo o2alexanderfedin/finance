@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
-status: executing
-stopped_at: Phase 10 COMPLETE — all ten plans shipped and 10-10 Task 3's five-site mutation sweep verified and approved by the phase owner. Phase 11 not started; verification dispatched separately.
-last_updated: "2026-08-06T22:31:27.027Z"
+status: paused
+stopped_at: PAUSED 2026-08-06 22:20 PDT. Phase 10 complete, verified PASS 5/5, merged to main, CI green. The stakeholder showcase for 2026-08-07 is BUILT and verified — all eight steps, run it with ./demo/serve.sh. Public hosting is DEFERRED pending a decision with Sergey, because a demo that runs the real engine in a public page publishes the real engine (see demo/todo/showcase-demo.md). Phases 11-14 remain in the requested autonomous scope; Phase 11 is next and not started.
+last_updated: "2026-08-07T05:22:00.000Z"
 last_activity: 2026-08-06
 progress:
   total_phases: 18

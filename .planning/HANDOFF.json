@@ -1,43 +1,59 @@
 {
   "version": "1.0",
-  "timestamp": "2026-08-06T18:00:00.000Z",
-  "phase": "09",
-  "phase_name": "Traceable Report Lines and the Anti-Hardcoding Gate",
-  "phase_dir": ".planning/phases/09-traceable-report-lines-and-the-anti-hardcoding-gate",
-  "plan": 8,
-  "task": 8,
-  "total_tasks": 8,
-  "status": "phases_8_and_9_complete_pr_stack_consolidated",
-  "branch": "feature/phase-08-ty2025-parameters-and-the-tax-table-as-data",
-  "head": "6e220e4",
+  "timestamp": "2026-08-07T02:00:00.000Z",
+  "phase": "10",
+  "phase_name": "Form 1040 Core, Line-16 Dispatch, and the Scope Guard",
+  "phase_dir": ".planning/phases/10-form-1040-core-line-16-dispatch-and-the-scope-guard",
+  "plan": 10,
+  "task": 3,
+  "total_tasks": 10,
+  "status": "phase_10_complete_verified_and_merged",
+  "branch": "feature/phase-10-form-1040-core-and-scope-guard",
+  "head": "ca9b0bf",
   "verified_at_head": {
-    "npm_test": "320 pass / 0 fail",
+    "npm_test": "494 pass / 0 fail",
     "tsc": "clean",
-    "project_local_proofs": 318,
+    "project_local_proofs": 492,
     "integration": "1 pass / 0 fail",
-    "functionalscript": "0.43.0",
+    "ci_on_main": "build: success",
+    "open_prs": 0,
     "note": "Do not quote these later. Re-measure: node --test 2>&1 | grep -c '^✔ import(\"./fjs/'"
   },
+  "most_time_critical": {
+    "what": "The stakeholder demo (2026-08-07) is BUILT and verified. It is presented from a laptop: run ./demo/serve.sh and open http://localhost:8000/demo/. All eight steps shipped, not only the six 'must' ones.",
+    "spec": "demo/todo/showcase-demo.md",
+    "run": "./demo/serve.sh",
+    "open_decision": "Whether the engine repository and the demo become public — one decision, not two. See demo-hosting below.",
+    "ship_order": ["What this is", "Documents", "Line 16", "The Return", "Refusal", "All", "Exactness", "Parameters", "Sandbox"],
+    "settled_do_not_relitigate": [
+      "The demo imports the REAL engine as ES modules — every fjs/ module is pure and functionalscript's virtual fs has no node: imports. Zero dependencies, zero build, static hosting.",
+      "WASM with a POSIX filesystem is the WRONG answer to the import() question: forbidden dependency, and it undermines the pitch by implying the jail is what makes it safe. The guest never calls import() — it EMITS an import effect, and a blob: URL satisfies it in ~10 lines.",
+      "The sandbox claim is narrower than 'it cannot reach the network' — see boundaries.",
+      "A demo that runs the real engine in a public page publishes the real engine. The browser has to download fjs/** to execute it, so no hosting arrangement — separate public repo, cross-repo token, vendored snapshot — avoids the disclosure. A read token for a private repo stored in a public repo is strictly worse: exfiltratable by any workflow edit, and it does not prevent what it appears to protect.",
+      "Every source/proof link and the build badge point at github.com/fjs-dev/finance, which is PRIVATE. They resolve for org members (so a laptop demo is fine) and 404 for everyone else. Repo visibility and demo hosting are therefore one decision."
+    ]
+  },
   "completed_this_session": [
-    {"id": "consolidation", "name": "Merged the whole PR stack (#32, #38, #39, #40, #41) into this branch; took fjs 0.43.0", "status": "done"},
-    {"id": "merge-fix-1", "name": "Reconciled subjectOnlyWithoutParentsPersistsPinnedFalse with #38's corrected pin semantics", "status": "done"},
-    {"id": "merge-fix-2", "name": "Restored the tax/table $100,000 refusal content assertion the feedback pass had weakened", "status": "done"},
-    {"id": "merge-fix-3", "name": "Restored the fjs_run/snapshot absent-hash content assertion, weakened silently with no textual conflict", "status": "done"}
+    {"id": "10-01..10-10", "name": "Phase 10 — ten plans, six waves, 318 to 492 project-local proofs", "status": "done"},
+    {"id": "10-VERIFICATION", "name": "gsd-verifier PASS 5/5, 40 mutations in an isolated copy, every tax figure re-derived by hand", "status": "done"},
+    {"id": "gap-closure", "name": "spouseItemizes and dualStatusAlien reached standardDeductionCents unwatched — an MFS filer whose spouse itemizes could take $22,150 instead of $0 with the suite green. Two through-the-profile leaves, no production change.", "status": "done"},
+    {"id": "consolidation", "name": "PR #44 merged to main, CI green; all worktrees synced; 0 open PRs", "status": "done"},
+    {"id": "demo-spec", "name": "demo/todo/showcase-demo.md written and committed", "status": "done"},
+    {"id": "demo-build", "name": "The showcase is BUILT — all eight steps plus the All view, importing the real engine as ES modules. 494/494, tsc clean, zero console errors, 17/17 links verified to exist at the pinned commit. Run it with ./demo/serve.sh", "status": "done"},
+    {"id": "demo-hosting", "name": "Public hosting DEFERRED pending a decision with Sergey. Not a plumbing problem: the browser must download fjs/** to execute it, so any world-readable deployment publishes the engine source (37 files, ~950 KB, rationale comments included). A separate public repo does not avoid it — the same bytes must reach the browser. Reasoning is in demo/todo/showcase-demo.md and at the top of .github/workflows/pages.yml.", "status": "open"}
   ],
   "blockers": [],
   "human_actions_pending": [
-    {
-      "action": "Phases 16-18 are recorded but undecided",
-      "context": "MAINT-01 (orphan ingestion island: wire or delete), MAINT-02..05 (documentation truth), MAINT-06..08 (duplicated step sequence, copy-pasted checks). fjs 0.43.0 is now done. All T3, none blocking v1.",
-      "blocking": false
-    }
+    {"action": "Review demo/todo/showcase-demo.md, then build in ship order", "context": "Demo is tomorrow. The spec's testing section lists five checks that must pass before presenting, including a link check — a 404 on screen is worse than a missing link.", "blocking": false},
+    {"action": "Three claims nobody has checked against paper", "context": "(1) the 2025 Form 1040 face's 56-line inventory and printed labels; (2) the 19 chart amounts vs f1040s.pdf p4; (3) research assumption A2, that the Tax Computation Worksheet is cent-exact not whole-dollar — exactly one value moves, QDCGT case (iv) line 24, $184,094.50 vs $184,095.00.", "blocking": false},
+    {"action": "Two documentation errors found but not fixed", "context": "REQUIREMENTS.md TAX-10 says the Social Security Benefits Worksheet is 19 lines; it is 18. ROADMAP.md constraint 4 names 1099-DIV boxes 2b/2d as forcing Schedule D; i1040gi p31 Exception 1 names 2b, 2c AND 2d. Fix during Phase 11 or 13 planning.", "blocking": false}
   ],
   "decisions": [
-    {"decision": "The six PRs were consolidated by merging origin/chore/apply-feedback, not by choosing between lineages", "rationale": "They were never divergent implementations. merge-base(HEAD, phase-09 lineage) is this branch's own 08-05 commit, and shared modules were byte-identical. chore/apply-feedback transitively contained main, #32, #38, #39 and #40, so a single merge collapsed the stack.", "phase": "09"},
-    {"decision": "A refusal proof asserts WHAT was thrown, never merely THAT something was", "rationale": "A feedback pass rewrote two refusal proofs as bare `throw: {}` leaves on the false premise that a .f.js module cannot catch — fjs/exec/module.f.js catches in shipped production code. The `throw:` form passes for any throw: mutating the tax-table refusal's `<` to `<=` still throws, via an unrelated path. Both content assertions are restored and carry MERGE NOTEs.", "phase": "09"},
-    {"decision": "A clean merge is verified by diffing proof-leaf sets of both parents against the result", "rationale": "The snapshot regression carried NO textual conflict and merged silently. A name-set diff is necessary but not sufficient — a leaf can keep its name and lose its assertions — so an assertion-count delta per changed file is checked too.", "phase": "09"}
+    {"decision": "The demo tells the truth about three boundaries on slide one", "rationale": "The engine is proven but has no production caller (Phase 14 owns end-to-end); the Schedule D branch refuses by design (Phase 12); and guest bodies run with host privileges — effect-whitelist refusal and the pre-execution specifier gate are real, guest-body isolation is not. Step 7 was sketched as 'watch it refuse network access', checked before the spec was written, and the codebase turned out to be honest about not having it. Telling a finance audience what is not yet defended buys more credibility than a claim they can poke a hole in.", "phase": "demo"},
+    {"decision": "The spec lives in demo/todo/, not docs/superpowers/specs/", "rationale": "AGENTS.md puts specs in a todo/ next to the code they concern and warns that a second planning location drifts from the one people edit. It is also the first file in demo/, which is the prescribed order: write the spec there before implementing.", "phase": "demo"},
+    {"decision": "Source links pin a commit SHA, never a branch name", "rationale": "GitHub serves commit-pinned blobs permanently whether or not the branch is merged; a branch-name link rots on the next push.", "phase": "demo"}
   ],
   "uncommitted_files": [],
-  "next_action": "Phase 10 — Form 1040 Core, Line-16 Dispatch, and the Scope Guard (TAX-03/05/06/16). ROADMAP marks Research: YES (QDCGT and Schedule D Tax Worksheets). Alternatively clear backlog Phases 16-18.",
-  "context_notes": "The consolidation blocker dissolved under measurement rather than needing a decision — the same way the earlier phase-7 merge question did. The lesson worth carrying: when branches look divergent, compute the merge-base and hash the shared files before treating it as a judgment call. The session's other finding is a refinement of the project's central rule: a green suite after a clean merge proves nothing either. Coverage can be lost with zero conflicts, so both parents' proof sets and per-file assertion counts are compared against the result. Still true and still the most valuable thing here: a red mutation means the tests and the code AGREE, not that the code is right."
+  "next_action": "If the demo is still tomorrow: review demo/todo/showcase-demo.md and build in ship order. Otherwise resume /gsd-autonomous at Phase 11 (Wage, Retirement, and Benefit Documents — W-2, SSA-1099, 1099-R, the document library, the retraction story). Phases 11-14 remain in the requested scope.",
+  "context_notes": "Phase 10 found fourteen plan defects and NOT ONE was a wrong tax number — research, planning, two review rounds and six executors independently reproduced every figure without correction. Every defect was in the machinery that proves the arithmetic: mutations that could not compile because removing an expression orphaned its binding, mutations a neighbouring operation absorbed, mutations mandated at gates whose leaves did not exist yet, acceptance tallies that excluded the very mutation closing a blocker, and a type guard that only worked against fresh object literals. Verification machinery fails silently and in the direction of looking successful. Four AGENTS.md sections came out of this, including a FOURTH instance of the signature defect: a proof iterating Object.keys() of the code under test, which could never notice an entry being deleted. The sharpest single artifact: swapping the line-16 dispatcher's condition order returns IDENTICAL cents on every ordinary return — only the method tag catches it, so a suite of realistic test returns would have shipped it fully green."
 }
