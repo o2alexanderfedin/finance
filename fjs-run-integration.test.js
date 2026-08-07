@@ -44,7 +44,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
-import { mkdtempSync, existsSync, rmSync } from 'node:fs'
+import { mkdtempSync, existsSync, rmSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -209,6 +209,15 @@ test(
             const initResponse = await waitForId(initId)
             assert.ok(!('error' in initResponse), `initialize failed: ${JSON.stringify(initResponse)}`)
             assert.equal(initResponse.result.serverInfo.name, 'finance-mcp')
+            // The advertised version must be the released one. `financeConfig`
+            // carries it as a LITERAL — it is a pure module with no filesystem
+            // to read the manifest from — so this is the only place the two can
+            // be compared, and without it a release that bumps `package.json`
+            // and forgets the server would ship a wrong version silently.
+            assert.equal(
+                initResponse.result.serverInfo.version,
+                JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')).version,
+                'MCP serverInfo.version must equal package.json version — bump both together')
 
             // ── tools/list, read at runtime (TEST-02) — never a hardcoded
             // array, so a tool added later without integration coverage

@@ -152,10 +152,17 @@ export const financeMcpHandlers = home => cacheKey => fromRegistry([
  * Static MCP configuration for the `finance` server: advertises the `tools`
  * capability, identifies as our own server (never fjs's own CAS server
  * identity), and pins the protocol version to `2025-11-25` per MCP-03.
+ *
+ * **`version` must equal `package.json`'s.** It is a literal because this is a
+ * pure module — there is no filesystem here to read the manifest from — so the
+ * two can drift, and a server advertising a version it is not is worse than
+ * one advertising none. `fjs-run-integration.test.js` reads the real manifest
+ * and asserts the advertised value against it, which is the only place that
+ * comparison can be made; bump both together.
  * @type {McpConfig}
  */
 export const financeConfig = {
-    serverInfo: { name: 'finance-mcp', version: '0.0.0' },
+    serverInfo: { name: 'finance-mcp', version: '0.10.0' },
     capabilities: { tools: {} },
     protocolVersion: '2025-11-25',
 }
