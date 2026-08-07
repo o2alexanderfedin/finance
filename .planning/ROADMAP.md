@@ -531,12 +531,12 @@ Phases 16-18 are backlog: unordered, independent of each other and of the critic
 | 2. Server Skeleton and Registration | Week 0 | 3/3 | Complete | verified 11/11 |
 | 3. The Restricted Interpreter | Week 1 | 2/2 | Complete | verified 11/11 |
 | 4. Exact Arithmetic | Week 1 | 2/2 | Complete | verified 10/10 |
-| 5. Document Base and First Dialects | Week 1 | 0/TBD | Not started | - |
-| 6. Guest ABI and Materialization | Week 1 | 0/TBD | Not started | - |
-| 7. `fjs_run` and Run Records | Week 1 | 0/8 | Planned | - |
-| 8. TY2025 Parameters and Tax Table | Week 2 | 3/4 | In Progress|  |
-| 9. Traceable Report Lines | Week 2 | 8/8 | Complete   | 2026-08-06 |
-| 10. 1040 Core and Scope Guard | Week 2 | 10/10 | Complete   | 2026-08-06 |
+| 5. Document Base and First Dialects | Week 1 | 5/5 | Complete | 2026-08-04 (no verification pass) |
+| 6. Guest ABI and Materialization | Week 1 | 2/2 | Complete | 2026-08-04 (no verification pass) |
+| 7. `fjs_run` and Run Records | Week 1 | 9/9 | Complete | 2026-08-05 (no verification pass) |
+| 8. TY2025 Parameters and Tax Table | Week 2 | 5/5 | Complete | verified 2026-08-05 |
+| 9. Traceable Report Lines | Week 2 | 8/8 | Complete   | verified 2026-08-06 |
+| 10. 1040 Core and Scope Guard | Week 2 | 10/10 | Complete   | verified 2026-08-06 5/5 |
 | 11. Wage, Retirement, Benefit Documents | Week 3 | 0/TBD | Not started | - |
 | 12. Brokerage and Capital-Gain Chain | Week 3 | 0/TBD | Not started | - |
 | 13. The 65+ Profile and Schedules | Week 3 | 0/TBD | Not started | - |
