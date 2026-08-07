@@ -229,11 +229,27 @@ tsc: (no output, exit 0)   →  node --test then ran the whole suite GREEN
 tsc: (no output, exit 0)
 ```
 
-**Mechanism.** TypeScript's excess-property check against a UNION admits any property declared in
-ANY constituent. `lines` is declared in the `ok` constituent, so the `kind: 'error'` discriminant
-never narrows the check. Omitting the field states the property; it does not enforce it. T-10-10-02
-was therefore **unmitigated** as designed, and the docstring's claim that "adding one back does not
-compile" was false as written.
+**Mechanism — probed four ways after approval, because the first statement of it was only half
+right.** Excess-property checking applies only to a FRESH object literal in a directly
+contextually-typed position. With `lines?: undefined` deleted:
+
+| Spelling | Result |
+|---|---|
+| `/** @type {Form1040Outcome} */ const o = { kind: 'error', …, lines: [] }` | **`TS2353`, rejected** |
+| `({ ...refusal, lines })` — a spread is not fresh | **compiles clean** |
+| bound to a local, then returned (with `kind` pinned) | **compiles clean** |
+| returned from an arrow checked against the `const`'s `@type` — **this file's own shape** | **compiles clean** |
+
+So the guarantee held for exactly one spelling, and not the one this module uses. That single
+rejecting case is why the plan's author believed the type was already safe. T-10-10-02 was
+**unmitigated** as designed, and the docstring's claim that "adding one back does not compile" was
+false as written.
+
+**A trap inside the probe itself**, recorded because it cost one here: written naively,
+`const o = { kind: 'error', … }` widens `kind` to `string` and the return fails with `TS2322` — an
+error about literal-type widening that has nothing to do with `lines`. Read as "the guard works",
+it would have closed the investigation on a probe that proved something else entirely. The bound-
+local case says nothing until `kind` is pinned with `@type {const}`.
 
 **Fix (deviation Rule 2), committed separately as `466d209`:** declare `readonly lines?: undefined`
 on the error member. That turns it into an assignability question, and both variants now fail:
@@ -460,3 +476,15 @@ other four dispositions were verified by the mutations that name them.
 - `fjs/form1040/core/module.f.js` exists and exports `form1040Report` (line 976).
 - `10-10-SUMMARY.md` exists at the path the plan specifies.
 - Commits `6925ebe`, `2e6d684`, `466d209` all present in `git log`.
+
+## Checkpoint outcome
+
+**Task 3 APPROVED** by the phase owner on 2026-08-06, after independently reproducing two findings
+rather than accepting them on report: the mutation-3 type hole (with the probe table above, which
+corrected this summary's first account of the mechanism) and site 2's differential. Site 4's
+over-prediction was accepted with its explanation — Form 4952's condition sits between 2a and 2c, so
+the move crosses three conditions rather than two.
+
+Bookkeeping closed on approval: Phase 10 ticked in ROADMAP.md; TAX-05 and TAX-16 marked complete in
+REQUIREMENTS.md with their traceability rows corrected from `Pending` to `Complete`; STATE.md set to
+Phase 10 complete, 10 of 10 plans. `deferred-items.md` left as it stands.

@@ -596,7 +596,7 @@ them. Week 0 is research's addition in front of the plan's Week 1.
 | TAX-02 | T1 | Phase 8 - TY2025 Parameters and Tax Table | Week 2 | Pending |
 | TAX-03 | T1 | Phase 10 - 1040 Core and Scope Guard | Week 2 | Complete |
 | TAX-04 | T1 | Phase 8 - TY2025 Parameters and Tax Table | Week 2 | Pending |
-| TAX-05 | T1 | Phase 10 - 1040 Core and Scope Guard | Week 2 | Pending |
+| TAX-05 | T1 | Phase 10 - 1040 Core and Scope Guard | Week 2 | Complete |
 | TAX-06 | T1 | Phase 10 - 1040 Core and Scope Guard | Week 2 | Complete |
 | TAX-07 | T2 | Phase 12 - Brokerage and Capital-Gain Chain | Week 3 | Pending |
 | TAX-08 | T2 | Phase 12 - Brokerage and Capital-Gain Chain | Week 3 | Pending |
@@ -607,7 +607,7 @@ them. Week 0 is research's addition in front of the plan's Week 1.
 | TAX-13 | T2 | Phase 13 - The 65+ Profile and Schedules | Week 3 | Pending |
 | TAX-14 | T2 | Phase 13 - The 65+ Profile and Schedules | Week 3 | Pending |
 | TAX-15 | T2 | Phase 12 - Brokerage and Capital-Gain Chain | Week 3 | Pending |
-| TAX-16 | T1 | Phase 10 - 1040 Core and Scope Guard | Week 2 | Pending |
+| TAX-16 | T1 | Phase 10 - 1040 Core and Scope Guard | Week 2 | Complete |
 | TAX-17 | T3 | Phase 15 - Realism Polish and Upstream | Week 5 | Pending |
 | PROV-01 | T1 | Phase 9 - Traceable Report Lines | Week 2 | Pending |
 | PROV-02 | T1 | Phase 9 - Traceable Report Lines | Week 2 | Pending |

@@ -561,14 +561,40 @@ export const form1040IncomeLines = taxParamSet => inputs => {
  *
  * ## `lines?: undefined` is load-bearing, and the obvious form does NOT work
  *
- * `[FINDING, this plan's Task 2 mutation 3]` The natural way to write this —
- * simply OMIT `lines` from the error member — states the property but does not
- * enforce it. This plan predicted that returning
- * `{ kind: 'error', message, unmodeled, lines }` would fail to compile. **It
- * compiled clean**, twice: with an empty array and with a genuinely partial
- * line list. TypeScript's excess-property check against a UNION admits any
- * property declared in ANY constituent, and `lines` is declared in the `ok`
- * constituent, so the discriminant does not narrow the check.
+ * `[FINDING, this plan's Task 2 mutation 3, reproduced independently by the
+ * phase owner]` The natural way to write this — simply OMIT `lines` from the
+ * error member — states the property but does not enforce it. This plan
+ * predicted that returning `{ kind: 'error', message, unmodeled, lines }` would
+ * fail to compile. **It compiled clean**, twice: with an empty array and with a
+ * genuinely partial line list.
+ *
+ * The mechanism is worth stating exactly, because the half that is easy to
+ * check is the half that gives the reassuring answer. Excess-property checking
+ * applies only to a FRESH object literal in a directly contextually-typed
+ * position, and there it does fire. All four spellings below were compiled with
+ * the `lines?: undefined` line deleted:
+ *
+ * - `/** @type {Form1040Outcome} *\/ const o = { kind: 'error', …, lines: [] }`
+ *   — **`TS2353`, rejected.** This is why the type was believed safe.
+ * - `({ ...refusal, lines })` — a SPREAD is not fresh: **compiled clean.**
+ * - the same literal bound to a local and then returned: **compiled clean**
+ *   (with `kind` pinned — see the trap below).
+ * - this module's own shape, where the literal is returned from an arrow whose
+ *   type is checked against the `@type` annotation on the `const` rather than
+ *   at the `return` itself: **compiled clean.**
+ *
+ * So the guarantee held for exactly one spelling — and not the one this file
+ * uses. An error outcome really could have carried a full set of computed
+ * lines: a partial 1040 returned under a refusal, which is precisely what
+ * 10-CONTEXT.md Decision 2 exists to prevent.
+ *
+ * **The trap in probing this**, recorded because it cost a probe here: written
+ * naively, `const o = { kind: 'error', … }` widens `kind` to `string`, so the
+ * return fails with `TS2322` — an error about literal-type widening that has
+ * nothing to do with `lines`. Read as "the guard works", it would have closed
+ * the investigation on a passing probe that proved something else entirely.
+ * The `kind` must be pinned with `@type {const}` before the bound-local case
+ * says anything at all.
  *
  * Declaring `lines?: undefined` here turns it from an excess-property question
  * into an ASSIGNABILITY one: `readonly ReportLine[]` is not assignable to

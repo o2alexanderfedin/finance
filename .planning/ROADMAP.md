@@ -138,7 +138,7 @@ These were established by execution, not inference. Any replan must preserve the
 
 - [x] **Phase 8: TY2025 Parameters and the Tax Table as Data** - Cited parameters and a row-by-row-verified Tax Table (completed 2026-08-05)
 - [x] **Phase 9: Traceable Report Lines and the Anti-Hardcoding Gate** - A line without sources does not typecheck; a constant answer fails the gate (completed 2026-08-05)
-- [ ] **Phase 10: Form 1040 Core, Line-16 Dispatch, and the Scope Guard** - Lines 1a–37, four-way line-16 branch, loud refusal outside scope (all ten plans shipped 2026-08-06; AWAITING human verification of 10-10 Task 3, the blocking five-site mutation sweep — transcript in 10-10-SUMMARY.md. Tick this box on approval.)
+- [x] **Phase 10: Form 1040 Core, Line-16 Dispatch, and the Scope Guard** - Lines 1a–37, four-way line-16 branch, loud refusal outside scope (completed 2026-08-06; 10-10 Task 3's five-site mutation sweep verified and approved by the phase owner, who independently reproduced the mutation-3 type hole and site 2's differential)
 
 ### Week 3 — Breadth in Documents
 

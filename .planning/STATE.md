@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
 status: executing
-stopped_at: Completed 10-10-PLAN.md (lines 16-37 and the whole-report scope refusal). Task 3, the phase-level five-site mutation sweep, has been RUN and its transcript is in 10-10-SUMMARY.md — it is a blocking human-verify checkpoint and has NOT been self-approved.
+stopped_at: Phase 10 COMPLETE — all ten plans shipped and 10-10 Task 3's five-site mutation sweep verified and approved by the phase owner. Phase 11 not started; verification dispatched separately.
 last_updated: "2026-08-06T22:31:27.027Z"
 last_activity: 2026-08-06
 progress:
@@ -35,8 +35,11 @@ Plan: 10 of 10 complete — wave 1 (10-01 QSS as a stored filing status, 10-02 t
   (10-06 QDCGT, 10-07 the classifyScope scope guard, executed in parallel),
   wave 4 (10-08 dispatchLine16), wave 5 (10-09 lines 1a-15) and wave 6 (10-10
   lines 16-37 + the whole-report refusal).
-Status: Awaiting human verification of 10-10 Task 3, the phase mutation sweep
-  (blocking checkpoint; transcript in 10-10-SUMMARY.md)
+Status: Phase 10 COMPLETE. TAX-03, TAX-05, TAX-06 and TAX-16 all closed; the
+  phase mutation sweep was run over five sites and APPROVED by the phase owner,
+  who independently reproduced the mutation-3 type hole (a spread or a bound
+  local carries `lines` past excess-property checking; only `lines?: undefined`
+  stops it) and site 2's differential. Phase 11 not started.
 
 Progress: [██████████] 100%
   in this file's frontmatter for the raw plan/summary counts — the percent figure here is
@@ -392,11 +395,10 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-08-06T22:31:21.916Z
-Stopped at: Completed 10-10-PLAN.md — all ten plans of Phase 10 have shipped.
-(measure the suite rather than quoting it — see "Test metrics" above. AWAITING HUMAN VERIFICATION of
-10-10 Task 3: the five-site phase mutation sweep was run in full and every failure set recorded in
-10-10-SUMMARY.md, including the two DIFFERENTIAL results the plan asked for. The executor did not
-self-approve the phase.)
+Stopped at: Phase 10 COMPLETE — all ten plans shipped, and 10-10 Task 3's five-site mutation
+sweep verified and APPROVED by the phase owner.
+(measure the suite rather than quoting it — see "Test metrics" above. Next: Phase 11. Verification of
+Phase 10 is dispatched separately and was NOT run by the executor.)
 Resume file: None
 (they were one-shot artifacts, written to `feature/planning-requirements-roadmap` seven
 minutes after PR #14 merged, so they never reached `main`; nothing else on that branch is
