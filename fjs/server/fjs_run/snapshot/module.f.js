@@ -429,4 +429,110 @@ export const proof = {
                 'the pin must actually change what the snapshot reports')
         },
     },
+
+    // ── DOC-15: an archived revision is unreachable through the guest
+    // vocabulary, even when its exact hash is supplied directly ─────────────
+    //
+    // Seeding follows buildRunSnapshotResolvesTheStore's exact pattern above:
+    // a real FileCas under home = '/', virtual(emptyState)(initEvo(cas)), then
+    // via evo(cas)(cacheKey): an ACTIVE head, then a SECOND add superseding it
+    // with archived: true and snapshot OMITTED (this module's own documented
+    // retraction call, inheriting the parent's snapshot per resolveSnapshot's
+    // single-parent rule). The proof walks the SAME discovery chain a real
+    // guest report program would use — ctx.evoList('true') FIRST, to discover
+    // the subject name, then evoHead/evoRevision — per RESEARCH.md Pitfall 2
+    // ("never skip straight to evoHead").
+    archivedRevisionUnreachable: {
+        adversarialAndControl: () => {
+            const home = '/'
+            const cas = fileCas(sha256)(home)
+            const [state0, cacheKey] = virtual(emptyState)(initEvo(cas))
+            const e = evo(cas)(cacheKey)
+
+            // Seed the archived subject: an active head, then a superseding
+            // archived head (the documented retraction call).
+            const docBytes = tryUtf8('{"dialect":"vnd.fjs.w2"}')
+            assert(docBytes !== null, 'expected the sample document to encode as UTF-8')
+            const [state1, docWrite] = virtual(state0)(
+                cas.write(pure({ first: ok(docBytes), tail: pure(undefined) })))
+            assert(docWrite[0] === 'ok', ['expected the document write to succeed', docWrite])
+            const docHash = vecToCBase32(docWrite[1])
+            const [state2, activeAddResult] = virtual(state1)(
+                e.add({ parents: [], subject: 'subjectS', snapshot: docHash }))
+            assert(activeAddResult[0] === 'ok', ['expected the active add to succeed', activeAddResult])
+            const activeHead = activeAddResult[1]
+            const [state3, archiveAddResult] = virtual(state2)(
+                e.add({ parents: [activeHead], subject: 'subjectS', archived: true }))
+            assert(archiveAddResult[0] === 'ok', ['expected the archiving add to succeed', archiveAddResult])
+            const archivedHead = archiveAddResult[1]
+
+            // Control: a SECOND, wholly active subject in the same store —
+            // a gate needs a control (AGENTS.md), proving the filter is
+            // selective, not a blanket break.
+            const [state4, controlDocWrite] = virtual(state3)(
+                cas.write(pure({ first: ok(docBytes), tail: pure(undefined) })))
+            assert(controlDocWrite[0] === 'ok', ['expected the control document write to succeed', controlDocWrite])
+            const [state5, controlAddResult] = virtual(state4)(
+                e.add({ parents: [], subject: 'subjectActive', snapshot: docHash }))
+            assert(controlAddResult[0] === 'ok', ['expected the control add to succeed', controlAddResult])
+            const controlHead = controlAddResult[1]
+
+            const [, snapshot] = virtual(state5)(buildRunSnapshot(cas)(e)(undefined))
+
+            // buildRunSnapshot-level assertions: the archived-only subject
+            // has NO surviving head (indistinguishable from unknown), and the
+            // archived revision itself is excluded from `revisions`.
+            assertEq(JSON.stringify(snapshot.heads['subjectS']), JSON.stringify([]))
+            assertEq(snapshot.revisions[archivedHead], undefined)
+            // Control: the active subject's head/revision are untouched.
+            assertEq(JSON.stringify(snapshot.heads['subjectActive']), JSON.stringify([controlHead]))
+            assert(snapshot.revisions[controlHead] !== undefined, 'expected the control revision to resolve')
+
+            const hostMap = buildHostMap(snapshot)
+
+            // The documented attack path (RESEARCH.md Pitfall 2): a report
+            // program discovers the archived subject's NAME via
+            // ctx.evoList('true') BEFORE ever calling evoHead/evoRevision on
+            // it. evoList('true') still surfaces the name — per this file's
+            // docstring, that reveals nothing about content — it is what
+            // comes next this fix closes off.
+            const [listT, listV] = interpret(hostMap)(guestCtx.evoList('true'))
+            assert(listT === 'ok', ['expected evoList to succeed', listT, listV])
+            const archivedNames = JSON.parse(listV[0])
+            assert(archivedNames.includes('subjectS'), archivedNames)
+
+            // ctx.evoHead on the archived-only subject returns [], not the
+            // demoted/archived hashes.
+            const [headT, headV] = interpret(hostMap)(guestCtx.evoHead('subjectS'))
+            assert(headT === 'ok', ['expected evoHead to succeed', headT, headV])
+            assertEq(headV[0], JSON.stringify([]))
+
+            // ctx.evoRevision on the archived hash — supplied directly, as it
+            // would be if smuggled in via fjs_run's args. `buildHostMap`'s own
+            // handler throws a plain bare string (verified directly against
+            // it, same as casReadOnAbsentHashThrowsAPlainString above) — but
+            // `interpret` (fjs/exec/module.f.js) catches that throw itself
+            // and converts it into the error arm of a Result, it never
+            // re-throws to this caller. So the assertion here is against
+            // THAT Result's error arm — same discipline as
+            // casReadOnAbsentHashThrowsAPlainString (assert the type, assert
+            // it is never an Error, assert the message names the hash),
+            // applied at the layer `interpret` actually surfaces it.
+            const revResult = interpret(hostMap)(guestCtx.evoRevision(archivedHead))
+            assert(revResult[0] === 'error', ['expected evoRevision to be refused', revResult])
+            const thrown = revResult[1]
+            assert(typeof thrown === 'string', ['expected a plain string refusal', thrown])
+            assert(!(/** @type {unknown} */ (thrown) instanceof Error), 'must never surface an Error')
+            assert(thrown.includes(archivedHead), thrown)
+
+            // Control leaf: the active subject's head/revision resolve
+            // through the identical buildHostMap call, proving the filter is
+            // selective rather than a blanket break.
+            const [controlHeadT, controlHeadV] = interpret(hostMap)(guestCtx.evoHead('subjectActive'))
+            assert(controlHeadT === 'ok', ['expected control evoHead to succeed', controlHeadT, controlHeadV])
+            assertEq(controlHeadV[0], JSON.stringify([controlHead]))
+            const [controlRevT, controlRevV] = interpret(hostMap)(guestCtx.evoRevision(controlHead))
+            assert(controlRevT === 'ok', ['expected control evoRevision to succeed', controlRevT, controlRevV])
+        },
+    },
 }
