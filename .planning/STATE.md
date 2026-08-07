@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
 status: paused
-stopped_at: PAUSED 2026-08-06 19:00 PDT. Phase 10 complete, verified PASS 5/5, merged to main (ca9b0bf), CI green, 0 open PRs. Phases 11-14 remain in the requested autonomous scope. TIME-CRITICAL: a stakeholder demo is scheduled for 2026-08-07 and its spec is committed at demo/todo/showcase-demo.md with NO code written yet.
-last_updated: "2026-08-07T02:00:00.000Z"
+stopped_at: PAUSED 2026-08-06 22:20 PDT. Phase 10 complete, verified PASS 5/5, merged to main, CI green. The stakeholder showcase for 2026-08-07 is BUILT and verified — all eight steps, run it with ./demo/serve.sh. Public hosting is DEFERRED pending a decision with Sergey, because a demo that runs the real engine in a public page publishes the real engine (see demo/todo/showcase-demo.md). Phases 11-14 remain in the requested autonomous scope; Phase 11 is next and not started.
+last_updated: "2026-08-07T05:22:00.000Z"
 last_activity: 2026-08-06
 progress:
   total_phases: 18

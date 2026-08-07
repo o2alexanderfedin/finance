@@ -20,13 +20,17 @@
     "note": "Do not quote these later. Re-measure: node --test 2>&1 | grep -c '^✔ import(\"./fjs/'"
   },
   "most_time_critical": {
-    "what": "A stakeholder demo is scheduled for 2026-08-07. The spec is written and committed; NO demo code exists.",
+    "what": "The stakeholder demo (2026-08-07) is BUILT and verified. It is presented from a laptop: run ./demo/serve.sh and open http://localhost:8000/demo/. All eight steps shipped, not only the six 'must' ones.",
     "spec": "demo/todo/showcase-demo.md",
-    "ship_order": ["What this is", "Documents", "Line 16", "The Return", "Refusal", "All", "Exactness (if time)", "Parameters (if time)", "Sandbox (if time)"],
+    "run": "./demo/serve.sh",
+    "open_decision": "Whether the engine repository and the demo become public — one decision, not two. See demo-hosting below.",
+    "ship_order": ["What this is", "Documents", "Line 16", "The Return", "Refusal", "All", "Exactness", "Parameters", "Sandbox"],
     "settled_do_not_relitigate": [
       "The demo imports the REAL engine as ES modules — every fjs/ module is pure and functionalscript's virtual fs has no node: imports. Zero dependencies, zero build, static hosting.",
       "WASM with a POSIX filesystem is the WRONG answer to the import() question: forbidden dependency, and it undermines the pitch by implying the jail is what makes it safe. The guest never calls import() — it EMITS an import effect, and a blob: URL satisfies it in ~10 lines.",
-      "The sandbox claim is narrower than 'it cannot reach the network' — see boundaries."
+      "The sandbox claim is narrower than 'it cannot reach the network' — see boundaries.",
+      "A demo that runs the real engine in a public page publishes the real engine. The browser has to download fjs/** to execute it, so no hosting arrangement — separate public repo, cross-repo token, vendored snapshot — avoids the disclosure. A read token for a private repo stored in a public repo is strictly worse: exfiltratable by any workflow edit, and it does not prevent what it appears to protect.",
+      "Every source/proof link and the build badge point at github.com/fjs-dev/finance, which is PRIVATE. They resolve for org members (so a laptop demo is fine) and 404 for everyone else. Repo visibility and demo hosting are therefore one decision."
     ]
   },
   "completed_this_session": [
@@ -34,7 +38,9 @@
     {"id": "10-VERIFICATION", "name": "gsd-verifier PASS 5/5, 40 mutations in an isolated copy, every tax figure re-derived by hand", "status": "done"},
     {"id": "gap-closure", "name": "spouseItemizes and dualStatusAlien reached standardDeductionCents unwatched — an MFS filer whose spouse itemizes could take $22,150 instead of $0 with the suite green. Two through-the-profile leaves, no production change.", "status": "done"},
     {"id": "consolidation", "name": "PR #44 merged to main, CI green; all worktrees synced; 0 open PRs", "status": "done"},
-    {"id": "demo-spec", "name": "demo/todo/showcase-demo.md written and committed — NOT implemented", "status": "done"}
+    {"id": "demo-spec", "name": "demo/todo/showcase-demo.md written and committed", "status": "done"},
+    {"id": "demo-build", "name": "The showcase is BUILT — all eight steps plus the All view, importing the real engine as ES modules. 494/494, tsc clean, zero console errors, 17/17 links verified to exist at the pinned commit. Run it with ./demo/serve.sh", "status": "done"},
+    {"id": "demo-hosting", "name": "Public hosting DEFERRED pending a decision with Sergey. Not a plumbing problem: the browser must download fjs/** to execute it, so any world-readable deployment publishes the engine source (37 files, ~950 KB, rationale comments included). A separate public repo does not avoid it — the same bytes must reach the browser. Reasoning is in demo/todo/showcase-demo.md and at the top of .github/workflows/pages.yml.", "status": "open"}
   ],
   "blockers": [],
   "human_actions_pending": [
