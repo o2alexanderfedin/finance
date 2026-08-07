@@ -2,17 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
-status: paused
-stopped_at: PAUSED 2026-08-07 14:11 PDT. Phase 10 complete and verified; RELEASED as v0.10.0 (9662736) — the repository's first tag. main and develop both at 8d2e0e6, CI green, 0 open PRs. The showcase is built, verified, demoed, and pinned to the release; run it with ./demo/serve.sh. Pre-1.0 deliberately: form1040Report has no production caller, so no server path produces a 1040 — that is Phase 14, and 1.0.0 is reserved for it. Public hosting remains DEFERRED pending one decision with Sergey covering both repo visibility and demo hosting, because a demo that runs the real engine in a public page publishes the real engine. Phases 11-14 remain in the requested autonomous scope; Phase 11 is next and not started.
-last_updated: "2026-08-07T21:11:00.000Z"
-last_activity: 2026-08-07
-released: v0.10.0
+status: executing
+stopped_at: Phase 10 COMPLETE — all ten plans shipped, and 10-10 Task 3's five-site mutation
+last_updated: "2026-08-07T22:53:28.817Z"
+last_activity: 2026-08-07 -- Phase 11 planning complete
 progress:
   total_phases: 18
   completed_phases: 10
-  total_plans: 48
+  total_plans: 53
   completed_plans: 51
-  percent: 100
+  percent: 96
 ---
 
 # Project State
@@ -36,7 +35,7 @@ Plan: 10 of 10 complete — wave 1 (10-01 QSS as a stored filing status, 10-02 t
   (10-06 QDCGT, 10-07 the classifyScope scope guard, executed in parallel),
   wave 4 (10-08 dispatchLine16), wave 5 (10-09 lines 1a-15) and wave 6 (10-10
   lines 16-37 + the whole-report refusal).
-Status: Phase 10 COMPLETE. TAX-03, TAX-05, TAX-06 and TAX-16 all closed; the
+Status: Ready to execute
   phase mutation sweep was run over five sites and APPROVED by the phase owner,
   who independently reproduced the mutation-3 type hole (a spread or a bound
   local carries `lines` past excess-property checking; only `lines?: undefined`
@@ -46,7 +45,7 @@ Progress: [██████████] 100%
   in this file's frontmatter for the raw plan/summary counts — the percent figure here is
   phase-based, not plan-based, because two phases carry an extra FIX-SUMMARY.md alongside a
   plan's own summary, which would otherwise round the plan-based figure to a misleading 100%)
-Last activity: 2026-08-06
+Last activity: 2026-08-07 -- Phase 11 planning complete
 
 ### Test metrics — MEASURE, do not read
 

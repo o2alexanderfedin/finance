@@ -402,9 +402,12 @@ of it to Phase 14, whose criteria are about tax correctness rather than the exec
 **Research**: **YES** — box lists for 1099-R and SSA-1099 are unverified and must be read from the IRS PDFs.
 **Plans**: 5 plans in 2 waves
 Plans:
+**Wave 1**
 - [ ] 11-01-PLAN.md — `vnd.fjs.1099r` and `vnd.fjs.ssa1099` document dialects (DOC-09, DOC-08) *(wave 1)*
 - [ ] 11-02-PLAN.md — `buildRunSnapshot` archived-revision filtering fix, adversarial+control proof, Mutation Gate M1 (DOC-15) *(wave 1)*
 - [ ] 11-03-PLAN.md — `finance_documents_list` MCP tool (MCP-08) *(wave 1)*
+
+**Wave 2** *(blocked on Wave 1 completion)*
 - [ ] 11-04-PLAN.md — `finance_schema`'s atomic `dialectSchemas` bump to 7 (DOC-08, DOC-09) *(wave 2, needs 11-01)*
 - [ ] 11-05-PLAN.md — Register `finance_documents_list` + same-commit integration test coverage (MCP-08, TEST-03) *(wave 2, needs 11-03)*
 
