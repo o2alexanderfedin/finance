@@ -303,6 +303,22 @@ test(
                 taxParamsResponse.result.content[0].text.includes('2025-32'),
                 'expected the finance_tax_params response to name its own Rev. Proc. citation')
 
+            // MCP-08: an agent enumerates stored documents through a real
+            // tool call, over this SAME real session, against the three
+            // subjects/revisions already seeded above (subjectA/B/C) — the
+            // decisive reachability proof this SAME-commit ordering
+            // constraint exists to require alongside the financeMcpHandlers
+            // registry entry (see fjs/server/module.f.js).
+            const documentsListResponse = await call('finance_documents_list', {})
+            assert.ok(
+                !documentsListResponse.result.isError,
+                `finance_documents_list failed: ${JSON.stringify(documentsListResponse)}`)
+            const documentsListed = JSON.parse(documentsListResponse.result.content[0].text)
+            assert.ok(Array.isArray(documentsListed), 'expected finance_documents_list to answer a JSON array')
+            assert.ok(
+                documentsListed.some(entry => entry.subject === subjectA || entry.subject === subjectB || entry.subject === subjectC),
+                `expected finance_documents_list to include one of the already-seeded subjects: ${JSON.stringify(documentsListed)}`)
+
             // ── The decisive call: fjs_run through the real, separate
             // process — a real write-then-import of the materialized
             // program, something no virtual proof can do ──────────────────
