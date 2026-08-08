@@ -294,7 +294,7 @@ structural (RTTI) and semantic passes.
       for every threshold in the parameter data.
 - [x] **TAX-05** *(T1)*: Form 1040 core lines 1a–37.
 - [x] **TAX-06** *(T1)*: Standard deduction with age and blindness increments.
-- [ ] **TAX-07** *(T2)*: Schedule B — interest and ordinary dividends, including the $1,500
+- [x] **TAX-07** *(T2)*: Schedule B — interest and ordinary dividends, including the $1,500
       threshold and the foreign-account questions.
 - [x] **TAX-08** *(T2)*: Qualified Dividends and Capital Gain Tax Worksheet (~25 lines),
       which calls **back into** the Tax Table for its ordinary-income component.

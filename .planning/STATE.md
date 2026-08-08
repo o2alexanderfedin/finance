@@ -4,13 +4,13 @@ milestone: v1.1
 milestone_name: milestone
 status: executing
 stopped_at: Completed 12-02-PLAN.md
-last_updated: "2026-08-08T02:43:41.798Z"
+last_updated: "2026-08-08T02:54:38.775Z"
 last_activity: 2026-08-08
 progress:
   total_phases: 19
   completed_phases: 11
   total_plans: 58
-  completed_plans: 58
+  completed_plans: 59
   percent: 100
 ---
 
@@ -29,7 +29,7 @@ the server executes it as a pure function of `(documents, tax-year parameters) �
 Phase: 12 (Brokerage Documents) — EXECUTING
   Ten plans across six waves. The plan set was returned BLOCKER by `gsd-plan-checker`
   (four blockers, ten warnings), revised, re-checked, and only then executed.
-Plan: 3 of 5
+Plan: 4 of 5
   whole-dollar election), wave 2 (10-03 Tax Computation Worksheet, 10-04 the
   vnd.fjs.return_profile dialect, 10-05 the standard deduction chart), wave 3
   (10-06 QDCGT, 10-07 the classifyScope scope guard, executed in parallel),
@@ -124,6 +124,7 @@ proofs and moves with submodule initialization state — which is exactly how a 
 | Phase 11 P05 | 20min | 1 tasks | 2 files |
 | Phase 12 P01 | 20min | 2 tasks | 1 files |
 | Phase 12 P02 | 21min | 2 tasks | 1 files |
+| Phase 12 P03 | 20min | 1 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -272,6 +273,7 @@ Full log in PROJECT.md Key Decisions. Recent decisions affecting current work:
 - [Phase 12]: DOC-06 shape proof uses a JSDoc @import type-only reference to QdcgtInput plus a runtime assertEq -- no runtime import of the QDCGT worksheet, dispatch, scope, or form1040 aggregation
 - [Phase 12]: Boxes 8-11 (profit-or-loss) reuse the shared negative-accepting moneyFieldError loop rather than a separate check
 - [Phase 12]: applicableCheckboxOnForm8949 stores the payer-printed A-F letter verbatim, never derived from boxes 2/5/12 (Phase 12.1's job)
+- [Phase 12-03]: No checkReferences cross-field rule links the four new foreign-account fields to each other or to declaredKinds -- Schedule B (Plan 12-04) decides what to do with the combination
 
 ### Pending Todos
 
@@ -416,7 +418,7 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-08-08T02:43:41.776Z
+Last session: 2026-08-08T02:51:03.905Z
 Stopped at: Completed 12-02-PLAN.md
 sweep verified and APPROVED by the phase owner.
 (measure the suite rather than quoting it — see "Test metrics" above. Next: Phase 11. Verification of
