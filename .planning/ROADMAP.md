@@ -499,7 +499,7 @@ Plans:
 - [x] 12.1-02-PLAN.md — The 47-line Schedule D Tax Worksheet, both worked examples, degenerate QDCGT equivalence (TAX-11, TAX-15) *(wave 1)*
 
 **Wave 2** *(blocked on Wave 1)*
-- [ ] 12.1-03-PLAN.md — Schedule D lines 1a-21, the loss-cap three-way branch, the two bounded sub-worksheets, Mutation Gate M2 (TAX-11) *(wave 2, needs 12.1-01)*
+- [x] 12.1-03-PLAN.md — Schedule D lines 1a-21, the loss-cap three-way branch, the two bounded sub-worksheets, Mutation Gate M2 (TAX-11) *(wave 2, needs 12.1-01)*
 
 **Wave 3** *(blocked on Wave 2)*
 - [ ] 12.1-04-PLAN.md — Form 1040 lines 3a/3b/7a wiring (Task 1, lands first — safe while the scope guard still refuses), THEN the six-kind scope reclassification + branch-2a computation + the demo fix (Task 2, the atomic transition point), THEN Mutation Gates M3/M4/M5 (Task 3) (TAX-11, TAX-15) *(wave 3, needs 12.1-01, 12.1-02, 12.1-03)*
