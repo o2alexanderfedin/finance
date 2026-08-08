@@ -223,7 +223,7 @@ structural (RTTI) and semantic passes.
 - [x] **DOC-06** *(T2)*: `vnd.fjs.1099div`. **Adding this dialect forces the QDCGT
       worksheet** (box 1b > 0) and the Schedule D Tax Worksheet (boxes 2b/2d) — schedule
       the worksheet with the dialect, not after it.
-- [ ] **DOC-07** *(T2)*: `vnd.fjs.1099b` — including the distinction that a blank box 1e
+- [x] **DOC-07** *(T2)*: `vnd.fjs.1099b` — including the distinction that a blank box 1e
       means "basis not reported", which is **not** zero.
 - [x] **DOC-08** *(T2)*: `vnd.fjs.ssa1099` — required by the 65+ profile.
 - [x] **DOC-09** *(T2)*: `vnd.fjs.1099r` — required by the 65+ profile.

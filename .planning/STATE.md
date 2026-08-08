@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
 status: executing
-stopped_at: Completed 11-04-PLAN.md
-last_updated: "2026-08-08T02:27:43.481Z"
+stopped_at: Completed 12-02-PLAN.md
+last_updated: "2026-08-08T02:43:41.798Z"
 last_activity: 2026-08-08
 progress:
   total_phases: 19
   completed_phases: 11
   total_plans: 58
-  completed_plans: 57
-  percent: 98
+  completed_plans: 58
+  percent: 100
 ---
 
 # Project State
@@ -29,7 +29,7 @@ the server executes it as a pure function of `(documents, tax-year parameters) �
 Phase: 12 (Brokerage Documents) — EXECUTING
   Ten plans across six waves. The plan set was returned BLOCKER by `gsd-plan-checker`
   (four blockers, ten warnings), revised, re-checked, and only then executed.
-Plan: 2 of 5
+Plan: 3 of 5
   whole-dollar election), wave 2 (10-03 Tax Computation Worksheet, 10-04 the
   vnd.fjs.return_profile dialect, 10-05 the standard deduction chart), wave 3
   (10-06 QDCGT, 10-07 the classifyScope scope guard, executed in parallel),
@@ -41,7 +41,7 @@ Status: Ready to execute
   local carries `lines` past excess-property checking; only `lines?: undefined`
   stops it) and site 2's differential. Phase 11 not started.
 
-Progress: [██████████] 98%
+Progress: [██████████] 100%
   in this file's frontmatter for the raw plan/summary counts — the percent figure here is
   phase-based, not plan-based, because two phases carry an extra FIX-SUMMARY.md alongside a
   plan's own summary, which would otherwise round the plan-based figure to a misleading 100%)
@@ -123,6 +123,7 @@ proofs and moves with submodule initialization state — which is exactly how a 
 | Phase 11 P04 | 20min | 1 tasks | 1 files |
 | Phase 11 P05 | 20min | 1 tasks | 2 files |
 | Phase 12 P01 | 20min | 2 tasks | 1 files |
+| Phase 12 P02 | 21min | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -269,6 +270,8 @@ Full log in PROJECT.md Key Decisions. Recent decisions affecting current work:
 - [Phase 11-05]: Same-commit ordering constraint (finance_documents_list registry entry + integration test call) verified live by mutation: commenting out only the call/assert block reddened toolsCalled/advertisedTools with the predicted diff, then restored byte-identical
 - [Phase 12]: vnd.fjs.1099div: sourceArtifactHash required (not option), validated via isHash, kept off the shared base() helper
 - [Phase 12]: DOC-06 shape proof uses a JSDoc @import type-only reference to QdcgtInput plus a runtime assertEq -- no runtime import of the QDCGT worksheet, dispatch, scope, or form1040 aggregation
+- [Phase 12]: Boxes 8-11 (profit-or-loss) reuse the shared negative-accepting moneyFieldError loop rather than a separate check
+- [Phase 12]: applicableCheckboxOnForm8949 stores the payer-printed A-F letter verbatim, never derived from boxes 2/5/12 (Phase 12.1's job)
 
 ### Pending Todos
 
@@ -413,8 +416,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-08-08T02:25:20.987Z
-Stopped at: Completed 11-04-PLAN.md
+Last session: 2026-08-08T02:43:41.776Z
+Stopped at: Completed 12-02-PLAN.md
 sweep verified and APPROVED by the phase owner.
 (measure the suite rather than quoting it — see "Test metrics" above. Next: Phase 11. Verification of
 Phase 10 is dispatched separately and was NOT run by the executor.)
