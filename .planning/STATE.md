@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
 status: executing
-stopped_at: Completed 11-03-PLAN.md
-last_updated: "2026-08-07T23:54:59.325Z"
-last_activity: 2026-08-07
+stopped_at: Completed 11-04-PLAN.md
+last_updated: "2026-08-08T00:04:08.367Z"
+last_activity: 2026-08-08
 progress:
   total_phases: 18
   completed_phases: 10
   total_plans: 53
-  completed_plans: 54
+  completed_plans: 55
   percent: 100
 ---
 
@@ -29,7 +29,7 @@ the server executes it as a pure function of `(documents, tax-year parameters) �
 Phase: 11 (Wage, Retirement, and Benefit Documents) — EXECUTING
   Ten plans across six waves. The plan set was returned BLOCKER by `gsd-plan-checker`
   (four blockers, ten warnings), revised, re-checked, and only then executed.
-Plan: 4 of 5
+Plan: 5 of 5
   whole-dollar election), wave 2 (10-03 Tax Computation Worksheet, 10-04 the
   vnd.fjs.return_profile dialect, 10-05 the standard deduction chart), wave 3
   (10-06 QDCGT, 10-07 the classifyScope scope guard, executed in parallel),
@@ -45,7 +45,7 @@ Progress: [██████████] 100%
   in this file's frontmatter for the raw plan/summary counts — the percent figure here is
   phase-based, not plan-based, because two phases carry an extra FIX-SUMMARY.md alongside a
   plan's own summary, which would otherwise round the plan-based figure to a misleading 100%)
-Last activity: 2026-08-07
+Last activity: 2026-08-08
 
 ### Test metrics — MEASURE, do not read
 
@@ -120,6 +120,7 @@ proofs and moves with submodule initialization state — which is exactly how a 
 | Phase 11 P01 | 30min | 3 tasks | 2 files |
 | Phase 11 P02 | 20min | 2 tasks | 1 files |
 | Phase 11 P03 | 30min | 2 tasks | 1 files |
+| Phase 11 P04 | 20min | 1 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -261,6 +262,7 @@ Full log in PROJECT.md Key Decisions. Recent decisions affecting current work:
 - [Phase 11]: MCP-08: one row per (subject, head) pair, not one per subject -- concurrent heads yield multiple rows sharing a subject
 - [Phase 11]: MCP-08: 'unknown' is the sentinel dialect for a well-formed document with no dialect field (arbitrary, recorded pick per RESEARCH.md A2)
 - [Phase 11]: MCP-08: finance_documents_list never validates against finance_schema's dialect registry -- an unregistered dialect tag is listed verbatim
+- [Phase 11-04]: expectedKnownDialectCount bumped 5 -> 7 in one commit registering both vnd.fjs.1099r and vnd.fjs.ssa1099 together (both dialect modules already existed from Plan 11-01); guard verified load-bearing by mutating to 6 and watching everyRegisteredDialectIsCounted fail with [7, 6, ...], then restored
 
 ### Pending Todos
 
@@ -405,8 +407,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-08-07T23:54:59.316Z
-Stopped at: Completed 11-03-PLAN.md
+Last session: 2026-08-08T00:04:08.361Z
+Stopped at: Completed 11-04-PLAN.md
 sweep verified and APPROVED by the phase owner.
 (measure the suite rather than quoting it — see "Test metrics" above. Next: Phase 11. Verification of
 Phase 10 is dispatched separately and was NOT run by the executor.)
