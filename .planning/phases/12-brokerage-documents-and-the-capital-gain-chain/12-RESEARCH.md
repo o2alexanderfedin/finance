@@ -79,6 +79,23 @@ second one.
   during 12.1 planning, not this one.
 </user_constraints>
 
+## ⚠ SUPERSEDED IN ONE RESPECT — read this before acting on anything below
+
+**This document recommends treating the `fjs/return/scope` reclassification and the
+`fjs/form1040/core` lines-3a/3b wiring as in-scope for Phase 12. That recommendation was NOT
+adopted.** `12-CONTEXT.md`'s "AMENDED 2026-08-07" section supersedes it: all wiring moved to
+**Phase 12.1**, and Phase 12 must not touch `fjs/return/scope/module.f.js`'s modeled/unmodeled
+partition, `fjs/form1040/core/module.f.js`, or anything under `fjs/tax/**`.
+
+The research finding itself was correct and valuable — the contradiction it identified was real, and
+it is why the phase boundary moved. Only its *recommendation about where the fix belongs* was
+overruled, because reclassifying dividends as modeled without wiring lines 3a/3b in the same act
+would make a return report a confident zero for dividend income instead of refusing.
+
+Everything else in this document — the box inventories, the DOC-13 provenance mechanism, the
+Schedule B threshold finding — stands unchanged. Assumption A1 and Open Questions 1 and 2 below are
+**RESOLVED**; see the markers there.
+
 ## Summary
 
 This phase looks, on the box-list surface, like a straightforward repeat of Phase 11's pattern: two
@@ -866,7 +883,20 @@ const withoutBasis = validate({ ...minimal, box1dProceeds: '10000.00' }) // box 
 **If this table is empty:** N/A — five assumptions logged, one (A1) load-bearing and requiring
 explicit confirmation before planning proceeds.
 
-## Open Questions
+## Open Questions — BOTH RESOLVED 2026-08-07
+
+**Q1 (should 1099-DIV box 2a be reclassified as modeled this phase?) — RESOLVED: no.** Deferred to
+Phase 12.1 along with every other scope-partition change, per `12-CONTEXT.md`'s AMENDED section.
+
+**Q2 (should CONTEXT be amended to authorize the `fjs/return/` edits?) — RESOLVED: no, the opposite.**
+CONTEXT was amended to move the edits OUT of this phase entirely, not to authorize them. The single
+granted exception is additive foreign-account fields on `vnd.fjs.return_profile` for Schedule B,
+which touches no partition.
+
+The original text of both questions is kept below, unedited, because the reasoning that produced
+them is what surfaced the contradiction in the first place.
+
+## Open Questions (original text, superseded above)
 
 1. **Should `capitalGainDistributions` (1099-DIV box 2a) also be reclassified to modeled this
    phase, wiring Form 1040 line 7a and `dispatchLine16`'s level-2d path?**
