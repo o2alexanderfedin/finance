@@ -51,6 +51,17 @@
  *   a printed form — nobody OCRs a return profile — and its versioning is the
  *   dialect tag itself. Adding a revision here would be cargo-culting DOC-10
  *   onto a document whose failure mode it does not describe.
+ * - **The four foreign-account fields are additive, taxpayer-DECLARED, and
+ *   deliberately carry no cross-field validation.** Schedule B Part III (TAX-07)
+ *   asks whether the taxpayer had a foreign financial account, whether FinCEN
+ *   Form 114 is required, which countries, and whether there was a foreign
+ *   trust distribution/grantor/transferor relationship — none of which any IRS
+ *   information return reports, so 12-CONTEXT.md's "taxpayer-DECLARED, never
+ *   inferred" decision makes this document, not a transcribed 1099, their only
+ *   possible source. `requiredToFileFinCen114` may be declared without
+ *   `hadForeignFinancialAccount`: the two printed sub-questions are independent
+ *   facts, and it is Schedule B, not this dialect, that decides what to do with
+ *   the combination.
  *
  * @module
  */
@@ -180,6 +191,17 @@ export const returnProfileSchema = /** @type {const} */ ({
     line26EstimatedTaxPayments: option(string),
     line35aRefundRequested: option(string),
     line36AppliedToNextYear: option(string),
+    // Schedule B Part III, line 7a (first sub-question) — TAX-07. Taxpayer-
+    // declared; no IRS information return reports this fact.
+    hadForeignFinancialAccount: option(true),
+    // Schedule B Part III, line 7a (second sub-question) — independent of
+    // hadForeignFinancialAccount, since the printed form asks it as a
+    // separate "if 'Yes'" sub-question rather than a derived consequence.
+    requiredToFileFinCen114: option(true),
+    // Schedule B Part III, line 7b — free-text country names, plural.
+    foreignAccountCountries: option(array(string)),
+    // Schedule B Part III, line 8.
+    receivedForeignTrustDistributionOrWasGrantorOrTransferor: option(true),
 })
 
 /** @typedef {Ts<typeof returnProfileSchema>} ReturnProfile */
@@ -480,6 +502,31 @@ export const proof = {
             })
             assertEq(t, 'ok')
         },
+        // Sibling of fullyPopulatedValidates rather than an edit to it: proves
+        // the four new foreign-account fields validate ALONGSIDE every
+        // already-existing field, without touching that leaf's own assertions.
+        fullyPopulatedWithForeignAccountFieldsValidates: () => {
+            const [t] = validate({
+                ...minimal,
+                filingStatus: 'marriedFilingJointly',
+                taxpayerBornBeforeJan2_1961: true,
+                taxpayerIsBlind: true,
+                spouseBornBeforeJan2_1961: true,
+                spouseIsBlind: true,
+                dependentCount: 2,
+                declaredKinds: ['wages', 'taxableInterest', 'estimatedTaxPayments'],
+                wholeDollarElection: true,
+                earnedIncome: '50000.00',
+                line26EstimatedTaxPayments: '1234.56',
+                line35aRefundRequested: '100.00',
+                line36AppliedToNextYear: '0.00',
+                hadForeignFinancialAccount: true,
+                requiredToFileFinCen114: true,
+                foreignAccountCountries: ['France', 'Germany'],
+                receivedForeignTrustDistributionOrWasGrantorOrTransferor: true,
+            })
+            assertEq(t, 'ok')
+        },
         wrongDialectRejected: () => {
             const [t, v] = validate({ ...minimal, dialect: 'vnd.fjs.wrong' })
             assertEq(t, 'error')
@@ -613,6 +660,52 @@ export const proof = {
                 })
                 assertEq(t, 'ok')
             },
+        },
+    },
+    // TAX-07: Schedule B Part III's four additive, taxpayer-declared fields.
+    // Structurally independent from every existing check above — no leaf here
+    // touches `checkReferences`'s seven-step order or `declaredKinds`.
+    foreignAccountFields: {
+        allFourPresentValidate: () => {
+            const [t, v] = validate({
+                ...minimal,
+                hadForeignFinancialAccount: true,
+                requiredToFileFinCen114: true,
+                foreignAccountCountries: ['France', 'Germany'],
+                receivedForeignTrustDistributionOrWasGrantorOrTransferor: true,
+            })
+            assert(t === 'ok', ['expected ok', t, v])
+            assertEq(v.foreignAccountCountries?.length, 2)
+            assertEq(v.foreignAccountCountries?.[0], 'France')
+            assertEq(v.foreignAccountCountries?.[1], 'Germany')
+        },
+        // Same DOC-12 discipline as every other checkbox on this dialect: a
+        // structural `false` is rejected, not accepted as "not applicable".
+        eachCheckboxRejectsFalse: () => {
+            const [t1] = validate({ ...minimal, hadForeignFinancialAccount: false })
+            assertEq(t1, 'error')
+            const [t2] = validate({
+                ...minimal,
+                receivedForeignTrustDistributionOrWasGrantorOrTransferor: false,
+            })
+            assertEq(t2, 'error')
+        },
+        // Pins the "no forced ordering" behavior claim as a proof, not just a
+        // docstring assertion: the two printed sub-questions are independent
+        // facts, so declaring only the second validates on its own.
+        requiredToFileWithoutHadAccountValidates: () => {
+            const [t] = validate({ ...minimal, requiredToFileFinCen114: true })
+            assertEq(t, 'ok')
+        },
+        multipleCountriesRoundTripInOrder: () => {
+            const [t, v] = validate({
+                ...minimal,
+                foreignAccountCountries: ['Japan', 'Canada'],
+            })
+            assert(t === 'ok', ['expected ok', t, v])
+            assertEq(v.foreignAccountCountries?.length, 2)
+            assertEq(v.foreignAccountCountries?.[0], 'Japan')
+            assertEq(v.foreignAccountCountries?.[1], 'Canada')
         },
     },
     crossDialect: {
