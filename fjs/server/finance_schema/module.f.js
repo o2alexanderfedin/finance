@@ -8,20 +8,24 @@
  *
  * ## The lookup map names WHICH schema, never re-describes it
  *
- * `dialectSchemas` below keys each of the five known dialect tag strings to
+ * `dialectSchemas` below keys each of the seven known dialect tag strings to
  * that dialect's own exported schema const (`oneZeroNineNineIntSchema`,
- * `ocrSchema`, `w2Schema`, `medicalExpensesSchema`, `returnProfileSchema`).
- * It contributes no field names of its own — `toJsonSchema` walks whichever
- * schema constant the map names, so every field an agent sees comes from the
- * same RTTI the dialect's own `validate` enforces. Per `07-CONTEXT.md`, a
- * hand-written field list would be exactly the second-source-of-truth MCP-06
- * exists to eliminate.
+ * `ocrSchema`, `w2Schema`, `medicalExpensesSchema`, `returnProfileSchema`,
+ * `oneZeroNineNineRSchema`, `ssa1099Schema`). It contributes no field names of
+ * its own — `toJsonSchema` walks whichever schema constant the map names, so
+ * every field an agent sees comes from the same RTTI the dialect's own
+ * `validate` enforces. Per `07-CONTEXT.md`, a hand-written field list would be
+ * exactly the second-source-of-truth MCP-06 exists to eliminate.
  *
  * `vnd.fjs.return_profile` is the fifth and is not a document read off a
  * printed form at all — it is what the taxpayer DECLARES (10-CONTEXT.md
  * Decision 4). It belongs here for the same reason as the other four: an
  * agent authoring a program against the declared kind set must read the field
  * names from the schema the validator enforces, never guess them.
+ *
+ * `vnd.fjs.1099r` and `vnd.fjs.ssa1099` are the sixth and seventh (DOC-08,
+ * DOC-09) — printed retirement/benefit forms, following the same "read from
+ * the schema, never guess" rule as every other dialect here.
  *
  * ## Unknown dialect: a tool-level `errorResult`, never a throw
  *
@@ -46,6 +50,8 @@ import { dialect as ocrDialect, ocrSchema } from '../../document/ocr/module.f.js
 import { dialect as w2Dialect, w2Schema } from '../../document/w2/module.f.js'
 import { dialect as medicalExpensesDialect, medicalExpensesSchema } from '../../document/medical_expenses/module.f.js'
 import { dialect as returnProfileDialect, returnProfileSchema } from '../../return/profile/module.f.js'
+import { dialect as oneZeroNineNineRDialect, oneZeroNineNineRSchema } from '../../document/1099r/module.f.js'
+import { dialect as ssa1099Dialect, ssa1099Schema } from '../../document/ssa1099/module.f.js'
 import { stringify as jsonText } from '../../json/module.f.js'
 
 /** @import { Type } from 'functionalscript/fjs/types/rtti/module.f.js' */
@@ -68,6 +74,8 @@ const dialectSchemas = {
     [w2Dialect]: w2Schema,
     [medicalExpensesDialect]: medicalExpensesSchema,
     [returnProfileDialect]: returnProfileSchema,
+    [oneZeroNineNineRDialect]: oneZeroNineNineRSchema,
+    [ssa1099Dialect]: ssa1099Schema,
 }
 
 /** The known dialect tags, in declaration order — used in the refusal message. */
@@ -91,10 +99,13 @@ const knownDialects = /** @type {readonly string[]} */ (Object.keys(dialectSchem
  * the code under test" — and the same `expectedThresholdCount` /
  * `expectedMoneyBoxFieldCount` idiom `fjs/tax/boundary` and
  * `fjs/document/1099int` already use. Raise it in the same commit that
- * registers a sixth dialect, and add that dialect's own `*Resolves` leaf.
+ * registers a new dialect, and add that dialect's own `*Resolves` leaf. This
+ * commit registers the SIXTH AND SEVENTH dialects (`vnd.fjs.1099r`,
+ * `vnd.fjs.ssa1099`) at once, so the count moves from 5 to 7 in one step and
+ * both new dialects gained their own `*Resolves` leaf below.
  * @type {number}
  */
-const expectedKnownDialectCount = 5
+const expectedKnownDialectCount = 7
 
 /**
  * `finance_schema(dialect)`: the MCP tool. Looks `dialect` up in
@@ -157,7 +168,7 @@ export const proof = {
     // dialect's own schema const — never a hand-written JSON literal, which
     // would reintroduce the second-source-of-truth MCP-06 forbids), plus one
     // leaf for the unknown-dialect refusal and one hand-typed count that the
-    // refusal loop cannot supply itself. Seven leaves total.
+    // refusal loop cannot supply itself. Nine leaves total.
     oneZeroNineNineIntResolves: () => {
         const result = call('vnd.fjs.1099int')
         assertEq(result.isError, undefined)
@@ -196,6 +207,22 @@ export const proof = {
         assertEq(
             JSON.stringify(JSON.parse(textOf(result))),
             JSON.stringify(toJsonSchema(returnProfileSchema)),
+        )
+    },
+    oneZeroNineNineRResolves: () => {
+        const result = call('vnd.fjs.1099r')
+        assertEq(result.isError, undefined)
+        assertEq(
+            JSON.stringify(JSON.parse(textOf(result))),
+            JSON.stringify(toJsonSchema(oneZeroNineNineRSchema)),
+        )
+    },
+    ssa1099Resolves: () => {
+        const result = call('vnd.fjs.ssa1099')
+        assertEq(result.isError, undefined)
+        assertEq(
+            JSON.stringify(JSON.parse(textOf(result))),
+            JSON.stringify(toJsonSchema(ssa1099Schema)),
         )
     },
     // An unknown dialect is a tool-level errorResult, never a throw — names
