@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
 status: executing
-stopped_at: "Phase 12.1 plan 01 (Form 8949) complete: module built, Mutation Gate M1 watched failing and reverted, 629 -> 643 project-local proofs. Plan 2 of 4 (12.1-02, the Schedule D Tax Worksheet) is next."
-last_updated: "2026-08-08T22:35:13.117Z"
+stopped_at: "Phase 12.1 plan 02 (Schedule D Tax Worksheet) complete: fjs/tax/line16/sdtw/module.f.js built, both worked examples proven line-by-line, degenerate QDCGT equivalence proven, 644 -> 649 project-local proofs. Plan 3 of 4 (12.1-03, Schedule D) is next."
+last_updated: "2026-08-08T23:26:16.158Z"
 last_activity: 2026-08-08
 progress:
   total_phases: 19
   completed_phases: 12
   total_plans: 62
-  completed_plans: 62
+  completed_plans: 63
   percent: 100
 ---
 
@@ -29,7 +29,7 @@ the server executes it as a pure function of `(documents, tax-year parameters) �
 Phase: 12.1 (The Capital-Gain Chain) — EXECUTING
   Ten plans across six waves. The plan set was returned BLOCKER by `gsd-plan-checker`
   (four blockers, ten warnings), revised, re-checked, and only then executed.
-Plan: 2 of 4
+Plan: 3 of 4
   whole-dollar election), wave 2 (10-03 Tax Computation Worksheet, 10-04 the
   vnd.fjs.return_profile dialect, 10-05 the standard deduction chart), wave 3
   (10-06 QDCGT, 10-07 the classifyScope scope guard, executed in parallel),
@@ -128,6 +128,7 @@ proofs and moves with submodule initialization state — which is exactly how a 
 | Phase 12 P04 | 35min | 1 tasks | 1 files |
 | Phase 12 P05 | 35min | 3 tasks | 2 files |
 | Phase 12.1 P01 | 35min | 2 tasks | 1 files |
+| Phase 12.1 P02 | 55min | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -283,6 +284,9 @@ Full log in PROJECT.md Key Decisions. Recent decisions affecting current work:
 - [Phase 12]: expectedKnownDialectCount bumped directly 7 -> 9 in one commit (both new dialects registered together), mirroring Phase 11's 11-04 precedent
 - [Phase 12.1-01]: Form 8949's category-derivation refusal check order is fixed and documented (box1f/box1g, then absent-basis, then undecided category) so Mutation Gate M1 has an unambiguous target line
 - [Phase 12.1-01]: TAX-11/TAX-15 are NOT marked complete after this plan, despite being named in its frontmatter -- the requirement spans all four plans of Phase 12.1 and REQUIREMENTS.md has no partial-completion representation. Deferred to 12.1-04.
+- [Phase 12.1-02]: SDTW lines 22/32's printed skip instructions are left unimplemented as special cases -- surrounding mins/floors already make the shortcut and straight-through arithmetic agree, mirroring qdcgt's own precedent; neither worked example directly observes this, flagged for a future mutation sweep
+- [Phase 12.1-02]: SDTW lines 35-40/41-43 are explicitly gated to 0n when their controlling Schedule D line (19/18) is zero, rather than relying on natural arithmetic -- necessary because line 42 carries no printed floor and would otherwise leak a spurious 28% charge
+- [Phase 12.1-02]: the split-dispatch fixture (method44 !== method46) and the degenerate-equivalence fixture (sdtw.line47 === qdcgt.line25) share one underlying input rather than two separate constructions
 
 ### Pending Todos
 
@@ -427,8 +431,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-08-08T22:35:13.035Z
-Stopped at: Phase 12.1 plan 01 (Form 8949) complete: module built, Mutation Gate M1 watched failing and reverted, 629 -> 643 project-local proofs. Plan 2 of 4 (12.1-02, the Schedule D Tax Worksheet) is next.
+Last session: 2026-08-08T23:26:16.149Z
+Stopped at: Phase 12.1 plan 02 (Schedule D Tax Worksheet) complete: fjs/tax/line16/sdtw/module.f.js built, both worked examples proven line-by-line, degenerate QDCGT equivalence proven, 644 -> 649 project-local proofs. Plan 3 of 4 (12.1-03, Schedule D) is next.
 nothing in progress. Phases 11 and 12 both complete, verified 4/4 each, and merged (PRs #53, #54);
 a ROADMAP totals correction merged as PR #55. Then, out of roadmap order for a stakeholder
 showcase: **v0.12.0 released** (PR #57) and the browser demo **re-pinned** to it (PR #58), with the
