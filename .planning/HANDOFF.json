@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "timestamp": "2026-08-08T10:33:22.917Z",
+  "timestamp": "2026-08-08T18:55:00.000Z",
   "phase": "12",
   "phase_name": "Brokerage Documents",
   "phase_dir": ".planning/phases/12-brokerage-documents-and-the-capital-gain-chain",
@@ -9,7 +9,13 @@
   "total_tasks": 5,
   "status": "between_phases_nothing_in_progress",
   "branch": "main",
-  "head": "674ebb4",
+  "head": "694d580",
+  "released": {
+    "tag": "v0.12.0",
+    "commit": "cfc4a121c52182e43f1dd9633baac1a42212a15e",
+    "covers": "Phases 11 and 12",
+    "note": "v0.11.0 was never cut — both phases landed before anyone tagged, so the minor position skips to 12 and still names the highest completed phase. Cutting it bumped package.json AND fjs/server's serverInfo.version literal together; fjs-run-integration.test.js:217 is the only place those two can be compared, and that assertion is mutation-verified. The showcase demo pins this commit."
+  },
   "verified_at_head": {
     "tsc": "clean",
     "project_local_proofs": 629,
@@ -21,7 +27,9 @@
   "shipped_this_session": [
     {"phase": "11", "name": "Wage, Retirement, and Benefit Documents", "pr": 53, "merge": "e3f405e", "proofs": "492 -> 544", "requirements": ["DOC-08", "DOC-09", "DOC-15", "MCP-08", "TEST-03"]},
     {"phase": "12", "name": "Brokerage Documents", "pr": 54, "merge": "5cdf30d", "proofs": "544 -> 629", "requirements": ["DOC-06", "DOC-07", "DOC-13", "TAX-07"]},
-    {"phase": "docs", "name": "ROADMAP totals corrected after the Phase 12 split", "pr": 55, "merge": "674ebb4"}
+    {"phase": "docs", "name": "ROADMAP totals corrected after the Phase 12 split", "pr": 55, "merge": "674ebb4"},
+    {"phase": "release", "name": "v0.12.0 — package.json + fjs/server serverInfo.version + CHANGELOG for Phases 11 and 12", "pr": 57, "merge": "cfc4a12"},
+    {"phase": "demo", "name": "Showcase re-pinned v0.10.0 -> v0.12.0 (492 -> 629 proofs); six slid source anchors fixed; 'six tools' corrected to twelve", "pr": 58, "merge": "694d580"}
   ],
   "blocking_constraints": [
     {
@@ -42,6 +50,12 @@
       "severity": "advisory",
       "description": "Phase 12's M3 mutated the 1099-B fixture and tripped an assertEq(fixture.box1e, undefined) assertion BEFORE the gain comparison it appeared to guard. The proof is honest but proof-local — no production change could redden it, because production gain computation does not exist until 12.1.",
       "mitigation": "When a mutation reddens, check WHICH leaf and WHICH assertion. Recorded as ROADMAP Phase 12.1 criterion 3a: DOC-07's consequence must be re-proven against real gain computation."
+    },
+    {
+      "id": "phase-12-1-invalidates-the-demo-twice",
+      "severity": "blocking",
+      "description": "Phase 12.1 edits fjs/return/scope and fjs/form1040/core — the two modules the showcase demo anchors into most heavily. TWO separate breakages follow, and only the first is mechanical. (1) Source anchors slide: Phase 12 adding four fields to fjs/return/profile moved six demo anchors, each still returning HTTP 200 while landing in the wrong place. (2) Step 4 'Refusal' CHANGES MEANING: its whole gesture is 'declare dividend income, the entire return refuses'. Once 12.1 models dividends, that return will compute instead, and the step will silently demonstrate the opposite of what its narration claims.",
+      "mitigation": "After 12.1 merges, re-run BOTH demo checks before the demo is shown again: the anchor audit (resolve every anchor at the new pin and read the line back — a path-exists check misses all of it) and a read of step 4's narration against what the engine now actually does. Procedure and rationale: demo/todo/showcase-demo.md, sections 'Re-pin' and 'Source and proof links'."
     },
     {
       "id": "agent-worktrees-cannot-build-this-repo",

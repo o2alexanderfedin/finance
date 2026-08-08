@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
 status: paused
-stopped_at: "PAUSED 2026-08-08 03:33 PDT, between phases with nothing in progress. Phases 11 and 12 both shipped and merged this session (PRs #53, #54), plus a ROADMAP totals correction (PR #55). main = develop = origin = 674ebb4, CI green, 0 open PRs, working tree clean, 629 project-local proofs. Phase 12.1 (The Capital-Gain Chain) is next and has no directory, no CONTEXT, no research, no plans. Its BLOCKING constraint: the dividend scope reclassification and the Form 1040 lines-3a/3b wiring must land as ONE atomic change, because doing either half alone makes the engine report a confident zero where it currently refuses honestly. Approved run: 12.1 -> 13 -> 15 -> 16 -> 17 -> 18, skipping 14 (needs the taxpayer's real documents)."
-last_updated: "2026-08-08T10:33:22.917Z"
+stopped_at: "PAUSED 2026-08-08, between phases with nothing in progress. Phases 11 and 12 both shipped and merged (PRs #53, #54), plus a ROADMAP totals correction (#55). Then, out of roadmap order and at the phase owner's request for a stakeholder showcase: v0.12.0 released (#57) and the browser demo re-pinned to it (#58). main = develop = origin = 694d580, CI green, 0 open PRs, working tree clean, 629 project-local proofs, tsc clean. Phase 12.1 (The Capital-Gain Chain) is next and has no directory, no CONTEXT, no research, no plans. Its BLOCKING constraint: the dividend scope reclassification and the Form 1040 lines-3a/3b wiring must land as ONE atomic change, because doing either half alone makes the engine report a confident zero where it currently refuses honestly. SECOND blocking constraint, new: 12.1 edits the two modules the demo anchors into most, so after it merges the demo's source anchors must be re-resolved AND step 4's narration re-read — once dividends are modeled, 'the whole return refuses' silently becomes false. Approved run: 12.1 -> 13 -> 15 -> 16 -> 17 -> 18, skipping 14 (needs the taxpayer's real documents)."
+last_updated: "2026-08-08T18:55:00.000Z"
 last_activity: 2026-08-08
 progress:
   total_phases: 19
