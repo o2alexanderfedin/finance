@@ -32,7 +32,7 @@ export const render = root => {
     }))
     claim.append(el('p', {
         text: 'This is not a slideshow of screenshots and it is not a mock. The pages '
-            + 'import the same modules that npm test runs 492 proofs against, and call '
+            + 'import the same modules that npm test runs 629 proofs against, and call '
             + 'them directly.',
     }))
     root.append(claim)
@@ -83,7 +83,7 @@ export const render = root => {
             ['Engine', 'Pure FunctionalScript modules under fjs/', 'Same code in Node, in a browser, and under test'],
             ['Effects', 'Requests as data, satisfied by a host map', 'What a program may do is a list you can read'],
             ['Storage', 'Content-addressed store (SHA-256) + revision log', 'A document\'s name is its content'],
-            ['Interface', 'MCP server over stdio, six tools', 'An assistant can drive it without a bespoke API'],
+            ['Interface', 'MCP server over stdio, twelve tools', 'An assistant can drive it without a bespoke API'],
             ['Proofs', 'Every module exports its own proof object', 'Source and test are the same file'],
             ['This demo', 'Vanilla HTML, CSS and ES modules', 'Zero dependencies, zero build step, static hosting'],
         ],
@@ -181,7 +181,7 @@ export const render = root => {
 
     root.append(sourceFooter([
         { label: 'fjs/return/scope — the six modeled and forty-four refused kinds', path: 'fjs/return/scope/module.f.js', line: 306, proofLine: 364 },
-        { label: 'fjs/return/profile — the frozen kind vocabulary', path: 'fjs/return/profile/module.f.js', line: 93, proofLine: 447 },
+        { label: 'fjs/return/profile — the frozen kind vocabulary', path: 'fjs/return/profile/module.f.js', line: 104, proofLine: 469 },
         { label: 'fjs/form1040/core — the whole-return entry point', path: 'fjs/form1040/core/module.f.js', line: 1002, proofLine: 1397 },
         { label: `CHANGELOG.md — what is in ${release}, and what is not`, path: 'CHANGELOG.md' },
         { label: 'AGENTS.md — the rules this codebase is held to', path: 'AGENTS.md' },

@@ -2,7 +2,7 @@
  * The one place this demo reaches into the engine.
  *
  * Everything below is imported from the SHIPPED modules under `fjs/` — the
- * same files `npm test` runs 492 proofs against. Nothing is re-implemented
+ * same files `npm test` runs 629 proofs against. Nothing is re-implemented
  * here, nothing is mocked, and no number this demo displays is typed into a
  * fixture except the ones explicitly labelled as hand-transcribed expected
  * values.
