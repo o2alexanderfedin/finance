@@ -24,6 +24,47 @@ Four things, and nothing else:
   12.1 lands, and that is correct: a boxes-2b/2c/2d return is genuinely unmodeled until the chain
   exists, and TAX-16's scope guard exists to say so loudly rather than compute something wrong.
 
+## AMENDED 2026-08-07, after research — criterion 1 was self-contradictory
+
+Research found, and the orchestrator verified against source, that this document as first written
+could not be satisfied. Recorded rather than quietly corrected:
+
+- `fjs/return/scope/module.f.js:135-136` classifies `qualifiedDividends` and `ordinaryDividends` as
+  **unmodeled**, refusing any return that declares them — with remedy text pointing at "Phase 12".
+- `fjs/form1040/core/module.f.js:386-387` sets lines 3a/3b to `declaredZero`, and `:755` hardcodes
+  `qualifiedDividendsCents: 0n` at the `dispatchLine16` call site.
+
+So "a box 1b > 0 case **reaches** the QDCGT worksheet" required editing `fjs/return/` — which this
+same document forbids two sections below. The error is in the criterion, not in the code: *reaching*
+a worksheet is computation, and this phase's own declared boundary is "stores and reads."
+
+**Resolution — all wiring moves to Phase 12.1**, which is the split the phase owner already chose
+(12 = documents, 12.1 = chain):
+
+- **Phase 12 (here):** `vnd.fjs.1099div` stores the full box list including 1b, and a proof
+  demonstrates the stored value has exactly the shape `qdcgt` consumes. **No wiring.** The scope
+  guard goes on refusing declared dividends, which is CORRECT until the wiring exists — Phase 10's
+  own docstring says it: *"an engine that can compute a worksheet is not thereby an engine that can
+  read the form feeding it."*
+- **Phase 12.1:** reclassify `qualifiedDividends`/`ordinaryDividends` as modeled (the paired edit
+  `fjs/return/scope` explicitly demands — growing the modeled list must be paired with a deletion
+  from `unmodeledKindRefusals`), wire lines 3a/3b, delete the hardcoded `0n`, and build the
+  8949 → Schedule D → Schedule D Tax Worksheet chain.
+
+**Why this ordering is safe and the reverse is not.** Reclassifying scope WITHOUT wiring lines 3a/3b
+would produce silent-zero dividend income — a return that computes a confident, wrong number instead
+of refusing. That is the precise failure TAX-16's scope guard exists to prevent, and it is worse
+than the refusal it would replace.
+
+**One exception to "do not touch `fjs/return/`", deliberately granted:** Schedule B (TAX-07) needs
+taxpayer-declared foreign-account answers, and research confirmed those fields do **not** yet exist
+on `vnd.fjs.return_profile`. Adding them is an ADDITIVE dialect change — modeling what the taxpayer
+declares, which is document work. It must NOT touch the modeled/unmodeled partition in
+`fjs/return/scope/module.f.js`. That partition is Phase 12.1's to change, atomically, with its
+paired deletion.
+
+---
+
 **TAX-08 IS ALREADY DELIVERED. DO NOT REBUILD IT.**
 
 `fjs/tax/line16/qdcgt/module.f.js` is a complete 634-line Qualified Dividends and Capital Gain Tax
