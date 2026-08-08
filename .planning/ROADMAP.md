@@ -142,7 +142,7 @@ These were established by execution, not inference. Any replan must preserve the
 
 ### Week 3 — Breadth in Documents
 
-- [x] **Phase 11: Wage, Retirement, and Benefit Documents** - W-2, SSA-1099, 1099-R, the document library, and the retraction story (completed 2026-08-08)
+- [x] **Phase 11: Wage, Retirement, and Benefit Documents** - W-2, SSA-1099, 1099-R, the document library, and the retraction story (completed 2026-08-07)
 - [ ] **Phase 12: Brokerage Documents and the Capital-Gain Chain** - 1099-DIV *with* QDCGT, 1099-B, Schedule B/8949/D and the Schedule D Tax Worksheet
 - [ ] **Phase 13: The 65+ Profile and the Remaining Schedules** - Schedule 1-A, the Social Security Benefits Worksheet, 8812, Schedule A, Schedules 1/2/3
 
