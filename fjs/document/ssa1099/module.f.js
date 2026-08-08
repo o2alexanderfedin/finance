@@ -113,14 +113,19 @@ const moneyBoxFields = /** @type {const} */ ([
 
 /**
  * Checks the semantic refinements the structural schema cannot express:
- * `formRevision` is non-empty (DOC-10), and every PRESENT money box is an
- * exact decimal within safe magnitude. Absent boxes are skipped, never
- * defaulted (DOC-11). `box3Description`/`box4Description`/`recipientName`
- * are plain optional strings, never validated beyond structural
- * `option(string)` — they are never computed on.
+ * `payerTin` must be the empty string (the module docstring's "ALWAYS
+ * stored as `''`" deviation — SSA-1099 prints no payer TIN), `formRevision`
+ * is non-empty (DOC-10), and every PRESENT money box is an exact decimal
+ * within safe magnitude. Absent boxes are skipped, never defaulted
+ * (DOC-11). `box3Description`/`box4Description`/`recipientName` are plain
+ * optional strings, never validated beyond structural `option(string)` —
+ * they are never computed on.
  * @type {(r: Ssa1099) => Result<Ssa1099, Ssa1099Error>}
  */
 export const checkReferences = r => {
+    if (r.payerTin !== '') {
+        return error(`payerTin must be the empty string for vnd.fjs.ssa1099 (SSA-1099 prints no payer TIN)`)
+    }
     if (r.formRevision.trim() === '') {
         return error(`formRevision must not be empty or whitespace-only`)
     }
@@ -263,6 +268,15 @@ export const proof = {
     checkReferences: {
         emptyFormRevisionRejected: () => {
             assertEq(validate({ ...minimal, formRevision: '' })[0], 'error')
+        },
+        // The control to payerTinEmptyStringRoundTrips above (AGENTS.md "a
+        // gate needs a control"): the module docstring's "payerTin is
+        // ALWAYS ''" invariant is refused, not merely accepted, when
+        // violated -- e.g. by a future from_ocr converter writing a
+        // real-looking TIN into this field.
+        nonEmptyPayerTinRejected: () => {
+            const [t, v] = validate({ ...minimal, payerTin: '99-9999999' })
+            assertEq(t, 'error', ['expected a non-empty payerTin to be refused', t, v])
         },
         // T-11-01-01: every money box named in `moneyBoxFields` is proven to
         // actually be walked by the exactness loop, not merely assumed
