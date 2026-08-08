@@ -316,8 +316,9 @@ test(
             const documentsListed = JSON.parse(documentsListResponse.result.content[0].text)
             assert.ok(Array.isArray(documentsListed), 'expected finance_documents_list to answer a JSON array')
             assert.ok(
-                documentsListed.some(entry => entry.subject === subjectA || entry.subject === subjectB || entry.subject === subjectC),
-                `expected finance_documents_list to include one of the already-seeded subjects: ${JSON.stringify(documentsListed)}`)
+                [subjectA, subjectB, subjectC].every(
+                    s => documentsListed.some(entry => entry.subject === s)),
+                `expected finance_documents_list to include all three seeded subjects: ${JSON.stringify(documentsListed)}`)
 
             // ── The decisive call: fjs_run through the real, separate
             // process — a real write-then-import of the materialized
