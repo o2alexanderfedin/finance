@@ -296,8 +296,12 @@ structural (RTTI) and semantic passes.
 - [x] **TAX-06** *(T1)*: Standard deduction with age and blindness increments.
 - [ ] **TAX-07** *(T2)*: Schedule B — interest and ordinary dividends, including the $1,500
       threshold and the foreign-account questions.
-- [ ] **TAX-08** *(T2)*: Qualified Dividends and Capital Gain Tax Worksheet (~25 lines),
+- [x] **TAX-08** *(T2)*: Qualified Dividends and Capital Gain Tax Worksheet (~25 lines),
       which calls **back into** the Tax Table for its ordinary-income component.
+      **Delivered in Phase 10**, not Phase 12 as the roadmap originally scheduled:
+      `fjs/tax/line16/qdcgt/module.f.js` imports `baseTaxForAmount` from `fjs/tax/table`
+      and its proofs assert `method22 === 'taxTable'`. Verified 2026-08-07 while scoping
+      Phase 12; the phase text that scheduled building it was stale and has been corrected.
 - [ ] **TAX-09** *(T2)*: **Schedule 1-A Parts I/V/VI** — mandatory given TY2025 + 65+.
       Senior deduction with 6% phase-out over $75k/$150k, feeding Form 1040 line 13b.
 - [ ] **TAX-10** *(T2)*: Social Security Benefits Worksheet — a 19-line near-circular
