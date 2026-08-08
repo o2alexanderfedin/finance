@@ -27,6 +27,10 @@
  * DOC-09) — printed retirement/benefit forms, following the same "read from
  * the schema, never guess" rule as every other dialect here.
  *
+ * `vnd.fjs.1099div` and `vnd.fjs.1099b` are the eighth and ninth (DOC-06,
+ * DOC-07) — printed brokerage forms, following the same "read from the
+ * schema, never guess" rule as every other dialect here.
+ *
  * ## Unknown dialect: a tool-level `errorResult`, never a throw
  *
  * `toolEntry` already rejects a call missing `dialect` via its own RTTI
@@ -52,6 +56,8 @@ import { dialect as medicalExpensesDialect, medicalExpensesSchema } from '../../
 import { dialect as returnProfileDialect, returnProfileSchema } from '../../return/profile/module.f.js'
 import { dialect as oneZeroNineNineRDialect, oneZeroNineNineRSchema } from '../../document/1099r/module.f.js'
 import { dialect as ssa1099Dialect, ssa1099Schema } from '../../document/ssa1099/module.f.js'
+import { dialect as oneZeroNineNineDivDialect, oneZeroNineNineDivSchema } from '../../document/1099div/module.f.js'
+import { dialect as oneZeroNineNineBDialect, oneZeroNineNineBSchema } from '../../document/1099b/module.f.js'
 import { stringify as jsonText } from '../../json/module.f.js'
 
 /** @import { Type } from 'functionalscript/fjs/types/rtti/module.f.js' */
@@ -76,6 +82,8 @@ const dialectSchemas = {
     [returnProfileDialect]: returnProfileSchema,
     [oneZeroNineNineRDialect]: oneZeroNineNineRSchema,
     [ssa1099Dialect]: ssa1099Schema,
+    [oneZeroNineNineDivDialect]: oneZeroNineNineDivSchema,
+    [oneZeroNineNineBDialect]: oneZeroNineNineBSchema,
 }
 
 /** The known dialect tags, in declaration order — used in the refusal message. */
@@ -100,12 +108,12 @@ const knownDialects = /** @type {readonly string[]} */ (Object.keys(dialectSchem
  * `expectedMoneyBoxFieldCount` idiom `fjs/tax/boundary` and
  * `fjs/document/1099int` already use. Raise it in the same commit that
  * registers a new dialect, and add that dialect's own `*Resolves` leaf. This
- * commit registers the SIXTH AND SEVENTH dialects (`vnd.fjs.1099r`,
- * `vnd.fjs.ssa1099`) at once, so the count moves from 5 to 7 in one step and
- * both new dialects gained their own `*Resolves` leaf below.
+ * commit registers the EIGHTH AND NINTH dialects (`vnd.fjs.1099div`,
+ * `vnd.fjs.1099b`), so the count moves from 7 to 9 in one step and both new
+ * dialects gained their own `*Resolves` leaf below.
  * @type {number}
  */
-const expectedKnownDialectCount = 7
+const expectedKnownDialectCount = 9
 
 /**
  * `finance_schema(dialect)`: the MCP tool. Looks `dialect` up in
@@ -168,7 +176,7 @@ export const proof = {
     // dialect's own schema const — never a hand-written JSON literal, which
     // would reintroduce the second-source-of-truth MCP-06 forbids), plus one
     // leaf for the unknown-dialect refusal and one hand-typed count that the
-    // refusal loop cannot supply itself. Nine leaves total.
+    // refusal loop cannot supply itself. Eleven leaves total.
     oneZeroNineNineIntResolves: () => {
         const result = call('vnd.fjs.1099int')
         assertEq(result.isError, undefined)
@@ -223,6 +231,22 @@ export const proof = {
         assertEq(
             JSON.stringify(JSON.parse(textOf(result))),
             JSON.stringify(toJsonSchema(ssa1099Schema)),
+        )
+    },
+    oneZeroNineNineDivResolves: () => {
+        const result = call('vnd.fjs.1099div')
+        assertEq(result.isError, undefined)
+        assertEq(
+            JSON.stringify(JSON.parse(textOf(result))),
+            JSON.stringify(toJsonSchema(oneZeroNineNineDivSchema)),
+        )
+    },
+    oneZeroNineNineBResolves: () => {
+        const result = call('vnd.fjs.1099b')
+        assertEq(result.isError, undefined)
+        assertEq(
+            JSON.stringify(JSON.parse(textOf(result))),
+            JSON.stringify(toJsonSchema(oneZeroNineNineBSchema)),
         )
     },
     // An unknown dialect is a tool-level errorResult, never a throw — names

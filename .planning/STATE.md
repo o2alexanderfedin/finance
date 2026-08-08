@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
 status: verifying
-stopped_at: Completed 11-04-PLAN.md
-last_updated: "2026-08-08T00:15:00.825Z"
+stopped_at: Completed 12-05-PLAN.md
+last_updated: "2026-08-08T03:27:10.383Z"
 last_activity: 2026-08-08
 progress:
-  total_phases: 18
-  completed_phases: 11
-  total_plans: 53
-  completed_plans: 56
+  total_phases: 19
+  completed_phases: 12
+  total_plans: 58
+  completed_plans: 61
   percent: 100
 ---
 
@@ -22,11 +22,11 @@ See: .planning/PROJECT.md (updated 2026-08-03)
 
 **Core value:** The report is a program, not an answer — the agent emits FunctionalScript;
 the server executes it as a pure function of `(documents, tax-year parameters) → report`.
-**Current focus:** Phase 11 — Wage, Retirement, and Benefit Documents
+**Current focus:** Phase 12 — Brokerage Documents
 
 ## Current Position
 
-Phase: 11 (Wage, Retirement, and Benefit Documents) — EXECUTING
+Phase: 12 (Brokerage Documents) — EXECUTING
   Ten plans across six waves. The plan set was returned BLOCKER by `gsd-plan-checker`
   (four blockers, ten warnings), revised, re-checked, and only then executed.
 Plan: 5 of 5
@@ -122,6 +122,11 @@ proofs and moves with submodule initialization state — which is exactly how a 
 | Phase 11 P03 | 30min | 2 tasks | 1 files |
 | Phase 11 P04 | 20min | 1 tasks | 1 files |
 | Phase 11 P05 | 20min | 1 tasks | 2 files |
+| Phase 12 P01 | 20min | 2 tasks | 1 files |
+| Phase 12 P02 | 21min | 2 tasks | 1 files |
+| Phase 12 P03 | 20min | 1 tasks | 1 files |
+| Phase 12 P04 | 35min | 1 tasks | 1 files |
+| Phase 12 P05 | 35min | 3 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -266,6 +271,15 @@ Full log in PROJECT.md Key Decisions. Recent decisions affecting current work:
 - [Phase 11-04]: expectedKnownDialectCount bumped 5 -> 7 in one commit registering both vnd.fjs.1099r and vnd.fjs.ssa1099 together (both dialect modules already existed from Plan 11-01); guard verified load-bearing by mutating to 6 and watching everyRegisteredDialectIsCounted fail with [7, 6, ...], then restored
 - [Phase 11-05]: financeDocumentsListTool inserted between financeTaxParamsTool and fjsRunTool in financeMcpHandlers, reusing the same evo/fileCas expressions the surrounding lines already construct
 - [Phase 11-05]: Same-commit ordering constraint (finance_documents_list registry entry + integration test call) verified live by mutation: commenting out only the call/assert block reddened toolsCalled/advertisedTools with the predicted diff, then restored byte-identical
+- [Phase 12]: vnd.fjs.1099div: sourceArtifactHash required (not option), validated via isHash, kept off the shared base() helper
+- [Phase 12]: DOC-06 shape proof uses a JSDoc @import type-only reference to QdcgtInput plus a runtime assertEq -- no runtime import of the QDCGT worksheet, dispatch, scope, or form1040 aggregation
+- [Phase 12]: Boxes 8-11 (profit-or-loss) reuse the shared negative-accepting moneyFieldError loop rather than a separate check
+- [Phase 12]: applicableCheckboxOnForm8949 stores the payer-printed A-F letter verbatim, never derived from boxes 2/5/12 (Phase 12.1's job)
+- [Phase 12-03]: No checkReferences cross-field rule links the four new foreign-account fields to each other or to declaredKinds -- Schedule B (Plan 12-04) decides what to do with the combination
+- [Phase 12-04]: Schedule B's $1,500 threshold is two INDEPENDENT strict comparisons, never a combined line4+line6 sum
+- [Phase 12-04]: Schedule B Part III foreign-account fields are read verbatim from vnd.fjs.return_profile, proven with zero stored 1099s so the read cannot be mistaken for document-derived inference
+- [Phase 12]: DOC-13's provenance proof lives in a new proof-only module (fjs/document/consolidated_provenance/module.f.js), not inside either dialect's own file, since the property spans both dialects plus formSubject
+- [Phase 12]: expectedKnownDialectCount bumped directly 7 -> 9 in one commit (both new dialects registered together), mirroring Phase 11's 11-04 precedent
 
 ### Pending Todos
 
@@ -410,8 +424,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-08-08T00:12:34.606Z
-Stopped at: Completed 11-04-PLAN.md
+Last session: 2026-08-08T03:27:10.373Z
+Stopped at: Completed 12-05-PLAN.md
 sweep verified and APPROVED by the phase owner.
 (measure the suite rather than quoting it — see "Test metrics" above. Next: Phase 11. Verification of
 Phase 10 is dispatched separately and was NOT run by the executor.)

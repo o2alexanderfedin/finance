@@ -100,8 +100,18 @@ These were established by execution, not inference. Any replan must preserve the
 3. **Document formats have zero dependencies** and are genuinely parallel with the
    execution spine. → Phase 5 ∥ Phase 3.
 4. **The 1099-DIV dialect FORCES the QDCGT worksheet** (box 1b > 0) **and the Schedule D
-   Tax Worksheet** (boxes 2b/2d). They are scheduled *together*, never sequentially.
-   → Phase 12 holds DOC-06, TAX-08, and TAX-11 in one phase.
+   Tax Worksheet** (boxes **2b, 2c and 2d** — i1040gi p31 Exception 1 names all three; earlier
+   revisions of this line said "2b/2d" and were wrong. Corrected 2026-08-07).
+   **AMENDED 2026-08-07 — this constraint is now historical.** It read "→ Phase 12 holds DOC-06,
+   TAX-08, and TAX-11 in one phase," which no longer describes reality on two counts. TAX-08's
+   QDCGT worksheet **already shipped in Phase 10** (`fjs/tax/line16/qdcgt/module.f.js`), and the
+   remainder was split on 2026-08-07 into Phase 12 (documents: DOC-06, DOC-07, DOC-13, TAX-07) and
+   Phase 12.1 (the chain: TAX-11, TAX-15).
+   **The constraint's INTENT survives and is still binding**: never ship a dialect whose forcing
+   worksheet does not exist. What actually happened is the harmless inverse — the worksheet shipped
+   first, alone — and Phase 12.1 closes the gap by reclassifying dividends as modeled and wiring
+   Form 1040 lines 3a/3b in the same atomic change. Doing either half without the other yields a
+   confident zero where a refusal belongs.
 5. **Money before any report program.** Retrofitting `Cents` after report programs exist
    means rewriting every one of them. → Phase 4, before Phase 9 and Phase 10.
 6. **The Evo subject model before any real document is stored.** CAS has no delete;
@@ -143,12 +153,33 @@ These were established by execution, not inference. Any replan must preserve the
 ### Week 3 — Breadth in Documents
 
 - [x] **Phase 11: Wage, Retirement, and Benefit Documents** - W-2, SSA-1099, 1099-R, the document library, and the retraction story (completed 2026-08-07)
-- [ ] **Phase 12: Brokerage Documents and the Capital-Gain Chain** - 1099-DIV *with* QDCGT, 1099-B, Schedule B/8949/D and the Schedule D Tax Worksheet
+- [x] **Phase 12: Brokerage Documents** - 1099-DIV, 1099-B, the consolidated-1099 document model, and Schedule B *(SPLIT from the original Phase 12, 2026-08-07)* (completed 2026-08-08)
+- [ ] **Phase 12.1: The Capital-Gain Chain** - Form 8949, Schedule D, the Schedule D Tax Worksheet, and replacing the live line-16 refusal *(SPLIT from the original Phase 12, 2026-08-07)*
 - [ ] **Phase 13: The 65+ Profile and the Remaining Schedules** - Schedule 1-A, the Social Security Benefits Worksheet, 8812, Schedule A, Schedules 1/2/3
+
+**Why Phase 12 was split (2026-08-07).** Two findings made the original single phase wrong:
+
+1. **TAX-08 was already delivered in Phase 10**, not pending. `fjs/tax/line16/qdcgt/module.f.js`
+   is a complete 634-line Qualified Dividends and Capital Gain Tax Worksheet that already calls
+   back into the Tax Table via `baseTaxForAmount`, with proofs asserting `method22 === 'taxTable'`.
+   The original phase text scheduled building it. It must be verified and closed, never rebuilt.
+2. **The remaining work is two separable bodies.** The document half (dialects, the consolidated-1099
+   model, Schedule B) has no dependency on the worksheet half (8949 → Schedule D → the Schedule D
+   Tax Worksheet, which must replace the `scheduleDTaxWorksheet` refusal that
+   `fjs/tax/line16/module.f.js` returns today). Together they exceeded the size of Phase 10, the
+   largest phase shipped so far. Splitting means a failure in the chain does not strand the dialects.
+
+**Constraint 4's "ship the worksheet WITH the dialect" was already violated, in the safe direction.**
+QDCGT shipped in Phase 10 without `vnd.fjs.1099div`. The constraint existed to prevent the opposite —
+a dialect whose forcing worksheet does not exist — so the ordering that actually occurred is the
+harmless one. Phase 12 wires the dialect into the worksheet that is already there.
 
 ### Week 4 — The Full Path Works on the User's Own Documents
 
 - [ ] **Phase 14: Acceptance — Reproducible, Cited, End-to-End** - Line-by-line match against the filed return, adversarially verified
+      **⚠ NOT AUTONOMOUS-EXECUTABLE.** This phase requires the taxpayer's real filed return and real
+      source documents to compare against. No agent can produce them. Explicitly skipped by the phase
+      owner on 2026-08-07 for the autonomous run; it needs a working session with the documents present.
 
 ### Week 5 — Technical Debt
 
@@ -411,19 +442,43 @@ Plans:
 - [x] 11-04-PLAN.md — `finance_schema`'s atomic `dialectSchemas` bump to 7 (DOC-08, DOC-09) *(wave 2, needs 11-01)*
 - [x] 11-05-PLAN.md — Register `finance_documents_list` + same-commit integration test coverage (MCP-08, TEST-03) *(wave 2, needs 11-03)*
 
-### Phase 12: Brokerage Documents and the Capital-Gain Chain
+### Phase 12: Brokerage Documents
 **Milestone**: Week 3 — Breadth in Documents
-**Goal**: The brokerage half of the profile computes correctly — and the dialects land together with the worksheets they force, not before them.
-**Depends on**: Phase 10 — **runs concurrently with Phase 11**
-**Requirements**: DOC-06, DOC-07, DOC-13, TAX-07, TAX-08, TAX-11, TAX-15
+**Goal**: Every brokerage document the declared profile produces can be stored and read, and the dividend half of the capital-gain story reaches the worksheet that already exists.
+**Depends on**: Phase 10 (the QDCGT worksheet and line-16 dispatch), Phase 11 (the dialect and document-listing precedents)
+**Requirements**: DOC-06, DOC-07, DOC-13, TAX-07
 **Tier**: T2
 **Success Criteria** (what must be TRUE):
-  1. `vnd.fjs.1099div` and the QDCGT worksheet ship **in the same phase**: a box 1b > 0 case matches the printed worksheet line by line, including its call **back into the Tax Table** for the ordinary-income component.
-  2. A boxes 2b/2d case routes through Form 8949 → Schedule D → the **Schedule D Tax Worksheet** and matches line by line.
-  3. `vnd.fjs.1099b` distinguishes a blank box 1e — "basis not reported" — from zero, proven by a case where treating it as zero changes the gain.
-  4. One consolidated brokerage PDF yields *N* typed documents with *N* subjects, each recording the same artifact hash as provenance. One uploaded file is not one document.
-  5. Schedule B applies the $1,500 threshold and the foreign-account questions; each worksheet is one named pure function carrying the printed form's line numbers, in IRS order.
-**Research**: **YES** — the QDCGT and Schedule D Tax Worksheets, and phase-out cliff behaviour.
+  1. `vnd.fjs.1099div` stores the full printed box list, and a proof demonstrates its box 1b value has exactly the shape the **already-shipped** QDCGT worksheet consumes. TAX-08 is verified and closed here, **never rebuilt**: `fjs/tax/line16/qdcgt/module.f.js` already exists. **No wiring in this phase** — `fjs/return/scope` goes on refusing declared dividends, correctly, until Phase 12.1 reclassifies them AND wires Form 1040 lines 3a/3b in the same act. Reclassifying without wiring would yield silent-zero dividend income, which is worse than the refusal it replaces.
+  2. `vnd.fjs.1099b` distinguishes a blank box 1e — "basis not reported" — from zero, proven by a case where treating it as zero **changes the gain**.
+  3. One consolidated brokerage PDF yields *N* typed documents with *N* subjects, each recording the same artifact hash as provenance. One uploaded file is not one document. Modeling and subject derivation only — no new ingestion wiring (that is Phase 16's orphan island).
+  4. Schedule B applies the $1,500 threshold and the foreign-account questions, reading stored 1099-INT and 1099-DIV documents. The foreign-account answers are taxpayer-DECLARED (they live on `vnd.fjs.return_profile`), never inferred from documents.
+**Research**: **YES** — the 1099-DIV and 1099-B printed box lists must be read from the current IRS PDFs, not from recall, per Phase 11's precedent. Note 1099-B box numbering is a known drift risk.
+**Plans**: 5 plans in 2 waves
+
+**Wave 1**
+- [x] 12-01-PLAN.md — `vnd.fjs.1099div` dialect, sourceArtifactHash, box 1b QDCGT-shape proof, Mutation Gate M1 (DOC-06) *(wave 1)*
+- [x] 12-02-PLAN.md — `vnd.fjs.1099b` dialect, sourceArtifactHash, box 1e/box 12 consequence proof, Mutation Gate M3 (DOC-07) *(wave 1)*
+- [x] 12-03-PLAN.md — Additive foreign-account fields on `vnd.fjs.return_profile` (TAX-07) *(wave 1)*
+
+**Wave 2** *(blocked on Wave 1 completion)*
+- [x] 12-04-PLAN.md — Schedule B: Part I/II totals, the two independent $1,500 tests, Part III echo (TAX-07) *(wave 2, needs 12-01, 12-03)*
+- [x] 12-05-PLAN.md — DOC-13 provenance proof, `finance_schema` atomic 7→9 registration, Mutation Gate M2 (DOC-13) *(wave 2, needs 12-01, 12-02)*
+
+### Phase 12.1: The Capital-Gain Chain
+**Milestone**: Week 3 — Breadth in Documents
+**Goal**: A brokerage sale flows all the way to line 16 — replacing the refusal that stands there today.
+**Depends on**: Phase 12 (`vnd.fjs.1099b` supplies the sales this chain computes over)
+**Requirements**: TAX-11, TAX-15
+**Tier**: T2
+**Success Criteria** (what must be TRUE):
+  1. A boxes 2b/2c/2d case routes through Form 8949 → Schedule D → the **Schedule D Tax Worksheet** and matches the printed forms line by line.
+  2. `dispatchLine16`'s `scheduleDTaxWorksheet` branch **computes instead of refusing**. It returns a refusal today (`fjs/tax/line16/module.f.js`); after this phase that branch produces a figure. The refusal path must remain reachable for genuinely unmodeled input — the scope guard (TAX-16) is not weakened.
+  2a. **The dividend wiring, moved here from Phase 12 on 2026-08-07.** `qualifiedDividends` and `ordinaryDividends` are reclassified from unmodeled to modeled in `fjs/return/scope/module.f.js` — paired with their deletion from `unmodeledKindRefusals`, which that module structurally requires — **in the same change** that wires Form 1040 lines 3a/3b in `fjs/form1040/core/module.f.js` and deletes the hardcoded `qualifiedDividendsCents: 0n` at the `dispatchLine16` call site. Doing the reclassification without the wiring produces a return that confidently reports zero dividend income instead of refusing: the exact failure TAX-16 exists to prevent, and strictly worse than the refusal it replaces.
+  3. Form 8949's categories are driven by the box-1e distinction Phase 12 delivered: basis-reported vs. basis-not-reported, short-term vs. long-term.
+  3a. **DOC-07's consequence must be RE-PROVEN here against real gain computation.** Phase 12 discharged it as far as a document phase can: `fjs/document/1099b`'s `criterion2GainConsequence` shows a proof-local `naiveGain` yields $10,000 for an absent box 1e versus $4,000 for a present one. But that helper is proof-local, so **no production mutation can redden it** — there was no production gain computation in Phase 12 to mutate. Once 8949/Schedule D compute real gains, a mutation that conflates absent-basis with zero-basis must turn a REAL proof red. Until then DOC-07 is demonstrated, not mutation-guarded.
+  4. Each worksheet is one named pure function carrying the printed form's line numbers, in IRS order (TAX-15). **No variable named `magi`** — the MAGI for the IRA deduction, Roth eligibility, the Premium Tax Credit, IRMAA, and the student-loan-interest deduction have different add-back lists, and one name for five quantities is how they get confused.
+**Research**: **YES** — the Schedule D Tax Worksheet's own line structure, and whether it is cent-exact or whole-dollar (the same open assumption A2 that the Tax Computation Worksheet carries; exactly one recorded value moves if it is wrong).
 **Plans**: TBD
 
 ### Phase 13: The 65+ Profile and the Remaining Schedules
@@ -547,7 +602,7 @@ Phases 16-18 are backlog: unordered, independent of each other and of the critic
 | 9. Traceable Report Lines | Week 2 | 8/8 | Complete   | verified 2026-08-06 |
 | 10. 1040 Core and Scope Guard | Week 2 | 10/10 | Complete   | verified 2026-08-06 5/5 |
 | 11. Wage, Retirement, Benefit Documents | Week 3 | 5/5 | Complete   | 2026-08-08 |
-| 12. Brokerage and Capital-Gain Chain | Week 3 | 0/TBD | Not started | - |
+| 12. Brokerage and Capital-Gain Chain | Week 3 | 5/5 | Complete   | 2026-08-08 |
 | 13. The 65+ Profile and Schedules | Week 3 | 0/TBD | Not started | - |
 | 14. Acceptance | Week 4 | 0/TBD | Not started | - |
 | 15. Realism Polish and Upstream | Week 5 | 0/TBD | Not started | - |

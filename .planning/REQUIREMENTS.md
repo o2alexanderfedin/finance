@@ -220,10 +220,10 @@ structural (RTTI) and semantic passes.
 - [x] **DOC-05** *(T2 → pulled forward to Phase 5)*: `vnd.fjs.w2` — box 12 as a list of
       `(code, amount)` pairs (box-12 confusion is a documented model failure); boxes 15–20
       stored faithfully as a repeating array and never computed on.
-- [ ] **DOC-06** *(T2)*: `vnd.fjs.1099div`. **Adding this dialect forces the QDCGT
+- [x] **DOC-06** *(T2)*: `vnd.fjs.1099div`. **Adding this dialect forces the QDCGT
       worksheet** (box 1b > 0) and the Schedule D Tax Worksheet (boxes 2b/2d) — schedule
       the worksheet with the dialect, not after it.
-- [ ] **DOC-07** *(T2)*: `vnd.fjs.1099b` — including the distinction that a blank box 1e
+- [x] **DOC-07** *(T2)*: `vnd.fjs.1099b` — including the distinction that a blank box 1e
       means "basis not reported", which is **not** zero.
 - [x] **DOC-08** *(T2)*: `vnd.fjs.ssa1099` — required by the 65+ profile.
 - [x] **DOC-09** *(T2)*: `vnd.fjs.1099r` — required by the 65+ profile.
@@ -233,7 +233,7 @@ structural (RTTI) and semantic passes.
 - [x] **DOC-11** *(T1)*: Every box is explicitly absent-able. Blank is not zero.
 - [x] **DOC-12** *(T1)*: The `CORRECTED` checkbox is modelled as data. It is printed on the
       form itself, so amendment is a read signal, not an inference.
-- [ ] **DOC-13** *(T2)*: A consolidated brokerage 1099 yields *N* typed documents from one
+- [x] **DOC-13** *(T2)*: A consolidated brokerage 1099 yields *N* typed documents from one
       PDF. One uploaded file is not one document.
 - [x] **DOC-14** *(T1)*: Documented CLI ingestion route for artifacts over 128 KiB
       (`npx functionalscript cas add`), plus a cache-refresh path so a store mutated by
@@ -294,10 +294,14 @@ structural (RTTI) and semantic passes.
       for every threshold in the parameter data.
 - [x] **TAX-05** *(T1)*: Form 1040 core lines 1a–37.
 - [x] **TAX-06** *(T1)*: Standard deduction with age and blindness increments.
-- [ ] **TAX-07** *(T2)*: Schedule B — interest and ordinary dividends, including the $1,500
+- [x] **TAX-07** *(T2)*: Schedule B — interest and ordinary dividends, including the $1,500
       threshold and the foreign-account questions.
-- [ ] **TAX-08** *(T2)*: Qualified Dividends and Capital Gain Tax Worksheet (~25 lines),
+- [x] **TAX-08** *(T2)*: Qualified Dividends and Capital Gain Tax Worksheet (~25 lines),
       which calls **back into** the Tax Table for its ordinary-income component.
+      **Delivered in Phase 10**, not Phase 12 as the roadmap originally scheduled:
+      `fjs/tax/line16/qdcgt/module.f.js` imports `baseTaxForAmount` from `fjs/tax/table`
+      and its proofs assert `method22 === 'taxTable'`. Verified 2026-08-07 while scoping
+      Phase 12; the phase text that scheduled building it was stale and has been corrected.
 - [ ] **TAX-09** *(T2)*: **Schedule 1-A Parts I/V/VI** — mandatory given TY2025 + 65+.
       Senior deduction with 6% phase-out over $75k/$150k, feeding Form 1040 line 13b.
 - [ ] **TAX-10** *(T2)*: Social Security Benefits Worksheet — a 19-line near-circular
