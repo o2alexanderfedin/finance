@@ -492,7 +492,20 @@ Plans:
   3a. **DOC-07's consequence must be RE-PROVEN here against real gain computation.** Phase 12 discharged it as far as a document phase can: `fjs/document/1099b`'s `criterion2GainConsequence` shows a proof-local `naiveGain` yields $10,000 for an absent box 1e versus $4,000 for a present one. But that helper is proof-local, so **no production mutation can redden it** — there was no production gain computation in Phase 12 to mutate. Once 8949/Schedule D compute real gains, a mutation that conflates absent-basis with zero-basis must turn a REAL proof red. Until then DOC-07 is demonstrated, not mutation-guarded.
   4. Each worksheet is one named pure function carrying the printed form's line numbers, in IRS order (TAX-15). **No variable named `magi`** — the MAGI for the IRA deduction, Roth eligibility, the Premium Tax Credit, IRMAA, and the student-loan-interest deduction have different add-back lists, and one name for five quantities is how they get confused.
 **Research**: **YES** — the Schedule D Tax Worksheet's own line structure, and whether it is cent-exact or whole-dollar (the same open assumption A2 that the Tax Computation Worksheet carries; exactly one recorded value moves if it is wrong).
-**Plans**: TBD
+**Plans**: 5 plans in 4 waves
+
+**Wave 1**
+- [ ] 12.1-01-PLAN.md — Form 8949 category derivation, aggregation, absent-basis/box-1f/1g refusal, Mutation Gate M1 (TAX-11) *(wave 1)*
+- [ ] 12.1-02-PLAN.md — The 47-line Schedule D Tax Worksheet, both worked examples, degenerate QDCGT equivalence (TAX-11, TAX-15) *(wave 1)*
+
+**Wave 2** *(blocked on Wave 1)*
+- [ ] 12.1-03-PLAN.md — Schedule D lines 1a-21, the loss-cap three-way branch, the two bounded sub-worksheets, Mutation Gate M2 (TAX-11) *(wave 2, needs 12.1-01)*
+
+**Wave 3** *(blocked on Wave 2 — the atomic scope + Form 1040 wiring)*
+- [ ] 12.1-04-PLAN.md — Six-kind scope reclassification + branch-2a computation + Form 1040 lines 3a/3b/7a wiring + Mutation Gates M3/M4/M5 (TAX-11, TAX-15) *(wave 3, needs 12.1-01, 12.1-02, 12.1-03)*
+
+**Wave 4** *(blocked on Wave 3)*
+- [ ] 12.1-05-PLAN.md — Demo `04-refusal.js` fix: offered[] and stale count/anchor (TAX-11) *(wave 4, needs 12.1-04)*
 
 ### Phase 13: The 65+ Profile and the Remaining Schedules
 **Milestone**: Week 3 — Breadth in Documents
