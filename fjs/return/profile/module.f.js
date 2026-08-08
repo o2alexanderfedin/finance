@@ -689,6 +689,17 @@ export const proof = {
                 receivedForeignTrustDistributionOrWasGrantorOrTransferor: false,
             })
             assertEq(t2, 'error')
+            // `requiredToFileFinCen114` was omitted here until the Phase 12
+            // code review (12-REVIEW.md WR-01). The omission was not a live
+            // defect — the shipped schema already rejected `false` — but it
+            // was an unguarded one: widening this single field from
+            // `option(true)` to `option(boolean)` passed `tsc --noEmit` AND
+            // the entire suite with zero failures. A green suite over a
+            // silently shrunk guarantee is exactly the failure this file's
+            // sibling count-constants exist to prevent, so every checkbox on
+            // this dialect is asserted individually rather than by sampling.
+            const [t3] = validate({ ...minimal, requiredToFileFinCen114: false })
+            assertEq(t3, 'error')
         },
         // Pins the "no forced ordering" behavior claim as a proof, not just a
         // docstring assertion: the two printed sub-questions are independent
