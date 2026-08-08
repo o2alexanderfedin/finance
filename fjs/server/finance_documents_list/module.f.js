@@ -43,11 +43,15 @@
  * ## The `'unknown'` sentinel — a deliberate, arbitrary-but-recorded pick
  *
  * A parsed snapshot that is well-formed JSON but carries NO `dialect` field
- * at all is structurally possible under the loose schema above. CONTEXT does
- * not name a sentinel for this case (RESEARCH.md Assumption A2); this module
- * picks the literal string `'unknown'`. Any documented choice would satisfy
- * the stated success criteria — this one is recorded here so a future reader
- * does not mistake it for a discovered convention.
+ * at all, OR carries a `dialect` field of the WRONG JSON type (e.g. `dialect:
+ * 123`), is structurally possible under the loose schema above — both fail
+ * {@link documentIdentitySchema}'s structural validation the same way
+ * (`t === 'error'`), so both fall into this same sentinel below. CONTEXT does
+ * not name a sentinel for either case (RESEARCH.md Assumption A2); this
+ * module picks the literal string `'unknown'` for both. Any documented choice
+ * would satisfy the stated success criteria — this one is recorded here so a
+ * future reader does not mistake it for a discovered convention, or mistake
+ * the sentinel as covering only the narrower "missing field" case.
  *
  * ## One row per (subject, head) pair — not one row per subject
  *
@@ -254,10 +258,12 @@ const findSubject = entries => subject => entries.find(entry => entry.subject ==
  *
  * Seeds, per the plan: (1) an active document with a KNOWN dialect; (2) a
  * well-formed document with an UNREGISTERED dialect tag; (3) a well-formed
- * document with NO dialect field at all; (4) an archived-only subject (one
- * `evo.add` with `archived: true`, no prior active head); (5) a non-JSON
- * snapshot blob, written directly via `cas.write` and pointed at by a
- * revision; (6) a subject with two concurrent, unmerged heads.
+ * document with NO dialect field at all; (3b) a well-formed document whose
+ * `dialect` field is PRESENT but the wrong JSON type (IN-01); (4) an
+ * archived-only subject (one `evo.add` with `archived: true`, no prior
+ * active head); (5) a non-JSON snapshot blob, written directly via
+ * `cas.write` and pointed at by a revision; (6) a subject with two
+ * concurrent, unmerged heads.
  * @type {() => {
  *   readonly active: readonly DocumentListEntry[],
  *   readonly archived: readonly DocumentListEntry[],
@@ -302,11 +308,21 @@ const buildFixture = () => {
         e.add({ parents: [], subject: 'subjectNoDialectField', snapshot: noDialectHash }))
     assert(noDialectAdd[0] === 'ok', ['expected the no-dialect-field add to succeed', noDialectAdd])
 
+    // (3b) IN-01: a well-formed document whose `dialect` field is PRESENT
+    // but the WRONG JSON type (a number, not a string) -- a distinct way to
+    // fail documentIdentitySchema's structural validation from (3)'s
+    // missing-field case, folded into the SAME 'unknown' sentinel (see the
+    // module header's "The 'unknown' sentinel" section).
+    const [state7, wrongTypeDialectHash] = writeDoc(state6)(JSON.stringify({ dialect: 123, taxYear: 2025 }))
+    const [state8, wrongTypeDialectAdd] = virtual(state7)(
+        e.add({ parents: [], subject: 'subjectWrongTypeDialect', snapshot: wrongTypeDialectHash }))
+    assert(wrongTypeDialectAdd[0] === 'ok', ['expected the wrong-type-dialect add to succeed', wrongTypeDialectAdd])
+
     // (4) An archived-only subject: one add with archived: true, no prior
     // active head.
-    const [state7, archivedHash] = writeDoc(state6)(
+    const [state9, archivedHash] = writeDoc(state8)(
         JSON.stringify({ dialect: 'vnd.fjs.1099int', taxYear: 2025 }))
-    const [state8, archivedAdd] = virtual(state7)(
+    const [state10, archivedAdd] = virtual(state9)(
         e.add({ parents: [], subject: 'subjectArchived', snapshot: archivedHash, archived: true }))
     assert(archivedAdd[0] === 'ok', ['expected the archived-only add to succeed', archivedAdd])
 
@@ -314,29 +330,29 @@ const buildFixture = () => {
     // pointed at by a revision.
     const brokenBytes = tryUtf8('not valid json at all {{{')
     assert(brokenBytes !== null, 'expected the broken sample to encode as UTF-8')
-    const [state9, brokenWrite] = virtual(state8)(
+    const [state11, brokenWrite] = virtual(state10)(
         cas.write(pure({ first: ok(brokenBytes), tail: pure(undefined) })))
     assert(brokenWrite[0] === 'ok', ['expected the broken-blob write to succeed', brokenWrite])
     const brokenHash = vecToCBase32(brokenWrite[1])
-    const [state10, brokenAdd] = virtual(state9)(
+    const [state12, brokenAdd] = virtual(state11)(
         e.add({ parents: [], subject: 'subjectBrokenSnapshot', snapshot: brokenHash }))
     assert(brokenAdd[0] === 'ok', ['expected the broken-snapshot add to succeed', brokenAdd])
 
     // (6) A subject with two concurrent, unmerged heads.
-    const [state11, concurrentHashA] = writeDoc(state10)(
+    const [state13, concurrentHashA] = writeDoc(state12)(
         JSON.stringify({ dialect: 'vnd.fjs.1099int', taxYear: 2025, box1InterestIncome: '1.00' }))
-    const [state12, concurrentAddA] = virtual(state11)(
+    const [state14, concurrentAddA] = virtual(state13)(
         e.add({ parents: [], subject: 'subjectConcurrent', snapshot: concurrentHashA }))
     assert(concurrentAddA[0] === 'ok', ['expected the first concurrent add to succeed', concurrentAddA])
-    const [state13, concurrentHashB] = writeDoc(state12)(
+    const [state15, concurrentHashB] = writeDoc(state14)(
         JSON.stringify({ dialect: 'vnd.fjs.1099int', taxYear: 2025, box1InterestIncome: '2.00' }))
-    const [state14, concurrentAddB] = virtual(state13)(
+    const [state16, concurrentAddB] = virtual(state15)(
         e.add({ parents: [], subject: 'subjectConcurrent', snapshot: concurrentHashB }))
     assert(concurrentAddB[0] === 'ok', ['expected the second concurrent add to succeed', concurrentAddB])
 
     return {
-        active: listThrough(state14)(cas)(e)({}),
-        archived: listThrough(state14)(cas)(e)({ archived: true }),
+        active: listThrough(state16)(cas)(e)({}),
+        archived: listThrough(state16)(cas)(e)({ archived: true }),
     }
 }
 
@@ -377,6 +393,17 @@ export const proof = {
         missingDialectFieldUsesSentinel: () => {
             const { active } = buildFixture()
             const entry = findSubject(active)('subjectNoDialectField')
+            assert(entry !== undefined, active)
+            assertEq(entry.dialect, 'unknown')
+        },
+        // IN-01: a PRESENT but wrongly-typed `dialect` field (a number, not
+        // a string) is a DISTINCT structural-validation failure from the
+        // missing-field case above, and this pins that it is folded into
+        // the SAME 'unknown' sentinel rather than crashing or being treated
+        // as a genuine dialect tag.
+        wrongTypeDialectFieldUsesSentinel: () => {
+            const { active } = buildFixture()
+            const entry = findSubject(active)('subjectWrongTypeDialect')
             assert(entry !== undefined, active)
             assertEq(entry.dialect, 'unknown')
         },
