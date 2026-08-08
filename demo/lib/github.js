@@ -13,22 +13,22 @@
 import { el, anchor } from './dom.js'
 
 /**
- * The commit tagged {@link release} — the first tagged release.
+ * The commit tagged {@link release}.
  *
  * **Links are built from the SHA; the badge displays the tag.** A tag is more
  * meaningful to a reader, but a tag can be force-moved and a commit cannot, so
  * what actually goes in an href is the immutable half.
  *
- * Nothing at runtime can check that this SHA is still what `v0.10.0` points
+ * Nothing at runtime can check that this SHA is still what `v0.12.0` points
  * at — the page has no network access to ask. That check belongs to the
  * pre-demo procedure in `demo/todo/showcase-demo.md`, which resolves every
  * generated href at this exact SHA, and it is the reason the SHA rather than
  * the tag is what gets resolved.
  */
-export const sha = '96627365f49f9ff7afa33ab11168697a1a383f8f'
+export const sha = 'cfc4a121c52182e43f1dd9633baac1a42212a15e'
 
 /** The release this demo shows. Displayed wherever a version is named. */
-export const release = 'v0.10.0'
+export const release = 'v0.12.0'
 
 /** The short form, for display next to the tag. */
 export const shortSha = sha.slice(0, 7)
@@ -38,13 +38,13 @@ export const shortSha = sha.slice(0, 7)
  * own modules, counted with `node --test | grep -c '^✔ import("./fjs/'`.
  *
  * **Deliberately not `npm test`'s total.** That number includes the vendored
- * `functionalscript` proofs and therefore depends on whether the submodule
- * happens to be checked out: the same commit reports 494 in a worktree without
- * it and 2730 in one with it, both correct and neither comparable. The
- * project-local count is the only figure that means the same thing in every
- * checkout, so it is the only one on the badge.
+ * `functionalscript` proofs and therefore depends on whether that dependency
+ * happens to be present: this same commit reports 629 project-local proofs and
+ * 2867 total in a checkout that has it, both correct and neither comparable.
+ * The project-local count is the only figure that means the same thing in
+ * every checkout, so it is the only one on the badge.
  */
-export const proofCount = 492
+export const proofCount = 629
 
 const repo = 'https://github.com/fjs-dev/finance'
 

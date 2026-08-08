@@ -1,8 +1,52 @@
 # Spec: the stakeholder showcase demo
 
 **Status:** BUILT — all eight steps plus the All view, 2026-08-06
+**Re-pinned:** `v0.12.0` @ `cfc4a12`, 629 proofs, 2026-08-08
 **Written:** 2026-08-06
 **Concerns:** `demo/` (this directory's parent)
+
+> **Re-pin, 2026-08-08 — and the anchor check earned its place.** Moving from
+> `v0.10.0` (492 proofs) to `v0.12.0` (629), after Phases 11 and 12 shipped.
+>
+> **Six of the 55 anchors had silently slid**, all into
+> `fjs/return/profile/module.f.js`, because Phase 12 added the four
+> foreign-account fields above them. Every one still returned HTTP 200 and
+> landed somewhere wrong — `proofLine: 447` had come to rest on a bare `},`.
+> This is precisely the failure mode step 3 of the re-pinning procedure below
+> exists to catch, and a path-exists check would have passed all six.
+>
+> Fixed: `93 → 104` (kindVocabulary, two sites), `156 → 167`
+> (returnProfileSchema), `447 → 469` (proof, three sites).
+>
+> **Nothing else needed rewording.** Steps 0 and 4 read their counts from the
+> engine (`modeledKinds.length`, `unmodeledKindRefusals.length`) rather than
+> from a literal, so they tracked the new dialects on their own. Only five
+> hardcoded sites carried the old snapshot. That is the second-source rule from
+> the roadmap working as intended: a number is safe to state twice when
+> something can watch it drift, and these were watched by the re-pin check.
+>
+> **A second defect, and it predates this re-pin.** Step 0's stack table said
+> "MCP server over stdio, **six** tools". The registry holds **twelve** — 3 from
+> `casToolRegistry`, 4 from `evoToolRegistry`, `cas_refresh`, and the four
+> `finance_*`/`fjs_run` entries. It was wrong at `v0.10.0` too (eleven then), and
+> `CHANGELOG.md`'s own `0.10.0` entry repeats the same "six tools". Corrected to
+> twelve here, cross-checked against `fjs-run-integration.test.js`, which reads
+> `tools/list` at runtime and asserts the set it calls equals the set advertised.
+> The `0.10.0` changelog entry is left as it was written — it is a released
+> record, and amending history to hide an error is worse than the error.
+>
+> **`v0.11.0` was never cut.** Phases 11 and 12 both landed before anyone tagged,
+> so this release is `v0.12.0` and the minor position still names the highest
+> completed phase. Cutting it meant bumping `package.json` *and*
+> `fjs/server`'s `serverInfo.version` literal together — the only place those two
+> can be compared is `fjs-run-integration.test.js:217`, and that assertion was
+> mutation-verified (`9.9.9` reddens it) rather than trusted.
+>
+> **Step 4 still works, and it was not luck.** Phase 12 shipped the 1099-DIV
+> and 1099-B *dialects* but deliberately did not reclassify `fjs/return/scope`
+> — that is Phase 12.1's atomic change. So "tick the box, the whole return
+> refuses" is intact. When 12.1 lands, this step's meaning changes and the
+> narration must be re-read, not just re-pinned.
 
 > **What shipped, and where it left the spec.** Recorded here rather than in a
 > commit message, because the next person to open this file needs it.
@@ -15,7 +59,7 @@
 >   `#L`-anchor check that a plain path-exists check misses.
 > - **`functionalscript` is staged from `node_modules`, not the submodule.**
 >   The submodule is not checked out in this working tree; `npm ci` installs
->   the same package `package.json` pins, which is what the 492 proofs run
+>   the same package `package.json` pins, which is what the 629 proofs run
 >   against. `.github/workflows/pages.yml` copies it beside `demo/` and
 >   `fjs/`. This is the spec's own stated fallback, reached for a reason the
 >   spec did not anticipate.
@@ -68,7 +112,7 @@ The third looked like the hard one and turned out to be free. The engine is pure
 FunctionalScript: every module under `fjs/` imports nothing from `node:` — the only
 `node:` strings in the tree are inside proof *fixtures* asserting that a guest program
 importing `node:fs` is refused. `functionalscript`'s `virtual` (the in-memory filesystem
-all 492 proofs already run against) has no `node:` imports either. The Node-specific
+all 629 proofs already run against) has no `node:` imports either. The Node-specific
 modules are `effects/node/*.js` and `.d.ts` files, and the demo imports neither.
 
 So the page imports the shipped modules directly and executes the same code the suite
@@ -193,7 +237,10 @@ is much better that they hear them from us.
    calls the engine directly, which is real computation, not an end-to-end product flow.
 2. **The Schedule D Tax Worksheet branch refuses by design.** It is *selected* correctly
    and then refuses, naming unrecaptured §1250 gain and 28%-rate gain as unmodeled.
-   Phase 12 owns the computation.
+   Phase 12.1 owns the computation. (Phase 12 shipped the 1099-DIV and 1099-B
+   dialects but deliberately left `fjs/return/scope` alone — the reclassification and
+   the Form 1040 lines-3a/3b wiring must land as one atomic change, or the engine
+   reports a confident zero where it currently refuses honestly.)
 3. **The sandbox claim is narrower than "it cannot reach the network."** What is real and
    provable: a guest requesting `fetch` **through the effect system is refused by name**,
    and a disallowed import specifier is refused **before the module body executes**. What
@@ -209,8 +256,8 @@ is much better that they hear them from us.
 
 Every page footers to `source ↗` and `proof ↗`.
 
-Pinned to the **`v0.10.0`** release — commit
-`96627365f49f9ff7afa33ab11168697a1a383f8f` in `fjs-dev/finance`.
+Pinned to the **`v0.12.0`** release — commit
+`cfc4a121c52182e43f1dd9633baac1a42212a15e` in `fjs-dev/finance`.
 
 ```js
 // lib/github.js
@@ -222,7 +269,7 @@ export const sourceUrl = (path, line) =>
 reader, but a tag can be force-moved and a commit cannot, so the immutable half is what
 actually gets resolved. Never a branch name — `blob/main/...` rots on the next push.
 
-The build badge reads **`v0.10.0 · 492 proofs`** and opens the GitHub release, which
+The build badge reads **`v0.12.0 · 629 proofs`** and opens the GitHub release, which
 states what is in it *and what is not* — the right thing to hand someone who clicks a
 badge on a page making claims.
 
@@ -254,29 +301,34 @@ Four things must be checked together, and the third is the one that gets forgott
 ## Testing
 
 The demo is presentation code and ships no `proof` export; the engine it imports carries
-its own 492. What must be verified before the demo — **all five were run on 2026-08-06,
-and all five pass**:
+its own 629. What must be verified before the demo — **all five were re-run on
+2026-08-08 at `v0.12.0`, and all five pass**:
 
-1. **It loads from a static file server with no build step.** ✓ Verified twice: against
-   the working tree, and against a byte-for-byte simulation of what the Pages workflow
-   stages (4.1 MB, root redirect included). All eight steps plus the All view render.
+1. **It loads from a static file server with no build step.** ✓ Served with
+   `./demo/serve.sh`; all eight steps plus the All view render, each with distinct
+   content and zero `.callout-stop` render failures. **Not re-run on 2026-08-08:** the
+   byte-for-byte simulation of what the Pages workflow stages. Pages has never been
+   run and hosting is still an open decision, so that path is unexercised either way.
 2. **Every `source ↗` and `proof ↗` link resolves, and lands where it claims.** ✓ At
-   `v0.10.0`: 18 distinct paths plus the verification report, each checked with
-   `git cat-file -e <sha>:<path>` **at the pinned commit** rather than in the working
-   tree — not the same question, and only the first is what GitHub serves. Then all 20
-   source anchors and all 15 proof anchors resolved and read back, because a path that
-   exists says nothing about whether `#L159` is still `dispatchLine16`.
+   `v0.12.0`: all **18 distinct paths** checked with `git cat-file -e <sha>:<path>`
+   **at the pinned commit** rather than in the working tree — not the same question,
+   and only the first is what GitHub serves. Then all **55 anchors** resolved and read
+   back. **Six had slid** (see the re-pin note at the top); the other 49 were
+   byte-identical at both SHAs. A path-exists check would have passed all six.
+   Confirmed live in the browser: 59 rendered GitHub hrefs, every one on the pinned
+   SHA, none on a branch.
 3. **The numbers on screen match the engine.** ✓ Step 2 recomputes both hand-typed
    regression cases live and prints `✓ matches` per case; a disagreement paints a loud
    red callout instead of silently preferring one. Step 1 does the same for CAS
    addresses: it re-hashes the JSON it just printed and shouts if the address on screen
-   is not the address of the text on screen.
-4. **No console errors on any step**, including the "All" view. ✓ Zero, after adding an
-   inline `data:` favicon to remove the one 404.
-5. **The suite is still green.** ✓ 492 project-local proofs and `tsc` clean, at
-   `v0.10.0`. Gate on the project-local count, never on `npm test`'s total — that total
-   is 494 or 2730 for the same commit depending on whether the `functionalscript`
-   submodule is checked out.
+   is not the address of the text on screen. Measured on the All view: 2 `✓ matches`,
+   5 documents re-hashed and dialect-valid, 0 stop callouts, 0 mismatch text.
+4. **No console errors on any step**, including the "All" view. ✓ Zero errors and zero
+   warnings.
+5. **The suite is still green.** ✓ 629 project-local proofs and `tsc` clean, at
+   `v0.12.0`. Gate on the project-local count, never on `npm test`'s total — this same
+   commit reports 629 project-local and 2867 total in a checkout with `functionalscript`
+   installed, both correct and neither comparable.
 
 ### How to run it
 
