@@ -9,7 +9,7 @@
   "total_tasks": 5,
   "status": "between_phases_nothing_in_progress",
   "branch": "main",
-  "head": "694d580",
+  "head": "555f11c",
   "released": {
     "tag": "v0.12.0",
     "commit": "cfc4a121c52182e43f1dd9633baac1a42212a15e",
