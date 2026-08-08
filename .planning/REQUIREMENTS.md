@@ -393,7 +393,7 @@ test the thing that breaks."* It was a one-off; this section makes it a practice
 - [x] **TEST-02** *(T1)*: Every MCP tool this project exposes is exercised at least once through
       that real stdio session, not only through `virtual`. A tool proven solely in-process has
       not been proven to be reachable by a client.
-- [ ] **TEST-03** *(T2)*: Each subsequent phase that adds a tool, a dialect, or a new seam adds
+- [x] **TEST-03** *(T2)*: Each subsequent phase that adds a tool, a dialect, or a new seam adds
       real-process coverage for it in the same session harness. The standing rule: a phase is not
       complete when its virtual proofs are green — it is complete when the thing a client would
       actually call has been called.

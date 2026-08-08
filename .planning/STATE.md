@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
-status: executing
+status: verifying
 stopped_at: Completed 11-04-PLAN.md
-last_updated: "2026-08-08T00:04:08.367Z"
+last_updated: "2026-08-08T00:15:00.825Z"
 last_activity: 2026-08-08
 progress:
   total_phases: 18
-  completed_phases: 10
+  completed_phases: 11
   total_plans: 53
-  completed_plans: 55
+  completed_plans: 56
   percent: 100
 ---
 
@@ -35,7 +35,7 @@ Plan: 5 of 5
   (10-06 QDCGT, 10-07 the classifyScope scope guard, executed in parallel),
   wave 4 (10-08 dispatchLine16), wave 5 (10-09 lines 1a-15) and wave 6 (10-10
   lines 16-37 + the whole-report refusal).
-Status: Ready to execute
+Status: Phase complete — ready for verification
   phase mutation sweep was run over five sites and APPROVED by the phase owner,
   who independently reproduced the mutation-3 type hole (a spread or a bound
   local carries `lines` past excess-property checking; only `lines?: undefined`
@@ -121,6 +121,7 @@ proofs and moves with submodule initialization state — which is exactly how a 
 | Phase 11 P02 | 20min | 2 tasks | 1 files |
 | Phase 11 P03 | 30min | 2 tasks | 1 files |
 | Phase 11 P04 | 20min | 1 tasks | 1 files |
+| Phase 11 P05 | 20min | 1 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -263,6 +264,8 @@ Full log in PROJECT.md Key Decisions. Recent decisions affecting current work:
 - [Phase 11]: MCP-08: 'unknown' is the sentinel dialect for a well-formed document with no dialect field (arbitrary, recorded pick per RESEARCH.md A2)
 - [Phase 11]: MCP-08: finance_documents_list never validates against finance_schema's dialect registry -- an unregistered dialect tag is listed verbatim
 - [Phase 11-04]: expectedKnownDialectCount bumped 5 -> 7 in one commit registering both vnd.fjs.1099r and vnd.fjs.ssa1099 together (both dialect modules already existed from Plan 11-01); guard verified load-bearing by mutating to 6 and watching everyRegisteredDialectIsCounted fail with [7, 6, ...], then restored
+- [Phase 11-05]: financeDocumentsListTool inserted between financeTaxParamsTool and fjsRunTool in financeMcpHandlers, reusing the same evo/fileCas expressions the surrounding lines already construct
+- [Phase 11-05]: Same-commit ordering constraint (finance_documents_list registry entry + integration test call) verified live by mutation: commenting out only the call/assert block reddened toolsCalled/advertisedTools with the predicted diff, then restored byte-identical
 
 ### Pending Todos
 
@@ -407,7 +410,7 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-08-08T00:04:08.361Z
+Last session: 2026-08-08T00:12:34.606Z
 Stopped at: Completed 11-04-PLAN.md
 sweep verified and APPROVED by the phase owner.
 (measure the suite rather than quoting it — see "Test metrics" above. Next: Phase 11. Verification of
