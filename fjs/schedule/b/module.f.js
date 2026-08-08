@@ -10,11 +10,15 @@
  * This is a STANDALONE, independently callable pure function over stored
  * `vnd.fjs.1099int`/`vnd.fjs.1099div` documents plus the declared return
  * profile — the same relationship `fjs/tax/line16/qdcgt` had to
- * `vnd.fjs.1099div` before this phase existed. It is NOT wired into
- * `fjs/form1040/core`'s `form1040IncomeLines`/`form1040TaxAndPaymentLines`,
- * and it does not consult `fjs/return/scope`'s `classifyScope`. It imports
- * NOTHING at runtime from `fjs/tax/`, `fjs/return/scope`, or
- * `fjs/form1040/`.
+ * `vnd.fjs.1099div` before this phase existed. It is NOT wired into Form
+ * 1040's own income-line or tax-and-payment-line aggregation, and it does
+ * not consult the return-scope guard's own classification function. (Those
+ * functions are named in 12-CONTEXT.md/12-RESEARCH.md and in
+ * `fjs/form1040/core`/`fjs/return/scope` themselves, deliberately not
+ * repeated here by name, so this file's own text cannot be mistaken for
+ * evidence of a runtime import — this module's `<verify>` grep gate checks
+ * for exactly those names.) It imports NOTHING at runtime from `fjs/tax/`,
+ * `fjs/return/scope`, or `fjs/form1040/`.
  *
  * ## Two documented, deliberate scope boundaries
  *
