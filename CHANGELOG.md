@@ -6,13 +6,79 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 **While the project is pre-1.0, the minor position tracks the roadmap phase.**
-`0.10.0` is the release cut when Phase 10 completed; `0.11.0` will be the one
-cut when Phase 11 does. `1.0.0` is reserved for the release in which Phase 14
+`0.10.0` is the release cut when Phase 10 completed. **`0.11.0` was never cut** —
+Phases 11 and 12 both landed before anyone tagged, so `0.12.0` covers the pair
+and the minor position continues to name the highest completed phase.
+`1.0.0` is reserved for the release in which Phase 14
 (Acceptance) lands and a real server path produces a Form 1040 end to end —
 until then the major position stays at zero deliberately, because the engine
 cannot yet be reached from the server.
 
 ## Unreleased
+
+## 0.12.0
+
+Phases 11 and 12: the documents a real return actually arrives as. Four new
+dialects, a tool to list what has been filed, Schedule B, and a retraction hole
+closed in the code that hands a guest program its view of the store.
+
+Project-local proofs: **492 → 629**.
+
+### What is here
+
+- **Four new document dialects**, each with its own structural schema and
+  semantic validator: `vnd.fjs.1099r` (retirement distributions),
+  `vnd.fjs.ssa1099` (Social Security benefits), `vnd.fjs.1099div` (dividends)
+  and `vnd.fjs.1099b` (broker proceeds). **Nine dialects are now registered**,
+  a count `finance_schema` asserts against a hand-typed constant so that
+  registering a dialect without registering its schema fails the build.
+- **`finance_documents_list`**, a twelfth MCP tool: what has been filed, by
+  dialect, read through Evo rather than by walking the store.
+- **Schedule B** (`fjs/schedule/b`) — the interest and ordinary-dividend
+  thresholds as two independent tests, each at $1,500, proved against a return
+  that is over the combined figure while under both individual ones and so
+  triggers neither.
+- **Foreign-account fields on `vnd.fjs.return_profile`.** Additive, and the one
+  deliberate exception to Phase 12's "do not touch `fjs/return/`" boundary: no
+  IRS information return reports whether a taxpayer holds a foreign account, so
+  it can only be declared.
+- **Absence stays absent** (DOC-11/DOC-12). Every money box is optional; a blank
+  box is not a zero, and a `"0"` standing in for "not printed" is a defect. A
+  correction is `corrected: option(true)` — `false` is structurally invalid,
+  because absence is the only way to say "not corrected".
+
+### Fixed
+
+- **A retracted document was still reachable** (DOC-15). `buildRunSnapshot`
+  resolved archived subjects' heads and every blob from `cas.list()`, so a guest
+  could walk `evo_list('true') → evo_head → evo_revision → cas_read` into a
+  document that had been withdrawn. Archived revisions are now tracked by hash
+  and excluded. The first fix conflated *archived* with *failed to decode* and
+  would have silently hidden an **active** document; the two cases are now
+  distinct, and a head that fails to decode still reports loudly.
+  **The honest boundary, unchanged:** `blobs` stays unfiltered, so this does not
+  — and cannot — make retracted bytes unreadable to a party already holding
+  their exact hash.
+
+### What is NOT here
+
+- **No production caller for `form1040Report`.** No server path produces a 1040
+  today; Phase 14 owns that, and it is why this is `0.12.0` and not `1.0.0`.
+- **Dividends are read but not used.** The 1099-DIV dialect can parse the form,
+  and the engine still **refuses** a return that declares dividend income —
+  `qualifiedDividends` and `ordinaryDividends` remain unmodeled in
+  `fjs/return/scope`. Reclassifying them without simultaneously wiring Form 1040
+  lines 3a/3b would make the engine report a confident zero where it currently
+  refuses honestly, which is strictly worse. Phase 12.1 does both as one change.
+- **The Schedule D Tax Worksheet branch still refuses**, naming unrecaptured
+  §1250 gain and 28%-rate gain as unmodeled. It is *selected* correctly; that
+  selection is proven.
+- **The sandbox claim is unchanged and still narrower than "it cannot reach the
+  network."** A guest requesting `fetch` through the effect system is refused by
+  name, and a disallowed import specifier is refused before the module body
+  executes. A guest body calling `globalThis.fetch(...)` directly runs with host
+  privileges — a recorded accepted risk, stated in `fjs/guest/materialize`'s own
+  header.
 
 ## 0.10.0
 
