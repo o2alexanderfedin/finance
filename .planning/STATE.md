@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
 status: executing
-stopped_at: Completed 12-02-PLAN.md
-last_updated: "2026-08-08T02:54:38.775Z"
+stopped_at: Completed 12-04-PLAN.md
+last_updated: "2026-08-08T03:10:19.899Z"
 last_activity: 2026-08-08
 progress:
   total_phases: 19
   completed_phases: 11
   total_plans: 58
-  completed_plans: 59
+  completed_plans: 60
   percent: 100
 ---
 
@@ -29,7 +29,7 @@ the server executes it as a pure function of `(documents, tax-year parameters) �
 Phase: 12 (Brokerage Documents) — EXECUTING
   Ten plans across six waves. The plan set was returned BLOCKER by `gsd-plan-checker`
   (four blockers, ten warnings), revised, re-checked, and only then executed.
-Plan: 4 of 5
+Plan: 5 of 5
   whole-dollar election), wave 2 (10-03 Tax Computation Worksheet, 10-04 the
   vnd.fjs.return_profile dialect, 10-05 the standard deduction chart), wave 3
   (10-06 QDCGT, 10-07 the classifyScope scope guard, executed in parallel),
@@ -125,6 +125,7 @@ proofs and moves with submodule initialization state — which is exactly how a 
 | Phase 12 P01 | 20min | 2 tasks | 1 files |
 | Phase 12 P02 | 21min | 2 tasks | 1 files |
 | Phase 12 P03 | 20min | 1 tasks | 1 files |
+| Phase 12 P04 | 35min | 1 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -274,6 +275,8 @@ Full log in PROJECT.md Key Decisions. Recent decisions affecting current work:
 - [Phase 12]: Boxes 8-11 (profit-or-loss) reuse the shared negative-accepting moneyFieldError loop rather than a separate check
 - [Phase 12]: applicableCheckboxOnForm8949 stores the payer-printed A-F letter verbatim, never derived from boxes 2/5/12 (Phase 12.1's job)
 - [Phase 12-03]: No checkReferences cross-field rule links the four new foreign-account fields to each other or to declaredKinds -- Schedule B (Plan 12-04) decides what to do with the combination
+- [Phase 12-04]: Schedule B's $1,500 threshold is two INDEPENDENT strict comparisons, never a combined line4+line6 sum
+- [Phase 12-04]: Schedule B Part III foreign-account fields are read verbatim from vnd.fjs.return_profile, proven with zero stored 1099s so the read cannot be mistaken for document-derived inference
 
 ### Pending Todos
 
@@ -418,8 +421,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-08-08T02:51:03.905Z
-Stopped at: Completed 12-02-PLAN.md
+Last session: 2026-08-08T03:10:19.889Z
+Stopped at: Completed 12-04-PLAN.md
 sweep verified and APPROVED by the phase owner.
 (measure the suite rather than quoting it — see "Test metrics" above. Next: Phase 11. Verification of
 Phase 10 is dispatched separately and was NOT run by the executor.)
