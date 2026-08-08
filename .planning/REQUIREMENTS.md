@@ -220,7 +220,7 @@ structural (RTTI) and semantic passes.
 - [x] **DOC-05** *(T2 → pulled forward to Phase 5)*: `vnd.fjs.w2` — box 12 as a list of
       `(code, amount)` pairs (box-12 confusion is a documented model failure); boxes 15–20
       stored faithfully as a repeating array and never computed on.
-- [ ] **DOC-06** *(T2)*: `vnd.fjs.1099div`. **Adding this dialect forces the QDCGT
+- [x] **DOC-06** *(T2)*: `vnd.fjs.1099div`. **Adding this dialect forces the QDCGT
       worksheet** (box 1b > 0) and the Schedule D Tax Worksheet (boxes 2b/2d) — schedule
       the worksheet with the dialect, not after it.
 - [ ] **DOC-07** *(T2)*: `vnd.fjs.1099b` — including the distinction that a blank box 1e

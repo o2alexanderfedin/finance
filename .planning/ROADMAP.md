@@ -457,7 +457,7 @@ Plans:
 **Plans**: 5 plans in 2 waves
 
 **Wave 1**
-- [ ] 12-01-PLAN.md — `vnd.fjs.1099div` dialect, sourceArtifactHash, box 1b QDCGT-shape proof, Mutation Gate M1 (DOC-06) *(wave 1)*
+- [x] 12-01-PLAN.md — `vnd.fjs.1099div` dialect, sourceArtifactHash, box 1b QDCGT-shape proof, Mutation Gate M1 (DOC-06) *(wave 1)*
 - [ ] 12-02-PLAN.md — `vnd.fjs.1099b` dialect, sourceArtifactHash, box 1e/box 12 consequence proof, Mutation Gate M3 (DOC-07) *(wave 1)*
 - [ ] 12-03-PLAN.md — Additive foreign-account fields on `vnd.fjs.return_profile` (TAX-07) *(wave 1)*
 
@@ -601,7 +601,7 @@ Phases 16-18 are backlog: unordered, independent of each other and of the critic
 | 9. Traceable Report Lines | Week 2 | 8/8 | Complete   | verified 2026-08-06 |
 | 10. 1040 Core and Scope Guard | Week 2 | 10/10 | Complete   | verified 2026-08-06 5/5 |
 | 11. Wage, Retirement, Benefit Documents | Week 3 | 5/5 | Complete   | 2026-08-08 |
-| 12. Brokerage and Capital-Gain Chain | Week 3 | 0/TBD | Not started | - |
+| 12. Brokerage and Capital-Gain Chain | Week 3 | 1/5 | In Progress|  |
 | 13. The 65+ Profile and Schedules | Week 3 | 0/TBD | Not started | - |
 | 14. Acceptance | Week 4 | 0/TBD | Not started | - |
 | 15. Realism Polish and Upstream | Week 5 | 0/TBD | Not started | - |

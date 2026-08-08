@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
-status: verifying
+status: executing
 stopped_at: Completed 11-04-PLAN.md
-last_updated: "2026-08-08T00:15:00.825Z"
+last_updated: "2026-08-08T02:27:43.481Z"
 last_activity: 2026-08-08
 progress:
-  total_phases: 18
+  total_phases: 19
   completed_phases: 11
-  total_plans: 53
-  completed_plans: 56
-  percent: 100
+  total_plans: 58
+  completed_plans: 57
+  percent: 98
 ---
 
 # Project State
@@ -22,26 +22,26 @@ See: .planning/PROJECT.md (updated 2026-08-03)
 
 **Core value:** The report is a program, not an answer — the agent emits FunctionalScript;
 the server executes it as a pure function of `(documents, tax-year parameters) → report`.
-**Current focus:** Phase 11 — Wage, Retirement, and Benefit Documents
+**Current focus:** Phase 12 — Brokerage Documents
 
 ## Current Position
 
-Phase: 11 (Wage, Retirement, and Benefit Documents) — EXECUTING
+Phase: 12 (Brokerage Documents) — EXECUTING
   Ten plans across six waves. The plan set was returned BLOCKER by `gsd-plan-checker`
   (four blockers, ten warnings), revised, re-checked, and only then executed.
-Plan: 5 of 5
+Plan: 2 of 5
   whole-dollar election), wave 2 (10-03 Tax Computation Worksheet, 10-04 the
   vnd.fjs.return_profile dialect, 10-05 the standard deduction chart), wave 3
   (10-06 QDCGT, 10-07 the classifyScope scope guard, executed in parallel),
   wave 4 (10-08 dispatchLine16), wave 5 (10-09 lines 1a-15) and wave 6 (10-10
   lines 16-37 + the whole-report refusal).
-Status: Phase complete — ready for verification
+Status: Ready to execute
   phase mutation sweep was run over five sites and APPROVED by the phase owner,
   who independently reproduced the mutation-3 type hole (a spread or a bound
   local carries `lines` past excess-property checking; only `lines?: undefined`
   stops it) and site 2's differential. Phase 11 not started.
 
-Progress: [██████████] 100%
+Progress: [██████████] 98%
   in this file's frontmatter for the raw plan/summary counts — the percent figure here is
   phase-based, not plan-based, because two phases carry an extra FIX-SUMMARY.md alongside a
   plan's own summary, which would otherwise round the plan-based figure to a misleading 100%)
@@ -122,6 +122,7 @@ proofs and moves with submodule initialization state — which is exactly how a 
 | Phase 11 P03 | 30min | 2 tasks | 1 files |
 | Phase 11 P04 | 20min | 1 tasks | 1 files |
 | Phase 11 P05 | 20min | 1 tasks | 2 files |
+| Phase 12 P01 | 20min | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -266,6 +267,8 @@ Full log in PROJECT.md Key Decisions. Recent decisions affecting current work:
 - [Phase 11-04]: expectedKnownDialectCount bumped 5 -> 7 in one commit registering both vnd.fjs.1099r and vnd.fjs.ssa1099 together (both dialect modules already existed from Plan 11-01); guard verified load-bearing by mutating to 6 and watching everyRegisteredDialectIsCounted fail with [7, 6, ...], then restored
 - [Phase 11-05]: financeDocumentsListTool inserted between financeTaxParamsTool and fjsRunTool in financeMcpHandlers, reusing the same evo/fileCas expressions the surrounding lines already construct
 - [Phase 11-05]: Same-commit ordering constraint (finance_documents_list registry entry + integration test call) verified live by mutation: commenting out only the call/assert block reddened toolsCalled/advertisedTools with the predicted diff, then restored byte-identical
+- [Phase 12]: vnd.fjs.1099div: sourceArtifactHash required (not option), validated via isHash, kept off the shared base() helper
+- [Phase 12]: DOC-06 shape proof uses a JSDoc @import type-only reference to QdcgtInput plus a runtime assertEq -- no runtime import of the QDCGT worksheet, dispatch, scope, or form1040 aggregation
 
 ### Pending Todos
 
@@ -410,7 +413,7 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-08-08T00:12:34.606Z
+Last session: 2026-08-08T02:25:20.987Z
 Stopped at: Completed 11-04-PLAN.md
 sweep verified and APPROVED by the phase owner.
 (measure the suite rather than quoting it — see "Test metrics" above. Next: Phase 11. Verification of
