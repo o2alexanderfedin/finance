@@ -2,17 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
-status: paused
-stopped_at: "PAUSED 2026-08-08, between phases with nothing in progress. Phases 11 and 12 both shipped and merged (PRs #53, #54), plus a ROADMAP totals correction (#55). Then, out of roadmap order and at the phase owner's request for a stakeholder showcase: v0.12.0 released (#57) and the browser demo re-pinned to it (#58). main = develop = origin = 555f11c, CI green, 0 open PRs, working tree clean, 629 project-local proofs, tsc clean. Phase 12.1 (The Capital-Gain Chain) is next and has no directory, no CONTEXT, no research, no plans. Its BLOCKING constraint: the dividend scope reclassification and the Form 1040 lines-3a/3b wiring must land as ONE atomic change, because doing either half alone makes the engine report a confident zero where it currently refuses honestly. SECOND blocking constraint, new: 12.1 edits the two modules the demo anchors into most, so after it merges the demo's source anchors must be re-resolved AND step 4's narration re-read — once dividends are modeled, 'the whole return refuses' silently becomes false. Approved run: 12.1 -> 13 -> 15 -> 16 -> 17 -> 18, skipping 14 (needs the taxpayer's real documents)."
-last_updated: "2026-08-08T19:35:00.000Z"
+status: executing
+stopped_at: "Phase 12.1 plan 01 (Form 8949) complete: module built, Mutation Gate M1 watched failing and reverted, 629 -> 643 project-local proofs. Plan 2 of 4 (12.1-02, the Schedule D Tax Worksheet) is next."
+last_updated: "2026-08-08T22:35:13.117Z"
 last_activity: 2026-08-08
 progress:
   total_phases: 19
   completed_phases: 12
-  total_plans: 58
-  completed_plans: 61
-  percent: 63
-  percent_note: "63 = 12 of 19 PHASES. Do not compute this from the plan counts: completed_plans (61) exceeds total_plans (58) because phases 5, 7 and 8 each carry an extra FIX-SUMMARY.md beside a plan's own summary. Both plan figures are summed live from disk, so a dynamically inserted phase (12.1 contributes 0/0) cannot skew them — the +3 is entirely the extra summaries."
+  total_plans: 62
+  completed_plans: 62
+  percent: 100
 ---
 
 # Project State
@@ -23,20 +22,20 @@ See: .planning/PROJECT.md (updated 2026-08-03)
 
 **Core value:** The report is a program, not an answer — the agent emits FunctionalScript;
 the server executes it as a pure function of `(documents, tax-year parameters) → report`.
-**Current focus:** Phase 12 — Brokerage Documents
+**Current focus:** Phase 12.1 — The Capital-Gain Chain
 
 ## Current Position
 
-Phase: 12 (Brokerage Documents) — EXECUTING
+Phase: 12.1 (The Capital-Gain Chain) — EXECUTING
   Ten plans across six waves. The plan set was returned BLOCKER by `gsd-plan-checker`
   (four blockers, ten warnings), revised, re-checked, and only then executed.
-Plan: 5 of 5
+Plan: 2 of 4
   whole-dollar election), wave 2 (10-03 Tax Computation Worksheet, 10-04 the
   vnd.fjs.return_profile dialect, 10-05 the standard deduction chart), wave 3
   (10-06 QDCGT, 10-07 the classifyScope scope guard, executed in parallel),
   wave 4 (10-08 dispatchLine16), wave 5 (10-09 lines 1a-15) and wave 6 (10-10
   lines 16-37 + the whole-report refusal).
-Status: Phase complete — ready for verification
+Status: Ready to execute
   phase mutation sweep was run over five sites and APPROVED by the phase owner,
   who independently reproduced the mutation-3 type hole (a spread or a bound
   local carries `lines` past excess-property checking; only `lines?: undefined`
@@ -128,6 +127,7 @@ proofs and moves with submodule initialization state — which is exactly how a 
 | Phase 12 P03 | 20min | 1 tasks | 1 files |
 | Phase 12 P04 | 35min | 1 tasks | 1 files |
 | Phase 12 P05 | 35min | 3 tasks | 2 files |
+| Phase 12.1 P01 | 35min | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -281,6 +281,8 @@ Full log in PROJECT.md Key Decisions. Recent decisions affecting current work:
 - [Phase 12-04]: Schedule B Part III foreign-account fields are read verbatim from vnd.fjs.return_profile, proven with zero stored 1099s so the read cannot be mistaken for document-derived inference
 - [Phase 12]: DOC-13's provenance proof lives in a new proof-only module (fjs/document/consolidated_provenance/module.f.js), not inside either dialect's own file, since the property spans both dialects plus formSubject
 - [Phase 12]: expectedKnownDialectCount bumped directly 7 -> 9 in one commit (both new dialects registered together), mirroring Phase 11's 11-04 precedent
+- [Phase 12.1-01]: Form 8949's category-derivation refusal check order is fixed and documented (box1f/box1g, then absent-basis, then undecided category) so Mutation Gate M1 has an unambiguous target line
+- [Phase 12.1-01]: TAX-11/TAX-15 are NOT marked complete after this plan, despite being named in its frontmatter -- the requirement spans all four plans of Phase 12.1 and REQUIREMENTS.md has no partial-completion representation. Deferred to 12.1-04.
 
 ### Pending Todos
 
@@ -425,8 +427,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-08-08 (resumed 12:32 PDT)
-Stopped at: **Session resumed; status presented, no phase work started.** Still between phases with
+Last session: 2026-08-08T22:35:13.035Z
+Stopped at: Phase 12.1 plan 01 (Form 8949) complete: module built, Mutation Gate M1 watched failing and reverted, 629 -> 643 project-local proofs. Plan 2 of 4 (12.1-02, the Schedule D Tax Worksheet) is next.
 nothing in progress. Phases 11 and 12 both complete, verified 4/4 each, and merged (PRs #53, #54);
 a ROADMAP totals correction merged as PR #55. Then, out of roadmap order for a stakeholder
 showcase: **v0.12.0 released** (PR #57) and the browser demo **re-pinned** to it (PR #58), with the
@@ -445,7 +447,7 @@ construction. Corrected at this resume; do not treat a recorded SHA as authorita
 Next: **Phase 12.1 — The Capital-Gain Chain**, which has no directory, no CONTEXT, no research and
 no plans. Read its BLOCKING constraint before planning it (below).
 
-Resume file: `.planning/phases/12-brokerage-documents-and-the-capital-gain-chain/.continue-here.md`
+Resume file: None
 plus `.planning/HANDOFF.json`. The stale `.continue-here.md` files in phases 09 and 10 were deleted
 during this pause — they were one-shot artifacts from earlier sessions and would have misdirected a
 resuming agent.

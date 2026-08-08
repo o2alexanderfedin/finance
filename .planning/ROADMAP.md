@@ -495,7 +495,7 @@ Plans:
 **Plans**: 4 plans in 3 waves
 
 **Wave 1**
-- [ ] 12.1-01-PLAN.md — Form 8949 category derivation, aggregation, absent-basis/box-1f/1g refusal, Mutation Gate M1 (TAX-11) *(wave 1)*
+- [x] 12.1-01-PLAN.md — Form 8949 category derivation, aggregation, absent-basis/box-1f/1g refusal, Mutation Gate M1 (TAX-11) *(wave 1)*
 - [ ] 12.1-02-PLAN.md — The 47-line Schedule D Tax Worksheet, both worked examples, degenerate QDCGT equivalence (TAX-11, TAX-15) *(wave 1)*
 
 **Wave 2** *(blocked on Wave 1)*
