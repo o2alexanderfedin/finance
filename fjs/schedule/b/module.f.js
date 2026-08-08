@@ -185,16 +185,6 @@ export const scheduleBThresholdCents = 150000n
 /**
  * Computes Schedule B for one return from stored 1099-INT/1099-DIV
  * documents and the declared return profile.
- *
- * RED PHASE (T-12-04, TDD): this is the deliberately WRONG "common error"
- * implementation the proof suite below exists to catch — it combines lines
- * 4 and 6 into a SINGLE $1,500 comparison, rather than the two INDEPENDENT
- * tests the printed form's own two separate Notes require. This is not a
- * placeholder stub (a stub would leave the box-sum helpers unused and fail
- * `tsc`'s `noUnusedLocals` before a single test could run — AGENTS.md's
- * "the mutation that deletes the last use of a binding does not compile").
- * It is corrected to two independent comparisons in the immediately
- * following GREEN commit.
  * @type {(inputs: ScheduleBInputs) => ScheduleB}
  */
 export const scheduleB = inputs => {
@@ -215,12 +205,10 @@ export const scheduleB = inputs => {
         sumBoxOverDocuments(dividendForms)('box1aTotalOrdinaryDividends')(
             form => form.box1aTotalOrdinaryDividends))
 
-    // RED BUG (deliberate): combines lines 4 and 6 into one test, exactly
-    // the "common error" 12-RESEARCH.md names — GREEN replaces this with
-    // two independent comparisons.
-    const combinedCents = line4.value + line6.value
-    const interestOverThreshold = combinedCents > scheduleBThresholdCents
-    const dividendsOverThreshold = combinedCents > scheduleBThresholdCents
+    // TWO INDEPENDENT tests — never a combined `line4.value + line6.value`
+    // sum. See module docstring, "The $1,500 threshold".
+    const interestOverThreshold = line4.value > scheduleBThresholdCents
+    const dividendsOverThreshold = line6.value > scheduleBThresholdCents
 
     const hadForeignFinancialAccount = profile.value.hadForeignFinancialAccount === true
     const requiredToFileFinCen114 = profile.value.requiredToFileFinCen114 === true
