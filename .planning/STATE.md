@@ -2,16 +2,17 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
-status: verifying
-stopped_at: Completed 12-05-PLAN.md
-last_updated: "2026-08-08T03:27:10.383Z"
+status: paused
+stopped_at: "PAUSED 2026-08-08 03:33 PDT, between phases with nothing in progress. Phases 11 and 12 both shipped and merged this session (PRs #53, #54), plus a ROADMAP totals correction (PR #55). main = develop = origin = 674ebb4, CI green, 0 open PRs, working tree clean, 629 project-local proofs. Phase 12.1 (The Capital-Gain Chain) is next and has no directory, no CONTEXT, no research, no plans. Its BLOCKING constraint: the dividend scope reclassification and the Form 1040 lines-3a/3b wiring must land as ONE atomic change, because doing either half alone makes the engine report a confident zero where it currently refuses honestly. Approved run: 12.1 -> 13 -> 15 -> 16 -> 17 -> 18, skipping 14 (needs the taxpayer's real documents)."
+last_updated: "2026-08-08T10:33:22.917Z"
 last_activity: 2026-08-08
 progress:
   total_phases: 19
   completed_phases: 12
   total_plans: 58
   completed_plans: 61
-  percent: 100
+  percent: 63
+  percent_note: "63 = 12 of 19 PHASES. Do not compute this from the plan counts: completed_plans (61) exceeds total_plans (58) because phases 5, 7 and 8 each carry an extra FIX-SUMMARY.md beside a plan's own summary. Both plan figures are summed live from disk, so a dynamically inserted phase (12.1 contributes 0/0) cannot skew them — the +3 is entirely the extra summaries."
 ---
 
 # Project State
@@ -424,12 +425,29 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-08-08T03:27:10.373Z
-Stopped at: Completed 12-05-PLAN.md
-sweep verified and APPROVED by the phase owner.
-(measure the suite rather than quoting it — see "Test metrics" above. Next: Phase 11. Verification of
-Phase 10 is dispatched separately and was NOT run by the executor.)
-Resume file: None
-(they were one-shot artifacts, written to `feature/planning-requirements-roadmap` seven
-minutes after PR #14 merged, so they never reached `main`; nothing else on that branch is
-unmerged and it can be deleted)
+Last session: 2026-08-08T10:33:22.917Z (paused 03:33 PDT)
+Stopped at: **Between phases, nothing in progress.** Phases 11 and 12 both complete, verified 4/4
+each, and merged (PRs #53, #54); a ROADMAP totals correction merged as PR #55. No branch, worktree,
+or file is mid-edit.
+
+Measure the suite rather than quoting it — see "Test metrics" above. At pause: `tsc` clean,
+**629** project-local proofs, full suite 2867 pass / 0 fail, working tree clean, 0 open PRs.
+
+Next: **Phase 12.1 — The Capital-Gain Chain**, which has no directory, no CONTEXT, no research and
+no plans. Read its BLOCKING constraint before planning it (below).
+
+Resume file: `.planning/phases/12-brokerage-documents-and-the-capital-gain-chain/.continue-here.md`
+plus `.planning/HANDOFF.json`. The stale `.continue-here.md` files in phases 09 and 10 were deleted
+during this pause — they were one-shot artifacts from earlier sessions and would have misdirected a
+resuming agent.
+
+**The one constraint that gates Phase 12.1:** the dividend scope reclassification
+(`fjs/return/scope`) and the Form 1040 lines-3a/3b wiring (`fjs/form1040/core`, which today sets
+them to `declaredZero` and hardcodes `qualifiedDividendsCents: 0n`) must land as **one atomic
+change**. Doing either half alone makes the engine report a confident **zero** for dividend income
+where it currently refuses honestly — strictly worse than the refusal, and the exact failure TAX-16
+exists to prevent.
+
+**Approved autonomous run** (phase owner, 2026-08-07): 12.1 → 13 → 15 → 16 → 17 → 18, with **14
+skipped** — Acceptance needs the taxpayer's real filed return and real documents, and is marked
+NOT AUTONOMOUS-EXECUTABLE in ROADMAP.md itself.
