@@ -595,6 +595,28 @@ export const proof = {
             const outcome = form8949([doc])
             assertEq(outcome.kind, 'error', ['expected a refusal when box2Ordinary is set', outcome])
         },
+        // Regression: box2Ordinary must dominate even when a holding-period
+        // box is ALSO set (a shape no real 1099-B should print, but
+        // structurally possible under this dialect's independent-checkbox
+        // modeling — see categorize's own docstring). If this check ever
+        // gets reordered after the short/long-term checks, this leaf must
+        // catch it: without it, this exact shape would silently compute a
+        // capital gain for income the payer marked ordinary.
+        box2OrdinaryDominatesEvenWhenAHoldingPeriodBoxIsAlsoSet: () => {
+            const doc = brokerageForm('doc-ordinary-plus-short-term')({
+                box1dProceeds: '10000.00',
+                box1eCostOrOtherBasis: '6000.00',
+                box2Ordinary: true,
+                box2ShortTermGainOrLoss: true,
+                box12BasisReportedToIrs: true,
+            })
+            const outcome = form8949([doc])
+            assertEq(
+                outcome.kind,
+                'error',
+                ['expected box2Ordinary to force a refusal even with box2ShortTermGainOrLoss also set', outcome],
+            )
+        },
     },
     // Acceptance criterion (the control case): a document with
     // box1dProceeds entirely undefined contributes to no category and does
