@@ -2,16 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
-status: paused
-stopped_at: PAUSED 2026-08-07 14:11 PDT. Phase 10 complete and verified; RELEASED as v0.10.0 (9662736) — the repository's first tag. main and develop both at 8d2e0e6, CI green, 0 open PRs. The showcase is built, verified, demoed, and pinned to the release; run it with ./demo/serve.sh. Pre-1.0 deliberately: form1040Report has no production caller, so no server path produces a 1040 — that is Phase 14, and 1.0.0 is reserved for it. Public hosting remains DEFERRED pending one decision with Sergey covering both repo visibility and demo hosting, because a demo that runs the real engine in a public page publishes the real engine. Phases 11-14 remain in the requested autonomous scope; Phase 11 is next and not started.
-last_updated: "2026-08-07T21:11:00.000Z"
-last_activity: 2026-08-07
-released: v0.10.0
+status: verifying
+stopped_at: Completed 11-04-PLAN.md
+last_updated: "2026-08-08T00:15:00.825Z"
+last_activity: 2026-08-08
 progress:
   total_phases: 18
-  completed_phases: 10
-  total_plans: 48
-  completed_plans: 51
+  completed_phases: 11
+  total_plans: 53
+  completed_plans: 56
   percent: 100
 ---
 
@@ -23,20 +22,20 @@ See: .planning/PROJECT.md (updated 2026-08-03)
 
 **Core value:** The report is a program, not an answer — the agent emits FunctionalScript;
 the server executes it as a pure function of `(documents, tax-year parameters) → report`.
-**Current focus:** Phase 10 — Form 1040 Core, Line-16 Dispatch, and the Scope Guard
+**Current focus:** Phase 11 — Wage, Retirement, and Benefit Documents
 
 ## Current Position
 
-Phase: 10 of 18 — Form 1040 Core, Line-16 Dispatch, and the Scope Guard (TAX-03/05/06/16).
+Phase: 11 (Wage, Retirement, and Benefit Documents) — EXECUTING
   Ten plans across six waves. The plan set was returned BLOCKER by `gsd-plan-checker`
   (four blockers, ten warnings), revised, re-checked, and only then executed.
-Plan: 10 of 10 complete — wave 1 (10-01 QSS as a stored filing status, 10-02 the IRS
+Plan: 5 of 5
   whole-dollar election), wave 2 (10-03 Tax Computation Worksheet, 10-04 the
   vnd.fjs.return_profile dialect, 10-05 the standard deduction chart), wave 3
   (10-06 QDCGT, 10-07 the classifyScope scope guard, executed in parallel),
   wave 4 (10-08 dispatchLine16), wave 5 (10-09 lines 1a-15) and wave 6 (10-10
   lines 16-37 + the whole-report refusal).
-Status: Phase 10 COMPLETE. TAX-03, TAX-05, TAX-06 and TAX-16 all closed; the
+Status: Phase complete — ready for verification
   phase mutation sweep was run over five sites and APPROVED by the phase owner,
   who independently reproduced the mutation-3 type hole (a spread or a bound
   local carries `lines` past excess-property checking; only `lines?: undefined`
@@ -46,7 +45,7 @@ Progress: [██████████] 100%
   in this file's frontmatter for the raw plan/summary counts — the percent figure here is
   phase-based, not plan-based, because two phases carry an extra FIX-SUMMARY.md alongside a
   plan's own summary, which would otherwise round the plan-based figure to a misleading 100%)
-Last activity: 2026-08-06
+Last activity: 2026-08-08
 
 ### Test metrics — MEASURE, do not read
 
@@ -118,6 +117,11 @@ proofs and moves with submodule initialization state — which is exactly how a 
 | Phase 10 P08 | 55min | 2 tasks | 1 files |
 | Phase 10 P09 | 75min | 2 tasks | 1 files |
 | Phase 10 P10 | 95min | 3 tasks | 1 files |
+| Phase 11 P01 | 30min | 3 tasks | 2 files |
+| Phase 11 P02 | 20min | 2 tasks | 1 files |
+| Phase 11 P03 | 30min | 2 tasks | 1 files |
+| Phase 11 P04 | 20min | 1 tasks | 1 files |
+| Phase 11 P05 | 20min | 1 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -251,6 +255,17 @@ Full log in PROJECT.md Key Decisions. Recent decisions affecting current work:
 - [Phase 10]: 10-09: line 12e cites filingStatus plus one box per checked 12d checkbox, exactly as planned; 12a-12c and earnedIncome determine the value but are cited only at document granularity — flagged for the phase owner, not widened, because 10-10 may pin the counts
 - [Phase 10]: 10-10: Form1040Outcome's error arm declares readonly lines?: undefined — omitting the field does NOT make adding it a tsc error, because TypeScript's excess-property check against a union admits any property declared in any constituent
 - [Phase 10]: 10-10: line 22's zero floor lives in its own named function: lines 19/20 are always profile-declared zeros in Phase 10, so the floor is unreachable through a whole report and would otherwise be an equivalent mutant
+- [Phase 11-01]: 1099-R modeled against the fuller TY2026 box set (strict superset of TY2025); box 7c/7d and the 8a/8b split are documented as 2026-only, option-typed additions, harmless on a TY2025 document
+- [Phase 11-01]: SSA-1099's payerTin is always stored as '' (no printed payer TIN exists) and accountNumber maps to Box 8's Claim Number; both proven by a round-trip leaf, not just documented
+- [Phase 11-01]: Mutation Gate M2 confirmed: removing one entry from moneyBoxFields while leaving expectedMoneyBoxFieldCount unchanged is the correct mutation shape -- schema-generated coverage leaves cannot detect a removal on their own
+- [Phase 11-02]: buildRunSnapshot's withBlobsAndRevisions/withHeads now exclude archived-flagged revisions from heads/revisions, closing the guest-vocabulary path (evoList('true') -> evoHead -> evoRevision -> casRead) to a retracted document; blobs and buildHostMap stay untouched (the honest, documented boundary)
+- [Phase 11-02]: Mutation Gate M1 confirmed load-bearing: reverting the two filtering conditions reddens archivedRevisionUnreachable.adversarialAndControl with the predicted failure (archived hash resurfacing in heads); restored verbatim, suite green, git status clean
+- [Phase 11]: MCP-08: one row per (subject, head) pair, not one per subject -- concurrent heads yield multiple rows sharing a subject
+- [Phase 11]: MCP-08: 'unknown' is the sentinel dialect for a well-formed document with no dialect field (arbitrary, recorded pick per RESEARCH.md A2)
+- [Phase 11]: MCP-08: finance_documents_list never validates against finance_schema's dialect registry -- an unregistered dialect tag is listed verbatim
+- [Phase 11-04]: expectedKnownDialectCount bumped 5 -> 7 in one commit registering both vnd.fjs.1099r and vnd.fjs.ssa1099 together (both dialect modules already existed from Plan 11-01); guard verified load-bearing by mutating to 6 and watching everyRegisteredDialectIsCounted fail with [7, 6, ...], then restored
+- [Phase 11-05]: financeDocumentsListTool inserted between financeTaxParamsTool and fjsRunTool in financeMcpHandlers, reusing the same evo/fileCas expressions the surrounding lines already construct
+- [Phase 11-05]: Same-commit ordering constraint (finance_documents_list registry entry + integration test call) verified live by mutation: commenting out only the call/assert block reddened toolsCalled/advertisedTools with the predicted diff, then restored byte-identical
 
 ### Pending Todos
 
@@ -395,8 +410,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-08-06T22:31:21.916Z
-Stopped at: Phase 10 COMPLETE — all ten plans shipped, and 10-10 Task 3's five-site mutation
+Last session: 2026-08-08T00:12:34.606Z
+Stopped at: Completed 11-04-PLAN.md
 sweep verified and APPROVED by the phase owner.
 (measure the suite rather than quoting it — see "Test metrics" above. Next: Phase 11. Verification of
 Phase 10 is dispatched separately and was NOT run by the executor.)

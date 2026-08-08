@@ -142,7 +142,7 @@ These were established by execution, not inference. Any replan must preserve the
 
 ### Week 3 — Breadth in Documents
 
-- [ ] **Phase 11: Wage, Retirement, and Benefit Documents** - W-2, SSA-1099, 1099-R, the document library, and the retraction story
+- [x] **Phase 11: Wage, Retirement, and Benefit Documents** - W-2, SSA-1099, 1099-R, the document library, and the retraction story (completed 2026-08-07)
 - [ ] **Phase 12: Brokerage Documents and the Capital-Gain Chain** - 1099-DIV *with* QDCGT, 1099-B, Schedule B/8949/D and the Schedule D Tax Worksheet
 - [ ] **Phase 13: The 65+ Profile and the Remaining Schedules** - Schedule 1-A, the Social Security Benefits Worksheet, 8812, Schedule A, Schedules 1/2/3
 
@@ -400,7 +400,16 @@ of it to Phase 14, whose criteria are about tax correctness rather than the exec
   3. `finance_documents_list` enumerates stored documents with dialect, tax year, and subject.
   4. A wrongly ingested document can be marked `archived`, and the recorded decision on whether report programs filter archived revisions is enforced by a `proof` — there is a documented answer to "I uploaded the wrong document."
 **Research**: **YES** — box lists for 1099-R and SSA-1099 are unverified and must be read from the IRS PDFs.
-**Plans**: TBD
+**Plans**: 5 plans in 2 waves
+Plans:
+**Wave 1**
+- [x] 11-01-PLAN.md — `vnd.fjs.1099r` and `vnd.fjs.ssa1099` document dialects (DOC-09, DOC-08) *(wave 1)*
+- [x] 11-02-PLAN.md — `buildRunSnapshot` archived-revision filtering fix, adversarial+control proof, Mutation Gate M1 (DOC-15) *(wave 1)*
+- [x] 11-03-PLAN.md — `finance_documents_list` MCP tool (MCP-08) *(wave 1)*
+
+**Wave 2** *(blocked on Wave 1 completion)*
+- [x] 11-04-PLAN.md — `finance_schema`'s atomic `dialectSchemas` bump to 7 (DOC-08, DOC-09) *(wave 2, needs 11-01)*
+- [x] 11-05-PLAN.md — Register `finance_documents_list` + same-commit integration test coverage (MCP-08, TEST-03) *(wave 2, needs 11-03)*
 
 ### Phase 12: Brokerage Documents and the Capital-Gain Chain
 **Milestone**: Week 3 — Breadth in Documents
@@ -537,7 +546,7 @@ Phases 16-18 are backlog: unordered, independent of each other and of the critic
 | 8. TY2025 Parameters and Tax Table | Week 2 | 5/5 | Complete | verified 2026-08-05 |
 | 9. Traceable Report Lines | Week 2 | 8/8 | Complete   | verified 2026-08-06 |
 | 10. 1040 Core and Scope Guard | Week 2 | 10/10 | Complete   | verified 2026-08-06 5/5 |
-| 11. Wage, Retirement, Benefit Documents | Week 3 | 0/TBD | Not started | - |
+| 11. Wage, Retirement, Benefit Documents | Week 3 | 5/5 | Complete   | 2026-08-08 |
 | 12. Brokerage and Capital-Gain Chain | Week 3 | 0/TBD | Not started | - |
 | 13. The 65+ Profile and Schedules | Week 3 | 0/TBD | Not started | - |
 | 14. Acceptance | Week 4 | 0/TBD | Not started | - |

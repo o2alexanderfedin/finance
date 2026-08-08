@@ -104,7 +104,7 @@ dissolves on contact.
       dialect, so the agent reads field names rather than guessing them.
 - [x] **MCP-07** *(T1)*: `finance_tax_params(year)` returns the tax-year parameter set, so
       the agent reads parameters rather than recalling them.
-- [ ] **MCP-08** *(T2)*: `finance_documents_list` enumerates stored documents with their
+- [x] **MCP-08** *(T2)*: `finance_documents_list` enumerates stored documents with their
       dialect, tax year, and subject.
 - [ ] **MCP-09** *(T3)*: `fjs_check(hash)` smoke-checks a stored program — imports it and
       confirms it exports `main` returning an `Effect` — without running it to completion.
@@ -225,8 +225,8 @@ structural (RTTI) and semantic passes.
       the worksheet with the dialect, not after it.
 - [ ] **DOC-07** *(T2)*: `vnd.fjs.1099b` — including the distinction that a blank box 1e
       means "basis not reported", which is **not** zero.
-- [ ] **DOC-08** *(T2)*: `vnd.fjs.ssa1099` — required by the 65+ profile.
-- [ ] **DOC-09** *(T2)*: `vnd.fjs.1099r` — required by the 65+ profile.
+- [x] **DOC-08** *(T2)*: `vnd.fjs.ssa1099` — required by the 65+ profile.
+- [x] **DOC-09** *(T2)*: `vnd.fjs.1099r` — required by the 65+ profile.
 - [x] **DOC-10** *(T1)*: Every dialect that transcribes a printed IRS form carries the
       **form revision**, not merely the tax
       year. Box semantics drift between revisions.
@@ -238,7 +238,7 @@ structural (RTTI) and semantic passes.
 - [x] **DOC-14** *(T1)*: Documented CLI ingestion route for artifacts over 128 KiB
       (`npx functionalscript cas add`), plus a cache-refresh path so a store mutated by
       another process is visible to the running server without a restart.
-- [ ] **DOC-15** *(T2)*: A retraction story via the `archived` flag, and a decision recorded
+- [x] **DOC-15** *(T2)*: A retraction story via the `archived` flag, and a decision recorded
       on whether report programs must filter archived revisions.
 - [ ] **DOC-16** *(T3)*: Dialect registration for `fjs/media`'s `detect`. It imports
       `decodeText`/`mediaType` from `fjs/media/revision` directly and performs exactly one
@@ -393,7 +393,7 @@ test the thing that breaks."* It was a one-off; this section makes it a practice
 - [x] **TEST-02** *(T1)*: Every MCP tool this project exposes is exercised at least once through
       that real stdio session, not only through `virtual`. A tool proven solely in-process has
       not been proven to be reachable by a client.
-- [ ] **TEST-03** *(T2)*: Each subsequent phase that adds a tool, a dialect, or a new seam adds
+- [x] **TEST-03** *(T2)*: Each subsequent phase that adds a tool, a dialect, or a new seam adds
       real-process coverage for it in the same session harness. The standing rule: a phase is not
       complete when its virtual proofs are green — it is complete when the thing a client would
       actually call has been called.
