@@ -1,11 +1,17 @@
 # Roadmap: Finance
 
 **Milestone:** v1
-**Granularity:** fine (15 phases on the critical path, plus 3 backlog phases — see "Granularity Note" below)
-**Coverage:** 85 v1 requirements mapped across Phases 1-15, plus 8 MAINT backlog requirements in Phases 16-18.
-**Count note:** older totals of 79 and 83 survive further down this file and in the coverage table; they
-predate TEST-01..04 and the MAINT set. MAINT-03 owns reconciling them. Recompute rather than trust prose:
-`grep -oE '\*\*[A-Z]+-[0-9]+\*\*' .planning/REQUIREMENTS.md | sort -u | wc -l`
+**Granularity:** fine (**16** phases on the critical path — 1-15 plus the inserted 12.1 — plus 3 backlog phases, **19 total**. See "Granularity Note" below.)
+**Coverage:** **93** requirements total in REQUIREMENTS.md, of which **8** are MAINT backlog (Phases 16-18); the remaining 85 map across Phases 1-15 and 12.1.
+**Count note:** these two lines were themselves stale until 2026-08-07 — they said "15 phases" and
+"85 v1 requirements" after Phase 12 was split into 12 and 12.1, which is exactly the drift this note
+warns about. Older totals of 79 and 83 also survive further down this file and in the coverage table;
+they predate TEST-01..04 and the MAINT set. MAINT-03 owns reconciling those.
+**Recompute rather than trust any prose in this file, including this line:**
+```
+grep -oE '\*\*[A-Z]+-[0-9]+\*\*' .planning/REQUIREMENTS.md | sort -u | wc -l   # requirements
+grep -cE '^- \[[ x]\] \*\*Phase ' .planning/ROADMAP.md                          # phases
+```
 **Created:** 2026-08-03
 
 ## Overview
@@ -59,13 +65,20 @@ engine does not model.
 
 ### Granularity Note
 
-`config.json` sets `granularity: fine` (target 8–12 phases). This roadmap has **15**. The
+`config.json` sets `granularity: fine` (target 8–12 phases). This roadmap has **19** — 16 on the
+critical path (1-15 plus the inserted 12.1) and 3 in the backlog. The
 work was derived first and the granularity applied as compression guidance second;
 compressing to 12 would mean merging phases that have genuinely distinct verification
 gates — for example folding the guest ABI freeze (widest blast radius of any interface
 here; every stored program is frozen against it) into the `fjs_run` tool that consumes it.
-At 79 requirements, 15 phases is 5.3 requirements per phase, which is within the spirit of
+At 93 requirements over 19 phases that is 4.9 requirements per phase, which is within the spirit of
 `fine`.
+
+The drift is worth naming rather than silently correcting: this paragraph said "**15**" and "79
+requirements" until 2026-08-07, having gone stale twice — once when TEST-01..04 and the MAINT set
+were added, and again when Phase 12 was split. Both times the prose was left behind by the work.
+That is the whole argument for the recompute commands in this file's header: **a hand-maintained
+count in prose is a second source of truth, and the second source is always the one that rots.**
 
 ---
 
