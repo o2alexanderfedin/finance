@@ -444,7 +444,16 @@ Plans:
   3. One consolidated brokerage PDF yields *N* typed documents with *N* subjects, each recording the same artifact hash as provenance. One uploaded file is not one document. Modeling and subject derivation only — no new ingestion wiring (that is Phase 16's orphan island).
   4. Schedule B applies the $1,500 threshold and the foreign-account questions, reading stored 1099-INT and 1099-DIV documents. The foreign-account answers are taxpayer-DECLARED (they live on `vnd.fjs.return_profile`), never inferred from documents.
 **Research**: **YES** — the 1099-DIV and 1099-B printed box lists must be read from the current IRS PDFs, not from recall, per Phase 11's precedent. Note 1099-B box numbering is a known drift risk.
-**Plans**: TBD
+**Plans**: 5 plans in 2 waves
+
+**Wave 1**
+- [ ] 12-01-PLAN.md — `vnd.fjs.1099div` dialect, sourceArtifactHash, box 1b QDCGT-shape proof, Mutation Gate M1 (DOC-06) *(wave 1)*
+- [ ] 12-02-PLAN.md — `vnd.fjs.1099b` dialect, sourceArtifactHash, box 1e/box 12 consequence proof, Mutation Gate M3 (DOC-07) *(wave 1)*
+- [ ] 12-03-PLAN.md — Additive foreign-account fields on `vnd.fjs.return_profile` (TAX-07) *(wave 1)*
+
+**Wave 2** *(blocked on Wave 1 completion)*
+- [ ] 12-04-PLAN.md — Schedule B: Part I/II totals, the two independent $1,500 tests, Part III echo (TAX-07) *(wave 2, needs 12-01, 12-03)*
+- [ ] 12-05-PLAN.md — DOC-13 provenance proof, `finance_schema` atomic 7→9 registration, Mutation Gate M2 (DOC-13) *(wave 2, needs 12-01, 12-02)*
 
 ### Phase 12.1: The Capital-Gain Chain
 **Milestone**: Week 3 — Breadth in Documents
