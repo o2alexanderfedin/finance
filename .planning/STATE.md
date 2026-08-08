@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
-status: executing
-stopped_at: Completed 12-04-PLAN.md
-last_updated: "2026-08-08T03:10:19.899Z"
+status: verifying
+stopped_at: Completed 12-05-PLAN.md
+last_updated: "2026-08-08T03:27:10.383Z"
 last_activity: 2026-08-08
 progress:
   total_phases: 19
-  completed_phases: 11
+  completed_phases: 12
   total_plans: 58
-  completed_plans: 60
+  completed_plans: 61
   percent: 100
 ---
 
@@ -35,7 +35,7 @@ Plan: 5 of 5
   (10-06 QDCGT, 10-07 the classifyScope scope guard, executed in parallel),
   wave 4 (10-08 dispatchLine16), wave 5 (10-09 lines 1a-15) and wave 6 (10-10
   lines 16-37 + the whole-report refusal).
-Status: Ready to execute
+Status: Phase complete — ready for verification
   phase mutation sweep was run over five sites and APPROVED by the phase owner,
   who independently reproduced the mutation-3 type hole (a spread or a bound
   local carries `lines` past excess-property checking; only `lines?: undefined`
@@ -126,6 +126,7 @@ proofs and moves with submodule initialization state — which is exactly how a 
 | Phase 12 P02 | 21min | 2 tasks | 1 files |
 | Phase 12 P03 | 20min | 1 tasks | 1 files |
 | Phase 12 P04 | 35min | 1 tasks | 1 files |
+| Phase 12 P05 | 35min | 3 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -277,6 +278,8 @@ Full log in PROJECT.md Key Decisions. Recent decisions affecting current work:
 - [Phase 12-03]: No checkReferences cross-field rule links the four new foreign-account fields to each other or to declaredKinds -- Schedule B (Plan 12-04) decides what to do with the combination
 - [Phase 12-04]: Schedule B's $1,500 threshold is two INDEPENDENT strict comparisons, never a combined line4+line6 sum
 - [Phase 12-04]: Schedule B Part III foreign-account fields are read verbatim from vnd.fjs.return_profile, proven with zero stored 1099s so the read cannot be mistaken for document-derived inference
+- [Phase 12]: DOC-13's provenance proof lives in a new proof-only module (fjs/document/consolidated_provenance/module.f.js), not inside either dialect's own file, since the property spans both dialects plus formSubject
+- [Phase 12]: expectedKnownDialectCount bumped directly 7 -> 9 in one commit (both new dialects registered together), mirroring Phase 11's 11-04 precedent
 
 ### Pending Todos
 
@@ -421,8 +424,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-08-08T03:10:19.889Z
-Stopped at: Completed 12-04-PLAN.md
+Last session: 2026-08-08T03:27:10.373Z
+Stopped at: Completed 12-05-PLAN.md
 sweep verified and APPROVED by the phase owner.
 (measure the suite rather than quoting it — see "Test metrics" above. Next: Phase 11. Verification of
 Phase 10 is dispatched separately and was NOT run by the executor.)

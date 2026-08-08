@@ -233,7 +233,7 @@ structural (RTTI) and semantic passes.
 - [x] **DOC-11** *(T1)*: Every box is explicitly absent-able. Blank is not zero.
 - [x] **DOC-12** *(T1)*: The `CORRECTED` checkbox is modelled as data. It is printed on the
       form itself, so amendment is a read signal, not an inference.
-- [ ] **DOC-13** *(T2)*: A consolidated brokerage 1099 yields *N* typed documents from one
+- [x] **DOC-13** *(T2)*: A consolidated brokerage 1099 yields *N* typed documents from one
       PDF. One uploaded file is not one document.
 - [x] **DOC-14** *(T1)*: Documented CLI ingestion route for artifacts over 128 KiB
       (`npx functionalscript cas add`), plus a cache-refresh path so a store mutated by

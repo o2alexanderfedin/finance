@@ -153,7 +153,7 @@ These were established by execution, not inference. Any replan must preserve the
 ### Week 3 — Breadth in Documents
 
 - [x] **Phase 11: Wage, Retirement, and Benefit Documents** - W-2, SSA-1099, 1099-R, the document library, and the retraction story (completed 2026-08-07)
-- [ ] **Phase 12: Brokerage Documents** - 1099-DIV, 1099-B, the consolidated-1099 document model, and Schedule B *(SPLIT from the original Phase 12, 2026-08-07)*
+- [x] **Phase 12: Brokerage Documents** - 1099-DIV, 1099-B, the consolidated-1099 document model, and Schedule B *(SPLIT from the original Phase 12, 2026-08-07)* (completed 2026-08-08)
 - [ ] **Phase 12.1: The Capital-Gain Chain** - Form 8949, Schedule D, the Schedule D Tax Worksheet, and replacing the live line-16 refusal *(SPLIT from the original Phase 12, 2026-08-07)*
 - [ ] **Phase 13: The 65+ Profile and the Remaining Schedules** - Schedule 1-A, the Social Security Benefits Worksheet, 8812, Schedule A, Schedules 1/2/3
 
@@ -463,7 +463,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 - [x] 12-04-PLAN.md — Schedule B: Part I/II totals, the two independent $1,500 tests, Part III echo (TAX-07) *(wave 2, needs 12-01, 12-03)*
-- [ ] 12-05-PLAN.md — DOC-13 provenance proof, `finance_schema` atomic 7→9 registration, Mutation Gate M2 (DOC-13) *(wave 2, needs 12-01, 12-02)*
+- [x] 12-05-PLAN.md — DOC-13 provenance proof, `finance_schema` atomic 7→9 registration, Mutation Gate M2 (DOC-13) *(wave 2, needs 12-01, 12-02)*
 
 ### Phase 12.1: The Capital-Gain Chain
 **Milestone**: Week 3 — Breadth in Documents
@@ -602,7 +602,7 @@ Phases 16-18 are backlog: unordered, independent of each other and of the critic
 | 9. Traceable Report Lines | Week 2 | 8/8 | Complete   | verified 2026-08-06 |
 | 10. 1040 Core and Scope Guard | Week 2 | 10/10 | Complete   | verified 2026-08-06 5/5 |
 | 11. Wage, Retirement, Benefit Documents | Week 3 | 5/5 | Complete   | 2026-08-08 |
-| 12. Brokerage and Capital-Gain Chain | Week 3 | 4/5 | In Progress|  |
+| 12. Brokerage and Capital-Gain Chain | Week 3 | 5/5 | Complete   | 2026-08-08 |
 | 13. The 65+ Profile and Schedules | Week 3 | 0/TBD | Not started | - |
 | 14. Acceptance | Week 4 | 0/TBD | Not started | - |
 | 15. Realism Polish and Upstream | Week 5 | 0/TBD | Not started | - |
