@@ -72,9 +72,11 @@ import { of, multiply, halfUp } from '../../../types/rational/module.f.js'
 import { centsFromString } from '../../../exact/module.f.js'
 import { taxParamsByYear } from '../../params/module.f.js'
 import { baseTaxForAmount } from '../../table/module.f.js'
+import { qdcgt } from '../qdcgt/module.f.js'
 
 /** @import { TaxParamSet, IndividualFilingStatus } from '../../params/module.f.js' */
 /** @import { Line16BaseMethod } from '../../table/module.f.js' */
+/** @import { QdcgtInput } from '../qdcgt/module.f.js' */
 
 /**
  * Everything the printed worksheet asks the filer to carry onto it.
@@ -381,5 +383,208 @@ export const proof = {
         assertEq(Object.keys(result).length, 49, 'expected 47 lines plus method44 and method46')
         assertEq(result.line1, splitDispatchInput.line1Cents, 'line 1 is a pure passthrough of taxable income')
         assert(typeof result.line47 === 'bigint', ['line 47 must be a bigint', result.line47])
+    },
+    // ★ ROADMAP criterion 2. Worked Example 1 (12.1-RESEARCH.md, "Worked
+    // Examples" — hand-transcribed from the printed Schedule D Tax
+    // Worksheet, independently reproduced by research, planner and
+    // executor before being written down, per 12.1-CONTEXT.md Decision
+    // 3.4): MFJ, taxable income $97,000.00, qualified dividends $300.00,
+    // not filing Form 4952, Schedule D lines 15/16 = $40,000.00 gain
+    // each, line 18 = $0.00, line 19 (unrecaptured §1250 gain) =
+    // $10,000.00. Every printed line is asserted individually, not just
+    // line 47 alone — a 47-line worksheet with two compensating
+    // transcription errors could total correctly, mirroring
+    // `fjs/tax/table`'s `rowByRowDiffMatchesPublishedTable` and QDCGT's
+    // own `regressionPairCaseAAllTwentyFiveLines` precedent.
+    regressionExampleOneAllFortySevenLines: () => {
+        /** @type {SdtwInput} */
+        const example1 = {
+            status: 'marriedFilingJointly',
+            line1Cents: 9700000n,
+            line2Cents: 30000n,
+            form4952Line4gCents: 0n,
+            form4952Line4eCents: 0n,
+            scheduleD15Cents: 4000000n,
+            scheduleD16Cents: 4000000n,
+            scheduleD18Cents: 0n,
+            scheduleD19Cents: 1000000n,
+        }
+        const r = sdtw(taxParams2025)(example1)
+        assertEq(r.line1, 9700000n, 'line 1 = $97,000.00')
+        assertEq(r.line2, 30000n, 'line 2 = $300.00')
+        assertEq(r.line3, 0n, 'line 3 = $0.00')
+        assertEq(r.line4, 0n, 'line 4 = $0.00')
+        assertEq(r.line5, 0n, 'line 5 = $0.00')
+        assertEq(r.line6, 30000n, 'line 6 = $300.00')
+        assertEq(r.line7, 4000000n, 'line 7 = $40,000.00')
+        assertEq(r.line8, 0n, 'line 8 = $0.00')
+        assertEq(r.line9, 4000000n, 'line 9 = $40,000.00')
+        assertEq(r.line10, 4030000n, 'line 10 = $40,300.00')
+        assertEq(r.line11, 1000000n, 'line 11 = $10,000.00')
+        assertEq(r.line12, 1000000n, 'line 12 = $10,000.00')
+        assertEq(r.line13, 3030000n, 'line 13 = $30,300.00')
+        assertEq(r.line14, 6670000n, 'line 14 = $66,700.00')
+        assertEq(r.line15, 9670000n, 'line 15 = $96,700.00')
+        assertEq(r.line16, 9670000n, 'line 16 = $96,700.00')
+        assertEq(r.line17, 6670000n, 'line 17 = $66,700.00')
+        assertEq(r.line18, 5670000n, 'line 18 = $56,700.00')
+        assertEq(r.line19, 9700000n, 'line 19 = $97,000.00')
+        assertEq(r.line20, 6670000n, 'line 20 = $66,700.00')
+        assertEq(r.line21, 6670000n, 'line 21 = $66,700.00')
+        assertEq(r.line22, 3000000n, 'line 22 = $30,000.00')
+        assertEq(r.line23, 3030000n, 'line 23 = $30,300.00')
+        assertEq(r.line24, 3000000n, 'line 24 = $30,000.00')
+        assertEq(r.line25, 30000n, 'line 25 = $300.00')
+        assertEq(r.line26, 60005000n, 'line 26 = $600,050.00')
+        assertEq(r.line27, 9700000n, 'line 27 = $97,000.00')
+        assertEq(r.line28, 9670000n, 'line 28 = $96,700.00')
+        assertEq(r.line29, 30000n, 'line 29 = $300.00')
+        assertEq(r.line30, 30000n, 'line 30 = $300.00')
+        assertEq(r.line31, 4500n, 'line 31 = $45.00')
+        assertEq(r.line32, 3030000n, 'line 32 = $30,300.00')
+        assertEq(r.line33, 0n, 'line 33 = $0.00')
+        assertEq(r.line34, 0n, 'line 34 = $0.00')
+        assertEq(r.line35, 1000000n, 'line 35 = $10,000.00')
+        assertEq(r.line36, 10700000n, 'line 36 = $107,000.00')
+        assertEq(r.line37, 9700000n, 'line 37 = $97,000.00')
+        assertEq(r.line38, 1000000n, 'line 38 = $10,000.00')
+        assertEq(r.line39, 0n, 'line 39 = $0.00')
+        assertEq(r.line40, 0n, 'line 40 = $0.00, Schedule D line 18 = $0.00 never reaches the 28% add-on')
+        assertEq(r.line41, 0n, 'line 41 = $0.00, gated off by Schedule D line 18 = $0.00')
+        assertEq(r.line42, 0n, 'line 42 = $0.00')
+        assertEq(r.line43, 0n, 'line 43 = $0.00')
+        assertEq(r.method44, 'taxTable', 'line 44 prices line 21 ($66,700.00) by the Tax Table')
+        assertEq(r.line44, 753000n, 'line 44 = $7,530.00, printed MFJ Tax Table row $66,700-$66,750')
+        assertEq(r.line45, 757500n, 'line 45 = $7,575.00')
+        assertEq(r.method46, 'taxTable', 'line 46 prices line 1 ($97,000.00) by the Tax Table')
+        assertEq(r.line46, 1117400n, 'line 46 = $11,174.00, printed MFJ Tax Table row $97,000-$97,050')
+        assertEq(r.line47, 757500n, 'line 47 = $7,575.00 — Form 1040 line 16')
+    },
+    // ★ ROADMAP criterion 2, second half. Worked Example 2
+    // (12.1-RESEARCH.md): single, taxable income $700,000.00, qualified
+    // dividends $0.00, not filing Form 4952, Schedule D lines 15/16 =
+    // $50,000.00 gain each, line 18 (28% rate gain) = $50,000.00 — the
+    // ENTIRE net capital gain is collectibles gain — line 19 = $0.00.
+    // The opposite shape from Example 1: there, the special-rate ceiling
+    // was never reached; here, the 28% ceiling is exactly what is doing
+    // the work (lines 41-43 compute a genuine non-zero figure), and both
+    // base-tax lookups (44 and 46) cross into the Tax Computation
+    // Worksheet.
+    regressionExampleTwoAllFortySevenLines: () => {
+        /** @type {SdtwInput} */
+        const example2 = {
+            status: 'single',
+            line1Cents: 70000000n,
+            line2Cents: 0n,
+            form4952Line4gCents: 0n,
+            form4952Line4eCents: 0n,
+            scheduleD15Cents: 5000000n,
+            scheduleD16Cents: 5000000n,
+            scheduleD18Cents: 5000000n,
+            scheduleD19Cents: 0n,
+        }
+        const r = sdtw(taxParams2025)(example2)
+        assertEq(r.line1, 70000000n, 'line 1 = $700,000.00')
+        assertEq(r.line2, 0n, 'line 2 = $0.00')
+        assertEq(r.line3, 0n, 'line 3 = $0.00')
+        assertEq(r.line4, 0n, 'line 4 = $0.00')
+        assertEq(r.line5, 0n, 'line 5 = $0.00')
+        assertEq(r.line6, 0n, 'line 6 = $0.00')
+        assertEq(r.line7, 5000000n, 'line 7 = $50,000.00')
+        assertEq(r.line8, 0n, 'line 8 = $0.00')
+        assertEq(r.line9, 5000000n, 'line 9 = $50,000.00')
+        assertEq(r.line10, 5000000n, 'line 10 = $50,000.00')
+        assertEq(r.line11, 5000000n, 'line 11 = $50,000.00')
+        assertEq(r.line12, 5000000n, 'line 12 = $50,000.00')
+        assertEq(r.line13, 0n, 'line 13 = $0.00')
+        assertEq(r.line14, 70000000n, 'line 14 = $700,000.00')
+        assertEq(r.line15, 4835000n, 'line 15 = $48,350.00')
+        assertEq(r.line16, 4835000n, 'line 16 = $48,350.00')
+        assertEq(r.line17, 4835000n, 'line 17 = $48,350.00')
+        assertEq(r.line18, 65000000n, 'line 18 = $650,000.00')
+        assertEq(r.line19, 19730000n, 'line 19 = $197,300.00')
+        assertEq(r.line20, 19730000n, 'line 20 = $197,300.00')
+        assertEq(r.line21, 65000000n, 'line 21 = $650,000.00')
+        assertEq(r.line22, 0n, 'line 22 = $0.00')
+        assertEq(r.line23, 0n, 'line 23 = $0.00')
+        assertEq(r.line24, 0n, 'line 24 = $0.00')
+        assertEq(r.line25, 0n, 'line 25 = $0.00')
+        assertEq(r.line26, 53340000n, 'line 26 = $533,400.00')
+        assertEq(r.line27, 53340000n, 'line 27 = $533,400.00')
+        assertEq(r.line28, 65000000n, 'line 28 = $650,000.00')
+        assertEq(r.line29, 0n, 'line 29 = $0.00, always floored: line 27 < line 28 here')
+        assertEq(r.line30, 0n, 'line 30 = $0.00')
+        assertEq(r.line31, 0n, 'line 31 = $0.00')
+        assertEq(r.line32, 0n, 'line 32 = $0.00')
+        assertEq(r.line33, 0n, 'line 33 = $0.00')
+        assertEq(r.line34, 0n, 'line 34 = $0.00')
+        assertEq(r.line35, 0n, 'line 35 = $0.00, gated off by Schedule D line 19 = $0.00')
+        assertEq(r.line36, 0n, 'line 36 = $0.00, gated')
+        assertEq(r.line37, 0n, 'line 37 = $0.00, gated')
+        assertEq(r.line38, 0n, 'line 38 = $0.00, gated')
+        assertEq(r.line39, 0n, 'line 39 = $0.00, gated')
+        assertEq(r.line40, 0n, 'line 40 = $0.00, gated')
+        assertEq(r.line41, 65000000n, 'line 41 = $650,000.00, the 28% add-on genuinely fires here')
+        assertEq(r.line42, 5000000n, 'line 42 = $50,000.00')
+        assertEq(r.line43, 1400000n, 'line 43 = $14,000.00 — the entire collectibles slice at 28%')
+        assertEq(r.method44, 'taxComputationWorksheet', 'line 44 prices line 21 ($650,000.00) by the TCW')
+        assertEq(r.line44, 19752025n, 'line 44 = $197,520.25, 37% x 650,000.00 - 42,979.75')
+        assertEq(r.line45, 21152025n, 'line 45 = $211,520.25')
+        assertEq(r.method46, 'taxComputationWorksheet', 'line 46 prices line 1 ($700,000.00) by the TCW')
+        assertEq(r.line46, 21602025n, 'line 46 = $216,020.25, 37% x 700,000.00 - 42,979.75')
+        assertEq(r.line47, 21152025n, 'line 47 = $211,520.25 — Form 1040 line 16')
+        // Sanity cross-check (12.1-RESEARCH.md): without the 28% ceiling
+        // this $50,000.00 slice would be taxed at this filer's 37%
+        // marginal rate; the worksheet instead charges 28%, saving
+        // exactly line46 - line45.
+        assertEq(r.line46 - r.line45, 450000n, 'the 28% ceiling saves exactly $4,500.00 on this return')
+    },
+    // Independent dispatch, end to end: line 44 by the Tax Table and line
+    // 46 by the Tax Computation Worksheet, in ONE execution. Neither
+    // worked example alone exercises this — see `splitDispatchInput`'s
+    // own docstring for why.
+    splitDispatchLinesFortyFourAndFortySixDisagree: () => {
+        const r = sdtw(taxParams2025)(splitDispatchInput)
+        assertEq(r.line21, 5000000n, 'line 21 = $50,000.00')
+        assertEq(r.method44, 'taxTable', 'line 44 prices line 21 ($50,000.00) by the Tax Table')
+        assertEq(r.line44, 552600n, 'line 44 = $5,526.00, printed MFJ Tax Table row $50,000-$50,050')
+        assertEq(r.line45, 1352100n, 'line 45 = $13,521.00')
+        assertEq(r.method46, 'taxComputationWorksheet', 'line 46 prices line 1 ($150,000.00) by the TCW')
+        assertEq(r.line46, 2282800n, 'line 46 = $22,828.00, 22% x 150,000.00 - 10,172.00')
+        assert(
+            r.method44 !== r.method46,
+            ['the two lines must be free to use different methods in one execution', r.method44],
+        )
+        assertEq(r.line47, 1352100n, 'line 47 = $13,521.00 — Form 1040 line 16, the min selects line 45')
+    },
+    // The degenerate-equivalence differential (12.1-RESEARCH.md's
+    // "Primary recommendation", deferred since Phase 10): when Schedule D
+    // lines 18 and 19 are both zero (and Form 4952 is not filed), the
+    // Schedule D Tax Worksheet and the already-shipped QDCGT worksheet
+    // are algebraically identical and MUST produce the same final cents
+    // figure for the same underlying return. This is what lets the
+    // dispatcher's 2a-before-2c ordering be tested later by a VALUE
+    // difference rather than only a method tag (12.1-CONTEXT.md,
+    // "Specifics"). Reuses `splitDispatchInput`, which already satisfies
+    // the precondition (lines 18/19 both zero).
+    degenerateEquivalenceWithQdcgtWhenScheduleD18And19AreZero: () => {
+        assertEq(splitDispatchInput.scheduleD18Cents, 0n, 'precondition: Schedule D line 18 = $0.00')
+        assertEq(splitDispatchInput.scheduleD19Cents, 0n, 'precondition: Schedule D line 19 = $0.00')
+        assertEq(splitDispatchInput.form4952Line4gCents, 0n, 'precondition: not filing Form 4952')
+        const sdtwResult = sdtw(taxParams2025)(splitDispatchInput)
+        /** @type {QdcgtInput} */
+        const equivalentQdcgtInput = {
+            status: splitDispatchInput.status,
+            line1Cents: splitDispatchInput.line1Cents,
+            line2Cents: splitDispatchInput.line2Cents,
+            filingScheduleD: true,
+            scheduleD15Cents: splitDispatchInput.scheduleD15Cents,
+            scheduleD16Cents: splitDispatchInput.scheduleD16Cents,
+            line7aCents: 0n,
+        }
+        const qdcgtResult = qdcgt(taxParams2025)(equivalentQdcgtInput)
+        assertEq(sdtwResult.line47, qdcgtResult.line25, 'SDTW line 47 must equal QDCGT line 25 on this degenerate input')
+        assert(sdtwResult.line47 !== 0n, ['the shared cents value must be non-trivial, not a vacuous 0 === 0', sdtwResult.line47])
+        assertEq(sdtwResult.line47, 1352100n, 'the shared figure is $13,521.00, independently confirmed above')
     },
 }
