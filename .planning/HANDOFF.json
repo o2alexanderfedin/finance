@@ -1,63 +1,80 @@
 {
   "version": "1.0",
-  "timestamp": "2026-08-07T21:11:00.000Z",
-  "phase": "10",
-  "phase_name": "Form 1040 Core, Line-16 Dispatch, and the Scope Guard",
-  "phase_dir": ".planning/phases/10-form-1040-core-line-16-dispatch-and-the-scope-guard",
-  "plan": 10,
-  "task": 10,
-  "total_tasks": 10,
-  "status": "phase_10_complete_verified_merged_and_released",
+  "timestamp": "2026-08-08T10:33:22.917Z",
+  "phase": "12",
+  "phase_name": "Brokerage Documents",
+  "phase_dir": ".planning/phases/12-brokerage-documents-and-the-capital-gain-chain",
+  "plan": 5,
+  "task": 5,
+  "total_tasks": 5,
+  "status": "between_phases_nothing_in_progress",
   "branch": "main",
-  "head": "8d2e0e6",
-  "release": {
-    "tag": "v0.10.0",
-    "commit": "96627365f49f9ff7afa33ab11168697a1a383f8f",
-    "url": "https://github.com/fjs-dev/finance/releases/tag/v0.10.0",
-    "note": "The repository's first tag ever. Pre-1.0 deliberately: form1040Report has no production caller, so no server path produces a 1040. The minor position tracks the roadmap phase — 0.11.0 after Phase 11; 1.0.0 reserved for the release in which Phase 14 (Acceptance) lands that path."
-  },
+  "head": "674ebb4",
   "verified_at_head": {
     "tsc": "clean",
-    "project_local_proofs": 492,
-    "integration": "1 pass / 0 fail",
-    "ci_on_main": "success",
+    "project_local_proofs": 629,
+    "full_suite": "2867 pass / 0 fail",
     "open_prs": 0,
-    "note": "Measured at pause, not quoted. Re-measure with: node --test 2>&1 | grep -c '^✔ import(\"./fjs/'. NEVER gate on npm test's total — it is 494 or 2730 for the SAME commit depending on whether the functionalscript submodule is checked out."
+    "working_tree": "clean",
+    "note": "Measured at pause, not quoted. Re-measure with: node --test 2>&1 | grep -c '^✔ import(\"./fjs/'. NEVER gate on npm test's raw total — it includes ~2,100 vendored submodule proofs and moves with submodule checkout state."
   },
-  "most_time_critical": {
-    "what": "Nothing is time-critical. The stakeholder demo happened; the showcase is built, verified and released.",
-    "run_the_demo": "./demo/serve.sh   then http://localhost:8000/demo/",
-    "open_decision": "Whether the engine repository and the demo become public — one decision, not two. Needs Sergey.",
-    "settled_do_not_relitigate": [
-      "The demo imports the REAL engine as ES modules. Every fjs/ module is pure; the closure is 43 modules with zero node: imports. Zero dependencies, zero build step.",
-      "WASM with a POSIX filesystem is the WRONG answer to the import() question: forbidden dependency, and it undermines the pitch by implying the jail is what makes it safe. The guest never calls import() — it EMITS an import effect.",
-      "A demo that runs the real engine in a public page publishes the real engine. The browser must download fjs/** (37 files, ~950 KB, rationale comments included) to execute it. No hosting arrangement avoids this — not a separate public repo, not a vendored snapshot, and a cross-repo read token in a public repo is strictly worse (exfiltratable by any workflow edit, and it does not prevent the disclosure it appears to protect).",
-      "Every source/proof link and the build badge point at github.com/fjs-dev/finance, which is PRIVATE. They resolve for org members (a laptop demo is fine) and 404 for everyone else. Repo visibility and demo hosting are therefore one decision.",
-      "The demo's links carry the COMMIT, not the tag — a tag can be force-moved and a commit cannot — while the page displays v0.10.0, which is what means something to a reader.",
-      "The badge shows the PROJECT-LOCAL proof count only. npm test's total depends on the reader's checkout, so it must never appear on a page."
-    ]
-  },
-  "completed_this_session": [
-    {"id": "demo-build", "name": "The showcase, built against the real engine: eight steps plus an All view, zero dependencies, no build step. 103 real type errors fixed rather than excluding demo/ from tsc.", "status": "done"},
-    {"id": "demo-serve", "name": "demo/serve.sh — one command, symlink staging, and a guard that refuses to start on a stale node_modules", "status": "done"},
-    {"id": "deps-0431", "name": "functionalscript 0.43.0 -> 0.43.1, both the npm pin and the submodule gitlink", "status": "done"},
-    {"id": "release-v0100", "name": "v0.10.0 released: tag, GitHub release, CHANGELOG.md, package.json off 0.0.0, develop fast-forwarded 261 commits", "status": "done"},
-    {"id": "demo-repin", "name": "Showcase re-pinned from a bare commit to the v0.10.0 release; the uncomparable 494/494 removed from the badge", "status": "done"},
-    {"id": "agents-hazards", "name": "AGENTS.md +47 lines: stale node_modules drift, git add discarding a staged gitlink, update-index accepting a nonexistent SHA, and two-references-to-one-dependency", "status": "done"}
+  "shipped_this_session": [
+    {"phase": "11", "name": "Wage, Retirement, and Benefit Documents", "pr": 53, "merge": "e3f405e", "proofs": "492 -> 544", "requirements": ["DOC-08", "DOC-09", "DOC-15", "MCP-08", "TEST-03"]},
+    {"phase": "12", "name": "Brokerage Documents", "pr": 54, "merge": "5cdf30d", "proofs": "544 -> 629", "requirements": ["DOC-06", "DOC-07", "DOC-13", "TAX-07"]},
+    {"phase": "docs", "name": "ROADMAP totals corrected after the Phase 12 split", "pr": 55, "merge": "674ebb4"}
   ],
+  "blocking_constraints": [
+    {
+      "id": "reclassify-without-wiring",
+      "severity": "blocking",
+      "description": "Marking qualifiedDividends/ordinaryDividends as modeled in fjs/return/scope WITHOUT simultaneously wiring Form 1040 lines 3a/3b (fjs/form1040/core, which today sets them to declaredZero and hardcodes qualifiedDividendsCents: 0n) makes the engine report a confident ZERO for dividend income where it currently refuses honestly.",
+      "why_it_matters": "Strictly worse than the refusal it replaces, and the exact failure TAX-16's scope guard exists to prevent.",
+      "mitigation": "ROADMAP Phase 12.1 criterion 2a requires both edits in ONE atomic change. Reject at plan-check any plan touching one without the other."
+    },
+    {
+      "id": "planning-text-contradicts-shipped-code",
+      "severity": "blocking",
+      "description": "Happened TWICE this session. Phase 11's CONTEXT asserted archived revisions were invisible to report programs 'by construction' — false of the shipped code. Phase 12's roadmap scheduled building a QDCGT worksheet that already existed (634 lines, Phase 10) and its criterion 1 required an fjs/return/ edit the same document forbade.",
+      "mitigation": "Every phase marked Research: YES must have research read the actual modules its criteria name and report contradictions as findings. Both were found before any code was written; neither would have been caught by executing the plan as written."
+    },
+    {
+      "id": "mutation-gate-tests-the-fixture-not-the-consequence",
+      "severity": "advisory",
+      "description": "Phase 12's M3 mutated the 1099-B fixture and tripped an assertEq(fixture.box1e, undefined) assertion BEFORE the gain comparison it appeared to guard. The proof is honest but proof-local — no production change could redden it, because production gain computation does not exist until 12.1.",
+      "mitigation": "When a mutation reddens, check WHICH leaf and WHICH assertion. Recorded as ROADMAP Phase 12.1 criterion 3a: DOC-07's consequence must be re-proven against real gain computation."
+    },
+    {
+      "id": "agent-worktrees-cannot-build-this-repo",
+      "severity": "advisory",
+      "description": "node_modules/ is gitignored and every fjs/** module imports functionalscript/... as a bare specifier, so a fresh git worktree has no dependency tree and cannot run tsc or a single proof.",
+      "mitigation": "Already structural: workflow.use_worktrees=false in .planning/config.json (commit f941014). Executors run sequentially on the main tree. Do not re-enable."
+    },
+    {
+      "id": "hand-maintained-counts-in-prose-rot",
+      "severity": "advisory",
+      "description": "ROADMAP.md's header said '15 phases / 79 requirements' while sitting beside its own 'Recompute rather than trust prose' note. Stale twice — once for TEST-01..04 + MAINT, once for the Phase 12 split.",
+      "mitigation": "Fixed in PR #55. The transferable rule: a second source of truth is good when something can watch it drift (expectedKnownDialectCount-style guards, watched by proofs) and bad when nothing can (prose)."
+    }
+  ],
+  "approved_run_plan": {
+    "decided_by": "phase owner, 2026-08-07",
+    "sequence": ["12.1", "13", "15", "16", "17", "18"],
+    "skipped": [{"phase": "14", "reason": "Acceptance requires the taxpayer's real filed return and real source documents. No agent can produce them. Marked NOT AUTONOMOUS-EXECUTABLE in ROADMAP.md itself."}]
+  },
   "blockers": [],
   "human_actions_pending": [
-    {"action": "Decide public vs private, with Sergey", "context": "One decision covering both repo visibility and demo hosting — see settled_do_not_relitigate. pages.yml is workflow_dispatch only and has never been run.", "blocking": false},
-    {"action": "Two documentation errors, found and not fixed", "context": "REQUIREMENTS.md TAX-10 says the Social Security Benefits Worksheet is 19 lines; it is 18. ROADMAP.md constraint 4 names 1099-DIV boxes 2b/2d as forcing Schedule D; i1040gi p31 Exception 1 names 2b, 2c AND 2d. Both are also in CHANGELOG.md's 'Known documentation defects', so fixing means updating two places. Do it during Phase 11 or 13 planning.", "blocking": false},
-    {"action": "Three claims nobody has checked against paper", "context": "(1) the 2025 Form 1040 face's 56-line inventory and printed labels; (2) the 19 chart amounts vs f1040s.pdf p4; (3) research assumption A2, that the Tax Computation Worksheet is cent-exact not whole-dollar — exactly one value moves, QDCGT case (iv) line 24, $184,094.50 vs $184,095.00.", "blocking": false}
+    {"action": "Decide public vs private, with Sergey", "context": "One decision covering both repo visibility and demo hosting — a demo that runs the real engine in a public page publishes the real engine, since the browser must download all 37 fjs/** modules to execute them.", "blocking": false},
+    {"action": "Three claims never verified against paper", "context": "Formally tracked: 10-VERIFICATION.md carries status: human_needed with 3 items — the 2025 Form 1040 face's 56-line inventory, the 19 standard-deduction chart amounts, and research assumption A2 (whether the Tax Computation Worksheet is cent-exact; exactly one recorded value moves if wrong, QDCGT case (iv) line 24, $184,094.50 vs $184,095.00). No agent can close these.", "blocking": false},
+    {"action": "REQUIREMENTS.md TAX-10 line count", "context": "Says the Social Security Benefits Worksheet is 19 lines; it is 18. Deliberately left open for Phase 13, which builds that worksheet and can fix it against the printed form rather than swapping one recalled number for another. Rationale recorded in CHANGELOG.md.", "blocking": false}
   ],
   "decisions": [
-    {"decision": "v0.10.0, not v1.0.0", "rationale": "form1040Report has no production caller — no server path produces a Form 1040. A major version would claim what the code cannot do, and it is the exact boundary the demo states out loud on slide one. The minor position tracks the roadmap phase; 1.0.0 is reserved for the release in which Phase 14 lands the end-to-end path.", "phase": "release"},
-    {"decision": "The release notes carry 'What is NOT here' at the same volume as what is", "rationale": "No production caller, Schedule D selected-then-refusing, four unmodeled document types, guest bodies with host privileges. The demo already tells the truth about these; a release that did not would contradict it in front of the same audience.", "phase": "release"},
-    {"decision": "The MCP serverInfo.version is pinned to package.json by the integration test", "rationale": "Bumping it to 0.10.0 created the hazard: it is a literal because a pure module has no filesystem to read the manifest from, so it can drift, and a server advertising a version it is not is worse than one advertising none. The test reads the real manifest and compares. Verified load-bearing — set the server to 0.9.9, the test fails with that message.", "phase": "release"},
-    {"decision": "npm publish is off the table", "rationale": "The name `finance` is already taken on npm by someone else at 0.0.1, and the repository is private. Publishing would need a scoped name such as @fjs-dev/finance, which is a separate decision.", "phase": "release"}
+    {"decision": "Phase 12 split into 12 (documents) and 12.1 (chain)", "rationale": "Together they exceeded Phase 10, the largest phase shipped so far. Splitting means a failure in the chain does not strand the dialects.", "phase": "12"},
+    {"decision": "TAX-08 marked complete, not rebuilt", "rationale": "fjs/tax/line16/qdcgt/module.f.js already exists at 634 lines, already imports baseTaxForAmount, and its proofs already assert method22 === 'taxTable'. The roadmap scheduled building it; that text was stale.", "phase": "12"},
+    {"decision": "All dividend wiring deferred to Phase 12.1, atomically", "rationale": "See the reclassify-without-wiring blocking constraint.", "phase": "12"},
+    {"decision": "One narrow exception to 'Phase 12 must not touch fjs/return/'", "rationale": "Additive foreign-account fields on vnd.fjs.return_profile for Schedule B — no IRS information return reports 'do you have a foreign account', so it can only be taxpayer-declared. Verified by an empty git diff on fjs/return/scope/module.f.js.", "phase": "12"},
+    {"decision": "/gsd-secure-phase deliberately not run", "rationale": "No phase in this project has ever produced a SECURITY.md; Phases 3 and 6 were far more security-critical and shipped without one. Running it for Phase 11 alone would be inconsistent. Recorded as a standing project-wide gap, not a phase gap.", "phase": "11"}
   ],
   "uncommitted_files": [],
-  "next_action": "Resume /gsd-autonomous at Phase 11 — Wage, Retirement, and Benefit Documents (W-2 extensions, SSA-1099, 1099-R, the document library, the retraction story). Not started: no CONTEXT, no plans. Phases 11-14 remain in the originally requested autonomous scope.",
-  "context_notes": "Phase 10's lesson was that verification machinery fails silently and in the direction of looking successful. This session produced the environment-and-process twin of it: four of nine commits exist only because something was checked rather than assumed, and in every case the symptom pointed away from the cause. Stale node_modules in two of three checkouts produced sixteen tsc errors INSIDE fjs/** that were not defects in fjs/**, plus a proof count ten short because modules that fail to import never register their proofs. `git add` on the uninitialized submodule silently reverted a staged gitlink, so a commit shipped without the change its own message described — caught only because git ls-tree AFTER the commit is a different check from git diff --cached before it. `git update-index --cacheinfo` accepts a SHA that does not exist. And re-pinning the demo, a path-exists sweep would have passed while an #L anchor pointed at the wrong line, which is worse than a 404 because nothing looks broken. The generalisation, now in AGENTS.md: THE CHECK THAT WOULD HAVE CAUGHT IT AND THE CHECK YOU RAN ARE RARELY THE SAME CHECK. Against that, not one wrong number reached a page: every figure in CHANGELOG.md was re-derived from the code while writing it, and the demo recomputes its own regression pair and re-hashes its own printed JSON, shouting on mismatch."
+  "next_action": "Run /gsd-autonomous --from 12.1 to resume the approved run. Phase 12.1 is Research: YES and genuinely unknown in two respects — the Schedule D Tax Worksheet's line structure, and whether it is cent-exact or whole-dollar (the same open assumption A2 the Tax Computation Worksheet carries). Before accepting any 12.1 plan, confirm it treats the scope reclassification and the lines-3a/3b wiring as ONE atomic change.",
+  "context_notes": "The session's through-line, and it decided the outcome twice: THE PLANNING DOCUMENTS WERE WRONG AND ONLY READING CODE CAUGHT IT. Phase 11's CONTEXT asserted a security property the shipped code did not have; Phase 12's roadmap scheduled building something that already existed while forbidding the edit its own criterion required. Neither would have been caught by executing the plans faithfully — both would have passed their own gates and shipped something subtly false. The corollary shaped every subsequent dispatch: subagents were told to try to FALSIFY the phase's own premises, and told that finding a premise unimplementable would be the most valuable thing they could return. That instruction produced both findings. Second theme: a green mutation gate is not automatically a meaningful one. M1 reddened a real production assertion; M3 reddened a fixture assertion sitting in front of the thing it appeared to guard. Both 'passed'; only one bought coverage."
 }
