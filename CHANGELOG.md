@@ -72,12 +72,18 @@ Stated as plainly as the above, because the gap is the point:
 
 ### Known documentation defects
 
-Found and recorded, not yet fixed:
+Found and recorded:
 
 - `REQUIREMENTS.md` TAX-10 calls the Social Security Benefits Worksheet 19
-  lines; it is 18.
-- `ROADMAP.md` constraint 4 names 1099-DIV boxes 2b/2d as forcing Schedule D;
-  i1040gi p31 Exception 1 names 2b, 2c **and** 2d.
+  lines; it is 18. **Still open** — deliberately left for Phase 13, which builds
+  that worksheet and will read it line by line against the printed form. Fixing
+  the count now, from the same recall that produced it, would swap one
+  unverified number for another.
+- ~~`ROADMAP.md` constraint 4 names 1099-DIV boxes 2b/2d as forcing Schedule D;
+  i1040gi p31 Exception 1 names 2b, 2c **and** 2d.~~ **Fixed 2026-08-07** while
+  scoping Phase 12, along with the same constraint's now-historical claim that
+  "Phase 12 holds DOC-06, TAX-08, and TAX-11 in one phase" — TAX-08 shipped in
+  Phase 10 and the remainder was split into Phases 12 and 12.1.
 
 ### Unverified against paper
 

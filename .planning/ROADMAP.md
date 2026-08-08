@@ -100,8 +100,18 @@ These were established by execution, not inference. Any replan must preserve the
 3. **Document formats have zero dependencies** and are genuinely parallel with the
    execution spine. → Phase 5 ∥ Phase 3.
 4. **The 1099-DIV dialect FORCES the QDCGT worksheet** (box 1b > 0) **and the Schedule D
-   Tax Worksheet** (boxes 2b/2d). They are scheduled *together*, never sequentially.
-   → Phase 12 holds DOC-06, TAX-08, and TAX-11 in one phase.
+   Tax Worksheet** (boxes **2b, 2c and 2d** — i1040gi p31 Exception 1 names all three; earlier
+   revisions of this line said "2b/2d" and were wrong. Corrected 2026-08-07).
+   **AMENDED 2026-08-07 — this constraint is now historical.** It read "→ Phase 12 holds DOC-06,
+   TAX-08, and TAX-11 in one phase," which no longer describes reality on two counts. TAX-08's
+   QDCGT worksheet **already shipped in Phase 10** (`fjs/tax/line16/qdcgt/module.f.js`), and the
+   remainder was split on 2026-08-07 into Phase 12 (documents: DOC-06, DOC-07, DOC-13, TAX-07) and
+   Phase 12.1 (the chain: TAX-11, TAX-15).
+   **The constraint's INTENT survives and is still binding**: never ship a dialect whose forcing
+   worksheet does not exist. What actually happened is the harmless inverse — the worksheet shipped
+   first, alone — and Phase 12.1 closes the gap by reclassifying dividends as modeled and wiring
+   Form 1040 lines 3a/3b in the same atomic change. Doing either half without the other yields a
+   confident zero where a refusal belongs.
 5. **Money before any report program.** Retrofitting `Cents` after report programs exist
    means rewriting every one of them. → Phase 4, before Phase 9 and Phase 10.
 6. **The Evo subject model before any real document is stored.** CAS has no delete;
