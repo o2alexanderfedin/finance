@@ -91,6 +91,8 @@ export const render = root => {
         profile: store(profileElecting(true)),
         w2s: [],
         interestForms: tenSmallInterestForms,
+        dividendForms: [],
+        brokerageForms: [],
     }
     const withoutElection = { ...withElection, profile: store(profileElecting(false)) }
 
