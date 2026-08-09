@@ -880,6 +880,7 @@ const form1040TaxAndPaymentLines = taxParamSet => inputs => income => {
         scheduleD19Cents: income.scheduleD19Cents,
         filingForm4952: false,
         form4952Line4gCents: 0n,
+        form4952Line4eCents: 0n,
         filingForm2555: false,
         form8615Applies: false,
         scheduleJElected: false,

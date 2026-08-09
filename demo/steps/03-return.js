@@ -184,9 +184,9 @@ export const render = root => {
     root.append(typed)
 
     root.append(sourceFooter([
-        { label: 'fjs/form1040/core — lines 1a-37 and the whole-return entry point', path: 'fjs/form1040/core/module.f.js', line: 1002, proofLine: 1397 },
+        { label: 'fjs/form1040/core — lines 1a-37 and the whole-return entry point', path: 'fjs/form1040/core/module.f.js', line: 1130, proofLine: 1648 },
         { label: 'fjs/report/line — the ReportLine type and its negative assertion', path: 'fjs/report/line/module.f.js', line: 1, proofLine: 182 },
         { label: 'fjs/tax/deduction — the standard deduction chart, 19 combinations', path: 'fjs/tax/deduction/module.f.js', line: 215, proofLine: 387 },
-        { label: 'fjs/tax/line16 — which method priced line 16', path: 'fjs/tax/line16/module.f.js', line: 159, proofLine: 517 },
+        { label: 'fjs/tax/line16 — which method priced line 16', path: 'fjs/tax/line16/module.f.js', line: 167, proofLine: 536 },
     ]))
 }

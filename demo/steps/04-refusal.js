@@ -32,8 +32,8 @@ export const tier = 'must'
  * @type {readonly UnmodeledKind[]}
  */
 const offered = [
-    'qualifiedDividends',
-    'capitalGainsOrLosses',
+    'pensionsAndAnnuities',
+    'scheduleOneAdditionalIncome',
     'socialSecurityBenefits',
     'iraDistributions',
     'itemizedDeductions',
@@ -167,9 +167,9 @@ export const render = root => {
     root.append(closing)
 
     root.append(sourceFooter([
-        { label: 'fjs/return/scope — classification and the one place a refusal is built', path: 'fjs/return/scope/module.f.js', line: 306, proofLine: 364 },
-        { label: 'fjs/return/scope — the 44-entry refusal table', path: 'fjs/return/scope/module.f.js', line: 126 },
-        { label: 'fjs/form1040/core — the guard runs before any line is computed', path: 'fjs/form1040/core/module.f.js', line: 1002, proofLine: 1397 },
+        { label: 'fjs/return/scope — classification and the one place a refusal is built', path: 'fjs/return/scope/module.f.js', line: 326, proofLine: 386 },
+        { label: 'fjs/return/scope — the 38-entry refusal table', path: 'fjs/return/scope/module.f.js', line: 152 },
+        { label: 'fjs/form1040/core — the guard runs before any line is computed', path: 'fjs/form1040/core/module.f.js', line: 1130, proofLine: 1648 },
         { label: 'fjs/return/profile — the frozen kind vocabulary', path: 'fjs/return/profile/module.f.js', line: 104, proofLine: 469 },
     ]))
 

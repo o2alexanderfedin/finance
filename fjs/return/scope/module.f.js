@@ -38,20 +38,38 @@
  * list, and it also catches accidental narrowing — an entry deleted from the
  * refusal table.
  *
- * ## Why `qualifiedDividends` is NOT modeled, even in the phase that ships QDCGT
+ * ## The dividend/capital-gain boundary, as of Phase 12.1
  *
- * The Qualified Dividends and Capital Gain Tax Worksheet computes in this same
- * phase (`fjs/tax/line16/qdcgt`, Plan 10-06), and yet a return DECLARING
- * qualified dividends is refused here. That is not a contradiction. The
- * worksheet's arithmetic is one thing; line 3a's SOURCE is another, and its
- * source is a Form 1099-DIV, whose dialect (`vnd.fjs.1099div`, DOC-06) is
- * Phase 12. So the dispatcher's QDCGT arm is proven directly, over worksheet
- * inputs supplied as values (Plans 10-06 and 10-08), while a taxpayer who
- * declares dividends gets a refusal naming the missing dialect instead of a
- * number derived from a document nobody could ingest. That is the guard doing
- * its job, and it is the exact shape of the failure TAX-16 names: an engine
- * that can compute a worksheet is not thereby an engine that can read the form
- * feeding it.
+ * Through Phase 10, this docstring argued that qualified dividends must stay
+ * refused even though the QDCGT worksheet already computed: the worksheet's
+ * arithmetic was one thing, line 3a's SOURCE — a Form 1099-DIV, whose dialect
+ * (`vnd.fjs.1099div`, DOC-06) did not exist yet — was another. **That
+ * argument's PRINCIPLE survives; its EXAMPLE does not.** Phase 12 shipped
+ * `vnd.fjs.1099div` and `vnd.fjs.1099b`, and Phase 12.1 (`12.1-CONTEXT.md`
+ * Decision 1.1) wires both into real computation: `fjs/form1040/core` reads
+ * dividend documents into lines 3a/3b/7a unconditionally, `fjs/schedule/d`
+ * computes the three-way capital-gain/loss routing, and `fjs/tax/line16`'s
+ * Schedule D Tax Worksheet branch computes instead of refusing. Six kinds
+ * move from {@link unmodeledKindRefusals} to {@link modeledKinds} in this
+ * one atomic change: `qualifiedDividends`, `ordinaryDividends`,
+ * `capitalGainDistributions`, `capitalGainsOrLosses`, `unrecaptured1250Gain`,
+ * `collectibles28RateGain`.
+ *
+ * **Two kinds still refuse, deliberately, for two DIFFERENT reasons** — the
+ * principle ("a worksheet that can compute is not thereby an engine that can
+ * read every form feeding it") still applies to both:
+ * - `investmentInterestForm4952` — this phase supplies no Form 4952 dialect
+ *   or election, and keeping a LIVE refusal on the Schedule D Tax Worksheet's
+ *   OWN branch (2b) is the ongoing proof that TAX-16 still guards something
+ *   real now that branch 2a computes. A branch that can only succeed is no
+ *   longer evidence of a guard.
+ * - `section1202Gain` — 1099-DIV box 2c's dollar amount is already included,
+ *   pass-through, inside box 2a (Schedule D line 13); what stays unmodeled is
+ *   the §1202 EXCLUSION percentage (50/60/75/100%, driven by when the
+ *   underlying QSB stock was acquired **by the fund**), which no 1099-DIV box
+ *   reports. Computing it without that percentage would overstate tax for
+ *   anyone entitled to the exclusion — a confident wrong answer, the exact
+ *   failure TAX-16 exists to prevent. Refusing is the honest, smaller option.
  *
  * @module
  */
@@ -65,18 +83,26 @@ import { kindVocabulary } from '../profile/module.f.js'
 // ── The frozen modeled set ───────────────────────────────────────────────────
 
 /**
- * The six kinds this engine models today, each with the document it actually
- * reads. Frozen in `fjs/guest`'s sense: growing this list is a deliberate act
- * that must be paired with a deletion from {@link unmodeledKindRefusals}, or
- * {@link _EveryKindIsEitherModeledOrRefused} fails to compile.
+ * The twelve kinds this engine models today, each with the document it
+ * actually reads. Frozen in `fjs/guest`'s sense: growing this list is a
+ * deliberate act that must be paired with a deletion from
+ * {@link unmodeledKindRefusals}, or {@link _EveryKindIsEitherModeledOrRefused}
+ * fails to compile.
  *
  * Kept in {@link kindVocabulary} order so the two lists can be diffed against
- * the 1040 face rather than against memory.
+ * the 1040 face rather than against memory. The last six entries are Plan
+ * 12.1-04's own addition (12.1-CONTEXT.md Decision 1.1).
  */
 export const modeledKinds = /** @type {const} */ ([
     'wages',                       // W-2 box 1                     -> 1040 line 1a
     'taxExemptInterest',           // 1099-INT box 8                -> 1040 line 2a
     'taxableInterest',             // 1099-INT boxes 1 and 3        -> 1040 line 2b
+    'qualifiedDividends',          // 1099-DIV box 1b                -> 1040 line 3a
+    'ordinaryDividends',           // 1099-DIV box 1a                -> 1040 line 3b
+    'capitalGainDistributions',    // 1099-DIV box 2a                -> 1040 line 7a
+    'capitalGainsOrLosses',        // Form 8949 + Schedule D          -> 1040 line 7a
+    'unrecaptured1250Gain',        // 1099-DIV box 2b + Sch D worksheet -> Schedule D line 19
+    'collectibles28RateGain',      // 1099-DIV box 2d + Sch D worksheet -> Schedule D line 18
     'federalTaxWithheldOnW2',      // W-2 box 2                     -> 1040 line 25a
     'federalTaxWithheldOn1099Int', // 1099-INT box 4                -> 1040 line 25b
     'estimatedTaxPayments',        // declared on the return profile -> 1040 line 26
@@ -90,7 +116,7 @@ export const modeledKinds = /** @type {const} */ ([
  * {@link modeledKinds} widened to a plain string list — an ordinary widening
  * ASSIGNMENT, not a cast: the tuple's literal member types are a subtype of
  * `string`, so nothing is silenced. It exists because the membership question
- * is asked of a {@link Kind}, and the six-literal tuple's own `.includes`
+ * is asked of a {@link Kind}, and the twelve-literal tuple's own `.includes`
  * would reject that argument at compile time — the compiler refusing to let us
  * ask the question the guard exists to answer. Same device, same reason, as
  * `fjs/return/profile`'s `kindNames`.
@@ -101,7 +127,7 @@ const modeledKindNames = modeledKinds
 // ── The refusal table ────────────────────────────────────────────────────────
 
 /**
- * The forty-four declared kinds this engine does not model, each naming the
+ * The thirty-eight declared kinds this engine does not model, each naming the
  * 1040 line that cannot be computed, a human label, and the remedy — the form
  * or schedule required and, where one exists, the requirement ID and phase
  * that will supply it. `10-RESEARCH.md`'s "Form 1040 Lines 1a-37" table is the
@@ -132,16 +158,10 @@ export const unmodeledKindRefusals = /** @type {const} */ ([
     { kind: 'form8919Wages', line: '1040 line 1g', label: 'Form 8919 wages', remedy: 'requires Form 8919 (no phase yet)' },
     { kind: 'otherEarnedIncome', line: '1040 line 1h', label: 'other earned income', remedy: 'no dialect models it (Phase 13)' },
     { kind: 'nontaxableCombatPayElection', line: '1040 line 1i', label: 'nontaxable combat pay election', remedy: 'no dialect models it (no phase yet)' },
-    { kind: 'qualifiedDividends', line: '1040 line 3a', label: 'qualified dividends', remedy: 'requires vnd.fjs.1099div (DOC-06, Phase 12)' },
-    { kind: 'ordinaryDividends', line: '1040 line 3b', label: 'ordinary dividends', remedy: 'requires vnd.fjs.1099div (DOC-06, Phase 12)' },
     { kind: 'iraDistributions', line: '1040 lines 4a/4b', label: 'IRA distributions', remedy: 'requires vnd.fjs.1099r (DOC-09, Phase 11)' },
     { kind: 'pensionsAndAnnuities', line: '1040 lines 5a/5b', label: 'pensions and annuities', remedy: 'requires vnd.fjs.1099r (DOC-09, Phase 11)' },
     { kind: 'socialSecurityBenefits', line: '1040 lines 6a/6b', label: 'social security benefits', remedy: 'requires vnd.fjs.ssa1099 and the Social Security Benefits Worksheet (TAX-10, Phase 13)' },
-    { kind: 'capitalGainDistributions', line: '1040 line 7a', label: 'capital gain distributions', remedy: 'requires vnd.fjs.1099div (DOC-06, Phase 12)' },
-    { kind: 'capitalGainsOrLosses', line: '1040 line 7a', label: 'capital gains or losses', remedy: 'requires Form 8949 and Schedule D (TAX-11, Phase 12)' },
-    { kind: 'unrecaptured1250Gain', line: 'Schedule D line 19', label: 'unrecaptured section 1250 gain', remedy: 'requires the Schedule D Tax Worksheet and the Unrecaptured Section 1250 Gain Worksheet (TAX-11, Phase 12)' },
-    { kind: 'collectibles28RateGain', line: 'Schedule D line 18', label: '28% rate gain', remedy: 'requires the Schedule D Tax Worksheet and the 28% Rate Gain Worksheet (TAX-11, Phase 12)' },
-    { kind: 'section1202Gain', line: 'Form 1099-DIV box 2c', label: 'section 1202 gain', remedy: 'requires vnd.fjs.1099div and Schedule D (DOC-06 and TAX-11, Phase 12)' },
+    { kind: 'section1202Gain', line: 'Form 1099-DIV box 2c', label: 'section 1202 gain', remedy: 'requires the §1202 exclusion percentage, which no 1099-DIV box carries (no phase yet)' },
     { kind: 'investmentInterestForm4952', line: 'Form 4952 line 4g', label: 'investment interest expense election', remedy: 'requires Form 4952 and the Schedule D Tax Worksheet (TAX-11, Phase 12)' },
     { kind: 'scheduleOneAdditionalIncome', line: '1040 line 8', label: 'additional income from Schedule 1', remedy: 'requires Schedule 1 (TAX-14, Phase 13)' },
     { kind: 'scheduleOneAdjustments', line: '1040 line 10', label: 'adjustments to income from Schedule 1', remedy: 'requires Schedule 1 (TAX-14, Phase 13)' },
@@ -321,10 +341,11 @@ export const classifyScope = declaredKinds => {
  * Independently hand-typed: the number of kinds {@link modeledKinds} names
  * today. Deliberately NOT `modeledKinds.length` — if it were, adding or
  * dropping a kind would move both sides together and this check could never
- * fail. The duplication is the mechanism, not a smell (AGENTS.md).
+ * fail. The duplication is the mechanism, not a smell (AGENTS.md). `6 -> 12`
+ * is Plan 12.1-04's own six-kind reclassification.
  * @type {number}
  */
-const expectedModeledKindCount = 6
+const expectedModeledKindCount = 12
 
 /**
  * Independently hand-typed: the number of entries
@@ -335,12 +356,13 @@ const expectedModeledKindCount = 6
  * table. A loop over a collection derived from the code under test can never
  * notice that collection shrinking — the project's fourth instance of the
  * signature defect, found this phase in `unknownDialectRefused`'s
- * `Object.keys(dialectSchemas)` loop. `50 - 6 = 44` is asserted here against
+ * `Object.keys(dialectSchemas)` loop. `50 - 12 = 38` is asserted here against
  * `kindVocabulary.length`, which `fjs/return/profile` in turn pins against its
- * own hand-typed `50`.
+ * own hand-typed `50`. `44 -> 38` is Plan 12.1-04's own six-kind
+ * reclassification.
  * @type {number}
  */
-const expectedUnmodeledKindCount = 44
+const expectedUnmodeledKindCount = 38
 
 /**
  * The complete refusal message for a return declaring exactly
@@ -364,13 +386,16 @@ const expectedSocialSecurityRefusalMessage
 export const proof = {
     partition: {
         // Both counts against hand-typed constants, and their sum against the
-        // vocabulary this module partitions -- so the 6/44 split cannot drift
-        // by a kind quietly migrating from one list to the other.
-        modeledKindsIsExactlySix: () => {
+        // vocabulary this module partitions -- so the 12/38 split cannot
+        // drift by a kind quietly migrating from one list to the other. This
+        // IS the hand-typed count-guard Mutation Gate M4 (Plan 12.1-04 Task
+        // 3) targets: removing one entry from `modeledKinds` without
+        // touching `expectedModeledKindCount` must redden this leaf.
+        modeledKindsIsExactlyTwelve: () => {
             assertEq(modeledKinds.length, expectedModeledKindCount)
             assertEq(new Set(modeledKinds).size, expectedModeledKindCount)
         },
-        unmodeledRefusalsIsExactlyFortyFour: () => {
+        unmodeledRefusalsIsExactlyThirtyEight: () => {
             assertEq(unmodeledKindRefusals.length, expectedUnmodeledKindCount)
             assertEq(
                 new Set(unmodeledKindRefusals.map(r => r.kind)).size,
@@ -445,19 +470,25 @@ export const proof = {
             const outcome = classifyScope([])
             assertEq(outcome.kind, 'ok', ['declaring nothing must be in scope', outcome])
         },
-        // The six modeled kinds, hand-typed rather than read from
+        // All twelve modeled kinds, hand-typed rather than read from
         // `modeledKinds`, so this leaf states independently what the engine
         // claims to be able to compute.
-        allSixModeledKindsDeclaredTogetherAreInScope: () => {
+        allTwelveModeledKindsDeclaredTogetherAreInScope: () => {
             const outcome = classifyScope([
                 'wages',
                 'taxExemptInterest',
                 'taxableInterest',
+                'qualifiedDividends',
+                'ordinaryDividends',
+                'capitalGainDistributions',
+                'capitalGainsOrLosses',
+                'unrecaptured1250Gain',
+                'collectibles28RateGain',
                 'federalTaxWithheldOnW2',
                 'federalTaxWithheldOn1099Int',
                 'estimatedTaxPayments',
             ])
-            assertEq(outcome.kind, 'ok', ['the six modeled kinds must be in scope', outcome])
+            assertEq(outcome.kind, 'ok', ['the twelve modeled kinds must be in scope', outcome])
         },
         // The gate. Its control is the leaf immediately below, which is this
         // same declaration with `socialSecurityBenefits` removed -- without it,
@@ -571,16 +602,20 @@ export const proof = {
                 ['the same declared kinds must produce the same message', declaredOneWay.message, declaredTheOther.message],
             )
         },
-        // Every one of the forty-four refuses on its own, naming its own line
-        // and label -- so no entry can be present in the table yet unreachable
-        // through the guard.
+        // Every one of the thirty-eight refuses on its own, naming its own
+        // line and label -- so no entry can be present in the table yet
+        // unreachable through the guard. `section1202Gain` and
+        // `investmentInterestForm4952` are both still in this table (Plan
+        // 12.1-04's own T-12.1-01 control), so this loop is also the ongoing
+        // re-verification that both still refuse after the six-kind
+        // reclassification.
         //
         // This loop iterates the code under test, which by itself could never
         // notice the table SHRINKING: an entry deleted disappears from the loop
         // in the same instant (the project's fourth signature defect, found
         // this phase in a proof looping `Object.keys(dialectSchemas)`). Two
         // things stand behind it, both independent of this table:
-        // `unmodeledRefusalsIsExactlyFortyFour`'s hand-typed count, and
+        // `unmodeledRefusalsIsExactlyThirtyEight`'s hand-typed count, and
         // `_EveryKindIsEitherModeledOrRefused`, which makes a deletion a `tsc`
         // failure. What the loop adds is reachability, which neither of those
         // can see; the CONTENT of two entries is pinned by the hand-typed

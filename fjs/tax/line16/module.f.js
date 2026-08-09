@@ -20,13 +20,16 @@
  * one level down.
  *
  * The tag sits on the ERROR arm as well, which is the part that is easy
- * to lose. 10-CONTEXT.md Decision 1 ships the Schedule D Tax Worksheet
- * branch as a TAX-16 REFUSAL rather than a computation, so that branch
- * returns no cents at all. Without a tag there would be nothing whatever
- * to assert about which branch was selected, and TAX-03's "a proof per
- * branch" would be unprovable for one of its four branches — the phase's
- * central claim would have a hole exactly where the hardest computation
- * was deferred.
+ * to lose. Through Phase 12, 10-CONTEXT.md Decision 1 shipped the Schedule
+ * D Tax Worksheet branch as a TAX-16 REFUSAL rather than a computation, so
+ * that branch returned no cents at all. **As of Plan 12.1-04
+ * (12.1-CONTEXT.md Decision 1.1), branch 2a COMPUTES**, via
+ * `fjs/tax/line16/sdtw`; branch 2b (Form 4952) still refuses, and it is now
+ * the live evidence that the guard still works — a branch that can only
+ * succeed would no longer be evidence of anything. Without a method tag on
+ * BOTH arms there would be nothing to assert about which branch was
+ * selected, and TAX-03's "a proof per branch" would be unprovable for the
+ * one branch that still refuses.
  *
  * ## Why the ordering is the hard part, stated once
  *
@@ -46,9 +49,10 @@
  * is wrong, it is wrong in the taxpayer's favour, and nothing screams.
  *
  * That is why level 2a is tested STRICTLY BEFORE level 2c below, and why
- * the proof that catches a swap asserts the **selected method** on an
- * input with a NON-ZERO Schedule D line 19 — see
- * `scheduleDConditionsOutrankQualifiedDividends` and its control.
+ * the proof that catches a swap asserts the **selected method** — and, as
+ * of Plan 12.1-04, a real VALUE too — on an input with a NON-ZERO Schedule
+ * D line 19 — see `scheduleDConditionsOutrankQualifiedDividends` and its
+ * control.
  *
  * ## The three level-0 entries are WRAPPERS, not a fifth peer branch
  *
@@ -79,6 +83,7 @@ import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
 import { baseTaxForAmount } from '../table/module.f.js'
 import { taxParamsByYear } from '../params/module.f.js'
 import { qdcgt } from './qdcgt/module.f.js'
+import { sdtw } from './sdtw/module.f.js'
 import { scopeRefusal } from '../../return/scope/module.f.js'
 
 /** @import { TaxParamSet, IndividualFilingStatus } from '../params/module.f.js' */
@@ -127,11 +132,13 @@ import { scopeRefusal } from '../../return/scope/module.f.js'
  * of TAX-03 is that the selection is made here, once, from the printed
  * conditions, rather than by a caller that already believes it knows.
  *
- * `scheduleD18Cents` and `scheduleD19Cents` earn their place even though
- * this phase cannot compute the worksheet they select — they are the ONLY
- * inputs on which the Schedule D Tax Worksheet and the QDCGT disagree, so
- * a dispatcher that did not read them could not tell the two branches
- * apart at all.
+ * `scheduleD18Cents` and `scheduleD19Cents` earn their place because they
+ * are the ONLY inputs on which the Schedule D Tax Worksheet and the QDCGT
+ * disagree, so a dispatcher that did not read them could not tell the two
+ * branches apart at all. As of Plan 12.1-04, branch 2a COMPUTES via
+ * `fjs/tax/line16/sdtw` rather than refusing; `form4952Line4eCents` is
+ * threaded to it (SDTW line 4) even though `dispatchLine16` itself never
+ * reads it.
  * @typedef {{
  *   readonly status: IndividualFilingStatus,
  *   readonly taxableIncomeCents: bigint,
@@ -144,6 +151,7 @@ import { scopeRefusal } from '../../return/scope/module.f.js'
  *   readonly scheduleD19Cents: bigint,
  *   readonly filingForm4952: boolean,
  *   readonly form4952Line4gCents: bigint,
+ *   readonly form4952Line4eCents: bigint,
  *   readonly filingForm2555: boolean,
  *   readonly form8615Applies: boolean,
  *   readonly scheduleJElected: boolean,
@@ -160,7 +168,8 @@ export const dispatchLine16 = taxParamSet => inputs => {
     const {
         status, taxableIncomeCents, qualifiedDividendsCents, capitalGainDistributionsCents,
         filingScheduleD, scheduleD15Cents, scheduleD16Cents, scheduleD18Cents, scheduleD19Cents,
-        filingForm4952, form4952Line4gCents, filingForm2555, form8615Applies, scheduleJElected,
+        filingForm4952, form4952Line4gCents, form4952Line4eCents, filingForm2555, form8615Applies,
+        scheduleJElected,
     } = inputs
     // The QDCGT arm, shared by level 2's THREE printed bullets (2c, 2d,
     // 2e) — each of which is written below as its own `if`, exactly as
@@ -186,6 +195,26 @@ export const dispatchLine16 = taxParamSet => inputs => {
             scheduleD16Cents,
             line7aCents: capitalGainDistributionsCents,
         }).line25,
+    })
+    // The Schedule D Tax Worksheet arm, mirroring `qdcgtOutcome`'s own
+    // shape — a function, called only on the arm that selects it (branch
+    // 2a's guard, below, stays byte-identical; only its BODY changes, from
+    // a refusal to this computation, in this one Plan 12.1-04 commit).
+    /** @type {() => Line16Outcome} */
+    const sdtwOutcome = () => ({
+        kind: 'ok',
+        method: 'scheduleDTaxWorksheet',
+        cents: sdtw(taxParamSet)({
+            status,
+            line1Cents: taxableIncomeCents,
+            line2Cents: qualifiedDividendsCents,
+            form4952Line4gCents,
+            form4952Line4eCents,
+            scheduleD15Cents,
+            scheduleD16Cents,
+            scheduleD18Cents,
+            scheduleD19Cents,
+        }).line47,
     })
     // ── LEVEL 0 — WRAPPERS, OUTERMOST ────────────────────────────────────
     //
@@ -256,19 +285,13 @@ export const dispatchLine16 = taxParamSet => inputs => {
     //     lines 18 and 19 zero the two worksheets are algebraically
     //     identical, so no ordinary test case can tell the two orderings
     //     apart. Only the SELECTED METHOD can.
+    //
+    //     As of Plan 12.1-04 (12.1-CONTEXT.md Decision 1.1), this branch
+    //     COMPUTES via `sdtwOutcome()` instead of refusing — the guard
+    //     above stays byte-identical; only the body changes.
     if (scheduleDLinesFifteenAndSixteenAreBothGains
         && (scheduleD18Cents > 0n || scheduleD19Cents > 0n)) {
-        // Only the lines that are actually non-zero are named, so the
-        // refusal says what THIS return has rather than what the branch
-        // is about in general. Both annotations are contextual types on
-        // an empty-or-singleton literal, not casts.
-        /** @type {readonly UnmodeledKind[]} */
-        const collectiblesKind = scheduleD18Cents > 0n ? ['collectibles28RateGain'] : []
-        /** @type {readonly UnmodeledKind[]} */
-        const unrecapturedKind = scheduleD19Cents > 0n ? ['unrecaptured1250Gain'] : []
-        const kinds = [...collectiblesKind, ...unrecapturedKind]
-        const { message, unmodeled } = scopeRefusal(kinds)
-        return { kind: 'error', method: 'scheduleDTaxWorksheet', message, unmodeled }
+        return sdtwOutcome()
     }
     // 2b. "You have to file Form 4952 and you have an amount on line 4g,
     //     even if you don't need to file Schedule D."
@@ -349,6 +372,7 @@ const nothingSwitchedOn = {
     scheduleD19Cents: 0n,
     filingForm4952: false,
     form4952Line4gCents: 0n,
+    form4952Line4eCents: 0n,
     filingForm2555: false,
     form8615Applies: false,
     scheduleJElected: false,
@@ -457,12 +481,14 @@ const taxThreeBranches = [
 
 /**
  * Independently hand-typed: the number of arms of this dispatcher that
- * REFUSE — the three level-0 wrappers, level 2a, and level 2b. Counted
- * off the printed decision tree rather than read from the table below,
- * for the reason on {@link expectedTaxThreeBranchCount}.
+ * REFUSE — the three level-0 wrappers, and level 2b. Counted off the
+ * printed decision tree rather than read from the table below, for the
+ * reason on {@link expectedTaxThreeBranchCount}. `5 -> 4` as of Plan
+ * 12.1-04: level 2a COMPUTES now, so it is no longer a refusing arm — see
+ * `scheduleDConditionsOutrankQualifiedDividends` for its own proof.
  * @type {number}
  */
-const expectedRefusingArmCount = 5
+const expectedRefusingArmCount = 4
 
 /**
  * Every refusing arm, with what its refusal must NAME.
@@ -497,13 +523,6 @@ const refusingArms = [
         expectedMethod: 'scheduleJ',
         expectedUnmodeled: ['farmIncomeAveragingScheduleJ'],
         expectedLabels: ['farm and fishing income averaging'],
-    },
-    {
-        name: 'level 2a — Schedule D lines 18 and 19 both non-zero',
-        inputs: { ...scheduleDWithUnrecapturedGainAndQualifiedDividends, scheduleD18Cents: 500000n },
-        expectedMethod: 'scheduleDTaxWorksheet',
-        expectedUnmodeled: ['unrecaptured1250Gain', 'collectibles28RateGain'],
-        expectedLabels: ['unrecaptured section 1250 gain', '28% rate gain'],
     },
     {
         name: 'level 2b — Form 4952 line 4g',
@@ -609,13 +628,12 @@ export const proof = {
         // qualified dividends to route. With line 3a at zero the two
         // orderings agree and this leaf could not see a swap.
         //
-        // Content, not merely refusal (AGENTS.md, and Phase 9's sweep,
-        // which found several assertions checking THAT a refusal happened
-        // rather than what it said): the `unmodeled` array is asserted
-        // element by element and the message's line, label and remedy are
-        // three separate `includes` calls so a failure names which part
-        // went missing.
-        scheduleDLineNineteenRefusesNamingUnrecapturedSection1250Gain: () => {
+        // As of Plan 12.1-04, branch 2a COMPUTES. This fixture is IDENTICAL
+        // in shape to 12.1-RESEARCH.md's Worked Example 1
+        // (`scheduleDWithUnrecapturedGainAndQualifiedDividends`), so
+        // `757500n` ($7,575.00) is REUSED from that hand-verified figure,
+        // never recomputed here.
+        scheduleDLineNineteenComputesNamingUnrecapturedSection1250Gain: () => {
             const outcome = dispatchLine16(taxParams2025)({
                 ...nothingSwitchedOn,
                 taxableIncomeCents: 9700000n,
@@ -626,31 +644,29 @@ export const proof = {
                 scheduleD19Cents: 1000000n,
             })
             assertEq(outcome.method, 'scheduleDTaxWorksheet', ['expected the Schedule D branch', outcome])
-            assert(outcome.kind === 'error', ['the Schedule D branch refuses (Decision 1)', outcome])
-            assertEq(outcome.unmodeled.length, 1, ['expected exactly one unmodeled kind', outcome.unmodeled])
-            assertEq(outcome.unmodeled[0], 'unrecaptured1250Gain', ['expected line 19\'s kind', outcome.unmodeled])
-            assert(
-                outcome.message.includes('unrecaptured section 1250 gain'),
-                ['expected the refusal to name unrecaptured section 1250 gain', outcome.message],
-            )
-            assert(
-                outcome.message.includes('Schedule D line 19'),
-                ['expected the refusal to name the Schedule D line', outcome.message],
-            )
-            assert(
-                outcome.message.includes('Schedule D Tax Worksheet'),
-                ['expected the refusal to name the remedy', outcome.message],
-            )
+            assert(outcome.kind === 'ok', ['the Schedule D branch computes as of Plan 12.1-04', outcome])
+            assertEq(outcome.cents, 757500n, 'Worked Example 1\'s own answer, $7,575.00')
         },
         // Level 2a's other trigger, Schedule D line 18, and then both at
         // once. Line 3a is again $300.00, for the same reason.
         //
-        // With both non-zero the two kinds are named in 1040 form order —
-        // unrecaptured §1250 gain (Schedule D line 19) before 28% rate
-        // gain (Schedule D line 18) — because `scopeRefusal` WALKS its
-        // own table rather than sorting its argument, so two returns
-        // declaring the same pair produce byte-identical messages.
-        scheduleDLineEighteenRefusesNamingTwentyEightPercentRateGain: () => {
+        // NEITHER fixture matches either of 12.1-RESEARCH.md's two worked
+        // examples, so both expected `cents` figures were HAND-COMPUTED
+        // independently from the printed Schedule D Tax Worksheet
+        // (i1040sd.pdf pp.15-16), cross-checked at minimum lines 41-47,
+        // before being written down (12.1-CONTEXT.md Decision 3.4) —
+        // never derived by calling `sdtw`/`dispatchLine16` and trusting the
+        // output.
+        //
+        // Collectibles-only: line21=$61,700.00, line22=$35,000.00 (the 0%
+        // slice), line41=$97,000.00 so line42=$0.00 (28% add-on is $0.00);
+        // line44 = tax on $61,700.00 (MFJ Tax Table, 10%x$23,850.00 +
+        // 12%x$37,875.00 = $2,385.00+$4,545.00=$6,930.00); line45 =
+        // $45.00 (line31, 15% of the $300.00 slice) + $6,930.00 =
+        // $6,975.00; line46 = tax on $97,000.00 = $11,174.00 (the same
+        // figure Example 1's own control leaf already hand-verifies);
+        // line47 = min($6,975.00, $11,174.00) = $6,975.00.
+        scheduleDLineEighteenComputesNamingTwentyEightPercentRateGain: () => {
             const collectiblesOnly = dispatchLine16(taxParams2025)({
                 ...nothingSwitchedOn,
                 taxableIncomeCents: 9700000n,
@@ -661,17 +677,13 @@ export const proof = {
                 scheduleD18Cents: 500000n,
             })
             assertEq(collectiblesOnly.method, 'scheduleDTaxWorksheet', ['expected the Schedule D branch', collectiblesOnly])
-            assert(collectiblesOnly.kind === 'error', ['the Schedule D branch refuses', collectiblesOnly])
-            assertEq(collectiblesOnly.unmodeled.length, 1, ['expected exactly one unmodeled kind', collectiblesOnly.unmodeled])
-            assertEq(collectiblesOnly.unmodeled[0], 'collectibles28RateGain', ['expected line 18\'s kind', collectiblesOnly.unmodeled])
-            assert(
-                collectiblesOnly.message.includes('28% rate gain'),
-                ['expected the refusal to name 28% rate gain', collectiblesOnly.message],
-            )
-            assert(
-                collectiblesOnly.message.includes('Schedule D line 18'),
-                ['expected the refusal to name the Schedule D line', collectiblesOnly.message],
-            )
+            assert(collectiblesOnly.kind === 'ok', ['the Schedule D branch computes as of Plan 12.1-04', collectiblesOnly])
+            assertEq(collectiblesOnly.cents, 697500n, 'hand-computed: $6,975.00')
+            // Both lines 18 AND 19 non-zero: line21=$71,700.00,
+            // line22=$25,000.00; line44 = tax on $71,700.00 (10%x$23,850.00
+            // + 12%x$47,875.00 = $2,385.00+$5,745.00=$8,130.00); line45 =
+            // $45.00 + $8,130.00 = $8,175.00; line47 = min($8,175.00,
+            // $11,174.00) = $8,175.00.
             const both = dispatchLine16(taxParams2025)({
                 ...nothingSwitchedOn,
                 taxableIncomeCents: 9700000n,
@@ -683,18 +695,8 @@ export const proof = {
                 scheduleD19Cents: 1000000n,
             })
             assertEq(both.method, 'scheduleDTaxWorksheet', ['expected the Schedule D branch', both])
-            assert(both.kind === 'error', ['the Schedule D branch refuses', both])
-            assertEq(both.unmodeled.length, 2, ['expected BOTH unmodeled kinds named', both.unmodeled])
-            assertEq(both.unmodeled[0], 'unrecaptured1250Gain', ['expected 1040 form order, line 19 first', both.unmodeled])
-            assertEq(both.unmodeled[1], 'collectibles28RateGain', ['expected 1040 form order, line 18 second', both.unmodeled])
-            assert(
-                both.message.includes('unrecaptured section 1250 gain'),
-                ['expected the refusal to name unrecaptured section 1250 gain', both.message],
-            )
-            assert(
-                both.message.includes('28% rate gain'),
-                ['expected the refusal to name 28% rate gain', both.message],
-            )
+            assert(both.kind === 'ok', ['the Schedule D branch computes as of Plan 12.1-04', both])
+            assertEq(both.cents, 817500n, 'hand-computed: $8,175.00')
         },
         // The SAME Schedule D conditions with line 3a = $0. The branch is
         // reachable without qualified dividends too, and this leaf is
@@ -708,7 +710,17 @@ export const proof = {
         // leaves like this one would have shipped a swapped order fully
         // green. See `scheduleDConditionsOutrankQualifiedDividends` for
         // the leaf that does see it.
-        scheduleDBranchIsReachableWithoutQualifiedDividends: () => {
+        //
+        // Hand-computed (no qualified dividends, so line2=$0.00
+        // throughout): line21=$67,000.00; line44 = tax on $67,000.00
+        // (10%x$23,850.00 + 12%x$43,175.00 = $2,385.00+$5,181.00=
+        // $7,566.00). line31 is still $45.00 (15% of line30=$300.00) even
+        // with no dividends — a Schedule D artifact of the worksheet's own
+        // algebra (line25/line29 both land on $300.00 through Schedule D's
+        // own terms alone), not a dividend term. line45 = $45.00 +
+        // $7,566.00 = $7,611.00; line47 = min($7,611.00, $11,174.00) =
+        // $7,611.00.
+        scheduleDBranchComputesReachableWithoutQualifiedDividends: () => {
             const outcome = dispatchLine16(taxParams2025)({
                 ...nothingSwitchedOn,
                 taxableIncomeCents: 9700000n,
@@ -718,9 +730,8 @@ export const proof = {
                 scheduleD19Cents: 1000000n,
             })
             assertEq(outcome.method, 'scheduleDTaxWorksheet', ['expected the Schedule D branch', outcome])
-            assert(outcome.kind === 'error', ['the Schedule D branch refuses', outcome])
-            assertEq(outcome.unmodeled.length, 1, ['expected exactly one unmodeled kind', outcome.unmodeled])
-            assertEq(outcome.unmodeled[0], 'unrecaptured1250Gain', ['expected line 19\'s kind', outcome.unmodeled])
+            assert(outcome.kind === 'ok', ['the Schedule D branch computes as of Plan 12.1-04', outcome])
+            assertEq(outcome.cents, 761100n, 'hand-computed: $7,611.00')
         },
         // Level 2b: Form 4952 with an amount on line 4g reaches the
         // Schedule D Tax Worksheet EVEN WITHOUT Schedule D, which is the
@@ -852,27 +863,24 @@ export const proof = {
         // ★ THE ORDERING PROOF. The one leaf in this phase that can see a
         // swapped 2a/2c dispatch order.
         //
-        // READ THIS BEFORE "SIMPLIFYING" THE LEAF. With Schedule D lines
-        // 18 and 19 zero and Form 4952 not filed, the Schedule D Tax
-        // Worksheet reduces EXACTLY to the QDCGT — 10-RESEARCH.md derived
-        // the line-by-line mapping from both printed worksheets (its
-        // assumption A4). So both orderings produce the same cents on
-        // every ordinary return, and a leaf rewritten into a cents check
-        // would pass under either order while appearing to test the
-        // dispatch.
-        //
-        // This leaf exists specifically because its input has a NON-ZERO
-        // Schedule D line 19 — the only kind of input the two orderings
-        // disagree on — AND a non-zero line 3a, without which level 2c
-        // could not compete at all. It asserts the SELECTED METHOD, which
-        // is the only observation that can see the disagreement. Under a
-        // swapped order the outcome is `{ kind: 'ok', method: 'qdcgt' }`
-        // and every assertion below fails.
+        // As of Plan 12.1-04, branch 2a COMPUTES rather than refuses, and
+        // that makes this leaf's own assertion STRICTLY STRONGER than it
+        // was through Phase 12: before, only the METHOD TAG could tell a
+        // correct dispatch from a swapped one (with Schedule D lines 18/19
+        // zero, the two worksheets are algebraically identical, so no
+        // ordinary test case can distinguish them). Now that BOTH branches
+        // compute over the SAME non-degenerate input (Schedule D line 19 =
+        // $10,000.00, non-zero), a swapped order must change the returned
+        // VALUE too: `757500n` ($7,575.00, correct) versus `637500n`
+        // ($6,375.00, `controlSameInputsWithZeroEighteenAndNineteenSelectQdcgt`'s
+        // own hand-verified figure) — Mutation Gate M3 (Plan 12.1-04 Task
+        // 3) watches this leaf redden on exactly that swap.
         //
         // Its control is `controlSameInputsWithZeroEighteenAndNineteenSelectQdcgt`,
         // immediately below: the same return with lines 18 and 19 at zero
-        // must still reach the QDCGT. Without it, a dispatcher that
-        // refused every Schedule D filer would pass this leaf.
+        // must still reach the QDCGT. Without it, a dispatcher that routed
+        // every Schedule D filer to the Schedule D Tax Worksheet would pass
+        // this leaf.
         scheduleDConditionsOutrankQualifiedDividends: () => {
             const outcome = dispatchLine16(taxParams2025)(
                 scheduleDWithUnrecapturedGainAndQualifiedDividends,
@@ -887,19 +895,10 @@ export const proof = {
                 ],
             )
             assert(
-                outcome.kind === 'error',
-                ['that branch is selected and then refuses (10-CONTEXT.md Decision 1)', outcome],
+                outcome.kind === 'ok',
+                ['that branch is selected and computes (Plan 12.1-04)', outcome],
             )
-            assertEq(outcome.unmodeled.length, 1, ['expected exactly one unmodeled kind', outcome.unmodeled])
-            assertEq(
-                outcome.unmodeled[0],
-                'unrecaptured1250Gain',
-                ['expected Schedule D line 19\'s kind named', outcome.unmodeled],
-            )
-            assert(
-                outcome.message.includes('unrecaptured section 1250 gain'),
-                ['expected the refusal to name what is unmodeled', outcome.message],
-            )
+            assertEq(outcome.cents, 757500n, 'Worked Example 1\'s own answer, $7,575.00')
         },
         // THE CONTROL for `scheduleDConditionsOutrankQualifiedDividends`.
         // The identical return with Schedule D lines 18 and 19 both zero
@@ -1030,7 +1029,7 @@ export const proof = {
             assertEq(
                 refusingArms.length,
                 expectedRefusingArmCount,
-                ['this dispatcher has five refusing arms', refusingArms.length],
+                ['this dispatcher has four refusing arms', refusingArms.length],
             )
             for (const row of refusingArms) {
                 const outcome = dispatchLine16(taxParams2025)(row.inputs)
@@ -1063,25 +1062,24 @@ export const proof = {
     },
 }
 
-// ── What this phase deliberately does NOT prove, and where it moves ──────────
+// ── Where the degenerate-equivalence differential now lives ──────────────────
 //
-// 10-RESEARCH.md's DEGENERATE-EQUIVALENCE DIFFERENTIAL: on inputs where
+// 10-RESEARCH.md's DEGENERATE-EQUIVALENCE DIFFERENTIAL — on inputs where
 // Schedule D lines 18 and 19 are both zero, the Schedule D Tax Worksheet
-// and the QDCGT must return the SAME CENTS. That is the property behind
-// everything this module says about ordering — it is precisely why a
-// swapped 2a/2c order is invisible to the number — and it cannot be
-// written here, because 10-CONTEXT.md Decision 1 ships the Schedule D Tax
-// Worksheet as a REFUSAL rather than a computation. There is no second
-// number to compare against.
+// and the QDCGT must return the SAME CENTS — is exactly the property
+// behind everything this module says about ordering (it is precisely why
+// a swapped 2a/2c order was invisible to the number through Phase 12,
+// while that branch still refused). Plan 12.1-02 built this proof, ahead
+// of this module's own wiring: `fjs/tax/line16/sdtw`'s own
+// `degenerateEquivalenceWithQdcgt`-style leaf validates BOTH
+// transcriptions against each other directly, over a shared fixture,
+// independently of this dispatcher.
 //
-// It is Phase 12's proof, alongside the brokerage documents that give the
-// Schedule D Tax Worksheet something to compute over, and it is worth
-// writing there for a second reason: it validates BOTH transcriptions
-// against each other, and it goes red for a reason that names both
-// worksheets.
-//
-// Until then, the ordering is carried by the method tag on
-// `scheduleDConditionsOutrankQualifiedDividends` and by the
-// `scheduleDTaxWorksheet` row of `dispatchIsExhaustiveOverTheFourTaxThreeBranches`
-// — two independent leaves in two different proofs, over the same
-// discriminating input.
+// This module's OWN ordering evidence, now that branch 2a computes, is
+// STRONGER than a differential: `scheduleDConditionsOutrankQualifiedDividends`
+// and the `scheduleDTaxWorksheet` row of
+// `dispatchIsExhaustiveOverTheFourTaxThreeBranches` assert a REAL, non-zero
+// cents figure on a non-degenerate input (Schedule D line 19 > 0), and
+// Mutation Gate M3 (Plan 12.1-04 Task 3) watches a swapped 2a/2c order
+// change that figure from `757500n` to `637500n` — a value disagreement,
+// not merely a tag disagreement.

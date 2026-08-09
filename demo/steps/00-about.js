@@ -180,9 +180,9 @@ export const render = root => {
     root.append(reading)
 
     root.append(sourceFooter([
-        { label: 'fjs/return/scope — the six modeled and forty-four refused kinds', path: 'fjs/return/scope/module.f.js', line: 306, proofLine: 364 },
+        { label: 'fjs/return/scope — the twelve modeled and thirty-eight refused kinds', path: 'fjs/return/scope/module.f.js', line: 326, proofLine: 386 },
         { label: 'fjs/return/profile — the frozen kind vocabulary', path: 'fjs/return/profile/module.f.js', line: 104, proofLine: 469 },
-        { label: 'fjs/form1040/core — the whole-return entry point', path: 'fjs/form1040/core/module.f.js', line: 1002, proofLine: 1397 },
+        { label: 'fjs/form1040/core — the whole-return entry point', path: 'fjs/form1040/core/module.f.js', line: 1130, proofLine: 1648 },
         { label: `CHANGELOG.md — what is in ${release}, and what is not`, path: 'CHANGELOG.md' },
         { label: 'AGENTS.md — the rules this codebase is held to', path: 'AGENTS.md' },
         { label: 'README.md', path: 'README.md' },

@@ -186,6 +186,6 @@ export const render = root => {
     root.append(sourceFooter([
         { label: 'fjs/exact — exact decimal parsing and formatting at the cents scale', path: 'fjs/exact/module.f.js', line: 34, proofLine: 70 },
         { label: 'fjs/report/line — the whole-dollar election, applied once', path: 'fjs/report/line/module.f.js', line: 162, proofLine: 182 },
-        { label: 'fjs/form1040/core — where the election is applied in the report', path: 'fjs/form1040/core/module.f.js', line: 1002, proofLine: 1397 },
+        { label: 'fjs/form1040/core — where the election is applied in the report', path: 'fjs/form1040/core/module.f.js', line: 1130, proofLine: 1648 },
     ]))
 }
