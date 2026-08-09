@@ -306,13 +306,13 @@ structural (RTTI) and semantic passes.
       Senior deduction with 6% phase-out over $75k/$150k, feeding Form 1040 line 13b.
 - [ ] **TAX-10** *(T2)*: Social Security Benefits Worksheet — a 19-line near-circular
       computation. Required by the 65+ profile.
-- [ ] **TAX-11** *(T2)*: Form 8949 and Schedule D, including the Schedule D Tax Worksheet.
+- [x] **TAX-11** *(T2)*: Form 8949 and Schedule D, including the Schedule D Tax Worksheet.
       Required by brokerage sales.
 - [ ] **TAX-12** *(T2)*: Schedule 8812. Required by dependents.
 - [ ] **TAX-13** *(T2)*: Schedule A. Required by itemizing, and it must compare against the
       standard deduction rather than assuming itemizing wins.
 - [ ] **TAX-14** *(T2)*: Schedule 1 and Schedule 2/3 to the extent the profile reaches them.
-- [ ] **TAX-15** *(T2)*: Worksheets modelled in IRS order, one named pure function per
+- [x] **TAX-15** *(T2)*: Worksheets modelled in IRS order, one named pure function per
       worksheet carrying the printed form's line numbers. **No variable named `magi`** — the
       MAGI for the IRA deduction, Roth eligibility, the Premium Tax Credit, IRMAA, and the
       student-loan-interest deduction have different add-back lists.

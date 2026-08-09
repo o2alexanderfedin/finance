@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
-status: executing
-stopped_at: "Phase 12.1 plan 03 (Schedule D) complete: fjs/schedule/d/module.f.js built (lines 1a-21, the three-way loss-cap branch, the 28% Rate Gain and Unrecaptured Section 1250 sub-worksheets), Mutation Gate M2 watched failing and reverted, 649 -> 659 project-local proofs. Plan 4 of 4 (12.1-04, Form 1040 wiring) is next."
-last_updated: "2026-08-08T23:50:24.602Z"
-last_activity: 2026-08-08
+status: verifying
+stopped_at: "Phase 12.1 plan 04 (Form 1040 wiring, the atomic scope-reclassification transition, and mutation gates M3/M4/M5) complete. Phase 12.1 is fully done: all four plans landed, TAX-11/TAX-15 marked complete. 659 -> 663 project-local proofs."
+last_updated: "2026-08-09T01:16:21.044Z"
+last_activity: 2026-08-09
 progress:
   total_phases: 19
-  completed_phases: 12
+  completed_phases: 13
   total_plans: 62
-  completed_plans: 64
+  completed_plans: 65
   percent: 100
 ---
 
@@ -35,7 +35,7 @@ Plan: 4 of 4
   (10-06 QDCGT, 10-07 the classifyScope scope guard, executed in parallel),
   wave 4 (10-08 dispatchLine16), wave 5 (10-09 lines 1a-15) and wave 6 (10-10
   lines 16-37 + the whole-report refusal).
-Status: Ready to execute
+Status: Phase complete — ready for verification
   phase mutation sweep was run over five sites and APPROVED by the phase owner,
   who independently reproduced the mutation-3 type hole (a spread or a bound
   local carries `lines` past excess-property checking; only `lines?: undefined`
@@ -45,7 +45,7 @@ Progress: [██████████] 100%
   in this file's frontmatter for the raw plan/summary counts — the percent figure here is
   phase-based, not plan-based, because two phases carry an extra FIX-SUMMARY.md alongside a
   plan's own summary, which would otherwise round the plan-based figure to a misleading 100%)
-Last activity: 2026-08-08
+Last activity: 2026-08-09
 
 ### Test metrics — MEASURE, do not read
 
@@ -130,6 +130,7 @@ proofs and moves with submodule initialization state — which is exactly how a 
 | Phase 12.1 P01 | 35min | 2 tasks | 1 files |
 | Phase 12.1 P02 | 55min | 2 tasks | 1 files |
 | Phase 12.1 P03 | 35min | 2 tasks | 1 files |
+| Phase 12.1 P04 | 70min | 3 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -291,6 +292,10 @@ Full log in PROJECT.md Key Decisions. Recent decisions affecting current work:
 - [Phase 12.1-03]: Schedule D's line-21 loss cap built as a three-way branch (gain/zero/capped-loss) rather than a pass-through of line16, per CONTEXT.md Decision 1.5 -- Form 1040 line 7a is wrong on every net-loss year without the $3,000/$1,500 MFS cap
 - [Phase 12.1-03]: Mutation Gate M2's short/long-term equivalent-mutant trap defeated by asserting Schedule D lines 7 and 15 separately -- swapping short-term/long-term categorization leaves line16's total unchanged ($400,000 net gain both before and after), so a total-only proof cannot see the swap
 - [Phase 12.1-03]: TAX-11 is NOT marked complete after this plan, despite being named in its frontmatter -- the requirement spans all four plans of Phase 12.1. Deferred to 12.1-04.
+- [Phase ?]: [Phase 12.1-04]: Task order REVERSED (1040 wiring first, scope reclassification last) as a git-history atomicity guarantee -- the six kinds stay refused throughout Task 1 so the new line3a/3b/7a/dispatch code is unreachable-or-correct, and Task 2's single commit is the only atomic transition point
+- [Phase ?]: [Phase 12.1-04]: filingScheduleD derives verbatim from declaredKinds.includes('capitalGainsOrLosses'), never document presence (Decision 1.6) -- status is now computed once near the top of form1040IncomeLines since Schedule D's loss-cap threshold needs it too
+- [Phase ?]: [Phase 12.1-04]: Mutation Gate M4's literal instruction (remove one modeledKinds entry, leave the count) does not compile -- it trips _EveryKindIsEitherModeledOrRefused (TS2344), a stronger correctly-caught defect. Ran the semantically-equivalent compiling form instead: migrate the kind into unmodeledKindRefusals without updating expectedModeledKindCount
+- [Phase ?]: [Phase 12.1-04]: TAX-11 and TAX-15 marked complete -- this plan is where Form 8949/Schedule D/the Schedule D Tax Worksheet actually get wired into a computing Form 1040, closing both requirements that spanned all four plans of Phase 12.1
 
 ### Pending Todos
 
@@ -435,8 +440,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-08-08T23:50:24.422Z
-Stopped at: Phase 12.1 plan 03 (Schedule D) complete: fjs/schedule/d/module.f.js built (lines 1a-21, the three-way loss-cap branch, the 28% Rate Gain and Unrecaptured Section 1250 sub-worksheets), Mutation Gate M2 watched failing and reverted, 649 -> 659 project-local proofs. Plan 4 of 4 (12.1-04, Form 1040 wiring) is next.
+Last session: 2026-08-09T01:16:20.688Z
+Stopped at: Phase 12.1 plan 04 (Form 1040 wiring, the atomic scope-reclassification transition, and mutation gates M3/M4/M5) complete. Phase 12.1 is fully done: all four plans landed, TAX-11/TAX-15 marked complete. 659 -> 663 project-local proofs.
 nothing in progress. Phases 11 and 12 both complete, verified 4/4 each, and merged (PRs #53, #54);
 a ROADMAP totals correction merged as PR #55. Then, out of roadmap order for a stakeholder
 showcase: **v0.12.0 released** (PR #57) and the browser demo **re-pinned** to it (PR #58), with the

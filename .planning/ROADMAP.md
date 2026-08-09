@@ -167,7 +167,7 @@ These were established by execution, not inference. Any replan must preserve the
 
 - [x] **Phase 11: Wage, Retirement, and Benefit Documents** - W-2, SSA-1099, 1099-R, the document library, and the retraction story (completed 2026-08-07)
 - [x] **Phase 12: Brokerage Documents** - 1099-DIV, 1099-B, the consolidated-1099 document model, and Schedule B *(SPLIT from the original Phase 12, 2026-08-07)* (completed 2026-08-08)
-- [ ] **Phase 12.1: The Capital-Gain Chain** - Form 8949, Schedule D, the Schedule D Tax Worksheet, and replacing the live line-16 refusal *(SPLIT from the original Phase 12, 2026-08-07)*
+- [x] **Phase 12.1: The Capital-Gain Chain** - Form 8949, Schedule D, the Schedule D Tax Worksheet, and replacing the live line-16 refusal *(SPLIT from the original Phase 12, 2026-08-07)* (completed 2026-08-09)
 - [ ] **Phase 13: The 65+ Profile and the Remaining Schedules** - Schedule 1-A, the Social Security Benefits Worksheet, 8812, Schedule A, Schedules 1/2/3
 
 **Why Phase 12 was split (2026-08-07).** Two findings made the original single phase wrong:
@@ -502,7 +502,7 @@ Plans:
 - [x] 12.1-03-PLAN.md — Schedule D lines 1a-21, the loss-cap three-way branch, the two bounded sub-worksheets, Mutation Gate M2 (TAX-11) *(wave 2, needs 12.1-01)*
 
 **Wave 3** *(blocked on Wave 2)*
-- [ ] 12.1-04-PLAN.md — Form 1040 lines 3a/3b/7a wiring (Task 1, lands first — safe while the scope guard still refuses), THEN the six-kind scope reclassification + branch-2a computation + the demo fix (Task 2, the atomic transition point), THEN Mutation Gates M3/M4/M5 (Task 3) (TAX-11, TAX-15) *(wave 3, needs 12.1-01, 12.1-02, 12.1-03)*
+- [x] 12.1-04-PLAN.md — Form 1040 lines 3a/3b/7a wiring (Task 1, lands first — safe while the scope guard still refuses), THEN the six-kind scope reclassification + branch-2a computation + the demo fix (Task 2, the atomic transition point), THEN Mutation Gates M3/M4/M5 (Task 3) (TAX-11, TAX-15) *(wave 3, needs 12.1-01, 12.1-02, 12.1-03)*
 
 ### Phase 13: The 65+ Profile and the Remaining Schedules
 **Milestone**: Week 3 — Breadth in Documents
