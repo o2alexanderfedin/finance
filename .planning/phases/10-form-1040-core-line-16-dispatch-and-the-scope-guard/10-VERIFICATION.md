@@ -3,7 +3,7 @@ phase: 10-form-1040-core-line-16-dispatch-and-the-scope-guard
 verified: 2026-08-07T01:03:21Z
 status: human_needed
 score: 5/5 must-haves verified
-verdict: PASS — with one coverage WARNING and two open human-verification items (F-01 closed 2026-08-09)
+verdict: PASS — with one coverage WARNING and one open human-verification item (F-01 and F-02 closed 2026-08-09)
 overrides_applied: 0
 method: goal-backward + independent mutation sweep (28 mutations executed by the verifier in an
   isolated copy, each reverted; every expected value re-derived from the stored brackets by hand
@@ -42,10 +42,15 @@ resolved_human_verification:
     confirmed_revision: "pdfinfo Title \"2025 Form 1040\", Subject \"U.S. Individual Income Tax Return\", 2 pages, CreationDate 2026-01-02 (PST); page-1 footer text \"Form 1040 (2025) Created 9/5/25\"; page-2 header \"Form 1040 (2025)\""
     result: "AGREE — 56 printed money lines enumerated 1a through 37, in the exact printed order `orderedLines` uses. 12a, 12b, 12c and 12d are checkboxes (no dollar box). 7b is a checkbox (\"Schedule D not required\" / \"Includes child's capital gain or (loss)\"). Line 38 (\"Estimated tax penalty\") is printed but out of the 1a-37 range. The seven named labels — 7a, 11a, 11b, 12e, 25a/25b/25c/25d, 27a, 35a — are printed on the form face exactly as the module names them."
     evidence: "`pdftotext -layout` extraction of both pages, cross-read against fjs/form1040/core/module.f.js's orderedLines (lines 994-1019) and expectedWholeReportLineCount = 56 (line 1227)."
-human_verification:
-  - test: "Confirm the 19 hand-typed Standard Deduction Chart amounts in fjs/tax/deduction against f1040s.pdf p4, particularly the four non-zero marriedFilingSeparately rows ($17,350 / $18,950 / $20,550 / $22,150) and the QSS chart stopping at two boxes."
+  - id: F-02
+    test: "Confirm the 19 hand-typed Standard Deduction Chart amounts in fjs/tax/deduction against f1040s.pdf p4, particularly the four non-zero marriedFilingSeparately rows ($17,350 / $18,950 / $20,550 / $22,150) and the QSS chart stopping at two boxes."
     expected: "Every row matches; MFS reaches four rows, QSS two."
-    why_human: "10-CONTEXT.md records an earlier read that truncated the MFS chart at three rows. The correction is documented but the page itself is the arbiter."
+    resolved: 2026-08-09
+    source_url: "https://www.irs.gov/pub/irs-pdf/f1040s.pdf"
+    confirmed_revision: "pdfinfo Title \"2025 Form 1040-SR\", Subject \"U.S. Income Tax Return for Seniors\", 4 pages, CreationDate 2026-01-02 (PST); page-1 form header \"1040-SR U.S. Income Tax Return for Seniors 2025\"; page-4 footer/header \"Form 1040-SR (2025)\""
+    result: "AGREE — all 19 chart amounts match, including the four non-zero MFS rows ($17,350/$18,950/$20,550/$22,150) and the QSS chart stopping at two boxes ($33,100/$34,700, no third or fourth row printed)."
+    evidence: "`pdftotext -layout` extraction of page 4, transcribed box-by-box before comparison against fjs/tax/deduction/module.f.js's chartCombinations (lines 299-326) and maxAgedOrBlindBoxes (lines 97-118)."
+human_verification:
   - test: "Confirm 10-RESEARCH.md assumption A2 — that the Tax Computation Worksheet is cent-exact rather than whole-dollar — against a real filed return."
     expected: "$184,094.50 for MFJ at $700,000.00 of taxable income (the one figure in the phase sensitive to A2)."
     why_human: "The IRS states no TCW-specific rounding rule. Both fjs/tax/table and fjs/tax/line16/qdcgt pin this figure; Phase 14's acceptance is what resolves it. Recorded honestly at both sites."
@@ -493,3 +498,112 @@ frontmatter.
 _F-01 closed: 2026-08-09 — Claude (gsd-executor), primary source fetched and read directly, revision
 confirmed via `pdfinfo` plus two independent on-page revision markers before any content was relied
 upon._
+
+---
+
+## F-02 — Closed: the 19 hand-typed Standard Deduction Chart amounts match the printed chart exactly
+
+_Appended 2026-08-09. Same session as F-01's closure, same reason the item is reopened rather than
+left `human_needed`: "the verifier has no access to the IRS PDF" stopped being true once a
+network-fetch capability became available._
+
+### Primary source and revision confirmation
+
+Fetched directly from `https://www.irs.gov/pub/irs-pdf/f1040s.pdf` (233,429 bytes, PDF 1.7). Before
+reading page 4, `pdfinfo` was run to confirm this is the TY2025 revision:
+
+```
+Title:           2025 Form 1040-SR
+Subject:         U.S. Income Tax Return for Seniors
+Pages:           4
+CreationDate:    Fri Jan  2 05:57:16 2026 PST
+ModDate:         Fri Jan  2 05:57:16 2026 PST
+```
+
+The extracted text independently confirms the same revision at two more sites: the page-1 form
+header prints `1040-SR U.S. Income Tax Return for Seniors 2025`, and the page-4 header/footer prints
+`Form 1040-SR (2025)` twice (once above the chart, once in the closing line). Three independent
+markers (`pdfinfo` title/subject, the page-1 header, the page-4 header/footer) all agree on TY2025 —
+proceeding to read was warranted.
+
+### Method
+
+Page 4 was extracted with `pdftotext -layout` (preserving the chart's column structure) and
+transcribed box by box, by filing status, **before** opening `fjs/tax/deduction/module.f.js` — so
+the comparison below is an independent read compared against the code, not a confirmation pass
+against a value already in mind.
+
+### The chart as read off the page
+
+```
+Standard Deduction Chart *
+  IF your filing status is...                AND boxes checked is...   THEN standard deduction is...
+  Single                                       1                         $17,750
+                                                2                          19,750
+  Married filing jointly                       1                        $33,100
+                                                2                          34,700
+                                                3                          36,300
+                                                4                          37,900
+  Qualifying surviving spouse                  1                        $33,100
+                                                2                          34,700
+  Head of household                            1                        $25,625
+                                                2                          27,625
+  Married filing separately**                  1                        $17,350
+                                                2                          18,950
+                                                3                          20,550
+                                                4                          22,150
+```
+
+Married filing jointly prints four rows (1/2/3/4). Qualifying surviving spouse prints **two** rows
+only (1/2) — no third or fourth box row exists in its column, confirmed by the row immediately
+following it being the unrelated "Head of household" section header. Married filing separately
+prints **four** rows (1/2/3/4), the maximum any status reaches, matching its `**` footnote allowing
+a spouse's boxes to be checked under the stated no-income condition.
+
+### Comparison against `fjs/tax/deduction/module.f.js`
+
+The chart's printed rows start at 1 box (a 0-box row is not printed — it is the base standard
+deduction carried on the Form 1040 face margin, not part of this chart). Comparing every printed
+row against `chartCombinations` (lines 299-326):
+
+| Status | Boxes | Printed | Coded (`chartCombinations`) | Match |
+|---|---|---|---|---|
+| Single | 1 | $17,750 | `1775000n` | ✓ |
+| Single | 2 | $19,750 | `1975000n` | ✓ |
+| Married filing jointly | 1 | $33,100 | `3310000n` | ✓ |
+| Married filing jointly | 2 | $34,700 | `3470000n` | ✓ |
+| Married filing jointly | 3 | $36,300 | `3630000n` | ✓ |
+| Married filing jointly | 4 | $37,900 | `3790000n` | ✓ |
+| Qualifying surviving spouse | 1 | $33,100 | `3310000n` | ✓ |
+| Qualifying surviving spouse | 2 | $34,700 | `3470000n` | ✓ |
+| Qualifying surviving spouse | 3/4 | **not printed** | **not present** (`maxAgedOrBlindBoxes.qualifyingSurvivingSpouse = 2`) | ✓ |
+| Head of household | 1 | $25,625 | `2562500n` | ✓ |
+| Head of household | 2 | $27,625 | `2762500n` | ✓ |
+| Married filing separately | 1 | $17,350 | `1735000n` | ✓ |
+| Married filing separately | 2 | $18,950 | `1895000n` | ✓ |
+| Married filing separately | 3 | $20,550 | `2055000n` | ✓ |
+| Married filing separately | 4 | $22,150 | `2215000n` | ✓ |
+
+Every printed non-zero row matches the coded cents exactly, to the cent. The box-count ceiling per
+status also matches: `maxAgedOrBlindBoxes` (lines 97-118) sets `single: 2`, `marriedFilingJointly: 4`,
+`marriedFilingSeparately: 4`, `headOfHousehold: 2`, `qualifyingSurvivingSpouse: 2` — exactly the
+number of rows each status's column prints on the page, including the specific near-miss the finding
+named: MFS reaches **four** rows (not three, as an earlier read had it per 10-CONTEXT.md), and QSS
+stops at **two**.
+
+`expectedChartCombinationCount = 19` (line 288) was independently recomputed from the transcription:
+Single 3 (0/1/2, the 0-row being the base amount) + MFJ 5 (0-4) + MFS 5 (0-4) + HoH 3 (0/1/2) + QSS 3
+(0/1/2) = **19**, matching both the hand-typed constant and the table's actual row count.
+
+### Result
+
+**AGREE.** The printed Standard Deduction Chart (f1040s.pdf p4, TY2025) and
+`fjs/tax/deduction/module.f.js`'s `chartCombinations` match exactly on all 19 combinations: the four
+non-zero MFS rows the finding specifically named ($17,350/$18,950/$20,550/$22,150) are correct, and
+the QSS chart genuinely stops at two boxes as `maxAgedOrBlindBoxes.qualifyingSurvivingSpouse = 2`
+encodes. No discrepancy found. `F-02` is resolved and moved from `human_verification` to
+`resolved_human_verification` in this report's frontmatter.
+
+_F-02 closed: 2026-08-09 — Claude (gsd-executor), primary source fetched and read directly, revision
+confirmed via `pdfinfo` plus two independent on-page revision markers, chart transcribed before the
+code was read._
