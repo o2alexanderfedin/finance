@@ -2,17 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
-status: paused
-stopped_at: "PAUSED 2026-08-08, between phases with nothing in progress. Phases 11 and 12 both shipped and merged (PRs #53, #54), plus a ROADMAP totals correction (#55). Then, out of roadmap order and at the phase owner's request for a stakeholder showcase: v0.12.0 released (#57) and the browser demo re-pinned to it (#58). main = develop = origin = 555f11c, CI green, 0 open PRs, working tree clean, 629 project-local proofs, tsc clean. Phase 12.1 (The Capital-Gain Chain) is next and has no directory, no CONTEXT, no research, no plans. Its BLOCKING constraint: the dividend scope reclassification and the Form 1040 lines-3a/3b wiring must land as ONE atomic change, because doing either half alone makes the engine report a confident zero where it currently refuses honestly. SECOND blocking constraint, new: 12.1 edits the two modules the demo anchors into most, so after it merges the demo's source anchors must be re-resolved AND step 4's narration re-read — once dividends are modeled, 'the whole return refuses' silently becomes false. Approved run: 12.1 -> 13 -> 15 -> 16 -> 17 -> 18, skipping 14 (needs the taxpayer's real documents)."
-last_updated: "2026-08-08T19:35:00.000Z"
-last_activity: 2026-08-08
+status: verifying
+stopped_at: "Phase 12.1 (The Capital-Gain Chain) COMPLETE — 4/4 plans; a brokerage sale flows 1099-B -> Form 8949 -> Schedule D -> the Schedule D Tax Worksheet -> Form 1040 line 16. TAX-11/TAX-15 marked complete. 663 project-local proofs, tsc clean. Branch feature/phase-12.1-capital-gain-chain is 22 commits ahead of origin/main and UNPUSHED. Audit F-01 closed against the real 2025 Form 1040 PDF; F-02 closable the same way; F-03 needs a real filed return. Phase 12.1 has NO VERIFICATION.md yet."
+last_updated: "2026-08-09T19:14:05.778Z"
+last_activity: 2026-08-09
 progress:
   total_phases: 19
-  completed_phases: 12
-  total_plans: 58
-  completed_plans: 61
-  percent: 63
-  percent_note: "63 = 12 of 19 PHASES. Do not compute this from the plan counts: completed_plans (61) exceeds total_plans (58) because phases 5, 7 and 8 each carry an extra FIX-SUMMARY.md beside a plan's own summary. Both plan figures are summed live from disk, so a dynamically inserted phase (12.1 contributes 0/0) cannot skew them — the +3 is entirely the extra summaries."
+  completed_phases: 13
+  total_plans: 62
+  completed_plans: 65
+  percent: 68
 ---
 
 # Project State
@@ -23,30 +22,36 @@ See: .planning/PROJECT.md (updated 2026-08-03)
 
 **Core value:** The report is a program, not an answer — the agent emits FunctionalScript;
 the server executes it as a pure function of `(documents, tax-year parameters) → report`.
-**Current focus:** Phase 12 — Brokerage Documents
+**Current focus:** Phase 12.1 — The Capital-Gain Chain
 
 ## Current Position
 
-Phase: 12 (Brokerage Documents) — EXECUTING
-  Ten plans across six waves. The plan set was returned BLOCKER by `gsd-plan-checker`
-  (four blockers, ten warnings), revised, re-checked, and only then executed.
-Plan: 5 of 5
-  whole-dollar election), wave 2 (10-03 Tax Computation Worksheet, 10-04 the
-  vnd.fjs.return_profile dialect, 10-05 the standard deduction chart), wave 3
-  (10-06 QDCGT, 10-07 the classifyScope scope guard, executed in parallel),
-  wave 4 (10-08 dispatchLine16), wave 5 (10-09 lines 1a-15) and wave 6 (10-10
-  lines 16-37 + the whole-report refusal).
-Status: Phase complete — ready for verification
-  phase mutation sweep was run over five sites and APPROVED by the phase owner,
-  who independently reproduced the mutation-3 type hole (a spread or a bound
-  local carries `lines` past excess-property checking; only `lines?: undefined`
-  stops it) and site 2's differential. Phase 11 not started.
+Phase: 12.1 (The Capital-Gain Chain) — COMPLETE, NOT YET VERIFIED
+  Four plans across three waves. The plan set was returned ISSUES FOUND by
+  `gsd-plan-checker` twice (2 blockers, then 2 more), revised each time, and only
+  executed after a third pass returned VERIFICATION PASSED.
+Plan: 4 of 4 — all summaries written
+  Wave 1: 12.1-01 (Form 8949 category derivation + the absent-basis refusal) and
+  12.1-02 (the 47-line Schedule D Tax Worksheet). Wave 2: 12.1-03 (Schedule D
+  lines 1a-21, the loss-cap three-way branch, two bounded sub-worksheets).
+  Wave 3: 12.1-04 (Form 1040 wiring FIRST, then the six-kind scope
+  reclassification — the atomic transition — then mutation gates M3/M4/M5).
+Status: Implemented and self-verified by its own plans; **no `12.1-VERIFICATION.md`
+  exists**. Every phase 01-12 has one. Execute-phase ran with `--no-transition` and
+  stopped after the final wave, so the phase has never been independently verified
+  against its goal. That is the next action.
 
-Progress: [██████████] 100%
-  in this file's frontmatter for the raw plan/summary counts — the percent figure here is
-  phase-based, not plan-based, because two phases carry an extra FIX-SUMMARY.md alongside a
-  plan's own summary, which would otherwise round the plan-based figure to a misleading 100%)
-Last activity: 2026-08-08
+Progress: [███████░░░] 68%  (13 of 19 phases)
+  Phase-based, never plan-based: `completed_plans` (65) exceeds `total_plans` (62)
+  because three phases carry an extra FIX-SUMMARY.md beside a plan's own summary,
+  which rounds the plan-based figure to a misleading 100%. See `percent_note`.
+Last activity: 2026-08-09
+
+> **This block carried Phase 10's text under a 12.1 heading until 2026-08-09** — "Ten plans
+> across six waves", `10-03 Tax Computation Worksheet`, "Phase 11 not started" — while
+> `Progress` read 100% against a frontmatter `percent` of 68. Rewritten from measurement.
+> The same class of defect as the coverage-table drift fixed in `REQUIREMENTS.md` the same
+> day: a hand-maintained second source that nothing compares against.
 
 ### Test metrics — MEASURE, do not read
 
@@ -75,7 +80,7 @@ proofs and moves with submodule initialization state — which is exactly how a 
 
 **Velocity:**
 
-- Total plans completed: 0
+- Total plans completed: 65 (see the per-plan table below; this line read 0 until 2026-08-09 while the table listed 40+ entries)
 - Average duration: —
 - Total execution time: 0.0 hours
 
@@ -128,6 +133,10 @@ proofs and moves with submodule initialization state — which is exactly how a 
 | Phase 12 P03 | 20min | 1 tasks | 1 files |
 | Phase 12 P04 | 35min | 1 tasks | 1 files |
 | Phase 12 P05 | 35min | 3 tasks | 2 files |
+| Phase 12.1 P01 | 35min | 2 tasks | 1 files |
+| Phase 12.1 P02 | 55min | 2 tasks | 1 files |
+| Phase 12.1 P03 | 35min | 2 tasks | 1 files |
+| Phase 12.1 P04 | 70min | 3 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -281,6 +290,18 @@ Full log in PROJECT.md Key Decisions. Recent decisions affecting current work:
 - [Phase 12-04]: Schedule B Part III foreign-account fields are read verbatim from vnd.fjs.return_profile, proven with zero stored 1099s so the read cannot be mistaken for document-derived inference
 - [Phase 12]: DOC-13's provenance proof lives in a new proof-only module (fjs/document/consolidated_provenance/module.f.js), not inside either dialect's own file, since the property spans both dialects plus formSubject
 - [Phase 12]: expectedKnownDialectCount bumped directly 7 -> 9 in one commit (both new dialects registered together), mirroring Phase 11's 11-04 precedent
+- [Phase 12.1-01]: Form 8949's category-derivation refusal check order is fixed and documented (box1f/box1g, then absent-basis, then undecided category) so Mutation Gate M1 has an unambiguous target line
+- [Phase 12.1-01]: TAX-11/TAX-15 are NOT marked complete after this plan, despite being named in its frontmatter -- the requirement spans all four plans of Phase 12.1 and REQUIREMENTS.md has no partial-completion representation. Deferred to 12.1-04.
+- [Phase 12.1-02]: SDTW lines 22/32's printed skip instructions are left unimplemented as special cases -- surrounding mins/floors already make the shortcut and straight-through arithmetic agree, mirroring qdcgt's own precedent; neither worked example directly observes this, flagged for a future mutation sweep
+- [Phase 12.1-02]: SDTW lines 35-40/41-43 are explicitly gated to 0n when their controlling Schedule D line (19/18) is zero, rather than relying on natural arithmetic -- necessary because line 42 carries no printed floor and would otherwise leak a spurious 28% charge
+- [Phase 12.1-02]: the split-dispatch fixture (method44 !== method46) and the degenerate-equivalence fixture (sdtw.line47 === qdcgt.line25) share one underlying input rather than two separate constructions
+- [Phase 12.1-03]: Schedule D's line-21 loss cap built as a three-way branch (gain/zero/capped-loss) rather than a pass-through of line16, per CONTEXT.md Decision 1.5 -- Form 1040 line 7a is wrong on every net-loss year without the $3,000/$1,500 MFS cap
+- [Phase 12.1-03]: Mutation Gate M2's short/long-term equivalent-mutant trap defeated by asserting Schedule D lines 7 and 15 separately -- swapping short-term/long-term categorization leaves line16's total unchanged ($400,000 net gain both before and after), so a total-only proof cannot see the swap
+- [Phase 12.1-03]: TAX-11 is NOT marked complete after this plan, despite being named in its frontmatter -- the requirement spans all four plans of Phase 12.1. Deferred to 12.1-04.
+- [Phase ?]: [Phase 12.1-04]: Task order REVERSED (1040 wiring first, scope reclassification last) as a git-history atomicity guarantee -- the six kinds stay refused throughout Task 1 so the new line3a/3b/7a/dispatch code is unreachable-or-correct, and Task 2's single commit is the only atomic transition point
+- [Phase ?]: [Phase 12.1-04]: filingScheduleD derives verbatim from declaredKinds.includes('capitalGainsOrLosses'), never document presence (Decision 1.6) -- status is now computed once near the top of form1040IncomeLines since Schedule D's loss-cap threshold needs it too
+- [Phase ?]: [Phase 12.1-04]: Mutation Gate M4's literal instruction (remove one modeledKinds entry, leave the count) does not compile -- it trips _EveryKindIsEitherModeledOrRefused (TS2344), a stronger correctly-caught defect. Ran the semantically-equivalent compiling form instead: migrate the kind into unmodeledKindRefusals without updating expectedModeledKindCount
+- [Phase ?]: [Phase 12.1-04]: TAX-11 and TAX-15 marked complete -- this plan is where Form 8949/Schedule D/the Schedule D Tax Worksheet actually get wired into a computing Form 1040, closing both requirements that spanned all four plans of Phase 12.1
 
 ### Pending Todos
 
@@ -425,16 +446,38 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-08-08 (resumed 12:32 PDT)
-Stopped at: **Session resumed; status presented, no phase work started.** Still between phases with
-nothing in progress. Phases 11 and 12 both complete, verified 4/4 each, and merged (PRs #53, #54);
-a ROADMAP totals correction merged as PR #55. Then, out of roadmap order for a stakeholder
-showcase: **v0.12.0 released** (PR #57) and the browser demo **re-pinned** to it (PR #58), with the
-handoff updated in PR #59. No branch, worktree, or file is mid-edit.
+Last session: 2026-08-09
+Stopped at: **Phase 12.1 (The Capital-Gain Chain) COMPLETE — 4/4 plans, 4/4 summaries.** A
+brokerage sale now flows 1099-B → Form 8949 → Schedule D → the Schedule D Tax Worksheet → Form
+1040 line 16. TAX-11 and TAX-15 marked complete. Nothing is mid-edit.
 
-Measure the suite rather than quoting it — see "Test metrics" above. Re-measured at resume on
-`555f11c`: `tsc` clean, **629** project-local proofs, working tree clean, 0 open PRs,
-`main` = `develop` = `origin`.
+> **An automated state write clobbered this block on 2026-08-09** (`stopped_at` replaced with
+> "context exhaustion at 75%", the continuity text truncated mid-sentence into a dangling
+> fragment, and the quoted metrics left two waves stale at `555f11c`/629 proofs). Restored here
+> from measurement. Its one *correct* edit was kept: `percent: 100 → 68`, which is 13/19 phases —
+> the plan-based figure is unusable (`completed_plans` 65 exceeds `total_plans` 62; see
+> `percent_note`).
+
+Measure the suite rather than quoting it — see "Test metrics" above. Measured on `d111258`:
+`tsc` clean, **663** project-local proofs (629 → 663 across Phase 12.1), 0 failures.
+
+**Branch `feature/phase-12.1-capital-gain-chain` is 22 commits ahead of `origin/main` and
+UNPUSHED.** No PR opened yet. `main` and `develop` are both still at `555f11c`.
+
+Also landed this session, outside the phase:
+- **`REQUIREMENTS.md` coverage table reconciled** — 28 rows said `Pending` for requirements whose
+  checkbox already said `[x]`, drift reaching back to Phase 3. Now 72 complete / 21 pending / 93
+  total, and the header's stale "79 requirements" corrected to 93. Phase 17 owns turning the
+  recompute command into an actual gate.
+- **Audit finding F-01 closed** — the 2025 Form 1040 face was fetched and its 56 printed money
+  lines enumerated against `orderedLines`: exact match. This item had been `human_needed` since
+  Phase 10 on the grounds that "the verifier has no access to the IRS PDF", which is no longer
+  true. **F-02 (Standard Deduction Chart) is closable the same way.** F-03 (assumption A2) is
+  NOT — it asks for confirmation against a real filed return, which no public PDF supplies.
+
+**Known gap: Phase 12.1 has no `12.1-VERIFICATION.md`.** Every phase 01-12 has one. Execute-phase
+ran with `--no-transition` and stopped after the final wave, so the phase is implemented and
+self-verified by its own plans but never independently verified against its goal.
 
 **Why the recorded HEAD drifted, and the general lesson:** the three handoff files each named
 `694d580` — the tip at the moment their text was written — while the commit that merged that very
@@ -445,7 +488,7 @@ construction. Corrected at this resume; do not treat a recorded SHA as authorita
 Next: **Phase 12.1 — The Capital-Gain Chain**, which has no directory, no CONTEXT, no research and
 no plans. Read its BLOCKING constraint before planning it (below).
 
-Resume file: `.planning/phases/12-brokerage-documents-and-the-capital-gain-chain/.continue-here.md`
+Resume file: None
 plus `.planning/HANDOFF.json`. The stale `.continue-here.md` files in phases 09 and 10 were deleted
 during this pause — they were one-shot artifacts from earlier sessions and would have misdirected a
 resuming agent.

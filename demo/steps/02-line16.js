@@ -43,6 +43,7 @@ const neutral = {
     scheduleD19Cents: 0n,
     filingForm4952: false,
     form4952Line4gCents: 0n,
+    form4952Line4eCents: 0n,
     filingForm2555: false,
     form8615Applies: false,
     scheduleJElected: false,
@@ -55,7 +56,7 @@ const methodBlurb = {
     taxTable: 'Publication 1040\'s printed Tax Table — the $50-wide band your income falls in, taxed at its midpoint.',
     taxComputationWorksheet: 'The Tax Computation Worksheet — above $100,000 the printed table stops, and a rate-times-income-minus-subtraction row takes over.',
     qdcgt: 'The Qualified Dividends and Capital Gain Tax Worksheet — 25 lines that price the preferential-rate slice separately from the ordinary slice.',
-    scheduleDTaxWorksheet: 'The Schedule D Tax Worksheet — correctly selected, and refused: it needs brokerage documents this engine does not model yet.',
+    scheduleDTaxWorksheet: 'The Schedule D Tax Worksheet — 47 lines pricing unrecaptured section 1250 gain at up to 25% and collectibles at 28%, separately from the ordinary and 0/15/20% slices.',
     foreignEarnedIncomeTaxWorksheet: 'The Foreign Earned Income Tax Worksheet wraps whichever base method applies. Not modeled.',
     form8615: 'Form 8615, a child\'s unearned income taxed at the parent\'s rate. Not modeled.',
     scheduleJ: 'Schedule J, farm income averaging. Not modeled.',
@@ -88,8 +89,8 @@ const presets = [
         },
     },
     {
-        label: 'Schedule D — refuses',
-        why: 'Selected correctly, then declines: 28%-rate gain is unmodeled.',
+        label: 'Schedule D Tax Worksheet',
+        why: '28%-rate gain on Schedule D routes to its own worksheet, taxed at up to 28% rather than 0/15/20%.',
         over: {
             taxableIncomeCents: centsFromString('97000.00'),
             filingScheduleD: true,
@@ -258,7 +259,9 @@ export const render = root => {
 
     live.append(controls)
 
-    // The toggles that select the refusing branches.
+    // The Schedule D toggle now COMPUTES (Plan 12.1-04); the other three
+    // toggles select the level-0 WRAPPER branches, which still refuse —
+    // no kind for Form 2555, Form 8615, or Schedule J is in scope.
     const toggles = el('div', { class: 'checks' })
     /** @type {readonly {
      *   readonly label: string,
@@ -301,7 +304,8 @@ export const render = root => {
     const jump = section('The four printed branches')
     jump.append(el('p', {
         text: 'Each button sets the return to the conditions that select one branch. '
-            + 'Three of them compute; the fourth is selected correctly and then refuses.',
+            + 'All four compute — the Schedule D Tax Worksheet joined the other three '
+            + 'as of Plan 12.1-04.',
     }))
     const buttons = el('div', { class: 'checks' })
     for (const preset of presets) {
@@ -404,10 +408,10 @@ export const render = root => {
     root.append(tagPanel)
 
     root.append(sourceFooter([
-        { label: 'fjs/tax/line16 — the dispatch, in printed order', path: 'fjs/tax/line16/module.f.js', line: 159, proofLine: 517 },
+        { label: 'fjs/tax/line16 — the dispatch, in printed order', path: 'fjs/tax/line16/module.f.js', line: 167, proofLine: 536 },
         { label: 'fjs/tax/line16/qdcgt — the 25-line worksheet', path: 'fjs/tax/line16/qdcgt/module.f.js', line: 131, proofLine: 284 },
         { label: 'fjs/tax/table — Tax Table and Tax Computation Worksheet', path: 'fjs/tax/table/module.f.js', line: 378, proofLine: 571 },
-        { label: 'fjs/return/scope — the one place a refusal is constructed', path: 'fjs/return/scope/module.f.js', line: 277, proofLine: 364 },
+        { label: 'fjs/return/scope — the one place a refusal is constructed', path: 'fjs/return/scope/module.f.js', line: 297, proofLine: 386 },
     ]))
 
     income.readout()

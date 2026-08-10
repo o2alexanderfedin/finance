@@ -49,6 +49,10 @@ import { applyWholeDollarElection } from '../../report/line/module.f.js'
 import { dispatchLine16 } from '../../tax/line16/module.f.js'
 import { dialect as w2Dialect } from '../../document/w2/module.f.js'
 import { dialect as oneZeroNineNineIntDialect } from '../../document/1099int/module.f.js'
+import { dialect as oneZeroNineNineDivDialect } from '../../document/1099div/module.f.js'
+import { dialect as oneZeroNineNineBDialect } from '../../document/1099b/module.f.js'
+import { qdcgt } from '../../tax/line16/qdcgt/module.f.js'
+import { sdtw } from '../../tax/line16/sdtw/module.f.js'
 import {
     dialect as returnProfileDialect,
     kindVocabulary,
@@ -57,14 +61,18 @@ import {
 import { classifyScope } from '../../return/scope/module.f.js'
 import { standardDeductionCents } from '../../tax/deduction/module.f.js'
 import { individualFilingStatuses, taxParamsByYear } from '../../tax/params/module.f.js'
+import { scheduleD } from '../../schedule/d/module.f.js'
 
 /** @import { ReportLine, Source } from '../../report/line/module.f.js' */
 /** @import { W2 } from '../../document/w2/module.f.js' */
 /** @import { OneZeroNineNineInt } from '../../document/1099int/module.f.js' */
+/** @import { OneZeroNineNineDiv } from '../../document/1099div/module.f.js' */
+/** @import { OneZeroNineNineB } from '../../document/1099b/module.f.js' */
 /** @import { Kind, ReturnProfile } from '../../return/profile/module.f.js' */
 /** @import { IndividualFilingStatus, TaxParamSet } from '../../tax/params/module.f.js' */
 /** @import { Line16Method } from '../../tax/line16/module.f.js' */
 /** @import { UnmodeledKind } from '../../return/scope/module.f.js' */
+/** @import { ScheduleDOutcome } from '../../schedule/d/module.f.js' */
 
 // ── Inputs ───────────────────────────────────────────────────────────────────
 
@@ -80,13 +88,21 @@ import { individualFilingStatuses, taxParamsByYear } from '../../tax/params/modu
 
 /**
  * Everything lines 1a-15 read. The profile is a single document (a return has
- * exactly one); W-2s and 1099-INTs are lists, because a taxpayer may hold any
- * number of each — which is precisely what makes criterion 5's ten-document
- * rounding demonstration expressible on a real line.
+ * exactly one); W-2s, 1099-INTs, 1099-DIVs and 1099-Bs are lists, because a
+ * taxpayer may hold any number of each — which is precisely what makes
+ * criterion 5's ten-document rounding demonstration expressible on a real
+ * line.
+ *
+ * `dividendForms`/`brokerageForms` are Plan 12.1-04's own widening
+ * (12.1-PATTERNS.md, `fjs/schedule/b`'s `ScheduleBInputs` precedent): lines
+ * 3a/3b read dividend documents unconditionally, and Schedule D reads both
+ * when `capitalGainsOrLosses` is declared.
  * @typedef {{
  *   readonly profile: Stored<ReturnProfile>,
  *   readonly w2s: readonly Stored<W2>[],
  *   readonly interestForms: readonly Stored<OneZeroNineNineInt>[],
+ *   readonly dividendForms: readonly Stored<OneZeroNineNineDiv>[],
+ *   readonly brokerageForms: readonly Stored<OneZeroNineNineB>[],
  * }} Form1040Inputs
  */
 
@@ -295,8 +311,15 @@ const storedFilingStatusNamed = status =>
 
 /**
  * Form 1040 lines 1a through 15, each a {@link ReportLine}, keyed by the
- * printed line label.
+ * printed line label — plus, since Plan 12.1-04, the `kind: 'ok'` tag that
+ * makes this the OK arm of a union with {@link Form1040Error} (mirroring
+ * {@link Form1040TaxAndPaymentLines}'s own return-type shape one function
+ * over), and four bookkeeping fields that are dispatcher INPUTS, never
+ * printed lines: `filingScheduleD` and the four `scheduleD1{5,6,8,9}Cents`
+ * fields Schedule D computed, threaded to `dispatchLine16`'s call site in
+ * {@link form1040TaxAndPaymentLines}.
  * @typedef {{
+ *   readonly kind: 'ok',
  *   readonly line1a: ReportLine,
  *   readonly line1b: ReportLine,
  *   readonly line1c: ReportLine,
@@ -328,27 +351,86 @@ const storedFilingStatusNamed = status =>
  *   readonly line13b: ReportLine,
  *   readonly line14: ReportLine,
  *   readonly line15: ReportLine,
+ *   readonly filingScheduleD: boolean,
+ *   readonly scheduleD15Cents: bigint,
+ *   readonly scheduleD16Cents: bigint,
+ *   readonly scheduleD18Cents: bigint,
+ *   readonly scheduleD19Cents: bigint,
  * }} Form1040IncomeLines
  */
 
 /**
  * Computes Form 1040 lines 1a through 15 for an in-scope return.
  *
- * Every `1b`-`1i`, `3a`-`8`, `10`, `13a` and `13b` line is a
+ * Every `1b`-`1i`, `4a`-`6b`, `8`, `10`, `13a` and `13b` line is a
  * {@link profileDeclaredZeroLine}: zero only because the corresponding kind
  * was not declared. Had it been declared, `fjs/return/scope` would already
  * have refused the whole report, so "declared but unmodeled" never reaches
- * this function.
+ * this function. Lines 3a, 3b and 7a are no longer in that group as of Plan
+ * 12.1-04 — see the comment above their construction below.
  *
  * `taxParamSet` is read by exactly one line — 12e, the standard deduction. It
  * is threaded through the outer arrow rather than looked up here, so the tax
  * year in force is the caller's decision and never an implicit default.
- * @type {(taxParamSet: TaxParamSet) => (inputs: Form1040Inputs) => Form1040IncomeLines}
+ *
+ * The return type is now a UNION with {@link Form1040Error}: a Schedule D
+ * absent-basis (or undecided-category) refusal must stop the WHOLE report
+ * before line 7a — or any later line — is ever built, mirroring
+ * {@link form1040TaxAndPaymentLines}'s own error-arm shape one function over.
+ * This is the SECOND, EARLIER error-arm short-circuit this file needed
+ * (12.1-PATTERNS.md's own finding): the pre-existing one, `line16Outcome`'s,
+ * runs too late, inside `form1040TaxAndPaymentLines`, which executes AFTER
+ * this function returns.
+ * @type {(taxParamSet: TaxParamSet) => (inputs: Form1040Inputs) => Form1040IncomeLines | Form1040Error}
  */
 export const form1040IncomeLines = taxParamSet => inputs => {
-    const { profile, w2s, interestForms } = inputs
+    const { profile, w2s, interestForms, dividendForms, brokerageForms } = inputs
     const declaredZero = profileDeclaredZeroLine(profile)
     const fromDocuments = documentLine(profile)
+
+    // The filing status, computed HERE (rather than only at line 12e, as
+    // before Plan 12.1-04) because Schedule D's loss-cap threshold
+    // ($3,000.00/$1,500.00 MFS) needs it too, and one rule belongs in one
+    // place.
+    const status = storedFilingStatusNamed(profile.value.filingStatus)
+    assert(
+        status !== undefined,
+        [
+            'the return profile carries a filing status this engine has no parameters for',
+            profile.value.filingStatus,
+        ],
+    )
+
+    // 12.1-CONTEXT.md Decision 1.6: `filingScheduleD` is read VERBATIM off
+    // the DECLARED KIND, never off document presence — the same discipline
+    // `fjs/schedule/b`'s foreign-account fields already use. `declaredKindsOf`
+    // and `fjs/return/scope`'s `classifyScope` are independent: the former
+    // only narrows `profile.value.declaredKinds` against the frozen
+    // vocabulary, which this phase's reclassification never touches, so this
+    // check is safe regardless of what the scope guard currently does with
+    // the result.
+    const filingScheduleD = declaredKindsOf(profile).includes('capitalGainsOrLosses')
+    /** @type {ScheduleDOutcome | undefined} */
+    const scheduleDOutcome = filingScheduleD
+        ? scheduleD({ status, brokerageForms, dividendForms })
+        : undefined
+    // The new, EARLIER error-arm guard: an absent-basis (or undecided-
+    // category) refusal from Form 8949/Schedule D stops the WHOLE return
+    // before ANY line is built — not merely line 7a — threaded exactly as
+    // `line16Outcome`'s error arm already is, one function over. This is a
+    // document-data-sufficiency refusal (12.1-CONTEXT.md Decision 2.6), never
+    // a `fjs/return/scope` kind, so `unmodeled` is empty rather than naming
+    // anything.
+    if (scheduleDOutcome !== undefined && scheduleDOutcome.kind === 'error') {
+        return { kind: 'error', message: scheduleDOutcome.message, unmodeled: [] }
+    }
+    // Narrowed a second, fully explicit way (never relying on `tsc` to carry
+    // the negation of the `if` above across the rest of this function): only
+    // an `ok` outcome — or no outcome at all, when Schedule D was never filed
+    // — can reach here.
+    const scheduleDOk = scheduleDOutcome !== undefined && scheduleDOutcome.kind === 'ok'
+        ? scheduleDOutcome
+        : undefined
 
     // 1a — total from Form(s) W-2 box 1.
     const line1a = fromDocuments('1040 line 1a')(
@@ -383,15 +465,44 @@ export const form1040IncomeLines = taxParamSet => inputs => {
         sumBoxOverDocuments(interestForms)('box3UsSavingsBondsAndTreasuryInterest')(
             form => form.box3UsSavingsBondsAndTreasuryInterest)))
 
-    const line3a = declaredZero('1040 line 3a') // qualified dividends
-    const line3b = declaredZero('1040 line 3b') // ordinary dividends
+    // 3a/3b — qualified/ordinary dividends, read UNCONDITIONALLY from stored
+    // 1099-DIVs, exactly like 1a/2a/2b already read from documents with no
+    // declaration gate (Plan 12.1-04's own <objective>): a MODELED line's job
+    // is to report what the documents say, and `declaredKinds` exists to gate
+    // REFUSALS for kinds this engine cannot yet compute, not to gate an
+    // individual already-computable line. A taxpayer who never declares
+    // `qualifiedDividends` but holds a real 1099-DIV gets their REAL figure —
+    // strictly more correct than the `declaredZero` this replaces, never less.
+    const line3a = fromDocuments('1040 line 3a')(
+        sumBoxOverDocuments(dividendForms)('box1bQualifiedDividends')(
+            div => div.box1bQualifiedDividends))
+    const line3b = fromDocuments('1040 line 3b')(
+        sumBoxOverDocuments(dividendForms)('box1aTotalOrdinaryDividends')(
+            div => div.box1aTotalOrdinaryDividends))
     const line4a = declaredZero('1040 line 4a') // IRA distributions
     const line4b = declaredZero('1040 line 4b') // IRA taxable amount
     const line5a = declaredZero('1040 line 5a') // pensions and annuities
     const line5b = declaredZero('1040 line 5b') // pensions taxable amount
     const line6a = declaredZero('1040 line 6a') // social security benefits
     const line6b = declaredZero('1040 line 6b') // social security taxable amount
-    const line7a = declaredZero('1040 line 7a') // capital gain or (loss)
+    // 7a — capital gain or (loss). Filing Schedule D: the THREE-WAY routed
+    // figure `fjs/schedule/d` already computed (gain / zero / capped loss),
+    // cited to Schedule D's own sources — falling back to the profile's
+    // `declaredKinds` box on the (structurally possible) case of a declared
+    // Schedule D filer with no actual 1099-B/1099-DIV box read, via
+    // {@link documentLine}, exactly like every other document-sourced line.
+    // Not filing Schedule D: capital gain distributions alone (1099-DIV box
+    // 2a), read unconditionally — dispatcher branches 2c/2d/2e's own
+    // `capitalGainDistributionsCents` input, correct in BOTH cases per this
+    // plan's own `<interfaces>` note.
+    const line7a = scheduleDOk === undefined
+        ? fromDocuments('1040 line 7a')(
+            sumBoxOverDocuments(dividendForms)('box2aTotalCapitalGainDistr')(
+                div => div.box2aTotalCapitalGainDistr))
+        : fromDocuments('1040 line 7a')({
+            value: scheduleDOk.line7aCapitalGainOrLoss,
+            sources: scheduleDOk.sources,
+        })
     const line8 = declaredZero('1040 line 8')   // additional income, Schedule 1
 
     // 9 — total income. The eight summands the printed form names, in its
@@ -423,15 +534,9 @@ export const form1040IncomeLines = taxParamSet => inputs => {
     // document with a real hash, so line 12e cites the profile's own
     // `filingStatus` box and one box per checked 12d checkbox. Phase 9's
     // `tsc`-level guarantee is left untouched rather than widened, and no
-    // synthetic hash is minted.
-    const status = storedFilingStatusNamed(profile.value.filingStatus)
-    assert(
-        status !== undefined,
-        [
-            'the return profile carries a filing status this engine has no parameters for',
-            profile.value.filingStatus,
-        ],
-    )
+    // synthetic hash is minted. `status` itself is computed once, near the
+    // top of this function, because Schedule D's loss-cap threshold needs it
+    // too (one rule, one place).
     const checkedAgedOrBlindBoxes = agedOrBlindBoxNames.filter(
         name => profile.value[name] !== undefined)
     /** @type {Source} */
@@ -493,6 +598,7 @@ export const form1040IncomeLines = taxParamSet => inputs => {
     }
 
     return {
+        kind: 'ok',
         line1a, line1b, line1c, line1d, line1e, line1f, line1g, line1h, line1i, line1z,
         line2a, line2b,
         line3a, line3b,
@@ -508,6 +614,11 @@ export const form1040IncomeLines = taxParamSet => inputs => {
         line13a, line13b,
         line14,
         line15,
+        filingScheduleD,
+        scheduleD15Cents: scheduleDOk === undefined ? 0n : scheduleDOk.line15,
+        scheduleD16Cents: scheduleDOk === undefined ? 0n : scheduleDOk.line16,
+        scheduleD18Cents: scheduleDOk === undefined ? 0n : scheduleDOk.line18,
+        scheduleD19Cents: scheduleDOk === undefined ? 0n : scheduleDOk.line19,
     }
 }
 
@@ -732,12 +843,21 @@ const form1040TaxAndPaymentLines = taxParamSet => inputs => income => {
         ],
     )
 
-    // 16 — the tax. Every preferential input is zero and every wrapper form is
-    // absent, and that is not an assumption: each one is a declared kind the
-    // scope guard refuses the whole report for, so a return reaching here has
-    // none of them. The dispatcher still receives them as FACTS rather than a
-    // pre-decided method, because TAX-03's whole point is that the selection is
-    // made in one place from the printed conditions.
+    // 16 — the tax. As of Plan 12.1-04, dividend income and (for a taxpayer
+    // who can reach it) Schedule D capital gains are REAL, non-zero facts fed
+    // to the dispatcher — `income.line3a`/`income.line7a` are no longer
+    // `declaredZero` placeholders, and `income.filingScheduleD`/the four
+    // `income.scheduleD1{5,6,8,9}Cents` fields are Schedule D's own routed
+    // output. Only the three level-0 wrapper forms (2555/8615/Schedule J) and
+    // Form 4952 remain always-absent this phase — no kind for any of the four
+    // is in scope. A declared-Schedule-D return whose Schedule D lines 18/19
+    // are non-zero still refuses today: `fjs/return/scope`'s six-kind
+    // reclassification (Plan 12.1-04 Task 2) and `fjs/tax/line16`'s own
+    // branch-2a computation (also Task 2) are what make that branch compute
+    // instead, landed in the SAME commit as this wiring's own atomic
+    // transition. The dispatcher still receives every field as a FACT rather
+    // than a pre-decided method, because TAX-03's whole point is that the
+    // selection is made in one place from the printed conditions.
     //
     // WHAT LINE 16 DOES NOT INCLUDE. `[VERIFIED: i1040gi.pdf p34, "Line 16
     // Tax"]` — line 16 is a SUM, not merely the dispatch result: "Include in
@@ -752,15 +872,16 @@ const form1040TaxAndPaymentLines = taxParamSet => inputs => income => {
     const line16Outcome = dispatchLine16(taxParamSet)({
         status,
         taxableIncomeCents: income.line15.value,
-        qualifiedDividendsCents: 0n,
-        capitalGainDistributionsCents: 0n,
-        filingScheduleD: false,
-        scheduleD15Cents: 0n,
-        scheduleD16Cents: 0n,
-        scheduleD18Cents: 0n,
-        scheduleD19Cents: 0n,
+        qualifiedDividendsCents: income.line3a.value,
+        capitalGainDistributionsCents: income.line7a.value,
+        filingScheduleD: income.filingScheduleD,
+        scheduleD15Cents: income.scheduleD15Cents,
+        scheduleD16Cents: income.scheduleD16Cents,
+        scheduleD18Cents: income.scheduleD18Cents,
+        scheduleD19Cents: income.scheduleD19Cents,
         filingForm4952: false,
         form4952Line4gCents: 0n,
+        form4952Line4eCents: 0n,
         filingForm2555: false,
         form8615Applies: false,
         scheduleJElected: false,
@@ -907,6 +1028,14 @@ const orderedLines = income => tax => [
  */
 const computeForm1040 = taxParamSet => inputs => {
     const income = form1040IncomeLines(taxParamSet)(inputs)
+    // The new, earlier error arm (Schedule D's absent-basis/undecided-category
+    // refusal) comes back out as the WHOLE report's outcome, exactly like
+    // `line16Outcome`'s own error arm does one function below — checked and
+    // returned BEFORE `form1040TaxAndPaymentLines` is ever called, so no later
+    // line is built for a return this engine could not finish computing.
+    if (income.kind === 'error') {
+        return income
+    }
     const rest = form1040TaxAndPaymentLines(taxParamSet)(inputs)(income)
     if (rest.kind === 'error') {
         return rest
@@ -1045,6 +1174,39 @@ assert(taxParams2025 !== undefined, 'expected TY2025 parameters to be present in
 const expectedIncomeLineCount = 31
 
 /**
+ * The printed-line FIELD NAMES {@link Form1040IncomeLines} carries, in the
+ * same order and count as {@link expectedIncomeLineCount} — hand-typed rather
+ * than `Object.keys(...)`, for the same reason that count is hand-typed.
+ *
+ * Needed because Plan 12.1-04 widened `Form1040IncomeLines`'s `ok` arm with
+ * FIVE bookkeeping fields that are dispatcher INPUTS, never printed
+ * `ReportLine`s (`kind`, `filingScheduleD`, `scheduleD15Cents`,
+ * `scheduleD16Cents`, `scheduleD18Cents`, `scheduleD19Cents`) — a bare
+ * `Object.entries(...)` walk would now include them and crash on their
+ * missing `.sources`/`.rule` shape. Naming exactly the printed-line keys is
+ * both the fix and a second independent check that nothing besides these 31
+ * is a printed line.
+ * @type {readonly Exclude<keyof Form1040IncomeLines, 'kind' | 'filingScheduleD' | 'scheduleD15Cents' | 'scheduleD16Cents' | 'scheduleD18Cents' | 'scheduleD19Cents'>[]}
+ */
+const incomeLineFieldNames = /** @type {const} */ ([
+    'line1a', 'line1b', 'line1c', 'line1d', 'line1e', 'line1f', 'line1g', 'line1h', 'line1i', 'line1z',
+    'line2a', 'line2b',
+    'line3a', 'line3b',
+    'line4a', 'line4b',
+    'line5a', 'line5b',
+    'line6a', 'line6b',
+    'line7a',
+    'line8',
+    'line9',
+    'line10',
+    'line11a', 'line11b',
+    'line12e',
+    'line13a', 'line13b',
+    'line14',
+    'line15',
+])
+
+/**
  * Independently HAND-TYPED: the number of printed money lines the WHOLE report
  * emits, 1a through 37.
  *
@@ -1154,11 +1316,92 @@ const interestDocument = documentHash => boxes => ({
     },
 })
 
-/**
- * Assembles the three input lists into a {@link Form1040Inputs}.
- * @type {(profile: Stored<ReturnProfile>) => (w2s: readonly Stored<W2>[]) => (interestForms: readonly Stored<OneZeroNineNineInt>[]) => Form1040Inputs}
+/** The `sourceArtifactHash` every 1099-DIV/1099-B test fixture below shares —
+ * the same literal `fjs/form8949`/`fjs/schedule/d` use for theirs.
+ * @type {string}
  */
-const inputsOf = profile => w2s => interestForms => ({ profile, w2s, interestForms })
+const dividendAndBrokerageSourceArtifactHash
+    = 'deadbeef00112233445566778899aabbccddeeff0011223344556677889900'
+
+/** The 1099-DIV boxes this file's fixtures read. The first three are Plan
+ * 12.1-04's own; `box2bUnrecapSec1250Gain`/`box2dCollectibles28PercentGain`
+ * were added closing 12.1-VERIFICATION.md's WARNING (the decorative-proof
+ * fix) — a NON-ZERO Schedule D 18/19 fixture needs them.
+ * @typedef {{
+ *   readonly box1aTotalOrdinaryDividends?: string,
+ *   readonly box1bQualifiedDividends?: string,
+ *   readonly box2aTotalCapitalGainDistr?: string,
+ *   readonly box2bUnrecapSec1250Gain?: string,
+ *   readonly box2dCollectibles28PercentGain?: string,
+ * }} DividendBoxes
+ */
+
+/**
+ * A 1099-DIV carrying whichever of the three read boxes the caller names.
+ * @type {(documentHash: string) => (boxes: DividendBoxes) => Stored<OneZeroNineNineDiv>}
+ */
+const dividendDocument = documentHash => boxes => ({
+    documentHash,
+    value: {
+        dialect: oneZeroNineNineDivDialect,
+        payerTin: '44-4444444',
+        recipientTin: '222-22-2222',
+        accountNumber: 'ACC-DIV',
+        taxYear: 2025,
+        formRevision: '2025',
+        sourceArtifactHash: dividendAndBrokerageSourceArtifactHash,
+        ...boxes,
+    },
+})
+
+/**
+ * A 1099-B carrying whichever boxes the caller names, mirroring
+ * `fjs/schedule/d`'s own `brokerageForm` fixture shape.
+ * @type {(documentHash: string) => (overrides: Partial<OneZeroNineNineB>) => Stored<OneZeroNineNineB>}
+ */
+const brokerageDocument = documentHash => overrides => ({
+    documentHash,
+    value: {
+        dialect: oneZeroNineNineBDialect,
+        payerTin: '55-5555555',
+        recipientTin: '222-22-2222',
+        accountNumber: 'ACC-B',
+        taxYear: 2025,
+        formRevision: '2025',
+        sourceArtifactHash: dividendAndBrokerageSourceArtifactHash,
+        ...overrides,
+    },
+})
+
+/**
+ * Assembles the five input lists into a {@link Form1040Inputs}. Widened from
+ * three to five curried parameters by Plan 12.1-04 (`dividendForms`,
+ * `brokerageForms`) — `npx tsc --noEmit` is what surfaced every call site
+ * below needing the two extra empty-array arguments, per this plan's own
+ * instruction not to enumerate them from memory.
+ * @type {(profile: Stored<ReturnProfile>) => (w2s: readonly Stored<W2>[]) => (interestForms: readonly Stored<OneZeroNineNineInt>[]) => (dividendForms: readonly Stored<OneZeroNineNineDiv>[]) => (brokerageForms: readonly Stored<OneZeroNineNineB>[]) => Form1040Inputs}
+ */
+const inputsOf = profile => w2s => interestForms => dividendForms => brokerageForms =>
+    ({ profile, w2s, interestForms, dividendForms, brokerageForms })
+
+/**
+ * Narrows a {@link Form1040IncomeLines}-or-{@link Form1040Error} result to the
+ * `ok` arm, for the many proof leaves in this file that call
+ * `form1040IncomeLines` DIRECTLY (rather than through the full
+ * `form1040Report` entry point) and then read `.lineN` fields straight off
+ * the result. Every fixture reaching this helper declares no unmodeled kind
+ * and no Schedule-D absent-basis condition, so the assert is a real
+ * narrowing that documents an invariant of the fixture, not false
+ * confidence — mirrors `fjs/schedule/d`'s own `expectOk` idiom.
+ * @type {(outcome: Form1040IncomeLines | Form1040Error) => Form1040IncomeLines}
+ */
+const expectIncomeOk = outcome => {
+    assert(outcome.kind === 'ok', ['expected the income lines to compute', outcome])
+    if (outcome.kind !== 'ok') {
+        throw ['expected ok', outcome]
+    }
+    return outcome
+}
 
 /**
  * A qualifying surviving spouse with BOTH taxpayer age/blindness boxes
@@ -1274,8 +1517,8 @@ const tenInterestDocumentsAtOneThirtyNine = [
  * every line-12e leaf needs, since 12e reads the profile alone.
  * @type {(value: ReturnProfile) => Form1040IncomeLines}
  */
-const linesForProfile = value => form1040IncomeLines(taxParams2025)(
-    inputsOf(storedProfile(value))([])([]))
+const linesForProfile = value => expectIncomeOk(form1040IncomeLines(taxParams2025)(
+    inputsOf(storedProfile(value))([])([])([])([])))
 
 /**
  * A married-filing-jointly filer with no checked boxes, declaring the same two
@@ -1315,7 +1558,7 @@ const withholdingProfile = {
  * @type {(inputs: Form1040Inputs) => { readonly income: Form1040IncomeLines, readonly tax: Form1040TaxAndPaymentLines, readonly line16Method: Line16Method }}
  */
 const computedLines = inputs => {
-    const income = form1040IncomeLines(taxParams2025)(inputs)
+    const income = expectIncomeOk(form1040IncomeLines(taxParams2025)(inputs))
     const rest = form1040TaxAndPaymentLines(taxParams2025)(inputs)(income)
     assert(rest.kind === 'ok', ['expected this return to compute lines 16-37', rest])
     return { income, tax: rest.tax, line16Method: rest.line16Method }
@@ -1394,6 +1637,20 @@ const source = documentHash => boxPath => ({ documentHash, boxPath, value: '1.00
  */
 const unionTestLine = sources => ({ value: 0n, sources, rule: '1040 line 9' })
 
+/**
+ * A married-filing-jointly filer declaring `capitalGainsOrLosses` — still
+ * refused by `fjs/return/scope` at the end of Plan 12.1-04's Task 1 (the six
+ * kinds have not moved yet), so every leaf below reaching this profile
+ * through `form1040Report` is EXPECTED to refuse, and the third/fourth
+ * fixtures instead call `form1040IncomeLines` directly, mirroring this
+ * file's own `linesForProfile`-style pattern.
+ * @type {ReturnProfile}
+ */
+const declaringCapitalGainsOrLossesProfile = {
+    ...singleProfile,
+    declaredKinds: ['wages', 'taxableInterest', 'capitalGainsOrLosses'],
+}
+
 export const proof = {
     unionSources: {
         // The same box of the same document, cited by two different lines, is
@@ -1440,10 +1697,10 @@ export const proof = {
     line1a: {
         // $50,000 + $25,000 = $75,000, cited to both W-2s.
         twoWTwosSumToSeventyFiveThousandCitingBoth: () => {
-            const lines = form1040IncomeLines(taxParams2025)(inputsOf(storedProfile(singleProfile))([
+            const lines = expectIncomeOk(form1040IncomeLines(taxParams2025)(inputsOf(storedProfile(singleProfile))([
                 w2Document('sha256-w2-01')('50000.00'),
                 w2Document('sha256-w2-02')('25000.00'),
-            ])([]))
+            ])([])([])([])))
             assertEq(lines.line1a.value, 7500000n)
             assertEq(lines.line1a.sources.length, 2)
             const [first, second] = lines.line1a.sources
@@ -1457,8 +1714,8 @@ export const proof = {
         // No W-2 at all: zero, citing the DECLARATION that makes it zero.
         // This is the leaf that fails if a zero line stops citing anything.
         noWTwoIsZeroCitingTheProfilesDeclaredKindsBox: () => {
-            const lines = form1040IncomeLines(taxParams2025)(
-                inputsOf(storedProfile(singleProfile))([])([]))
+            const lines = expectIncomeOk(form1040IncomeLines(taxParams2025)(
+                inputsOf(storedProfile(singleProfile))([])([])([])([])))
             assertEq(lines.line1a.value, 0n)
             assertEq(lines.line1a.sources.length, 1)
             const [only] = lines.line1a.sources
@@ -1471,13 +1728,13 @@ export const proof = {
         // Box 1 $100.00 + box 3 $25.00 on ONE form = $125.00, two citations
         // from the same document at different box paths.
         boxOneAndBoxThreeOfOneFormAreTwoCitations: () => {
-            const lines = form1040IncomeLines(taxParams2025)(
+            const lines = expectIncomeOk(form1040IncomeLines(taxParams2025)(
                 inputsOf(storedProfile(singleProfile))([])([
                     interestDocument('sha256-int-01')({
                         box1InterestIncome: '100.00',
                         box3UsSavingsBondsAndTreasuryInterest: '25.00',
                     }),
-                ]))
+                ])([])([])))
             assertEq(lines.line2b.value, 12500n)
             assertEq(lines.line2b.sources.length, 2)
             const [first, second] = lines.line2b.sources
@@ -1490,10 +1747,10 @@ export const proof = {
         // to the same $100.00 — so the source COUNT is the only observer, and
         // that is exactly what this asserts.
         absentBoxIsSkippedNeverDefaultedToZero: () => {
-            const lines = form1040IncomeLines(taxParams2025)(
+            const lines = expectIncomeOk(form1040IncomeLines(taxParams2025)(
                 inputsOf(storedProfile(singleProfile))([])([
                     interestDocument('sha256-int-01')({ box1InterestIncome: '100.00' }),
-                ]))
+                ])([])([])))
             assertEq(lines.line2b.value, 10000n)
             assertEq(lines.line2b.sources.length, 1)
             const [only] = lines.line2b.sources
@@ -1502,13 +1759,13 @@ export const proof = {
         // The control for the box-8 mapping: tax-exempt interest is line 2a,
         // and it does not leak into 2b.
         taxExemptInterestIsLineTwoANotTwoB: () => {
-            const lines = form1040IncomeLines(taxParams2025)(
+            const lines = expectIncomeOk(form1040IncomeLines(taxParams2025)(
                 inputsOf(storedProfile(singleProfile))([])([
                     interestDocument('sha256-int-01')({
                         box1InterestIncome: '100.00',
                         box8TaxExemptInterest: '7.00',
                     }),
-                ]))
+                ])([])([])))
             assertEq(lines.line2a.value, 700n)
             assertEq(lines.line2b.value, 10000n)
         },
@@ -1519,7 +1776,7 @@ export const proof = {
         // 1099-INT boxes, and the profile's `declaredKinds` box — cited by
         // seven different zero lines and DEDUPLICATED to one.
         sumsTheEightSummandsAndUnionsTheirSourcesDeduplicated: () => {
-            const lines = form1040IncomeLines(taxParams2025)(inputsOf(storedProfile(singleProfile))([
+            const lines = expectIncomeOk(form1040IncomeLines(taxParams2025)(inputsOf(storedProfile(singleProfile))([
                 w2Document('sha256-w2-01')('50000.00'),
                 w2Document('sha256-w2-02')('25000.00'),
             ])([
@@ -1527,7 +1784,7 @@ export const proof = {
                     box1InterestIncome: '100.00',
                     box3UsSavingsBondsAndTreasuryInterest: '25.00',
                 }),
-            ]))
+            ])([])([])))
             assertEq(lines.line9.value, 7512500n)
             // Hand-typed: 2 W-2 box-1 citations + 2 1099-INT box citations +
             // 1 profile `declaredKinds` citation = 5.
@@ -1538,9 +1795,9 @@ export const proof = {
         // 11a = 9 - 10, and 11b restates it: same value, same provenance,
         // a different printed name. A recomputation could disagree with 9.
         elevenBRestatesElevenAWithTheSameSources: () => {
-            const lines = form1040IncomeLines(taxParams2025)(inputsOf(storedProfile(singleProfile))([
+            const lines = expectIncomeOk(form1040IncomeLines(taxParams2025)(inputsOf(storedProfile(singleProfile))([
                 w2Document('sha256-w2-01')('50000.00'),
-            ])([]))
+            ])([])([])([])))
             assertEq(lines.line11a.value, 5000000n)
             assertEq(lines.line11b.value, 5000000n)
             assertEq(lines.line11a.sources.length, lines.line11b.sources.length)
@@ -1683,9 +1940,9 @@ export const proof = {
     line15: {
         // $50,000 of wages less the $15,750 standard deduction = $34,250.
         taxableIncomeIsElevenBMinusFourteen: () => {
-            const lines = form1040IncomeLines(taxParams2025)(inputsOf(storedProfile(singleProfile))([
+            const lines = expectIncomeOk(form1040IncomeLines(taxParams2025)(inputsOf(storedProfile(singleProfile))([
                 w2Document('sha256-w2-01')('50000.00'),
-            ])([]))
+            ])([])([])([])))
             assertEq(lines.line11b.value, 5000000n)
             assertEq(lines.line14.value, 1575000n)
             assertEq(lines.line15.value, 3425000n)
@@ -1696,9 +1953,9 @@ export const proof = {
         // subtraction is positive and passes through untouched — so this is a
         // floor, not a function that returns zero.
         deductionExceedingAdjustedGrossIncomeIsZeroNotNegative: () => {
-            const lines = form1040IncomeLines(taxParams2025)(inputsOf(storedProfile(singleProfile))([
+            const lines = expectIncomeOk(form1040IncomeLines(taxParams2025)(inputsOf(storedProfile(singleProfile))([
                 w2Document('sha256-w2-01')('5000.00'),
-            ])([]))
+            ])([])([])([])))
             assertEq(lines.line11b.value, 500000n)
             assertEq(lines.line14.value, 1575000n)
             assertEq(lines.line15.value, 0n)
@@ -1722,7 +1979,7 @@ export const proof = {
             const { income, tax, line16Method } = computedLines(
                 inputsOf(storedProfile(marriedFilingJointlyProfile))([
                     w2Document('sha256-w2-01')('56800.00'),
-                ])([]))
+                ])([])([])([]))
             assertEq(income.line14.value, 3150000n, 'the joint standard deduction, $31,500.00')
             assertEq(income.line15.value, 2530000n, 'taxable income of $25,300.00')
             assertEq(tax.line16.value, 256200n, 'the printed Tax Table Example\'s own answer, $2,562.00')
@@ -1751,7 +2008,7 @@ export const proof = {
             const { income, tax, line16Method } = computedLines(
                 inputsOf(storedProfile(singleProfile))([
                     w2Document('sha256-w2-01')('115750.00'),
-                ])([]))
+                ])([])([])([]))
             assertEq(income.line15.value, 10000000n, 'taxable income of exactly $100,000.00')
             assertEq(tax.line16.value, 1691400n, 'Section A\'s first printed worksheet row, $16,914.00')
             assertEq(line16Method, 'taxComputationWorksheet')
@@ -1807,7 +2064,7 @@ export const proof = {
                     box1InterestIncome: '100.00',
                     box4FederalIncomeTaxWithheld: '10.00',
                 }),
-            ]))
+            ])([])([]))
             assertEq(tax.line25a.value, 750000n, '$7,500.00 withheld on wages')
             assertEq(tax.line25a.sources.length, 2)
             const [firstW2Source] = tax.line25a.sources
@@ -1838,7 +2095,7 @@ export const proof = {
         paymentsExceedingTaxAreAnOverpaymentOnLineThirtyFour: () => {
             const { tax } = computedLines(inputsOf(storedProfile(withholdingProfile))([
                 w2WithWithholding('sha256-w2-01')('56800.00')('3000.00'),
-            ])([]))
+            ])([])([])([]))
             assertEq(tax.line24.value, 256200n, 'the printed example\'s $2,562.00 of tax')
             assertEq(tax.line33.value, 300000n, '$3,000.00 of total payments')
             assertEq(tax.line34.value, 43800n, 'an overpayment of $438.00')
@@ -1853,7 +2110,7 @@ export const proof = {
             const { tax } = computedLines(
                 inputsOf(storedProfile(marriedFilingJointlyProfile))([
                     w2Document('sha256-w2-01')('56800.00'),
-                ])([]))
+                ])([])([])([]))
             assertEq(tax.line24.value, 256200n)
             assertEq(tax.line33.value, 0n, 'nothing was withheld and nothing was paid in')
             assertEq(tax.line34.value, 0n, 'a return that underpaid has no overpayment')
@@ -1865,7 +2122,7 @@ export const proof = {
         paymentsExactlyEqualToTaxLeaveBothLinesZero: () => {
             const { tax } = computedLines(inputsOf(storedProfile(withholdingProfile))([
                 w2WithWithholding('sha256-w2-01')('56800.00')('2562.00'),
-            ])([]))
+            ])([])([])([]))
             assertEq(tax.line24.value, 256200n)
             assertEq(tax.line33.value, 256200n)
             assertEq(tax.line34.value, 0n)
@@ -1888,7 +2145,7 @@ export const proof = {
                 line26EstimatedTaxPayments: '1234.56',
                 line35aRefundRequested: '1000.00',
                 line36AppliedToNextYear: '234.56',
-            }))([])([]))
+            }))([])([])([])([]))
             assertEq(tax.line26.value, 123456n)
             assertEq(tax.line26.sources.length, 1)
             const [estimatedSource] = tax.line26.sources
@@ -1909,7 +2166,7 @@ export const proof = {
         // the line zero rather than quoting a box that carries nothing.
         anAbsentProfileMoneyBoxIsAZeroCitingTheDeclaration: () => {
             const { tax } = computedLines(
-                inputsOf(storedProfile(singleProfile))([])([]))
+                inputsOf(storedProfile(singleProfile))([])([])([])([]))
             assertEq(tax.line26.value, 0n)
             assertEq(tax.line26.sources.length, 1)
             const [only] = tax.line26.sources
@@ -1932,7 +2189,7 @@ export const proof = {
         // place of another keeps the length at 56 and would otherwise pass.
         everyOneOfTheFiftySixLinesCitesADocumentAndNamesItsRule: () => {
             const outcome = computeForm1040(taxParams2025)(
-                inputsOf(storedProfile(singleProfile))([])([]))
+                inputsOf(storedProfile(singleProfile))([])([])([])([]))
             assert(outcome.kind === 'ok', ['an in-scope return must compute', outcome])
             assertEq(
                 outcome.lines.length,
@@ -1975,7 +2232,7 @@ export const proof = {
             const outcome = form1040Report(taxParams2025)(
                 inputsOf(storedProfile(sixtyFivePlusProfile))([
                     w2Document('sha256-w2-01')('60000.00'),
-                ])([]))
+                ])([])([])([]))
             assert(
                 outcome.kind === 'error',
                 ['the 65+ declared profile must refuse the whole report', outcome],
@@ -2020,7 +2277,7 @@ export const proof = {
         controlTheSixtyFivePlusProfileWithoutThoseTwoKindsComputesLinesOneAToThirtySeven: () => {
             const inputs = inputsOf(storedProfile(sixtyFivePlusProfileWithinScope))([
                 w2Document('sha256-w2-01')('60000.00'),
-            ])([])
+            ])([])([])([])
             const outcome = form1040Report(taxParams2025)(inputs)
             assert(outcome.kind === 'ok', ['the same profile within scope must compute', outcome])
             assertEq(
@@ -2038,7 +2295,7 @@ export const proof = {
             // computes.
             assertEq(
                 lineRuled(outcome.lines)('1040 line 15').value,
-                form1040IncomeLines(taxParams2025)(inputs).line15.value,
+                expectIncomeOk(form1040IncomeLines(taxParams2025)(inputs)).line15.value,
             )
         },
         // A second, independent refusal, on a kind whose remedy is a missing
@@ -2050,7 +2307,7 @@ export const proof = {
             const outcome = form1040Report(taxParams2025)(inputsOf(storedProfile({
                 ...singleProfile,
                 declaredKinds: ['wages', 'taxableInterest', 'socialSecurityBenefits'],
-            }))([w2Document('sha256-w2-01')('50000.00')])([]))
+            }))([w2Document('sha256-w2-01')('50000.00')])([])([])([]))
             assert(outcome.kind === 'error', ['a declared unmodeled kind must refuse', outcome])
             assertEq(outcome.unmodeled.length, 1, ['expected exactly one unmodeled kind', outcome.unmodeled])
             assertEq(outcome.unmodeled[0], 'socialSecurityBenefits', ['expected the declared kind named', outcome.unmodeled])
@@ -2072,7 +2329,7 @@ export const proof = {
             const outcome = form1040Report(taxParams2025)(
                 inputsOf(storedProfile(singleProfile))([
                     w2Document('sha256-w2-01')('50000.00'),
-                ])([]))
+                ])([])([])([]))
             assert(outcome.kind === 'ok', ['dropping the unmodeled kind must compute', outcome])
             assertEq(lineRuled(outcome.lines)('1040 line 6b').value, 0n, 'legitimately zero, not refused')
             assertEq(lineRuled(outcome.lines)('1040 line 15').value, 3425000n, '$50,000 less $15,750')
@@ -2090,14 +2347,14 @@ export const proof = {
         // predicate.
         theErrorArmCarriesNoLinesFieldAtAll: () => {
             const refused = form1040Report(taxParams2025)(
-                inputsOf(storedProfile(sixtyFivePlusProfile))([])([]))
+                inputsOf(storedProfile(sixtyFivePlusProfile))([])([])([])([]))
             assert(refused.kind === 'error', ['expected a refusal', refused])
             assert(
                 !Object.hasOwn(refused, 'lines'),
                 ['a refused return must carry no line list at all', Object.keys(refused)],
             )
             const computed = form1040Report(taxParams2025)(
-                inputsOf(storedProfile(sixtyFivePlusProfileWithinScope))([])([]))
+                inputsOf(storedProfile(sixtyFivePlusProfileWithinScope))([])([])([])([]))
             assert(computed.kind === 'ok', ['expected the control to compute', computed])
             assert(
                 Object.hasOwn(computed, 'lines'),
@@ -2117,7 +2374,7 @@ export const proof = {
             const outcome = form1040Report(taxParams2025)(inputsOf(storedProfile({
                 ...singleProfile,
                 wholeDollarElection: true,
-            }))([])(tenInterestDocumentsAtOneThirtyNine))
+            }))([])(tenInterestDocumentsAtOneThirtyNine)([])([]))
             assert(outcome.kind === 'ok', ['expected the elected return to compute', outcome])
             assertEq(lineRuled(outcome.lines)('1040 line 2b').value, 1400n, '$14, rounded once')
             for (const line of outcome.lines) {
@@ -2134,7 +2391,7 @@ export const proof = {
         // both hand-typed and neither is derived from the other.
         controlWithoutTheElectionTheSameTenDocumentsKeepTheirCents: () => {
             const outcome = form1040Report(taxParams2025)(
-                inputsOf(storedProfile(singleProfile))([])(tenInterestDocumentsAtOneThirtyNine))
+                inputsOf(storedProfile(singleProfile))([])(tenInterestDocumentsAtOneThirtyNine)([])([]))
             assert(outcome.kind === 'ok', ['expected the unelected return to compute', outcome])
             assertEq(lineRuled(outcome.lines)('1040 line 2b').value, 1390n, '$13.90, cents intact')
         },
@@ -2152,7 +2409,7 @@ export const proof = {
         // must keep passing; neither can stand in for the other.
         scopeGuardAndZeroReadGuardAreOrthogonal: () => {
             const outcome = form1040Report(taxParams2025)(
-                inputsOf(storedProfile(singleProfile))([])([]))
+                inputsOf(storedProfile(singleProfile))([])([])([])([]))
             assert(outcome.kind === 'ok', ['a return of legitimate zeros must compute', outcome])
             assertEq(outcome.lines.length, expectedWholeReportLineCount)
             const readsOfTheProfile = outcome.lines.filter(
@@ -2190,8 +2447,8 @@ export const proof = {
 
         // The IRS's way: ONE line whose value is the exact cents sum of its
         // ten sources, rounded once.
-        const { line2b } = form1040IncomeLines(taxParams2025)(
-            inputsOf(profile)([])(tenInterestDocumentsAtOneThirtyNine))
+        const { line2b } = expectIncomeOk(form1040IncomeLines(taxParams2025)(
+            inputsOf(profile)([])(tenInterestDocumentsAtOneThirtyNine)([])([])))
         assertEq(line2b.value, 1390n)
         assertEq(line2b.sources.length, 10)
         const roundOfSum = assertNotNullish(
@@ -2205,8 +2462,8 @@ export const proof = {
         const sumOfRounds = tenInterestDocumentsAtOneThirtyNine.reduce(
             (total, document) => total + assertNotNullish(
                 applyWholeDollarElection(true)([
-                    form1040IncomeLines(taxParams2025)(
-                        inputsOf(profile)([])([document])).line2b,
+                    expectIncomeOk(form1040IncomeLines(taxParams2025)(
+                        inputsOf(profile)([])([document])([])([]))).line2b,
                 ])[0],
                 'the projection of a one-document report must have a line 0').value,
             0n)
@@ -2225,17 +2482,354 @@ export const proof = {
     // disappearing. {@link expectedLineCount} is the independently hand-typed
     // count that closes it (AGENTS.md's `expectedMoneyBoxFieldCount` idiom).
     everyLineCitesAtLeastOneDocument: () => {
-        const lines = form1040IncomeLines(taxParams2025)(
-            inputsOf(storedProfile(singleProfile))([])([]))
-        const entries = Object.entries(lines)
+        const lines = expectIncomeOk(form1040IncomeLines(taxParams2025)(
+            inputsOf(storedProfile(singleProfile))([])([])([])([])))
         assertEq(
-            entries.length,
+            incomeLineFieldNames.length,
             expectedIncomeLineCount,
-            ['expected exactly the independently-stated printed line count', entries.length],
+            ['expected exactly the independently-stated printed line count', incomeLineFieldNames.length],
         )
-        for (const [name, line] of entries) {
+        for (const name of incomeLineFieldNames) {
+            const line = lines[name]
             assert(line.sources.length > 0, ['a line with no citation is a silently omitted line', name])
             assert(line.rule !== '', ['a line must name the rule it implements', name])
         }
+    },
+    // Plan 12.1-04 Task 1: dividend income and Schedule D reach REAL lines —
+    // 3a/3b/7a, and the dispatch call site — while the six-kind scope
+    // reclassification has NOT landed yet (Task 2). See this plan's own
+    // <objective> for why that ordering is safe.
+    dividendsAndScheduleDBeforeTheScopeReclassificationLands: {
+        // The mixed-dividends fixture Mutation Gate M5 (Task 3) targets:
+        // `box1aTotalOrdinaryDividends: '1000.00'`,
+        // `box1bQualifiedDividends: '500.00'`, no problematic kind declared.
+        // Reached through the FULL `form1040Report(...)` entry point, so the
+        // outer scope guard runs too (and passes, since neither
+        // `qualifiedDividends` nor `ordinaryDividends` is declared).
+        //
+        // Wages of $50,000.00 plus $1,000.00 of ordinary dividends less the
+        // $31,500.00 MFJ standard deduction is $19,500.00 of taxable income
+        // — hand-computed independently of this leaf's own assertions below.
+        // Line 16 is cross-checked against a SEPARATE, direct call to the
+        // already-proven `qdcgt` (its own arithmetic is exhaustively covered,
+        // with a mutation gate, in `fjs/tax/line16/qdcgt`), fed the fixture's
+        // own hand-known dividend figures and the independently-derived
+        // taxable income — never a value read back off the code under test.
+        mixedDividendsComputeRealLinesThreeAThreeBSevenAAndANonZeroLineSixteen: () => {
+            const dividendForm = dividendDocument('sha256-div-mixed')({
+                box1aTotalOrdinaryDividends: '1000.00',
+                box1bQualifiedDividends: '500.00',
+            })
+            const inputs = inputsOf(storedProfile(marriedFilingJointlyProfile))([
+                w2Document('sha256-w2-div-01')('50000.00'),
+            ])([])([dividendForm])([])
+            const outcome = form1040Report(taxParams2025)(inputs)
+            assert(outcome.kind === 'ok', ['expected a legitimate, in-scope return to compute', outcome])
+            assertEq(lineRuled(outcome.lines)('1040 line 3a').value, 50000n, '$500.00 qualified dividends')
+            assertEq(lineRuled(outcome.lines)('1040 line 3b').value, 100000n, '$1,000.00 ordinary dividends')
+            assertEq(lineRuled(outcome.lines)('1040 line 7a').value, 0n, 'no capital gain distribution box')
+            assertEq(lineRuled(outcome.lines)('1040 line 15').value, 50000n + 1900000n, '$19,500.00 taxable income')
+            assertEq(outcome.line16Method, 'qdcgt', 'branch 2c: qualified dividends select the QDCGT')
+            const line16 = lineRuled(outcome.lines)('1040 line 16').value
+            assert(line16 > 0n, ['expected a real, non-zero line 16', line16])
+            const crossCheck = qdcgt(taxParams2025)({
+                status: 'marriedFilingJointly',
+                line1Cents: 1950000n,
+                line2Cents: 50000n,
+                filingScheduleD: false,
+                scheduleD15Cents: 0n,
+                scheduleD16Cents: 0n,
+                line7aCents: 0n,
+            }).line25
+            assertEq(line16, crossCheck, 'the wiring must feed the SAME facts an independent qdcgt call would')
+            // filingScheduleD is not part of a rendered ReportLine — checked
+            // through a direct income-lines call on the SAME inputs.
+            const income = expectIncomeOk(form1040IncomeLines(taxParams2025)(inputs))
+            assertEq(income.filingScheduleD, false)
+        },
+        // The SAME shape, but the 1099-DIV also carries a capital gain
+        // distribution (box 2a): line 7a picks it up (dispatcher branch 2d's
+        // case), still with `filingScheduleD === false`.
+        capitalGainDistributionBoxFeedsLineSevenAWithoutFilingScheduleD: () => {
+            const dividendForm = dividendDocument('sha256-div-mixed-with-2a')({
+                box1aTotalOrdinaryDividends: '1000.00',
+                box1bQualifiedDividends: '500.00',
+                box2aTotalCapitalGainDistr: '200.00',
+            })
+            const inputs = inputsOf(storedProfile(marriedFilingJointlyProfile))([
+                w2Document('sha256-w2-div-02')('50000.00'),
+            ])([])([dividendForm])([])
+            const outcome = form1040Report(taxParams2025)(inputs)
+            assert(outcome.kind === 'ok', ['expected a legitimate, in-scope return to compute', outcome])
+            assertEq(lineRuled(outcome.lines)('1040 line 7a').value, 20000n, '$200.00 capital gain distribution')
+            const income = expectIncomeOk(form1040IncomeLines(taxParams2025)(inputs))
+            assertEq(income.filingScheduleD, false)
+        },
+        // A profile DECLARING `capitalGainsOrLosses` with a clean-gain 1099-B
+        // (basis and proceeds both present): tested by calling
+        // `form1040IncomeLines(...)` DIRECTLY, never through `form1040Report`
+        // — `capitalGainsOrLosses` is still in `unmodeledKindRefusals` at the
+        // end of Task 1, so the outer guard would refuse the whole return for
+        // that unrelated, pre-existing reason before this task's new wiring
+        // is ever reached. Testing the new code in isolation is the only way
+        // to exercise it this task.
+        //
+        // `scheduleD(...)`'s own output is the comparison target — never a
+        // hand-typed cents literal here — because this leaf tests WIRING
+        // (did `form1040IncomeLines` thread Schedule D's real output onto
+        // line 7a and the four dispatcher-input fields?), not Schedule D's
+        // own arithmetic, which `fjs/schedule/d`'s own proof already covers
+        // exhaustively.
+        cleanGainDeclaredScheduleDWiresLineSevenAAndTheFourDispatcherFields: () => {
+            const brokerageForm = brokerageDocument('sha256-b-clean-gain')({
+                box1dProceeds: '9000.00',
+                box1eCostOrOtherBasis: '4000.00',
+                box2LongTermGainOrLoss: true,
+                box12BasisReportedToIrs: true,
+            })
+            const inputs = inputsOf(storedProfile(declaringCapitalGainsOrLossesProfile))([])([])([])([brokerageForm])
+            const outcome = form1040IncomeLines(taxParams2025)(inputs)
+            assert(outcome.kind === 'ok', ['expected the income lines to compute in isolation', outcome])
+            if (outcome.kind !== 'ok') {
+                throw ['expected ok', outcome]
+            }
+            assertEq(outcome.filingScheduleD, true, 'the declared kind must select Schedule D')
+            const independentScheduleD = scheduleD({
+                status: 'single',
+                brokerageForms: [brokerageForm],
+                dividendForms: [],
+            })
+            assert(independentScheduleD.kind === 'ok', ['expected Schedule D to compute', independentScheduleD])
+            if (independentScheduleD.kind !== 'ok') {
+                throw ['expected ok', independentScheduleD]
+            }
+            assertEq(outcome.line7a.value, independentScheduleD.line7aCapitalGainOrLoss)
+            assertEq(outcome.scheduleD15Cents, independentScheduleD.line15)
+            assertEq(outcome.scheduleD16Cents, independentScheduleD.line16)
+            assertEq(outcome.scheduleD18Cents, independentScheduleD.line18)
+            assertEq(outcome.scheduleD19Cents, independentScheduleD.line19)
+        },
+        // 12.1-VERIFICATION.md's WARNING: the leaf above's fixture has NO
+        // 1099-DIV at all, so `independentScheduleD.line18`/`.line19` are
+        // BOTH `0n` on the real code path AND on a hypothetical
+        // hardcoded-zero mutant at this file's own `scheduleD18Cents`/
+        // `scheduleD19Cents` construction (lines 619-620 above) — the
+        // wiring assertions `outcome.scheduleD18Cents ===
+        // independentScheduleD.line18` (and the line19 sibling) pass
+        // identically either way for that fixture. AGENTS.md names four
+        // prior instances of exactly this shape: a proof whose expected
+        // side is not independent of the code under test.
+        //
+        // This sibling fixture adds a 1099-DIV carrying box 2b
+        // (unrecaptured section 1250 gain) and box 2d (28%-rate
+        // collectibles gain) — the natural source per 12.1-CONTEXT.md's own
+        // "SCOPE — what becomes modeled" decisions — so
+        // `scheduleD18Cents`/`scheduleD19Cents` are NON-ZERO and the SAME
+        // two assertions become load-bearing.
+        //
+        // MUTATION-VERIFIED (recorded here per this plan's own
+        // instruction): hardcoding `scheduleD18Cents: 0n` at this file's
+        // line 619 (`scheduleD18Cents: scheduleDOk === undefined ? 0n :
+        // scheduleDOk.line18,`) reddens exactly this leaf, at exactly
+        // `assertEq(outcome.scheduleD18Cents, independentScheduleD.line18)`
+        // below — `50000n !== 0n`. Reverting restores green. Separately
+        // hardcoding `scheduleD19Cents: 0n` at line 620 reddens the SAME
+        // leaf at the matching `scheduleD19Cents` assertion — `30000n !==
+        // 0n`. Neither mutation touches the leaf above, which stays green
+        // throughout (its own two assertions are still `0n === 0n`,
+        // unaffected) — confirming this new leaf, not the old one, is what
+        // now carries the load.
+        nonDegenerateGainWiresLineEighteenAndLineNineteenWhenBothAreNonZero: () => {
+            const brokerageForm = brokerageDocument('sha256-b-1250-and-28pct-gain')({
+                box1dProceeds: '9000.00',
+                box1eCostOrOtherBasis: '4000.00',
+                box2LongTermGainOrLoss: true,
+                box12BasisReportedToIrs: true,
+            })
+            const dividendForm = dividendDocument('sha256-div-1250-and-28pct')({
+                box2bUnrecapSec1250Gain: '300.00',
+                box2dCollectibles28PercentGain: '500.00',
+            })
+            const inputs = inputsOf(storedProfile(declaringCapitalGainsOrLossesProfile))([])([])(
+                [dividendForm])([brokerageForm])
+            const outcome = form1040IncomeLines(taxParams2025)(inputs)
+            assert(outcome.kind === 'ok', ['expected the income lines to compute in isolation', outcome])
+            if (outcome.kind !== 'ok') {
+                throw ['expected ok', outcome]
+            }
+            const independentScheduleD = scheduleD({
+                status: 'single',
+                brokerageForms: [brokerageForm],
+                dividendForms: [dividendForm],
+            })
+            assert(independentScheduleD.kind === 'ok', ['expected Schedule D to compute', independentScheduleD])
+            if (independentScheduleD.kind !== 'ok') {
+                throw ['expected ok', independentScheduleD]
+            }
+            // Hand-typed and independent of the code under test — the
+            // fixture's own $500.00 box 2d and $300.00 box 2b, never
+            // derived from `outcome` or `independentScheduleD`.
+            assertEq(independentScheduleD.line18, 50000n, '$500.00 box 2d, hand-typed')
+            assertEq(independentScheduleD.line19, 30000n, '$300.00 box 2b, hand-typed')
+            assertEq(outcome.scheduleD18Cents, independentScheduleD.line18)
+            assertEq(outcome.scheduleD19Cents, independentScheduleD.line19)
+        },
+        // The SAME declared-`capitalGainsOrLosses` profile, but its ONLY
+        // 1099-B has `box1dProceeds` present and `box1eCostOrOtherBasis`
+        // genuinely absent: `form1040IncomeLines(...)` (called DIRECTLY,
+        // same reasoning as above) returns `{ kind: 'error', ... }` — no line
+        // constructed at all.
+        absentBasisRefusesTheWholeIncomeLinesCallBeforeAnyLineIsBuilt: () => {
+            const absentBasisForm = brokerageDocument('sha256-b-absent-basis')({
+                box1dProceeds: '10000.00',
+                box2LongTermGainOrLoss: true,
+                box5NoncoveredSecurity: true,
+                // box1eCostOrOtherBasis genuinely OMITTED.
+            })
+            const inputs = inputsOf(storedProfile(declaringCapitalGainsOrLossesProfile))([])([])([])([absentBasisForm])
+            const outcome = form1040IncomeLines(taxParams2025)(inputs)
+            assertEq(outcome.kind, 'error', ['expected the absent-basis refusal to propagate', outcome])
+            assert(!Object.hasOwn(outcome, 'line1a'), 'no line may be built once Schedule D refuses')
+            // Separately, `form1040Report(...)` on this SAME profile ALSO
+            // returns `{ kind: 'error', ... }`. Task 2 has landed:
+            // `capitalGainsOrLosses` is a MODELED kind now
+            // (`fjs/return/scope`'s `modeledKinds`), so `classifyScope`
+            // no longer refuses this profile — the PRE-EXISTING scope
+            // refusal this comment used to describe cannot fire here any
+            // more. The refusal below arrives via THIS task's own
+            // absent-basis mechanism (12.1-CONTEXT.md Decision 2.6): the
+            // SAME `Form8949Error`/`ScheduleDOutcome` error arm
+            // `form1040IncomeLines` already threaded above, propagated
+            // verbatim one function further by `form1040Report`.
+            //
+            // Distinguished BY MECHANISM, not merely by the shared
+            // `kind === 'error'` shape (AGENTS.md: "assert the effect, not
+            // the error message" cuts both ways — two different refusals
+            // can share a message SHAPE just as two orderings can share a
+            // message). A scope refusal would name `capitalGainsOrLosses`
+            // in `unmodeled`; the absent-basis mechanism never does —
+            // `unmodeled` stays EMPTY — and its `message` names the
+            // missing box, which no scope refusal message does.
+            const wholeReportOutcome = form1040Report(taxParams2025)(inputs)
+            assert(
+                wholeReportOutcome.kind === 'error',
+                ['expected the whole report to refuse today, via the absent-basis mechanism', wholeReportOutcome],
+            )
+            if (wholeReportOutcome.kind !== 'error') {
+                throw ['expected error', wholeReportOutcome]
+            }
+            assertEq(
+                wholeReportOutcome.unmodeled.length,
+                0,
+                [
+                    'the absent-basis mechanism refuses with an EMPTY unmodeled list — ' +
+                        'a scope refusal would instead name capitalGainsOrLosses',
+                    wholeReportOutcome.unmodeled,
+                ],
+            )
+            assert(
+                wholeReportOutcome.message.includes('box1eCostOrOtherBasis is genuinely absent'),
+                ['expected the absent-basis message to name the missing box', wholeReportOutcome.message],
+            )
+        },
+    },
+    // 12.1-VERIFICATION.md's WARNING, second half: no COMMITTED,
+    // regression-tested proof exercised the FULL production chain —
+    // `fjs/form8949` → `fjs/schedule/d` → `fjs/tax/line16/sdtw` →
+    // `fjs/tax/line16`'s `dispatchLine16` → this file's own
+    // `form1040Report(...)` — for a non-degenerate §1250/28%-rate case
+    // (dispatcher branch 2a) reaching an `'ok'` outcome. `12.1-04-SUMMARY.md`
+    // says as much itself: Task 2's acceptance criterion for this exact
+    // scenario was verified only via an UNCOMMITTED, throwaway script, and
+    // the phase's own verifier reproduced it again the same way (its own
+    // Truth #2) rather than trusting that claim. Neither run left anything
+    // behind to catch a future regression — e.g. a Phase 13 refactor of this
+    // file's `dispatchLine16` call site silently breaking this path.
+    endToEndSectionOneTwoFiftyGainReachesLineSixteenThroughTheFullChain: {
+        // MFJ, wages $90,000.00, a $40,000.00 long-term gain from a single
+        // 1099-B sale (proceeds $45,000.00 less basis $5,000.00, category D:
+        // long-term with basis reported to the IRS), and a 1099-DIV carrying
+        // ONLY box 2b — $3,000.00 of unrecaptured section 1250 gain, no box
+        // 2a/2d. Schedule D lines 15/16 = $40,000.00 (both gains, from the
+        // brokerage sale alone); line 18 = $0 (no box 2d); line 19 =
+        // $3,000.00 (box 2b, via its own sub-worksheet, independent of the
+        // brokerage sale per `fjs/schedule/d`'s own docstring). That is
+        // exactly branch 2a's condition — `filingScheduleD && D15>0 && D16>0
+        // && (D18>0 || D19>0)` — with D19 the non-zero term, so
+        // `dispatchLine16` MUST select `scheduleDTaxWorksheet`, never
+        // `qdcgt` (no qualified dividends are declared here at all, so the
+        // 2a-before-2c ordering is not even in tension for this fixture —
+        // 2c is not a candidate).
+        //
+        // AGI = $90,000.00 wages + $40,000.00 Schedule D gain = $130,000.00.
+        // Taxable income (1040 line 15) = $130,000.00 - $31,500.00 (2025 MFJ
+        // standard deduction) = $98,500.00 — independently confirmed against
+        // this same fixture below, never assumed.
+        //
+        // `717600n` ($7,176.00) is NOT a fresh literal invented here: it is
+        // this verifier's own Truth #2 measurement
+        // (`12.1-VERIFICATION.md`, "Behavioral Spot-Checks"), independently
+        // RE-DERIVED for this commit by running this exact fixture and
+        // separately, by feeding the SAME facts straight to `sdtw(...)`
+        // below — never assumed, never copied from one side of this leaf to
+        // the other.
+        nonDegenerateSectionOneTwoFiftyGainComputesThroughFormOneZeroFourZeroReport: () => {
+            const dividendForm = dividendDocument('sha256-div-e2e-1250')({
+                box2bUnrecapSec1250Gain: '3000.00',
+            })
+            const brokerageForm = brokerageDocument('sha256-b-e2e-1250')({
+                box1dProceeds: '45000.00',
+                box1eCostOrOtherBasis: '5000.00',
+                box2LongTermGainOrLoss: true,
+                box12BasisReportedToIrs: true,
+            })
+            const profile = {
+                ...marriedFilingJointlyProfile,
+                declaredKinds: /** @type {readonly Kind[]} */ (
+                    ['wages', 'capitalGainsOrLosses', 'unrecaptured1250Gain']),
+            }
+            const inputs = inputsOf(storedProfile(profile))([
+                w2Document('sha256-w2-e2e-1250')('90000.00'),
+            ])([])([dividendForm])([brokerageForm])
+
+            const outcome = form1040Report(taxParams2025)(inputs)
+            assert(outcome.kind === 'ok', ['expected the full chain to compute', outcome])
+            if (outcome.kind !== 'ok') {
+                throw ['expected ok', outcome]
+            }
+            // The method tag, not merely the value — the 2a-before-2c
+            // ordering (12.1-CONTEXT.md's own "Specific Ideas" note) is
+            // only observable through this tag when the two worksheets
+            // could otherwise agree; asserting it is what proves branch 2a,
+            // not merely SOME branch, produced the figure below.
+            assertEq(outcome.line16Method, 'scheduleDTaxWorksheet', 'branch 2a must select the SDTW, not the QDCGT')
+
+            const taxableIncome = lineRuled(outcome.lines)('1040 line 15').value
+            assertEq(taxableIncome, 9850000n, '$98,500.00, independently hand-computed above')
+            const line7a = lineRuled(outcome.lines)('1040 line 7a').value
+            assertEq(line7a, 4000000n, '$40,000.00, the brokerage sale\'s own gain')
+            const line16 = lineRuled(outcome.lines)('1040 line 16').value
+            assertEq(line16, 717600n, '$7,176.00 — this verifier\'s own Truth #2 figure, re-derived')
+
+            // Cross-checked a SECOND way, independent of `form1040Report`'s
+            // own dispatch: the SAME facts fed straight to `sdtw(...)`
+            // (never to `dispatchLine16`, so this does not merely re-run
+            // the code under test) must reach the identical cents —
+            // mirroring `mixedDividendsComputeRealLinesThreeAThreeBSevenAAndANonZeroLineSixteen`'s
+            // own qdcgt cross-check, one worksheet over.
+            const crossCheck = sdtw(taxParams2025)({
+                status: 'marriedFilingJointly',
+                line1Cents: taxableIncome,
+                line2Cents: 0n,
+                form4952Line4gCents: 0n,
+                form4952Line4eCents: 0n,
+                scheduleD15Cents: 4000000n,
+                scheduleD16Cents: 4000000n,
+                scheduleD18Cents: 0n,
+                scheduleD19Cents: 300000n,
+            }).line47
+            assertEq(crossCheck, 717600n, 'independent sdtw(...) call must reach the SAME figure')
+            assertEq(line16, crossCheck, 'the wiring must feed the SAME facts an independent sdtw call would')
+        },
     },
 }

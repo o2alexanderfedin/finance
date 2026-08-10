@@ -306,13 +306,13 @@ structural (RTTI) and semantic passes.
       Senior deduction with 6% phase-out over $75k/$150k, feeding Form 1040 line 13b.
 - [ ] **TAX-10** *(T2)*: Social Security Benefits Worksheet — a 19-line near-circular
       computation. Required by the 65+ profile.
-- [ ] **TAX-11** *(T2)*: Form 8949 and Schedule D, including the Schedule D Tax Worksheet.
+- [x] **TAX-11** *(T2)*: Form 8949 and Schedule D, including the Schedule D Tax Worksheet.
       Required by brokerage sales.
 - [ ] **TAX-12** *(T2)*: Schedule 8812. Required by dependents.
 - [ ] **TAX-13** *(T2)*: Schedule A. Required by itemizing, and it must compare against the
       standard deduction rather than assuming itemizing wins.
 - [ ] **TAX-14** *(T2)*: Schedule 1 and Schedule 2/3 to the extent the profile reaches them.
-- [ ] **TAX-15** *(T2)*: Worksheets modelled in IRS order, one named pure function per
+- [x] **TAX-15** *(T2)*: Worksheets modelled in IRS order, one named pure function per
       worksheet carrying the printed form's line numbers. **No variable named `magi`** — the
       MAGI for the IRA deduction, Roth eligibility, the Premium Tax Credit, IRMAA, and the
       student-loan-interest deduction have different add-back lists.
@@ -525,10 +525,29 @@ to be written down with its consequences rather than left implicit.
 ## Traceability
 
 Populated by the roadmapper from [`.planning/ROADMAP.md`](ROADMAP.md).
-**All 79 v1 requirements map to exactly one phase. No orphans, no duplicates.**
+**All 93 requirements map to exactly one phase. No orphans, no duplicates.**
 
 Milestones are `todo/plan.md`'s weeks and keep its names; phases are sliced underneath
 them. Week 0 is research's addition in front of the plan's Week 1.
+
+> **This table's `Status` column is a SECOND SOURCE, and it rots.** The checkbox on each
+> requirement above is what executors update; this column is not, and until 2026-08-08
+> **28 rows said `Pending` for requirements whose checkbox already said `[x]`** — drift
+> accumulated across Phases 3 through 12.1. Both were reconciled on that date (72 complete,
+> 21 pending, 93 total).
+>
+> Recompute rather than trusting either figure:
+> ```sh
+> # every row whose checkbox and Status disagree — must print nothing
+> for r in $(grep -oE '^- \[[ x]\] \*\*[A-Z]+-[0-9]+\*\*' .planning/REQUIREMENTS.md | grep -oE '[A-Z]+-[0-9]+'); do
+>   cb=$(grep -oE "^- \[[ x]\] \*\*${r}\*\*" .planning/REQUIREMENTS.md | grep -oE '\[[ x]\]' | head -1)
+>   tb=$(grep -E "^\| ${r} " .planning/REQUIREMENTS.md | awk -F'|' '{print $6}' | tr -d ' ')
+>   { [ "$cb" = '[x]' ] && [ "$tb" != Complete ] && [ "$tb" != Done ]; } && echo "MISMATCH $r $cb $tb"
+> done
+> ```
+> **A second source of truth is safe only when something watches it drift.** Nothing watches
+> this one — the command above is not run by any gate. **Phase 17 (Documentation Truth Pass)
+> owns making it an actual check** rather than a snippet someone has to remember.
 
 | REQ-ID | Tier | Phase | Milestone | Status |
 |--------|------|-------|-----------|--------|
@@ -544,14 +563,14 @@ them. Week 0 is research's addition in front of the plan's Week 1.
 | MCP-03 | T0 | Phase 2 - Server Skeleton and Registration | Week 0 | Done |
 | MCP-04 | T0 | Phase 2 - Server Skeleton and Registration | Week 0 | Done |
 | MCP-05 | T0 | Phase 2 - Server Skeleton and Registration | Week 0 | Done |
-| MCP-06 | T1 | Phase 7 - `fjs_run` and Run Records | Week 1 | Pending |
-| MCP-07 | T1 | Phase 8 - TY2025 Parameters and Tax Table | Week 2 | Pending |
-| MCP-08 | T2 | Phase 11 - Wage, Retirement, Benefit Documents | Week 3 | Pending |
+| MCP-06 | T1 | Phase 7 - `fjs_run` and Run Records | Week 1 | Complete |
+| MCP-07 | T1 | Phase 8 - TY2025 Parameters and Tax Table | Week 2 | Complete |
+| MCP-08 | T2 | Phase 11 - Wage, Retirement, Benefit Documents | Week 3 | Complete |
 | MCP-09 | T3 | Phase 15 - Realism Polish and Upstream | Week 5 | Pending |
-| TEST-01 | T1 | Phase 7 - `fjs_run` and Run Records | Week 1 | Pending |
-| TEST-02 | T1 | Phase 7 - `fjs_run` and Run Records | Week 1 | Pending |
-| TEST-03 | T2 | Phases 8-15 - standing, per phase | Weeks 2-5 | Pending |
-| TEST-04 | T2 | Phase 7 - `fjs_run` and Run Records | Week 1 | Pending |
+| TEST-01 | T1 | Phase 7 - `fjs_run` and Run Records | Week 1 | Complete |
+| TEST-02 | T1 | Phase 7 - `fjs_run` and Run Records | Week 1 | Complete |
+| TEST-03 | T2 | Phases 8-15 - standing, per phase | Weeks 2-5 | Complete |
+| TEST-04 | T2 | Phase 7 - `fjs_run` and Run Records | Week 1 | Complete |
 | MAINT-01 | T3 | Phase 16 - Orphan Ingestion Island | Backlog | Pending |
 | MAINT-02 | T3 | Phase 17 - Documentation Truth Pass | Backlog | Pending |
 | MAINT-03 | T3 | Phase 17 - Documentation Truth Pass | Backlog | Pending |
@@ -567,11 +586,11 @@ them. Week 0 is research's addition in front of the plan's Week 1.
 | EXEC-05 | T0 | Phase 3 - The Restricted Interpreter | Week 1 | Done |
 | EXEC-06 | T0 | Phase 3 - The Restricted Interpreter | Week 1 | Done |
 | EXEC-07 | T0 | Phase 6 - Guest ABI and Materialization | Week 1 | Complete |
-| EXEC-08 | T1 | Phase 7 - `fjs_run` and Run Records | Week 1 | Pending |
+| EXEC-08 | T1 | Phase 7 - `fjs_run` and Run Records | Week 1 | Complete |
 | EXEC-09 | T1 | Phase 6 - Guest ABI and Materialization | Week 1 | Complete |
-| EXEC-10 | T1 | Phase 7 - `fjs_run` and Run Records | Week 1 | Pending |
-| EXEC-11 | T1 | Phase 7 - `fjs_run` and Run Records | Week 1 | Pending |
-| EXEC-12 | T1 | Phase 7 - `fjs_run` and Run Records | Week 1 | Pending |
+| EXEC-10 | T1 | Phase 7 - `fjs_run` and Run Records | Week 1 | Complete |
+| EXEC-11 | T1 | Phase 7 - `fjs_run` and Run Records | Week 1 | Complete |
+| EXEC-12 | T1 | Phase 7 - `fjs_run` and Run Records | Week 1 | Complete |
 | EXEC-13 | T2 | Phase 14 - Acceptance | Week 4 | Pending |
 | DOC-00 | T0 | Phase 5 - Document Base and First Dialects | Week 1 | Complete |
 | DOC-01 | T0 | Phase 5 - Document Base and First Dialects | Week 1 | Complete |
@@ -579,16 +598,16 @@ them. Week 0 is research's addition in front of the plan's Week 1.
 | DOC-03 | T1 | Phase 5 - Document Base and First Dialects | Week 1 | Complete |
 | DOC-04 | T1 | Phase 5 - Document Base and First Dialects | Week 1 | Complete |
 | DOC-05 | T2 | Phase 5 - Document Base and First Dialects (pulled forward) | Week 1 | Complete |
-| DOC-06 | T2 | Phase 12 - Brokerage and Capital-Gain Chain | Week 3 | Pending |
-| DOC-07 | T2 | Phase 12 - Brokerage and Capital-Gain Chain | Week 3 | Pending |
-| DOC-08 | T2 | Phase 11 - Wage, Retirement, Benefit Documents | Week 3 | Pending |
-| DOC-09 | T2 | Phase 11 - Wage, Retirement, Benefit Documents | Week 3 | Pending |
+| DOC-06 | T2 | Phase 12 - Brokerage and Capital-Gain Chain | Week 3 | Complete |
+| DOC-07 | T2 | Phase 12 - Brokerage and Capital-Gain Chain | Week 3 | Complete |
+| DOC-08 | T2 | Phase 11 - Wage, Retirement, Benefit Documents | Week 3 | Complete |
+| DOC-09 | T2 | Phase 11 - Wage, Retirement, Benefit Documents | Week 3 | Complete |
 | DOC-10 | T1 | Phase 5 - Document Base and First Dialects | Week 1 | Complete |
 | DOC-11 | T1 | Phase 5 - Document Base and First Dialects | Week 1 | Complete |
 | DOC-12 | T1 | Phase 5 - Document Base and First Dialects | Week 1 | Complete |
-| DOC-13 | T2 | Phase 12 - Brokerage and Capital-Gain Chain | Week 3 | Pending |
+| DOC-13 | T2 | Phase 12 - Brokerage and Capital-Gain Chain | Week 3 | Complete |
 | DOC-14 | T1 | Phase 5 - Document Base and First Dialects | Week 1 | Complete |
-| DOC-15 | T2 | Phase 11 - Wage, Retirement, Benefit Documents | Week 3 | Pending |
+| DOC-15 | T2 | Phase 11 - Wage, Retirement, Benefit Documents | Week 3 | Complete |
 | DOC-16 | T3 | Phase 15 - Realism Polish and Upstream | Week 5 | Pending |
 | DOC-17 | T2 | Phase 5 - Document Base and First Dialects (added) | Week 1 | Complete |
 | EXACT-01 | T0 | Phase 4 - Exact Arithmetic | Week 1 | Done |
@@ -596,30 +615,30 @@ them. Week 0 is research's addition in front of the plan's Week 1.
 | EXACT-03 | T0 | Phase 4 - Exact Arithmetic | Week 1 | Done |
 | EXACT-04 | T0 | Phase 4 - Exact Arithmetic | Week 1 | Done |
 | EXACT-05 | T1 | Phase 4 - Exact Arithmetic | Week 1 | Done |
-| TAX-01 | T1 | Phase 8 - TY2025 Parameters and Tax Table | Week 2 | Pending |
-| TAX-02 | T1 | Phase 8 - TY2025 Parameters and Tax Table | Week 2 | Pending |
+| TAX-01 | T1 | Phase 8 - TY2025 Parameters and Tax Table | Week 2 | Complete |
+| TAX-02 | T1 | Phase 8 - TY2025 Parameters and Tax Table | Week 2 | Complete |
 | TAX-03 | T1 | Phase 10 - 1040 Core and Scope Guard | Week 2 | Complete |
-| TAX-04 | T1 | Phase 8 - TY2025 Parameters and Tax Table | Week 2 | Pending |
+| TAX-04 | T1 | Phase 8 - TY2025 Parameters and Tax Table | Week 2 | Complete |
 | TAX-05 | T1 | Phase 10 - 1040 Core and Scope Guard | Week 2 | Complete |
 | TAX-06 | T1 | Phase 10 - 1040 Core and Scope Guard | Week 2 | Complete |
-| TAX-07 | T2 | Phase 12 - Brokerage and Capital-Gain Chain | Week 3 | Pending |
-| TAX-08 | T2 | Phase 12 - Brokerage and Capital-Gain Chain | Week 3 | Pending |
+| TAX-07 | T2 | Phase 12 - Brokerage and Capital-Gain Chain | Week 3 | Complete |
+| TAX-08 | T2 | Phase 10 - 1040 Core and Scope Guard | Week 3 | Complete |
 | TAX-09 | T2 | Phase 13 - The 65+ Profile and Schedules | Week 3 | Pending |
 | TAX-10 | T2 | Phase 13 - The 65+ Profile and Schedules | Week 3 | Pending |
-| TAX-11 | T2 | Phase 12 - Brokerage and Capital-Gain Chain | Week 3 | Pending |
+| TAX-11 | T2 | Phase 12.1 - The Capital-Gain Chain | Week 3 | Complete |
 | TAX-12 | T2 | Phase 13 - The 65+ Profile and Schedules | Week 3 | Pending |
 | TAX-13 | T2 | Phase 13 - The 65+ Profile and Schedules | Week 3 | Pending |
 | TAX-14 | T2 | Phase 13 - The 65+ Profile and Schedules | Week 3 | Pending |
-| TAX-15 | T2 | Phase 12 - Brokerage and Capital-Gain Chain | Week 3 | Pending |
+| TAX-15 | T2 | Phase 12.1 - The Capital-Gain Chain | Week 3 | Complete |
 | TAX-16 | T1 | Phase 10 - 1040 Core and Scope Guard | Week 2 | Complete |
 | TAX-17 | T3 | Phase 15 - Realism Polish and Upstream | Week 5 | Pending |
-| PROV-01 | T1 | Phase 9 - Traceable Report Lines | Week 2 | Pending |
-| PROV-02 | T1 | Phase 9 - Traceable Report Lines | Week 2 | Pending |
-| PROV-03 | T1 | Phase 7 - `fjs_run` and Run Records | Week 1 | Pending |
+| PROV-01 | T1 | Phase 9 - Traceable Report Lines | Week 2 | Complete |
+| PROV-02 | T1 | Phase 9 - Traceable Report Lines | Week 2 | Complete |
+| PROV-03 | T1 | Phase 7 - `fjs_run` and Run Records | Week 1 | Complete |
 | PROV-04 | T2 | Phase 14 - Acceptance | Week 4 | Pending |
 | PROV-05 | T2 | Phase 14 - Acceptance | Week 4 | Pending |
 | PROV-06 | T3 | Phase 15 - Realism Polish and Upstream | Week 5 | Pending |
-| PROV-07 | T2 | Phase 9 - Traceable Report Lines | Week 2 | Pending |
+| PROV-07 | T2 | Phase 9 - Traceable Report Lines | Week 2 | Complete |
 | PROV-08 | T3 | Phase 15 - Realism Polish and Upstream | Week 5 | Pending |
 | SEC-01 | T0 | Phase 2 - Server Skeleton and Registration | Week 0 | Done |
 | SEC-02 | T1 | Phase 6 - Guest ABI and Materialization | Week 1 | Complete |

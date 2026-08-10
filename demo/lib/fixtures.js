@@ -145,11 +145,19 @@ export const documents = [
     { label: '1099-INT — Treasury', dialect: 'vnd.fjs.1099int', stored: int1099Treasury },
 ]
 
-/** The engine's `Form1040Inputs` for the sample return. */
+/**
+ * The engine's `Form1040Inputs` for the sample return. `dividendForms`/
+ * `brokerageForms` are Plan 12.1-04's own widening of `Form1040Inputs` — the
+ * sample return holds neither a 1099-DIV nor a 1099-B, so both are empty;
+ * `inputsDeclaring` below spreads `...inputs`, so both fields are inherited
+ * automatically by every demo step that consumes it.
+ */
 export const inputs = {
     profile: returnProfile,
     w2s: [w2Dana, w2Ray],
     interestForms: [int1099Savings, int1099Treasury],
+    dividendForms: [],
+    brokerageForms: [],
 }
 
 /**
