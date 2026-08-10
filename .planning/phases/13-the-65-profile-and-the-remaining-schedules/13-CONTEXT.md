@@ -1,0 +1,325 @@
+# Phase 13: The 65+ Profile and the Remaining Schedules - Context
+
+**Gathered:** 2026-08-10
+**Status:** Ready for planning
+
+<domain>
+## Phase Boundary
+
+This phase makes the **declared taxpayer profile structurally complete**: a 65+ TY2025
+return with dependents that itemizes is no longer missing anything it is required to have.
+
+In scope — the five requirements TAX-09, TAX-10, TAX-12, TAX-13, TAX-14:
+
+- **Schedule 1-A** senior deduction (the parts criterion 1 names), with the 6% phase-out
+  over $75k/$150k, feeding Form 1040 line 13b.
+- **The 19-line Social Security Benefits Worksheet**, feeding 1040 lines 6a/6b.
+- **Schedule A**, compared against the standard deduction rather than assumed to win.
+- **Schedule 8812**, both halves — the nonrefundable credit (line 19) and the ACTC (line 28).
+- **Schedules 1, 2, and 3**, carrying every line the profile reaches.
+
+Also in scope, because the phase cannot be honest without them:
+
+- **Wiring `vnd.fjs.1099r` into 1040 lines 4a/4b/5a/5b.** The dialect shipped in Phase 11
+  and nothing reads it. The SSB worksheet's own line 3 sums 4b and 5b, so TAX-10 cannot be
+  verified while they are `declaredZero`.
+- **Wiring 1040 line 25b** (`federalTaxWithheldOnOther1099`) from 1099-R / 1099-DIV / 1099-B.
+- **One new taxpayer-asserted dialect** for the Schedule A amounts no information return
+  reports, and a **`dependents` array** on `vnd.fjs.return_profile` for Schedule 8812.
+- **New TY2025 parameter data** with citations: senior deduction and its phase-out, the SSB
+  base amounts, the SALT cap and its phase-down, the CTC/ODC/ACTC amounts, the medical floor.
+
+Out of scope, and staying refused: household employee wages (1b), Medicaid waiver payments
+(1d), other earned income (1h), other-form withholding (25c), net qualified disaster loss
+(Form 4684), the QBI deduction, §1202, Form 4952, and every line-16 wrapper and add-on.
+
+</domain>
+
+<decisions>
+## Implementation Decisions
+
+### 1. Phase Shape and Scope Boundary
+
+- **1.1 — One phase, wave-decomposed. No 13.1 split.** Estimated 9–11 plans, which matches
+  Phase 7 (9 plans) and Phase 10 (10 plans). Phase 12's split existed because its two halves
+  had a genuine dependency ordering (documents, then the chain computing over them); this
+  phase's five schedules are siblings that share one wiring step, not a chain. Splitting
+  would also leave half the declared profile unbuilt, and Phase 14's acceptance test cannot
+  pass on half a profile.
+
+- **1.2 — Form 1040 lines 4a/4b and 5a/5b are wired from `vnd.fjs.1099r` in this phase.**
+  The dialect shipped in Phase 11; nothing reads it. This is the identical
+  reclassify-without-wiring hazard 12.1 Decision 1.3 named for line 7a. It is not optional
+  scope growth: the Social Security Benefits Worksheet's line 3 sums 1040 lines 1z, 2b, 3b,
+  4b, 5b, 7 and 8, so TAX-10's criterion-2 case cannot exercise the worksheet's real
+  arithmetic while 4b and 5b are `declaredZero`. `iraDistributions` and
+  `pensionsAndAnnuities` move from `unmodeledKindRefusals` to `modeledKinds`.
+
+- **1.3 — Form 1040 line 25b is wired.** `federalTaxWithheldOnOther1099`'s own remedy string
+  already reads "requires vnd.fjs.1099r, vnd.fjs.1099div or vnd.fjs.1099b (Phases 11 and
+  12)" — all three shipped. A 65+ return with 1099-R withholding that omits it computes the
+  wrong refund, and line 25a already reads W-2 withholding through `fromDocuments`, so the
+  precedent and the machinery both exist.
+
+- **1.4 — Five kinds KEEP REFUSING, and their remedy strings are CORRECTED.** The declared
+  profile reaches none of them, and a remedy that names Phase 13 while Phase 13 ships without
+  it is a false remedy — precisely the failure mode Phase 1 existed to eliminate. A remedy is
+  read by a taxpayer deciding what to do next; a wrong one is worse than a vague one.
+  - `householdEmployeeWages` (1b), `medicaidWaiverPayments` (1d), `otherEarnedIncome` (1h),
+    `federalTaxWithheldOnOtherForms` (25c) — remedy becomes "no dialect models it (no phase
+    yet)".
+  - `netQualifiedDisasterLoss` (12e exception) — remedy becomes "requires Form 4684 (no
+    phase yet)". Schedule A shipping does not make the disaster-loss election computable.
+
+- **1.5 — Kind arithmetic must balance and be stated.** `modeledKinds` 12 → the new total,
+  `unmodeledKindRefusals` 38 → its complement, `kindVocabulary` stays **50**. The
+  `_EveryKindIsEitherModeledOrRefused` conditional type enforces the partition at `tsc`;
+  the plan states the two counts explicitly so a miscount is caught in review, not in CI.
+
+### 2. Schedule A — Where the Itemized Numbers Come From
+
+- **2.1 — ONE new taxpayer-asserted dialect, `vnd.fjs.itemized_deductions`**, carrying
+  line-tagged entries for SALT, mortgage interest, gifts to charity, and the other-itemized
+  lines. It follows `vnd.fjs.medical_expenses` **verbatim** on every design point that
+  dialect already argued: no `formRevision` (DOC-10 governs dialects transcribing a printed
+  IRS form, and there is no printed form here), **no stored totals** (a stored total is a
+  second source of truth able to disagree with the entries it came from, and no floor or cap
+  can be applied without an AGI the document cannot see), and free-string categories
+  (enumerating what Publication 526 allows is deduction logic, and this dialect stores).
+
+  Medical expenses stay in their own existing dialect — it already exists, already has
+  proofs, and folding it in would be a rewrite for symmetry's sake.
+
+  Rejected: one dialect per Schedule A section (four to five new dialects, four to five new
+  subject conventions, for one taxpayer record). Rejected: transcribing Form 1098 — it covers
+  only mortgage interest, and no information return reports charitable gifts or real-estate
+  tax, so the taxpayer-asserted dialect would still be needed alongside it.
+
+- **2.2 — Schedule A line 5a stays TAXPAYER-ASSERTED; the stored withholding becomes a
+  PROOF, never an input.** Line 5a is state and local income tax *paid* during the year —
+  withholding plus estimated payments plus any prior-year balance paid — so W-2 box 17 alone
+  systematically understates it. A proof asserts that the asserted line 5a is **at least**
+  the sum of W-2 box 17 and 1099-R box 14 across stored documents, since withheld tax is
+  necessarily paid; the proof applies only when the income-tax election (rather than the
+  general-sales-tax election) is in force.
+
+  This is 12.1 Decision 2.4's shape reused: the second source is something a proof watches
+  for drift, never the input itself.
+
+  **`fjs/document/w2` and `fjs/document/1099r` docstrings must be amended.** Both currently
+  state that nothing reads the state/local rows because a state return is out of scope. That
+  stays true of *computation* — but a proof now reads them, and a docstring that says
+  "nothing here reads them" while something does is exactly the kind of claim Phase 17 exists
+  to delete.
+
+- **2.3 — Every printed Schedule A line is modeled.** Lines no source can populate are
+  **documented zeros with the boundary stated in the module's own docstring**, never silent
+  omissions — 12.1 Decision 2.5, itself `fjs/schedule/b`'s Form 8815 precedent. A later phase
+  widening the dialect then knows exactly what to revisit.
+
+- **2.4 — The comparison lives in `fjs/tax/deduction` as a named `deductionChoice`**,
+  returning a discriminated union `{ chosen: 'standard' | 'itemized', standard, itemized }`.
+  `fjs/tax/deduction` already owns the standard deduction including the age and blindness
+  increments, so the comparison belongs beside the figure it compares against; putting it in
+  `fjs/form1040/core` would bury a tax rule in a wiring module, and putting it in
+  `fjs/schedule/a` would make Schedule A responsible for deciding whether it is used.
+
+  **1040 line 12 cites BOTH figures in its sources**, so the report shows what was compared,
+  not only what won. Criterion 3 requires proofs in **both directions**, including a case
+  above $15,750 / $31,500 where itemizing still loses.
+
+- **2.5 — The Schedule A line 18 election** ("itemize even though less than the standard
+  deduction") joins `vnd.fjs.return_profile`. It is a taxpayer election that no document
+  reports, exactly like `hadForeignFinancialAccount` (Phase 12's precedent), and without it
+  `deductionChoice` cannot express a legitimate return.
+
+### 3. Schedule 1-A, the SSB Worksheet, and the MAGI Rule
+
+- **3.1 — New TY2025 numbers extend `fjs/tax/params`**, each with its own citation. Phase 8's
+  rule is that every number the engine consults is data with a citation, and
+  `finance_tax_params` already serves that module to the agent. The existing
+  `unmodifiedParametersCite2024_40Only` proof is **not loosened** — it gets a sibling proof
+  for the OBBBA-sourced set, so the two provenances stay separable and neither can silently
+  absorb the other.
+
+- **3.2 — Schedule 1-A parts the profile does not reach are DOCUMENTED ZEROS, not refusals.**
+  The 50-kind vocabulary is frozen and carries exactly one kind
+  (`seniorAndOtherScheduleOneADeductions`) for the whole of Schedule 1-A, so a *scope* refusal
+  for the tips / overtime / car-loan-interest parts is **not expressible** — the same reason
+  12.1 Decision 1.4 gave for 1099-B boxes 1f and 1g. Each such part is a documented zero with
+  the boundary in the module docstring. The exact part numbering comes from research against
+  the printed form; the criterion names Parts I/V/VI and research confirms or corrects that.
+
+- **3.3 — The SSB worksheet computes in printed IRS order, one pass; the one true cycle
+  REFUSES loudly.** Taxable social security depends on income excluding social security, so
+  the ordering is: other income → the worksheet → line 6b → AGI → the Schedule 1-A phase-out.
+  The genuine circularity is the IRA-deduction ↔ taxable-SS pair, which requires Pub 590-A
+  Worksheet 1-1 — another worksheet, and out of this phase. When the profile declares an IRA
+  deduction on Schedule 1, the return refuses with a named remedy rather than iterating to a
+  fixed point or quietly ignoring the interaction. Refusing is honest and small; a silent
+  approximation here is exactly TAX-16's failure mode.
+
+- **3.4 — Criterion 2's case must exercise the near-circularity, not merely the arithmetic.**
+  The case lands taxable social security in the 85% tier and includes **tax-exempt interest
+  (1040 line 2a)**, which the worksheet adds back — the add-back a naive implementation
+  omits, and the reason the worksheet is not simply "85% of benefits".
+
+- **3.5 — TAX-15 / criterion 5: one named income function per rule, in the module that owns
+  the rule**, each stating its own add-back list in its own docstring — for example
+  `socialSecurityCombinedIncome`, `seniorDeductionPhaseoutIncome`, `saltCapPhasedownIncome`.
+  The names are indicative; research fixes them against the printed line labels. There is no
+  shared "MAGI" anything, because the IRA deduction, Roth eligibility, the Premium Tax Credit,
+  IRMAA, and the student-loan-interest deduction do not share one.
+
+- **3.6 — The criterion is enforced MECHANICALLY, not remembered.** A gate proof walks the
+  `fjs/` tree and fails on a lowercase `magi` token, so `grep -rn "magi" fjs/` returning
+  nothing is a property the build maintains rather than a fact someone checked once. This
+  follows Phase 9's anti-hardcoding gate precedent: a rule a human has to remember is a rule
+  that decays. Uppercase `MAGI` in prose stays permitted — the rule is about names.
+
+### 4. Dependents, Schedule 8812, and Schedules 1 / 2 / 3
+
+- **4.1 — `vnd.fjs.return_profile` grows a `dependents` array** — relationship, SSN valid for
+  employment, age at year end, and lived-with-taxpayer — while **`dependentCount` is KEPT**,
+  with a proof asserting the array length equals it. Schedule 8812 cannot tell a qualifying
+  child from an other dependent from a bare count, and the two credits differ in both amount
+  and refundability. The count stays the load-bearing declaration (the scope guard and the
+  existing proofs read it); the array is what Schedule 8812 reads.
+
+  Rejected: replacing `dependentCount` — it is referenced by existing proofs and is the
+  simpler declaration for a return that itemizes nothing about its dependents. Rejected: two
+  scalar counts — they encode 8812's classification decision in the *input*, which makes the
+  engine's own classification unverifiable, the same objection 12.1 Decision 2.4 raised
+  against trusting the payer-printed Form 8949 checkbox.
+
+- **4.2 — Schedules 1, 2, and 3 model every printed line.** Populatable lines compute;
+  the rest are documented zeros with the boundary in each module's docstring. **Documented
+  zero and scope refusal stay strictly distinct** — `fjs/return/scope`'s docstring already
+  insists on this: a line that is legitimately zero cites the profile, and a line the
+  taxpayer declared but the engine cannot compute refuses the whole return. Criterion 4's
+  "every line the profile actually reaches" is about the first category; the declared-kind
+  guard still governs the second.
+
+- **4.3 — Schedule 8812 is modeled in FULL, both halves.** Part I's nonrefundable credit
+  (1040 line 19) and Part II-A's additional child tax credit (1040 line 28) compute from the
+  same inputs, and `additionalChildTaxCredit` is one of this phase's refusals. Shipping half
+  the form would leave line 28 refusing on a return that has a completed Schedule 8812 sitting
+  in front of it — an outcome no taxpayer could interpret.
+
+- **4.4 — Three waves.**
+  - **Wave 1 (leaves, parallel):** TY2025 parameter data; the `vnd.fjs.itemized_deductions`
+    dialect; the `vnd.fjs.return_profile` extension (`dependents`, the line 18 election).
+  - **Wave 2 (schedules, parallel — each reads Wave 1, none reads another):** Schedule 1-A;
+    the Social Security Benefits Worksheet; Schedule A plus `deductionChoice`; Schedule 8812;
+    Schedules 1, 2, and 3.
+  - **Wave 3 (the atomic transition, strictly ordered):** Form 1040 wiring **first**, then the
+    scope reclassification in one change, then the MAGI gate proof. This is 12.1 Plan 04's
+    exact ordering, and it exists so that no kind is ever modeled-but-unwired — the state in
+    which the scope guard reports a line as computed while it still returns `declaredZero`.
+
+### Claude's Discretion
+
+- Module paths for the new schedules, following the established `fjs/schedule/<letter>` and
+  `fjs/form<number>` conventions (`fjs/schedule/a`, `fjs/schedule/1a` or similar, `fjs/form8812`).
+- Exact function names for the per-rule income definitions and worksheet lines — research
+  against the printed forms decides these, subject to TAX-15's rule that each carries the
+  printed line numbers in IRS order.
+- Plan-to-wave assignment within the three-wave structure, and whether Wave 2's five schedules
+  are five plans or fewer.
+- The precise field list of `vnd.fjs.itemized_deductions`, subject to 2.1's constraints.
+
+</decisions>
+
+<code_context>
+## Existing Code Insights
+
+### Reusable Assets
+
+- **`fjs/tax/deduction/module.f.js`** (617 lines) — the standard deduction with age and
+  blindness increments and the dependent worksheet. `deductionChoice` belongs here.
+- **`fjs/document/medical_expenses/module.f.js`** (282 lines) — the taxpayer-asserted dialect
+  precedent, with its no-`formRevision` / no-total / free-category reasoning already argued in
+  its docstring. `vnd.fjs.itemized_deductions` follows it.
+- **`fjs/schedule/b`** and **`fjs/schedule/d`** — the schedule module precedent, including
+  `fjs/schedule/b`'s Form 8815 documented-boundary pattern for unpopulatable lines.
+- **`fjs/tax/line16/qdcgt`** and **`fjs/tax/line16/sdtw`** — the worksheet precedent: one named
+  pure function per worksheet line, printed line numbers preserved, IRS order.
+- **`fjs/report/line/module.f.js`** — `ReportLine`, `declaredZero`, `totalLine`,
+  `fromDocuments`, `unionSources`. Every new line uses these; nothing computes a bare number.
+- **`fjs/tax/params/module.f.js`** — `taxParamsByYear[2025]`, `standardDeduction`,
+  `agedOrBlindAdditional`, `dependentStandardDeductionCap`, plus seven citation proofs.
+
+### Established Patterns
+
+- **Documented zero vs. scope refusal** is the central distinction of this codebase
+  (`fjs/return/scope`'s docstring). A legitimately-zero line cites the profile; a declared but
+  unmodeled kind refuses the *whole return*, never a partial one.
+- **The frozen partition** — `_EveryKindIsEitherModeledOrRefused` is a conditional type that
+  fails at `tsc` if a kind is classified nowhere or twice. Adding to `modeledKinds` requires
+  deleting from `unmodeledKindRefusals` in the same change.
+- **Wire before reclassify** (12.1 Plan 04) — the 1040 line reads real data *before* its kind
+  moves out of the refusal table, never after.
+- **A payer-printed or second-source value is a proof's subject, never an input** (12.1
+  Decision 2.4).
+- **Money is exact decimal** via `fjs/exact` and `fjs/types/decimal`; every dialect money field
+  is a string at the storage boundary and is re-parsed for exactness (Phase 4).
+- **Every module carries a `proof` export**; the project is at 665 proofs, `tsc` clean.
+
+### Integration Points
+
+- `fjs/form1040/core/module.f.js` (2835 lines) — lines 4a/4b, 5a/5b, 6a/6b, 8, 10, 12e, 13b,
+  17, 19, 20, 23, 25b, 28, 31 are all `declaredZero` today and are this phase's wiring targets.
+  Three parallel structures must stay in sync: the `@typedef` block (~line 341), the returned
+  object (~line 607), the flattening array (~line 1002), and the line-name list (~line 1197).
+- `fjs/return/scope/module.f.js` — `modeledKinds` / `unmodeledKindRefusals` partition.
+- `fjs/return/profile/module.f.js` — `returnProfileSchema`, `kindVocabulary` (frozen at 50),
+  `checkReferences`, `validate`.
+- `fjs/server/finance_tax_params` — serves `fjs/tax/params` to the agent; new parameters
+  surface here.
+- `fjs/server/finance_schema` — dialect schema surface; the new dialect registers here.
+- `fjs/document/base` and `fjs/document/subject` — `base(dialect)`, `mediaTypeOf`, `formSubject`
+  keyed on `(payerTin, recipientTin, accountNumber, taxYear, formType)`. The taxpayer-asserted
+  dialect uses `''` for payer and account, giving one record per taxpayer per year.
+
+</code_context>
+
+<specifics>
+## Specific Ideas
+
+- **Criterion 5 is a gate, not a note.** `grep -rn "magi" fjs/` returns nothing *today*. This
+  phase introduces five distinct income definitions, which is exactly the moment the criterion
+  is at risk. It must be mechanically enforced (Decision 3.6), and the phase's verification
+  must run the literal command from the criterion.
+
+- **Criterion 3 needs proofs in BOTH directions.** The stated failure mode is an engine where
+  itemizing automatically wins above the standard deduction. A case above $15,750 / $31,500
+  where the standard deduction still wins is the load-bearing proof, not the easy one.
+
+- **Criterion 2 needs a case that exercises the near-circular dependency**, specifically the
+  tax-exempt-interest add-back — not merely a case where the 19 lines produce a number.
+
+- **The stale-remedy correction (Decision 1.4) is small and easy to forget**, and it is the
+  kind of thing Phase 1 and Phase 17 exist to catch. It belongs in Wave 3 beside the
+  reclassification, in the same change that touches the refusal table.
+
+</specifics>
+
+<deferred>
+## Deferred Ideas
+
+- **Pub 590-A Worksheet 1-1** — the IRA-deduction ↔ taxable-social-security fixed point.
+  Refused loudly in this phase (Decision 3.3); a future phase can model it.
+- **Form 4684 and the net qualified disaster loss** — the 12e exception stays refused.
+- **The §1202 exclusion percentage** — unchanged from Phase 12.1; no 1099-DIV box carries it.
+- **Form 4952 and the investment interest election** — deliberately still refusing, as the
+  live proof that the Schedule D Tax Worksheet branch's guard is real (12.1 Decision 1.2).
+- **Form 1098 / 1098-E as transcribed dialects** — a real information return exists for
+  mortgage interest and student loan interest; a later phase could add them and let a proof
+  watch them against the taxpayer-asserted record, exactly as Decision 2.2 does for withholding.
+- **State returns** — out of scope project-wide. The state/local rows stay stored and, apart
+  from Decision 2.2's proof, uncomputed.
+- **Capital loss carryover (TAX-17)** — Phase 15, T3.
+- **Household employee wages, Medicaid waiver payments, other earned income, other-form
+  withholding** — no dialect models them and no phase is scheduled (Decision 1.4).
+
+</deferred>
