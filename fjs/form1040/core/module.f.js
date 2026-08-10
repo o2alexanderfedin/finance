@@ -52,6 +52,7 @@ import { dialect as oneZeroNineNineIntDialect } from '../../document/1099int/mod
 import { dialect as oneZeroNineNineDivDialect } from '../../document/1099div/module.f.js'
 import { dialect as oneZeroNineNineBDialect } from '../../document/1099b/module.f.js'
 import { qdcgt } from '../../tax/line16/qdcgt/module.f.js'
+import { sdtw } from '../../tax/line16/sdtw/module.f.js'
 import {
     dialect as returnProfileDialect,
     kindVocabulary,
@@ -2730,6 +2731,105 @@ export const proof = {
                 wholeReportOutcome.message.includes('box1eCostOrOtherBasis is genuinely absent'),
                 ['expected the absent-basis message to name the missing box', wholeReportOutcome.message],
             )
+        },
+    },
+    // 12.1-VERIFICATION.md's WARNING, second half: no COMMITTED,
+    // regression-tested proof exercised the FULL production chain —
+    // `fjs/form8949` → `fjs/schedule/d` → `fjs/tax/line16/sdtw` →
+    // `fjs/tax/line16`'s `dispatchLine16` → this file's own
+    // `form1040Report(...)` — for a non-degenerate §1250/28%-rate case
+    // (dispatcher branch 2a) reaching an `'ok'` outcome. `12.1-04-SUMMARY.md`
+    // says as much itself: Task 2's acceptance criterion for this exact
+    // scenario was verified only via an UNCOMMITTED, throwaway script, and
+    // the phase's own verifier reproduced it again the same way (its own
+    // Truth #2) rather than trusting that claim. Neither run left anything
+    // behind to catch a future regression — e.g. a Phase 13 refactor of this
+    // file's `dispatchLine16` call site silently breaking this path.
+    endToEndSectionOneTwoFiftyGainReachesLineSixteenThroughTheFullChain: {
+        // MFJ, wages $90,000.00, a $40,000.00 long-term gain from a single
+        // 1099-B sale (proceeds $45,000.00 less basis $5,000.00, category D:
+        // long-term with basis reported to the IRS), and a 1099-DIV carrying
+        // ONLY box 2b — $3,000.00 of unrecaptured section 1250 gain, no box
+        // 2a/2d. Schedule D lines 15/16 = $40,000.00 (both gains, from the
+        // brokerage sale alone); line 18 = $0 (no box 2d); line 19 =
+        // $3,000.00 (box 2b, via its own sub-worksheet, independent of the
+        // brokerage sale per `fjs/schedule/d`'s own docstring). That is
+        // exactly branch 2a's condition — `filingScheduleD && D15>0 && D16>0
+        // && (D18>0 || D19>0)` — with D19 the non-zero term, so
+        // `dispatchLine16` MUST select `scheduleDTaxWorksheet`, never
+        // `qdcgt` (no qualified dividends are declared here at all, so the
+        // 2a-before-2c ordering is not even in tension for this fixture —
+        // 2c is not a candidate).
+        //
+        // AGI = $90,000.00 wages + $40,000.00 Schedule D gain = $130,000.00.
+        // Taxable income (1040 line 15) = $130,000.00 - $31,500.00 (2025 MFJ
+        // standard deduction) = $98,500.00 — independently confirmed against
+        // this same fixture below, never assumed.
+        //
+        // `717600n` ($7,176.00) is NOT a fresh literal invented here: it is
+        // this verifier's own Truth #2 measurement
+        // (`12.1-VERIFICATION.md`, "Behavioral Spot-Checks"), independently
+        // RE-DERIVED for this commit by running this exact fixture and
+        // separately, by feeding the SAME facts straight to `sdtw(...)`
+        // below — never assumed, never copied from one side of this leaf to
+        // the other.
+        nonDegenerateSectionOneTwoFiftyGainComputesThroughFormOneZeroFourZeroReport: () => {
+            const dividendForm = dividendDocument('sha256-div-e2e-1250')({
+                box2bUnrecapSec1250Gain: '3000.00',
+            })
+            const brokerageForm = brokerageDocument('sha256-b-e2e-1250')({
+                box1dProceeds: '45000.00',
+                box1eCostOrOtherBasis: '5000.00',
+                box2LongTermGainOrLoss: true,
+                box12BasisReportedToIrs: true,
+            })
+            const profile = {
+                ...marriedFilingJointlyProfile,
+                declaredKinds: /** @type {readonly Kind[]} */ (
+                    ['wages', 'capitalGainsOrLosses', 'unrecaptured1250Gain']),
+            }
+            const inputs = inputsOf(storedProfile(profile))([
+                w2Document('sha256-w2-e2e-1250')('90000.00'),
+            ])([])([dividendForm])([brokerageForm])
+
+            const outcome = form1040Report(taxParams2025)(inputs)
+            assert(outcome.kind === 'ok', ['expected the full chain to compute', outcome])
+            if (outcome.kind !== 'ok') {
+                throw ['expected ok', outcome]
+            }
+            // The method tag, not merely the value — the 2a-before-2c
+            // ordering (12.1-CONTEXT.md's own "Specific Ideas" note) is
+            // only observable through this tag when the two worksheets
+            // could otherwise agree; asserting it is what proves branch 2a,
+            // not merely SOME branch, produced the figure below.
+            assertEq(outcome.line16Method, 'scheduleDTaxWorksheet', 'branch 2a must select the SDTW, not the QDCGT')
+
+            const taxableIncome = lineRuled(outcome.lines)('1040 line 15').value
+            assertEq(taxableIncome, 9850000n, '$98,500.00, independently hand-computed above')
+            const line7a = lineRuled(outcome.lines)('1040 line 7a').value
+            assertEq(line7a, 4000000n, '$40,000.00, the brokerage sale\'s own gain')
+            const line16 = lineRuled(outcome.lines)('1040 line 16').value
+            assertEq(line16, 717600n, '$7,176.00 — this verifier\'s own Truth #2 figure, re-derived')
+
+            // Cross-checked a SECOND way, independent of `form1040Report`'s
+            // own dispatch: the SAME facts fed straight to `sdtw(...)`
+            // (never to `dispatchLine16`, so this does not merely re-run
+            // the code under test) must reach the identical cents —
+            // mirroring `mixedDividendsComputeRealLinesThreeAThreeBSevenAAndANonZeroLineSixteen`'s
+            // own qdcgt cross-check, one worksheet over.
+            const crossCheck = sdtw(taxParams2025)({
+                status: 'marriedFilingJointly',
+                line1Cents: taxableIncome,
+                line2Cents: 0n,
+                form4952Line4gCents: 0n,
+                form4952Line4eCents: 0n,
+                scheduleD15Cents: 4000000n,
+                scheduleD16Cents: 4000000n,
+                scheduleD18Cents: 0n,
+                scheduleD19Cents: 300000n,
+            }).line47
+            assertEq(crossCheck, 717600n, 'independent sdtw(...) call must reach the SAME figure')
+            assertEq(line16, crossCheck, 'the wiring must feed the SAME facts an independent sdtw call would')
         },
     },
 }
