@@ -2690,17 +2690,45 @@ export const proof = {
             assertEq(outcome.kind, 'error', ['expected the absent-basis refusal to propagate', outcome])
             assert(!Object.hasOwn(outcome, 'line1a'), 'no line may be built once Schedule D refuses')
             // Separately, `form1040Report(...)` on this SAME profile ALSO
-            // returns `{ kind: 'error', ... }` today — via the PRE-EXISTING
-            // scope refusal of the still-unmodeled `capitalGainsOrLosses`
-            // kind, not yet via this task's own new absent-basis mechanism.
-            // This end-to-end assertion does not yet distinguish "scope
-            // refusal" from "absent-basis refusal" by MECHANISM; Task 2's own
-            // acceptance criteria re-run this exact fixture to confirm the
-            // mechanism has shifted.
+            // returns `{ kind: 'error', ... }`. Task 2 has landed:
+            // `capitalGainsOrLosses` is a MODELED kind now
+            // (`fjs/return/scope`'s `modeledKinds`), so `classifyScope`
+            // no longer refuses this profile — the PRE-EXISTING scope
+            // refusal this comment used to describe cannot fire here any
+            // more. The refusal below arrives via THIS task's own
+            // absent-basis mechanism (12.1-CONTEXT.md Decision 2.6): the
+            // SAME `Form8949Error`/`ScheduleDOutcome` error arm
+            // `form1040IncomeLines` already threaded above, propagated
+            // verbatim one function further by `form1040Report`.
+            //
+            // Distinguished BY MECHANISM, not merely by the shared
+            // `kind === 'error'` shape (AGENTS.md: "assert the effect, not
+            // the error message" cuts both ways — two different refusals
+            // can share a message SHAPE just as two orderings can share a
+            // message). A scope refusal would name `capitalGainsOrLosses`
+            // in `unmodeled`; the absent-basis mechanism never does —
+            // `unmodeled` stays EMPTY — and its `message` names the
+            // missing box, which no scope refusal message does.
             const wholeReportOutcome = form1040Report(taxParams2025)(inputs)
             assert(
                 wholeReportOutcome.kind === 'error',
-                ['expected the whole report to refuse today, via the pre-existing scope guard', wholeReportOutcome],
+                ['expected the whole report to refuse today, via the absent-basis mechanism', wholeReportOutcome],
+            )
+            if (wholeReportOutcome.kind !== 'error') {
+                throw ['expected error', wholeReportOutcome]
+            }
+            assertEq(
+                wholeReportOutcome.unmodeled.length,
+                0,
+                [
+                    'the absent-basis mechanism refuses with an EMPTY unmodeled list — ' +
+                        'a scope refusal would instead name capitalGainsOrLosses',
+                    wholeReportOutcome.unmodeled,
+                ],
+            )
+            assert(
+                wholeReportOutcome.message.includes('box1eCostOrOtherBasis is genuinely absent'),
+                ['expected the absent-basis message to name the missing box', wholeReportOutcome.message],
             )
         },
     },
