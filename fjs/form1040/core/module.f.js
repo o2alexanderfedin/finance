@@ -1322,11 +1322,16 @@ const interestDocument = documentHash => boxes => ({
 const dividendAndBrokerageSourceArtifactHash
     = 'deadbeef00112233445566778899aabbccddeeff0011223344556677889900'
 
-/** The three 1099-DIV boxes Plan 12.1-04's own fixtures read.
+/** The 1099-DIV boxes this file's fixtures read. The first three are Plan
+ * 12.1-04's own; `box2bUnrecapSec1250Gain`/`box2dCollectibles28PercentGain`
+ * were added closing 12.1-VERIFICATION.md's WARNING (the decorative-proof
+ * fix) — a NON-ZERO Schedule D 18/19 fixture needs them.
  * @typedef {{
  *   readonly box1aTotalOrdinaryDividends?: string,
  *   readonly box1bQualifiedDividends?: string,
  *   readonly box2aTotalCapitalGainDistr?: string,
+ *   readonly box2bUnrecapSec1250Gain?: string,
+ *   readonly box2dCollectibles28PercentGain?: string,
  * }} DividendBoxes
  */
 
@@ -2600,6 +2605,71 @@ export const proof = {
             assertEq(outcome.line7a.value, independentScheduleD.line7aCapitalGainOrLoss)
             assertEq(outcome.scheduleD15Cents, independentScheduleD.line15)
             assertEq(outcome.scheduleD16Cents, independentScheduleD.line16)
+            assertEq(outcome.scheduleD18Cents, independentScheduleD.line18)
+            assertEq(outcome.scheduleD19Cents, independentScheduleD.line19)
+        },
+        // 12.1-VERIFICATION.md's WARNING: the leaf above's fixture has NO
+        // 1099-DIV at all, so `independentScheduleD.line18`/`.line19` are
+        // BOTH `0n` on the real code path AND on a hypothetical
+        // hardcoded-zero mutant at this file's own `scheduleD18Cents`/
+        // `scheduleD19Cents` construction (lines 619-620 above) — the
+        // wiring assertions `outcome.scheduleD18Cents ===
+        // independentScheduleD.line18` (and the line19 sibling) pass
+        // identically either way for that fixture. AGENTS.md names four
+        // prior instances of exactly this shape: a proof whose expected
+        // side is not independent of the code under test.
+        //
+        // This sibling fixture adds a 1099-DIV carrying box 2b
+        // (unrecaptured section 1250 gain) and box 2d (28%-rate
+        // collectibles gain) — the natural source per 12.1-CONTEXT.md's own
+        // "SCOPE — what becomes modeled" decisions — so
+        // `scheduleD18Cents`/`scheduleD19Cents` are NON-ZERO and the SAME
+        // two assertions become load-bearing.
+        //
+        // MUTATION-VERIFIED (recorded here per this plan's own
+        // instruction): hardcoding `scheduleD18Cents: 0n` at this file's
+        // line 619 (`scheduleD18Cents: scheduleDOk === undefined ? 0n :
+        // scheduleDOk.line18,`) reddens exactly this leaf, at exactly
+        // `assertEq(outcome.scheduleD18Cents, independentScheduleD.line18)`
+        // below — `50000n !== 0n`. Reverting restores green. Separately
+        // hardcoding `scheduleD19Cents: 0n` at line 620 reddens the SAME
+        // leaf at the matching `scheduleD19Cents` assertion — `30000n !==
+        // 0n`. Neither mutation touches the leaf above, which stays green
+        // throughout (its own two assertions are still `0n === 0n`,
+        // unaffected) — confirming this new leaf, not the old one, is what
+        // now carries the load.
+        nonDegenerateGainWiresLineEighteenAndLineNineteenWhenBothAreNonZero: () => {
+            const brokerageForm = brokerageDocument('sha256-b-1250-and-28pct-gain')({
+                box1dProceeds: '9000.00',
+                box1eCostOrOtherBasis: '4000.00',
+                box2LongTermGainOrLoss: true,
+                box12BasisReportedToIrs: true,
+            })
+            const dividendForm = dividendDocument('sha256-div-1250-and-28pct')({
+                box2bUnrecapSec1250Gain: '300.00',
+                box2dCollectibles28PercentGain: '500.00',
+            })
+            const inputs = inputsOf(storedProfile(declaringCapitalGainsOrLossesProfile))([])([])(
+                [dividendForm])([brokerageForm])
+            const outcome = form1040IncomeLines(taxParams2025)(inputs)
+            assert(outcome.kind === 'ok', ['expected the income lines to compute in isolation', outcome])
+            if (outcome.kind !== 'ok') {
+                throw ['expected ok', outcome]
+            }
+            const independentScheduleD = scheduleD({
+                status: 'single',
+                brokerageForms: [brokerageForm],
+                dividendForms: [dividendForm],
+            })
+            assert(independentScheduleD.kind === 'ok', ['expected Schedule D to compute', independentScheduleD])
+            if (independentScheduleD.kind !== 'ok') {
+                throw ['expected ok', independentScheduleD]
+            }
+            // Hand-typed and independent of the code under test — the
+            // fixture's own $500.00 box 2d and $300.00 box 2b, never
+            // derived from `outcome` or `independentScheduleD`.
+            assertEq(independentScheduleD.line18, 50000n, '$500.00 box 2d, hand-typed')
+            assertEq(independentScheduleD.line19, 30000n, '$300.00 box 2b, hand-typed')
             assertEq(outcome.scheduleD18Cents, independentScheduleD.line18)
             assertEq(outcome.scheduleD19Cents, independentScheduleD.line19)
         },
