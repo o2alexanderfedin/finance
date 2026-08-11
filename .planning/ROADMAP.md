@@ -535,7 +535,7 @@ Plans:
 
 **Wave 4** (TAX-12 — dependents and Schedule 8812)
 - [x] 13-08-PLAN.md — return_profile dependents array, CTC/ODC/ACTC/phase-out parameters *(needs 13-07)*
-- [ ] 13-09-PLAN.md — Schedule 8812 Parts I/II-A, roundUpToNextThousandDollars, dependent classification *(needs 13-08)*
+- [x] 13-09-PLAN.md — Schedule 8812 Parts I/II-A, roundUpToNextThousandDollars, dependent classification *(needs 13-08)*
 - [ ] 13-10-PLAN.md — Wire 1040 lines 19/28, reclassify childTaxCreditOrOtherDependents/additionalChildTaxCredit, end-to-end proof *(needs 13-09)*
 
 **Wave 5** (TAX-14 — remaining schedules and the sweep)
@@ -652,7 +652,7 @@ Phases 16-18 are backlog: unordered, independent of each other and of the critic
 | 10. 1040 Core and Scope Guard | Week 2 | 10/10 | Complete   | verified 2026-08-06 5/5 |
 | 11. Wage, Retirement, Benefit Documents | Week 3 | 5/5 | Complete   | 2026-08-08 |
 | 12. Brokerage and Capital-Gain Chain | Week 3 | 5/5 | Complete   | 2026-08-08 |
-| 13. The 65+ Profile and Schedules | Week 3 | 8/13 | In Progress|  |
+| 13. The 65+ Profile and Schedules | Week 3 | 9/13 | In Progress|  |
 | 14. Acceptance | Week 4 | 0/TBD | Not started | - |
 | 15. Realism Polish and Upstream | Week 5 | 0/TBD | Not started | - |
 
