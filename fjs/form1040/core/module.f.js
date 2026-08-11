@@ -830,9 +830,20 @@ export const form1040IncomeLines = taxParamSet => inputs => {
         spouseHasValidSsnAndBornBefore1961Jan2: profile.value.spouseBornBeforeJan2_1961 === true,
         profile,
     })
+    // WR-03 (13-REVIEW.md): line 13b's VALUE depends on `status` (which
+    // threshold applies, and the MFS short-circuit) and on every CHECKED
+    // age/blindness box (which of `scheduleOneAResult`'s line36a/line36b is
+    // nonzero) -- not merely on AGI. `filingStatusSource`/`twelveDBoxSources`
+    // are the SAME `Source`s `line12e` already cites a few dozen lines above
+    // (built once, reused here); the annotation mirrors `twelveESources`'s
+    // own precedent exactly: a spread of a plain array into an array
+    // literal infers a plain array, and the head element is what makes the
+    // tuple non-empty.
+    /** @type {readonly [Source, ...(readonly Source[])]} */
+    const thirteenBSources = [filingStatusSource, ...twelveDBoxSources, ...line11b.sources]
     const line13b = {
         value: scheduleOneAResult.partVI.line38,
-        sources: unionSources([line11b]),
+        sources: thirteenBSources,
         rule: '1040 line 13b',
     }
     const line14 = totalLine('1040 line 14')([line12e, line13a, line13b])
@@ -1215,9 +1226,23 @@ const form1040TaxAndPaymentLines = taxParamSet => inputs => income => {
     if (form8812Outcome.kind === 'error') {
         return { kind: 'error', message: form8812Outcome.message, unmodeled: [] }
     }
+    // WR-03 (13-REVIEW.md): lines 19/28 are PRIMARILY determined by the
+    // profile's own `dependents` array (ages and SSN-validity, which drive
+    // the CTC-vs-ODC counts) -- not merely by AGI. Cited here so an auditor
+    // inspecting either line's sources after a dependent's age changes the
+    // computed credit sees the array was consulted, mirroring `line12e`'s
+    // own precedent of citing every fact a comparison actually reads.
+    /** @type {Source} */
+    const dependentsSource = {
+        documentHash: profile.documentHash,
+        boxPath: 'dependents',
+        value: JSON.stringify(profile.value.dependents ?? []),
+    }
+    /** @type {readonly [Source, ...(readonly Source[])]} */
+    const nineteenSources = [...unionSources([income.line11b]), dependentsSource]
     const line19 = {
         value: form8812Outcome.line14,
-        sources: unionSources([income.line11b]),
+        sources: nineteenSources,
         rule: '1040 line 19',
     }
     // 20/31 — Schedule 3 (`fjs/schedule/3`, Plan 13-11/13-12, TAX-14):
@@ -1282,9 +1307,14 @@ const form1040TaxAndPaymentLines = taxParamSet => inputs => income => {
     // 28 — additional child tax credit: Schedule 8812 Part II-A's line 27,
     // computed above alongside line 19 from the SAME `form8812Outcome`, per
     // Decision 4.3 — never independently re-derived here.
+    // Same `dependentsSource` line 19 cites above -- line 28 (the ACTC) is
+    // driven by the SAME `dependents` array (line16b's qualifying-child
+    // count), from the SAME `form8812Outcome`.
+    /** @type {readonly [Source, ...(readonly Source[])]} */
+    const twentyEightSources = [...unionSources([income.line11b, line18]), dependentsSource]
     const line28 = {
         value: form8812Outcome.line27,
-        sources: unionSources([income.line11b, line18]),
+        sources: twentyEightSources,
         rule: '1040 line 28',
     }
     const line29 = declaredZero('1040 line 29')   // American opportunity credit
@@ -3423,9 +3453,27 @@ export const proof = {
                 inputsOf(storedProfile(profile))([w2Form])([])([])([])([])([])([])([])))
             assertEq(lines.line11b.value, 8000000n, '$80,000.00 AGI -- wages alone')
             assertEq(lines.line13b.value, 570000n, '$5,700.00, Schedule 1-A\'s own $80,000 AGI fixture')
+            // WR-03 (13-REVIEW.md): line13b's value depends on `status`
+            // (which threshold, and the MFS short-circuit) and on the
+            // CHECKED age box (which of line36a/line36b is nonzero) -- not
+            // merely on AGI. This assertion is REWRITTEN, not weakened
+            // (AGENTS.md): the fix legitimately widens line13b's sources
+            // beyond line11b's own, so the old "cites the SAME sources as
+            // line11b" claim is no longer true, and the replacement checks
+            // for MORE provenance, not less.
             assertEq(
-                lines.line13b.sources.length, lines.line11b.sources.length,
-                'cites the SAME sources as line11b (AGI) -- the only fact Schedule 1-A\'s wiring reads',
+                lines.line13b.sources.length,
+                1 /* filingStatusSource */ + 1 /* the checked taxpayerBornBeforeJan2_1961 box */
+                    + lines.line11b.sources.length /* AGI's own provenance */,
+                'cites the filing-status box AND the checked age box IN ADDITION TO AGI\'s own provenance',
+            )
+            assert(
+                lines.line13b.sources.some(source => source.boxPath === 'filingStatus'),
+                ['expected line13b to cite the filing-status box (Decision 5.4\'s MFS short-circuit)', lines.line13b.sources],
+            )
+            assert(
+                lines.line13b.sources.some(source => source.boxPath === 'taxpayerBornBeforeJan2_1961'),
+                ['expected line13b to cite the checked age box driving line36a', lines.line13b.sources],
             )
             assertEq(
                 lines.line14.value,
@@ -4026,6 +4074,18 @@ export const proof = {
             const line28 = lineRuled(outcome.lines)('1040 line 28')
             assertEq(line28.value, 170000n, '$1,700.00 -- ACTC, capped by ONE qualifying child\'s $1,700.00')
             assert(line28.value > 0n, ['expected a real, non-zero line 28', line28.value])
+
+            // WR-03 (13-REVIEW.md): both lines are PRIMARILY determined by
+            // the profile's own `dependents` array -- an auditor inspecting
+            // either line's sources must see it was consulted.
+            assert(
+                line19.sources.some(source => source.boxPath === 'dependents'),
+                ['expected line19 to cite the dependents array', line19.sources],
+            )
+            assert(
+                line28.sources.some(source => source.boxPath === 'dependents'),
+                ['expected line28 to cite the dependents array', line28.sources],
+            )
 
             // Cross-checked a SECOND way, independent of `form1040Report`'s
             // own wiring: the SAME facts fed straight to `form8812(...)`
