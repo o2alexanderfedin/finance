@@ -589,6 +589,75 @@ export const medicalExpenseFloor = {
 }
 
 /**
+ * Schedule 8812's Child Tax Credit / Credit for Other Dependents /
+ * Additional Child Tax Credit figures, plus the phase-out threshold and
+ * rate — TAX-12 (13-CONTEXT.md Decision 4.1/4.3, 13-RESEARCH.md §4/§7).
+ *
+ * **This is the ONE parameter group in this module where the figures are
+ * NOT uniformly sourced.** `ctcAmount` ($2,200) is the only figure in this
+ * entire phase Rev. Proc. 2025-32 actually backs — confirmed by a full grep
+ * of that document (13-RESEARCH.md Pitfall 5, `[VERIFIED: f1040s8.pdf p1
+ * line5; rp-25-32.pdf §2.03]`). `odcAmount` ($500), `actcCap` ($1,700), and
+ * `phaseoutThreshold` ($400,000 MFJ / $200,000 other) all cite `kind:
+ * 'code'`, §24(h) — research's best available identification of the
+ * governing U.S. Code subsection (13-RESEARCH.md's own "LOW confidence on
+ * exact U.S. Code section numbers for OBBBA provisions" caveat covers the
+ * SECTION NUMBER only; the DOLLAR figures themselves are HIGH confidence,
+ * read directly off the published 2025 form). Do not default any of these
+ * three to `kind: 'revProc'` merely because `ctcAmount` is — that is
+ * exactly the sourcing error Pitfall 5 names, inverted.
+ *
+ * `phaseoutRatePercent` (5) is a plain rate, mirroring every other
+ * `*RatePercent` field in this module. Unlike `seniorDeduction`'s and
+ * `saltCap`'s CONTINUOUS phase-outs, Schedule 8812's is STEPPED — a true
+ * cliff, rounding the excess UP to the next whole $1,000 before applying the
+ * rate (13-RESEARCH.md §7). That rounding arithmetic
+ * (`roundUpToNextThousandDollars`) has no precedent anywhere in this
+ * codebase and is a later plan's job to write and apply; this module stores
+ * the threshold and rate only, exactly as it stores every other phase-out's
+ * inputs without performing the phase-out itself.
+ * @type {{
+ *   readonly ctcAmount: AmountWithCitation,
+ *   readonly odcAmount: AmountWithCitation,
+ *   readonly actcCap: AmountWithCitation,
+ *   readonly phaseoutThreshold: {
+ *     readonly marriedFilingJointly: AmountWithCitation,
+ *     readonly other: AmountWithCitation,
+ *   },
+ *   readonly phaseoutRatePercent: number,
+ * }}
+ */
+export const childTaxCredit = {
+    ctcAmount: {
+        amount: '2200.00',
+        citation: { kind: 'revProc', revProc: '2025-32', section: '§2.03', effectiveDate: '2025-01-01' },
+    },
+    odcAmount: {
+        amount: '500.00',
+        citation: { kind: 'code', section: '§24(h)', effectiveDate: '2025-01-01' },
+    },
+    actcCap: {
+        amount: '1700.00',
+        citation: { kind: 'code', section: '§24(h)', effectiveDate: '2025-01-01' },
+    },
+    phaseoutThreshold: {
+        marriedFilingJointly: {
+            amount: '400000.00',
+            citation: { kind: 'code', section: '§24(h)', effectiveDate: '2025-01-01' },
+        },
+        other: {
+            amount: '200000.00',
+            citation: { kind: 'code', section: '§24(h)', effectiveDate: '2025-01-01' },
+        },
+    },
+    // A plain rate, not money — mirroring `seniorDeduction.phaseoutRatePercent`
+    // and `saltCap.phasedownRatePercent`. Applied to the EXCESS after it is
+    // rounded UP to the next whole $1,000 (13-RESEARCH.md §7) — that
+    // rounding is 13-09's arithmetic to perform, not this module's.
+    phaseoutRatePercent: 5,
+}
+
+/**
  * A full tax-year parameter set: every TY2025 parameter this phase
  * requires, together.
  * @typedef {{
@@ -601,6 +670,7 @@ export const medicalExpenseFloor = {
  *   readonly seniorDeduction: typeof seniorDeduction,
  *   readonly saltCap: typeof saltCap,
  *   readonly medicalExpenseFloor: typeof medicalExpenseFloor,
+ *   readonly childTaxCredit: typeof childTaxCredit,
  * }} TaxParamSet
  */
 
@@ -624,6 +694,7 @@ export const taxParamsByYear = {
         seniorDeduction,
         saltCap,
         medicalExpenseFloor,
+        childTaxCredit,
     },
 }
 
@@ -704,6 +775,11 @@ const everyDollarStringField = [
     saltCap.threshold.marriedFilingSeparately.amount,
     saltCap.threshold.headOfHousehold.amount,
     saltCap.threshold.qualifyingSurvivingSpouse.amount,
+    childTaxCredit.ctcAmount.amount,
+    childTaxCredit.odcAmount.amount,
+    childTaxCredit.actcCap.amount,
+    childTaxCredit.phaseoutThreshold.marriedFilingJointly.amount,
+    childTaxCredit.phaseoutThreshold.other.amount,
 ]
 
 export const proof = {
@@ -1052,5 +1128,54 @@ export const proof = {
         assertEq(medicalExpenseFloor.citation.kind, 'code')
         assertEq(medicalExpenseFloor.citation.section, '§213(a)')
         assertEq(medicalExpenseFloor.citation.effectiveDate, '2025-01-01')
+    },
+    // TAX-12/13-RESEARCH.md Pitfall 5: the CTC amount ($2,200) is the ONLY
+    // figure in `childTaxCredit` — and the only new figure in this entire
+    // phase — Rev. Proc. 2025-32 actually backs.
+    childTaxCreditCtcAmountCitesRevProc202532Section203: () => {
+        const citation = assertRevProcCitation(childTaxCredit.ctcAmount.citation)
+        assertEq(citation.revProc, '2025-32')
+        assertEq(citation.section, '§2.03')
+        assertEq(citation.effectiveDate, '2025-01-01')
+        assertEq(childTaxCredit.ctcAmount.amount, '2200.00')
+    },
+    // The exact trap Pitfall 5 names, inverted: ODC/ACTC-cap/phase-out must
+    // NOT inherit the CTC's Rev. Proc. citation. Asserted per field
+    // (`kind`/`section`/`effectiveDate`) on every one of the four remaining
+    // stored amounts.
+    childTaxCreditOdcActcCapAndPhaseoutCiteIrc24hOnly: () => {
+        const entries = [
+            childTaxCredit.odcAmount,
+            childTaxCredit.actcCap,
+            childTaxCredit.phaseoutThreshold.marriedFilingJointly,
+            childTaxCredit.phaseoutThreshold.other,
+        ]
+        for (const entry of entries) {
+            assertEq(entry.citation.kind, 'code', ['expected the code citation kind, NOT revProc', entry])
+            assertEq(entry.citation.section, '§24(h)', ['expected IRC §24(h)', entry])
+            assertEq(entry.citation.effectiveDate, '2025-01-01', ['expected the TY2025 effective date', entry])
+        }
+        assertEq(childTaxCredit.odcAmount.amount, '500.00')
+        assertEq(childTaxCredit.actcCap.amount, '1700.00')
+        assertEq(childTaxCredit.phaseoutThreshold.marriedFilingJointly.amount, '400000.00')
+        assertEq(childTaxCredit.phaseoutThreshold.other.amount, '200000.00')
+        assertEq(childTaxCredit.phaseoutRatePercent, 5)
+    },
+    // The specific claim the acceptance criteria names: the CTC citation and
+    // ONLY the CTC citation among this group is `kind: 'revProc'` — asserted
+    // by counting, not by re-reading the two leaves above, so a future
+    // addition to this group that quietly defaults to `'revProc'` fails
+    // here even if it is never individually asserted against.
+    onlyCtcAmountIsRevProcSourcedAmongChildTaxCreditFigures: () => {
+        const allChildTaxCreditAmounts = [
+            childTaxCredit.ctcAmount,
+            childTaxCredit.odcAmount,
+            childTaxCredit.actcCap,
+            childTaxCredit.phaseoutThreshold.marriedFilingJointly,
+            childTaxCredit.phaseoutThreshold.other,
+        ]
+        const revProcSourced = allChildTaxCreditAmounts.filter(entry => entry.citation.kind === 'revProc')
+        assertEq(revProcSourced.length, 1, ['expected exactly one revProc-sourced figure', revProcSourced])
+        assertEq(revProcSourced[0], childTaxCredit.ctcAmount)
     },
 }
