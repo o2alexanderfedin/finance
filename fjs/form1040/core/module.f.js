@@ -2416,48 +2416,43 @@ export const proof = {
     },
     form1040Report: {
         // ROADMAP criterion 4, on the profile this phase was written for. The
-        // 65+ joint return with dependents declares two kinds this engine does
-        // not model, and the WHOLE report is an error naming both — not a 1040
-        // with two quiet zeros on it.
+        // 65+ joint return with dependents declared TWO kinds this engine did
+        // not model, and the WHOLE report was an error naming both — not a
+        // 1040 with two quiet zeros on it.
+        //
+        // **Rewritten in place by Plan 13-04** (Phase 13 Wave 2, TAX-09):
+        // `seniorAndOtherScheduleOneADeductions` moved to `fjs/return/scope`'s
+        // `modeledKinds` in this plan's own Task 2, so this profile's own
+        // premise — TWO unavoidable refusals — stopped being true the instant
+        // the kind was reclassified. The mechanical adaptation Plan 13-02's
+        // own `iraDistributionsAndPensionsAndAnnuitiesNowComputeThroughTheFullReport`
+        // leaf already narrates for an earlier reclassification, one plan
+        // over: renamed, and its assertions narrowed to the ONE kind that
+        // still refuses (`childTaxCreditOrOtherDependents`, Schedule 8812,
+        // TAX-12 — a later wave), rather than deleted.
         //
         // THE CONTROL for this leaf is
         // `controlTheSixtyFivePlusProfileWithoutThoseTwoKindsComputesLinesOneAToThirtySeven`
-        // immediately below: the same taxpayer with those two kinds removed
-        // computes end to end. Without it, a guard that refused every return
-        // would pass this leaf and every other refusal leaf in this file.
-        //
-        // The four message fragments are FOUR separate `includes` calls, never
-        // one combined match: a single match can hide two errors that cancel,
-        // and a failure here names which part went missing (AGENTS.md, and
-        // Phase 9's sweep, which found assertions checking THAT a refusal
-        // happened rather than what it said).
-        theSixtyFivePlusProfileRefusesTheWholeReportNamingBothUnmodeledKinds: () => {
+        // immediately below: the same taxpayer with both kinds removed still
+        // computes end to end — unaffected by this rename, since it never
+        // relied on `seniorAndOtherScheduleOneADeductions` refusing.
+        theSixtyFivePlusProfileNowRefusesNamingOnlyTheRemainingUnmodeledKind: () => {
             const outcome = form1040Report(taxParams2025)(
                 inputsOf(storedProfile(sixtyFivePlusProfile))([
                     w2Document('sha256-w2-01')('60000.00'),
                 ])([])([])([])([])([]))
             assert(
                 outcome.kind === 'error',
-                ['the 65+ declared profile must refuse the whole report', outcome],
+                ['the 65+ declared profile must still refuse -- Schedule 8812 remains unmodeled', outcome],
             )
-            assertEq(outcome.unmodeled.length, 2, ['expected BOTH unmodeled kinds', outcome.unmodeled])
+            assertEq(
+                outcome.unmodeled.length, 1,
+                ['expected exactly the one remaining unmodeled kind', outcome.unmodeled],
+            )
             assertEq(
                 outcome.unmodeled[0],
-                'seniorAndOtherScheduleOneADeductions',
-                ['expected line 13b\'s kind named first, in 1040 form order', outcome.unmodeled],
-            )
-            assertEq(
-                outcome.unmodeled[1],
                 'childTaxCreditOrOtherDependents',
-                ['expected line 19\'s kind named second', outcome.unmodeled],
-            )
-            assert(
-                outcome.message.includes('1040 line 13b'),
-                ['expected the refusal to name the senior deduction\'s line', outcome.message],
-            )
-            assert(
-                outcome.message.includes('Schedule 1-A'),
-                ['expected the refusal to name Schedule 1-A', outcome.message],
+                ['expected line 19\'s kind named', outcome.unmodeled],
             )
             assert(
                 outcome.message.includes('1040 line 19'),
@@ -2467,8 +2462,12 @@ export const proof = {
                 outcome.message.includes('Schedule 8812'),
                 ['expected the refusal to name Schedule 8812', outcome.message],
             )
+            assert(
+                !outcome.message.includes('1040 line 13b'),
+                ['the senior deduction must no longer be named -- it is a modeled kind now', outcome.message],
+            )
         },
-        // THE CONTROL for `theSixtyFivePlusProfileRefusesTheWholeReportNamingBothUnmodeledKinds`:
+        // THE CONTROL for `theSixtyFivePlusProfileNowRefusesNamingOnlyTheRemainingUnmodeledKind`:
         // the SAME taxpayer — both age boxes checked, both dependents declared
         // — with only the two unmodeled kinds removed from the declaration.
         // Lines 1a-37 compute end to end.
@@ -3155,29 +3154,33 @@ export const proof = {
                 'line14 automatically sums the new line13b value -- no further wiring needed',
             )
         },
-        // Still refuses at `classifyScope`, through the FULL
-        // `form1040Report(...)` entry point, before the wiring above is
-        // ever reached: `seniorAndOtherScheduleOneADeductions` stays in
-        // `unmodeledKindRefusals` until Task 2's own commit. Inert until
-        // then, per this task's own acceptance criteria.
-        declaringSeniorAndOtherScheduleOneADeductionsStillRefusesBeforeTask2Lands: () => {
+        // Task 2 has landed: `seniorAndOtherScheduleOneADeductions` is a
+        // MODELED kind now (`fjs/return/scope`'s `modeledKinds`), so
+        // `classifyScope` no longer refuses a return declaring it —
+        // rewritten IN PLACE from this task's own original "still refuses"
+        // assertion (the mechanical adaptation this file's own
+        // `retirementAndSocialSecurityBeforeTheScopeReclassificationLands`
+        // section, above, already narrates for the identical situation one
+        // reclassification earlier). Declaring it through the FULL
+        // `form1040Report(...)` entry point now computes a real,
+        // non-placeholder line13b — the property Task 3's own end-to-end
+        // proof (below) also covers at a different AGI, so this leaf keeps
+        // the narrower, faster check: the scope guard specifically stops
+        // refusing, at the exact fixture Task 1's own leaf above pinned.
+        declaringSeniorAndOtherScheduleOneADeductionsNowComputesThroughTheFullReport: () => {
+            const w2Form = w2Document('sha256-t4b-w2-80k')('80000.00')
             const outcome = form1040Report(taxParams2025)(inputsOf(storedProfile({
                 ...singleProfile,
                 taxpayerBornBeforeJan2_1961: true,
                 declaredKinds: ['wages', 'taxableInterest', 'seniorAndOtherScheduleOneADeductions'],
-            }))([])([])([])([])([])([]))
-            assert(
-                outcome.kind === 'error',
-                ['expected the kind to still refuse before Task 2\'s reclassification', outcome],
-            )
-            if (outcome.kind !== 'error') {
-                throw ['expected error', outcome]
+            }))([w2Form])([])([])([])([])([]))
+            assert(outcome.kind === 'ok', ['expected the kind to compute now', outcome])
+            if (outcome.kind !== 'ok') {
+                throw ['expected ok', outcome]
             }
-            assertEq(outcome.unmodeled.length, 1, ['expected exactly the one declared unmodeled kind', outcome.unmodeled])
-            assertEq(outcome.unmodeled[0], 'seniorAndOtherScheduleOneADeductions')
-            assert(
-                outcome.message.includes('1040 line 13b'),
-                ['expected the refusal to name the line', outcome.message],
+            assertEq(
+                lineRuled(outcome.lines)('1040 line 13b').value, 570000n,
+                '$5,700.00, Schedule 1-A\'s own $80,000 AGI fixture',
             )
         },
         // THE CONTROL for the leaf above: the same declaration minus the
