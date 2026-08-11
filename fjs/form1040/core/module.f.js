@@ -4186,4 +4186,181 @@ export const proof = {
             assertEq(line16, crossCheck, 'the wiring must feed the SAME facts an independent sdtw call would')
         },
     },
+    // Plan 13-12 Task 2 — the FIRST proof in this codebase combining every
+    // one of this phase's five slices in ONE computed return: retirement/
+    // Social Security income (Wave 1, TAX-10), the senior deduction
+    // (Wave 2, TAX-09), itemizing (Wave 3, TAX-13), dependents (Wave 4,
+    // TAX-12), and Schedule 1/2/3's own real per-line citations (this
+    // plan, TAX-14) — lines 1a-37, no refusal, through the FULL
+    // `form1040Report(...)` entry point. A regression in any ONE wave's
+    // wiring cannot hide behind another wave's correct output here:
+    // line6b, line13b, line12e and line19 are each asserted against a
+    // figure hand-computed INDEPENDENTLY of the other three, and each is
+    // separately cross-checked against a direct call to the sub-module
+    // that produced it.
+    wave5FullProfile: {
+        allFiveSlicesComposeInOneReturnComputingLinesOneAThroughThirtySevenWithNoRefusal: () => {
+            const w2Form = w2Document('sha256-w5-w2')('40000.00')
+            const iraForm = retirementDocument('sha256-w5-r-ira')({
+                box1GrossDistribution: '8000.00',
+                box2aTaxableAmount: '8000.00',
+                box7bIraSepSimple: true,
+            })
+            const ssaForm = socialSecurityDocument('sha256-w5-ssa')('30000.00')
+            const itemizedForm = itemizedDeductionsDocument('sha256-w5-itemized')([
+                { lineTag: 'saltIncomeTax', amount: '8000.00' },
+                { lineTag: 'mortgageInterest1098', amount: '9000.00' },
+                { lineTag: 'charitableCash', amount: '3000.00' },
+            ])
+            /** @type {ReturnProfile} */
+            const profile = {
+                ...singleProfile,
+                taxpayerBornBeforeJan2_1961: true,
+                dependentCount: 1,
+                dependents: [
+                    { relationship: 'daughter', ssnValidForEmployment: true, ageAtYearEnd: 10, livedWithTaxpayer: true },
+                ],
+                declaredKinds: [
+                    'wages', 'taxableInterest', 'socialSecurityBenefits', 'iraDistributions',
+                    'pensionsAndAnnuities', 'federalTaxWithheldOnOther1099',
+                    'seniorAndOtherScheduleOneADeductions', 'itemizedDeductions',
+                    'childTaxCreditOrOtherDependents', 'additionalChildTaxCredit',
+                ],
+            }
+            const inputs = inputsOf(storedProfile(profile))([w2Form])([])([])([])(
+                [iraForm])([ssaForm])([itemizedForm])([])
+            const outcome = form1040Report(taxParams2025)(inputs)
+            assert(outcome.kind === 'ok', ['expected all five slices to compose without refusal', outcome])
+            if (outcome.kind !== 'ok') {
+                throw ['expected ok', outcome]
+            }
+
+            // Slice 1 (Wave 1, TAX-10) — 1z ($40,000.00 wages) + 4b
+            // ($8,000.00 taxable IRA distribution) feed the SSB
+            // worksheet's own arithmetic: line1=$30,000.00,
+            // line2=$15,000.00 (50%), line3=$48,000.00 (1z+4b),
+            // line5=$63,000.00, line7=$63,000.00 (no Schedule 1
+            // adjustments), line9=$38,000.00 (>$25,000.00 single base),
+            // line11=$29,000.00 (>$9,000.00 second threshold — the 85%
+            // tier), line12=$9,000.00, line13=$4,500.00, line14=$4,500.00
+            // (smaller of line2/line13), line15=$24,650.00 (85% of
+            // line11), line16=$29,150.00, line17=$25,500.00 (85% of
+            // line1), line18=$25,500.00 (smaller of line16/line17) ->
+            // 1040 line 6b.
+            const line6b = lineRuled(outcome.lines)('1040 line 6b')
+            assertEq(line6b.value, 2550000n, '$25,500.00, hand-computed from the worksheet\'s own arithmetic')
+            assert(line6b.value > 0n, ['expected a real, non-zero taxable Social Security amount', line6b.value])
+            const ssbCrossCheck = socialSecurityBenefitsWorksheet(taxParams2025)({
+                status: 'single',
+                mfsLivedWithSpouseAtAnyTimeInYear: false,
+                totalSsaAndRrbBox5Cents: 3000000n,
+                otherIncomeLine3Cents: 4800000n,
+                taxExemptInterestCents: 0n,
+                scheduleOneAdjustmentsTotalCents: 0n,
+            }).line18
+            assertEq(ssbCrossCheck, 2550000n, 'independent socialSecurityBenefitsWorksheet(...) call must reach the SAME figure')
+            assertEq(line6b.value, ssbCrossCheck, 'the wiring must feed the SAME facts an independent worksheet call would')
+
+            // AGI (1040 line 11b) = 1z ($40,000.00) + 4b ($8,000.00) + 6b
+            // ($25,500.00) = $73,500.00 — no Schedule 1 adjustments (line
+            // 10 stays $0.00, Slice 5's own boundary).
+            const line11b = lineRuled(outcome.lines)('1040 line 11b').value
+            assertEq(line11b, 7350000n, '$73,500.00 AGI, hand-computed')
+
+            // Slice 2 (Wave 2, TAX-09) — $73,500.00 AGI is BELOW the
+            // $75,000.00 single phase-out threshold, so the senior
+            // deduction is the FULL, unreduced base amount: $6,000.00
+            // (one qualifying person, age box checked, a valid SSN
+            // assumed for a declared filer per this file's own established
+            // convention).
+            const line13b = lineRuled(outcome.lines)('1040 line 13b')
+            assertEq(
+                line13b.value, 600000n,
+                '$6,000.00, the full unreduced base amount — $73,500.00 AGI is under the $75,000.00 threshold',
+            )
+            assert(line13b.value > 0n, ['expected a real, non-zero senior deduction', line13b.value])
+            const scheduleOneACrossCheck = scheduleOneA(taxParams2025)({
+                status: 'single',
+                agiCents: 7350000n,
+                taxpayerHasValidSsnAndBornBefore1961Jan2: true,
+                spouseHasValidSsnAndBornBefore1961Jan2: false,
+                profile: storedProfile(profile),
+            }).partVI.line38
+            assertEq(scheduleOneACrossCheck, 600000n, 'independent scheduleOneA(...) call must reach the SAME figure')
+            assertEq(line13b.value, scheduleOneACrossCheck, 'the wiring must feed the SAME facts an independent scheduleOneA call would')
+
+            // Slice 3 (Wave 3, TAX-13) — $8,000.00 SALT + $9,000.00
+            // mortgage interest + $3,000.00 cash charity = $20,000.00
+            // itemized total, ABOVE this filer's own $17,750.00 standard
+            // deduction (single, one age box, the $2,000.00 unmarried
+            // increment) — itemizing wins.
+            const line12e = lineRuled(outcome.lines)('1040 line 12e')
+            assertEq(line12e.value, 2000000n, '$20,000.00 itemized total, exceeding the $17,750.00 standard deduction')
+            assert(line12e.value > 0n, ['expected a real, non-zero line 12e', line12e.value])
+            const scheduleACrossCheck = scheduleA(taxParams2025)({
+                status: 'single',
+                agiCents: 7350000n,
+                itemizedEntries: [
+                    { documentHash: 'sha256-w5-itemized', value: { lineTag: 'saltIncomeTax', provider: 'Some Provider', amount: '8000.00' } },
+                    { documentHash: 'sha256-w5-itemized', value: { lineTag: 'mortgageInterest1098', provider: 'Some Provider', amount: '9000.00' } },
+                    { documentHash: 'sha256-w5-itemized', value: { lineTag: 'charitableCash', provider: 'Some Provider', amount: '3000.00' } },
+                ],
+                medicalExpenseEntries: [],
+                profile: storedProfile(profile),
+            }).line17
+            assertEq(scheduleACrossCheck, 2000000n, 'independent scheduleA(...) call must reach the SAME grand total')
+
+            // line15 (taxable income) = line11b - line14; line14 =
+            // line12e ($20,000.00) + line13a ($0.00, no QBI) + line13b
+            // ($6,000.00) = $26,000.00; line15 = $73,500.00 - $26,000.00
+            // = $47,500.00.
+            const line15 = lineRuled(outcome.lines)('1040 line 15').value
+            assertEq(line15, 4750000n, '$47,500.00 taxable income')
+
+            // Slice 4 (Wave 4, TAX-12) — ONE qualifying child (age 10,
+            // valid SSN), $2,200.00 base CTC, well under the $200,000.00
+            // single phase-out and well under this return's own
+            // $5,465.00 tax liability (line18), so line19 is the FULL,
+            // UNCAPPED $2,200.00.
+            const line18 = lineRuled(outcome.lines)('1040 line 18').value
+            const line19 = lineRuled(outcome.lines)('1040 line 19')
+            assertEq(line19.value, 220000n, '$2,200.00 — the full, uncapped CTC for one qualifying child')
+            assert(line19.value > 0n, ['expected a real, non-zero line 19', line19.value])
+            const form8812CrossCheck = form8812(taxParams2025)({
+                status: 'single',
+                agiCents: 7350000n,
+                dependents: [
+                    { relationship: 'daughter', ssnValidForEmployment: true, ageAtYearEnd: 10, livedWithTaxpayer: true },
+                ],
+                line18Cents: line18,
+                earnedIncomeCents: 0n,
+                nontaxableCombatPayCents: 0n,
+            })
+            assert(form8812CrossCheck.kind === 'ok', ['expected the cross-check to compute', form8812CrossCheck])
+            if (form8812CrossCheck.kind === 'ok') {
+                assertEq(form8812CrossCheck.line14, line19.value, 'independent form8812(...) call must reach the SAME line19 figure')
+            }
+
+            // Slice 5 (this plan, TAX-14) — Schedule 1/2/3 all stay at
+            // $0.00 for this profile (their five coarse kinds all remain
+            // unmodeled-refused per this plan's own scope), but
+            // line8/10/17/20/23/31 now cite the real schedule modules
+            // rather than an opaque inline zero (Task 1's own citation-
+            // granularity improvement, exercised end to end here).
+            assertEq(lineRuled(outcome.lines)('1040 line 8').value, 0n, 'Schedule 1 Part I stays $0.00 — the coarse kind stays refused')
+            assertEq(lineRuled(outcome.lines)('1040 line 10').value, 0n, 'Schedule 1 Part II stays $0.00 — the coarse kind stays refused')
+            assertEq(lineRuled(outcome.lines)('1040 line 17').value, 0n, 'Schedule 2 Part I stays $0.00 — the coarse kind stays refused')
+            assertEq(lineRuled(outcome.lines)('1040 line 20').value, 0n, 'Schedule 3 Part I stays $0.00 — the coarse kind stays refused')
+            assertEq(lineRuled(outcome.lines)('1040 line 23').value, 0n, 'Schedule 2 Part II stays $0.00 — the coarse kind stays refused')
+            assertEq(lineRuled(outcome.lines)('1040 line 31').value, 0n, 'Schedule 3 Part II stays $0.00 — the coarse kind stays refused')
+
+            // Independent cross-check of the tax liability itself: the
+            // SAME taxable income fed straight to `baseTaxForAmount(...)`
+            // (never to `dispatchLine16`) must reach the identical cents
+            // used above as line18's own input.
+            const taxCrossCheck = baseTaxForAmount(taxParams2025)('single')(4750000n)
+            assertEq(taxCrossCheck.cents, 546500n, 'independent baseTaxForAmount(...) call must reach the SAME $5,465.00 tax')
+            assertEq(line18, 546500n, '$5,465.00 — line16 (tax) + line17 (Schedule 2 Part I, $0.00)')
+        },
+    },
 }
