@@ -65,6 +65,8 @@ import { classifyScope } from '../../return/scope/module.f.js'
 import { standardDeductionCents } from '../../tax/deduction/module.f.js'
 import { individualFilingStatuses, taxParamsByYear } from '../../tax/params/module.f.js'
 import { scheduleD } from '../../schedule/d/module.f.js'
+import { scheduleOneA } from '../../schedule/1a/module.f.js'
+import { baseTaxForAmount } from '../../tax/table/module.f.js'
 
 /** @import { ReportLine, Source } from '../../report/line/module.f.js' */
 /** @import { W2 } from '../../document/w2/module.f.js' */
@@ -684,14 +686,39 @@ export const form1040IncomeLines = taxParamSet => inputs => {
         rule: '1040 line 12e',
     }
     const line13a = declaredZero('1040 line 13a') // QBI deduction, Form 8995
-    // 13b — additional deductions from Schedule 1-A. For a profile that
-    // declares `seniorAndOtherScheduleOneADeductions`, this line is NOT
-    // legitimately zero: the OBBBA enhanced deduction for seniors is
-    // MANDATORY, not elective, so a zero here would understate the deduction
-    // and overstate the tax. That is exactly why the kind is unmodeled in
-    // `fjs/return/scope` and refuses the WHOLE report. Within scope the kind
-    // is undeclared, and only then is the zero honest.
-    const line13b = declaredZero('1040 line 13b')
+    // 13b — additional deductions from Schedule 1-A (Plan 13-03/13-04,
+    // TAX-09): the senior deduction's continuous 6% phase-out, Parts I/V/VI.
+    // Read UNCONDITIONALLY, exactly like lines 3a/3b/4a-6b above — a MODELED
+    // line reports what the facts say; `declaredKinds` gates the WHOLE-
+    // RETURN refusal for `seniorAndOtherScheduleOneADeductions`
+    // (`fjs/return/scope`), never this individual line. For a profile that
+    // declares the kind while it is still unmodeled, this wiring is
+    // UNREACHABLE: `form1040Report`'s own `classifyScope` call refuses the
+    // whole return before `form1040IncomeLines` (this function) ever runs —
+    // this line only computes for a return already in scope, at which point
+    // the zero it would otherwise be is instead the real Schedule 1-A
+    // figure.
+    //
+    // `taxpayerHasValidSsnAndBornBefore1961Jan2`/`spouseHasValidSsnAnd...`
+    // are NOT yet profile fields of their own — derived from the EXISTING
+    // age boxes (`taxpayerBornBeforeJan2_1961`/`spouseBornBeforeJan2_1961`,
+    // already on the profile and already read by line 12e above), with a
+    // valid SSN ASSUMED TRUE for a declared filer: no SSN-validity field
+    // exists yet for the primary taxpayer/spouse themselves (Schedule
+    // 8812's `dependents` array is the first place SSN validity becomes a
+    // per-person fact, a later wave).
+    const scheduleOneAResult = scheduleOneA(taxParamSet)({
+        status,
+        agiCents: line11b.value,
+        taxpayerHasValidSsnAndBornBefore1961Jan2: profile.value.taxpayerBornBeforeJan2_1961 === true,
+        spouseHasValidSsnAndBornBefore1961Jan2: profile.value.spouseBornBeforeJan2_1961 === true,
+        profile,
+    })
+    const line13b = {
+        value: scheduleOneAResult.partVI.line38,
+        sources: unionSources([line11b]),
+        rule: '1040 line 13b',
+    }
     const line14 = totalLine('1040 line 14')([line12e, line13a, line13b])
 
     // 15 — taxable income. The printed form says "If zero or less, enter -0-",
@@ -2446,10 +2473,26 @@ export const proof = {
         // — with only the two unmodeled kinds removed from the declaration.
         // Lines 1a-37 compute end to end.
         //
-        // $60,000.00 of wages less the two-box joint standard deduction
-        // ($31,500 + 2 x $1,600 = $34,700) is $25,300.00 of taxable income,
-        // which is the IRS's own printed Tax Table Example again: $2,562.00.
-        // Every figure hand-typed.
+        // **Re-derived by Plan 13-04** (Phase 13 Wave 2, TAX-09): this
+        // fixture's expected figures pre-date Schedule 1-A's wiring, when
+        // line 13b was still an inert `declaredZero`. Line 13b now reads
+        // Schedule 1-A UNCONDITIONALLY off the profile's own age boxes —
+        // exactly like lines 3a/3b/4a-6b already do off documents — and
+        // this profile has BOTH taxpayer and spouse age boxes checked
+        // (`taxpayerBornBeforeJan2_1961`/`spouseBornBeforeJan2_1961`), so it
+        // now legitimately receives the FULL $12,000.00 combined senior
+        // deduction (line36a $6,000.00 + line36b $6,000.00, since
+        // $60,000.00 AGI is well under the $150,000.00 MFJ phase-out start
+        // — Schedule 1-A's own `mfjBothSpousesQualifyingGetsDoubleTheSamePhaseOutAmount`
+        // fixture, `fjs/schedule/1a`, is this exact shape). The old
+        // "$25,300.00 taxable income, the IRS's own printed Tax Table
+        // Example" narrative no longer holds for THIS profile — it held
+        // only while line 13b was a placeholder zero — so every figure
+        // below is RE-HAND-COMPUTED: $34,700.00 standard deduction (12e) +
+        // $12,000.00 senior deduction (13b) = $46,700.00 (14); $60,000.00 -
+        // $46,700.00 = $13,300.00 taxable income (15); Tax Table on
+        // $13,300.00 MFJ = $1,333.00 (16/37) — independently cross-checked
+        // below via a direct `baseTaxForAmount(...)` call, never assumed.
         controlTheSixtyFivePlusProfileWithoutThoseTwoKindsComputesLinesOneAToThirtySeven: () => {
             const inputs = inputsOf(storedProfile(sixtyFivePlusProfileWithinScope))([
                 w2Document('sha256-w2-01')('60000.00'),
@@ -2463,9 +2506,21 @@ export const proof = {
             )
             assertEq(outcome.line16Method, 'taxTable')
             assertEq(lineRuled(outcome.lines)('1040 line 12e').value, 3470000n, 'two age boxes, $34,700.00')
-            assertEq(lineRuled(outcome.lines)('1040 line 15').value, 2530000n, 'taxable income of $25,300.00')
-            assertEq(lineRuled(outcome.lines)('1040 line 16').value, 256200n, 'the printed example, $2,562.00')
-            assertEq(lineRuled(outcome.lines)('1040 line 37').value, 256200n, 'and all of it is owed')
+            assertEq(
+                lineRuled(outcome.lines)('1040 line 13b').value, 1200000n,
+                '$12,000.00 -- BOTH spouses 65+, well under the $150,000 MFJ phase-out start',
+            )
+            assertEq(lineRuled(outcome.lines)('1040 line 14').value, 4670000n, '$34,700.00 + $12,000.00')
+            assertEq(lineRuled(outcome.lines)('1040 line 15').value, 1330000n, 'taxable income of $13,300.00')
+            assertEq(lineRuled(outcome.lines)('1040 line 16').value, 133300n, 'Tax Table on $13,300.00 MFJ')
+            assertEq(lineRuled(outcome.lines)('1040 line 37').value, 133300n, 'and all of it is owed')
+            // Cross-checked a SECOND way, independent of `form1040Report`'s
+            // own line-16 dispatch: the SAME taxable income fed straight to
+            // `baseTaxForAmount(...)` (never to `dispatchLine16`) must reach
+            // the identical cents.
+            const crossCheck = baseTaxForAmount(taxParams2025)('marriedFilingJointly')(1330000n)
+            assertEq(crossCheck.method, 'taxTable')
+            assertEq(crossCheck.cents, 133300n, 'independent baseTaxForAmount(...) call must reach the SAME figure')
             // Line 15 is unchanged from what the income lines alone produce:
             // the guard decides WHETHER a return is computed, never WHAT it
             // computes.
@@ -3066,6 +3121,73 @@ export const proof = {
             assertEq(lineRuled(outcome.lines)('1040 line 4b').value, 400000n, '$4,000.00 IRA taxable amount')
             assertEq(lineRuled(outcome.lines)('1040 line 5a').value, 300000n, '$3,000.00 pension gross distribution')
             assertEq(lineRuled(outcome.lines)('1040 line 5b').value, 300000n, '$3,000.00 pension taxable amount')
+        },
+    },
+    // Plan 13-04 Task 1 — Slice 2's own wiring, before the scope
+    // reclassification lands: line13b reads Schedule 1-A's real Part VI
+    // total UNCONDITIONALLY off the profile's own age boxes, exactly like
+    // lines 3a/3b and the retirement lines above already established, even
+    // though `seniorAndOtherScheduleOneADeductions` is still in
+    // `unmodeledKindRefusals` — proving the wiring itself is correct and
+    // independent of the declaration.
+    seniorDeductionBeforeTheScopeReclassificationLands: {
+        // AGI = $80,000.00 exactly (wages alone, no other income) —
+        // Schedule 1-A's OWN `continuousPhaseoutSingleEightyThousandMagi`
+        // fixture (`fjs/schedule/1a`) computed line37/line38 = $5,700.00
+        // from this same AGI; this leaf re-derives it through the FULL 1040
+        // wiring, calling `form1040IncomeLines` DIRECTLY (bypassing
+        // `classifyScope`, since the kind is not declared here at all).
+        sixtyFivePlusSingleFilerComputesRealLine13bFromScheduleOneA: () => {
+            const w2Form = w2Document('sha256-t4-w2-80k')('80000.00')
+            /** @type {ReturnProfile} */
+            const profile = { ...singleProfile, taxpayerBornBeforeJan2_1961: true }
+            const lines = expectIncomeOk(form1040IncomeLines(taxParams2025)(
+                inputsOf(storedProfile(profile))([w2Form])([])([])([])([])([])))
+            assertEq(lines.line11b.value, 8000000n, '$80,000.00 AGI -- wages alone')
+            assertEq(lines.line13b.value, 570000n, '$5,700.00, Schedule 1-A\'s own $80,000 AGI fixture')
+            assertEq(
+                lines.line13b.sources.length, lines.line11b.sources.length,
+                'cites the SAME sources as line11b (AGI) -- the only fact Schedule 1-A\'s wiring reads',
+            )
+            assertEq(
+                lines.line14.value,
+                lines.line12e.value + lines.line13a.value + lines.line13b.value,
+                'line14 automatically sums the new line13b value -- no further wiring needed',
+            )
+        },
+        // Still refuses at `classifyScope`, through the FULL
+        // `form1040Report(...)` entry point, before the wiring above is
+        // ever reached: `seniorAndOtherScheduleOneADeductions` stays in
+        // `unmodeledKindRefusals` until Task 2's own commit. Inert until
+        // then, per this task's own acceptance criteria.
+        declaringSeniorAndOtherScheduleOneADeductionsStillRefusesBeforeTask2Lands: () => {
+            const outcome = form1040Report(taxParams2025)(inputsOf(storedProfile({
+                ...singleProfile,
+                taxpayerBornBeforeJan2_1961: true,
+                declaredKinds: ['wages', 'taxableInterest', 'seniorAndOtherScheduleOneADeductions'],
+            }))([])([])([])([])([])([]))
+            assert(
+                outcome.kind === 'error',
+                ['expected the kind to still refuse before Task 2\'s reclassification', outcome],
+            )
+            if (outcome.kind !== 'error') {
+                throw ['expected error', outcome]
+            }
+            assertEq(outcome.unmodeled.length, 1, ['expected exactly the one declared unmodeled kind', outcome.unmodeled])
+            assertEq(outcome.unmodeled[0], 'seniorAndOtherScheduleOneADeductions')
+            assert(
+                outcome.message.includes('1040 line 13b'),
+                ['expected the refusal to name the line', outcome.message],
+            )
+        },
+        // THE CONTROL for the leaf above: the same declaration minus the
+        // still-unmodeled kind computes end to end.
+        controlTheSameDeclarationWithoutSeniorAndOtherScheduleOneADeductionsComputes: () => {
+            const outcome = form1040Report(taxParams2025)(inputsOf(storedProfile({
+                ...singleProfile,
+                taxpayerBornBeforeJan2_1961: true,
+            }))([])([])([])([])([])([]))
+            assertEq(outcome.kind, 'ok', ['dropping the unmodeled kind must compute', outcome])
         },
     },
     // Plan 13-02 Task 3 — Slice 1's own vertical cut, end to end: a real
