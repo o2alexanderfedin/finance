@@ -518,7 +518,32 @@ Plans:
   4. Schedule 8812 computes for the declared dependents, and Schedules 1, 2, and 3 carry every line the profile actually reaches.
   5. `grep -rn "magi" fjs/` returns nothing — each rule's MAGI is a separately named function stating its own add-back list, because the IRA deduction, Roth eligibility, the Premium Tax Credit, IRMAA, and the student-loan-interest deduction do not share one.
 **Research**: **YES** — MAGI add-back lists per rule, phase-out cliff mechanics, and Schedule 1-A limitation mechanics.
-**Plans**: TBD
+**Plans**: 13 plans in 5 waves (one wave per vertical slice, CONTEXT.md Decision 6.1 — supersedes the original three-wave shape)
+
+**Wave 1** (TAX-10 — retirement and Social Security income)
+- [ ] 13-01-PLAN.md — Citation discriminated union, SSB base-amount parameters, the 18-line Social Security Benefits Worksheet
+- [ ] 13-02-PLAN.md — 1099-R/SSA-1099 wiring into 1040 lines 4a-6b/25b, the iraDeductionDeclared refusal, four-kind reclassification, end-to-end proof *(needs 13-01)*
+
+**Wave 2** (TAX-09 — the senior deduction)
+- [ ] 13-03-PLAN.md — Senior deduction parameters, Schedule 1-A Parts I/V/VI *(needs 13-02)*
+- [ ] 13-04-PLAN.md — Wire 1040 line 13b, reclassify seniorAndOtherScheduleOneADeductions, end-to-end proof *(needs 13-03)*
+
+**Wave 3** (TAX-13 — itemizing)
+- [ ] 13-05-PLAN.md — vnd.fjs.itemized_deductions dialect, SALT cap/medical floor parameters, Schedule A line 18 election *(needs 13-04)*
+- [ ] 13-06-PLAN.md — Schedule A (all 18 lines), the withholding-drift proof, w2/1099r docstring amendments *(needs 13-05)*
+- [ ] 13-07-PLAN.md — deductionChoice, wire 1040 line 12e, reclassify itemizedDeductions, end-to-end proof both directions *(needs 13-06)*
+
+**Wave 4** (TAX-12 — dependents and Schedule 8812)
+- [ ] 13-08-PLAN.md — return_profile dependents array, CTC/ODC/ACTC/phase-out parameters *(needs 13-07)*
+- [ ] 13-09-PLAN.md — Schedule 8812 Parts I/II-A, roundUpToNextThousandDollars, dependent classification *(needs 13-08)*
+- [ ] 13-10-PLAN.md — Wire 1040 lines 19/28, reclassify childTaxCreditOrOtherDependents/additionalChildTaxCredit, end-to-end proof *(needs 13-09)*
+
+**Wave 5** (TAX-14 — remaining schedules and the sweep)
+- [ ] 13-11-PLAN.md — Schedules 1/2/3 as standalone, printed-line-complete, documented-zero modules *(needs 13-10)*
+- [ ] 13-12-PLAN.md — Wire 1040 lines 8/10/17/20/23/31, the first full-profile end-to-end proof combining all five slices *(needs 13-11)*
+- [ ] 13-13-PLAN.md — The mechanical MAGI gate, ten corrected remedy strings, the 18-line REQUIREMENTS.md/ROADMAP.md correction *(needs 13-12)*
+
+**A finding from planning, worth the phase owner's attention**: `scheduleOneAdditionalIncome`, `scheduleOneAdjustments`, `scheduleTwoTaxes`, `scheduleThreeNonrefundableCredits` and `scheduleThreeRefundableCredits` are NOT reclassified to `modeledKinds` in this plan set, unlike CONTEXT.md Decision 6.1's table implies. 13-RESEARCH.md's own Open Questions 1 and 2 found that each is one coarse kind covering many distinct Schedule 1/2/3 line items with no per-line dialect to attribute a real dollar figure to — reclassifying them while the module can only ever return `$0` would be a confident zero replacing an honest refusal, exactly TAX-16's failure mode. Research's own recommendation ("No action needed for Phase 13's target profile") is followed. Final `modeledKinds`/`unmodeledKindRefusals` split after this phase: 20/30 (not the 25/25 a literal reading of the table would suggest).
 
 **── Milestone: Week 4 — The Full Path Works on the User's Own Documents ──**
 
