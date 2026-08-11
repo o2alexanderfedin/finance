@@ -36,7 +36,10 @@ const offered = [
     'scheduleOneAdditionalIncome',
     'qualifiedBusinessIncomeDeduction',
     'additionalChildTaxCredit',
-    'itemizedDeductions',
+    // `itemizedDeductions` moved to `modeledKinds` in Plan 13-07 (Phase 13
+    // Wave 3, TAX-13) — swapped for `netQualifiedDisasterLoss`, its former
+    // neighbor in the refusal table, which stays refused per Decision 1.4.
+    'netQualifiedDisasterLoss',
     'childTaxCreditOrOtherDependents',
 ]
 
