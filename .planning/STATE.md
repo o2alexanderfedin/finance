@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
 status: executing
-stopped_at: Completed 13-07-PLAN.md
-last_updated: "2026-08-11T04:54:44.639Z"
+stopped_at: Completed 13-08-PLAN.md
+last_updated: "2026-08-11T05:10:48.759Z"
 last_activity: 2026-08-11
 progress:
   total_phases: 19
   completed_phases: 13
   total_plans: 75
-  completed_plans: 72
-  percent: 96
+  completed_plans: 73
+  percent: 97
 ---
 
 # Project State
@@ -30,7 +30,7 @@ Phase: 13 (The 65+ Profile and the Remaining Schedules) — EXECUTING
   Four plans across three waves. The plan set was returned ISSUES FOUND by
   `gsd-plan-checker` twice (2 blockers, then 2 more), revised each time, and only
   executed after a third pass returned VERIFICATION PASSED.
-Plan: 8 of 13
+Plan: 9 of 13
   Wave 1: 12.1-01 (Form 8949 category derivation + the absent-basis refusal) and
   12.1-02 (the 47-line Schedule D Tax Worksheet). Wave 2: 12.1-03 (Schedule D
   lines 1a-21, the loss-cap three-way branch, two bounded sub-worksheets).
@@ -41,7 +41,7 @@ Status: Ready to execute
   stopped after the final wave, so the phase has never been independently verified
   against its goal. That is the next action.
 
-Progress: [██████████] 96%
+Progress: [██████████] 97%
   Phase-based, never plan-based: `completed_plans` (65) exceeds `total_plans` (62)
   because three phases carry an extra FIX-SUMMARY.md beside a plan's own summary,
   which rounds the plan-based figure to a misleading 100%. See `percent_note`.
@@ -144,6 +144,7 @@ proofs and moves with submodule initialization state — which is exactly how a 
 | Phase 13 P05 | 25min | 2 tasks | 3 files |
 | Phase 13 P06 | 35min | 2 tasks | 4 files |
 | Phase 13 P07 | 70min | 3 tasks | 6 files |
+| Phase 13 P08 | 30min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -327,6 +328,9 @@ Full log in PROJECT.md Key Decisions. Recent decisions affecting current work:
 - [Phase 13]: Decision 2.2's withholding-drift proof gates on presence of a saltIncomeTax-tagged entry, never a separate election flag (13-06)
 - [Phase 13]: deductionChoice lives in fjs/tax/deduction beside standardDeductionCents, comparing against Schedule A's already-computed total; the comparison is a strict > with the line 18 election overriding outright
 - [Phase 13]: itemizedDeductions reclassified to modeledKinds in kindVocabulary order (before seniorAndOtherScheduleOneADeductions); netQualifiedDisasterLoss stays refused per Decision 1.4 -- TAX-13 closed
+- [Phase 13]: 13-08: dependentEntrySchema's boolean-shaped facts (ssnValidForEmployment, livedWithTaxpayer) use option(true), extending DOC-12's checkbox convention to a taxpayer-asserted credit-eligibility fact rather than a printed checkbox
+- [Phase 13]: 13-08: citizenship/resident-alien status is deliberately NOT a fifth dependents field (Decision 5.7) -- documented as an accepted trust boundary in the profile module's own docstring, mirroring fjs/schedule/b's Form 8815 boundary
+- [Phase 13]: 13-08: childTaxCredit.odcAmount/actcCap/phaseoutThreshold all cite kind:'code' section §24(h), never kind:'revProc' -- Rev. Proc. 2025-32 backs only the CTC figure among this phase's new numbers (Pitfall 5); first fjs/tax/params group with mixed citation kinds among sibling figures
 
 ### Pending Todos
 
@@ -471,8 +475,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-08-11T04:54:44.631Z
-Stopped at: Completed 13-07-PLAN.md
+Last session: 2026-08-11T05:10:48.751Z
+Stopped at: Completed 13-08-PLAN.md
 Nothing is mid-edit. Next: Plan 13-08 (Wave 4 -- Slice 4, dependents: return_profile
 dependents array, CTC/ODC/ACTC/phase-out parameters).
 
