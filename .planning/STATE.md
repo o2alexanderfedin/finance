@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
-status: verifying
-stopped_at: "Phase 12.1 (The Capital-Gain Chain) COMPLETE — 4/4 plans; a brokerage sale flows 1099-B -> Form 8949 -> Schedule D -> the Schedule D Tax Worksheet -> Form 1040 line 16. TAX-11/TAX-15 marked complete. 663 project-local proofs, tsc clean. Branch feature/phase-12.1-capital-gain-chain is 22 commits ahead of origin/main and UNPUSHED. Audit F-01 closed against the real 2025 Form 1040 PDF; F-02 closable the same way; F-03 needs a real filed return. Phase 12.1 has NO VERIFICATION.md yet."
-last_updated: "2026-08-09T19:14:05.778Z"
-last_activity: 2026-08-09
+status: executing
+stopped_at: **Phase 12.1 (The Capital-Gain Chain) COMPLETE — 4/4 plans, 4/4 summaries.** A
+last_updated: "2026-08-11T01:20:21.275Z"
+last_activity: 2026-08-11 -- Phase 13 planning complete
 progress:
   total_phases: 19
   completed_phases: 13
-  total_plans: 62
+  total_plans: 75
   completed_plans: 65
-  percent: 68
+  percent: 87
 ---
 
 # Project State
@@ -36,7 +36,7 @@ Plan: 4 of 4 — all summaries written
   lines 1a-21, the loss-cap three-way branch, two bounded sub-worksheets).
   Wave 3: 12.1-04 (Form 1040 wiring FIRST, then the six-kind scope
   reclassification — the atomic transition — then mutation gates M3/M4/M5).
-Status: Implemented and self-verified by its own plans; **no `12.1-VERIFICATION.md`
+Status: Ready to execute
   exists**. Every phase 01-12 has one. Execute-phase ran with `--no-transition` and
   stopped after the final wave, so the phase has never been independently verified
   against its goal. That is the next action.
@@ -45,7 +45,7 @@ Progress: [███████░░░] 68%  (13 of 19 phases)
   Phase-based, never plan-based: `completed_plans` (65) exceeds `total_plans` (62)
   because three phases carry an extra FIX-SUMMARY.md beside a plan's own summary,
   which rounds the plan-based figure to a misleading 100%. See `percent_note`.
-Last activity: 2026-08-09
+Last activity: 2026-08-11 -- Phase 13 planning complete
 
 > **This block carried Phase 10's text under a 12.1 heading until 2026-08-09** — "Ten plans
 > across six waves", `10-03 Tax Computation Worksheet`, "Phase 11 not started" — while
@@ -465,10 +465,12 @@ Measure the suite rather than quoting it — see "Test metrics" above. Measured 
 UNPUSHED.** No PR opened yet. `main` and `develop` are both still at `555f11c`.
 
 Also landed this session, outside the phase:
+
 - **`REQUIREMENTS.md` coverage table reconciled** — 28 rows said `Pending` for requirements whose
   checkbox already said `[x]`, drift reaching back to Phase 3. Now 72 complete / 21 pending / 93
   total, and the header's stale "79 requirements" corrected to 93. Phase 17 owns turning the
   recompute command into an actual gate.
+
 - **Audit finding F-01 closed** — the 2025 Form 1040 face was fetched and its 56 printed money
   lines enumerated against `orderedLines`: exact match. This item had been `human_needed` since
   Phase 10 on the grounds that "the verifier has no access to the IRS PDF", which is no longer
