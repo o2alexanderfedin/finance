@@ -274,28 +274,52 @@ const modeledKindNames = modeledKinds
  * that is load-bearing rather than tidy: {@link scopeRefusal} walks this table
  * to order what it names, so `refusalTableFollowsKindVocabularyOrder` pins it.
  */
+// ── Wave 5's ten corrections (Plan 13-13, Decision 1.4 + 13-11's finding) ────
+//
+// Ten entries below name a phase in their remedy that has now shipped
+// WITHOUT making the kind computable -- a remedy naming a phase that
+// shipped without it is a FALSE remedy, worse than a vague one, because a
+// taxpayer reading it believes the gap will close on its own. Two different
+// reasons produced the ten, and they read differently on purpose:
+//
+// - Decision 1.4's five (`householdEmployeeWages`, `medicaidWaiverPayments`,
+//   `otherEarnedIncome`, `federalTaxWithheldOnOtherForms`,
+//   `netQualifiedDisasterLoss`) were simply never going to be reached this
+//   phase -- Phase 13's own wave plan never touched them. Their remedy now
+//   reads `(no phase yet)`, the same phrasing every other not-yet-scheduled
+//   kind in this table already uses (see `dependentCareBenefits`,
+//   `adoptionBenefits`, etc., immediately above), so a reader cannot tell
+//   these five apart from any other ordinary backlog item.
+// - The other five (`scheduleOneAdditionalIncome`, `scheduleOneAdjustments`,
+//   `scheduleTwoTaxes`, `scheduleThreeNonrefundableCredits`,
+//   `scheduleThreeRefundableCredits`) ARE reached: Schedule 1/2/3 modules
+//   exist and are wired (Plans 13-11/13-12, TAX-14). They remain refused
+//   anyway, because the frozen `kindVocabulary` declares each as one COARSE
+//   kind covering many distinct printed lines, and this engine has no
+//   per-line dialect to attribute a real amount to any one of them -- so
+//   their remedy says exactly that structural reason, not "(no phase yet)".
 export const unmodeledKindRefusals = /** @type {const} */ ([
-    { kind: 'householdEmployeeWages', line: '1040 line 1b', label: 'household employee wages', remedy: 'no dialect models it (Phase 13)' },
+    { kind: 'householdEmployeeWages', line: '1040 line 1b', label: 'household employee wages', remedy: 'no dialect models it (no phase yet)' },
     { kind: 'unreportedTips', line: '1040 line 1c', label: 'unreported tips', remedy: 'requires Form 4137 (no phase yet)' },
-    { kind: 'medicaidWaiverPayments', line: '1040 line 1d', label: 'nontaxable Medicaid waiver payments', remedy: 'no dialect models it (Phase 13)' },
+    { kind: 'medicaidWaiverPayments', line: '1040 line 1d', label: 'nontaxable Medicaid waiver payments', remedy: 'no dialect models it (no phase yet)' },
     { kind: 'dependentCareBenefits', line: '1040 line 1e', label: 'dependent care benefits', remedy: 'requires Form 2441 (no phase yet)' },
     { kind: 'adoptionBenefits', line: '1040 line 1f', label: 'employer-provided adoption benefits', remedy: 'requires Form 8839 (no phase yet)' },
     { kind: 'form8919Wages', line: '1040 line 1g', label: 'Form 8919 wages', remedy: 'requires Form 8919 (no phase yet)' },
-    { kind: 'otherEarnedIncome', line: '1040 line 1h', label: 'other earned income', remedy: 'no dialect models it (Phase 13)' },
+    { kind: 'otherEarnedIncome', line: '1040 line 1h', label: 'other earned income', remedy: 'no dialect models it (no phase yet)' },
     { kind: 'nontaxableCombatPayElection', line: '1040 line 1i', label: 'nontaxable combat pay election', remedy: 'no dialect models it (no phase yet)' },
     { kind: 'section1202Gain', line: 'Form 1099-DIV box 2c', label: 'section 1202 gain', remedy: 'requires the §1202 exclusion percentage, which no 1099-DIV box carries (no phase yet)' },
     { kind: 'investmentInterestForm4952', line: 'Form 4952 line 4g', label: 'investment interest expense election', remedy: 'requires Form 4952 and the Schedule D Tax Worksheet (TAX-11, Phase 12)' },
-    { kind: 'scheduleOneAdditionalIncome', line: '1040 line 8', label: 'additional income from Schedule 1', remedy: 'requires Schedule 1 (TAX-14, Phase 13)' },
-    { kind: 'scheduleOneAdjustments', line: '1040 line 10', label: 'adjustments to income from Schedule 1', remedy: 'requires Schedule 1 (TAX-14, Phase 13)' },
-    { kind: 'netQualifiedDisasterLoss', line: '1040 line 12e', label: 'net qualified disaster loss', remedy: 'requires Schedule A (TAX-13, Phase 13)' },
+    { kind: 'scheduleOneAdditionalIncome', line: '1040 line 8', label: 'additional income from Schedule 1', remedy: 'this coarse kind covers many distinct Schedule 1 line items with no per-line dialect to attribute a real amount to any one of them (no phase yet)' },
+    { kind: 'scheduleOneAdjustments', line: '1040 line 10', label: 'adjustments to income from Schedule 1', remedy: 'this coarse kind covers many distinct Schedule 1 line items with no per-line dialect to attribute a real amount to any one of them (no phase yet)' },
+    { kind: 'netQualifiedDisasterLoss', line: '1040 line 12e', label: 'net qualified disaster loss', remedy: 'requires Form 4684 (no phase yet)' },
     { kind: 'qualifiedBusinessIncomeDeduction', line: '1040 line 13a', label: 'qualified business income deduction', remedy: 'requires Form 8995 or 8995-A (no phase yet)' },
-    { kind: 'scheduleTwoTaxes', line: '1040 lines 17 and 23', label: 'additional taxes from Schedule 2', remedy: 'requires Schedule 2 (TAX-14, Phase 13)' },
-    { kind: 'scheduleThreeNonrefundableCredits', line: '1040 line 20', label: 'nonrefundable credits from Schedule 3', remedy: 'requires Schedule 3 (TAX-14, Phase 13)' },
-    { kind: 'federalTaxWithheldOnOtherForms', line: '1040 line 25c', label: 'federal income tax withheld on other forms', remedy: 'no dialect models it (Phase 13)' },
+    { kind: 'scheduleTwoTaxes', line: '1040 lines 17 and 23', label: 'additional taxes from Schedule 2', remedy: 'this coarse kind covers AMT, self-employment tax and other Schedule 2 items this engine has no dialect for (no phase yet)' },
+    { kind: 'scheduleThreeNonrefundableCredits', line: '1040 line 20', label: 'nonrefundable credits from Schedule 3', remedy: 'this coarse kind covers many distinct Schedule 3 nonrefundable credits with no per-credit dialect to attribute a real amount to any one of them (no phase yet)' },
+    { kind: 'federalTaxWithheldOnOtherForms', line: '1040 line 25c', label: 'federal income tax withheld on other forms', remedy: 'no dialect models it (no phase yet)' },
     { kind: 'earnedIncomeCredit', line: '1040 line 27a', label: 'earned income credit', remedy: 'requires Schedule EIC (no phase yet)' },
     { kind: 'americanOpportunityCredit', line: '1040 line 29', label: 'American opportunity credit', remedy: 'requires Form 8863 (no phase yet)' },
     { kind: 'refundableAdoptionCredit', line: '1040 line 30', label: 'refundable adoption credit', remedy: 'requires Form 8839 (no phase yet)' },
-    { kind: 'scheduleThreeRefundableCredits', line: '1040 line 31', label: 'refundable credits from Schedule 3', remedy: 'requires Schedule 3 (TAX-14, Phase 13)' },
+    { kind: 'scheduleThreeRefundableCredits', line: '1040 line 31', label: 'refundable credits from Schedule 3', remedy: 'this coarse kind covers many distinct Schedule 3 refundable credits with no per-credit dialect to attribute a real amount to any one of them (no phase yet)' },
     // ── The nine line-16 entries below matter more than they look ────────────
     //
     // `[VERIFIED: i1040gi.pdf p34, "Line 16 Tax"]` — line 16 is a SUM, not just
@@ -752,10 +776,11 @@ export const proof = {
         // 65+ profile's own remaining gaps — mirroring Plan 13-02's own
         // `unreportedTips` re-pointing precedent one reclassification
         // earlier. Do NOT pin the whole refusal MESSAGE containing
-        // `householdEmployeeWages`'s remedy string: Plan 13-13 rewrites it
-        // (`'no dialect models it (Phase 13)'` -> `'(no phase yet)'`), which
-        // would break this fixture three waves later; only line locators and
-        // kind ordering are asserted here.
+        // `householdEmployeeWages`'s remedy string: Plan 13-13 rewrites its
+        // stale phase-naming suffix to `'no phase yet'` (see this table's
+        // own header comment above), which would break this fixture three
+        // waves later; only line locators and kind ordering are asserted
+        // here.
         //
         // Deliberately asserts lines but NOT remedies, so that dropping the
         // remedy term from the message localizes to the one leaf above that
