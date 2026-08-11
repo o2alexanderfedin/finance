@@ -2570,56 +2570,79 @@ export const proof = {
     },
     form1040Report: {
         // ROADMAP criterion 4, on the profile this phase was written for. The
-        // 65+ joint return with dependents declared TWO kinds this engine did
-        // not model, and the WHOLE report was an error naming both — not a
-        // 1040 with two quiet zeros on it.
+        // 65+ joint return with dependents ORIGINALLY declared TWO kinds this
+        // engine did not model, and the WHOLE report was an error naming
+        // both — not a 1040 with two quiet zeros on it.
         //
-        // **Rewritten in place by Plan 13-04** (Phase 13 Wave 2, TAX-09):
-        // `seniorAndOtherScheduleOneADeductions` moved to `fjs/return/scope`'s
-        // `modeledKinds` in this plan's own Task 2, so this profile's own
-        // premise — TWO unavoidable refusals — stopped being true the instant
-        // the kind was reclassified. The mechanical adaptation Plan 13-02's
-        // own `iraDistributionsAndPensionsAndAnnuitiesNowComputeThroughTheFullReport`
-        // leaf already narrates for an earlier reclassification, one plan
-        // over: renamed, and its assertions narrowed to the ONE kind that
-        // still refuses (`childTaxCreditOrOtherDependents`, Schedule 8812,
-        // TAX-12 — a later wave), rather than deleted.
+        // **Rewritten in place a SECOND time, by Plan 13-10** (Phase 13 Wave
+        // 4, TAX-12): `childTaxCreditOrOtherDependents` — the one kind Plan
+        // 13-04 left refusing when it rewrote this leaf the first time
+        // (see git history for that version) — moved to `fjs/return/scope`'s
+        // `modeledKinds` in this plan's own Task 2, so `sixtyFivePlusProfile`
+        // no longer has ANY unavoidable refusal left. This is the closing
+        // moment 13-04-SUMMARY.md's own "Next Phase Readiness" section named:
+        // "Slice 4 ... is what finally lets this specific declared profile
+        // compute end to end without any refusal." The mechanical adaptation
+        // is the same one Plan 13-02's own
+        // `iraDistributionsAndPensionsAndAnnuitiesNowComputeThroughTheFullReport`
+        // leaf narrates for the first reclassification in this chain: renamed
+        // and rewritten to assert what the profile now DOES rather than what
+        // it still refuses.
+        //
+        // `sixtyFivePlusProfile` declares `dependentCount: 2` but carries no
+        // `dependents` ARRAY (it pre-dates Plan 13-08's addition of that
+        // per-dependent detail) — so line 19/28 are legitimately `$0.00` here,
+        // through `fjs/form8812`'s own STOP arm (zero qualifying children,
+        // zero other dependents), never through a `declaredZero` placeholder.
+        // Task 3's own `wave4Dependents` section below is where a profile
+        // WITH real per-dependent facts gets a real, non-zero credit.
         //
         // THE CONTROL for this leaf is
         // `controlTheSixtyFivePlusProfileWithoutThoseTwoKindsComputesLinesOneAToThirtySeven`
-        // immediately below: the same taxpayer with both kinds removed still
-        // computes end to end — unaffected by this rename, since it never
-        // relied on `seniorAndOtherScheduleOneADeductions` refusing.
-        theSixtyFivePlusProfileNowRefusesNamingOnlyTheRemainingUnmodeledKind: () => {
+        // immediately below: the SAME taxpayer with both kinds undeclared
+        // computes identically, since the wiring is unconditional — this leaf
+        // proves DECLARING the two kinds no longer changes the outcome at
+        // all, the strongest form of "in scope" this pair of fixtures can
+        // state.
+        theSixtyFivePlusProfileNowComputesEndToEndClosingThePhase: () => {
             const outcome = form1040Report(taxParams2025)(
                 inputsOf(storedProfile(sixtyFivePlusProfile))([
                     w2Document('sha256-w2-01')('60000.00'),
                 ])([])([])([])([])([])([])([]))
-            assert(
-                outcome.kind === 'error',
-                ['the 65+ declared profile must still refuse -- Schedule 8812 remains unmodeled', outcome],
+            assert(outcome.kind === 'ok', ['expected the 65+ declared profile to compute now', outcome])
+            if (outcome.kind !== 'ok') {
+                throw ['expected ok', outcome]
+            }
+            assertEq(
+                outcome.lines.length,
+                expectedWholeReportLineCount,
+                ['the flagship profile must produce the FULL line set, not a partial one', outcome.lines.length],
             )
             assertEq(
-                outcome.unmodeled.length, 1,
-                ['expected exactly the one remaining unmodeled kind', outcome.unmodeled],
+                lineRuled(outcome.lines)('1040 line 19').value, 0n,
+                '$0.00 -- dependentCount alone carries no per-dependent facts for form8812 to classify',
             )
-            assertEq(
-                outcome.unmodeled[0],
-                'childTaxCreditOrOtherDependents',
-                ['expected line 19\'s kind named', outcome.unmodeled],
-            )
-            assert(
-                outcome.message.includes('1040 line 19'),
-                ['expected the refusal to name the child tax credit\'s line', outcome.message],
-            )
-            assert(
-                outcome.message.includes('Schedule 8812'),
-                ['expected the refusal to name Schedule 8812', outcome.message],
-            )
-            assert(
-                !outcome.message.includes('1040 line 13b'),
-                ['the senior deduction must no longer be named -- it is a modeled kind now', outcome.message],
-            )
+            assertEq(lineRuled(outcome.lines)('1040 line 28').value, 0n, '$0.00, the same STOP')
+            assertEq(lineRuled(outcome.lines)('1040 line 37').value, 133300n, 'identical to the control below')
+            // Cross-checked against the control immediately below: declaring
+            // the two now-modeled kinds must produce a BYTE-IDENTICAL report
+            // to not declaring them at all.
+            const controlOutcome = form1040Report(taxParams2025)(
+                inputsOf(storedProfile(sixtyFivePlusProfileWithinScope))([
+                    w2Document('sha256-w2-01')('60000.00'),
+                ])([])([])([])([])([])([])([]))
+            assert(controlOutcome.kind === 'ok', ['expected the control to compute', controlOutcome])
+            if (controlOutcome.kind === 'ok') {
+                // `assertEq` is `===`, so two DIFFERENT arrays (even with
+                // identical bigint contents) never compare equal by
+                // reference — joined into a single string first, as bigints
+                // are not `JSON.stringify`-able either.
+                assertEq(
+                    outcome.lines.map(line => line.value).join(','),
+                    controlOutcome.lines.map(line => line.value).join(','),
+                    'declaring vs. not declaring the two now-modeled kinds must produce the SAME figures',
+                )
+            }
         },
         // THE CONTROL for `theSixtyFivePlusProfileNowRefusesNamingOnlyTheRemainingUnmodeledKind`:
         // the SAME taxpayer — both age boxes checked, both dependents declared
@@ -2743,16 +2766,30 @@ export const proof = {
         // The `ok` half in the same leaf is its control: the key IS present
         // there, so this is a property of the ERROR arm and not of the
         // predicate.
+        //
+        // **Re-pointed by Plan 13-10** (Phase 13 Wave 4, TAX-12):
+        // `sixtyFivePlusProfile` no longer refuses at all (both of its own
+        // kinds are modeled now — see
+        // `theSixtyFivePlusProfileNowComputesEndToEndClosingThePhase`,
+        // above), so this leaf's own refusing half needs a fixture that still
+        // refuses. Re-pointed at `unreportedTips` (Decision 1.4, stays
+        // refused for the rest of this phase) for the ERROR half, and at
+        // `singleProfile` (always in scope) for the OK half — the PROPERTY
+        // this leaf proves (the error arm carries no `lines` key at all; the
+        // ok arm does) is unchanged, only the fixtures are.
         theErrorArmCarriesNoLinesFieldAtAll: () => {
             const refused = form1040Report(taxParams2025)(
-                inputsOf(storedProfile(sixtyFivePlusProfile))([])([])([])([])([])([])([])([]))
+                inputsOf(storedProfile({
+                    ...singleProfile,
+                    declaredKinds: ['wages', 'taxableInterest', 'unreportedTips'],
+                }))([])([])([])([])([])([])([])([]))
             assert(refused.kind === 'error', ['expected a refusal', refused])
             assert(
                 !Object.hasOwn(refused, 'lines'),
                 ['a refused return must carry no line list at all', Object.keys(refused)],
             )
             const computed = form1040Report(taxParams2025)(
-                inputsOf(storedProfile(sixtyFivePlusProfileWithinScope))([])([])([])([])([])([])([])([]))
+                inputsOf(storedProfile(singleProfile))([])([])([])([])([])([])([])([]))
             assert(computed.kind === 'ok', ['expected the control to compute', computed])
             assert(
                 Object.hasOwn(computed, 'lines'),
@@ -3432,11 +3469,15 @@ export const proof = {
                 ['unmodeled must be empty -- this is not a fjs/return/scope kind refusal', outcome.unmodeled],
             )
         },
-        // The kinds are still UNMODELED at `fjs/return/scope` -- inert until
-        // Task 2's own atomic reclassification. A profile declaring
-        // `childTaxCreditOrOtherDependents` still refuses the WHOLE report
-        // through `classifyScope`, before this wiring is ever reached.
-        declaringChildTaxCreditOrOtherDependentsStillRefusesBeforeTask2Lands: () => {
+        // Task 2 has landed: `childTaxCreditOrOtherDependents` is a MODELED
+        // kind now (`fjs/return/scope`'s `modeledKinds`), so `classifyScope`
+        // no longer refuses a return declaring it -- rewritten IN PLACE from
+        // this task's own original "still refuses" assertion, the same
+        // mechanical adaptation this file's own
+        // `declaringSeniorAndOtherScheduleOneADeductionsNowComputesThroughTheFullReport`
+        // leaf already narrates for an earlier reclassification, one wave
+        // over.
+        declaringChildTaxCreditOrOtherDependentsNowComputesThroughTheFullReport: () => {
             const w2Form = w2Document('sha256-t10-w2-inert')('60000.00')
             /** @type {ReturnProfile} */
             const profile = {
@@ -3450,10 +3491,31 @@ export const proof = {
             }
             const outcome = form1040Report(taxParams2025)(
                 inputsOf(storedProfile(profile))([w2Form])([])([])([])([])([])([])([]))
-            assert(
-                outcome.kind === 'error',
-                ['the kind must still refuse -- Task 2\'s reclassification has not landed yet', outcome],
+            assert(outcome.kind === 'ok', ['expected the kind to compute now', outcome])
+            if (outcome.kind !== 'ok') {
+                throw ['expected ok', outcome]
+            }
+            assertEq(
+                lineRuled(outcome.lines)('1040 line 19').value, 440000n,
+                '$4,400.00 -- two qualifying children x $2,200.00, same fixture Task 1\'s own leaf pinned',
             )
+        },
+        // THE CONTROL for the leaf above: the same declaration minus the
+        // still-unmodeled kind computes end to end.
+        controlTheSameDeclarationWithoutChildTaxCreditOrOtherDependentsComputes: () => {
+            const w2Form = w2Document('sha256-t10-w2-inert-control')('60000.00')
+            /** @type {ReturnProfile} */
+            const profile = {
+                ...singleProfile,
+                dependentCount: 2,
+                dependents: [
+                    { relationship: 'daughter', ssnValidForEmployment: true, ageAtYearEnd: 10, livedWithTaxpayer: true },
+                    { relationship: 'son', ssnValidForEmployment: true, ageAtYearEnd: 12, livedWithTaxpayer: true },
+                ],
+            }
+            const outcome = form1040Report(taxParams2025)(
+                inputsOf(storedProfile(profile))([w2Form])([])([])([])([])([])([])([]))
+            assertEq(outcome.kind, 'ok', ['dropping the unmodeled kind must compute', outcome])
         },
     },
     // Plan 13-02 Task 3 — Slice 1's own vertical cut, end to end: a real

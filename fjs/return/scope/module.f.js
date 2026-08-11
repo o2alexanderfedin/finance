@@ -147,6 +147,37 @@
  * resting on `householdEmployeeWages`/`unreportedTips`) are untouched by
  * this wave's reclassification and still pass unmodified.
  *
+ * ## Slice 4's dependents boundary, as of Phase 13 Wave 4 — this closes TAX-12
+ *
+ * Plan 13-10 wires `fjs/form8812` (Schedule 8812 Part I's CTC/ODC and Part
+ * II-A's ACTC, one function execution, Plan 13-09) into 1040 lines 19 and
+ * 28, then reclassifies BOTH `childTaxCreditOrOtherDependents` and
+ * `additionalChildTaxCredit` from {@link unmodeledKindRefusals} to
+ * {@link modeledKinds} in the SAME commit — wire before reclassify, the
+ * identical discipline every earlier wave this docstring records already
+ * established. This closes TAX-12, the phase's fourth vertical slice, and
+ * with it 13-CONTEXT.md's own Decision 6.5: a return with declared
+ * dependents computes a real CTC/ODC and ACTC through the full
+ * `form1040Report` entry point.
+ *
+ * **A full-file read before this reclassification found no hand-typed proof
+ * leaf in THIS file** using either kind as a "still refused" example
+ * fixture — the only occurrences were the two kinds' own table rows, exactly
+ * as this plan's own `<interfaces>` text predicted (Plan 13-04's own
+ * `twoUnmodeledKindsRefuseNamingBothInFormOrder`/
+ * `unmodeledFollowsFormOrderNotDeclarationOrder` deliberately avoided
+ * reusing these two kinds when it re-pointed, precisely so this wave would
+ * not need to). **`fjs/form1040/core/module.f.js` carried three such
+ * fixtures anyway** — `sixtyFivePlusProfile`'s own two-kind declaration and
+ * the two leaves built on it — adapted there, not deleted; see this plan's
+ * own SUMMARY for the mechanical detail.
+ *
+ * Part II-B (3+ qualifying children or Puerto Rico residents) is **not** a
+ * `fjs/return/scope` kind at all — it is a document-data-sufficiency
+ * refusal threaded by `fjs/form1040/core` itself (`unmodeled: []`),
+ * mirroring the Schedule D absent-basis and `iraDeductionDeclared`
+ * precedents this docstring already records.
+ *
  * @module
  */
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
@@ -175,6 +206,9 @@ import { kindVocabulary } from '../profile/module.f.js'
  * is Plan 13-04's own (Phase 13 Wave 2, TAX-09) — see "Slice 2's
  * senior-deduction boundary". `itemizedDeductions` is Plan 13-07's own
  * (Phase 13 Wave 3, TAX-13) — see "Slice 3's itemizing boundary".
+ * `childTaxCreditOrOtherDependents` and `additionalChildTaxCredit` are Plan
+ * 13-10's own (Phase 13 Wave 4, TAX-12) — see "Slice 4's dependents
+ * boundary".
  */
 export const modeledKinds = /** @type {const} */ ([
     'wages',                       // W-2 box 1                     -> 1040 line 1a
@@ -191,10 +225,12 @@ export const modeledKinds = /** @type {const} */ ([
     'collectibles28RateGain',      // 1099-DIV box 2d + Sch D worksheet -> Schedule D line 18
     'itemizedDeductions',          // Schedule A + deductionChoice   -> 1040 line 12e
     'seniorAndOtherScheduleOneADeductions', // Schedule 1-A Parts I/V/VI -> 1040 line 13b
+    'childTaxCreditOrOtherDependents', // Schedule 8812 Part I       -> 1040 line 19
     'federalTaxWithheldOnW2',      // W-2 box 2                     -> 1040 line 25a
     'federalTaxWithheldOn1099Int', // 1099-INT box 4                -> 1040 line 25b
     'federalTaxWithheldOnOther1099', // 1099-R/1099-DIV/1099-B box 4 -> 1040 line 25b
     'estimatedTaxPayments',        // declared on the return profile -> 1040 line 26
+    'additionalChildTaxCredit',    // Schedule 8812 Part II-A       -> 1040 line 28
 ])
 
 /** One member of {@link modeledKinds}.
@@ -216,7 +252,7 @@ const modeledKindNames = modeledKinds
 // ── The refusal table ────────────────────────────────────────────────────────
 
 /**
- * The thirty-two declared kinds this engine does not model, each naming the
+ * The thirty declared kinds this engine does not model, each naming the
  * 1040 line that cannot be computed, a human label, and the remedy — the form
  * or schedule required and, where one exists, the requirement ID and phase
  * that will supply it. `10-RESEARCH.md`'s "Form 1040 Lines 1a-37" table is the
@@ -254,11 +290,9 @@ export const unmodeledKindRefusals = /** @type {const} */ ([
     { kind: 'netQualifiedDisasterLoss', line: '1040 line 12e', label: 'net qualified disaster loss', remedy: 'requires Schedule A (TAX-13, Phase 13)' },
     { kind: 'qualifiedBusinessIncomeDeduction', line: '1040 line 13a', label: 'qualified business income deduction', remedy: 'requires Form 8995 or 8995-A (no phase yet)' },
     { kind: 'scheduleTwoTaxes', line: '1040 lines 17 and 23', label: 'additional taxes from Schedule 2', remedy: 'requires Schedule 2 (TAX-14, Phase 13)' },
-    { kind: 'childTaxCreditOrOtherDependents', line: '1040 line 19', label: 'child tax credit or credit for other dependents', remedy: 'requires Schedule 8812 (TAX-12, Phase 13)' },
     { kind: 'scheduleThreeNonrefundableCredits', line: '1040 line 20', label: 'nonrefundable credits from Schedule 3', remedy: 'requires Schedule 3 (TAX-14, Phase 13)' },
     { kind: 'federalTaxWithheldOnOtherForms', line: '1040 line 25c', label: 'federal income tax withheld on other forms', remedy: 'no dialect models it (Phase 13)' },
     { kind: 'earnedIncomeCredit', line: '1040 line 27a', label: 'earned income credit', remedy: 'requires Schedule EIC (no phase yet)' },
-    { kind: 'additionalChildTaxCredit', line: '1040 line 28', label: 'additional child tax credit', remedy: 'requires Schedule 8812 (TAX-12, Phase 13)' },
     { kind: 'americanOpportunityCredit', line: '1040 line 29', label: 'American opportunity credit', remedy: 'requires Form 8863 (no phase yet)' },
     { kind: 'refundableAdoptionCredit', line: '1040 line 30', label: 'refundable adoption credit', remedy: 'requires Form 8839 (no phase yet)' },
     { kind: 'scheduleThreeRefundableCredits', line: '1040 line 31', label: 'refundable credits from Schedule 3', remedy: 'requires Schedule 3 (TAX-14, Phase 13)' },
@@ -428,11 +462,12 @@ export const classifyScope = declaredKinds => {
  * was Plan 12.1-04's own six-kind reclassification; `12 -> 16` was Plan
  * 13-02's own four-kind reclassification (Phase 13 Wave 1, TAX-10); `16 ->
  * 17` was Plan 13-04's own one-kind reclassification (Phase 13 Wave 2,
- * TAX-09); `17 -> 18` is Plan 13-07's own one-kind reclassification (Phase
- * 13 Wave 3, TAX-13).
+ * TAX-09); `17 -> 18` was Plan 13-07's own one-kind reclassification (Phase
+ * 13 Wave 3, TAX-13); `18 -> 20` is Plan 13-10's own two-kind
+ * reclassification (Phase 13 Wave 4, TAX-12).
  * @type {number}
  */
-const expectedModeledKindCount = 18
+const expectedModeledKindCount = 20
 
 /**
  * Independently hand-typed: the number of entries
@@ -443,15 +478,16 @@ const expectedModeledKindCount = 18
  * table. A loop over a collection derived from the code under test can never
  * notice that collection shrinking — the project's fourth instance of the
  * signature defect, found this phase in `unknownDialectRefused`'s
- * `Object.keys(dialectSchemas)` loop. `50 - 18 = 32` is asserted here against
+ * `Object.keys(dialectSchemas)` loop. `50 - 20 = 30` is asserted here against
  * `kindVocabulary.length`, which `fjs/return/profile` in turn pins against its
  * own hand-typed `50`. `44 -> 38` was Plan 12.1-04's own six-kind
  * reclassification; `38 -> 34` was Plan 13-02's own four-kind
  * reclassification; `34 -> 33` was Plan 13-04's own one-kind reclassification;
- * `33 -> 32` is Plan 13-07's own one-kind reclassification.
+ * `33 -> 32` was Plan 13-07's own one-kind reclassification; `32 -> 30` is
+ * Plan 13-10's own two-kind reclassification.
  * @type {number}
  */
-const expectedUnmodeledKindCount = 32
+const expectedUnmodeledKindCount = 30
 
 /**
  * The complete refusal message for a return declaring exactly
@@ -486,18 +522,19 @@ const expectedUnreportedTipsRefusalMessage
 export const proof = {
     partition: {
         // Both counts against hand-typed constants, and their sum against the
-        // vocabulary this module partitions -- so the 18/32 split cannot
+        // vocabulary this module partitions -- so the 20/30 split cannot
         // drift by a kind quietly migrating from one list to the other. This
         // IS the hand-typed count-guard Mutation Gate M4 (Plan 12.1-04 Task
         // 3, re-verified live by Plan 13-02's own four-kind move, Plan
-        // 13-04's own one-kind move, and Plan 13-07's own one-kind move)
-        // targets: removing one entry from `modeledKinds` without touching
-        // `expectedModeledKindCount` must redden this leaf.
-        modeledKindsIsExactlyEighteen: () => {
+        // 13-04's own one-kind move, Plan 13-07's own one-kind move, and
+        // Plan 13-10's own two-kind move) targets: removing one entry from
+        // `modeledKinds` without touching `expectedModeledKindCount` must
+        // redden this leaf.
+        modeledKindsIsExactlyTwenty: () => {
             assertEq(modeledKinds.length, expectedModeledKindCount)
             assertEq(new Set(modeledKinds).size, expectedModeledKindCount)
         },
-        unmodeledRefusalsIsExactlyThirtyTwo: () => {
+        unmodeledRefusalsIsExactlyThirty: () => {
             assertEq(unmodeledKindRefusals.length, expectedUnmodeledKindCount)
             assertEq(
                 new Set(unmodeledKindRefusals.map(r => r.kind)).size,
@@ -572,10 +609,10 @@ export const proof = {
             const outcome = classifyScope([])
             assertEq(outcome.kind, 'ok', ['declaring nothing must be in scope', outcome])
         },
-        // All eighteen modeled kinds, hand-typed rather than read from
+        // All twenty modeled kinds, hand-typed rather than read from
         // `modeledKinds`, so this leaf states independently what the engine
         // claims to be able to compute.
-        allEighteenModeledKindsDeclaredTogetherAreInScope: () => {
+        allTwentyModeledKindsDeclaredTogetherAreInScope: () => {
             const outcome = classifyScope([
                 'wages',
                 'taxExemptInterest',
@@ -591,12 +628,14 @@ export const proof = {
                 'collectibles28RateGain',
                 'itemizedDeductions',
                 'seniorAndOtherScheduleOneADeductions',
+                'childTaxCreditOrOtherDependents',
                 'federalTaxWithheldOnW2',
                 'federalTaxWithheldOn1099Int',
                 'federalTaxWithheldOnOther1099',
                 'estimatedTaxPayments',
+                'additionalChildTaxCredit',
             ])
-            assertEq(outcome.kind, 'ok', ['the eighteen modeled kinds must be in scope', outcome])
+            assertEq(outcome.kind, 'ok', ['the twenty modeled kinds must be in scope', outcome])
         },
         // Plan 13-02's own four newly-reclassified kinds, declared TOGETHER
         // and WITHOUT any of the other twelve — the atomic transition's own
@@ -624,6 +663,18 @@ export const proof = {
         itemizedDeductionsIsInScopeAlone: () => {
             const outcome = classifyScope(['itemizedDeductions'])
             assertEq(outcome.kind, 'ok', ['the newly-modeled itemized-deductions kind must be in scope', outcome])
+        },
+        // Plan 13-10's own two-kind reclassification (Phase 13 Wave 4,
+        // TAX-12), declared TOGETHER and WITHOUT any of the other
+        // eighteen -- the atomic transition's own acceptance criterion,
+        // isolated from the leaf above so a failure here localizes to
+        // exactly these two.
+        theTwoKindsThisPlanReclassifiedAreInScopeTogether: () => {
+            const outcome = classifyScope([
+                'childTaxCreditOrOtherDependents',
+                'additionalChildTaxCredit',
+            ])
+            assertEq(outcome.kind, 'ok', ['the two newly-modeled Schedule 8812 kinds must be in scope', outcome])
         },
         // The gate. Its control is the leaf immediately below, which is this
         // same declaration with `unreportedTips` removed -- without it, a
@@ -767,7 +818,7 @@ export const proof = {
                 ['the same declared kinds must produce the same message', declaredOneWay.message, declaredTheOther.message],
             )
         },
-        // Every one of the thirty-two refuses on its own, naming its own
+        // Every one of the thirty refuses on its own, naming its own
         // line and label -- so no entry can be present in the table yet
         // unreachable through the guard. `section1202Gain` and
         // `investmentInterestForm4952` are both still in this table (Plan
@@ -780,7 +831,7 @@ export const proof = {
         // in the same instant (the project's fourth signature defect, found
         // this phase in a proof looping `Object.keys(dialectSchemas)`). Two
         // things stand behind it, both independent of this table:
-        // `unmodeledRefusalsIsExactlyThirtyFour`'s hand-typed count, and
+        // `unmodeledRefusalsIsExactlyThirty`'s hand-typed count, and
         // `_EveryKindIsEitherModeledOrRefused`, which makes a deletion a `tsc`
         // failure. What the loop adds is reachability, which neither of those
         // can see; the CONTENT of two entries is pinned by the hand-typed
