@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
 status: executing
-stopped_at: Completed 13-06-PLAN.md
-last_updated: "2026-08-11T04:26:38.451Z"
+stopped_at: Completed 13-07-PLAN.md
+last_updated: "2026-08-11T04:54:44.639Z"
 last_activity: 2026-08-11
 progress:
   total_phases: 19
   completed_phases: 13
   total_plans: 75
-  completed_plans: 71
-  percent: 95
+  completed_plans: 72
+  percent: 96
 ---
 
 # Project State
@@ -30,7 +30,7 @@ Phase: 13 (The 65+ Profile and the Remaining Schedules) — EXECUTING
   Four plans across three waves. The plan set was returned ISSUES FOUND by
   `gsd-plan-checker` twice (2 blockers, then 2 more), revised each time, and only
   executed after a third pass returned VERIFICATION PASSED.
-Plan: 7 of 13
+Plan: 8 of 13
   Wave 1: 12.1-01 (Form 8949 category derivation + the absent-basis refusal) and
   12.1-02 (the 47-line Schedule D Tax Worksheet). Wave 2: 12.1-03 (Schedule D
   lines 1a-21, the loss-cap three-way branch, two bounded sub-worksheets).
@@ -41,7 +41,7 @@ Status: Ready to execute
   stopped after the final wave, so the phase has never been independently verified
   against its goal. That is the next action.
 
-Progress: [██████████] 95%
+Progress: [██████████] 96%
   Phase-based, never plan-based: `completed_plans` (65) exceeds `total_plans` (62)
   because three phases carry an extra FIX-SUMMARY.md beside a plan's own summary,
   which rounds the plan-based figure to a misleading 100%. See `percent_note`.
@@ -143,6 +143,7 @@ proofs and moves with submodule initialization state — which is exactly how a 
 | Phase 13 P04 | 25min | 3 tasks | 2 files |
 | Phase 13 P05 | 25min | 2 tasks | 3 files |
 | Phase 13 P06 | 35min | 2 tasks | 4 files |
+| Phase 13 P07 | 70min | 3 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -324,6 +325,8 @@ Full log in PROJECT.md Key Decisions. Recent decisions affecting current work:
 - [Phase 13]: SALT worksheet w1/w9 computed flat for every filing status; the ONE halving step for MFS applies to w9 only when constructing w10 (13-06)
 - [Phase 13]: Mortgage-interest and charitable Schedule A entries pass through at face value with no Pub. 936/526 limitation arithmetic (13-06)
 - [Phase 13]: Decision 2.2's withholding-drift proof gates on presence of a saltIncomeTax-tagged entry, never a separate election flag (13-06)
+- [Phase 13]: deductionChoice lives in fjs/tax/deduction beside standardDeductionCents, comparing against Schedule A's already-computed total; the comparison is a strict > with the line 18 election overriding outright
+- [Phase 13]: itemizedDeductions reclassified to modeledKinds in kindVocabulary order (before seniorAndOtherScheduleOneADeductions); netQualifiedDisasterLoss stays refused per Decision 1.4 -- TAX-13 closed
 
 ### Pending Todos
 
@@ -468,10 +471,10 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-08-11T04:26:38.442Z
-Stopped at: Completed 13-06-PLAN.md
-Nothing is mid-edit. Next: Plan 13-05 (Wave 3 -- Slice 3, itemizing: vnd.fjs.itemized_deductions
-dialect, SALT cap/medical floor parameters, Schedule A line 18 election).
+Last session: 2026-08-11T04:54:44.631Z
+Stopped at: Completed 13-07-PLAN.md
+Nothing is mid-edit. Next: Plan 13-08 (Wave 4 -- Slice 4, dependents: return_profile
+dependents array, CTC/ODC/ACTC/phase-out parameters).
 
 > **An automated state write clobbered this block on 2026-08-09** (`stopped_at` replaced with
 > "context exhaustion at 75%", the continuity text truncated mid-sentence into a dangling

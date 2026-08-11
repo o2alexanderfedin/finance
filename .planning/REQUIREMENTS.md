@@ -309,7 +309,7 @@ structural (RTTI) and semantic passes.
 - [x] **TAX-11** *(T2)*: Form 8949 and Schedule D, including the Schedule D Tax Worksheet.
       Required by brokerage sales.
 - [ ] **TAX-12** *(T2)*: Schedule 8812. Required by dependents.
-- [ ] **TAX-13** *(T2)*: Schedule A. Required by itemizing, and it must compare against the
+- [x] **TAX-13** *(T2)*: Schedule A. Required by itemizing, and it must compare against the
       standard deduction rather than assuming itemizing wins.
 - [ ] **TAX-14** *(T2)*: Schedule 1 and Schedule 2/3 to the extent the profile reaches them.
 - [x] **TAX-15** *(T2)*: Worksheets modelled in IRS order, one named pure function per
