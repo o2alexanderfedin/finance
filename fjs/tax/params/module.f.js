@@ -450,6 +450,31 @@ export const socialSecurityBenefitsWorksheetBaseAmounts = {
  * filing statuses the printed form's own threshold applies to — see this
  * module's own docstring, "`seniorDeduction`", for why
  * `marriedFilingSeparately` has no entry here.
+ *
+ * ## `saltCap` and `medicalExpenseFloor` — Slice 3's parameters (TAX-13,
+ * 13-CONTEXT.md Decision 2.1/3.1, 13-RESEARCH.md §3/Pitfall 2/Pitfall 5)
+ *
+ * The State and Local Tax Deduction Worksheet's five dollar figures — the
+ * $40,000 flat cap, the $10,000 flat floor, and the $500,000/$250,000(MFS)
+ * phase-down threshold — are direct OBBBA statute (Public Law 119-21
+ * §70120), never Rev. Proc. 2025-32 (which backs only the CTC among this
+ * phase's new numbers — Pitfall 5). **The worksheet's own body (lines w1
+ * through w9) uses the FLAT, non-MFS-halved dollar figures throughout**;
+ * only the FINAL line (w10) halves the computed result for MFS filers.
+ * That halving is Schedule A's own arithmetic to perform, not a second,
+ * pre-halved parameter stored here — storing an MFS-specific `flatCap` or
+ * `floor` would misrepresent what the worksheet's printed lines actually
+ * say (Pitfall 2). `phasedownRatePercent` is 30, continuous — no $1,000
+ * stepping, unlike the senior deduction's Schedule 1-A siblings.
+ *
+ * `medicalExpenseFloor` is the 7.5%-of-AGI floor behind Schedule A line 3
+ * — long-standing IRC §213(a), unmodified by OBBBA (13-RESEARCH.md
+ * assumption A2), so it cites `kind: 'code'` rather than either OBBBA
+ * union arm. Shaped with a `ratePercent`, not an `AmountWithCitation`: 7.5
+ * is a rate applied to AGI, not a dollar amount, mirroring
+ * `seniorDeduction.phaseoutRatePercent` and `Bracket.ratePercent` — plain
+ * numbers crossing no money boundary, so neither belongs in
+ * `everyDollarStringField`'s round-trip list below.
  * @type {{
  *   readonly amount: AmountWithCitation,
  *   readonly phaseoutRatePercent: number,
@@ -490,6 +515,80 @@ export const seniorDeduction = {
 }
 
 /**
+ * The State and Local Tax Deduction Worksheet's parameters (Schedule A
+ * line 5e) — Public Law 119-21 §70120, TAX-13 (13-CONTEXT.md Decision
+ * 2.1/3.1, 13-RESEARCH.md §3 "SALT cap: $40,000 ($20,000 MFS), confirmed"
+ * / Pitfall 2). Every dollar figure below is the FLAT, non-MFS-halved
+ * value the worksheet's own printed lines w1-w9 use — see this module's
+ * own docstring, "`saltCap` and `medicalExpenseFloor`", for why no
+ * MFS-specific `flatCap`/`floor` is stored: only the worksheet's FINAL
+ * line (w10) halves the result for MFS, and that is Schedule A's
+ * arithmetic to perform, not a parameter to pre-compute here.
+ * `threshold.marriedFilingSeparately` is the one figure in this parameter
+ * set that genuinely IS status-specific on the worksheet's own face (w5).
+ * @type {{
+ *   readonly flatCap: AmountWithCitation,
+ *   readonly floor: AmountWithCitation,
+ *   readonly phasedownRatePercent: number,
+ *   readonly threshold: {
+ *     readonly single: AmountWithCitation,
+ *     readonly marriedFilingJointly: AmountWithCitation,
+ *     readonly marriedFilingSeparately: AmountWithCitation,
+ *     readonly headOfHousehold: AmountWithCitation,
+ *     readonly qualifyingSurvivingSpouse: AmountWithCitation,
+ *   },
+ * }}
+ */
+export const saltCap = {
+    flatCap: {
+        amount: '40000.00',
+        citation: { kind: 'publicLaw', publicLaw: '119-21', section: '§70120', effectiveDate: '2025-01-01' },
+    },
+    floor: {
+        amount: '10000.00',
+        citation: { kind: 'publicLaw', publicLaw: '119-21', section: '§70120', effectiveDate: '2025-01-01' },
+    },
+    // A plain rate, not money — mirroring `seniorDeduction.phaseoutRatePercent`.
+    phasedownRatePercent: 30,
+    threshold: {
+        single: {
+            amount: '500000.00',
+            citation: { kind: 'publicLaw', publicLaw: '119-21', section: '§70120', effectiveDate: '2025-01-01' },
+        },
+        marriedFilingJointly: {
+            amount: '500000.00',
+            citation: { kind: 'publicLaw', publicLaw: '119-21', section: '§70120', effectiveDate: '2025-01-01' },
+        },
+        marriedFilingSeparately: {
+            amount: '250000.00',
+            citation: { kind: 'publicLaw', publicLaw: '119-21', section: '§70120', effectiveDate: '2025-01-01' },
+        },
+        headOfHousehold: {
+            amount: '500000.00',
+            citation: { kind: 'publicLaw', publicLaw: '119-21', section: '§70120', effectiveDate: '2025-01-01' },
+        },
+        qualifyingSurvivingSpouse: {
+            amount: '500000.00',
+            citation: { kind: 'publicLaw', publicLaw: '119-21', section: '§70120', effectiveDate: '2025-01-01' },
+        },
+    },
+}
+
+/**
+ * Schedule A line 3's 7.5%-of-AGI medical-expense floor — IRC §213(a),
+ * long-standing, unmodified by OBBBA (13-RESEARCH.md §3 "Medical floor:
+ * 7.5%, confirmed unchanged"). `ratePercent`, not `amount`: this is a rate
+ * applied to AGI, not a dollar amount, so it is a plain number crossing no
+ * money boundary — see this module's own docstring for why it is excluded
+ * from {@link everyDollarStringField} below.
+ * @type {{ readonly ratePercent: number, readonly citation: Citation }}
+ */
+export const medicalExpenseFloor = {
+    ratePercent: 7.5,
+    citation: { kind: 'code', section: '§213(a)', effectiveDate: '2025-01-01' },
+}
+
+/**
  * A full tax-year parameter set: every TY2025 parameter this phase
  * requires, together.
  * @typedef {{
@@ -500,6 +599,8 @@ export const seniorDeduction = {
  *   readonly capitalGainsBreakpoints: typeof capitalGainsBreakpoints,
  *   readonly socialSecurityBenefitsWorksheetBaseAmounts: typeof socialSecurityBenefitsWorksheetBaseAmounts,
  *   readonly seniorDeduction: typeof seniorDeduction,
+ *   readonly saltCap: typeof saltCap,
+ *   readonly medicalExpenseFloor: typeof medicalExpenseFloor,
  * }} TaxParamSet
  */
 
@@ -521,6 +622,8 @@ export const taxParamsByYear = {
         capitalGainsBreakpoints,
         socialSecurityBenefitsWorksheetBaseAmounts,
         seniorDeduction,
+        saltCap,
+        medicalExpenseFloor,
     },
 }
 
@@ -594,6 +697,13 @@ const everyDollarStringField = [
     seniorDeduction.phaseoutThreshold.marriedFilingJointly.amount,
     seniorDeduction.phaseoutThreshold.headOfHousehold.amount,
     seniorDeduction.phaseoutThreshold.qualifyingSurvivingSpouse.amount,
+    saltCap.flatCap.amount,
+    saltCap.floor.amount,
+    saltCap.threshold.single.amount,
+    saltCap.threshold.marriedFilingJointly.amount,
+    saltCap.threshold.marriedFilingSeparately.amount,
+    saltCap.threshold.headOfHousehold.amount,
+    saltCap.threshold.qualifyingSurvivingSpouse.amount,
 ]
 
 export const proof = {
@@ -900,5 +1010,47 @@ export const proof = {
         assertEq(seniorDeduction.phaseoutThreshold.marriedFilingJointly.amount, '150000.00')
         assertEq(seniorDeduction.phaseoutThreshold.headOfHousehold.amount, '75000.00')
         assertEq(seniorDeduction.phaseoutThreshold.qualifyingSurvivingSpouse.amount, '75000.00')
+    },
+    // TAX-13/13-RESEARCH.md Pitfall 5: every `saltCap` dollar figure cites
+    // OBBBA Public Law 119-21 §70120 directly — NEVER `kind: 'revProc'`,
+    // and never Rev. Proc. 2025-32 (which does not contain this figure at
+    // all, the exact trap Pitfall 5 names). Asserted per field
+    // (`kind`/`publicLaw`/`section`/`effectiveDate`), on every one of the
+    // seven stored amounts, never via one deep-equality assertion against
+    // a second copy of the object.
+    saltCapCitesPublicLaw11921Section70120: () => {
+        const entries = [
+            saltCap.flatCap,
+            saltCap.floor,
+            saltCap.threshold.single,
+            saltCap.threshold.marriedFilingJointly,
+            saltCap.threshold.marriedFilingSeparately,
+            saltCap.threshold.headOfHousehold,
+            saltCap.threshold.qualifyingSurvivingSpouse,
+        ]
+        for (const entry of entries) {
+            const citation = assertPublicLawCitation(entry.citation)
+            assertEq(citation.publicLaw, '119-21', ['expected OBBBA Public Law 119-21', entry])
+            assertEq(citation.section, '§70120', ['expected OBBBA §70120', entry])
+            assertEq(citation.effectiveDate, '2025-01-01', ['expected the TY2025 effective date', entry])
+        }
+        assertEq(saltCap.flatCap.amount, '40000.00')
+        assertEq(saltCap.floor.amount, '10000.00')
+        assertEq(saltCap.phasedownRatePercent, 30)
+        assertEq(saltCap.threshold.single.amount, '500000.00')
+        assertEq(saltCap.threshold.marriedFilingJointly.amount, '500000.00')
+        assertEq(saltCap.threshold.marriedFilingSeparately.amount, '250000.00')
+        assertEq(saltCap.threshold.headOfHousehold.amount, '500000.00')
+        assertEq(saltCap.threshold.qualifyingSurvivingSpouse.amount, '500000.00')
+    },
+    // TAX-13/13-RESEARCH.md §3 "Medical floor: 7.5%, confirmed unchanged":
+    // the medical-expense floor cites IRC §213(a) directly — `kind:
+    // 'code'`, long-standing and unmodified by OBBBA, never a Rev. Proc.
+    // and never a Public Law.
+    medicalExpenseFloorCitesIrc213aOnly: () => {
+        assertEq(medicalExpenseFloor.ratePercent, 7.5)
+        assertEq(medicalExpenseFloor.citation.kind, 'code')
+        assertEq(medicalExpenseFloor.citation.section, '§213(a)')
+        assertEq(medicalExpenseFloor.citation.effectiveDate, '2025-01-01')
     },
 }
