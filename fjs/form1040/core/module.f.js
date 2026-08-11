@@ -68,6 +68,7 @@ import { individualFilingStatuses, taxParamsByYear } from '../../tax/params/modu
 import { scheduleD } from '../../schedule/d/module.f.js'
 import { scheduleOneA } from '../../schedule/1a/module.f.js'
 import { scheduleA } from '../../schedule/a/module.f.js'
+import { form8812 } from '../../form8812/module.f.js'
 import { baseTaxForAmount } from '../../tax/table/module.f.js'
 
 /** @import { ReportLine, Source } from '../../report/line/module.f.js' */
@@ -1125,7 +1126,54 @@ const form1040TaxAndPaymentLines = taxParamSet => inputs => income => {
     }
     const line17 = declaredZero('1040 line 17')  // Schedule 2, part I
     const line18 = totalLine('1040 line 18')([line16, line17])
-    const line19 = declaredZero('1040 line 19')  // child tax credit, Schedule 8812
+
+    // 19 and 28 — Schedule 8812 (`fjs/form8812`, Plan 13-09/13-10, TAX-12):
+    // Part I's CTC/ODC (line 14) feeds line 19, Part II-A's ACTC (line 27)
+    // feeds line 28, both from ONE function execution so line 28 is never
+    // independently stale on Part I's own state (13-CONTEXT.md Decision
+    // 4.3). Read UNCONDITIONALLY, exactly like every other Wave 1-3 wiring —
+    // a MODELED line reports what the facts say; `declaredKinds` gates the
+    // WHOLE-RETURN refusal for `childTaxCreditOrOtherDependents`/
+    // `additionalChildTaxCredit` (`fjs/return/scope`), never these two
+    // individual lines. For a profile that declares either kind while it is
+    // still unmodeled, this wiring is UNREACHABLE: `form1040Report`'s own
+    // `classifyScope` call refuses the whole return before this function
+    // ever runs.
+    //
+    // `dependents` is read off the profile and normalized from `option(true)`
+    // booleans to definite ones — the same `=== true` normalization
+    // `fjs/schedule/b` performs on `hadForeignFinancialAccount`, and exactly
+    // what `fjs/form8812`'s own docstring expects its caller to do before it
+    // ever sees the array.
+    const form8812Outcome = form8812(taxParamSet)({
+        status,
+        agiCents: income.line11b.value,
+        dependents: (profile.value.dependents ?? []).map(d => ({
+            relationship: d.relationship,
+            ssnValidForEmployment: d.ssnValidForEmployment === true,
+            ageAtYearEnd: d.ageAtYearEnd,
+            livedWithTaxpayer: d.livedWithTaxpayer === true,
+        })),
+        line18Cents: line18.value,
+        earnedIncomeCents: profile.value.earnedIncome === undefined
+            ? 0n
+            : centsFromString(profile.value.earnedIncome),
+        nontaxableCombatPayCents: 0n,
+    })
+    // Part II-B's refusal (3+ qualifying children or Puerto Rico residents)
+    // is the THIRD document-data-sufficiency early-return guard in this file
+    // — Schedule D's absent-basis guard (above, in `form1040IncomeLines`) and
+    // Wave 1's `iraDeductionDeclared` guard are the first two — threaded
+    // exactly the same way: `unmodeled: []`, since it names no
+    // `fjs/return/scope` kind.
+    if (form8812Outcome.kind === 'error') {
+        return { kind: 'error', message: form8812Outcome.message, unmodeled: [] }
+    }
+    const line19 = {
+        value: form8812Outcome.line14,
+        sources: unionSources([income.line11b]),
+        rule: '1040 line 19',
+    }
     const line20 = declaredZero('1040 line 20')  // Schedule 3, part I
     const line21 = totalLine('1040 line 21')([line19, line20])
     const line22 = line22TaxLessNonrefundableCredits(line18)(line21)
@@ -1165,7 +1213,14 @@ const form1040TaxAndPaymentLines = taxParamSet => inputs => income => {
     const line26 = fromDocuments('1040 line 26')(
         profileMoneyBox(profile)('line26EstimatedTaxPayments'))
     const line27a = declaredZero('1040 line 27a') // earned income credit
-    const line28 = declaredZero('1040 line 28')   // additional child tax credit
+    // 28 — additional child tax credit: Schedule 8812 Part II-A's line 27,
+    // computed above alongside line 19 from the SAME `form8812Outcome`, per
+    // Decision 4.3 — never independently re-derived here.
+    const line28 = {
+        value: form8812Outcome.line27,
+        sources: unionSources([income.line11b, line18]),
+        rule: '1040 line 28',
+    }
     const line29 = declaredZero('1040 line 29')   // American opportunity credit
     const line30 = declaredZero('1040 line 30')   // refundable adoption credit
     const line31 = declaredZero('1040 line 31')   // Schedule 3, part II
@@ -3290,6 +3345,115 @@ export const proof = {
                 taxpayerBornBeforeJan2_1961: true,
             }))([])([])([])([])([])([])([])([]))
             assertEq(outcome.kind, 'ok', ['dropping the unmodeled kind must compute', outcome])
+        },
+    },
+    // Plan 13-10 Task 1 — Schedule 8812 wired into lines 19/28, with
+    // `childTaxCreditOrOtherDependents`/`additionalChildTaxCredit` still
+    // refused at `classifyScope` (inert until Task 2's own reclassification,
+    // mirroring `retirementAndSocialSecurityBeforeTheScopeReclassificationLands`'s
+    // and `seniorDeductionBeforeTheScopeReclassificationLands`'s own shape,
+    // one reclassification earlier).
+    dependentsBeforeTheScopeReclassificationLands: {
+        // Two qualifying children (age 10/12, valid SSN), $60,000.00 AGI --
+        // well under the $200,000.00 single phase-out threshold -- and
+        // ample tax liability ($5,075.00, computed independently below) so
+        // line13 never binds: line 19 = 2 x $2,200.00 = $4,400.00. Calls
+        // `computedLines` (`form1040IncomeLines` then
+        // `form1040TaxAndPaymentLines`) DIRECTLY, bypassing `classifyScope`,
+        // since the kind is not declared here at all.
+        twoQualifyingChildrenComputeARealNonZeroLineNineteen: () => {
+            const w2Form = w2Document('sha256-t10-w2-60k')('60000.00')
+            /** @type {ReturnProfile} */
+            const profile = {
+                ...singleProfile,
+                dependentCount: 2,
+                dependents: [
+                    { relationship: 'daughter', ssnValidForEmployment: true, ageAtYearEnd: 10, livedWithTaxpayer: true },
+                    { relationship: 'son', ssnValidForEmployment: true, ageAtYearEnd: 12, livedWithTaxpayer: true },
+                ],
+            }
+            const inputs = inputsOf(storedProfile(profile))([w2Form])([])([])([])([])([])([])([])
+            const { tax } = computedLines(inputs)
+            assertEq(tax.line19.value, 440000n, '$4,400.00 -- two qualifying children x $2,200.00')
+            assert(tax.line19.value > 0n, ['expected a real, non-zero line 19', tax.line19.value])
+            // Cross-checked a SECOND way, independent of `form1040TaxAndPaymentLines`'s
+            // own wiring: the SAME facts fed straight to `form8812(...)`
+            // (never through the report's own call site) must reach the
+            // identical line14.
+            const crossCheck = form8812(taxParams2025)({
+                status: 'single',
+                agiCents: 6000000n,
+                dependents: [
+                    { relationship: 'daughter', ssnValidForEmployment: true, ageAtYearEnd: 10, livedWithTaxpayer: true },
+                    { relationship: 'son', ssnValidForEmployment: true, ageAtYearEnd: 12, livedWithTaxpayer: true },
+                ],
+                line18Cents: tax.line18.value,
+                earnedIncomeCents: 0n,
+                nontaxableCombatPayCents: 0n,
+            })
+            assert(crossCheck.kind === 'ok', ['expected the cross-check to compute', crossCheck])
+            if (crossCheck.kind === 'ok') {
+                assertEq(crossCheck.line14, 440000n, 'independent form8812(...) call must reach the SAME figure')
+            }
+        },
+        // 3+ qualifying children makes Part II-B reachable (`fjs/form8812`'s
+        // own docstring) -- the whole report refuses, naming "Part II-B",
+        // rather than silently computing a wrong ACTC. Calls
+        // `form1040IncomeLines`/`form1040TaxAndPaymentLines` directly the
+        // same way, so the leaf localizes to THIS guard, not the scope guard.
+        threeQualifyingChildrenRefusesTheWholeReportNamingPartTwoB: () => {
+            const w2Form = w2Document('sha256-t10-w2-3kids')('60000.00')
+            /** @type {ReturnProfile} */
+            const profile = {
+                ...singleProfile,
+                dependentCount: 3,
+                dependents: [
+                    { relationship: 'daughter', ssnValidForEmployment: true, ageAtYearEnd: 5, livedWithTaxpayer: true },
+                    { relationship: 'son', ssnValidForEmployment: true, ageAtYearEnd: 8, livedWithTaxpayer: true },
+                    { relationship: 'son', ssnValidForEmployment: true, ageAtYearEnd: 11, livedWithTaxpayer: true },
+                ],
+            }
+            const inputs = inputsOf(storedProfile(profile))([w2Form])([])([])([])([])([])([])([])
+            const income = expectIncomeOk(form1040IncomeLines(taxParams2025)(inputs))
+            const outcome = form1040TaxAndPaymentLines(taxParams2025)(inputs)(income)
+            assert(
+                outcome.kind === 'error',
+                ['expected the whole report to refuse, never a silently-wrong ACTC', outcome],
+            )
+            if (outcome.kind !== 'error') {
+                throw ['expected error', outcome]
+            }
+            assert(
+                outcome.message.includes('Part II-B'),
+                ['expected the refusal to name Part II-B', outcome.message],
+            )
+            assertEq(
+                outcome.unmodeled.length, 0,
+                ['unmodeled must be empty -- this is not a fjs/return/scope kind refusal', outcome.unmodeled],
+            )
+        },
+        // The kinds are still UNMODELED at `fjs/return/scope` -- inert until
+        // Task 2's own atomic reclassification. A profile declaring
+        // `childTaxCreditOrOtherDependents` still refuses the WHOLE report
+        // through `classifyScope`, before this wiring is ever reached.
+        declaringChildTaxCreditOrOtherDependentsStillRefusesBeforeTask2Lands: () => {
+            const w2Form = w2Document('sha256-t10-w2-inert')('60000.00')
+            /** @type {ReturnProfile} */
+            const profile = {
+                ...singleProfile,
+                dependentCount: 2,
+                dependents: [
+                    { relationship: 'daughter', ssnValidForEmployment: true, ageAtYearEnd: 10, livedWithTaxpayer: true },
+                    { relationship: 'son', ssnValidForEmployment: true, ageAtYearEnd: 12, livedWithTaxpayer: true },
+                ],
+                declaredKinds: ['wages', 'taxableInterest', 'childTaxCreditOrOtherDependents'],
+            }
+            const outcome = form1040Report(taxParams2025)(
+                inputsOf(storedProfile(profile))([w2Form])([])([])([])([])([])([])([]))
+            assert(
+                outcome.kind === 'error',
+                ['the kind must still refuse -- Task 2\'s reclassification has not landed yet', outcome],
+            )
         },
     },
     // Plan 13-02 Task 3 — Slice 1's own vertical cut, end to end: a real
