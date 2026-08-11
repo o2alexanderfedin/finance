@@ -68,6 +68,9 @@ import { individualFilingStatuses, taxParamsByYear } from '../../tax/params/modu
 import { scheduleD } from '../../schedule/d/module.f.js'
 import { scheduleOneA } from '../../schedule/1a/module.f.js'
 import { scheduleA } from '../../schedule/a/module.f.js'
+import { scheduleOne } from '../../schedule/1/module.f.js'
+import { scheduleTwo } from '../../schedule/2/module.f.js'
+import { scheduleThree } from '../../schedule/3/module.f.js'
 import { form8812 } from '../../form8812/module.f.js'
 import { baseTaxForAmount } from '../../tax/table/module.f.js'
 
@@ -588,7 +591,22 @@ export const form1040IncomeLines = taxParamSet => inputs => {
             value: scheduleDOk.line7aCapitalGainOrLoss,
             sources: scheduleDOk.sources,
         })
-    const line8 = declaredZero('1040 line 8')   // additional income, Schedule 1
+    // 8/10 — Schedule 1 (`fjs/schedule/1`, Plan 13-11/13-12, TAX-14): Part
+    // I's total additional income (line10) feeds 1040 line 8, Part II's
+    // total adjustments (line26) feeds 1040 line 10 — ONE `scheduleOne(...)`
+    // call, never two, so the two 1040 lines can never read two different
+    // Schedule 1 computations. `scheduleOneAdditionalIncome`/
+    // `scheduleOneAdjustments` stay in `unmodeledKindRefusals`
+    // (`fjs/return/scope`) for the whole of this phase — every field
+    // `scheduleOne` returns is a `profileDeclaredZeroLine`, so both totals
+    // are `0n` for every profile this engine can otherwise compute (this
+    // plan's own objective: citation granularity, not a value change).
+    const scheduleOneResult = scheduleOne(profile)
+    const line8 = {
+        value: scheduleOneResult.line10.value,
+        sources: scheduleOneResult.line10.sources,
+        rule: '1040 line 8',
+    }   // additional income, Schedule 1 Part I total (line10)
 
     // 6a — total Social Security/Railroad Retirement benefits (SSA-1099/
     // RRB-1099 box 5), read UNCONDITIONALLY from stored documents, exactly
@@ -639,7 +657,14 @@ export const form1040IncomeLines = taxParamSet => inputs => {
     const line9 = totalLine('1040 line 9')([
         line1z, line2b, line3b, line4b, line5b, line6b, line7a, line8,
     ])
-    const line10 = declaredZero('1040 line 10') // adjustments, Schedule 1
+    // 10 — Schedule 1 Part II's own total (line26), from the SAME
+    // `scheduleOneResult` computed at line 8, above — never a second,
+    // independently stale `scheduleOne(...)` call.
+    const line10 = {
+        value: scheduleOneResult.line26.value,
+        sources: scheduleOneResult.line26.sources,
+        rule: '1040 line 10',
+    } // adjustments, Schedule 1 Part II total (line26)
 
     // 11a/11b — adjusted gross income. **New on the 2025 form**: the 2024 form
     // had a single line 11; the 2025 face states AGI on page 1 (11a) and
@@ -1124,7 +1149,18 @@ const form1040TaxAndPaymentLines = taxParamSet => inputs => income => {
         sources: unionSources([income.line15]),
         rule: `1040 line 16 (${line16MethodNames[line16Outcome.method]})`,
     }
-    const line17 = declaredZero('1040 line 17')  // Schedule 2, part I
+    // 17/23 — Schedule 2 (`fjs/schedule/2`, Plan 13-11/13-12, TAX-14): Part
+    // I's total tax (line3) feeds 1040 line 17, Part II's total other taxes
+    // (line21) feeds 1040 line 23 — ONE `scheduleTwo(...)` call, mirroring
+    // Schedule 1's own single-call precedent above. `scheduleTwoTaxes`
+    // stays in `unmodeledKindRefusals`, so both totals are `0n` for every
+    // profile this engine can otherwise compute.
+    const scheduleTwoResult = scheduleTwo(profile)
+    const line17 = {
+        value: scheduleTwoResult.line3.value,
+        sources: scheduleTwoResult.line3.sources,
+        rule: '1040 line 17',
+    }  // Schedule 2 Part I total (line3)
     const line18 = totalLine('1040 line 18')([line16, line17])
 
     // 19 and 28 — Schedule 8812 (`fjs/form8812`, Plan 13-09/13-10, TAX-12):
@@ -1174,10 +1210,30 @@ const form1040TaxAndPaymentLines = taxParamSet => inputs => income => {
         sources: unionSources([income.line11b]),
         rule: '1040 line 19',
     }
-    const line20 = declaredZero('1040 line 20')  // Schedule 3, part I
+    // 20/31 — Schedule 3 (`fjs/schedule/3`, Plan 13-11/13-12, TAX-14):
+    // Part I's total nonrefundable credits (line8) feeds 1040 line 20,
+    // Part II's total other payments/refundable credits (line15) feeds
+    // 1040 line 31 — ONE `scheduleThree(...)` call, mirroring Schedule 1
+    // and Schedule 2's own single-call precedent above.
+    // `scheduleThreeNonrefundableCredits`/`scheduleThreeRefundableCredits`
+    // stay in `unmodeledKindRefusals`, so both totals are `0n` for every
+    // profile this engine can otherwise compute.
+    const scheduleThreeResult = scheduleThree(profile)
+    const line20 = {
+        value: scheduleThreeResult.line8.value,
+        sources: scheduleThreeResult.line8.sources,
+        rule: '1040 line 20',
+    }  // Schedule 3 Part I total (line8)
     const line21 = totalLine('1040 line 21')([line19, line20])
     const line22 = line22TaxLessNonrefundableCredits(line18)(line21)
-    const line23 = declaredZero('1040 line 23')  // other taxes, Schedule 2 part II
+    // 23 — Schedule 2 Part II's own total (line21), from the SAME
+    // `scheduleTwoResult` computed at line 17, above — never a second,
+    // independently stale `scheduleTwo(...)` call.
+    const line23 = {
+        value: scheduleTwoResult.line21.value,
+        sources: scheduleTwoResult.line21.sources,
+        rule: '1040 line 23',
+    }  // other taxes, Schedule 2 Part II total (line21)
     const line24 = totalLine('1040 line 24')([line22, line23])
 
     // 25a/25b — federal income tax withheld, read off the forms themselves:
@@ -1223,7 +1279,14 @@ const form1040TaxAndPaymentLines = taxParamSet => inputs => income => {
     }
     const line29 = declaredZero('1040 line 29')   // American opportunity credit
     const line30 = declaredZero('1040 line 30')   // refundable adoption credit
-    const line31 = declaredZero('1040 line 31')   // Schedule 3, part II
+    // 31 — Schedule 3 Part II's own total (line15), from the SAME
+    // `scheduleThreeResult` computed at line 20, above — never a second,
+    // independently stale `scheduleThree(...)` call.
+    const line31 = {
+        value: scheduleThreeResult.line15.value,
+        sources: scheduleThreeResult.line15.sources,
+        rule: '1040 line 31',
+    }   // Schedule 3 Part II total (line15)
     const line32 = totalLine('1040 line 32')([line27a, line28, line29, line30, line31])
     const line33 = totalLine('1040 line 33')([line25d, line26, line32])
 
