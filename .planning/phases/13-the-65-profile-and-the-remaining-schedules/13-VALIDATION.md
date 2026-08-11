@@ -94,6 +94,48 @@ discipline (Decision 5.2's widened `Citation`) is what makes this check possible
 
 ---
 
+## Carried Findings — MUST be resolved before the phase closes
+
+Found during execution, after the plans were written. Each names the plan that owns it.
+
+### C-1 — Criterion 5's gate is case-sensitive and misses camelCase `Magi` (owner: **13-13**)
+
+Found while verifying 13-03. The criterion is written as `grep -rn "magi" fjs/`, which is
+case-sensitive, so **camelCase `Magi` passes it**. As of 13-03 there are six such identifiers,
+all proof-leaf names in `fjs/schedule/1a/module.f.js`:
+
+- `continuousPhaseoutSingleEightyThousandMagi` (and two comment references)
+- `mfsAtZeroMagiGetsZeroNotDecisiveAlone`
+- `mfsAtTenThousandMagiGetsZeroDecisiveShortCircuitProof`
+- `partIMagiEqualsSeniorDeductionPhaseoutIncomeForEveryFixture`
+
+**Substance is currently fine** — the real income function is correctly named
+`seniorDeductionPhaseoutIncome`, and no shared income *variable* is called MAGI. These are test
+fixture names. But the hole is real: a future `seniorMagi` / `saltMagi` variable would pass the
+gate while being exactly what TAX-15 forbids.
+
+**13-13 must do both:**
+1. Rename the six identifiers so they name what the fixture actually exercises (the income
+   measure is `seniorDeductionPhaseoutIncome` — say that, or say "phaseout income").
+2. Make the mechanical gate **case-insensitive** on identifiers, so `Magi` / `MAGI` inside a
+   name fails while `MAGI` in prose and docstrings still passes. The gate must be strictly
+   stronger than the literal criterion text, not equal to it — the criterion is the floor.
+
+Verify with: `grep -rno "[a-zA-Z]*[Mm]agi[a-zA-Z]*" fjs/` returning only prose matches.
+
+### C-2 — TAX-10 is marked complete while its own text is false (owner: **13-13**)
+
+`REQUIREMENTS.md` TAX-10 was checked `[x]` by plan 13-02, but still reads *"a **19-line**
+near-circular computation"*. The worksheet has **18** lines (Decision 5.3,
+`[VERIFIED: i1040gi.pdf (2025) p32]`), and the code implements 18 with a count-guard proof.
+
+A requirement marked satisfied while its own description states something false is the exact
+failure Phase 1 existed to eliminate. 13-13 already owns the 19→18 prose correction in
+REQUIREMENTS.md and ROADMAP.md; this note exists so the check is not skipped because the box is
+already ticked.
+
+---
+
 ## Validation Sign-Off
 
 - [ ] All tasks have an automated verify or a stated Wave 0 dependency
