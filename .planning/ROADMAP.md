@@ -579,7 +579,7 @@ Plans:
 **Research**: **YES** — child-process isolation design, the wall-clock kill path, and the upstream API shapes (see v2 in REQUIREMENTS.md).
 **Plans**: 6 plans across 2 waves
 - [x] 15-01-PLAN.md — PROV-08: income-by-payer report, import-graph gate, real fjs_run proof
-- [ ] 15-02-PLAN.md — TAX-17 foundations: no-bare-2025 gate, prior-year capital-loss dialect, Capital Loss Carryover Worksheet
+- [x] 15-02-PLAN.md — TAX-17 foundations: no-bare-2025 gate, prior-year capital-loss dialect, Capital Loss Carryover Worksheet
 - [ ] 15-03-PLAN.md — MCP-09: fjs_check pure logic, registration, zero-security-value documentation
 - [ ] 15-04-PLAN.md — PROV-06: the amendment-diff module (Columns A/B/C from two run hashes)
 - [ ] 15-05-PLAN.md — TAX-17 wiring: carryover into Schedule D and Form 1040, year-genericity proof
@@ -660,7 +660,7 @@ Phases 16-18 are backlog: unordered, independent of each other and of the critic
 | 12. Brokerage and Capital-Gain Chain | Week 3 | 5/5 | Complete   | 2026-08-08 |
 | 13. The 65+ Profile and Schedules | Week 3 | 13/13 | Complete   | 2026-08-11 |
 | 14. Acceptance | Week 4 | 0/TBD | Not started | - |
-| 15. Realism Polish and Upstream | Week 5 | 1/6 | In Progress|  |
+| 15. Realism Polish and Upstream | Week 5 | 2/6 | In Progress|  |
 
 ---
 

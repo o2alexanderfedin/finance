@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
 status: executing
-stopped_at: Completed 15-01-PLAN.md — payer report (PROV-08) shipped
-last_updated: "2026-08-11T23:03:54.053Z"
+stopped_at: Completed 15-02-PLAN.md — carryover foundation (TAX-17) shipped
+last_updated: "2026-08-11T23:29:39.380Z"
 last_activity: 2026-08-11
 progress:
   total_phases: 19
   completed_phases: 14
   total_plans: 81
-  completed_plans: 79
-  percent: 98
+  completed_plans: 80
+  percent: 99
 ---
 
 # Project State
@@ -30,7 +30,7 @@ Phase: 15 (realism-polish-and-upstream) — EXECUTING
   13 plans across 5 vertical-slice waves. The plan set was returned ISSUES FOUND by
   `gsd-plan-checker` twice (2 blockers, then 2 more), revised each time, and only
   executed after a third pass returned VERIFICATION PASSED.
-Plan: 2 of 6
+Plan: 3 of 6
 Status: Ready to execute
   `13-VERIFICATION.md` scores **5/5 ROADMAP success criteria at the code level**, with
   `status: human_needed` for one manual-only item (the IRS-figure transcription check).
@@ -40,7 +40,7 @@ Status: Ready to execute
 Next phase: **15 — Realism Polish and Upstream.** Phase 14 is skipped by owner decision;
   read the CARRIED, NOW UNOWNED block under "Session Continuity" before closing v1.
 
-Progress: [██████████] 98%
+Progress: [██████████] 99%
   Phase-based, never plan-based: `completed_plans` exceeds `total_plans` because three
   phases carry an extra FIX-SUMMARY.md beside a plan's own summary, which rounds the
   plan-based figure to a misleading 100%. See `percent_note`.
@@ -177,6 +177,7 @@ proofs and moves with submodule initialization state — which is exactly how a 
 | Phase 13 P12 | 35min | 2 tasks | 1 files |
 | Phase 13 P13 | 20min | 3 tasks | 8 files |
 | Phase 15 P01 | 35min | 3 tasks | 3 files |
+| Phase 15 P02 | 40min | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -375,6 +376,9 @@ Full log in PROJECT.md Key Decisions. Recent decisions affecting current work:
 - [Phase ?]: C-3 resolved via childTaxCredit docstring precision (verified-against-printed-form + governing-provision language), not a guessed Rev. Proc. number — research only confirmed Rev. Proc. 2025-32 section 2.03 for ctcAmount by full-document grep; odcAmount/actcCap/phaseoutThreshold have no confirmed Rev. Proc. citation, so guessing one would repeat the exact sourcing error Pitfall 5 names
 - [Phase 15]: 15-01: payerReportSource and payerReport are two independently hand-authored artifacts, kept in sync across two test tiers rather than a runtime cross-check (07-08/07-09 precedent)
 - [Phase 15]: 15-01: fjs/report/payer's two-dialect scope boundary (1099-INT box1, 1099-DIV box1a only) is deliberate and mechanically additive to widen, documented in Schedule D's Decision-2.5 boundary-comment style
+- [Phase 15]: 15-02: Corrected the year-genericity gate's own suggested regex, which failed its own required positive control (bare 4-letter 'year' identifier); made the leading identifier-prefix group optional and re-verified all controls
+- [Phase 15]: 15-02: Added carryoverWorksheetInputsFromDocument bridging fjs/tax/carryover to fjs/document/prior_year_capital_loss via centsFromString, required by the plan's own frontmatter must_haves.key_links but not spelled out in Task 3's action text
+- [Phase 15]: 15-02: All four money fields in vnd.fjs.prior_year_capital_loss are required, never option -- absent-document-is-zero is handled by the caller never constructing the document, not by an optional field
 
 ### Pending Todos
 
@@ -519,8 +523,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-08-11T23:03:54.044Z
-Stopped at: Completed 15-01-PLAN.md — payer report (PROV-08) shipped
+Last session: 2026-08-11T23:29:39.372Z
+Stopped at: Completed 15-02-PLAN.md — carryover foundation (TAX-17) shipped
 
 Nothing is mid-edit. The working tree is clean.
 
