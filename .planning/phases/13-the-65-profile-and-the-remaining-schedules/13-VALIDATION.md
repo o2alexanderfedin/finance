@@ -138,6 +138,31 @@ failure Phase 1 existed to eliminate. 13-13 already owns the 19→18 prose corre
 REQUIREMENTS.md and ROADMAP.md; this note exists so the check is not skipped because the box is
 already ticked.
 
+### C-3 — The $1,700 ACTC cap's citation names a statute that does not literally contain it (owner: **phase verification / 13-13**)
+
+Found while verifying 13-08. `fjs/tax/params`'s `childTaxCredit.actcCap` is `$1,700.00` cited
+`{ kind: 'code', section: '§24(h)' }`. The **value is correct and verified** —
+13-RESEARCH.md §4 confirms it `[VERIFIED: f1040s8.pdf p2 line16b]`, read off the printed form.
+
+The imprecision is in the *citation*, not the figure. IRC §24(h)(5) is the correct statutory
+home for the refundable cap, but the section carries a base amount that is inflation-adjusted
+into $1,700 for TY2025 by a Rev. Proc. — so a reader who follows the citation to §24(h) does
+not find `$1,700` there. The `Citation` union was widened in 13-01 precisely so a citation is
+honest about what kind of source backs each figure; "read off the printed form line 16b" is not
+faithfully expressed by either `code` or `revProc` as currently written.
+
+Same question applies to `odcAmount` ($500) and `phaseoutThreshold` ($400,000/$200,000), which
+are also cited `kind: 'code'` §24(h).
+
+**Not a blocker** — no computed number is wrong. Resolve by either (a) citing the Rev. Proc.
+that performs the inflation adjustment for the adjusted figures, keeping `§24(h)` for the
+mechanism, or (b) recording in the params docstring that these figures are verified against the
+printed form and that `§24(h)` names the governing provision rather than the literal amount.
+(b) is cheaper and matches how research actually verified them.
+
+Verify at phase close: every `kind: 'code'` citation either contains its literal amount in the
+cited section, or its docstring says where the amount actually comes from.
+
 ---
 
 ## Validation Sign-Off
