@@ -77,15 +77,11 @@
  * Plan 13-04's job, mirroring `fjs/schedule/b`'s own "standalone,
  * independently callable" boundary.
  *
- * ## RED phase (Task 2, TDD)
- *
- * Every exported function below is currently a stub that always throws —
- * every proof leaf that calls one is expected to FAIL. The GREEN commit
- * replaces each stub with the real, printed-form-transcribed arithmetic.
- *
  * @module
  */
-import { assert, assertEq, todo } from 'functionalscript/fjs/asserts/module.f.js'
+import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
+import { of, multiply, halfUp } from '../../types/rational/module.f.js'
+import { centsFromString } from '../../exact/module.f.js'
 import { taxParamsByYear } from '../../tax/params/module.f.js'
 
 /** @import { TaxParamSet, IndividualFilingStatus } from '../../tax/params/module.f.js' */
@@ -98,6 +94,16 @@ import { taxParamsByYear } from '../../tax/params/module.f.js'
  * @template T
  * @typedef {{ readonly documentHash: string, readonly value: T }} Stored
  */
+
+/**
+ * Rounds `cents * (percent / 100)` to the nearest cent, ties away from zero
+ * (IRS half-up) — line34's own 6% multiplication. Reimplemented locally
+ * (not imported from `fjs/tax/ssb`, which does not export it) per this
+ * project's "reimplement an idiom you cannot import" precedent
+ * (`fjs/schedule/b`).
+ * @type {(cents: bigint) => (percent: bigint) => bigint}
+ */
+const percentOfCents = cents => percent => halfUp(multiply(of(cents)(1n))(of(percent)(100n)))
 
 /**
  * TAX-15's named income function for the senior-deduction phase-out
@@ -117,8 +123,17 @@ import { taxParamsByYear } from '../../tax/params/module.f.js'
  * @type {(agiCents: bigint) => bigint}
  */
 export const seniorDeductionPhaseoutIncome = agiCents => {
-    assert(typeof agiCents === 'bigint', 'RED phase stub')
-    return todo()
+    // Add-backs, per the printed form (see this function's own docstring
+    // above) — every term currently zero.
+    const puertoRicoExcludedIncome = 0n
+    const form2555Line45ForeignEarnedIncomeExclusion = 0n
+    const form2555Line50ForeignHousingExclusion = 0n
+    const form4563Line15AmericanSamoaExclusion = 0n
+    return agiCents
+        + puertoRicoExcludedIncome
+        + form2555Line45ForeignEarnedIncomeExclusion
+        + form2555Line50ForeignHousingExclusion
+        + form4563Line15AmericanSamoaExclusion
 }
 
 /**
@@ -135,8 +150,21 @@ export const seniorDeductionPhaseoutIncome = agiCents => {
  * @type {(agiCents: bigint) => SchedulePartIResult}
  */
 export const scheduleOneAPartI = agiCents => {
-    assert(typeof agiCents === 'bigint', 'RED phase stub')
-    return todo()
+    // 1. "Enter the amount from Form 1040 ... line 11b" (AGI).
+    const line1 = agiCents
+    // 2a. Puerto Rico excluded income -- not modeled, always 0.
+    const line2a = 0n
+    // 2b. Form 2555 line 45 -- refused if declared, always 0 here.
+    const line2b = 0n
+    // 2c. Form 2555 line 50 -- same.
+    const line2c = 0n
+    // 2d. Form 4563 line 15 -- not modeled, always 0.
+    const line2d = 0n
+    // 2e. "Add lines 2a through 2d."
+    const line2e = line2a + line2b + line2c + line2d
+    // 3. "Add lines 1 and 2e." -- Schedule 1-A's shared MAGI.
+    const line3 = line1 + line2e
+    return { line1, line2a, line2b, line2c, line2d, line2e, line3 }
 }
 
 /**
@@ -164,10 +192,59 @@ export const scheduleOneAPartI = agiCents => {
  * @type {(taxParamSet: TaxParamSet) => (input: SchedulePartVInput) => SchedulePartVResult}
  */
 export const scheduleOneAPartV = taxParamSet => input => {
-    assert(typeof taxParamSet === 'object', 'RED phase stub')
-    assert(typeof input === 'object', 'RED phase stub')
-    return todo()
+    const {
+        status, magiCents,
+        taxpayerHasValidSsnAndBornBefore1961Jan2, spouseHasValidSsnAndBornBefore1961Jan2,
+    } = input
+    // Decision 5.4/Pitfall 3: the MFS short-circuit runs BEFORE line31 is
+    // even assigned -- a filing-status gate, not a consequence of the
+    // arithmetic below.
+    if (status === 'marriedFilingSeparately') {
+        return { line31: 0n, line32: 0n, line33: 0n, line34: 0n, line35: 0n, line36a: 0n, line36b: 0n, line37: 0n }
+    }
+    const { seniorDeduction } = taxParamSet
+    const mfj = status === 'marriedFilingJointly'
+    // 31. "Enter the amount from Part I, line 3" -- the shared MAGI.
+    const line31 = magiCents
+    // 32. Filing-status threshold -- $150,000 MFJ, $75,000 every other
+    //     status this branch reaches (single/HoH/QSS).
+    const line32 = centsFromString(seniorDeduction.phaseoutThreshold[status].amount)
+    // 33. "Subtract line 32 from line 31. If zero or less, skip line 34 and
+    //     enter $6,000 on line 35."
+    const line33 = line31 > line32 ? line31 - line32 : 0n
+    // 34. "Multiply line 33 by 6% (0.06)." CONTINUOUS -- never rounded to a
+    //     $1,000 increment (Decision 5.5).
+    const line34 = percentOfCents(line33)(BigInt(seniorDeduction.phaseoutRatePercent))
+    const baseCents = centsFromString(seniorDeduction.amount.amount)
+    // 35. "Subtract line 34 from $6,000. If zero or less, enter -0-."
+    const line35 = line34 < baseCents ? baseCents - line34 : 0n
+    // 36a. "If you have a valid SSN and were born before January 2, 1961,
+    //      enter the amount from line 35" -- otherwise blank (0).
+    const line36a = taxpayerHasValidSsnAndBornBefore1961Jan2 ? line35 : 0n
+    // 36b. Same test, for the spouse -- only reachable when MFJ.
+    const line36b = mfj && spouseHasValidSsnAndBornBefore1961Jan2 ? line35 : 0n
+    // 37. "Add lines 36a and 36b." -- "Enhanced deduction for seniors."
+    const line37 = line36a + line36b
+    assert(line37 >= 0n, ['Schedule 1-A line 37 must never be negative', line37])
+    return { line31, line32, line33, line34, line35, line36a, line36b, line37 }
 }
+
+/**
+ * A line that is zero because the taxpayer declared no such income, citing
+ * the return profile's own `declaredKinds` box — reimplemented locally,
+ * private, per `fjs/schedule/b`'s own precedent (this module does not
+ * import from `fjs/form1040/core`, which does not export this helper).
+ * @type {(profile: Stored<ReturnProfile>) => (rule: string) => ReportLine}
+ */
+const profileDeclaredZeroLine = profile => rule => ({
+    value: 0n,
+    sources: [{
+        documentHash: profile.documentHash,
+        boxPath: 'declaredKinds',
+        value: JSON.stringify(profile.value.declaredKinds),
+    }],
+    rule,
+})
 
 /**
  * @typedef {{
@@ -184,9 +261,17 @@ export const scheduleOneAPartV = taxParamSet => input => {
  * @type {(profile: Stored<ReturnProfile>) => (line37: bigint) => SchedulePartVIResult}
  */
 export const scheduleOneAPartVI = profile => line37 => {
-    assert(typeof profile === 'object', 'RED phase stub')
-    assert(typeof line37 === 'bigint', 'RED phase stub')
-    return todo()
+    const zero = profileDeclaredZeroLine(profile)
+    // 13. "No Tax on Tips" (Part II) -- not modeled this phase; see this
+    //     module's own docstring, "Parts II/III/IV are documented zeros".
+    const line13 = zero('Schedule 1-A line 13 (No Tax on Tips, Part II -- not modeled this phase)')
+    // 21. "No Tax on Overtime" (Part III) -- same boundary.
+    const line21 = zero('Schedule 1-A line 21 (No Tax on Overtime, Part III -- not modeled this phase)')
+    // 30. "No Tax on Car Loan Interest" (Part IV) -- same boundary.
+    const line30 = zero('Schedule 1-A line 30 (No Tax on Car Loan Interest, Part IV -- not modeled this phase)')
+    // 38. "Add lines 13, 21, 30, and 37." -> Form 1040/1040-SR line 13b.
+    const line38 = line13.value + line21.value + line30.value + line37
+    return { line13, line21, line30, line37, line38 }
 }
 
 /**
@@ -212,9 +297,18 @@ export const scheduleOneAPartVI = profile => line37 => {
  * @type {(taxParamSet: TaxParamSet) => (input: ScheduleOneAInput) => ScheduleOneA}
  */
 export const scheduleOneA = taxParamSet => input => {
-    assert(typeof taxParamSet === 'object', 'RED phase stub')
-    assert(typeof input === 'object', 'RED phase stub')
-    return todo()
+    const {
+        status, agiCents,
+        taxpayerHasValidSsnAndBornBefore1961Jan2, spouseHasValidSsnAndBornBefore1961Jan2,
+        profile,
+    } = input
+    const partI = scheduleOneAPartI(agiCents)
+    const partV = scheduleOneAPartV(taxParamSet)({
+        status, magiCents: partI.line3,
+        taxpayerHasValidSsnAndBornBefore1961Jan2, spouseHasValidSsnAndBornBefore1961Jan2,
+    })
+    const partVI = scheduleOneAPartVI(profile)(partV.line37)
+    return { partI, partV, partVI }
 }
 
 // ── Tests ────────────────────────────────────────────────────────────────────
