@@ -217,6 +217,90 @@ Out of scope, and staying refused: household employee wages (1b), Medicaid waive
     exact ordering, and it exists so that no kind is ever modeled-but-unwired — the state in
     which the scope guard reports a line as computed while it still returns `declaredZero`.
 
+### 5. Resolutions From Research (added 2026-08-10, after `13-RESEARCH.md`)
+
+Research transcribed all five forms from published final 2025 IRS PDFs and surfaced three
+contradictions and three open questions. These are the resolutions. They amend, and where
+they conflict take precedence over, the decisions above.
+
+- **5.1 — The IRA-deduction refusal fires on a NEW PROFILE FIELD, not on the coarse kind.**
+  `vnd.fjs.return_profile` gains `iraDeductionDeclared: option(true)`. The frozen 50-kind
+  vocabulary carries exactly one kind (`scheduleOneAdjustments`) for the whole of Schedule 1
+  Part II, so it cannot distinguish an IRA deduction — which creates Decision 3.3's cycle —
+  from an HSA or educator-expense adjustment, which does not. A new *field* keeps the 50-kind
+  freeze intact and is the same mechanism Decisions 2.5 and 4.1 already use.
+
+  Research confirmed the cycle's exact boundary: SSB worksheet **line 6** adds back Schedule 1
+  lines 11–20, 23 and 25 — every Part II adjustment **except** the student-loan-interest
+  deduction (line 21) — and of those, only the IRA deduction (line 20) has an amount that
+  itself depends on taxable social security (Pub 590-A Worksheet 1-1). Refusing on any
+  declared adjustment would therefore reject returns this engine can compute correctly.
+
+- **5.2 — `Citation` in `fjs/tax/params` widens to a DISCRIMINATED UNION.** This amends
+  Decision 3.1's implication that the OBBBA parameters share the existing citation shape.
+  Research grepped Rev. Proc. 2025-32 in full: it backs **only** the $2,200 CTC (§2.03) among
+  this phase's new numbers. The senior deduction ($6,000, 6%, $75k/$150k) and the SALT cap
+  ($40,000, 30%, $500k/$250k, $10,000 floor) are direct OBBBA statute; the 7.5% medical floor
+  is long-standing IRC §213(a). The existing `{ revProc, section, effectiveDate }` has no
+  honest field for either.
+
+  New shape: `{ kind: 'revProc', revProc, section, effectiveDate } | { kind: 'publicLaw',
+  publicLaw, section, effectiveDate } | { kind: 'code', section, effectiveDate }`. The change
+  is **additive** — every existing entry becomes `kind: 'revProc'` with no value change — and
+  it is what keeps `unmodifiedParametersCite2024_40Only`-style proofs meaningful, because a
+  proof asserting "cites a Rev. Proc." stops meaning anything the moment `revProc` is allowed
+  to hold a Public Law number.
+
+- **5.3 — The Social Security Benefits Worksheet has EIGHTEEN lines, not nineteen, and the
+  planning documents are corrected in this phase.** `[VERIFIED: i1040gi.pdf (2025) p32]` —
+  lines 1 through 18, no lettered sub-lines. REQUIREMENTS.md's TAX-10 and ROADMAP.md's
+  criterion 2 both say "19-line". Build **18** named line functions plus a count-guard proof
+  asserting 18, and fix the prose in both planning documents in the same phase. Phase 1 exists
+  precisely so that no later phase is planned against text that dissolves on contact; leaving
+  a known-false count for Phase 17 to find would be that failure committed knowingly.
+
+- **5.4 — The senior deduction is CATEGORICALLY UNAVAILABLE to married-filing-separately
+  filers, at any income.** `[VERIFIED: f1040s1a.pdf (2025) p2, Part V caution: "If married,
+  you must file jointly to claim this deduction."]` CONTEXT.md was silent on filing-status
+  eligibility. Part V must **short-circuit to `$0` for MFS before the phase-out arithmetic
+  runs** — not merely arrive at `$0` through it. The form's face alone under-specifies this:
+  MFS shares the non-MFJ $75,000 threshold, so an MFS filer with low income would otherwise
+  compute a nonzero deduction. Only the caption states the exclusion. This needs its own proof.
+
+- **5.5 — The senior-deduction phase-out is CONTINUOUS, unlike its own siblings.** Schedule
+  1-A's tips / overtime / car-loan-interest parts round the phase-out to $1,000 increments;
+  **Part V does not**. Schedule 8812's CTC/ODC phase-out *is* stepped (5% per $1,000 rounded
+  up — a true cliff at the threshold). Getting these backwards is the phase's most likely
+  silent-wrong-number failure, so each phase-out carries `threshold − 1¢ / threshold /
+  threshold + 1¢` boundary proofs per TAX-04 at the exact dollar values research names.
+
+- **5.6 — FOUR named income functions, not three.** Decision 3.5's three examples missed
+  Schedule 8812's own phase-out income. Research transcribed all three worksheets side by side
+  and found the senior-deduction phase-out, the SALT cap phase-down, and the CTC/ODC phase-out
+  read the **identical** measure — AGI plus the Puerto Rico exclusion plus Form 2555 lines
+  45/50 plus Form 4563 line 15 — and since all three add-backs are unmodeled and stay refused,
+  all three are *provably equal to bare AGI* for every return this engine can compute.
+
+  They are still written as **four separately named functions** (the three above plus the
+  social-security combined-income measure), each stating its own add-back list. Identical
+  values stored independently is the established precedent here —
+  `qssParametersEqualMfjAndAreStoredIndependently` in `fjs/tax/params` is the same argument —
+  and it is the entire point of TAX-15: these four coincide *today*, for reasons that are
+  contingent on what is unmodeled, not on the rules being the same rule.
+
+- **5.7 — Schedule 8812's citizenship/national/resident-alien test for the ODC is an ACCEPTED
+  TRUST BOUNDARY**, documented in the module's own docstring rather than added to the
+  `dependents` array. The taxpayer's act of declaring a dependent already asserts it, and the
+  printed form keys the CTC-vs-ODC classification itself on only two facts — age and SSN
+  validity — both of which Decision 4.1's array carries. This mirrors how `fjs/schedule/b`
+  documents its Form 8815 boundary.
+
+- **5.8 — Neither OBBBA itemized-deduction change applies to TY2025.** The 0.5% charitable AGI
+  floor and the high-income "2/37ths" haircut are **TY2026**, confirmed by the 2025
+  instructions' own "What's New". Schedule A must **not** implement either. Recording this
+  because both are widely discussed as if current, and a plan that adds them would produce a
+  confidently wrong return.
+
 ### Claude's Discretion
 
 - Module paths for the new schedules, following the established `fjs/schedule/<letter>` and
