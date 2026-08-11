@@ -25,18 +25,22 @@
  *   yet. The proofs below pin faithful round-tripping, including two
  *   entries for the same state, which is what "faithfully" has to mean.
  *
- *   **As of Phase 13 (TAX-13, 13-CONTEXT.md Decision 2.2), a PROOF in
- *   `fjs/schedule/a` now READS `stateIncomeTax` from this array** — not to
- *   compute anything, but to watch whether the taxpayer-asserted Schedule A
- *   line 5a (state/local income tax paid, under the income-tax election) is
- *   at least the amount already withheld here, since withheld tax is
- *   necessarily paid. That proof never feeds `stateIncomeTax` into any
- *   computed line — line 5a stays taxpayer-asserted, never derived from
- *   this box — so the claim above stays true of COMPUTATION. It is no
- *   longer true that "nothing here reads them": a reader now exists, and it
- *   is a drift check, not a federal-line computation. Both claims are
- *   deliberately narrower than the original paragraph and are both true
- *   today.
+ *   **As of Phase 13 (TAX-13, 13-CONTEXT.md Decision 2.2), `fjs/schedule/a`
+ *   now READS `stateIncomeTax` from this array in its own REAL computation**
+ *   (WR-02, 13-REVIEW.md widened this from "a PROOF reads it" to "the
+ *   production path reads it": `scheduleA`'s own withholding-drift check is
+ *   wired into every return `fjs/form1040/core` processes, not merely into
+ *   this module's own hand-written fixtures) — not to compute anything, but
+ *   to WATCH whether the taxpayer-asserted Schedule A line 5a (state/local
+ *   income tax paid, under the income-tax election) is at least the amount
+ *   already withheld here, since withheld tax is necessarily paid, refusing
+ *   the whole return if it is not. That check never feeds `stateIncomeTax`
+ *   into any computed VALUE — line 5a stays taxpayer-asserted, never
+ *   derived from this box — so the claim above stays true of COMPUTING A
+ *   FEDERAL LINE FROM IT. It is no longer true that "nothing here reads
+ *   them": a reader now exists, and it runs on every return, not merely a
+ *   drift check that only proofs exercise. Both claims are deliberately
+ *   narrower than the original paragraph and are both true today.
  *
  * Boxes 9 and 14 are deliberately not modelled (YAGNI): box 9 is defunct,
  * and box 14 is a free-form employer field with no defined semantics —

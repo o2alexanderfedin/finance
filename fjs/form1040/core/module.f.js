@@ -737,13 +737,20 @@ export const form1040IncomeLines = taxParamSet => inputs => {
         itemizedEntries,
         medicalExpenseEntries,
         profile,
+        // WR-02 (13-REVIEW.md): the REAL stored W-2/1099-R documents this
+        // return already carries -- `scheduleA` observes the same
+        // documents `form1040IncomeLines` (this function) does, not
+        // fixtures the drift check wrote for itself.
+        w2Forms: w2s,
+        oneZeroNineNineRForms: retirementForms,
     })
-    // CR-01/WR-04 (13-REVIEW.md): a document-data-sufficiency refusal from
-    // Schedule A (a mutually-exclusive line 5a election, or an unrecognized
-    // itemized-deductions `lineTag`) stops the WHOLE return before any
-    // further line is built — threaded exactly like the Schedule D
-    // absent-basis guard and the IRA-deduction guard above, one function
-    // over: `unmodeled: []`, since this names no `fjs/return/scope` kind.
+    // CR-01/WR-04/WR-02 (13-REVIEW.md): a document-data-sufficiency refusal
+    // from Schedule A (a mutually-exclusive line 5a election, an
+    // unrecognized itemized-deductions `lineTag`, or the SALT withholding
+    // drift check firing) stops the WHOLE return before any further line is
+    // built — threaded exactly like the Schedule D absent-basis guard and
+    // the IRA-deduction guard above, one function over: `unmodeled: []`,
+    // since this names no `fjs/return/scope` kind.
     if (scheduleAResult.kind === 'error') {
         return { kind: 'error', message: scheduleAResult.message, unmodeled: [] }
     }
@@ -4013,6 +4020,67 @@ export const proof = {
             })).line17
             assertEq(crossCheck, 1800000n, '$18,000.00, independently confirmed above the BASE $15,750.00')
             assert(crossCheck > 1575000n, ['expected the itemized total to exceed the base standard deduction', crossCheck])
+        },
+    },
+    // WR-02 (13-REVIEW.md): Decision 2.2's withholding-drift check, now
+    // wired into `scheduleA`'s real computation, exercised through the FULL
+    // `form1040Report(...)` entry point — a genuinely too-low asserted
+    // `saltIncomeTax` entry sitting next to a W-2 whose `stateIncomeTax` box
+    // shows more was withheld must refuse the WHOLE return, not compute
+    // silently.
+    wr02SaltWithholdingDriftWholeReturn: {
+        understatedSaltIncomeTaxNextToARealW2RefusesTheWholeReturn: () => {
+            const w2Form = {
+                ...w2Document('sha256-w5-drift-w2')('90000.00'),
+                value: {
+                    ...w2Document('sha256-w5-drift-w2')('90000.00').value,
+                    box15Through20: [{ state: 'CA', stateIncomeTax: '4200.00' }],
+                },
+            }
+            const itemizedForm = itemizedDeductionsDocument('sha256-w5-drift-itemized')([
+                // Asserted $1,000.00 -- genuinely BELOW the $4,200.00 CA
+                // withholding this SAME return's own W-2 already reports.
+                { lineTag: 'saltIncomeTax', amount: '1000.00' },
+            ])
+            /** @type {ReturnProfile} */
+            const profile = {
+                ...singleProfile,
+                declaredKinds: ['wages', 'itemizedDeductions'],
+            }
+            const inputs = inputsOf(storedProfile(profile))([w2Form])([])([])([])([])([])([itemizedForm])([])
+            const outcome = form1040Report(taxParams2025)(inputs)
+            assertEq(outcome.kind, 'error', 'expected the whole return to refuse on the withholding drift')
+            if (outcome.kind === 'error') {
+                assert(
+                    outcome.message.includes('asserted') && outcome.message.includes('storedWithholding'),
+                    ['expected the refusal to name the withholding drift', outcome.message],
+                )
+                assertEq(outcome.unmodeled.length, 0, 'a data-sufficiency refusal, never a fjs/return/scope kind')
+            }
+        },
+        // The control: the SAME W-2, with the asserted SALT income tax
+        // raised to cover the withholding, computes the WHOLE return
+        // normally -- proving the wiring refuses the drift specifically,
+        // not every return that carries a W-2 alongside itemized SALT.
+        consistentSaltIncomeTaxNextToTheSameW2ComputesNormally: () => {
+            const w2Form = {
+                ...w2Document('sha256-w5-nodrift-w2')('90000.00'),
+                value: {
+                    ...w2Document('sha256-w5-nodrift-w2')('90000.00').value,
+                    box15Through20: [{ state: 'CA', stateIncomeTax: '4200.00' }],
+                },
+            }
+            const itemizedForm = itemizedDeductionsDocument('sha256-w5-nodrift-itemized')([
+                { lineTag: 'saltIncomeTax', amount: '5000.00' },
+            ])
+            /** @type {ReturnProfile} */
+            const profile = {
+                ...singleProfile,
+                declaredKinds: ['wages', 'itemizedDeductions'],
+            }
+            const inputs = inputsOf(storedProfile(profile))([w2Form])([])([])([])([])([])([itemizedForm])([])
+            const outcome = form1040Report(taxParams2025)(inputs)
+            assert(outcome.kind === 'ok', ['expected the consistent return to compute, not refuse', outcome])
         },
     },
     // Plan 13-10 Task 3 — Slice 4's own vertical cut, end to end (closes

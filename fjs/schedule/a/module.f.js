@@ -10,13 +10,14 @@
  * pages.
  *
  * This is a STANDALONE, independently callable pure function over stored
- * `vnd.fjs.itemized_deductions`/`vnd.fjs.medical_expenses` entries plus the
- * declared return profile — the same relationship `fjs/schedule/b` and
- * `fjs/schedule/1a` have to their own inputs. It is NOT wired into Form
- * 1040's own line 12e or `deductionChoice` (both 13-07's job), and it does
- * not consult the return-scope guard's own classification function. It
- * imports NOTHING at runtime from `fjs/tax/deduction`, `fjs/return/scope`,
- * or `fjs/form1040/`.
+ * `vnd.fjs.itemized_deductions`/`vnd.fjs.medical_expenses` entries, the
+ * declared return profile, and the stored W-2/1099-R documents Decision
+ * 2.2's withholding-drift check reads (WR-02) — the same relationship
+ * `fjs/schedule/b` and `fjs/schedule/1a` have to their own inputs. It is NOT
+ * wired into Form 1040's own line 12e or `deductionChoice` (both 13-07's
+ * job), and it does not consult the return-scope guard's own classification
+ * function. It imports NOTHING at runtime from `fjs/tax/deduction`,
+ * `fjs/return/scope`, or `fjs/form1040/`.
  *
  * ## Two DIFFERENT kinds of "boundary" on this schedule — do not conflate them
  *
@@ -79,11 +80,16 @@
  * module actually reads (13-CONTEXT.md Decision 2.1 keeps `lineTag` a free
  * string at the DIALECT boundary; the recognized set is known only HERE,
  * at the schedule that consumes it) is a typo or a stale tag, not a
- * legitimate zero. Both refuse via `{ kind: 'error' }` — the SAME shape
- * `fjs/schedule/d`/`fjs/form8812` already use for their own
- * document-data-sufficiency refusals (12.1 Decision 2.6's category), never
- * a `fjs/return/scope` kind (this is not a declared-but-unmodeled-kind
- * problem) and never a silent sum or a silent drop.
+ * legitimate zero. A THIRD case (WR-02): the income-tax election's own
+ * asserted amount drifting BELOW the state/local income tax already
+ * withheld on stored W-2s/1099-Rs (Decision 2.2's own withholding-drift
+ * check, now wired into this module's real computation — see "Decision
+ * 2.2's withholding-drift check" below). All three refuse via
+ * `{ kind: 'error' }` — the SAME shape `fjs/schedule/d`/`fjs/form8812`
+ * already use for their own document-data-sufficiency refusals (12.1
+ * Decision 2.6's category), never a `fjs/return/scope` kind (this is not a
+ * declared-but-unmodeled-kind problem) and never a silent sum or a silent
+ * drop.
  *
  * ## Neither TY2026 OBBBA itemized-deduction change is implemented
  * (Decision 5.8)
@@ -140,14 +146,22 @@ import { taxParamsByYear } from '../../tax/params/module.f.js'
  * already computed, the itemized-deductions entries flattened from the ONE
  * stored `vnd.fjs.itemized_deductions` document (each entry paired with
  * that document's own hash), the medical-expense entries flattened from the
- * ONE stored `vnd.fjs.medical_expenses` document the same way, and the one
- * return profile a return has exactly one of.
+ * ONE stored `vnd.fjs.medical_expenses` document the same way, the one
+ * return profile a return has exactly one of, and the STORED W-2/1099-R
+ * documents Decision 2.2's withholding-drift check reads (WR-02,
+ * 13-REVIEW.md — see this module's own docstring, "Decision 2.2's
+ * withholding-drift check"). The two document arrays are OPTIONAL
+ * (`?? []` inside {@link scheduleA}): a caller/fixture that supplies
+ * neither exercises every line exactly as before WR-02 landed, since the
+ * drift check is a no-op with no documents to compare against.
  * @typedef {{
  *   readonly status: IndividualFilingStatus,
  *   readonly agiCents: bigint,
  *   readonly itemizedEntries: readonly Stored<ItemizedEntry>[],
  *   readonly medicalExpenseEntries: readonly Stored<MedicalExpenseEntry>[],
  *   readonly profile: Stored<ReturnProfile>,
+ *   readonly w2Forms?: readonly Stored<W2>[],
+ *   readonly oneZeroNineNineRForms?: readonly Stored<OneZeroNineNineR>[],
  * }} ScheduleAInput
  */
 
@@ -402,6 +416,74 @@ const saltCapWorksheet = taxParamSet => input => {
     return { w1, w4, w5, w6, w7, w8, w9, w10 }
 }
 
+// ── Decision 2.2's withholding-drift check (WR-02, 13-REVIEW.md) ──────────
+//
+// WIRED into `scheduleA`'s own real computation below, not merely this
+// module's own proof fixtures — `grep`'s single-caller-site finding
+// (13-REVIEW.md WR-02) no longer holds: `scheduleA` itself is a second,
+// production caller.
+
+/**
+ * Decision 2.2's own withholding-drift check. Asserts (throws on failure)
+ * that the taxpayer-asserted `saltIncomeTax`-tagged itemized entries sum to
+ * AT LEAST the state/local income tax already withheld and reported on
+ * stored W-2s/1099-Rs — withheld tax is necessarily paid, so the asserted
+ * amount can never honestly be less.
+ *
+ * Applies ONLY when the income-tax election is in force: if no
+ * `saltIncomeTax`-tagged entry is present (the taxpayer instead elected the
+ * general-sales-tax line, or asserted nothing at all on line 5a), there is
+ * nothing to compare, and this is a silent no-op — never a refusal for a
+ * return that legitimately elected the sales-tax line.
+ *
+ * Stays THROW-based (never returns an outcome directly) so this module's own
+ * proofs can keep exercising it in isolation via {@link refuses}, exactly as
+ * before WR-02; {@link scheduleA} is the ONE production caller, and it
+ * catches the throw and translates it into `{ kind: 'error' }` (this
+ * codebase's merge-note precedent that catching a bare thrown value in
+ * shipped production code is legitimate — `fjs/exec/module.f.js` already
+ * does it — never branching on `instanceof Error`, since nothing here ever
+ * throws one).
+ *
+ * `fjs/document/w2`'s `stateIncomeTax` (inside `box15Through20`) and
+ * `fjs/document/1099r`'s `stateTaxWithheld` (inside `stateLocal`) — see both
+ * modules' own amended docstrings, which now state this check reads these
+ * fields, from `scheduleA`'s real computation, not merely from a proof.
+ * Reading them still never FEEDS them into any computed line — line 5a stays
+ * taxpayer-asserted, never derived from either box; this check only GATES a
+ * refusal.
+ * @type {(itemizedEntries: readonly Stored<ItemizedEntry>[]) => (w2Forms: readonly Stored<W2>[]) => (oneZeroNineNineRForms: readonly Stored<OneZeroNineNineR>[]) => void}
+ */
+const assertAssertedSaltIncomeTaxIsAtLeastStoredWithholding = itemizedEntries => w2Forms => oneZeroNineNineRForms => {
+    const incomeTaxEntries = itemizedEntries.filter(entry => entry.value.lineTag === 'saltIncomeTax')
+    if (incomeTaxEntries.length === 0) {
+        // The general-sales-tax election is in force (or nothing at all is
+        // asserted on line 5a) -- this check watches the income-tax
+        // election only.
+        return
+    }
+    const assertedCents = incomeTaxEntries.reduce(
+        (total, entry) => total + centsFromString(entry.value.amount), 0n)
+    const w2WithholdingCents = w2Forms.reduce((total, form) =>
+        total + (form.value.box15Through20 ?? []).reduce((rowTotal, row) =>
+            rowTotal + (row.stateIncomeTax === undefined ? 0n : centsFromString(row.stateIncomeTax)), 0n),
+        0n)
+    const oneZeroNineNineRWithholdingCents = oneZeroNineNineRForms.reduce((total, form) =>
+        total + (form.value.stateLocal ?? []).reduce((rowTotal, row) =>
+            rowTotal + (row.stateTaxWithheld === undefined ? 0n : centsFromString(row.stateTaxWithheld)), 0n),
+        0n)
+    const storedWithholdingCents = w2WithholdingCents + oneZeroNineNineRWithholdingCents
+    assert(
+        assertedCents >= storedWithholdingCents,
+        [
+            'Schedule A line 5a (SALT income tax, taxpayer-asserted) is below the state/local '
+            + 'income tax already withheld and reported on stored W-2s/1099-Rs -- withheld tax '
+            + 'is necessarily paid',
+            'asserted', assertedCents, 'storedWithholding', storedWithholdingCents,
+        ],
+    )
+}
+
 // ── Schedule A itself ───────────────────────────────────────────────────────
 
 /**
@@ -446,6 +528,8 @@ const saltCapWorksheet = taxParamSet => input => {
  */
 export const scheduleA = taxParamSet => input => {
     const { status, agiCents, itemizedEntries, medicalExpenseEntries, profile } = input
+    const w2Forms = input.w2Forms ?? []
+    const oneZeroNineNineRForms = input.oneZeroNineNineRForms ?? []
 
     // WR-04 (13-REVIEW.md): an unrecognized `lineTag` must refuse LOUDLY,
     // before any line is built -- never silently drop money from line 17's
@@ -485,6 +569,21 @@ export const scheduleA = taxParamSet => input => {
         }
     }
     const line5a = fromEntries('Schedule A line 5a')(addBoxSums(saltIncomeTaxSum)(saltGeneralSalesTaxSum))
+    // WR-02 (13-REVIEW.md): Decision 2.2's withholding-drift check, WIRED
+    // into this real computation path (previously exercised only by its own
+    // hand-written proof fixtures). Catches the check's own throw and
+    // translates it into this module's `{ kind: 'error' }` shape -- the
+    // SAME data-sufficiency refusal category as CR-01/WR-04 above, never a
+    // `fjs/return/scope` kind.
+    try {
+        assertAssertedSaltIncomeTaxIsAtLeastStoredWithholding(itemizedEntries)(w2Forms)(oneZeroNineNineRForms)
+    } catch (thrown) {
+        assert(
+            typeof thrown === 'string' || Array.isArray(thrown),
+            ['expected a bare thrown value: a string or an array', thrown],
+        )
+        return { kind: 'error', message: typeof thrown === 'string' ? thrown : thrown.join(' ') }
+    }
     const line5b = fromEntries('Schedule A line 5b')(byTag('realEstateTax'))
     const line5c = fromEntries('Schedule A line 5c')(byTag('personalPropertyTax'))
     const line5d = line5a.value + line5b.value + line5c.value
@@ -535,11 +634,14 @@ export const scheduleA = taxParamSet => input => {
     }
 }
 
-// ── Decision 2.2's withholding-drift proof ─────────────────────────────────
+// ── Decision 2.2's withholding-drift check — test-only helper ──────────────
 //
-// A PROOF, never production logic — `scheduleA`'s own `line5a` above never
-// reads `fjs/document/w2` or `fjs/document/1099r`, and nothing below feeds
-// back into `ScheduleA`. See this module's own function docstring.
+// `assertAssertedSaltIncomeTaxIsAtLeastStoredWithholding` itself now lives
+// ABOVE `scheduleA` (WR-02, 13-REVIEW.md) — it is production logic, wired
+// into every return's real computation, not merely this module's own proof
+// fixtures. `refuses` below stays a test-only helper: it lets this module's
+// OWN proofs exercise the throwing check function directly, independent of
+// `scheduleA`'s try/catch translation into `{ kind: 'error' }`.
 
 /**
  * Runs a call that must REFUSE, and hands the thrown value's text to
@@ -562,55 +664,6 @@ const refuses = call => check => {
         check(typeof thrown === 'string' ? thrown : thrown.join(' '))
     }
     assert(threw, 'expected the call to refuse, but it completed without throwing')
-}
-
-/**
- * Decision 2.2's own withholding-drift check. Asserts (throws on failure)
- * that the taxpayer-asserted `saltIncomeTax`-tagged itemized entries sum to
- * AT LEAST the state/local income tax already withheld and reported on
- * stored W-2s/1099-Rs — withheld tax is necessarily paid, so the asserted
- * amount can never honestly be less.
- *
- * Applies ONLY when the income-tax election is in force: if no
- * `saltIncomeTax`-tagged entry is present (the taxpayer instead elected the
- * general-sales-tax line, or asserted nothing at all on line 5a), there is
- * nothing to compare, and this is a silent no-op — never a refusal for a
- * return that legitimately elected the sales-tax line.
- *
- * `fjs/document/w2`'s `stateIncomeTax` (inside `box15Through20`) and
- * `fjs/document/1099r`'s `stateTaxWithheld` (inside `stateLocal`) — see
- * both modules' own amended docstrings, which now state a PROOF reads
- * these fields even though computation still never does.
- * @type {(itemizedEntries: readonly Stored<ItemizedEntry>[]) => (w2Forms: readonly Stored<W2>[]) => (oneZeroNineNineRForms: readonly Stored<OneZeroNineNineR>[]) => void}
- */
-const assertAssertedSaltIncomeTaxIsAtLeastStoredWithholding = itemizedEntries => w2Forms => oneZeroNineNineRForms => {
-    const incomeTaxEntries = itemizedEntries.filter(entry => entry.value.lineTag === 'saltIncomeTax')
-    if (incomeTaxEntries.length === 0) {
-        // The general-sales-tax election is in force (or nothing at all is
-        // asserted on line 5a) -- this proof watches the income-tax
-        // election only.
-        return
-    }
-    const assertedCents = incomeTaxEntries.reduce(
-        (total, entry) => total + centsFromString(entry.value.amount), 0n)
-    const w2WithholdingCents = w2Forms.reduce((total, form) =>
-        total + (form.value.box15Through20 ?? []).reduce((rowTotal, row) =>
-            rowTotal + (row.stateIncomeTax === undefined ? 0n : centsFromString(row.stateIncomeTax)), 0n),
-        0n)
-    const oneZeroNineNineRWithholdingCents = oneZeroNineNineRForms.reduce((total, form) =>
-        total + (form.value.stateLocal ?? []).reduce((rowTotal, row) =>
-            rowTotal + (row.stateTaxWithheld === undefined ? 0n : centsFromString(row.stateTaxWithheld)), 0n),
-        0n)
-    const storedWithholdingCents = w2WithholdingCents + oneZeroNineNineRWithholdingCents
-    assert(
-        assertedCents >= storedWithholdingCents,
-        [
-            'Schedule A line 5a (SALT income tax, taxpayer-asserted) is below the state/local '
-            + 'income tax already withheld and reported on stored W-2s/1099-Rs -- withheld tax '
-            + 'is necessarily paid',
-            'asserted', assertedCents, 'storedWithholding', storedWithholdingCents,
-        ],
-    )
 }
 
 // ── Tests ────────────────────────────────────────────────────────────────────
@@ -1124,6 +1177,61 @@ export const proof = {
             // $175.00 exactly is enough.
             assertAssertedSaltIncomeTaxIsAtLeastStoredWithholding(
                 [itemizedEntry('saltIncomeTax')('175.00')('itemized-doc-1')])(w2s)([])
+        },
+    },
+
+    // WR-02 (13-REVIEW.md): the SAME withholding-drift check, now exercised
+    // through `scheduleA(...)` ITSELF -- never a fixture written by this
+    // proof for its own sake, since `w2Forms`/`oneZeroNineNineRForms` are
+    // ScheduleAInput's own real fields, the SAME fields `fjs/form1040/core`
+    // feeds from the return's own stored documents.
+    withholdingDriftWiredIntoScheduleA: {
+        realReturnWithUnderstatedSaltIncomeTaxRefuses: () => {
+            const outcome = scheduleA(taxParams2025)({
+                status: 'single', agiCents: 0n,
+                itemizedEntries: [itemizedEntry('saltIncomeTax')('1000.00')('itemized-doc-1')],
+                medicalExpenseEntries: [],
+                profile: profileNoDeclaredKinds,
+                w2Forms: [w2Fixture([{ state: 'CA', stateIncomeTax: '4200.00' }])('w2-doc-1')],
+                oneZeroNineNineRForms: [],
+            })
+            assertEq(outcome.kind, 'error', 'expected a refusal, never a silently-accepted understated SALT entry')
+            if (outcome.kind === 'error') {
+                assert(
+                    outcome.message.includes('asserted') && outcome.message.includes('storedWithholding'),
+                    ['expected the refusal to name both sides of the drift', outcome.message],
+                )
+            }
+        },
+        // The control: the SAME W-2, with the asserted amount raised to
+        // cover the stored withholding, computes normally through
+        // `scheduleA(...)` -- proving the wiring refuses drift specifically,
+        // not every return that happens to carry a W-2 alongside SALT.
+        realReturnWithConsistentSaltIncomeTaxComputesNormally: () => {
+            const outcome = scheduleA(taxParams2025)({
+                status: 'single', agiCents: 0n,
+                itemizedEntries: [itemizedEntry('saltIncomeTax')('5000.00')('itemized-doc-1')],
+                medicalExpenseEntries: [],
+                profile: profileNoDeclaredKinds,
+                w2Forms: [w2Fixture([{ state: 'CA', stateIncomeTax: '4200.00' }])('w2-doc-1')],
+                oneZeroNineNineRForms: [],
+            })
+            assertEq(outcome.kind, 'ok', 'expected the consistent return to compute, not refuse')
+            if (outcome.kind === 'ok') {
+                assertEq(outcome.line5a.value, 500000n, 'line 5a still reads the taxpayer-asserted $5,000.00 -- never the withheld figure')
+            }
+        },
+        // A caller supplying NEITHER document array (the default `?? []`)
+        // behaves exactly as before WR-02 -- the drift check is a no-op
+        // with nothing to compare against, never a spurious refusal.
+        omittedDocumentArraysAreANoOp: () => {
+            const outcome = scheduleA(taxParams2025)({
+                status: 'single', agiCents: 0n,
+                itemizedEntries: [itemizedEntry('saltIncomeTax')('1.00')('itemized-doc-1')],
+                medicalExpenseEntries: [],
+                profile: profileNoDeclaredKinds,
+            })
+            assertEq(outcome.kind, 'ok', 'expected no refusal when no W-2/1099-R documents are supplied at all')
         },
     },
 

@@ -112,6 +112,17 @@ Out of scope, and staying refused: household employee wages (1b), Medicaid waive
   "nothing here reads them" while something does is exactly the kind of claim Phase 17 exists
   to delete.
 
+  **AMENDED (13-REVIEW.md WR-02, applied by the code-fixer):** the drift check described above
+  shipped as a private function called only from this module's own hand-written test fixtures —
+  it protected zero real returns while its own docstring and the amended `fjs/document/w2`/
+  `fjs/document/1099r` docstrings read as though it were an active safeguard. It is now WIRED
+  into `fjs/schedule/a`'s own real computation: `ScheduleAInput` carries the return's own stored
+  `w2Forms`/`oneZeroNineNineRForms`, and a drift refusal propagates as a `{ kind: 'error' }`
+  document-data-sufficiency outcome (12.1 Decision 2.6's category), threaded through
+  `fjs/form1040/core` exactly like the Schedule D absent-basis guard. "A proof watches for
+  drift, never the input itself" stays true — the check still never feeds `stateIncomeTax`/
+  `stateTaxWithheld` into line 5a's VALUE, only into whether the whole return refuses.
+
 - **2.3 — Every printed Schedule A line is modeled.** Lines no source can populate are
   **documented zeros with the boundary stated in the module's own docstring**, never silent
   omissions — 12.1 Decision 2.5, itself `fjs/schedule/b`'s Form 8815 precedent. A later phase
