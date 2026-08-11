@@ -2,7 +2,7 @@
  * MCP-09 — `fjs_check`'s pure logic: import a stored program and confirm it
  * exports a callable `report`, without ever invoking that export.
  *
- * **This has NO security value.** `fjs_check` confirms a shape; it does not
+ * **This has no security value.** `fjs_check` confirms a shape; it does not
  * sandbox, verify, or certify anything about the program's behavior. By the
  * time this function has an answer, `import()` has already run the module's
  * top-level code with full Node privileges — exactly the same exposure a

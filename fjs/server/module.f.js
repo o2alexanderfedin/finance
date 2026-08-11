@@ -54,7 +54,7 @@
 import { mapStep, pure, step } from 'functionalscript/fjs/effects/module.f.js'
 import { create, write } from 'functionalscript/fjs/effects/memory/module.f.js'
 import { stdioTransport } from 'functionalscript/fjs/protocol/mcp/stdio/module.f.js'
-import { mcpStep, uninitializedState, fromRegistry, toolEntry, okResult } from 'functionalscript/fjs/protocol/mcp/module.f.js'
+import { mcpStep, uninitializedState, fromRegistry, toolEntry, okResult, errorResult } from 'functionalscript/fjs/protocol/mcp/module.f.js'
 import { fileCas } from 'functionalscript/fjs/cas/module.f.js'
 import { initEvo, evo, buildCache } from 'functionalscript/fjs/cas/evo/module.f.js'
 import { sha256 } from 'functionalscript/fjs/crypto/sha2/module.f.js'
@@ -76,11 +76,12 @@ import { financeSchemaTool } from './finance_schema/module.f.js'
 import { financeTaxParamsTool } from './finance_tax_params/module.f.js'
 import { financeDocumentsListTool } from './finance_documents_list/module.f.js'
 import { fjsRunTool, placeJsModuleFixture } from './fjs_run/module.f.js'
+import { fjsCheck } from '../guest/check/module.f.js'
 import { guestCtx } from '../guest/module.f.js'
 import { programPath, materializeHome } from '../guest/materialize/module.f.js'
 import { validate as validateRun } from '../run/module.f.js'
 import { dialect as oneZeroNineNineIntDialect, validate as validateOneZeroNineNineInt } from '../document/1099int/module.f.js'
-import { parse as jsonParse } from '../json/module.f.js'
+import { parse as jsonParse, stringify as jsonText } from '../json/module.f.js'
 import { unwrap } from 'functionalscript/fjs/types/result/module.f.js'
 
 /** @import { McpConfig, McpHandlers, ToolEntry } from 'functionalscript/fjs/protocol/mcp/module.f.js' */
@@ -127,17 +128,45 @@ export const casRefreshTool = cas => cacheKey => toolEntry(
         () => okResult('refreshed')),
 )
 
+// ── fjs_check (MCP-09) ────────────────────────────────────────────────────────
+/**
+ * The `fjs_check` MCP tool (MCP-09): a cheap, honest sanity check that a
+ * stored program (by CAS hash) imports cleanly and exports something that
+ * looks like a report — never a run. **This tool has NO security value.**
+ * It confirms a shape; it is not a sandbox, a verification, or a trust
+ * boundary, and the program's top-level code has already run (via
+ * `import()`) by the time this answers — exactly the same exposure a real
+ * `fjs_run` call carries. See `fjs/guest/check/module.f.js`'s own module
+ * header (place 2 of the "no security value" statement's three required
+ * places is this tool's own description below; place 3 is README.md) for
+ * the full account of what `fjsCheck` does and does not guarantee.
+ * @type {(materializeHomeRoot: string) => (cas: Cas<FileCasOperation>) => ToolEntry<FileCasOperation | Mkdir | WriteFile | Import>}
+ */
+export const fjsCheckTool = materializeHomeRoot => cas => toolEntry(
+    'fjs_check',
+    'Smoke-checks a stored program (by CAS hash): imports it and reports whether it ' +
+    'exports a callable report, without running it to completion. This tool has NO ' +
+    'security value — it confirms a shape, never a sandbox, verification, or trust ' +
+    'boundary, and the program\'s top-level code has already run by the time this ' +
+    'answers. Use fjs_run to actually execute a program.',
+    { hash: string },
+    args => mapStep(
+        fjsCheck(materializeHomeRoot)(cas)(args.hash),
+        result => result[0] === 'error' ? errorResult(result[1]) : okResult(jsonText(result[1]))),
+)
+
 // ── Handlers ────────────────────────────────────────────────────────────────────
 /**
  * MCP handlers for `FileCas` (`casToolRegistry`) plus the Evo API
  * (`evoToolRegistry`) layered on it, plus `casRefreshTool` (DOC-14),
  * `financeSchemaTool` (MCP-06), `financeTaxParamsTool` (MCP-07),
- * `financeDocumentsListTool` (MCP-08), and `fjsRunTool` (EXEC-08/EXEC-10/
- * EXEC-11/PROV-03), bound to `home` and an already-built Evo cache slot (see
- * `initEvo`). `financeSchemaTool`, `financeTaxParamsTool`,
- * `financeDocumentsListTool`, and `fjsRunTool` concatenate straight into the
- * same flat array `casRefreshTool` already established the pattern for —
- * no separate composition mechanism, per this file's own precedent.
+ * `financeDocumentsListTool` (MCP-08), `fjsRunTool` (EXEC-08/EXEC-10/
+ * EXEC-11/PROV-03), and `fjsCheckTool` (MCP-09), bound to `home` and an
+ * already-built Evo cache slot (see `initEvo`). `financeSchemaTool`,
+ * `financeTaxParamsTool`, `financeDocumentsListTool`, `fjsRunTool`, and
+ * `fjsCheckTool` concatenate straight into the same flat array
+ * `casRefreshTool` already established the pattern for — no separate
+ * composition mechanism, per this file's own precedent.
  * @type {(home: string) => (cacheKey: Key<Cache>) => McpHandlers<FileCasOperation | MemOp | Mkdir | WriteFile | Import>}
  */
 export const financeMcpHandlers = home => cacheKey => fromRegistry([
@@ -148,6 +177,7 @@ export const financeMcpHandlers = home => cacheKey => fromRegistry([
     financeTaxParamsTool,
     financeDocumentsListTool(evo(fileCas(sha256)(home))(cacheKey))(fileCas(sha256)(home)),
     fjsRunTool(home)(fileCas(sha256)(home))(evo(fileCas(sha256)(home))(cacheKey)),
+    fjsCheckTool(home)(fileCas(sha256)(home)),
 ])
 
 // ── Session configuration ───────────────────────────────────────────────────────
