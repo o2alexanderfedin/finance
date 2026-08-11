@@ -101,13 +101,17 @@ Found during execution, after the plans were written. Each names the plan that o
 ### C-1 — Criterion 5's gate is case-sensitive and misses camelCase `Magi` (owner: **13-13**)
 
 Found while verifying 13-03. The criterion is written as `grep -rn "magi" fjs/`, which is
-case-sensitive, so **camelCase `Magi` passes it**. As of 13-03 there are six such identifiers,
-all proof-leaf names in `fjs/schedule/1a/module.f.js`:
+case-sensitive, so **camelCase `Magi` passes it**. The distinct names are:
 
-- `continuousPhaseoutSingleEightyThousandMagi` (and two comment references)
+- `continuousPhaseoutSingleEightyThousandMagi`
 - `mfsAtZeroMagiGetsZeroNotDecisiveAlone`
 - `mfsAtTenThousandMagiGetsZeroDecisiveShortCircuitProof`
 - `partIMagiEqualsSeniorDeductionPhaseoutIncomeForEveryFixture`
+
+**Do not scope the fix to one file.** The count was 6 occurrences in
+`fjs/schedule/1a/module.f.js` after 13-03; by 13-04 it was 7 across **two** files, the new one a
+cross-reference comment in `fjs/form1040/core/module.f.js`. Later plans may spread it further.
+Enumerate at fix time with the verify command below rather than trusting this list's length.
 
 **Substance is currently fine** — the real income function is correctly named
 `seniorDeductionPhaseoutIncome`, and no shared income *variable* is called MAGI. These are test
