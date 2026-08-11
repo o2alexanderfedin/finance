@@ -58,19 +58,55 @@
  * stored as a CAS document would make `finance_tax_params` fail there
  * until someone remembered to seed them.
  *
+ * ## `Citation` widened to a discriminated union — pulled forward from
+ * Slice 2 (13-CONTEXT.md Decision 5.2)
+ *
+ * Every citation object here used to share one shape: `{ revProc, section,
+ * effectiveDate }`. That shape has no honest field for a Public-Law-sourced
+ * figure or a bare-IRC-section-sourced figure, and this plan's own new
+ * parameter — the Social Security Benefits Worksheet's base amounts
+ * (IRC §86(c), long-standing, never Rev.-Proc.-cited) — needs exactly that.
+ * Rather than invent a second, parallel citation shape for one parameter,
+ * `Citation` widens here, in Wave 1 Plan 1 of Phase 13, to the three-`kind`
+ * discriminated union (`'revProc'` / `'publicLaw'` / `'code'`) that
+ * 13-CONTEXT.md's Decision 5.2 places in Slice 2 (the senior deduction,
+ * which needs the `'publicLaw'` arm). Landing it here instead is a
+ * deliberate one-plan pull-forward, not scope creep: this plan's own
+ * `socialSecurityBenefitsWorksheetBaseAmounts` needs the `'code'` arm
+ * immediately, and widening the type twice (once for `'code'`, again later
+ * for `'publicLaw'`) would be strictly more disruptive than widening it
+ * once to the union Slice 2 already commits to. The change is additive
+ * only: every EXISTING citation literal gains the `revProc` tag as its
+ * first field, with no other value changed — verified by a grep over this
+ * file's `revProc`-tagged citation literals matching the pre-existing
+ * citation-literal count exactly, and by `unmodifiedParametersCite2024_40Only`
+ * staying green unmodified.
+ *
  * @module
  */
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
 import { centsFromString, centsToString } from '../../exact/module.f.js'
 
 /**
- * A single parameter's own citation: the exact Rev. Proc. number, its
- * section, and the effective date — never one shared citation for a
- * whole document.
+ * A single parameter's own citation: the exact governing authority and the
+ * effective date — never one shared citation for a whole document. Three
+ * kinds, since this project's parameters come from three genuinely
+ * different kinds of authority (13-CONTEXT.md Decision 5.2):
+ * - `'revProc'` — an annual IRS Revenue Procedure (e.g. Rev. Proc. 2024-40),
+ *   the shape every parameter in this module used before Phase 13.
+ * - `'publicLaw'` — a numbered Act of Congress (e.g. Public Law 119-21,
+ *   OBBBA), for a figure Congress set directly rather than the IRS having
+ *   inflation-adjusted it.
+ * - `'code'` — a bare Internal Revenue Code section, for a long-standing
+ *   figure with no annual Rev. Proc. and no recent Public Law of its own
+ *   (e.g. the Social Security Benefits Worksheet's IRC §86(c) base amounts,
+ *   unchanged since 1993).
  * @typedef {{
- *   readonly revProc: string,
- *   readonly section: string,
- *   readonly effectiveDate: string,
+ *   readonly kind: 'revProc', readonly revProc: string, readonly section: string, readonly effectiveDate: string
+ * } | {
+ *   readonly kind: 'publicLaw', readonly publicLaw: string, readonly section: string, readonly effectiveDate: string
+ * } | {
+ *   readonly kind: 'code', readonly section: string, readonly effectiveDate: string
  * }} Citation
  */
 
@@ -153,19 +189,19 @@ export const allFilingStatuses = [...individualFilingStatuses, 'estatesAndTrusts
 export const standardDeduction = {
     single: {
         amount: '15750.00',
-        citation: { revProc: '2025-32', section: '§3.01', effectiveDate: '2025-01-01' },
+        citation: { kind: 'revProc', revProc: '2025-32', section: '§3.01', effectiveDate: '2025-01-01' },
     },
     marriedFilingJointly: {
         amount: '31500.00',
-        citation: { revProc: '2025-32', section: '§3.01', effectiveDate: '2025-01-01' },
+        citation: { kind: 'revProc', revProc: '2025-32', section: '§3.01', effectiveDate: '2025-01-01' },
     },
     marriedFilingSeparately: {
         amount: '15750.00',
-        citation: { revProc: '2025-32', section: '§3.01', effectiveDate: '2025-01-01' },
+        citation: { kind: 'revProc', revProc: '2025-32', section: '§3.01', effectiveDate: '2025-01-01' },
     },
     headOfHousehold: {
         amount: '23625.00',
-        citation: { revProc: '2025-32', section: '§3.01', effectiveDate: '2025-01-01' },
+        citation: { kind: 'revProc', revProc: '2025-32', section: '§3.01', effectiveDate: '2025-01-01' },
     },
     // Rev. Proc. 2025-32 §3.01's table names one row "Married Individuals
     // Filing Joint Returns and Surviving Spouses" — a qualifying surviving
@@ -177,7 +213,7 @@ export const standardDeduction = {
     // observe the two statuses drifting apart.
     qualifyingSurvivingSpouse: {
         amount: '31500.00',
-        citation: { revProc: '2025-32', section: '§3.01', effectiveDate: '2025-01-01' },
+        citation: { kind: 'revProc', revProc: '2025-32', section: '§3.01', effectiveDate: '2025-01-01' },
     },
 }
 
@@ -194,11 +230,11 @@ export const standardDeduction = {
 export const agedOrBlindAdditional = {
     married: {
         amount: '1600.00',
-        citation: { revProc: '2024-40', section: '§2.15(3)', effectiveDate: '2025-01-01' },
+        citation: { kind: 'revProc', revProc: '2024-40', section: '§2.15(3)', effectiveDate: '2025-01-01' },
     },
     unmarried: {
         amount: '2000.00',
-        citation: { revProc: '2024-40', section: '§2.15(3)', effectiveDate: '2025-01-01' },
+        citation: { kind: 'revProc', revProc: '2024-40', section: '§2.15(3)', effectiveDate: '2025-01-01' },
     },
 }
 
@@ -212,11 +248,11 @@ export const agedOrBlindAdditional = {
 export const dependentStandardDeductionCap = {
     minimum: {
         amount: '1350.00',
-        citation: { revProc: '2024-40', section: '§2.15(2)', effectiveDate: '2025-01-01' },
+        citation: { kind: 'revProc', revProc: '2024-40', section: '§2.15(2)', effectiveDate: '2025-01-01' },
     },
     earnedIncomeAddOn: {
         amount: '450.00',
-        citation: { revProc: '2024-40', section: '§2.15(2)', effectiveDate: '2025-01-01' },
+        citation: { kind: 'revProc', revProc: '2024-40', section: '§2.15(2)', effectiveDate: '2025-01-01' },
     },
 }
 
@@ -232,7 +268,7 @@ export const dependentStandardDeductionCap = {
  */
 export const ordinaryBrackets = {
     marriedFilingJointly: {
-        citation: { revProc: '2024-40', section: '§2.01', effectiveDate: '2025-01-01' },
+        citation: { kind: 'revProc', revProc: '2024-40', section: '§2.01', effectiveDate: '2025-01-01' },
         brackets: [
             { ratePercent: 10, ceiling: '23850.00' },
             { ratePercent: 12, ceiling: '96950.00' },
@@ -244,7 +280,7 @@ export const ordinaryBrackets = {
         ],
     },
     headOfHousehold: {
-        citation: { revProc: '2024-40', section: '§2.01', effectiveDate: '2025-01-01' },
+        citation: { kind: 'revProc', revProc: '2024-40', section: '§2.01', effectiveDate: '2025-01-01' },
         brackets: [
             { ratePercent: 10, ceiling: '17000.00' },
             { ratePercent: 12, ceiling: '64850.00' },
@@ -256,7 +292,7 @@ export const ordinaryBrackets = {
         ],
     },
     single: {
-        citation: { revProc: '2024-40', section: '§2.01', effectiveDate: '2025-01-01' },
+        citation: { kind: 'revProc', revProc: '2024-40', section: '§2.01', effectiveDate: '2025-01-01' },
         brackets: [
             { ratePercent: 10, ceiling: '11925.00' },
             { ratePercent: 12, ceiling: '48475.00' },
@@ -268,7 +304,7 @@ export const ordinaryBrackets = {
         ],
     },
     marriedFilingSeparately: {
-        citation: { revProc: '2024-40', section: '§2.01', effectiveDate: '2025-01-01' },
+        citation: { kind: 'revProc', revProc: '2024-40', section: '§2.01', effectiveDate: '2025-01-01' },
         brackets: [
             { ratePercent: 10, ceiling: '11925.00' },
             { ratePercent: 12, ceiling: '48475.00' },
@@ -286,7 +322,7 @@ export const ordinaryBrackets = {
     // from `ordinaryBrackets.marriedFilingJointly`, for the reason stated
     // on `standardDeduction.qualifyingSurvivingSpouse`.
     qualifyingSurvivingSpouse: {
-        citation: { revProc: '2024-40', section: '§2.01', effectiveDate: '2025-01-01' },
+        citation: { kind: 'revProc', revProc: '2024-40', section: '§2.01', effectiveDate: '2025-01-01' },
         brackets: [
             { ratePercent: 10, ceiling: '23850.00' },
             { ratePercent: 12, ceiling: '96950.00' },
@@ -298,7 +334,7 @@ export const ordinaryBrackets = {
         ],
     },
     estatesAndTrusts: {
-        citation: { revProc: '2024-40', section: '§2.01', effectiveDate: '2025-01-01' },
+        citation: { kind: 'revProc', revProc: '2024-40', section: '§2.01', effectiveDate: '2025-01-01' },
         brackets: [
             { ratePercent: 10, ceiling: '3150.00' },
             { ratePercent: 24, ceiling: '11450.00' },
@@ -317,22 +353,22 @@ export const capitalGainsBreakpoints = {
     marriedFilingJointly: {
         zeroRateMax: '96700.00',
         fifteenRateMax: '600050.00',
-        citation: { revProc: '2024-40', section: '§2.03', effectiveDate: '2025-01-01' },
+        citation: { kind: 'revProc', revProc: '2024-40', section: '§2.03', effectiveDate: '2025-01-01' },
     },
     marriedFilingSeparately: {
         zeroRateMax: '48350.00',
         fifteenRateMax: '300000.00',
-        citation: { revProc: '2024-40', section: '§2.03', effectiveDate: '2025-01-01' },
+        citation: { kind: 'revProc', revProc: '2024-40', section: '§2.03', effectiveDate: '2025-01-01' },
     },
     headOfHousehold: {
         zeroRateMax: '64750.00',
         fifteenRateMax: '566700.00',
-        citation: { revProc: '2024-40', section: '§2.03', effectiveDate: '2025-01-01' },
+        citation: { kind: 'revProc', revProc: '2024-40', section: '§2.03', effectiveDate: '2025-01-01' },
     },
     single: {
         zeroRateMax: '48350.00',
         fifteenRateMax: '533400.00',
-        citation: { revProc: '2024-40', section: '§2.03', effectiveDate: '2025-01-01' },
+        citation: { kind: 'revProc', revProc: '2024-40', section: '§2.03', effectiveDate: '2025-01-01' },
     },
     // Rev. Proc. 2024-40 §2.03 — hand-typed from the same "Married Filing
     // Jointly and Surviving Spouses" row, deliberately NOT spread from
@@ -340,12 +376,52 @@ export const capitalGainsBreakpoints = {
     qualifyingSurvivingSpouse: {
         zeroRateMax: '96700.00',
         fifteenRateMax: '600050.00',
-        citation: { revProc: '2024-40', section: '§2.03', effectiveDate: '2025-01-01' },
+        citation: { kind: 'revProc', revProc: '2024-40', section: '§2.03', effectiveDate: '2025-01-01' },
     },
     estatesAndTrusts: {
         zeroRateMax: '3250.00',
         fifteenRateMax: '15900.00',
-        citation: { revProc: '2024-40', section: '§2.03', effectiveDate: '2025-01-01' },
+        citation: { kind: 'revProc', revProc: '2024-40', section: '§2.03', effectiveDate: '2025-01-01' },
+    },
+}
+
+/**
+ * The Social Security Benefits Worksheet's two base-amount pairs
+ * (`fjs/tax/ssb`'s printed lines 8 and 10) — IRC §86(c), unmodified since
+ * 1993, so cited `kind: 'code'` rather than an annual Rev. Proc.
+ * (13-CONTEXT.md Decision 5.2, 13-RESEARCH.md §2 "Base amounts, confirmed
+ * exactly"). `'other'` covers single, head of household, qualifying
+ * surviving spouse, and MFS-lived-apart-all-year — every filing-status case
+ * the worksheet's own printed line 8 answers with a DOLLAR figure. The
+ * third, genuinely different line-8 case — MFS-lived-with-spouse-at-any-
+ * time — is not a third base amount at all; it is a structural skip
+ * straight to line 16, so it is modeled as a branch inside `fjs/tax/ssb`
+ * itself, never as a parameter here.
+ * @type {{
+ *   readonly firstThreshold: { readonly marriedFilingJointly: AmountWithCitation, readonly other: AmountWithCitation },
+ *   readonly secondThreshold: { readonly marriedFilingJointly: AmountWithCitation, readonly other: AmountWithCitation },
+ * }}
+ */
+export const socialSecurityBenefitsWorksheetBaseAmounts = {
+    firstThreshold: {
+        marriedFilingJointly: {
+            amount: '32000.00',
+            citation: { kind: 'code', section: '§86(c)', effectiveDate: '2025-01-01' },
+        },
+        other: {
+            amount: '25000.00',
+            citation: { kind: 'code', section: '§86(c)', effectiveDate: '2025-01-01' },
+        },
+    },
+    secondThreshold: {
+        marriedFilingJointly: {
+            amount: '12000.00',
+            citation: { kind: 'code', section: '§86(c)', effectiveDate: '2025-01-01' },
+        },
+        other: {
+            amount: '9000.00',
+            citation: { kind: 'code', section: '§86(c)', effectiveDate: '2025-01-01' },
+        },
     },
 }
 
@@ -358,6 +434,7 @@ export const capitalGainsBreakpoints = {
  *   readonly dependentStandardDeductionCap: typeof dependentStandardDeductionCap,
  *   readonly ordinaryBrackets: typeof ordinaryBrackets,
  *   readonly capitalGainsBreakpoints: typeof capitalGainsBreakpoints,
+ *   readonly socialSecurityBenefitsWorksheetBaseAmounts: typeof socialSecurityBenefitsWorksheetBaseAmounts,
  * }} TaxParamSet
  */
 
@@ -377,6 +454,7 @@ export const taxParamsByYear = {
         dependentStandardDeductionCap,
         ordinaryBrackets,
         capitalGainsBreakpoints,
+        socialSecurityBenefitsWorksheetBaseAmounts,
     },
 }
 
@@ -390,6 +468,22 @@ export const taxParamsByYear = {
  * @type {(value: string | undefined) => value is string}
  */
 const isDefinedString = value => value !== undefined
+
+/**
+ * Narrows a `Citation` to its `'revProc'` arm, throwing (never casting) if
+ * it is not. Every citation this module stored BEFORE Phase 13 is
+ * `'revProc'`-sourced (Rev. Proc. 2024-40/2025-32); the widened `Citation`
+ * union (13-CONTEXT.md Decision 5.2) means `tsc` can no longer see `.revProc`
+ * on a bare `Citation` without this narrow, so the below proof leaves —
+ * which read `.revProc` on exactly the entries that predate the widening —
+ * route through here rather than through a cast (AGENTS.md's "no cast over
+ * an indexed access" rule, applied to a discriminated union instead).
+ * @type {(citation: Citation) => Extract<Citation, { readonly kind: 'revProc' }>}
+ */
+const assertRevProcCitation = citation => {
+    assert(citation.kind === 'revProc', ['expected a revProc-kind citation', citation])
+    return citation
+}
 
 /**
  * Every dollar-string field this module exports, gathered once so the
@@ -413,6 +507,10 @@ const everyDollarStringField = [
         capitalGainsBreakpoints[status].zeroRateMax,
         capitalGainsBreakpoints[status].fifteenRateMax,
     ]),
+    socialSecurityBenefitsWorksheetBaseAmounts.firstThreshold.marriedFilingJointly.amount,
+    socialSecurityBenefitsWorksheetBaseAmounts.firstThreshold.other.amount,
+    socialSecurityBenefitsWorksheetBaseAmounts.secondThreshold.marriedFilingJointly.amount,
+    socialSecurityBenefitsWorksheetBaseAmounts.secondThreshold.other.amount,
 ]
 
 export const proof = {
@@ -429,7 +527,7 @@ export const proof = {
         }
         for (const status of individualFilingStatuses) {
             const entry = standardDeduction[status]
-            assertEq(entry.citation.revProc, '2025-32')
+            assertEq(assertRevProcCitation(entry.citation).revProc, '2025-32')
             assertEq(entry.citation.section, '§3.01')
             assertEq(entry.citation.effectiveDate, '2025-01-01')
             assertEq(entry.amount, expectedAmounts[status])
@@ -443,23 +541,23 @@ export const proof = {
     // §2.15(9)) or effectiveDate (2025-01-01 → 2026-01-01) previously
     // survived undetected because only `revProc` was ever read.
     unmodifiedParametersCite2024_40Only: () => {
-        assertEq(agedOrBlindAdditional.married.citation.revProc, '2024-40')
+        assertEq(assertRevProcCitation(agedOrBlindAdditional.married.citation).revProc, '2024-40')
         assertEq(agedOrBlindAdditional.married.citation.section, '§2.15(3)')
         assertEq(agedOrBlindAdditional.married.citation.effectiveDate, '2025-01-01')
-        assertEq(agedOrBlindAdditional.unmarried.citation.revProc, '2024-40')
+        assertEq(assertRevProcCitation(agedOrBlindAdditional.unmarried.citation).revProc, '2024-40')
         assertEq(agedOrBlindAdditional.unmarried.citation.section, '§2.15(3)')
         assertEq(agedOrBlindAdditional.unmarried.citation.effectiveDate, '2025-01-01')
-        assertEq(dependentStandardDeductionCap.minimum.citation.revProc, '2024-40')
+        assertEq(assertRevProcCitation(dependentStandardDeductionCap.minimum.citation).revProc, '2024-40')
         assertEq(dependentStandardDeductionCap.minimum.citation.section, '§2.15(2)')
         assertEq(dependentStandardDeductionCap.minimum.citation.effectiveDate, '2025-01-01')
-        assertEq(dependentStandardDeductionCap.earnedIncomeAddOn.citation.revProc, '2024-40')
+        assertEq(assertRevProcCitation(dependentStandardDeductionCap.earnedIncomeAddOn.citation).revProc, '2024-40')
         assertEq(dependentStandardDeductionCap.earnedIncomeAddOn.citation.section, '§2.15(2)')
         assertEq(dependentStandardDeductionCap.earnedIncomeAddOn.citation.effectiveDate, '2025-01-01')
         for (const status of allFilingStatuses) {
-            assertEq(ordinaryBrackets[status].citation.revProc, '2024-40')
+            assertEq(assertRevProcCitation(ordinaryBrackets[status].citation).revProc, '2024-40')
             assertEq(ordinaryBrackets[status].citation.section, '§2.01')
             assertEq(ordinaryBrackets[status].citation.effectiveDate, '2025-01-01')
-            assertEq(capitalGainsBreakpoints[status].citation.revProc, '2024-40')
+            assertEq(assertRevProcCitation(capitalGainsBreakpoints[status].citation).revProc, '2024-40')
             assertEq(capitalGainsBreakpoints[status].citation.section, '§2.03')
             assertEq(capitalGainsBreakpoints[status].citation.effectiveDate, '2025-01-01')
         }
@@ -670,5 +768,26 @@ export const proof = {
                 previousCeilingCents = ceilingCents
             }
         }
+    },
+    // TAX-10/13-CONTEXT.md Decision 5.2: the SSB worksheet's four base
+    // amounts cite IRC §86(c) directly — `kind: 'code'`, never
+    // `kind: 'revProc'` — because no annual Rev. Proc. sets them (unchanged
+    // since 1993). Asserted field by field (`kind`, `section`,
+    // `effectiveDate`, `amount`), independently of
+    // `unmodifiedParametersCite2024_40Only` above, so this proof's own name
+    // stays literally true: nothing here shares that leaf's Rev.-Proc.-only
+    // claim.
+    socialSecurityBaseAmountsCiteIrc86cOnly: () => {
+        /** @type {(label: string) => (entry: AmountWithCitation) => (expectedAmount: string) => void} */
+        const checkOne = label => entry => expectedAmount => {
+            assertEq(entry.amount, expectedAmount, ['SSB base amount mismatch', label])
+            assertEq(entry.citation.kind, 'code', ['expected the code citation kind', label])
+            assertEq(entry.citation.section, '§86(c)', ['expected IRC §86(c)', label])
+            assertEq(entry.citation.effectiveDate, '2025-01-01', ['expected the TY2025 effective date', label])
+        }
+        checkOne('firstThreshold.marriedFilingJointly')(socialSecurityBenefitsWorksheetBaseAmounts.firstThreshold.marriedFilingJointly)('32000.00')
+        checkOne('firstThreshold.other')(socialSecurityBenefitsWorksheetBaseAmounts.firstThreshold.other)('25000.00')
+        checkOne('secondThreshold.marriedFilingJointly')(socialSecurityBenefitsWorksheetBaseAmounts.secondThreshold.marriedFilingJointly)('12000.00')
+        checkOne('secondThreshold.other')(socialSecurityBenefitsWorksheetBaseAmounts.secondThreshold.other)('9000.00')
     },
 }
