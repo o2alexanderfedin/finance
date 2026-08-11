@@ -633,6 +633,20 @@ export const medicalExpenseFloor = {
  * codebase and is a later plan's job to write and apply; this module stores
  * the threshold and rate only, exactly as it stores every other phase-out's
  * inputs without performing the phase-out itself.
+ *
+ * **`actcEarnedIncomeThreshold` ($2,500) and `actcEarnedIncomeRatePercent`
+ * (15) — WR-01 (13-REVIEW.md).** Schedule 8812 Part II-A lines 19/20: "Is
+ * line 18a more than $2,500? ... Multiply line 19 by 15% (0.15)"
+ * (13-RESEARCH.md §4, `[VERIFIED: f1040s8.pdf p2 lines 19-20]`). Both were
+ * hardcoded literals in `fjs/form8812` with no citation at all until this
+ * fix — every other dollar figure and rate this phase introduces has one.
+ * Cited `kind: 'code'`, §24(d) (the ACTC computation subsection) — the SAME
+ * "governing provision, not the literal source" caveat `odcAmount`/
+ * `actcCap`/`phaseoutThreshold` already carry above (Carried finding C-3):
+ * this research did not identify the specific Rev. Proc. performing any
+ * inflation adjustment to $2,500, so `kind: 'code'` stays the honest,
+ * verifiable half of the citation rather than a guessed Rev. Proc. number.
+ * What backs the DOLLAR VALUE and the RATE is the printed 2025 form itself.
  * @type {{
  *   readonly ctcAmount: AmountWithCitation,
  *   readonly odcAmount: AmountWithCitation,
@@ -642,6 +656,8 @@ export const medicalExpenseFloor = {
  *     readonly other: AmountWithCitation,
  *   },
  *   readonly phaseoutRatePercent: number,
+ *   readonly actcEarnedIncomeThreshold: AmountWithCitation,
+ *   readonly actcEarnedIncomeRatePercent: number,
  * }}
  */
 export const childTaxCredit = {
@@ -672,6 +688,15 @@ export const childTaxCredit = {
     // rounded UP to the next whole $1,000 (13-RESEARCH.md §7) — that
     // rounding is 13-09's arithmetic to perform, not this module's.
     phaseoutRatePercent: 5,
+    // Schedule 8812 Part II-A line 19's own $2,500 earned-income floor —
+    // see this field group's own docstring above (WR-01).
+    actcEarnedIncomeThreshold: {
+        amount: '2500.00',
+        citation: { kind: 'code', section: '§24(d)', effectiveDate: '2025-01-01' },
+    },
+    // Part II-A line 20's own 15% rate — same docstring, same citation
+    // reasoning; a plain rate, not money.
+    actcEarnedIncomeRatePercent: 15,
 }
 
 /**
@@ -797,6 +822,7 @@ const everyDollarStringField = [
     childTaxCredit.actcCap.amount,
     childTaxCredit.phaseoutThreshold.marriedFilingJointly.amount,
     childTaxCredit.phaseoutThreshold.other.amount,
+    childTaxCredit.actcEarnedIncomeThreshold.amount,
 ]
 
 export const proof = {
@@ -1178,6 +1204,18 @@ export const proof = {
         assertEq(childTaxCredit.phaseoutThreshold.other.amount, '200000.00')
         assertEq(childTaxCredit.phaseoutRatePercent, 5)
     },
+    // WR-01 (13-REVIEW.md): the ACTC earned-income floor ($2,500) and rate
+    // (15%) — Schedule 8812 Part II-A lines 19/20 — cite IRC §24(d) directly,
+    // the SAME "governing provision, not literal source" pattern as
+    // `odcAmount`/`actcCap`/`phaseoutThreshold` above (Carried finding C-3),
+    // never a guessed Rev. Proc. number.
+    childTaxCreditActcEarnedIncomeFloorAndRateCiteIrc24dOnly: () => {
+        assertEq(childTaxCredit.actcEarnedIncomeThreshold.citation.kind, 'code')
+        assertEq(childTaxCredit.actcEarnedIncomeThreshold.citation.section, '§24(d)')
+        assertEq(childTaxCredit.actcEarnedIncomeThreshold.citation.effectiveDate, '2025-01-01')
+        assertEq(childTaxCredit.actcEarnedIncomeThreshold.amount, '2500.00')
+        assertEq(childTaxCredit.actcEarnedIncomeRatePercent, 15)
+    },
     // The specific claim the acceptance criteria names: the CTC citation and
     // ONLY the CTC citation among this group is `kind: 'revProc'` — asserted
     // by counting, not by re-reading the two leaves above, so a future
@@ -1190,6 +1228,7 @@ export const proof = {
             childTaxCredit.actcCap,
             childTaxCredit.phaseoutThreshold.marriedFilingJointly,
             childTaxCredit.phaseoutThreshold.other,
+            childTaxCredit.actcEarnedIncomeThreshold,
         ]
         const revProcSourced = allChildTaxCreditAmounts.filter(entry => entry.citation.kind === 'revProc')
         assertEq(revProcSourced.length, 1, ['expected exactly one revProc-sourced figure', revProcSourced])

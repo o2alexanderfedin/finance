@@ -265,8 +265,12 @@ export const form8812 = taxParamSet => input => {
     //     $1,000." THE STEPPED CLIFF -- see module docstring.
     const excess = line3 > line9 ? line3 - line9 : 0n
     const line10 = excess === 0n ? 0n : roundUpToNextThousandDollars(excess)
-    // 11. "Multiply line 10 by 5% (0.05)."
-    const line11 = halfUp(of(line10 * 5n)(100n))
+    // 11. "Multiply line 10 by 5% (0.05)." Reads the STORED, cited
+    // `phaseoutRatePercent` (WR-01, 13-REVIEW.md) rather than a hardcoded
+    // `5n` — mirroring `fjs/schedule/1a`'s/`fjs/schedule/a`'s own
+    // `BigInt(...phaseoutRatePercent)` precedent, so a future correction to
+    // this stored rate actually changes the computed credit.
+    const line11 = halfUp(of(line10 * BigInt(childTaxCredit.phaseoutRatePercent))(100n))
     // 12. "Is line 8 more than line 11?" If NOT (line 8 <= line 11): STOP.
     //     No CTC/ODC/ACTC at all -- every line past line 12 is unreachable
     //     on the printed page. Modeled here as control flow, not merely
@@ -317,10 +321,13 @@ export const form8812 = taxParamSet => input => {
     // 18a/18b. Earned income and nontaxable combat pay, taken as given.
     const line18a = earnedIncomeCents
     const line18b = nontaxableCombatPayCents
-    // 19. "Is line 18a more than $2,500?"
-    const line19 = line18a > 250000n ? line18a - 250000n : 0n
-    // 20. "Multiply line 19 by 15% (0.15)."
-    const line20 = halfUp(of(line19 * 15n)(100n))
+    // 19. "Is line 18a more than $2,500?" Reads the STORED, cited
+    // `actcEarnedIncomeThreshold` (WR-01) rather than a hardcoded `250000n`.
+    const actcEarnedIncomeThresholdCents = centsFromString(childTaxCredit.actcEarnedIncomeThreshold.amount)
+    const line19 = line18a > actcEarnedIncomeThresholdCents ? line18a - actcEarnedIncomeThresholdCents : 0n
+    // 20. "Multiply line 19 by 15% (0.15)." Reads the STORED, cited
+    // `actcEarnedIncomeRatePercent` rather than a hardcoded `15n`.
+    const line20 = halfUp(of(line19 * BigInt(childTaxCredit.actcEarnedIncomeRatePercent))(100n))
     // 27. "Smaller of line 17 or line 20" (Part II-B skipped). -> 1040 line 28.
     const line27 = line17 < line20 ? line17 : line20
 
@@ -590,6 +597,42 @@ export const proof = {
             })))
             assertEq(result.line13, 100000n, 'line 13 = clw line3 = clw line1 - clw line2 (documented zero) = $1,000.00')
             assertEq(result.line14, 100000n, 'line 14 = smaller of line12 ($2,200) or line13 ($1,000) = $1,000.00')
+        },
+    },
+
+    // WR-01 (13-REVIEW.md): line11/line19/line20 must read `childTaxCredit`'s
+    // STORED rate/threshold, not a hardcoded literal that happens to equal
+    // it today. Each figure is independently hand-computed here directly
+    // from `taxParams2025.childTaxCredit`, not from a copy of this module's
+    // own arithmetic -- a stored-parameter change that this module failed to
+    // read would diverge from these expectations even though nothing in
+    // this module's own source changed.
+    ratesAndThresholdReadFromStoredParams: {
+        phaseoutRateMatchesStoredPercent: () => {
+            const result = expectOk(form8812(taxParams2025)(baseInput({
+                status: 'single',
+                agiCents: 20000001n, // $200,000.01 -- one cent over the threshold
+                dependents: [dependent(10)(true)],
+            })))
+            const expectedLine11 = halfUp(of(result.line10 * BigInt(taxParams2025.childTaxCredit.phaseoutRatePercent))(100n))
+            assertEq(result.line11, expectedLine11, 'line 11 must equal line10 x the STORED phaseoutRatePercent')
+            assertEq(taxParams2025.childTaxCredit.phaseoutRatePercent, 5, 'today\'s stored rate is 5%')
+        },
+        actcFloorAndRateMatchStoredParams: () => {
+            const result = expectOk(form8812(taxParams2025)(baseInput({
+                status: 'single',
+                agiCents: 5000000n,
+                dependents: [dependent(5)(true)],
+                line18Cents: 100000000n,
+                earnedIncomeCents: 6000000n, // $60,000.00
+            })))
+            const storedThresholdCents = centsFromString(taxParams2025.childTaxCredit.actcEarnedIncomeThreshold.amount)
+            const expectedLine19 = result.line18a > storedThresholdCents ? result.line18a - storedThresholdCents : 0n
+            assertEq(result.line19, expectedLine19, 'line 19 must use the STORED actcEarnedIncomeThreshold')
+            const expectedLine20 = halfUp(of(expectedLine19 * BigInt(taxParams2025.childTaxCredit.actcEarnedIncomeRatePercent))(100n))
+            assertEq(result.line20, expectedLine20, 'line 20 must use the STORED actcEarnedIncomeRatePercent')
+            assertEq(taxParams2025.childTaxCredit.actcEarnedIncomeThreshold.amount, '2500.00', 'today\'s stored floor is $2,500.00')
+            assertEq(taxParams2025.childTaxCredit.actcEarnedIncomeRatePercent, 15, 'today\'s stored rate is 15%')
         },
     },
 
