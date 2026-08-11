@@ -3385,7 +3385,7 @@ export const proof = {
     // independent of the declaration.
     seniorDeductionBeforeTheScopeReclassificationLands: {
         // AGI = $80,000.00 exactly (wages alone, no other income) —
-        // Schedule 1-A's OWN `continuousPhaseoutSingleEightyThousandMagi`
+        // Schedule 1-A's OWN `continuousPhaseoutSingleAtEightyThousandDollars`
         // fixture (`fjs/schedule/1a`) computed line37/line38 = $5,700.00
         // from this same AGI; this leaf re-derives it through the FULL 1040
         // wiring, calling `form1040IncomeLines` DIRECTLY (bypassing

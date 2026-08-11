@@ -346,7 +346,7 @@ export const proof = {
         assertEq(result.line35, 600000n, 'line 35 = $6,000.00, the full base amount')
         assertEq(result.line37, 600000n, 'line 37 = $6,000.00')
     },
-    continuousPhaseoutSingleEightyThousandMagi: () => {
+    continuousPhaseoutSingleAtEightyThousandDollars: () => {
         const result = scheduleOneAPartV(taxParams2025)({
             status: 'single',
             phaseoutIncomeCents: 8000000n, // $80,000.00
@@ -363,7 +363,7 @@ export const proof = {
     // single: $74,999.99 / $75,000.00 / $75,000.01. The 6% rate's coarseness
     // (6% of $0.01 = $0.0006, far below the half-cent rounding threshold)
     // means all three land on the SAME $6,000.00 full amount --
-    // continuousPhaseoutSingleEightyThousandMagi above is what proves the
+    // continuousPhaseoutSingleAtEightyThousandDollars above is what proves the
     // SAME 6% rate genuinely reduces the deduction at dollar-level
     // granularity. This trio pins the CONDITIONAL's own edge (line33's `>`
     // comparison), not a doomed cent-level output difference.
@@ -426,7 +426,7 @@ export const proof = {
     // cents, far below the half-cent rounding threshold), so BOTH one-cent
     // probes round to the SAME $0.00 as the exact zero point -- a real,
     // provable property of this arithmetic, not a bug. See
-    // continuousPhaseoutSingleEightyThousandMagi/phaseoutStartBoundaryTrioMfj
+    // continuousPhaseoutSingleAtEightyThousandDollars/phaseoutStartBoundaryTrioMfj
     // above for fixtures where the SAME 6% arithmetic visibly bites at
     // dollar-level granularity.
     phaseoutFloorOneCentBelowTheZeroPointStillRoundsToZero: () => {
@@ -466,7 +466,7 @@ export const proof = {
     },
 
     // Test 3 (MFS short-circuit, Decision 5.4/Pitfall 3).
-    mfsAtZeroMagiGetsZeroNotDecisiveAlone: () => {
+    mfsAtZeroPhaseoutIncomeGetsZeroNotDecisiveAlone: () => {
         const result = scheduleOneAPartV(taxParams2025)({
             status: 'marriedFilingSeparately',
             phaseoutIncomeCents: 0n,
@@ -479,7 +479,7 @@ export const proof = {
     // threshold, the ORDINARY arithmetic (absent the short-circuit) would
     // give the FULL $6,000 -- this fixture proves the short-circuit is a
     // GATE, not a consequence of the arithmetic.
-    mfsAtTenThousandMagiGetsZeroDecisiveShortCircuitProof: () => {
+    mfsAtTenThousandPhaseoutIncomeGetsZeroDecisiveShortCircuitProof: () => {
         const result = scheduleOneAPartV(taxParams2025)({
             status: 'marriedFilingSeparately',
             phaseoutIncomeCents: 1000000n, // $10,000.00 -- well under $75,000
@@ -529,7 +529,7 @@ export const proof = {
     // SAME rule (Schedule 1-A's own Part I feeding its own Part V), so they
     // are asserted equal on every fixture -- documented, not silently
     // assumed (TAX-15/Decision 5.6's precedent, applied within one schedule).
-    partIMagiEqualsSeniorDeductionPhaseoutIncomeForEveryFixture: () => {
+    partILine3EqualsSeniorDeductionPhaseoutIncomeForEveryFixture: () => {
         for (const agi of [0n, 8000000n, 17500000n, 99999999n]) {
             assertEq(scheduleOneAPartI(agi).line3, seniorDeductionPhaseoutIncome(agi))
         }
