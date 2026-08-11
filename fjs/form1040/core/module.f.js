@@ -53,6 +53,7 @@ import { dialect as oneZeroNineNineDivDialect } from '../../document/1099div/mod
 import { dialect as oneZeroNineNineBDialect } from '../../document/1099b/module.f.js'
 import { dialect as oneZeroNineNineRDialect } from '../../document/1099r/module.f.js'
 import { dialect as ssa1099Dialect } from '../../document/ssa1099/module.f.js'
+import { dialect as itemizedDeductionsDialect } from '../../document/itemized_deductions/module.f.js'
 import { qdcgt } from '../../tax/line16/qdcgt/module.f.js'
 import { sdtw } from '../../tax/line16/sdtw/module.f.js'
 import { socialSecurityBenefitsWorksheet } from '../../tax/ssb/module.f.js'
@@ -1647,6 +1648,22 @@ const socialSecurityDocument = documentHash => box5NetBenefits => ({
         taxYear: 2025,
         formRevision: '2025',
         box5NetBenefits,
+    },
+})
+
+/**
+ * A `vnd.fjs.itemized_deductions` document carrying one entry per named
+ * `(lineTag, amount)` pair — Plan 13-07's own end-to-end fixture builder,
+ * mirroring {@link socialSecurityDocument}'s shape one dialect over.
+ * @type {(documentHash: string) => (entries: readonly { readonly lineTag: string, readonly amount: string }[]) => Stored<ItemizedDeductions>}
+ */
+const itemizedDeductionsDocument = documentHash => entries => ({
+    documentHash,
+    value: {
+        dialect: itemizedDeductionsDialect,
+        recipientTin: '222-22-2222',
+        taxYear: 2025,
+        entries: entries.map(entry => ({ lineTag: entry.lineTag, provider: 'Some Provider', amount: entry.amount })),
     },
 })
 
@@ -3498,6 +3515,142 @@ export const proof = {
                 line13b, 0n,
                 'MFS gets $0 UNCONDITIONALLY, even at $100,000 AGI, well past the phase-out start',
             )
+        },
+    },
+    // Wave 3 (TAX-13, Slice 3, Plan 13-07): a return that itemizes computes
+    // line 12e for real, through the full `form1040Report` entry point —
+    // both directions, per criterion 3. THE SECOND leaf is the load-bearing
+    // one: itemizing does NOT automatically win merely because it exceeds
+    // the BASE $15,750/$31,500 figure.
+    wave3Itemizing: {
+        // Itemizing WINS: a single filer, no age/blindness boxes, itemized
+        // total $20,000.00 -- above the $15,750.00 base standard deduction.
+        // Hand-totaled independently of `scheduleA`'s own arithmetic:
+        // $8,000.00 SALT (under the $40,000 cap, well under the $500,000
+        // phase-down threshold) + $9,000.00 mortgage interest (trusted at
+        // face value, no Pub. 936 limitation on Schedule A's own printed
+        // face) + $3,000.00 cash charity = $20,000.00.
+        itemizingWinsComputesLineTwelveEAsTheItemizedTotal: () => {
+            const w2Form = w2Document('sha256-w2-t07-itemizing-wins')('90000.00')
+            const itemizedForm = itemizedDeductionsDocument('sha256-itemized-t07-wins')([
+                { lineTag: 'saltIncomeTax', amount: '8000.00' },
+                { lineTag: 'mortgageInterest1098', amount: '9000.00' },
+                { lineTag: 'charitableCash', amount: '3000.00' },
+            ])
+            /** @type {ReturnProfile} */
+            const profile = {
+                ...singleProfile,
+                declaredKinds: ['wages', 'itemizedDeductions'],
+            }
+            const inputs = inputsOf(storedProfile(profile))([w2Form])([])([])([])([])([])([itemizedForm])([])
+            const outcome = form1040Report(taxParams2025)(inputs)
+            assert(outcome.kind === 'ok', ['expected the itemizing return to compute', outcome])
+            if (outcome.kind !== 'ok') {
+                throw ['expected ok', outcome]
+            }
+
+            const line11b = lineRuled(outcome.lines)('1040 line 11b').value
+            assertEq(line11b, 9000000n, '$90,000.00 AGI -- wages alone')
+
+            const line12e = lineRuled(outcome.lines)('1040 line 12e')
+            assertEq(line12e.value, 2000000n, '$20,000.00 itemized total, exceeding the $15,750.00 standard')
+            // Decision 2.4: line 12e cites what was COMPARED, not only what
+            // won -- the itemized-deductions document's own hash is among
+            // line 12e's sources even though it is also the WINNER here.
+            assert(
+                line12e.sources.some(source => source.documentHash === 'sha256-itemized-t07-wins'),
+                ['expected line 12e to cite the itemized-deductions document', line12e.sources],
+            )
+
+            // Cross-checked a SECOND way, independent of `form1040Report`'s
+            // own wiring: the SAME entries fed straight to `scheduleA(...)`
+            // (never to `form1040IncomeLines`) must reach the identical
+            // line 17 grand total.
+            const crossCheck = scheduleA(taxParams2025)({
+                status: 'single',
+                agiCents: line11b,
+                itemizedEntries: [
+                    { documentHash: 'sha256-itemized-t07-wins', value: { lineTag: 'saltIncomeTax', provider: 'Some Provider', amount: '8000.00' } },
+                    { documentHash: 'sha256-itemized-t07-wins', value: { lineTag: 'mortgageInterest1098', provider: 'Some Provider', amount: '9000.00' } },
+                    { documentHash: 'sha256-itemized-t07-wins', value: { lineTag: 'charitableCash', provider: 'Some Provider', amount: '3000.00' } },
+                ],
+                medicalExpenseEntries: [],
+                profile: storedProfile(profile),
+            }).line17
+            assertEq(crossCheck, 2000000n, 'independent scheduleA(...) call must reach the SAME grand total')
+
+            // line15 (taxable income) REFLECTS the itemized figure, not the
+            // $15,750.00 base standard deduction: line13a/line13b are both
+            // $0 for this profile (no age boxes, no tips/overtime/car-loan
+            // declared), so line14 = line12e = $20,000.00, and line15 =
+            // $90,000.00 - $20,000.00 = $70,000.00 -- $4,250.00 LOWER than
+            // the $74,250.00 it would be with the $15,750.00 standard
+            // deduction instead.
+            const line15 = lineRuled(outcome.lines)('1040 line 15').value
+            assertEq(line15, 7000000n, '$70,000.00 taxable income, WITH the $20,000.00 itemized total')
+        },
+        // THE LOAD-BEARING CASE (criterion 3): a single filer with BOTH
+        // age/blindness boxes checked has a REAL standard deduction of
+        // $19,750.00 ($15,750.00 + two $2,000.00 increments) -- NOT the
+        // bare chart minimum. $18,000.00 of itemized deductions exceeds
+        // that $15,750.00 BASE figure and STILL LOSES, because the
+        // comparison is against THIS filer's own $19,750.00, never the
+        // base. An engine where itemizing automatically wins above the
+        // base figure would ship $18,000.00 here; this one ships
+        // $19,750.00.
+        standardStillWinsAboveTheBaseThresholdTheLoadBearingCase: () => {
+            const w2Form = w2Document('sha256-w2-t07-standard-still-wins')('90000.00')
+            const itemizedForm = itemizedDeductionsDocument('sha256-itemized-t07-loses')([
+                { lineTag: 'saltIncomeTax', amount: '8000.00' },
+                { lineTag: 'mortgageInterest1098', amount: '7000.00' },
+                { lineTag: 'charitableCash', amount: '3000.00' },
+            ])
+            /** @type {ReturnProfile} */
+            const profile = {
+                ...singleProfile,
+                taxpayerBornBeforeJan2_1961: true,
+                taxpayerIsBlind: true,
+                declaredKinds: ['wages', 'itemizedDeductions'],
+            }
+            const inputs = inputsOf(storedProfile(profile))([w2Form])([])([])([])([])([])([itemizedForm])([])
+            const outcome = form1040Report(taxParams2025)(inputs)
+            assert(outcome.kind === 'ok', ['expected the standard-still-wins return to compute', outcome])
+            if (outcome.kind !== 'ok') {
+                throw ['expected ok', outcome]
+            }
+
+            const line12e = lineRuled(outcome.lines)('1040 line 12e')
+            assertEq(
+                line12e.value, 1975000n,
+                '$19,750.00 (two age/blindness boxes) -- NOT the $18,000.00 itemized total, ' +
+                'and NOT the base $15,750.00: itemizing does not automatically win above the base figure',
+            )
+            assert(line12e.value !== 1800000n, ['line 12e must not equal the losing itemized figure', line12e.value])
+            // Even though the STANDARD deduction won, line 12e still cites
+            // the itemized-deductions document -- Decision 2.4: what was
+            // COMPARED, not only what won.
+            assert(
+                line12e.sources.some(source => source.documentHash === 'sha256-itemized-t07-loses'),
+                ['expected line 12e to cite the itemized-deductions document even though it lost', line12e.sources],
+            )
+
+            // Cross-checked independently: the itemized total itself really
+            // is $18,000.00 -- ABOVE the base $15,750.00 -- so the property
+            // under test is genuinely exercised, not a fixture that merely
+            // looks like it is.
+            const crossCheck = scheduleA(taxParams2025)({
+                status: 'single',
+                agiCents: 9000000n,
+                itemizedEntries: [
+                    { documentHash: 'sha256-itemized-t07-loses', value: { lineTag: 'saltIncomeTax', provider: 'Some Provider', amount: '8000.00' } },
+                    { documentHash: 'sha256-itemized-t07-loses', value: { lineTag: 'mortgageInterest1098', provider: 'Some Provider', amount: '7000.00' } },
+                    { documentHash: 'sha256-itemized-t07-loses', value: { lineTag: 'charitableCash', provider: 'Some Provider', amount: '3000.00' } },
+                ],
+                medicalExpenseEntries: [],
+                profile: storedProfile(profile),
+            }).line17
+            assertEq(crossCheck, 1800000n, '$18,000.00, independently confirmed above the BASE $15,750.00')
+            assert(crossCheck > 1575000n, ['expected the itemized total to exceed the base standard deduction', crossCheck])
         },
     },
     // 12.1-VERIFICATION.md's WARNING, second half: no COMMITTED,
