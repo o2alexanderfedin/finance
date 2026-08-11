@@ -57,27 +57,55 @@ dependency is waived by decision, not satisfied.
 - **Mismatched program hash or parameter set is refused loudly.** Two reports from different
   programs or different parameter sets are a different computation, not an amendment. Silently
   diffing them would produce a confident, wrong Column B.
+  > **Research resolution:** this costs nothing extra and needs no new run-record field. Guest
+  > programs cannot `import`, and `guestCtx` exposes no tax-parameter lookup, so every parameter
+  > a stored program uses is a literal baked into its own source — **`programHash` equality
+  > already implies parameter-set equality.** PROV-04's parameter-set-hash field (Phase 14,
+  > waived) is therefore not a prerequisite (`15-RESEARCH.md` Pitfall 1).
 - **The diff is taken over the projected lines**, after the whole-dollar election is applied, so
   that `B = C − A` holds exactly in the printed dollars a filer would copy onto the form.
+  > **Research resolution:** `applyWholeDollarElection` is **not** in `guestCtx`, so a guest
+  > program cannot have applied it and the stored line values are raw cents. The diff module
+  > therefore applies the projection itself, host-side, and takes **`elected` as an explicit
+  > caller argument** (confirmed by the phase owner 2026-08-11). Re-deriving the flag from stored
+  > CAS content was rejected: it is only valid if both runs pinned the same return-profile
+  > revision, an assumption that can silently be false.
 
 ### Multi-Year and Capital Loss Carryover (TAX-17)
 
-- **A minimal but genuinely cited TY2024 subset**, covering only what the carryover path needs —
-  not a full TY2024 parameter set. Every unmodeled TY2024 area must refuse loudly, consistent
-  with TAX-16's standing rule that an honest refusal beats a confident zero. A complete TY2024
-  set was rejected for this phase: it is large, and it re-opens the same IRS-figure transcription
-  problem Phase 13 already left open and unowned.
-- **The prior-year carryover arrives as a new document dialect** carrying the prior-year
-  Schedule D figures. A carryover is a transcribed fact from a filed return, and documents are
-  this engine's input; `vnd.fjs.return_profile` is for taxpayer *declarations* and would be the
-  wrong home for a transcribed figure.
-- **The carryover is derived, not asserted** — computed through the Capital Loss Carryover
-  Worksheet from the prior-year figures, refusing when the inputs are absent. Accepting an
-  asserted carryover amount would let an unchecked number into the chain.
-- **"Any year with parameters and documents computes" is enforced mechanically** — a gate in the
-  style of `magi-gate.test.js`, asserting no bare `2025` literal survives in the computation
-  modules. Phase 13's experience is that a mechanical gate is the only version of this that
-  stays true; inspection does not.
+> **REVISED 2026-08-11 after research falsified this area's central premise.** The original
+> decision was sized around "the minimal TY2024 parameter subset the carryover path needs."
+> `15-RESEARCH.md` fetched the IRS `i1040sd.pdf` (2025 revision, p9) and transcribed all 13
+> worksheet lines: the Capital Loss Carryover Worksheet consumes **exactly four prior-year
+> *result* figures and zero rate or threshold parameters.** That subset does not exist. The
+> three decisions below replace the original four, confirmed by the phase owner the same day.
+
+- **No TY2024 parameter transcription at all.** The carryover computation needs none, and
+  "any year with parameters and documents computes" is proven **structurally** instead: every
+  schedule/form module already takes `TaxParamSet` as an explicit argument, and
+  `taxParamsByYear` / `finance_tax_params` are already open-keyed with unknown-year handled as
+  an ordinary refusal. Adding hand-transcribed TY2024 figures was rejected because it would
+  create a second batch of unverified IRS constants stacked on top of the Phase 13 batch that is
+  already open and unowned. A synthetic fixture year was rejected because a fake year sitting in
+  a shipped parameter table invites a later reader to mistake it for real.
+- **The prior-year carryover arrives as a new document dialect** carrying the four figures the
+  worksheet actually consumes — 2024 Form 1040 line 15, and 2024 Schedule D lines 7, 15 and 21.
+  A carryover is a transcribed fact from a filed return, and documents are this engine's input;
+  `vnd.fjs.return_profile` is for taxpayer *declarations* and would be the wrong home.
+- **The carryover is derived, not asserted** — computed through the worksheet from those four
+  figures rather than accepting a supplied carryover amount.
+- **Absent document means zero; present-but-broken refuses.** A missing carryover document is a
+  legitimate `0n` on Schedule D lines 6 and 14 — a first-year filer, or anyone who genuinely had
+  no prior-year capital loss, has nothing to carry, and refusing there would make them unable to
+  file at all. A document that *exists* but has a missing or inconsistent required field refuses,
+  naming the field. This mirrors `fjs/document/1099b`, where an absent box 1e is a distinct valid
+  state from a malformed one. (The original text said only "refusing when the inputs are absent",
+  which read ambiguously across these two cases — `15-RESEARCH.md` Pitfall 4.)
+- **The mechanical year-genericity gate must be narrowly scoped.** A literal `no bare 2025` grep
+  over `fjs/` false-positives on roughly 450 lines: every module's own proof section names its
+  test fixtures `taxParams2025`. The gate targets computation paths, not fixture identifiers, and
+  its exact scope is to be tuned against real offending code rather than asserted up front
+  (`15-RESEARCH.md` Pitfall 2).
 
 ### `fjs_check` and the Dialect Registry (MCP-09, DOC-16)
 
