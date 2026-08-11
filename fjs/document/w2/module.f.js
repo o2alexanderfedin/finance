@@ -18,12 +18,25 @@
  * - **Boxes 15–20 are a repeating array, stored faithfully and never
  *   computed on.** One W-2 can carry several states and several localities.
  *   They are recorded because they are on the form, not because anything
- *   here reads them: this project computes a FEDERAL return, and a state
- *   figure that silently reached a federal line would be a wrong return.
- *   That constraint is a design commitment for later phases, not something
- *   this file can enforce — nothing computes yet. The proofs below pin
- *   faithful round-tripping, including two entries for the same state,
- *   which is what "faithfully" has to mean.
+ *   here COMPUTES from them: this project computes a FEDERAL return, and a
+ *   state figure that silently reached a federal line would be a wrong
+ *   return. That constraint is a design commitment for later phases, not
+ *   something this file can enforce — nothing computes from these boxes
+ *   yet. The proofs below pin faithful round-tripping, including two
+ *   entries for the same state, which is what "faithfully" has to mean.
+ *
+ *   **As of Phase 13 (TAX-13, 13-CONTEXT.md Decision 2.2), a PROOF in
+ *   `fjs/schedule/a` now READS `stateIncomeTax` from this array** — not to
+ *   compute anything, but to watch whether the taxpayer-asserted Schedule A
+ *   line 5a (state/local income tax paid, under the income-tax election) is
+ *   at least the amount already withheld here, since withheld tax is
+ *   necessarily paid. That proof never feeds `stateIncomeTax` into any
+ *   computed line — line 5a stays taxpayer-asserted, never derived from
+ *   this box — so the claim above stays true of COMPUTATION. It is no
+ *   longer true that "nothing here reads them": a reader now exists, and it
+ *   is a drift check, not a federal-line computation. Both claims are
+ *   deliberately narrower than the original paragraph and are both true
+ *   today.
  *
  * Boxes 9 and 14 are deliberately not modelled (YAGNI): box 9 is defunct,
  * and box 14 is a free-form employer field with no defined semantics —
