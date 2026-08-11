@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
 status: executing
-stopped_at: "Plan 13-05 COMPLETE -- vnd.fjs.itemized_deductions dialect created (verbatim to medical_expenses); saltCap (OBBBA Public Law 119-21 §70120) and medicalExpenseFloor (IRC §213(a)) parameters added; Schedule A line 18 itemize-anyway election added to return profile. TAX-13 NOT marked complete -- slice 3 closes at 13-07. Next: Plan 13-06 (Schedule A itself, deductionChoice)."
-last_updated: "2026-08-11T03:58:37.436Z"
+stopped_at: Completed 13-06-PLAN.md
+last_updated: "2026-08-11T04:26:38.451Z"
 last_activity: 2026-08-11
 progress:
   total_phases: 19
   completed_phases: 13
   total_plans: 75
-  completed_plans: 70
-  percent: 93
+  completed_plans: 71
+  percent: 95
 ---
 
 # Project State
@@ -30,7 +30,7 @@ Phase: 13 (The 65+ Profile and the Remaining Schedules) — EXECUTING
   Four plans across three waves. The plan set was returned ISSUES FOUND by
   `gsd-plan-checker` twice (2 blockers, then 2 more), revised each time, and only
   executed after a third pass returned VERIFICATION PASSED.
-Plan: 6 of 13
+Plan: 7 of 13
   Wave 1: 12.1-01 (Form 8949 category derivation + the absent-basis refusal) and
   12.1-02 (the 47-line Schedule D Tax Worksheet). Wave 2: 12.1-03 (Schedule D
   lines 1a-21, the loss-cap three-way branch, two bounded sub-worksheets).
@@ -41,7 +41,7 @@ Status: Ready to execute
   stopped after the final wave, so the phase has never been independently verified
   against its goal. That is the next action.
 
-Progress: [█████████░] 93%
+Progress: [██████████] 95%
   Phase-based, never plan-based: `completed_plans` (65) exceeds `total_plans` (62)
   because three phases carry an extra FIX-SUMMARY.md beside a plan's own summary,
   which rounds the plan-based figure to a misleading 100%. See `percent_note`.
@@ -142,6 +142,7 @@ proofs and moves with submodule initialization state — which is exactly how a 
 | Phase 13 P03 | 35min | 2 tasks | 3 files |
 | Phase 13 P04 | 25min | 3 tasks | 2 files |
 | Phase 13 P05 | 25min | 2 tasks | 3 files |
+| Phase 13 P06 | 35min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -320,6 +321,9 @@ Full log in PROJECT.md Key Decisions. Recent decisions affecting current work:
 - [Phase 13]: 13-04: TAX-09 marked COMPLETE -- vertical slice 2 closes here, a 65+ TY2025 return's line 13b is a real Schedule 1-A figure through the full form1040Report entry point, mirroring slice 1's (TAX-10) precedent
 - [Phase 13]: 13-05: saltCap stores only the worksheet's flat, non-MFS dollar figures -- only the SALT worksheet's final line (w10) halves the result for MFS (13-RESEARCH.md Pitfall 2)
 - [Phase 13]: 13-05: medicalExpenseFloor and saltCap.phasedownRatePercent are plain number rates, not AmountWithCitation, excluded from the dollar-string round-trip proof
+- [Phase 13]: SALT worksheet w1/w9 computed flat for every filing status; the ONE halving step for MFS applies to w9 only when constructing w10 (13-06)
+- [Phase 13]: Mortgage-interest and charitable Schedule A entries pass through at face value with no Pub. 936/526 limitation arithmetic (13-06)
+- [Phase 13]: Decision 2.2's withholding-drift proof gates on presence of a saltIncomeTax-tagged entry, never a separate election flag (13-06)
 
 ### Pending Todos
 
@@ -464,8 +468,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-08-11T03:58:37.424Z
-Stopped at: Completed 13-05-PLAN.md
+Last session: 2026-08-11T04:26:38.442Z
+Stopped at: Completed 13-06-PLAN.md
 Nothing is mid-edit. Next: Plan 13-05 (Wave 3 -- Slice 3, itemizing: vnd.fjs.itemized_deductions
 dialect, SALT cap/medical floor parameters, Schedule A line 18 election).
 
