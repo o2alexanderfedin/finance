@@ -67,6 +67,24 @@
  * hand-written pin of that exact arithmetic (13-RESEARCH.md §3, `w1`
  * through `w10`).
  *
+ * ## A THIRD kind of boundary: data-sufficiency refusals (CR-01, WR-04)
+ *
+ * Distinct from both of the above: a stored document that is structurally
+ * valid but semantically UNREPRESENTABLE on the printed form. Line 5a is a
+ * single EITHER/OR election (state/local income tax paid, OR general sales
+ * tax, never both — the printed form's own line 5a checkbox,
+ * 13-RESEARCH.md §3) — a document carrying entries under BOTH
+ * `saltIncomeTax` and `saltGeneralSalesTax` cannot be summed into one
+ * honest figure. Likewise, an `entries[].lineTag` outside the eleven this
+ * module actually reads (13-CONTEXT.md Decision 2.1 keeps `lineTag` a free
+ * string at the DIALECT boundary; the recognized set is known only HERE,
+ * at the schedule that consumes it) is a typo or a stale tag, not a
+ * legitimate zero. Both refuse via `{ kind: 'error' }` — the SAME shape
+ * `fjs/schedule/d`/`fjs/form8812` already use for their own
+ * document-data-sufficiency refusals (12.1 Decision 2.6's category), never
+ * a `fjs/return/scope` kind (this is not a declared-but-unmodeled-kind
+ * problem) and never a silent sum or a silent drop.
+ *
  * ## Neither TY2026 OBBBA itemized-deduction change is implemented
  * (Decision 5.8)
  *
@@ -169,6 +187,44 @@ const sumEntriesByLineTag = entries => lineTag => {
 }
 
 /**
+ * Every `lineTag` this module's own `byTag(...)` calls (via
+ * {@link sumEntriesByLineTag}) recognize — the ONLY vocabulary Schedule A
+ * can place a dollar figure against. Hand-typed as a single list (not
+ * derived from the `byTag('...')` call sites below, which would make this
+ * list a function of the code it is meant to police) so a future retagging
+ * touches exactly one place. {@link firstUnrecognizedLineTag} refuses any
+ * stored entry carrying anything outside it (WR-04, 13-REVIEW.md) — Decision
+ * 2.1 keeps `lineTag` a free string at the DIALECT boundary
+ * (`fjs/document/itemized_deductions`); this is the SCHEDULE A boundary
+ * where the recognized set is actually known.
+ * @type {readonly string[]}
+ */
+const knownLineTags = [
+    'saltIncomeTax', 'saltGeneralSalesTax', 'realEstateTax', 'personalPropertyTax',
+    'otherTaxes', 'mortgageInterest1098', 'mortgageInterestNo1098', 'pointsNo1098',
+    'charitableCash', 'charitableNonCash', 'charitableCarryover', 'otherItemized',
+]
+
+/**
+ * The exact count of {@link knownLineTags} — an independently hand-typed
+ * expectation, AGENTS.md's `expectedThresholdCount` idiom, so deleting an
+ * entry from the list above fails a proof even though `.length` would
+ * otherwise happily report one fewer without complaint.
+ * @type {number}
+ */
+const expectedKnownLineTagCount = 12
+
+/**
+ * The FIRST stored entry whose `lineTag` is not in {@link knownLineTags},
+ * or `undefined` if every entry's tag is recognized.
+ * @type {(entries: readonly Stored<ItemizedEntry>[]) => string | undefined}
+ */
+const firstUnrecognizedLineTag = entries => {
+    const unrecognized = entries.find(entry => !knownLineTags.includes(entry.value.lineTag))
+    return unrecognized?.value.lineTag
+}
+
+/**
  * The exact cents sum of every stored medical/dental expense entry, NET of
  * its own `reimbursed` amount — an entry-level subtraction, not a single
  * printed box read, so it is written once here rather than forced through
@@ -198,7 +254,11 @@ const sumMedicalEntriesNetOfReimbursement = entries => {
  * Used for line 5a, which reads EITHER the `saltIncomeTax`-tagged entry or
  * the `saltGeneralSalesTax`-tagged entry (a taxpayer elects one, never
  * both) — summing across both tags collapses to "whichever one is present"
- * without an explicit branch.
+ * WITHOUT an explicit branch ONLY because {@link scheduleA} itself refuses
+ * (CR-01, `{ kind: 'error' }`) before ever calling this on line 5a's two
+ * sums, when BOTH tags are present. `addBoxSums` here is never handed two
+ * genuinely populated sums at once — see `scheduleA`'s own mutual-exclusion
+ * check, immediately before its line 5a is built.
  * @type {(a: BoxSum) => (b: BoxSum) => BoxSum}
  */
 const addBoxSums = a => b => ({
@@ -354,6 +414,7 @@ const saltCapWorksheet = taxParamSet => input => {
  * `line38` are bare `bigint`). `line18` is the boolean election, never
  * money.
  * @typedef {{
+ *   readonly kind: 'ok',
  *   readonly line1: ReportLine, readonly line2: bigint, readonly line3: bigint, readonly line4: bigint,
  *   readonly line5a: ReportLine, readonly line5b: ReportLine, readonly line5c: ReportLine,
  *   readonly line5d: bigint, readonly line5e: bigint,
@@ -366,15 +427,38 @@ const saltCapWorksheet = taxParamSet => input => {
  *   readonly line15: ReportLine, readonly line16: ReportLine, readonly line17: bigint,
  *   readonly line18: boolean,
  *   readonly saltWorksheet: SaltWorksheetResult,
- * }} ScheduleA
+ * }} ScheduleAOk
  */
 
 /**
+ * The graceful, tagged refusal a document-data-sufficiency problem produces
+ * (this module's own docstring, "A THIRD kind of boundary") — the SAME
+ * shape `fjs/schedule/d`'s `ScheduleDError` and `fjs/form8812`'s error arm
+ * already use, never a `fjs/return/scope` kind.
+ * @typedef {{ readonly kind: 'error', readonly message: string }} ScheduleAError
+ */
+
+/** @typedef {ScheduleAOk | ScheduleAError} ScheduleAOutcome */
+
+/**
  * Computes Schedule A for one return.
- * @type {(taxParamSet: TaxParamSet) => (input: ScheduleAInput) => ScheduleA}
+ * @type {(taxParamSet: TaxParamSet) => (input: ScheduleAInput) => ScheduleAOutcome}
  */
 export const scheduleA = taxParamSet => input => {
     const { status, agiCents, itemizedEntries, medicalExpenseEntries, profile } = input
+
+    // WR-04 (13-REVIEW.md): an unrecognized `lineTag` must refuse LOUDLY,
+    // before any line is built -- never silently drop money from line 17's
+    // total. Checked FIRST, ahead of every other computation.
+    const unrecognizedTag = firstUnrecognizedLineTag(itemizedEntries)
+    if (unrecognizedTag !== undefined) {
+        return {
+            kind: 'error',
+            message: `Schedule A: itemized-deductions entry carries an unrecognized lineTag `
+                + `"${unrecognizedTag}" -- known tags: ${knownLineTags.join(', ')}`,
+        }
+    }
+
     const fromEntries = documentLine(profile)
     const zero = profileDeclaredZeroLine(profile)
     const byTag = sumEntriesByLineTag(itemizedEntries)
@@ -386,8 +470,21 @@ export const scheduleA = taxParamSet => input => {
     const line4 = line1.value > line3 ? line1.value - line3 : 0n
 
     // ── Taxes You Paid ────────────────────────────────────────────────────
-    const line5a = fromEntries('Schedule A line 5a')(
-        addBoxSums(byTag('saltIncomeTax'))(byTag('saltGeneralSalesTax')))
+    // CR-01 (13-REVIEW.md): the printed line 5a is a single EITHER/OR
+    // election -- state/local income tax paid, OR general sales tax, NEVER
+    // both (13-RESEARCH.md §3, the form's own line 5a checkbox). A document
+    // carrying entries under BOTH tags is unrepresentable on the printed
+    // form; refuse rather than silently sum both into an inflated figure.
+    const saltIncomeTaxSum = byTag('saltIncomeTax')
+    const saltGeneralSalesTaxSum = byTag('saltGeneralSalesTax')
+    if (saltIncomeTaxSum.sources.length > 0 && saltGeneralSalesTaxSum.sources.length > 0) {
+        return {
+            kind: 'error',
+            message: 'Schedule A line 5a: saltIncomeTax and saltGeneralSalesTax are mutually '
+                + 'exclusive elections -- a stored document may not carry entries under both tags',
+        }
+    }
+    const line5a = fromEntries('Schedule A line 5a')(addBoxSums(saltIncomeTaxSum)(saltGeneralSalesTaxSum))
     const line5b = fromEntries('Schedule A line 5b')(byTag('realEstateTax'))
     const line5c = fromEntries('Schedule A line 5c')(byTag('personalPropertyTax'))
     const line5d = line5a.value + line5b.value + line5c.value
@@ -425,6 +522,7 @@ export const scheduleA = taxParamSet => input => {
     const line18 = profile.value.itemizeEvenThoughLessThanStandardDeduction === true
 
     return {
+        kind: 'ok',
         line1, line2, line3, line4,
         line5a, line5b, line5c, line5d, line5e,
         line6, line7,
@@ -588,40 +686,52 @@ const oneZeroNineNineRFixture = rows => hash => ({
     },
 })
 
+/**
+ * Asserts the outcome is `kind: 'ok'` and returns it narrowed, so every
+ * fixture below can read line fields without repeating the discriminant
+ * check — mirrors `fjs/form8812`'s own local `expectOk` precedent exactly.
+ * @type {(outcome: ScheduleAOutcome) => ScheduleAOk}
+ */
+const expectOk = outcome => {
+    assert(outcome.kind === 'ok', ['expected an ok outcome', outcome])
+    if (outcome.kind !== 'ok') { throw ['unreachable', outcome] }
+    return outcome
+}
+
 export const proof = {
     // Test 1 (medical floor).
     medicalFloor: {
         aboveFloorFixture: () => {
-            const result = scheduleA(taxParams2025)({
+            const result = expectOk(scheduleA(taxParams2025)({
                 status: 'single',
                 agiCents: 8000000n, // $80,000.00
                 itemizedEntries: [],
                 medicalExpenseEntries: [medicalEntry('10000.00')(undefined)('med-doc-1')],
                 profile: profileNoDeclaredKinds,
-            })
+            }))
             assertEq(result.line1.value, 1000000n, 'line 1 = $10,000.00')
             assertEq(result.line3, 600000n, 'line 3 = $6,000.00 -- 7.5% of $80,000.00')
             assertEq(result.line4, 400000n, 'line 4 = $4,000.00')
         },
         belowFloorFixtureFloorsAtZero: () => {
-            const result = scheduleA(taxParams2025)({
+            const result = expectOk(scheduleA(taxParams2025)({
                 status: 'single',
                 agiCents: 8000000n, // $80,000.00
                 itemizedEntries: [],
                 medicalExpenseEntries: [medicalEntry('5000.00')(undefined)('med-doc-1')],
                 profile: profileNoDeclaredKinds,
-            })
+            }))
             assertEq(result.line3, 600000n, 'line 3 unchanged -- same AGI')
             assertEq(result.line4, 0n, 'line 4 = $0 -- line3 > line1')
         },
         reimbursementReducesLine1: () => {
-            const result = scheduleA(taxParams2025)({
+            const result = expectOk(scheduleA(taxParams2025)({
                 status: 'single',
                 agiCents: 0n,
                 itemizedEntries: [],
                 medicalExpenseEntries: [medicalEntry('1000.00')('400.00')('med-doc-1')],
                 profile: profileNoDeclaredKinds,
-            })
+            }))
             assertEq(result.line1.value, 60000n, 'line 1 = $600.00 -- $1,000 minus $400 reimbursed')
         },
     },
@@ -629,13 +739,13 @@ export const proof = {
     // Test 2 (SALT flat-then-halved, Pitfall 2) -- THE decisive fixture.
     saltWorksheet: {
         mfsHalvesOnlyTheFinalLine: () => {
-            const result = scheduleA(taxParams2025)({
+            const result = expectOk(scheduleA(taxParams2025)({
                 status: 'marriedFilingSeparately',
                 agiCents: 60000000n, // $600,000.00 -- above the $250,000 MFS threshold
                 itemizedEntries: [itemizedEntry('saltIncomeTax')('30000.00')('itemized-doc-1')],
                 medicalExpenseEntries: [],
                 profile: profileNoDeclaredKinds,
-            })
+            }))
             assertEq(result.line5d, 3000000n, 'line 5d = $30,000.00')
             assertEq(result.saltWorksheet.w1, 4000000n, 'w1 = $40,000.00 -- FLAT, not halved for MFS')
             assertEq(result.saltWorksheet.w6, 35000000n, 'w6 = $350,000.00 ($600,000 - $250,000)')
@@ -647,49 +757,49 @@ export const proof = {
         // The non-MFS control for the SAME excess income: no halving at
         // any line, including w10.
         nonMfsAtTheSameExcessIncomeIsNotHalved: () => {
-            const result = scheduleA(taxParams2025)({
+            const result = expectOk(scheduleA(taxParams2025)({
                 status: 'single',
                 agiCents: 100000000n, // $1,000,000.00 -- $500,000 above the single threshold
                 itemizedEntries: [itemizedEntry('saltIncomeTax')('40000.00')('itemized-doc-1')],
                 medicalExpenseEntries: [],
                 profile: profileNoDeclaredKinds,
-            })
+            }))
             assertEq(result.saltWorksheet.w9, 1000000n, 'w9 = $10,000.00 -- the same flat floor')
             assertEq(result.line5e, 1000000n, 'line 5e = $10,000.00 -- NOT halved for a non-MFS filer')
         },
         // Test 3 (below-threshold skip): collapses to the ordinary cap.
         belowThresholdCollapsesToOrdinaryCapNonMfs: () => {
-            const result = scheduleA(taxParams2025)({
+            const result = expectOk(scheduleA(taxParams2025)({
                 status: 'single',
                 agiCents: 40000000n, // $400,000.00 -- below the $500,000 threshold
                 itemizedEntries: [itemizedEntry('saltIncomeTax')('50000.00')('itemized-doc-1')],
                 medicalExpenseEntries: [],
                 profile: profileNoDeclaredKinds,
-            })
+            }))
             assertEq(result.saltWorksheet.w6, 0n, 'w6 = $0 -- skipped, below threshold')
             assertEq(result.saltWorksheet.w9, 4000000n, 'w9 = w1 = $40,000.00, uncapped')
             assertEq(result.line5e, 4000000n, 'line 5e = $40,000.00 -- the ordinary cap, line5d exceeds it')
         },
         belowThresholdLeavesLine5dUnreducedWhenUnderTheCap: () => {
-            const result = scheduleA(taxParams2025)({
+            const result = expectOk(scheduleA(taxParams2025)({
                 status: 'single',
                 agiCents: 40000000n, // $400,000.00 -- below threshold
                 itemizedEntries: [itemizedEntry('saltIncomeTax')('9500.00')('itemized-doc-1')],
                 medicalExpenseEntries: [],
                 profile: profileNoDeclaredKinds,
-            })
+            }))
             assertEq(result.line5d, 950000n, 'line 5d = $9,500.00')
             assertEq(result.line5e, 950000n, 'line 5e = $9,500.00 -- under the cap, fully deductible')
         },
         // TAX-04 boundary trio: the worksheet's own `<=` edge (w6's skip
         // branch), single filer, at the $500,000 threshold.
         thresholdBoundaryTrioSingle: () => {
-            const at = (/** @type {bigint} */ agiCents) => scheduleA(taxParams2025)({
+            const at = (/** @type {bigint} */ agiCents) => expectOk(scheduleA(taxParams2025)({
                 status: 'single', agiCents,
                 itemizedEntries: [itemizedEntry('saltIncomeTax')('50000.00')('itemized-doc-1')],
                 medicalExpenseEntries: [],
                 profile: profileNoDeclaredKinds,
-            })
+            }))
             const below = at(49999999n) // $499,999.99
             assertEq(below.saltWorksheet.w6, 0n, 'one cent below: still skipped')
             const exactly = at(50000000n) // $500,000.00
@@ -706,26 +816,26 @@ export const proof = {
         // The rate genuinely reduces the cap once the excess is large
         // enough to survive rounding to the nearest cent.
         realMovementAboveThreshold: () => {
-            const result = scheduleA(taxParams2025)({
+            const result = expectOk(scheduleA(taxParams2025)({
                 status: 'single',
                 agiCents: 50010000n, // $500,100.00 -- $100.00 above threshold
                 itemizedEntries: [itemizedEntry('saltIncomeTax')('50000.00')('itemized-doc-1')],
                 medicalExpenseEntries: [],
                 profile: profileNoDeclaredKinds,
-            })
+            }))
             assertEq(result.saltWorksheet.w6, 10000n, 'w6 = $100.00')
             assertEq(result.saltWorksheet.w7, 3000n, 'w7 = $30.00 -- 30% of $100.00, cent-exact')
             assertEq(result.line5e, 3997000n, 'line 5e = $39,970.00 -- $30.00 below the flat cap')
         },
         // The floor never breaches below $10,000, even at a very large excess.
         floorNeverBreachedAtLargeExcess: () => {
-            const result = scheduleA(taxParams2025)({
+            const result = expectOk(scheduleA(taxParams2025)({
                 status: 'single',
                 agiCents: 900000000n, // $9,000,000.00 -- far above threshold
                 itemizedEntries: [itemizedEntry('saltIncomeTax')('50000.00')('itemized-doc-1')],
                 medicalExpenseEntries: [],
                 profile: profileNoDeclaredKinds,
-            })
+            }))
             assertEq(result.saltWorksheet.w9, 1000000n, 'w9 floors at $10,000.00, never lower')
         },
     },
@@ -734,20 +844,20 @@ export const proof = {
     // declaredKinds box, exactly as `fjs/schedule/b`'s Form 8815 boundary does.
     documentedZeros: {
         line9CitesProfileDeclaredKinds: () => {
-            const result = scheduleA(taxParams2025)({
+            const result = expectOk(scheduleA(taxParams2025)({
                 status: 'single', agiCents: 0n, itemizedEntries: [], medicalExpenseEntries: [],
                 profile: profileNoDeclaredKinds,
-            })
+            }))
             assertEq(result.line9.value, 0n)
             assertEq(result.line9.sources.length, 1)
             assertEq(result.line9.sources[0].documentHash, profileNoDeclaredKinds.documentHash)
             assertEq(result.line9.sources[0].boxPath, 'declaredKinds')
         },
         line15CitesProfileDeclaredKinds: () => {
-            const result = scheduleA(taxParams2025)({
+            const result = expectOk(scheduleA(taxParams2025)({
                 status: 'single', agiCents: 0n, itemizedEntries: [], medicalExpenseEntries: [],
                 profile: profileNoDeclaredKinds,
-            })
+            }))
             assertEq(result.line15.value, 0n)
             assertEq(result.line15.sources.length, 1)
             assertEq(result.line15.sources[0].documentHash, profileNoDeclaredKinds.documentHash)
@@ -757,12 +867,12 @@ export const proof = {
         // the SAME documented-zero shape via `documentLine` -- distinct
         // from lines 9/15's ALWAYS-zero shape, but structurally identical.
         absentTagFallsBackToDocumentedZero: () => {
-            const result = scheduleA(taxParams2025)({
+            const result = expectOk(scheduleA(taxParams2025)({
                 status: 'single', agiCents: 0n,
                 itemizedEntries: [itemizedEntry('charitableCash')('100.00')('itemized-doc-1')],
                 medicalExpenseEntries: [],
                 profile: profileNoDeclaredKinds,
-            })
+            }))
             assertEq(result.line13.value, 0n)
             assertEq(result.line13.sources[0].boxPath, 'declaredKinds')
         },
@@ -773,7 +883,7 @@ export const proof = {
     // own face (this module's own docstring).
     trustedTaxpayerAssertedLines: {
         mortgageAndCharitableEntriesPassThroughUnlimited: () => {
-            const result = scheduleA(taxParams2025)({
+            const result = expectOk(scheduleA(taxParams2025)({
                 status: 'single', agiCents: 100000n, // a trivially small AGI
                 itemizedEntries: [
                     itemizedEntry('mortgageInterest1098')('900000.00')('itemized-doc-1'),
@@ -781,7 +891,7 @@ export const proof = {
                 ],
                 medicalExpenseEntries: [],
                 profile: profileNoDeclaredKinds,
-            })
+            }))
             // Neither the Pub. 936 acquisition-debt cap nor the Pub. 526
             // 30%/20%-of-AGI limit is applied -- both entries pass through
             // exactly as asserted, even though a $100,000.00 AGI would
@@ -794,18 +904,108 @@ export const proof = {
     // Test 5 (line 18 election): read VERBATIM, no inference.
     line18Election: {
         trueWhenProfileElects: () => {
-            const result = scheduleA(taxParams2025)({
+            const result = expectOk(scheduleA(taxParams2025)({
                 status: 'single', agiCents: 0n, itemizedEntries: [], medicalExpenseEntries: [],
                 profile: profileItemizeAnyway,
-            })
+            }))
             assertEq(result.line18, true)
         },
         falseWhenProfileDoesNotElect: () => {
-            const result = scheduleA(taxParams2025)({
+            const result = expectOk(scheduleA(taxParams2025)({
                 status: 'single', agiCents: 0n, itemizedEntries: [], medicalExpenseEntries: [],
                 profile: profileNoDeclaredKinds,
-            })
+            }))
             assertEq(result.line18, false)
+        },
+    },
+
+    // CR-01 (13-REVIEW.md): line 5a is a single EITHER/OR election. All
+    // three cases pinned as controls: income-tax only, sales-tax only, and
+    // BOTH -- the third must refuse, never silently sum.
+    saltLine5aElection: {
+        incomeTaxOnlyReadsThatOneTag: () => {
+            const result = expectOk(scheduleA(taxParams2025)({
+                status: 'single', agiCents: 0n,
+                itemizedEntries: [itemizedEntry('saltIncomeTax')('4000.00')('itemized-doc-1')],
+                medicalExpenseEntries: [],
+                profile: profileNoDeclaredKinds,
+            }))
+            assertEq(result.line5a.value, 400000n, 'line 5a = $4,000.00, the income-tax entry alone')
+        },
+        salesTaxOnlyReadsThatOneTag: () => {
+            const result = expectOk(scheduleA(taxParams2025)({
+                status: 'single', agiCents: 0n,
+                itemizedEntries: [itemizedEntry('saltGeneralSalesTax')('3500.00')('itemized-doc-1')],
+                medicalExpenseEntries: [],
+                profile: profileNoDeclaredKinds,
+            }))
+            assertEq(result.line5a.value, 350000n, 'line 5a = $3,500.00, the sales-tax entry alone')
+        },
+        neitherTagPresentIsADocumentedZero: () => {
+            const result = expectOk(scheduleA(taxParams2025)({
+                status: 'single', agiCents: 0n, itemizedEntries: [], medicalExpenseEntries: [],
+                profile: profileNoDeclaredKinds,
+            }))
+            assertEq(result.line5a.value, 0n)
+            assertEq(result.line5a.sources[0]?.boxPath, 'declaredKinds')
+        },
+        // THE decisive fixture: a document carrying entries under BOTH tags
+        // must refuse -- summing them would silently inflate the SALT
+        // deduction, the exact failure CR-01 names.
+        bothTagsPresentRefuses: () => {
+            const outcome = scheduleA(taxParams2025)({
+                status: 'single', agiCents: 0n,
+                itemizedEntries: [
+                    itemizedEntry('saltIncomeTax')('4000.00')('itemized-doc-1'),
+                    itemizedEntry('saltGeneralSalesTax')('3500.00')('itemized-doc-1'),
+                ],
+                medicalExpenseEntries: [],
+                profile: profileNoDeclaredKinds,
+            })
+            assertEq(outcome.kind, 'error', 'expected a refusal, never a silently-summed line5a')
+            if (outcome.kind === 'error') {
+                assert(
+                    outcome.message.includes('saltIncomeTax') && outcome.message.includes('saltGeneralSalesTax'),
+                    ['expected the refusal to name both mutually exclusive tags', outcome.message],
+                )
+            }
+        },
+    },
+
+    // WR-04 (13-REVIEW.md): an unrecognized `lineTag` must refuse LOUDLY,
+    // never silently drop money from line 17's total.
+    unrecognizedLineTag: {
+        knownTagCountIsHandTyped: () => {
+            assertEq(knownLineTags.length, expectedKnownLineTagCount)
+        },
+        misspelledTagRefusesNamingIt: () => {
+            const outcome = scheduleA(taxParams2025)({
+                status: 'single', agiCents: 0n,
+                itemizedEntries: [itemizedEntry('saltIncomeTaxx')('100.00')('itemized-doc-1')],
+                medicalExpenseEntries: [],
+                profile: profileNoDeclaredKinds,
+            })
+            assertEq(outcome.kind, 'error', 'expected a refusal, never a silent drop from line 17')
+            if (outcome.kind === 'error') {
+                assert(
+                    outcome.message.includes('saltIncomeTaxx'),
+                    ['expected the refusal to name the offending tag', outcome.message],
+                )
+            }
+        },
+        // The control: every ONE of the 12 recognized tags, individually,
+        // computes normally -- proving the check refuses what is actually
+        // unrecognized, not merely "any tag at all".
+        everyKnownTagIsTheControlAndComputesNormally: () => {
+            for (const lineTag of knownLineTags) {
+                const outcome = scheduleA(taxParams2025)({
+                    status: 'single', agiCents: 0n,
+                    itemizedEntries: [itemizedEntry(lineTag)('10.00')('itemized-doc-1')],
+                    medicalExpenseEntries: [],
+                    profile: profileNoDeclaredKinds,
+                })
+                assertEq(outcome.kind, 'ok', ['expected the recognized tag to compute, not refuse', lineTag, outcome])
+            }
         },
     },
 
@@ -814,13 +1014,13 @@ export const proof = {
     // (where the TY2026 0.5%-of-AGI floor and the 2/37ths haircut would
     // both bite, were either implemented) still deducts in FULL, unreduced.
     obbbaTy2026ChangesNotImplemented: () => {
-        const result = scheduleA(taxParams2025)({
+        const result = expectOk(scheduleA(taxParams2025)({
             status: 'single',
             agiCents: 100000000n, // $1,000,000.00 -- well into the TY2026 high-income haircut's range
             itemizedEntries: [itemizedEntry('charitableCash')('500.00')('itemized-doc-1')],
             medicalExpenseEntries: [],
             profile: profileNoDeclaredKinds,
-        })
+        }))
         // The TY2026 0.5%-of-AGI floor would subtract $5,000.00 (0.5% of
         // $1,000,000) from this gift, and would floor a $500.00 gift at
         // $0 entirely. Neither happens: line 11 is the full $500.00.
@@ -831,7 +1031,7 @@ export const proof = {
     // End-to-end: all six sections computed together for one fixture,
     // hand-totaled independently of `scheduleA`'s own arithmetic.
     computesAllEighteenLinesForAFullyItemizedFixture: () => {
-        const result = scheduleA(taxParams2025)({
+        const result = expectOk(scheduleA(taxParams2025)({
             status: 'single',
             agiCents: 10000000n, // $100,000.00
             itemizedEntries: [
@@ -847,7 +1047,7 @@ export const proof = {
             ],
             medicalExpenseEntries: [medicalEntry('5000.00')(undefined)('med-doc-1')],
             profile: profileItemizeAnyway,
-        })
+        }))
         assertEq(result.line1.value, 500000n, 'line 1 = $5,000.00')
         assertEq(result.line3, 750000n, 'line 3 = $7,500.00 -- 7.5% of $100,000')
         assertEq(result.line4, 0n, 'line 4 = $0 -- below the floor')
@@ -930,10 +1130,10 @@ export const proof = {
     // This module computes a schedule, not a stored document: no `dialect`/
     // `mediaType`, mirroring `fjs/schedule/b`'s own `dialectIndependence` leaf.
     dialectIndependence: () => {
-        const result = scheduleA(taxParams2025)({
+        const result = expectOk(scheduleA(taxParams2025)({
             status: 'single', agiCents: 0n, itemizedEntries: [], medicalExpenseEntries: [],
             profile: profileNoDeclaredKinds,
-        })
+        }))
         assert(!('dialect' in result), 'scheduleA output must not carry a dialect tag')
         assert(!('mediaType' in result), 'scheduleA output must not carry a mediaType')
     },

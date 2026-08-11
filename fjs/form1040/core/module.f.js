@@ -88,6 +88,7 @@ import { baseTaxForAmount } from '../../tax/table/module.f.js'
 /** @import { Line16Method } from '../../tax/line16/module.f.js' */
 /** @import { UnmodeledKind } from '../../return/scope/module.f.js' */
 /** @import { ScheduleDOutcome } from '../../schedule/d/module.f.js' */
+/** @import { ScheduleAOutcome } from '../../schedule/a/module.f.js' */
 
 // ── Inputs ───────────────────────────────────────────────────────────────────
 
@@ -737,6 +738,15 @@ export const form1040IncomeLines = taxParamSet => inputs => {
         medicalExpenseEntries,
         profile,
     })
+    // CR-01/WR-04 (13-REVIEW.md): a document-data-sufficiency refusal from
+    // Schedule A (a mutually-exclusive line 5a election, or an unrecognized
+    // itemized-deductions `lineTag`) stops the WHOLE return before any
+    // further line is built — threaded exactly like the Schedule D
+    // absent-basis guard and the IRA-deduction guard above, one function
+    // over: `unmodeled: []`, since this names no `fjs/return/scope` kind.
+    if (scheduleAResult.kind === 'error') {
+        return { kind: 'error', message: scheduleAResult.message, unmodeled: [] }
+    }
     // The standard-vs-itemized comparison itself (13-CONTEXT.md Decision
     // 2.4): `deductionChoice` owns the decision, this wiring only feeds it
     // both figures and takes the winner. `itemizedCents` is Schedule A's own
@@ -1817,6 +1827,21 @@ const inputsOf = profile => w2s => interestForms => dividendForms => brokerageFo
  */
 const expectIncomeOk = outcome => {
     assert(outcome.kind === 'ok', ['expected the income lines to compute', outcome])
+    if (outcome.kind !== 'ok') {
+        throw ['expected ok', outcome]
+    }
+    return outcome
+}
+
+/**
+ * The same narrowing idiom as {@link expectIncomeOk}, for the handful of
+ * proof leaves below that call `scheduleA(...)` DIRECTLY as an independent
+ * cross-check of `form1040Report`'s own wiring (CR-01/WR-04 widened
+ * `scheduleA`'s return type to `ScheduleAOutcome`).
+ * @type {(outcome: ScheduleAOutcome) => Extract<ScheduleAOutcome, { readonly kind: 'ok' }>}
+ */
+const expectScheduleAOk = outcome => {
+    assert(outcome.kind === 'ok', ['expected scheduleA(...) to compute, not refuse', outcome])
     if (outcome.kind !== 'ok') {
         throw ['expected ok', outcome]
     }
@@ -3855,7 +3880,7 @@ export const proof = {
             // own wiring: the SAME entries fed straight to `scheduleA(...)`
             // (never to `form1040IncomeLines`) must reach the identical
             // line 17 grand total.
-            const crossCheck = scheduleA(taxParams2025)({
+            const crossCheck = expectScheduleAOk(scheduleA(taxParams2025)({
                 status: 'single',
                 agiCents: line11b,
                 itemizedEntries: [
@@ -3865,7 +3890,7 @@ export const proof = {
                 ],
                 medicalExpenseEntries: [],
                 profile: storedProfile(profile),
-            }).line17
+            })).line17
             assertEq(crossCheck, 2000000n, 'independent scheduleA(...) call must reach the SAME grand total')
 
             // line15 (taxable income) REFLECTS the itemized figure, not the
@@ -3927,7 +3952,7 @@ export const proof = {
             // is $18,000.00 -- ABOVE the base $15,750.00 -- so the property
             // under test is genuinely exercised, not a fixture that merely
             // looks like it is.
-            const crossCheck = scheduleA(taxParams2025)({
+            const crossCheck = expectScheduleAOk(scheduleA(taxParams2025)({
                 status: 'single',
                 agiCents: 9000000n,
                 itemizedEntries: [
@@ -3937,7 +3962,7 @@ export const proof = {
                 ],
                 medicalExpenseEntries: [],
                 profile: storedProfile(profile),
-            }).line17
+            })).line17
             assertEq(crossCheck, 1800000n, '$18,000.00, independently confirmed above the BASE $15,750.00')
             assert(crossCheck > 1575000n, ['expected the itemized total to exceed the base standard deduction', crossCheck])
         },
@@ -4297,7 +4322,7 @@ export const proof = {
             const line12e = lineRuled(outcome.lines)('1040 line 12e')
             assertEq(line12e.value, 2000000n, '$20,000.00 itemized total, exceeding the $17,750.00 standard deduction')
             assert(line12e.value > 0n, ['expected a real, non-zero line 12e', line12e.value])
-            const scheduleACrossCheck = scheduleA(taxParams2025)({
+            const scheduleACrossCheck = expectScheduleAOk(scheduleA(taxParams2025)({
                 status: 'single',
                 agiCents: 7350000n,
                 itemizedEntries: [
@@ -4307,7 +4332,7 @@ export const proof = {
                 ],
                 medicalExpenseEntries: [],
                 profile: storedProfile(profile),
-            }).line17
+            })).line17
             assertEq(scheduleACrossCheck, 2000000n, 'independent scheduleA(...) call must reach the SAME grand total')
 
             // line15 (taxable income) = line11b - line14; line14 =
