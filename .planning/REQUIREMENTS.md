@@ -304,7 +304,7 @@ structural (RTTI) and semantic passes.
       Phase 12; the phase text that scheduled building it was stale and has been corrected.
 - [ ] **TAX-09** *(T2)*: **Schedule 1-A Parts I/V/VI** — mandatory given TY2025 + 65+.
       Senior deduction with 6% phase-out over $75k/$150k, feeding Form 1040 line 13b.
-- [ ] **TAX-10** *(T2)*: Social Security Benefits Worksheet — a 19-line near-circular
+- [x] **TAX-10** *(T2)*: Social Security Benefits Worksheet — a 19-line near-circular
       computation. Required by the 65+ profile.
 - [x] **TAX-11** *(T2)*: Form 8949 and Schedule D, including the Schedule D Tax Worksheet.
       Required by brokerage sales.

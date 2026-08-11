@@ -522,7 +522,7 @@ Plans:
 
 **Wave 1** (TAX-10 — retirement and Social Security income)
 - [x] 13-01-PLAN.md — Citation discriminated union, SSB base-amount parameters, the 18-line Social Security Benefits Worksheet
-- [ ] 13-02-PLAN.md — 1099-R/SSA-1099 wiring into 1040 lines 4a-6b/25b, the iraDeductionDeclared refusal, four-kind reclassification, end-to-end proof *(needs 13-01)*
+- [x] 13-02-PLAN.md — 1099-R/SSA-1099 wiring into 1040 lines 4a-6b/25b, the iraDeductionDeclared refusal, four-kind reclassification, end-to-end proof *(needs 13-01)*
 
 **Wave 2** (TAX-09 — the senior deduction)
 - [ ] 13-03-PLAN.md — Senior deduction parameters, Schedule 1-A Parts I/V/VI *(needs 13-02)*
@@ -652,7 +652,7 @@ Phases 16-18 are backlog: unordered, independent of each other and of the critic
 | 10. 1040 Core and Scope Guard | Week 2 | 10/10 | Complete   | verified 2026-08-06 5/5 |
 | 11. Wage, Retirement, Benefit Documents | Week 3 | 5/5 | Complete   | 2026-08-08 |
 | 12. Brokerage and Capital-Gain Chain | Week 3 | 5/5 | Complete   | 2026-08-08 |
-| 13. The 65+ Profile and Schedules | Week 3 | 1/13 | In Progress|  |
+| 13. The 65+ Profile and Schedules | Week 3 | 2/13 | In Progress|  |
 | 14. Acceptance | Week 4 | 0/TBD | Not started | - |
 | 15. Realism Polish and Upstream | Week 5 | 0/TBD | Not started | - |
 
