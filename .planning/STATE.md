@@ -4,14 +4,14 @@ milestone: v1.1
 milestone_name: milestone
 status: executing
 stopped_at: **Phase 12.1 (The Capital-Gain Chain) COMPLETE — 4/4 plans, 4/4 summaries.** A
-last_updated: "2026-08-11T01:20:21.275Z"
-last_activity: 2026-08-11 -- Phase 13 planning complete
+last_updated: "2026-08-11T01:56:58.597Z"
+last_activity: 2026-08-11
 progress:
   total_phases: 19
   completed_phases: 13
   total_plans: 75
-  completed_plans: 65
-  percent: 87
+  completed_plans: 66
+  percent: 88
 ---
 
 # Project State
@@ -22,15 +22,15 @@ See: .planning/PROJECT.md (updated 2026-08-03)
 
 **Core value:** The report is a program, not an answer — the agent emits FunctionalScript;
 the server executes it as a pure function of `(documents, tax-year parameters) → report`.
-**Current focus:** Phase 12.1 — The Capital-Gain Chain
+**Current focus:** Phase 13 — The 65+ Profile and the Remaining Schedules
 
 ## Current Position
 
-Phase: 12.1 (The Capital-Gain Chain) — COMPLETE, NOT YET VERIFIED
+Phase: 13 (The 65+ Profile and the Remaining Schedules) — EXECUTING
   Four plans across three waves. The plan set was returned ISSUES FOUND by
   `gsd-plan-checker` twice (2 blockers, then 2 more), revised each time, and only
   executed after a third pass returned VERIFICATION PASSED.
-Plan: 4 of 4 — all summaries written
+Plan: 2 of 13
   Wave 1: 12.1-01 (Form 8949 category derivation + the absent-basis refusal) and
   12.1-02 (the 47-line Schedule D Tax Worksheet). Wave 2: 12.1-03 (Schedule D
   lines 1a-21, the loss-cap three-way branch, two bounded sub-worksheets).
@@ -41,11 +41,11 @@ Status: Ready to execute
   stopped after the final wave, so the phase has never been independently verified
   against its goal. That is the next action.
 
-Progress: [███████░░░] 68%  (13 of 19 phases)
+Progress: [█████████░] 88%
   Phase-based, never plan-based: `completed_plans` (65) exceeds `total_plans` (62)
   because three phases carry an extra FIX-SUMMARY.md beside a plan's own summary,
   which rounds the plan-based figure to a misleading 100%. See `percent_note`.
-Last activity: 2026-08-11 -- Phase 13 planning complete
+Last activity: 2026-08-11
 
 > **This block carried Phase 10's text under a 12.1 heading until 2026-08-09** — "Ten plans
 > across six waves", `10-03 Tax Computation Worksheet`, "Phase 11 not started" — while
@@ -137,6 +137,7 @@ proofs and moves with submodule initialization state — which is exactly how a 
 | Phase 12.1 P02 | 55min | 2 tasks | 1 files |
 | Phase 12.1 P03 | 35min | 2 tasks | 1 files |
 | Phase 12.1 P04 | 70min | 3 tasks | 9 files |
+| Phase 13 P01 | 35min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -302,6 +303,9 @@ Full log in PROJECT.md Key Decisions. Recent decisions affecting current work:
 - [Phase ?]: [Phase 12.1-04]: filingScheduleD derives verbatim from declaredKinds.includes('capitalGainsOrLosses'), never document presence (Decision 1.6) -- status is now computed once near the top of form1040IncomeLines since Schedule D's loss-cap threshold needs it too
 - [Phase ?]: [Phase 12.1-04]: Mutation Gate M4's literal instruction (remove one modeledKinds entry, leave the count) does not compile -- it trips _EveryKindIsEitherModeledOrRefused (TS2344), a stronger correctly-caught defect. Ran the semantically-equivalent compiling form instead: migrate the kind into unmodeledKindRefusals without updating expectedModeledKindCount
 - [Phase ?]: [Phase 12.1-04]: TAX-11 and TAX-15 marked complete -- this plan is where Form 8949/Schedule D/the Schedule D Tax Worksheet actually get wired into a computing Form 1040, closing both requirements that spanned all four plans of Phase 12.1
+- [Phase 13]: 13-01: Citation widening pulled forward from Slice 2 into this plan, since socialSecurityBenefitsWorksheetBaseAmounts needed the 'code' arm immediately
+- [Phase 13]: 13-01: MFS-lived-with-spouse SSB worksheet branch computes line16 as 85% of line7 (not line1 as the plan text said), corrected against 13-RESEARCH.md's verified transcription
+- [Phase 13]: 13-01: TAX-10 NOT marked complete -- this plan builds Slice 1's foundation only; wiring into Form 1040 is Plan 13-02's job
 
 ### Pending Todos
 
@@ -446,7 +450,7 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-08-09
+Last session: 2026-08-11T01:38:30.768Z
 Stopped at: **Phase 12.1 (The Capital-Gain Chain) COMPLETE — 4/4 plans, 4/4 summaries.** A
 brokerage sale now flows 1099-B → Form 8949 → Schedule D → the Schedule D Tax Worksheet → Form
 1040 line 16. TAX-11 and TAX-15 marked complete. Nothing is mid-edit.
