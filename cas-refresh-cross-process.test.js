@@ -20,13 +20,14 @@
 // nothing to `package.json`, and no other file in this repo carries it.
 //
 // Test flow (DOC-14 / Success Criterion 5): a real `node index.js <home>`
-// server (one OS process) is started against a fresh CAS home; a real `npx
-// functionalscript cas add` (a second, genuinely independent OS process)
-// writes a `vnd.fjs.revision` blob directly into that same store while the
-// server is already running, bypassing the running server's `evo_add`
-// entirely; the still-running server is told to `cas_refresh`, and its
-// `evo_head` is shown to see the externally-written revision afterward —
-// without ever restarting the server.
+// server (one OS process) is started against a fresh CAS home; a real
+// `fjs cas add` (a second, genuinely independent OS process, spawned from
+// this repo's pinned `node_modules` copy — see `fjsCliPath`) writes a
+// `vnd.fjs.revision` blob directly into that same store while the server is
+// already running, bypassing the running server's `evo_add` entirely; the
+// still-running server is told to `cas_refresh`, and its `evo_head` is shown
+// to see the externally-written revision afterward — without ever restarting
+// the server.
 
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
@@ -56,7 +57,33 @@ const initializeRequest = {
 const initializedNotification = { jsonrpc: '2.0', method: 'notifications/initialized' }
 
 /**
- * Runs `npx functionalscript <args>` to completion with `HOME` overridden to
+ * The FunctionalScript CLI as this repo pins it. Spawned by absolute path
+ * into `node_modules/` rather than through `npx`, for two reasons — both
+ * measured, not assumed:
+ *
+ * 1. **Provenance.** `functionalscript`'s `package.json` declares its bin as
+ *    `fjs`, not `functionalscript`, so no `node_modules/.bin/functionalscript`
+ *    link exists. `npx functionalscript` therefore could not resolve a local
+ *    binary by name and fell through to npm's package-resolution path, which
+ *    reaches the registry — the child leaked npm's own
+ *    "New minor version of npm available!" notice, proving the network call.
+ *    A test for a content-addressed store must exercise the version this repo
+ *    depends on, not whatever a registry hands back. An absolute path into
+ *    `node_modules/` makes that true by construction.
+ * 2. **Wall clock.** That resolution cost 6.3s + 2.9s across this test's two
+ *    invocations — 84% of an 11.0s run, against a 30s budget. It is why the
+ *    test timed out under the full suite's parallel, process-isolated load
+ *    while passing in isolation. By absolute path the same two calls cost
+ *    2.8s + 1.0s, and the run halves to 5.9s.
+ *
+ * Nothing about the proof weakens: this is still a real `spawn` of a real,
+ * genuinely separate OS process, and it produces a byte-identical content
+ * hash (verified directly against the `npx` route before the change).
+ */
+const fjsCliPath = join(repoRoot, 'node_modules', 'functionalscript', 'fjs', 'module.js')
+
+/**
+ * Runs the pinned `fjs <args>` CLI to completion with `HOME` overridden to
  * `home` — a genuinely separate OS process, awaited here (it does not need
  * to overlap with the server) but otherwise the same real `spawn` this file
  * uses for the server itself. Verified end-to-end against this repo:
@@ -66,7 +93,7 @@ const initializedNotification = { jsonrpc: '2.0', method: 'notifications/initial
  * (`fjs/index.f.js`'s `options.args[0]`).
  */
 const runFjsCli = (home, args) => new Promise((resolve, reject) => {
-    const child = spawn('npx', ['functionalscript', ...args], {
+    const child = spawn('node', [fjsCliPath, ...args], {
         cwd: repoRoot,
         env: { ...process.env, HOME: home },
     })
@@ -79,7 +106,7 @@ const runFjsCli = (home, args) => new Promise((resolve, reject) => {
     child.on('error', reject)
     child.on('close', code => {
         if (code !== 0) {
-            reject(new Error(`npx functionalscript ${args.join(' ')} failed (code ${code}): ${stderr}`))
+            reject(new Error(`fjs ${args.join(' ')} failed (code ${code}): ${stderr}`))
             return
         }
         resolve(stdout.trim())
@@ -100,7 +127,7 @@ test(
             writeFileSync(fixturePath, Buffer.alloc(140 * 1024, 'a'))
 
             // The >128 KiB CLI ingestion route (DOC-14's first half, already
-            // exists upstream as `npx functionalscript cas add` — this test
+            // exists upstream as the `fjs cas add` CLI — this test
             // exercises it, does not build it). Run once here, before the
             // server starts, purely so the resulting content hash is known
             // for the checks below: the raw blob it writes carries no
@@ -171,7 +198,7 @@ test(
             )
 
             // A `vnd.fjs.revision` blob, written directly into the SAME
-            // store by a genuinely separate `npx functionalscript cas add`
+            // store by a genuinely separate `fjs cas add`
             // process — bypassing the running server's evo_add entirely.
             // This is the exact scenario DOC-14's refresh path exists for.
             const revisionText = JSON.stringify({
