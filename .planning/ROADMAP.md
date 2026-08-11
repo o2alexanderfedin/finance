@@ -529,7 +529,7 @@ Plans:
 - [x] 13-04-PLAN.md — Wire 1040 line 13b, reclassify seniorAndOtherScheduleOneADeductions, end-to-end proof *(needs 13-03)*
 
 **Wave 3** (TAX-13 — itemizing)
-- [ ] 13-05-PLAN.md — vnd.fjs.itemized_deductions dialect, SALT cap/medical floor parameters, Schedule A line 18 election *(needs 13-04)*
+- [x] 13-05-PLAN.md — vnd.fjs.itemized_deductions dialect, SALT cap/medical floor parameters, Schedule A line 18 election *(needs 13-04)*
 - [ ] 13-06-PLAN.md — Schedule A (all 18 lines), the withholding-drift proof, w2/1099r docstring amendments *(needs 13-05)*
 - [ ] 13-07-PLAN.md — deductionChoice, wire 1040 line 12e, reclassify itemizedDeductions, end-to-end proof both directions *(needs 13-06)*
 
@@ -652,7 +652,7 @@ Phases 16-18 are backlog: unordered, independent of each other and of the critic
 | 10. 1040 Core and Scope Guard | Week 2 | 10/10 | Complete   | verified 2026-08-06 5/5 |
 | 11. Wage, Retirement, Benefit Documents | Week 3 | 5/5 | Complete   | 2026-08-08 |
 | 12. Brokerage and Capital-Gain Chain | Week 3 | 5/5 | Complete   | 2026-08-08 |
-| 13. The 65+ Profile and Schedules | Week 3 | 4/13 | In Progress|  |
+| 13. The 65+ Profile and Schedules | Week 3 | 5/13 | In Progress|  |
 | 14. Acceptance | Week 4 | 0/TBD | Not started | - |
 | 15. Realism Polish and Upstream | Week 5 | 0/TBD | Not started | - |
 
