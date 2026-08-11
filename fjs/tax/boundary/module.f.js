@@ -200,9 +200,33 @@ const saltCapThresholds = (
 })
 
 /**
+ * The CTC/ODC phase-out's own START threshold (13-CONTEXT.md Decision
+ * 5.5/5.6; Schedule 8812 Part I, `fjs/form8812`) -- 2 total, the two keys
+ * `childTaxCredit.phaseoutThreshold` carries (`marriedFilingJointly` and
+ * `other`). UNLIKE {@link seniorDeductionThresholds}/{@link saltCapThresholds},
+ * this registers ONLY the crossing point -- no floor/zero-point entry. The
+ * STEPPED $1,000-rounding shape that makes this phase-out's cliff
+ * distinctive is a module-local property `fjs/form8812`'s own Test 2/3
+ * fixtures pin directly; `segmentIndex`'s generic `<=`-count check here only
+ * proves "is the threshold crossed at exactly this cent," which neither
+ * needs nor can prove the $1,000-step rounding itself.
+ * @type {readonly Threshold[]}
+ */
+const childTaxCreditThresholds = (
+    /** @type {readonly ('marriedFilingJointly' | 'other')[]} */
+    (['marriedFilingJointly', 'other'])
+).flatMap(key => [
+    {
+        label: `childTaxCreditPhaseoutStart:${key}`,
+        cents: centsFromString(taxParams2025.childTaxCredit.phaseoutThreshold[key].amount),
+    },
+])
+
+/**
  * The combined threshold inventory: every ordinary-bracket ceiling, capital-gains breakpoint,
- * Tax Table band edge, senior-deduction phase-out threshold, and SALT-cap phase-down threshold
- * this phase's data introduces, assembled from the five sources above.
+ * Tax Table band edge, senior-deduction phase-out threshold, SALT-cap phase-down threshold, and
+ * CTC/ODC phase-out start threshold this phase's data introduces, assembled from the six sources
+ * above.
  * @type {readonly Threshold[]}
  */
 export const allThresholds = [
@@ -211,6 +235,7 @@ export const allThresholds = [
     ...taxTableBandThresholds,
     ...seniorDeductionThresholds,
     ...saltCapThresholds,
+    ...childTaxCreditThresholds,
 ]
 
 /**
@@ -218,19 +243,20 @@ export const allThresholds = [
  * ceilings (6 + 6 + 6 + 6 + 6 across the five individual filing statuses, + 3 for estates &
  * trusts) + 12 capital-gains breakpoints (2 x 6 statuses) + 5 Tax Table band edges + 8
  * senior-deduction phase-out thresholds (start + floor, x 4 statuses) + 10 SALT-cap phase-down
- * thresholds (start + floor, x 5 statuses, INCLUDING marriedFilingSeparately) = 68. This exists
- * so a threshold silently dropped during assembly fails an explicit assertion
- * (`everyThresholdIsCovered` below) rather than passing by omission.
+ * thresholds (start + floor, x 5 statuses, INCLUDING marriedFilingSeparately) + 2 CTC/ODC
+ * phase-out start thresholds (MFJ + other, START ONLY, no floor) = 70. This exists so a threshold
+ * silently dropped during assembly fails an explicit assertion (`everyThresholdIsCovered` below)
+ * rather than passing by omission.
  *
  * `qualifyingSurvivingSpouse`'s thresholds duplicate `marriedFilingJointly`'s CENTS values while
  * carrying distinct labels (10-CONTEXT.md Decision 6: the two statuses read the same Rev. Proc.
  * rows). That leaves `sortedCents`'s de-duplication below unaffected -- it already had duplicate
  * values to collapse, e.g. the $103,350.00 ceiling shared by `single` and `headOfHousehold` --
- * and each of the ten new SALT-cap leaves still asserts a real boundary, since the assertion is
- * about where the count changes, not about the label being unique in cents.
+ * and each new leaf still asserts a real boundary, since the assertion is about where the count
+ * changes, not about the label being unique in cents.
  * @type {number}
  */
-export const expectedThresholdCount = 68
+export const expectedThresholdCount = 70
 
 // ── Tests ────────────────────────────────────────────────────────────────────
 
