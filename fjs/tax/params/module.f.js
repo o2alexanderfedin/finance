@@ -607,6 +607,23 @@ export const medicalExpenseFloor = {
  * three to `kind: 'revProc'` merely because `ctcAmount` is — that is
  * exactly the sourcing error Pitfall 5 names, inverted.
  *
+ * **Carried finding C-3 (13-VALIDATION.md, resolved here): §24(h) is the
+ * governing PROVISION, not the literal source of these three amounts.**
+ * IRC §24(h)(5) is genuinely where the refundable-credit-cap mechanism
+ * lives, but the section itself carries base amounts that Treasury
+ * inflation-adjusts for the current tax year through a separate revenue
+ * procedure — so a reader who opens §24(h) looking for `$1,700`, `$500` or
+ * `$400,000`/`$200,000` will not find those figures written there. This
+ * research did not identify the specific Rev. Proc. that performs that
+ * OBBBA-era adjustment (unlike `ctcAmount`, where Rev. Proc. 2025-32 §2.03
+ * was confirmed by a full grep of the document itself), so `kind: 'code'`
+ * stays as the honest, verifiable half of the citation — the governing
+ * provision — rather than guessing a Rev. Proc. number this research never
+ * checked. What backs the DOLLAR VALUE for all three is `13-RESEARCH.md`'s
+ * own `[VERIFIED: f1040s8.pdf p2 line16b]`: each figure was read directly
+ * off the printed 2025 Schedule 8812, the same "form face" sourcing this
+ * module's other non-`revProc` citations already document above.
+ *
  * `phaseoutRatePercent` (5) is a plain rate, mirroring every other
  * `*RatePercent` field in this module. Unlike `seniorDeduction`'s and
  * `saltCap`'s CONTINUOUS phase-outs, Schedule 8812's is STEPPED — a true
