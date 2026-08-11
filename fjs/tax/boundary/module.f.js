@@ -143,22 +143,53 @@ const taxTableBandThresholds = [
 ]
 
 /**
- * The combined threshold inventory: every ordinary-bracket ceiling, capital-gains breakpoint, and
- * Tax Table band edge this phase's data introduces, assembled from the three sources above.
+ * The senior deduction's phase-out START and zero-FLOOR thresholds
+ * (13-CONTEXT.md Decision 5.5/Pitfall 3; Schedule 1-A Part V,
+ * `fjs/schedule/1a`) -- 8 total (2 per status x 4 statuses). No
+ * `marriedFilingSeparately` entry: Decision 5.4/Pitfall 3's short-circuit
+ * makes the senior deduction $0 UNCONDITIONALLY for MFS, at any income --
+ * there is no dollar boundary to register for a status whose amount never
+ * depends on one.
+ *
+ * The floor point is DERIVED from the SAME stored fields `fjs/schedule/1a`
+ * itself reads ($6,000 base / 6% rate = $100,000 above the start), never a
+ * second hand-typed dollar literal -- so a future change to either the base
+ * amount or the rate moves BOTH the module's own arithmetic and this
+ * registered threshold together.
+ * @type {readonly Threshold[]}
+ */
+const seniorDeductionThresholds = (
+    /** @type {readonly ('single' | 'marriedFilingJointly' | 'headOfHousehold' | 'qualifyingSurvivingSpouse')[]} */
+    (['single', 'marriedFilingJointly', 'headOfHousehold', 'qualifyingSurvivingSpouse'])
+).flatMap(status => {
+    const startCents = centsFromString(taxParams2025.seniorDeduction.phaseoutThreshold[status].amount)
+    return [
+        { label: `seniorDeductionPhaseoutStart:${status}`, cents: startCents },
+        // $6,000.00 / 6% = $100,000.00 = 10,000,000 cents above the start.
+        { label: `seniorDeductionPhaseoutFloor:${status}`, cents: startCents + 10000000n },
+    ]
+})
+
+/**
+ * The combined threshold inventory: every ordinary-bracket ceiling, capital-gains breakpoint,
+ * Tax Table band edge, and senior-deduction phase-out threshold this phase's data introduces,
+ * assembled from the four sources above.
  * @type {readonly Threshold[]}
  */
 export const allThresholds = [
     ...ordinaryBracketThresholds,
     ...capitalGainsThresholds,
     ...taxTableBandThresholds,
+    ...seniorDeductionThresholds,
 ]
 
 /**
  * The independently-stated expected count of thresholds assembled above -- 33 ordinary-bracket
  * ceilings (6 + 6 + 6 + 6 + 6 across the five individual filing statuses, + 3 for estates &
- * trusts) + 12 capital-gains breakpoints (2 x 6 statuses) + 5 Tax Table band edges = 50. This
- * exists so a threshold silently dropped during assembly fails an explicit assertion
- * (`everyThresholdIsCovered` below) rather than passing by omission.
+ * trusts) + 12 capital-gains breakpoints (2 x 6 statuses) + 5 Tax Table band edges + 8
+ * senior-deduction phase-out thresholds (start + floor, x 4 statuses) = 58. This exists so a
+ * threshold silently dropped during assembly fails an explicit assertion (`everyThresholdIsCovered`
+ * below) rather than passing by omission.
  *
  * `qualifyingSurvivingSpouse`'s thresholds duplicate `marriedFilingJointly`'s CENTS values while
  * carrying distinct labels (10-CONTEXT.md Decision 6: the two statuses read the same Rev. Proc.
@@ -168,7 +199,7 @@ export const allThresholds = [
  * where the count changes, not about the label being unique in cents.
  * @type {number}
  */
-export const expectedThresholdCount = 50
+export const expectedThresholdCount = 58
 
 // ── Tests ────────────────────────────────────────────────────────────────────
 
@@ -185,7 +216,7 @@ const sortedCents = [...new Set(allThresholds.map(threshold => threshold.cents))
 
 /**
  * One generated proof leaf per stored threshold -- built by mapping `allThresholds` into
- * `[label, assertion]` pairs via `Object.fromEntries`, never as a hand-written literal with 50
+ * `[label, assertion]` pairs via `Object.fromEntries`, never as a hand-written literal with 58
  * manually authored keys. Each leaf asserts the boundary is crossed at EXACTLY the threshold's
  * own cent: one cent before must count strictly fewer boundaries reached than the threshold
  * itself, and the threshold must count the same number of boundaries reached as one cent after

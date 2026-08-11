@@ -178,7 +178,7 @@ export const scheduleOneAPartI = agiCents => {
 /**
  * @typedef {{
  *   readonly status: IndividualFilingStatus,
- *   readonly magiCents: bigint,
+ *   readonly phaseoutIncomeCents: bigint,
  *   readonly taxpayerHasValidSsnAndBornBefore1961Jan2: boolean,
  *   readonly spouseHasValidSsnAndBornBefore1961Jan2: boolean,
  * }} SchedulePartVInput
@@ -193,7 +193,7 @@ export const scheduleOneAPartI = agiCents => {
  */
 export const scheduleOneAPartV = taxParamSet => input => {
     const {
-        status, magiCents,
+        status, phaseoutIncomeCents,
         taxpayerHasValidSsnAndBornBefore1961Jan2, spouseHasValidSsnAndBornBefore1961Jan2,
     } = input
     // Decision 5.4/Pitfall 3: the MFS short-circuit runs BEFORE line31 is
@@ -205,7 +205,7 @@ export const scheduleOneAPartV = taxParamSet => input => {
     const { seniorDeduction } = taxParamSet
     const mfj = status === 'marriedFilingJointly'
     // 31. "Enter the amount from Part I, line 3" -- the shared MAGI.
-    const line31 = magiCents
+    const line31 = phaseoutIncomeCents
     // 32. Filing-status threshold -- $150,000 MFJ, $75,000 every other
     //     status this branch reaches (single/HoH/QSS).
     const line32 = centsFromString(seniorDeduction.phaseoutThreshold[status].amount)
@@ -304,7 +304,7 @@ export const scheduleOneA = taxParamSet => input => {
     } = input
     const partI = scheduleOneAPartI(agiCents)
     const partV = scheduleOneAPartV(taxParamSet)({
-        status, magiCents: partI.line3,
+        status, phaseoutIncomeCents: partI.line3,
         taxpayerHasValidSsnAndBornBefore1961Jan2, spouseHasValidSsnAndBornBefore1961Jan2,
     })
     const partVI = scheduleOneAPartVI(profile)(partV.line37)
@@ -337,7 +337,7 @@ export const proof = {
     continuousPhaseoutAtExactThreshold: () => {
         const result = scheduleOneAPartV(taxParams2025)({
             status: 'single',
-            magiCents: 7500000n, // $75,000.00 -- exactly at the start threshold
+            phaseoutIncomeCents: 7500000n, // $75,000.00 -- exactly at the start threshold
             taxpayerHasValidSsnAndBornBefore1961Jan2: true,
             spouseHasValidSsnAndBornBefore1961Jan2: false,
         })
@@ -349,7 +349,7 @@ export const proof = {
     continuousPhaseoutSingleEightyThousandMagi: () => {
         const result = scheduleOneAPartV(taxParams2025)({
             status: 'single',
-            magiCents: 8000000n, // $80,000.00
+            phaseoutIncomeCents: 8000000n, // $80,000.00
             taxpayerHasValidSsnAndBornBefore1961Jan2: true,
             spouseHasValidSsnAndBornBefore1961Jan2: false,
         })
@@ -369,21 +369,21 @@ export const proof = {
     // comparison), not a doomed cent-level output difference.
     phaseoutStartBoundaryTrioSingle: () => {
         const belowResult = scheduleOneAPartV(taxParams2025)({
-            status: 'single', magiCents: 7499999n, // $74,999.99
+            status: 'single', phaseoutIncomeCents: 7499999n, // $74,999.99
             taxpayerHasValidSsnAndBornBefore1961Jan2: true, spouseHasValidSsnAndBornBefore1961Jan2: false,
         })
         assertEq(belowResult.line33, 0n, 'below the threshold: line 33 = $0.00')
         assertEq(belowResult.line35, 600000n, 'below the threshold: the full $6,000.00')
 
         const atResult = scheduleOneAPartV(taxParams2025)({
-            status: 'single', magiCents: 7500000n, // $75,000.00 exactly
+            status: 'single', phaseoutIncomeCents: 7500000n, // $75,000.00 exactly
             taxpayerHasValidSsnAndBornBefore1961Jan2: true, spouseHasValidSsnAndBornBefore1961Jan2: false,
         })
         assertEq(atResult.line33, 0n, 'at the threshold: line 33 = $0.00 ("if zero or less")')
         assertEq(atResult.line35, 600000n, 'at the threshold: still the full $6,000.00')
 
         const aboveResult = scheduleOneAPartV(taxParams2025)({
-            status: 'single', magiCents: 7500001n, // $75,000.01
+            status: 'single', phaseoutIncomeCents: 7500001n, // $75,000.01
             taxpayerHasValidSsnAndBornBefore1961Jan2: true, spouseHasValidSsnAndBornBefore1961Jan2: false,
         })
         assertEq(aboveResult.line33, 1n, 'above the threshold: line 33 = $0.01, the `>` branch now fires')
@@ -394,14 +394,14 @@ export const proof = {
     },
     phaseoutStartBoundaryTrioMfj: () => {
         const atResult = scheduleOneAPartV(taxParams2025)({
-            status: 'marriedFilingJointly', magiCents: 15000000n, // $150,000.00 exactly
+            status: 'marriedFilingJointly', phaseoutIncomeCents: 15000000n, // $150,000.00 exactly
             taxpayerHasValidSsnAndBornBefore1961Jan2: true, spouseHasValidSsnAndBornBefore1961Jan2: true,
         })
         assertEq(atResult.line32, 15000000n, 'line 32 = $150,000.00, the MFJ threshold')
         assertEq(atResult.line35, 600000n, 'at the threshold: still the full $6,000.00')
 
         const aboveResult = scheduleOneAPartV(taxParams2025)({
-            status: 'marriedFilingJointly', magiCents: 15100000n, // $151,000.00 -- $1,000 above
+            status: 'marriedFilingJointly', phaseoutIncomeCents: 15100000n, // $151,000.00 -- $1,000 above
             taxpayerHasValidSsnAndBornBefore1961Jan2: true, spouseHasValidSsnAndBornBefore1961Jan2: true,
         })
         assertEq(aboveResult.line33, 100000n, 'line 33 = $1,000.00, the excess')
@@ -413,7 +413,7 @@ export const proof = {
     phaseoutFloorsAtZeroAtTheExactZeroPoint: () => {
         const result = scheduleOneAPartV(taxParams2025)({
             status: 'single',
-            magiCents: 17500000n, // $175,000.00 -- $75,000 + $6,000/0.06
+            phaseoutIncomeCents: 17500000n, // $175,000.00 -- $75,000 + $6,000/0.06
             taxpayerHasValidSsnAndBornBefore1961Jan2: true,
             spouseHasValidSsnAndBornBefore1961Jan2: false,
         })
@@ -432,7 +432,7 @@ export const proof = {
     phaseoutFloorOneCentBelowTheZeroPointStillRoundsToZero: () => {
         const result = scheduleOneAPartV(taxParams2025)({
             status: 'single',
-            magiCents: 17499999n, // $174,999.99 -- one cent below the zero point
+            phaseoutIncomeCents: 17499999n, // $174,999.99 -- one cent below the zero point
             taxpayerHasValidSsnAndBornBefore1961Jan2: true,
             spouseHasValidSsnAndBornBefore1961Jan2: false,
         })
@@ -442,7 +442,7 @@ export const proof = {
     phaseoutFloorOneCentAboveTheZeroPointStaysZero: () => {
         const result = scheduleOneAPartV(taxParams2025)({
             status: 'single',
-            magiCents: 17500001n, // $175,000.01 -- one cent above the zero point
+            phaseoutIncomeCents: 17500001n, // $175,000.01 -- one cent above the zero point
             taxpayerHasValidSsnAndBornBefore1961Jan2: true,
             spouseHasValidSsnAndBornBefore1961Jan2: false,
         })
@@ -452,7 +452,7 @@ export const proof = {
     phaseoutFloorAtZeroMfjAtTwoFiftyThousand: () => {
         const result = scheduleOneAPartV(taxParams2025)({
             status: 'marriedFilingJointly',
-            magiCents: 25000000n, // $250,000.00 -- $150,000 + $6,000/0.06
+            phaseoutIncomeCents: 25000000n, // $250,000.00 -- $150,000 + $6,000/0.06
             taxpayerHasValidSsnAndBornBefore1961Jan2: true,
             spouseHasValidSsnAndBornBefore1961Jan2: true,
         })
@@ -469,7 +469,7 @@ export const proof = {
     mfsAtZeroMagiGetsZeroNotDecisiveAlone: () => {
         const result = scheduleOneAPartV(taxParams2025)({
             status: 'marriedFilingSeparately',
-            magiCents: 0n,
+            phaseoutIncomeCents: 0n,
             taxpayerHasValidSsnAndBornBefore1961Jan2: true,
             spouseHasValidSsnAndBornBefore1961Jan2: false,
         })
@@ -482,7 +482,7 @@ export const proof = {
     mfsAtTenThousandMagiGetsZeroDecisiveShortCircuitProof: () => {
         const result = scheduleOneAPartV(taxParams2025)({
             status: 'marriedFilingSeparately',
-            magiCents: 1000000n, // $10,000.00 -- well under $75,000
+            phaseoutIncomeCents: 1000000n, // $10,000.00 -- well under $75,000
             taxpayerHasValidSsnAndBornBefore1961Jan2: true,
             spouseHasValidSsnAndBornBefore1961Jan2: false,
         })
@@ -496,7 +496,7 @@ export const proof = {
     mfjBothSpousesQualifyingGetsDoubleTheSamePhaseOutAmount: () => {
         const result = scheduleOneAPartV(taxParams2025)({
             status: 'marriedFilingJointly',
-            magiCents: 0n,
+            phaseoutIncomeCents: 0n,
             taxpayerHasValidSsnAndBornBefore1961Jan2: true,
             spouseHasValidSsnAndBornBefore1961Jan2: true,
         })
