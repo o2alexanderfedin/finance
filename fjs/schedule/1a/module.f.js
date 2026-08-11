@@ -162,8 +162,15 @@ export const scheduleOneAPartI = agiCents => {
     const line2d = 0n
     // 2e. "Add lines 2a through 2d."
     const line2e = line2a + line2b + line2c + line2d
-    // 3. "Add lines 1 and 2e." -- Schedule 1-A's shared MAGI.
-    const line3 = line1 + line2e
+    // 3. "Add lines 1 and 2e." -- Schedule 1-A's shared MAGI. Calls
+    // {@link seniorDeductionPhaseoutIncome} directly (WR-05) rather than
+    // re-deriving the identical `agiCents + 0 + 0 + 0 + 0` arithmetic a
+    // second time in this file -- the SAME rule written once, not twice.
+    // `line1 + line2e` is exactly what the named function already computes
+    // (every add-back above is a documented, permanent 0), so this is not a
+    // behavior change; `partILine3EqualsSeniorDeductionPhaseoutIncomeForEveryFixture`
+    // below still pins the equality, now trivially, as a regression guard.
+    const line3 = seniorDeductionPhaseoutIncome(agiCents)
     return { line1, line2a, line2b, line2c, line2d, line2e, line3 }
 }
 

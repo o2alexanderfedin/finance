@@ -239,8 +239,13 @@ export const form8812 = taxParamSet => input => {
     const line2c = 0n
     // 2d. "Add lines 2a through 2c."
     const line2d = line2a + line2b + line2c
-    // 3. "Add lines 1 and 2d." -- "modified AGI" for CTC/ODC purposes.
-    const line3 = line1 + line2d
+    // 3. "Add lines 1 and 2d." -- "modified AGI" for CTC/ODC purposes. Calls
+    // {@link childTaxCreditPhaseoutIncome} directly (WR-05) rather than
+    // re-deriving the identical `line1 + line2d` arithmetic a second time in
+    // this file -- every add-back above is a documented, permanent 0, so
+    // this is not a behavior change; `lineThreeEqualsChildTaxCreditPhaseoutIncomeForEveryFixture`
+    // below still pins the equality, now trivially, as a regression guard.
+    const line3 = childTaxCreditPhaseoutIncome(agiCents)
     // 4. Count of qualifying children under 17 with a required SSN.
     const line4 = BigInt(qualifyingChildren.length)
     // 5. "Multiply line 4 by $2,200."
