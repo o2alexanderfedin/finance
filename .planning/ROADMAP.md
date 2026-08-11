@@ -506,6 +506,7 @@ Plans:
 
 ### Phase 13: The 65+ Profile and the Remaining Schedules
 **Milestone**: Week 3 — Breadth in Documents
+**Mode:** mvp
 **Goal**: The declared taxpayer profile is structurally complete — a 65+ TY2025 return with dependents that itemizes is no longer missing anything it is required to have.
 **Depends on**: Phase 11, Phase 12
 **Requirements**: TAX-09, TAX-10, TAX-12, TAX-13, TAX-14

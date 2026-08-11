@@ -206,16 +206,10 @@ Out of scope, and staying refused: household employee wages (1b), Medicaid waive
   the form would leave line 28 refusing on a return that has a completed Schedule 8812 sitting
   in front of it — an outcome no taxpayer could interpret.
 
-- **4.4 — Three waves.**
-  - **Wave 1 (leaves, parallel):** TY2025 parameter data; the `vnd.fjs.itemized_deductions`
-    dialect; the `vnd.fjs.return_profile` extension (`dependents`, the line 18 election).
-  - **Wave 2 (schedules, parallel — each reads Wave 1, none reads another):** Schedule 1-A;
-    the Social Security Benefits Worksheet; Schedule A plus `deductionChoice`; Schedule 8812;
-    Schedules 1, 2, and 3.
-  - **Wave 3 (the atomic transition, strictly ordered):** Form 1040 wiring **first**, then the
-    scope reclassification in one change, then the MAGI gate proof. This is 12.1 Plan 04's
-    exact ordering, and it exists so that no kind is ever modeled-but-unwired — the state in
-    which the scope guard reports a line as computed while it still returns `declaredZero`.
+- **4.4 — SUPERSEDED by Decision 6.1.** This decision originally specified three horizontal
+  waves (all parameters and dialects → all five schedules → all wiring and the reclassification
+  in one atomic change). It is replaced by the vertical-slice decomposition below. The
+  reasoning that survives is recorded in 6.2; the reasoning that does not is why 6.1 exists.
 
 ### 5. Resolutions From Research (added 2026-08-10, after `13-RESEARCH.md`)
 
@@ -300,6 +294,69 @@ they conflict take precedence over, the decisions above.
   instructions' own "What's New". Schedule A must **not** implement either. Recording this
   because both are widely discussed as if current, and a plan that adds them would produce a
   confidently wrong return.
+
+### 6. Vertical Slices (user directive, 2026-08-10 — supersedes Decision 4.4)
+
+- **6.1 — This phase is planned as FIVE VERTICAL SLICES, one per wave, executed in order.**
+  Each slice carries its own parameters, its own module, its own Form 1040 wiring, and its own
+  scope reclassification, and ends with a **return that computes something it could not
+  compute before**. Nothing is deferred to a final integration wave.
+
+  The test each slice must pass, borrowed from `planner-mvp-mode.md`'s acceptance question and
+  translated out of its web vocabulary: *after this slice, does a real TY2025 return produce a
+  number it did not produce before?* If the honest answer is "no, but the foundation is laid",
+  it is a horizontal task wearing a slice's label and must be restructured.
+
+  | # | Slice | Delivers | Req |
+  |---|-------|----------|-----|
+  | 1 | **Retirement and Social Security income** — the 18-line SSB worksheet; `vnd.fjs.1099r` into 1040 lines 4a/4b and 5a/5b; lines 6a/6b; line 25b withholding; the `iraDeductionDeclared` refusal | A 65+ return with an SSA-1099 and a 1099-R computes its income lines and **a correct AGI** | TAX-10 |
+  | 2 | **The senior deduction** — the `Citation` union widening; the OBBBA parameters; Schedule 1-A Parts I/V/VI; 1040 line 13b | A 65+ TY2025 return stops being structurally wrong | TAX-09 |
+  | 3 | **Itemizing** — `vnd.fjs.itemized_deductions`; Schedule A; `deductionChoice`; 1040 line 12e | A return that itemizes computes, and the comparison against the standard deduction decides | TAX-13 |
+  | 4 | **Dependents** — the profile `dependents` array; Schedule 8812 Parts I and II-A; 1040 lines 19 and 28 | A return with dependents gets its CTC/ODC and its ACTC | TAX-12 |
+  | 5 | **The remaining schedules and the sweep** — Schedules 1, 2, 3; 1040 lines 8, 10, 17, 20, 23, 31; the MAGI tree-walk gate; the five stale remedy strings; the 18-vs-19 correction in REQUIREMENTS.md and ROADMAP.md | Criterion 4's "every line the profile reaches" and criterion 5's gate | TAX-14 |
+
+- **6.2 — Slice 1 is first because AGI is upstream of everything else, not because it is
+  easiest.** The senior-deduction phase-out, the SALT cap phase-down, the CTC phase-out, and
+  the 7.5% medical floor **all read AGI**, and AGI includes 1040 line 6b — taxable social
+  security. Building any other slice first would mean proving its arithmetic against an AGI
+  that is still `declaredZero` where the SSA-1099 and 1099-R belong, and every one of those
+  proofs would have to be revisited once slice 1 landed. Slices 2, 3 and 4 are mutually
+  independent once slice 1 is done; slice 5 sweeps.
+
+- **6.3 — The atomic-transition invariant is PRESERVED, and is in fact tightened.** Decision
+  4.4 inherited 12.1 Plan 04's single reclassification commit, and the fear behind it is real:
+  a kind that is `modeledKinds` while its 1040 line still returns `declaredZero` makes the
+  scope guard report a line as computed when it is not. But the invariant was never "all kinds
+  move together" — it is **"no kind moves before its line is wired."** 12.1 used one commit
+  because its six kinds were one feature: a single capital-gain chain that did not compute
+  until all of it did.
+
+  Here the five slices are five independent features, so each slice performs its own
+  wire-then-reclassify inside itself, atomically. This makes the blast radius *smaller* per
+  change, and `_EveryKindIsEitherModeledOrRefused` type-checks every one of the five
+  independently — a kind added to `modeledKinds` without a paired deletion from
+  `unmodeledKindRefusals` still stops the build at `tsc`, five times instead of once.
+
+- **6.4 — The known cost, accepted with eyes open: `fjs/form1040/core` gets touched five
+  times instead of once.** `13-PATTERNS.md` identifies six structures in that file that must
+  move together for every wired line — the `@typedef` block, the returned object, the
+  `orderedLines` flattening array, the `incomeLineFieldNames` list, and two independently
+  hand-typed count constants — and names it the highest-risk mechanical trap in the phase.
+  Five slices means five chances to update five of six.
+
+  This is accepted rather than avoided, because the mitigation is already in the file: the two
+  count constants exist precisely to fail when the structures drift apart. Each slice's plan
+  must **name all six structures explicitly in its task**, and the count constants must be
+  updated in the same commit as the line they count. A single large wiring change would not
+  remove this risk — it would concentrate it into one commit that is harder to review and
+  harder to bisect.
+
+- **6.5 — Slice-internal task order.** Within each slice: (1) the parameters the slice needs,
+  with citations; (2) the worksheet or schedule module with its proofs, including its boundary
+  probes; (3) the Form 1040 wiring across all six parallel structures; (4) the scope
+  reclassification paired with its refusal-table deletion; (5) the end-to-end proof that a
+  return computes the new number. Step 5 is what makes the slice vertical — a slice that stops
+  after step 4 has built a module nothing calls.
 
 ### Claude's Discretion
 
