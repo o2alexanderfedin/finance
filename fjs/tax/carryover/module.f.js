@@ -60,6 +60,9 @@
  * @module
  */
 import { assertEq } from 'functionalscript/fjs/asserts/module.f.js'
+import { centsFromString } from '../../exact/module.f.js'
+
+/** @import { PriorYearCapitalLoss } from '../../document/prior_year_capital_loss/module.f.js' */
 
 /**
  * Everything the worksheet reads: the four prior-year figures, each a
@@ -72,6 +75,29 @@ import { assertEq } from 'functionalscript/fjs/asserts/module.f.js'
  *   readonly priorYearScheduleDLine21Cents: bigint,
  * }} CarryoverWorksheetInputs
  */
+
+/**
+ * Derives {@link CarryoverWorksheetInputs} from an already-validated
+ * `vnd.fjs.prior_year_capital_loss` document — the one place this project
+ * connects the dialect's four stored decimal-string facts to the
+ * worksheet's four signed-bigint-cents inputs, via `centsFromString`
+ * (mirroring how every other module in this codebase crosses the
+ * string-at-rest / bigint-in-computation boundary; `fjs/exact`'s own
+ * docstring names this the storage/wire-to-computation layer). The
+ * document is ALREADY validated by the time it reaches here — `validate`'s
+ * `checkReferences` has already confirmed every one of the four fields is
+ * an exact decimal string within safe magnitude — so `centsFromString`
+ * (the throwing form) is used directly rather than the `Result`-returning
+ * `tryCentsFromString`, exactly as `fjs/schedule/d`'s own
+ * `sumBoxOverDocuments` reads an already-validated box.
+ * @type {(document: PriorYearCapitalLoss) => CarryoverWorksheetInputs}
+ */
+export const carryoverWorksheetInputsFromDocument = document => ({
+    priorYearFormLine15Cents: centsFromString(document.priorYearFormLine15),
+    priorYearScheduleDLine7Cents: centsFromString(document.priorYearScheduleDLine7),
+    priorYearScheduleDLine15Cents: centsFromString(document.priorYearScheduleDLine15),
+    priorYearScheduleDLine21Cents: centsFromString(document.priorYearScheduleDLine21),
+})
 
 /**
  * What the worksheet produces: this year's Schedule D lines 6 and 14 —
@@ -200,6 +226,34 @@ export const proof = {
             priorYearScheduleDLine21Cents: 0n,
         })
         assertEq(result.shortTermCarryoverCents, 0n)
+        assertEq(result.longTermCarryoverCents, 0n)
+    },
+    // The document -> worksheet-inputs link: derives CarryoverWorksheetInputs
+    // from a vnd.fjs.prior_year_capital_loss-shaped document via
+    // centsFromString, then feeds that straight into
+    // capitalLossCarryoverWorksheet — reusing Worked Example B's own
+    // literals (as decimal STRINGS this time, the dialect's own storage
+    // shape) so the end-to-end path is proven against the SAME
+    // independently-verified expected figure the bigint-only leaf above
+    // already established.
+    carryoverWorksheetInputsFromDocumentDerivesWorkedExampleB: () => {
+        /** @type {PriorYearCapitalLoss} */
+        const document = {
+            dialect: 'vnd.fjs.prior_year_capital_loss',
+            recipientTin: '222-22-2222',
+            taxYear: 2024,
+            priorYearFormLine15: '20000.00',
+            priorYearScheduleDLine7: '-10000.00',
+            priorYearScheduleDLine15: '1000.00',
+            priorYearScheduleDLine21: '-3000.00',
+        }
+        const inputs = carryoverWorksheetInputsFromDocument(document)
+        assertEq(inputs.priorYearFormLine15Cents, 2000000n)
+        assertEq(inputs.priorYearScheduleDLine7Cents, -1000000n)
+        assertEq(inputs.priorYearScheduleDLine15Cents, 100000n)
+        assertEq(inputs.priorYearScheduleDLine21Cents, -300000n)
+        const result = capitalLossCarryoverWorksheet(inputs)
+        assertEq(result.shortTermCarryoverCents, 600000n, '$6,000.00 short-term carryover, via the document link')
         assertEq(result.longTermCarryoverCents, 0n)
     },
 }
