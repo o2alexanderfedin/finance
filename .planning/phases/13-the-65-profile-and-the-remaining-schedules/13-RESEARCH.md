@@ -1028,7 +1028,7 @@ threshold/phase-out arithmetic, since $75,000/$150,000 apply per status and MFS 
 $75,000 non-MFJ threshold on the form's face — the form's face alone under-specifies this;
 only the caption states the MFS exclusion).
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Can the frozen `kindVocabulary` distinguish a declared IRA deduction from other Schedule
    1 adjustments, for Decision 3.3's refusal to fire correctly?**
@@ -1051,6 +1051,12 @@ only the caption states the MFS exclusion).
      the user/planner explicitly rather than assumed — it changes Wave 1's `return_profile`
      scope.
 
+   **RESOLVED:** 13-CONTEXT.md Decision 5.1 adopts option (b) — `iraDeductionDeclared:
+   option(true)` joins `vnd.fjs.return_profile` as a new additive field; the refusal fires
+   on the field, not on the coarse `scheduleOneAdjustments` kind. See 13-02-PLAN.md's
+   objective for the one respect in which this decision's originally-stated rationale does
+   not fully apply this phase.
+
 2. **Do Schedule 2 and Schedule 3's coarse kinds (`scheduleTwoTaxes`,
    `scheduleThreeNonrefundableCredits`, `scheduleThreeRefundableCredits`) have the same
    line-attribution problem as Schedule 1?**
@@ -1066,6 +1072,14 @@ only the caption states the MFS exclusion).
      to a documented zero. No action needed for Phase 13's target profile; flag for whichever
      future phase widens the profile beyond the current five requirements.
 
+   **RESOLVED:** the recommendation is followed as stated — no new field or kind is added.
+   ROADMAP.md's Wave 5 finding paragraph and 13-11-PLAN.md's objective record that
+   `scheduleTwoTaxes`, `scheduleThreeNonrefundableCredits` and
+   `scheduleThreeRefundableCredits` (together with Schedule 1's two coarse kinds from
+   Question 1) stay in `unmodeledKindRefusals` for the whole of this phase; the final
+   `modeledKinds`/`unmodeledKindRefusals` split is 20/30, not the 25/25 a literal reading of
+   CONTEXT.md Decision 6.1's table would suggest.
+
 3. **Is Schedule 8812's ODC citizenship/national/resident-alien test (line 6's caution: "do
    not include... anyone who is not a U.S. citizen, U.S. national, or U.S. resident alien")
    captured by the `dependents` array's four fields (relationship, SSN valid for employment,
@@ -1080,6 +1094,10 @@ only the caption states the MFS exclusion).
      SSN validity). No new field needed; note it in the Schedule 8812 module's own docstring
      as a documented scope boundary, mirroring the Schedule A 12e docstring's treatment of its
      own out-of-scope exceptions.
+
+   **RESOLVED:** 13-CONTEXT.md Decision 5.7 adopts the recommendation — treated as an
+   accepted trust boundary, documented in `fjs/form8812`'s own docstring rather than added
+   as a fifth `dependents` field.
 
 ## Environment Availability
 
