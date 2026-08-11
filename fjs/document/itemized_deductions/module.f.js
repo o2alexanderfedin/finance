@@ -44,6 +44,7 @@ import { validate as rttiValidate } from 'functionalscript/fjs/types/rtti/valida
 import { error, ok } from 'functionalscript/fjs/types/result/module.f.js'
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
 import { base, mediaTypeOf } from '../base/module.f.js'
+import { moneyFieldError } from '../money_field/module.f.js'
 import { dialect as medicalExpensesDialect, medicalExpensesSchema } from '../medical_expenses/module.f.js'
 
 /** @import { Result } from 'functionalscript/fjs/types/result/module.f.js' */
@@ -96,10 +97,29 @@ const validateShape = rttiValidate(itemizedDeductionsSchema)
  */
 
 /**
+ * Checks the semantic refinement the structural schema cannot express:
+ * every entry's `amount` is an exact decimal within safe magnitude —
+ * mirroring `medical_expenses`'s own per-entry `moneyFieldError` loop
+ * exactly. No date field on this dialect, so no `isoDate` check applies
+ * here — this dialect has no `datePaid` analog.
+ * @type {(r: ItemizedDeductions) => Result<ItemizedDeductions, ItemizedDeductionsError>}
+ */
+export const checkReferences = r => {
+    for (const entry of r.entries) {
+        const amountMessage = moneyFieldError(`amount for ${entry.provider} (${entry.lineTag})`)(entry.amount)
+        if (amountMessage !== undefined) {
+            return error(amountMessage)
+        }
+    }
+    return ok(r)
+}
+
+/**
  * Validates an already-parsed JSON value as an `itemized_deductions` BLOB:
- * structural (rtti) validation only, for now. Dialect discrimination
- * happens exclusively through the schema's exact-literal `dialect`
- * constant — the serialized JSON text is never inspected.
+ * structural (rtti) validation followed by {@link checkReferences}.
+ * Dialect discrimination happens exclusively through the schema's
+ * exact-literal `dialect` constant — the serialized JSON text is never
+ * inspected.
  * @type {(value: Unknown) => Result<ItemizedDeductions, ItemizedDeductionsError>}
  */
 export const validate = value => {
@@ -107,7 +127,7 @@ export const validate = value => {
     if (t === 'error') {
         return error(v)
     }
-    return ok(v)
+    return checkReferences(v)
 }
 
 // ── Tests ────────────────────────────────────────────────────────────────────
@@ -164,10 +184,9 @@ export const proof = {
         },
     },
     amounts: {
-        // Not yet enforced: {@link checkReferences} does not exist yet, so
-        // this comma-grouped amount is expected to be REFUSED but is
-        // currently accepted structurally. This leaf is the plan's RED
-        // step — it must fail before the semantic check lands.
+        // The comma-grouped form is the OCR boundary's input, never a
+        // stored value — refused by {@link checkReferences}, never
+        // repaired into one.
         commaGroupedRejected: () => {
             assertEq(validate({ ...minimal, entries: [{ ...saltEntry, amount: '4,200.00' }] })[0], 'error')
         },
