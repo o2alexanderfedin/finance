@@ -3324,6 +3324,100 @@ export const proof = {
             assertEq(outcome.unmodeled.length, 0, ['expected an EMPTY unmodeled list', outcome.unmodeled])
         },
     },
+    // Plan 13-04 Task 3 — Slice 2's own vertical cut, end to end (closes
+    // TAX-09): a real 65+ single filer's line13b is a REAL, non-placeholder
+    // Schedule 1-A figure, and line15 (taxable income) is correspondingly
+    // LOWER than it would be with line13b = $0 — through the FULL
+    // `form1040Report(...)` entry point, the point at which "a 65+ TY2025
+    // return stops being structurally wrong" (13-CONTEXT.md's own Slice 2
+    // acceptance test) is either true or it is not.
+    wave2SeniorDeduction: {
+        // AGI $100,000.00 — $25,000.00 into the $75,000.00 single phase-out
+        // start — hand-computed against Schedule 1-A's own printed
+        // arithmetic (13-RESEARCH.md §1): line33 = $25,000.00, line34 = 6%
+        // of $25,000.00 = $1,500.00 (cent-exact, never $1,000-stepped),
+        // line35 = $6,000.00 - $1,500.00 = $4,500.00, line37 = line38 =
+        // $4,500.00 (no tips/overtime/car-loan declared).
+        endToEndSixtyFivePlusReturnComputesARealNonZeroLineThirteenB: () => {
+            const w2Form = w2Document('sha256-w2-t04-100k')('100000.00')
+            /** @type {ReturnProfile} */
+            const profile = {
+                ...singleProfile,
+                taxpayerBornBeforeJan2_1961: true,
+                declaredKinds: ['wages', 'seniorAndOtherScheduleOneADeductions'],
+            }
+            const inputs = inputsOf(storedProfile(profile))([w2Form])([])([])([])([])([])
+            const outcome = form1040Report(taxParams2025)(inputs)
+            assert(outcome.kind === 'ok', ['expected the 65+ senior-deduction return to compute', outcome])
+            if (outcome.kind !== 'ok') {
+                throw ['expected ok', outcome]
+            }
+
+            const line11b = lineRuled(outcome.lines)('1040 line 11b').value
+            assertEq(line11b, 10000000n, '$100,000.00 AGI -- wages alone')
+
+            const line13b = lineRuled(outcome.lines)('1040 line 13b').value
+            assertEq(line13b, 450000n, '$4,500.00, hand-computed from Schedule 1-A\'s own printed arithmetic')
+            assert(line13b > 0n, ['expected a real, non-zero senior deduction', line13b])
+
+            // Cross-checked a SECOND way, independent of `form1040Report`'s
+            // own wiring: the SAME AGI fed straight to `scheduleOneA(...)`
+            // (never to `form1040IncomeLines`, so this does not merely
+            // re-run the code under test) must reach the identical line38.
+            const crossCheck = scheduleOneA(taxParams2025)({
+                status: 'single',
+                agiCents: 10000000n,
+                taxpayerHasValidSsnAndBornBefore1961Jan2: true,
+                spouseHasValidSsnAndBornBefore1961Jan2: false,
+                profile: storedProfile(profile),
+            }).partVI.line38
+            assertEq(crossCheck, 450000n, 'independent scheduleOneA(...) call must reach the SAME figure')
+            assertEq(line13b, crossCheck, 'the wiring must feed the SAME facts an independent scheduleOneA call would')
+
+            // line15 (taxable income) is CORRESPONDINGLY LOWER than it would
+            // be with line13b = $0 -- $17,750.00 standard deduction (single,
+            // one age box, the $2,000 unmarried increment) + $0.00 would
+            // leave line15 = $100,000.00 - $17,750.00 = $82,250.00 WITHOUT
+            // the senior deduction. WITH it, line14 = $17,750.00 +
+            // $4,500.00 = $22,250.00, so line15 = $100,000.00 - $22,250.00
+            // = $77,750.00 -- exactly $4,500.00 lower, the senior
+            // deduction's own amount.
+            const line15 = lineRuled(outcome.lines)('1040 line 15').value
+            assertEq(line15, 7775000n, '$77,750.00 taxable income, WITH the $4,500.00 senior deduction')
+            const standardDeductionAlone = lineRuled(outcome.lines)('1040 line 12e').value
+            assertEq(standardDeductionAlone, 1775000n, '$17,750.00, single with one age box')
+            const line15WithoutSeniorDeduction = line11b - standardDeductionAlone
+            assertEq(
+                line15, line15WithoutSeniorDeduction - line13b,
+                'line15 must be exactly line13b LOWER than it would be with line13b = $0',
+            )
+        },
+        // THE CONTROL: an MFS 65+ filer, otherwise IDENTICAL, computes
+        // line13b = $0 -- Decision 5.4/Pitfall 3's short-circuit, proven at
+        // the WHOLE-REPORT level through `form1040Report`, not merely
+        // inside `fjs/schedule/1a`'s own standalone proof.
+        mfsSixtyFivePlusReturnComputesLineThirteenBAtZero: () => {
+            const w2Form = w2Document('sha256-w2-t04-mfs-100k')('100000.00')
+            /** @type {ReturnProfile} */
+            const profile = {
+                ...singleProfile,
+                filingStatus: 'marriedFilingSeparately',
+                taxpayerBornBeforeJan2_1961: true,
+                declaredKinds: ['wages', 'seniorAndOtherScheduleOneADeductions'],
+            }
+            const inputs = inputsOf(storedProfile(profile))([w2Form])([])([])([])([])([])
+            const outcome = form1040Report(taxParams2025)(inputs)
+            assert(outcome.kind === 'ok', ['expected the MFS return to compute', outcome])
+            if (outcome.kind !== 'ok') {
+                throw ['expected ok', outcome]
+            }
+            const line13b = lineRuled(outcome.lines)('1040 line 13b').value
+            assertEq(
+                line13b, 0n,
+                'MFS gets $0 UNCONDITIONALLY, even at $100,000 AGI, well past the phase-out start',
+            )
+        },
+    },
     // 12.1-VERIFICATION.md's WARNING, second half: no COMMITTED,
     // regression-tested proof exercised the FULL production chain —
     // `fjs/form8949` → `fjs/schedule/d` → `fjs/tax/line16/sdtw` →
