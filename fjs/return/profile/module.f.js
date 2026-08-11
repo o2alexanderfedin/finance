@@ -202,6 +202,21 @@ export const returnProfileSchema = /** @type {const} */ ({
     foreignAccountCountries: option(array(string)),
     // Schedule B Part III, line 8.
     receivedForeignTrustDistributionOrWasGrantorOrTransferor: option(true),
+    // Phase 13 Slice 1 (TAX-10), 13-CONTEXT.md Decision 5.1: the IRA-
+    // deduction circularity refusal fires on THIS FIELD, not on the coarse
+    // `scheduleOneAdjustments` kind — that kind cannot distinguish an IRA
+    // deduction (which creates the Pub. 590-A / taxable-Social-Security
+    // cycle) from an HSA or educator-expense adjustment, which does not.
+    // Read only by `fjs/form1040/core`; no cross-field check needed here.
+    iraDeductionDeclared: option(true),
+    // Phase 13 Slice 1 (TAX-10): the Social Security Benefits Worksheet's
+    // line 8 branches on this fact for a married-filing-separately filer —
+    // no other 1040 line already carries it. Additive, taxpayer-declared,
+    // and read only by `fjs/form1040/core`, mirroring
+    // `spouseHadNoIncomeIsNotFilingAndIsNotADependent`'s own precedent: no
+    // cross-field check here, since `fjs/form1040/core` gates the value by
+    // `filingStatus` itself before ever passing it to the worksheet.
+    mfsLivedWithSpouseAtAnyTimeInYear: option(true),
 })
 
 /** @typedef {Ts<typeof returnProfileSchema>} ReturnProfile */
@@ -717,6 +732,34 @@ export const proof = {
             assertEq(v.foreignAccountCountries?.length, 2)
             assertEq(v.foreignAccountCountries?.[0], 'Japan')
             assertEq(v.foreignAccountCountries?.[1], 'Canada')
+        },
+    },
+    // Phase 13 Slice 1 (TAX-10), Decision 5.1: two additive fields, both
+    // read only by `fjs/form1040/core`, both structurally independent of
+    // every check above — no leaf here touches `checkReferences`'s order or
+    // `declaredKinds`.
+    scheduleOneCircularityFields: {
+        iraDeductionDeclaredValidates: () => {
+            const [t, v] = validate({ ...minimal, iraDeductionDeclared: true })
+            assert(t === 'ok', ['expected ok', t, v])
+            assertEq(v.iraDeductionDeclared, true)
+        },
+        mfsLivedWithSpouseAtAnyTimeInYearValidates: () => {
+            const [t, v] = validate({
+                ...minimal,
+                filingStatus: 'marriedFilingSeparately',
+                mfsLivedWithSpouseAtAnyTimeInYear: true,
+            })
+            assert(t === 'ok', ['expected ok', t, v])
+            assertEq(v.mfsLivedWithSpouseAtAnyTimeInYear, true)
+        },
+        // DOC-12, same discipline as every other checkbox on this dialect: a
+        // structural `false` is rejected, not accepted as "not applicable".
+        eachCheckboxRejectsFalse: () => {
+            const [t1] = validate({ ...minimal, iraDeductionDeclared: false })
+            assertEq(t1, 'error')
+            const [t2] = validate({ ...minimal, mfsLivedWithSpouseAtAnyTimeInYear: false })
+            assertEq(t2, 'error')
         },
     },
     crossDialect: {

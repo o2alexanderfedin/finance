@@ -93,6 +93,8 @@ export const render = root => {
         interestForms: tenSmallInterestForms,
         dividendForms: [],
         brokerageForms: [],
+        retirementForms: [],
+        socialSecurityForms: [],
     }
     const withoutElection = { ...withElection, profile: store(profileElecting(false)) }
 
