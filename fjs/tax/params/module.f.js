@@ -82,6 +82,24 @@
  * citation-literal count exactly, and by `unmodifiedParametersCite2024_40Only`
  * staying green unmodified.
  *
+ * ## `seniorDeduction` — Slice 2's own `'publicLaw'`-kind parameter
+ * (13-CONTEXT.md Decision 5.2/5.4/5.5, Phase 13 Wave 2 Plan 03)
+ *
+ * The OBBBA "Enhanced Deduction for Seniors" (Schedule 1-A Part V): a
+ * $6,000 per-qualifying-taxpayer base amount, phased out at a CONTINUOUS 6%
+ * of MAGI over $75,000 ($150,000 if MFJ). Every dollar figure here cites
+ * `{ kind: 'publicLaw', publicLaw: '119-21', section: '§70103' }` —
+ * 13-RESEARCH.md Pitfall 5 confirmed Rev. Proc. 2025-32 does NOT contain
+ * this figure (it backs only the $2,200 CTC among this phase's new
+ * numbers); the senior deduction is direct OBBBA statute. `phaseoutThreshold`
+ * carries exactly FOUR entries (single/marriedFilingJointly/headOfHousehold/
+ * qualifyingSurvivingSpouse) — deliberately NO `marriedFilingSeparately`
+ * entry, since Decision 5.4/Pitfall 3 makes the deduction $0
+ * UNCONDITIONALLY for MFS, at any income; there is no dollar threshold for
+ * a status whose amount never depends on one. `fjs/schedule/1a` is where
+ * that short-circuit lives, and where the eligibility test on the OTHER
+ * four statuses reads `phaseoutThreshold` below.
+ *
  * @module
  */
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
@@ -426,6 +444,52 @@ export const socialSecurityBenefitsWorksheetBaseAmounts = {
 }
 
 /**
+ * The OBBBA "Enhanced Deduction for Seniors" (Schedule 1-A Part V) —
+ * Public Law 119-21 §70103, TAX-09 (13-CONTEXT.md Decision 5.2/5.4/5.5,
+ * 13-RESEARCH.md §1/§7). `phaseoutThreshold` carries exactly the FOUR
+ * filing statuses the printed form's own threshold applies to — see this
+ * module's own docstring, "`seniorDeduction`", for why
+ * `marriedFilingSeparately` has no entry here.
+ * @type {{
+ *   readonly amount: AmountWithCitation,
+ *   readonly phaseoutRatePercent: number,
+ *   readonly phaseoutThreshold: {
+ *     readonly single: AmountWithCitation,
+ *     readonly marriedFilingJointly: AmountWithCitation,
+ *     readonly headOfHousehold: AmountWithCitation,
+ *     readonly qualifyingSurvivingSpouse: AmountWithCitation,
+ *   },
+ * }}
+ */
+export const seniorDeduction = {
+    amount: {
+        amount: '6000.00',
+        citation: { kind: 'publicLaw', publicLaw: '119-21', section: '§70103', effectiveDate: '2025-01-01' },
+    },
+    // A plain rate, not money — AGENTS.md's decimal-string rule governs
+    // DOLLAR amounts, mirroring `Bracket.ratePercent` above.
+    phaseoutRatePercent: 6,
+    phaseoutThreshold: {
+        single: {
+            amount: '75000.00',
+            citation: { kind: 'publicLaw', publicLaw: '119-21', section: '§70103', effectiveDate: '2025-01-01' },
+        },
+        marriedFilingJointly: {
+            amount: '150000.00',
+            citation: { kind: 'publicLaw', publicLaw: '119-21', section: '§70103', effectiveDate: '2025-01-01' },
+        },
+        headOfHousehold: {
+            amount: '75000.00',
+            citation: { kind: 'publicLaw', publicLaw: '119-21', section: '§70103', effectiveDate: '2025-01-01' },
+        },
+        qualifyingSurvivingSpouse: {
+            amount: '75000.00',
+            citation: { kind: 'publicLaw', publicLaw: '119-21', section: '§70103', effectiveDate: '2025-01-01' },
+        },
+    },
+}
+
+/**
  * A full tax-year parameter set: every TY2025 parameter this phase
  * requires, together.
  * @typedef {{
@@ -435,6 +499,7 @@ export const socialSecurityBenefitsWorksheetBaseAmounts = {
  *   readonly ordinaryBrackets: typeof ordinaryBrackets,
  *   readonly capitalGainsBreakpoints: typeof capitalGainsBreakpoints,
  *   readonly socialSecurityBenefitsWorksheetBaseAmounts: typeof socialSecurityBenefitsWorksheetBaseAmounts,
+ *   readonly seniorDeduction: typeof seniorDeduction,
  * }} TaxParamSet
  */
 
@@ -455,6 +520,7 @@ export const taxParamsByYear = {
         ordinaryBrackets,
         capitalGainsBreakpoints,
         socialSecurityBenefitsWorksheetBaseAmounts,
+        seniorDeduction,
     },
 }
 
@@ -486,6 +552,18 @@ const assertRevProcCitation = citation => {
 }
 
 /**
+ * Narrows a `Citation` to its `'publicLaw'` arm, throwing (never casting)
+ * if it is not — the same narrowing idiom as {@link assertRevProcCitation},
+ * for `seniorDeduction`'s OBBBA-statute citations (13-CONTEXT.md Decision
+ * 5.2/13-RESEARCH.md Pitfall 5).
+ * @type {(citation: Citation) => Extract<Citation, { readonly kind: 'publicLaw' }>}
+ */
+const assertPublicLawCitation = citation => {
+    assert(citation.kind === 'publicLaw', ['expected a publicLaw-kind citation', citation])
+    return citation
+}
+
+/**
  * Every dollar-string field this module exports, gathered once so the
  * round-trip check below (`everyDollarAmountIsAStringAndRoundTrips`)
  * walks the data instead of a second, hand-written list that could
@@ -511,6 +589,11 @@ const everyDollarStringField = [
     socialSecurityBenefitsWorksheetBaseAmounts.firstThreshold.other.amount,
     socialSecurityBenefitsWorksheetBaseAmounts.secondThreshold.marriedFilingJointly.amount,
     socialSecurityBenefitsWorksheetBaseAmounts.secondThreshold.other.amount,
+    seniorDeduction.amount.amount,
+    seniorDeduction.phaseoutThreshold.single.amount,
+    seniorDeduction.phaseoutThreshold.marriedFilingJointly.amount,
+    seniorDeduction.phaseoutThreshold.headOfHousehold.amount,
+    seniorDeduction.phaseoutThreshold.qualifyingSurvivingSpouse.amount,
 ]
 
 export const proof = {
@@ -789,5 +872,33 @@ export const proof = {
         checkOne('firstThreshold.other')(socialSecurityBenefitsWorksheetBaseAmounts.firstThreshold.other)('25000.00')
         checkOne('secondThreshold.marriedFilingJointly')(socialSecurityBenefitsWorksheetBaseAmounts.secondThreshold.marriedFilingJointly)('12000.00')
         checkOne('secondThreshold.other')(socialSecurityBenefitsWorksheetBaseAmounts.secondThreshold.other)('9000.00')
+    },
+    // TAX-09/13-RESEARCH.md Pitfall 5: every `seniorDeduction` dollar
+    // figure cites OBBBA Public Law 119-21 §70103 directly — NEVER
+    // `kind: 'revProc'` and never Rev. Proc. 2025-32 (which does not
+    // contain this figure at all). Asserted per field
+    // (`kind`/`publicLaw`/`section`/`effectiveDate`), on every one of the
+    // five stored amounts, never via one deep-equality assertion against a
+    // second copy of the object.
+    seniorDeductionCitesPublicLaw11921Section70103: () => {
+        const entries = [
+            seniorDeduction.amount,
+            seniorDeduction.phaseoutThreshold.single,
+            seniorDeduction.phaseoutThreshold.marriedFilingJointly,
+            seniorDeduction.phaseoutThreshold.headOfHousehold,
+            seniorDeduction.phaseoutThreshold.qualifyingSurvivingSpouse,
+        ]
+        for (const entry of entries) {
+            const citation = assertPublicLawCitation(entry.citation)
+            assertEq(citation.publicLaw, '119-21', ['expected OBBBA Public Law 119-21', entry])
+            assertEq(citation.section, '§70103', ['expected OBBBA §70103', entry])
+            assertEq(citation.effectiveDate, '2025-01-01', ['expected the TY2025 effective date', entry])
+        }
+        assertEq(seniorDeduction.amount.amount, '6000.00')
+        assertEq(seniorDeduction.phaseoutRatePercent, 6)
+        assertEq(seniorDeduction.phaseoutThreshold.single.amount, '75000.00')
+        assertEq(seniorDeduction.phaseoutThreshold.marriedFilingJointly.amount, '150000.00')
+        assertEq(seniorDeduction.phaseoutThreshold.headOfHousehold.amount, '75000.00')
+        assertEq(seniorDeduction.phaseoutThreshold.qualifyingSurvivingSpouse.amount, '75000.00')
     },
 }
