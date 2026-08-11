@@ -192,23 +192,83 @@ export const socialSecurityBenefitsWorksheet = taxParamSet => input => {
         ['mfsLivedWithSpouseAtAnyTimeInYear only applies to marriedFilingSeparately', status],
     )
     const baseAmounts = taxParamSet.socialSecurityBenefitsWorksheetBaseAmounts
-    // STUB — RED phase. Every line intentionally returns 0n so this
-    // module's own proof suite can be watched failing before the real
-    // arithmetic lands (AGENTS.md: "a proof is not known to work until you
-    // have watched it fail").
-    void status
-    void mfsLivedWithSpouseAtAnyTimeInYear
-    void totalSsaAndRrbBox5Cents
-    void otherIncomeLine3Cents
-    void taxExemptInterestCents
-    void scheduleOneAdjustmentsTotalCents
-    void baseAmounts
-    void centsFromString('0.00')
-    void percentOfCents(0n)(0n)
+    // 1. "Enter the total amount from box 5 of ALL your Forms SSA-1099 and
+    //    RRB-1099." Also feeds Form 1040 line 6a. Caller-summed over
+    //    stored documents; this module does not read them.
+    const line1 = totalSsaAndRrbBox5Cents
+    // 2. "Enter one-half of line 1."
+    const line2 = percentOfCents(line1)(50n)
+    // 3. "Combine the amounts from Form 1040 or 1040-SR, lines 1z, 2b, 3b,
+    //    4b, 5b, 7a, and 8." Caller-summed; this module reads only the
+    //    total.
+    const line3 = otherIncomeLine3Cents
+    // 4. "Enter the amount from Form 1040 or 1040-SR, line 2a" — tax-exempt
+    //    interest, the add-back a naive implementation omits.
+    const line4 = taxExemptInterestCents
+    // 5. "Add lines 2, 3, and 4." — socialSecurityCombinedIncome's own
+    //    shape, exported separately per TAX-15/13-CONTEXT.md Decision 3.5.
+    const line5 = socialSecurityCombinedIncome(line2)(line3)(line4)
+    // 6. "Enter the total of the amounts from Schedule 1, lines 11 through
+    //    20, and 23 and 25." Caller-supplied — see this module's own
+    //    docstring for why it is not computed here.
+    const line6 = scheduleOneAdjustmentsTotalCents
+    // 7. "Is the amount on line 6 less than the amount on line 5? No.
+    //    STOP. None of your benefits are taxable... Yes. Subtract line 6
+    //    from line 5."
+    const line7 = line6 < line5 ? line5 - line6 : 0n
+    // 8. Filing-status base amount — MFJ $32,000, single/HoH/QSS/
+    //    MFS-lived-apart-all-year $25,000. MFS-lived-with-spouse-at-any-
+    //    time is a genuine THIRD branch that skips lines 8 through 15
+    //    entirely; see this module's own docstring for why line 16 there
+    //    is 85% of LINE 7, not line 1.
+    if (mfsLivedWithSpouseAtAnyTimeInYear) {
+        const line16 = percentOfCents(line7)(85n)
+        // 17. "Multiply line 1 by 85% (0.85)." Computed the same way in
+        //     every branch — it never depends on line 8 or the threshold
+        //     comparison at all.
+        const line17 = percentOfCents(line1)(85n)
+        // 18. "Taxable benefits. Enter the smaller of line 16 or line 17."
+        const line18 = line16 < line17 ? line16 : line17
+        return {
+            line1, line2, line3, line4, line5, line6, line7,
+            line8: 0n, line9: 0n, line10: 0n, line11: 0n, line12: 0n,
+            line13: 0n, line14: 0n, line15: 0n,
+            line16, line17, line18,
+        }
+    }
+    const mfj = status === 'marriedFilingJointly'
+    const line8 = centsFromString(
+        mfj ? baseAmounts.firstThreshold.marriedFilingJointly.amount : baseAmounts.firstThreshold.other.amount,
+    )
+    // 9. "Is the amount on line 7 more than the amount on line 8? No.
+    //    STOP. None of your benefits are taxable... Yes. Subtract line 8
+    //    from line 7."
+    const line9 = line7 <= line8 ? 0n : line7 - line8
+    // 10. Second threshold — $12,000 MFJ, $9,000 single/HoH/QSS/MFS.
+    const line10 = centsFromString(
+        mfj ? baseAmounts.secondThreshold.marriedFilingJointly.amount : baseAmounts.secondThreshold.other.amount,
+    )
+    // 11. "Subtract line 10 from line 9. If zero or less, enter -0-."
+    const line11 = line9 - line10 > 0n ? line9 - line10 : 0n
+    // 12. "Enter the smaller of line 9 or line 10."
+    const line12 = line9 < line10 ? line9 : line10
+    // 13. "Enter one-half of line 12."
+    const line13 = percentOfCents(line12)(50n)
+    // 14. "Enter the smaller of line 2 or line 13."
+    const line14 = line2 < line13 ? line2 : line13
+    // 15. "Multiply line 11 by 85% (0.85). If line 11 is zero, enter -0-."
+    //     No special case needed in code: multiplying zero by 85% is
+    //     already zero.
+    const line15 = percentOfCents(line11)(85n)
+    // 16. "Add lines 14 and 15."
+    const line16 = line14 + line15
+    // 17. "Multiply line 1 by 85% (0.85)."
+    const line17 = percentOfCents(line1)(85n)
+    // 18. "Taxable benefits. Enter the smaller of line 16 or line 17."
+    const line18 = line16 < line17 ? line16 : line17
     return {
-        line1: 0n, line2: 0n, line3: 0n, line4: 0n, line5: 0n, line6: 0n,
-        line7: 0n, line8: 0n, line9: 0n, line10: 0n, line11: 0n, line12: 0n,
-        line13: 0n, line14: 0n, line15: 0n, line16: 0n, line17: 0n, line18: 0n,
+        line1, line2, line3, line4, line5, line6, line7, line8, line9,
+        line10, line11, line12, line13, line14, line15, line16, line17, line18,
     }
 }
 
