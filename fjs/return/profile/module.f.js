@@ -69,6 +69,21 @@
  *   larger, so this dialect is the only possible source. Read only by
  *   `fjs/tax/deduction`'s `deductionChoice` (13-06); without it, a
  *   legitimate itemize-anyway return could not be expressed at all.
+ * - **`dependents` (TAX-12, 13-CONTEXT.md Decision 4.1) is ADDITIVE, and
+ *   `dependentCount` is KEPT rather than replaced.** `dependentCount` stays
+ *   the load-bearing declaration existing proofs and the scope guard read;
+ *   `dependents` is a per-dependent array Schedule 8812 needs to tell a
+ *   qualifying child from an other dependent, which a bare count cannot
+ *   express. Check 8 below enforces `dependents.length === dependentCount`
+ *   whenever the array is present, so the two can never silently diverge.
+ *   **Citizenship/national/resident-alien status is deliberately NOT one of
+ *   this array's fields.** Schedule 8812's own docstring (Wave 4's later
+ *   plan, `fjs/schedule/8812`) documents that trust boundary — the
+ *   taxpayer's act of declaring a dependent already asserts it, and the
+ *   printed form keys the CTC-vs-ODC classification itself on only two
+ *   facts (age, SSN validity), both of which this array carries
+ *   (13-CONTEXT.md Decision 5.7). This mirrors how `fjs/schedule/b`
+ *   documents its own Form 8815 boundary.
  *
  * @module
  */
@@ -166,6 +181,27 @@ export const kindVocabulary = /** @type {const} */ ([
  */
 
 /**
+ * One entry of {@link returnProfileSchema}'s `dependents` array — the exact
+ * four facts Schedule 8812 itself keys its CTC/ODC classification on
+ * (13-RESEARCH.md §4): `relationship` (free text, the dependency-test detail
+ * this array does not otherwise model), `ssnValidForEmployment` (line4's
+ * "required SSN" test), `ageAtYearEnd` (line4's "under 17" test), and
+ * `livedWithTaxpayer` (a fact every dependency claim relies on, though no
+ * single 8812 line names it directly). The three boolean-shaped facts are
+ * `option(true)`, DOC-12's convention extended to a taxpayer-asserted fact
+ * rather than a printed checkbox: ABSENT means "not asserted true", the
+ * conservative default for a credit-eligibility fact — a serializer that
+ * helpfully materializes every key as `false` cannot smuggle a false
+ * assertion in as a true one.
+ */
+const dependentEntrySchema = /** @type {const} */ ({
+    relationship: string,
+    ssnValidForEmployment: option(true),
+    ageAtYearEnd: number,
+    livedWithTaxpayer: option(true),
+})
+
+/**
  * rtti schema for a `return_profile` BLOB. `dialect` is spread first (via
  * `base`) so structural validation reports it as the first failing field on a
  * mismatched blob — DOC-00's criterion-1 discriminant, proven by
@@ -230,6 +266,13 @@ export const returnProfileSchema = /** @type {const} */ ({
     // hadForeignFinancialAccount. Read only by `fjs/tax/deduction`'s
     // `deductionChoice` (13-06); no cross-field check needed here.
     itemizeEvenThoughLessThanStandardDeduction: option(true),
+    // TAX-12 (13-CONTEXT.md Decision 4.1) — per-dependent facts Schedule
+    // 8812 needs to classify a qualifying child versus an other dependent.
+    // Additive, ABSENT for a return declaring `dependentCount: 0` and
+    // itemizing nothing about its dependents (check 8 below). See this
+    // module's own docstring, "schema decisions worth stating", for why
+    // citizenship is deliberately NOT a fifth field here.
+    dependents: option(array(dependentEntrySchema)),
 })
 
 /** @typedef {Ts<typeof returnProfileSchema>} ReturnProfile */
@@ -310,6 +353,7 @@ const statusesWithoutSpouseBoxes = ['single', 'headOfHousehold', 'qualifyingSurv
  * 5b. Married filing separately's spouse boxes require the footnote condition.
  * 6. Every PRESENT money box is an exact decimal string at the cents scale.
  * 7. A present line-26 amount has `'estimatedTaxPayments'` declared.
+ * 8. A present `dependents` array's length equals `dependentCount`.
  *
  * Nothing here throws: every refusal is an `error(...)` the caller unwraps, so
  * a hostile blob can never escape `validate` as an exception.
@@ -401,6 +445,17 @@ export const checkReferences = r => {
         return error(
             'line26EstimatedTaxPayments is present but declaredKinds does not name '
             + "'estimatedTaxPayments'",
+        )
+    }
+    // 8 — TAX-12/13-CONTEXT.md Decision 4.1: `dependentCount` stays the
+    // load-bearing declaration; `dependents`, when present, must agree with
+    // it exactly, or Schedule 8812's per-dependent classification and the
+    // scope guard's coarse count would silently describe two different
+    // returns.
+    if (r.dependents !== undefined && r.dependents.length !== r.dependentCount) {
+        return error(
+            `dependents array length (${r.dependents.length}) does not match `
+            + `dependentCount (${r.dependentCount})`,
         )
     }
     return ok(r)
@@ -790,6 +845,86 @@ export const proof = {
         falseRejected: () => {
             const [t] = validate({ ...minimal, itemizeEvenThoughLessThanStandardDeduction: false })
             assertEq(t, 'error')
+        },
+    },
+    // TAX-12 (13-CONTEXT.md Decision 4.1): the `dependents` array and its
+    // cross-field length check against `dependentCount` (checkReferences
+    // step 8). Structurally independent of every check above.
+    dependentsArray: {
+        // Test 1 — a matching length validates.
+        matchingLengthValidates: () => {
+            const [t, v] = validate({
+                ...minimal,
+                dependentCount: 1,
+                dependents: [
+                    { relationship: 'daughter', ssnValidForEmployment: true, ageAtYearEnd: 10, livedWithTaxpayer: true },
+                ],
+            })
+            assert(t === 'ok', ['expected ok', t, v])
+        },
+        // Test 2 — a mismatched length is refused, naming both numbers.
+        mismatchedLengthRefusedNamingBothNumbers: () => {
+            const [t, v] = validate({
+                ...minimal,
+                dependentCount: 2,
+                dependents: [
+                    { relationship: 'son', ssnValidForEmployment: true, ageAtYearEnd: 15, livedWithTaxpayer: true },
+                ],
+            })
+            assertEq(t, 'error')
+            assert(typeof v === 'string', ['expected a semantic string refusal', v])
+            assert(v.includes('1'), ['expected the array length named', v])
+            assert(v.includes('2'), ['expected dependentCount named', v])
+        },
+        // Test 3 — `dependents` omitted entirely, with `dependentCount: 0`,
+        // is a real, valid state: the array is present only when there is
+        // something to itemize.
+        omittedWithZeroCountValidates: () => {
+            const [t] = validate(minimal)
+            assertEq(t, 'ok')
+        },
+        // Test 4 — a dependent entry round-trips all four fields.
+        entryRoundTripsAllFourFields: () => {
+            const [t, v] = validate({
+                ...minimal,
+                dependentCount: 1,
+                dependents: [
+                    {
+                        relationship: 'grandson',
+                        ssnValidForEmployment: true,
+                        ageAtYearEnd: 12,
+                        livedWithTaxpayer: true,
+                    },
+                ],
+            })
+            assert(t === 'ok', ['expected ok', t, v])
+            const entry = v.dependents?.[0]
+            assert(entry !== undefined, ['expected a dependent entry', v])
+            assertEq(entry.relationship, 'grandson')
+            assertEq(entry.ssnValidForEmployment, true)
+            assertEq(entry.ageAtYearEnd, 12)
+            assertEq(entry.livedWithTaxpayer, true)
+        },
+        // DOC-12, same discipline as every other checkbox on this dialect: a
+        // structural `false` on either boolean-shaped fact is rejected, not
+        // accepted as "not applicable".
+        eachCheckboxRejectsFalse: () => {
+            const [t1] = validate({
+                ...minimal,
+                dependentCount: 1,
+                dependents: [
+                    { relationship: 'son', ssnValidForEmployment: false, ageAtYearEnd: 10, livedWithTaxpayer: true },
+                ],
+            })
+            assertEq(t1, 'error')
+            const [t2] = validate({
+                ...minimal,
+                dependentCount: 1,
+                dependents: [
+                    { relationship: 'son', ssnValidForEmployment: true, ageAtYearEnd: 10, livedWithTaxpayer: false },
+                ],
+            })
+            assertEq(t2, 'error')
         },
     },
     crossDialect: {
