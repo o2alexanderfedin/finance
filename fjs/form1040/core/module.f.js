@@ -3879,6 +3879,151 @@ export const proof = {
             assert(crossCheck > 1575000n, ['expected the itemized total to exceed the base standard deduction', crossCheck])
         },
     },
+    // Plan 13-10 Task 3 — Slice 4's own vertical cut, end to end (closes
+    // TAX-12 and, with it, Phase 13's fourth vertical slice): a return with
+    // declared dependents computes a real CTC/ODC (line 19) AND a real ACTC
+    // (line 28) through the FULL `form1040Report(...)` entry point — never
+    // through a direct `form8812(...)` call.
+    wave4Dependents: {
+        // ONE qualifying child (age 10, valid SSN, $2,200.00 CTC) and ONE
+        // other dependent (age 20, $500.00 ODC) — the CTC/ODC SPLIT proven
+        // end to end, not merely classified in isolation. $20,000.00 wages
+        // (AGI), single, no age/blindness boxes: standard deduction
+        // $15,750.00, taxable income $4,250.00, tax (Tax Table) $428.00 --
+        // hand-computed and independently cross-checked below via
+        // `baseTaxForAmount(...)`.
+        //
+        // Line 19 (1040): line8 = $2,200.00 + $500.00 = $2,700.00, well under
+        // the $200,000.00 single phase-out (line10/11 = $0.00), so
+        // line12 = $2,700.00 -- but line13 (Credit Limit Worksheet A) is the
+        // return's OWN $428.00 tax liability, smaller than line12, so
+        // line14 = $428.00: the CTC/ODC is CAPPED by tax liability, a real,
+        // non-zero, non-degenerate figure.
+        //
+        // Line 28 (1040): line16a = line12 - line14 = $2,700.00 - $428.00 =
+        // $2,272.00; line16b = 1 qualifying child x $1,700.00 = $1,700.00
+        // (the ACTC cap counts ONLY qualifying children, never other
+        // dependents); line17 = min(line16a, line16b) = $1,700.00.
+        // `earnedIncome: '20000.00'` (declared on the profile, matching
+        // wages) exercises line19/20's own arithmetic: line19 = $20,000.00 -
+        // $2,500.00 = $17,500.00; line20 = 15% of that = $2,625.00.
+        // line27 = min(line17, line20) = $1,700.00 -> 1040 line 28.
+        oneQualifyingChildAndOneOtherDependentComputeRealCtcOdcAndActc: () => {
+            const w2Form = w2Document('sha256-t10-wave4-w2')('20000.00')
+            /** @type {ReturnProfile} */
+            const profile = {
+                ...singleProfile,
+                dependentCount: 2,
+                dependents: [
+                    { relationship: 'daughter', ssnValidForEmployment: true, ageAtYearEnd: 10, livedWithTaxpayer: true },
+                    { relationship: 'mother', ssnValidForEmployment: true, ageAtYearEnd: 20, livedWithTaxpayer: true },
+                ],
+                earnedIncome: '20000.00',
+                declaredKinds: ['wages', 'childTaxCreditOrOtherDependents', 'additionalChildTaxCredit'],
+            }
+            const outcome = form1040Report(taxParams2025)(
+                inputsOf(storedProfile(profile))([w2Form])([])([])([])([])([])([])([]))
+            assert(outcome.kind === 'ok', ['expected the dependents return to compute', outcome])
+            if (outcome.kind !== 'ok') {
+                throw ['expected ok', outcome]
+            }
+
+            const line11b = lineRuled(outcome.lines)('1040 line 11b').value
+            assertEq(line11b, 2000000n, '$20,000.00 AGI -- wages alone')
+
+            const line19 = lineRuled(outcome.lines)('1040 line 19')
+            assertEq(line19.value, 42800n, '$428.00 -- CTC/ODC capped by this return\'s own tax liability')
+            assert(line19.value > 0n, ['expected a real, non-zero line 19', line19.value])
+
+            const line28 = lineRuled(outcome.lines)('1040 line 28')
+            assertEq(line28.value, 170000n, '$1,700.00 -- ACTC, capped by ONE qualifying child\'s $1,700.00')
+            assert(line28.value > 0n, ['expected a real, non-zero line 28', line28.value])
+
+            // Cross-checked a SECOND way, independent of `form1040Report`'s
+            // own wiring: the SAME facts fed straight to `form8812(...)`
+            // (never through the report's own call site) must reach the
+            // identical line14/line27.
+            const line18 = lineRuled(outcome.lines)('1040 line 18').value
+            const crossCheck = form8812(taxParams2025)({
+                status: 'single',
+                agiCents: 2000000n,
+                dependents: [
+                    { relationship: 'daughter', ssnValidForEmployment: true, ageAtYearEnd: 10, livedWithTaxpayer: true },
+                    { relationship: 'mother', ssnValidForEmployment: true, ageAtYearEnd: 20, livedWithTaxpayer: true },
+                ],
+                line18Cents: line18,
+                earnedIncomeCents: 2000000n,
+                nontaxableCombatPayCents: 0n,
+            })
+            assert(crossCheck.kind === 'ok', ['expected the cross-check to compute', crossCheck])
+            if (crossCheck.kind === 'ok') {
+                assertEq(crossCheck.line14, line19.value, 'independent form8812(...) call must reach the SAME line19 figure')
+                assertEq(crossCheck.line27, line28.value, 'independent form8812(...) call must reach the SAME line28 figure')
+            }
+
+            // Independent cross-check of the tax liability itself, never
+            // assumed: the SAME taxable income fed straight to
+            // `baseTaxForAmount(...)` (never to `dispatchLine16`) must reach
+            // the identical cents this fixture's own hand-computation used.
+            const line15 = lineRuled(outcome.lines)('1040 line 15').value
+            assertEq(line15, 425000n, '$4,250.00 taxable income -- $20,000.00 less the $15,750.00 standard deduction')
+            const taxCrossCheck = baseTaxForAmount(taxParams2025)('single')(line15)
+            assertEq(taxCrossCheck.cents, 42800n, 'independent baseTaxForAmount(...) call must reach the SAME $428.00 tax')
+        },
+        // THE PHASE-OUT CLIFF, at the WHOLE-REPORT level (contrast
+        // `fjs/form8812`'s own `steppedCliff` proof, which calls `form8812`
+        // directly): a married-filing-jointly filer with ONE qualifying
+        // child, AGI exactly $400,000.00 versus $400,000.01 -- one cent
+        // over the threshold costs the FULL $50.00 first step immediately,
+        // visible on 1040 line 19 itself, not merely inside Schedule 8812's
+        // own standalone proof. Tax liability at either AGI (well into six
+        // figures of taxable income) is far larger than line12's own
+        // $2,200.00/$2,150.00, so line13 never binds and the whole $50.00
+        // move is visible on line 19 unobstructed.
+        mfjOneCentOverThePhaseOutThresholdCostsTheFullFiftyDollarStepOnLineNineteen: () => {
+            const atThreshold = form1040Report(taxParams2025)(inputsOf(storedProfile({
+                ...singleProfile,
+                filingStatus: 'marriedFilingJointly',
+                dependentCount: 1,
+                dependents: [
+                    { relationship: 'son', ssnValidForEmployment: true, ageAtYearEnd: 10, livedWithTaxpayer: true },
+                ],
+                declaredKinds: ['wages', 'childTaxCreditOrOtherDependents', 'additionalChildTaxCredit'],
+            }))([w2Document('sha256-t10-wave4-cliff-at')('400000.00')])([])([])([])([])([])([])([]))
+            assert(atThreshold.kind === 'ok', ['expected the at-threshold return to compute', atThreshold])
+            if (atThreshold.kind !== 'ok') {
+                throw ['expected ok', atThreshold]
+            }
+            assertEq(
+                lineRuled(atThreshold.lines)('1040 line 19').value, 220000n,
+                '$2,200.00 -- one qualifying child, no phase-out yet at exactly $400,000.00 AGI',
+            )
+
+            const overThreshold = form1040Report(taxParams2025)(inputsOf(storedProfile({
+                ...singleProfile,
+                filingStatus: 'marriedFilingJointly',
+                dependentCount: 1,
+                dependents: [
+                    { relationship: 'son', ssnValidForEmployment: true, ageAtYearEnd: 10, livedWithTaxpayer: true },
+                ],
+                declaredKinds: ['wages', 'childTaxCreditOrOtherDependents', 'additionalChildTaxCredit'],
+            }))([w2Document('sha256-t10-wave4-cliff-over')('400000.01')])([])([])([])([])([])([])([]))
+            assert(overThreshold.kind === 'ok', ['expected the over-threshold return to compute', overThreshold])
+            if (overThreshold.kind !== 'ok') {
+                throw ['expected ok', overThreshold]
+            }
+            assertEq(
+                lineRuled(overThreshold.lines)('1040 line 19').value, 215000n,
+                '$2,150.00 -- $0.01 of excess rounds UP to a full $1,000.00 step, costing $50.00 immediately',
+            )
+
+            assertEq(
+                lineRuled(atThreshold.lines)('1040 line 19').value - lineRuled(overThreshold.lines)('1040 line 19').value,
+                5000n,
+                'exactly a $50.00 drop between $400,000.00 and $400,000.01 AGI, visible on 1040 line 19 itself',
+            )
+        },
+    },
     // 12.1-VERIFICATION.md's WARNING, second half: no COMMITTED,
     // regression-tested proof exercised the FULL production chain —
     // `fjs/form8949` → `fjs/schedule/d` → `fjs/tax/line16/sdtw` →
