@@ -344,7 +344,7 @@ structural (RTTI) and semantic passes.
       audit reported with each run, plus a perturbation gate (change an input, assert the
       output moves). `main = () => pure({ line16: 9137 })` satisfies every other criterion
       while defeating the entire thesis.
-- [ ] **PROV-08** *(T3)*: A second, non-tax report over the same documents — the cheapest
+- [x] **PROV-08** *(T3)*: A second, non-tax report over the same documents — the cheapest
       possible demonstration that "reports are programs" rather than a tax engine wearing a
       disguise.
 

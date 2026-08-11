@@ -2,17 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
-status: shipped
-stopped_at: Phase 13 shipped — PR #62 open against develop, CI green
-last_updated: "2026-08-11T18:05:00.000Z"
+status: executing
+stopped_at: Completed 15-01-PLAN.md — payer report (PROV-08) shipped
+last_updated: "2026-08-11T23:03:54.053Z"
 last_activity: 2026-08-11
 progress:
   total_phases: 19
   completed_phases: 14
-  percent_note: "phase-based (14 of 19); plan-based is unusable — see Current Position"
-  total_plans: 75
-  completed_plans: 78
-  percent: 100
+  total_plans: 81
+  completed_plans: 79
+  percent: 98
 ---
 
 # Project State
@@ -23,16 +22,16 @@ See: .planning/PROJECT.md (updated 2026-08-03)
 
 **Core value:** The report is a program, not an answer — the agent emits FunctionalScript;
 the server executes it as a pure function of `(documents, tax-year parameters) → report`.
-**Current focus:** Phase 15 — Realism Polish and Upstream (not yet started)
+**Current focus:** Phase 15 — realism-polish-and-upstream
 
 ## Current Position
 
-Phase: 13 (The 65+ Profile and the Remaining Schedules) — **SHIPPED**
+Phase: 15 (realism-polish-and-upstream) — EXECUTING
   13 plans across 5 vertical-slice waves. The plan set was returned ISSUES FOUND by
   `gsd-plan-checker` twice (2 blockers, then 2 more), revised each time, and only
   executed after a third pass returned VERIFICATION PASSED.
-Plan: 13 of 13 — all complete, every PLAN has its SUMMARY.
-Status: Verified, reviewed, and shipped.
+Plan: 2 of 6
+Status: Ready to execute
   `13-VERIFICATION.md` scores **5/5 ROADMAP success criteria at the code level**, with
   `status: human_needed` for one manual-only item (the IRS-figure transcription check).
   `13-REVIEW.md` found 1 critical + 5 warnings; all six are remedied in the branch.
@@ -41,7 +40,7 @@ Status: Verified, reviewed, and shipped.
 Next phase: **15 — Realism Polish and Upstream.** Phase 14 is skipped by owner decision;
   read the CARRIED, NOW UNOWNED block under "Session Continuity" before closing v1.
 
-Progress: 14 of 19 phases [███████░░░] 74%
+Progress: [██████████] 98%
   Phase-based, never plan-based: `completed_plans` exceeds `total_plans` because three
   phases carry an extra FIX-SUMMARY.md beside a plan's own summary, which rounds the
   plan-based figure to a misleading 100%. See `percent_note`.
@@ -68,6 +67,7 @@ npm test                                        # tsc && node --test
 npm run test:integration                        # real-process subset (also included in npm test)
 
 # project-local proofs — the ONLY honest metric. MUST be de-duplicated:
+
 node --test 2>&1 | grep '^✔ import("./fjs/' | sed 's/ ([0-9.]*ms)$//' | sort -u | wc -l
 ```
 
@@ -176,6 +176,7 @@ proofs and moves with submodule initialization state — which is exactly how a 
 | Phase 13-the-65-profile-and-the-remaining-schedules P11 | 30min | 2 tasks | 3 files |
 | Phase 13 P12 | 35min | 2 tasks | 1 files |
 | Phase 13 P13 | 20min | 3 tasks | 8 files |
+| Phase 15 P01 | 35min | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -372,6 +373,8 @@ Full log in PROJECT.md Key Decisions. Recent decisions affecting current work:
 - [Phase 13]: No scope reclassification in 13-12: the five coarse Schedule 1/2/3 kinds stay in unmodeledKindRefusals -- modeledKinds/unmodeledKindRefusals stay 20/30
 - [Phase ?]: MAGI gate regex: [a-zA-Z]*[Mm]agi[a-zA-Z]* (case-insensitive on M/m, fixed lowercase agi), stronger than criterion 5's literal grep, matching 13-VALIDATION.md C-1's own verify command — criterion 5 is case-sensitive and misses camelCase Magi (carried finding C-1); the gate must catch identifier-level mixed-case while still permitting all-uppercase MAGI in prose
 - [Phase ?]: C-3 resolved via childTaxCredit docstring precision (verified-against-printed-form + governing-provision language), not a guessed Rev. Proc. number — research only confirmed Rev. Proc. 2025-32 section 2.03 for ctcAmount by full-document grep; odcAmount/actcCap/phaseoutThreshold have no confirmed Rev. Proc. citation, so guessing one would repeat the exact sourcing error Pitfall 5 names
+- [Phase 15]: 15-01: payerReportSource and payerReport are two independently hand-authored artifacts, kept in sync across two test tiers rather than a runtime cross-check (07-08/07-09 precedent)
+- [Phase 15]: 15-01: fjs/report/payer's two-dialect scope boundary (1099-INT box1, 1099-DIV box1a only) is deliberate and mechanically additive to widen, documented in Schedule D's Decision-2.5 boundary-comment style
 
 ### Pending Todos
 
@@ -516,8 +519,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-08-11 (resume session)
-Stopped at: Phase 13 shipped — branch pushed, PR #62 open against `develop`, CI green.
+Last session: 2026-08-11T23:03:54.044Z
+Stopped at: Completed 15-01-PLAN.md — payer report (PROV-08) shipped
 
 Nothing is mid-edit. The working tree is clean.
 
