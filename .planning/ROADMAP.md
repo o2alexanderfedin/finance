@@ -540,7 +540,7 @@ Plans:
 
 **Wave 5** (TAX-14 — remaining schedules and the sweep)
 - [x] 13-11-PLAN.md — Schedules 1/2/3 as standalone, printed-line-complete, documented-zero modules *(needs 13-10)*
-- [ ] 13-12-PLAN.md — Wire 1040 lines 8/10/17/20/23/31, the first full-profile end-to-end proof combining all five slices *(needs 13-11)*
+- [x] 13-12-PLAN.md — Wire 1040 lines 8/10/17/20/23/31, the first full-profile end-to-end proof combining all five slices *(needs 13-11)*
 - [ ] 13-13-PLAN.md — The mechanical MAGI gate, ten corrected remedy strings, the 18-line REQUIREMENTS.md/ROADMAP.md correction *(needs 13-12)*
 
 **A finding from planning, worth the phase owner's attention**: `scheduleOneAdditionalIncome`, `scheduleOneAdjustments`, `scheduleTwoTaxes`, `scheduleThreeNonrefundableCredits` and `scheduleThreeRefundableCredits` are NOT reclassified to `modeledKinds` in this plan set, unlike CONTEXT.md Decision 6.1's table implies. 13-RESEARCH.md's own Open Questions 1 and 2 found that each is one coarse kind covering many distinct Schedule 1/2/3 line items with no per-line dialect to attribute a real dollar figure to — reclassifying them while the module can only ever return `$0` would be a confident zero replacing an honest refusal, exactly TAX-16's failure mode. Research's own recommendation ("No action needed for Phase 13's target profile") is followed. Final `modeledKinds`/`unmodeledKindRefusals` split after this phase: 20/30 (not the 25/25 a literal reading of the table would suggest).
@@ -652,7 +652,7 @@ Phases 16-18 are backlog: unordered, independent of each other and of the critic
 | 10. 1040 Core and Scope Guard | Week 2 | 10/10 | Complete   | verified 2026-08-06 5/5 |
 | 11. Wage, Retirement, Benefit Documents | Week 3 | 5/5 | Complete   | 2026-08-08 |
 | 12. Brokerage and Capital-Gain Chain | Week 3 | 5/5 | Complete   | 2026-08-08 |
-| 13. The 65+ Profile and Schedules | Week 3 | 11/13 | In Progress|  |
+| 13. The 65+ Profile and Schedules | Week 3 | 12/13 | In Progress|  |
 | 14. Acceptance | Week 4 | 0/TBD | Not started | - |
 | 15. Realism Polish and Upstream | Week 5 | 0/TBD | Not started | - |
 
