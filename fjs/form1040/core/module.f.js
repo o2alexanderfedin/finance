@@ -3068,6 +3068,137 @@ export const proof = {
             assertEq(lineRuled(outcome.lines)('1040 line 5b').value, 300000n, '$3,000.00 pension taxable amount')
         },
     },
+    // Plan 13-02 Task 3 — Slice 1's own vertical cut, end to end: a real
+    // 65+ single filer with a real SSA-1099 and two 1099-Rs computes a REAL,
+    // non-placeholder line 6b and a REAL AGI (line 11b) through the FULL
+    // `form1040Report(...)` entry point — the point at which this plan's
+    // whole objective ("a return with retirement and Social Security income
+    // actually computes AGI correctly") is either true or it is not.
+    //
+    // The fixture lands taxable Social Security in the 85% tier (worksheet
+    // line 11 > 0) AND carries nonzero tax-exempt interest — 13-RESEARCH.md
+    // §2's criterion-2 case, reused here at the WHOLE-REPORT level rather
+    // than fed straight to `socialSecurityBenefitsWorksheet(...)` the way
+    // `fjs/tax/ssb`'s own proof does it. Every cents figure below is
+    // HAND-COMPUTED from the worksheet's own printed arithmetic
+    // (13-RESEARCH.md §2), independently of this file's own code, and
+    // cross-checked against a SEPARATE, direct
+    // `socialSecurityBenefitsWorksheet(...)` call fed the SAME facts —
+    // mirroring
+    // `mixedDividendsComputeRealLinesThreeAThreeBSevenAAndANonZeroLineSixteen`'s
+    // own `qdcgt` cross-check, one worksheet over.
+    wave1RetirementAndSocialSecurity: {
+        endToEndSixtyFivePlusReturnComputesARealAgiFromRetirementAndSocialSecurityIncome: () => {
+            const w2Form = w2Document('sha256-w1-w2')('20000.00')
+            const interestForm = interestDocument('sha256-w1-int')({
+                box1InterestIncome: '500.00',
+                box8TaxExemptInterest: '3000.00',
+            })
+            const iraForm = retirementDocument('sha256-w1-r-ira')({
+                box1GrossDistribution: '8000.00',
+                box2aTaxableAmount: '8000.00',
+                box7bIraSepSimple: true,
+            })
+            const pensionForm = retirementDocument('sha256-w1-r-pension')({
+                box1GrossDistribution: '12000.00',
+                box2aTaxableAmount: '12000.00',
+            })
+            const ssaForm = socialSecurityDocument('sha256-w1-ssa')('30000.00')
+            /** @type {ReturnProfile} */
+            const profile = {
+                ...singleProfile,
+                taxpayerBornBeforeJan2_1961: true,
+                declaredKinds: [
+                    'wages', 'socialSecurityBenefits', 'iraDistributions',
+                    'pensionsAndAnnuities', 'federalTaxWithheldOnOther1099',
+                ],
+            }
+            const inputs = inputsOf(storedProfile(profile))([w2Form])([interestForm])([])([])(
+                [iraForm, pensionForm])([ssaForm])
+            const outcome = form1040Report(taxParams2025)(inputs)
+            assert(outcome.kind === 'ok', ['expected the 65+ retirement/SS return to compute', outcome])
+            if (outcome.kind !== 'ok') {
+                throw ['expected ok', outcome]
+            }
+            // Hand-computed from the worksheet's own printed arithmetic
+            // (13-RESEARCH.md §2): line1=$30,000.00, line2=$15,000.00,
+            // line3=$40,500.00 (1z $20,000.00 + 2b $500.00 + 4b $8,000.00 +
+            // 5b $12,000.00), line4=$3,000.00 (the tax-exempt-interest
+            // add-back), line5=$58,500.00, line6=$0.00 (no Schedule 1
+            // adjustments), line7=$58,500.00, line8=$25,000.00 (single base
+            // amount), line9=$33,500.00, line10=$9,000.00 (single second
+            // threshold), line11=$24,500.00 (> 0 — the 85% tier),
+            // line12=$9,000.00, line13=$4,500.00, line14=$4,500.00 (smaller
+            // of line2/line13), line15=$20,825.00 (85% of line11),
+            // line16=$25,325.00, line17=$25,500.00 (85% of line1),
+            // line18=$25,325.00 (smaller of line16/line17) -> 1040 line 6b.
+            const line6a = lineRuled(outcome.lines)('1040 line 6a').value
+            const line6b = lineRuled(outcome.lines)('1040 line 6b').value
+            assertEq(line6a, 3000000n, '$30,000.00 total SSA-1099 box 5')
+            assertEq(line6b, 2532500n, '$25,325.00, hand-computed from the worksheet\'s own arithmetic')
+            assert(line6b > 0n, ['expected a real, non-zero taxable Social Security amount', line6b])
+
+            // AGI = 1z ($20,000.00) + 2b ($500.00) + 4b ($8,000.00) + 5b
+            // ($12,000.00) + 6b ($25,325.00) - line 10 ($0.00, no
+            // adjustments) = $65,825.00. Hand-computed independently of the
+            // sources above (added freshly here, never copied from them or
+            // from `outcome` itself).
+            const line11b = lineRuled(outcome.lines)('1040 line 11b').value
+            assertEq(line11b, 6582500n, '$65,825.00 AGI, hand-computed')
+            assert(line11b > 0n, ['expected a real, non-zero AGI', line11b])
+
+            // Cross-checked a SECOND way, independent of `form1040Report`'s
+            // own wiring: the SAME facts fed straight to
+            // `socialSecurityBenefitsWorksheet(...)` (never to
+            // `form1040IncomeLines`, so this does not merely re-run the code
+            // under test) must reach the identical line 18.
+            const crossCheck = socialSecurityBenefitsWorksheet(taxParams2025)({
+                status: 'single',
+                mfsLivedWithSpouseAtAnyTimeInYear: false,
+                totalSsaAndRrbBox5Cents: 3000000n,
+                otherIncomeLine3Cents: 4050000n,
+                taxExemptInterestCents: 300000n,
+                scheduleOneAdjustmentsTotalCents: 0n,
+            }).line18
+            assertEq(crossCheck, 2532500n, 'independent socialSecurityBenefitsWorksheet(...) call must reach the SAME figure')
+            assertEq(line6b, crossCheck, 'the wiring must feed the SAME facts an independent worksheet call would')
+        },
+        // THE SAME kind of profile, with `iraDeductionDeclared: true` added:
+        // the return refuses BEFORE the worksheet ever runs, naming
+        // Pub. 590-A — Decision 3.3/5.1's circularity refusal, proven at the
+        // whole-report level rather than only through `form1040IncomeLines`
+        // directly (`retirementAndSocialSecurityBeforeTheScopeReclassificationLands`'s
+        // own `iraDeductionDeclaredRefusesNamingPub590ABeforeTheWorksheetRuns`
+        // leaf, above, is the narrower, isolated version of this same fact).
+        sameProfileWithIraDeductionDeclaredRefusesNamingPub590A: () => {
+            const iraForm = retirementDocument('sha256-w1b-r-ira')({
+                box1GrossDistribution: '8000.00',
+                box2aTaxableAmount: '8000.00',
+                box7bIraSepSimple: true,
+            })
+            const ssaForm = socialSecurityDocument('sha256-w1b-ssa')('30000.00')
+            /** @type {ReturnProfile} */
+            const profile = {
+                ...singleProfile,
+                taxpayerBornBeforeJan2_1961: true,
+                iraDeductionDeclared: true,
+                declaredKinds: [
+                    'wages', 'socialSecurityBenefits', 'iraDistributions',
+                ],
+            }
+            const inputs = inputsOf(storedProfile(profile))([])([])([])([])([iraForm])([ssaForm])
+            const outcome = form1040Report(taxParams2025)(inputs)
+            assert(outcome.kind === 'error', ['expected the IRA-deduction refusal', outcome])
+            if (outcome.kind !== 'error') {
+                throw ['expected error', outcome]
+            }
+            assert(
+                outcome.message.includes('Pub. 590-A'),
+                ['expected the refusal to name Pub. 590-A', outcome.message],
+            )
+            assertEq(outcome.unmodeled.length, 0, ['expected an EMPTY unmodeled list', outcome.unmodeled])
+        },
+    },
     // 12.1-VERIFICATION.md's WARNING, second half: no COMMITTED,
     // regression-tested proof exercised the FULL production chain —
     // `fjs/form8949` → `fjs/schedule/d` → `fjs/tax/line16/sdtw` →
