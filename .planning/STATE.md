@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
 status: executing
-stopped_at: "Completed 13-02-PLAN.md -- vertical slice 1 (TAX-10) closed: 65+ return with SSA-1099 and 1099-R computes real lines 4a-6b/25b and a correct AGI."
-last_updated: "2026-08-11T02:28:43.171Z"
+stopped_at: Plan 13-03 COMPLETE -- fjs/tax/params gains the OBBBA senior-deduction parameters (Public Law 119-21 section 70103); new fjs/schedule/1a computes Parts I/V/VI (continuous 6% phase-out, MFS short-circuit, per-spouse grant), standalone, not yet wired into Form 1040. fjs/tax/boundary's allThresholds grows 50 -> 58. TAX-09 NOT yet complete -- Plan 13-04 wires line 13b and reclassifies the kind.
+last_updated: "2026-08-11T03:12:15.539Z"
 last_activity: 2026-08-11
 progress:
   total_phases: 19
   completed_phases: 13
   total_plans: 75
-  completed_plans: 67
-  percent: 89
+  completed_plans: 68
+  percent: 91
 ---
 
 # Project State
@@ -30,7 +30,7 @@ Phase: 13 (The 65+ Profile and the Remaining Schedules) — EXECUTING
   Four plans across three waves. The plan set was returned ISSUES FOUND by
   `gsd-plan-checker` twice (2 blockers, then 2 more), revised each time, and only
   executed after a third pass returned VERIFICATION PASSED.
-Plan: 3 of 13
+Plan: 4 of 13
   Wave 1: 12.1-01 (Form 8949 category derivation + the absent-basis refusal) and
   12.1-02 (the 47-line Schedule D Tax Worksheet). Wave 2: 12.1-03 (Schedule D
   lines 1a-21, the loss-cap three-way branch, two bounded sub-worksheets).
@@ -41,7 +41,7 @@ Status: Ready to execute
   stopped after the final wave, so the phase has never been independently verified
   against its goal. That is the next action.
 
-Progress: [█████████░] 89%
+Progress: [█████████░] 91%
   Phase-based, never plan-based: `completed_plans` (65) exceeds `total_plans` (62)
   because three phases carry an extra FIX-SUMMARY.md beside a plan's own summary,
   which rounds the plan-based figure to a misleading 100%. See `percent_note`.
@@ -139,6 +139,7 @@ proofs and moves with submodule initialization state — which is exactly how a 
 | Phase 12.1 P04 | 70min | 3 tasks | 9 files |
 | Phase 13 P01 | 35min | 2 tasks | 3 files |
 | Phase 13 P02 | 100min | 3 tasks | 6 files |
+| Phase 13 P03 | 35min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -310,6 +311,8 @@ Full log in PROJECT.md Key Decisions. Recent decisions affecting current work:
 - [Phase 13]: 13-02: The IRA-deduction circularity refuses via a document-data-sufficiency error-arm on a new profile field (iraDeductionDeclared), never a fjs/return/scope kind -- the 50-kind vocabulary cannot distinguish an IRA deduction from any other Schedule 1 adjustment
 - [Phase 13]: 13-02: retirementForms/socialSecurityForms appended at the END of Form1040Inputs's curried parameter list, mirroring 12.1-04's own dividendForms/brokerageForms widening -- every existing call site needed only two trailing empty-array arguments
 - [Phase 13]: 13-02: TAX-10 marked COMPLETE -- vertical slice 1 closes here; a 65+ return with SSA-1099 and 1099-R income computes real lines 4a-6b/25b and a correct AGI through the full form1040Report entry point
+- [Phase 13]: 13-03: The plan's own $174,999.99 -> $0.06 boundary example was wrong under correct half-up cent rounding; corrected against independently verified arithmetic -- the 6% rate is coarser than one cent of MAGI, so the floor/start boundary trios are legitimately flat at both points
+- [Phase 13]: 13-03: magiCents renamed to phaseoutIncomeCents before commit -- caught the forbidden lowercase 'magi' substring (Decision 3.6) during the plan's own verification sweep
 
 ### Pending Todos
 
@@ -454,13 +457,10 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-08-11T02:28:43.161Z
-Stopped at: **Plan 13-02 COMPLETE — vertical slice 1 (TAX-10) closed.** A 65+ single filer
-with a real SSA-1099 and two 1099-Rs now computes real, non-placeholder Form 1040 lines
-4a/4b, 5a/5b, 6a/6b, 9, 11b and 25b through the full `form1040Report` entry point, and a
-correct AGI. `modeledKinds` grew 12 → 16, `unmodeledKindRefusals` shrank 38 → 34.
-`iraDeductionDeclared`/`mfsLivedWithSpouseAtAnyTimeInYear` are new profile fields. Nothing
-is mid-edit. Next: Plan 13-03 (Wave 2, the senior deduction, TAX-09).
+Last session: 2026-08-11T03:12:15.529Z
+Stopped at: Plan 13-03 COMPLETE -- fjs/tax/params gains the OBBBA senior-deduction parameters (Public Law 119-21 section 70103); new fjs/schedule/1a computes Parts I/V/VI (continuous 6% phase-out, MFS short-circuit, per-spouse grant), standalone, not yet wired into Form 1040. fjs/tax/boundary's allThresholds grows 50 -> 58. TAX-09 NOT yet complete -- Plan 13-04 wires line 13b and reclassifies the kind.
+Nothing is mid-edit. Next: Plan 13-04 (Wave 2 continued -- wire 1040 line 13b, reclassify
+seniorAndOtherScheduleOneADeductions, end-to-end proof closing TAX-09).
 
 > **An automated state write clobbered this block on 2026-08-09** (`stopped_at` replaced with
 > "context exhaustion at 75%", the continuity text truncated mid-sentence into a dangling
