@@ -43,7 +43,7 @@ The taxpayer profile (65+, brokerage sales, dependents, itemizes) was chosen del
 for realism, and it is a legitimate choice. It is also roughly **4–5× the v1 research
 recommended** (1040 core + Schedule B + three dialects). Phases 11–13 alone contain nine
 IRS forms/schedules and five document dialects, including the two hardest single
-computations in the domain (the Schedule D Tax Worksheet and the 19-line Social Security
+computations in the domain (the Schedule D Tax Worksheet and the 18-line Social Security
 Benefits Worksheet), neither of which has been read line by line yet. `todo/plan.md`
 allots one week — Week 3 — to what is here three phases.
 
@@ -513,7 +513,7 @@ Plans:
 **Tier**: T2
 **Success Criteria** (what must be TRUE):
   1. Schedule 1-A Parts I/V/VI compute the senior deduction with the 6% phase-out over $75k/$150k, feeding Form 1040 line 13b — a 65+ TY2025 return without it is structurally wrong, not merely incomplete.
-  2. The 19-line Social Security Benefits Worksheet matches the printed worksheet on a case that exercises its near-circular dependency.
+  2. The 18-line Social Security Benefits Worksheet matches the printed worksheet on a case that exercises its near-circular dependency.
   3. Schedule A computes and is **compared against** the standard deduction, with proofs in both directions — itemizing does not automatically win above $15,750 / $31,500.
   4. Schedule 8812 computes for the declared dependents, and Schedules 1, 2, and 3 carry every line the profile actually reaches.
   5. `grep -rn "magi" fjs/` returns nothing — each rule's MAGI is a separately named function stating its own add-back list, because the IRA deduction, Roth eligibility, the Premium Tax Credit, IRMAA, and the student-loan-interest deduction do not share one.

@@ -30,7 +30,7 @@ profile is roughly 4–5× that:
   return that omits the senior deduction (Parts I/V/VI, 6% phase-out over $75k/$150k) is
   structurally wrong, not merely incomplete.
 - **65+ realistically implies SSA-1099 and 1099-R.** The Social Security Benefits
-  Worksheet is a 19-line near-circular computation — research flagged it as one of the two
+  Worksheet is an 18-line near-circular computation — research flagged it as one of the two
   hardest single computations in the domain.
 - **Brokerage sales pull in the whole capital-gains chain**: 1099-B → Form 8949 →
   Schedule D → the Schedule D Tax Worksheet (strictly harder than the QDCGT worksheet).
@@ -304,14 +304,14 @@ structural (RTTI) and semantic passes.
       Phase 12; the phase text that scheduled building it was stale and has been corrected.
 - [x] **TAX-09** *(T2)*: **Schedule 1-A Parts I/V/VI** — mandatory given TY2025 + 65+.
       Senior deduction with 6% phase-out over $75k/$150k, feeding Form 1040 line 13b.
-- [x] **TAX-10** *(T2)*: Social Security Benefits Worksheet — a 19-line near-circular
+- [x] **TAX-10** *(T2)*: Social Security Benefits Worksheet — an 18-line near-circular
       computation. Required by the 65+ profile.
 - [x] **TAX-11** *(T2)*: Form 8949 and Schedule D, including the Schedule D Tax Worksheet.
       Required by brokerage sales.
 - [x] **TAX-12** *(T2)*: Schedule 8812. Required by dependents.
 - [x] **TAX-13** *(T2)*: Schedule A. Required by itemizing, and it must compare against the
       standard deduction rather than assuming itemizing wins.
-- [ ] **TAX-14** *(T2)*: Schedule 1 and Schedule 2/3 to the extent the profile reaches them.
+- [x] **TAX-14** *(T2)*: Schedule 1 and Schedule 2/3 to the extent the profile reaches them.
 - [x] **TAX-15** *(T2)*: Worksheets modelled in IRS order, one named pure function per
       worksheet carrying the printed form's line numbers. **No variable named `magi`** — the
       MAGI for the IRA deduction, Roth eligibility, the Premium Tax Credit, IRMAA, and the
