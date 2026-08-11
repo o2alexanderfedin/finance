@@ -85,7 +85,7 @@ Note the Tax Table is a *lookup*, not a bracket formula — TaxCalcBench found m
 | 1099-B → Schedule D → Form 8949 | Short/long-term split; basis-reported vs. not (8949 box codes A/B/C/G/H/I short, D/E/F/J/K/L long); wash sales (box 1g); noncovered securities (box 5). **Shortcut worth exploiting:** transactions reported on 1099-B with basis reported to IRS and no adjustments may be totaled directly on Schedule D lines 1a/8a with no Form 8949 at all. | HIGH |
 | Capital loss carryover | Requires prior-year Schedule D → forces multi-year support; $3,000/$1,500 annual limit | MEDIUM |
 | 1099-R → lines 4a/4b, 5a/5b | Distribution codes drive taxability; basis via Form 8606 for IRAs | MEDIUM–HIGH |
-| SSA-1099 → line 6a/6b | Social Security Benefits Worksheet — a genuinely nasty 19-line circular-ish computation | HIGH |
+| SSA-1099 → line 6a/6b | Social Security Benefits Worksheet — a genuinely nasty 18-line circular-ish computation (research originally said 19; corrected in Phase 13 against `[VERIFIED: i1040gi.pdf (2025) p32]`) | HIGH |
 | Schedule 1 | Only needed for any of lines 1–8z income or 11–24z adjustments; large surface, mostly rare items | MEDIUM |
 | Schedule A (itemized) | Only wins above $15,750/$31,500 — for many personal returns it is dead weight | HIGH |
 

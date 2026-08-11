@@ -13,7 +13,8 @@ In scope — the five requirements TAX-09, TAX-10, TAX-12, TAX-13, TAX-14:
 
 - **Schedule 1-A** senior deduction (the parts criterion 1 names), with the 6% phase-out
   over $75k/$150k, feeding Form 1040 line 13b.
-- **The 19-line Social Security Benefits Worksheet**, feeding 1040 lines 6a/6b.
+- **The 18-line Social Security Benefits Worksheet**, feeding 1040 lines 6a/6b.
+  (Corrected from "19-line" — see Decision 5.3; `[VERIFIED: i1040gi.pdf (2025) p32]`.)
 - **Schedule A**, compared against the standard deduction rather than assumed to win.
 - **Schedule 8812**, both halves — the nonrefundable credit (line 19) and the ACTC (line 28).
 - **Schedules 1, 2, and 3**, carrying every line the profile reaches.
@@ -448,7 +449,7 @@ they conflict take precedence over, the decisions above.
   where the standard deduction still wins is the load-bearing proof, not the easy one.
 
 - **Criterion 2 needs a case that exercises the near-circular dependency**, specifically the
-  tax-exempt-interest add-back — not merely a case where the 19 lines produce a number.
+  tax-exempt-interest add-back — not merely a case where the 18 lines produce a number.
 
 - **The stale-remedy correction (Decision 1.4) is small and easy to forget**, and it is the
   kind of thing Phase 1 and Phase 17 exist to catch. It belongs in Wave 3 beside the
