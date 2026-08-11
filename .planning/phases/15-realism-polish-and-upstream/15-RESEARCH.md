@@ -506,10 +506,20 @@ needed for this requirement.
 
 **If this table is empty:** N/A — see entries above.
 
-## Open Questions
+## Open Questions (ALL RESOLVED 2026-08-11)
 
-1. **Does TAX-17 need a real, cited second tax year, or can "any year with parameters and
+> All three were resolved by the phase owner the same day research completed. The resolutions
+> are recorded as locked decisions in `15-CONTEXT.md`; the plans implement them. Kept here with
+> their original reasoning intact so the trail from question to decision stays readable.
+
+
+1. **[RESOLVED → structural proof only]** **Does TAX-17 need a real, cited second tax year, or can "any year with parameters and
    documents computes" be demonstrated structurally?**
+   - **Resolution:** structurally, with NO TY2024 transcription. See `15-CONTEXT.md` § Area 3
+     "REVISED 2026-08-11". Adding hand-transcribed TY2024 figures was rejected because it would
+     stack a second batch of unverified IRS constants on the Phase 13 batch that is already open
+     and unowned. A synthetic `TaxParamSet` proves genericity in `15-05`, and is never added to
+     `taxParamsByYear`.
    - What we know: every schedule/form computation module already takes `TaxParamSet` as an
      explicit argument (confirmed by source read); `taxParamsByYear`/`finance_tax_params` are
      already open-keyed and already treat an unknown year as an ordinary refusal. The Capital
@@ -524,7 +534,11 @@ needed for this requirement.
      if the planner judges it non-trivial, since CONTEXT.md's own text hedges ("not a full TY2024
      parameter set") without pinning the exact subset.
 
-2. **Absent-carryover-document semantics.**
+2. **[RESOLVED → absent means zero]** **Absent-carryover-document semantics.**
+   - **Resolution:** an absent document is a legitimate `0n` on Schedule D lines 6/14; only a
+     document that exists with a missing or inconsistent field refuses, naming the field. See
+     `15-CONTEXT.md` § Area 3. The strict reading would have made every first-year filer unable
+     to file.
    - What we know: DOC-11's "absent is not zero" convention is well-established for form boxes.
    - What's unclear: whether that convention should extend to "the whole carryover document is
      absent" (this research recommends treating that as legitimate zero, distinct from "present
@@ -534,7 +548,11 @@ needed for this requirement.
      with a missing/inconsistent required field → named refusal. Confirm before locking the
      dialect's own validation.
 
-3. **Where exactly does `applyWholeDollarElection` get its `elected` flag for the diff?**
+3. **[RESOLVED → explicit caller argument]** **Where exactly does `applyWholeDollarElection` get its `elected` flag for the diff?**
+   - **Resolution:** an explicit caller argument, and the diff applies the projection host-side.
+     See `15-CONTEXT.md` § Area 2, second "Research resolution" note. Re-deriving from stored CAS
+     content was rejected: it is only valid if both runs pinned the same return-profile revision,
+     which can silently be false.
    - What we know: the election is a fact on the return-profile document, read by whichever
      guest program(s) produced the two stored results being diffed.
    - What's unclear: whether the new diff module should re-derive `elected` from stored CAS
@@ -552,7 +570,7 @@ needed for this requirement.
 | Framework | Node's built-in `node:test`, driven via FunctionalScript's Emergent Testing (`proof` exports discovered by `all.test.js`) |
 | Config file | none — `tsconfig.json` (strict mode) governs typecheck; `package.json`'s `"test": "tsc && node --test"` governs the run |
 | Quick run command | `node --test 2>&1 \| grep -c '^✔ import("\./fjs/'` after `npx tsc --noEmit` on the touched files only (fast, per-task signal — AGENTS.md's own de-duplication caveat applies to the FULL count, not to "did my new leaves appear") |
-| Full suite command | `npm test` (includes the two real-process integration tests; per AGENTS.md this is the ONLY command whose total is trustworthy, and it currently takes ~11s under load per STATE.md's own measurement) |
+| Full suite command | `npm test` (includes the two real-process integration tests; per AGENTS.md this is the ONLY command whose total is trustworthy). **Runtime ~8 minutes** — 481s wall clock for 6166 tests, measured on `e36ef1a`. An earlier draft of this row said "~11s", which misread STATE.md: 11.2s is the `cas_refresh` real-process test *alone* under load, not the suite. Corrected 2026-08-11. |
 
 ### Phase Requirements → Test Map
 
