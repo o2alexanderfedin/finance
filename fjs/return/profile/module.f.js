@@ -62,6 +62,13 @@
  *   `hadForeignFinancialAccount`: the two printed sub-questions are independent
  *   facts, and it is Schedule B, not this dialect, that decides what to do with
  *   the combination.
+ * - **`itemizeEvenThoughLessThanStandardDeduction` (Schedule A line 18,
+ *   TAX-13, 13-CONTEXT.md Decision 2.5) is a taxpayer ELECTION no document
+ *   reports** — exactly like `hadForeignFinancialAccount`: no 1099 or W-2
+ *   states that a taxpayer wants to itemize when the standard deduction is
+ *   larger, so this dialect is the only possible source. Read only by
+ *   `fjs/tax/deduction`'s `deductionChoice` (13-06); without it, a
+ *   legitimate itemize-anyway return could not be expressed at all.
  *
  * @module
  */
@@ -217,6 +224,12 @@ export const returnProfileSchema = /** @type {const} */ ({
     // cross-field check here, since `fjs/form1040/core` gates the value by
     // `filingStatus` itself before ever passing it to the worksheet.
     mfsLivedWithSpouseAtAnyTimeInYear: option(true),
+    // Schedule A line 18 (TAX-13, 13-CONTEXT.md Decision 2.5) — "elect to
+    // itemize deductions even though they are less than your standard
+    // deduction". A taxpayer election no document reports, exactly like
+    // hadForeignFinancialAccount. Read only by `fjs/tax/deduction`'s
+    // `deductionChoice` (13-06); no cross-field check needed here.
+    itemizeEvenThoughLessThanStandardDeduction: option(true),
 })
 
 /** @typedef {Ts<typeof returnProfileSchema>} ReturnProfile */
@@ -760,6 +773,23 @@ export const proof = {
             assertEq(t1, 'error')
             const [t2] = validate({ ...minimal, mfsLivedWithSpouseAtAnyTimeInYear: false })
             assertEq(t2, 'error')
+        },
+    },
+    // TAX-13 (13-CONTEXT.md Decision 2.5): Schedule A line 18's
+    // itemize-anyway election. Structurally independent of every check
+    // above — no leaf here touches `checkReferences`'s order or
+    // `declaredKinds`.
+    scheduleALine18Election: {
+        itemizeEvenThoughLessThanStandardDeductionValidates: () => {
+            const [t, v] = validate({ ...minimal, itemizeEvenThoughLessThanStandardDeduction: true })
+            assert(t === 'ok', ['expected ok', t, v])
+            assertEq(v.itemizeEvenThoughLessThanStandardDeduction, true)
+        },
+        // DOC-12, same discipline as every other checkbox on this dialect: a
+        // structural `false` is rejected, not accepted as "not applicable".
+        falseRejected: () => {
+            const [t] = validate({ ...minimal, itemizeEvenThoughLessThanStandardDeduction: false })
+            assertEq(t, 'error')
         },
     },
     crossDialect: {
