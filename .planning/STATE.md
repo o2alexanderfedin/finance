@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
 status: executing
-stopped_at: Plan 13-03 COMPLETE -- fjs/tax/params gains the OBBBA senior-deduction parameters (Public Law 119-21 section 70103); new fjs/schedule/1a computes Parts I/V/VI (continuous 6% phase-out, MFS short-circuit, per-spouse grant), standalone, not yet wired into Form 1040. fjs/tax/boundary's allThresholds grows 50 -> 58. TAX-09 NOT yet complete -- Plan 13-04 wires line 13b and reclassifies the kind.
-last_updated: "2026-08-11T03:12:15.539Z"
+stopped_at: "Plan 13-04 COMPLETE -- line13b wired to Schedule 1-A's real Part VI total; seniorAndOtherScheduleOneADeductions reclassified (modeledKinds 17, unmodeledKindRefusals 33); end-to-end proof closes TAX-09 (vertical slice 2). Next: Plan 13-05 (Slice 3, itemizing / Schedule A)."
+last_updated: "2026-08-11T03:42:59.623Z"
 last_activity: 2026-08-11
 progress:
   total_phases: 19
   completed_phases: 13
   total_plans: 75
-  completed_plans: 68
-  percent: 91
+  completed_plans: 69
+  percent: 92
 ---
 
 # Project State
@@ -30,7 +30,7 @@ Phase: 13 (The 65+ Profile and the Remaining Schedules) — EXECUTING
   Four plans across three waves. The plan set was returned ISSUES FOUND by
   `gsd-plan-checker` twice (2 blockers, then 2 more), revised each time, and only
   executed after a third pass returned VERIFICATION PASSED.
-Plan: 4 of 13
+Plan: 5 of 13
   Wave 1: 12.1-01 (Form 8949 category derivation + the absent-basis refusal) and
   12.1-02 (the 47-line Schedule D Tax Worksheet). Wave 2: 12.1-03 (Schedule D
   lines 1a-21, the loss-cap three-way branch, two bounded sub-worksheets).
@@ -41,7 +41,7 @@ Status: Ready to execute
   stopped after the final wave, so the phase has never been independently verified
   against its goal. That is the next action.
 
-Progress: [█████████░] 91%
+Progress: [█████████░] 92%
   Phase-based, never plan-based: `completed_plans` (65) exceeds `total_plans` (62)
   because three phases carry an extra FIX-SUMMARY.md beside a plan's own summary,
   which rounds the plan-based figure to a misleading 100%. See `percent_note`.
@@ -140,6 +140,7 @@ proofs and moves with submodule initialization state — which is exactly how a 
 | Phase 13 P01 | 35min | 2 tasks | 3 files |
 | Phase 13 P02 | 100min | 3 tasks | 6 files |
 | Phase 13 P03 | 35min | 2 tasks | 3 files |
+| Phase 13 P04 | 25min | 3 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -313,6 +314,9 @@ Full log in PROJECT.md Key Decisions. Recent decisions affecting current work:
 - [Phase 13]: 13-02: TAX-10 marked COMPLETE -- vertical slice 1 closes here; a 65+ return with SSA-1099 and 1099-R income computes real lines 4a-6b/25b and a correct AGI through the full form1040Report entry point
 - [Phase 13]: 13-03: The plan's own $174,999.99 -> $0.06 boundary example was wrong under correct half-up cent rounding; corrected against independently verified arithmetic -- the 6% rate is coarser than one cent of MAGI, so the floor/start boundary trios are legitimately flat at both points
 - [Phase 13]: 13-03: magiCents renamed to phaseoutIncomeCents before commit -- caught the forbidden lowercase 'magi' substring (Decision 3.6) during the plan's own verification sweep
+- [Phase 13]: 13-04: scheduleOneA's actual return shape is { partI, partV, partVI }, not the flat record the plan's own interfaces sketch described -- line13b reads scheduleOneAResult.partVI.line38, and the call also passes the required profile field the plan's four-field list omitted
+- [Phase 13]: 13-04: line13b's wiring is unconditional, not gated on declaredKinds -- the same design Plan 13-02 established for lines 3a/3b/4a-6b: a modeled line reports the facts, declaredKinds governs only whole-return refusal
+- [Phase 13]: 13-04: TAX-09 marked COMPLETE -- vertical slice 2 closes here, a 65+ TY2025 return's line 13b is a real Schedule 1-A figure through the full form1040Report entry point, mirroring slice 1's (TAX-10) precedent
 
 ### Pending Todos
 
@@ -457,10 +461,10 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-08-11T03:12:15.529Z
-Stopped at: Plan 13-03 COMPLETE -- fjs/tax/params gains the OBBBA senior-deduction parameters (Public Law 119-21 section 70103); new fjs/schedule/1a computes Parts I/V/VI (continuous 6% phase-out, MFS short-circuit, per-spouse grant), standalone, not yet wired into Form 1040. fjs/tax/boundary's allThresholds grows 50 -> 58. TAX-09 NOT yet complete -- Plan 13-04 wires line 13b and reclassifies the kind.
-Nothing is mid-edit. Next: Plan 13-04 (Wave 2 continued -- wire 1040 line 13b, reclassify
-seniorAndOtherScheduleOneADeductions, end-to-end proof closing TAX-09).
+Last session: 2026-08-11T03:42:59.607Z
+Stopped at: Plan 13-04 COMPLETE -- line13b wired to Schedule 1-A's real Part VI total; seniorAndOtherScheduleOneADeductions reclassified (modeledKinds 17, unmodeledKindRefusals 33); end-to-end proof closes TAX-09 (vertical slice 2). Next: Plan 13-05 (Slice 3, itemizing / Schedule A).
+Nothing is mid-edit. Next: Plan 13-05 (Wave 3 -- Slice 3, itemizing: vnd.fjs.itemized_deductions
+dialect, SALT cap/medical floor parameters, Schedule A line 18 election).
 
 > **An automated state write clobbered this block on 2026-08-09** (`stopped_at` replaced with
 > "context exhaustion at 75%", the continuity text truncated mid-sentence into a dangling
