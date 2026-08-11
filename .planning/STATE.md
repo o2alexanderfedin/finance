@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
-status: executing
-stopped_at: Completed 13-12-PLAN.md
-last_updated: "2026-08-11T06:30:45.363Z"
+status: verifying
+stopped_at: Completed 13-13-PLAN.md
+last_updated: "2026-08-11T06:50:13.434Z"
 last_activity: 2026-08-11
 progress:
   total_phases: 19
-  completed_phases: 13
+  completed_phases: 14
   total_plans: 75
-  completed_plans: 77
+  completed_plans: 78
   percent: 100
 ---
 
@@ -36,7 +36,7 @@ Plan: 13 of 13
   lines 1a-21, the loss-cap three-way branch, two bounded sub-worksheets).
   Wave 3: 12.1-04 (Form 1040 wiring FIRST, then the six-kind scope
   reclassification — the atomic transition — then mutation gates M3/M4/M5).
-Status: Ready to execute
+Status: Phase complete — ready for verification
   exists**. Every phase 01-12 has one. Execute-phase ran with `--no-transition` and
   stopped after the final wave, so the phase has never been independently verified
   against its goal. That is the next action.
@@ -149,6 +149,7 @@ proofs and moves with submodule initialization state — which is exactly how a 
 | Phase 13-the-65-profile-and-the-remaining-schedules P10 | 11min | 3 tasks | 3 files |
 | Phase 13-the-65-profile-and-the-remaining-schedules P11 | 30min | 2 tasks | 3 files |
 | Phase 13 P12 | 35min | 2 tasks | 1 files |
+| Phase 13 P13 | 20min | 3 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -343,6 +344,8 @@ Full log in PROJECT.md Key Decisions. Recent decisions affecting current work:
 - [Phase 13-11]: Schedule 3 line 11 (excess Social Security/tier-1 RRTA withheld) is a documented zero, not a W-2-derived computation, even though the underlying data exists in stored W-2s -- explicitly out of this phase's scope
 - [Phase 13]: No typedef/orderedLines/count-constant change: all six lines (8/10/17/20/23/31) already existed as declaredZero placeholders since Phase 10
 - [Phase 13]: No scope reclassification in 13-12: the five coarse Schedule 1/2/3 kinds stay in unmodeledKindRefusals -- modeledKinds/unmodeledKindRefusals stay 20/30
+- [Phase ?]: MAGI gate regex: [a-zA-Z]*[Mm]agi[a-zA-Z]* (case-insensitive on M/m, fixed lowercase agi), stronger than criterion 5's literal grep, matching 13-VALIDATION.md C-1's own verify command — criterion 5 is case-sensitive and misses camelCase Magi (carried finding C-1); the gate must catch identifier-level mixed-case while still permitting all-uppercase MAGI in prose
+- [Phase ?]: C-3 resolved via childTaxCredit docstring precision (verified-against-printed-form + governing-provision language), not a guessed Rev. Proc. number — research only confirmed Rev. Proc. 2025-32 section 2.03 for ctcAmount by full-document grep; odcAmount/actcCap/phaseoutThreshold have no confirmed Rev. Proc. citation, so guessing one would repeat the exact sourcing error Pitfall 5 names
 
 ### Pending Todos
 
@@ -487,8 +490,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-08-11T06:30:45.350Z
-Stopped at: Completed 13-12-PLAN.md
+Last session: 2026-08-11T06:50:13.426Z
+Stopped at: Completed 13-13-PLAN.md
 Nothing is mid-edit. Next: Plan 13-08 (Wave 4 -- Slice 4, dependents: return_profile
 dependents array, CTC/ODC/ACTC/phase-out parameters).
 
