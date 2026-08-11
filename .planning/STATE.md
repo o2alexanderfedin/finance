@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
 status: executing
-stopped_at: Completed 13-10-PLAN.md
-last_updated: "2026-08-11T05:58:04.446Z"
+stopped_at: Completed 13-11-PLAN.md
+last_updated: "2026-08-11T06:13:43.419Z"
 last_activity: 2026-08-11
 progress:
   total_phases: 19
   completed_phases: 13
   total_plans: 75
-  completed_plans: 75
+  completed_plans: 76
   percent: 100
 ---
 
@@ -30,7 +30,7 @@ Phase: 13 (The 65+ Profile and the Remaining Schedules) — EXECUTING
   Four plans across three waves. The plan set was returned ISSUES FOUND by
   `gsd-plan-checker` twice (2 blockers, then 2 more), revised each time, and only
   executed after a third pass returned VERIFICATION PASSED.
-Plan: 11 of 13
+Plan: 12 of 13
   Wave 1: 12.1-01 (Form 8949 category derivation + the absent-basis refusal) and
   12.1-02 (the 47-line Schedule D Tax Worksheet). Wave 2: 12.1-03 (Schedule D
   lines 1a-21, the loss-cap three-way branch, two bounded sub-worksheets).
@@ -147,6 +147,7 @@ proofs and moves with submodule initialization state — which is exactly how a 
 | Phase 13 P08 | 30min | 2 tasks | 2 files |
 | Phase 13 P09 | 55min | 1 tasks | 2 files |
 | Phase 13-the-65-profile-and-the-remaining-schedules P10 | 11min | 3 tasks | 3 files |
+| Phase 13-the-65-profile-and-the-remaining-schedules P11 | 30min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -337,6 +338,8 @@ Full log in PROJECT.md Key Decisions. Recent decisions affecting current work:
 - [Phase 13]: childTaxCreditPhaseoutIncome (13-09) written independently of seniorDeductionPhaseoutIncome/saltCapPhasedownIncome with its own docstring and a dedicated equality proof, TAX-15's fourth named income function
 - [Phase 13]: fjs/tax/boundary registers only the CTC/ODC phase-out's START threshold (2 entries) -- no floor entry, since line12's own STOP is the effective floor rather than a fixed income ceiling
 - [Phase 13-the-65-profile-and-the-remaining-schedules]: TAX-12: Schedule 8812 wired into 1040 lines 19/28 from one form8812() call sharing Part I and Part II-A state (Decision 4.3); childTaxCreditOrOtherDependents/additionalChildTaxCredit reclassified atomically (modeledKinds 20/unmodeledKindRefusals 30); sixtyFivePlusProfile -- the fixture this whole phase was written for -- now computes end to end, closing all four vertical slices
+- [Phase 13-11]: The five coarse kinds (scheduleOneAdditionalIncome, scheduleOneAdjustments, scheduleTwoTaxes, scheduleThreeNonrefundableCredits, scheduleThreeRefundableCredits) stay refused, not reclassified -- modeledKinds/unmodeledKindRefusals stay at 20/30
+- [Phase 13-11]: Schedule 3 line 11 (excess Social Security/tier-1 RRTA withheld) is a documented zero, not a W-2-derived computation, even though the underlying data exists in stored W-2s -- explicitly out of this phase's scope
 
 ### Pending Todos
 
@@ -481,8 +484,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-08-11T05:58:04.435Z
-Stopped at: Completed 13-10-PLAN.md
+Last session: 2026-08-11T06:13:43.410Z
+Stopped at: Completed 13-11-PLAN.md
 Nothing is mid-edit. Next: Plan 13-08 (Wave 4 -- Slice 4, dependents: return_profile
 dependents array, CTC/ODC/ACTC/phase-out parameters).
 
