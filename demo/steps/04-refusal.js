@@ -32,10 +32,10 @@ export const tier = 'must'
  * @type {readonly UnmodeledKind[]}
  */
 const offered = [
-    'pensionsAndAnnuities',
+    'unreportedTips',
     'scheduleOneAdditionalIncome',
-    'socialSecurityBenefits',
-    'iraDistributions',
+    'qualifiedBusinessIncomeDeduction',
+    'additionalChildTaxCredit',
     'itemizedDeductions',
     'childTaxCreditOrOtherDependents',
 ]

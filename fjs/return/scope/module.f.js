@@ -71,6 +71,28 @@
  *   anyone entitled to the exclusion — a confident wrong answer, the exact
  *   failure TAX-16 exists to prevent. Refusing is the honest, smaller option.
  *
+ * ## Slice 1's retirement and Social Security boundary, as of Phase 13 Wave 1
+ *
+ * Plan 13-02 wires `vnd.fjs.1099r` into 1040 lines 4a/4b (IRA) and 5a/5b
+ * (pensions), routed by each document's own `box7bIraSepSimple` checkbox;
+ * `vnd.fjs.ssa1099` into line 6a; and the 18-line Social Security Benefits
+ * Worksheet (`fjs/tax/ssb`) into line 6b. Line 25b also now sums
+ * `vnd.fjs.1099r` withholding alongside 1099-INT/1099-DIV/1099-B, which is
+ * why `federalTaxWithheldOnOther1099` moves together with the other three.
+ * Four kinds move from {@link unmodeledKindRefusals} to {@link modeledKinds}
+ * in this one atomic change: `iraDistributions`, `pensionsAndAnnuities`,
+ * `socialSecurityBenefits`, `federalTaxWithheldOnOther1099`.
+ *
+ * **The IRA-deduction circularity is NOT modeled by a coarse kind refusal.**
+ * 13-CONTEXT.md Decision 5.1: the frozen 50-kind vocabulary carries exactly
+ * one kind (`scheduleOneAdjustments`) for the whole of Schedule 1 Part II, so
+ * it cannot distinguish an IRA deduction (which creates the Pub. 590-A ↔
+ * taxable-Social-Security cycle) from an HSA or educator-expense adjustment,
+ * which does not. `iraDeductionDeclared`, a new field on
+ * `vnd.fjs.return_profile`, is what still refuses that one case — a
+ * document-data-sufficiency refusal threaded by `fjs/form1040/core` itself,
+ * never a `fjs/return/scope` kind.
+ *
  * @module
  */
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
@@ -83,15 +105,19 @@ import { kindVocabulary } from '../profile/module.f.js'
 // ── The frozen modeled set ───────────────────────────────────────────────────
 
 /**
- * The twelve kinds this engine models today, each with the document it
+ * The sixteen kinds this engine models today, each with the document it
  * actually reads. Frozen in `fjs/guest`'s sense: growing this list is a
  * deliberate act that must be paired with a deletion from
  * {@link unmodeledKindRefusals}, or {@link _EveryKindIsEitherModeledOrRefused}
  * fails to compile.
  *
  * Kept in {@link kindVocabulary} order so the two lists can be diffed against
- * the 1040 face rather than against memory. The last six entries are Plan
- * 12.1-04's own addition (12.1-CONTEXT.md Decision 1.1).
+ * the 1040 face rather than against memory. The six entries before
+ * `federalTaxWithheldOnW2` were Plan 12.1-04's own addition
+ * (12.1-CONTEXT.md Decision 1.1); `iraDistributions`, `pensionsAndAnnuities`,
+ * `socialSecurityBenefits` and `federalTaxWithheldOnOther1099` are Plan
+ * 13-02's own (Phase 13 Wave 1, TAX-10) — see this module's own docstring,
+ * "Slice 1's retirement and Social Security boundary".
  */
 export const modeledKinds = /** @type {const} */ ([
     'wages',                       // W-2 box 1                     -> 1040 line 1a
@@ -99,12 +125,16 @@ export const modeledKinds = /** @type {const} */ ([
     'taxableInterest',             // 1099-INT boxes 1 and 3        -> 1040 line 2b
     'qualifiedDividends',          // 1099-DIV box 1b                -> 1040 line 3a
     'ordinaryDividends',           // 1099-DIV box 1a                -> 1040 line 3b
+    'iraDistributions',            // 1099-R (box7bIraSepSimple)     -> 1040 lines 4a/4b
+    'pensionsAndAnnuities',        // 1099-R (not box7bIraSepSimple) -> 1040 lines 5a/5b
+    'socialSecurityBenefits',      // SSA-1099 box 5 + SSB worksheet -> 1040 lines 6a/6b
     'capitalGainDistributions',    // 1099-DIV box 2a                -> 1040 line 7a
     'capitalGainsOrLosses',        // Form 8949 + Schedule D          -> 1040 line 7a
     'unrecaptured1250Gain',        // 1099-DIV box 2b + Sch D worksheet -> Schedule D line 19
     'collectibles28RateGain',      // 1099-DIV box 2d + Sch D worksheet -> Schedule D line 18
     'federalTaxWithheldOnW2',      // W-2 box 2                     -> 1040 line 25a
     'federalTaxWithheldOn1099Int', // 1099-INT box 4                -> 1040 line 25b
+    'federalTaxWithheldOnOther1099', // 1099-R/1099-DIV/1099-B box 4 -> 1040 line 25b
     'estimatedTaxPayments',        // declared on the return profile -> 1040 line 26
 ])
 
@@ -127,7 +157,7 @@ const modeledKindNames = modeledKinds
 // ── The refusal table ────────────────────────────────────────────────────────
 
 /**
- * The thirty-eight declared kinds this engine does not model, each naming the
+ * The thirty-four declared kinds this engine does not model, each naming the
  * 1040 line that cannot be computed, a human label, and the remedy — the form
  * or schedule required and, where one exists, the requirement ID and phase
  * that will supply it. `10-RESEARCH.md`'s "Form 1040 Lines 1a-37" table is the
@@ -158,9 +188,6 @@ export const unmodeledKindRefusals = /** @type {const} */ ([
     { kind: 'form8919Wages', line: '1040 line 1g', label: 'Form 8919 wages', remedy: 'requires Form 8919 (no phase yet)' },
     { kind: 'otherEarnedIncome', line: '1040 line 1h', label: 'other earned income', remedy: 'no dialect models it (Phase 13)' },
     { kind: 'nontaxableCombatPayElection', line: '1040 line 1i', label: 'nontaxable combat pay election', remedy: 'no dialect models it (no phase yet)' },
-    { kind: 'iraDistributions', line: '1040 lines 4a/4b', label: 'IRA distributions', remedy: 'requires vnd.fjs.1099r (DOC-09, Phase 11)' },
-    { kind: 'pensionsAndAnnuities', line: '1040 lines 5a/5b', label: 'pensions and annuities', remedy: 'requires vnd.fjs.1099r (DOC-09, Phase 11)' },
-    { kind: 'socialSecurityBenefits', line: '1040 lines 6a/6b', label: 'social security benefits', remedy: 'requires vnd.fjs.ssa1099 and the Social Security Benefits Worksheet (TAX-10, Phase 13)' },
     { kind: 'section1202Gain', line: 'Form 1099-DIV box 2c', label: 'section 1202 gain', remedy: 'requires the §1202 exclusion percentage, which no 1099-DIV box carries (no phase yet)' },
     { kind: 'investmentInterestForm4952', line: 'Form 4952 line 4g', label: 'investment interest expense election', remedy: 'requires Form 4952 and the Schedule D Tax Worksheet (TAX-11, Phase 12)' },
     { kind: 'scheduleOneAdditionalIncome', line: '1040 line 8', label: 'additional income from Schedule 1', remedy: 'requires Schedule 1 (TAX-14, Phase 13)' },
@@ -172,7 +199,6 @@ export const unmodeledKindRefusals = /** @type {const} */ ([
     { kind: 'scheduleTwoTaxes', line: '1040 lines 17 and 23', label: 'additional taxes from Schedule 2', remedy: 'requires Schedule 2 (TAX-14, Phase 13)' },
     { kind: 'childTaxCreditOrOtherDependents', line: '1040 line 19', label: 'child tax credit or credit for other dependents', remedy: 'requires Schedule 8812 (TAX-12, Phase 13)' },
     { kind: 'scheduleThreeNonrefundableCredits', line: '1040 line 20', label: 'nonrefundable credits from Schedule 3', remedy: 'requires Schedule 3 (TAX-14, Phase 13)' },
-    { kind: 'federalTaxWithheldOnOther1099', line: '1040 line 25b', label: 'federal income tax withheld on Forms 1099 other than 1099-INT', remedy: 'requires vnd.fjs.1099r, vnd.fjs.1099div or vnd.fjs.1099b (Phases 11 and 12)' },
     { kind: 'federalTaxWithheldOnOtherForms', line: '1040 line 25c', label: 'federal income tax withheld on other forms', remedy: 'no dialect models it (Phase 13)' },
     { kind: 'earnedIncomeCredit', line: '1040 line 27a', label: 'earned income credit', remedy: 'requires Schedule EIC (no phase yet)' },
     { kind: 'additionalChildTaxCredit', line: '1040 line 28', label: 'additional child tax credit', remedy: 'requires Schedule 8812 (TAX-12, Phase 13)' },
@@ -280,7 +306,7 @@ export const unmodeledKindRefusals = /** @type {const} */ ([
  * unmodeled is no better than the silence it replaces. Nothing but this
  * module's compiled-in strings reaches the message: no taxpayer amount, name or
  * document hash can be carried out through it (T-10-07-04), which the
- * hand-typed {@link expectedSocialSecurityRefusalMessage} pins exactly.
+ * hand-typed {@link expectedUnreportedTipsRefusalMessage} pins exactly.
  *
  * The order is {@link kindVocabulary}'s (1040 form order), obtained by walking
  * {@link unmodeledKindRefusals} rather than by sorting the argument, so two
@@ -342,10 +368,11 @@ export const classifyScope = declaredKinds => {
  * today. Deliberately NOT `modeledKinds.length` — if it were, adding or
  * dropping a kind would move both sides together and this check could never
  * fail. The duplication is the mechanism, not a smell (AGENTS.md). `6 -> 12`
- * is Plan 12.1-04's own six-kind reclassification.
+ * was Plan 12.1-04's own six-kind reclassification; `12 -> 16` is Plan
+ * 13-02's own four-kind reclassification (Phase 13 Wave 1, TAX-10).
  * @type {number}
  */
-const expectedModeledKindCount = 12
+const expectedModeledKindCount = 16
 
 /**
  * Independently hand-typed: the number of entries
@@ -356,19 +383,31 @@ const expectedModeledKindCount = 12
  * table. A loop over a collection derived from the code under test can never
  * notice that collection shrinking — the project's fourth instance of the
  * signature defect, found this phase in `unknownDialectRefused`'s
- * `Object.keys(dialectSchemas)` loop. `50 - 12 = 38` is asserted here against
+ * `Object.keys(dialectSchemas)` loop. `50 - 16 = 34` is asserted here against
  * `kindVocabulary.length`, which `fjs/return/profile` in turn pins against its
- * own hand-typed `50`. `44 -> 38` is Plan 12.1-04's own six-kind
- * reclassification.
+ * own hand-typed `50`. `44 -> 38` was Plan 12.1-04's own six-kind
+ * reclassification; `38 -> 34` is Plan 13-02's own four-kind reclassification.
  * @type {number}
  */
-const expectedUnmodeledKindCount = 38
+const expectedUnmodeledKindCount = 34
 
 /**
  * The complete refusal message for a return declaring exactly
- * `socialSecurityBenefits` — hand-typed here, character for character, from
+ * `unreportedTips` — hand-typed here, character for character, from
  * the fields the refusal table carries rather than produced by running
  * {@link scopeRefusal} and pasting what came out.
+ *
+ * **Re-pointed from `socialSecurityBenefits` to `unreportedTips` by Plan
+ * 13-02.** `socialSecurityBenefits` moved from {@link unmodeledKindRefusals}
+ * to {@link modeledKinds} in this plan's own Task 2 (Phase 13 Wave 1,
+ * TAX-10), so the example this constant pinned no longer refuses at all —
+ * an unused local under `noUnusedLocals: true` (TS6133, a `tsc` failure, not
+ * a test failure) the instant its last reference goes away. `unreportedTips`
+ * stays refused for the rest of this phase (Decision 1.4; its remedy string
+ * is one of the five NOT corrected until Wave 5), so it is the control kind
+ * every leaf below is re-pointed at — the identical assertions (whole-
+ * message format, structured-`unmodeled` pin, bare-value shape) preserved
+ * verbatim, per this plan's own instruction never to delete this coverage.
  *
  * It is the strongest single statement of two properties at once. It pins the
  * message FORMAT, so the line, the label and the remedy cannot silently swap
@@ -377,25 +416,25 @@ const expectedUnmodeledKindCount = 38
  * with no room for a taxpayer amount, name or document hash to ride along.
  * @type {string}
  */
-const expectedSocialSecurityRefusalMessage
+const expectedUnreportedTipsRefusalMessage
     = 'scope refusal: this return declares 1 kind(s) this engine does not model, '
-    + 'so no Form 1040 is produced; socialSecurityBenefits at 1040 lines 6a/6b '
-    + '(social security benefits): requires vnd.fjs.ssa1099 and the Social '
-    + 'Security Benefits Worksheet (TAX-10, Phase 13)'
+    + 'so no Form 1040 is produced; unreportedTips at 1040 line 1c '
+    + '(unreported tips): requires Form 4137 (no phase yet)'
 
 export const proof = {
     partition: {
         // Both counts against hand-typed constants, and their sum against the
-        // vocabulary this module partitions -- so the 12/38 split cannot
+        // vocabulary this module partitions -- so the 16/34 split cannot
         // drift by a kind quietly migrating from one list to the other. This
         // IS the hand-typed count-guard Mutation Gate M4 (Plan 12.1-04 Task
-        // 3) targets: removing one entry from `modeledKinds` without
-        // touching `expectedModeledKindCount` must redden this leaf.
-        modeledKindsIsExactlyTwelve: () => {
+        // 3, re-verified live by Plan 13-02's own four-kind move) targets:
+        // removing one entry from `modeledKinds` without touching
+        // `expectedModeledKindCount` must redden this leaf.
+        modeledKindsIsExactlySixteen: () => {
             assertEq(modeledKinds.length, expectedModeledKindCount)
             assertEq(new Set(modeledKinds).size, expectedModeledKindCount)
         },
-        unmodeledRefusalsIsExactlyThirtyEight: () => {
+        unmodeledRefusalsIsExactlyThirtyFour: () => {
             assertEq(unmodeledKindRefusals.length, expectedUnmodeledKindCount)
             assertEq(
                 new Set(unmodeledKindRefusals.map(r => r.kind)).size,
@@ -470,53 +509,78 @@ export const proof = {
             const outcome = classifyScope([])
             assertEq(outcome.kind, 'ok', ['declaring nothing must be in scope', outcome])
         },
-        // All twelve modeled kinds, hand-typed rather than read from
+        // All sixteen modeled kinds, hand-typed rather than read from
         // `modeledKinds`, so this leaf states independently what the engine
         // claims to be able to compute.
-        allTwelveModeledKindsDeclaredTogetherAreInScope: () => {
+        allSixteenModeledKindsDeclaredTogetherAreInScope: () => {
             const outcome = classifyScope([
                 'wages',
                 'taxExemptInterest',
                 'taxableInterest',
                 'qualifiedDividends',
                 'ordinaryDividends',
+                'iraDistributions',
+                'pensionsAndAnnuities',
+                'socialSecurityBenefits',
                 'capitalGainDistributions',
                 'capitalGainsOrLosses',
                 'unrecaptured1250Gain',
                 'collectibles28RateGain',
                 'federalTaxWithheldOnW2',
                 'federalTaxWithheldOn1099Int',
+                'federalTaxWithheldOnOther1099',
                 'estimatedTaxPayments',
             ])
-            assertEq(outcome.kind, 'ok', ['the twelve modeled kinds must be in scope', outcome])
+            assertEq(outcome.kind, 'ok', ['the sixteen modeled kinds must be in scope', outcome])
+        },
+        // Plan 13-02's own four newly-reclassified kinds, declared TOGETHER
+        // and WITHOUT any of the other twelve — the atomic transition's own
+        // acceptance criterion, isolated from the leaf above so a failure
+        // here localizes to exactly these four.
+        theFourKindsThisPlanReclassifiedAreInScopeTogether: () => {
+            const outcome = classifyScope([
+                'iraDistributions',
+                'pensionsAndAnnuities',
+                'socialSecurityBenefits',
+                'federalTaxWithheldOnOther1099',
+            ])
+            assertEq(outcome.kind, 'ok', ['the four newly-modeled kinds must be in scope', outcome])
         },
         // The gate. Its control is the leaf immediately below, which is this
-        // same declaration with `socialSecurityBenefits` removed -- without it,
-        // a guard that refused EVERY profile would pass this leaf.
+        // same declaration with `unreportedTips` removed -- without it, a
+        // guard that refused EVERY profile would pass this leaf.
+        //
+        // Re-pointed from `socialSecurityBenefits` to `unreportedTips` by
+        // Plan 13-02 (see {@link expectedUnreportedTipsRefusalMessage} for
+        // why): `socialSecurityBenefits` moved to {@link modeledKinds} in
+        // this plan's own Task 2, so the example this gate exercised no
+        // longer refuses at all. `unreportedTips` stays refused for the rest
+        // of this phase and is not one of the five stale-remedy kinds Wave 5
+        // corrects (Decision 1.4).
         //
         // Content, not merely refusal (AGENTS.md, and Phase 9's sweep, which
         // found several assertions checking THAT a refusal happened rather than
         // what it said): the structured `unmodeled` field is asserted element
         // by element, and the line, the label and the remedy are three separate
         // `includes` calls so a failure names which part went missing.
-        socialSecurityBenefitsRefusesNamingItsLineLabelAndRemedy: () => {
-            const outcome = classifyScope(['wages', 'taxableInterest', 'socialSecurityBenefits'])
+        unreportedTipsRefusesNamingItsLineLabelAndRemedy: () => {
+            const outcome = classifyScope(['wages', 'taxableInterest', 'unreportedTips'])
             assert(
                 outcome.kind === 'error',
                 ['a declared unmodeled kind must refuse the whole return', outcome],
             )
             assertEq(outcome.unmodeled.length, 1, ['expected exactly one unmodeled kind', outcome.unmodeled])
-            assertEq(outcome.unmodeled[0], 'socialSecurityBenefits', ['expected the declared kind named', outcome.unmodeled])
+            assertEq(outcome.unmodeled[0], 'unreportedTips', ['expected the declared kind named', outcome.unmodeled])
             assert(
-                outcome.message.includes('1040 lines 6a/6b'),
+                outcome.message.includes('1040 line 1c'),
                 ['expected the refusal to name the 1040 line', outcome.message],
             )
             assert(
-                outcome.message.includes('social security benefits'),
+                outcome.message.includes('unreported tips'),
                 ['expected the refusal to name the human label', outcome.message],
             )
             assert(
-                outcome.message.includes('vnd.fjs.ssa1099'),
+                outcome.message.includes('Form 4137'),
                 ['expected the refusal to name the remedy', outcome.message],
             )
         },
@@ -524,19 +588,19 @@ export const proof = {
         // unmodeled kind computes. A gate that refuses everything passes every
         // refusal proof ever written and nothing else; this is what
         // distinguishes this guard from that one.
-        controlTheSameDeclarationWithoutSocialSecurityBenefitsIsInScope: () => {
+        controlTheSameDeclarationWithoutUnreportedTipsIsInScope: () => {
             const outcome = classifyScope(['wages', 'taxableInterest'])
             assertEq(outcome.kind, 'ok', ['the same profile minus the unmodeled kind must compute', outcome])
         },
         // The exact sentence, against a hand-typed expectation. See
-        // {@link expectedSocialSecurityRefusalMessage} for why a whole-message
+        // {@link expectedUnreportedTipsRefusalMessage} for why a whole-message
         // assertion earns its brittleness twice over.
         theRefusalMessageIsExactlyTheHandTypedSentence: () => {
-            const outcome = classifyScope(['socialSecurityBenefits'])
+            const outcome = classifyScope(['unreportedTips'])
             assert(outcome.kind === 'error', ['expected a refusal', outcome])
             assertEq(
                 outcome.message,
-                expectedSocialSecurityRefusalMessage,
+                expectedUnreportedTipsRefusalMessage,
                 ['the refusal message must be exactly the hand-typed sentence', outcome.message],
             )
         },
@@ -602,20 +666,20 @@ export const proof = {
                 ['the same declared kinds must produce the same message', declaredOneWay.message, declaredTheOther.message],
             )
         },
-        // Every one of the thirty-eight refuses on its own, naming its own
+        // Every one of the thirty-four refuses on its own, naming its own
         // line and label -- so no entry can be present in the table yet
         // unreachable through the guard. `section1202Gain` and
         // `investmentInterestForm4952` are both still in this table (Plan
-        // 12.1-04's own T-12.1-01 control), so this loop is also the ongoing
-        // re-verification that both still refuse after the six-kind
-        // reclassification.
+        // 12.1-04's own T-12.1-01 control, re-verified again by Plan 13-02's
+        // own four-kind reclassification), so this loop is also the ongoing
+        // re-verification that both still refuse.
         //
         // This loop iterates the code under test, which by itself could never
         // notice the table SHRINKING: an entry deleted disappears from the loop
         // in the same instant (the project's fourth signature defect, found
         // this phase in a proof looping `Object.keys(dialectSchemas)`). Two
         // things stand behind it, both independent of this table:
-        // `unmodeledRefusalsIsExactlyThirtyEight`'s hand-typed count, and
+        // `unmodeledRefusalsIsExactlyThirtyFour`'s hand-typed count, and
         // `_EveryKindIsEitherModeledOrRefused`, which makes a deletion a `tsc`
         // failure. What the loop adds is reachability, which neither of those
         // can see; the CONTENT of two entries is pinned by the hand-typed
@@ -650,8 +714,12 @@ export const proof = {
         // branching on an `Error` instance would miss every one of them, so
         // this pins the shape the consumers in Plans 10-08 and 10-10 may rely
         // on: a plain object, a string message, a real array.
+        //
+        // Re-pointed from `socialSecurityBenefits` to `unreportedTips` by
+        // Plan 13-02, same reason as this file's other three re-pointed
+        // leaves (see {@link expectedUnreportedTipsRefusalMessage}).
         refusalIsABareValueShapeNotAnError: () => {
-            const outcome = classifyScope(['socialSecurityBenefits'])
+            const outcome = classifyScope(['unreportedTips'])
             assert(outcome.kind === 'error', ['expected a refusal', outcome])
             assertEq(typeof outcome.message, 'string', ['message must be a string', outcome])
             assert(Array.isArray(outcome.unmodeled), ['unmodeled must be an array', outcome])

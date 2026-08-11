@@ -2475,39 +2475,53 @@ export const proof = {
             )
         },
         // A second, independent refusal, on a kind whose remedy is a missing
-        // DIALECT rather than a missing worksheet: social security benefits
-        // need `vnd.fjs.ssa1099`, which no phase has shipped. Its control is
-        // `controlTheSameDeclarationWithoutSocialSecurityBenefitsComputes`
+        // FORM rather than a missing worksheet: unreported tips need Form
+        // 4137, which no phase has shipped. Its control is
+        // `controlTheSameDeclarationWithoutUnreportedTipsComputes`
         // immediately below.
-        socialSecurityBenefitsRefuseTheWholeReportNamingTheLineAndTheDialect: () => {
+        //
+        // Re-pointed from `socialSecurityBenefits` to `unreportedTips` by
+        // Plan 13-02 (Phase 13 Wave 1, TAX-10): `socialSecurityBenefits`
+        // moved to `fjs/return/scope`'s `modeledKinds` in this plan's own
+        // Task 2, so declaring it no longer refuses at all — this leaf's
+        // whole premise (a coarse-kind refusal naming a missing dialect)
+        // stopped being true the instant the kind was reclassified. The
+        // PROPERTY this leaf proves — `form1040Report` threads a
+        // `fjs/return/scope` refusal end to end, naming the kind, the line
+        // and the remedy — is preserved verbatim against `unreportedTips`,
+        // which stays refused for the rest of this phase (Decision 1.4).
+        // `socialSecurityBenefits` itself now has its OWN "actually computes"
+        // coverage: `retirementAndSocialSecurityBeforeTheScopeReclassificationLands`
+        // above and `wave1RetirementAndSocialSecurity` below.
+        unreportedTipsRefuseTheWholeReportNamingTheLineAndTheRemedy: () => {
             const outcome = form1040Report(taxParams2025)(inputsOf(storedProfile({
                 ...singleProfile,
-                declaredKinds: ['wages', 'taxableInterest', 'socialSecurityBenefits'],
+                declaredKinds: ['wages', 'taxableInterest', 'unreportedTips'],
             }))([w2Document('sha256-w2-01')('50000.00')])([])([])([])([])([]))
             assert(outcome.kind === 'error', ['a declared unmodeled kind must refuse', outcome])
             assertEq(outcome.unmodeled.length, 1, ['expected exactly one unmodeled kind', outcome.unmodeled])
-            assertEq(outcome.unmodeled[0], 'socialSecurityBenefits', ['expected the declared kind named', outcome.unmodeled])
+            assertEq(outcome.unmodeled[0], 'unreportedTips', ['expected the declared kind named', outcome.unmodeled])
             assert(
-                outcome.message.includes('1040 lines 6a/6b'),
-                ['expected the refusal to name the 1040 lines', outcome.message],
+                outcome.message.includes('1040 line 1c'),
+                ['expected the refusal to name the 1040 line', outcome.message],
             )
             assert(
-                outcome.message.includes('vnd.fjs.ssa1099'),
-                ['expected the refusal to name the missing dialect', outcome.message],
+                outcome.message.includes('Form 4137'),
+                ['expected the refusal to name the missing form', outcome.message],
             )
         },
-        // THE CONTROL for the leaf above: the same return with social security
-        // benefits removed from the declaration computes, and its lines 6a and
-        // 6b are legitimately zero rather than refused. That distinction — a
-        // zero the taxpayer declared versus an input the engine cannot model —
-        // is the entire reason the return profile exists (Decision 4).
-        controlTheSameDeclarationWithoutSocialSecurityBenefitsComputes: () => {
+        // THE CONTROL for the leaf above: the same return with unreported
+        // tips removed from the declaration computes, and its own line 1c is
+        // legitimately zero rather than refused. That distinction — a zero
+        // the taxpayer declared versus an input the engine cannot model — is
+        // the entire reason the return profile exists (Decision 4).
+        controlTheSameDeclarationWithoutUnreportedTipsComputes: () => {
             const outcome = form1040Report(taxParams2025)(
                 inputsOf(storedProfile(singleProfile))([
                     w2Document('sha256-w2-01')('50000.00'),
                 ])([])([])([])([])([]))
             assert(outcome.kind === 'ok', ['dropping the unmodeled kind must compute', outcome])
-            assertEq(lineRuled(outcome.lines)('1040 line 6b').value, 0n, 'legitimately zero, not refused')
+            assertEq(lineRuled(outcome.lines)('1040 line 1c').value, 0n, 'legitimately zero, not refused')
             assertEq(lineRuled(outcome.lines)('1040 line 15').value, 3425000n, '$50,000 less $15,750')
         },
         // T-10-10-02, asserted STRUCTURALLY rather than by inspecting a
@@ -3018,37 +3032,40 @@ export const proof = {
                     [])([])([])([])([])([]))
             assertEq(outcome.kind, 'ok', ['expected the flag to be gated, not crash', outcome])
         },
-        // The inertness this task's own acceptance criteria names explicitly:
-        // TODAY, with `iraDistributions` and `pensionsAndAnnuities` still in
-        // `unmodeledKindRefusals`, a return DECLARING either kind still
-        // refuses at `classifyScope` — before this task's own document-
-        // reading wiring is ever reached. `socialSecurityBenefits`'s own
-        // sibling control is the pre-existing
-        // `socialSecurityBenefitsRefuseTheWholeReportNamingTheLineAndTheDialect`
-        // leaf (`form1040Report` section, above), unchanged by this task.
-        iraDistributionsAndPensionsAndAnnuitiesStillRefuseAtDeclarationUntilReclassified: () => {
-            const iraOutcome = form1040Report(taxParams2025)(inputsOf(storedProfile({
+        // Task 2 has landed: `iraDistributions` and `pensionsAndAnnuities`
+        // are MODELED kinds now (`fjs/return/scope`'s `modeledKinds`), so
+        // `classifyScope` no longer refuses a return declaring either —
+        // rewritten IN PLACE from this task's own original "still refuses"
+        // assertion (the mechanical adaptation this file's own Schedule D
+        // absent-basis leaf, above, already narrates for the identical
+        // situation one reclassification earlier). Declaring both together
+        // through the FULL `form1040Report(...)` entry point now computes a
+        // real, non-placeholder line 4a/4b and 5a/5b from stored 1099-Rs —
+        // the property Task 3's own end-to-end proof (below) also covers at
+        // the whole-return level, so this leaf keeps the narrower, faster
+        // check: the scope guard specifically stops refusing.
+        iraDistributionsAndPensionsAndAnnuitiesNowComputeThroughTheFullReport: () => {
+            const iraForm = retirementDocument('sha256-r-ira-t2')({
+                box1GrossDistribution: '5000.00',
+                box2aTaxableAmount: '4000.00',
+                box7bIraSepSimple: true,
+            })
+            const pensionForm = retirementDocument('sha256-r-pension-t2')({
+                box1GrossDistribution: '3000.00',
+                box2aTaxableAmount: '3000.00',
+            })
+            const outcome = form1040Report(taxParams2025)(inputsOf(storedProfile({
                 ...singleProfile,
-                declaredKinds: ['wages', 'taxableInterest', 'iraDistributions'],
-            }))([])([])([])([])([])([]))
-            assert(iraOutcome.kind === 'error', ['expected iraDistributions to still refuse today', iraOutcome])
-            if (iraOutcome.kind !== 'error') {
-                throw ['expected error', iraOutcome]
+                declaredKinds: ['wages', 'taxableInterest', 'iraDistributions', 'pensionsAndAnnuities'],
+            }))([])([])([])([])([iraForm, pensionForm])([]))
+            assert(outcome.kind === 'ok', ['expected both kinds to compute now', outcome])
+            if (outcome.kind !== 'ok') {
+                throw ['expected ok', outcome]
             }
-            assertEq(iraOutcome.unmodeled[0], 'iraDistributions')
-
-            const pensionOutcome = form1040Report(taxParams2025)(inputsOf(storedProfile({
-                ...singleProfile,
-                declaredKinds: ['wages', 'taxableInterest', 'pensionsAndAnnuities'],
-            }))([])([])([])([])([])([]))
-            assert(
-                pensionOutcome.kind === 'error',
-                ['expected pensionsAndAnnuities to still refuse today', pensionOutcome],
-            )
-            if (pensionOutcome.kind !== 'error') {
-                throw ['expected error', pensionOutcome]
-            }
-            assertEq(pensionOutcome.unmodeled[0], 'pensionsAndAnnuities')
+            assertEq(lineRuled(outcome.lines)('1040 line 4a').value, 500000n, '$5,000.00 IRA gross distribution')
+            assertEq(lineRuled(outcome.lines)('1040 line 4b').value, 400000n, '$4,000.00 IRA taxable amount')
+            assertEq(lineRuled(outcome.lines)('1040 line 5a').value, 300000n, '$3,000.00 pension gross distribution')
+            assertEq(lineRuled(outcome.lines)('1040 line 5b').value, 300000n, '$3,000.00 pension taxable amount')
         },
     },
     // 12.1-VERIFICATION.md's WARNING, second half: no COMMITTED,
