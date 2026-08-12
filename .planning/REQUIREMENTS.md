@@ -648,9 +648,9 @@ them. Week 0 is research's addition in front of the plan's Week 1.
 | PROV-03 | T1 | Phase 7 - `fjs_run` and Run Records | Week 1 | Complete |
 | PROV-04 | T2 | Phase 14 - Acceptance | Week 4 | Pending |
 | PROV-05 | T2 | Phase 14 - Acceptance | Week 4 | Pending |
-| PROV-06 | T3 | Phase 15 - Realism Polish and Upstream | Week 5 | Pending |
+| PROV-06 | T3 | Phase 15 - Realism Polish and Upstream | Week 5 | Complete |
 | PROV-07 | T2 | Phase 9 - Traceable Report Lines | Week 2 | Complete |
-| PROV-08 | T3 | Phase 15 - Realism Polish and Upstream | Week 5 | Pending |
+| PROV-08 | T3 | Phase 15 - Realism Polish and Upstream | Week 5 | Complete |
 | SEC-01 | T0 | Phase 2 - Server Skeleton and Registration | Week 0 | Done |
 | SEC-02 | T1 | Phase 6 - Guest ABI and Materialization | Week 1 | Complete |
 | SEC-03 | T1 | Phase 6 - Guest ABI and Materialization | Week 1 | Complete |
