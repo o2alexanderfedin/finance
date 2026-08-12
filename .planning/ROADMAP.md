@@ -687,7 +687,7 @@ decision was postponed, not made. MAINT-01 stays open and this phase stays in th
 **Research**: No — the mechanisms (`vnd.fjs.run`, `programHash`, Evo revisions, `fjs/report/line`) all exist and are proven. This is wiring and proof work, not investigation.
 **Plans**: 3 plans across 3 waves
 - [x] 19-01-PLAN.md — EXEC-13/PROV-04 foundations: fjs/report/provenance/module.f.js (paramSetHash, reviewedEstimateFraming, the acceptance predicate)
-- [ ] 19-02-PLAN.md — PROV-04/EXEC-13 wiring: taxYear on fjs_run's schema/record/response across every existing call site, plus Mutation Gate M2
+- [x] 19-02-PLAN.md — PROV-04/EXEC-13 wiring: taxYear on fjs_run's schema/record/response across every existing call site, plus Mutation Gate M2
 - [ ] 19-03-PLAN.md — PROV-05: the real-process control-then-pinned byte-identical reproduction proof, plus Mutation Gate M1
 
 ---
@@ -728,7 +728,7 @@ is deferred, so three phases remain, and two reasons override the numeric defaul
 | 16. The Orphan Ingestion Island | Backlog | 0/TBD | **Deferred** (owner, 2026-08-12) | - |
 | 17. Documentation Truth Pass | Backlog | 0/TBD | Not started | - |
 | 18. Dependency and Duplication Debt | Backlog | 0/TBD | Not started | - |
-| 19. Reproducibility and Report Provenance | Week 4 | 1/3 | In Progress | - |
+| 19. Reproducibility and Report Provenance | Week 4 | 2/3 | In Progress | - |
 
 > **Phase 12.1 was missing from this table** until 2026-08-12, which is why plan totals
 > computed from it came out four short. Added from measurement.

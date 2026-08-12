@@ -4,7 +4,7 @@ milestone: v1.1
 milestone_name: milestone
 status: shipped
 stopped_at: Phase 15 complete, reviewed, verified 5/5, and merged to develop (PR #63). Clean boundary before Phase 16.
-last_updated: "2026-08-12T06:41:00.000Z"
+last_updated: "2026-08-12T09:15:00.000Z"
 last_activity: 2026-08-12
 progress:
   total_phases: 20
@@ -413,6 +413,9 @@ Full log in PROJECT.md Key Decisions. Recent decisions affecting current work:
 - [Phase 19-01]: paramSetHash's jsonText(taxParamSet) call needs NO JsonUnknown cast, contradicting 19-PATTERNS.md's own excerpt -- verified against the live fjs/server/finance_tax_params/module.f.js:157 precedent (jsonText(response), a TaxParamSet-shaped value including the ceiling: string | undefined required-field case) and confirmed empirically with npx tsc --noEmit before finalizing
 - [Phase 19-01]: countsTowardReproducibilityAcceptance reads run.pinned alone and deliberately does not re-derive fjs/run/module.f.js's checkReferences both-or-neither invariant -- verified independently load-bearing per arm by mutation (run.pinned || true reddens only rejectsAnUnpinnedRun)
 - [Phase 19-01]: matchesFileCassOwnHashOfTheIdenticalBytes is the ONLY leaf that catches paramSetHash's derivation drifting from the exact primitive fileCas uses on identical bytes -- confirmed by a computeSync(sha256)([bytes, bytes]) mutation that reddened that one leaf alone, none of the other three
+- [Phase 19-02]: fjs/report/provenance/module.f.js's own unpinnedRun TEST-FIXTURE (shipped by 19-01, typed @type {Run} directly) is a FIFTH Run-literal-construction population, missed by the plan's and the earlier plan-check's four-file enumeration because it postdates both -- found by re-deriving the population via `grep -rn "pinned:" fjs *.js` rather than trusting either the plan's checklist or the prior plan-check's grep, and fixed in the same atomic commit as a Rule 3 blocking-issue auto-fix
+- [Phase 19-02]: Mutation Gate M2 (&& -> ||) reddens exactly the one leaf 19-VALIDATION.md's corrected gate table names (fjsRunTool.pinIntegrity.subjectOnlyWithoutParentsPersistsPinnedFalse) via handleRunOutcome's own record-assembly assert firing on the mixed-pin case, before any Run value is built -- countsTowardReproducibilityAcceptance's own two proof leaves independently confirmed to stay green under the identical mutation, positively confirming the structurally-unreachable-input claim rather than merely observing an absence of failure
+- [Phase 19-02]: The responseShape and sizeGuard proofs both hand-count fjs_run's envelope keys (six -> ten); both updated in this plan's own commit rather than left to silently under-cover the widened envelope
 
 ### Pending Todos
 
@@ -703,14 +706,25 @@ Measured on `e36ef1a`: `tsc` clean, **6166/6166 passing, 0 failures, 0 cancelled
 Autonomous run in progress, executing **19 → 18 → 17** (see the ordering rationale above).
 
 - **Phase 19 — Reproducibility and Report Provenance** (Week 4, T2, EXEC-13/PROV-04/PROV-05).
-  CONTEXT/PATTERNS/VALIDATION and Plans 19-01/19-02 written 2026-08-12. ROADMAP marks it
-  **Research: No** — every mechanism it needs already ships and is proven.
+  CONTEXT/PATTERNS/VALIDATION and Plans 19-01/19-02/19-03 written 2026-08-12. ROADMAP marks
+  it **Research: No** — every mechanism it needs already ships and is proven.
   **Plan 19-01 executed and committed** (`d42cc2d`): `fjs/report/provenance/module.f.js` —
   `paramSetHash`, `reviewedEstimateFraming`, `countsTowardReproducibilityAcceptance`, all 7
-  proof leaves mutation-gate-verified. See `19-01-SUMMARY.md`. Zero consumers yet — Plan
-  19-02 wires it into `fjs_run`; Plan 19-03 (not yet written) wires the acceptance predicate
-  into the real-process reproducibility proof. `npm test` 6310/6310; de-duplicated
-  project-local proofs 907 → 914.
+  proof leaves mutation-gate-verified. See `19-01-SUMMARY.md`.
+  **Plan 19-02 executed and committed** (`7a58c76`): `runSchema`/`fjsRunInputSchema` widened
+  with required `taxYear`/`paramSetHash`; `fjs_run`'s response envelope and persisted
+  `vnd.fjs.run` record both now carry `taxYear`/`paramSetHash`/`programHash`/
+  `reviewedEstimateFraming` alongside the existing six/eight keys; an unknown `taxYear` is
+  refused by name before `executeRun` ever runs. All four independent Run-shaped-literal/
+  call-site populations updated in the one commit, plus a fifth population
+  (`fjs/report/provenance/module.f.js`'s own `unpinnedRun` fixture, shipped by 19-01 after
+  the plan's population enumeration was frozen) found and fixed the same way. Mutation Gate
+  M2 performed and confirmed against 19-VALIDATION.md's corrected red set (observation only,
+  no code change survives it — `&&`/`||` restored byte-identical). See `19-02-SUMMARY.md`.
+  PROV-04 marked complete; EXEC-13 stays Pending (its second sentence needs 19-03's gate).
+  Plan 19-03 wires the acceptance predicate into the real-process reproducibility proof
+  (PROV-05) and performs Mutation Gate M1. `npm test` 6314/6314; de-duplicated project-local
+  proofs 907 → 916 (914 → 916 this plan, +2 for the two new taxYearHandling leaves).
 - **Phase 18 — Dependency and Duplication Debt** (Backlog, T3, MAINT-06…08).
 - **Phase 17 — Documentation Truth Pass** (Backlog, T3, MAINT-02…05). Its criterion 5 is the
   requirement count, which read **79** in ROADMAP's Coverage table and **83** in
@@ -721,4 +735,4 @@ Autonomous run in progress, executing **19 → 18 → 17** (see the ordering rat
 
 **Phase 16** is deferred and **Phase 14** is skipped; neither is part of this run.
 
-Resume file: None — consumed 2026-08-12
+Resume file: None — Plan 19-02 complete; next is Plan 19-03 (PROV-05, Mutation Gate M1)

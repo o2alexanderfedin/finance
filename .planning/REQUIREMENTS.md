@@ -341,7 +341,7 @@ structural (RTTI) and semantic passes.
       tuples plus the rule or worksheet line it implements.
 - [x] **PROV-03** *(T1)*: A `vnd.fjs.run` record — program hash, observed inputs, result
       hash, status, pinned flag — written by the tool handler on every run.
-- [ ] **PROV-04** *(T2)*: Report output states the tax year, the parameter-set hash, and the
+- [x] **PROV-04** *(T2)*: Report output states the tax year, the parameter-set hash, and the
       program hash alongside the figures.
 - [ ] **PROV-05** *(T2)*: Re-running a pinned program over the same inputs reproduces the
       report **byte-identically**, verified adversarially: add an amended revision *between*
@@ -646,7 +646,7 @@ them. Week 0 is research's addition in front of the plan's Week 1.
 | PROV-01 | T1 | Phase 9 - Traceable Report Lines | Week 2 | Complete |
 | PROV-02 | T1 | Phase 9 - Traceable Report Lines | Week 2 | Complete |
 | PROV-03 | T1 | Phase 7 - `fjs_run` and Run Records | Week 1 | Complete |
-| PROV-04 | T2 | Phase 19 - Reproducibility and Report Provenance | Week 4 | Pending |
+| PROV-04 | T2 | Phase 19 - Reproducibility and Report Provenance | Week 4 | Complete |
 | PROV-05 | T2 | Phase 19 - Reproducibility and Report Provenance | Week 4 | Pending |
 | PROV-06 | T3 | Phase 15 - Realism Polish and Upstream | Week 5 | Complete |
 | PROV-07 | T2 | Phase 9 - Traceable Report Lines | Week 2 | Complete |
