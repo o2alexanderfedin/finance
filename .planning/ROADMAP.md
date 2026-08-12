@@ -685,7 +685,10 @@ decision was postponed, not made. MAINT-01 stays open and this phase stays in th
   3. Re-running a pinned program over the same inputs reproduces the report **byte-identically**, verified **adversarially**: add an amended revision to a subject *between* the two runs and assert the output does not move. A reproducibility check that passes only because nothing changed is not a check, and a proof that cannot fail is worse than no proof — mutate the pinning so the second run *does* drift, and watch this go red.
   4. The parameter-set hash in criterion 2 is derived, never hand-written. Phase 15 established that `programHash` equality already implies parameter-set equality because guest programs cannot import and bake every parameter in as a literal; whatever this phase adds must not contradict that finding or duplicate it.
 **Research**: No — the mechanisms (`vnd.fjs.run`, `programHash`, Evo revisions, `fjs/report/line`) all exist and are proven. This is wiring and proof work, not investigation.
-**Plans**: TBD
+**Plans**: 3 plans across 3 waves
+- [ ] 19-01-PLAN.md — EXEC-13/PROV-04 foundations: fjs/report/provenance/module.f.js (paramSetHash, reviewedEstimateFraming, the acceptance predicate)
+- [ ] 19-02-PLAN.md — PROV-04/EXEC-13 wiring: taxYear on fjs_run's schema/record/response across every existing call site, plus Mutation Gate M2
+- [ ] 19-03-PLAN.md — PROV-05: the real-process control-then-pinned byte-identical reproduction proof, plus Mutation Gate M1
 
 ---
 
