@@ -240,10 +240,15 @@ structural (RTTI) and semantic passes.
       another process is visible to the running server without a restart.
 - [x] **DOC-15** *(T2)*: A retraction story via the `archived` flag, and a decision recorded
       on whether report programs must filter archived revisions.
-- [ ] **DOC-16** *(T3)*: Dialect registration for `fjs/media`'s `detect`. It imports
-      `decodeText`/`mediaType` from `fjs/media/revision` directly and performs exactly one
-      check, so `vnd.fjs.revision` is the only dialect it can recognize — its own docstring
-      says "currently just `vnd.fjs.revision`", so growth is anticipated but unimplemented.
+- [x] **DOC-16** *(T3)*: Dialect registration for `fjs/media`'s `detect`. The registry this
+      requirement asks for — "a list of dialect decoders that falls through when none
+      match" — already ships in the pinned `functionalscript` 0.43.1 as `dialectEntry`/
+      `detect` in `fjs/media/module.f.js`; correcting this entry's earlier, stale text
+      (which described an older `fjs/media` recognizing only `vnd.fjs.revision`) is itself
+      part of DOC-16's own scope, per 15-RESEARCH.md's "State of the Art" finding. This repo
+      adopts that already-shipped machinery LOCALLY (`fjs/media/dialects/module.f.js`,
+      Plan 15-06) for every one of its own thirteen dialects, wired into `cas_refresh`'s real
+      running path — no upstream contribution is needed or was made.
 - [x] **DOC-17** *(T2, added Phase 5)*: `vnd.fjs.medical_expenses` — the substantiation record
       behind Schedule A's medical and dental deduction. Unlike every other dialect it is
       taxpayer-asserted rather than transcribed from an information return: no IRS form
@@ -608,7 +613,7 @@ them. Week 0 is research's addition in front of the plan's Week 1.
 | DOC-13 | T2 | Phase 12 - Brokerage and Capital-Gain Chain | Week 3 | Complete |
 | DOC-14 | T1 | Phase 5 - Document Base and First Dialects | Week 1 | Complete |
 | DOC-15 | T2 | Phase 11 - Wage, Retirement, Benefit Documents | Week 3 | Complete |
-| DOC-16 | T3 | Phase 15 - Realism Polish and Upstream | Week 5 | Pending |
+| DOC-16 | T3 | Phase 15 - Realism Polish and Upstream | Week 5 | Complete |
 | DOC-17 | T2 | Phase 5 - Document Base and First Dialects (added) | Week 1 | Complete |
 | EXACT-01 | T0 | Phase 4 - Exact Arithmetic | Week 1 | Done |
 | EXACT-02 | T0 | Phase 4 - Exact Arithmetic | Week 1 | Done |

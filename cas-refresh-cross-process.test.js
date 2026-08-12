@@ -224,6 +224,17 @@ test(
             await waitForResponses(4)
             const [, , refreshResponse, afterHeadResponse] = responses
             assert.ok(!('error' in refreshResponse), `cas_refresh failed: ${JSON.stringify(refreshResponse)}`)
+            // DOC-16: detectFinance is reachable from a genuinely separate
+            // real process's tools/call, over content written by ANOTHER
+            // genuinely separate real process (fjs cas add) -- the exact
+            // scenario this file already exists to prove for cas_refresh
+            // itself, extended here to the dialect registry it now also
+            // exercises.
+            const refreshBody = JSON.parse(refreshResponse.result.content[0].text)
+            assert.ok(
+                refreshBody.dialectCounts['application/vnd.fjs.revision+json'] >= 1,
+                `expected cas_refresh's dialectCounts to include the externally-written vnd.fjs.revision blob: ${JSON.stringify(refreshBody)}`,
+            )
             assert.ok(!('error' in afterHeadResponse), `evo_head (after) failed: ${JSON.stringify(afterHeadResponse)}`)
             assert.equal(
                 afterHeadResponse.result.content[0].text,
