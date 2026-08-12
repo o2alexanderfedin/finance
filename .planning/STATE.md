@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
-status: verifying
-stopped_at: Completed 15-06-PLAN.md (final plan of Phase 15)
-last_updated: "2026-08-12T01:33:57.627Z"
+status: shipped
+stopped_at: Phase 15 complete, reviewed, verified 5/5, and merged to develop (PR #63). Clean boundary before Phase 16.
+last_updated: "2026-08-12T06:41:00.000Z"
 last_activity: 2026-08-12
 progress:
   total_phases: 19
   completed_phases: 15
-  total_plans: 81
-  completed_plans: 84
-  percent: 100
+  total_plans: 82
+  completed_plans: 82
+  percent: 79
 ---
 
 # Project State
@@ -22,41 +22,59 @@ See: .planning/PROJECT.md (updated 2026-08-03)
 
 **Core value:** The report is a program, not an answer — the agent emits FunctionalScript;
 the server executes it as a pure function of `(documents, tax-year parameters) → report`.
-**Current focus:** Phase 15 — realism-polish-and-upstream
+**Current focus:** Between phases — Phase 15 shipped, Phase 16 awaiting an owner decision
 
 ## Current Position
 
-Phase: 15 (realism-polish-and-upstream) — EXECUTING
-  13 plans across 5 vertical-slice waves. The plan set was returned ISSUES FOUND by
-  `gsd-plan-checker` twice (2 blockers, then 2 more), revised each time, and only
-  executed after a third pass returned VERIFICATION PASSED.
-Plan: 6 of 6
-Status: Phase complete — ready for verification
-  `13-VERIFICATION.md` scores **5/5 ROADMAP success criteria at the code level**, with
-  `status: human_needed` for one manual-only item (the IRS-figure transcription check).
-  `13-REVIEW.md` found 1 critical + 5 warnings; all six are remedied in the branch.
-  Pushed as **PR #62** against `develop` on 2026-08-11 — 71 commits, MERGEABLE, CI green.
+Phase: 15 (realism-polish-and-upstream) — **COMPLETE AND MERGED**
+  6 plans across 2 waves. Delivered all five requirements: PROV-08, TAX-17, MCP-09,
+  PROV-06, DOC-16. Proofs went 845 → 907.
+Plan: 6 of 6 — all six have SUMMARY files
+Status: **Shipped.** `15-VERIFICATION.md` scores **5/5 ROADMAP success criteria**, and unlike
+  Phases 10 and 13 it added **zero** new `human_needed` debt — the verifier fetched the live
+  IRS `i1040sd.pdf` and closed the phase's only manual-only item rather than deferring it.
+  `15-REVIEW.md` found 1 critical (CR-01) + 2 warnings; all three are remedied and committed.
+  Merged to `develop` via **PR #63** on 2026-08-12, alongside Phase 13's **PR #62**.
 
-Next phase: **15 — Realism Polish and Upstream.** Phase 14 is skipped by owner decision;
-  read the CARRIED, NOW UNOWNED block under "Session Continuity" before closing v1.
+Next phase: **16 — The Orphan Ingestion Island.** Blocked on an owner decision, not on work.
+  ROADMAP states outright: *"Research: No — the decision needs the author's intent, not
+  investigation."* **Phases 17 and 18 are unblocked and independent of 16 and of each other.**
+  Phase 14 remains skipped by owner decision; read the CARRIED, NOW UNOWNED block under
+  "Session Continuity" before closing v1.
 
-Progress: [██████████] 100%
-  Phase-based, never plan-based: `completed_plans` exceeds `total_plans` because three
-  phases carry an extra FIX-SUMMARY.md beside a plan's own summary, which rounds the
-  plan-based figure to a misleading 100%. See `percent_note`.
+Progress: [████████░░] 79% — **15 of 19 phases**
+  Phase-based, never plan-based. Plans are 82 of 82, which is *not* the project's progress
+  figure: it only says every plan that was written has been executed. Two FIX-SUMMARY.md
+  files sit beside their plans' own summaries and are deliberately excluded from both counts.
+  (Note 14 is skipped by decision, so 15 of the 18 *achievable* phases = 83%; the 79% figure
+  is kept because 19 is what ROADMAP declares.)
 Last activity: 2026-08-12
 
-> **This block carried Phase 10's text under a 12.1 heading until 2026-08-09** — "Ten plans
-> across six waves", `10-03 Tax Computation Worksheet`, "Phase 11 not started" — while
-> `Progress` read 100% against a frontmatter `percent` of 68. Rewritten from measurement.
-> The same class of defect as the coverage-table drift fixed in `REQUIREMENTS.md` the same
-> day: a hand-maintained second source that nothing compares against.
+> **This block has now been wrong THREE times, always in the same direction: stale text left
+> under a newer heading.** It carried Phase 10's text under a 12.1 heading until 2026-08-09;
+> it carried Phase 12.1's wave breakdown under a Phase 13 heading until 2026-08-11; and on
+> 2026-08-12 it was found carrying **Phase 13's** text (`13-VERIFICATION.md`, PR #62, "13 plans
+> across 5 waves") under a **Phase 15** heading, reading EXECUTING for a phase that was
+> complete, reviewed, verified and merged.
 >
-> **It drifted again by 2026-08-11**, still describing Phase 13 as EXECUTING and still
-> quoting Phase 12.1's wave breakdown ("Four plans across three waves", `12.1-01`...`12.1-04`)
-> under a Phase 13 heading, with `Progress` reading 100% against 14/19 phases. Rewritten from
-> measurement a second time. The recurrence is the point: this block has now been wrong twice
-> in three days, both times in the same direction — stale text left under a newer heading.
+> **The third recurrence has a known mechanism, which the first two did not.** `git log` shows
+> the last writer was `f59b6a3` — the `15-06` plan executor. A correction made earlier in the
+> same session was overwritten by the next agent to touch this file, because the per-plan
+> state update rewrites the header without reading what it replaces. Correcting the text again
+> without recording that will simply schedule a fourth occurrence.
+>
+> **Do not read this block and believe it. Measure:**
+> ```
+> ls .planning/phases/*/*-PLAN.md | wc -l                          # plans written
+> ls .planning/phases/*/*-SUMMARY.md | grep -v FIX | wc -l         # plans executed
+> git log --oneline -1 -- .planning/STATE.md                       # who wrote this last
+> ```
+> A mismatch between the last writer and the phase named above means the block is stale again.
+
+> **Known artifact gap (not a work gap):** `05-05-SUMMARY.md` exists with no `05-05-PLAN.md`
+> beside it — the only such mismatch in the project. The work shipped (ROADMAP records Phase 5
+> as 5/5); the plan file is simply absent. This is why "plans executed" reads 82 against 81
+> `*-PLAN.md` files on disk.
 
 ### Test metrics — MEASURE, do not read
 
@@ -528,6 +546,25 @@ None yet.
   branch, 90 ahead of `develop`. Nothing to reconcile; any merge is a fast-forward. The branch
   is **not yet pushed** to origin, which is the only remaining action.
 
+## Anti-Patterns — every row is an actual failure, not a prediction
+
+Folded in from `.planning/.continue-here.md` on 2026-08-12 when that one-shot handoff was
+consumed. These are session-independent lessons; they belong somewhere permanent.
+
+| Pattern | What happened | Severity | Prevention |
+|---------|---------------|----------|------------|
+| **Vacuous proof** | A proof that is green and *permanently unable to fail*. Happened **twice in Phase 15**: 15-02's year-genericity gate regex could not match its own required positive control (`[A-Za-z_$][\w$]*[Yy]ear` needs ≥5 chars, so a bare `year` never matched); 15-03's never-executes proof called a decomposed helper instead of the composed export, so mutating `fjsCheck` to *actually run the guest program* left the unit suite green at 3110/3110. | **blocking** | Mutate the **production body** the proof guards and watch that specific leaf go red, then restore byte-identical. Mutating the fixture is not the same test. AGENTS.md already requires this; both failures came from skipping it. |
+| **Trusting a plan's own literals** | Plan text contained values that could not produce their own stated expectations. 15-04's plan used `'100000'`/`'150000'` where `centsFromString` has no implied cents scaling, so its own expected columns were unreachable. 15-06's hand-typed dialect count predated 15-02 adding a dialect. | **blocking** | Verify each literal against the function that will consume it *before* implementing. **Every one of Phase 15's six plans contained at least one real defect.** |
+| **Grepping for a runtime surface** | The MCP tool count was reported wrong three times (7, then 8, then 12; the answer is **13**) because finance-local `toolEntry(` declarations miss the upstream `casToolRegistry`/`evoToolRegistry` spread into `financeMcpHandlers`. This produced a *false headline claim* — "no document-write tool is registered" — when `evo_add` has always been there. | **blocking** | Start `node index.js` and ask it (`initialize` → `notifications/initialized` → `tools/list`). `cas-refresh-cross-process.test.js` has the spawn-and-speak pattern to copy. Never derive an advertised surface from source. |
+| **Two sources of truth drifting** | `REQUIREMENTS.md`'s traceability table read `Pending` for PROV-06/PROV-08 while their own checkboxes read `[x]` — the **identical defect Phase 13 closed out with**, recurring one phase later. STATE.md's Current Position block is the same disease (three occurrences, see above). | advisory | When marking a requirement complete, update the checkbox **and** the table row, then sweep *all* complete requirements rather than only the ones you noticed. |
+| **Double-counted proof metric** | `node --test 2>&1 \| grep -c '^✔ import("./fjs/'` inflates by exactly 2× whenever the `functionalscript` submodule is initialized. Reports 1690 where the truth is 845. | advisory | De-duplicate — see "Test metrics" above for the corrected command. |
+| **`npx` in a real-process test** | `npx functionalscript` can never resolve (the package's bin is named `fjs`), so it fell through to npm's registry-touching path: 84% of one test's wall clock, and the reason `npm test` went red under parallel load. Pre-existing since Phase 5. | advisory | Spawn `node` against an absolute path into `node_modules`. See `fjsCliPath` in `cas-refresh-cross-process.test.js`. Fixed in `e36ef1a`; do not reintroduce. |
+
+**The through-line:** nine real defects surfaced in Phase 15 and **not one was caught by reading
+code.** They were caught by mutating production and watching a specific test go red, by
+re-deriving a plan's literals against the function that consumes them, and by starting the
+server and asking it instead of grepping. Green does not mean verified.
+
 ## Deferred Items
 
 | Category | Item | Status | Deferred At |
@@ -536,12 +573,29 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-08-12T01:33:57.619Z
-Stopped at: Completed 15-06-PLAN.md (final plan of Phase 15)
+Last session: 2026-08-12T06:41:00.000Z
+Stopped at: Session resumed at a clean phase boundary. Phase 15 shipped; Phase 16 awaits an
+owner decision. Nothing is mid-edit, the working tree is clean, there are no open PRs.
 
-Nothing is mid-edit. The working tree is clean.
+`develop` @ `4c8e6f9`, in sync with origin. One worktree (the main checkout). Suite green:
+**exit 0, 6296/6296, 907 de-duplicated project-local proofs** (measured on `c54bfa7`; `4c8e6f9`
+differs from it only by two `.planning/` markdown files, so the measurement still holds).
 
-### What this session did
+**HANDOFF.json and `.continue-here.md` were consumed and deleted on resume** — they are
+one-shot artifacts, and this file's own history records stale phase-09/phase-10 handoffs having
+to be deleted because a handoff left lying around reads as unfinished work. Everything durable
+in them was folded into this file first: the anti-pattern table above, and the pending human
+decisions below. Nothing was lost; both remain in git history at `4c8e6f9`.
+
+### What the resume found
+
+STATE.md's Current Position block had **drifted for the third time**, describing Phase 15 as
+EXECUTING while carrying Phase 13's text. Corrected from measurement, with the mechanism
+recorded this time — see the margin note under "Current Position". No other artifact was stale:
+82 plans, 82 summaries, no PLAN-without-SUMMARY, no interrupted agents, no pending todos, and
+the ROADMAP progress table was already accurate.
+
+### What the previous session did
 
 1. **Resumed and found Phase 13 already complete** — 13 plans, 13 summaries, CONTEXT /
    PATTERNS / RESEARCH / VALIDATION / REVIEW / VERIFICATION all present, all six code-review
@@ -599,17 +653,45 @@ Measured on `e36ef1a`: `tsc` clean, **6166/6166 passing, 0 failures, 0 cancelled
 > Note also that **Phase 15's ROADMAP entry declares `Depends on: Phase 14`.** That
 > dependency is being waived by decision, not satisfied.
 
+### Human decisions pending (none are technical blockers)
+
+1. **Phase 16 — wire it or delete it.** Binary: either wire `fjs/document/1099int/from_ocr` so
+   an import graph from `index.js` reaches it, **or** delete it along with
+   `fjs/document/ocr_amount` and `fjs/document/subject`. ROADMAP: *"Research: No — the decision
+   needs the author's intent, not investigation."* Guessing wrong means deleting working tested
+   code, or resurrecting something the owner wanted gone. *If wired*, TEST-03 requires a
+   real-process integration call. *If removed*, `todo/plan.md`'s Track B must be amended so the
+   next reader does not rebuild it.
+
+2. **EXEC-13 / PROV-04 / PROV-05 have no owner.** These are the **last non-MAINT requirements**
+   in the milestone and all three belong to skipped Phase 14. When 16–18 finish, v1 will have
+   every T3 item done and these three T2 items homeless. A write-path-only phase would not need
+   the taxpayer's filed return — that was the part of Phase 14 that genuinely required the owner.
+
+3. **Release timing.** `develop` is **110 commits ahead of `main`**. A release means bumping
+   `package.json` from `0.12.0`, writing CHANGELOG entries for Phases 13 and 15, merging to
+   `main`, and tagging. Note an existing test asserts `serverInfo.version` equals
+   `package.json`'s version, so the bump is a code change, not just metadata. Owner chose on
+   2026-08-12 to stop at `develop`.
+
+4. **Standing verification debt** — see the CARRIED, NOW UNOWNED block above. Phases **05, 06,
+   07** have no VERIFICATION.md under any name; Phase 10's Tax Computation Worksheet
+   cent-exactness and Phase 13's TY2025 IRS figures remain `human_needed`.
+
 ### Next
 
-**Phase 15 — Realism Polish and Upstream** (Week 5 — Technical Debt, Tier T3).
-No directory, no CONTEXT, no research, no plans yet. `ROADMAP.md` marks it **Research: YES**
-(child-process isolation design, the wall-clock kill path, and the upstream API shapes).
-Requirements: MCP-09, DOC-16, TAX-17, PROV-06, PROV-08.
+**Phase 16 — The Orphan Ingestion Island** (Backlog, Tier T3, MAINT-01) is next in ROADMAP order
+but is **gated on decision 1 above**, not on any work.
 
-Its five success criteria, in short: a second **non-tax** report over the same documents with
-no engine change; Form 1040-X columns A/B/C from a mechanical diff of two stored reports; a
-prior-year capital loss carrying into the current year's Schedule D; `fjs_check(hash)`
-documented as having **zero** security value; and `fjs/media`'s `detect` recognising our
-dialects through a registry contributed **upstream** to FunctionalScript.
+**Phase 17 — Documentation Truth Pass** (Backlog, Tier T3, MAINT-02…05) is the highest-value
+*unblocked* work available: it depends on nothing, needs no owner decision, and already has six
+concrete success criteria written. Several of them target exactly the stale-claim drift this
+file has now suffered three times — including criterion 5, the requirement count that reads 79
+in ROADMAP's Coverage table and 83 elsewhere while the real figure is **93** (82 complete, 11
+outstanding).
 
-Resume file: None
+**Phase 18 — Dependency and Duplication Debt** (MAINT-06…08) is also unblocked.
+
+All three are T3 backlog: unordered, independent of each other and of the critical path.
+
+Resume file: None — consumed 2026-08-12
