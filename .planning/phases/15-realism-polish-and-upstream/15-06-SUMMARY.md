@@ -112,3 +112,19 @@ None - no external service configuration required.
 ---
 *Phase: 15-realism-polish-and-upstream*
 *Completed: 2026-08-11*
+
+## Self-Check: PASSED
+
+All claimed files exist on disk and all task/metadata commits are present in `git log --oneline --all`:
+
+- `fjs/media/dialects/module.f.js` — FOUND
+- `fjs/server/module.f.js` — FOUND
+- `cas-refresh-cross-process.test.js` — FOUND
+- `.planning/REQUIREMENTS.md` — FOUND
+- `.planning/phases/15-realism-polish-and-upstream/15-06-SUMMARY.md` — FOUND
+- `894c822` (Task 1) — FOUND
+- `625af0e` (Task 2) — FOUND
+- `4d0daa7` (Task 3) — FOUND
+- `85d6e2a` (Summary) — FOUND
+
+`npm test`: 6292/6292 passing, 0 failures, `tsc` clean. De-duplicated project-local proof count: 905 (up from 889 at end of Plan 15-05, +16 matching this plan's own new leaves).
