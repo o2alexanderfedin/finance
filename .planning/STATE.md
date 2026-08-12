@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
 status: shipped
-stopped_at: Phase 15 complete, reviewed, verified 5/5, and merged to develop (PR #63). Clean boundary before Phase 16.
+stopped_at: Phase 19 complete on feature/phase-19-reproducibility - 3/3 plans, reviewed (0 critical), verified 4/4, both mutation gates independently re-run. Not yet merged. Next: Phase 18.
 last_updated: "2026-08-12T10:05:00.000Z"
 last_activity: 2026-08-12
 progress:
   total_phases: 20
   completed_phases: 16
-  total_plans: 82
-  completed_plans: 82
+  total_plans: 85
+  completed_plans: 85
   percent: 80
 ---
 
@@ -581,6 +581,8 @@ server and asking it instead of grepping. Green does not mean verified.
 |----------|------|--------|-------------|
 | Doc truth (→ Phase 17) | **The "~8 min / 481s full suite" figure is wrong, but so was my first correction.** Two measurements on 2026-08-12: `0038eed` → `duration_ms 44707` (**44.7s**, 6296 tests); `20f5459` → `duration_ms 136059` (**136s**, 6314 tests). Both exit 0. So the honest figure is a **range of roughly 45-140s that varies ~3x with machine load**, not the single 44.7s I first recorded, and not the 481s in STATE.md's Infrastructure notes / `19-VALIDATION.md` / `15-VALIDATION.md`. **Note the shape of my own error: I measured once and reported a point value as if it were the property.** That is the same defect as reporting one grep's population as the whole — which this phase hit four times. Phase 17 should record a range with the measurement conditions, and correct every copy. Consequence is not cosmetic: plans avoided per-task full-suite runs on the strength of the 481s figure, trading real feedback for imagined cost. | Open | 2026-08-12 |
 | Doc truth (→ Phase 17) | `amendmentDiff` refusing unpinned runs — deferred from Phase 19 Area 2 by owner decision. Revisit only if a real caller is misled. | Open | 2026-08-12 |
+| Structure (→ Phase 18) | **`fjs-run-integration.test.js` is one giant `test()` block, and the masking is not hypothetical.** Phase 19's code review raised it as WR-03 after it cost real work: under Mutation Gate M1, Node reported the failure as the *pre-existing* pin proof, which shares the block and runs first — the new PROV-05 assertion's independent redness could only be established with a throwaway diagnostic copy. **Two separate agents hit this.** The consequence beyond mutation testing: a future regression in any later assertion of that block is invisible while an earlier one fails, so the file reports one failure no matter how many things break. Splitting it into per-concern `test()` blocks belongs with Phase 18's structural work; doing it inside a phase close would have been unreviewed churn. | Open | 2026-08-12 |
+| Process (→ any phase) | **Never run a code reviewer concurrently with a verifier that re-runs mutation gates.** My error in Phase 19: I parallelized them to save wall-clock, but the verifier mutates and restores production files while the reviewer reads them. The reviewer caught a target line changing under it mid-review (IN-02) — it detected the interference rather than being fooled, which was diligence, not design. Mutation-running agents need exclusive access to the tree. | Open | 2026-08-12 |
 
 ## Session Continuity
 
