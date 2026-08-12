@@ -107,9 +107,15 @@ dissolves on contact.
 - [x] **MCP-08** *(T2)*: `finance_documents_list` enumerates stored documents with their
       dialect, tax year, and subject.
 - [x] **MCP-09** *(T3)*: `fjs_check(hash)` smoke-checks a stored program — imports it and
-      confirms it exports `main` returning an `Effect` — without running it to completion.
-      An agent-productivity feature with **no** security value; it must not be described as
-      a security control.
+      confirms it exports `report` — without running it to completion. Correcting this
+      entry's earlier, stale text (which named `main`, the `NodeProgram` convention
+      AGENTS.md reserves for `index.f.js`'s own entry point, not a guest program's
+      `Report<T>` export, and claimed the check inspects whether that export "returns an
+      `Effect`," which it deliberately never does — doing so would mean executing it, which
+      this requirement's own "never running it to completion" mandate forbids) is itself
+      part of MCP-09's own scope, mirroring the identical correction already applied to
+      DOC-16's entry in this same phase. An agent-productivity feature with **no** security
+      value; it must not be described as a security control.
 
 ### Execution Spine (EXEC)
 
@@ -571,7 +577,7 @@ them. Week 0 is research's addition in front of the plan's Week 1.
 | MCP-06 | T1 | Phase 7 - `fjs_run` and Run Records | Week 1 | Complete |
 | MCP-07 | T1 | Phase 8 - TY2025 Parameters and Tax Table | Week 2 | Complete |
 | MCP-08 | T2 | Phase 11 - Wage, Retirement, Benefit Documents | Week 3 | Complete |
-| MCP-09 | T3 | Phase 15 - Realism Polish and Upstream | Week 5 | Pending |
+| MCP-09 | T3 | Phase 15 - Realism Polish and Upstream | Week 5 | Complete |
 | TEST-01 | T1 | Phase 7 - `fjs_run` and Run Records | Week 1 | Complete |
 | TEST-02 | T1 | Phase 7 - `fjs_run` and Run Records | Week 1 | Complete |
 | TEST-03 | T2 | Phases 8-15 - standing, per phase | Weeks 2-5 | Complete |
