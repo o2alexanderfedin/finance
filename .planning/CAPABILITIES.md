@@ -1,8 +1,17 @@
 # Finance — Capability Snapshot
 
-**Pinned to:** `02d478d` (2026-08-11)
-**Suite at that commit:** `npm test` green — 6230/6230, 0 failures; 874 de-duplicated project-local proofs
-**Phase state:** 14 of 19 phases complete; Phase 15 in flight (3 of 6 plans landed at this commit)
+**Pinned to:** `17e0d06` (2026-08-12)
+**Suite at that commit:** `npm test` green — 6296/6296, 0 failures; 907 de-duplicated project-local proofs
+**Phase state:** 15 of 19 phases complete (Phase 15 closed: all 6 plans, code review, 3 fixes applied)
+
+> **Correction, 2026-08-12.** The first two revisions of this file claimed "no document-write MCP
+> tool is registered" and put the tool count at 7, then 8. **Both were wrong.** `cas_add`,
+> `cas_get`, `evo_add`, `evo_head`, `evo_list` and `evo_revision` are all registered — they come
+> from upstream's `casToolRegistry`/`evoToolRegistry`, which `financeMcpHandlers` spreads in at
+> `fjs/server/module.f.js:217-218`. The error came from grepping only for finance-local
+> `toolEntry(` declarations, which misses both spread-in registries. The real surface is **12
+> tools**, and documents **can** be stored from inside an MCP session. The actual constraint is
+> narrower and is described under "What does NOT run end to end".
 
 > **Read this file as a snapshot, not a contract.** It answers one question — *what can this
 > system actually do today?* — and it is derived by reading the code, not the roadmap.
@@ -18,14 +27,20 @@
 ## The one-line summary
 
 **A working, fully traceable TY2025 tax engine for one specific taxpayer profile, driven by an
-agent-authored program — with the document-ingestion half of its own story still missing from
-the MCP surface.**
+agent-authored program — complete enough to compute and cite a full Form 1040 in-session, but
+never yet checked against a real filed return, and with no wiring from a scanned document to
+typed input.**
 
 ---
 
 ## The MCP surface
 
-Eight tools over local stdio (remote transport is an explicit v2 milestone):
+**Twelve tools** over local stdio (remote transport is an explicit v2 milestone). Six are
+finance's own; six are inherited from upstream FunctionalScript and spread into
+`financeMcpHandlers` — a distinction worth keeping, because grepping only for finance-local
+`toolEntry(` declarations misses half the surface (this file got that wrong twice).
+
+**Finance's own:**
 
 | Tool | What it does |
 |---|---|
@@ -34,12 +49,18 @@ Eight tools over local stdio (remote transport is an explicit v2 milestone):
 | `finance_schema` | Schema discovery for the document dialects. |
 | `finance_tax_params` | Given a tax year, returns that year's parameter set. An unknown year is an ordinary refusal, not a crash. |
 | `finance_documents_list` | Lists stored documents. |
-| `evo_head` | Current revision for a subject. |
-| `evo_list` | Subject/revision enumeration. |
-| `cas_refresh` | Picks up blobs written into the store by another process, without a server restart. |
+| `cas_refresh` | Picks up blobs written into the store by another process, without a restart. Answers `{ status, dialectCounts }` — a breaking change from the pre-Phase-15 bare `'refreshed'` string. |
 
-**There is no document-write tool.** See "What does not run end to end" below — this is the
-single most important limitation on this page.
+**Inherited from upstream (`casToolRegistry` / `evoToolRegistry`):**
+
+| Tool | What it does |
+|---|---|
+| `cas_add` | Writes a blob into the content-addressed store. |
+| `cas_get` | Reads a blob back by hash. |
+| `evo_add` | **Adds a revision for a subject — this is how a document is stored from inside an MCP session.** |
+| `evo_head` | Current revision for a subject. |
+| `evo_list` | Subject enumeration. |
+| `evo_revision` | Revision lookup. |
 
 ---
 
@@ -106,7 +127,22 @@ reusing the same traced `ReportLine` type. A mechanical import-graph gate proves
 This is the cheapest available evidence that the report layer is not a tax engine wearing a
 disguise.
 
-### 6. Exact arithmetic throughout
+### 6. Amend a return as a mechanical diff
+
+`amendmentDiff(cas)(elected)(runHashA)(runHashB)` reads two stored runs by hash and produces Form
+1040-X Columns A / B / C per 1040 line, with per-line source hashes carried through and
+`B = C − A` holding in printed dollars. It refuses loudly when the two runs came from different
+programs — `programHash` equality already implies parameter-set equality, since a guest program
+cannot import and has no parameter lookup, so every figure it uses is a literal in its own source.
+
+### 7. Carry a prior-year capital loss forward
+
+The 13-line IRS Capital Loss Carryover Worksheet computes from a stored
+`vnd.fjs.prior_year_capital_loss` document and feeds Schedule D lines 6 and 14. An **absent**
+carryover document is a legitimate `0n` — a first-year filer can still file; only a document that
+exists with a missing or inconsistent field refuses, naming the field.
+
+### 8. Exact arithmetic throughout
 
 Money is `bigint` cents everywhere — never floats. Rounding is a property of a specific 1040
 line, not of a value, and the whole-dollar election is an explicit projection.
@@ -131,22 +167,36 @@ Eleven typed dialects, each with its own `validate` and `checkReferences` and co
 | `vnd.fjs.ocr` | Vision transcription artifact |
 | `vnd.fjs.return_profile` | Taxpayer declarations (filing status, age/blindness, dependents, elections) |
 
+All eleven are registered with upstream `fjs/media`'s dialect registry via `financeDialects`, and
+`detectFinance` is wired into the live `cas_refresh` path — so a stored blob is classified by
+content, falling through to `text/plain` when nothing matches.
+
 ---
 
 ## What does NOT run end to end
 
-### The document-ingestion half is missing from the MCP surface
+### Documents above 128 KiB need the CLI, not the MCP session
 
-**No `evo_add` or `cas_add` tool is registered on this server.** Documents enter the store via
-the `fjs cas add` **CLI — a separate process, out of band.**
+`evo_add` and `cas_add` are registered, so a typed dialect document of ordinary size **can** be
+stored from inside an MCP conversation. The constraint is a size ceiling, not a missing tool:
+**a single encoded JSON-RPC line caps at 128 KiB** (`fjs/server/response/module.f.js`), and the
+`fjs cas add` CLI route exists precisely for blobs above it (DOC-14). A scanned PDF or a
+high-resolution document image will exceed the cap; the transcribed JSON derived from it
+generally will not.
 
-So the story README tells — *upload → ask "what do I owe for 2025?" → answer, in one Claude Code
-or Claude Desktop session touching no code* — **cannot be completed inside a single MCP
-conversation today.** You can ask, and get a fully traceable answer. You cannot put the documents
-in that way.
+So the README's story — *upload → ask "what do I owe for 2025?" → answer, in one session* — is
+**partly reachable today**: the ask, the compute, and the traceable answer all work in-session,
+and storing normally-sized typed documents works in-session too. What is not proven is the whole
+chain end to end on real documents, which is Phase 14's criterion 1.
 
-This is exactly Phase 14's success criterion 1, and **Phase 14 is skipped** (owner decision,
-2026-08-11). Nothing currently scheduled restores it.
+### The vision step has no wiring
+
+Between "a scanned document" and "typed dialect JSON" sits transcription, and that path is the
+orphan island below — tested, but not reachable from `index.js`. So the *upload a photo of a W-2*
+half of the story has no implementation route today regardless of the size cap.
+
+**Phase 14 is skipped** (owner decision, 2026-08-11), and it owned the end-to-end acceptance run.
+Nothing currently scheduled replaces it.
 
 ### The vision/OCR ingestion path is unreachable
 
@@ -181,7 +231,7 @@ Six items, none of which a green suite can close:
 | 05, 06, 07 | Never independently verified against their goals — no VERIFICATION.md under any name |
 | 10 | Tax Computation Worksheet: cent-exact or whole-dollar? Pinned at $184,094.50 for MFJ at $700,000 taxable |
 | 13 | The TY2025 figures have never been checked against the printed IRS PDFs |
-| 15 | The four prior-year line references in the new carryover dialect (in flight) |
+| 15 | The four prior-year line references in the new carryover dialect — 2024 Form 1040 line 15, and 2024 Schedule D lines 7, 15, 21 |
 
 Items 2 and 3 were both to be resolved by Phase 14's run against a real filed return. With
 Phase 14 skipped, they have **no scheduled owner** — see STATE.md's "CARRIED, NOW UNOWNED" block.
