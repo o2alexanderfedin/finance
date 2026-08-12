@@ -225,7 +225,7 @@ test(
 
             // ── The decisive call: fjs_run through the real, separate
             // process, over the payer report's own literal stored text ────
-            const runResponse = await call('fjs_run', { hash: programHash })
+            const runResponse = await call('fjs_run', { hash: programHash, taxYear: 2025 })
             assert.equal(runResponse.result.isError, undefined, `fjs_run failed: ${JSON.stringify(runResponse)}`)
             const parsed = JSON.parse(runResponse.result.content[0].text)
             assert.ok(typeof parsed.resultHash === 'string' && parsed.resultHash !== '', 'expected a resultHash')

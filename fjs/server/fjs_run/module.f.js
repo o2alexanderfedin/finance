@@ -120,7 +120,7 @@ import { collectRead, fileCas } from 'functionalscript/fjs/cas/module.f.js'
 import { cBase32ToVec, vecToCBase32 } from 'functionalscript/fjs/basen/cbase32/module.f.js'
 import { utf8ToString, tryUtf8 } from 'functionalscript/fjs/text/module.f.js'
 import { ok } from 'functionalscript/fjs/types/result/module.f.js'
-import { option, array, string } from 'functionalscript/fjs/types/rtti/module.f.js'
+import { option, array, number, string } from 'functionalscript/fjs/types/rtti/module.f.js'
 import { toolEntry, okResult, errorResult } from 'functionalscript/fjs/protocol/mcp/module.f.js'
 import { sha256 } from 'functionalscript/fjs/crypto/sha2/module.f.js'
 import { initEvo, evo } from 'functionalscript/fjs/cas/evo/module.f.js'
@@ -136,6 +136,8 @@ import { guestCtx } from '../../guest/module.f.js'
 import { materializeProgram, loadProgram, materializeHome, programPath } from '../../guest/materialize/module.f.js'
 import { buildRunSnapshot, buildHostMap } from './snapshot/module.f.js'
 import { dialect, validate as validateRun } from '../../run/module.f.js'
+import { taxParamsByYear } from '../../tax/params/module.f.js'
+import { paramSetHash, reviewedEstimateFraming } from '../../report/provenance/module.f.js'
 import { sizeGuard, previewBytes, guardBytes } from '../response/module.f.js'
 import { readUtf8File } from 'functionalscript/fjs/effects/node/module.f.js'
 import { vec8, length as bitLength } from 'functionalscript/fjs/types/bit_vec/module.f.js'
@@ -345,9 +347,9 @@ const withResultText = o => {
  * case. Real Node has no such limitation — `fjsRunTool` itself is
  * unchanged, and `fjs-run-integration.test.js` proves the real, single-call
  * round trip end to end against a genuinely separate process.
- * @type {(cas: Cas<FileCasOperation>) => (programHash: string) => (programArgs: readonly string[]) => (pinned: boolean) => (pinFields: { readonly subject?: string, readonly parents?: readonly string[] }) => (outcome: RunOutcome<unknown>) => Effect<FileCasOperation | MemOp, ToolsCallResult>}
+ * @type {(cas: Cas<FileCasOperation>) => (programHash: string) => (programArgs: readonly string[]) => (pinned: boolean) => (pinFields: { readonly subject?: string, readonly parents?: readonly string[] }) => (provenance: { readonly taxYear: number, readonly paramSetHash: string }) => (outcome: RunOutcome<unknown>) => Effect<FileCasOperation | MemOp, ToolsCallResult>}
  */
-const handleRunOutcome = cas => programHash => programArgs => pinned => pinFields => rawOutcome => {
+const handleRunOutcome = cas => programHash => programArgs => pinned => pinFields => provenance => rawOutcome => {
     const outcome = withResultText(rawOutcome)
     const inputs = outcome.reads.map(([command, payload]) => ({
         command,
@@ -361,6 +363,8 @@ const handleRunOutcome = cas => programHash => programArgs => pinned => pinField
                 dialect,
                 programHash,
                 args: programArgs,
+                taxYear: provenance.taxYear,
+                paramSetHash: provenance.paramSetHash,
                 pinned,
                 ...pinFields,
                 status: 'ok',
@@ -383,6 +387,10 @@ const handleRunOutcome = cas => programHash => programArgs => pinned => pinField
                     truncated,
                     readCount: inputs.length,
                     literalCount: outcome.literalCount,
+                    taxYear: provenance.taxYear,
+                    paramSetHash: provenance.paramSetHash,
+                    programHash,
+                    reviewedEstimateFraming,
                 })))
             })
         })
@@ -392,6 +400,8 @@ const handleRunOutcome = cas => programHash => programArgs => pinned => pinField
         dialect,
         programHash,
         args: programArgs,
+        taxYear: provenance.taxYear,
+        paramSetHash: provenance.paramSetHash,
         pinned,
         ...pinFields,
         status: 'error',
@@ -405,14 +415,18 @@ const handleRunOutcome = cas => programHash => programArgs => pinned => pinField
 }
 
 /**
- * `fjs_run`'s input contract: a program hash, optional `args`, and an
+ * `fjs_run`'s input contract: a program hash, optional `args`, a REQUIRED
+ * `taxYear` (PROV-04 — explicit caller argument, never inferred, mirroring
+ * the `elected` precedent Phase 15 set for the same reason), and an
  * optional `subject`/`parents` pin (07-CONTEXT.md — both present pins the
  * run; either absent is an ordinary unpinned run, recorded as
- * `pinned: false`).
+ * `pinned: false`). `toolEntry`'s own RTTI check rejects a call missing
+ * `taxYear` or supplying a non-number before the handler ever runs.
  */
 export const fjsRunInputSchema = /** @type {const} */ ({
     hash: string,
     args: option(array(string)),
+    taxYear: number,
     subject: option(string),
     parents: option(array(string)),
 })
@@ -422,21 +436,41 @@ export const fjsRunInputSchema = /** @type {const} */ ({
  * inputs, writes the result and the `vnd.fjs.run` record to CAS (the
  * handler, never the guest — see the module header), and, on success,
  * returns `{ resultHash, runHash, preview, truncated, readCount,
- * literalCount }` — the same six keys regardless of outcome size. `readCount`
- * and `literalCount` (PROV-07, 09-CONTEXT.md) surface beside the two hashes:
- * `readCount` is `inputs.length` (the SAME observed-read array the run
- * record persists), `literalCount` is the numeric-literal count of the
- * program's own source text (`fjs/report/audit`'s `countNumericLiterals`).
+ * literalCount, taxYear, paramSetHash, programHash,
+ * reviewedEstimateFraming }` — the same ten keys regardless of outcome
+ * size. `readCount` and `literalCount` (PROV-07, 09-CONTEXT.md) surface
+ * beside the two hashes: `readCount` is `inputs.length` (the SAME
+ * observed-read array the run record persists), `literalCount` is the
+ * numeric-literal count of the program's own source text
+ * (`fjs/report/audit`'s `countNumericLiterals`). `taxYear`/`paramSetHash`/
+ * `programHash`/`reviewedEstimateFraming` (PROV-04) are the provenance
+ * header: which tax year's parameters were in effect, a content hash of
+ * that exact parameter set, the CAS hash of the program that ran, and the
+ * "reviewed estimate" framing constant, carried verbatim.
  * @type {(materializeHomeRoot: string) => (cas: Cas<FileCasOperation>) => (evoApi: Evo<FileCasOperation>) => ToolEntry<FileCasOperation | Mkdir | WriteFile | Import | MemOp>}
  */
 export const fjsRunTool = materializeHomeRoot => cas => evoApi => toolEntry(
     'fjs_run',
     'Runs a stored report program (by CAS hash) against pinned inputs and returns ' +
-    'the result and run-record hashes. Supply subject and parents together to pin ' +
+    'the result and run-record hashes. Requires taxYear (the tax year whose parameter ' +
+    'set was in effect for this run). Supply subject and parents together to pin ' +
     'the snapshot the program\'s evoHead reads; omit both for an ordinary unpinned run.',
     fjsRunInputSchema,
     /** @type {(args: Ts<typeof fjsRunInputSchema>) => Effect<FileCasOperation | Mkdir | WriteFile | Import | MemOp, ToolsCallResult>} */
     (args => {
+        // PROV-04: taxYear is an explicit caller argument, never inferred
+        // (mirroring the `elected` precedent Phase 15 set for the same
+        // reason). An unknown year is refused BEFORE executeRun ever runs —
+        // the identical shape `finance_tax_params`'s own unknown-year
+        // refusal uses, never a throw, never a cast past the `| undefined`
+        // noUncheckedIndexedAccess produces.
+        const taxParamSet = taxParamsByYear[args.taxYear]
+        if (taxParamSet === undefined) {
+            return pure(errorResult(
+                `unknown tax year: ${args.taxYear}; known: ${Object.keys(taxParamsByYear).map(Number).join(', ')}`,
+            ))
+        }
+        const resolvedParamSetHash = paramSetHash(taxParamSet)
         const programArgs = args.args ?? []
         const pinned = args.subject !== undefined && args.parents !== undefined
         // Both or neither. A half-supplied pin is an ordinary unpinned run
@@ -453,7 +487,7 @@ export const fjsRunTool = materializeHomeRoot => cas => evoApi => toolEntry(
                 args: programArgs,
                 ...pinFields,
             }),
-            outcome => handleRunOutcome(cas)(args.hash)(programArgs)(pinned)(pinFields)(outcome),
+            outcome => handleRunOutcome(cas)(args.hash)(programArgs)(pinned)(pinFields)({ taxYear: args.taxYear, paramSetHash: resolvedParamSetHash })(outcome),
         )
     }),
 )
@@ -674,7 +708,7 @@ const assertSessionSurvivesAFollowingCall = home => cas => e => state => goodHas
     /** @type {Report<string>} */
     const goodReport = ctx => () => ctx.step(ctx.evoList('false'), () => ctx.pure('ok'))
     const [state1, outcome] = runExecuteRunViaFixture(home)(cas)(e)(goodHash)(goodProgramSource)(goodReport)([])(undefined)(state)
-    const [, followUp] = virtual(state1)(handleRunOutcome(cas)(goodHash)([])(false)({})(outcome))
+    const [, followUp] = virtual(state1)(handleRunOutcome(cas)(goodHash)([])(false)({})({ taxYear: 2025, paramSetHash: 'sha256-paramset1' })(outcome))
     assertEq(followUp.isError, undefined)
 }
 
@@ -844,7 +878,7 @@ export const proof = {
                 // sequence and handed to handleRunOutcome directly —
                 // fjsRunTool's OWN post-outcome logic, unchanged.
                 const [state3b, outcome] = runExecuteRunViaFixture(home)(cas)(e)(programHash)(programSource)(adversarialReport)([])(undefined)(state3)
-                const [state4, callResult] = virtual(state3b)(handleRunOutcome(cas)(programHash)([])(false)({})(outcome))
+                const [state4, callResult] = virtual(state3b)(handleRunOutcome(cas)(programHash)([])(false)({})({ taxYear: 2025, paramSetHash: 'sha256-paramset1' })(outcome))
                 assertEq(callResult.isError, undefined)
                 const first = callResult.content[0]
                 if (first === undefined || first.type !== 'text') {
@@ -891,7 +925,7 @@ export const proof = {
                 // why a direct fjsRunTool.handle call can no longer succeed
                 // under virtual.
                 const [state1b, outcome] = runExecuteRunViaFixture(home)(cas)(e)(programHash)(programSource)(trivialReport)([])(undefined)(state1)
-                const [state2, callResult] = virtual(state1b)(handleRunOutcome(cas)(programHash)([])(false)({})(outcome))
+                const [state2, callResult] = virtual(state1b)(handleRunOutcome(cas)(programHash)([])(false)({})({ taxYear: 2025, paramSetHash: 'sha256-paramset1' })(outcome))
                 assertEq(callResult.isError, undefined)
                 const first = callResult.content[0]
                 if (first === undefined || first.type !== 'text') {
@@ -940,7 +974,7 @@ export const proof = {
                 const objectReport = ctx => () => ctx.step(ctx.evoList('false'), () => ctx.pure({ total: '1234.56' }))
 
                 const [state1b, outcome] = runExecuteRunViaFixture(home)(cas)(e)(programHash)(programSource)(objectReport)([])(undefined)(state1)
-                const [state2, callResult] = virtual(state1b)(handleRunOutcome(cas)(programHash)([])(false)({})(outcome))
+                const [state2, callResult] = virtual(state1b)(handleRunOutcome(cas)(programHash)([])(false)({})({ taxYear: 2025, paramSetHash: 'sha256-paramset1' })(outcome))
                 assertEq(callResult.isError, undefined)
                 const first = callResult.content[0]
                 if (first === undefined || first.type !== 'text') {
@@ -983,7 +1017,7 @@ export const proof = {
                 const expected = outcome.literalCount
                 assert(expected > 0, ['the fixture must have numeric literals to count', expected])
 
-                const [, callResult] = virtual(state1b)(handleRunOutcome(cas)(programHash)([])(false)({})(outcome))
+                const [, callResult] = virtual(state1b)(handleRunOutcome(cas)(programHash)([])(false)({})({ taxYear: 2025, paramSetHash: 'sha256-paramset1' })(outcome))
                 const first = callResult.content[0]
                 if (first === undefined || first.type !== 'text') {
                     throw ['expected a text content item', callResult]
@@ -1005,7 +1039,7 @@ export const proof = {
                 const stringReport = ctx => () => ctx.step(ctx.evoList('false'), () => ctx.pure('0.00'))
 
                 const [state1b, outcome] = runExecuteRunViaFixture(home)(cas)(e)(programHash)(programSource)(stringReport)([])(undefined)(state1)
-                const [state2, callResult] = virtual(state1b)(handleRunOutcome(cas)(programHash)([])(false)({})(outcome))
+                const [state2, callResult] = virtual(state1b)(handleRunOutcome(cas)(programHash)([])(false)({})({ taxYear: 2025, paramSetHash: 'sha256-paramset1' })(outcome))
                 const first = callResult.content[0]
                 if (first === undefined || first.type !== 'text') {
                     throw ['expected a text content item', callResult]
@@ -1030,7 +1064,7 @@ export const proof = {
                 const bigintReport = ctx => () => ctx.step(ctx.evoList('false'), () => ctx.pure(1n))
 
                 const [state1b, outcome] = runExecuteRunViaFixture(home)(cas)(e)(programHash)(programSource)(bigintReport)([])(undefined)(state1)
-                const [state2, callResult] = virtual(state1b)(handleRunOutcome(cas)(programHash)([])(false)({})(outcome))
+                const [state2, callResult] = virtual(state1b)(handleRunOutcome(cas)(programHash)([])(false)({})({ taxYear: 2025, paramSetHash: 'sha256-paramset1' })(outcome))
                 assertEq(callResult.isError, true)
                 const first = callResult.content[0]
                 if (first === undefined || first.type !== 'text') {
@@ -1048,11 +1082,13 @@ export const proof = {
             },
         },
         // A successful run's response has exactly the six uniform keys
-        // (PROV-07 added readCount/literalCount beside the original four),
-        // and the result is written to CAS even for a trivially small
-        // value (truncated === false, but resultHash still resolves).
+        // (PROV-07 added readCount/literalCount beside the original four;
+        // PROV-04 added taxYear/paramSetHash/programHash/
+        // reviewedEstimateFraming beside those), and the result is written
+        // to CAS even for a trivially small value (truncated === false, but
+        // resultHash still resolves).
         responseShape: {
-            sixKeysExactlyAndResultAlwaysResolvable: () => {
+            tenKeysExactlyAndResultAlwaysResolvable: () => {
                 const home = '/shape'
                 const cas = fileCas(sha256)(home)
                 const [state0, cacheKey] = virtual(emptyState)(initEvo(cas))
@@ -1070,7 +1106,7 @@ export const proof = {
                 // why a direct fjsRunTool.handle call can no longer succeed
                 // under virtual.
                 const [state1b, outcome] = runExecuteRunViaFixture(home)(cas)(e)(programHash)(programSource)(tinyReport)([])(undefined)(state1)
-                const [state2, callResult] = virtual(state1b)(handleRunOutcome(cas)(programHash)([])(false)({})(outcome))
+                const [state2, callResult] = virtual(state1b)(handleRunOutcome(cas)(programHash)([])(false)({})({ taxYear: 2025, paramSetHash: 'sha256-paramset1' })(outcome))
                 assertEq(callResult.isError, undefined)
                 const first = callResult.content[0]
                 if (first === undefined || first.type !== 'text') {
@@ -1079,7 +1115,10 @@ export const proof = {
                 const parsed = /** @type {Record<string, unknown>} */ (JSON.parse(first.text))
                 assertEq(
                     JSON.stringify(Object.keys(parsed).sort()),
-                    JSON.stringify(['literalCount', 'preview', 'readCount', 'resultHash', 'runHash', 'truncated']))
+                    JSON.stringify([
+                        'literalCount', 'paramSetHash', 'preview', 'programHash', 'readCount',
+                        'resultHash', 'reviewedEstimateFraming', 'runHash', 'taxYear', 'truncated',
+                    ]))
                 assertEq(parsed['truncated'], false)
                 // PROV-07: tinyReport (repaired in Task 1) dispatches
                 // exactly one evoList read; readCount derives from the SAME
@@ -1089,6 +1128,11 @@ export const proof = {
                 // numeric literal.
                 assertEq(parsed['readCount'], 1)
                 assertEq(parsed['literalCount'], countNumericLiterals(programSource))
+                // PROV-04: the provenance header alongside the existing keys.
+                assertEq(parsed['taxYear'], 2025)
+                assertEq(parsed['paramSetHash'], 'sha256-paramset1')
+                assertEq(parsed['programHash'], programHash)
+                assertEq(parsed['reviewedEstimateFraming'], reviewedEstimateFraming)
 
                 const resultHashValue = parsed['resultHash']
                 assert(typeof resultHashValue === 'string', ['expected resultHash to be a string', parsed])
@@ -1108,7 +1152,7 @@ export const proof = {
                 const [state0, cacheKey] = virtual(emptyState)(initEvo(cas))
                 const e = evo(cas)(cacheKey)
                 const [state1, callResult] = virtual(state0)(
-                    fjsRunTool(home)(cas)(e).handle({ hash: 'not-a-real-hash' }))
+                    fjsRunTool(home)(cas)(e).handle({ hash: 'not-a-real-hash', taxYear: 2025 }))
                 assertEq(callResult.isError, true)
                 const first = callResult.content[0]
                 if (first === undefined || first.type !== 'text') {
@@ -1158,7 +1202,7 @@ export const proof = {
                 const [state0, cacheKey] = virtual(emptyState)(initEvo(cas))
                 const e = evo(cas)(cacheKey)
                 const [state1, callResult] = virtual(state0)(
-                    fjsRunTool(home)(cas)(e).handle({ hash: 'not-a-real-hash', subject: 'someSubject' }))
+                    fjsRunTool(home)(cas)(e).handle({ hash: 'not-a-real-hash', taxYear: 2025, subject: 'someSubject' }))
                 assertEq(callResult.isError, true)
                 const first = callResult.content[0]
                 if (first === undefined || first.type !== 'text') {
@@ -1216,7 +1260,7 @@ export const proof = {
                 const [state1b, outcome] = runExecuteRunViaFixture(home)(cas)(e)(programHash)(programSource)(trivialReport)([])(undefined)(state1)
                 assert(outcome.kind === 'ok', ['expected an ok outcome', outcome])
                 const pinFields = /** @type {{ readonly subject?: string, readonly parents?: readonly string[] }} */ ({ subject: 'pinnedSubject', parents: ['pinnedParent'] })
-                const [state2, callResult] = virtual(state1b)(handleRunOutcome(cas)(programHash)([])(true)(pinFields)(outcome))
+                const [state2, callResult] = virtual(state1b)(handleRunOutcome(cas)(programHash)([])(true)(pinFields)({ taxYear: 2025, paramSetHash: 'sha256-paramset1' })(outcome))
                 assertEq(callResult.isError, undefined)
                 const first = callResult.content[0]
                 if (first === undefined || first.type !== 'text') {
@@ -1263,7 +1307,7 @@ export const proof = {
                 /** @type {RunOutcome<unknown>} */
                 const outcome = { kind: 'error', message: 'refused: fetch', reads: [['casRead', ['observed-before-failure-hash']]] }
                 const [state1, callResult] = virtual(emptyState)(
-                    handleRunOutcome(cas)('program-hash-error-arm-inputs')([])(false)({})(outcome))
+                    handleRunOutcome(cas)('program-hash-error-arm-inputs')([])(false)({})({ taxYear: 2025, paramSetHash: 'sha256-paramset1' })(outcome))
                 assertEq(callResult.isError, true)
                 const first = callResult.content[0]
                 if (first === undefined || first.type !== 'text') {
@@ -1299,7 +1343,7 @@ export const proof = {
                 const [state1b, outcome] = runExecuteRunViaFixture(home)(cas)(e)(programHash)(programSource)(trivialReport)([])(undefined)(state1)
                 assert(outcome.kind === 'ok', ['expected an ok outcome', outcome])
                 const distinctiveArgs = ['distinctive-arg-alpha', 'distinctive-arg-beta']
-                const [state2, callResult] = virtual(state1b)(handleRunOutcome(cas)(programHash)(distinctiveArgs)(false)({})(outcome))
+                const [state2, callResult] = virtual(state1b)(handleRunOutcome(cas)(programHash)(distinctiveArgs)(false)({})({ taxYear: 2025, paramSetHash: 'sha256-paramset1' })(outcome))
                 assertEq(callResult.isError, undefined)
                 const first = callResult.content[0]
                 if (first === undefined || first.type !== 'text') {
@@ -1354,7 +1398,7 @@ export const proof = {
                 // the SAME path (see the module header), masking the
                 // refusal this leaf exists to prove.
                 const [state2b, outcome] = runExecuteRunViaFixture(home)(cas)(e)(escapingHash)(programSource)(escapingReport)([])(undefined)(state2)
-                const [state3, callResult] = virtual(state2b)(handleRunOutcome(cas)(escapingHash)([])(false)({})(outcome))
+                const [state3, callResult] = virtual(state2b)(handleRunOutcome(cas)(escapingHash)([])(false)({})({ taxYear: 2025, paramSetHash: 'sha256-paramset1' })(outcome))
                 assertEq(callResult.isError, true)
                 const first = callResult.content[0]
                 if (first === undefined || first.type !== 'text') {
@@ -1383,7 +1427,7 @@ export const proof = {
                 const missingHash = vecToCBase32(vec8(0xabn))
 
                 const [state2, callResult] = virtual(state1)(
-                    fjsRunTool(home)(cas)(e).handle({ hash: missingHash }))
+                    fjsRunTool(home)(cas)(e).handle({ hash: missingHash, taxYear: 2025 }))
                 assertEq(callResult.isError, true)
                 const first = callResult.content[0]
                 if (first === undefined || first.type !== 'text') {
@@ -1429,7 +1473,7 @@ export const proof = {
                 // the whole point of this leaf.
 
                 const [state3, callResult] = virtual(state2)(
-                    fjsRunTool(home)(cas)(e).handle({ hash: unimportableHash }))
+                    fjsRunTool(home)(cas)(e).handle({ hash: unimportableHash, taxYear: 2025 }))
                 assertEq(callResult.isError, true)
                 const first = callResult.content[0]
                 if (first === undefined || first.type !== 'text') {
@@ -1442,6 +1486,45 @@ export const proof = {
                 // threaded state still succeeds.
                 assertSessionSurvivesAFollowingCall(home)(cas)(e)(state3)(goodHash)
             },
+        },
+    },
+
+    // ── PROV-04: taxYear is required and validated ────────────────────────
+    taxYearHandling: {
+        // `toolEntry`'s own RTTI check refuses a call missing `taxYear`
+        // before the handler ever runs — the handler's own unknown-year
+        // lookup never executes.
+        missingTaxYearRejectedByToolEntry: () => {
+            const home = '/tax-year-missing'
+            const cas = fileCas(sha256)(home)
+            const [state0, cacheKey] = virtual(emptyState)(initEvo(cas))
+            const e = evo(cas)(cacheKey)
+            const [, callResult] = virtual(state0)(
+                fjsRunTool(home)(cas)(e).handle({ hash: 'not-a-real-hash' }))
+            assertEq(callResult.isError, true)
+            const first = callResult.content[0]
+            if (first === undefined || first.type !== 'text') {
+                throw ['expected a text content item', callResult]
+            }
+            assert(first.text.includes('invalid arguments'), ['expected toolEntry\'s own RTTI refusal', first.text])
+        },
+        // An unknown `taxYear` is refused by name, before executeRun is
+        // ever called — never a throw, mirroring finance_tax_params's own
+        // unknown-year refusal shape.
+        unknownTaxYearRefused: () => {
+            const home = '/tax-year-unknown'
+            const cas = fileCas(sha256)(home)
+            const [state0, cacheKey] = virtual(emptyState)(initEvo(cas))
+            const e = evo(cas)(cacheKey)
+            const [, callResult] = virtual(state0)(
+                fjsRunTool(home)(cas)(e).handle({ hash: 'not-a-real-hash', taxYear: 1999 }))
+            assertEq(callResult.isError, true)
+            const first = callResult.content[0]
+            if (first === undefined || first.type !== 'text') {
+                throw ['expected a text content item', callResult]
+            }
+            assert(first.text.includes('1999'), ['expected the offending year to be named', first.text])
+            assert(first.text.includes('2025'), ['expected the known set to be named', first.text])
         },
     },
 
@@ -1464,7 +1547,7 @@ export const proof = {
             const [state1b, outcome] = runExecuteRunViaFixture(home)(cas)(e)(programHash)(programSource)(zeroReadReport)([])(undefined)(state1)
             assertEq(outcome.kind, 'error')
 
-            const [state2, callResult] = virtual(state1b)(handleRunOutcome(cas)(programHash)([])(false)({})(outcome))
+            const [state2, callResult] = virtual(state1b)(handleRunOutcome(cas)(programHash)([])(false)({})({ taxYear: 2025, paramSetHash: 'sha256-paramset1' })(outcome))
             assertEq(callResult.isError, true)
             const first = callResult.content[0]
             if (first === undefined || first.type !== 'text') {
@@ -1492,13 +1575,17 @@ export const proof = {
                 truncated: true,
                 readCount: 999999,
                 literalCount: 999999,
+                taxYear: 999999,
+                paramSetHash: 'c'.repeat(64),
+                programHash: 'd'.repeat(64),
+                reviewedEstimateFraming,
             })
             const encoded = tryUtf8(envelope)
             assert(encoded !== null, ['expected the envelope to encode as UTF-8', envelope])
             const bytes = bitLength(encoded) / 8n
             assert(
                 bytes < BigInt(guardBytes),
-                ['expected the six-key envelope to stay well clear of guardBytes', bytes, guardBytes])
+                ['expected the ten-key envelope to stay well clear of guardBytes', bytes, guardBytes])
         },
     },
 
@@ -1684,7 +1771,7 @@ export const proof = {
             // PROV-03: provenance that covers only successes is not
             // provenance — a status:'error' run record is still persisted
             // for a zero-read refusal.
-            const [state8, callResult] = virtual(state7)(handleRunOutcome(cas)(adversaryHash)([])(false)({})(outcome2))
+            const [state8, callResult] = virtual(state7)(handleRunOutcome(cas)(adversaryHash)([])(false)({})({ taxYear: 2025, paramSetHash: 'sha256-paramset1' })(outcome2))
             assertEq(callResult.isError, true)
             const first = callResult.content[0]
             if (first === undefined || first.type !== 'text') {

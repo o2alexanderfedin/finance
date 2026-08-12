@@ -323,7 +323,7 @@ test(
             // ── The decisive call: fjs_run through the real, separate
             // process — a real write-then-import of the materialized
             // program, something no virtual proof can do ──────────────────
-            const runResponse = await call('fjs_run', { hash: programHash })
+            const runResponse = await call('fjs_run', { hash: programHash, taxYear: 2025 })
             assert.equal(runResponse.result.isError, undefined, `fjs_run failed: ${JSON.stringify(runResponse)}`)
             const parsed = JSON.parse(runResponse.result.content[0].text)
             assert.ok(typeof parsed.resultHash === 'string' && parsed.resultHash !== '', 'expected a resultHash')
@@ -335,6 +335,12 @@ test(
             // source text contains at least the `0n` accumulator literal.
             assert.ok(typeof parsed.readCount === 'number' && parsed.readCount > 0, 'expected a positive readCount')
             assert.ok(typeof parsed.literalCount === 'number' && parsed.literalCount >= 1, 'expected literalCount to be at least 1')
+            // PROV-04: the provenance header reaches a REAL fjs_run response
+            // over a live MCP session — taxYear/paramSetHash/programHash
+            // alongside the existing six keys.
+            assert.equal(parsed.taxYear, 2025)
+            assert.ok(typeof parsed.paramSetHash === 'string' && parsed.paramSetHash !== '', 'expected a non-empty paramSetHash')
+            assert.equal(parsed.programHash, programHash)
 
             // The expected total, computed INDEPENDENTLY here from the two
             // PRESENT seeded values via centsFromString/centsToString —
@@ -433,6 +439,7 @@ test(
             const pinRunResponse = await call('fjs_run', {
                 hash: pinProgramHash,
                 args: [pinSubject],
+                taxYear: 2025,
                 subject: pinSubject,
                 parents: pinnedParents,
             })
@@ -479,7 +486,7 @@ test(
             // against a real filesystem ──────────────────────────────────
             const adversarySource = 'export const report = ctx => () => ctx.pure({ line16: 9137 })'
             const adversaryHash = await casAdd(adversarySource)
-            const adversaryRunResponse = await call('fjs_run', { hash: adversaryHash })
+            const adversaryRunResponse = await call('fjs_run', { hash: adversaryHash, taxYear: 2025 })
             assert.equal(
                 adversaryRunResponse.result.isError, true,
                 `expected the zero-read adversary to be refused: ${JSON.stringify(adversaryRunResponse)}`)
