@@ -103,7 +103,24 @@ Both gates below must be performed, observed, and the code restored byte-identic
 | Gate | Mutation | Must redden | Why this target |
 |------|----------|-------------|-----------------|
 | **M1 (PROV-05)** | In `buildRunSnapshot`, make the pinned branch resolve the **live** head instead of `pin.parents` | The pinned reproduction leaf in `fjs-run-integration.test.js` | This is the single line the whole requirement rests on. If mutating it leaves the suite green, the test is not exercising pinning — the 15-03 failure mode exactly. |
-| **M2 (EXEC-13)** | In `fjs_run`, change `pinned` derivation from `&&` to `\|\|` (half a pin now counts as pinned) | A `vnd.fjs.run` `checkReferences` leaf **and** the acceptance predicate's rejection arm | EXEC-13 is inherited as "already done" from PROV-03. A requirement inherited as done is a claim, not a fact; this gate is what converts it. |
+| **M2 (EXEC-13)** | In `fjs_run`, change `pinned` derivation from `&&` to `\|\|` (half a pin now counts as pinned) | A leaf that calls `fjs_run` with **exactly one** of `subject`/`parents` supplied and asserts the persisted record has `pinned: false` | EXEC-13 is inherited as "already done" from PROV-03. A requirement inherited as done is a claim, not a fact; this gate is what converts it. |
+
+> **Corrected 2026-08-12, before execution, by the plan-checker.** This row originally also
+> required the mutation to redden *"the acceptance predicate's rejection arm."* **That is
+> structurally impossible, and the impossibility is a good property rather than a gap.**
+>
+> `&&` and `||` diverge on exactly one input: the mixed case, where one of `subject`/`parents`
+> is supplied and the other is not. Under the mutation that case yields `pinned: true` with
+> `parents: undefined` — which `fjs/run/module.f.js`'s `checkReferences` (lines 160-163)
+> rejects outright, so `fjs_run`'s own record-assembly `assert` fires first. The acceptance
+> predicate consumes a **validated** `Run`, and a pinned-without-parents `Run` cannot exist at
+> its input. Demanding that arm redden was asking a proof to observe a state the type and its
+> validator jointly make unreachable.
+>
+> **The lesson is the one this phase is built around.** A required-red leaf that *cannot* go
+> red is the mirror image of a vacuous proof: instead of a green assertion that can never fail,
+> it is a red-set requirement that can never be met — and either one, left in place, turns a
+> gate into paperwork. The gate is real; only its second clause was wrong.
 
 **A mutation that fails to compile proves nothing** — `npm test` is `tsc && node --test`, and
 `allowUnreachableCode: false` has already rejected one such attempt in Phase 5. If a mutation
@@ -132,7 +149,8 @@ the plan has drifted into Phase 14's scope.**
 - [ ] Wave 0 covers all MISSING references
 - [ ] No watch-mode flags
 - [ ] **M1 and M2 both performed and watched failing**, then restored byte-identical with a
-      clean `git status`
+      clean `git status` — against M2's **corrected** red set (see the note under the gate table;
+      the original wording named a leaf that cannot redden)
 - [ ] The PROV-05 unpinned control was observed to MOVE before the pinned assertion was trusted
 - [ ] `nyquist_compliant: true` set in frontmatter
 
