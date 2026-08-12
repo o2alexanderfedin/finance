@@ -30,16 +30,23 @@
  * (qualified dividends) is Form 1040 line 3a's own concern. None of the
  * three appears in this module's exported contract.
  *
- * ## No prior-year carryover (Schedule D lines 6 and 14)
+ * ## Prior-year carryover (Schedule D lines 6 and 14) — CLOSED, Plan 15-05
  *
- * The short-term and long-term capital loss carryovers (lines 6 and 14) are
- * a MULTI-YEAR concern — the Capital Loss Carryover Worksheet needs last
- * year's return, which this engine has no place to read from yet (TAX-17,
- * Phase 15, per the roadmap's own tiering). This phase computes a single
- * tax year in isolation, so both lines are hardcoded to `0n`, each its own
- * named, documented constant — never silently folded into line 7 or line 15
- * as a bare literal. A future phase adding multi-year carryforward changes
- * exactly these two lines and nothing else in this module's arithmetic.
+ * The short-term and long-term capital loss carryovers (lines 6 and 14) were
+ * a documented multi-year seam through Plan 15-02; Plan 15-05 closes it.
+ * `ScheduleDInputs.priorYearCapitalLossCarryover` is OPTIONAL, and that
+ * optionality is deliberate, not provisional: an ABSENT carryover document
+ * is a legitimate `0n` on both lines — a first-year filer, or anyone who
+ * genuinely had no prior-year capital loss, has nothing to carry, and
+ * refusing there would make an ordinary return unable to file at all
+ * (15-CONTEXT.md's REVISED Area 3). When the document IS present, both
+ * lines are driven by `capitalLossCarryoverWorksheet`
+ * (`fjs/tax/carryover/module.f.js`), never hardcoded. A document that
+ * exists but has a missing or malformed required field is refused one layer
+ * up, by `vnd.fjs.prior_year_capital_loss`'s own `validate`/
+ * `checkReferences` — this module trusts an already-validated `Stored<
+ * PriorYearCapitalLoss>` exactly as it trusts every other stored document it
+ * reads.
  *
  * ## The 28% Rate Gain Worksheet and the Unrecaptured §1250 Gain Worksheet
  * are bounded to exactly the lines this project's dialects can populate
@@ -86,12 +93,14 @@
  *
  * @module
  */
-import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
-import { centsFromString } from '../../exact/module.f.js'
+import { assert, assertEq, assertNotNullish } from 'functionalscript/fjs/asserts/module.f.js'
+import { centsFromString, centsToString } from '../../exact/module.f.js'
 import { form8949 } from '../../form8949/module.f.js'
+import { capitalLossCarryoverWorksheet } from '../../tax/carryover/module.f.js'
 
 /** @import { OneZeroNineNineB } from '../../document/1099b/module.f.js' */
 /** @import { OneZeroNineNineDiv } from '../../document/1099div/module.f.js' */
+/** @import { PriorYearCapitalLoss } from '../../document/prior_year_capital_loss/module.f.js' */
 /** @import { Source } from '../../report/line/module.f.js' */
 /** @import { IndividualFilingStatus } from '../../tax/params/module.f.js' */
 
@@ -109,10 +118,14 @@ import { form8949 } from '../../form8949/module.f.js'
  * Everything Schedule D reads: the filing status (loss-cap threshold only),
  * stored 1099-B documents (fed to `fjs/form8949`), and stored 1099-DIV
  * documents (lines 13/18/19).
+ * `priorYearCapitalLossCarryover` is OPTIONAL — its absence is a legitimate
+ * `0n` on lines 6/14, never a refusal (module docstring, "Prior-year
+ * carryover").
  * @typedef {{
  *   readonly status: IndividualFilingStatus,
  *   readonly brokerageForms: readonly Stored<OneZeroNineNineB>[],
  *   readonly dividendForms: readonly Stored<OneZeroNineNineDiv>[],
+ *   readonly priorYearCapitalLossCarryover?: Stored<PriorYearCapitalLoss>,
  * }} ScheduleDInputs
  */
 
@@ -178,7 +191,7 @@ const sumBoxOverDocuments = documents => boxPath => read => {
  * @type {(inputs: ScheduleDInputs) => ScheduleDOutcome}
  */
 export const scheduleD = inputs => {
-    const { status, brokerageForms, dividendForms } = inputs
+    const { status, brokerageForms, dividendForms, priorYearCapitalLossCarryover } = inputs
 
     const form8949Outcome = form8949(brokerageForms)
     if (form8949Outcome.kind === 'error') {
@@ -187,6 +200,20 @@ export const scheduleD = inputs => {
         return { kind: 'error', message: form8949Outcome.message }
     }
     const { categoryA, categoryB, categoryD, categoryE } = form8949Outcome
+
+    // The Capital Loss Carryover Worksheet, run ONCE and its two outputs
+    // shared by lines 6 (Part I) and 14 (Part II) below — see module
+    // docstring, "Prior-year carryover". `undefined` exactly when the
+    // document is absent, which is the legitimate-zero case, not a
+    // refusal.
+    const carryoverOutputs = priorYearCapitalLossCarryover === undefined
+        ? undefined
+        : capitalLossCarryoverWorksheet({
+            priorYearFormLine15Cents: centsFromString(priorYearCapitalLossCarryover.value.priorYearFormLine15),
+            priorYearScheduleDLine7Cents: centsFromString(priorYearCapitalLossCarryover.value.priorYearScheduleDLine7),
+            priorYearScheduleDLine15Cents: centsFromString(priorYearCapitalLossCarryover.value.priorYearScheduleDLine15),
+            priorYearScheduleDLine21Cents: centsFromString(priorYearCapitalLossCarryover.value.priorYearScheduleDLine21),
+        })
 
     // ── Part I — Short-Term ─────────────────────────────────────────────
 
@@ -210,9 +237,21 @@ export const scheduleD = inputs => {
     // 5. Net ST gain/loss from partnerships/S-corps/estates/trusts via
     //    Schedule K-1 — no K-1 dialect, documented 0.
     const line5 = 0n
-    // 6. ST capital loss carryover — multi-year, TAX-17/Phase 15 (see
-    //    module docstring "No prior-year carryover"), documented 0.
-    const line6 = 0n
+    // 6. ST capital loss carryover — TAX-17/Phase 15 (see module docstring
+    //    "Prior-year carryover"): the worksheet's short-term output,
+    //    entered as a NEGATIVE (the printed line's entry box is
+    //    parenthesized — a carryover loss reduces the total), or a
+    //    legitimate 0 when there is no stored carryover document.
+    const line6 = carryoverOutputs === undefined ? 0n : -carryoverOutputs.shortTermCarryoverCents
+    /** @type {readonly Source[]} */
+    const line6Sources = priorYearCapitalLossCarryover !== undefined
+        && carryoverOutputs !== undefined && line6 !== 0n
+        ? [{
+            documentHash: priorYearCapitalLossCarryover.documentHash,
+            boxPath: 'priorYearCapitalLossCarryoverWorksheet(shortTerm)',
+            value: centsToString(carryoverOutputs.shortTermCarryoverCents),
+        }]
+        : []
     // 7. "Net short-term capital gain or (loss). Combine lines 1a through
     //    6."
     const line7 = line1a + line1b + line2 + line3 + line4 + line5 + line6
@@ -243,9 +282,21 @@ export const scheduleD = inputs => {
     const line13Sum = sumBoxOverDocuments(dividendForms)('box2aTotalCapitalGainDistr')(
         div => div.box2aTotalCapitalGainDistr)
     const line13 = line13Sum.value
-    // 14. LT capital loss carryover — multi-year, TAX-17/Phase 15,
-    //     documented 0.
-    const line14 = 0n
+    // 14. LT capital loss carryover — TAX-17/Phase 15 (see module docstring
+    //     "Prior-year carryover"): the worksheet's long-term output,
+    //     entered as a NEGATIVE, or a legitimate 0 when there is no stored
+    //     carryover document. Shares `carryoverOutputs` with line 6 above —
+    //     computed once from the SAME stored document.
+    const line14 = carryoverOutputs === undefined ? 0n : -carryoverOutputs.longTermCarryoverCents
+    /** @type {readonly Source[]} */
+    const line14Sources = priorYearCapitalLossCarryover !== undefined
+        && carryoverOutputs !== undefined && line14 !== 0n
+        ? [{
+            documentHash: priorYearCapitalLossCarryover.documentHash,
+            boxPath: 'priorYearCapitalLossCarryoverWorksheet(longTerm)',
+            value: centsToString(carryoverOutputs.longTermCarryoverCents),
+        }]
+        : []
     // 15. "Net long-term capital gain or (loss). Combine lines 8a through
     //     14."
     const line15 = line8a + line8b + line9 + line10 + line11 + line12 + line13 + line14
@@ -362,6 +413,7 @@ export const scheduleD = inputs => {
     const sources = [
         ...categoryA.sources, ...categoryB.sources, ...categoryD.sources, ...categoryE.sources,
         ...line13Sum.sources, ...twentyEightPercentLine4Sum.sources, ...unrecap1250Line11Sum.sources,
+        ...line6Sources, ...line14Sources,
     ]
 
     return {
@@ -670,6 +722,62 @@ export const proof = {
         assertEq(result.line11, 0n)
         assertEq(result.line12, 0n)
         assertEq(result.line14, 0n)
+    },
+    // TAX-17/Phase 15: the carryover boundary, both halves.
+    priorYearCapitalLossCarryover: {
+        // Trap 4's control (15-RESEARCH.md Pitfall 4): a return WITH
+        // brokerage sales and NO stored carryover document computes lines
+        // 6/14 as a legitimate 0 -- it must NOT refuse.
+        absentCarryoverWithBrokerageSalesPresentComputesLegitimateZeroNotRefusal: () => {
+            const saleDoc = brokerageForm('doc-carryover-control')({
+                box1dProceeds: '9000.00',
+                box1eCostOrOtherBasis: '4000.00',
+                box2ShortTermGainOrLoss: true,
+                box12BasisReportedToIrs: true,
+            })
+            const result = expectOk(scheduleD({
+                status: 'single',
+                brokerageForms: [saleDoc],
+                dividendForms: [],
+            }))
+            assertEq(result.line6, 0n, 'absent carryover document -- a legitimate zero, not a refusal')
+            assertEq(result.line14, 0n, 'absent carryover document -- a legitimate zero, not a refusal')
+        },
+        // Plan 15-02's Worked Example B (ST loss $10,000.00, LT gain
+        // $1,000.00, line21 -$3,000.00, Form1040 line15 +$20,000.00),
+        // independently hand-computed by `fjs/tax/carryover/module.f.js`'s
+        // own worked example to a $6,000.00 short-term carryover -- reused
+        // here so this module's expectation is the SAME independently
+        // verified figure, not a value produced by calling `scheduleD`
+        // itself and pasting the output.
+        presentValidCarryoverDrivesLinesSixAndFourteen: () => {
+            /** @type {Stored<PriorYearCapitalLoss>} */
+            const carryoverDoc = {
+                documentHash: 'doc-carryover-worked-example-b',
+                value: {
+                    dialect: 'vnd.fjs.prior_year_capital_loss',
+                    recipientTin: '222-22-2222',
+                    taxYear: 2024,
+                    priorYearFormLine15: '20000.00',
+                    priorYearScheduleDLine7: '-10000.00',
+                    priorYearScheduleDLine15: '1000.00',
+                    priorYearScheduleDLine21: '-3000.00',
+                },
+            }
+            const result = expectOk(scheduleD({
+                status: 'single',
+                brokerageForms: [],
+                dividendForms: [],
+                priorYearCapitalLossCarryover: carryoverDoc,
+            }))
+            assertEq(result.line6, -600000n, '$6,000.00 short-term carryover, entered as a negative')
+            assertEq(result.line14, 0n, 'Worked Example B carries no long-term amount')
+            assertEq(result.sources.length, 1, 'exactly one source: the ST carryover citation')
+            const source = assertNotNullish(result.sources[0])
+            assertEq(source.documentHash, 'doc-carryover-worked-example-b')
+            assertEq(source.boxPath, 'priorYearCapitalLossCarryoverWorksheet(shortTerm)')
+            assertEq(source.value, '6000.00')
+        },
     },
     // This module never carries a `dialect`/`mediaType` tag -- it computes
     // a schedule, it does not store a document (mirrors `fjs/schedule/b`'s
