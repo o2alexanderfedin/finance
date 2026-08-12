@@ -106,7 +106,7 @@ dissolves on contact.
       the agent reads parameters rather than recalling them.
 - [x] **MCP-08** *(T2)*: `finance_documents_list` enumerates stored documents with their
       dialect, tax year, and subject.
-- [ ] **MCP-09** *(T3)*: `fjs_check(hash)` smoke-checks a stored program — imports it and
+- [x] **MCP-09** *(T3)*: `fjs_check(hash)` smoke-checks a stored program — imports it and
       confirms it exports `main` returning an `Effect` — without running it to completion.
       An agent-productivity feature with **no** security value; it must not be described as
       a security control.
