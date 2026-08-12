@@ -410,6 +410,9 @@ Full log in PROJECT.md Key Decisions. Recent decisions affecting current work:
 - [Phase 15]: DOC-16 verified the real dialect count directly (grep against fjs/) rather than trusting the plan's own table -- 12 local dialects + upstream revisionDialect = 13
 - [Phase 15]: DOC-16: cas_refresh's dialectCounts counts an unregistered-dialect blob under its detectVec text/plain fallback -- present, never absorbed into a registered dialect's count
 - [Phase 15]: DOC-16: each dialect's extraValidate written inline rather than factored into a shared generic helper, avoiding an any/cast under dialectEntry's contextual Ts<T> typing
+- [Phase 19-01]: paramSetHash's jsonText(taxParamSet) call needs NO JsonUnknown cast, contradicting 19-PATTERNS.md's own excerpt -- verified against the live fjs/server/finance_tax_params/module.f.js:157 precedent (jsonText(response), a TaxParamSet-shaped value including the ceiling: string | undefined required-field case) and confirmed empirically with npx tsc --noEmit before finalizing
+- [Phase 19-01]: countsTowardReproducibilityAcceptance reads run.pinned alone and deliberately does not re-derive fjs/run/module.f.js's checkReferences both-or-neither invariant -- verified independently load-bearing per arm by mutation (run.pinned || true reddens only rejectsAnUnpinnedRun)
+- [Phase 19-01]: matchesFileCassOwnHashOfTheIdenticalBytes is the ONLY leaf that catches paramSetHash's derivation drifting from the exact primitive fileCas uses on identical bytes -- confirmed by a computeSync(sha256)([bytes, bytes]) mutation that reddened that one leaf alone, none of the other three
 
 ### Pending Todos
 
@@ -700,8 +703,14 @@ Measured on `e36ef1a`: `tsc` clean, **6166/6166 passing, 0 failures, 0 cancelled
 Autonomous run in progress, executing **19 → 18 → 17** (see the ordering rationale above).
 
 - **Phase 19 — Reproducibility and Report Provenance** (Week 4, T2, EXEC-13/PROV-04/PROV-05).
-  New, created 2026-08-12. No directory, no CONTEXT, no plans yet. ROADMAP marks it
+  CONTEXT/PATTERNS/VALIDATION and Plans 19-01/19-02 written 2026-08-12. ROADMAP marks it
   **Research: No** — every mechanism it needs already ships and is proven.
+  **Plan 19-01 executed and committed** (`d42cc2d`): `fjs/report/provenance/module.f.js` —
+  `paramSetHash`, `reviewedEstimateFraming`, `countsTowardReproducibilityAcceptance`, all 7
+  proof leaves mutation-gate-verified. See `19-01-SUMMARY.md`. Zero consumers yet — Plan
+  19-02 wires it into `fjs_run`; Plan 19-03 (not yet written) wires the acceptance predicate
+  into the real-process reproducibility proof. `npm test` 6310/6310; de-duplicated
+  project-local proofs 907 → 914.
 - **Phase 18 — Dependency and Duplication Debt** (Backlog, T3, MAINT-06…08).
 - **Phase 17 — Documentation Truth Pass** (Backlog, T3, MAINT-02…05). Its criterion 5 is the
   requirement count, which read **79** in ROADMAP's Coverage table and **83** in

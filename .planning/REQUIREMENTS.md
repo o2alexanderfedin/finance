@@ -185,7 +185,7 @@ dissolves on contact.
 - [x] **EXEC-12** *(T1)*: Total error capture — including non-`Error` throws, missing
       hashes, and import failures — surfaced as a tool-level `errorResult`, never as a
       process crash.
-- [ ] **EXEC-13** *(T2)*: Run records mark `pinned: true|false`. Only pinned runs count
+- [x] **EXEC-13** *(T2)*: Run records mark `pinned: true|false`. Only pinned runs count
       toward reproducibility acceptance.
 
 ### Document Formats and Ingestion (DOC)
@@ -602,7 +602,7 @@ them. Week 0 is research's addition in front of the plan's Week 1.
 | EXEC-10 | T1 | Phase 7 - `fjs_run` and Run Records | Week 1 | Complete |
 | EXEC-11 | T1 | Phase 7 - `fjs_run` and Run Records | Week 1 | Complete |
 | EXEC-12 | T1 | Phase 7 - `fjs_run` and Run Records | Week 1 | Complete |
-| EXEC-13 | T2 | Phase 19 - Reproducibility and Report Provenance | Week 4 | Pending |
+| EXEC-13 | T2 | Phase 19 - Reproducibility and Report Provenance | Week 4 | Complete |
 | DOC-00 | T0 | Phase 5 - Document Base and First Dialects | Week 1 | Complete |
 | DOC-01 | T0 | Phase 5 - Document Base and First Dialects | Week 1 | Complete |
 | DOC-02 | T0 | Phase 2 - Server Skeleton and Registration | Week 0 | Done |
