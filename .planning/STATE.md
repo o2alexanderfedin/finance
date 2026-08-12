@@ -569,7 +569,8 @@ server and asking it instead of grepping. Green does not mean verified.
 
 | Category | Item | Status | Deferred At |
 |----------|------|--------|-------------|
-| *(none)* | | | |
+| Doc truth (→ Phase 17) | **The "~8 min / 481s full suite" figure is wrong.** Measured on `0038eed` 2026-08-12: `npm test` reports `duration_ms 44707` — **44.7s** for 6296 tests, exit 0. The 481s figure appears in STATE.md's Infrastructure notes, `19-VALIDATION.md`, and `15-VALIDATION.md`. It is plausibly a cold-cache or high-load measurement that was never re-taken. Consequence is not cosmetic: plans have been written to avoid full-suite runs per task on the strength of it, trading real feedback for imagined time. Re-measure, then correct every copy. | Open | 2026-08-12 |
+| Doc truth (→ Phase 17) | `amendmentDiff` refusing unpinned runs — deferred from Phase 19 Area 2 by owner decision. Revisit only if a real caller is misled. | Open | 2026-08-12 |
 
 ## Session Continuity
 
