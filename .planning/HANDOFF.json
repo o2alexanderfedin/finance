@@ -1,0 +1,72 @@
+{
+  "version": "1.0",
+  "timestamp": "2026-08-12T05:32:32.627Z",
+  "phase": "15",
+  "phase_name": "realism-polish-and-upstream",
+  "phase_dir": ".planning/phases/15-realism-polish-and-upstream",
+  "plan": 6,
+  "task": 6,
+  "total_tasks": 6,
+  "status": "phase_complete_clean_boundary",
+  "position_note": "NOT paused mid-plan. Phase 15 is complete, verified 5/5, code-reviewed, all findings fixed, and MERGED to develop. This handoff marks a clean boundary between phases 15 and 16. There is no in-flight work to resume — the next step is a decision, not a continuation.",
+  "git": {
+    "branch": "develop",
+    "head": "c54bfa7",
+    "in_sync_with_origin": true,
+    "working_tree": "clean",
+    "open_prs": 0,
+    "worktrees": 1,
+    "develop_ahead_of_main": 110
+  },
+  "suite": {
+    "command": "npm test",
+    "exit": 0,
+    "tests": "6296/6296",
+    "deduplicated_project_local_proofs": 907,
+    "measured_on": "c54bfa7 (merged develop, post-merge verification)"
+  },
+  "completed_tasks": [
+    {"id": 1, "name": "15-01 payer-summary report (PROV-08)", "status": "done", "commit": "28e2e1a"},
+    {"id": 2, "name": "15-02 carryover dialect + worksheet + year gate (TAX-17 foundation)", "status": "done", "commit": "535c787"},
+    {"id": 3, "name": "15-03 fjs_check (MCP-09)", "status": "done", "commit": "02d478d"},
+    {"id": 4, "name": "15-04 amendment diff (PROV-06)", "status": "done", "commit": "5ba6f36"},
+    {"id": 5, "name": "15-05 carryover wiring into Schedule D (TAX-17 complete)", "status": "done", "commit": "2b68952"},
+    {"id": 6, "name": "15-06 dialect registry (DOC-16)", "status": "done", "commit": "f59b6a3"},
+    {"id": 7, "name": "code review + 3 fixes (CR-01, WR-01, WR-02)", "status": "done", "commit": "17e0d06"},
+    {"id": 8, "name": "phase verification 5/5, manual item closed", "status": "done", "commit": "a60a8ed"},
+    {"id": 9, "name": "merge PR #62 (phase 13) and PR #63 (phase 15) to develop", "status": "done", "commit": "c54bfa7"}
+  ],
+  "remaining_tasks": [
+    {"id": 10, "name": "Phase 16 — The Orphan Ingestion Island (MAINT-01)", "status": "blocked_on_user_decision"},
+    {"id": 11, "name": "Phase 17 — Documentation Truth Pass (MAINT-02..05)", "status": "not_started"},
+    {"id": 12, "name": "Phase 18 — Dependency and Duplication Debt (MAINT-06..08)", "status": "not_started"}
+  ],
+  "blockers": [
+    {
+      "description": "Phase 16 cannot start autonomously. It is a binary wire-it-or-delete-it decision about the OCR conversion pipeline, and ROADMAP.md states outright: 'Research: No — the decision needs the author's intent, not investigation.' Guessing wrong means either deleting working tested code or resurrecting something the owner wanted gone.",
+      "type": "human_action",
+      "workaround": "Skip to Phase 17 or 18 — both are independent of 16 and of each other, and neither needs an owner decision to begin."
+    },
+    {
+      "description": "EXEC-13, PROV-04 and PROV-05 are the only non-MAINT requirements left in the milestone, and all three belong to Phase 14, which was skipped by owner decision on 2026-08-11. They currently have no scheduled owner. When Phases 16-18 finish, v1 will have every T3 item done and these three T2 items homeless.",
+      "type": "human_action",
+      "workaround": "Re-home them into a smaller phase via /gsd-phase, or drop them from v1 explicitly. A write-path-only phase would not need the taxpayer's filed return, which was the part of Phase 14 that genuinely required the owner."
+    }
+  ],
+  "human_actions_pending": [
+    {"action": "Decide Phase 16: wire fjs/document/1099int/from_ocr so it is reachable from index.js, or delete it plus fjs/document/ocr_amount and fjs/document/subject", "context": "MAINT-01. ROADMAP says the decision needs author intent, not investigation.", "blocking": true},
+    {"action": "Decide what happens to EXEC-13 / PROV-04 / PROV-05", "context": "Orphaned by the Phase 14 skip; the last T2 items in the milestone.", "blocking": false},
+    {"action": "Decide when to cut a release to main", "context": "develop is 110 commits ahead of main. Owner chose 2026-08-12 to stop at develop. A release means bumping package.json from 0.12.0, writing CHANGELOG entries for Phases 13 and 15, merging to main, and tagging. Note an existing test asserts serverInfo.version equals package.json's version, so the bump is a code change, not just metadata.", "blocking": false},
+    {"action": "Close the standing verification debt", "context": "Phases 05, 06 and 07 have no VERIFICATION.md under any name. Phase 10's Tax Computation Worksheet cent-exactness and Phase 13's TY2025 IRS figures remain human_needed with no scheduled owner since Phase 14 was skipped.", "blocking": false}
+  ],
+  "decisions": [
+    {"decision": "Phase 14 skipped; Phase 15 executed instead", "rationale": "Owner decision 2026-08-11. Phase 15's declared 'Depends on: Phase 14' was waived rather than satisfied.", "phase": "15"},
+    {"decision": "No TY2024 IRS figures transcribed for TAX-17", "rationale": "Research fetched IRS i1040sd.pdf (2025 rev.) p9 and found the Capital Loss Carryover Worksheet consumes four prior-year RESULT figures and zero tax parameters. The 'minimal TY2024 subset' the phase was originally sized around does not exist. Year-genericity proven structurally instead, avoiding a second batch of unverified IRS constants on top of Phase 13's open batch.", "phase": "15"},
+    {"decision": "An absent prior-year carryover document yields 0n, not a refusal", "rationale": "Only a document that exists with a missing or inconsistent field refuses, naming the field. The strict reading of TAX-16 would have made every first-year filer unable to file.", "phase": "15"},
+    {"decision": "DOC-16 was local adoption, not an upstream contribution", "rationale": "The dialect registry (dialectEntry/detect) already shipped in the pinned functionalscript 0.43.1 before the phase began. DOC-16's requirement text described an older version and was stale; it was corrected. No cross-repo PR was opened or needed.", "phase": "15"},
+    {"decision": "Stop at develop; do not merge to main", "rationale": "Owner decision 2026-08-12. Merging to main is cutting a release, which is a separate deliberate act.", "phase": "15"}
+  ],
+  "uncommitted_files": [],
+  "next_action": "Answer the Phase 16 wire-or-delete question, then run /gsd-plan-phase 16. If you would rather not decide now, run /gsd-plan-phase 17 — Phase 17 (Documentation Truth Pass) depends on nothing, needs no owner decision, and has six concrete success criteria already written.",
+  "context_notes": "This session resumed at Phase 13 complete-but-unpushed, found npm test RED from a pre-existing Phase 5 defect (npx functionalscript could never resolve because the package's bin is named fjs, and it reached the network), fixed it, shipped Phase 13, then ran Phase 15 end to end and merged both. The single most important thing a resuming agent should carry forward is the anti-pattern table in .planning/.continue-here.md: this session produced two proofs that were green and PERMANENTLY UNABLE TO FAIL, and both were caught only by mutating the production body. Reading a proof is not enough; mutate the code it guards."
+}
