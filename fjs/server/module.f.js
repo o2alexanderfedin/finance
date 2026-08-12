@@ -121,6 +121,16 @@ import { unwrap } from 'functionalscript/fjs/types/result/module.f.js'
  * bad read; per T-15-12 this second full-store pass is accepted as
  * consistent with `buildCache`'s own already-full-rescan contract, not a
  * new cost `cas_refresh` introduces.
+ *
+ * **BREAKING response-shape change from the pre-Phase-15 bare-string
+ * form.** `cas_refresh` used to answer the literal string `'refreshed'`; it
+ * now answers `{ status: 'refreshed', dialectCounts }`. Named explicitly
+ * here as a boundary, the same way `fjs/schedule/d`'s own docstring names
+ * Decision 2.5 rather than leaving it implicit — this is a real,
+ * backward-incompatible change to an already-shipped MCP tool contract
+ * (every in-repo caller was updated in this same commit, so nothing here is
+ * broken, but a client written against the OLD bare-string form would
+ * break silently), not an additive widening.
  * @type {<O extends Operation>(cas: Cas<O>) => (cacheKey: Key<Cache>) => ToolEntry<O | MemOp>}
  */
 export const casRefreshTool = cas => cacheKey => toolEntry(
