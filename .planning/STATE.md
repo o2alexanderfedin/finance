@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
-status: executing
-stopped_at: Completed 15-05-PLAN.md
-last_updated: "2026-08-12T01:08:35.213Z"
+status: verifying
+stopped_at: Completed 15-06-PLAN.md (final plan of Phase 15)
+last_updated: "2026-08-12T01:33:57.627Z"
 last_activity: 2026-08-12
 progress:
   total_phases: 19
-  completed_phases: 14
+  completed_phases: 15
   total_plans: 81
-  completed_plans: 83
+  completed_plans: 84
   percent: 100
 ---
 
@@ -31,7 +31,7 @@ Phase: 15 (realism-polish-and-upstream) — EXECUTING
   `gsd-plan-checker` twice (2 blockers, then 2 more), revised each time, and only
   executed after a third pass returned VERIFICATION PASSED.
 Plan: 6 of 6
-Status: Ready to execute
+Status: Phase complete — ready for verification
   `13-VERIFICATION.md` scores **5/5 ROADMAP success criteria at the code level**, with
   `status: human_needed` for one manual-only item (the IRS-figure transcription check).
   `13-REVIEW.md` found 1 critical + 5 warnings; all six are remedied in the branch.
@@ -181,6 +181,7 @@ proofs and moves with submodule initialization state — which is exactly how a 
 | Phase 15 P03 | 45min | 2 tasks | 4 files |
 | Phase 15 P04 | 50min | 2 tasks | 1 files |
 | Phase 15 P05 | 55min | 2 tasks | 5 files |
+| Phase 15 P06 | 55min | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -388,6 +389,9 @@ Full log in PROJECT.md Key Decisions. Recent decisions affecting current work:
 - [Phase 15]: 15-05: priorYearCapitalLossCarryover is OPTIONAL on ScheduleDInputs, not option()-wrapped inside a document -- absence-is-zero lives at the caller's cardinality, mirroring 15-02's own caller-never-constructs-the-document decision one layer up
 - [Phase 15]: 15-05: The full-return reachability proof compares against an independent scheduleD(...) call fed the SAME carryover document, checking line16 (the only Schedule D total form1040IncomeLines exposes) rather than a nonexistent scheduleD6Cents field -- a dropped capitalLossCarryoverForms argument makes the two sides differ by exactly $6,000.00
 - [Phase 15]: 15-05: TAX-17 marked complete -- absence-is-zero, presence-drives-the-worksheet through the full form1040IncomeLines entry point, and year-genericity via a synthetic second TaxParamSet are all delivered and mutation-verified
+- [Phase 15]: DOC-16 verified the real dialect count directly (grep against fjs/) rather than trusting the plan's own table -- 12 local dialects + upstream revisionDialect = 13
+- [Phase 15]: DOC-16: cas_refresh's dialectCounts counts an unregistered-dialect blob under its detectVec text/plain fallback -- present, never absorbed into a registered dialect's count
+- [Phase 15]: DOC-16: each dialect's extraValidate written inline rather than factored into a shared generic helper, avoiding an any/cast under dialectEntry's contextual Ts<T> typing
 
 ### Pending Todos
 
@@ -532,8 +536,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-08-12T01:08:35.204Z
-Stopped at: Completed 15-05-PLAN.md
+Last session: 2026-08-12T01:33:57.619Z
+Stopped at: Completed 15-06-PLAN.md (final plan of Phase 15)
 
 Nothing is mid-edit. The working tree is clean.
 
