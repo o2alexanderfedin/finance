@@ -53,7 +53,7 @@ import { validate as rttiValidate } from 'functionalscript/fjs/types/rtti/valida
 import { assert, assertEq, assertNotNullish } from 'functionalscript/fjs/asserts/module.f.js'
 import { dialect as runDialect, validate as validateRun } from '../../run/module.f.js'
 import { applyWholeDollarElection } from '../line/module.f.js'
-import { centsFromString, centsToString } from '../../exact/module.f.js'
+import { centsFromString, centsToString, tryCentsFromString } from '../../exact/module.f.js'
 
 /** @import { Effect } from 'functionalscript/fjs/effects/module.f.js' */
 /** @import { Cas, FileCasOperation } from 'functionalscript/fjs/cas/module.f.js' */
@@ -157,29 +157,69 @@ const readResultRecord = cas => resultHash => {
 // ── Reconstructing ReportLine[], projecting, diffing ────────────────────────
 
 /**
- * Reconstructs one named `ReportLine` from its wire shape — `value` via
- * `centsFromString` (the raw exact cents this diff must project itself,
- * never trusting either stored program to have done so). `sources` is
- * asserted non-empty (a genuine `ReportLine` always has at least one, by
- * `fjs/report/line`'s own type — PROV-01/02); a wire record violating that
- * is a malformed stored result, refused by name rather than silently
- * treated as sourceless.
- * @type {(name: string) => (w: WireLine) => { readonly name: string, readonly line: ReportLine }}
+ * Reconstructs one named `ReportLine` from its wire shape as a `Result`,
+ * never a throw. This wire content is untrusted CAS-stored data,
+ * only structurally validated by `resultRecordSchema` — `array(wireSourceSchema)`
+ * permits length 0, and `value: string` accepts any string, so an empty
+ * `sources` array and a non-decimal `value` both pass that structural check.
+ * This function is the semantic second step, mirroring the structural-rtti +
+ * semantic-`checkReferences` two-step every document dialect in this
+ * codebase already uses (e.g. `fjs/document/1099b/module.f.js`'s
+ * `validate`/`checkReferences` split): `value` is parsed via the
+ * `Result`-returning `tryCentsFromString`, never the throwing
+ * `centsFromString`; `sources` is checked non-empty explicitly here, rather
+ * than assumed from `fjs/report/line`'s compile-time non-empty-tuple
+ * guarantee (`readonly [Source, ...(readonly Source[])]`), which holds only
+ * on the TypeScript side of the JSON/CAS serialization boundary and is NOT
+ * preserved by rtti's `resultRecordSchema` (rtti has no non-empty-array
+ * combinator). A wire record violating either check is a malformed stored
+ * result, refused by name as an `error(...)` `Result` — never a throw —
+ * rather than silently treated as sourceless or crashing the process.
+ * @type {(name: string) => (w: WireLine) => Result<{ readonly name: string, readonly line: ReportLine }, string>}
  */
 const namedReportLineFromWire = name => w => {
-    const [first, ...rest] = w.sources
-    const firstSource = assertNotNullish(first, `stored line "${name}" has no sources`)
-    return {
-        name,
-        line: { value: centsFromString(w.value), sources: [firstSource, ...rest], rule: w.rule },
+    if (w.sources.length === 0) {
+        return error(`stored line "${name}" has no sources`)
     }
+    const parsed = tryCentsFromString(w.value)
+    if (parsed[0] === 'error') {
+        return error(`stored line "${name}" has a malformed value: "${w.value}" (${parsed[1]})`)
+    }
+    // The length check above already refused an empty `sources`, so `first`
+    // is unreachably `undefined` here — `assertNotNullish` is purely a
+    // compiler-narrowing device for that internal invariant
+    // (`noUncheckedIndexedAccess`), not a second, redundant check against
+    // untrusted input. The one check against untrusted input is the length
+    // check above.
+    const [first, ...rest] = w.sources
+    /** @type {{ readonly name: string, readonly line: ReportLine }} */
+    const named = {
+        name,
+        line: { value: parsed[1], sources: [assertNotNullish(first, `stored line "${name}" has no sources`), ...rest], rule: w.rule },
+    }
+    return ok(named)
 }
 
 /**
- * @type {(wireRecord: WireResultRecord) => readonly { readonly name: string, readonly line: ReportLine }[]}
+ * Maps every entry of a stored result record through
+ * {@link namedReportLineFromWire}, short-circuiting on the first `error` —
+ * the same fail-fast, name-the-offender shape {@link readResultRecord} uses
+ * one layer up.
+ * @type {(wireRecord: WireResultRecord) => Result<readonly { readonly name: string, readonly line: ReportLine }[], string>}
  */
-const namedLinesFromRecord = wireRecord => Object.entries(wireRecord).map(
-    ([name, w]) => namedReportLineFromWire(name)(assertNotNullish(w, `stored record has an undefined entry for "${name}"`)))
+const namedLinesFromRecord = wireRecord => {
+    /** @type {{ readonly name: string, readonly line: ReportLine }[]} */
+    const named = []
+    for (const [name, w] of Object.entries(wireRecord)) {
+        const wire = assertNotNullish(w, `stored record has an undefined entry for "${name}"`)
+        const result = namedReportLineFromWire(name)(wire)
+        if (result[0] === 'error') {
+            return error(result[1])
+        }
+        named.push(result[1])
+    }
+    return ok(named)
+}
 
 /**
  * Applies the whole-dollar election to one side's `ReportLine[]`,
@@ -202,12 +242,18 @@ const projectedLinesByName = elected => named => {
  * Column A/C are each side's projected cents (or `'0.00'`/`[]` when that
  * side never had the line at all), and Column B IS `centsToString(centsC -
  * centsA)` — never a value computed separately that merely happens to
- * agree, so `B = C - A` holds by construction.
- * @type {(elected: boolean) => (wireA: WireResultRecord) => (wireB: WireResultRecord) => AmendmentDiffResult}
+ * agree, so `B = C - A` holds by construction. Returns a `Result`, refusing
+ * by name (never throwing) if either side's stored record has a malformed
+ * line — see {@link namedReportLineFromWire}.
+ * @type {(elected: boolean) => (wireA: WireResultRecord) => (wireB: WireResultRecord) => Result<AmendmentDiffResult, string>}
  */
 const diffWireRecords = elected => wireA => wireB => {
-    const mapA = projectedLinesByName(elected)(namedLinesFromRecord(wireA))
-    const mapB = projectedLinesByName(elected)(namedLinesFromRecord(wireB))
+    const namedA = namedLinesFromRecord(wireA)
+    if (namedA[0] === 'error') { return error(namedA[1]) }
+    const namedB = namedLinesFromRecord(wireB)
+    if (namedB[0] === 'error') { return error(namedB[1]) }
+    const mapA = projectedLinesByName(elected)(namedA[1])
+    const mapB = projectedLinesByName(elected)(namedB[1])
     const names = new Set([...Object.keys(wireA), ...Object.keys(wireB)])
     /** @type {{ [line: string]: { columnA: string, columnB: string, columnC: string, sourcesA: readonly Source[], sourcesC: readonly Source[] } }} */
     const result = {}
@@ -224,7 +270,7 @@ const diffWireRecords = elected => wireA => wireB => {
             sourcesC: lineB?.sources ?? [],
         }
     }
-    return result
+    return ok(result)
 }
 
 // ── amendmentDiff ────────────────────────────────────────────────────────────
@@ -255,7 +301,7 @@ const readResultsAndDiff = cas => elected => runHashA => runHashB => resultHashA
             if (wireB[0] === 'error') {
                 return pure(/** @type {Result<AmendmentDiffResult, string>} */ (error(`run B's (${runHashB}) stored result is invalid: ${wireB[1]}`)))
             }
-            return pure(/** @type {Result<AmendmentDiffResult, string>} */ (ok(diffWireRecords(elected)(wireA[1])(wireB[1]))))
+            return pure(diffWireRecords(elected)(wireA[1])(wireB[1]))
         }))
 
 /**
@@ -487,6 +533,41 @@ export const proof = {
             assertEq(result[0], 'error')
             if (result[0] !== 'error') { throw ['expected error', result] }
             assert(result[1].includes('refused: no such subject'), result[1])
+        },
+    },
+
+    // CR-01: a schema-valid but semantically malformed stored result (rtti's
+    // `resultRecordSchema` has no non-empty-array combinator and accepts any
+    // string for `value`) must be refused by name as a `Result`, never
+    // escape as an uncaught throw. Neither case was exercised by any of this
+    // module's other proof leaves before this fix.
+    malformedStoredResult: {
+        // Schema-valid: `array(wireSourceSchema)` permits length 0. Must be
+        // refused BY NAME, never thrown — the exact repro this finding's own
+        // review reproduced live against the pre-fix implementation.
+        emptySourcesRefusedNamingTheLine: () => {
+            const home = '/amend/malformed-empty-sources'
+            const cas = fileCas(sha256)(home)
+            const wireA = { interest: { value: '10.00', sources: [], rule: '1040 line 2b' } }
+            const wireB = { interest: { value: '10.00', sources: [{ documentHash: 'sha256-doc', boxPath: 'box1InterestIncome', value: '10.00' }], rule: '1040 line 2b' } }
+            const [, result] = virtual(emptyState)(runOkDiffFixture(cas)('sha256-programA')([])(wireA)('sha256-programA')([])(wireB)(false))
+            assertEq(result[0], 'error')
+            if (result[0] !== 'error') { throw ['expected error, not a thrown value', result] }
+            assert(result[1].includes('interest'), result[1])
+            assert(result[1].includes('no sources'), result[1])
+        },
+        // Schema-valid: `value: string` accepts any string, including a
+        // non-decimal one. Must be refused BY NAME, never thrown.
+        malformedValueRefusedNamingTheLine: () => {
+            const home = '/amend/malformed-value'
+            const cas = fileCas(sha256)(home)
+            const wireA = { interest: { value: 'not-a-number', sources: [{ documentHash: 'sha256-doc', boxPath: 'box1InterestIncome', value: '10.00' }], rule: '1040 line 2b' } }
+            const wireB = { interest: { value: '10.00', sources: [{ documentHash: 'sha256-doc', boxPath: 'box1InterestIncome', value: '10.00' }], rule: '1040 line 2b' } }
+            const [, result] = virtual(emptyState)(runOkDiffFixture(cas)('sha256-programA')([])(wireA)('sha256-programA')([])(wireB)(false))
+            assertEq(result[0], 'error')
+            if (result[0] !== 'error') { throw ['expected error, not a thrown value', result] }
+            assert(result[1].includes('interest'), result[1])
+            assert(result[1].includes('not-a-number'), result[1])
         },
     },
 
