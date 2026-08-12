@@ -4,14 +4,14 @@ milestone: v1.1
 milestone_name: milestone
 status: shipped
 stopped_at: Phase 15 complete, reviewed, verified 5/5, and merged to develop (PR #63). Clean boundary before Phase 16.
-last_updated: "2026-08-12T09:15:00.000Z"
+last_updated: "2026-08-12T10:05:00.000Z"
 last_activity: 2026-08-12
 progress:
   total_phases: 20
-  completed_phases: 15
+  completed_phases: 16
   total_plans: 82
   completed_plans: 82
-  percent: 79
+  percent: 80
 ---
 
 # Project State
@@ -110,6 +110,7 @@ state:
 | End of Phase 7 | 185 | `grep -c` — **suspect**, see below |
 | End of Phase 9 | 260 | `grep -c` — **suspect**, see below |
 | End of Phase 13 | 845 | de-duplicated; independently confirmed by CI |
+| End of Phase 19 | 916 | de-duplicated; `node --test 2>&1 \| grep '^✔ import("./fjs/' \| sed 's/ ([0-9.]*ms)$//' \| sort -u \| wc -l` |
 
 The two older figures were taken with the double-counting `grep -c` command. Whether they are
 inflated depends on whether the submodule was initialized in that session, which is not
@@ -416,6 +417,9 @@ Full log in PROJECT.md Key Decisions. Recent decisions affecting current work:
 - [Phase 19-02]: fjs/report/provenance/module.f.js's own unpinnedRun TEST-FIXTURE (shipped by 19-01, typed @type {Run} directly) is a FIFTH Run-literal-construction population, missed by the plan's and the earlier plan-check's four-file enumeration because it postdates both -- found by re-deriving the population via `grep -rn "pinned:" fjs *.js` rather than trusting either the plan's checklist or the prior plan-check's grep, and fixed in the same atomic commit as a Rule 3 blocking-issue auto-fix
 - [Phase 19-02]: Mutation Gate M2 (&& -> ||) reddens exactly the one leaf 19-VALIDATION.md's corrected gate table names (fjsRunTool.pinIntegrity.subjectOnlyWithoutParentsPersistsPinnedFalse) via handleRunOutcome's own record-assembly assert firing on the mixed-pin case, before any Run value is built -- countsTowardReproducibilityAcceptance's own two proof leaves independently confirmed to stay green under the identical mutation, positively confirming the structurally-unreachable-input claim rather than merely observing an absence of failure
 - [Phase 19-02]: The responseShape and sizeGuard proofs both hand-count fjs_run's envelope keys (six -> ten); both updated in this plan's own commit rather than left to silently under-cover the widened envelope
+- [Phase 19-03]: The unpinned control leg's movement was verified as a genuinely independent observation, not inferred from the pinned leg passing: controlBytes1/controlBytes2 differed (two distinct revision-hash-array JSON strings) after the SAME amendment shape landed between two unpinned runs, confirmed BEFORE the pinned leg's code was trusted, per 19-VALIDATION.md's "the control leaf is not optional"
+- [Phase 19-03]: Mutation Gate M1's naive full-suite run showed only the PRE-EXISTING real-process pin proof failing (the whole integration test is one node:test `test()` block, so the first thrown assertion aborts everything after it in source order) -- confirmed the NEW PROV-05 pinned-reproduction assertion is independently load-bearing by a diagnostic run with the earlier pin block's assertions neutralized: `pinnedRun1.resultHash !== pinnedRun2.resultHash` then reddened on its own line, isolated from the earlier assertion. The two `buildRunSnapshot`-level unit proofs (`buildRunSnapshotResolvesTheStore.pinOverridesTheResolvedHead`, `executeRun.pinOverridesTheLiveHeadThroughFullExecuteRun`) also reddened, both predicted by 19-VALIDATION.md/the plan
+- [Phase 19-03]: EXEC-13 marked complete on the reasoning that `countsTowardReproducibilityAcceptance` has no other consumption point to gate in this codebase (grepped: zero production call sites of `.pinned` beyond `fjs_run`'s own record-assembly and this predicate's own module) -- its docstring frames it as consumer-side by design, and this plan is the first caller to exercise it against two REAL, CAS-fetched persisted run records rather than hand-typed fixtures, correctly discriminating pinned (true) from unpinned (false)
 
 ### Pending Todos
 
@@ -704,10 +708,13 @@ Measured on `e36ef1a`: `tsc` clean, **6166/6166 passing, 0 failures, 0 cancelled
 ### Next
 
 Autonomous run in progress, executing **19 → 18 → 17** (see the ordering rationale above).
+**Phase 19 is now COMPLETE** — all three plans executed, all three requirements closed. Next
+up is **Phase 18**.
 
-- **Phase 19 — Reproducibility and Report Provenance** (Week 4, T2, EXEC-13/PROV-04/PROV-05).
-  CONTEXT/PATTERNS/VALIDATION and Plans 19-01/19-02/19-03 written 2026-08-12. ROADMAP marks
-  it **Research: No** — every mechanism it needs already ships and is proven.
+- **Phase 19 — Reproducibility and Report Provenance — COMPLETE (2026-08-12).**
+  (Week 4, T2, EXEC-13/PROV-04/PROV-05). CONTEXT/PATTERNS/VALIDATION and Plans
+  19-01/19-02/19-03 written and executed 2026-08-12. ROADMAP marks it **Research: No** —
+  every mechanism it needs already ships and is proven.
   **Plan 19-01 executed and committed** (`d42cc2d`): `fjs/report/provenance/module.f.js` —
   `paramSetHash`, `reviewedEstimateFraming`, `countsTowardReproducibilityAcceptance`, all 7
   proof leaves mutation-gate-verified. See `19-01-SUMMARY.md`.
@@ -722,10 +729,24 @@ Autonomous run in progress, executing **19 → 18 → 17** (see the ordering rat
   M2 performed and confirmed against 19-VALIDATION.md's corrected red set (observation only,
   no code change survives it — `&&`/`||` restored byte-identical). See `19-02-SUMMARY.md`.
   PROV-04 marked complete; EXEC-13 stays Pending (its second sentence needs 19-03's gate).
-  Plan 19-03 wires the acceptance predicate into the real-process reproducibility proof
-  (PROV-05) and performs Mutation Gate M1. `npm test` 6314/6314; de-duplicated project-local
-  proofs 907 → 916 (914 → 916 this plan, +2 for the two new taxYearHandling leaves).
-- **Phase 18 — Dependency and Duplication Debt** (Backlog, T3, MAINT-06…08).
+  **Plan 19-03 executed and committed** (`0315577`): PROV-05's control-then-pinned
+  byte-identical reproduction proof added to `fjs-run-integration.test.js`. The unpinned
+  control leg was built and OBSERVED to move (two distinct fetched-byte values, one head
+  hash before the amendment, a different one after) before the pinned leg's stability was
+  trusted, per 19-VALIDATION.md. The pinned leg then reproduced byte-identically across the
+  same amendment, both by `resultHash` string equality AND by fetched-byte equality.
+  `countsTowardReproducibilityAcceptance` was called against two REAL, CAS-fetched persisted
+  run records (never hand-built fixtures): `true` for the pinned run, `false` for the
+  control. **Mutation Gate M1** (pinned branch resolves the live head instead of
+  `pin.parents`) reddened the new PROV-05 assertion — confirmed independently load-bearing
+  via a diagnostic run isolating it from the pre-existing pin proof that also reddens in the
+  same mutated pass — plus both `buildRunSnapshot`-level unit proofs 19-VALIDATION.md
+  predicted; restored byte-identical, `git status` clean, suite green again. **EXEC-13 and
+  PROV-05 both marked complete** (checkbox + traceability row). `npm test` 6314/6314;
+  de-duplicated project-local proofs unchanged at **916** (this plan's new assertions live in
+  the root-level integration test, not under `fjs/`). See `19-03-SUMMARY.md`. **This closes
+  Phase 19.**
+- **Phase 18 — Dependency and Duplication Debt** (Backlog, T3, MAINT-06…08). Now next.
 - **Phase 17 — Documentation Truth Pass** (Backlog, T3, MAINT-02…05). Its criterion 5 is the
   requirement count, which read **79** in ROADMAP's Coverage table and **83** in
   REQUIREMENTS.md while the real figure is **93** (82 complete, 11 open). The Coverage table
@@ -735,4 +756,5 @@ Autonomous run in progress, executing **19 → 18 → 17** (see the ordering rat
 
 **Phase 16** is deferred and **Phase 14** is skipped; neither is part of this run.
 
-Resume file: None — Plan 19-02 complete; next is Plan 19-03 (PROV-05, Mutation Gate M1)
+Resume file: None — Plan 19-03 complete, Phase 19 COMPLETE (3/3 plans, EXEC-13/PROV-04/PROV-05
+all closed); next is Phase 18 (Dependency and Duplication Debt)
