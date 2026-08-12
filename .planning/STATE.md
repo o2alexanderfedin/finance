@@ -2,16 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
-status: shipped
-stopped_at: Phase 13 shipped — PR #62 open against develop, CI green
-last_updated: "2026-08-11T18:05:00.000Z"
-last_activity: 2026-08-11
+status: verifying
+stopped_at: Completed 15-06-PLAN.md (final plan of Phase 15)
+last_updated: "2026-08-12T01:33:57.627Z"
+last_activity: 2026-08-12
 progress:
   total_phases: 19
-  completed_phases: 14
-  percent_note: "phase-based (14 of 19); plan-based is unusable — see Current Position"
-  total_plans: 75
-  completed_plans: 78
+  completed_phases: 15
+  total_plans: 81
+  completed_plans: 84
   percent: 100
 ---
 
@@ -23,16 +22,16 @@ See: .planning/PROJECT.md (updated 2026-08-03)
 
 **Core value:** The report is a program, not an answer — the agent emits FunctionalScript;
 the server executes it as a pure function of `(documents, tax-year parameters) → report`.
-**Current focus:** Phase 15 — Realism Polish and Upstream (not yet started)
+**Current focus:** Phase 15 — realism-polish-and-upstream
 
 ## Current Position
 
-Phase: 13 (The 65+ Profile and the Remaining Schedules) — **SHIPPED**
+Phase: 15 (realism-polish-and-upstream) — EXECUTING
   13 plans across 5 vertical-slice waves. The plan set was returned ISSUES FOUND by
   `gsd-plan-checker` twice (2 blockers, then 2 more), revised each time, and only
   executed after a third pass returned VERIFICATION PASSED.
-Plan: 13 of 13 — all complete, every PLAN has its SUMMARY.
-Status: Verified, reviewed, and shipped.
+Plan: 6 of 6
+Status: Phase complete — ready for verification
   `13-VERIFICATION.md` scores **5/5 ROADMAP success criteria at the code level**, with
   `status: human_needed` for one manual-only item (the IRS-figure transcription check).
   `13-REVIEW.md` found 1 critical + 5 warnings; all six are remedied in the branch.
@@ -41,11 +40,11 @@ Status: Verified, reviewed, and shipped.
 Next phase: **15 — Realism Polish and Upstream.** Phase 14 is skipped by owner decision;
   read the CARRIED, NOW UNOWNED block under "Session Continuity" before closing v1.
 
-Progress: 14 of 19 phases [███████░░░] 74%
+Progress: [██████████] 100%
   Phase-based, never plan-based: `completed_plans` exceeds `total_plans` because three
   phases carry an extra FIX-SUMMARY.md beside a plan's own summary, which rounds the
   plan-based figure to a misleading 100%. See `percent_note`.
-Last activity: 2026-08-11
+Last activity: 2026-08-12
 
 > **This block carried Phase 10's text under a 12.1 heading until 2026-08-09** — "Ten plans
 > across six waves", `10-03 Tax Computation Worksheet`, "Phase 11 not started" — while
@@ -68,6 +67,7 @@ npm test                                        # tsc && node --test
 npm run test:integration                        # real-process subset (also included in npm test)
 
 # project-local proofs — the ONLY honest metric. MUST be de-duplicated:
+
 node --test 2>&1 | grep '^✔ import("./fjs/' | sed 's/ ([0-9.]*ms)$//' | sort -u | wc -l
 ```
 
@@ -176,6 +176,12 @@ proofs and moves with submodule initialization state — which is exactly how a 
 | Phase 13-the-65-profile-and-the-remaining-schedules P11 | 30min | 2 tasks | 3 files |
 | Phase 13 P12 | 35min | 2 tasks | 1 files |
 | Phase 13 P13 | 20min | 3 tasks | 8 files |
+| Phase 15 P01 | 35min | 3 tasks | 3 files |
+| Phase 15 P02 | 40min | 3 tasks | 3 files |
+| Phase 15 P03 | 45min | 2 tasks | 4 files |
+| Phase 15 P04 | 50min | 2 tasks | 1 files |
+| Phase 15 P05 | 55min | 2 tasks | 5 files |
+| Phase 15 P06 | 55min | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -372,6 +378,20 @@ Full log in PROJECT.md Key Decisions. Recent decisions affecting current work:
 - [Phase 13]: No scope reclassification in 13-12: the five coarse Schedule 1/2/3 kinds stay in unmodeledKindRefusals -- modeledKinds/unmodeledKindRefusals stay 20/30
 - [Phase ?]: MAGI gate regex: [a-zA-Z]*[Mm]agi[a-zA-Z]* (case-insensitive on M/m, fixed lowercase agi), stronger than criterion 5's literal grep, matching 13-VALIDATION.md C-1's own verify command — criterion 5 is case-sensitive and misses camelCase Magi (carried finding C-1); the gate must catch identifier-level mixed-case while still permitting all-uppercase MAGI in prose
 - [Phase ?]: C-3 resolved via childTaxCredit docstring precision (verified-against-printed-form + governing-provision language), not a guessed Rev. Proc. number — research only confirmed Rev. Proc. 2025-32 section 2.03 for ctcAmount by full-document grep; odcAmount/actcCap/phaseoutThreshold have no confirmed Rev. Proc. citation, so guessing one would repeat the exact sourcing error Pitfall 5 names
+- [Phase 15]: 15-01: payerReportSource and payerReport are two independently hand-authored artifacts, kept in sync across two test tiers rather than a runtime cross-check (07-08/07-09 precedent)
+- [Phase 15]: 15-01: fjs/report/payer's two-dialect scope boundary (1099-INT box1, 1099-DIV box1a only) is deliberate and mechanically additive to widen, documented in Schedule D's Decision-2.5 boundary-comment style
+- [Phase 15]: 15-02: Corrected the year-genericity gate's own suggested regex, which failed its own required positive control (bare 4-letter 'year' identifier); made the leading identifier-prefix group optional and re-verified all controls
+- [Phase 15]: 15-02: Added carryoverWorksheetInputsFromDocument bridging fjs/tax/carryover to fjs/document/prior_year_capital_loss via centsFromString, required by the plan's own frontmatter must_haves.key_links but not spelled out in Task 3's action text
+- [Phase 15]: 15-02: All four money fields in vnd.fjs.prior_year_capital_loss are required, never option -- absent-document-is-zero is handled by the caller never constructing the document, not by an optional field
+- [Phase 15]: [Phase 15]: 15-03: The unit-level never-executes proof for fjs_check cannot call the composed export itself under fjs/effects/node/virtual (writeFile/import_ representational split, same limitation as fjs_run's executeRun) -- discovered by mutation (a real report invocation left the unit suite green); the decisive proof against the shipped tool is fjs-run-integration.test.js's real-process call, using a program whose report would throw if invoked paired with a following-call session-survival assertion
+- [Phase 15]: programHash equality (defensively paired with args) is the complete parameter-set guard for the amendment diff — no new vnd.fjs.run field added — Guest programs cannot import and guestCtx exposes no tax-parameter lookup, so every parameter a stored program uses is a literal baked into its own source, already covered by programHash (15-RESEARCH.md Pitfall 1).
+- [Phase 15]: The whole-dollar election is applied host-side, independently per side, as an explicit elected argument to amendmentDiff — never re-derived from stored CAS content — applyWholeDollarElection is not part of guestCtx, so a guest program cannot have applied it; re-deriving elected from stored CAS content would only be sound if both runs pinned the same return-profile revision, which can silently be false.
+- [Phase 15]: 15-05: priorYearCapitalLossCarryover is OPTIONAL on ScheduleDInputs, not option()-wrapped inside a document -- absence-is-zero lives at the caller's cardinality, mirroring 15-02's own caller-never-constructs-the-document decision one layer up
+- [Phase 15]: 15-05: The full-return reachability proof compares against an independent scheduleD(...) call fed the SAME carryover document, checking line16 (the only Schedule D total form1040IncomeLines exposes) rather than a nonexistent scheduleD6Cents field -- a dropped capitalLossCarryoverForms argument makes the two sides differ by exactly $6,000.00
+- [Phase 15]: 15-05: TAX-17 marked complete -- absence-is-zero, presence-drives-the-worksheet through the full form1040IncomeLines entry point, and year-genericity via a synthetic second TaxParamSet are all delivered and mutation-verified
+- [Phase 15]: DOC-16 verified the real dialect count directly (grep against fjs/) rather than trusting the plan's own table -- 12 local dialects + upstream revisionDialect = 13
+- [Phase 15]: DOC-16: cas_refresh's dialectCounts counts an unregistered-dialect blob under its detectVec text/plain fallback -- present, never absorbed into a registered dialect's count
+- [Phase 15]: DOC-16: each dialect's extraValidate written inline rather than factored into a shared generic helper, avoiding an any/cast under dialectEntry's contextual Ts<T> typing
 
 ### Pending Todos
 
@@ -516,8 +536,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-08-11 (resume session)
-Stopped at: Phase 13 shipped — branch pushed, PR #62 open against `develop`, CI green.
+Last session: 2026-08-12T01:33:57.619Z
+Stopped at: Completed 15-06-PLAN.md (final plan of Phase 15)
 
 Nothing is mid-edit. The working tree is clean.
 

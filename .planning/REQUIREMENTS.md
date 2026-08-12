@@ -106,10 +106,16 @@ dissolves on contact.
       the agent reads parameters rather than recalling them.
 - [x] **MCP-08** *(T2)*: `finance_documents_list` enumerates stored documents with their
       dialect, tax year, and subject.
-- [ ] **MCP-09** *(T3)*: `fjs_check(hash)` smoke-checks a stored program — imports it and
-      confirms it exports `main` returning an `Effect` — without running it to completion.
-      An agent-productivity feature with **no** security value; it must not be described as
-      a security control.
+- [x] **MCP-09** *(T3)*: `fjs_check(hash)` smoke-checks a stored program — imports it and
+      confirms it exports `report` — without running it to completion. Correcting this
+      entry's earlier, stale text (which named `main`, the `NodeProgram` convention
+      AGENTS.md reserves for `index.f.js`'s own entry point, not a guest program's
+      `Report<T>` export, and claimed the check inspects whether that export "returns an
+      `Effect`," which it deliberately never does — doing so would mean executing it, which
+      this requirement's own "never running it to completion" mandate forbids) is itself
+      part of MCP-09's own scope, mirroring the identical correction already applied to
+      DOC-16's entry in this same phase. An agent-productivity feature with **no** security
+      value; it must not be described as a security control.
 
 ### Execution Spine (EXEC)
 
@@ -240,10 +246,15 @@ structural (RTTI) and semantic passes.
       another process is visible to the running server without a restart.
 - [x] **DOC-15** *(T2)*: A retraction story via the `archived` flag, and a decision recorded
       on whether report programs must filter archived revisions.
-- [ ] **DOC-16** *(T3)*: Dialect registration for `fjs/media`'s `detect`. It imports
-      `decodeText`/`mediaType` from `fjs/media/revision` directly and performs exactly one
-      check, so `vnd.fjs.revision` is the only dialect it can recognize — its own docstring
-      says "currently just `vnd.fjs.revision`", so growth is anticipated but unimplemented.
+- [x] **DOC-16** *(T3)*: Dialect registration for `fjs/media`'s `detect`. The registry this
+      requirement asks for — "a list of dialect decoders that falls through when none
+      match" — already ships in the pinned `functionalscript` 0.43.1 as `dialectEntry`/
+      `detect` in `fjs/media/module.f.js`; correcting this entry's earlier, stale text
+      (which described an older `fjs/media` recognizing only `vnd.fjs.revision`) is itself
+      part of DOC-16's own scope, per 15-RESEARCH.md's "State of the Art" finding. This repo
+      adopts that already-shipped machinery LOCALLY (`fjs/media/dialects/module.f.js`,
+      Plan 15-06) for every one of its own thirteen dialects, wired into `cas_refresh`'s real
+      running path — no upstream contribution is needed or was made.
 - [x] **DOC-17** *(T2, added Phase 5)*: `vnd.fjs.medical_expenses` — the substantiation record
       behind Schedule A's medical and dental deduction. Unlike every other dialect it is
       taxpayer-asserted rather than transcribed from an information return: no IRS form
@@ -319,7 +330,7 @@ structural (RTTI) and semantic passes.
 - [x] **TAX-16** *(T1)*: A **scope guard** — unmodeled input causes a loud refusal, never a
       silently omitted line. This is what makes a partial 1040 honest instead of quietly
       wrong, and it is how REQ TAX-05's "full line-by-line" claim stays truthful.
-- [ ] **TAX-17** *(T3)*: Multi-year support, including capital loss carryover, which the
+- [x] **TAX-17** *(T3)*: Multi-year support, including capital loss carryover, which the
       brokerage profile promotes from optional to required.
 
 ### Provenance and Reporting (PROV)
@@ -336,7 +347,7 @@ structural (RTTI) and semantic passes.
       report **byte-identically**, verified adversarially: add an amended revision *between*
       two runs and assert the output does not move. A reproducibility check that passes
       only because nothing changed is not a check.
-- [ ] **PROV-06** *(T3)*: Mechanical Form 1040-X columns from a report diff. Form 1040-X is
+- [x] **PROV-06** *(T3)*: Mechanical Form 1040-X columns from a report diff. Form 1040-X is
       literally a three-column diff (A original, B net change, C correct), so corrected
       document → new revision → re-run → diff yields Columns A/B/C with per-line source
       hashes already attached. No new mechanism required.
@@ -344,7 +355,7 @@ structural (RTTI) and semantic passes.
       audit reported with each run, plus a perturbation gate (change an input, assert the
       output moves). `main = () => pure({ line16: 9137 })` satisfies every other criterion
       while defeating the entire thesis.
-- [ ] **PROV-08** *(T3)*: A second, non-tax report over the same documents — the cheapest
+- [x] **PROV-08** *(T3)*: A second, non-tax report over the same documents — the cheapest
       possible demonstration that "reports are programs" rather than a tax engine wearing a
       disguise.
 
@@ -566,7 +577,7 @@ them. Week 0 is research's addition in front of the plan's Week 1.
 | MCP-06 | T1 | Phase 7 - `fjs_run` and Run Records | Week 1 | Complete |
 | MCP-07 | T1 | Phase 8 - TY2025 Parameters and Tax Table | Week 2 | Complete |
 | MCP-08 | T2 | Phase 11 - Wage, Retirement, Benefit Documents | Week 3 | Complete |
-| MCP-09 | T3 | Phase 15 - Realism Polish and Upstream | Week 5 | Pending |
+| MCP-09 | T3 | Phase 15 - Realism Polish and Upstream | Week 5 | Complete |
 | TEST-01 | T1 | Phase 7 - `fjs_run` and Run Records | Week 1 | Complete |
 | TEST-02 | T1 | Phase 7 - `fjs_run` and Run Records | Week 1 | Complete |
 | TEST-03 | T2 | Phases 8-15 - standing, per phase | Weeks 2-5 | Complete |
@@ -608,7 +619,7 @@ them. Week 0 is research's addition in front of the plan's Week 1.
 | DOC-13 | T2 | Phase 12 - Brokerage and Capital-Gain Chain | Week 3 | Complete |
 | DOC-14 | T1 | Phase 5 - Document Base and First Dialects | Week 1 | Complete |
 | DOC-15 | T2 | Phase 11 - Wage, Retirement, Benefit Documents | Week 3 | Complete |
-| DOC-16 | T3 | Phase 15 - Realism Polish and Upstream | Week 5 | Pending |
+| DOC-16 | T3 | Phase 15 - Realism Polish and Upstream | Week 5 | Complete |
 | DOC-17 | T2 | Phase 5 - Document Base and First Dialects (added) | Week 1 | Complete |
 | EXACT-01 | T0 | Phase 4 - Exact Arithmetic | Week 1 | Done |
 | EXACT-02 | T0 | Phase 4 - Exact Arithmetic | Week 1 | Done |
@@ -631,15 +642,15 @@ them. Week 0 is research's addition in front of the plan's Week 1.
 | TAX-14 | T2 | Phase 13 - The 65+ Profile and Schedules | Week 3 | Complete |
 | TAX-15 | T2 | Phase 12.1 - The Capital-Gain Chain | Week 3 | Complete |
 | TAX-16 | T1 | Phase 10 - 1040 Core and Scope Guard | Week 2 | Complete |
-| TAX-17 | T3 | Phase 15 - Realism Polish and Upstream | Week 5 | Pending |
+| TAX-17 | T3 | Phase 15 - Realism Polish and Upstream | Week 5 | Complete |
 | PROV-01 | T1 | Phase 9 - Traceable Report Lines | Week 2 | Complete |
 | PROV-02 | T1 | Phase 9 - Traceable Report Lines | Week 2 | Complete |
 | PROV-03 | T1 | Phase 7 - `fjs_run` and Run Records | Week 1 | Complete |
 | PROV-04 | T2 | Phase 14 - Acceptance | Week 4 | Pending |
 | PROV-05 | T2 | Phase 14 - Acceptance | Week 4 | Pending |
-| PROV-06 | T3 | Phase 15 - Realism Polish and Upstream | Week 5 | Pending |
+| PROV-06 | T3 | Phase 15 - Realism Polish and Upstream | Week 5 | Complete |
 | PROV-07 | T2 | Phase 9 - Traceable Report Lines | Week 2 | Complete |
-| PROV-08 | T3 | Phase 15 - Realism Polish and Upstream | Week 5 | Pending |
+| PROV-08 | T3 | Phase 15 - Realism Polish and Upstream | Week 5 | Complete |
 | SEC-01 | T0 | Phase 2 - Server Skeleton and Registration | Week 0 | Done |
 | SEC-02 | T1 | Phase 6 - Guest ABI and Materialization | Week 1 | Complete |
 | SEC-03 | T1 | Phase 6 - Guest ABI and Materialization | Week 1 | Complete |

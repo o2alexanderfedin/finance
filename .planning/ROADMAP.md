@@ -196,7 +196,7 @@ harmless one. Phase 12 wires the dialect into the worksheet that is already ther
 
 ### Week 5 — Technical Debt
 
-- [ ] **Phase 15: Realism Polish and Upstream** - Multi-year, mechanical 1040-X, a second report, and the fjs contributions
+- [x] **Phase 15: Realism Polish and Upstream** - Multi-year, mechanical 1040-X, a second report, and the fjs contributions (completed 2026-08-12)
 
 ### Backlog — Deferred Judgments
 
@@ -577,7 +577,13 @@ Plans:
   4. `fjs_check(hash)` smoke-checks a stored program without running it to completion, and is documented in the repo as having **zero** security value.
   5. `fjs/media`'s `detect` recognises our dialects through a registry contributed **upstream** to FunctionalScript — a list of dialect decoders that falls through when none match, not local glue.
 **Research**: **YES** — child-process isolation design, the wall-clock kill path, and the upstream API shapes (see v2 in REQUIREMENTS.md).
-**Plans**: TBD
+**Plans**: 6 plans across 2 waves
+- [x] 15-01-PLAN.md — PROV-08: income-by-payer report, import-graph gate, real fjs_run proof
+- [x] 15-02-PLAN.md — TAX-17 foundations: no-bare-2025 gate, prior-year capital-loss dialect, Capital Loss Carryover Worksheet
+- [x] 15-03-PLAN.md — MCP-09: fjs_check pure logic, registration, zero-security-value documentation
+- [x] 15-04-PLAN.md — PROV-06: the amendment-diff module (Columns A/B/C from two run hashes)
+- [x] 15-05-PLAN.md — TAX-17 wiring: carryover into Schedule D and Form 1040, year-genericity proof
+- [x] 15-06-PLAN.md — DOC-16: local dialect registry, wired into cas_refresh, REQUIREMENTS.md correction
 
 ---
 
@@ -654,7 +660,7 @@ Phases 16-18 are backlog: unordered, independent of each other and of the critic
 | 12. Brokerage and Capital-Gain Chain | Week 3 | 5/5 | Complete   | 2026-08-08 |
 | 13. The 65+ Profile and Schedules | Week 3 | 13/13 | Complete   | 2026-08-11 |
 | 14. Acceptance | Week 4 | 0/TBD | Not started | - |
-| 15. Realism Polish and Upstream | Week 5 | 0/TBD | Not started | - |
+| 15. Realism Polish and Upstream | Week 5 | 6/6 | Complete   | 2026-08-12 |
 
 ---
 

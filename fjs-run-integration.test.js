@@ -359,6 +359,44 @@ test(
                 runRecord.inputs.some(i => i.command === 'evoHead' && i.payload[0] === subjectC),
                 'expected subjectC (the absent-field document) to have been enumerated')
 
+            // ── MCP-09: fjs_check reachable from a real MCP tools/call —
+            // against the SAME already-materialized programHash this file
+            // seeded above, over this SAME real session ────────────────────
+            const checkResponse = await call('fjs_check', { hash: programHash })
+            assert.equal(checkResponse.result.isError, undefined, `fjs_check failed: ${JSON.stringify(checkResponse)}`)
+            const checkParsed = JSON.parse(checkResponse.result.content[0].text)
+            assert.equal(checkParsed.exportsReport, true, 'expected the seeded interest-summing program to export a report')
+
+            // The decisive proof that fjs_check never executes the program —
+            // not "fjs_check returned quickly", not "it didn't throw" on its
+            // OWN response, but that the SAME live process still answers a
+            // FOLLOWING call afterward. This program's report would THROW
+            // the instant it is actually invoked; import() alone (which
+            // fjs_check cannot avoid — the module's top-level code always
+            // runs on import) never reaches that throw, since it lives
+            // inside the exported function body, not at module scope. If
+            // fjs_check's shipped implementation ever called this report,
+            // the throw would surface here as a crashed connection or a
+            // dead process — waitForId's own timeout is what would catch
+            // that, since nothing in fjs/protocol/mcp/module.f.js's handler
+            // dispatch wraps a throw in a try/catch.
+            const throwingReportSource = 'export const report = ctx => args => { throw new Error(\'fjs_check must never invoke report\') }'
+            const throwingProgramHash = await casAdd(throwingReportSource)
+            const throwingCheckResponse = await call('fjs_check', { hash: throwingProgramHash })
+            assert.equal(
+                throwingCheckResponse.result.isError, undefined,
+                `expected fjs_check to succeed against a program whose report would throw if invoked: ${JSON.stringify(throwingCheckResponse)}`)
+            const throwingCheckParsed = JSON.parse(throwingCheckResponse.result.content[0].text)
+            assert.equal(throwingCheckParsed.exportsReport, true)
+            // EXEC-12-style session survival, proven for THIS call
+            // specifically: the SAME live process still answers a
+            // FOLLOWING request rather than having died invoking the
+            // throwing report.
+            const checkSurvivesResponse = await call('cas_list', {})
+            assert.ok(
+                !checkSurvivesResponse.result.isError,
+                `cas_list after fjs_check against a throwing report failed: ${JSON.stringify(checkSurvivesResponse)}`)
+
             // ── 09-07: the pin path through the SHIPPED fjs_run tool,
             // against a real separate process — the assertion that fails
             // when `...pinFields` is dropped from fjsRunTool's own

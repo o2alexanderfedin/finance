@@ -14,6 +14,13 @@ document it came from.
 Built for personal use, on top of the `fjs` CAS, Evo, and MCP modules. Early — see the
 documents below for what is settled, what is planned, and what is still open.
 
+The `fjs_check` tool smoke-checks a stored program — confirming it imports cleanly and
+exports something that looks like a report — before an agent spends a real `fjs_run` call
+on it. **`fjs_check` has no security value.** It is a productivity convenience, never a
+validation, sandboxing, or trust control: the program's top-level code has already run (via
+`import()`) by the time `fjs_check` has an answer, exactly the same exposure a real `fjs_run`
+call carries.
+
 ## Documentation
 
 | Document | What it covers |
