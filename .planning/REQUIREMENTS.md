@@ -336,7 +336,7 @@ structural (RTTI) and semantic passes.
       report **byte-identically**, verified adversarially: add an amended revision *between*
       two runs and assert the output does not move. A reproducibility check that passes
       only because nothing changed is not a check.
-- [ ] **PROV-06** *(T3)*: Mechanical Form 1040-X columns from a report diff. Form 1040-X is
+- [x] **PROV-06** *(T3)*: Mechanical Form 1040-X columns from a report diff. Form 1040-X is
       literally a three-column diff (A original, B net change, C correct), so corrected
       document → new revision → re-run → diff yields Columns A/B/C with per-line source
       hashes already attached. No new mechanism required.
