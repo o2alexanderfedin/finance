@@ -32,12 +32,19 @@ export const tier = 'must'
  * @type {readonly UnmodeledKind[]}
  */
 const offered = [
-    'pensionsAndAnnuities',
+    'unreportedTips',
     'scheduleOneAdditionalIncome',
-    'socialSecurityBenefits',
-    'iraDistributions',
-    'itemizedDeductions',
-    'childTaxCreditOrOtherDependents',
+    'qualifiedBusinessIncomeDeduction',
+    // `itemizedDeductions` moved to `modeledKinds` in Plan 13-07 (Phase 13
+    // Wave 3, TAX-13) — swapped for `netQualifiedDisasterLoss`, its former
+    // neighbor in the refusal table, which stays refused per Decision 1.4.
+    'netQualifiedDisasterLoss',
+    // `childTaxCreditOrOtherDependents`/`additionalChildTaxCredit` moved to
+    // `modeledKinds` in Plan 13-10 (Phase 13 Wave 4, TAX-12) — swapped for
+    // two of Decision 1.4's five permanently-refused kinds, so this toggle
+    // list never needs re-pointing again for the rest of the phase.
+    'medicaidWaiverPayments',
+    'otherEarnedIncome',
 ]
 
 /**

@@ -24,10 +24,20 @@ export const beat = 'Every figure the tax year fixes, stored once, each citing t
 export const tier = 'optional'
 
 /**
- * `{ revProc, section, effectiveDate }` as one printable citation.
- * @type {(citation: { readonly revProc: string, readonly section: string }) => string}
+ * A `Citation` as one printable string. `Citation` is a discriminated union
+ * (`fjs/tax/params`'s `kind: 'revProc' | 'publicLaw' | 'code'`, widened in
+ * Phase 13) because not every parameter this engine stores comes from an
+ * annual Revenue Procedure — some are direct Public Law text, some are
+ * long-standing bare IRC sections with no annual update at all. This page
+ * renders whichever authority actually governs the figure, rather than
+ * assuming Rev. Proc. for everything.
+ * @type {(citation: { readonly kind: 'revProc', readonly revProc: string, readonly section: string } | { readonly kind: 'publicLaw', readonly publicLaw: string, readonly section: string } | { readonly kind: 'code', readonly section: string }) => string}
  */
-const cite = citation => `Rev. Proc. ${citation.revProc} ${citation.section}`
+const cite = citation => {
+    if (citation.kind === 'revProc') { return `Rev. Proc. ${citation.revProc} ${citation.section}` }
+    if (citation.kind === 'publicLaw') { return `Pub. L. ${citation.publicLaw} ${citation.section}` }
+    return `IRC ${citation.section}`
+}
 
 /** @type {Step['render']} */
 export const render = root => {

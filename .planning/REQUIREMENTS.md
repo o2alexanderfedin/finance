@@ -30,7 +30,7 @@ profile is roughly 4–5× that:
   return that omits the senior deduction (Parts I/V/VI, 6% phase-out over $75k/$150k) is
   structurally wrong, not merely incomplete.
 - **65+ realistically implies SSA-1099 and 1099-R.** The Social Security Benefits
-  Worksheet is a 19-line near-circular computation — research flagged it as one of the two
+  Worksheet is an 18-line near-circular computation — research flagged it as one of the two
   hardest single computations in the domain.
 - **Brokerage sales pull in the whole capital-gains chain**: 1099-B → Form 8949 →
   Schedule D → the Schedule D Tax Worksheet (strictly harder than the QDCGT worksheet).
@@ -302,16 +302,16 @@ structural (RTTI) and semantic passes.
       `fjs/tax/line16/qdcgt/module.f.js` imports `baseTaxForAmount` from `fjs/tax/table`
       and its proofs assert `method22 === 'taxTable'`. Verified 2026-08-07 while scoping
       Phase 12; the phase text that scheduled building it was stale and has been corrected.
-- [ ] **TAX-09** *(T2)*: **Schedule 1-A Parts I/V/VI** — mandatory given TY2025 + 65+.
+- [x] **TAX-09** *(T2)*: **Schedule 1-A Parts I/V/VI** — mandatory given TY2025 + 65+.
       Senior deduction with 6% phase-out over $75k/$150k, feeding Form 1040 line 13b.
-- [ ] **TAX-10** *(T2)*: Social Security Benefits Worksheet — a 19-line near-circular
+- [x] **TAX-10** *(T2)*: Social Security Benefits Worksheet — an 18-line near-circular
       computation. Required by the 65+ profile.
 - [x] **TAX-11** *(T2)*: Form 8949 and Schedule D, including the Schedule D Tax Worksheet.
       Required by brokerage sales.
-- [ ] **TAX-12** *(T2)*: Schedule 8812. Required by dependents.
-- [ ] **TAX-13** *(T2)*: Schedule A. Required by itemizing, and it must compare against the
+- [x] **TAX-12** *(T2)*: Schedule 8812. Required by dependents.
+- [x] **TAX-13** *(T2)*: Schedule A. Required by itemizing, and it must compare against the
       standard deduction rather than assuming itemizing wins.
-- [ ] **TAX-14** *(T2)*: Schedule 1 and Schedule 2/3 to the extent the profile reaches them.
+- [x] **TAX-14** *(T2)*: Schedule 1 and Schedule 2/3 to the extent the profile reaches them.
 - [x] **TAX-15** *(T2)*: Worksheets modelled in IRS order, one named pure function per
       worksheet carrying the printed form's line numbers. **No variable named `magi`** — the
       MAGI for the IRA deduction, Roth eligibility, the Premium Tax Credit, IRMAA, and the
@@ -623,12 +623,12 @@ them. Week 0 is research's addition in front of the plan's Week 1.
 | TAX-06 | T1 | Phase 10 - 1040 Core and Scope Guard | Week 2 | Complete |
 | TAX-07 | T2 | Phase 12 - Brokerage and Capital-Gain Chain | Week 3 | Complete |
 | TAX-08 | T2 | Phase 10 - 1040 Core and Scope Guard | Week 3 | Complete |
-| TAX-09 | T2 | Phase 13 - The 65+ Profile and Schedules | Week 3 | Pending |
-| TAX-10 | T2 | Phase 13 - The 65+ Profile and Schedules | Week 3 | Pending |
+| TAX-09 | T2 | Phase 13 - The 65+ Profile and Schedules | Week 3 | Complete |
+| TAX-10 | T2 | Phase 13 - The 65+ Profile and Schedules | Week 3 | Complete |
 | TAX-11 | T2 | Phase 12.1 - The Capital-Gain Chain | Week 3 | Complete |
-| TAX-12 | T2 | Phase 13 - The 65+ Profile and Schedules | Week 3 | Pending |
-| TAX-13 | T2 | Phase 13 - The 65+ Profile and Schedules | Week 3 | Pending |
-| TAX-14 | T2 | Phase 13 - The 65+ Profile and Schedules | Week 3 | Pending |
+| TAX-12 | T2 | Phase 13 - The 65+ Profile and Schedules | Week 3 | Complete |
+| TAX-13 | T2 | Phase 13 - The 65+ Profile and Schedules | Week 3 | Complete |
+| TAX-14 | T2 | Phase 13 - The 65+ Profile and Schedules | Week 3 | Complete |
 | TAX-15 | T2 | Phase 12.1 - The Capital-Gain Chain | Week 3 | Complete |
 | TAX-16 | T1 | Phase 10 - 1040 Core and Scope Guard | Week 2 | Complete |
 | TAX-17 | T3 | Phase 15 - Realism Polish and Upstream | Week 5 | Pending |

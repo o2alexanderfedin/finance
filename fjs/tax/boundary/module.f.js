@@ -143,32 +143,120 @@ const taxTableBandThresholds = [
 ]
 
 /**
- * The combined threshold inventory: every ordinary-bracket ceiling, capital-gains breakpoint, and
- * Tax Table band edge this phase's data introduces, assembled from the three sources above.
+ * The senior deduction's phase-out START and zero-FLOOR thresholds
+ * (13-CONTEXT.md Decision 5.5/Pitfall 3; Schedule 1-A Part V,
+ * `fjs/schedule/1a`) -- 8 total (2 per status x 4 statuses). No
+ * `marriedFilingSeparately` entry: Decision 5.4/Pitfall 3's short-circuit
+ * makes the senior deduction $0 UNCONDITIONALLY for MFS, at any income --
+ * there is no dollar boundary to register for a status whose amount never
+ * depends on one.
+ *
+ * The floor point is DERIVED from the SAME stored fields `fjs/schedule/1a`
+ * itself reads ($6,000 base / 6% rate = $100,000 above the start), never a
+ * second hand-typed dollar literal -- so a future change to either the base
+ * amount or the rate moves BOTH the module's own arithmetic and this
+ * registered threshold together.
+ * @type {readonly Threshold[]}
+ */
+const seniorDeductionThresholds = (
+    /** @type {readonly ('single' | 'marriedFilingJointly' | 'headOfHousehold' | 'qualifyingSurvivingSpouse')[]} */
+    (['single', 'marriedFilingJointly', 'headOfHousehold', 'qualifyingSurvivingSpouse'])
+).flatMap(status => {
+    const startCents = centsFromString(taxParams2025.seniorDeduction.phaseoutThreshold[status].amount)
+    return [
+        { label: `seniorDeductionPhaseoutStart:${status}`, cents: startCents },
+        // $6,000.00 / 6% = $100,000.00 = 10,000,000 cents above the start.
+        { label: `seniorDeductionPhaseoutFloor:${status}`, cents: startCents + 10000000n },
+    ]
+})
+
+/**
+ * The SALT cap's phase-down START and FLOOR thresholds (13-CONTEXT.md
+ * Decision 2.1/5.6/Pitfall 2; the State and Local Tax Deduction Worksheet,
+ * `fjs/schedule/a`) -- 10 total (2 per status x 5 statuses). UNLIKE
+ * {@link seniorDeductionThresholds}, this one covers `marriedFilingSeparately`
+ * too: the worksheet's own w5 line IS genuinely status-specific on its face
+ * ($250,000 MFS vs $500,000 every other status) -- Pitfall 2 is about w1/w9
+ * staying FLAT across every status, never about w5, and w5 is exactly what
+ * this threshold registers.
+ *
+ * The floor point is DERIVED from the SAME stored fields `fjs/schedule/a`
+ * itself reads (($40,000 flat cap - $10,000 flat floor) / 30% phase-down
+ * rate = $100,000 above the start), never a second hand-typed dollar
+ * literal -- so a future change to any of the three parameters moves both
+ * the module's own arithmetic and this registered threshold together.
+ * @type {readonly Threshold[]}
+ */
+const saltCapThresholds = (
+    /** @type {readonly ('single' | 'marriedFilingJointly' | 'marriedFilingSeparately' | 'headOfHousehold' | 'qualifyingSurvivingSpouse')[]} */
+    (['single', 'marriedFilingJointly', 'marriedFilingSeparately', 'headOfHousehold', 'qualifyingSurvivingSpouse'])
+).flatMap(status => {
+    const startCents = centsFromString(taxParams2025.saltCap.threshold[status].amount)
+    return [
+        { label: `saltCapPhasedownStart:${status}`, cents: startCents },
+        // ($40,000.00 - $10,000.00) / 30% = $100,000.00 = 10,000,000 cents above the start.
+        { label: `saltCapPhasedownFloor:${status}`, cents: startCents + 10000000n },
+    ]
+})
+
+/**
+ * The CTC/ODC phase-out's own START threshold (13-CONTEXT.md Decision
+ * 5.5/5.6; Schedule 8812 Part I, `fjs/form8812`) -- 2 total, the two keys
+ * `childTaxCredit.phaseoutThreshold` carries (`marriedFilingJointly` and
+ * `other`). UNLIKE {@link seniorDeductionThresholds}/{@link saltCapThresholds},
+ * this registers ONLY the crossing point -- no floor/zero-point entry. The
+ * STEPPED $1,000-rounding shape that makes this phase-out's cliff
+ * distinctive is a module-local property `fjs/form8812`'s own Test 2/3
+ * fixtures pin directly; `segmentIndex`'s generic `<=`-count check here only
+ * proves "is the threshold crossed at exactly this cent," which neither
+ * needs nor can prove the $1,000-step rounding itself.
+ * @type {readonly Threshold[]}
+ */
+const childTaxCreditThresholds = (
+    /** @type {readonly ('marriedFilingJointly' | 'other')[]} */
+    (['marriedFilingJointly', 'other'])
+).flatMap(key => [
+    {
+        label: `childTaxCreditPhaseoutStart:${key}`,
+        cents: centsFromString(taxParams2025.childTaxCredit.phaseoutThreshold[key].amount),
+    },
+])
+
+/**
+ * The combined threshold inventory: every ordinary-bracket ceiling, capital-gains breakpoint,
+ * Tax Table band edge, senior-deduction phase-out threshold, SALT-cap phase-down threshold, and
+ * CTC/ODC phase-out start threshold this phase's data introduces, assembled from the six sources
+ * above.
  * @type {readonly Threshold[]}
  */
 export const allThresholds = [
     ...ordinaryBracketThresholds,
     ...capitalGainsThresholds,
     ...taxTableBandThresholds,
+    ...seniorDeductionThresholds,
+    ...saltCapThresholds,
+    ...childTaxCreditThresholds,
 ]
 
 /**
  * The independently-stated expected count of thresholds assembled above -- 33 ordinary-bracket
  * ceilings (6 + 6 + 6 + 6 + 6 across the five individual filing statuses, + 3 for estates &
- * trusts) + 12 capital-gains breakpoints (2 x 6 statuses) + 5 Tax Table band edges = 50. This
- * exists so a threshold silently dropped during assembly fails an explicit assertion
- * (`everyThresholdIsCovered` below) rather than passing by omission.
+ * trusts) + 12 capital-gains breakpoints (2 x 6 statuses) + 5 Tax Table band edges + 8
+ * senior-deduction phase-out thresholds (start + floor, x 4 statuses) + 10 SALT-cap phase-down
+ * thresholds (start + floor, x 5 statuses, INCLUDING marriedFilingSeparately) + 2 CTC/ODC
+ * phase-out start thresholds (MFJ + other, START ONLY, no floor) = 70. This exists so a threshold
+ * silently dropped during assembly fails an explicit assertion (`everyThresholdIsCovered` below)
+ * rather than passing by omission.
  *
  * `qualifyingSurvivingSpouse`'s thresholds duplicate `marriedFilingJointly`'s CENTS values while
  * carrying distinct labels (10-CONTEXT.md Decision 6: the two statuses read the same Rev. Proc.
  * rows). That leaves `sortedCents`'s de-duplication below unaffected -- it already had duplicate
  * values to collapse, e.g. the $103,350.00 ceiling shared by `single` and `headOfHousehold` --
- * and each of the eight new leaves still asserts a real boundary, since the assertion is about
- * where the count changes, not about the label being unique in cents.
+ * and each new leaf still asserts a real boundary, since the assertion is about where the count
+ * changes, not about the label being unique in cents.
  * @type {number}
  */
-export const expectedThresholdCount = 50
+export const expectedThresholdCount = 70
 
 // ── Tests ────────────────────────────────────────────────────────────────────
 
@@ -185,7 +273,7 @@ const sortedCents = [...new Set(allThresholds.map(threshold => threshold.cents))
 
 /**
  * One generated proof leaf per stored threshold -- built by mapping `allThresholds` into
- * `[label, assertion]` pairs via `Object.fromEntries`, never as a hand-written literal with 50
+ * `[label, assertion]` pairs via `Object.fromEntries`, never as a hand-written literal with 68
  * manually authored keys. Each leaf asserts the boundary is crossed at EXACTLY the threshold's
  * own cent: one cent before must count strictly fewer boundaries reached than the threshold
  * itself, and the threshold must count the same number of boundaries reached as one cent after

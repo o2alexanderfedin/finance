@@ -43,7 +43,7 @@ The taxpayer profile (65+, brokerage sales, dependents, itemizes) was chosen del
 for realism, and it is a legitimate choice. It is also roughly **4–5× the v1 research
 recommended** (1040 core + Schedule B + three dialects). Phases 11–13 alone contain nine
 IRS forms/schedules and five document dialects, including the two hardest single
-computations in the domain (the Schedule D Tax Worksheet and the 19-line Social Security
+computations in the domain (the Schedule D Tax Worksheet and the 18-line Social Security
 Benefits Worksheet), neither of which has been read line by line yet. `todo/plan.md`
 allots one week — Week 3 — to what is here three phases.
 
@@ -168,7 +168,7 @@ These were established by execution, not inference. Any replan must preserve the
 - [x] **Phase 11: Wage, Retirement, and Benefit Documents** - W-2, SSA-1099, 1099-R, the document library, and the retraction story (completed 2026-08-07)
 - [x] **Phase 12: Brokerage Documents** - 1099-DIV, 1099-B, the consolidated-1099 document model, and Schedule B *(SPLIT from the original Phase 12, 2026-08-07)* (completed 2026-08-08)
 - [x] **Phase 12.1: The Capital-Gain Chain** - Form 8949, Schedule D, the Schedule D Tax Worksheet, and replacing the live line-16 refusal *(SPLIT from the original Phase 12, 2026-08-07)* (completed 2026-08-09)
-- [ ] **Phase 13: The 65+ Profile and the Remaining Schedules** - Schedule 1-A, the Social Security Benefits Worksheet, 8812, Schedule A, Schedules 1/2/3
+- [x] **Phase 13: The 65+ Profile and the Remaining Schedules** - Schedule 1-A, the Social Security Benefits Worksheet, 8812, Schedule A, Schedules 1/2/3 (completed 2026-08-11)
 
 **Why Phase 12 was split (2026-08-07).** Two findings made the original single phase wrong:
 
@@ -506,18 +506,44 @@ Plans:
 
 ### Phase 13: The 65+ Profile and the Remaining Schedules
 **Milestone**: Week 3 — Breadth in Documents
+**Mode:** mvp
 **Goal**: The declared taxpayer profile is structurally complete — a 65+ TY2025 return with dependents that itemizes is no longer missing anything it is required to have.
 **Depends on**: Phase 11, Phase 12
 **Requirements**: TAX-09, TAX-10, TAX-12, TAX-13, TAX-14
 **Tier**: T2
 **Success Criteria** (what must be TRUE):
   1. Schedule 1-A Parts I/V/VI compute the senior deduction with the 6% phase-out over $75k/$150k, feeding Form 1040 line 13b — a 65+ TY2025 return without it is structurally wrong, not merely incomplete.
-  2. The 19-line Social Security Benefits Worksheet matches the printed worksheet on a case that exercises its near-circular dependency.
+  2. The 18-line Social Security Benefits Worksheet matches the printed worksheet on a case that exercises its near-circular dependency.
   3. Schedule A computes and is **compared against** the standard deduction, with proofs in both directions — itemizing does not automatically win above $15,750 / $31,500.
   4. Schedule 8812 computes for the declared dependents, and Schedules 1, 2, and 3 carry every line the profile actually reaches.
   5. `grep -rn "magi" fjs/` returns nothing — each rule's MAGI is a separately named function stating its own add-back list, because the IRA deduction, Roth eligibility, the Premium Tax Credit, IRMAA, and the student-loan-interest deduction do not share one.
 **Research**: **YES** — MAGI add-back lists per rule, phase-out cliff mechanics, and Schedule 1-A limitation mechanics.
-**Plans**: TBD
+**Plans**: 13 plans in 5 waves (one wave per vertical slice, CONTEXT.md Decision 6.1 — supersedes the original three-wave shape)
+
+**Wave 1** (TAX-10 — retirement and Social Security income)
+- [x] 13-01-PLAN.md — Citation discriminated union, SSB base-amount parameters, the 18-line Social Security Benefits Worksheet
+- [x] 13-02-PLAN.md — 1099-R/SSA-1099 wiring into 1040 lines 4a-6b/25b, the iraDeductionDeclared refusal, four-kind reclassification, end-to-end proof *(needs 13-01)*
+
+**Wave 2** (TAX-09 — the senior deduction)
+- [x] 13-03-PLAN.md — Senior deduction parameters, Schedule 1-A Parts I/V/VI *(needs 13-02)*
+- [x] 13-04-PLAN.md — Wire 1040 line 13b, reclassify seniorAndOtherScheduleOneADeductions, end-to-end proof *(needs 13-03)*
+
+**Wave 3** (TAX-13 — itemizing)
+- [x] 13-05-PLAN.md — vnd.fjs.itemized_deductions dialect, SALT cap/medical floor parameters, Schedule A line 18 election *(needs 13-04)*
+- [x] 13-06-PLAN.md — Schedule A (all 18 lines), the withholding-drift proof, w2/1099r docstring amendments *(needs 13-05)*
+- [x] 13-07-PLAN.md — deductionChoice, wire 1040 line 12e, reclassify itemizedDeductions, end-to-end proof both directions *(needs 13-06)*
+
+**Wave 4** (TAX-12 — dependents and Schedule 8812)
+- [x] 13-08-PLAN.md — return_profile dependents array, CTC/ODC/ACTC/phase-out parameters *(needs 13-07)*
+- [x] 13-09-PLAN.md — Schedule 8812 Parts I/II-A, roundUpToNextThousandDollars, dependent classification *(needs 13-08)*
+- [x] 13-10-PLAN.md — Wire 1040 lines 19/28, reclassify childTaxCreditOrOtherDependents/additionalChildTaxCredit, end-to-end proof *(needs 13-09)*
+
+**Wave 5** (TAX-14 — remaining schedules and the sweep)
+- [x] 13-11-PLAN.md — Schedules 1/2/3 as standalone, printed-line-complete, documented-zero modules *(needs 13-10)*
+- [x] 13-12-PLAN.md — Wire 1040 lines 8/10/17/20/23/31, the first full-profile end-to-end proof combining all five slices *(needs 13-11)*
+- [x] 13-13-PLAN.md — The mechanical MAGI gate, ten corrected remedy strings, the 18-line REQUIREMENTS.md/ROADMAP.md correction *(needs 13-12)*
+
+**A finding from planning, worth the phase owner's attention**: `scheduleOneAdditionalIncome`, `scheduleOneAdjustments`, `scheduleTwoTaxes`, `scheduleThreeNonrefundableCredits` and `scheduleThreeRefundableCredits` are NOT reclassified to `modeledKinds` in this plan set, unlike CONTEXT.md Decision 6.1's table implies. 13-RESEARCH.md's own Open Questions 1 and 2 found that each is one coarse kind covering many distinct Schedule 1/2/3 line items with no per-line dialect to attribute a real dollar figure to — reclassifying them while the module can only ever return `$0` would be a confident zero replacing an honest refusal, exactly TAX-16's failure mode. Research's own recommendation ("No action needed for Phase 13's target profile") is followed. Final `modeledKinds`/`unmodeledKindRefusals` split after this phase: 20/30 (not the 25/25 a literal reading of the table would suggest).
 
 **── Milestone: Week 4 — The Full Path Works on the User's Own Documents ──**
 
@@ -626,7 +652,7 @@ Phases 16-18 are backlog: unordered, independent of each other and of the critic
 | 10. 1040 Core and Scope Guard | Week 2 | 10/10 | Complete   | verified 2026-08-06 5/5 |
 | 11. Wage, Retirement, Benefit Documents | Week 3 | 5/5 | Complete   | 2026-08-08 |
 | 12. Brokerage and Capital-Gain Chain | Week 3 | 5/5 | Complete   | 2026-08-08 |
-| 13. The 65+ Profile and Schedules | Week 3 | 0/TBD | Not started | - |
+| 13. The 65+ Profile and Schedules | Week 3 | 13/13 | Complete   | 2026-08-11 |
 | 14. Acceptance | Week 4 | 0/TBD | Not started | - |
 | 15. Realism Polish and Upstream | Week 5 | 0/TBD | Not started | - |
 

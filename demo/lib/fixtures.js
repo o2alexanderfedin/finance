@@ -147,9 +147,11 @@ export const documents = [
 
 /**
  * The engine's `Form1040Inputs` for the sample return. `dividendForms`/
- * `brokerageForms` are Plan 12.1-04's own widening of `Form1040Inputs` — the
- * sample return holds neither a 1099-DIV nor a 1099-B, so both are empty;
- * `inputsDeclaring` below spreads `...inputs`, so both fields are inherited
+ * `brokerageForms` are Plan 12.1-04's own widening of `Form1040Inputs`;
+ * `retirementForms`/`socialSecurityForms` are Plan 13-02's own widening;
+ * `itemizedDeductionForms`/`medicalExpenseForms` are Plan 13-07's own
+ * widening — the sample return holds none of the six, so all are empty;
+ * `inputsDeclaring` below spreads `...inputs`, so every field is inherited
  * automatically by every demo step that consumes it.
  */
 export const inputs = {
@@ -158,6 +160,10 @@ export const inputs = {
     interestForms: [int1099Savings, int1099Treasury],
     dividendForms: [],
     brokerageForms: [],
+    retirementForms: [],
+    socialSecurityForms: [],
+    itemizedDeductionForms: [],
+    medicalExpenseForms: [],
 }
 
 /**
