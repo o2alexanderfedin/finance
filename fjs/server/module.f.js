@@ -51,7 +51,7 @@
  *
  * @module
  */
-import { mapStep, pure, step } from 'functionalscript/fjs/effects/module.f.js'
+import { mapStep, pure, step, foldStep } from 'functionalscript/fjs/effects/module.f.js'
 import { create, write } from 'functionalscript/fjs/effects/memory/module.f.js'
 import { stdioTransport } from 'functionalscript/fjs/protocol/mcp/stdio/module.f.js'
 import { mcpStep, uninitializedState, fromRegistry, toolEntry, okResult, errorResult } from 'functionalscript/fjs/protocol/mcp/module.f.js'
@@ -77,6 +77,7 @@ import { financeTaxParamsTool } from './finance_tax_params/module.f.js'
 import { financeDocumentsListTool } from './finance_documents_list/module.f.js'
 import { fjsRunTool, placeJsModuleFixture } from './fjs_run/module.f.js'
 import { fjsCheck } from '../guest/check/module.f.js'
+import { detectFinance } from '../media/dialects/module.f.js'
 import { guestCtx } from '../guest/module.f.js'
 import { programPath, materializeHome } from '../guest/materialize/module.f.js'
 import { validate as validateRun } from '../run/module.f.js'
@@ -109,23 +110,56 @@ import { unwrap } from 'functionalscript/fjs/types/result/module.f.js'
  * always rescans the whole store, mirroring `buildCache`'s own full-rescan
  * contract — see the module doc's threat-model note (`T-05-04-02`) on why a
  * full rescan, not a targeted `syncRevision`, is the right lever here.
+ *
+ * DOC-16: after the cache rebuild/write, this ALSO re-lists and re-reads
+ * every blob `cas` holds, classifies each via `fjs/media/dialects`'
+ * `detectFinance`, and reports a `{ [mimeType]: count }` map in the
+ * response — this is `detect`'s one real, reachable running path (see that
+ * module's own header for why: registered-but-unreachable is precisely the
+ * defect Phase 16 exists to clean up). A CAS read failure is skipped
+ * silently, mirroring `financeDocumentsListTool`'s own defensive skip for a
+ * bad read; per T-15-12 this second full-store pass is accepted as
+ * consistent with `buildCache`'s own already-full-rescan contract, not a
+ * new cost `cas_refresh` introduces.
  * @type {<O extends Operation>(cas: Cas<O>) => (cacheKey: Key<Cache>) => ToolEntry<O | MemOp>}
  */
 export const casRefreshTool = cas => cacheKey => toolEntry(
     'cas_refresh',
-    'Rescans the CAS store and replaces the in-memory Evo subject/head cache. ' +
-    'The refresh lever for content mutated by another process (e.g. `npx ' +
-    'functionalscript cas add`) since the server started or was last ' +
-    'refreshed; call this after externally adding a revision blob so ' +
-    'evo_head/evo_list see it without a restart.',
+    'Rescans the CAS store and replaces the in-memory Evo subject/head cache, ' +
+    'and reports a per-dialect count of every stored blob classified via ' +
+    'fjs/media/dialects\' detectFinance (DOC-16). The refresh lever for ' +
+    'content mutated by another process (e.g. `npx functionalscript cas ' +
+    'add`) since the server started or was last refreshed; call this after ' +
+    'externally adding a revision blob so evo_head/evo_list see it without ' +
+    'a restart.',
     {},
-    // Two sequential effects, written as a chain rather than as a nest: the
-    // rebuild feeds the write, and the write's result is replaced by the
-    // response. `mapStep(e, () => v)` is the constant form — upstream's own
-    // docstring explains why no `constStep` exists.
+    // Sequential effects, written as a chain rather than as a nest: the
+    // rebuild feeds the write, the write feeds a full re-list-and-classify
+    // fold over cas, and that fold's result becomes the response.
+    // `mapStep(e, () => v)` is the constant form — upstream's own docstring
+    // explains why no `constStep` exists.
     () => mapStep(
-        step(buildCache(cas), newCache => write(cacheKey, newCache)),
-        () => okResult('refreshed')),
+        step(
+            step(buildCache(cas), newCache => write(cacheKey, newCache)),
+            () => step(
+                cas.list(),
+                hashes => foldStep(
+                    pure(hashes),
+                    /** @type {{ [mimeType: string]: number }} */ ({}),
+                    hash => acc => mapStep(
+                        collectRead(cas.read(hash)),
+                        readResult => {
+                            if (readResult[0] === 'error') {
+                                return acc
+                            }
+                            const mimeType = detectFinance(readResult[1]).mime_type
+                            return { ...acc, [mimeType]: (acc[mimeType] ?? 0) + 1 }
+                        },
+                    ),
+                ),
+            ),
+        ),
+        dialectCounts => okResult(jsonText({ status: 'refreshed', dialectCounts }))),
 )
 
 // ── fjs_check (MCP-09) ────────────────────────────────────────────────────────
@@ -488,13 +522,78 @@ export const proof = {
             const [state5, refreshResponses] = runBatch(state4, [{ jsonrpc: '2.0', method: 'tools/call', id: 11, params: { name: 'cas_refresh', arguments: {} } }])
             // Decoding against a schema that requires `result` is itself the
             // "not an error" assertion — a JSON-RPC error envelope carries
-            // `error` and no `result`. It also pins what the tool actually
-            // answered, which `!('error' in …)` never did.
-            assertEq(asCallResult(refreshResponses[0]).result.content[0]?.text, 'refreshed')
+            // `error` and no `result`. The response body is now a JSON
+            // object (DOC-16's dialectCounts widening), so this leaf checks
+            // the `status` field rather than the old bare-string body —
+            // `dialectCounts.casRefreshReportsDialectCounts` (below) is what
+            // pins the counts themselves.
+            assertEq(
+                JSON.parse(asCallResult(refreshResponses[0]).result.content[0]?.text ?? '{}').status,
+                'refreshed')
             // AFTER cas_refresh: the same subject now resolves to the
             // seeded revision's own hash (its only, zero-parent head).
             const [, afterResponses] = runBatch(state5, [evoHeadCall(12)])
             assertEq(asCallResult(afterResponses[0]).result.content[0]?.text, seededHash)
+        },
+        // DOC-16: cas_refresh's dialectCounts response, over three blobs
+        // seeded directly into the store (the same technique
+        // seedInvisibleUntilRefreshed above uses) — one vnd.fjs.1099int
+        // document, one vnd.fjs.revision blob, and one well-formed JSON
+        // blob naming a dialect NONE of financeDialects registers. The
+        // unregistered blob's chosen behavior (documented at
+        // casRefreshTool's own module header): it falls through to
+        // detectFinance's ordinary text/plain verdict and is counted under
+        // that sentinel, never silently absorbed into either registered
+        // dialect's own count.
+        dialectCountsReportsPerDialectClassification: () => {
+            const home = '/'
+            const cas = fileCas(sha256)(home)
+            const [state0, cacheKey] = virtual(emptyState)(initEvo(cas))
+            /**
+             * Writes `text` directly into `cas` — the same seeding
+             * technique `seedInvisibleUntilRefreshed` (above) uses —
+             * threading `state`.
+             * @type {(state: State) => (text: string) => readonly [State, string]}
+             */
+            const seedBlob = state => text => {
+                const bytes = tryUtf8(text)
+                assert(bytes !== null, ['expected the seed text to encode as UTF-8', text])
+                const [nextState, w] = virtual(state)(cas.write(pure({ first: ok(bytes), tail: pure(undefined) })))
+                assert(w[0] === 'ok', ['expected the seed write to succeed', w])
+                return /** @type {const} */ ([nextState, vecToCBase32(w[1])])
+            }
+            const [state1] = seedBlob(state0)(JSON.stringify({
+                dialect: oneZeroNineNineIntDialect,
+                payerTin: '11-1111111',
+                recipientTin: '222-22-2222',
+                accountNumber: 'ACC-0001',
+                taxYear: 2024,
+                formRevision: '2024',
+            }))
+            const revisionSubject = vecToCBase32(vec8(0x22n))
+            const [state2] = seedBlob(state1)(
+                `{"dialect":"${revisionDialect}","subject":"${revisionSubject}","parents":[],"snapshot":"${revisionSubject}","generation":0}`)
+            const [state3] = seedBlob(state2)(JSON.stringify({ dialect: 'vnd.fjs.not-a-real-dialect' }))
+            const [state4, sessionKey] = virtual(state3)(create(uninitializedState))
+            const handlers = financeMcpHandlers(home)(cacheKey)
+            /**
+             * @type {(state: State, messages: readonly unknown[]) => readonly [State, readonly Unknown[]]}
+             */
+            const runBatch = (state, messages) => {
+                const input = messages.map(m => JSON.stringify(m)).join('\n') + '\n'
+                const [nextState] = virtual({ ...state, stdout: '', stderr: '', stdin: toBytes(input) })(
+                    stdioTransport(mcpStep(financeConfig)(handlers)(sessionKey)))
+                return [nextState, responsesOf(nextState)]
+            }
+            const [state5] = runBatch(state4, [initializeRequest, initializedNotification])
+            const [, refreshResponses] = runBatch(state5, [
+                { jsonrpc: '2.0', method: 'tools/call', id: 11, params: { name: 'cas_refresh', arguments: {} } },
+            ])
+            const body = JSON.parse(asCallResult(refreshResponses[0]).result.content[0]?.text ?? '{}')
+            assertEq(body.status, 'refreshed')
+            assertEq(body.dialectCounts['application/vnd.fjs.1099int+json'], 1)
+            assertEq(body.dialectCounts['application/vnd.fjs.revision+json'], 1)
+            assertEq(body.dialectCounts['text/plain'], 1)
         },
     },
     // ── The Week 1 Convergence (todo/plan.md's Week 1 finish line, Success
