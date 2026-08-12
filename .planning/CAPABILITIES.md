@@ -1,26 +1,30 @@
 # Finance — Capability Snapshot
 
-**Pinned to:** `17e0d06` (2026-08-12)
+**Pinned to:** `449846a` (2026-08-12)
 **Suite at that commit:** `npm test` green — 6296/6296, 0 failures; 907 de-duplicated project-local proofs
 **Phase state:** 15 of 19 phases complete (Phase 15 closed: all 6 plans, code review, 3 fixes applied)
 
-> **Correction, 2026-08-12.** The first two revisions of this file claimed "no document-write MCP
-> tool is registered" and put the tool count at 7, then 8. **Both were wrong.** `cas_add`,
-> `cas_get`, `evo_add`, `evo_head`, `evo_list` and `evo_revision` are all registered — they come
-> from upstream's `casToolRegistry`/`evoToolRegistry`, which `financeMcpHandlers` spreads in at
-> `fjs/server/module.f.js:217-218`. The error came from grepping only for finance-local
-> `toolEntry(` declarations, which misses both spread-in registries. The real surface is **12
-> tools**, and documents **can** be stored from inside an MCP session. The actual constraint is
-> narrower and is described under "What does NOT run end to end".
+> **Correction, 2026-08-12 — and a lesson about method.** Earlier revisions of this file put the
+> tool count at 7, then 8, then 12. All three were wrong; the answer is **13**. Worse, the first
+> two asserted "no document-write MCP tool is registered", which was flatly false and was this
+> file's load-bearing claim.
+>
+> Every wrong number came from the same mistake: **grepping source instead of asking the server.**
+> Finance-local `toolEntry(` declarations miss the upstream `casToolRegistry`/`evoToolRegistry`
+> spread into `financeMcpHandlers` at `fjs/server/module.f.js:217-218`, and even after accounting
+> for those, a hand-assembled list dropped `cas_list`.
+>
+> **The tool table below is now obtained by running `node index.js` and issuing `tools/list`** —
+> see "How to re-derive this file". Do not update it by reading code.
 
 > **Read this file as a snapshot, not a contract.** It answers one question — *what can this
-> system actually do today?* — and it is derived by reading the code, not the roadmap.
+> system actually do today?* — from the code and the running server, not from the roadmap.
 > REQUIREMENTS.md says what is promised; ROADMAP.md says when; **this file says what runs.**
 >
-> Everything below was verified against source at the pinned commit. Where a capability is
-> partial or unreachable, that is stated rather than omitted. Regenerate with `/gsd-progress`
-> after any phase closes, and re-pin the commit — a capability list that outlives its commit
-> becomes marketing.
+> The tool table came from a live `tools/list`; the suite figures from an actual `npm test`;
+> everything else from source at the pinned commit. Where a capability is partial or unreachable,
+> that is stated rather than omitted. Regenerate with `/gsd-progress` after any phase closes, and
+> re-pin the commit — a capability list that outlives its commit becomes marketing.
 
 ---
 
@@ -35,10 +39,12 @@ typed input.**
 
 ## The MCP surface
 
-**Twelve tools** over local stdio (remote transport is an explicit v2 milestone). Six are
-finance's own; six are inherited from upstream FunctionalScript and spread into
-`financeMcpHandlers` — a distinction worth keeping, because grepping only for finance-local
-`toolEntry(` declarations misses half the surface (this file got that wrong twice).
+**Thirteen tools** over local stdio, as advertised by a running `node index.js` answering
+`tools/list` (`serverInfo: finance-mcp 0.12.0`, `protocolVersion: 2025-11-25`). Remote transport
+is an explicit v2 milestone.
+
+Six are finance's own; seven are inherited from upstream FunctionalScript and spread into
+`financeMcpHandlers` at `fjs/server/module.f.js:217-218`.
 
 **Finance's own:**
 
@@ -57,6 +63,7 @@ finance's own; six are inherited from upstream FunctionalScript and spread into
 |---|---|
 | `cas_add` | Writes a blob into the content-addressed store. |
 | `cas_get` | Reads a blob back by hash. |
+| `cas_list` | Enumerates stored blobs. |
 | `evo_add` | **Adds a revision for a subject — this is how a document is stored from inside an MCP session.** |
 | `evo_head` | Current revision for a subject. |
 | `evo_list` | Subject enumeration. |
@@ -249,7 +256,12 @@ npm test                                    # full suite: tsc && node --test
 # functionalscript submodule is initialized, because its own all.test.js re-scans this tree
 node --test 2>&1 | grep '^✔ import("./fjs/' | sed 's/ ([0-9.]*ms)$//' | sort -u | wc -l
 
-grep -oE "t\.name === '[a-z_]+'" fjs/server/module.f.js | sort -u    # registered tools
-sed -n '213,300p' fjs/return/scope/module.f.js                        # modeled kinds
-sed -n '301,400p' fjs/return/scope/module.f.js                        # refused kinds
+sed -n '213,300p' fjs/return/scope/module.f.js   # modeled kinds
+sed -n '301,400p' fjs/return/scope/module.f.js   # refused kinds
 ```
+
+**For the tool list, do NOT grep — ask the server.** Every wrong count in this file's history came
+from reading source. Start `node index.js <fresh-home>`, send `initialize`, then
+`notifications/initialized`, then `tools/list`, and read the answer. A ~40-line probe script is
+all it takes, and `cas-refresh-cross-process.test.js` already contains the exact spawn-and-speak
+NDJSON pattern to copy.
