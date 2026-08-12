@@ -55,18 +55,38 @@ import { dialect as runDialect } from '../../run/module.f.js'
 // ── PROV-04: paramSetHash and the reviewed-estimate framing ─────────────────
 
 /**
- * PROV-04's parameter-set fingerprint: a content hash over the canonical
- * JSON serialization of a `TaxParamSet`, computed host-side. Reuses the
- * SAME one-shot SHA-256 primitive `fileCas` calls internally, without ever
+ * PROV-04's parameter-set fingerprint: a content hash over the JSON
+ * serialization of a `TaxParamSet`, computed host-side. Reuses the SAME
+ * one-shot SHA-256 primitive `fileCas` calls internally, without ever
  * performing a `cas.write` — nothing here needs to be retrievable by this
  * hash, only stable. `matchesFileCassOwnHashOfTheIdenticalBytes` below
  * cross-checks this is genuinely the same content-addressing primitive CAS
  * itself uses, not an independently invented, hand-written format.
+ *
+ * **The serialization is source-order, NOT canonical — do not call it that.**
+ * An earlier version of this docstring said "canonical", which overclaims what
+ * `fjs/json`'s `stringify` guarantees: it emits keys in the source object's own
+ * property order and performs no sorting. The hash is stable in practice only
+ * because every caller passes the same singleton `taxParamsByYear[year]`
+ * object, whose key order is fixed by its source literal.
+ *
+ * **The consequence is a real, silent hazard.** Reordering the fields of a
+ * `TaxParamSet` literal in `fjs/tax/params/module.f.js` — a pure
+ * readability edit, changing no dollar figure and no citation — would change
+ * every `paramSetHash` this function produces, and therefore change the
+ * provenance header on every report, with nothing in the suite objecting.
+ * Two runs that SHOULD be comparable would stop looking comparable.
+ *
+ * If a caller ever needs to hash a `TaxParamSet` it built itself rather than
+ * one of those singletons, sort the keys first or this fingerprint means
+ * nothing across callers. Do not paper over it by re-adding the word
+ * "canonical".
+ *
  * @type {(taxParamSet: TaxParamSet) => string}
  */
 export const paramSetHash = taxParamSet => {
     const bytes = tryUtf8(jsonText(taxParamSet))
-    assert(bytes !== null, ['expected the canonical parameter-set text to encode as UTF-8', taxParamSet])
+    assert(bytes !== null, ['expected the parameter-set text to encode as UTF-8', taxParamSet])
     return vecToCBase32(computeSync(sha256)([bytes]))
 }
 
@@ -170,7 +190,7 @@ export const proof = {
             const home = '/report/provenance/param-set-hash-cas-cross-check'
             const cas = fileCas(sha256)(home)
             const bytes = tryUtf8(jsonText(taxParams2025))
-            assert(bytes !== null, ['expected the canonical parameter-set text to encode as UTF-8', taxParams2025])
+            assert(bytes !== null, ['expected the parameter-set text to encode as UTF-8', taxParams2025])
             const [, write] = virtual(emptyState)(cas.write(pure({ first: ok(bytes), tail: pure(undefined) })))
             assert(write[0] === 'ok', ['expected the CAS write to succeed', write])
             assertEq(vecToCBase32(write[1]), paramSetHash(taxParams2025))

@@ -1,9 +1,9 @@
 ---
 phase: 19
 slug: reproducibility-and-report-provenance
-status: draft
-nyquist_compliant: false
-wave_0_complete: false
+status: complete
+nyquist_compliant: true
+wave_0_complete: true
 created: 2026-08-12
 ---
 
@@ -26,7 +26,7 @@ created: 2026-08-12
 | **Quick run command** | `npx tsc --noEmit && node --test all.test.js 2>&1 \| tail -20` |
 | **Targeted real-process** | `node --test fjs-run-integration.test.js 2>&1 \| tail -20` |
 | **Full suite command** | `npm test` |
-| **Estimated runtime** | ~8 min full suite (~6300 tests); typecheck alone ~30s; `fjs-run-integration.test.js` alone ~15s |
+| **Estimated runtime** | **~45-140s** full suite (~6300 tests), varying ~3x with machine load — measured 44.7s, 136s, 72.8s, 42.7s and 28.5s across five runs on 2026-08-12. The "~8 min / 481s" figure this row originally carried is ~10x too high and was never re-taken; it is filed as a Phase 17 correction. |
 
 > **`node --test <source-file>` reports a FAKE PASS.** Emergent Testing only registers when root
 > `all.test.js` is imported. Only ever trust `npm test` or `node --test all.test.js`. The
@@ -46,7 +46,7 @@ created: 2026-08-12
 - **After every plan wave:** `npm test` (full suite, including both real-process tests)
 - **Before `/gsd-verify-work`:** Full suite green
 - **Phase gate:** `npm test` green **plus** the two mutation gates below, both watched failing
-- **Max feedback latency:** ~45s per task, ~8 min per wave
+- **Max feedback latency:** ~45s per task; a full-suite wave gate is ~45-140s, not the 8 minutes older docs claim — there is no cost reason to prefer narrow verification here
 
 ---
 
@@ -54,15 +54,15 @@ created: 2026-08-12
 
 | Req ID | Behavior | Test Type | Automated Command | File Exists | Status |
 |--------|----------|-----------|-------------------|-------------|--------|
-| EXEC-13 | `pinned` is `true` iff both `subject` and `parents` are supplied; the record round-trips | unit | `node --test all.test.js` | ✅ shipped (PROV-03) | ⬜ verify-only |
-| EXEC-13 | A named predicate reports whether a run counts toward reproducibility acceptance | unit | `node --test all.test.js` | ❌ W0 | ⬜ pending |
-| EXEC-13 | The predicate rejects an unpinned run and accepts a pinned one — **both arms** | unit | `node --test all.test.js` | ❌ W0 | ⬜ pending |
-| PROV-04 | `paramSetHash` is derived from `taxParamsByYear[taxYear]`, not hand-written | unit | `node --test all.test.js` | ❌ W0 | ⬜ pending |
-| PROV-04 | Two different tax years produce two different `paramSetHash` values | unit | `node --test all.test.js` | ❌ W0 | ⬜ pending |
-| PROV-04 | The header carries `taxYear`, `paramSetHash` and `programHash` together | unit | `node --test all.test.js` | ❌ W0 | ⬜ pending |
-| PROV-04 | The header reaches a **real** `fjs_run` response over a live MCP session | real-process | `node --test fjs-run-integration.test.js` | ❌ W0 | ⬜ pending |
-| PROV-05 | Two runs of a pinned program with an amended revision added between them produce an identical `resultHash` **and** identical fetched blob bytes | real-process | `node --test fjs-run-integration.test.js` | ❌ W0 | ⬜ pending |
-| PROV-05 | The control: the **same** scenario **unpinned** DOES move | real-process | `node --test fjs-run-integration.test.js` | ❌ W0 | ⬜ pending |
+| EXEC-13 | `pinned` is `true` iff both `subject` and `parents` are supplied; the record round-trips | unit | `node --test all.test.js` | ✅ shipped (PROV-03) | ✅ green |
+| EXEC-13 | A named predicate reports whether a run counts toward reproducibility acceptance | unit | `node --test all.test.js` | ❌ W0 | ✅ green |
+| EXEC-13 | The predicate rejects an unpinned run and accepts a pinned one — **both arms** | unit | `node --test all.test.js` | ❌ W0 | ✅ green |
+| PROV-04 | `paramSetHash` is derived from `taxParamsByYear[taxYear]`, not hand-written | unit | `node --test all.test.js` | ❌ W0 | ✅ green |
+| PROV-04 | Two different tax years produce two different `paramSetHash` values | unit | `node --test all.test.js` | ❌ W0 | ✅ green |
+| PROV-04 | The header carries `taxYear`, `paramSetHash` and `programHash` together | unit | `node --test all.test.js` | ❌ W0 | ✅ green |
+| PROV-04 | The header reaches a **real** `fjs_run` response over a live MCP session | real-process | `node --test fjs-run-integration.test.js` | ❌ W0 | ✅ green |
+| PROV-05 | Two runs of a pinned program with an amended revision added between them produce an identical `resultHash` **and** identical fetched blob bytes | real-process | `node --test fjs-run-integration.test.js` | ❌ W0 | ✅ green |
+| PROV-05 | The control: the **same** scenario **unpinned** DOES move | real-process | `node --test fjs-run-integration.test.js` | ❌ W0 | ✅ green |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -82,11 +82,11 @@ control *first*, before the pinned assertion.
 
 ## Wave 0 Requirements
 
-- [ ] `fjs/report/provenance/module.f.js` — the header builder, the `paramSetHash` derivation,
+- [x] `fjs/report/provenance/module.f.js` — the header builder, the `paramSetHash` derivation,
       the "reviewed estimate" framing constant, and the EXEC-13 acceptance predicate, each with
       proof leaves
-- [ ] The `taxYear` argument on `fjs_run`'s tool schema, and the envelope widening
-- [ ] `fjs-run-integration.test.js` — the PROV-05 pinned/unpinned pair and the PROV-04
+- [x] The `taxYear` argument on `fjs_run`'s tool schema, and the envelope widening
+- [x] `fjs-run-integration.test.js` — the PROV-05 pinned/unpinned pair and the PROV-04
       real-response assertion
 
 Gates land in Wave 0 because every later wave's code is what they protect.
@@ -144,14 +144,18 @@ the plan has drifted into Phase 14's scope.**
 
 ## Validation Sign-Off
 
-- [ ] All tasks have automated verification or a Wave 0 dependency
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all MISSING references
-- [ ] No watch-mode flags
-- [ ] **M1 and M2 both performed and watched failing**, then restored byte-identical with a
+- [x] All tasks have automated verification or a Wave 0 dependency
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify
+- [x] Wave 0 covers all MISSING references
+- [x] No watch-mode flags
+- [x] **M1 and M2 both performed and watched failing**, then restored byte-identical with a
       clean `git status` — against M2's **corrected** red set (see the note under the gate table;
       the original wording named a leaf that cannot redden)
-- [ ] The PROV-05 unpinned control was observed to MOVE before the pinned assertion was trusted
-- [ ] `nyquist_compliant: true` set in frontmatter
+- [x] The PROV-05 unpinned control was observed to MOVE before the pinned assertion was trusted
+- [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending
+**Approval:** approved 2026-08-12 — verified 4/4 by `gsd-verifier`, which independently
+re-ran BOTH mutation gates rather than accepting the executors' reports, and restored each
+byte-identical. M1's red set was reproduced including its masking behavior; the new PROV-05
+assertion was isolated as independently load-bearing. Zero `human_needed` items, as this
+document required.

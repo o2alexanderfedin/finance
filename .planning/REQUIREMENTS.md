@@ -188,6 +188,30 @@ dissolves on contact.
 - [x] **EXEC-13** *(T2)*: Run records mark `pinned: true|false`. Only pinned runs count
       toward reproducibility acceptance.
 
+      > **Closed 2026-08-12 as a SCOPE-BOUNDED completion. Read this before citing it.**
+      > This requirement was marked complete, reverted as premature (`14942a9`), and marked
+      > again. Both a code review and an independent verification examined the second marking
+      > and reached the same split conclusion, so the resolution is recorded here rather than
+      > left to the next reader to rediscover.
+      >
+      > **Sentence 1 is unambiguously true.** `fjs/run/module.f.js` declares `pinned` as a
+      > required boolean and `checkReferences` enforces both-or-neither in each direction;
+      > `fjs_run` derives it and persists it on both the `ok` and `error` arms. Mutation Gate
+      > M2 was run twice, by two agents, and reddens `subjectOnlyWithoutParentsPersistsPinnedFalse`.
+      >
+      > **Sentence 2 is true only in the sense available to v1.**
+      > `countsTowardReproducibilityAcceptance` (`fjs/report/provenance/module.f.js`) is
+      > correct and mutation-tested, and PROV-05's real-process proof calls it against two
+      > genuinely CAS-fetched run records. But **no production code path gates behavior on
+      > it** — and none can, because "reproducibility acceptance" names Phase 14's acceptance
+      > activity, which the owner skipped on 2026-08-11. There is no pipeline to gate.
+      >
+      > **Do not read this checkbox as "the running server refuses unpinned runs."** It does
+      > not, by design (07-CONTEXT.md: every run gets a record, pinned or not; refusing
+      > unpinned runs would implement a policy nobody asked for). If Phase 14 is ever
+      > un-skipped, its acceptance run is the consumer this predicate was built for, and that
+      > is the moment to re-check this box's honesty.
+
 ### Document Formats and Ingestion (DOC)
 
 All dialects follow the `vnd.fjs.revision` precedent: JSON plus a dialect tag, the dialect
