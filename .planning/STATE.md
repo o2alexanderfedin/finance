@@ -653,22 +653,38 @@ Measured on `e36ef1a`: `tsc` clean, **6166/6166 passing, 0 failures, 0 cancelled
 > Note also that **Phase 15's ROADMAP entry declares `Depends on: Phase 14`.** That
 > dependency is being waived by decision, not satisfied.
 
-### Human decisions pending (none are technical blockers)
+### Decisions taken 2026-08-12 (phase owner, autonomous run)
 
-1. **Phase 16 — wire it or delete it.** Binary: either wire `fjs/document/1099int/from_ocr` so
-   an import graph from `index.js` reaches it, **or** delete it along with
-   `fjs/document/ocr_amount` and `fjs/document/subject`. ROADMAP: *"Research: No — the decision
-   needs the author's intent, not investigation."* Guessing wrong means deleting working tested
-   code, or resurrecting something the owner wanted gone. *If wired*, TEST-03 requires a
-   real-process integration call. *If removed*, `todo/plan.md`'s Track B must be amended so the
-   next reader does not rebuild it.
+- **Phase 16 is DEFERRED, not skipped and not cancelled.** The wire-or-delete decision was
+  postponed rather than made; MAINT-01 stays open and the phase stays in the milestone.
+  **Its ROADMAP criterion 1 was found factually wrong and has been corrected in place:**
+  `fjs/document/subject` is NOT an orphan — `fjs/document/consolidated_provenance/module.f.js:41`
+  imports `formSubject` and calls it at lines 117-118 (Phase 12's shipped DOC-13 proof).
+  Deleting the three modules as the criterion instructed would have broken verified work. The
+  real orphan is **396 lines across two** modules (`from_ocr`, `ocr_amount`), not 576 across
+  three. The error came from grepping bare names — `subject` appears in four docstrings that
+  are not imports. **Grep for `import` statements, not for names.**
 
-2. **EXEC-13 / PROV-04 / PROV-05 have no owner.** These are the **last non-MAINT requirements**
-   in the milestone and all three belong to skipped Phase 14. When 16–18 finish, v1 will have
-   every T3 item done and these three T2 items homeless. A write-path-only phase would not need
-   the taxpayer's filed return — that was the part of Phase 14 that genuinely required the owner.
+- **EXEC-13 / PROV-04 / PROV-05 re-homed into new Phase 19** — *Reproducibility and Report
+  Provenance*. None of the three needs the taxpayer's filed return: they are the pinned-run
+  flag, the tax-year/parameter-set/program-hash header on report output, and adversarial
+  byte-identical reproduction. Phase 14 had bundled them with an acceptance run that genuinely
+  did need the owner; skipping the phase stranded all five criteria together. Phase 14 keeps
+  only criteria 1 and 2 and stays skipped. The milestone now has **no homeless requirements**.
 
-3. **Release timing.** `develop` is **110 commits ahead of `main`**. A release means bumping
+- **Remaining execution order is deliberately non-numeric: 19 → 18 → 17.** Phases 19 and 18
+  both touch `executeRun`, so 18's step-sequence sharing should happen after 19 stops changing
+  it; and 17 is the documentation truth pass, which must run last or the code changes in 18/19
+  re-stale the claims it exists to make true.
+
+### Human decisions still pending
+
+1. **Phase 16 — wire it or delete it.** Deferred above, not answered. When it is taken:
+   *if wired*, TEST-03 requires a real-process integration call; *if removed*, `todo/plan.md`'s
+   Track B must be amended so the next reader does not rebuild it, and **`fjs/document/subject`
+   is out of scope either way.**
+
+2. **Release timing.** `develop` is **110 commits ahead of `main`**. A release means bumping
    `package.json` from `0.12.0`, writing CHANGELOG entries for Phases 13 and 15, merging to
    `main`, and tagging. Note an existing test asserts `serverInfo.version` equals
    `package.json`'s version, so the bump is a code change, not just metadata. Owner chose on
@@ -680,18 +696,19 @@ Measured on `e36ef1a`: `tsc` clean, **6166/6166 passing, 0 failures, 0 cancelled
 
 ### Next
 
-**Phase 16 — The Orphan Ingestion Island** (Backlog, Tier T3, MAINT-01) is next in ROADMAP order
-but is **gated on decision 1 above**, not on any work.
+Autonomous run in progress, executing **19 → 18 → 17** (see the ordering rationale above).
 
-**Phase 17 — Documentation Truth Pass** (Backlog, Tier T3, MAINT-02…05) is the highest-value
-*unblocked* work available: it depends on nothing, needs no owner decision, and already has six
-concrete success criteria written. Several of them target exactly the stale-claim drift this
-file has now suffered three times — including criterion 5, the requirement count that reads 79
-in ROADMAP's Coverage table and 83 elsewhere while the real figure is **93** (82 complete, 11
-outstanding).
+- **Phase 19 — Reproducibility and Report Provenance** (Week 4, T2, EXEC-13/PROV-04/PROV-05).
+  New, created 2026-08-12. No directory, no CONTEXT, no plans yet. ROADMAP marks it
+  **Research: No** — every mechanism it needs already ships and is proven.
+- **Phase 18 — Dependency and Duplication Debt** (Backlog, T3, MAINT-06…08).
+- **Phase 17 — Documentation Truth Pass** (Backlog, T3, MAINT-02…05). Its criterion 5 is the
+  requirement count, which read **79** in ROADMAP's Coverage table and **83** in
+  REQUIREMENTS.md while the real figure is **93** (82 complete, 11 open). The Coverage table
+  was corrected on 2026-08-12 — it had also omitted the entire MAINT category and its own rows
+  summed to 90, not the 79 it declared. REQUIREMENTS.md's prose claim is still uncorrected and
+  is Phase 17's to fix.
 
-**Phase 18 — Dependency and Duplication Debt** (MAINT-06…08) is also unblocked.
-
-All three are T3 backlog: unordered, independent of each other and of the critical path.
+**Phase 16** is deferred and **Phase 14** is skipped; neither is part of this run.
 
 Resume file: None — consumed 2026-08-12

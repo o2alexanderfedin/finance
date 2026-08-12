@@ -203,9 +203,13 @@ harmless one. Phase 12 wires the dialect into the worksheet that is already ther
 Not on the critical path. Each is a maintainer's decision that surfaced during Phases 7-9 and was
 deliberately left untaken, so that discovering it did not become a reason to stop.
 
-- [ ] **Phase 16: The Orphan Ingestion Island** - Wire the OCR conversion pipeline into the server, or remove it
+- [ ] **Phase 16: The Orphan Ingestion Island** - Wire the OCR conversion pipeline into the server, or remove it — **DEFERRED by owner decision 2026-08-12**, see the phase entry
 - [ ] **Phase 17: Documentation Truth Pass** - Every claim a reader would act on is true, or is deleted
 - [ ] **Phase 18: Dependency and Duplication Debt** - fjs 0.43.0, the duplicated step sequence, two copy-pasted checks
+
+### Carved out of Phase 14 — Reproducibility Without the Filed Return
+
+- [ ] **Phase 19: Reproducibility and Report Provenance** - The three engineering requirements that were stranded when Phase 14 was skipped (added 2026-08-12)
 
 ---
 
@@ -551,14 +555,19 @@ Plans:
 **Milestone**: Week 4 — The Full Path Works on the User's Own Documents
 **Goal**: All four of PROJECT.md's success criteria hold simultaneously against the user's own filed return, verified adversarially rather than optimistically.
 **Depends on**: Phase 13
-**Requirements**: EXEC-13, PROV-04, PROV-05
+**Requirements**: *(none — all three moved to Phase 19 on 2026-08-12)*
 **Tier**: T2
+**Status**: **SKIPPED by owner decision 2026-08-11.** Criteria 1 and 2 below cannot be met
+without the user's own filed TY2025 return in a working session, which is the part that
+genuinely required the owner. Criteria 3, 4 and 5 did not — they were pure engineering, and
+carrying three requirements against a phase nobody had scheduled left them homeless. They are
+now **Phase 19**, and this phase keeps only what actually needs the taxpayer.
 **Success Criteria** (what must be TRUE):
   1. Upload → vision → store → ask "what do I owe for 2025?" → program authored, stored, run → answer with citing hashes, in one Claude Code / Claude Desktop session touching no code.
   2. **Every line** of the user's filed TY2025 return matches — line by line, not just totals.
-  3. Adding an amended revision to a subject **between** two runs of a pinned program leaves the output byte-identical. A reproducibility check that passes only because nothing changed is not a check.
-  4. Run records carry `pinned: true|false`; an unpinned run is marked as such and does not count toward acceptance.
-  5. Report output states the tax year, the parameter-set hash, and the program hash alongside the figures, framed as a reviewed estimate to check against the source documents before filing.
+  3. ~~Adding an amended revision to a subject **between** two runs of a pinned program leaves the output byte-identical.~~ → **moved to Phase 19** (PROV-05)
+  4. ~~Run records carry `pinned: true|false`.~~ → **moved to Phase 19** (EXEC-13)
+  5. ~~Report output states the tax year, the parameter-set hash, and the program hash alongside the figures.~~ → **moved to Phase 19** (PROV-04)
 **Research**: Partial — 30 minutes to confirm whether TaxCalcBench's 51-case input format is directly consumable or needs a shim into `vnd.fjs.*`.
 **Plans**: TBD
 
@@ -599,8 +608,24 @@ result; all are T3. They are written down so they are decided deliberately rathe
 **Depends on**: Nothing
 **Requirements**: MAINT-01
 **Tier**: T3
+**Status**: **DEFERRED by owner decision 2026-08-12.** Not skipped and not cancelled — the
+decision was postponed, not made. MAINT-01 stays open and this phase stays in the milestone.
+
+> **Criterion 1 below is factually wrong and must be corrected before this phase is planned.**
+> Measured 2026-08-12: `fjs/document/subject` is **not** an orphan —
+> `fjs/document/consolidated_provenance/module.f.js:41` imports `formSubject` and calls it
+> twice (lines 117-118), which is Phase 12's shipped DOC-13 provenance proof. Deleting it as
+> written would break verified work. The two words are also inverted: `ocr_amount` and
+> `subject` are `from_ocr`'s **dependencies**, not its dependants.
+>
+> The real orphan is **396 lines across two modules**, not 576 across three:
+> `fjs/document/1099int/from_ocr` (296 lines, imported by nothing) and
+> `fjs/document/ocr_amount` (100 lines, imported only by `from_ocr`). Verified by grepping
+> for real `import` statements rather than bare name mentions — the name `subject` appears in
+> four docstrings that are not imports, which is how the original criterion went wrong.
+
 **Success Criteria** (what must be TRUE):
-  1. An import graph from `index.js` either reaches `fjs/document/1099int/from_ocr`, or that module and its two dependants (`fjs/document/ocr_amount`, `fjs/document/subject`) no longer exist.
+  1. An import graph from `index.js` either reaches `fjs/document/1099int/from_ocr`, or that module and **its one exclusive dependency `fjs/document/ocr_amount`** no longer exist. **`fjs/document/subject` is out of scope either way** — it has a live importer.
   2. If wired: a real-process integration call exercises the conversion, per TEST-03's standing rule — the tool a client would call has actually been called.
   3. If removed: `todo/plan.md`'s Track B is amended to state plainly that the agent authors the typed dialect JSON itself and stores it via the already-registered `evo_add`, so the next reader does not rebuild what was just deleted.
 **Research**: No — the decision needs the author's intent, not investigation.
@@ -632,8 +657,34 @@ result; all are T3. They are written down so they are decided deliberately rathe
   1. `package.json` takes `functionalscript` 0.43.0, the suite is green on it, and each `fjs/todo/upstream-*.md` note has been re-checked against the new version — one such note was already retired by an upstream fix.
   2. `executeRun`'s step sequence is shared with `runExecuteRunViaFixture` rather than written twice. Proven the only way that counts: reorder or insert a step, and both the virtual proofs and the integration test go red. The helper itself stays — `fjs/effects/node/virtual` cannot compose a write with an import in one session.
   3. The `formRevision must not be empty` check exists once, shared the way `moneyFieldError` already is, rather than byte-identically in two dialect files.
-  4. `artifactSubject` is either called by something or deleted.
+  4. `artifactSubject` is either called by something or deleted. *(Confirmed 2026-08-12: `fjs/document/subject/module.f.js:48` exports it and nothing outside that file references it. Note this is a different question from Phase 16's — `formSubject`, from the same file, IS live.)*
 **Research**: No.
+**Plans**: TBD
+
+**── Carved out of Phase 14: Reproducibility Without the Filed Return ──**
+
+### Phase 19: Reproducibility and Report Provenance
+**Milestone**: Week 4 — The Full Path Works on the User's Own Documents
+**Goal**: A report says which tax year, which parameters and which program produced it, and a pinned program run twice over a store that changed underneath it produces byte-identical output.
+**Depends on**: Phase 13 (inherited from Phase 14). **Not** Phase 14 itself — the acceptance run is a consumer of these three properties, not a prerequisite for them.
+**Requirements**: EXEC-13, PROV-04, PROV-05
+**Tier**: T2
+**Created**: 2026-08-12, by owner decision, carved out of skipped Phase 14.
+
+> **Why this phase exists.** Phase 14 bundled two separable things: an acceptance run against
+> the owner's real filed TY2025 return, and three engineering properties that make such a run
+> *meaningful*. Skipping Phase 14 on 2026-08-11 stranded all five criteria together, leaving
+> EXEC-13, PROV-04 and PROV-05 as the milestone's only homeless requirements. **None of the
+> three needs the taxpayer's return.** They are ordinary engineering against machinery that
+> already ships: `vnd.fjs.run` already records a `pinned` flag field (PROV-03, complete), and
+> `programHash` is already load-bearing in Phase 15's amendment diff.
+
+**Success Criteria** (what must be TRUE):
+  1. Run records carry `pinned: true|false`, and an unpinned run is marked as such. `vnd.fjs.run` already declares the field under PROV-03 — this criterion is about the flag being *set meaningfully and read*, not about the field existing. Check what is already true before planning work to add it.
+  2. Report output states the tax year, the parameter-set hash, and the program hash alongside the figures, framed as a reviewed estimate to check against the source documents before filing.
+  3. Re-running a pinned program over the same inputs reproduces the report **byte-identically**, verified **adversarially**: add an amended revision to a subject *between* the two runs and assert the output does not move. A reproducibility check that passes only because nothing changed is not a check, and a proof that cannot fail is worse than no proof — mutate the pinning so the second run *does* drift, and watch this go red.
+  4. The parameter-set hash in criterion 2 is derived, never hand-written. Phase 15 established that `programHash` equality already implies parameter-set equality because guest programs cannot import and bake every parameter in as a literal; whatever this phase adds must not contradict that finding or duplicate it.
+**Research**: No — the mechanisms (`vnd.fjs.run`, `programHash`, Evo revisions, `fjs/report/line`) all exist and are proven. This is wiring and proof work, not investigation.
 **Plans**: TBD
 
 ---
@@ -643,6 +694,15 @@ result; all are T3. They are written down so they are decided deliberately rathe
 **Execution Order:** Phases execute in numeric order, with the concurrency sets in
 "Parallelism" above run together: 1 ∥ 2 → 3 ∥ (4 → 5) → 6 → 7 → 8 ∥ 9 → 10 → 11 ∥ 12 → 13 → 14 → 15
 Phases 16-18 are backlog: unordered, independent of each other and of the critical path.
+
+**Remaining order is deliberately NOT numeric: 19 → 18 → 17.** Phase 14 is skipped and Phase 16
+is deferred, so three phases remain, and two reasons override the numeric default:
+> - **19 before 18.** Both touch `executeRun` — Phase 18's criterion 2 shares its step sequence
+>   with `runExecuteRunViaFixture`. Sharing the sequence *after* Phase 19 has finished changing
+>   it means the shared version is the final one, instead of being refactored twice.
+> - **17 last.** It is the documentation truth pass. Running it before 18 and 19 change code
+>   would re-stale the very claims it exists to make true — the failure mode this project has
+>   hit three times in STATE.md alone.
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -658,9 +718,17 @@ Phases 16-18 are backlog: unordered, independent of each other and of the critic
 | 10. 1040 Core and Scope Guard | Week 2 | 10/10 | Complete   | verified 2026-08-06 5/5 |
 | 11. Wage, Retirement, Benefit Documents | Week 3 | 5/5 | Complete   | 2026-08-08 |
 | 12. Brokerage and Capital-Gain Chain | Week 3 | 5/5 | Complete   | 2026-08-08 |
+| 12.1 The Capital-Gain Chain | Week 3 | 4/4 | Complete   | 2026-08-09 |
 | 13. The 65+ Profile and Schedules | Week 3 | 13/13 | Complete   | 2026-08-11 |
-| 14. Acceptance | Week 4 | 0/TBD | Not started | - |
+| 14. Acceptance | Week 4 | 0/TBD | **Skipped** (owner, 2026-08-11) — needs the filed return | - |
 | 15. Realism Polish and Upstream | Week 5 | 6/6 | Complete   | 2026-08-12 |
+| 16. The Orphan Ingestion Island | Backlog | 0/TBD | **Deferred** (owner, 2026-08-12) | - |
+| 17. Documentation Truth Pass | Backlog | 0/TBD | Not started | - |
+| 18. Dependency and Duplication Debt | Backlog | 0/TBD | Not started | - |
+| 19. Reproducibility and Report Provenance | Week 4 | 0/TBD | Not started | - |
+
+> **Phase 12.1 was missing from this table** until 2026-08-12, which is why plan totals
+> computed from it came out four short. Added from measurement.
 
 ---
 
@@ -670,16 +738,29 @@ Phases 16-18 are backlog: unordered, independent of each other and of the critic
 |---|---|---|
 | DOCC (documentation corrections) | 7 | 1 |
 | MCP (server and tools) | 9 | 2, 7, 8, 11, 15 |
-| EXEC (execution spine) | 13 | 3, 6, 7, 14 |
-| DOC (formats and ingestion) | 17 | 2, 5, 11, 12, 15 |
+| EXEC (execution spine) | 13 | 3, 6, 7, **19** |
+| DOC (formats and ingestion) | 18 | 2, 5, 11, 12, 15 |
 | EXACT (exact arithmetic) | 5 | 4 |
 | TAX (tax computation) | 17 | 8, 10, 12, 13, 15 |
-| PROV (provenance and reporting) | 8 | 7, 9, 14, 15 |
+| PROV (provenance and reporting) | 8 | 7, 9, 15, **19** |
 | SEC (security) | 4 | 1, 2, 6 |
-| **Total** | **79** | **15 phases** |
+| TEST (testing discipline) | 4 | 7, and standing across 8-15 |
+| MAINT (maintenance debt) | 8 | 16, 17, 18 |
+| **Total** | **93** | **18 phases** |
 
-**All 79 v1 requirements map to exactly one phase. No orphans. No duplicates.**
-Verified mechanically against REQUIREMENTS.md; full mapping is in that file's Traceability table.
+**All 93 requirements map to exactly one phase. No orphans. No duplicates.**
+
+> **This table said 79 until 2026-08-12 and was wrong twice over.** It omitted the MAINT
+> category entirely (8 requirements across Phases 16-18), and its own category counts summed to
+> 90, not 79. REQUIREMENTS.md separately said 83. The real figure is **93** — measured, not
+> transcribed: `grep -c '^- \[[ x]\] \*\*' .planning/REQUIREMENTS.md` (82 complete, 11 open).
+> **Phase 17's success criterion 5 exists precisely because of this defect**, so if you are
+> reading this while planning Phase 17: the count is stated here, it is now right, and the
+> criterion asks you to state it *where it can be recomputed* rather than in prose. Re-measure
+> before trusting the number above.
+>
+> EXEC-13, PROV-04 and PROV-05 moved from skipped Phase 14 to new Phase 19 on 2026-08-12,
+> which is why Phase 14 no longer appears in this table.
 
 ---
 *Roadmap created 2026-08-03 from PROJECT.md, REQUIREMENTS.md, todo/plan.md,

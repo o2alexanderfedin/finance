@@ -602,7 +602,7 @@ them. Week 0 is research's addition in front of the plan's Week 1.
 | EXEC-10 | T1 | Phase 7 - `fjs_run` and Run Records | Week 1 | Complete |
 | EXEC-11 | T1 | Phase 7 - `fjs_run` and Run Records | Week 1 | Complete |
 | EXEC-12 | T1 | Phase 7 - `fjs_run` and Run Records | Week 1 | Complete |
-| EXEC-13 | T2 | Phase 14 - Acceptance | Week 4 | Pending |
+| EXEC-13 | T2 | Phase 19 - Reproducibility and Report Provenance | Week 4 | Pending |
 | DOC-00 | T0 | Phase 5 - Document Base and First Dialects | Week 1 | Complete |
 | DOC-01 | T0 | Phase 5 - Document Base and First Dialects | Week 1 | Complete |
 | DOC-02 | T0 | Phase 2 - Server Skeleton and Registration | Week 0 | Done |
@@ -646,8 +646,8 @@ them. Week 0 is research's addition in front of the plan's Week 1.
 | PROV-01 | T1 | Phase 9 - Traceable Report Lines | Week 2 | Complete |
 | PROV-02 | T1 | Phase 9 - Traceable Report Lines | Week 2 | Complete |
 | PROV-03 | T1 | Phase 7 - `fjs_run` and Run Records | Week 1 | Complete |
-| PROV-04 | T2 | Phase 14 - Acceptance | Week 4 | Pending |
-| PROV-05 | T2 | Phase 14 - Acceptance | Week 4 | Pending |
+| PROV-04 | T2 | Phase 19 - Reproducibility and Report Provenance | Week 4 | Pending |
+| PROV-05 | T2 | Phase 19 - Reproducibility and Report Provenance | Week 4 | Pending |
 | PROV-06 | T3 | Phase 15 - Realism Polish and Upstream | Week 5 | Complete |
 | PROV-07 | T2 | Phase 9 - Traceable Report Lines | Week 2 | Complete |
 | PROV-08 | T3 | Phase 15 - Realism Polish and Upstream | Week 5 | Complete |
@@ -673,8 +673,9 @@ them. Week 0 is research's addition in front of the plan's Week 1.
 | 11. Wage, Retirement, Benefit Documents | Week 3 | DOC-08, DOC-09, DOC-15, MCP-08 | 4 | T2 |
 | 12. Brokerage and Capital-Gain Chain | Week 3 | DOC-06, DOC-07, DOC-13, TAX-07, TAX-08, TAX-11, TAX-15 | 7 | T2 |
 | 13. The 65+ Profile and Schedules | Week 3 | TAX-09, TAX-10, TAX-12, TAX-13, TAX-14 | 5 | T2 |
-| 14. Acceptance | Week 4 | EXEC-13, PROV-04, PROV-05 | 3 | T2 |
+| 14. Acceptance | Week 4 | *(none - moved to Phase 19)* | 0 | T2 |
 | 15. Realism Polish and Upstream | Week 5 | MCP-09, DOC-16, TAX-17, PROV-06, PROV-08 | 5 | T3 |
+| 19. Reproducibility and Report Provenance | Week 4 | EXEC-13, PROV-04, PROV-05 | 3 | T2 |
 
 **Cut line.** Phases 1-10 constitute a defensible v1 - the scope guard (TAX-16) is what
 makes a partial 1040 honest rather than quietly wrong. Phases 11-13 complete the declared
