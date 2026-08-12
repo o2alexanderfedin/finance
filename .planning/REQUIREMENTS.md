@@ -319,7 +319,7 @@ structural (RTTI) and semantic passes.
 - [x] **TAX-16** *(T1)*: A **scope guard** — unmodeled input causes a loud refusal, never a
       silently omitted line. This is what makes a partial 1040 honest instead of quietly
       wrong, and it is how REQ TAX-05's "full line-by-line" claim stays truthful.
-- [ ] **TAX-17** *(T3)*: Multi-year support, including capital loss carryover, which the
+- [x] **TAX-17** *(T3)*: Multi-year support, including capital loss carryover, which the
       brokerage profile promotes from optional to required.
 
 ### Provenance and Reporting (PROV)
@@ -631,7 +631,7 @@ them. Week 0 is research's addition in front of the plan's Week 1.
 | TAX-14 | T2 | Phase 13 - The 65+ Profile and Schedules | Week 3 | Complete |
 | TAX-15 | T2 | Phase 12.1 - The Capital-Gain Chain | Week 3 | Complete |
 | TAX-16 | T1 | Phase 10 - 1040 Core and Scope Guard | Week 2 | Complete |
-| TAX-17 | T3 | Phase 15 - Realism Polish and Upstream | Week 5 | Pending |
+| TAX-17 | T3 | Phase 15 - Realism Polish and Upstream | Week 5 | Complete |
 | PROV-01 | T1 | Phase 9 - Traceable Report Lines | Week 2 | Complete |
 | PROV-02 | T1 | Phase 9 - Traceable Report Lines | Week 2 | Complete |
 | PROV-03 | T1 | Phase 7 - `fjs_run` and Run Records | Week 1 | Complete |
