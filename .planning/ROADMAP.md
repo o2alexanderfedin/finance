@@ -685,7 +685,11 @@ decision was postponed, not made. MAINT-01 stays open and this phase stays in th
      > returns more than six, a dialect was added after this note and the count is stale again.
   4. `artifactSubject` is either called by something or deleted. *(Confirmed 2026-08-12: `fjs/document/subject/module.f.js:48` exports it and nothing outside that file references it. Note this is a different question from Phase 16's — `formSubject`, from the same file, IS live.)*
 **Research**: No.
-**Plans**: TBD
+**Plans**: 4 plans
+- [ ] 18-01-PLAN.md — Bump functionalscript to ^0.44.0 alone, then re-check the four upstream-*.md notes against it
+- [ ] 18-02-PLAN.md — Share the formRevision check across all six dialects (formRevisionError), Mutation Gates M1+M2
+- [ ] 18-04-PLAN.md — Split fjs-run-integration.test.js into node:test subtests (WR-03), Mutation Gate M4
+- [ ] 18-03-PLAN.md — Share executeRun/runExecuteRunViaFixture's tail (Mutation Gate M3) and delete artifactSubject
 
 **── Carved out of Phase 14: Reproducibility Without the Filed Return ──**
 
