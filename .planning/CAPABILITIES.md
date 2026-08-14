@@ -1,7 +1,14 @@
 # What This System Can Actually Do
 
-**Measured on `6053db9`** (branch `feature/phase-19-reproducibility`), 2026-08-13.
-Supersedes the version pinned to `449846a`.
+**Re-measured on `e7837a3`** (branch `feature/phase-18-dependency-and-duplication-debt`), 2026-08-14.
+Supersedes the versions pinned to `449846a` and `6053db9`.
+
+> **Nothing in the capability set changed since the `6053db9` measurement, and that was checked
+> rather than assumed.** Phase 19 has since merged to `develop` (PR #66) and Phase 18 has been
+> planned — 4 plans, 3 waves, plan-checked twice, 3 blockers fixed — but **Phase 18 has executed
+> zero plans**, so no shipped behavior moved. The live probe was re-run anyway and returned an
+> identical surface: 13 tools, `fjs_run` requiring `[hash, taxYear]`, 9 document dialects, 1 tax
+> year. "It shouldn't have changed" is a prediction; this line records a measurement.
 
 > **Every number in this document was measured, not inferred.** That rule exists because the
 > first version of this file got the tool count wrong **three times** (7, then 8, then 12; the
@@ -175,12 +182,14 @@ Archived revisions become unreachable through the guest vocabulary
 
 | | |
 |---|---|
-| Suite | `npm test` **6314/6314**, 0 fail, exit 0 |
+| Suite | `npm test` **6314/6314**, 0 fail, exit 0 (re-run on `27ba2c2`, `duration_ms 25337`) |
 | Project-local proofs | **916** (de-duplicated) |
-| Full-suite runtime | **~45–140s**, varying ~3× with load (five runs, 2026-08-13) |
+| Full-suite runtime | **~25–140s**, varying ~5× with load (eight runs, 2026-08-12/14) |
 | Requirements | **85 of 93** complete (91.4%) |
 | Phases | **16 of 20** complete |
+| Plans | **85 of 89** (Phase 18's 4 are written but unexecuted) |
 | MCP tools | **13** |
+| `functionalscript` | **0.43.1** — Phase 18 Wave 1 will take it to 0.44.0 |
 
 **Re-derive, don't quote.** Tools: probe the server. Proofs:
 `node --test 2>&1 | grep '^✔ import("./fjs/' | sed 's/ ([0-9.]*ms)$//' | sort -u | wc -l`
@@ -191,8 +200,14 @@ Archived revisions become unreachable through the guest vocabulary
 
 ## Still open
 
-- **Phase 18** — dependency and duplication debt (not started)
-- **Phase 17** — documentation truth pass (not started)
-- **Phase 16** — the orphan ingestion island (deferred, owner decision)
-- **Phase 14** — acceptance against the filed return (skipped, needs the owner)
-- **Release** — `develop` is >110 commits ahead of `main`; Phase 19's work is not yet merged
+- **Phase 18** — dependency and duplication debt. **Planned, zero plans executed.** 4 plans in 3
+  waves: bump `functionalscript` to 0.44.0 alone; share the six-way `formRevision` duplication;
+  share `executeRun`'s tail and delete `artifactSubject`; split the integration test into 12
+  subtests. None of it changes a computed figure — it is all refactor and dependency work.
+- **Phase 17** — documentation truth pass (not started). Its criterion 5 is the requirement count,
+  which this project has stated wrongly in three places.
+- **Phase 16** — the orphan ingestion island (deferred by owner decision, 2026-08-12). This is why
+  there is still no OCR ingestion tool.
+- **Phase 14** — acceptance against the filed return (skipped; needs the owner's own documents).
+- **Release** — `develop` is >110 commits ahead of `main`. Phase 19 **is** merged (PR #66); the
+  release itself remains a separate deliberate act.
