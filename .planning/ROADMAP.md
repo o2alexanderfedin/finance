@@ -649,14 +649,40 @@ decision was postponed, not made. MAINT-01 stays open and this phase stays in th
 
 ### Phase 18: Dependency and Duplication Debt
 **Milestone**: Backlog
-**Goal**: The vendored dependency is current, and the two remaining duplications are shared rather than copied.
+**Goal**: The vendored dependency is current, and the remaining duplications are shared rather than copied.
 **Depends on**: Nothing
 **Requirements**: MAINT-06, MAINT-07, MAINT-08
 **Tier**: T3
 **Success Criteria** (what must be TRUE):
-  1. `package.json` takes `functionalscript` 0.43.0, the suite is green on it, and each `fjs/todo/upstream-*.md` note has been re-checked against the new version — one such note was already retired by an upstream fix.
+  1. `package.json` takes `functionalscript` **0.44.0**, the suite is green on it, and each of the four `fjs/todo/upstream-*.md` notes has been re-checked against the new version.
+
+     > **Corrected 2026-08-13, by owner decision.** This criterion said **0.43.0**, which
+     > `package.json` had already exceeded — it has declared `^0.43.1` since Phase 15, and
+     > 0.43.1 is what is installed. Satisfying the literal text would have meant doing nothing.
+     > The registry's current release is **0.44.0**, so the criterion's *intent* — "the vendored
+     > dependency is current" — now means 0.44.0, and the owner chose to honour the intent.
+     >
+     > The "one such note was already retired" clause is **`upstream-json-parse-split.md`**,
+     > which has read *"landed upstream and adopted here — `parse` is total as of 0.42.0"*
+     > since before this phase was written. Its own text says to delete it once adopted; that
+     > has not happened. The other three (`mcp-protocol-version-negotiation`,
+     > `node-spawn-effect`, `total-match-dispatch`) all read "not filed upstream yet" and must
+     > each be re-checked against 0.44.0 — a note claiming a gap that upstream has since closed
+     > is exactly the wrong-remedy defect Phase 17 exists to eliminate.
   2. `executeRun`'s step sequence is shared with `runExecuteRunViaFixture` rather than written twice. Proven the only way that counts: reorder or insert a step, and both the virtual proofs and the integration test go red. The helper itself stays — `fjs/effects/node/virtual` cannot compose a write with an import in one session.
-  3. The `formRevision must not be empty` check exists once, shared the way `moneyFieldError` already is, rather than byte-identically in two dialect files.
+  3. The `formRevision must not be empty` check exists once, shared the way `moneyFieldError` already is, rather than byte-identically in **six** dialect files.
+
+     > **Corrected 2026-08-13 from measurement.** This criterion said **two** dialect files. It
+     > is six: `1099int` (line 130), `1099r` (232), `w2` (196), `ssa1099` (130), `1099div` (234)
+     > and `1099b` (264), each carrying the identical
+     > `` error(`formRevision must not be empty or whitespace-only`) ``.
+     >
+     > **The undercount is the point, not a typo.** Phase 19 shipped after four separate
+     > blockers of exactly this shape — a claim about a population that was true of the part
+     > someone looked at and false of the whole. This criterion was written when four of the six
+     > dialects did not yet exist, and nothing re-derived it as Phases 11 and 12 added them.
+     > **Re-derive before fixing:** `grep -rn "formRevision must not be empty" fjs`. If it
+     > returns more than six, a dialect was added after this note and the count is stale again.
   4. `artifactSubject` is either called by something or deleted. *(Confirmed 2026-08-12: `fjs/document/subject/module.f.js:48` exports it and nothing outside that file references it. Note this is a different question from Phase 16's — `formSubject`, from the same file, IS live.)*
 **Research**: No.
 **Plans**: TBD
