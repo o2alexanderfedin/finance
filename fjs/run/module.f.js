@@ -49,7 +49,7 @@
  *
  * @module
  */
-import { array, boolean, option, or, string } from 'functionalscript/fjs/types/rtti/module.f.js'
+import { array, boolean, number, option, or, string } from 'functionalscript/fjs/types/rtti/module.f.js'
 import { validate as rttiValidate } from 'functionalscript/fjs/types/rtti/validate/module.f.js'
 import { error, ok } from 'functionalscript/fjs/types/result/module.f.js'
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
@@ -90,6 +90,12 @@ const inputEntry = /** @type {const} */ ({
  * - `programHash`/`args` — the program identity and invocation the record
  *   is *about*; non-empty `programHash` is a semantic check (below), since
  *   RTTI's `string` alone accepts `''`.
+ * - `taxYear`/`paramSetHash` — PROV-04's provenance header: which tax year's
+ *   parameters, and a content hash of that exact parameter set
+ *   (`fjs/report/provenance/module.f.js`'s `paramSetHash`), were in effect
+ *   for this run. Both REQUIRED — every run, pinned or not, ok or error,
+ *   carries this header, mirroring `pinned`'s own "every run gets a record"
+ *   rule immediately below.
  * - `pinned` — EXEC-08/07-CONTEXT.md: every run, pinned or not, gets a
  *   record with this flag; refusing unpinned runs would implement a later
  *   (T2) requirement early.
@@ -105,6 +111,8 @@ export const runSchema = /** @type {const} */ ({
     ...base(dialect),
     programHash: string,
     args: array(string),
+    taxYear: number,
+    paramSetHash: string,
     pinned: boolean,
     subject: option(string),
     parents: option(array(string)),
@@ -203,6 +211,8 @@ const minimalOk = {
     dialect,
     programHash: 'sha256-program1',
     args: [],
+    taxYear: 2025,
+    paramSetHash: 'sha256-paramset1',
     pinned: false,
     status: 'ok',
     inputs: [],
@@ -214,6 +224,8 @@ const minimalError = {
     dialect,
     programHash: 'sha256-program1',
     args: [],
+    taxYear: 2025,
+    paramSetHash: 'sha256-paramset1',
     pinned: false,
     status: 'error',
     inputs: [],

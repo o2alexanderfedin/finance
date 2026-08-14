@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
 status: shipped
-stopped_at: Phase 15 complete, reviewed, verified 5/5, and merged to develop (PR #63). Clean boundary before Phase 16.
-last_updated: "2026-08-12T06:41:00.000Z"
+stopped_at: Phase 19 complete on feature/phase-19-reproducibility - 3/3 plans, reviewed (0 critical), verified 4/4, both mutation gates independently re-run. Not yet merged. Next: Phase 18.
+last_updated: "2026-08-12T10:05:00.000Z"
 last_activity: 2026-08-12
 progress:
-  total_phases: 19
-  completed_phases: 15
-  total_plans: 82
-  completed_plans: 82
-  percent: 79
+  total_phases: 20
+  completed_phases: 16
+  total_plans: 85
+  completed_plans: 85
+  percent: 80
 ---
 
 # Project State
@@ -110,6 +110,7 @@ state:
 | End of Phase 7 | 185 | `grep -c` — **suspect**, see below |
 | End of Phase 9 | 260 | `grep -c` — **suspect**, see below |
 | End of Phase 13 | 845 | de-duplicated; independently confirmed by CI |
+| End of Phase 19 | 916 | de-duplicated; `node --test 2>&1 \| grep '^✔ import("./fjs/' \| sed 's/ ([0-9.]*ms)$//' \| sort -u \| wc -l` |
 
 The two older figures were taken with the double-counting `grep -c` command. Whether they are
 inflated depends on whether the submodule was initialized in that session, which is not
@@ -410,6 +411,15 @@ Full log in PROJECT.md Key Decisions. Recent decisions affecting current work:
 - [Phase 15]: DOC-16 verified the real dialect count directly (grep against fjs/) rather than trusting the plan's own table -- 12 local dialects + upstream revisionDialect = 13
 - [Phase 15]: DOC-16: cas_refresh's dialectCounts counts an unregistered-dialect blob under its detectVec text/plain fallback -- present, never absorbed into a registered dialect's count
 - [Phase 15]: DOC-16: each dialect's extraValidate written inline rather than factored into a shared generic helper, avoiding an any/cast under dialectEntry's contextual Ts<T> typing
+- [Phase 19-01]: paramSetHash's jsonText(taxParamSet) call needs NO JsonUnknown cast, contradicting 19-PATTERNS.md's own excerpt -- verified against the live fjs/server/finance_tax_params/module.f.js:157 precedent (jsonText(response), a TaxParamSet-shaped value including the ceiling: string | undefined required-field case) and confirmed empirically with npx tsc --noEmit before finalizing
+- [Phase 19-01]: countsTowardReproducibilityAcceptance reads run.pinned alone and deliberately does not re-derive fjs/run/module.f.js's checkReferences both-or-neither invariant -- verified independently load-bearing per arm by mutation (run.pinned || true reddens only rejectsAnUnpinnedRun)
+- [Phase 19-01]: matchesFileCassOwnHashOfTheIdenticalBytes is the ONLY leaf that catches paramSetHash's derivation drifting from the exact primitive fileCas uses on identical bytes -- confirmed by a computeSync(sha256)([bytes, bytes]) mutation that reddened that one leaf alone, none of the other three
+- [Phase 19-02]: fjs/report/provenance/module.f.js's own unpinnedRun TEST-FIXTURE (shipped by 19-01, typed @type {Run} directly) is a FIFTH Run-literal-construction population, missed by the plan's and the earlier plan-check's four-file enumeration because it postdates both -- found by re-deriving the population via `grep -rn "pinned:" fjs *.js` rather than trusting either the plan's checklist or the prior plan-check's grep, and fixed in the same atomic commit as a Rule 3 blocking-issue auto-fix
+- [Phase 19-02]: Mutation Gate M2 (&& -> ||) reddens exactly the one leaf 19-VALIDATION.md's corrected gate table names (fjsRunTool.pinIntegrity.subjectOnlyWithoutParentsPersistsPinnedFalse) via handleRunOutcome's own record-assembly assert firing on the mixed-pin case, before any Run value is built -- countsTowardReproducibilityAcceptance's own two proof leaves independently confirmed to stay green under the identical mutation, positively confirming the structurally-unreachable-input claim rather than merely observing an absence of failure
+- [Phase 19-02]: The responseShape and sizeGuard proofs both hand-count fjs_run's envelope keys (six -> ten); both updated in this plan's own commit rather than left to silently under-cover the widened envelope
+- [Phase 19-03]: The unpinned control leg's movement was verified as a genuinely independent observation, not inferred from the pinned leg passing: controlBytes1/controlBytes2 differed (two distinct revision-hash-array JSON strings) after the SAME amendment shape landed between two unpinned runs, confirmed BEFORE the pinned leg's code was trusted, per 19-VALIDATION.md's "the control leaf is not optional"
+- [Phase 19-03]: Mutation Gate M1's naive full-suite run showed only the PRE-EXISTING real-process pin proof failing (the whole integration test is one node:test `test()` block, so the first thrown assertion aborts everything after it in source order) -- confirmed the NEW PROV-05 pinned-reproduction assertion is independently load-bearing by a diagnostic run with the earlier pin block's assertions neutralized: `pinnedRun1.resultHash !== pinnedRun2.resultHash` then reddened on its own line, isolated from the earlier assertion. The two `buildRunSnapshot`-level unit proofs (`buildRunSnapshotResolvesTheStore.pinOverridesTheResolvedHead`, `executeRun.pinOverridesTheLiveHeadThroughFullExecuteRun`) also reddened, both predicted by 19-VALIDATION.md/the plan
+- [Phase 19-03]: EXEC-13 marked complete on the reasoning that `countsTowardReproducibilityAcceptance` has no other consumption point to gate in this codebase (grepped: zero production call sites of `.pinned` beyond `fjs_run`'s own record-assembly and this predicate's own module) -- its docstring frames it as consumer-side by design, and this plan is the first caller to exercise it against two REAL, CAS-fetched persisted run records rather than hand-typed fixtures, correctly discriminating pinned (true) from unpinned (false)
 
 ### Pending Todos
 
@@ -569,7 +579,10 @@ server and asking it instead of grepping. Green does not mean verified.
 
 | Category | Item | Status | Deferred At |
 |----------|------|--------|-------------|
-| *(none)* | | | |
+| Doc truth (→ Phase 17) | **The "~8 min / 481s full suite" figure is wrong, but so was my first correction.** Two measurements on 2026-08-12: `0038eed` → `duration_ms 44707` (**44.7s**, 6296 tests); `20f5459` → `duration_ms 136059` (**136s**, 6314 tests). Both exit 0. So the honest figure is a **range of roughly 45-140s that varies ~3x with machine load**, not the single 44.7s I first recorded, and not the 481s in STATE.md's Infrastructure notes / `19-VALIDATION.md` / `15-VALIDATION.md`. **Note the shape of my own error: I measured once and reported a point value as if it were the property.** That is the same defect as reporting one grep's population as the whole — which this phase hit four times. Phase 17 should record a range with the measurement conditions, and correct every copy. Consequence is not cosmetic: plans avoided per-task full-suite runs on the strength of the 481s figure, trading real feedback for imagined cost. | Open | 2026-08-12 |
+| Doc truth (→ Phase 17) | `amendmentDiff` refusing unpinned runs — deferred from Phase 19 Area 2 by owner decision. Revisit only if a real caller is misled. | Open | 2026-08-12 |
+| Structure (→ Phase 18) | **`fjs-run-integration.test.js` is one giant `test()` block, and the masking is not hypothetical.** Phase 19's code review raised it as WR-03 after it cost real work: under Mutation Gate M1, Node reported the failure as the *pre-existing* pin proof, which shares the block and runs first — the new PROV-05 assertion's independent redness could only be established with a throwaway diagnostic copy. **Two separate agents hit this.** The consequence beyond mutation testing: a future regression in any later assertion of that block is invisible while an earlier one fails, so the file reports one failure no matter how many things break. Splitting it into per-concern `test()` blocks belongs with Phase 18's structural work; doing it inside a phase close would have been unreviewed churn. | Open | 2026-08-12 |
+| Process (→ any phase) | **Never run a code reviewer concurrently with a verifier that re-runs mutation gates.** My error in Phase 19: I parallelized them to save wall-clock, but the verifier mutates and restores production files while the reviewer reads them. The reviewer caught a target line changing under it mid-review (IN-02) — it detected the interference rather than being fooled, which was diligence, not design. Mutation-running agents need exclusive access to the tree. | Open | 2026-08-12 |
 
 ## Session Continuity
 
@@ -653,22 +666,38 @@ Measured on `e36ef1a`: `tsc` clean, **6166/6166 passing, 0 failures, 0 cancelled
 > Note also that **Phase 15's ROADMAP entry declares `Depends on: Phase 14`.** That
 > dependency is being waived by decision, not satisfied.
 
-### Human decisions pending (none are technical blockers)
+### Decisions taken 2026-08-12 (phase owner, autonomous run)
 
-1. **Phase 16 — wire it or delete it.** Binary: either wire `fjs/document/1099int/from_ocr` so
-   an import graph from `index.js` reaches it, **or** delete it along with
-   `fjs/document/ocr_amount` and `fjs/document/subject`. ROADMAP: *"Research: No — the decision
-   needs the author's intent, not investigation."* Guessing wrong means deleting working tested
-   code, or resurrecting something the owner wanted gone. *If wired*, TEST-03 requires a
-   real-process integration call. *If removed*, `todo/plan.md`'s Track B must be amended so the
-   next reader does not rebuild it.
+- **Phase 16 is DEFERRED, not skipped and not cancelled.** The wire-or-delete decision was
+  postponed rather than made; MAINT-01 stays open and the phase stays in the milestone.
+  **Its ROADMAP criterion 1 was found factually wrong and has been corrected in place:**
+  `fjs/document/subject` is NOT an orphan — `fjs/document/consolidated_provenance/module.f.js:41`
+  imports `formSubject` and calls it at lines 117-118 (Phase 12's shipped DOC-13 proof).
+  Deleting the three modules as the criterion instructed would have broken verified work. The
+  real orphan is **396 lines across two** modules (`from_ocr`, `ocr_amount`), not 576 across
+  three. The error came from grepping bare names — `subject` appears in four docstrings that
+  are not imports. **Grep for `import` statements, not for names.**
 
-2. **EXEC-13 / PROV-04 / PROV-05 have no owner.** These are the **last non-MAINT requirements**
-   in the milestone and all three belong to skipped Phase 14. When 16–18 finish, v1 will have
-   every T3 item done and these three T2 items homeless. A write-path-only phase would not need
-   the taxpayer's filed return — that was the part of Phase 14 that genuinely required the owner.
+- **EXEC-13 / PROV-04 / PROV-05 re-homed into new Phase 19** — *Reproducibility and Report
+  Provenance*. None of the three needs the taxpayer's filed return: they are the pinned-run
+  flag, the tax-year/parameter-set/program-hash header on report output, and adversarial
+  byte-identical reproduction. Phase 14 had bundled them with an acceptance run that genuinely
+  did need the owner; skipping the phase stranded all five criteria together. Phase 14 keeps
+  only criteria 1 and 2 and stays skipped. The milestone now has **no homeless requirements**.
 
-3. **Release timing.** `develop` is **110 commits ahead of `main`**. A release means bumping
+- **Remaining execution order is deliberately non-numeric: 19 → 18 → 17.** Phases 19 and 18
+  both touch `executeRun`, so 18's step-sequence sharing should happen after 19 stops changing
+  it; and 17 is the documentation truth pass, which must run last or the code changes in 18/19
+  re-stale the claims it exists to make true.
+
+### Human decisions still pending
+
+1. **Phase 16 — wire it or delete it.** Deferred above, not answered. When it is taken:
+   *if wired*, TEST-03 requires a real-process integration call; *if removed*, `todo/plan.md`'s
+   Track B must be amended so the next reader does not rebuild it, and **`fjs/document/subject`
+   is out of scope either way.**
+
+2. **Release timing.** `develop` is **110 commits ahead of `main`**. A release means bumping
    `package.json` from `0.12.0`, writing CHANGELOG entries for Phases 13 and 15, merging to
    `main`, and tagging. Note an existing test asserts `serverInfo.version` equals
    `package.json`'s version, so the bump is a code change, not just metadata. Owner chose on
@@ -680,18 +709,54 @@ Measured on `e36ef1a`: `tsc` clean, **6166/6166 passing, 0 failures, 0 cancelled
 
 ### Next
 
-**Phase 16 — The Orphan Ingestion Island** (Backlog, Tier T3, MAINT-01) is next in ROADMAP order
-but is **gated on decision 1 above**, not on any work.
+Autonomous run in progress, executing **19 → 18 → 17** (see the ordering rationale above).
+**Phase 19 is now COMPLETE** — all three plans executed, all three requirements closed. Next
+up is **Phase 18**.
 
-**Phase 17 — Documentation Truth Pass** (Backlog, Tier T3, MAINT-02…05) is the highest-value
-*unblocked* work available: it depends on nothing, needs no owner decision, and already has six
-concrete success criteria written. Several of them target exactly the stale-claim drift this
-file has now suffered three times — including criterion 5, the requirement count that reads 79
-in ROADMAP's Coverage table and 83 elsewhere while the real figure is **93** (82 complete, 11
-outstanding).
+- **Phase 19 — Reproducibility and Report Provenance — COMPLETE (2026-08-12).**
+  (Week 4, T2, EXEC-13/PROV-04/PROV-05). CONTEXT/PATTERNS/VALIDATION and Plans
+  19-01/19-02/19-03 written and executed 2026-08-12. ROADMAP marks it **Research: No** —
+  every mechanism it needs already ships and is proven.
+  **Plan 19-01 executed and committed** (`d42cc2d`): `fjs/report/provenance/module.f.js` —
+  `paramSetHash`, `reviewedEstimateFraming`, `countsTowardReproducibilityAcceptance`, all 7
+  proof leaves mutation-gate-verified. See `19-01-SUMMARY.md`.
+  **Plan 19-02 executed and committed** (`7a58c76`): `runSchema`/`fjsRunInputSchema` widened
+  with required `taxYear`/`paramSetHash`; `fjs_run`'s response envelope and persisted
+  `vnd.fjs.run` record both now carry `taxYear`/`paramSetHash`/`programHash`/
+  `reviewedEstimateFraming` alongside the existing six/eight keys; an unknown `taxYear` is
+  refused by name before `executeRun` ever runs. All four independent Run-shaped-literal/
+  call-site populations updated in the one commit, plus a fifth population
+  (`fjs/report/provenance/module.f.js`'s own `unpinnedRun` fixture, shipped by 19-01 after
+  the plan's population enumeration was frozen) found and fixed the same way. Mutation Gate
+  M2 performed and confirmed against 19-VALIDATION.md's corrected red set (observation only,
+  no code change survives it — `&&`/`||` restored byte-identical). See `19-02-SUMMARY.md`.
+  PROV-04 marked complete; EXEC-13 stays Pending (its second sentence needs 19-03's gate).
+  **Plan 19-03 executed and committed** (`0315577`): PROV-05's control-then-pinned
+  byte-identical reproduction proof added to `fjs-run-integration.test.js`. The unpinned
+  control leg was built and OBSERVED to move (two distinct fetched-byte values, one head
+  hash before the amendment, a different one after) before the pinned leg's stability was
+  trusted, per 19-VALIDATION.md. The pinned leg then reproduced byte-identically across the
+  same amendment, both by `resultHash` string equality AND by fetched-byte equality.
+  `countsTowardReproducibilityAcceptance` was called against two REAL, CAS-fetched persisted
+  run records (never hand-built fixtures): `true` for the pinned run, `false` for the
+  control. **Mutation Gate M1** (pinned branch resolves the live head instead of
+  `pin.parents`) reddened the new PROV-05 assertion — confirmed independently load-bearing
+  via a diagnostic run isolating it from the pre-existing pin proof that also reddens in the
+  same mutated pass — plus both `buildRunSnapshot`-level unit proofs 19-VALIDATION.md
+  predicted; restored byte-identical, `git status` clean, suite green again. **EXEC-13 and
+  PROV-05 both marked complete** (checkbox + traceability row). `npm test` 6314/6314;
+  de-duplicated project-local proofs unchanged at **916** (this plan's new assertions live in
+  the root-level integration test, not under `fjs/`). See `19-03-SUMMARY.md`. **This closes
+  Phase 19.**
+- **Phase 18 — Dependency and Duplication Debt** (Backlog, T3, MAINT-06…08). Now next.
+- **Phase 17 — Documentation Truth Pass** (Backlog, T3, MAINT-02…05). Its criterion 5 is the
+  requirement count, which read **79** in ROADMAP's Coverage table and **83** in
+  REQUIREMENTS.md while the real figure is **93** (82 complete, 11 open). The Coverage table
+  was corrected on 2026-08-12 — it had also omitted the entire MAINT category and its own rows
+  summed to 90, not the 79 it declared. REQUIREMENTS.md's prose claim is still uncorrected and
+  is Phase 17's to fix.
 
-**Phase 18 — Dependency and Duplication Debt** (MAINT-06…08) is also unblocked.
+**Phase 16** is deferred and **Phase 14** is skipped; neither is part of this run.
 
-All three are T3 backlog: unordered, independent of each other and of the critical path.
-
-Resume file: None — consumed 2026-08-12
+Resume file: None — Plan 19-03 complete, Phase 19 COMPLETE (3/3 plans, EXEC-13/PROV-04/PROV-05
+all closed); next is Phase 18 (Dependency and Duplication Debt)

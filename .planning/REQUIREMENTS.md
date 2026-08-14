@@ -185,8 +185,32 @@ dissolves on contact.
 - [x] **EXEC-12** *(T1)*: Total error capture — including non-`Error` throws, missing
       hashes, and import failures — surfaced as a tool-level `errorResult`, never as a
       process crash.
-- [ ] **EXEC-13** *(T2)*: Run records mark `pinned: true|false`. Only pinned runs count
+- [x] **EXEC-13** *(T2)*: Run records mark `pinned: true|false`. Only pinned runs count
       toward reproducibility acceptance.
+
+      > **Closed 2026-08-12 as a SCOPE-BOUNDED completion. Read this before citing it.**
+      > This requirement was marked complete, reverted as premature (`14942a9`), and marked
+      > again. Both a code review and an independent verification examined the second marking
+      > and reached the same split conclusion, so the resolution is recorded here rather than
+      > left to the next reader to rediscover.
+      >
+      > **Sentence 1 is unambiguously true.** `fjs/run/module.f.js` declares `pinned` as a
+      > required boolean and `checkReferences` enforces both-or-neither in each direction;
+      > `fjs_run` derives it and persists it on both the `ok` and `error` arms. Mutation Gate
+      > M2 was run twice, by two agents, and reddens `subjectOnlyWithoutParentsPersistsPinnedFalse`.
+      >
+      > **Sentence 2 is true only in the sense available to v1.**
+      > `countsTowardReproducibilityAcceptance` (`fjs/report/provenance/module.f.js`) is
+      > correct and mutation-tested, and PROV-05's real-process proof calls it against two
+      > genuinely CAS-fetched run records. But **no production code path gates behavior on
+      > it** — and none can, because "reproducibility acceptance" names Phase 14's acceptance
+      > activity, which the owner skipped on 2026-08-11. There is no pipeline to gate.
+      >
+      > **Do not read this checkbox as "the running server refuses unpinned runs."** It does
+      > not, by design (07-CONTEXT.md: every run gets a record, pinned or not; refusing
+      > unpinned runs would implement a policy nobody asked for). If Phase 14 is ever
+      > un-skipped, its acceptance run is the consumer this predicate was built for, and that
+      > is the moment to re-check this box's honesty.
 
 ### Document Formats and Ingestion (DOC)
 
@@ -341,9 +365,9 @@ structural (RTTI) and semantic passes.
       tuples plus the rule or worksheet line it implements.
 - [x] **PROV-03** *(T1)*: A `vnd.fjs.run` record — program hash, observed inputs, result
       hash, status, pinned flag — written by the tool handler on every run.
-- [ ] **PROV-04** *(T2)*: Report output states the tax year, the parameter-set hash, and the
+- [x] **PROV-04** *(T2)*: Report output states the tax year, the parameter-set hash, and the
       program hash alongside the figures.
-- [ ] **PROV-05** *(T2)*: Re-running a pinned program over the same inputs reproduces the
+- [x] **PROV-05** *(T2)*: Re-running a pinned program over the same inputs reproduces the
       report **byte-identically**, verified adversarially: add an amended revision *between*
       two runs and assert the output does not move. A reproducibility check that passes
       only because nothing changed is not a check.
@@ -602,7 +626,7 @@ them. Week 0 is research's addition in front of the plan's Week 1.
 | EXEC-10 | T1 | Phase 7 - `fjs_run` and Run Records | Week 1 | Complete |
 | EXEC-11 | T1 | Phase 7 - `fjs_run` and Run Records | Week 1 | Complete |
 | EXEC-12 | T1 | Phase 7 - `fjs_run` and Run Records | Week 1 | Complete |
-| EXEC-13 | T2 | Phase 14 - Acceptance | Week 4 | Pending |
+| EXEC-13 | T2 | Phase 19 - Reproducibility and Report Provenance | Week 4 | Complete |
 | DOC-00 | T0 | Phase 5 - Document Base and First Dialects | Week 1 | Complete |
 | DOC-01 | T0 | Phase 5 - Document Base and First Dialects | Week 1 | Complete |
 | DOC-02 | T0 | Phase 2 - Server Skeleton and Registration | Week 0 | Done |
@@ -646,8 +670,8 @@ them. Week 0 is research's addition in front of the plan's Week 1.
 | PROV-01 | T1 | Phase 9 - Traceable Report Lines | Week 2 | Complete |
 | PROV-02 | T1 | Phase 9 - Traceable Report Lines | Week 2 | Complete |
 | PROV-03 | T1 | Phase 7 - `fjs_run` and Run Records | Week 1 | Complete |
-| PROV-04 | T2 | Phase 14 - Acceptance | Week 4 | Pending |
-| PROV-05 | T2 | Phase 14 - Acceptance | Week 4 | Pending |
+| PROV-04 | T2 | Phase 19 - Reproducibility and Report Provenance | Week 4 | Complete |
+| PROV-05 | T2 | Phase 19 - Reproducibility and Report Provenance | Week 4 | Complete |
 | PROV-06 | T3 | Phase 15 - Realism Polish and Upstream | Week 5 | Complete |
 | PROV-07 | T2 | Phase 9 - Traceable Report Lines | Week 2 | Complete |
 | PROV-08 | T3 | Phase 15 - Realism Polish and Upstream | Week 5 | Complete |
@@ -673,8 +697,9 @@ them. Week 0 is research's addition in front of the plan's Week 1.
 | 11. Wage, Retirement, Benefit Documents | Week 3 | DOC-08, DOC-09, DOC-15, MCP-08 | 4 | T2 |
 | 12. Brokerage and Capital-Gain Chain | Week 3 | DOC-06, DOC-07, DOC-13, TAX-07, TAX-08, TAX-11, TAX-15 | 7 | T2 |
 | 13. The 65+ Profile and Schedules | Week 3 | TAX-09, TAX-10, TAX-12, TAX-13, TAX-14 | 5 | T2 |
-| 14. Acceptance | Week 4 | EXEC-13, PROV-04, PROV-05 | 3 | T2 |
+| 14. Acceptance | Week 4 | *(none - moved to Phase 19)* | 0 | T2 |
 | 15. Realism Polish and Upstream | Week 5 | MCP-09, DOC-16, TAX-17, PROV-06, PROV-08 | 5 | T3 |
+| 19. Reproducibility and Report Provenance | Week 4 | EXEC-13, PROV-04, PROV-05 | 3 | T2 |
 
 **Cut line.** Phases 1-10 constitute a defensible v1 - the scope guard (TAX-16) is what
 makes a partial 1040 honest rather than quietly wrong. Phases 11-13 complete the declared

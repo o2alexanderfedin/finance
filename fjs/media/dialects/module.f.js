@@ -243,6 +243,8 @@ const fixtures = {
         dialect: runDialect,
         programHash: 'sha256-program1',
         args: [],
+        taxYear: 2025,
+        paramSetHash: 'sha256-paramset1',
         pinned: false,
         status: 'ok',
         inputs: [],

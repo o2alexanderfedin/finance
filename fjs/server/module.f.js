@@ -797,7 +797,7 @@ export const proof = {
             // separate process and a real filesystem — is proven
             // exclusively by `fjs-run-integration.test.js`.
             const [state12, runResponses] = runBatch(state11, [
-                { jsonrpc: '2.0', method: 'tools/call', id: 21, params: { name: 'fjs_run', arguments: { hash: programHash } } },
+                { jsonrpc: '2.0', method: 'tools/call', id: 21, params: { name: 'fjs_run', arguments: { hash: programHash, taxYear: 2025 } } },
             ])
             const runResult = asCallResultWithIsError(runResponses[0])
             assertEq(runResult.result.isError, true)

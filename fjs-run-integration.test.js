@@ -59,6 +59,7 @@ import { centsFromString, centsToString } from './fjs/exact/module.f.js'
 import { dialect as oneZeroNineNineIntDialect, validate as validateOneZeroNineNineInt } from './fjs/document/1099int/module.f.js'
 import { dialect as revisionDialect } from 'functionalscript/fjs/media/revision/module.f.js'
 import { materializeHome, programPath } from './fjs/guest/materialize/module.f.js'
+import { countsTowardReproducibilityAcceptance } from './fjs/report/provenance/module.f.js'
 
 const repoRoot = fileURLToPath(new URL('.', import.meta.url))
 
@@ -323,7 +324,7 @@ test(
             // ── The decisive call: fjs_run through the real, separate
             // process — a real write-then-import of the materialized
             // program, something no virtual proof can do ──────────────────
-            const runResponse = await call('fjs_run', { hash: programHash })
+            const runResponse = await call('fjs_run', { hash: programHash, taxYear: 2025 })
             assert.equal(runResponse.result.isError, undefined, `fjs_run failed: ${JSON.stringify(runResponse)}`)
             const parsed = JSON.parse(runResponse.result.content[0].text)
             assert.ok(typeof parsed.resultHash === 'string' && parsed.resultHash !== '', 'expected a resultHash')
@@ -335,6 +336,12 @@ test(
             // source text contains at least the `0n` accumulator literal.
             assert.ok(typeof parsed.readCount === 'number' && parsed.readCount > 0, 'expected a positive readCount')
             assert.ok(typeof parsed.literalCount === 'number' && parsed.literalCount >= 1, 'expected literalCount to be at least 1')
+            // PROV-04: the provenance header reaches a REAL fjs_run response
+            // over a live MCP session — taxYear/paramSetHash/programHash
+            // alongside the existing six keys.
+            assert.equal(parsed.taxYear, 2025)
+            assert.ok(typeof parsed.paramSetHash === 'string' && parsed.paramSetHash !== '', 'expected a non-empty paramSetHash')
+            assert.equal(parsed.programHash, programHash)
 
             // The expected total, computed INDEPENDENTLY here from the two
             // PRESENT seeded values via centsFromString/centsToString —
@@ -433,6 +440,7 @@ test(
             const pinRunResponse = await call('fjs_run', {
                 hash: pinProgramHash,
                 args: [pinSubject],
+                taxYear: 2025,
                 subject: pinSubject,
                 parents: pinnedParents,
             })
@@ -463,6 +471,174 @@ test(
             assert.equal(pinRunRecord.subject, pinSubject)
             assert.deepEqual(pinRunRecord.parents, pinnedParents)
 
+            // ── PROV-05: the control-then-pinned adversarial reproduction
+            // proof — the phase's central deliverable. PROV-05 asserts a
+            // NEGATIVE: that a pinned run's output did NOT move after an
+            // amendment lands on the subject it is pinned against. An
+            // assertion that nothing happened passes trivially if the
+            // mechanism under test never ran at all — exactly how Phase 15
+            // shipped two proofs that were green and permanently unable to
+            // fail. 19-VALIDATION.md therefore makes the unpinned CONTROL
+            // leg mandatory and ordered FIRST: build it, and OBSERVE it
+            // actually move, before the pinned leg is written or trusted.
+            // Both legs reuse `pinProgramHash` (`ctx.evoHead(args[0])`) —
+            // its report is directly the JSON-stringified array of head
+            // hashes for whatever subject the pin/live resolution yields —
+            // and `docBHash`, already seeded above, as the amendment. ──────
+
+            // ── Step 1: the control leg (UNPINNED) — build and observe
+            // movement FIRST ──────────────────────────────────────────────
+            const controlSubject = 'finance-integration-prov05-control'
+            const controlAdd1Response = await call('evo_add', {
+                parents: [],
+                subject: controlSubject,
+                snapshot: docAHash,
+            })
+            assert.ok(
+                !controlAdd1Response.result.isError,
+                `evo_add (control setup) failed: ${JSON.stringify(controlAdd1Response)}`)
+            const controlRev1 = controlAdd1Response.result.content[0].text
+
+            const controlRun1Response = await call('fjs_run', {
+                hash: pinProgramHash,
+                args: [controlSubject],
+                taxYear: 2025,
+            })
+            assert.equal(
+                controlRun1Response.result.isError, undefined,
+                `control fjs_run #1 (unpinned) failed: ${JSON.stringify(controlRun1Response)}`)
+            const controlRun1 = JSON.parse(controlRun1Response.result.content[0].text)
+            const controlBytes1Get = await call('cas_get', { hash: controlRun1.resultHash, content: true })
+            assert.ok(
+                !controlBytes1Get.result.isError,
+                `cas_get(control resultHash #1) failed: ${JSON.stringify(controlBytes1Get)}`)
+            const controlBytes1 = JSON.parse(controlBytes1Get.result.content[0].text).text
+
+            // The amendment: a second revision on the SAME control subject,
+            // landing BETWEEN the two control runs.
+            const controlAdd2Response = await call('evo_add', {
+                parents: [controlRev1],
+                subject: controlSubject,
+                snapshot: docBHash,
+            })
+            assert.ok(
+                !controlAdd2Response.result.isError,
+                `evo_add (control amendment) failed: ${JSON.stringify(controlAdd2Response)}`)
+
+            // The SAME unpinned fjs_run call, identical arguments, run again.
+            const controlRun2Response = await call('fjs_run', {
+                hash: pinProgramHash,
+                args: [controlSubject],
+                taxYear: 2025,
+            })
+            assert.equal(
+                controlRun2Response.result.isError, undefined,
+                `control fjs_run #2 (unpinned) failed: ${JSON.stringify(controlRun2Response)}`)
+            const controlRun2 = JSON.parse(controlRun2Response.result.content[0].text)
+            const controlBytes2Get = await call('cas_get', { hash: controlRun2.resultHash, content: true })
+            assert.ok(
+                !controlBytes2Get.result.isError,
+                `cas_get(control resultHash #2) failed: ${JSON.stringify(controlBytes2Get)}`)
+            const controlBytes2 = JSON.parse(controlBytes2Get.result.content[0].text).text
+
+            // The decisive control assertion: the UNPINNED output MOVED
+            // after the amendment. If this does not hold, the pinned leg
+            // below would be measuring nothing against a scenario that
+            // never demonstrates movement at all — 19-VALIDATION.md's own
+            // instruction is to stop rather than trust the pinned leg in
+            // that case. (See this file's own docstring block above this
+            // assertion, and 19-VALIDATION.md's "The control leaf is not
+            // optional" section.)
+            assert.notEqual(controlBytes1, controlBytes2)
+
+            // ── Step 2 (only reached because Step 1's assertion passed):
+            // the pinned leg — the decisive PROV-05 assertion ──────────────
+            const prov05PinnedSubject = 'finance-integration-prov05-pinned'
+            const prov05PinnedAdd1Response = await call('evo_add', {
+                parents: [],
+                subject: prov05PinnedSubject,
+                snapshot: docAHash,
+            })
+            assert.ok(
+                !prov05PinnedAdd1Response.result.isError,
+                `evo_add (pinned setup) failed: ${JSON.stringify(prov05PinnedAdd1Response)}`)
+            const pinnedRev1 = prov05PinnedAdd1Response.result.content[0].text
+
+            const pinnedRun1Response = await call('fjs_run', {
+                hash: pinProgramHash,
+                args: [prov05PinnedSubject],
+                subject: prov05PinnedSubject,
+                parents: [pinnedRev1],
+                taxYear: 2025,
+            })
+            assert.equal(
+                pinnedRun1Response.result.isError, undefined,
+                `pinned fjs_run #1 failed: ${JSON.stringify(pinnedRun1Response)}`)
+            const pinnedRun1 = JSON.parse(pinnedRun1Response.result.content[0].text)
+            const pinnedBytes1Get = await call('cas_get', { hash: pinnedRun1.resultHash, content: true })
+            assert.ok(
+                !pinnedBytes1Get.result.isError,
+                `cas_get(pinned resultHash #1) failed: ${JSON.stringify(pinnedBytes1Get)}`)
+            const pinnedBytes1 = JSON.parse(pinnedBytes1Get.result.content[0].text).text
+
+            // The SAME shape of amendment as the control leg, landing on the
+            // PINNED subject BETWEEN the two pinned runs.
+            const prov05PinnedAdd2Response = await call('evo_add', {
+                parents: [pinnedRev1],
+                subject: prov05PinnedSubject,
+                snapshot: docBHash,
+            })
+            assert.ok(
+                !prov05PinnedAdd2Response.result.isError,
+                `evo_add (pinned amendment) failed: ${JSON.stringify(prov05PinnedAdd2Response)}`)
+
+            // The SAME pinned fjs_run call again — SAME subject, SAME
+            // parents: [pinnedRev1] (the FIRST revision, never the new one
+            // the amendment just added).
+            const pinnedRun2Response = await call('fjs_run', {
+                hash: pinProgramHash,
+                args: [prov05PinnedSubject],
+                subject: prov05PinnedSubject,
+                parents: [pinnedRev1],
+                taxYear: 2025,
+            })
+            assert.equal(
+                pinnedRun2Response.result.isError, undefined,
+                `pinned fjs_run #2 failed: ${JSON.stringify(pinnedRun2Response)}`)
+            const pinnedRun2 = JSON.parse(pinnedRun2Response.result.content[0].text)
+            const pinnedBytes2Get = await call('cas_get', { hash: pinnedRun2.resultHash, content: true })
+            assert.ok(
+                !pinnedBytes2Get.result.isError,
+                `cas_get(pinned resultHash #2) failed: ${JSON.stringify(pinnedBytes2Get)}`)
+            const pinnedBytes2 = JSON.parse(pinnedBytes2Get.result.content[0].text).text
+
+            // The decisive PROV-05 assertion, in both forms 19-CONTEXT.md
+            // requires: hash-string equality is close to a
+            // content-addressing tautology on its own, so this also
+            // compares the actual fetched bytes.
+            assert.equal(pinnedRun1.resultHash, pinnedRun2.resultHash)
+            assert.equal(pinnedBytes1, pinnedBytes2)
+
+            // ── Step 3: EXEC-13 consumption against REAL, CAS-fetched run
+            // records — never a hand-built fixture. Mirrors the
+            // pinRunRecord pattern above (double JSON.parse: cas_get's own
+            // response envelope, then the persisted vnd.fjs.run text it
+            // carries) ───────────────────────────────────────────────────
+            const pinnedRun1Get = await call('cas_get', { hash: pinnedRun1.runHash, content: true })
+            assert.ok(
+                !pinnedRun1Get.result.isError,
+                `cas_get(pinned runHash) failed: ${JSON.stringify(pinnedRun1Get)}`)
+            const pinnedRunRecord = JSON.parse(JSON.parse(pinnedRun1Get.result.content[0].text).text)
+
+            const controlRun1Get = await call('cas_get', { hash: controlRun1.runHash, content: true })
+            assert.ok(
+                !controlRun1Get.result.isError,
+                `cas_get(control runHash) failed: ${JSON.stringify(controlRun1Get)}`)
+            const controlRunRecord = JSON.parse(JSON.parse(controlRun1Get.result.content[0].text).text)
+
+            assert.equal(countsTowardReproducibilityAcceptance(pinnedRunRecord), true)
+            assert.equal(countsTowardReproducibilityAcceptance(controlRunRecord), false)
+
             // ── 09-05: the zero-read adversary through the REAL server —
             // the exact verbatim ROADMAP adversary, `() => pure({ line16:
             // 9137 })`, stored for real via THIS SAME live session's cas_add
@@ -479,7 +655,7 @@ test(
             // against a real filesystem ──────────────────────────────────
             const adversarySource = 'export const report = ctx => () => ctx.pure({ line16: 9137 })'
             const adversaryHash = await casAdd(adversarySource)
-            const adversaryRunResponse = await call('fjs_run', { hash: adversaryHash })
+            const adversaryRunResponse = await call('fjs_run', { hash: adversaryHash, taxYear: 2025 })
             assert.equal(
                 adversaryRunResponse.result.isError, true,
                 `expected the zero-read adversary to be refused: ${JSON.stringify(adversaryRunResponse)}`)
