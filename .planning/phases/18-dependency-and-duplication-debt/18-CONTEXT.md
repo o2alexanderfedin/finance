@@ -92,8 +92,32 @@ change. **This phase must not alter a single computed figure.**
   copy. **Two separate agents hit this.** Beyond mutation testing, a regression in any later
   assertion is invisible today while an earlier one fails: the file reports one failure no matter
   how many things break.
-- **Split by concern into multiple `test()` calls**, preserving every existing assertion verbatim.
-  This is a pure restructuring: no assertion added, removed, or weakened.
+- **Use `node:test` SUBTESTS — `await t.test(...)` inside the existing outer `test()`.** Not
+  separate top-level `test()` calls, and not `describe`/`before`. The pattern mapper found that
+  **no root-level test file in this repo uses `describe`/`before`/`after`**, so those would be a
+  new convention; subtests are plain `node:test` and need no new idiom.
+
+  **Verified empirically 2026-08-14, not assumed.** A probe with a deliberately failing *early*
+  subtest and two later ones produced:
+
+  ```
+  ℹ tests 4 · pass 1 · fail 3
+  ✖ failing tests:
+  ✖ early block — FAILS
+  ✖ late block 2 — also FAILS
+  ```
+
+  The early failure did **not** stop the later subtests, both failures were reported **by name**,
+  and the passing late subtest passed. `await t.test()` resolves rather than throws on a subtest
+  failure, which is precisely why execution continues.
+
+  **This is what makes shared setup survivable.** The server spawn and CAS seeding stay in the
+  outer `test()` scope, created once; each subtest reads them. Separate top-level `test()` calls
+  would force either re-spawning the server per block or hoisting state to module scope — both
+  worse.
+
+- **Split by concern into subtests, preserving every existing assertion verbatim.** This is a pure
+  restructuring: no assertion added, removed, or weakened.
 - **Prove the split worked the only way that counts:** break an assertion in a *late* block and
   confirm it is now reported by name, where before it would have been masked by an earlier
   failure. A split that isn't demonstrated to unmask is just moved code.
