@@ -244,6 +244,27 @@ edit in a form that keeps the binding live, and record both the compile error an
 delete the `spouseItemizes` term  ->  (spouseItemizes && false)          // keeps the binding used
 ```
 
+**`&& false` does NOT work inside an `if` condition.** `tsconfig.json` sets
+`allowUnreachableCode: false`, so `if (x && false) { ... }` makes the whole block unreachable and
+`tsc` reports **TS7027** — no `ℹ tests` line, nothing runs, and the gate proves nothing while
+looking performed. The recipe above is sound only where the value is *consumed* rather than
+*branched on*. Inside a condition, keep the binding live with a comparison that is false for the
+fixture but not statically dead:
+
+```
+if (printed !== undefined)        ->  if (printed !== undefined && printed.length > 1000)
+if (cents !== 0n)                 ->  if (cents !== 0n && cents > 10n ** 12n)
+```
+
+Found on 2026-08-15 during Phase 20's verification, running this file's own recipe.
+
+**Erasing a string interpolation is a mutation worth running, and almost nobody runs it.** The
+same verification found `${destination}` -> `${destination.slice(0, 0)}` survived the entire
+suite: five refusal proofs asserted the box name and the phrase "cannot compute", and not one
+asserted *where the amount would have gone* — the only part of the message a reader can act on. If
+a message is part of the contract, assert the part that carries the information, not the part that
+is easy to assert.
+
 ### The equivalent mutant: a mutation a neighbouring operation absorbs
 
 The second way a written-down mutation turns out not to bite. It compiles, it applies cleanly, it

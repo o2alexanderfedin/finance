@@ -9,7 +9,7 @@
  *
  * ## What this dialect COMPUTES versus what it merely STORES
  *
- * A 1099-G carries nine distinct money boxes feeding several different
+ * A 1099-G carries eight distinct money boxes feeding several different
  * places on a return. This dialect models the printed form faithfully — every
  * box is storable — but only **two** are consumed by a computation:
  *
@@ -134,7 +134,7 @@ const unmodeledMoneyBoxes = /** @type {const} */ ([
     ['box2StateOrLocalIncomeTaxRefunds', 'Schedule 1 line 1 (taxable state/local income tax refunds), which depends on whether the taxpayer itemized in the PRIOR year — this engine models one tax year and holds no prior-year return'],
     ['box5RtaaPayments', "Schedule 1 line 8's collapsed other-income block, which no dialect can attribute an amount to"],
     ['box6TaxableGrants', "Schedule 1 line 8's collapsed other-income block, which no dialect can attribute an amount to"],
-    ['box7AgriculturePayments', 'Schedule F, which this engine does not model'],
+    ['box7AgriculturePayments', 'Schedule F line 4b (taxable agricultural program payments), which this engine does not model'],
     ['box9MarketGain', "Schedule 1 line 8's collapsed other-income block, which no dialect can attribute an amount to"],
 ])
 
@@ -240,13 +240,21 @@ const perMoneyBoxRejection = Object.fromEntries(moneyBoxFields.map(field => [
  * refused and the message must name both the box and where it would have gone.
  * A dialect that stored these silently would understate income.
  */
-const perUnmodeledBoxRefusal = Object.fromEntries(unmodeledMoneyBoxes.map(([field]) => [
+const perUnmodeledBoxRefusal = Object.fromEntries(unmodeledMoneyBoxes.map(([field, destination]) => [
     `${field}IsRefusedWhenNonZero`,
     () => {
         const [t, v] = validate({ ...minimal, [field]: '100.00' })
         assertEq(t, 'error', `${field} must be refused when non-zero`)
         assert(typeof v === 'string' && v.includes(field), [field, v])
         assert(typeof v === 'string' && v.includes('cannot compute'), [field, v])
+        // The DESTINATION, not merely the box name. A refusal that says "this
+        // box cannot be computed" without naming where the amount would have
+        // gone tells the reader nothing actionable — naming the line is the
+        // whole difference between a refusal and an error. Added 2026-08-15
+        // after Phase 20's verification found `destination` -> `''` survived
+        // the entire suite: the behaviour was true of the code and observed by
+        // nothing.
+        assert(typeof v === 'string' && v.includes(destination), [field, destination, v])
     },
 ]))
 

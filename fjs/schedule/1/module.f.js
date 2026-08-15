@@ -17,21 +17,29 @@
  * ## Read this before Schedule 2 or Schedule 3 — the shape is identical
  *
  * Every printed line on this schedule is modeled — no line is silently
- * omitted. For the declared 65+/dependents/itemizing profile this project
- * targets, research (13-RESEARCH.md §5) confirms **none of Schedule 1's
- * Part I income items and none of Part II's adjustments are populated by
- * any kind this engine models.** Every line below is a
- * `profileDeclaredZeroLine`, citing the profile's own `declaredKinds` box —
- * `fjs/schedule/b`'s Form 8815 boundary treatment, copied verbatim in
- * shape, applied to an entire schedule rather than one line.
+ * omitted. **Exactly one line computes from a document: line 7,
+ * unemployment compensation, summed from `vnd.fjs.1099g` box 1 (Phase 20).**
+ * Every other line is a `profileDeclaredZeroLine`, citing the profile's own
+ * `declaredKinds` box — `fjs/schedule/b`'s Form 8815 boundary treatment,
+ * copied verbatim in shape, applied to almost an entire schedule rather
+ * than one line.
+ *
+ * The paragraph above read *"none of Schedule 1's Part I income items and
+ * none of Part II's adjustments are populated by any kind this engine
+ * models"* until 2026-08-15, which stopped being true the day before, when
+ * line 7 began computing. Corrected after Phase 20's verification pass found
+ * it. Research (13-RESEARCH.md §5) established that claim honestly for the
+ * declared 65+/dependents/itemizing profile; **a finding is true of the
+ * moment it was made, and a docstring that quotes one inherits its expiry.**
  *
  * ## Why the whole schedule collapses to documented zero, and why that is
  * honest rather than a shortcut
  *
- * The frozen 50-kind `kindVocabulary` (`fjs/return/scope`) carries exactly
- * TWO kinds for the whole of this schedule: `scheduleOneAdditionalIncome`
- * (all of Part I, lines 1-10) and `scheduleOneAdjustments` (all of Part II,
- * lines 11-26). Each covers many distinct line items — Part I's line 8
+ * The frozen 51-kind `kindVocabulary` (`fjs/return/scope`) carries exactly
+ * two COARSE kinds for this schedule: `scheduleOneAdditionalIncome` (all of
+ * Part I *except* line 7) and `scheduleOneAdjustments` (all of Part II,
+ * lines 11-26) — plus `unemploymentCompensation`, the one fine-grained kind
+ * that carved line 7 out of the first of those in Phase 20. Each covers many distinct line items — Part I's line 8
  * alone has 26 sub-lines (8a-8z: NOL, gambling, cancellation of debt, the
  * foreign earned income exclusion, Alaska PFD, jury duty, digital assets,
  * and nineteen more), and Part II's line 24 has 11 (24a-24z). This engine

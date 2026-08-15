@@ -2733,6 +2733,39 @@ export const proof = {
             assertEq(line8Source.boxPath, 'declaredKinds', 'the zero still carries profile provenance')
         },
 
+        /**
+         * The same return through the **FULL `form1040Report(...)` entry
+         * point**, so the outer scope guard runs on the way.
+         *
+         * Both leaves above call `computedLines`, which reaches
+         * `form1040IncomeLines`/`form1040TaxAndPaymentLines` directly and
+         * **bypasses the scope guard entirely**. That makes them proofs about
+         * the line assembly, not about the return — and it means neither of
+         * them would have failed if `unemploymentCompensation` had been left
+         * out of `modeledKinds`. The whole phase began with a real transcript
+         * REFUSED at exactly that guard, so a proof that the refusal is now a
+         * computation has to go through the thing that refused.
+         *
+         * $45,505.00 of wages plus $4,554.00 of unemployment is $50,059.00 of
+         * total income; less the $31,500.00 MFJ standard deduction leaves
+         * $18,559.00 taxable — hand-computed here, never read back off the
+         * code under test.
+         */
+        unemploymentComputesThroughTheFullEntryPointWithTheGuardSatisfied: () => {
+            const inputs = withUnemployment(
+                inputsOf(storedProfile(unemploymentProfile))([
+                    w2WithWithholding('sha256-w2-01')('45505.00')('8962.00'),
+                ])([])([])([])([])([])([])([])([]))([
+                    unemploymentDocument('sha256-1099g-01')('4554.00')('454.00'),
+                ])
+            const outcome = form1040Report(taxParams2025)(inputs)
+            assert(outcome.kind === 'ok', ['the guard must now PASS on a declared unemployment return', outcome])
+            assertEq(lineRuled(outcome.lines)('1040 line 8').value, 455400n, '$4,554.00 of unemployment')
+            assertEq(lineRuled(outcome.lines)('1040 line 9').value, 5005900n, '$50,059.00 total income')
+            assertEq(lineRuled(outcome.lines)('1040 line 15').value, 1855900n, '$18,559.00 taxable income')
+            assertEq(lineRuled(outcome.lines)('1040 line 25b').value, 45400n, '$454.00 withheld on the 1099-G')
+        },
+
         twentyFiveDSumsTwentyFiveAAndTwentyFiveBCitingEveryBox: () => {
             const { tax } = computedLines(inputsOf(storedProfile(withholdingProfile))([
                 w2WithWithholding('sha256-w2-01')('50000.00')('5000.00'),
@@ -3634,13 +3667,20 @@ export const proof = {
             const [pension5aSource] = lines.line5a.sources
             assertEq(pension5aSource.documentHash, 'sha256-r-pension')
         },
-        // line25b now sums FOUR document types: 1099-INT, 1099-R, 1099-DIV
-        // and 1099-B, each `box4FederalIncomeTaxWithheld` — matching
-        // `federalTaxWithheldOnOther1099`'s own remedy string, which names
-        // all three of the latter three (`fjs/return/scope`). $10 + $100 +
-        // $50 + $25 = $185.00, hand-typed, never re-derived from the code
-        // under test.
-        line25bSumsAllFourWithholdingDocumentTypes: () => {
+        // line25b now sums FIVE document types: 1099-INT, 1099-R, 1099-DIV,
+        // 1099-B and 1099-G, each `box4FederalIncomeTaxWithheld` — matching
+        // `federalTaxWithheldOnOther1099`'s own remedy string
+        // (`fjs/return/scope`). $10 + $100 + $50 + $25 + $20 = $205.00,
+        // hand-typed, never re-derived from the code under test.
+        //
+        // **This leaf said FOUR, and tested four, for a day after line 25b
+        // began summing five.** Phase 20 added the 1099-G term and its own
+        // dedicated leaf, but left the leaf whose entire job is to assert the
+        // COMPLETE set still asserting the old set — and green, because four
+        // of five summing correctly is a true statement about a subset. It is
+        // the same defect as the hand-typed modeled-kind list in
+        // `fjs/return/scope`, on the same day, from the same commit.
+        line25bSumsAllFiveWithholdingDocumentTypes: () => {
             const retirementForm = retirementDocument('sha256-r-wh')({
                 box4FederalIncomeTaxWithheld: '100.00',
             })
@@ -3653,11 +3693,12 @@ export const proof = {
             const interestForm = interestDocument('sha256-int-wh')({
                 box4FederalIncomeTaxWithheld: '10.00',
             })
-            const { tax } = computedLines(
+            const unemploymentForm = unemploymentDocument('sha256-1099g-wh')('0.00')('20.00')
+            const { tax } = computedLines(withUnemployment(
                 inputsOf(storedProfile(singleProfile))([])([interestForm])([dividendForm])([brokerageForm])(
-                    [retirementForm])([])([])([])([]))
-            assertEq(tax.line25b.value, 18500n, '$185.00 across all four document types')
-            assertEq(tax.line25b.sources.length, 4)
+                    [retirementForm])([])([])([])([]))([unemploymentForm]))
+            assertEq(tax.line25b.value, 20500n, '$205.00 across all five document types')
+            assertEq(tax.line25b.sources.length, 5)
         },
         // The IRA-deduction circularity refusal (Decision 3.3/5.1): a
         // profile declaring `iraDeductionDeclared: true` refuses the WHOLE
