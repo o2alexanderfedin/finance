@@ -10,8 +10,10 @@
  * ## What this dialect COMPUTES versus what it merely STORES
  *
  * A 1099-G carries eight distinct money boxes feeding several different
- * places on a return. This dialect models the printed form faithfully — every
- * box is storable — but only **two** are consumed by a computation:
+ * places on a return — seven at the top level, plus the state income tax
+ * withheld that lives inside a boxes-10a-through-11 row. This dialect models
+ * the printed form faithfully — every box is storable — but only **two** are
+ * consumed by a computation:
  *
  * - **Box 1, unemployment compensation** → Schedule 1 line 7 → 1040 line 8.
  * - **Box 4, federal income tax withheld** → 1040 line 25b, joining the other
@@ -49,7 +51,7 @@
  *
  * @module
  */
-import { number, option, string } from 'functionalscript/fjs/types/rtti/module.f.js'
+import { array, number, option, string } from 'functionalscript/fjs/types/rtti/module.f.js'
 import { validate as rttiValidate } from 'functionalscript/fjs/types/rtti/validate/module.f.js'
 import { error, ok } from 'functionalscript/fjs/types/result/module.f.js'
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
@@ -68,6 +70,26 @@ import { moneyFieldError } from '../money_field/module.f.js'
 export const dialect = 'vnd.fjs.1099g'
 /** The media type derived from {@link dialect}: `application/vnd.fjs.1099g+json`. */
 export const mediaType = mediaTypeOf(dialect)
+
+/**
+ * One boxes-10a-through-11 row: the state, its payer identification number,
+ * and the state income tax withheld on that state's line. Every field but
+ * `state` is absent-able (DOC-11), and the printed form carries TWO such rows,
+ * which is why this is an array rather than three flat fields.
+ *
+ * Modelled on `fjs/document/w2`'s `stateLocalEntry` — the same problem one
+ * dialect over, solved the same way. **Before 2026-08-15 this dialect carried
+ * a bare top-level `box11StateIncomeTaxWithheld` and no 10a/10b at all**,
+ * justified in its own docstring by "a state return would want it". That
+ * justification was half-built: a withheld amount with no state attached tells
+ * a state return nothing, and Phase 20's verification pass raised exactly that.
+ * Either the state block is modelled or box 11 should not have been stored.
+ */
+const stateEntry = /** @type {const} */ ({
+    state: string,
+    statePayerStateNumber: option(string),
+    stateIncomeTaxWithheld: option(string),
+})
 
 /**
  * rtti schema for a `1099g` BLOB. `dialect` is spread first (via `base`) so
@@ -91,7 +113,7 @@ export const oneZeroNineNineGSchema = /** @type {const} */ ({
     box7AgriculturePayments: option(string),
     box8TradeOrBusinessIncome: option(true),
     box9MarketGain: option(string),
-    box11StateIncomeTaxWithheld: option(string),
+    box10Through11: option(array(stateEntry)),
     payerName: option(string),
     recipientName: option(string),
 })
@@ -117,7 +139,17 @@ const moneyBoxFields = /** @type {const} */ ([
     'box6TaxableGrants',
     'box7AgriculturePayments',
     'box9MarketGain',
-    'box11StateIncomeTaxWithheld',
+])
+
+/**
+ * The one money-carrying field of a boxes-10a-through-11 row (`state` and
+ * `statePayerStateNumber` are identity labels, not amounts). Named once at
+ * module scope so {@link checkReferences}' loop and this module's generated
+ * proof walk the identical list — `fjs/document/w2`'s `stateLocalMoneyFields`
+ * precedent, and AGENTS.md's "one rule, one place".
+ */
+const stateMoneyFields = /** @type {const} */ ([
+    'stateIncomeTaxWithheld',
 ])
 
 /**
@@ -125,10 +157,15 @@ const moneyBoxFields = /** @type {const} */ ([
  * amount in any of these is refused by name — see the module header for why
  * each one is genuinely undecidable here rather than merely unimplemented.
  *
- * `box11StateIncomeTaxWithheld` is NOT in this list: state withholding never
- * reaches a federal return at all, so storing it and not computing on it is
- * correct rather than a gap. It is stored because the printed form carries it
- * and a state return would want it.
+ * The state income tax withheld inside a boxes-10a-through-11 row is NOT in
+ * this list: state withholding never reaches a federal return at all, so
+ * storing it and not computing on it is correct rather than a gap. It is
+ * stored because the printed form carries it and a state return would want it
+ * — **together with the state and payer number that make it usable**, which is
+ * what turns that sentence from an assertion into a true one. `fjs/document/w2`
+ * treats its own boxes 15-20 the same way, and REQUIREMENTS.md's Out of Scope
+ * entry for state returns says exactly this: *"store W-2 boxes 15-20
+ * faithfully, compute nothing."*
  */
 const unmodeledMoneyBoxes = /** @type {const} */ ([
     ['box2StateOrLocalIncomeTaxRefunds', 'Schedule 1 line 1 (taxable state/local income tax refunds), which depends on whether the taxpayer itemized in the PRIOR year — this engine models one tax year and holds no prior-year return'],
@@ -171,6 +208,18 @@ export const checkReferences = r => {
         const message = moneyFieldError(field)(printed)
         if (message !== undefined) {
             return error(message)
+        }
+    }
+    for (const entry of r.box10Through11 ?? []) {
+        for (const field of stateMoneyFields) {
+            const printed = entry[field]
+            if (printed === undefined) {
+                continue
+            }
+            const message = moneyFieldError(`${entry.state} ${field}`)(printed)
+            if (message !== undefined) {
+                return error(message)
+            }
         }
     }
     for (const [field, destination] of unmodeledMoneyBoxes) {
@@ -272,8 +321,10 @@ const perUnmodeledBoxZeroAccepted = Object.fromEntries(unmodeledMoneyBoxes.map((
     },
 ]))
 
-/** The number of money boxes this module models, hand-typed so a REMOVAL is caught. */
-const expectedMoneyBoxCount = 8
+/** The number of TOP-LEVEL money boxes, hand-typed so a REMOVAL is caught. */
+const expectedMoneyBoxCount = 7
+/** The number of money fields on one boxes-10a-through-11 row, hand-typed likewise. */
+const expectedStateMoneyFieldCount = 1
 /** The number of refused-when-non-zero boxes, hand-typed so a REMOVAL is caught. */
 const expectedUnmodeledBoxCount = 5
 
@@ -290,6 +341,62 @@ export const proof = {
     boxListsAreCovered: () => {
         assertEq(moneyBoxFields.length, expectedMoneyBoxCount)
         assertEq(unmodeledMoneyBoxes.length, expectedUnmodeledBoxCount)
+        assertEq(stateMoneyFields.length, expectedStateMoneyFieldCount)
+    },
+
+    box10Through11: {
+        /**
+         * Two state rows on one form, which is why this is an array. The
+         * printed 1099-G carries two 10a/10b/11 lines, and a taxpayer who
+         * moved mid-year receives exactly that.
+         */
+        twoStateRowsAreStoredInOrder: () => {
+            const [t, v] = validate({
+                ...minimal,
+                box10Through11: [
+                    { state: 'CA', statePayerStateNumber: '999-1111-1', stateIncomeTaxWithheld: '120.00' },
+                    { state: 'OR', stateIncomeTaxWithheld: '45.00' },
+                ],
+            })
+            assertEq(t, 'ok')
+            assert(typeof v !== 'string' && !Array.isArray(v), ['expected the validated document', v])
+            const rows = /** @type {OneZeroNineNineG} */ (v).box10Through11
+            assertEq(rows?.length, 2)
+            assertEq(rows?.[0]?.state, 'CA')
+            assertEq(rows?.[0]?.statePayerStateNumber, '999-1111-1')
+            assertEq(rows?.[1]?.state, 'OR')
+            // Absent, not defaulted (DOC-11). The second row prints no payer
+            // number, and "absent" must stay distinguishable from "empty".
+            assertEq(rows?.[1]?.statePayerStateNumber, undefined)
+        },
+
+        /** A state with no withholding at all is ordinary and must validate. */
+        aStateRowNeedsOnlyItsState: () => {
+            const [t] = validate({ ...minimal, box10Through11: [{ state: 'TX' }] })
+            assertEq(t, 'ok')
+        },
+
+        /**
+         * The money field inside a row goes through the SAME `moneyFieldError`
+         * every top-level box does — a comma-grouped amount is refused there
+         * too. Without this, the row would be a hole in DOC-11's parsing rule.
+         */
+        aCommaGroupedStateAmountIsRefusedNamingTheState: () => {
+            const [t, v] = validate({
+                ...minimal,
+                box10Through11: [{ state: 'CA', stateIncomeTaxWithheld: '1,234.56' }],
+            })
+            assertEq(t, 'error')
+            assert(typeof v === 'string' && v.includes('CA'), ['the refusal must name the state', v])
+        },
+
+        /** The transcript this dialect was built from prints no state block at all. */
+        anAbsentStateBlockIsAbsentNotEmpty: () => {
+            const [t, v] = validate(minimal)
+            assertEq(t, 'ok')
+            assert(typeof v !== 'string' && !Array.isArray(v), ['expected the validated document', v])
+            assertEq(/** @type {OneZeroNineNineG} */ (v).box10Through11, undefined)
+        },
     },
 
     minimalValidates: () => {
@@ -344,12 +451,19 @@ export const proof = {
     /**
      * State withholding is stored and NOT refused, unlike the other unmodeled
      * boxes — it never reaches a federal return, so having no computation for
-     * it is correct rather than a gap.
+     * it is correct rather than a gap. **It is stored WITH the state it was
+     * withheld for**, which is the part that makes that reasoning hold: an
+     * amount with no state attached is of no use to the state return the
+     * storage is justified by.
      */
-    box11StateWithholdingIsStoredNotRefused: () => {
-        const [t, v] = validate({ ...minimal, box11StateIncomeTaxWithheld: '250.00' })
+    stateWithholdingIsStoredWithItsStateNotRefused: () => {
+        const [t, v] = validate({
+            ...minimal,
+            box10Through11: [{ state: 'CA', stateIncomeTaxWithheld: '250.00' }],
+        })
         assertEq(t, 'ok')
-        assert(t === 'ok' && v.box11StateIncomeTaxWithheld === '250.00', [v])
+        assert(t === 'ok' && v.box10Through11?.[0]?.stateIncomeTaxWithheld === '250.00', [v])
+        assert(t === 'ok' && v.box10Through11?.[0]?.state === 'CA', [v])
     },
 
     /** A blob tagged as another dialect is rejected structurally, on `dialect`. */

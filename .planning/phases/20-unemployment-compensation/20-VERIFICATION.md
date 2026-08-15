@@ -410,3 +410,67 @@ baseline.
 
 _Verified: 2026-08-15_
 _Verifier: Claude (gsd-verifier) — seven mutation gates and three `tsc` gates executed and restored by this verifier; live MCP server probed in a separate OS process_
+
+---
+
+## Resolution of both `human_needed` items — 2026-08-15
+
+Both were closed the same day this report was written. Neither needed a new phase.
+
+### 1. Re-feed the original transcript — **CLOSED, confirmed**
+
+The IRS Wage and Income Transcript (TIN `XXX-XX-1426`, tax period `12-31-2025`, tracking number
+`111112058106`) was re-read and its figures driven through the **full `form1040Report` entry
+point** — not `computedLines`, which is what the phase's own leaves used and which skips the
+scope guard.
+
+| 1040 line | Expected | Engine | Source |
+|---|---|---|---|
+| 1a wages | $45,505.00 | ✅ | $35,937.00 + $9,568.00, two W-2s |
+| **8 unemployment** | **$4,554.00** | ✅ | **the line that used to refuse** |
+| 9 total income | $50,059.00 | ✅ | |
+| 11a / 11b AGI | $50,059.00 | ✅ | no adjustments |
+| 12e standard deduction | $15,750.00 | ✅ | single, under 65 |
+| 15 taxable income | $34,309.00 | ✅ | |
+| 25a W-2 withholding | $8,962.00 | ✅ | $6,384.00 + $2,578.00 |
+| **25b 1099-G withholding** | **$454.00** | ✅ | |
+| 25d total withholding | $9,416.00 | ✅ | |
+| 16 tax (Tax Table) | $3,881.00 | ✅ | |
+| **34 refund** | **$5,535.00** | ✅ | matches the independent hand calculation |
+
+**Provenance was checked, not just the amounts.** Line 8 cites the real 1099-G's
+`box1UnemploymentCompensation` and line 25b cites its `box4FederalIncomeTaxWithheld` — the
+figures are not merely equal to the document, they are traceable to the box.
+
+Two transcript details worth recording, because both exercise DOC-11/DOC-12 rather than
+merely passing through it:
+- *"1099G Offset: Not Refund, Credit or Offset for Trade or Business"* → box 8 **unchecked**,
+  therefore **absent**, which under DOC-12's `option(true)` convention is the only way to say so.
+- The transcript prints **no state block at all**, so 10a/10b/11 are **absent, not zero** —
+  exactly the distinction DOC-11 exists to preserve.
+
+### 2. Boxes 10a/10b — **CLOSED, the gap was real and is fixed**
+
+The report was right that the justification was half-built. `box11StateIncomeTaxWithheld` was
+stored on the stated grounds that *"a state return would want it"*, while neither the state nor
+its payer identification number was modelled — and **a withheld amount with no state attached
+is of no use to a state return.** The reasoning did not support what it was used to justify.
+
+Fixed by modelling the state block properly, following `fjs/document/w2`'s `stateLocalEntry`
+precedent — the same problem one dialect over, already solved in this tree:
+
+```js
+const stateEntry = { state, statePayerStateNumber?, stateIncomeTaxWithheld? }
+box10Through11: option(array(stateEntry))
+```
+
+An **array**, because the printed 1099-G carries two 10a/10b/11 rows and a taxpayer who moved
+mid-year receives exactly that. The row's money field goes through the same `moneyFieldError`
+every top-level box does, so it is not a hole in DOC-11's parsing rule; the refusal names the
+state. Four new proofs, and the money check was **watched to fail** (condition mutated, one leaf
+reddened, restored byte-identical).
+
+This also aligns the dialect with REQUIREMENTS.md's Out-of-Scope entry for state returns —
+*"store W-2 boxes 15-20 faithfully, compute nothing"* — which is now what the 1099-G does too.
+
+**Suite after both fixes: `npm test` 6394/6394, exit 0, `tsc` clean.**
