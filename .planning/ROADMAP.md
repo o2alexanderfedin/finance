@@ -211,6 +211,10 @@ deliberately left untaken, so that discovering it did not become a reason to sto
 
 - [x] **Phase 19: Reproducibility and Report Provenance** - The three engineering requirements that were stranded when Phase 14 was skipped (added 2026-08-12, completed 2026-08-12)
 
+### Written after the fact — work that shipped outside this roadmap
+
+- [x] **Phase 20: Unemployment Compensation** - `vnd.fjs.1099g` and Schedule 1 line 7, built on 2026-08-14 in response to a real document the scope guard refused; **this entry was written on 2026-08-15, after the code was already committed** (see the phase entry)
+
 ---
 
 ## Phase Details
@@ -722,6 +726,46 @@ decision was postponed, not made. MAINT-01 stays open and this phase stays in th
 
 ---
 
+### Phase 20: Unemployment Compensation
+**Milestone**: Week 5 — Realism
+**Goal**: A 1099-G's unemployment compensation reaches Form 1040 line 8 and its withholding reaches line 25b, and every box this engine cannot compute is refused by name rather than silently dropped.
+**Depends on**: Phase 10 (the scope guard), Phase 13 (Schedule 1).
+**Requirements**: DOC-18, TAX-18
+**Tier**: T2
+**Code committed**: 2026-08-14 (`8d00990`). **This entry written**: 2026-08-15.
+
+> **⚠ THIS PHASE IS WRITTEN AFTER THE FACT, AND THAT IS THE MOST USEFUL THING ABOUT IT.**
+>
+> The work did not come from this roadmap. It came from a real IRS Wage and Income Transcript
+> the owner handed to the engine mid-session, which the engine **refused** — correctly, on the
+> first real document it had ever seen. Unemployment compensation reaches 1040 line 8 through
+> Schedule 1 line 7, and line 7 was a declared zero whose only scope kind was a coarse
+> catch-all. TAX-16's guard fired exactly as designed and named what it could not compute.
+>
+> The feature was then built, proven and committed **entirely outside the GSD structure**: no
+> CONTEXT, no VALIDATION, no PATTERNS, no PLAN, no plan-check, no code review, no verification.
+> It is recorded here as an exception rather than dressed up as a phase that was planned,
+> because a roadmap whose entries are all tidy is not evidence that the process was followed —
+> it is evidence that the record was tidied.
+>
+> **What that bypass cost, concretely:** every defect class caught during the surrounding
+> sessions — vacuous proofs, mutation gates that could not compile, required-red leaves that
+> could not redden, four separate population undercounts — was caught *by* the artifacts this
+> work skipped. The retrofit's verification pass (`20-VERIFICATION.md`) is the one gate applied
+> after the fact; the others cannot be recovered.
+
+**Success Criteria** (what must be TRUE — written after the fact, then verified against the shipped code, not assumed from it):
+  1. A `vnd.fjs.1099g` dialect exists, is registered in `kindVocabulary`, `modeledKinds`, `finance_schema` and `fjs/media/dialects`, and a live server reports it among its document dialects.
+  2. Box 1 summed across every supplied 1099-G is Schedule 1 line 7, and reaches 1040 line 8 through Schedule 1's Part I total — not by a side channel.
+  3. Box 4 joins 1040 line 25b alongside the existing 1099 withholding terms.
+  4. Boxes 2, 5, 6, 7 and 9 are **refused by name, naming the destination line**, when present and non-zero; accepted silently when zero. Box 11 is deliberately **not** refused, because state withholding never reaches a federal return.
+  5. `Form1040Inputs.unemploymentForms` is required, so `tsc` — not a convention — enforces it on every production caller.
+  6. Each of the three behaviours above was **watched to fail**: a mutation gate per behaviour, production restored byte-identical.
+**Research**: No — it was reactive work against machinery that already shipped.
+**Plans**: **0. None were written.** The `0/0` in the progress table is literal.
+
+---
+
 ## Progress
 
 **Execution Order:** Phases execute in numeric order, with the concurrency sets in
@@ -759,9 +803,14 @@ is deferred, so three phases remain, and two reasons override the numeric defaul
 | 17. Documentation Truth Pass | Backlog | 0/TBD | Not started | - |
 | 18. Dependency and Duplication Debt | Backlog | 0/TBD | Not started | - |
 | 19. Reproducibility and Report Provenance | Week 4 | 3/3 | Complete | 2026-08-12 |
+| 20. Unemployment Compensation *(retrofitted)* | Week 5 | 0/0 — no plans were written | Complete (code 2026-08-14, recorded 2026-08-15) | 2026-08-14 |
 
 > **Phase 12.1 was missing from this table** until 2026-08-12, which is why plan totals
 > computed from it came out four short. Added from measurement.
+>
+> **Phase 20's `0/0` is literal, not a placeholder.** The work shipped with no PLAN files
+> because it never went through planning. Counting it as `1/1` or `2/2` would make the plan
+> totals lie in order to make the table look regular.
 
 ---
 
@@ -772,16 +821,17 @@ is deferred, so three phases remain, and two reasons override the numeric defaul
 | DOCC (documentation corrections) | 7 | 1 |
 | MCP (server and tools) | 9 | 2, 7, 8, 11, 15 |
 | EXEC (execution spine) | 13 | 3, 6, 7, **19** |
-| DOC (formats and ingestion) | 18 | 2, 5, 11, 12, 15 |
+| DOC (formats and ingestion) | 19 | 2, 5, 11, 12, 15, **20** |
 | EXACT (exact arithmetic) | 5 | 4 |
-| TAX (tax computation) | 17 | 8, 10, 12, 13, 15 |
+| TAX (tax computation) | 18 | 8, 10, 12, 13, 15, **20** |
 | PROV (provenance and reporting) | 8 | 7, 9, 15, **19** |
 | SEC (security) | 4 | 1, 2, 6 |
 | TEST (testing discipline) | 4 | 7, and standing across 8-15 |
 | MAINT (maintenance debt) | 8 | 16, 17, 18 |
-| **Total** | **93** | **18 phases** |
+| **Total** | **95** | **19 phases** |
 
-**All 93 requirements map to exactly one phase. No orphans. No duplicates.**
+**All 95 requirements map to a phase. No orphans. No duplicates.** TEST-03 maps to a *range*
+(Phases 8-15, standing), so the older "exactly one phase" wording was false for that one row.
 
 > **This table said 79 until 2026-08-12 and was wrong twice over.** It omitted the MAINT
 > category entirely (8 requirements across Phases 16-18), and its own category counts summed to
@@ -794,6 +844,12 @@ is deferred, so three phases remain, and two reasons override the numeric defaul
 >
 > EXEC-13, PROV-04 and PROV-05 moved from skipped Phase 14 to new Phase 19 on 2026-08-12,
 > which is why Phase 14 no longer appears in this table.
+>
+> **93 → 95 on 2026-08-15** with the DOC-18/TAX-18 retrofit. Note what this table got right
+> that its counterpart did not: REQUIREMENTS.md's own "Coverage by phase" table was found the
+> same day summing to **81** against a declared 93, omitting Phases 16-18 entirely and three
+> TEST requirements from Phase 7. Two coverage tables over one requirement set disagreed by
+> twelve, and neither had a check. Both now reconcile at 95 by command, not by transcription.
 
 ---
 *Roadmap created 2026-08-03 from PROJECT.md, REQUIREMENTS.md, todo/plan.md,

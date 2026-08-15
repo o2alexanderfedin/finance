@@ -293,6 +293,17 @@ structural (RTTI) and semantic passes.
       our own validation does not need `detect`, which matters only for classifying a blob
       of unknown provenance. *Found independently by both the research pass and Sergey.*
 
+- [x] **DOC-18** *(T2, RETROFITTED — see the note below)*: `vnd.fjs.1099g` — Certain Government
+      Payments. Two boxes are **computed**: box 1 (unemployment compensation) and box 4
+      (federal income tax withheld). Boxes **2, 5, 6, 7 and 9 are refused by name when
+      present and non-zero**, and accepted when zero, because each feeds a line this engine
+      does not compute — box 2's state-refund taxability needs the *prior* year's return
+      under the tax-benefit rule, and this engine holds one year. Box 11 (state income tax
+      withheld) is deliberately **not** refused: state withholding never reaches a federal
+      return, so storing it without computing it is correct rather than a gap.
+      Registered in `kindVocabulary`, `modeledKinds`, `finance_schema` and
+      `fjs/media/dialects` in the same commit, per the Phase 8/11/12 precedent.
+
 ### Exact Arithmetic (EXACT)
 
 - [x] **EXACT-01** *(T0)*: An upstreamable exact-arithmetic module — integer cents, exact
@@ -356,6 +367,14 @@ structural (RTTI) and semantic passes.
       wrong, and it is how REQ TAX-05's "full line-by-line" claim stays truthful.
 - [x] **TAX-17** *(T3)*: Multi-year support, including capital loss carryover, which the
       brokerage profile promotes from optional to required.
+- [x] **TAX-18** *(T2, RETROFITTED — see the note below)*: Unemployment compensation reaching
+      the return. Schedule 1 line 7 becomes a real computed line summing box 1 across every
+      1099-G, flowing to **1040 line 8** via Schedule 1's Part I total; 1099-G box 4 joins
+      **1040 line 25b**. Before this, Schedule 1 line 7 was a declared zero whose only scope
+      kind was a coarse catch-all — which is precisely why TAX-16's guard **refused a real
+      taxpayer's transcript**, correctly, on the first real document the engine ever saw.
+      `Form1040Inputs.unemploymentForms` is a **required** field, so `tsc` enforces it on
+      every production caller.
 
 ### Provenance and Reporting (PROV)
 
@@ -470,7 +489,9 @@ so they are scheduled rather than remembered. All are T3 — none blocks the v1 
       are hand-transcribed and the remaining ~2,000 are checked against invariants that share code
       with the generator; DOC-04 describes `Number.isSafeInteger`-guarded integer cents when storage
       is canonical decimal strings; the v1 requirement total is written as 79 in one place and 83 in
-      another while **85** IDs are defined.
+      another while **95** IDs are defined. (That last figure read 85 until 2026-08-15 — it was
+      already stale before the DOC-18/TAX-18 retrofit, not made stale by it. A pending item whose
+      job is to fix wrong counts, carrying a wrong count, is the defect describing itself.)
 
 - [ ] **MAINT-04** *(T3)*: Fix the documentation that contradicts the code. DOCC-01 is checked and
       its own verification document asserts a grep is clean, but `fjs/todo/implement-mcp-server.md`
@@ -560,7 +581,18 @@ to be written down with its consequences rather than left implicit.
 ## Traceability
 
 Populated by the roadmapper from [`.planning/ROADMAP.md`](ROADMAP.md).
-**All 93 requirements map to exactly one phase. No orphans, no duplicates.**
+**All 95 requirements map to a phase. No orphans, no duplicates.** One — TEST-03 — maps to a
+*range* of phases ("Phases 8-15, standing") rather than to one; the older wording of this
+sentence said "exactly one phase" and was false for that row alone.
+
+> **Two of these 95 (DOC-18, TAX-18) were written AFTER the code shipped.** The `vnd.fjs.1099g`
+> dialect and its Schedule 1 line 7 wiring were built mid-session on 2026-08-14 in response to
+> a real taxpayer document that the scope guard refused, entirely outside the GSD structure —
+> no requirement, no phase, no CONTEXT or VALIDATION artifact. The retrofit (2026-08-15,
+> commit `8d00990` for the code) assigns the IDs, adds **Phase 20** to the roadmap labelled as
+> written after the fact, and subjects the work to the same verification gate every other
+> phase cleared. **It is recorded as retrofitted rather than presented as planned**, because
+> the value of this table is that its history is true, not that it is tidy.
 
 Milestones are `todo/plan.md`'s weeks and keep its names; phases are sliced underneath
 them. Week 0 is research's addition in front of the plan's Week 1.
@@ -645,6 +677,7 @@ them. Week 0 is research's addition in front of the plan's Week 1.
 | DOC-15 | T2 | Phase 11 - Wage, Retirement, Benefit Documents | Week 3 | Complete |
 | DOC-16 | T3 | Phase 15 - Realism Polish and Upstream | Week 5 | Complete |
 | DOC-17 | T2 | Phase 5 - Document Base and First Dialects (added) | Week 1 | Complete |
+| DOC-18 | T2 | Phase 20 - Unemployment Compensation (retrofitted) | Week 5 | Complete |
 | EXACT-01 | T0 | Phase 4 - Exact Arithmetic | Week 1 | Done |
 | EXACT-02 | T0 | Phase 4 - Exact Arithmetic | Week 1 | Done |
 | EXACT-03 | T0 | Phase 4 - Exact Arithmetic | Week 1 | Done |
@@ -667,6 +700,7 @@ them. Week 0 is research's addition in front of the plan's Week 1.
 | TAX-15 | T2 | Phase 12.1 - The Capital-Gain Chain | Week 3 | Complete |
 | TAX-16 | T1 | Phase 10 - 1040 Core and Scope Guard | Week 2 | Complete |
 | TAX-17 | T3 | Phase 15 - Realism Polish and Upstream | Week 5 | Complete |
+| TAX-18 | T2 | Phase 20 - Unemployment Compensation (retrofitted) | Week 5 | Complete |
 | PROV-01 | T1 | Phase 9 - Traceable Report Lines | Week 2 | Complete |
 | PROV-02 | T1 | Phase 9 - Traceable Report Lines | Week 2 | Complete |
 | PROV-03 | T1 | Phase 7 - `fjs_run` and Run Records | Week 1 | Complete |
@@ -690,7 +724,7 @@ them. Week 0 is research's addition in front of the plan's Week 1.
 | 4. Exact Arithmetic | Week 1 | EXACT-01, EXACT-02, EXACT-03, EXACT-04, EXACT-05 | 5 | T0, T1 |
 | 5. Document Base and First Dialects | Week 1 | DOC-00, DOC-01, DOC-03, DOC-04, DOC-05, DOC-10, DOC-11, DOC-12, DOC-14, DOC-17 | 10 | T0, T1, T2 |
 | 6. Guest ABI and Materialization | Week 1 | EXEC-07, EXEC-09, SEC-02, SEC-03 | 4 | T0, T1 |
-| 7. `fjs_run` and Run Records | Week 1 | EXEC-08, EXEC-10, EXEC-11, EXEC-12, PROV-03, MCP-06 | 6 | T1 |
+| 7. `fjs_run` and Run Records | Week 1 | EXEC-08, EXEC-10, EXEC-11, EXEC-12, PROV-03, MCP-06, TEST-01, TEST-02, TEST-04 | 9 | T1 |
 | 8. TY2025 Parameters and Tax Table | Week 2 | TAX-01, TAX-02, TAX-04, MCP-07 | 4 | T1 |
 | 9. Traceable Report Lines | Week 2 | PROV-01, PROV-02, PROV-07 | 3 | T1, T2 |
 | 10. 1040 Core and Scope Guard | Week 2 | TAX-03, TAX-05, TAX-06, TAX-16 | 4 | T1 |
@@ -699,7 +733,27 @@ them. Week 0 is research's addition in front of the plan's Week 1.
 | 13. The 65+ Profile and Schedules | Week 3 | TAX-09, TAX-10, TAX-12, TAX-13, TAX-14 | 5 | T2 |
 | 14. Acceptance | Week 4 | *(none - moved to Phase 19)* | 0 | T2 |
 | 15. Realism Polish and Upstream | Week 5 | MCP-09, DOC-16, TAX-17, PROV-06, PROV-08 | 5 | T3 |
+| 16. The Orphan Ingestion Island *(deferred)* | Week 5 | MAINT-01 | 1 | T3 |
+| 17. Documentation Truth Pass | Week 5 | MAINT-02, MAINT-03, MAINT-04, MAINT-05 | 4 | T3 |
+| 18. Dependency and Duplication Debt | Week 5 | MAINT-06, MAINT-07, MAINT-08 | 3 | T3 |
 | 19. Reproducibility and Report Provenance | Week 4 | EXEC-13, PROV-04, PROV-05 | 3 | T2 |
+| 20. Unemployment Compensation *(retrofitted)* | Week 5 | DOC-18, TAX-18 | 2 | T2 |
+| *(standing, not a phase)* | Weeks 2-5 | TEST-03 | 1 | T2 |
+| **Total** | | | **95** | |
+
+> **This table under-counted by twelve until 2026-08-15.** It summed to 81 against a declared
+> 93: Phase 7's row omitted the three TEST requirements the traceability table already assigned
+> to it, phases 16, 17 and 18 had no rows at all, and TEST-03 — which maps to a phase *range* —
+> had nowhere to go. Every one of those requirements was correctly listed twenty lines above, in
+> the traceability table. **This is the project's most-repeated defect: a count that is true of
+> the part someone examined and false of the whole.** Re-derive rather than read:
+> ```sh
+> # rows in the traceability table
+> grep -cE '^\| [A-Z]+-[0-9]+ \|' .planning/REQUIREMENTS.md
+> # sum of this table's Count column, excluding the Total row
+> awk -F'|' '/^\| ([0-9]+[.] |\*\(standing)/{gsub(/ /,"",$5); s+=$5} END{print s}' .planning/REQUIREMENTS.md
+> # the two MUST agree
+> ```
 
 **Cut line.** Phases 1-10 constitute a defensible v1 - the scope guard (TAX-16) is what
 makes a partial 1040 honest rather than quietly wrong. Phases 11-13 complete the declared
