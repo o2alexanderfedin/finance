@@ -215,6 +215,19 @@ deliberately left untaken, so that discovering it did not become a reason to sto
 
 - [x] **Phase 20: Unemployment Compensation** - `vnd.fjs.1099g` and Schedule 1 line 7, built on 2026-08-14 in response to a real document the scope guard refused; **this entry was written on 2026-08-15, after the code was already committed** (see the phase entry)
 
+### Milestone v2 — The Product Path and Four Personas (opened 2026-08-15)
+
+- [ ] **Phase 21: The Last Mile** - The 1040 engine reachable from a stored guest program via `guestCtx`, and a real return produced through `evo_add` → `fjs_run` → `vnd.fjs.run`
+- [ ] **Phase 22: Computable Tripwires** - Documents that imply a kind must have been declared; closes the silent-understatement hole
+- [ ] **Phase 23: Schedule 2 Populated** - Forms 8959 and 8960 — **unblocks the FAANG employee**
+- [ ] **Phase 24: Schedule 1 Adjustments** - Student loan interest, educator expenses, HSA — **unblocks the non-profit worker**
+- [ ] **Phase 25: Schedule 3 Credits** - Saver's Credit, education credits, EITC
+- [ ] **Phase 26: Retiree Completion** - Qualified Charitable Distributions and Form 8606
+- [ ] **Phase 27: 1099-NEC and Schedule C** - Reversed from Out of Scope on 2026-08-15
+- [ ] **Phase 28: Schedule SE and QBI** - **unblocks the startup founder**
+- [ ] **Phase 29: Equity Compensation and AMT** - Forms 3921/3922, Form 6251, Form 8949 basis adjustment codes
+- [ ] **Phase 30: Pass-Through Income** - Schedule K-1 and Schedule E
+
 ---
 
 ## Phase Details
@@ -766,6 +779,95 @@ decision was postponed, not made. MAINT-01 stays open and this phase stays in th
 
 ---
 
+**── Milestone v2: The Product Path and Four Personas ──**
+
+Opened 2026-08-15 by owner decision after `.planning/PERSONA-COVERAGE.md` measured the engine
+against four taxpayers. One of the four is supported; one computes a **wrong** return; two refuse.
+Requirements and per-phase mapping live in REQUIREMENTS.md's "v2 Requirements" section — 25 IDs,
+counted separately from v1's 95.
+
+> **Phase 22 is a hard prerequisite for 23 through 30 and must not be reordered.** Every phase
+> after it adds a form the engine will compute; each one landing before the tripwires widens the
+> window in which the engine answers confidently and wrongly. This is not a style preference —
+> today a $300,000 W-2 produces a return understating tax by roughly $900, silently, because the
+> scope guard cannot see a threshold-triggered tax the taxpayer did not know to declare.
+
+### Phase 21: The Last Mile
+**Goal**: A guest program calls the 1040 engine and produces a real return through the product path.
+**Depends on**: Phases 6, 7, 19 — all complete.
+**Requirements**: EXEC-14, PROV-09
+**Tier**: T0
+
+> **This phase exists because the project's two proven halves have never been joined.**
+> `form1040Report` has no production caller; `demo/steps/00-about.js:140` says so on the demo's
+> own first page. Phase 19's provenance header and PROV-05's pinned reproduction have therefore
+> never run against an actual 1040.
+>
+> **The obvious implementation is forbidden, and that is the whole design content of this phase.**
+> A server tool that reads documents, assembles `Form1040Inputs` and calls the engine is exactly
+> the `finance_compute_1040` tool REQUIREMENTS.md rules out — *"would destroy the thesis
+> permanently. The agent would call it and never author a program again."* The 2026-08-15 handoff
+> described the last mile in precisely those forbidden terms, and it would have been built that
+> way had the persona survey not re-read the Out of Scope list.
+>
+> **The route that preserves the thesis:** `guestCtx` already carries pure non-effect helpers
+> (`step`, `pure`, `centsFromString`, `centsToString`) beside the four frozen CAS commands, and
+> `_CasOpIsExactlyTheFourCommands` pins the **effect** vocabulary, not the context. The engine
+> joins that pure list. The agent still authors the program.
+
+**Success Criteria** (what must be TRUE):
+  1. A stored guest program, with zero `import` statements, reads documents through `casRead`/`evoHead` and calls the 1040 engine from `ctx`, returning a report.
+  2. `_CasOpIsExactlyTheFourCommands` still compiles **unchanged** — the effect whitelist does not widen by one entry. Verify by mutation: add a fifth effect and watch `tsc` stop the build.
+  3. A real return runs end to end: documents in via `evo_add`, program in CAS, executed by `fjs_run`, result written as `vnd.fjs.run` with Phase 19's provenance header populated.
+  4. PROV-05's pinned reproduction is exercised **against that real 1040** — amend a subject between two runs and assert byte-identical output. Today it has only ever run against a fixture.
+  5. No `finance_compute_1040`-shaped tool is added. A reviewer must be able to check this by reading `tools/list`.
+**Research**: No — every mechanism exists and is proven. This is wiring.
+
+### Phase 22: Computable Tripwires
+**Goal**: A document that implies a tax obligation forces the declaration, so the engine refuses instead of silently understating.
+**Depends on**: Phase 21.
+**Requirements**: TAX-19
+**Tier**: T0
+**Success Criteria**:
+  1. A table of (predicate over stored documents) → (kind that must be declared), evaluated before any line computes.
+  2. W-2 box 5 above the Additional Medicare Tax threshold, with `scheduleTwoTaxes` undeclared, **refuses** — naming the form and the line.
+  3. The refusal reuses `fjs/return/scope`'s existing `scopeRefusal` shape. One place builds a scope refusal; this does not become a second.
+  4. A legitimately-zero case still computes: below threshold and undeclared is silence, not a refusal. A tripwire that always fires is not a tripwire.
+  5. Watched to fail: invert each predicate, watch the matching leaf redden, restore byte-identical.
+**Research**: No.
+
+### Phase 23: Schedule 2 Populated — unblocks the FAANG employee
+**Requirements**: TAX-20 (Form 8959), TAX-21 (Form 8960), TAX-22 (split the coarse kind) · **Tier**: T1
+**Success Criteria**: 8959's 0.9% above the unindexed $200k/$250k/$125k thresholds reaches Schedule 2 line 11 → 1040 line 23; 8960's 3.8% on the lesser of NII or excess MAGI reaches Schedule 2 line 12; `scheduleTwoTaxes` splits into per-line kinds with **only the wired lines reclassified, in the same commit**; and TAX-15's "no variable named `magi`" rule is honoured — 8960's MAGI has its own add-back list.
+
+### Phase 24: Schedule 1 Adjustments — unblocks the non-profit worker
+**Requirements**: TAX-23, TAX-24, DOC-19 · **Tier**: T2
+**Success Criteria**: student loan interest with its phase-out at line 21, educator expenses at line 11, HSA at line 13, each reading a `vnd.fjs.adjustments` taxpayer-asserted document that follows `vnd.fjs.medical_expenses` exactly; and **the hard zeros are replaced, not supplemented** — a reviewer must be able to confirm no `zero(...)` remains on a line this phase claims.
+
+### Phase 25: Schedule 3 Credits
+**Requirements**: TAX-25 (Form 8880), TAX-26 (Form 8863), TAX-27 (EITC) · **Tier**: T2
+
+### Phase 26: Retiree Completion
+**Requirements**: TAX-28 (QCD election, $108,000 TY2025 cap), TAX-29 (Form 8606 pro-rata) · **Tier**: T2
+**Note**: TAX-28 closes a **silent overstatement** — today a QCD'd RMD is taxed in full. It is the mirror image of Phase 22's understatement, and neither is visible to the taxpayer.
+
+### Phase 27: 1099-NEC and Schedule C
+**Requirements**: DOC-20, DOC-21, TAX-30 · **Tier**: T3
+**Note**: This phase reverses an Out-of-Scope decision made 2026-08-03 and struck through on 2026-08-15. The original rationale — *"the three-box simplicity is a trap; the downstream is Schedule C / SE / QBI"* — is preserved in REQUIREMENTS.md as a warning, because it was correct.
+
+### Phase 28: Schedule SE and QBI — unblocks the startup founder
+**Requirements**: TAX-31 (Schedule SE), TAX-32 (Form 8995/8995-A) · **Tier**: T3
+**Depends on**: Phase 23 — Schedule SE feeds Schedule 2 line 4, so it cannot land before Schedule 2 computes. **Also note the wage-base coordination**: the Social Security ceiling is shared with W-2 box 3 wages already counted, so this is not a standalone computation.
+
+### Phase 29: Equity Compensation and AMT
+**Requirements**: DOC-22 (3921), DOC-23 (3922), TAX-33 (Form 6251), TAX-34 (Form 8949 basis codes) · **Tier**: T3
+**Note**: TAX-34 closes a **double-taxation** bug for anyone with RSUs — brokers report $0 or unadjusted basis and the filer must adjust. Form 8949 already exists; this is its adjustment column.
+
+### Phase 30: Pass-Through Income
+**Requirements**: DOC-24 (K-1, two dialects — 1065 and 1120-S box numbering differs), TAX-35 (Schedule E) · **Tier**: T3
+
+---
+
 ## Progress
 
 **Execution Order:** Phases execute in numeric order, with the concurrency sets in
@@ -804,6 +906,17 @@ is deferred, so three phases remain, and two reasons override the numeric defaul
 | 18. Dependency and Duplication Debt | Backlog | 0/TBD | Not started | - |
 | 19. Reproducibility and Report Provenance | Week 4 | 3/3 | Complete | 2026-08-12 |
 | 20. Unemployment Compensation *(retrofitted)* | Week 5 | 0/0 — no plans were written | Complete (code 2026-08-14, recorded 2026-08-15) | 2026-08-14 |
+| **── Milestone v2 ──** | | | | |
+| 21. The Last Mile | v2 | 0/TBD | Not started | - |
+| 22. Computable Tripwires | v2 | 0/TBD | Not started | - |
+| 23. Schedule 2 Populated | v2 | 0/TBD | Not started | - |
+| 24. Schedule 1 Adjustments | v2 | 0/TBD | Not started | - |
+| 25. Schedule 3 Credits | v2 | 0/TBD | Not started | - |
+| 26. Retiree Completion | v2 | 0/TBD | Not started | - |
+| 27. 1099-NEC and Schedule C | v2 | 0/TBD | Not started | - |
+| 28. Schedule SE and QBI | v2 | 0/TBD | Not started | - |
+| 29. Equity Compensation and AMT | v2 | 0/TBD | Not started | - |
+| 30. Pass-Through Income | v2 | 0/TBD | Not started | - |
 
 > **Phase 12.1 was missing from this table** until 2026-08-12, which is why plan totals
 > computed from it came out four short. Added from measurement.
