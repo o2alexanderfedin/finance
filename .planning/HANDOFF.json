@@ -32,20 +32,75 @@
     "measured_on": "8d00990"
   },
   "completed_this_session": [
-    {"id": 1, "name": "Phase 19 (EXEC-13, PROV-04, PROV-05) executed, reviewed, verified 4/4, merged", "commit": "addc23c", "pr": 66},
-    {"id": 2, "name": "Phase 18 criteria corrections (0.43.0 stale; 'two dialect files' is six) merged", "commit": "6d6d8b8", "pr": 67},
-    {"id": 3, "name": "Phase 18 planned: CONTEXT, VALIDATION, PATTERNS, 4 plans; plan-checked twice; 3 blockers fixed", "commit": "27ba2c2"},
-    {"id": 4, "name": "STATE.md fourth corruption repaired (third caused by state.advance-plan)", "commit": "e7837a3"},
-    {"id": 5, "name": "CAPABILITIES.md re-measured from a live server probe", "commit": "1535dbe"},
-    {"id": 6, "name": "UNPLANNED: vnd.fjs.1099g dialect + unemployment wired to Schedule 1 line 7 / 1040 line 8 / line 25b, 3 mutation gates", "commit": "8d00990"},
-    {"id": 7, "name": "First real-world return computed end to end: refund $5,535, corroborated by an independent hand calculation", "commit": null}
+    {
+      "id": 1,
+      "name": "Phase 19 (EXEC-13, PROV-04, PROV-05) executed, reviewed, verified 4/4, merged",
+      "commit": "addc23c",
+      "pr": 66
+    },
+    {
+      "id": 2,
+      "name": "Phase 18 criteria corrections (0.43.0 stale; 'two dialect files' is six) merged",
+      "commit": "6d6d8b8",
+      "pr": 67
+    },
+    {
+      "id": 3,
+      "name": "Phase 18 planned: CONTEXT, VALIDATION, PATTERNS, 4 plans; plan-checked twice; 3 blockers fixed",
+      "commit": "27ba2c2"
+    },
+    {
+      "id": 4,
+      "name": "STATE.md fourth corruption repaired (third caused by state.advance-plan)",
+      "commit": "e7837a3"
+    },
+    {
+      "id": 5,
+      "name": "CAPABILITIES.md re-measured from a live server probe",
+      "commit": "1535dbe"
+    },
+    {
+      "id": 6,
+      "name": "UNPLANNED: vnd.fjs.1099g dialect + unemployment wired to Schedule 1 line 7 / 1040 line 8 / line 25b, 3 mutation gates",
+      "commit": "8d00990"
+    },
+    {
+      "id": 7,
+      "name": "First real-world return computed end to end: refund $5,535, corroborated by an independent hand calculation",
+      "commit": null
+    }
   ],
   "remaining_tasks": [
-    {"id": 8, "name": "Resolve the 1099-G traceability gap (requirement IDs + phase entry, or an explicit out-of-band declaration)", "status": "blocking_honest_reporting"},
-    {"id": 9, "name": "Merge feature/1099g-unemployment to develop; delete the redundant phase-18 branch", "status": "ready"},
-    {"id": 10, "name": "Phase 18 Wave 1 (18-01): functionalscript 0.44.0 bump, alone in its own commit", "status": "ready"},
-    {"id": 11, "name": "Phase 18 Wave 2 (18-02 + 18-04, parallel), then Wave 3 (18-03)", "status": "blocked_on_wave_1"},
-    {"id": 12, "name": "Phase 17 — Documentation Truth Pass (MAINT-02..05)", "status": "not_started"}
+    {
+      "id": 8,
+      "name": "Resolve the 1099-G traceability gap (requirement IDs + phase entry, or an explicit out-of-band declaration)",
+      "status": "blocking_honest_reporting"
+    },
+    {
+      "id": 9,
+      "name": "Merge feature/1099g-unemployment to develop; delete the redundant phase-18 branch",
+      "status": "ready"
+    },
+    {
+      "id": 10,
+      "name": "Phase 18 Wave 1 (18-01): functionalscript 0.44.0 bump, alone in its own commit",
+      "status": "ready"
+    },
+    {
+      "id": 11,
+      "name": "Phase 18 Wave 2 (18-02 + 18-04, parallel), then Wave 3 (18-03)",
+      "status": "blocked_on_wave_1"
+    },
+    {
+      "id": 12,
+      "name": "Phase 17 \u2014 Documentation Truth Pass (MAINT-02..05)",
+      "status": "not_started"
+    },
+    {
+      "id": 13,
+      "name": "THE LAST MILE: wire a server tool that reads stored documents and calls form1040Report. Today there is NO production caller and no server path produces a 1040 (demo/steps/00-about.js:140 states this). Guests cannot import, so fjs_run can never reach the engine. Everything this needs now exists.",
+      "status": "highest_value_unbuilt"
+    }
   ],
   "blockers": [
     {
@@ -60,21 +115,60 @@
     }
   ],
   "human_actions_pending": [
-    {"action": "Decide how the 1099-G work is recorded in REQUIREMENTS.md and ROADMAP.md", "blocking": true},
-    {"action": "Approve merging feature/1099g-unemployment to develop", "blocking": false},
-    {"action": "Decide Phase 16 (orphan OCR island) — still deferred; the 1099-G work just showed the manual-authoring path works", "blocking": false},
-    {"action": "Decide release timing — develop is >110 commits ahead of main", "blocking": false},
-    {"action": "Close standing verification debt: Phases 05/06/07 have no VERIFICATION.md; Phase 10 and 13 human_needed items remain unowned. PARTIALLY REDUCED: TY2025 standard deduction verified against IRS published figures for all five filing statuses, exact match. Nine other parameter groups unchecked.", "blocking": false}
+    {
+      "action": "Decide how the 1099-G work is recorded in REQUIREMENTS.md and ROADMAP.md",
+      "blocking": true
+    },
+    {
+      "action": "Approve merging feature/1099g-unemployment to develop",
+      "blocking": false
+    },
+    {
+      "action": "Decide Phase 16 (orphan OCR island) \u2014 still deferred; the 1099-G work just showed the manual-authoring path works",
+      "blocking": false
+    },
+    {
+      "action": "Decide release timing \u2014 develop is >110 commits ahead of main",
+      "blocking": false
+    },
+    {
+      "action": "Close standing verification debt: Phases 05/06/07 have no VERIFICATION.md; Phase 10 and 13 human_needed items remain unowned. PARTIALLY REDUCED: TY2025 standard deduction verified against IRS published figures for all five filing statuses, exact match. Nine other parameter groups unchecked.",
+      "blocking": false
+    }
   ],
   "decisions": [
-    {"decision": "Phase 18 targets functionalscript 0.44.0, not the 0.43.0 its criterion named", "rationale": "package.json already declared ^0.43.1, so the literal text was satisfiable by doing nothing. Owner chose the criterion's intent: the vendored dependency is current.", "phase": "18"},
-    {"decision": "The formRevision duplication is shared across all SIX dialects and the ROADMAP corrected", "rationale": "The criterion said two. Measured six. It was written when four of those dialects did not exist and nothing re-derived it.", "phase": "18"},
-    {"decision": "WR-03 (splitting fjs-run-integration.test.js) folded into Phase 18", "rationale": "Owner decision. The masking is proven, not theoretical: it cost two agents real work during Phase 19's gate M1.", "phase": "18"},
-    {"decision": "The test split uses node:test SUBTESTS, not describe/before", "rationale": "No root-level test file in this repo uses describe/before, so those would be a new convention. Subtests verified by probe: an early failure does not stop later subtests and each is reported by name, while shared setup stays in the outer scope.", "phase": "18"},
-    {"decision": "1099-G boxes 2/5/6/7/9 are REFUSED when non-zero, not stored-and-ignored", "rationale": "Box 2 is taxable only under the tax-benefit rule, which needs the prior year's return; this engine holds one year. Ignoring it would understate income for anyone who itemized last year. Box 11 is deliberately NOT refused: state withholding never reaches a federal return.", "phase": "unplanned"},
-    {"decision": "inputsOf keeps ten curried parameters and defaults unemploymentForms to empty", "rationale": "It is a test helper. The field is REQUIRED on Form1040Inputs and tsc enforces that on production callers; defaulting in the helper left forty existing proof call sites untouched.", "phase": "unplanned"}
+    {
+      "decision": "Phase 18 targets functionalscript 0.44.0, not the 0.43.0 its criterion named",
+      "rationale": "package.json already declared ^0.43.1, so the literal text was satisfiable by doing nothing. Owner chose the criterion's intent: the vendored dependency is current.",
+      "phase": "18"
+    },
+    {
+      "decision": "The formRevision duplication is shared across all SIX dialects and the ROADMAP corrected",
+      "rationale": "The criterion said two. Measured six. It was written when four of those dialects did not exist and nothing re-derived it.",
+      "phase": "18"
+    },
+    {
+      "decision": "WR-03 (splitting fjs-run-integration.test.js) folded into Phase 18",
+      "rationale": "Owner decision. The masking is proven, not theoretical: it cost two agents real work during Phase 19's gate M1.",
+      "phase": "18"
+    },
+    {
+      "decision": "The test split uses node:test SUBTESTS, not describe/before",
+      "rationale": "No root-level test file in this repo uses describe/before, so those would be a new convention. Subtests verified by probe: an early failure does not stop later subtests and each is reported by name, while shared setup stays in the outer scope.",
+      "phase": "18"
+    },
+    {
+      "decision": "1099-G boxes 2/5/6/7/9 are REFUSED when non-zero, not stored-and-ignored",
+      "rationale": "Box 2 is taxable only under the tax-benefit rule, which needs the prior year's return; this engine holds one year. Ignoring it would understate income for anyone who itemized last year. Box 11 is deliberately NOT refused: state withholding never reaches a federal return.",
+      "phase": "unplanned"
+    },
+    {
+      "decision": "inputsOf keeps ten curried parameters and defaults unemploymentForms to empty",
+      "rationale": "It is a test helper. The field is REQUIRED on Form1040Inputs and tsc enforces that on production callers; defaulting in the helper left forty existing proof call sites untouched.",
+      "phase": "unplanned"
+    }
   ],
   "uncommitted_files": [],
-  "next_action": "Resolve the 1099-G traceability gap first (requirement IDs and a phase entry, or an explicit out-of-band note). Then merge feature/1099g-unemployment to develop and delete the redundant phase-18 branch. Then /gsd-execute-phase 18, starting with Wave 1's isolated 0.44.0 bump — but re-derive the proof-count floor first, since the plans say 916 and it is now 951.",
-  "context_notes": "The through-line of this session was one defect class appearing SIX times: a count or population that was true of the part someone examined and false of the whole. Phase 19's four pre-execution blockers, Phase 18's ROADMAP saying 'two dialect files' when it is six, and my own suite-runtime figure taken from a single sample. The prevention is not care, it is method: re-derive every population with a command that does not depend on the method that found it, because different discovery methods find different subsets. Second: three of Phase 18's mutation gates would have failed to COMPILE, which is the same failure as a vacuous proof one level up - a gate that cannot run proves nothing while appearing performed. Third, and most valuable: the engine REFUSED a real user document correctly, on the first one it ever saw, and that refusal is what produced the 1099-G feature."
+  "next_action": "Resolve the 1099-G traceability gap first (requirement IDs and a phase entry, or an explicit out-of-band note). Then merge feature/1099g-unemployment to develop and delete the redundant phase-18 branch. Then /gsd-execute-phase 18, starting with Wave 1's isolated 0.44.0 bump \u2014 but re-derive the proof-count floor first, since the plans say 916 and it is now 951.",
+  "context_notes": "The through-line of this session was one defect class appearing SIX times: a count or population that was true of the part someone examined and false of the whole. Phase 19's four pre-execution blockers, Phase 18's ROADMAP saying 'two dialect files' when it is six, and my own suite-runtime figure taken from a single sample. The prevention is not care, it is method: re-derive every population with a command that does not depend on the method that found it, because different discovery methods find different subsets. Second: three of Phase 18's mutation gates would have failed to COMPILE, which is the same failure as a vacuous proof one level up - a gate that cannot run proves nothing while appearing performed. Third, and most valuable: the engine REFUSED a real user document correctly, on the first one it ever saw, and that refusal is what produced the 1099-G feature. FOURTH, surfaced at the very end: form1040Report has NO production caller. The proven 1040 engine and the proven program-execution spine have never been joined, and cannot be by the guest path since guests cannot import. Phase 19's provenance and reproduction work has therefore never run against a real 1040. Wiring a server tool that reads stored documents and calls the engine is the highest-value unbuilt thing in the project."
 }
