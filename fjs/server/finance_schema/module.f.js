@@ -56,6 +56,7 @@ import { dialect as medicalExpensesDialect, medicalExpensesSchema } from '../../
 import { dialect as returnProfileDialect, returnProfileSchema } from '../../return/profile/module.f.js'
 import { dialect as oneZeroNineNineRDialect, oneZeroNineNineRSchema } from '../../document/1099r/module.f.js'
 import { dialect as ssa1099Dialect, ssa1099Schema } from '../../document/ssa1099/module.f.js'
+import { dialect as oneZeroNineNineGDialect, oneZeroNineNineGSchema } from '../../document/1099g/module.f.js'
 import { dialect as oneZeroNineNineDivDialect, oneZeroNineNineDivSchema } from '../../document/1099div/module.f.js'
 import { dialect as oneZeroNineNineBDialect, oneZeroNineNineBSchema } from '../../document/1099b/module.f.js'
 import { stringify as jsonText } from '../../json/module.f.js'
@@ -82,6 +83,7 @@ const dialectSchemas = {
     [returnProfileDialect]: returnProfileSchema,
     [oneZeroNineNineRDialect]: oneZeroNineNineRSchema,
     [ssa1099Dialect]: ssa1099Schema,
+    [oneZeroNineNineGDialect]: oneZeroNineNineGSchema,
     [oneZeroNineNineDivDialect]: oneZeroNineNineDivSchema,
     [oneZeroNineNineBDialect]: oneZeroNineNineBSchema,
 }
@@ -113,7 +115,7 @@ const knownDialects = /** @type {readonly string[]} */ (Object.keys(dialectSchem
  * dialects gained their own `*Resolves` leaf below.
  * @type {number}
  */
-const expectedKnownDialectCount = 9
+const expectedKnownDialectCount = 10
 
 /**
  * `finance_schema(dialect)`: the MCP tool. Looks `dialect` up in

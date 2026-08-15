@@ -219,6 +219,7 @@ export const modeledKinds = /** @type {const} */ ([
     'iraDistributions',            // 1099-R (box7bIraSepSimple)     -> 1040 lines 4a/4b
     'pensionsAndAnnuities',        // 1099-R (not box7bIraSepSimple) -> 1040 lines 5a/5b
     'socialSecurityBenefits',      // SSA-1099 box 5 + SSB worksheet -> 1040 lines 6a/6b
+    'unemploymentCompensation',    // 1099-G box 1 -> Schedule 1 line 7 -> 1040 line 8
     'capitalGainDistributions',    // 1099-DIV box 2a                -> 1040 line 7a
     'capitalGainsOrLosses',        // Form 8949 + Schedule D          -> 1040 line 7a
     'unrecaptured1250Gain',        // 1099-DIV box 2b + Sch D worksheet -> Schedule D line 19
@@ -491,7 +492,7 @@ export const classifyScope = declaredKinds => {
  * reclassification (Phase 13 Wave 4, TAX-12).
  * @type {number}
  */
-const expectedModeledKindCount = 20
+const expectedModeledKindCount = 21
 
 /**
  * Independently hand-typed: the number of entries
