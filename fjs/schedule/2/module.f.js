@@ -6,8 +6,27 @@
  * `f1040s2.pdf` (2025), "Created" 2025.
  *
  * Lines 11 and 12 carry real Form 8959 and Form 8960 figures as of Phase 23
- * (TAX-20/TAX-21); every other line is still a documented zero. See "Lines 11
+ * (TAX-20/TAX-21) and **line 4 carries a real Schedule SE figure as of Phase
+ * 28** (TAX-31); every other line is still a documented zero. See "Lines 11
  * and 12 compute; the other nineteen are still declared zeros" below.
+ *
+ * ## Line 4, and the one thing about it that differs from lines 11 and 12
+ *
+ * Schedule SE is not run here. `fjs/schedule/1` runs it, because that
+ * schedule needs the SAME execution's line 13 for its own line 15 — the
+ * deductible half, which reduces adjusted gross income. So the whole
+ * `SelfEmploymentOutcome` arrives as an INPUT, where Form 8959's and Form
+ * 8960's arrive as calls. That asymmetry is deliberate and is argued at
+ * {@link ScheduleTwoInput}: a form whose output lands on two schedules must
+ * be executed by whichever of them needs it first, or the second execution
+ * runs against a return the first one has already changed.
+ *
+ * **Line 4 stays a single profile citation for a return with no business**,
+ * because both of the facts it unions are then `profileDeclaredZeroLine`s and
+ * the union deduplicates them to one. That is not a coincidence to be relied
+ * on quietly — `lineFourIsAComputedZeroThatStillCitesOnlyTheProfile` is the
+ * leaf that pins it, and it is the property that makes Phase 28 move nothing
+ * for a return without self-employment.
  *
  * This is a STANDALONE, independently callable pure function over its own
  * input — the same relationship `fjs/schedule/1` has to its own (read that
@@ -99,6 +118,7 @@
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
 import { form8959 } from '../../form8959/module.f.js'
 import { form8960 } from '../../form8960/module.f.js'
+import { scheduleSelfEmploymentPartI } from '../se/module.f.js'
 import { taxParamsByYear } from '../../tax/params/module.f.js'
 
 /** @import { ReturnProfile } from '../../return/profile/module.f.js' */
@@ -106,6 +126,7 @@ import { taxParamsByYear } from '../../tax/params/module.f.js'
 /** @import { IndividualFilingStatus, TaxParamSet } from '../../tax/params/module.f.js' */
 /** @import { Form8959 } from '../../form8959/module.f.js' */
 /** @import { Form8960 } from '../../form8960/module.f.js' */
+/** @import { SelfEmploymentOutcome } from '../se/module.f.js' */
 
 // ── Inputs ───────────────────────────────────────────────────────────────────
 
@@ -180,6 +201,17 @@ const totalLine = rule => lines => ({
  * see this module's own docstring, "Provenance". `medicareWages` and
  * `medicareTaxWithheld` are the W-2 box 5 and box 6 totals, which no 1040
  * line carries — Form 8959 is the only reader either box has.
+ * `selfEmployment` is the WHOLE Schedule SE result, already executed by
+ * `fjs/schedule/1` — never a bare tax figure and never a set of inputs this
+ * module could run Schedule SE from itself. Two of that form's lines land in
+ * two different places (line 12 here on line 4, line 13 on Schedule 1 line 15
+ * where it reduces adjusted gross income), and a third, line 6, feeds Form
+ * 8959 Part II from this module's own call below. Running Schedule SE twice —
+ * once for the deduction and once for the tax — is the drift Schedule 8812's
+ * single `form8812Outcome` and Form 8959's own line 18/line 24 pairing
+ * already exist to prevent (13-CONTEXT.md Decision 4.3), and here it would be
+ * worse than drift: the deduction changes AGI, so the second execution would
+ * be running against a return the first one had already altered.
  * @typedef {{
  *   readonly profile: Stored<ReturnProfile>,
  *   readonly status: IndividualFilingStatus,
@@ -189,6 +221,7 @@ const totalLine = rule => lines => ({
  *   readonly ordinaryDividends: ReportLine,
  *   readonly netCapitalGainOrLoss: ReportLine,
  *   readonly adjustedGrossIncome: ReportLine,
+ *   readonly selfEmployment: SelfEmploymentOutcome,
  * }} ScheduleTwoInput
  */
 
@@ -234,8 +267,12 @@ export const scheduleTwo = taxParamSet => input => {
         profile, status,
         medicareWages, medicareTaxWithheld,
         taxableInterest, ordinaryDividends, netCapitalGainOrLoss, adjustedGrossIncome,
+        selfEmployment,
     } = input
     const zero = profileDeclaredZeroLine(profile)
+    // The two facts Schedule SE actually read, unioned wherever a line on
+    // this schedule depends on that form -- lines 4 and 11 both do.
+    const selfEmploymentSources = [selfEmployment.netProfit, selfEmployment.socialSecurityWages]
 
     // ── Part I: Tax ───────────────────────────────────────────────────────
     // 1a-1z. Excess advance premium tax credit repayment, clean-vehicle-
@@ -249,7 +286,26 @@ export const scheduleTwo = taxParamSet => input => {
     const line3 = totalLine('Schedule 2 line 3 (total tax -> 1040 line 17)')([line1z, line2])
 
     // ── Part II: Other Taxes ─────────────────────────────────────────────
-    const line4 = zero('Schedule 2 line 4 (self-employment tax)')
+    // 4. "Self-employment tax. Attach Schedule SE." Schedule SE Part I line
+    //    12, off the execution `fjs/schedule/1` already performed -- see this
+    //    module's own `ScheduleTwoInput` docstring for why the whole result
+    //    travels rather than a bare figure. Read UNCONDITIONALLY, exactly as
+    //    lines 11 and 12 are: self-employment tax is NOT elective, so gating
+    //    it on a declaration would let a truthful filer who declared only
+    //    `businessIncomeOrLoss` receive a return with this line at zero --
+    //    which is precisely the ~$7,000 understatement `fjs/schedule/c`'s
+    //    Phase 27 refusal existed to prevent, reintroduced at a different
+    //    layer.
+    //
+    //    On a return with no business the sources dedup to the profile's own
+    //    `declaredKinds` box, because BOTH inputs are then
+    //    `profileDeclaredZeroLine`s -- which is what keeps this line
+    //    byte-identical to the documented zero it was before this phase.
+    const line4 = {
+        value: selfEmployment.lines.line12,
+        sources: unionSources(selfEmploymentSources),
+        rule: 'Schedule 2 line 4 (self-employment tax, Schedule SE line 12)',
+    }
     const line5 = zero('Schedule 2 line 5 (Social Security/Medicare tax on unreported tips)')
     const line6 = zero('Schedule 2 line 6 (uncollected Social Security/Medicare tax on wages)')
     // 7. "Add lines 5 and 6."
@@ -269,14 +325,20 @@ export const scheduleTwo = taxParamSet => input => {
         status,
         medicareWagesCents: medicareWages.value,
         medicareTaxWithheldCents: medicareTaxWithheld.value,
+        // Part II line 8 -- Schedule SE Part I line 6, net earnings from
+        // self-employment. Phase 23 wrote Part II's threshold coordination
+        // against a permanent zero here and said so; this is the argument
+        // that makes it bite.
+        selfEmploymentIncomeCents: selfEmployment.lines.line6,
     })
     const line11 = {
         value: form8959Result.line18,
         // Box 6 is cited even though it feeds only Part V, which does NOT
         // reach this line: an auditor reading line 11 has to be able to see
         // that the same execution produced 1040 line 25c's credit, since the
-        // two are meaningless apart.
-        sources: unionSources([medicareWages, medicareTaxWithheld]),
+        // two are meaningless apart. The two Schedule SE facts are cited as
+        // of Phase 28, because Part II line 8 now reads that form.
+        sources: unionSources([medicareWages, medicareTaxWithheld, ...selfEmploymentSources]),
         rule: 'Schedule 2 line 11 (Additional Medicare Tax, Form 8959 line 18)',
     }
     // 12. "Net investment income tax. Attach Form 8960." Part III line 17.
@@ -362,6 +424,47 @@ const inputLine = boxPath => cents => ({
 })
 
 /**
+ * A {@link ReportLine} citing the profile's own `declaredKinds` box — which
+ * is what a return with NO business really hands this module for both of
+ * Schedule SE's inputs, since `fjs/schedule/c` and `fjs/schedule/se` both
+ * fall back to `profileDeclaredZeroLine` when no document supplied a figure.
+ * Using `inputLine` here instead would invent a document source that no such
+ * return has, and `lineFourIsAComputedZeroThatStillCitesOnlyTheProfile` would
+ * then be checking a fiction. Test-only: builds an INPUT.
+ * @type {(rule: string) => ReportLine}
+ */
+const profileZeroInput = rule => ({
+    value: 0n,
+    sources: [{
+        documentHash: profileNoDeclaredKinds.documentHash,
+        boxPath: 'declaredKinds',
+        value: '[]',
+    }],
+    rule,
+})
+
+/**
+ * Schedule SE, run for REAL against TY2025's parameters, paired with the two
+ * sourced facts it read — the shape `fjs/schedule/1` hands this module.
+ *
+ * The Schedule SE arithmetic is an INPUT here, never an expected value: every
+ * assertion below states its own hand-computed cents.
+ * @type {(netProfit: ReportLine) => (socialSecurityWages: ReportLine) => SelfEmploymentOutcome}
+ */
+const selfEmploymentInput = netProfit => socialSecurityWages => ({
+    lines: scheduleSelfEmploymentPartI(taxParams2025)({
+        netProfitCents: netProfit.value,
+        socialSecurityWagesCents: socialSecurityWages.value,
+    }),
+    netProfit,
+    socialSecurityWages,
+})
+
+/** A return with no business at all — both facts profile-cited zeros. */
+const noSelfEmployment = selfEmploymentInput(
+    profileZeroInput('Schedule C line 31'))(profileZeroInput('Schedule SE line 8a'))
+
+/**
  * Every input zero, each still citing its own box — the base every fixture
  * below widens. Written out rather than defaulted, so a fixture that forgets
  * an input gets a zero with provenance rather than a `undefined`.
@@ -376,6 +479,7 @@ const noAmounts = {
     ordinaryDividends: inputLine('line3b')(0n),
     netCapitalGainOrLoss: inputLine('line7a')(0n),
     adjustedGrossIncome: inputLine('line11b')(0n),
+    selfEmployment: noSelfEmployment,
 }
 
 /** Runs Schedule 2 against TY2025's real parameter set.
@@ -400,23 +504,26 @@ export const proof = {
     // `Object.keys(result)`: a list computed from the thing under test could
     // never notice a twentieth line quietly acquiring a document source.
     //
-    // Three of the twenty-two printed lines are absent from this list. Lines
-    // 11 and 12 now cite the boxes their forms read. Line 21 is the Part II
-    // TOTAL, so its `sources` union necessarily includes theirs — it is
-    // asserted separately, immediately below, because "still $0.00" and
-    // "still cites only the profile" have come apart for it and only the
+    // FOUR of the twenty-two printed lines are absent from this list. Lines
+    // 11 and 12 cite the boxes their forms read. Line 4 is Phase 28's own
+    // removal — it is a COMPUTED zero for this fixture rather than a declared
+    // one, and it gets its own leaf immediately below because "cites only the
+    // profile" is still true of it for a different and more fragile reason.
+    // Line 21 is the Part II TOTAL, so its `sources` union necessarily
+    // includes theirs — it is asserted separately too, because "still $0.00"
+    // and "still cites only the profile" have come apart for it and only the
     // first is still true.
     nineteenLinesAreStillDeclaredZerosCitingOnlyTheProfile: () => {
         const result = run(noAmounts)
         /** @type {readonly ReportLine[]} */
         const declaredZeroLines = [
             result.line1, result.line1z, result.line2, result.line3,
-            result.line4, result.line5, result.line6, result.line7,
+            result.line5, result.line6, result.line7,
             result.line8, result.line9, result.line10,
             result.line13, result.line14, result.line15, result.line16,
             result.line17, result.line18, result.line19, result.line20,
         ]
-        assertEq(declaredZeroLines.length, 19, 'twenty-two printed lines, less lines 11, 12 and the line 21 total')
+        assertEq(declaredZeroLines.length, 18, 'twenty-two printed lines, less lines 4, 11, 12 and the line 21 total')
         for (const line of declaredZeroLines) {
             assertEq(line.value, 0n, ['expected a declared zero', line.rule])
             assertEq(line.sources.length, 1, ['expected exactly one citation', line.rule])
@@ -464,6 +571,86 @@ export const proof = {
         assert(!('dialect' in result), 'scheduleTwo output must not carry a dialect tag')
         assert(!('mediaType' in result), 'scheduleTwo output must not carry a mediaType')
     },
+    line4: {
+        // THE REGRESSION PROPERTY PHASE 28 RESTS ON. A return with no
+        // business hands this module two `profileDeclaredZeroLine`s, their
+        // union deduplicates to ONE source, and line 4 is therefore
+        // indistinguishable from the documented zero it was before this
+        // phase — same value, same single citation, same box path. Only the
+        // `rule` string changed, and that is asserted too so the change is
+        // visible rather than silent.
+        lineFourIsAComputedZeroThatStillCitesOnlyTheProfile: () => {
+            const result = run(noAmounts)
+            assertEq(result.line4.value, 0n, 'line 4 = $0.00')
+            assertEq(result.line4.sources.length, 1, 'the two profile zeros dedup to one citation')
+            assertEq(result.line4.sources[0].documentHash, profileNoDeclaredKinds.documentHash)
+            assertEq(result.line4.sources[0].boxPath, 'declaredKinds')
+            assert(
+                result.line4.rule.includes('Schedule SE line 12'),
+                ['the rule must name the form line it implements', result.line4.rule])
+            assertEq(result.line21.value, 0n, 'and nothing reaches 1040 line 23')
+        },
+        // THE FOUNDER'S RETURN, at the schedule. A $50,000.00 Schedule C net
+        // profit and no wages: Schedule SE line 12 is $7,064.78 (92.35% of
+        // $50,000 is $46,175.00; 12.4% of it is $5,725.70 and 2.9% is
+        // $1,339.08), and it reaches line 21 -> 1040 line 23 rather than
+        // stopping at line 4. Hand-computed; the Schedule SE arithmetic is an
+        // input here, never the expected value.
+        aFiftyThousandDollarProfitReachesLineTwentyOne: () => {
+            const result = run({
+                ...noAmounts,
+                selfEmployment: selfEmploymentInput(
+                    inputLine('entries[Schedule C line 31]')(5000000n))(
+                    profileZeroInput('Schedule SE line 8a')),
+            })
+            assertEq(result.line4.value, 706478n, 'line 4 = $7,064.78')
+            assertEq(result.line21.value, 706478n, 'line 21 = $7,064.78 -> 1040 line 23')
+            // …and NOT through Part I: self-employment tax is a Part II tax.
+            assertEq(result.line3.value, 0n, 'line 3 = $0.00 -- 1040 line 17 is untouched')
+            // Provenance: the two facts Schedule SE read, and the Schedule C
+            // one is the one an auditor needs first.
+            const boxes = result.line4.sources.map(source => source.boxPath)
+            assert(
+                boxes.includes('entries[Schedule C line 31]'),
+                ['line 4 must cite the net profit it taxed', boxes])
+        },
+        // Line 4 is Schedule SE line 12, asserted as an identity against the
+        // record that produced it -- so a wiring that read line 10, line 11
+        // or the deductible half instead would name itself. Each of those
+        // three is a real number on the same record, and each is WRONG here.
+        lineFourIsScheduleSeLineTwelveAndNoNeighbouringLine: () => {
+            const selfEmployment = selfEmploymentInput(
+                inputLine('entries[Schedule C line 31]')(5000000n))(
+                profileZeroInput('Schedule SE line 8a'))
+            const result = run({ ...noAmounts, selfEmployment })
+            assertEq(result.line4.value, selfEmployment.lines.line12, 'line 4 is Schedule SE line 12')
+            assert(
+                result.line4.value !== selfEmployment.lines.line10,
+                ['line 4 is not the Social Security portion alone', selfEmployment.lines.line10])
+            assert(
+                result.line4.value !== selfEmployment.lines.line11,
+                ['line 4 is not the Medicare portion alone', selfEmployment.lines.line11])
+            assert(
+                result.line4.value !== selfEmployment.lines.line13,
+                ['line 4 is the TAX, not the deductible half', selfEmployment.lines.line13])
+        },
+        // Self-employment tax is read UNCONDITIONALLY, exactly as lines 11
+        // and 12 are. The profile below declares NOTHING at all -- not even
+        // `businessIncomeOrLoss` -- and the tax still lands, because
+        // self-employment tax is not elective and a declaration gate here
+        // would reintroduce the ~$7,000 understatement `fjs/schedule/c`'s
+        // Phase 27 refusal existed to prevent.
+        theTaxIsNotGatedOnADeclaration: () => {
+            const result = run({
+                ...noAmounts,
+                profile: { documentHash: 'profile-hash-0003', value: { ...minimalProfileValue, declaredKinds: [] } },
+                selfEmployment: selfEmploymentInput(
+                    inputLine('entries[Schedule C line 31]')(5000000n))(
+                    profileZeroInput('Schedule SE line 8a')),
+            })
+            assertEq(result.line4.value, 706478n, 'the tax lands on an undeclared return too')
+        },
+    },
     line11: {
         // THE PHASE'S MOTIVATING FIGURE, at the schedule. A single filer with
         // $300,000 in box 5: $100,000 of excess wages at 0.9% = $900.00,
@@ -504,6 +691,79 @@ export const proof = {
             assert(boxes.includes('box6MedicareTaxWithheld'), ['line 11 must cite box 6', boxes])
             // …and the withholding really did come out of the SAME execution.
             assertEq(result.form8959.line24, 90000n, 'Form 8959 line 24 = $900.00 -> 1040 line 25c')
+        },
+        // FORM 8959 PART II, WIRED — the leaf no proof inside `fjs/form8959`
+        // can write, because that module only sees the figure it is handed.
+        // This is what pins that Part II line 8 is Schedule SE line 6 rather
+        // than line 12, line 4a, or Schedule C's own line 31.
+        //
+        // A single filer with a $300,000.00 Schedule C net profit and no
+        // wages, every figure hand-computed:
+        //
+        //   Sch SE 4a  30,000,000 x 9235 / 10,000            $277,050.00
+        //   Sch SE 6   = line 4a                             $277,050.00
+        //   Sch SE 9   base 176,100.00 - 0.00                $176,100.00
+        //   Sch SE 10  12.4% of $176,100.00 (the CAP binds)   $21,836.40
+        //   Sch SE 11  2.9% of $277,050.00                     $8,034.45
+        //   Sch SE 12  -> Schedule 2 line 4                   $29,870.85
+        //   8959 8     = Sch SE line 6                       $277,050.00
+        //   8959 11    threshold $200,000 - $0 of wages      $200,000.00
+        //   8959 12    277,050.00 - 200,000.00                $77,050.00
+        //   8959 13    0.9% of $77,050.00                        $693.45
+        //   line 21    29,870.85 + 693.45                     $30,564.30
+        partTwoOfFormEightNineFiveNineReadsScheduleSeLineSix: () => {
+            const selfEmployment = selfEmploymentInput(
+                inputLine('entries[Schedule C line 31]')(30000000n))(
+                profileZeroInput('Schedule SE line 8a'))
+            const result = run({ ...noAmounts, selfEmployment })
+            assertEq(selfEmployment.lines.line6, 27705000n, 'Schedule SE line 6 = $277,050.00')
+            assertEq(result.form8959.line8, 27705000n, 'Form 8959 line 8 IS Schedule SE line 6')
+            assertEq(result.form8959.line11, 20000000n, 'line 11 = the whole $200,000 threshold')
+            assertEq(result.form8959.line12, 7705000n, 'line 12 = $77,050.00')
+            assertEq(result.form8959.line13, 69345n, 'line 13 = $693.45')
+            assertEq(result.line11.value, 69345n, 'Schedule 2 line 11 = $693.45, all of it Part II')
+            assertEq(result.form8959.line7, 0n, 'Part I charges nothing -- there are no wages')
+            assertEq(result.line4.value, 2987085n, 'Schedule 2 line 4 = $29,870.85')
+            assertEq(result.line21.value, 3056430n, 'line 21 = $30,564.30 = $29,870.85 + $693.45')
+            // …and line 8 is Schedule SE line 6, NOT one of the neighbouring
+            // figures a miswiring would plausibly reach for. Each of these is
+            // a real number on the same record.
+            assert(
+                result.form8959.line8 !== selfEmployment.lines.line12,
+                'line 8 is net EARNINGS, not the self-employment tax')
+            assert(
+                result.form8959.line8 !== selfEmployment.lines.line2,
+                'line 8 is net earnings, not Schedule C line 31 before the 92.35% factor')
+        },
+        // THE TWO CEILINGS ARE DIFFERENT CEILINGS, shared by two different
+        // rules — the thing most likely to be conflated by anyone reading
+        // these two forms together. Wages of $150,000.00 and a $50,000.00 net
+        // profit:
+        //
+        //   §1402(b)(1)'s wage base is $176,100 and box 3's $150,000 leaves
+        //   $26,100 of it, so Schedule SE line 10 taxes $26,100 rather than
+        //   the whole $46,175 of net earnings.
+        //   §3101(b)(2)'s threshold is $200,000 and box 5's $150,000 leaves
+        //   $50,000 of it, so Form 8959 line 12 taxes nothing at all —
+        //   $46,175 of net earnings is under the $50,000 of head-room.
+        //
+        // Two ceilings, two boxes, two answers, one return.
+        theWageBaseAndTheMedicareThresholdAreDifferentCeilings: () => {
+            const result = run({
+                ...noAmounts,
+                medicareWages: inputLine('box5MedicareWagesAndTips')(15000000n),
+                selfEmployment: selfEmploymentInput(
+                    inputLine('entries[Schedule C line 31]')(5000000n))(
+                    inputLine('box3SocialSecurityWages')(15000000n)),
+            })
+            assertEq(result.form8959.line11, 5000000n, '$50,000.00 of §3101(b)(2) head-room left')
+            assertEq(result.form8959.line12, 0n, '$46,175.00 of net earnings fits inside it')
+            assertEq(result.line11.value, 0n, 'Schedule 2 line 11 = $0.00')
+            // …while the OTHER ceiling has already bitten: 12.4% of the
+            // $26,100.00 of wage base left, plus 2.9% of the whole
+            // $46,175.00, is $3,236.40 + $1,339.08 = $4,575.48.
+            assertEq(result.line4.value, 457548n, 'Schedule 2 line 4 = $4,575.48')
+            assertEq(result.line21.value, 457548n, 'line 21 = $4,575.48')
         },
     },
     line12: {

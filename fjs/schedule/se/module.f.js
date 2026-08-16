@@ -136,7 +136,7 @@ import { centsFromString } from '../../exact/module.f.js'
 import { taxParamsByYear } from '../../tax/params/module.f.js'
 
 /** @import { W2 } from '../../document/w2/module.f.js' */
-/** @import { Source } from '../../report/line/module.f.js' */
+/** @import { ReportLine, Source } from '../../report/line/module.f.js' */
 /** @import { TaxParamSet, IndividualFilingStatus } from '../../tax/params/module.f.js' */
 
 /**
@@ -527,6 +527,29 @@ export const scheduleSelfEmploymentPartI = taxParamSet => input => {
         line7, line8a, line8b, line8c, line8d, line9, line10, line11, line12, line13,
     }
 }
+
+/**
+ * **The whole Schedule SE execution as it TRAVELS**, which is a different
+ * thing from the printed lines alone.
+ *
+ * `fjs/schedule/1` builds one of these — it is the schedule that needs line
+ * 13 first, for its own line 15 — and `fjs/schedule/2` reads line 12 and line
+ * 6 off the SAME object rather than running this form a second time. The two
+ * {@link ReportLine}s are the sourced facts the form read, carried so that
+ * whichever schedule prints a figure can cite them; this module builds
+ * neither, and does not need to know which lines its consumers will print.
+ *
+ * **Running Schedule SE twice would be worse than ordinary drift.** Line 13
+ * reduces adjusted gross income, so a second execution performed after the
+ * first had been applied would be pricing a return the first one had already
+ * changed. That is why the whole record travels and no consumer is handed the
+ * inputs.
+ * @typedef {{
+ *   readonly lines: ScheduleSelfEmploymentPartI,
+ *   readonly netProfit: ReportLine,
+ *   readonly socialSecurityWages: ReportLine,
+ * }} SelfEmploymentOutcome
+ */
 
 // ── Tests ────────────────────────────────────────────────────────────────────
 
