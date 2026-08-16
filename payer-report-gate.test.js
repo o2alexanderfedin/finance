@@ -38,11 +38,41 @@
 // is never written into the real payer module, proving the pattern itself is
 // not vacuously strict (i.e. it is not a regex that could never match
 // anything, which would make the gate above pass for the wrong reason).
+//
+// -- What the TEXT gate above cannot see (Phase 21) ------------------------
+//
+// The scan reads TEXT; the claim is about DEPENDENCY. Those are not the same
+// thing, and the difference is exactly the "true of the part examined"
+// defect AGENTS.md records four shipped instances of. `fjs/report/payer`
+// imports `fjs/guest/module.f.js`, so anything the ABI module imports, the
+// payer report imports too -- transitively, with no `/tax/` text anywhere
+// under `fjs/report/payer/` for the scan to find.
+//
+// Phase 21 made that a live hazard rather than a theoretical one: it put the
+// 1040 engine on a guest context. Had `taxGuestCtx` been added to
+// `fjs/guest/module.f.js` (the obvious place) instead of to its own
+// `fjs/guest/tax/module.f.js`, the scan above would have stayed green while
+// the payer report acquired a transitive dependency on the entire tax
+// engine. Verified by mutation on 2026-08-16: adding one import of
+// `../form1040/core/module.f.js` to the ABI module leaves BOTH text leaves
+// green and reddens the dependency leaf below, naming all eleven modules it
+// pulled in.
+//
+// So the second gate below resolves imports TRANSITIVELY and asserts the
+// closure reaches no `fjs/tax/**`, `fjs/form1040/**` or `fjs/return/**`
+// module. Its control is a real module rather than a synthetic string: the
+// SAME walker, pointed at `fjs/report/tax_return/module.f.js` (the 1040
+// report, which is supposed to reach the engine), must find those modules.
+// A walker that resolved nothing would pass the payer leg for the wrong
+// reason and fail the control -- confirmed by mutation too: stopping the
+// walker from following relative specifiers reddens the control leaf AND the
+// payer leaf's own non-vacuity assertion, never the payer leaf's verdict
+// alone.
 
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readdirSync, readFileSync, statSync } from 'node:fs'
-import { join, relative } from 'node:path'
+import { join, relative, resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const repoRoot = fileURLToPath(new URL('.', import.meta.url))
@@ -123,4 +153,92 @@ test('fjs/report/payer gate positive control: the fjs/tax/* import pattern is no
         'expected an artificially over-narrowed pattern to NOT match the synthetic offending import -- ' +
         'this is the mutation the real gate above must be strong enough to avoid',
     )
+})
+
+// -- The transitive dependency gate (Phase 21) -----------------------------
+
+// Matches a `from '...'`/`from "..."` clause and captures the specifier, so
+// the walker can follow the RELATIVE ones. Bare specifiers
+// (`functionalscript/...`) are deliberately not followed: the vendored
+// submodule is not this repo's own source, and it contains no tax module.
+const specifierPattern = /from\s+['"]([^'"]+)['"]/g
+
+// The three directories the payer report must not be able to reach, however
+// many modules away. Written as path segments so a file at any depth inside
+// them matches.
+const forbiddenForPayer = ['/fjs/tax/', '/fjs/form1040/', '/fjs/return/']
+
+/**
+ * Resolves the transitive closure of RELATIVE imports reachable from `entry`,
+ * as a set of absolute file paths. A specifier this crude resolver cannot
+ * find is skipped rather than thrown on -- and cannot be silently treated as
+ * "clean", because each leg below asserts the closure is non-trivial before
+ * drawing any conclusion from it.
+ */
+const importClosure = entry => {
+    const seen = new Set()
+    const stack = [entry]
+    while (stack.length > 0) {
+        const current = stack.pop()
+        if (seen.has(current)) {
+            continue
+        }
+        let text
+        try {
+            text = readFileSync(current, 'utf8')
+        } catch {
+            continue
+        }
+        seen.add(current)
+        for (const match of text.matchAll(specifierPattern)) {
+            const specifier = match[1]
+            if (!specifier.startsWith('.')) {
+                continue
+            }
+            stack.push(resolve(dirname(current), specifier))
+        }
+    }
+    return seen
+}
+
+test('fjs/report/payer reaches nothing under fjs/tax, fjs/form1040 or fjs/return, transitively', () => {
+    const reached = new Set()
+    for (const filePath of listFilesRecursively(scanRoot)) {
+        for (const dependency of importClosure(filePath)) {
+            reached.add(dependency)
+        }
+    }
+    // The walker must actually have walked. Without this, a resolver that
+    // returned nothing would pass the assertion below for the wrong reason --
+    // the same vacuity the text gate's own positive control guards against.
+    assert.ok(
+        reached.size > 1,
+        `expected the payer report's import closure to contain more than the file itself; got ${reached.size}`)
+    const offenders = [...reached]
+        .filter(p => forbiddenForPayer.some(segment => p.includes(segment)))
+        .map(p => relative(repoRoot, p))
+        .sort()
+    assert.deepEqual(
+        offenders,
+        [],
+        `PROV-08's claim is that the payer report consults zero tax parameters. It TRANSITIVELY ` +
+        `imports these, which the text scan above cannot see:\n${offenders.join('\n')}`)
+})
+
+test('transitive gate positive control: the same walker DOES reach the tax engine from the 1040 report', () => {
+    // A real module, not a synthetic string: `fjs/report/tax_return` is the
+    // stored 1040 program's reference module, and it is SUPPOSED to reach the
+    // engine. If the walker cannot find the tax engine from there, it cannot
+    // find it from anywhere, and the payer leg above proves nothing.
+    const reached = [...importClosure(join(repoRoot, 'fjs', 'report', 'tax_return', 'module.f.js'))]
+        .map(p => relative(repoRoot, p))
+    for (const expected of [
+        'fjs/form1040/core/module.f.js',
+        'fjs/tax/params/module.f.js',
+        'fjs/return/scope/module.f.js',
+    ]) {
+        assert.ok(
+            reached.includes(expected),
+            `expected the walker to reach ${expected} from the 1040 report; reached ${reached.length} modules`)
+    }
 })

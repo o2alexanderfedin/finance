@@ -212,6 +212,15 @@ export const proof = {
     // as a single hand-typed string, exactly as that leaf does — a fifth
     // command name still fails this line, which is the property the type-level
     // `_CasOpIsExactlyTheFourCommands` guards at compile time.
+    //
+    // Measured, not assumed: adding `'form1040Report'` to `casOpNames` was run
+    // as a mutation gate on 2026-08-16 and reddened `vocabularyIsFrozenAtFour`,
+    // `everyConstructorDispatches` and THIS leaf — while `fjs/guest`'s own
+    // `combinatorsAreNeverOperations` stayed GREEN, because it enumerates
+    // `step`/`pure`/`centsFromString`/`centsToString` and cannot see a name it
+    // was never told about. That is precisely why this leaf exists rather than
+    // a line being added to that one: a guard whose list is fixed at the
+    // members somebody thought of is blind to the next member.
     engineAndParametersAreNeverOperations: () => {
         assertEq(casOpNames.join(','), 'casRead,evoList,evoHead,evoRevision')
         assert(!casOpNames.includes('form1040Report'), ['form1040Report must never be listed as a command'])

@@ -195,6 +195,21 @@ import { stringify as jsonText } from '../../json/module.f.js'
  * that does not read `ctx.form1040Report`/`ctx.taxParams` is unaffected by
  * their presence, which is why `fjs/report/payer`'s own stored program
  * still runs here unchanged.
+ *
+ * **The "never re-resolve" half of that rule is currently UNPROVEN, and
+ * measured to be so.** Replacing `input.taxParams` below with a fresh
+ * `taxParamsByYear[2025]` lookup was run as a mutation gate on 2026-08-16
+ * and **survived the entire suite** (6419/6419, exit 0). It cannot fail
+ * today for a reason that has nothing to do with test quality:
+ * `taxParamsByYear` holds exactly ONE year, so threading the caller's
+ * object and re-resolving it are observationally identical at every input
+ * that exists. The first phase to add a second tax year should re-run that
+ * gate — it will bite then — and until it does, this paragraph is the only
+ * thing standing between the rule and a silent regression. What IS proven:
+ * the parameter set actually reaches the guest (substituting a different
+ * standard deduction here reddens `tax-return-integration.test.js`), and
+ * `tsc` refuses a bare `guestCtx` in its place (TS2739, `taxParams` and
+ * `form1040Report` missing).
  * @type {(materializeHomeRoot: string) => (cas: Cas<FileCasOperation>) => (evoApi: Evo<FileCasOperation>) => (input: { readonly hash: string, readonly args: readonly string[], readonly taxParams: TaxParamSet, readonly subject?: string, readonly parents?: readonly string[] }) => Effect<FileCasOperation | Mkdir | WriteFile | Import | MemOp, RunOutcome<unknown>>}
  */
 export const executeRun = materializeHomeRoot => cas => evoApi => input => {
