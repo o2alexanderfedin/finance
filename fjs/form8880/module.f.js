@@ -110,9 +110,44 @@
  * absent "attained age 18" would deny a credit that may be owed, and absent
  * "was a full-time student" would grant one that may not be. So this module
  * refuses — but only when the answer could change the outcome, which is when
- * there are contributions AND the rate is non-zero. A return whose income is
- * above the top band, or which made no qualifying contribution at all,
- * computes `$0` silently and correctly, exactly as it did before this phase.
+ * there are contributions AND the rate is non-zero AND the return has
+ * ENGAGED with this credit at all.
+ *
+ * ## That last condition is a REAL GAP, deliberately taken, and it is the
+ * most important paragraph in this file
+ *
+ * `saversCreditDeclared` (the profile declared
+ * `retirementSavingsContributionsCredit`) or a supplied eligibility record is
+ * what counts as engaging. Without either, a return with a Form W-2 box 12
+ * code D deferral computes `$0` on Schedule 3 line 4 and says nothing.
+ *
+ * **The first draft of this module did not have that condition, and its
+ * control leaf caught what that cost.** Every eligible-income filer with a
+ * 401(k) — which is to say the commonest return in the country — was refused
+ * for not having answered three questions about a credit they had not
+ * claimed. Refusing the modal American return is not honesty, it is an engine
+ * that does not work.
+ *
+ * So the gap is this: **a taxpayer who is entitled to the saver's credit and
+ * has never heard of it gets `$0` and no warning.** That is exactly the
+ * failure mode `.planning/PERSONA-COVERAGE.md` identified and
+ * `fjs/return/tripwire` exists to close — and a tripwire cannot close this
+ * one. §25B(b)'s bands are on ADJUSTED GROSS INCOME, and a tripwire runs
+ * before any line computes, which is precisely the reason that module's own
+ * docstring gives for `netInvestmentIncomeTax` having no entry: an
+ * over-approximation from Form W-2 box 1 alone would fire on returns that
+ * owe nothing, and would be worse than no entry.
+ *
+ * Closing it needs a guard that runs AFTER adjusted gross income and asks the
+ * tripwire's question. No such layer exists, and inventing one is not this
+ * phase's work. What this paragraph buys is that the gap is written down
+ * where the next reader of this form will find it, rather than discovered by
+ * a taxpayer.
+ *
+ * A return whose income is above the top band, or which made no qualifying
+ * contribution at all, computes `$0` silently and correctly, exactly as it
+ * did before this phase — and so, now, does one that never mentions this
+ * credit.
  *
  * The dependent test reads the RETURN PROFILE's own `claimedAsDependent`
  * (1040 line 12a), never a second field of its own — one rule, one place; see
@@ -186,6 +221,7 @@ import { taxParamsByYear } from '../tax/params/module.f.js'
  *   readonly agiCents: bigint,
  *   readonly claimedAsDependent: boolean,
  *   readonly people: readonly Form8880Person[],
+ *   readonly saversCreditDeclared: boolean,
  *   readonly line18Cents: bigint,
  *   readonly earlierScheduleThreeCreditsCents: bigint,
  *   readonly aStored1099RProvesADistribution: boolean,
@@ -296,7 +332,7 @@ export const saversCreditRatePercent = taxParamSet => status => agiCents => {
  */
 export const form8880 = taxParamSet => input => {
     const {
-        status, agiCents, claimedAsDependent, people,
+        status, agiCents, claimedAsDependent, people, saversCreditDeclared,
         line18Cents, earlierScheduleThreeCreditsCents, aStored1099RProvesADistribution,
     } = input
     const { retirementSavingsContributionsCredit } = taxParamSet
@@ -314,7 +350,16 @@ export const form8880 = taxParamSet => input => {
     // §25B(c)(3): an individual another taxpayer can claim as a dependent is
     // not an eligible individual, so the credit is a determinate $0 -- not a
     // refusal, and not a reason to demand eligibility answers.
-    const creditCouldMatter = anyContribution && line9RatePercent !== 0 && !claimedAsDependent
+    //
+    // `engaged` is the condition this module's own docstring calls a REAL
+    // GAP: a return that neither declares this credit nor supplies any
+    // §25B(c) answer has not claimed it, and refusing such a return for
+    // unanswered questions would refuse every 401(k) contributor in the
+    // country. Read the docstring's "That last condition is a REAL GAP"
+    // before removing it.
+    const engaged = saversCreditDeclared || people.some(p => p.eligibility !== undefined)
+    const creditCouldMatter =
+        anyContribution && line9RatePercent !== 0 && !claimedAsDependent && engaged
 
     // ── Every refusal runs BEFORE any line is assigned ───────────────────
     // (`fjs/form8889`'s own ordering discipline: a gate is a gate, never a
@@ -465,6 +510,7 @@ const baseInput = overrides => ({
     status: 'single',
     agiCents: 2000000n,             // $20,000.00 -- inside the 50% band
     claimedAsDependent: false,
+    saversCreditDeclared: true,
     people: [person({ iraContributionCents: 200000n })],
     line18Cents: 100000000n,        // ample, so line 11 never binds
     earlierScheduleThreeCreditsCents: 0n,
@@ -827,6 +873,52 @@ export const proof = {
                 aStored1099RProvesADistribution: true,
             }))
             assertEq(outcome.kind, 'ok', 'an income above the top band cannot be refused')
+        },
+        // **The GAP, asserted rather than only described.** A return that
+        // neither declares this credit nor answers any §25B(c) question is
+        // NOT refused, however squarely it lands in a crediting band with a
+        // real deferral. It computes $0 and says nothing — which is the
+        // honest cost of not refusing the modal American return, and is
+        // written down in this module's own docstring as a gap rather than
+        // as a feature.
+        //
+        // This is also criterion 4 for this form: an ordinary W-2 return with
+        // a 401(k) computes exactly what it computed before Phase 25.
+        aReturnThatNeverMentionsThisCreditIsNotRefusedAndGetsNothing: () => {
+            const outcome = compute(baseInput({
+                saversCreditDeclared: false,
+                people: [person({ electiveDeferralCents: 200000n, eligibility: undefined })],
+            }))
+            const result = okResult(outcome)
+            assertEq(result.line7, 0n, 'no eligible column, so nothing creditable')
+            assertEq(result.line12, 0n, '$0.00 — and no refusal, and no warning')
+        },
+        // The CONTROL for the gap: the SAME return, DECLARED, is refused —
+        // so the declaration is what turns silence into a question, and a
+        // gate written against something else would fail this pair.
+        theSameReturnDeclaredIsRefused: () => {
+            const result = refusal(compute(baseInput({
+                saversCreditDeclared: true,
+                people: [person({ electiveDeferralCents: 200000n, eligibility: undefined })],
+            })))
+            assert(result.message.includes('§25B(c)'), ['must name the provision', result.message])
+        },
+        // …and so is the same return that ANSWERED for one person while
+        // another contributed: supplying any eligibility record is engaging
+        // with the credit, so the incomplete answer is a question rather
+        // than silence. Without this, a joint return could answer for the
+        // taxpayer and quietly drop the spouse's column.
+        answeringForOnePersonEngagesTheCreditForBoth: () => {
+            const result = refusal(compute(baseInput({
+                saversCreditDeclared: false,
+                status: 'marriedFilingJointly',
+                agiCents: 4000000n,
+                people: [
+                    person({ individual: 'taxpayer', iraContributionCents: 200000n }),
+                    person({ individual: 'spouse', iraContributionCents: 200000n, eligibility: undefined }),
+                ],
+            })))
+            assert(result.message.includes('spouse'), ['must name the unanswered person', result.message])
         },
     },
 

@@ -169,6 +169,8 @@ export const inputs = {
     unemploymentForms: [],
     adjustmentForms: [],
     studentLoanInterestForms: [],
+    tuitionForms: [],
+    creditForms: [],
 }
 
 /**

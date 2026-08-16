@@ -151,6 +151,8 @@ import { dialect as priorYearCapitalLossDialect } from '../../document/prior_yea
 import { dialect as oneZeroNineNineGDialect } from '../../document/1099g/module.f.js'
 import { dialect as adjustmentsDialect } from '../../document/adjustments/module.f.js'
 import { dialect as oneZeroNineEightEDialect } from '../../document/1098e/module.f.js'
+import { dialect as oneZeroNineEightTDialect } from '../../document/1098t/module.f.js'
+import { dialect as creditsDialect } from '../../document/credits/module.f.js'
 
 /** @import { Effect, OperationMap } from 'functionalscript/fjs/effects/module.f.js' */
 /** @import { CasOp } from '../../guest/module.f.js' */
@@ -170,6 +172,8 @@ import { dialect as oneZeroNineEightEDialect } from '../../document/1098e/module
 /** @import { OneZeroNineNineG } from '../../document/1099g/module.f.js' */
 /** @import { Adjustments } from '../../document/adjustments/module.f.js' */
 /** @import { OneZeroNineEightE } from '../../document/1098e/module.f.js' */
+/** @import { OneZeroNineEightT } from '../../document/1098t/module.f.js' */
+/** @import { Credits } from '../../document/credits/module.f.js' */
 
 // ── The rendered wire shape ──────────────────────────────────────────────────
 
@@ -211,7 +215,7 @@ import { dialect as oneZeroNineEightEDialect } from '../../document/1098e/module
  * `vnd.fjs.revision`, a future addition) falls straight through
  * {@link collectDocument} untouched — never coerced into a bucket, never
  * treated as a zero.
- * @typedef {ReturnProfile | W2 | OneZeroNineNineInt | OneZeroNineNineDiv | OneZeroNineNineB | OneZeroNineNineR | Ssa1099 | ItemizedDeductions | MedicalExpenses | PriorYearCapitalLoss | OneZeroNineNineG | Adjustments | OneZeroNineEightE} EngineDocument
+ * @typedef {ReturnProfile | W2 | OneZeroNineNineInt | OneZeroNineNineDiv | OneZeroNineNineB | OneZeroNineNineR | Ssa1099 | ItemizedDeductions | MedicalExpenses | PriorYearCapitalLoss | OneZeroNineNineG | Adjustments | OneZeroNineEightE | OneZeroNineEightT | Credits} EngineDocument
  */
 
 /**
@@ -242,6 +246,8 @@ import { dialect as oneZeroNineEightEDialect } from '../../document/1098e/module
  *   readonly unemploymentForms: readonly Stored<OneZeroNineNineG>[],
  *   readonly adjustmentForms: readonly Stored<Adjustments>[],
  *   readonly studentLoanInterestForms: readonly Stored<OneZeroNineEightE>[],
+ *   readonly tuitionForms: readonly Stored<OneZeroNineEightT>[],
+ *   readonly creditForms: readonly Stored<Credits>[],
  * }} Collected
  */
 
@@ -306,6 +312,8 @@ export const taxReturnReportSource = [
     '        unemploymentForms: [],',
     '        adjustmentForms: [],',
     '        studentLoanInterestForms: [],',
+    '        tuitionForms: [],',
+    '        creditForms: [],',
     '    }',
     '    const runYear = ctx.taxParams.taxYear',
     '    const noteYearMismatch = documentHash => doc => acc => {',
@@ -335,6 +343,8 @@ export const taxReturnReportSource = [
     '        if (doc.dialect === \'vnd.fjs.1099g\') { return { ...acc, unemploymentForms: [...acc.unemploymentForms, stored] } }',
     '        if (doc.dialect === \'vnd.fjs.adjustments\') { return { ...acc, adjustmentForms: [...acc.adjustmentForms, stored] } }',
     '        if (doc.dialect === \'vnd.fjs.1098e\') { return { ...acc, studentLoanInterestForms: [...acc.studentLoanInterestForms, stored] } }',
+    '        if (doc.dialect === \'vnd.fjs.1098t\') { return { ...acc, tuitionForms: [...acc.tuitionForms, stored] } }',
+    '        if (doc.dialect === \'vnd.fjs.credits\') { return { ...acc, creditForms: [...acc.creditForms, stored] } }',
     '        return undefined',
     '    }',
     '    const collect = documentHash => doc => acc => {',
@@ -385,6 +395,8 @@ export const taxReturnReportSource = [
     '            unemploymentForms: acc.unemploymentForms,',
     '            adjustmentForms: acc.adjustmentForms,',
     '            studentLoanInterestForms: acc.studentLoanInterestForms,',
+    '            tuitionForms: acc.tuitionForms,',
+    '            creditForms: acc.creditForms,',
     '        })',
     '        if (outcome.kind === \'error\') {',
     '            return { kind: \'error\', message: outcome.message, unmodeled: outcome.unmodeled }',
@@ -449,6 +461,8 @@ const emptyCollected = {
     unemploymentForms: [],
     adjustmentForms: [],
     studentLoanInterestForms: [],
+    tuitionForms: [],
+    creditForms: [],
 }
 
 /**
@@ -485,6 +499,8 @@ const routeDocument = documentHash => doc => acc => {
     if (doc.dialect === oneZeroNineNineGDialect) { return { ...acc, unemploymentForms: [...acc.unemploymentForms, { documentHash, value: doc }] } }
     if (doc.dialect === adjustmentsDialect) { return { ...acc, adjustmentForms: [...acc.adjustmentForms, { documentHash, value: doc }] } }
     if (doc.dialect === oneZeroNineEightEDialect) { return { ...acc, studentLoanInterestForms: [...acc.studentLoanInterestForms, { documentHash, value: doc }] } }
+    if (doc.dialect === oneZeroNineEightTDialect) { return { ...acc, tuitionForms: [...acc.tuitionForms, { documentHash, value: doc }] } }
+    if (doc.dialect === creditsDialect) { return { ...acc, creditForms: [...acc.creditForms, { documentHash, value: doc }] } }
     return undefined
 }
 
@@ -585,6 +601,8 @@ const renderReturn = ctx => acc => {
         unemploymentForms: acc.unemploymentForms,
         adjustmentForms: acc.adjustmentForms,
         studentLoanInterestForms: acc.studentLoanInterestForms,
+        tuitionForms: acc.tuitionForms,
+        creditForms: acc.creditForms,
     })
     if (outcome.kind === 'error') {
         return { kind: 'error', message: outcome.message, unmodeled: outcome.unmodeled }
@@ -678,6 +696,11 @@ const fixtureProfilePriorYearHash = 'sha256-tax-return-profile-prior-year'
 const fixtureCarryoverHash = 'sha256-tax-return-carryover'
 const fixtureW2NoYearHash = 'sha256-tax-return-w2-no-year'
 const fixtureOutOfScopePriorYearHash = 'sha256-tax-return-out-of-scope-prior-year'
+const fixtureCreditsProfileHash = 'sha256-tax-return-credits-profile'
+const fixtureCreditsW2Hash = 'sha256-tax-return-credits-w2'
+const fixtureCreditsTuitionHash = 'sha256-tax-return-credits-1098t'
+const fixtureCreditsRecordHash = 'sha256-tax-return-credits-record'
+const fixtureCreditsProfileUndeclaredHash = 'sha256-tax-return-credits-profile-undeclared'
 
 const subjectProfile = 'tax-return-subject-profile'
 const subjectW2A = 'tax-return-subject-w2-a'
@@ -689,6 +712,13 @@ const subjectProfilePriorYear = 'tax-return-subject-profile-prior-year'
 const subjectCarryover = 'tax-return-subject-carryover'
 const subjectW2NoYear = 'tax-return-subject-w2-no-year'
 const subjectOutOfScopePriorYear = 'tax-return-subject-out-of-scope-prior-year'
+// Phase 25 (TAX-25/TAX-26): a SEPARATE subject set, so the phase-21 fixture
+// above keeps computing byte for byte what it always has.
+const subjectCreditsProfile = 'tax-return-subject-credits-profile'
+const subjectCreditsW2 = 'tax-return-subject-credits-w2'
+const subjectCreditsTuition = 'tax-return-subject-credits-1098t'
+const subjectCreditsRecord = 'tax-return-subject-credits-record'
+const subjectCreditsProfileUndeclared = 'tax-return-subject-credits-profile-undeclared'
 
 /** @type {Readonly<Record<string, EngineDocument | { readonly dialect: string, readonly taxYear?: number }>>} */
 const documentByHash = {
@@ -799,6 +829,70 @@ const documentByHash = {
         dialect: 'vnd.fjs.ocr',
         taxYear: 2024,
     },
+    // ── Phase 25's own four documents ──────────────────────────────────
+    //
+    // The identical return `fjs/form1040/core`'s own `scheduleThreeCredits`
+    // block computes directly, presented here through the STORED PROGRAM
+    // instead — which is what proves the two new dialects are routed by the
+    // guest source text rather than only by the host twin. Without a fixture
+    // that carries them, the two new `route` branches could be deleted and
+    // nothing would notice, which is the Phase 24 lesson exactly.
+    [fixtureCreditsProfileHash]: {
+        dialect: returnProfileDialect,
+        taxYear: 2025,
+        filingStatus: 'single',
+        dependentCount: 0,
+        declaredKinds: [
+            'wages', 'educationCredits', 'retirementSavingsContributionsCredit',
+            'americanOpportunityCredit',
+        ],
+    },
+    [fixtureCreditsW2Hash]: {
+        dialect: w2Dialect,
+        payerTin: '11-1111111',
+        recipientTin: '222-22-2222',
+        accountNumber: 'ACC-W2-C',
+        taxYear: 2025,
+        formRevision: '2025',
+        box1WagesTipsOtherCompensation: '39000.00',
+        box12: [{ code: 'DD', amount: '9800.00' }, { code: 'D', amount: '2000.00' }],
+    },
+    [fixtureCreditsTuitionHash]: {
+        dialect: oneZeroNineEightTDialect,
+        payerTin: '66-6666666',
+        recipientTin: '222-22-2222',
+        accountNumber: 'STU-0001',
+        taxYear: 2025,
+        formRevision: '2025',
+        box1PaymentsReceivedForQualifiedTuition: '9000.00',
+        box8AtLeastHalfTimeStudent: true,
+    },
+    [fixtureCreditsRecordHash]: {
+        dialect: creditsDialect,
+        recipientTin: '222-22-2222',
+        taxYear: 2025,
+        educationStudents: [{
+            studentTin: '222-22-2222',
+            studentName: 'the filer',
+            credit: 'americanOpportunity',
+            enrolledAtLeastHalfTimeInADegreeProgram: true,
+        }],
+        filerAttainedAgeTwentyFourBeforeTheEndOfTheYear: true,
+        saversCreditEligibility: [{
+            individual: 'taxpayer',
+            attainedAgeEighteen: true,
+            noTestingPeriodDistributions: true,
+        }],
+    },
+    // The same filer declaring nothing but wages — the return this engine
+    // computed for a 401(k) contributor before Phase 25, and still does.
+    [fixtureCreditsProfileUndeclaredHash]: {
+        dialect: returnProfileDialect,
+        taxYear: 2025,
+        filingStatus: 'single',
+        dependentCount: 0,
+        declaredKinds: ['wages'],
+    },
 }
 
 /** @type {Readonly<Record<string, string>>} */
@@ -813,6 +907,11 @@ const snapshotBySubject = {
     [subjectCarryover]: fixtureCarryoverHash,
     [subjectW2NoYear]: fixtureW2NoYearHash,
     [subjectOutOfScopePriorYear]: fixtureOutOfScopePriorYearHash,
+    [subjectCreditsProfile]: fixtureCreditsProfileHash,
+    [subjectCreditsW2]: fixtureCreditsW2Hash,
+    [subjectCreditsTuition]: fixtureCreditsTuitionHash,
+    [subjectCreditsRecord]: fixtureCreditsRecordHash,
+    [subjectCreditsProfileUndeclared]: fixtureCreditsProfileUndeclaredHash,
 }
 
 /**
@@ -844,6 +943,11 @@ const hostMapOver = subjects => ({
 
 /** The fixture's five subjects, deliberately NOT in sorted order. */
 const fixtureSubjects = [subjectW2B, subjectProfile, subjectOutOfScope, subject1099G, subjectW2A]
+
+/** Phase 25's own four subjects, likewise NOT in sorted order. */
+const creditsSubjects = [
+    subjectCreditsTuition, subjectCreditsW2, subjectCreditsRecord, subjectCreditsProfile,
+]
 
 /**
  * Runs the twin against a subject enumeration and returns its result.
@@ -894,10 +998,21 @@ const dispatchedDialects = [
     medicalExpensesDialect,
     priorYearCapitalLossDialect,
     oneZeroNineNineGDialect,
+    // **These four were missing until Phase 25**, and the count below said
+    // eleven while the twin dispatched on thirteen. Phase 24 added
+    // `vnd.fjs.adjustments` and `vnd.fjs.1098e` to the source and the twin
+    // and not to this list, so the one mechanical check on the hand-sync
+    // silently stopped covering the two newest dialects — the same
+    // hand-typed-list drift `fjs/return/scope`'s own modeled-kind list
+    // suffered twice. Corrected here, with the two this phase adds.
+    adjustmentsDialect,
+    oneZeroNineEightEDialect,
+    oneZeroNineEightTDialect,
+    creditsDialect,
 ]
 
 /** @type {number} */
-const expectedDispatchedDialectCount = 11
+const expectedDispatchedDialectCount = 15
 
 export const proof = {
     // The phase's central number check, and the reason this module exists:
@@ -1122,12 +1237,82 @@ export const proof = {
             }
         },
     },
+    // ── Phase 25 (TAX-25/TAX-26): the two new dialects, through the STORED
+    //    PROGRAM rather than only through the host twin ─────────────────────
+    //
+    // Every figure below is the one `fjs/form1040/core`'s own
+    // `scheduleThreeCredits` block hand-derives, restated here rather than
+    // imported: wages $39,000.00 (line 1a and line 11); less TY2025's
+    // $15,750.00 single standard deduction = $23,250.00 of taxable income;
+    // Tax Table = $2,555.00; Schedule 3 line 3 (education, nonrefundable)
+    // $1,500.00 plus line 4 (saver's) $200.00 = $1,700.00 on line 20; line
+    // 22 = $855.00; the refundable 40% of the $2,500.00 American Opportunity
+    // Credit = $1,000.00 on line 29; $1,000.00 - $855.00 = $145.00 overpaid.
+    //
+    // What this leaf proves that the direct one cannot: the SOURCE TEXT's own
+    // `route` branches for `vnd.fjs.1098t` and `vnd.fjs.credits` are real.
+    // Delete either and the credits vanish, because no other fixture in this
+    // repository carries a document of either dialect through the stored
+    // program.
+    storedProgramRoutesTheTwoCreditDialectsAndComputesBothCredits: () => {
+        const result = runTwin(creditsSubjects)
+        assert(result.kind === 'ok', ['expected a computed return', result])
+        if (result.kind !== 'ok') {
+            return
+        }
+        const cents = renderedCents(result)
+        assertEq(cents('1040 line 1a'), 3900000n)
+        assertEq(cents('1040 line 15'), 2325000n)
+        assertEq(cents('1040 line 16 (Tax Table)'), 255500n)
+        assertEq(cents('1040 line 20'), 170000n, '$1,700.00 through Schedule 3 Part I')
+        assertEq(cents('1040 line 22'), 85500n)
+        assertEq(cents('1040 line 29'), 100000n, '$1,000.00 refundable, NOT through Schedule 3')
+        assertEq(cents('1040 line 34'), 14500n, '$145.00 overpaid')
+    },
+    // **Criterion 4 through the stored program.** The SAME wages and the
+    // SAME W-2 — including its box 12 code D deferral — with the two credit
+    // documents withheld AND the three kinds undeclared. Line 20 and line 29
+    // go to zero and the taxpayer OWES the whole $2,555.00, which is exactly
+    // what this engine computed for this return before Phase 25.
+    theSameStoredReturnClaimingNoCreditsOwesTheWholeTax: () => {
+        const result = runTwin([subjectCreditsW2, subjectCreditsProfileUndeclared])
+        assert(result.kind === 'ok', ['expected a computed return', result])
+        if (result.kind !== 'ok') {
+            return
+        }
+        const cents = renderedCents(result)
+        assertEq(cents('1040 line 16 (Tax Table)'), 255500n, 'the same tax')
+        assertEq(cents('1040 line 20'), 0n)
+        assertEq(cents('1040 line 29'), 0n)
+        assertEq(cents('1040 line 37'), 255500n, 'and the whole of it owed')
+    },
+    // …and the OTHER control, which is the more interesting of the two: the
+    // same W-2 with the credit DECLARED and the credits document withheld is
+    // REFUSED rather than quietly given $0. Declaring the kind is what turns
+    // this engine's silence into a question, and this leaf is what says the
+    // two cases really are different. `fjs/form8880`'s own docstring records
+    // the gap the first case leaves open.
+    theSameStoredReturnDeclaringTheCreditWithoutItsDocumentIsRefused: () => {
+        const result = runTwin([subjectCreditsW2, subjectCreditsProfile])
+        assertEq(result.kind, 'error', 'a declared credit with no answers must refuse')
+        if (result.kind === 'error') {
+            assert(
+                result.message.includes('§25B(c)'),
+                ['the refusal must name the provision', result.message],
+            )
+            assertEq(
+                result.unmodeled.length,
+                0,
+                'a document-data-sufficiency refusal names no fjs/return/scope kind',
+            )
+        }
+    },
     // The one mechanical half of the source/twin hand-sync (see the module
     // header): every dialect tag the TWIN dispatches on appears verbatim in
     // the SOURCE text, against a hand-typed count. The twin imports these
     // constants; the source cannot, so it spells them out — this is what
     // stops a rename from quietly desynchronizing the two.
-    sourceAndTwinDispatchOnTheSameElevenDialects: () => {
+    sourceAndTwinDispatchOnTheSameFifteenDialects: () => {
         assertEq(dispatchedDialects.length, expectedDispatchedDialectCount)
         for (const tag of dispatchedDialects) {
             assert(
