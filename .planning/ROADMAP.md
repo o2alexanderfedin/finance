@@ -846,6 +846,16 @@ counted separately from v1's 95.
 
 ### Phase 25: Schedule 3 Credits
 **Requirements**: TAX-25 (Form 8880), TAX-26 (Form 8863), TAX-27 (EITC) · **Tier**: T2
+**Status**: complete. TAX-25 and TAX-26 compute; **TAX-27 ships a named refusal rather than a
+computation**, which is the phase's own finding and not a shortfall — §32(c)(3)'s
+qualifying-child test needs four facts `vnd.fjs.return_profile`'s `dependents` array cannot
+express and §32(c)(1) needs three more about the filer, and a wrong EIC is the most audited
+figure on the return. `fjs/todo/tax-27-earned-income-credit.md` is the record and the spec.
+**Note**: the two coarse Schedule 3 kinds were the last of the five this roadmap's Phase 13
+finding paragraph listed; only `scheduleOneAdditionalIncome` remains. Two new dialects
+(`vnd.fjs.1098t`, `vnd.fjs.credits`), and §26's ordering of the nonrefundable credits now runs
+through three interlocking Credit Limit Worksheets, which is what made this phase edit
+`fjs/form8812`.
 
 ### Phase 26: Retiree Completion
 **Requirements**: TAX-28 (QCD election, $108,000 TY2025 cap), TAX-29 (Form 8606 pro-rata) · **Tier**: T2

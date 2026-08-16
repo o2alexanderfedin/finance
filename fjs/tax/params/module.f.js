@@ -1138,6 +1138,324 @@ export const healthSavingsAccount = {
 }
 
 /**
+ * One row of Form 8880's own line 9 rate table: the credit rate that applies
+ * when adjusted gross income does not exceed {@link ceiling}.
+ *
+ * `ceiling: undefined` on the LAST row, mirroring {@link Bracket}'s own
+ * open-topped last entry — above the highest printed figure the rate is zero
+ * and there is no further boundary. Sharing {@link Bracket}'s TYPE would have
+ * been shorter and is deliberately not done: a bracket is a MARGINAL rate on
+ * income, applied to the slice between two ceilings, and one of these is a
+ * CLIFF rate applied to the whole contribution. Two quantities with the same
+ * shape and opposite arithmetic are exactly the pair a shared name makes
+ * indistinguishable.
+ * @typedef {{ readonly ratePercent: number, readonly ceiling: string | undefined }} SaversCreditBand
+ */
+
+/**
+ * Schedule 3 line 4's retirement savings contributions credit, the *Saver's
+ * Credit* — IRC §25B, Form 8880, TAX-25, Phase 25.
+ *
+ * ## The rate schedule is a CLIFF, and that is the whole risk in this group
+ *
+ * Read {@link seniorDeduction}'s continuous 6% phase-out and
+ * {@link studentLoanInterestDeduction}'s three-decimal ratio, then read this
+ * one, because it is neither. Form 8880 line 9 is a LOOKUP: adjusted gross
+ * income selects one of four rates — 50%, 20%, 10% or nothing — and the whole
+ * of line 7 is multiplied by it. **One cent over a band boundary costs real
+ * money.** A single filer with $2,000 of contributions and $23,750.00 of AGI
+ * receives $1,000; at $23,750.01 the same taxpayer receives $400. There is no
+ * taper between the two, and no arithmetic anywhere on the printed form
+ * softens the step.
+ *
+ * This is the third distinct phase-out SHAPE this engine now models —
+ * `fjs/schedule/1a`'s continuous curve, `fjs/form8812`'s $1,000-stepped 5%,
+ * and this four-way cliff — and reading any of the three as another is this
+ * phase's most likely silent-wrong-number failure.
+ *
+ * ## The bands are INDEXED, and the two figures a reader will look for are
+ * not stored
+ *
+ * §25B(g) inflation-adjusts every dollar figure in §25B(b)'s table (rounded
+ * to the next lowest multiple of $500), so all twelve figures below are
+ * TY2025's and TY2025's alone. The movement is real: the top joint band was
+ * $73,000 (2023), $76,500 (2024) and $79,000 (2025).
+ *
+ * The three statuses that share a column on the printed table —
+ * `single`, `marriedFilingSeparately` and `qualifyingSurvivingSpouse` — each
+ * carry their own hand-typed copy rather than being spread from one another,
+ * for the reason {@link standardDeduction} states: a spread makes two
+ * statuses impossible to observe drifting apart, and AGENTS.md records a
+ * mutation in which married-filing-separately stayed green precisely because
+ * it genuinely shared single's figure.
+ *
+ * ## What is NOT here, and why
+ *
+ * §25B(d)(2)'s TESTING PERIOD reduction (Form 8880 line 4) has no parameter,
+ * because it is not a dollar figure — it is the sum of distributions received
+ * across a four-year window (2023, 2024, 2025, and 2026 up to the return's
+ * due date). `fjs/form8880` REFUSES rather than treating that line as zero;
+ * see its own docstring.
+ *
+ * §25B(c)'s eligibility conditions (age 18 or over, not a full-time student,
+ * not claimable as another taxpayer's dependent) are facts, not amounts, and
+ * are likewise absent from this group.
+ *
+ * ## Citation kind
+ *
+ * `kind: 'code'`, per the same "governing provision, not the literal source"
+ * position {@link studentLoanInterestDeduction} records: §25B(a) is where the
+ * $2,000 contribution cap lives and §25B(b) is where the rate table lives,
+ * but the TY2025 dollar figures themselves come from the printed 2025 Form
+ * 8880's own line 9 table. Naming a Revenue Procedure section this work never
+ * opened would be the sourcing error this module's header exists to prevent.
+ * @type {{
+ *   readonly contributionCap: AmountWithCitation,
+ *   readonly rateBands: {
+ *     readonly single: readonly SaversCreditBand[],
+ *     readonly marriedFilingJointly: readonly SaversCreditBand[],
+ *     readonly marriedFilingSeparately: readonly SaversCreditBand[],
+ *     readonly headOfHousehold: readonly SaversCreditBand[],
+ *     readonly qualifyingSurvivingSpouse: readonly SaversCreditBand[],
+ *   },
+ *   readonly rateBandCitation: Citation,
+ * }}
+ */
+export const retirementSavingsContributionsCredit = {
+    // §25B(a): the applicable percentage multiplies "so much of the qualified
+    // retirement savings contributions ... as does not exceed $2,000". PER
+    // PERSON — Form 8880's line 6 has a column for the taxpayer and one for
+    // the spouse, and the cap is applied inside each column before line 7
+    // adds them. NOT indexed: §25B(g) reaches subsection (b)'s table amounts
+    // only, and this figure has been $2,000 since 2002.
+    contributionCap: {
+        amount: '2000.00',
+        citation: { kind: 'code', section: '§25B(a)', effectiveDate: '2025-01-01' },
+    },
+    rateBands: {
+        single: [
+            { ratePercent: 50, ceiling: '23750.00' },
+            { ratePercent: 20, ceiling: '25500.00' },
+            { ratePercent: 10, ceiling: '39500.00' },
+            { ratePercent: 0, ceiling: undefined },
+        ],
+        marriedFilingJointly: [
+            { ratePercent: 50, ceiling: '47500.00' },
+            { ratePercent: 20, ceiling: '51000.00' },
+            { ratePercent: 10, ceiling: '79000.00' },
+            { ratePercent: 0, ceiling: undefined },
+        ],
+        marriedFilingSeparately: [
+            { ratePercent: 50, ceiling: '23750.00' },
+            { ratePercent: 20, ceiling: '25500.00' },
+            { ratePercent: 10, ceiling: '39500.00' },
+            { ratePercent: 0, ceiling: undefined },
+        ],
+        headOfHousehold: [
+            { ratePercent: 50, ceiling: '35625.00' },
+            { ratePercent: 20, ceiling: '38250.00' },
+            { ratePercent: 10, ceiling: '59250.00' },
+            { ratePercent: 0, ceiling: undefined },
+        ],
+        qualifyingSurvivingSpouse: [
+            { ratePercent: 50, ceiling: '23750.00' },
+            { ratePercent: 20, ceiling: '25500.00' },
+            { ratePercent: 10, ceiling: '39500.00' },
+            { ratePercent: 0, ceiling: undefined },
+        ],
+    },
+    // ONE citation for the whole table rather than one per band, mirroring
+    // {@link ordinaryBrackets}' own per-schedule `citation`: the twenty rows
+    // are one printed table with one governing provision, and twenty copies
+    // of the same three fields would be noise a reader has to diff.
+    rateBandCitation: { kind: 'code', section: '§25B(b)', effectiveDate: '2025-01-01' },
+}
+
+/**
+ * Schedule 3 line 3 and 1040 line 29's education credits — IRC §25A, Form
+ * 8863, TAX-26, Phase 25.
+ *
+ * ## TWO credits, one statute, and conflating them is the trap
+ *
+ * The American Opportunity Credit and the Lifetime Learning Credit share
+ * §25A and share a phase-out range, and share almost nothing else:
+ *
+ * | | American Opportunity | Lifetime Learning |
+ * |---|---|---|
+ * | computed | per STUDENT | per RETURN |
+ * | formula | 100% of the first $2,000 + 25% of the next $2,000 | 20% of up to $10,000 |
+ * | maximum | $2,500 per student | $2,000 per return |
+ * | refundable | 40% (→ 1040 line 29) | never |
+ * | years | 4 taxable years per student | unlimited |
+ * | enrolment | at least half-time, in a degree programme | any course |
+ * | course materials | qualify wherever bought | only if paid to the institution |
+ *
+ * The last row is the one no 1098-T can settle and the reason
+ * `vnd.fjs.credits` exists; `fjs/document/1098t`'s own header records it.
+ *
+ * ## The phase-out figures are STATUTORY and NOT indexed — the opposite of
+ * {@link retirementSavingsContributionsCredit} directly above
+ *
+ * §25A(d) once indexed the Lifetime Learning Credit's own separate,
+ * lower thresholds. The Taxpayer Certainty and Disaster Tax Relief Act of
+ * 2020 repealed that indexing and aligned the Lifetime Learning Credit with
+ * the American Opportunity Credit's fixed $80,000/$160,000 start, so BOTH
+ * credits have used $80,000/$160,000 with a $10,000/$20,000 range every year
+ * since 2021 and no Revenue Procedure moves them. A reader who inherits the
+ * "these are indexed" reasoning from the group above gets this one wrong, in
+ * the same way {@link healthSavingsAccount}'s own docstring warns about its
+ * mixed group.
+ *
+ * ## The CEILING is stored, not the start — because the printed form reads
+ * downwards
+ *
+ * Form 8863 lines 2 and 13 both read *"Enter: $180,000 if married filing
+ * jointly; $90,000 if single, head of household, or qualifying surviving
+ * spouse"*, line 3/14 subtract modified adjusted gross income FROM it, and
+ * lines 5/16 divide by *"$20,000 if married filing jointly; $10,000
+ * otherwise"*. Those two are exactly the figures stored below. The $80,000 /
+ * $160,000 a reader of §25A(d)(2) expects is the DERIVED difference, and
+ * `educationCreditPhaseoutStartsMatchTheStatutoryFigures` asserts it against
+ * hand-typed statutory numbers rather than storing a third field that could
+ * disagree with the two the computation reads — the identical decision
+ * {@link studentLoanInterestDeduction} records under "Two figures, not
+ * three", taken from the other end.
+ *
+ * ## `marriedFilingSeparately` has no entry, and that is a filing-status gate
+ *
+ * §25A(g)(6): no education credit at all is allowed to a married individual
+ * filing a separate return, at ANY income. So there is no threshold for a
+ * status whose amount never depends on one — the identical omission, for the
+ * identical kind of reason, as {@link studentLoanInterestDeduction}'s under
+ * §221(e)(2). `fjs/form8863` is where that short-circuit lives.
+ *
+ * **The omission and that short-circuit are ONE mechanism, and `tsc` is what
+ * joins them** — a property found by mutating rather than by reading, and
+ * recorded in full in `fjs/form8863`'s own docstring. Because these two
+ * records have four keys rather than five, `fjs/form8863`'s early return for
+ * a separate filer is the only thing that narrows `IndividualFilingStatus`
+ * down to what they carry; weakening it stops the build at TS7053 rather than
+ * producing a wrong number. **Adding a `marriedFilingSeparately` entry here
+ * "for symmetry" would silently make that gate deletable.** Do not.
+ *
+ * ## Citation kind
+ *
+ * `kind: 'code'` throughout, at the subsection depth this work can actually
+ * support. §25A(b)/(c) genuinely carry the two credits' own formulas, §25A(d)
+ * the phase-out mechanism, §25A(g)(6) the separate-return denial and §25A(i)
+ * the American Opportunity Credit's special rules including its refundable
+ * portion — but the PARAGRAPH-level subdivision inside §25A(i) was not read
+ * against the statute here, so no paragraph number is written that this work
+ * did not verify. The literal source of every figure below is the printed
+ * 2025 Form 8863 and its own line text.
+ * @type {{
+ *   readonly americanOpportunity: {
+ *     readonly fullRateExpenseCap: AmountWithCitation,
+ *     readonly totalExpenseCap: AmountWithCitation,
+ *     readonly reducedRatePercent: number,
+ *     readonly maximumCredit: AmountWithCitation,
+ *     readonly refundablePercent: number,
+ *   },
+ *   readonly lifetimeLearning: {
+ *     readonly expenseCap: AmountWithCitation,
+ *     readonly ratePercent: number,
+ *   },
+ *   readonly phaseoutCeiling: {
+ *     readonly single: AmountWithCitation,
+ *     readonly marriedFilingJointly: AmountWithCitation,
+ *     readonly headOfHousehold: AmountWithCitation,
+ *     readonly qualifyingSurvivingSpouse: AmountWithCitation,
+ *   },
+ *   readonly phaseoutRange: {
+ *     readonly single: AmountWithCitation,
+ *     readonly marriedFilingJointly: AmountWithCitation,
+ *     readonly headOfHousehold: AmountWithCitation,
+ *     readonly qualifyingSurvivingSpouse: AmountWithCitation,
+ *   },
+ * }}
+ */
+export const educationCredits = {
+    americanOpportunity: {
+        // Form 8863 line 28, "Subtract $2,000 from line 27" — the slice
+        // credited at 100%.
+        fullRateExpenseCap: {
+            amount: '2000.00',
+            citation: { kind: 'code', section: '§25A(i)', effectiveDate: '2025-01-01' },
+        },
+        // Form 8863 line 27, "Don't enter more than $4,000" — the whole
+        // expense figure the per-student computation may consider.
+        totalExpenseCap: {
+            amount: '4000.00',
+            citation: { kind: 'code', section: '§25A(i)', effectiveDate: '2025-01-01' },
+        },
+        // Form 8863 line 29, "Multiply line 28 by 25% (0.25)".
+        reducedRatePercent: 25,
+        // $2,000 + 25% x $2,000. Stored anyway rather than derived, and
+        // `theAmericanOpportunityMaximumIsTheTwoRatesApplied` asserts the
+        // identity — because the maximum is what a taxpayer and an auditor
+        // both recognize, and a derived-only figure could not be compared
+        // against the printed instruction that states it.
+        maximumCredit: {
+            amount: '2500.00',
+            citation: { kind: 'code', section: '§25A(i)', effectiveDate: '2025-01-01' },
+        },
+        // Form 8863 line 8, "Multiply line 7 by 40% (0.40)" -> 1040 line 29.
+        refundablePercent: 40,
+    },
+    lifetimeLearning: {
+        // Form 8863 line 11, "Enter the smaller of line 10 or $10,000".
+        // PER RETURN, not per student — the single most-confused fact about
+        // this credit.
+        expenseCap: {
+            amount: '10000.00',
+            citation: { kind: 'code', section: '§25A(c)(1)', effectiveDate: '2025-01-01' },
+        },
+        // Form 8863 line 12, "Multiply line 11 by 20% (0.20)".
+        ratePercent: 20,
+    },
+    phaseoutCeiling: {
+        single: {
+            amount: '90000.00',
+            citation: { kind: 'code', section: '§25A(d)', effectiveDate: '2025-01-01' },
+        },
+        marriedFilingJointly: {
+            amount: '180000.00',
+            citation: { kind: 'code', section: '§25A(d)', effectiveDate: '2025-01-01' },
+        },
+        // The printed lines 2 and 13 group "single, head of household, or
+        // qualifying surviving spouse" on one row, so these two carry the
+        // same figure as `single` — hand-typed per status anyway, never
+        // spread, for the reason {@link standardDeduction} states.
+        headOfHousehold: {
+            amount: '90000.00',
+            citation: { kind: 'code', section: '§25A(d)', effectiveDate: '2025-01-01' },
+        },
+        qualifyingSurvivingSpouse: {
+            amount: '90000.00',
+            citation: { kind: 'code', section: '§25A(d)', effectiveDate: '2025-01-01' },
+        },
+    },
+    phaseoutRange: {
+        single: {
+            amount: '10000.00',
+            citation: { kind: 'code', section: '§25A(d)', effectiveDate: '2025-01-01' },
+        },
+        marriedFilingJointly: {
+            amount: '20000.00',
+            citation: { kind: 'code', section: '§25A(d)', effectiveDate: '2025-01-01' },
+        },
+        headOfHousehold: {
+            amount: '10000.00',
+            citation: { kind: 'code', section: '§25A(d)', effectiveDate: '2025-01-01' },
+        },
+        qualifyingSurvivingSpouse: {
+            amount: '10000.00',
+            citation: { kind: 'code', section: '§25A(d)', effectiveDate: '2025-01-01' },
+        },
+    },
+}
+
+/**
  * A full tax-year parameter set: every TY2025 parameter this phase
  * requires, together.
  *
@@ -1179,6 +1497,8 @@ export const healthSavingsAccount = {
  *   readonly studentLoanInterestDeduction: typeof studentLoanInterestDeduction,
  *   readonly educatorExpenses: typeof educatorExpenses,
  *   readonly healthSavingsAccount: typeof healthSavingsAccount,
+ *   readonly retirementSavingsContributionsCredit: typeof retirementSavingsContributionsCredit,
+ *   readonly educationCredits: typeof educationCredits,
  * }} TaxParamSet
  */
 
@@ -1211,6 +1531,8 @@ export const taxParamsByYear = {
         studentLoanInterestDeduction,
         educatorExpenses,
         healthSavingsAccount,
+        retirementSavingsContributionsCredit,
+        educationCredits,
     },
 }
 
@@ -1312,6 +1634,24 @@ const everyDollarStringField = [
     healthSavingsAccount.annualLimit.selfOnly.amount,
     healthSavingsAccount.annualLimit.family.amount,
     healthSavingsAccount.catchUpContribution.amount,
+    retirementSavingsContributionsCredit.contributionCap.amount,
+    ...individualFilingStatuses.flatMap(status =>
+        retirementSavingsContributionsCredit.rateBands[status]
+            .map(band => band.ceiling)
+            .filter(isDefinedString),
+    ),
+    educationCredits.americanOpportunity.fullRateExpenseCap.amount,
+    educationCredits.americanOpportunity.totalExpenseCap.amount,
+    educationCredits.americanOpportunity.maximumCredit.amount,
+    educationCredits.lifetimeLearning.expenseCap.amount,
+    educationCredits.phaseoutCeiling.single.amount,
+    educationCredits.phaseoutCeiling.marriedFilingJointly.amount,
+    educationCredits.phaseoutCeiling.headOfHousehold.amount,
+    educationCredits.phaseoutCeiling.qualifyingSurvivingSpouse.amount,
+    educationCredits.phaseoutRange.single.amount,
+    educationCredits.phaseoutRange.marriedFilingJointly.amount,
+    educationCredits.phaseoutRange.headOfHousehold.amount,
+    educationCredits.phaseoutRange.qualifyingSurvivingSpouse.amount,
 ]
 
 export const proof = {
@@ -2064,5 +2404,273 @@ export const proof = {
                 healthSavingsAccount.catchUpContribution.citation.section,
             ],
         )
+    },
+
+    // ── TAX-25: Form 8880's rate table ─────────────────────────────────────
+    saversCredit: {
+        // Every one of the twelve stored ceilings, hand-typed here off the
+        // printed 2025 Form 8880 line 9 table rather than read back from the
+        // data, in the printed table's own three-row-per-column order. This
+        // is the leaf a transposed column or a stale prior-year figure has to
+        // get past, and neither the loop below nor
+        // `everyDollarAmountIsAStringAndRoundTrips` could catch either.
+        theTwelveBandCeilingsMatchThePrintedFormEightyEightyTable: () => {
+            /** @type {Record<IndividualFilingStatus, readonly [string, string, string]>} */
+            const expected = {
+                marriedFilingJointly: ['47500.00', '51000.00', '79000.00'],
+                headOfHousehold: ['35625.00', '38250.00', '59250.00'],
+                single: ['23750.00', '25500.00', '39500.00'],
+                marriedFilingSeparately: ['23750.00', '25500.00', '39500.00'],
+                qualifyingSurvivingSpouse: ['23750.00', '25500.00', '39500.00'],
+            }
+            for (const status of individualFilingStatuses) {
+                const bands = retirementSavingsContributionsCredit.rateBands[status]
+                const printed = expected[status]
+                assertEq(bands.length, 4, ['three printed rows plus the open-topped zero band', status])
+                assertEq(bands[0]?.ceiling, printed[0], ['50% band ceiling', status])
+                assertEq(bands[1]?.ceiling, printed[1], ['20% band ceiling', status])
+                assertEq(bands[2]?.ceiling, printed[2], ['10% band ceiling', status])
+                assertEq(bands[3]?.ceiling, undefined, ['the last band is open-topped', status])
+            }
+        },
+        // The rates themselves, in order, for every status. Separated from
+        // the ceilings above so a table whose ceilings are right and whose
+        // rates were shifted by one row names itself.
+        theFourRatesAreFiftyTwentyTenAndZeroForEveryStatus: () => {
+            for (const status of individualFilingStatuses) {
+                const bands = retirementSavingsContributionsCredit.rateBands[status]
+                assertEq(bands[0]?.ratePercent, 50, ['first band', status])
+                assertEq(bands[1]?.ratePercent, 20, ['second band', status])
+                assertEq(bands[2]?.ratePercent, 10, ['third band', status])
+                assertEq(bands[3]?.ratePercent, 0, ['the open-topped band credits nothing', status])
+            }
+        },
+        // Every column's ceilings ascend. A table whose rows were reordered
+        // would still hold twelve correct figures and would still pass a
+        // membership check; only monotonicity notices.
+        everyColumnAscends: () => {
+            for (const status of individualFilingStatuses) {
+                retirementSavingsContributionsCredit.rateBands[status]
+                    .map(band => band.ceiling)
+                    .filter(isDefinedString)
+                    .map(centsFromString)
+                    .reduce((previous, ceiling) => {
+                        assert(
+                            ceiling > previous,
+                            ['a saver\'s credit band ceiling is out of order', status, ceiling, previous],
+                        )
+                        return ceiling
+                    }, -1n)
+            }
+        },
+        // The printed table's own three-column STRUCTURE, asserted as a
+        // relationship rather than as three more copies of the same figures:
+        // head of household is exactly three quarters of the joint column and
+        // the single column exactly half of it, at every row. That is how
+        // §25B(b) is written, and it is a property no single mistyped figure
+        // can satisfy by accident.
+        headOfHouseholdIsThreeQuartersOfJointAndSingleIsHalf: () => {
+            const joint = retirementSavingsContributionsCredit.rateBands.marriedFilingJointly
+            const hoh = retirementSavingsContributionsCredit.rateBands.headOfHousehold
+            const single = retirementSavingsContributionsCredit.rateBands.single
+            for (const row of [0, 1, 2]) {
+                const jointCeiling = joint[row]?.ceiling
+                const hohCeiling = hoh[row]?.ceiling
+                const singleCeiling = single[row]?.ceiling
+                assert(
+                    jointCeiling !== undefined && hohCeiling !== undefined && singleCeiling !== undefined,
+                    ['every one of the three printed rows must carry a ceiling', row],
+                )
+                if (jointCeiling === undefined || hohCeiling === undefined || singleCeiling === undefined) {
+                    throw ['unreachable', row]
+                }
+                assertEq(
+                    4n * centsFromString(hohCeiling),
+                    3n * centsFromString(jointCeiling),
+                    ['head of household is three quarters of the joint column', row],
+                )
+                assertEq(
+                    2n * centsFromString(singleCeiling),
+                    centsFromString(jointCeiling),
+                    ['single is half of the joint column', row],
+                )
+            }
+        },
+        // The three statuses the printed table groups on ONE row carry the
+        // same figures — stated as an assertion rather than as a spread, so
+        // the day a Revenue Procedure separates them the divergence is
+        // visible here instead of impossible to express.
+        singleSeparateAndSurvivingSpouseShareTheThirdColumnToday: () => {
+            for (const row of [0, 1, 2]) {
+                const single = retirementSavingsContributionsCredit.rateBands.single[row]?.ceiling
+                assertEq(
+                    retirementSavingsContributionsCredit.rateBands.marriedFilingSeparately[row]?.ceiling,
+                    single,
+                    ['married filing separately shares single\'s printed column today', row],
+                )
+                assertEq(
+                    retirementSavingsContributionsCredit.rateBands.qualifyingSurvivingSpouse[row]?.ceiling,
+                    single,
+                    ['qualifying surviving spouse shares single\'s printed column today', row],
+                )
+            }
+        },
+        theContributionCapIsTwoThousandPerPersonAndIsNotIndexed: () => {
+            assertEq(retirementSavingsContributionsCredit.contributionCap.amount, '2000.00', '§25B(a)')
+            assertEq(retirementSavingsContributionsCredit.contributionCap.citation.kind, 'code')
+            assertEq(retirementSavingsContributionsCredit.contributionCap.citation.section, '§25B(a)')
+            assertEq(
+                retirementSavingsContributionsCredit.contributionCap.citation.effectiveDate,
+                '2025-01-01',
+            )
+            // §25B(g) reaches subsection (b)'s table only, so the cap cites a
+            // DIFFERENT subsection from the bands beside it — the structural
+            // fact that says "this one does not move", exactly as the HSA
+            // catch-up's own leaf above does.
+            assert(
+                retirementSavingsContributionsCredit.contributionCap.citation.section
+                    !== retirementSavingsContributionsCredit.rateBandCitation.section,
+                [
+                    'the unindexed cap must not share a subsection with the indexed table',
+                    retirementSavingsContributionsCredit.contributionCap.citation.section,
+                ],
+            )
+        },
+        theRateTableCarriesOneCitationForTheWholePrintedTable: () => {
+            assertEq(retirementSavingsContributionsCredit.rateBandCitation.kind, 'code')
+            assertEq(retirementSavingsContributionsCredit.rateBandCitation.section, '§25B(b)')
+            assertEq(retirementSavingsContributionsCredit.rateBandCitation.effectiveDate, '2025-01-01')
+        },
+        // §25B(d)(2)'s testing-period reduction and §25B(c)'s eligibility
+        // conditions are FACTS, not amounts, and this group carries neither.
+        // Hand-typed key count, so a fourth field quietly added here — the
+        // shape a "just store zero for line 4" change would take — fails.
+        exactlyThreeFieldsAreStored: () => {
+            assertEq(
+                Object.keys(retirementSavingsContributionsCredit).length,
+                3,
+                'the testing period is not a dollar figure and has no parameter here',
+            )
+        },
+    },
+
+    // ── TAX-26: Form 8863's two credits ────────────────────────────────────
+    educationCredits: {
+        // The American Opportunity Credit's four printed figures, hand-typed
+        // off Form 8863 Part III lines 27-30.
+        americanOpportunityFiguresMatchThePrintedFormEightyEightSixtyThree: () => {
+            assertEq(educationCredits.americanOpportunity.fullRateExpenseCap.amount, '2000.00', 'line 28')
+            assertEq(educationCredits.americanOpportunity.totalExpenseCap.amount, '4000.00', 'line 27 cap')
+            assertEq(educationCredits.americanOpportunity.reducedRatePercent, 25, 'line 29')
+            assertEq(educationCredits.americanOpportunity.maximumCredit.amount, '2500.00')
+            assertEq(educationCredits.americanOpportunity.refundablePercent, 40, 'line 8')
+        },
+        // The maximum is not an independent figure: it is the two rates
+        // applied to the two expense slices. Asserted rather than derived
+        // away, per this group's own docstring.
+        theAmericanOpportunityMaximumIsTheTwoRatesApplied: () => {
+            const { fullRateExpenseCap, totalExpenseCap, reducedRatePercent, maximumCredit }
+                = educationCredits.americanOpportunity
+            const firstSlice = centsFromString(fullRateExpenseCap.amount)
+            const secondSlice = centsFromString(totalExpenseCap.amount) - firstSlice
+            assertEq(
+                firstSlice + secondSlice * BigInt(reducedRatePercent) / 100n,
+                centsFromString(maximumCredit.amount),
+                '$2,000 + 25% of the next $2,000 = $2,500',
+            )
+        },
+        lifetimeLearningFiguresMatchThePrintedFormEightyEightSixtyThree: () => {
+            assertEq(educationCredits.lifetimeLearning.expenseCap.amount, '10000.00', 'line 11')
+            assertEq(educationCredits.lifetimeLearning.ratePercent, 20, 'line 12')
+            // 20% of $10,000 is the $2,000 per-RETURN maximum the printed
+            // instructions state. Derived here rather than stored, because
+            // unlike the American Opportunity maximum no printed LINE holds
+            // it — line 12 is the last word.
+            assertEq(
+                centsFromString(educationCredits.lifetimeLearning.expenseCap.amount)
+                    * BigInt(educationCredits.lifetimeLearning.ratePercent) / 100n,
+                200000n,
+                '20% of $10,000 = $2,000 per return',
+            )
+        },
+        // Form 8863 lines 2/13 and 5/16, hand-typed. Both credits read the
+        // SAME two figures, which has been true only since 2021.
+        phaseoutCeilingsAndRangesMatchThePrintedForm: () => {
+            assertEq(educationCredits.phaseoutCeiling.marriedFilingJointly.amount, '180000.00')
+            assertEq(educationCredits.phaseoutCeiling.single.amount, '90000.00')
+            assertEq(educationCredits.phaseoutCeiling.headOfHousehold.amount, '90000.00')
+            assertEq(educationCredits.phaseoutCeiling.qualifyingSurvivingSpouse.amount, '90000.00')
+            assertEq(educationCredits.phaseoutRange.marriedFilingJointly.amount, '20000.00')
+            assertEq(educationCredits.phaseoutRange.single.amount, '10000.00')
+            assertEq(educationCredits.phaseoutRange.headOfHousehold.amount, '10000.00')
+            assertEq(educationCredits.phaseoutRange.qualifyingSurvivingSpouse.amount, '10000.00')
+        },
+        // The DERIVED start of the phase-out, against the statutory figures
+        // a reader of §25A(d)(2) expects — the check a third stored field
+        // would have made impossible. See this group's own docstring, "The
+        // CEILING is stored, not the start".
+        educationCreditPhaseoutStartsMatchTheStatutoryFigures: () => {
+            /** @type {readonly (readonly ['single' | 'marriedFilingJointly' | 'headOfHousehold' | 'qualifyingSurvivingSpouse', bigint])[]} */
+            const expected = [
+                ['single', 8000000n],
+                ['marriedFilingJointly', 16000000n],
+                ['headOfHousehold', 8000000n],
+                ['qualifyingSurvivingSpouse', 8000000n],
+            ]
+            assertEq(expected.length, 4, 'four statuses; §25A(g)(6) denies the credit to the fifth')
+            for (const [status, start] of expected) {
+                assertEq(
+                    centsFromString(educationCredits.phaseoutCeiling[status].amount)
+                        - centsFromString(educationCredits.phaseoutRange[status].amount),
+                    start,
+                    ['the phase-out start is the ceiling less the range', status],
+                )
+            }
+        },
+        // §25A(g)(6): no education credit at all on a separate return, so
+        // there is no threshold for it — the identical omission
+        // `studentLoanInterestDeduction` makes under §221(e)(2).
+        marriedFilingSeparatelyHasNoThresholdBecauseItHasNoCredit: () => {
+            assertEq(Object.keys(educationCredits.phaseoutCeiling).length, 4)
+            assertEq(Object.keys(educationCredits.phaseoutRange).length, 4)
+            assertEq(
+                Object.keys(educationCredits.phaseoutCeiling).includes('marriedFilingSeparately'),
+                false,
+            )
+            assertEq(
+                Object.keys(educationCredits.phaseoutRange).includes('marriedFilingSeparately'),
+                false,
+            )
+        },
+        // These figures are NOT indexed, which is the opposite of the group
+        // directly above them in this file. Stated as its own leaf so the
+        // claim is somewhere a reader looks, and pinned through the citation
+        // rather than through prose alone.
+        everyEducationCreditFigureCitesTheCodeAndNotARevenueProcedure: () => {
+            /** @type {readonly AmountWithCitation[]} */
+            const every = [
+                educationCredits.americanOpportunity.fullRateExpenseCap,
+                educationCredits.americanOpportunity.totalExpenseCap,
+                educationCredits.americanOpportunity.maximumCredit,
+                educationCredits.lifetimeLearning.expenseCap,
+                educationCredits.phaseoutCeiling.single,
+                educationCredits.phaseoutCeiling.marriedFilingJointly,
+                educationCredits.phaseoutCeiling.headOfHousehold,
+                educationCredits.phaseoutCeiling.qualifyingSurvivingSpouse,
+                educationCredits.phaseoutRange.single,
+                educationCredits.phaseoutRange.marriedFilingJointly,
+                educationCredits.phaseoutRange.headOfHousehold,
+                educationCredits.phaseoutRange.qualifyingSurvivingSpouse,
+            ]
+            assertEq(every.length, 12, 'hand-counted: four AOC/LLC figures and eight phase-out figures')
+            for (const figure of every) {
+                assertEq(figure.citation.kind, 'code', ['not indexed, so no Revenue Procedure', figure.amount])
+                assertEq(figure.citation.effectiveDate, '2025-01-01')
+                assert(
+                    figure.citation.section.startsWith('§25A'),
+                    ['every education credit figure is §25A\'s', figure.citation.section],
+                )
+            }
+        },
     },
 }

@@ -120,12 +120,22 @@ import {
     oneZeroNineEightESchema,
     checkReferences as checkOneZeroNineEightE,
 } from '../../document/1098e/module.f.js'
+import {
+    dialect as oneZeroNineEightTDialect,
+    oneZeroNineEightTSchema,
+    checkReferences as checkOneZeroNineEightT,
+} from '../../document/1098t/module.f.js'
+import {
+    dialect as creditsDialect,
+    creditsSchema,
+    checkReferences as checkCredits,
+} from '../../document/credits/module.f.js'
 
 /** @import { DialectEntry } from 'functionalscript/fjs/media/module.f.js' */
 
 /**
  * Every one of this repo's own dialects, registered for {@link detect}: the
- * fifteen local finance document/return/run dialects wrapped via
+ * seventeen local finance document/return/run dialects wrapped via
  * {@link dialectEntry}, plus upstream's own {@link revisionDialect} reused
  * unchanged. See this module's own docstring for why `ocr` is the one entry
  * with no `extraValidate` second argument.
@@ -147,6 +157,8 @@ export const financeDialects = [
     dialectEntry(priorYearCapitalLossSchema, v => checkPriorYearCapitalLoss(v)[0] === 'ok'),
     dialectEntry(adjustmentsSchema, v => checkAdjustments(v)[0] === 'ok'),
     dialectEntry(oneZeroNineEightESchema, v => checkOneZeroNineEightE(v)[0] === 'ok'),
+    dialectEntry(oneZeroNineEightTSchema, v => checkOneZeroNineEightT(v)[0] === 'ok'),
+    dialectEntry(creditsSchema, v => checkCredits(v)[0] === 'ok'),
     revisionDialect,
 ]
 
@@ -162,7 +174,7 @@ export const detectFinance = detect(financeDialects)
 
 /**
  * Independently hand-typed: the number of entries {@link financeDialects}
- * is expected to carry today — fifteen local dialects plus
+ * is expected to carry today — seventeen local dialects plus
  * {@link revisionDialect}. Deliberately NOT derived from
  * `financeDialects.length` itself (AGENTS.md's hand-typed-count idiom,
  * mirroring `fjs/document/1099b`'s `expectedMoneyBoxFieldCount`): a dialect
@@ -173,7 +185,7 @@ export const detectFinance = detect(financeDialects)
  * collection shrinking").
  * @type {number}
  */
-const expectedDialectCount = 16
+const expectedDialectCount = 18
 
 /** A sample cbase32 hash — {@link revisionDialect}'s own `snapshot`/`parents` shape needs a decodable one; the value itself is arbitrary. */
 const revisionSampleHash = vecToCBase32(vec8(0x77n))
@@ -307,6 +319,19 @@ const fixtures = {
         accountNumber: 'LOAN-0001',
         taxYear: 2025,
         formRevision: '2025',
+    },
+    [oneZeroNineEightTDialect]: {
+        dialect: oneZeroNineEightTDialect,
+        payerTin: '11-1111111',
+        recipientTin: '333-33-3333',
+        accountNumber: 'STU-0001',
+        taxYear: 2025,
+        formRevision: '2025',
+    },
+    [creditsDialect]: {
+        dialect: creditsDialect,
+        recipientTin: '222-22-2222',
+        taxYear: 2025,
     },
     [revisionDialectTag]: {
         dialect: revisionDialectTag,

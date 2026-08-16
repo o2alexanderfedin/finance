@@ -592,11 +592,24 @@ itemizing, which is complete apart from the eight open MAINT items.
       phase-out. Today a hard zero — the single largest silent overstatement for this persona.
 - [x] **TAX-24** *(M2, T2)*: **Schedule 1 line 11**, educator expenses; **line 13**, HSA
       deduction (Form 8889). Both hard zeros today.
-- [ ] **TAX-25** *(M2, T2)*: **Form 8880**, the Saver's Credit → Schedule 3 line 4.
-- [ ] **TAX-26** *(M2, T2)*: **Form 8863**, American Opportunity and Lifetime Learning credits
+- [x] **TAX-25** *(M2, T2)*: **Form 8880**, the Saver's Credit → Schedule 3 line 4.
+- [x] **TAX-26** *(M2, T2)*: **Form 8863**, American Opportunity and Lifetime Learning credits
       → Schedule 3 line 3 and 1040 line 29.
-- [ ] **TAX-27** *(M2, T2)*: **Earned Income Credit** → 1040 line 27, with the qualifying-child
-      rules the existing Schedule 8812 dependent model already carries most of.
+- [ ] **TAX-27** *(M2, T2)*: **Earned Income Credit** → 1040 line 27. **NOT DELIVERED as a
+      computation — deliberately, and the box stays unchecked because of it.** Phase 25 shipped a
+      named refusal plus a fact-by-fact spec, which is honest work and the right outcome, but it is
+      not the credit. A `[x]` here would tell every count derived from these checkboxes that EIC
+      computes. It does not. Re-scoped: the refusal and the spec are done; the computation needs a
+      profile widening and belongs to a later phase.
+      **The sentence above is what Phase 25 found to be false**:
+      the existing Schedule 8812 dependent model carries almost none of §32(c)(3)'s
+      qualifying-child rules. `dependents` was built for a two-fact test (age under 17, an
+      employment-valid SSN); §32(c)(3) needs a checked relationship vocabulary, full-time-student
+      status, permanent and total disability, and residency *in the United States* for more than
+      half the year, and §32(c)(1) needs three more about the filer. The refusal now names all
+      seven, and `fjs/todo/tax-27-earned-income-credit.md` carries the fact-by-fact analysis and
+      the five things a future phase must add. A wrong EIC is the most audited figure on the
+      return; shipping a partial one was the alternative and was rejected.
 - [x] **DOC-19** *(M2, T2)*: `vnd.fjs.adjustments` — the taxpayer-asserted record behind the
       Schedule 1 Part II adjustments, following `vnd.fjs.medical_expenses` exactly: no IRS
       information return reports educator expenses or HSA contributions to the filer, so the

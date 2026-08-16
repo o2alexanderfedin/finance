@@ -166,6 +166,8 @@ const parameterProbeInputs = {
     unemploymentForms: [],
     adjustmentForms: [],
     studentLoanInterestForms: [],
+    tuitionForms: [],
+    creditForms: [],
 }
 
 /**

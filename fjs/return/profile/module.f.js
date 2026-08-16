@@ -222,7 +222,37 @@ export const kindVocabulary = /** @type {const} */ ([
     'premiumTaxCreditReconciliation',       // Schedule 2 line 19 -> 23
     'section965NetTaxLiabilityInstallment', // Schedule 2 line 20 (memo)
     'childTaxCreditOrOtherDependents',      // 19
-    'scheduleThreeNonrefundableCredits',    // 20
+    // ── Schedule 3 Part I's own lines, one kind each (TAX-25/26, Phase 25) ──
+    //
+    // `scheduleThreeNonrefundableCredits` stood here as ONE coarse kind for
+    // the whole of Part I -- the foreign tax credit, the dependent care
+    // credit, education credits, the saver's credit, two residential energy
+    // credits and thirteen more sub-lines at 6a-6z alone. A single kind
+    // covering that many distinct credits could only ever refuse them
+    // together, so nothing on Part I was nameable and nothing on it could be
+    // reclassified one line at a time. It is split here into one kind per
+    // printed line, in SCHEDULE 3's own order -- which is 1040 form order for
+    // the block as a whole, since every one of these feeds line 8 and thence
+    // 1040 line 20.
+    //
+    // **6a-6z stays ONE collapsed kind**, exactly as Schedule 1's
+    // `otherAdjustments` (24a-24z) and Schedule 2's `otherAdditionalTaxes`
+    // (17a-17z) do: the printed line 6 is a header over lettered sub-lines
+    // with no dollar box of its own, this engine models none of them, and
+    // inventing a kind per sub-line would put names in this frozen vocabulary
+    // that no work here read off the printed page.
+    //
+    // Line 7 deliberately gets no kind: it is the TOTAL of the 6a-6z block
+    // `otherNonrefundableCredits` already covers, and line 8 is Part I's own
+    // total. A kind for either would be a declaration a taxpayer could never
+    // truthfully make.
+    'foreignTaxCredit',                     // Schedule 3 line 1  -> 20
+    'dependentCareCredit',                  // Schedule 3 line 2  -> 20
+    'educationCredits',                     // Schedule 3 line 3  -> 20
+    'retirementSavingsContributionsCredit', // Schedule 3 line 4  -> 20
+    'residentialCleanEnergyCredit',         // Schedule 3 line 5a -> 20
+    'energyEfficientHomeImprovementCredit', // Schedule 3 line 5b -> 20
+    'otherNonrefundableCredits',            // Schedule 3 line 6a-6z -> 20
     'federalTaxWithheldOnW2',               // 25a
     'federalTaxWithheldOn1099Int',          // 25b
     'federalTaxWithheldOnOther1099',        // 25b
@@ -232,7 +262,26 @@ export const kindVocabulary = /** @type {const} */ ([
     'additionalChildTaxCredit',             // 28
     'americanOpportunityCredit',            // 29
     'refundableAdoptionCredit',             // 30
-    'scheduleThreeRefundableCredits',       // 31
+    // ── Schedule 3 Part II's own lines, one kind each (Phase 25) ────────────
+    //
+    // `scheduleThreeRefundableCredits` stood here as ONE coarse kind for the
+    // whole of Part II, and is split for the identical reason as Part I's
+    // above. Every one of these feeds Schedule 3 line 15 and thence 1040 line
+    // 31; 13a-13z stays one collapsed kind, and lines 14 and 15 get none
+    // because they are totals.
+    //
+    // **None of the five is MODELED after this phase.** TAX-25 and TAX-26
+    // reach Part I's lines 3 and 4 only; Part II is untouched. `excessSocial\
+    // SecurityWithheld` is nonetheless the most interesting entry in this
+    // block, because it is the one line on this schedule whose amount is
+    // already derivable from documents this engine holds -- see its own
+    // remedy string in `fjs/return/scope` and `fjs/schedule/3`'s own
+    // docstring.
+    'netPremiumTaxCredit',                  // Schedule 3 line 9  -> 31
+    'amountPaidWithExtensionRequest',       // Schedule 3 line 10 -> 31
+    'excessSocialSecurityWithheld',         // Schedule 3 line 11 -> 31
+    'federalFuelTaxCredit',                 // Schedule 3 line 12 -> 31
+    'otherPaymentsAndRefundableCredits',    // Schedule 3 line 13a-13z -> 31
     'foreignEarnedIncomeForm2555',          // line 16 wrapper
     'childsUnearnedIncomeForm8615',         // line 16 wrapper
     'farmIncomeAveragingScheduleJ',         // line 16 wrapper
@@ -626,16 +675,25 @@ const expectedMoneyBoxFieldCount = 4
  * Thirteen rather than sixteen because the printed Part II's line 22 is
  * reserved with no box to fill, and lines 24/25 are one collapsed lettered
  * block plus its own total — see the vocabulary's own comment above.
+ *
+ * `76 -> 86` is Phase 25's own Schedule 3 split (TAX-25/TAX-26), the same
+ * shape one schedule further on and the last of the five coarse kinds
+ * `fjs/return/scope`'s Wave 5 note listed. TWO coarse kinds are removed here
+ * rather than one — `scheduleThreeNonrefundableCredits` and
+ * `scheduleThreeRefundableCredits` — and twelve per-printed-line kinds added,
+ * `76 - 2 + 12`. Seven for Part I (lines 1, 2, 3, 4, 5a, 5b and the collapsed
+ * 6a-6z) and five for Part II (lines 9, 10, 11, 12 and the collapsed
+ * 13a-13z); lines 7, 8, 14 and 15 get none, because all four are totals.
  * @type {number}
  */
-const expectedKindCount = 76
+const expectedKindCount = 86
 
 export const proof = {
     dialectAndMediaType: () => {
         assertEq(dialect, 'vnd.fjs.return_profile')
         assertEq(mediaType, 'application/vnd.fjs.return_profile+json')
     },
-    kindVocabularyIsExactlySeventySix: () => {
+    kindVocabularyIsExactlyEightySix: () => {
         assertEq(kindVocabulary.length, expectedKindCount)
         assertEq(new Set(kindVocabulary).size, kindVocabulary.length)
     },

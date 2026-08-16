@@ -93,6 +93,8 @@ import { baseTaxForAmount } from '../../tax/table/module.f.js'
 /** @import { MedicalExpenses } from '../../document/medical_expenses/module.f.js' */
 /** @import { Adjustments } from '../../document/adjustments/module.f.js' */
 /** @import { OneZeroNineEightE } from '../../document/1098e/module.f.js' */
+/** @import { OneZeroNineEightT } from '../../document/1098t/module.f.js' */
+/** @import { Credits } from '../../document/credits/module.f.js' */
 /** @import { OneZeroNineNineG } from '../../document/1099g/module.f.js' */
 /** @import { PriorYearCapitalLoss } from '../../document/prior_year_capital_loss/module.f.js' */
 /** @import { Kind, ReturnProfile } from '../../return/profile/module.f.js' */
@@ -145,6 +147,16 @@ import { baseTaxForAmount } from '../../tax/table/module.f.js'
  * each, but the shape stays a list for the same reason `profile` alone is
  * not: consistency with every other document field here.
  *
+ * `tuitionForms`/`creditForms` are Phase 25's own widening (TAX-25/TAX-26):
+ * Schedule 3 lines 3 and 4 read `vnd.fjs.1098t` and `vnd.fjs.credits`
+ * documents. `tuitionForms` is a list because it genuinely is one — a
+ * household with two students in college, or one student who transferred
+ * mid-year, holds several 1098-Ts, and each is matched to a claimed student
+ * by the STUDENT'S TIN rather than by assuming the filer's
+ * (`fjs/document/1098t`'s own header records why). `creditForms` is a list
+ * under this typedef's own "one running record per taxpayer per year"
+ * convention, exactly like `adjustmentForms`.
+ *
  * `adjustmentForms`/`studentLoanInterestForms` are Phase 24's own widening
  * (TAX-23/TAX-24): Schedule 1 Part II lines 11, 13 and 21 read
  * `vnd.fjs.adjustments` and `vnd.fjs.1098e` documents. `adjustmentForms` is a
@@ -175,6 +187,8 @@ import { baseTaxForAmount } from '../../tax/table/module.f.js'
  *   readonly unemploymentForms: readonly Stored<OneZeroNineNineG>[],
  *   readonly adjustmentForms: readonly Stored<Adjustments>[],
  *   readonly studentLoanInterestForms: readonly Stored<OneZeroNineEightE>[],
+ *   readonly tuitionForms: readonly Stored<OneZeroNineEightT>[],
+ *   readonly creditForms: readonly Stored<Credits>[],
  * }} Form1040Inputs
  */
 
@@ -1134,8 +1148,8 @@ const line16MethodNames = {
  * The floor is UNREACHABLE through a whole report in this phase, and that is a
  * property of the scope guard rather than of this line: line 21 is `19 + 20`,
  * both of which are profile-declared zeros, because a return declaring
- * `childTaxCreditOrOtherDependents` (line 19) or
- * `scheduleThreeNonrefundableCredits` (line 20) is refused whole. So line 21
+ * `childTaxCreditOrOtherDependents` (line 19) or any of Schedule 3 Part I's
+ * seven per-line kinds (line 20) is refused whole. So line 21
  * is always `0n` here and `18 - 21` can never go negative — a neighbouring
  * rule ABSORBS the floor exactly the way `fjs/tax/line16/qdcgt`'s line 3 guard
  * is absorbed by the `min` below it (AGENTS.md, "the equivalent mutant"). A
@@ -1331,6 +1345,32 @@ const form1040TaxAndPaymentLines = taxParamSet => inputs => income => {
     // `fjs/schedule/b` performs on `hadForeignFinancialAccount`, and exactly
     // what `fjs/form8812`'s own docstring expects its caller to do before it
     // ever sees the array.
+    //
+    // **`scheduleThree(...)` runs FIRST, and the order is a rule rather than
+    // a preference.** Schedule 8812's own Credit Limit Worksheet A line 2
+    // subtracts Schedule 3 lines 1, 2, 3, 4, 6d, 6e, 6f, 6l and 6m from the
+    // tax before the child tax credit sees it — §26's ordering of the
+    // nonrefundable personal credits. Until Phase 25 that line was a
+    // documented `0n` inside `fjs/form8812` and the two calls could go in
+    // either order; lines 3 and 4 are real now, so they cannot.
+    const scheduleThreeOutcome = scheduleThree(taxParamSet)({
+        profile,
+        status,
+        agiCents: income.line11b.value,
+        line18Cents: line18.value,
+        w2Forms: w2s,
+        creditForms: inputs.creditForms,
+        tuitionForms: inputs.tuitionForms,
+        // §25B(d)(2)'s testing period, for the ONE year of it this engine can
+        // observe: a stored Form 1099-R reporting a distribution. The other
+        // three years of the window are unobservable and `fjs/form8880`
+        // refuses on the taxpayer's own assertion instead — see its docstring.
+        aStored1099RProvesADistribution: retirementForms.some(
+            form => form.value.box1GrossDistribution !== undefined),
+    })
+    if (scheduleThreeOutcome.kind === 'error') {
+        return { kind: 'error', message: scheduleThreeOutcome.message, unmodeled: [] }
+    }
     const form8812Outcome = form8812(taxParamSet)({
         status,
         agiCents: income.line11b.value,
@@ -1341,6 +1381,12 @@ const form1040TaxAndPaymentLines = taxParamSet => inputs => income => {
             livedWithTaxpayer: d.livedWithTaxpayer === true,
         })),
         line18Cents: line18.value,
+        // Credit Limit Worksheet A line 2: Schedule 3 lines 3 and 4, off the
+        // SAME execution that produced them. The other ten summands the
+        // printed worksheet lists are refused `fjs/return/scope` kinds and
+        // therefore documented zeros.
+        scheduleThreeCreditsCents:
+            scheduleThreeOutcome.line3.value + scheduleThreeOutcome.line4.value,
         earnedIncomeCents: profile.value.earnedIncome === undefined
             ? 0n
             : centsFromString(profile.value.earnedIncome),
@@ -1374,18 +1420,19 @@ const form1040TaxAndPaymentLines = taxParamSet => inputs => income => {
         sources: nineteenSources,
         rule: '1040 line 19',
     }
-    // 20/31 — Schedule 3 (`fjs/schedule/3`, Plan 13-11/13-12, TAX-14):
-    // Part I's total nonrefundable credits (line8) feeds 1040 line 20,
-    // Part II's total other payments/refundable credits (line15) feeds
-    // 1040 line 31 — ONE `scheduleThree(...)` call, mirroring Schedule 1
-    // and Schedule 2's own single-call precedent above.
-    // `scheduleThreeNonrefundableCredits`/`scheduleThreeRefundableCredits`
-    // stay in `unmodeledKindRefusals`, so both totals are `0n` for every
-    // profile this engine can otherwise compute.
-    const scheduleThreeResult = scheduleThree(profile)
+    // 20/29/31 — Schedule 3 (`fjs/schedule/3`, Plan 13-11/13-12, TAX-14;
+    // TAX-25/TAX-26 since Phase 25): Part I's total nonrefundable credits
+    // (line8) feeds 1040 line 20, Part II's total other payments/refundable
+    // credits (line15) feeds 1040 line 31, and Form 8863 Part I's own line 8
+    // feeds 1040 line 29 DIRECTLY, never through this schedule — all from
+    // the ONE `scheduleThree(...)` call made above, before Schedule 8812.
+    //
+    // Ten of Schedule 3's twelve per-line kinds stay in
+    // `unmodeledKindRefusals`, so every line but 3 and 4 is `0n` for any
+    // profile this engine can compute.
     const line20 = {
-        value: scheduleThreeResult.line8.value,
-        sources: scheduleThreeResult.line8.sources,
+        value: scheduleThreeOutcome.line8.value,
+        sources: scheduleThreeOutcome.line8.sources,
         rule: '1040 line 20',
     }  // Schedule 3 Part I total (line8)
     const line21 = totalLine('1040 line 21')([line19, line20])
@@ -1488,14 +1535,28 @@ const form1040TaxAndPaymentLines = taxParamSet => inputs => income => {
         sources: twentyEightSources,
         rule: '1040 line 28',
     }
-    const line29 = declaredZero('1040 line 29')   // American opportunity credit
+    // 29 — the REFUNDABLE American Opportunity Credit: Form 8863 line 8, off
+    // the SAME `scheduleThreeOutcome` lines 20 and 31 came from. It reaches
+    // this line DIRECTLY rather than through Schedule 3, because the printed
+    // Form 8863 sends it here; only its nonrefundable remainder (line 9,
+    // through line 19) goes to Schedule 3 line 3. One form, two destinations
+    // — see `fjs/schedule/3`'s own docstring.
+    //
+    // Ruled just `'1040 line 29'`, per this file's own convention that a 1040
+    // line is named by its 1040 line number and what the amount came from is
+    // carried by `sources` — the same decision line 25c records at length.
+    const line29 = {
+        value: scheduleThreeOutcome.form8863.line8,
+        sources: scheduleThreeOutcome.line3.sources,
+        rule: '1040 line 29',
+    }
     const line30 = declaredZero('1040 line 30')   // refundable adoption credit
     // 31 — Schedule 3 Part II's own total (line15), from the SAME
-    // `scheduleThreeResult` computed at line 20, above — never a second,
+    // `scheduleThreeOutcome` lines 20 and 29 came from — never a second,
     // independently stale `scheduleThree(...)` call.
     const line31 = {
-        value: scheduleThreeResult.line15.value,
-        sources: scheduleThreeResult.line15.sources,
+        value: scheduleThreeOutcome.line15.value,
+        sources: scheduleThreeOutcome.line15.sources,
         rule: '1040 line 31',
     }   // Schedule 3 Part II total (line15)
     const line32 = totalLine('1040 line 32')([line27a, line28, line29, line30, line31])
@@ -2104,6 +2165,8 @@ const inputsOf = profile => w2s => interestForms => dividendForms => brokerageFo
                 unemploymentForms: [],
                 adjustmentForms: [],
                 studentLoanInterestForms: [],
+                tuitionForms: [],
+                creditForms: [],
             })
 
 /**
@@ -2574,6 +2637,120 @@ const phaseTwentyFourInputs = {
     ...inputsOf(storedProfile(phaseTwentyFourProfile))([phaseTwentyFourW2])([])([])([])([])([])([])([])([]),
     adjustmentForms: [phaseTwentyFourAdjustments],
     studentLoanInterestForms: [phaseTwentyFourOneZeroNineEightE],
+}
+
+
+// ── Phase 25's own fixture (TAX-25/TAX-26): a student with a 401(k) ────────
+//
+// The persona both credits exist for and neither reached before this phase:
+// a modest single earner who put money into an employer plan AND paid
+// tuition. Until Phase 25 this return computed confidently and OVERSTATED
+// the tax by $1,700 of nonrefundable credit, and understated the refund by
+// a further $1,000 of refundable credit, with nothing in the report saying
+// so.
+
+/** @type {ReturnProfile} */
+const phaseTwentyFiveProfile = {
+    dialect: returnProfileDialect,
+    taxYear: 2025,
+    filingStatus: 'single',
+    dependentCount: 0,
+    declaredKinds: [
+        'wages', 'educationCredits', 'retirementSavingsContributionsCredit',
+        'americanOpportunityCredit',
+    ],
+}
+
+/**
+ * The W-2, carrying box 12 code D beside a much larger code DD amount — so a
+ * wiring that read "any box 12 entry" rather than the nine deferral codes
+ * produces a wildly different saver's credit and is caught end to end, not
+ * only in `fjs/schedule/3`'s unit proofs. The identical shape, and the
+ * identical reason, as `phaseTwentyFourW2`'s code W beside its code DD.
+ * @type {Stored<W2>}
+ */
+const phaseTwentyFiveW2 = {
+    documentHash: 'sha256-p25-w2',
+    value: {
+        ...w2Document('sha256-p25-w2')('39000.00').value,
+        box12: [{ code: 'DD', amount: '9800.00' }, { code: 'D', amount: '2000.00' }],
+    },
+}
+
+/** The transcribed half: one 1098-T for one student. @type {Stored<OneZeroNineEightT>} */
+const phaseTwentyFiveOneZeroNineEightT = {
+    documentHash: 'sha256-p25-1098t',
+    value: {
+        dialect: 'vnd.fjs.1098t',
+        payerTin: '66-6666666',
+        recipientTin: '222-22-2222',
+        accountNumber: 'STU-0001',
+        taxYear: 2025,
+        formRevision: '2025',
+        box1PaymentsReceivedForQualifiedTuition: '9000.00',
+        box8AtLeastHalfTimeStudent: true,
+    },
+}
+
+/** The asserted half: the election, the Part III answers, the §25B(c)
+ * answers, and the §25A(i) age assertion. @type {Stored<Credits>} */
+const phaseTwentyFiveCredits = {
+    documentHash: 'sha256-p25-credits',
+    value: {
+        dialect: 'vnd.fjs.credits',
+        recipientTin: '222-22-2222',
+        taxYear: 2025,
+        educationStudents: [{
+            studentTin: '222-22-2222',
+            studentName: 'the filer',
+            credit: 'americanOpportunity',
+            enrolledAtLeastHalfTimeInADegreeProgram: true,
+        }],
+        filerAttainedAgeTwentyFourBeforeTheEndOfTheYear: true,
+        saversCreditEligibility: [{
+            individual: 'taxpayer',
+            attainedAgeEighteen: true,
+            noTestingPeriodDistributions: true,
+        }],
+    },
+}
+
+/** @type {Form1040Inputs} */
+const phaseTwentyFiveInputs = {
+    ...inputsOf(storedProfile(phaseTwentyFiveProfile))([phaseTwentyFiveW2])([])([])([])([])([])([])([])([]),
+    tuitionForms: [phaseTwentyFiveOneZeroNineEightT],
+    creditForms: [phaseTwentyFiveCredits],
+}
+
+/**
+ * The SAME return with one qualifying child — the fixture that makes §26's
+ * ordering observable end to end.
+ *
+ * Nothing else in this repository carries Schedule 3 credits AND a dependent
+ * at once, and without such a fixture `form8812`'s new
+ * `scheduleThreeCreditsCents` argument could be replaced by `0n` at its call
+ * site with the whole suite staying green — a newly-real read that no fixture
+ * exercises, which is the defect Phase 24's own verification found and this
+ * fixture exists to prevent.
+ * @type {Form1040Inputs}
+ */
+const phaseTwentyFiveWithDependentInputs = {
+    ...phaseTwentyFiveInputs,
+    profile: storedProfile({
+        ...phaseTwentyFiveProfile,
+        dependentCount: 1,
+        declaredKinds: [
+            ...phaseTwentyFiveProfile.declaredKinds,
+            'childTaxCreditOrOtherDependents', 'additionalChildTaxCredit',
+        ],
+        dependents: [{
+            relationship: 'daughter',
+            ssnValidForEmployment: true,
+            ageAtYearEnd: 10,
+            livedWithTaxpayer: true,
+        }],
+        earnedIncome: '39000.00',
+    }),
 }
 
 
@@ -4772,6 +4949,11 @@ export const proof = {
                     { relationship: 'son', ssnValidForEmployment: true, ageAtYearEnd: 12, livedWithTaxpayer: true },
                 ],
                 line18Cents: tax.line18.value,
+                // Credit Limit Worksheet A line 2: this fixture claims no
+                // Schedule 3 credit, so the ordering this input expresses
+                // subtracts nothing — which is what makes the cross-check an
+                // independent re-derivation rather than a copy.
+                scheduleThreeCreditsCents: 0n,
                 earnedIncomeCents: 0n,
                 nontaxableCombatPayCents: 0n,
             })
@@ -5372,6 +5554,10 @@ export const proof = {
                     { relationship: 'mother', ssnValidForEmployment: true, ageAtYearEnd: 20, livedWithTaxpayer: true },
                 ],
                 line18Cents: line18,
+                // See the sibling cross-check above: this fixture claims no
+                // Schedule 3 credit, so Credit Limit Worksheet A line 2 is
+                // zero and the re-derivation stays independent.
+                scheduleThreeCreditsCents: 0n,
                 earnedIncomeCents: 2000000n,
                 nontaxableCombatPayCents: 0n,
             })
@@ -5690,6 +5876,10 @@ export const proof = {
                     { relationship: 'daughter', ssnValidForEmployment: true, ageAtYearEnd: 10, livedWithTaxpayer: true },
                 ],
                 line18Cents: line18,
+                // See the sibling cross-check above: this fixture claims no
+                // Schedule 3 credit, so Credit Limit Worksheet A line 2 is
+                // zero and the re-derivation stays independent.
+                scheduleThreeCreditsCents: 0n,
                 earnedIncomeCents: 0n,
                 nontaxableCombatPayCents: 0n,
             })
@@ -5731,6 +5921,226 @@ export const proof = {
     // the thing the unit proofs in `fjs/schedule/1` cannot: that lines 11, 13
     // and 21 reach 1040 line 10 **through Schedule 1's own Part II total**
     // and go on to move AGI and taxable income.
+    // ── Phase 25 (TAX-25/TAX-26): Schedule 3's credits, end to end ─────────
+    //
+    // These leaves run the whole `form1040Report` entry point, so they prove
+    // what `fjs/schedule/3`'s unit proofs cannot: that the two credits reach
+    // 1040 line 20 **through Schedule 3's own Part I total**, that the
+    // refundable American Opportunity Credit reaches 1040 line 29 WITHOUT
+    // passing through Schedule 3 at all, and that both then move the amount
+    // owed.
+    //
+    // Every figure below is hand-derived from the printed forms, in order,
+    // and none of it is read back from the code under test:
+    //
+    //   1040 line 1a/1z = W-2 box 1                            $39,000.00
+    //   1040 line 9  (total income)                            $39,000.00
+    //   1040 line 11 (AGI; Schedule 1 is all zeros)            $39,000.00
+    //   1040 line 12 (standard deduction, single TY2025)       $15,750.00
+    //   1040 line 15 (taxable income)                          $23,250.00
+    //   1040 line 16: the printed Tax Table, NOT bracket arithmetic. The
+    //       $50-wide band [$23,250, $23,300) has midpoint $23,275.00, taxed
+    //       at 10% of the first $11,925.00 = $1,192.50 plus 12% of the
+    //       remaining $11,350.00 = $1,362.00, i.e. $2,554.50, rounded to the
+    //       nearest DOLLAR                                      $2,555.00
+    //   1040 line 18 (line 16 + Schedule 2 Part I $0.00)        $2,555.00
+    //
+    //   Form 8863 Part III: line 27 = min($9,000.00, $4,000.00) = $4,000.00;
+    //       line 28 = $2,000.00; line 29 = 25% = $500.00; line 30 = $2,500.00
+    //   Form 8863 Part I: line 1 = $2,500.00; line 2 = $90,000.00; line 3 =
+    //       $39,000.00; line 4 = $51,000.00, which exceeds line 5's
+    //       $10,000.00, so line 6 = 1.000; line 7 = $2,500.00; line 8 = 40%
+    //       = $1,000.00 -> 1040 line 29; line 9 = $1,500.00
+    //   Form 8863's Credit Limit Worksheet: $2,555.00 - $0.00 = $2,555.00,
+    //       which exceeds $1,500.00, so line 19 =                $1,500.00
+    //
+    //   Form 8880: line 2 = W-2 box 12 code D                    $2,000.00
+    //       (code DD's $9,800.00 is employer health coverage and is NOT a
+    //       deferral); line 6 = min($2,000.00, the $2,000.00 cap); line 7 =
+    //       $2,000.00; line 8 = $39,000.00, which is over $25,500.00 and not
+    //       over $39,500.00, so line 9 = 10%; line 10 =            $200.00
+    //   Form 8880's Credit Limit Worksheet: $2,555.00 - $1,500.00 =
+    //       $1,055.00, which exceeds $200.00, so line 12 =         $200.00
+    //
+    //   Schedule 3 line 8 = $1,500.00 + $200.00 -> 1040 line 20  $1,700.00
+    //   1040 line 21 = line 19 ($0.00) + line 20                 $1,700.00
+    //   1040 line 22 = $2,555.00 - $1,700.00                       $855.00
+    //   1040 line 24 (line 22 + Schedule 2 Part II $0.00)          $855.00
+    //   1040 line 29 (refundable)                                $1,000.00
+    //   1040 line 32/33 (no withholding on this W-2)             $1,000.00
+    //   1040 line 34 = $1,000.00 - $855.00                         $145.00
+    //
+    // The last figure is the point of the whole phase for this persona: the
+    // return goes from owing to being owed.
+    scheduleThreeCredits: {
+        theStudentWithAFourOhOneKayGetsBothCreditsThroughScheduleThree: () => {
+            const outcome = form1040Report(taxParams2025)(phaseTwentyFiveInputs)
+            assert(outcome.kind === 'ok', ['expected the student return to compute', outcome])
+            if (outcome.kind !== 'ok') {
+                throw ['expected ok', outcome]
+            }
+            /** @type {(rule: string) => bigint} */
+            const cents = rule => lineRuled(outcome.lines)(rule).value
+            assertEq(cents('1040 line 1a'), 3900000n, '$39,000.00 of wages')
+            assertEq(cents('1040 line 11'), 3900000n, 'AGI — no Schedule 1 adjustments')
+            assertEq(cents('1040 line 15'), 2325000n, '$39,000.00 - $15,750.00 = $23,250.00')
+            assertEq(cents('1040 line 18'), 255500n, '$2,555.00 — the Tax Table band midpoint, dollar-rounded')
+            assertEq(cents('1040 line 20'), 170000n, '$1,700.00 — Schedule 3 Part I total')
+            assertEq(cents('1040 line 21'), 170000n, 'line 19 ($0.00) + line 20')
+            assertEq(cents('1040 line 22'), 85500n, '$2,555.00 - $1,700.00 = $855.00')
+            assertEq(cents('1040 line 29'), 100000n, '$1,000.00 refundable — never through Schedule 3')
+            assertEq(cents('1040 line 31'), 0n, 'Schedule 3 Part II is untouched by this phase')
+            assertEq(cents('1040 line 34'), 14500n, '$145.00 overpaid — this return was owing before Phase 25')
+            assertEq(cents('1040 line 37'), 0n, 'and nothing is owed')
+        },
+        // **The two halves land on DIFFERENT 1040 lines, and neither is the
+        // other.** A wiring that sent the whole Form 8863 credit through
+        // Schedule 3, or the whole of it to line 29, would still produce a
+        // plausible-looking return; this is the leaf that says which is
+        // which.
+        theRefundableAndNonrefundableHalvesLandOnTwoDifferentLines: () => {
+            const outcome = form1040Report(taxParams2025)(phaseTwentyFiveInputs)
+            assert(outcome.kind === 'ok', ['expected the student return to compute', outcome])
+            if (outcome.kind !== 'ok') {
+                throw ['expected ok', outcome]
+            }
+            const line20 = lineRuled(outcome.lines)('1040 line 20')
+            const line29 = lineRuled(outcome.lines)('1040 line 29')
+            assertEq(line29.value, 100000n, '40% of $2,500.00 is refundable')
+            // Line 20 is the NONrefundable $1,500.00 plus the saver's
+            // $200.00 — so it is neither $2,500.00 (the whole education
+            // credit) nor $2,700.00 (the whole of both forms).
+            assertEq(line20.value, 170000n)
+            assert(
+                line20.value !== 250000n && line20.value !== 270000n,
+                ['the refundable half must not reach the nonrefundable line', line20.value],
+            )
+            // …and the two together are the whole of both forms, so nothing
+            // was dropped on the way.
+            assertEq(line20.value + line29.value, 270000n, '$1,700.00 + $1,000.00 = $2,700.00')
+        },
+        // The saver's credit reads exactly code D and NOT code DD, end to
+        // end. The fixture's W-2 carries $9,800.00 of code DD beside
+        // $2,000.00 of code D; a read that took "any box 12 entry" would
+        // give 10% of the $2,000 cap either way, so this leaf pins the
+        // figure that DISTINGUISHES them — Form 8880 line 2 itself, off the
+        // schedule's own result.
+        onlyTheDeferralCodesReachFormEightyEightyLineTwo: () => {
+            const outcome = form1040Report(taxParams2025)(phaseTwentyFiveInputs)
+            assert(outcome.kind === 'ok', ['expected the student return to compute', outcome])
+            if (outcome.kind !== 'ok') {
+                throw ['expected ok', outcome]
+            }
+            // An independent `scheduleThree(...)` call over the SAME inputs
+            // must reach the identical figures — the cross-check idiom this
+            // file already uses for `form8812` and `scheduleD`.
+            const crossCheck = scheduleThree(taxParams2025)({
+                profile: storedProfile(phaseTwentyFiveProfile),
+                status: 'single',
+                agiCents: 3900000n,
+                line18Cents: 255500n,
+                w2Forms: [phaseTwentyFiveW2],
+                creditForms: [phaseTwentyFiveCredits],
+                tuitionForms: [phaseTwentyFiveOneZeroNineEightT],
+                aStored1099RProvesADistribution: false,
+            })
+            assert(crossCheck.kind === 'ok', ['expected the cross-check to compute', crossCheck])
+            if (crossCheck.kind !== 'ok') {
+                throw ['expected ok', crossCheck]
+            }
+            assertEq(
+                crossCheck.form8880.columns[0]?.line2,
+                200000n,
+                '$2,000.00 of code D — never the $11,800.00 that including code DD would give',
+            )
+            assertEq(crossCheck.line4.value, 20000n, '10% of $2,000.00 = $200.00')
+            assertEq(
+                crossCheck.line8.value,
+                lineRuled(outcome.lines)('1040 line 20').value,
+                'the independent call must reach the SAME 1040 line 20',
+            )
+        },
+        // **§26's ordering, end to end, in money.** Schedule 3's credits are
+        // subtracted from the tax BEFORE the child tax credit sees it, and
+        // the difference is large and visible on three separate 1040 lines.
+        //
+        // Hand-derived, continuing from the arithmetic above and adding one
+        // qualifying child aged 10:
+        //
+        //   Schedule 8812 line 5 = 1 x $2,200.00                 $2,200.00
+        //   line 9 = $200,000.00, so line 11 = $0.00 and
+        //       line 12 =                                        $2,200.00
+        //   Credit Limit Worksheet A: line 1 = 1040 line 18       $2,555.00
+        //       line 2 = Schedule 3 lines 3 + 4                   $1,700.00
+        //       line 3 =                                            $855.00
+        //   line 14 = min($2,200.00, $855.00) -> 1040 line 19       $855.00
+        //   line 16a = $2,200.00 - $855.00                        $1,345.00
+        //   line 16b = 1 x $1,700.00                              $1,700.00
+        //   line 17 = min($1,345.00, $1,700.00)                   $1,345.00
+        //   line 19 = $39,000.00 - $2,500.00                     $36,500.00
+        //   line 20 = 15% of line 19                              $5,475.00
+        //   line 27 = min($1,345.00, $5,475.00) -> 1040 line 28   $1,345.00
+        //
+        //   1040 line 21 = $855.00 + $1,700.00                    $2,555.00
+        //   1040 line 22 = $2,555.00 - $2,555.00                      $0.00
+        //   1040 line 32 = $1,345.00 + $1,000.00                  $2,345.00
+        //   1040 line 34 =                                        $2,345.00
+        //
+        // **What ordering costs and what it does not.** The child tax credit
+        // drops from $2,200.00 to $855.00 because the education and saver's
+        // credits took the tax first — and $1,345.00 of it reappears on line
+        // 28 as the ADDITIONAL child tax credit, refunded. Ordering moves
+        // money between two 1040 lines; it does not destroy it. A wiring
+        // that passed `0n` for Credit Limit Worksheet A's line 2 would give
+        // line 19 = $2,200.00, line 28 = $0.00 and line 34 = $1,000.00 — a
+        // return $1,345.00 worse for the taxpayer, computed confidently.
+        scheduleThreeCreditsAreOrderedBeforeTheChildTaxCredit: () => {
+            const outcome = form1040Report(taxParams2025)(phaseTwentyFiveWithDependentInputs)
+            assert(outcome.kind === 'ok', ['expected the return to compute', outcome])
+            if (outcome.kind !== 'ok') {
+                throw ['expected ok', outcome]
+            }
+            /** @type {(rule: string) => bigint} */
+            const cents = rule => lineRuled(outcome.lines)(rule).value
+            assertEq(cents('1040 line 18'), 255500n, 'the same $2,555.00 of tax')
+            assertEq(cents('1040 line 20'), 170000n, 'Schedule 3 takes $1,700.00 of it first')
+            assertEq(cents('1040 line 19'), 85500n, '$855.00 of child tax credit is what is left')
+            assert(
+                cents('1040 line 19') !== 220000n,
+                ['the child tax credit must NOT be the full $2,200.00', cents('1040 line 19')],
+            )
+            assertEq(cents('1040 line 21'), 255500n, '$855.00 + $1,700.00 exactly consumes the tax')
+            assertEq(cents('1040 line 22'), 0n)
+            assertEq(cents('1040 line 28'), 134500n, '$1,345.00 reappears as the ADDITIONAL child tax credit')
+            assertEq(cents('1040 line 29'), 100000n, 'and the refundable education half is untouched')
+            assertEq(cents('1040 line 34'), 234500n, '$2,345.00 refunded')
+        },
+        // **Criterion 4, stated as a leaf.** A return claiming no credits
+        // computes exactly what it computed before this phase: the same
+        // fixture with the two credit documents removed and the three kinds
+        // undeclared has $0.00 on lines 20, 29 and 31, and its line 22 is
+        // the whole $2,555.00 of tax.
+        theSameReturnWithoutTheCreditDocumentsIsUnchanged: () => {
+            const outcome = form1040Report(taxParams2025)({
+                ...inputsOf(storedProfile({
+                    ...phaseTwentyFiveProfile,
+                    declaredKinds: ['wages'],
+                }))([phaseTwentyFiveW2])([])([])([])([])([])([])([])([]),
+            })
+            assert(outcome.kind === 'ok', ['expected the control return to compute', outcome])
+            if (outcome.kind !== 'ok') {
+                throw ['expected ok', outcome]
+            }
+            /** @type {(rule: string) => bigint} */
+            const cents = rule => lineRuled(outcome.lines)(rule).value
+            assertEq(cents('1040 line 18'), 255500n, 'the same $2,555.00 of tax')
+            assertEq(cents('1040 line 20'), 0n)
+            assertEq(cents('1040 line 29'), 0n)
+            assertEq(cents('1040 line 31'), 0n)
+            assertEq(cents('1040 line 22'), 255500n, 'the whole tax, with nothing credited against it')
+            assertEq(cents('1040 line 37'), 255500n, 'and the whole of it owed')
+        },
+    },
     scheduleOneAdjustments: {
         theNonProfitEmployeeReturnDeductsAllThreeAdjustmentsThroughLineTen: () => {
             const outcome = form1040Report(taxParams2025)(phaseTwentyFourInputs)

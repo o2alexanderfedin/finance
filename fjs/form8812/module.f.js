@@ -65,13 +65,33 @@
  * line16b's `< $5,100` skip of Part II-B are the printed form's own control
  * flow, transcribed as such.
  *
- * ## Credit Limit Worksheet A's line 2 is a documented zero, not a hard-coded collapse
+ * ## Credit Limit Worksheet A's line 2 was a documented zero until Phase 25,
+ * and is now a real figure
  *
- * Every Schedule 3 credit this worksheet's own line 2 could sum (foreign
- * tax credit, dependent care, education credits, etc.) is unmodeled for
- * this profile (13-RESEARCH.md §4), so line 2 collapses to bare `0n` — but
- * it is written as its OWN line, computed, exactly as `qdcgt`'s own line 11
- * (a pure copy of line 9) is kept as its own line rather than folded away
+ * Through Phase 24 this section read: *"Every Schedule 3 credit this
+ * worksheet's own line 2 could sum (foreign tax credit, dependent care,
+ * education credits, etc.) is unmodeled for this profile (13-RESEARCH.md §4),
+ * so line 2 collapses to bare `0n`"*. It was true when written and Phase 25
+ * (TAX-25/TAX-26) makes it false: Schedule 3 lines 3 and 4 now compute real
+ * education and saver's credits, and the printed worksheet's own line 2 sums
+ * *"Schedule 3, line 1; line 2; line 3; line 4; line 6d; line 6e; line 6f;
+ * line 6l; line 6m; Form 5695 line 30; Form 8910 line 15; Form 8936 line
+ * 23"*. Two of those twelve are now non-zero.
+ *
+ * So `scheduleThreeCreditsCents` is an INPUT, and the caller
+ * (`fjs/form1040/core`) supplies Schedule 3 lines 3 + 4 off the SAME
+ * `scheduleThree(...)` execution that produced them. What this encodes is
+ * §26's ordering: the child tax credit is applied to what is left of the tax
+ * after the other nonrefundable personal credits, so a taxpayer whose
+ * education credit already consumed the liability gets no child tax credit
+ * from it — and, because Part II-A exists, may get the additional child tax
+ * credit refunded instead.
+ * `creditLimitWorksheetA.scheduleThreeCreditsReduceTheChildTaxCredit` is what
+ * watches that happen.
+ *
+ * The other ten summands are still documented zeros, and line 2 is still
+ * written as its OWN line, computed, exactly as `qdcgt`'s own line 11 (a pure
+ * copy of line 9) is kept as its own line rather than folded away
  * (AGENTS.md's "every printed line exists" discipline).
  *
  * ## What this module deliberately does NOT do
@@ -118,12 +138,14 @@ import { taxParamsByYear } from '../tax/params/module.f.js'
  * Everything Schedule 8812 reads: the filing status and AGI a caller has
  * already computed, the declared `dependents` array, the tax-after-Schedule-
  * 2-Part-I amount Credit Limit Worksheet A's own line 1 needs (1040 line 18),
- * and the two earned-income figures Part II-A's line 19 needs.
+ * the Schedule 3 credits its line 2 subtracts (Phase 25), and the two
+ * earned-income figures Part II-A's line 19 needs.
  * @typedef {{
  *   readonly status: IndividualFilingStatus,
  *   readonly agiCents: bigint,
  *   readonly dependents: readonly DependentEntry[],
  *   readonly line18Cents: bigint,
+ *   readonly scheduleThreeCreditsCents: bigint,
  *   readonly earnedIncomeCents: bigint,
  *   readonly nontaxableCombatPayCents: bigint,
  * }} Form8812Input
@@ -220,7 +242,10 @@ const partTwoBThresholdCents = 510000n
  * @type {(taxParamSet: TaxParamSet) => (input: Form8812Input) => Form8812Outcome}
  */
 export const form8812 = taxParamSet => input => {
-    const { status, agiCents, dependents, line18Cents, earnedIncomeCents, nontaxableCombatPayCents } = input
+    const {
+        status, agiCents, dependents, line18Cents, scheduleThreeCreditsCents,
+        earnedIncomeCents, nontaxableCombatPayCents,
+    } = input
     const { childTaxCredit } = taxParamSet
 
     // Classification -- derived from age + SSN validity, never supplied
@@ -290,8 +315,16 @@ export const form8812 = taxParamSet => input => {
     // 13. Credit Limit Worksheet A, computed explicitly here -- line2 is a
     //     documented zero (see module docstring), not hard-coded away.
     const clwLine1 = line18Cents
-    const clwLine2 = 0n // Documented zero -- Schedule 3 Part I, unmodeled for this profile.
-    const clwLine3 = clwLine1 - clwLine2
+    // 2. Schedule 3 lines 1, 2, 3, 4, 6d, 6e, 6f, 6l, 6m and Forms
+    //    5695/8910/8936. Lines 3 and 4 are REAL as of Phase 25 and arrive as
+    //    an input; the other ten are documented zeros because each is a
+    //    refused `fjs/return/scope` kind. See this module's own docstring.
+    const clwLine2 = scheduleThreeCreditsCents
+    // 3. "Subtract line 2 from line 1." The floor is this engine's, not the
+    //    printed page's -- the worksheet assumes line 1 is the larger, which
+    //    was necessarily true while line 2 was always zero and is not any
+    //    more.
+    const clwLine3 = clwLine1 > clwLine2 ? clwLine1 - clwLine2 : 0n
     const line13 = clwLine3
     // 14. "Smaller of line 12 or line 13." -> 1040 line 19.
     const line14 = line12 < line13 ? line12 : line13
@@ -362,6 +395,7 @@ const baseInput = overrides => ({
     agiCents: 0n,
     dependents: [],
     line18Cents: 0n,
+    scheduleThreeCreditsCents: 0n,
     earnedIncomeCents: 0n,
     nontaxableCombatPayCents: 0n,
     ...overrides,
@@ -595,8 +629,48 @@ export const proof = {
                 dependents: [dependent(10)(true)], // line8 = $2,200
                 line18Cents: 100000n, // $1,000.00 tax after Schedule 2 Part I -- smaller than line12
             })))
-            assertEq(result.line13, 100000n, 'line 13 = clw line3 = clw line1 - clw line2 (documented zero) = $1,000.00')
+            assertEq(result.line13, 100000n, 'line 13 = clw line3 = clw line1 - clw line2 (zero here) = $1,000.00')
             assertEq(result.line14, 100000n, 'line 14 = smaller of line12 ($2,200) or line13 ($1,000) = $1,000.00')
+        },
+        // **§26's ordering, watched.** Phase 25 made worksheet line 2 real:
+        // Schedule 3's education and saver's credits come out of the tax
+        // BEFORE the child tax credit sees it. The same $1,000.00 of tax,
+        // with $600.00 already consumed by Schedule 3, leaves $400.00.
+        //
+        // Hand-derived: clw line 1 = $1,000.00, line 2 = $600.00, line 3 =
+        // $400.00. Line 12 = $2,200.00 (one qualifying child, no phase-out),
+        // so line 14 = min($2,200.00, $400.00) = $400.00 -> 1040 line 19.
+        scheduleThreeCreditsReduceTheChildTaxCredit: () => {
+            const result = expectOk(form8812(taxParams2025)(baseInput({
+                status: 'single',
+                agiCents: 5000000n,
+                dependents: [dependent(10)(true)],
+                line18Cents: 100000n,
+                scheduleThreeCreditsCents: 60000n,
+            })))
+            assertEq(result.line13, 40000n, '$1,000.00 of tax less $600.00 of Schedule 3 credits')
+            assertEq(result.line14, 40000n, '-> 1040 line 19')
+            // …and the credit the child tax credit could not use is not lost:
+            // line 16a carries it into Part II-A, where the ADDITIONAL child
+            // tax credit may refund it. Ordering moves money between two
+            // 1040 lines rather than destroying it, which is the property a
+            // reader of the worksheet most needs to see.
+            assertEq(result.line16a, 180000n, '$2,200.00 - $400.00 = $1,800.00 into Part II-A')
+        },
+        // Schedule 3 credits exceeding the whole liability leave NOTHING for
+        // the child tax credit, and worksheet line 3 floors at zero rather
+        // than going negative — a floor this engine had no way to reach until
+        // line 2 stopped being a constant.
+        scheduleThreeCreditsExceedingTheLiabilityFloorAtZero: () => {
+            const result = expectOk(form8812(taxParams2025)(baseInput({
+                status: 'single',
+                agiCents: 5000000n,
+                dependents: [dependent(10)(true)],
+                line18Cents: 100000n,
+                scheduleThreeCreditsCents: 250000n,
+            })))
+            assertEq(result.line13, 0n, 'never negative')
+            assertEq(result.line14, 0n, '1040 line 19 gets nothing')
         },
     },
 

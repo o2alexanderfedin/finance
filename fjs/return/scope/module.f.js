@@ -280,6 +280,42 @@
  * fires first, and this paragraph is the record that the redundancy is known
  * rather than accidental.
  *
+ * ## Schedule 3's credits boundary, as of Phase 25 (TAX-25/TAX-26/TAX-27)
+ *
+ * The same two-commit shape as Phases 23 and 24, one schedule further on, and
+ * with one difference worth stating: Schedule 3 is the only schedule whose two
+ * PARTS each carried a coarse kind, so this split removes TWO rows rather
+ * than one.
+ *
+ * 1. `scheduleThreeNonrefundableCredits` becomes SEVEN per-printed-line kinds
+ *    (Part I lines 1, 2, 3, 4, 5a, 5b and the collapsed 6a-6z) and
+ *    `scheduleThreeRefundableCredits` becomes FIVE (Part II lines 9, 10, 11,
+ *    12 and the collapsed 13a-13z). All twelve are still refused; nothing is
+ *    reclassified, and the refusals only become nameable.
+ * 2. `fjs/schedule/3` wires lines 3 and 4 to real `fjs/form8863` and
+ *    `fjs/form8880` figures, `fjs/form1040/core` carries Form 8863 Part I's
+ *    refundable American Opportunity Credit to 1040 line 29 — and
+ *    `educationCredits`, `retirementSavingsContributionsCredit` and
+ *    `americanOpportunityCredit` move from {@link unmodeledKindRefusals} to
+ *    {@link modeledKinds} in the SAME commit as that wiring.
+ *
+ * **The reclassified set is three kinds, not two, and the third is on a
+ * different schedule.** Form 8863 is one form whose output splits across two
+ * printed destinations: its nonrefundable part reaches Schedule 3 line 3, and
+ * 40% of its American Opportunity half reaches 1040 line 29 directly, never
+ * through Schedule 3 at all. So `americanOpportunityCredit` — a 1040 line 29
+ * kind that predates this whole block — is reclassified beside the two
+ * Schedule 3 kinds, because one function execution makes all three
+ * computable at once.
+ *
+ * **TAX-27's `earnedIncomeCredit` is deliberately NOT reclassified**, and
+ * that is the phase's own finding rather than an omission. Its remedy string
+ * is rewritten in this phase to name the specific facts
+ * `vnd.fjs.return_profile` does not carry — see that row in
+ * {@link unmodeledKindRefusals}, which is the whole of what TAX-27 ships.
+ *
+ * The other nine Schedule 3 kinds stay refused, by name.
+ *
  * @module
  */
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
@@ -336,11 +372,14 @@ export const modeledKinds = /** @type {const} */ ([
     'additionalMedicareTax',       // Form 8959 -> Schedule 2 line 11 -> 1040 lines 23/25c
     'netInvestmentIncomeTax',      // Form 8960 -> Schedule 2 line 12 -> 1040 line 23
     'childTaxCreditOrOtherDependents', // Schedule 8812 Part I       -> 1040 line 19
+    'educationCredits',            // Form 8863 line 19 -> Schedule 3 line 3 -> 1040 line 20
+    'retirementSavingsContributionsCredit', // Form 8880 -> Schedule 3 line 4 -> 1040 line 20
     'federalTaxWithheldOnW2',      // W-2 box 2                     -> 1040 line 25a
     'federalTaxWithheldOn1099Int', // 1099-INT box 4                -> 1040 line 25b
     'federalTaxWithheldOnOther1099', // 1099-R/1099-DIV/1099-B box 4 -> 1040 line 25b
     'estimatedTaxPayments',        // declared on the return profile -> 1040 line 26
     'additionalChildTaxCredit',    // Schedule 8812 Part II-A       -> 1040 line 28
+    'americanOpportunityCredit',   // Form 8863 line 8              -> 1040 line 29
 ])
 
 /** One member of {@link modeledKinds}.
@@ -418,9 +457,15 @@ const modeledKindNames = modeledKinds
 //
 // **Phase 24 (TAX-23/TAX-24) closed the second.** `scheduleOneAdjustments`
 // no longer exists either; it is now thirteen rows, one per printed Schedule
-// 1 Part II line. `scheduleOneAdditionalIncome` and the two Schedule 3
-// entries are what remain of the five, and they still read the way this note
-// describes -- the same argument waiting for the same treatment.
+// 1 Part II line.
+//
+// **Phase 25 (TAX-25/TAX-26) closed the fourth and the fifth together.**
+// `scheduleThreeNonrefundableCredits` and `scheduleThreeRefundableCredits`
+// are now seven and five rows respectively, one per printed Schedule 3 line.
+// `scheduleOneAdditionalIncome` is the ONLY one of the original five left,
+// and it still reads the way this note describes -- the same argument still
+// waiting for the same treatment, now on the one schedule this project has
+// not yet taken apart.
 export const unmodeledKindRefusals = /** @type {const} */ ([
     { kind: 'householdEmployeeWages', line: '1040 line 1b', label: 'household employee wages', remedy: 'no dialect models it (no phase yet)' },
     { kind: 'unreportedTips', line: '1040 line 1c', label: 'unreported tips', remedy: 'requires Form 4137 (no phase yet)' },
@@ -494,12 +539,66 @@ export const unmodeledKindRefusals = /** @type {const} */ ([
     { kind: 'otherAdditionalTaxes', line: 'Schedule 2 line 17a-17z -> 1040 line 23', label: 'other additional taxes', remedy: 'the printed form itself collapses more than twenty lettered sub-lines here and this engine models none of them (no phase yet)' },
     { kind: 'premiumTaxCreditReconciliation', line: 'Schedule 2 line 19 -> 1040 line 23', label: 'reconciliation of the premium tax credit and excess advance payment recapture', remedy: 'requires Form 8962 (no phase yet)' },
     { kind: 'section965NetTaxLiabilityInstallment', line: 'Schedule 2 line 20', label: 'section 965 net tax liability installment', remedy: 'requires Form 965-A (no phase yet)' },
-    { kind: 'scheduleThreeNonrefundableCredits', line: '1040 line 20', label: 'nonrefundable credits from Schedule 3', remedy: 'this coarse kind covers many distinct Schedule 3 nonrefundable credits with no per-credit dialect to attribute a real amount to any one of them (no phase yet)' },
+    // ── Schedule 3 Part I's seven per-line kinds (TAX-25/26, Phase 25) ──────
+    //
+    // `scheduleThreeNonrefundableCredits` -- one coarse row covering this
+    // whole block -- stood here until Phase 25 split it, and its remedy was
+    // the last surviving copy of the sentence Phase 23 and Phase 24 each
+    // deleted one schedule earlier: "this coarse kind covers many distinct
+    // Schedule 3 nonrefundable credits with no per-credit dialect to
+    // attribute a real amount to any one of them". A taxpayer can do nothing
+    // with that. Each row below names the printed line that cannot be
+    // computed AND the form that would compute it, and `line` names the
+    // SCHEDULE 3 line first and the 1040 line it reaches second, exactly as
+    // the Schedule 1 and Schedule 2 blocks above do.
+    //
+    // **Two of the seven are NOT here**, because they are MODELED:
+    // `educationCredits` (line 3) and `retirementSavingsContributionsCredit`
+    // (line 4) moved to {@link modeledKinds} in the SAME commit as the
+    // `fjs/schedule/3`/`fjs/form1040/core` wiring that makes them computable
+    // -- wire before reclassify, exactly as Phases 23 and 24 did. The split
+    // commit before it added all twelve as refusals and reclassified nothing.
+    //
+    // `americanOpportunityCredit` (1040 line 29) moved with them, out of the
+    // Part II block far below, because Form 8863's ONE execution produces
+    // both it and line 3 -- see this module's own docstring.
+    //
+    // `dependentCareCredit` and `dependentCareBenefits` (1040 line 1e) are
+    // BOTH kinds, and that is deliberate, unlike the Schedule 2 block above
+    // where `unreportedTips` deliberately got no second kind for its own tax.
+    // The two halves of Form 2441 are separable facts a taxpayer can have one
+    // of without the other: Part III's employer-provided benefits are
+    // INCLUDIBLE INCOME, and Part II's credit is a credit. Declaring one
+    // would not be declaring the other.
+    { kind: 'foreignTaxCredit', line: 'Schedule 3 line 1 -> 1040 line 20', label: 'the foreign tax credit', remedy: 'requires Form 1116 (no phase yet)' },
+    { kind: 'dependentCareCredit', line: 'Schedule 3 line 2 -> 1040 line 20', label: 'the credit for child and dependent care expenses', remedy: 'requires Form 2441 Part II (no phase yet)' },
+    { kind: 'residentialCleanEnergyCredit', line: 'Schedule 3 line 5a -> 1040 line 20', label: 'the residential clean energy credit', remedy: 'requires Form 5695 Part I (no phase yet)' },
+    { kind: 'energyEfficientHomeImprovementCredit', line: 'Schedule 3 line 5b -> 1040 line 20', label: 'the energy efficient home improvement credit', remedy: 'requires Form 5695 Part II (no phase yet)' },
+    { kind: 'otherNonrefundableCredits', line: 'Schedule 3 line 6a-6z -> 1040 line 20', label: 'other nonrefundable credits', remedy: 'the printed form itself collapses thirteen lettered sub-lines here — among them the general business credit, the prior-year minimum tax credit, the NONrefundable half of the adoption credit and the credit for the elderly or disabled on Schedule R — and this engine models none of them (no phase yet)' },
     { kind: 'federalTaxWithheldOnOtherForms', line: '1040 line 25c', label: 'federal income tax withheld on other forms', remedy: 'no dialect models it (no phase yet)' },
-    { kind: 'earnedIncomeCredit', line: '1040 line 27a', label: 'earned income credit', remedy: 'requires Schedule EIC (no phase yet)' },
-    { kind: 'americanOpportunityCredit', line: '1040 line 29', label: 'American opportunity credit', remedy: 'requires Form 8863 (no phase yet)' },
+    { kind: 'earnedIncomeCredit', line: '1040 line 27a', label: 'earned income credit', remedy: '§32(c)(3)’s qualifying-child test needs four facts `vnd.fjs.return_profile`’s dependents array does not carry — a checked relationship vocabulary, full-time-student status, permanent and total disability, and residency in the United States for more than half the year — and §32(c)(1) needs three about the filer that it does not carry either: an age between 25 and 65 for the childless credit, a valid social security number, and not being another taxpayer’s qualifying child. This engine holds none of the seven, and a wrong earned income credit is the most audited figure on the return; see fjs/todo/tax-27-earned-income-credit.md (no phase yet)' },
     { kind: 'refundableAdoptionCredit', line: '1040 line 30', label: 'refundable adoption credit', remedy: 'requires Form 8839 (no phase yet)' },
-    { kind: 'scheduleThreeRefundableCredits', line: '1040 line 31', label: 'refundable credits from Schedule 3', remedy: 'this coarse kind covers many distinct Schedule 3 refundable credits with no per-credit dialect to attribute a real amount to any one of them (no phase yet)' },
+    // ── Schedule 3 Part II's five per-line kinds (Phase 25) ─────────────────
+    //
+    // `scheduleThreeRefundableCredits` -- one coarse row covering this whole
+    // block -- stood here until Phase 25 split it, for the identical reason
+    // as Part I's above. NONE of the five is reclassified by this phase or
+    // any commit in it: TAX-25 and TAX-26 reach Part I's lines 3 and 4 only.
+    //
+    // `excessSocialSecurityWithheld` is the row worth reading. Every other
+    // refusal in this whole table is unmodeled because no document this
+    // engine holds carries the figure. That one is different: `vnd.fjs.w2`
+    // box 4 already carries it, on every W-2 this engine stores, and the
+    // computation is a comparison against one indexed maximum. It is refused
+    // because it is not modeled, not because it is unmodelable -- a
+    // distinction the remedy says out loud, so a reader is not told to go and
+    // find a form that does not exist. `fjs/schedule/3`'s own docstring has
+    // recorded this boundary since Phase 13.
+    { kind: 'netPremiumTaxCredit', line: 'Schedule 3 line 9 -> 1040 line 31', label: 'the net premium tax credit', remedy: 'requires Form 8962 (no phase yet)' },
+    { kind: 'amountPaidWithExtensionRequest', line: 'Schedule 3 line 10 -> 1040 line 31', label: 'the amount paid with a request for an extension to file', remedy: 'no dialect models it — there is no information return for a payment made with Form 4868 (no phase yet)' },
+    { kind: 'excessSocialSecurityWithheld', line: 'Schedule 3 line 11 -> 1040 line 31', label: 'excess Social Security and tier-1 RRTA tax withheld', remedy: 'no form is missing: this is computable from the Form W-2 box 4 figures this engine already stores, by comparing their sum against the annual Social Security wage-base maximum, and it is unmodeled only because no phase has yet stored that maximum or written the comparison (no phase yet)' },
+    { kind: 'federalFuelTaxCredit', line: 'Schedule 3 line 12 -> 1040 line 31', label: 'the credit for federal tax paid on fuels', remedy: 'requires Form 4136 (no phase yet)' },
+    { kind: 'otherPaymentsAndRefundableCredits', line: 'Schedule 3 line 13a-13z -> 1040 line 31', label: 'other payments or refundable credits', remedy: 'the printed form itself collapses five lettered sub-lines here and this engine models none of them (no phase yet)' },
     // ── The nine line-16 entries below matter more than they look ────────────
     //
     // `[VERIFIED: i1040gi.pdf p34, "Line 16 Tax"]` — line 16 is a SUM, not just
@@ -896,12 +995,63 @@ export const classifyScope = declaredKinds => {
  * TAX-09); `17 -> 18` was Plan 13-07's own one-kind reclassification (Phase
  * 13 Wave 3, TAX-13); `18 -> 20` was Plan 13-10's own two-kind
  * reclassification (Phase 13 Wave 4, TAX-12); `20 -> 21` was Phase 20's own
- * `unemploymentCompensation`; and `21 -> 23` is Phase 23's own two-kind
+ * `unemploymentCompensation`; `21 -> 23` was Phase 23's own two-kind
  * reclassification (TAX-20/TAX-21), landed in the same commit as the
- * Schedule 2 line 11/12 wiring that makes both computable.
+ * Schedule 2 line 11/12 wiring that makes both computable; `23 -> 26` was
+ * Phase 24's own three-kind Schedule 1 Part II reclassification; and
+ * `26 -> 29` is Phase 25's own (`educationCredits`,
+ * `retirementSavingsContributionsCredit`, `americanOpportunityCredit`),
+ * landed beside the Schedule 3 wiring that makes all three computable.
  * @type {number}
  */
-const expectedModeledKindCount = 26
+const expectedModeledKindCount = 29
+
+/**
+ * The modeled set, hand-typed a SECOND time and in {@link kindVocabulary}'s
+ * own order — the independent statement of what this engine claims it can
+ * compute, which `scope.allTwentyNineModeledKindsDeclaredTogetherAreInScope`
+ * declares and `scope.theHandTypedListNamesEveryModeledKind` compares against
+ * {@link expectedModeledKindCount}.
+ *
+ * It lives at module scope rather than inside the leaf that uses it so the
+ * comparison leaf can reach it too. Deliberately NOT `modeledKinds` widened:
+ * a list derived from the thing it mirrors is not an independent statement,
+ * it is an alias, and this list has now fallen silently short TWICE (Phase 20
+ * by one, Phase 24 by three) precisely because nothing compared it to
+ * anything.
+ * @type {readonly Kind[]}
+ */
+const everyModeledKindHandTyped = [
+    'wages',
+    'taxExemptInterest',
+    'taxableInterest',
+    'qualifiedDividends',
+    'ordinaryDividends',
+    'iraDistributions',
+    'pensionsAndAnnuities',
+    'socialSecurityBenefits',
+    'unemploymentCompensation',
+    'capitalGainDistributions',
+    'capitalGainsOrLosses',
+    'unrecaptured1250Gain',
+    'collectibles28RateGain',
+    'educatorExpenses',
+    'healthSavingsAccountDeduction',
+    'studentLoanInterestDeduction',
+    'itemizedDeductions',
+    'seniorAndOtherScheduleOneADeductions',
+    'additionalMedicareTax',
+    'netInvestmentIncomeTax',
+    'childTaxCreditOrOtherDependents',
+    'educationCredits',
+    'retirementSavingsContributionsCredit',
+    'federalTaxWithheldOnW2',
+    'federalTaxWithheldOn1099Int',
+    'federalTaxWithheldOnOther1099',
+    'estimatedTaxPayments',
+    'additionalChildTaxCredit',
+    'americanOpportunityCredit',
+]
 
 /**
  * Independently hand-typed: the number of entries
@@ -933,9 +1083,20 @@ const expectedModeledKindCount = 26
  * (`educatorExpenses`, `healthSavingsAccountDeduction`,
  * `studentLoanInterestDeduction`), beside the Schedule 1 wiring that makes
  * all three computable.
+ *
+ * `50 -> 60` is Phase 25's own Schedule 3 split (TAX-25/TAX-26): `50 - 2 +
+ * 12`, TWO coarse rows replaced by twelve per-printed-line rows, with NO kind
+ * reclassified in the same step. Two rather than one because Schedule 3 is
+ * the only schedule whose Parts I and II each had a coarse kind of their own.
+ * `60 -> 57` is that phase's own THREE-kind reclassification one commit later
+ * (`educationCredits`, `retirementSavingsContributionsCredit` and
+ * `americanOpportunityCredit`), beside the Schedule 3 wiring that makes all
+ * three computable. Three rather than two because the third is not on
+ * Schedule 3 at all: Form 8863's single execution produces the refundable
+ * amount 1040 line 29 carries as well as the nonrefundable one line 3 does.
  * @type {number}
  */
-const expectedUnmodeledKindCount = 50
+const expectedUnmodeledKindCount = 57
 
 /**
  * The complete refusal message for a return declaring exactly
@@ -1001,11 +1162,11 @@ export const proof = {
         // Plan 13-10's own two-kind move) targets: removing one entry from
         // `modeledKinds` without touching `expectedModeledKindCount` must
         // redden this leaf.
-        modeledKindsIsExactlyTwentyThree: () => {
+        modeledKindsIsExactlyTwentyNine: () => {
             assertEq(modeledKinds.length, expectedModeledKindCount)
             assertEq(new Set(modeledKinds).size, expectedModeledKindCount)
         },
-        unmodeledRefusalsIsExactlyFortyOne: () => {
+        unmodeledRefusalsIsExactlyFiftySeven: () => {
             assertEq(unmodeledKindRefusals.length, expectedUnmodeledKindCount)
             assertEq(
                 new Set(unmodeledKindRefusals.map(r => r.kind)).size,
@@ -1062,6 +1223,12 @@ export const proof = {
                     // line 10`), for the same reason -- a coarse "1040 line
                     // 10" is what made the kind they replaced unactionable.
                     || r.line.startsWith('Schedule 1 line')
+                    // Phase 25's own addition, the same shape one schedule
+                    // further on: the twelve Schedule 3 rows name their
+                    // SCHEDULE 3 line first (`Schedule 3 line 4 -> 1040 line
+                    // 20`), for the same reason -- a coarse "1040 line 20"
+                    // is what made the two kinds they replaced unactionable.
+                    || r.line.startsWith('Schedule 3 line')
                     || r.line.startsWith('Form '),
                     ['refusal entry does not name a form location', r.kind, r.line],
                 )
@@ -1087,7 +1254,7 @@ export const proof = {
         // hand-typed here off the printed form, in the form's own order, and
         // compared against the table — so a kind that lost its row, gained
         // the wrong line, or drifted out of Schedule 2 order names itself.
-        // This is the counterweight `unmodeledRefusalsIsExactlyFortyOne`'s
+        // This is the counterweight `unmodeledRefusalsIsExactlyFiftySeven`'s
         // bare count cannot be: thirteen rows could be added with one wrong
         // line number and the count would still be 43.
         //
@@ -1228,6 +1395,82 @@ export const proof = {
                 )
             }
         },
+        // TAX-25/TAX-26, Phase 25: the twelve Schedule 3 kinds, in SCHEDULE
+        // 3's own printed order, each naming its own printed line. The
+        // identical shape as the two leaves above, one schedule further on.
+        //
+        // Two things this one has to say that neither of those did. First,
+        // the twelve span BOTH PARTS of one schedule and therefore reach TWO
+        // different 1040 lines — Part I's seven reach line 20 and Part II's
+        // five reach line 31 — so the destination is checked per row against
+        // a hand-typed expectation rather than against one shared string.
+        // Second, lines 7, 8, 14 and 15 are deliberately absent: all four are
+        // TOTALS (7 of the 6a-6z block, 8 of Part I, 14 of the 13a-13z block,
+        // 15 of Part II), and a kind for a total would let a taxpayer declare
+        // a sum without declaring anything it is a sum of.
+        theTwelveScheduleThreeKindsNameTheirOwnPrintedLine: () => {
+            /** @type {readonly (readonly [string, string, string])[]} */
+            const expected = [
+                ['foreignTaxCredit', 'Schedule 3 line 1', '1040 line 20'],
+                ['dependentCareCredit', 'Schedule 3 line 2', '1040 line 20'],
+                ['educationCredits', 'Schedule 3 line 3', '1040 line 20'],
+                ['retirementSavingsContributionsCredit', 'Schedule 3 line 4', '1040 line 20'],
+                ['residentialCleanEnergyCredit', 'Schedule 3 line 5a', '1040 line 20'],
+                ['energyEfficientHomeImprovementCredit', 'Schedule 3 line 5b', '1040 line 20'],
+                ['otherNonrefundableCredits', 'Schedule 3 line 6a-6z', '1040 line 20'],
+                ['netPremiumTaxCredit', 'Schedule 3 line 9', '1040 line 31'],
+                ['amountPaidWithExtensionRequest', 'Schedule 3 line 10', '1040 line 31'],
+                ['excessSocialSecurityWithheld', 'Schedule 3 line 11', '1040 line 31'],
+                ['federalFuelTaxCredit', 'Schedule 3 line 12', '1040 line 31'],
+                ['otherPaymentsAndRefundableCredits', 'Schedule 3 line 13a-13z', '1040 line 31'],
+            ]
+            assertEq(expected.length, 12, 'the split produced twelve kinds, hand-counted off the printed form')
+            assertEq(
+                expected.filter(([, , destination]) => destination === '1040 line 20').length,
+                7,
+                'Part I has seven, hand-counted: lines 1, 2, 3, 4, 5a, 5b and the collapsed 6a-6z',
+            )
+            assertEq(
+                expected.filter(([, , destination]) => destination === '1040 line 31').length,
+                5,
+                'Part II has five, hand-counted: lines 9, 10, 11, 12 and the collapsed 13a-13z',
+            )
+            expected
+                .map(([kind]) => kindVocabulary.findIndex(candidate => candidate === kind))
+                .reduce((previous, position) => {
+                    assert(
+                        position > previous,
+                        ['a Schedule 3 kind is missing from the vocabulary, or is out of Schedule 3 order', position, previous],
+                    )
+                    return position
+                }, -1)
+            for (const [kind, line, destination] of expected) {
+                const row = unmodeledKindRefusals.find(r => r.kind === kind)
+                if (row === undefined) {
+                    assert(
+                        modeledKindNames.includes(kind),
+                        ['a Schedule 3 kind is neither refused nor modeled', kind],
+                    )
+                    continue
+                }
+                // The trailing space is what stops `Schedule 3 line 1` from
+                // matching `Schedule 3 line 12`, and `line 5` from matching
+                // `line 5a`.
+                assert(
+                    row.line === line || row.line.startsWith(`${line} `),
+                    ['a Schedule 3 refusal row names the wrong printed line', kind, line, row.line],
+                )
+                // Part I reaches 1040 line 20 and Part II reaches line 31.
+                // A row that named the OTHER part's destination would be the
+                // most consequential single-token error possible here — a
+                // nonrefundable credit described as a refundable one — and
+                // this is the assertion that catches it.
+                assert(
+                    row.line.includes(destination),
+                    ['a Schedule 3 row names the wrong 1040 destination', kind, destination, row.line],
+                )
+            }
+        },
     },
     scope: {
         // Declaring nothing is IN SCOPE. This is the leaf that keeps the guard
@@ -1250,33 +1493,67 @@ export const proof = {
         // is never compared to the thing it mirrors is not independent, it is
         // just a second place to be wrong. `modeledKindCountIsExact` below is
         // what makes the omission visible.
-        allTwentyThreeModeledKindsDeclaredTogetherAreInScope: () => {
+        //
+        // **It fell short a SECOND time, by three, between 2026-08-16 and this
+        // phase.** Phase 24 reclassified `educatorExpenses`,
+        // `healthSavingsAccountDeduction` and `studentLoanInterestDeduction`
+        // and did not add them here, so this leaf spent a phase asserting a
+        // twenty-three-kind set against a twenty-six-kind engine — green
+        // throughout, for the identical reason recorded above. The paragraph
+        // above named the mechanism and did not stop it, because nothing
+        // COMPARED the list to anything.
+        //
+        // `theHandTypedListNamesEveryModeledKind` below is that comparison,
+        // and it is the difference between a warning and a guard. It checks
+        // this list's LENGTH against `expectedModeledKindCount` — the OTHER
+        // hand-typed constant, not `modeledKinds.length` — so the two
+        // independent statements of the modeled set have to agree with each
+        // other, and a kind added to one of them alone reddens.
+        allTwentyNineModeledKindsDeclaredTogetherAreInScope: () => {
+            const outcome = classifyScope(everyModeledKindHandTyped)
+            assertEq(outcome.kind, 'ok', ['the twenty-nine modeled kinds must be in scope', outcome])
+        },
+        theHandTypedListNamesEveryModeledKind: () => {
+            assertEq(
+                everyModeledKindHandTyped.length,
+                expectedModeledKindCount,
+                [
+                    'the hand-typed in-scope list has fallen short of the hand-typed modeled count',
+                    everyModeledKindHandTyped.length,
+                    expectedModeledKindCount,
+                ],
+            )
+            assertEq(
+                new Set(everyModeledKindHandTyped).size,
+                expectedModeledKindCount,
+                'and it names each kind once',
+            )
+        },
+        // TAX-25/TAX-26, Phase 25: the three kinds this phase reclassified,
+        // declared TOGETHER and WITHOUT any of the other twenty-six — the
+        // atomic transition's own acceptance criterion, isolated from the
+        // declared-together leaf above so a failure names this phase rather
+        // than the whole engine. Every earlier reclassification added the
+        // same pair of leaves; this one follows.
+        theThreeKindsThisPhaseWiredAreInScopeTogether: () => {
             const outcome = classifyScope([
-                'wages',
-                'taxExemptInterest',
-                'taxableInterest',
-                'qualifiedDividends',
-                'ordinaryDividends',
-                'iraDistributions',
-                'pensionsAndAnnuities',
-                'socialSecurityBenefits',
-                'unemploymentCompensation',
-                'capitalGainDistributions',
-                'capitalGainsOrLosses',
-                'unrecaptured1250Gain',
-                'collectibles28RateGain',
-                'itemizedDeductions',
-                'seniorAndOtherScheduleOneADeductions',
-                'additionalMedicareTax',
-                'netInvestmentIncomeTax',
-                'childTaxCreditOrOtherDependents',
-                'federalTaxWithheldOnW2',
-                'federalTaxWithheldOn1099Int',
-                'federalTaxWithheldOnOther1099',
-                'estimatedTaxPayments',
-                'additionalChildTaxCredit',
+                'educationCredits',
+                'retirementSavingsContributionsCredit',
+                'americanOpportunityCredit',
             ])
-            assertEq(outcome.kind, 'ok', ['the twenty-three modeled kinds must be in scope', outcome])
+            assertEq(outcome.kind, 'ok', ['this phase\'s three kinds must be in scope', outcome])
+        },
+        eachOfThisPhasesThreeKindsIsInScopeAlone: () => {
+            /** @type {readonly Kind[]} */
+            const wired = [
+                'educationCredits',
+                'retirementSavingsContributionsCredit',
+                'americanOpportunityCredit',
+            ]
+            assertEq(wired.length, 3, 'hand-counted: two Schedule 3 lines and one 1040 line')
+            for (const kind of wired) {
+                assertEq(classifyScope([kind]).kind, 'ok', ['must be in scope alone', kind])
+            }
         },
         // NOTE: no count leaf is added here. A `modeledKinds.length === 21`
         // assertion was written at this spot on 2026-08-15 and then DELETED
@@ -1477,6 +1754,135 @@ export const proof = {
                 ['it must name its own Schedule 1 line', selfEmploymentHalf.message],
             )
         },
+        // **TAX-27, Phase 25: the requirement whose whole delivery is this
+        // refusal.** The Earned Income Credit is NOT computed by this phase
+        // and `earnedIncomeCredit` stays refused, which is a decision rather
+        // than an omission — see `fjs/todo/tax-27-earned-income-credit.md`
+        // for the fact-by-fact analysis.
+        //
+        // What Phase 25 changed is the REMEDY. It used to read "requires
+        // Schedule EIC (no phase yet)", which tells a taxpayer to go and find
+        // a form and tells the next engineer nothing at all. It now names the
+        // specific facts `vnd.fjs.return_profile` does not carry, and this
+        // leaf asserts the part of the message that carries the information
+        // rather than the part that is easy to assert — AGENTS.md's own
+        // recorded lesson from the Phase 20 mutant that erased a destination
+        // and survived five refusal proofs.
+        theEarnedIncomeCreditRefusalNamesTheFactsThatAreMissing: () => {
+            const outcome = classifyScope(['earnedIncomeCredit'])
+            assert(outcome.kind === 'error', ['the earned income credit must still refuse', outcome])
+            if (outcome.kind !== 'error') {
+                throw ['unreachable', outcome]
+            }
+            assert(
+                outcome.message.includes('1040 line 27a'),
+                ['must name the line that cannot be computed', outcome.message],
+            )
+            // The four qualifying-child facts, each named. A remedy that
+            // dropped one would leave a reader believing a widening was
+            // smaller than it is.
+            for (const fact of [
+                'relationship vocabulary',
+                'full-time-student status',
+                'permanent and total disability',
+                'more than half the year',
+            ]) {
+                assert(
+                    outcome.message.includes(fact),
+                    ['the refusal must name this missing qualifying-child fact', fact, outcome.message],
+                )
+            }
+            // …and the three about the filer.
+            for (const fact of [
+                'between 25 and 65',
+                'social security number',
+                'another taxpayer’s qualifying child',
+            ]) {
+                assert(
+                    outcome.message.includes(fact),
+                    ['the refusal must name this missing filer fact', fact, outcome.message],
+                )
+            }
+            // The provisions, so a reader can go to the statute rather than
+            // to a form that would not help them.
+            assert(
+                outcome.message.includes('§32(c)(3)') && outcome.message.includes('§32(c)(1)'),
+                ['the refusal must name both provisions', outcome.message],
+            )
+            // And the file that carries the whole analysis, which is the one
+            // part of this message the NEXT ENGINEER can act on.
+            assert(
+                outcome.message.includes('fjs/todo/tax-27-earned-income-credit.md'),
+                ['the refusal must point at the recorded analysis', outcome.message],
+            )
+        },
+        // TAX-25/TAX-26, Phase 25: the SAME property one schedule further on.
+        // The nine Schedule 3 kinds this phase did NOT wire must still refuse
+        // on their own, or the split quietly widened the engine's claims
+        // rather than named them.
+        //
+        // Hand-typed, in Schedule 3 order, and deliberately NOT derived by
+        // subtracting the two wired kinds from the twelve — a list computed
+        // from the tables under test could never notice a tenth kind silently
+        // becoming modeled.
+        theNineScheduleThreeKindsThisPhaseDidNotWireStillRefuse: () => {
+            /** @type {readonly Kind[]} */
+            const stillRefused = [
+                'foreignTaxCredit',
+                'dependentCareCredit',
+                'residentialCleanEnergyCredit',
+                'energyEfficientHomeImprovementCredit',
+                'otherNonrefundableCredits',
+                'netPremiumTaxCredit',
+                'amountPaidWithExtensionRequest',
+                'excessSocialSecurityWithheld',
+                'federalFuelTaxCredit',
+                'otherPaymentsAndRefundableCredits',
+            ]
+            assertEq(stillRefused.length, 10, 'twelve Schedule 3 kinds minus the two this phase wired')
+            for (const kind of stillRefused) {
+                const outcome = classifyScope([kind])
+                assert(
+                    outcome.kind === 'error',
+                    ['this Schedule 3 kind must still refuse after the split', kind, outcome],
+                )
+            }
+            // The two the phase's own record names, each with the reason it
+            // still cannot be computed.
+            const foreign = classifyScope(['foreignTaxCredit'])
+            assert(foreign.kind === 'error', ['the foreign tax credit must still refuse', foreign])
+            assert(
+                foreign.message.includes('Form 1116'),
+                ['the foreign tax credit refusal must name Form 1116', foreign.message],
+            )
+            assert(
+                foreign.message.includes('Schedule 3 line 1'),
+                ['it must name its own Schedule 3 line', foreign.message],
+            )
+            const premium = classifyScope(['netPremiumTaxCredit'])
+            assert(premium.kind === 'error', ['the net premium tax credit must still refuse', premium])
+            assert(
+                premium.message.includes('Form 8962'),
+                ['the net premium tax credit refusal must name Form 8962', premium.message],
+            )
+            assert(
+                premium.message.includes('1040 line 31'),
+                ['it must name the REFUNDABLE 1040 line it reaches', premium.message],
+            )
+            // And the one whose remedy says NO FORM IS MISSING — the only row
+            // in this whole table that can. A remedy rewritten to "requires
+            // Form NNNN" would be a lie a reader would act on.
+            const excess = classifyScope(['excessSocialSecurityWithheld'])
+            assert(excess.kind === 'error', ['excess Social Security must still refuse', excess])
+            assert(
+                excess.message.includes('no form is missing'),
+                ['this refusal must say that no form is missing', excess.message],
+            )
+            assert(
+                excess.message.includes('box 4'),
+                ['and must name the box it could already read', excess.message],
+            )
+        },
         // The gate. Its control is the leaf immediately below, which is this
         // same declaration with `unreportedTips` removed -- without it, a
         // guard that refused EVERY profile would pass this leaf.
@@ -1633,7 +2039,7 @@ export const proof = {
         // in the same instant (the project's fourth signature defect, found
         // this phase in a proof looping `Object.keys(dialectSchemas)`). Two
         // things stand behind it, both independent of this table:
-        // `unmodeledRefusalsIsExactlyFortyOne`'s hand-typed count, and
+        // `unmodeledRefusalsIsExactlyFiftySeven`'s hand-typed count, and
         // `_EveryKindIsEitherModeledOrRefused`, which makes a deletion a `tsc`
         // failure. What the loop adds is reachability, which neither of those
         // can see; the CONTENT of two entries is pinned by the hand-typed
@@ -1818,7 +2224,7 @@ export const proof = {
         // naming its own line, label and remedy — so a kind a future tripwire
         // points at cannot turn out to be undescribable. The loop iterates the
         // code under test and therefore cannot see the table shrinking; what
-        // stands behind it is `unmodeledRefusalsIsExactlyFortyOne`'s hand-typed
+        // stands behind it is `unmodeledRefusalsIsExactlyFiftySeven`'s hand-typed
         // count and `_EveryKindIsEitherModeledOrRefused`, exactly as recorded
         // for the declared-scope loop above.
         // Phase 23's own new arm: a MODELED kind a tripwire still requires to
