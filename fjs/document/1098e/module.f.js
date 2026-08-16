@@ -94,6 +94,7 @@ import { error, ok } from 'functionalscript/fjs/types/result/module.f.js'
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
 import { base, mediaTypeOf } from '../base/module.f.js'
 import { moneyFieldError } from '../money_field/module.f.js'
+import { formSubject } from '../subject/module.f.js'
 
 /** @import { Result } from 'functionalscript/fjs/types/result/module.f.js' */
 /** @import { Ts, Unknown } from 'functionalscript/fjs/types/rtti/ts/module.f.js' */
@@ -291,6 +292,55 @@ export const proof = {
         assert(
             v.payerTin !== v.recipientTin,
             ['a 1098-E always has two distinct parties', v.payerTin, v.recipientTin],
+        )
+    },
+
+    /**
+     * **The cardinality argument, run through the real `formSubject` rather
+     * than asserted in prose.** This module's header claims that a borrower
+     * whose loans were sold mid-year holds two 1098-Es that are two SUBJECTS,
+     * and that this is why the figure cannot live in a record whose empty
+     * `payerTin` admits exactly one subject per taxpayer per year. That claim
+     * is only true if DOC-01's key actually separates them, so it is checked
+     * here against `fjs/document/subject`'s own function.
+     *
+     * The third case is the control: two forms from ONE servicer for ONE
+     * borrower under ONE account are the SAME subject — which is what makes a
+     * corrected form a revision rather than a second document, and what
+     * distinguishes this leaf from one that would pass for any key at all.
+     */
+    twoServicersForOneBorrowerAreTwoSubjects: () => {
+        /** @type {(r: OneZeroNineEightE) => string} */
+        const subjectOf = r => formSubject({
+            payerTin: r.payerTin,
+            recipientTin: r.recipientTin,
+            accountNumber: r.accountNumber,
+            taxYear: r.taxYear,
+            formType: r.dialect,
+        })
+        const firstServicer = subjectOf(withInterest)
+        const secondServicer = subjectOf({
+            ...withInterest,
+            payerTin: '33-3333333',
+            accountNumber: 'LOAN-0002',
+            box1StudentLoanInterestReceived: '412.08',
+        })
+        assert(
+            firstServicer !== secondServicer,
+            ['two servicers must be two subjects', firstServicer, secondServicer],
+        )
+        // A second borrower at the SAME servicer is also a distinct subject —
+        // the half a key that ignored `recipientTin` would get wrong.
+        const otherBorrower = subjectOf({ ...withInterest, recipientTin: '444-44-4444' })
+        assert(
+            firstServicer !== otherBorrower,
+            ['two borrowers must be two subjects', firstServicer, otherBorrower],
+        )
+        // The control: the same form, corrected, is the SAME subject.
+        assertEq(
+            subjectOf({ ...withInterest, corrected: true, box1StudentLoanInterestReceived: '1900.00' }),
+            firstServicer,
+            'a corrected form is a revision of one subject, never a second subject',
         )
     },
 
