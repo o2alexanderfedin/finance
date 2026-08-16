@@ -700,6 +700,72 @@ export const childTaxCredit = {
 }
 
 /**
+ * Form 8959's Additional Medicare Tax thresholds — IRC §3101(b)(2), TAX-19
+ * (Phase 22's computable tripwires). The 0.9% tax applies to Medicare wages
+ * (Form W-2 box 5) **in excess of** the figure below for the filer's status.
+ *
+ * **These figures are NOT inflation-indexed, and that is the point of storing
+ * them here rather than anywhere else.** §3101(b)(2) writes the three dollar
+ * amounts into the statute itself — `(A)` $250,000 "in the case of a joint
+ * return", `(B)` $125,000 "in the case of a married taxpayer (as defined in
+ * section 7703) filing a separate return", `(C)` $200,000 "in any other case"
+ * — with no Rev. Proc. adjusting them, unchanged since they took effect for
+ * taxable years beginning after December 31, 2012. So this is a `kind: 'code'`
+ * citation for the same reason `medicalExpenseFloor` is: there is no annual
+ * revenue procedure to cite, and inventing one would be the sourcing error
+ * this module's own header exists to prevent. `effectiveDate` still reads
+ * `'2025-01-01'`, per that header — every citation here states the year the
+ * figure is being APPLIED for, not the year it was enacted.
+ *
+ * **`qualifyingSurvivingSpouse` is $200,000, NOT MFJ's $250,000 — the one
+ * trap in this parameter group.** A QSS return is not a *joint return*, so
+ * §3101(b)(2)(A) does not reach it and it falls to `(C)`'s "any other case".
+ * Form 8959's own printed threshold table says so directly ("Qualifying
+ * surviving spouse … $200,000"). Every OTHER per-status parameter in this
+ * module gives QSS the married-filing-jointly figure (see
+ * {@link standardDeduction}'s own note), so copying that habit here would
+ * understate a QSS filer's threshold by $50,000 and silently disarm the
+ * tripwire that reads it. Hand-typed per status, deliberately never spread
+ * from another status's entry, for exactly the reason
+ * {@link standardDeduction} states: a spread makes two statuses impossible to
+ * observe drifting apart.
+ *
+ * Nothing here stores the 0.9% RATE. This phase builds the tripwire that
+ * refuses a return whose W-2s cross the threshold undeclared; it does not
+ * compute Form 8959, so a rate would be a parameter with no reader (YAGNI).
+ * Phase 23 adds it beside these thresholds when it adds the form.
+ *
+ * No `estatesAndTrusts` entry: the Additional Medicare Tax is a tax on an
+ * individual's wages and self-employment income, and this map is keyed by
+ * {@link IndividualFilingStatus} to say so at the type level.
+ * @type {Record<IndividualFilingStatus, AmountWithCitation>}
+ */
+export const additionalMedicareTaxThreshold = {
+    single: {
+        amount: '200000.00',
+        citation: { kind: 'code', section: '§3101(b)(2)(C)', effectiveDate: '2025-01-01' },
+    },
+    marriedFilingJointly: {
+        amount: '250000.00',
+        citation: { kind: 'code', section: '§3101(b)(2)(A)', effectiveDate: '2025-01-01' },
+    },
+    marriedFilingSeparately: {
+        amount: '125000.00',
+        citation: { kind: 'code', section: '§3101(b)(2)(B)', effectiveDate: '2025-01-01' },
+    },
+    headOfHousehold: {
+        amount: '200000.00',
+        citation: { kind: 'code', section: '§3101(b)(2)(C)', effectiveDate: '2025-01-01' },
+    },
+    // See this group's own docstring: "any other case", NOT the joint-return
+    // figure every other per-status parameter in this module gives QSS.
+    qualifyingSurvivingSpouse: {
+        amount: '200000.00',
+        citation: { kind: 'code', section: '§3101(b)(2)(C)', effectiveDate: '2025-01-01' },
+    },
+}
+
+/**
  * A full tax-year parameter set: every TY2025 parameter this phase
  * requires, together.
  *
@@ -734,6 +800,7 @@ export const childTaxCredit = {
  *   readonly saltCap: typeof saltCap,
  *   readonly medicalExpenseFloor: typeof medicalExpenseFloor,
  *   readonly childTaxCredit: typeof childTaxCredit,
+ *   readonly additionalMedicareTaxThreshold: typeof additionalMedicareTaxThreshold,
  * }} TaxParamSet
  */
 
@@ -759,6 +826,7 @@ export const taxParamsByYear = {
         saltCap,
         medicalExpenseFloor,
         childTaxCredit,
+        additionalMedicareTaxThreshold,
     },
 }
 
@@ -845,6 +913,7 @@ const everyDollarStringField = [
     childTaxCredit.phaseoutThreshold.marriedFilingJointly.amount,
     childTaxCredit.phaseoutThreshold.other.amount,
     childTaxCredit.actcEarnedIncomeThreshold.amount,
+    ...individualFilingStatuses.map(status => additionalMedicareTaxThreshold[status].amount),
 ]
 
 export const proof = {
@@ -917,6 +986,51 @@ export const proof = {
             assertEq(capitalGainsBreakpoints[status].citation.section, '§2.03')
             assertEq(capitalGainsBreakpoints[status].citation.effectiveDate, '2025-01-01')
         }
+    },
+    // TAX-19: Form 8959's thresholds, hand-typed here from IRC §3101(b)(2)'s
+    // own three dollar figures and Form 8959's printed threshold table --
+    // never read back from the stored object, so a wrong stored figure cannot
+    // pass by comparing against itself.
+    //
+    // The QSS row is the reason this leaf asserts every status separately
+    // rather than looping with one shared expectation: a QSS return is not a
+    // JOINT return, so §3101(b)(2)(A)'s $250,000 does not reach it and it
+    // falls to (C)'s $200,000 -- the OPPOSITE of what every other per-status
+    // parameter in this module does with QSS. The subsection letter is
+    // asserted alongside the amount so the two cannot drift: a $250,000 QSS
+    // amount would have to arrive with an (A) citation to pass, and it would
+    // still fail on the amount.
+    additionalMedicareTaxThresholdsAreTheUnindexedStatutoryFigures: () => {
+        /** @type {Record<IndividualFilingStatus, readonly [string, string]>} */
+        const expected = {
+            single: ['200000.00', '§3101(b)(2)(C)'],
+            marriedFilingJointly: ['250000.00', '§3101(b)(2)(A)'],
+            marriedFilingSeparately: ['125000.00', '§3101(b)(2)(B)'],
+            headOfHousehold: ['200000.00', '§3101(b)(2)(C)'],
+            qualifyingSurvivingSpouse: ['200000.00', '§3101(b)(2)(C)'],
+        }
+        for (const status of individualFilingStatuses) {
+            const entry = additionalMedicareTaxThreshold[status]
+            const [amount, section] = expected[status]
+            assertEq(entry.amount, amount, ['wrong Additional Medicare Tax threshold', status, entry.amount])
+            // Not a Rev. Proc. figure and not a Public Law one: the statute
+            // itself carries the dollar amounts, and nothing indexes them.
+            assertEq(entry.citation.kind, 'code', ['expected a bare-IRC citation', status, entry.citation])
+            assertEq(entry.citation.section, section, ['wrong governing subsection', status, entry.citation])
+            assertEq(entry.citation.effectiveDate, '2025-01-01')
+        }
+        // The trap, stated as its own assertion rather than left implicit in
+        // the table above: QSS does NOT share the married-filing-jointly
+        // figure here, unlike `standardDeduction` and every other per-status
+        // parameter in this module.
+        assert(
+            additionalMedicareTaxThreshold.qualifyingSurvivingSpouse.amount
+                !== additionalMedicareTaxThreshold.marriedFilingJointly.amount,
+            [
+                'a qualifying surviving spouse is not filing a JOINT return, so §3101(b)(2)(A) does not reach it',
+                additionalMedicareTaxThreshold.qualifyingSurvivingSpouse.amount,
+            ],
+        )
     },
     // T-08-02: every stored dollar amount is a `string`, never a JSON
     // number, and round-trips exactly through

@@ -1,7 +1,9 @@
 /**
  * TAX-16's scope guard: the FROZEN modeled set, the refusal table,
  * {@link classifyScope}, and {@link scopeRefusal} — the one place a scope
- * refusal is built.
+ * refusal is built. Since Phase 22 (TAX-19) it also carries
+ * {@link tripwireRefusal}, the second builder of that same shape; see "The
+ * uncovered failure mode" below.
  *
  * ## Why a declared set and not the store
  *
@@ -24,6 +26,39 @@
  * refusal. The whole distinction between "legitimately zero" and "unmodeled,
  * so no return at all" is carried by the declared kind set, which is why the
  * profile document is load-bearing rather than convenient.
+ *
+ * ## The uncovered failure mode, and the complementary guard (Phase 22, TAX-19)
+ *
+ * **Everything above is still true, and is not weakened by what follows.** The
+ * store-driven guard really is unsound for the reason recorded above, and a
+ * legitimately-zero line really can only be told apart from an unmodeled one by
+ * the declared set.
+ *
+ * But the argument has a gap, found by `.planning/PERSONA-COVERAGE.md`'s
+ * persona survey ("The structural finding: declaration-driven scoping fails for
+ * mandatory taxes"): it assumes every unmodeled item is either ELECTIVE or
+ * something the taxpayer knows they have. Some taxes are neither. They trigger
+ * on a THRESHOLD, from data the engine ALREADY HOLDS:
+ *
+ * > A single filer with $300,000 in W-2 box 5 owes Additional Medicare Tax.
+ * > Full stop. If they do not know Form 8959 exists — and most people do not —
+ * > they will not declare `scheduleTwoTaxes`, the guard stays silent, and the
+ * > engine emits a confident return understating tax by roughly $900.
+ *
+ * The guard's soundness rests on the taxpayer knowing what they owe, which is
+ * the thing they came to a tax engine not to have to know. That is not an
+ * argument against the declared-set design; it is an argument that the design
+ * needs a SECOND guard beside it, asking the other question.
+ *
+ * `fjs/return/tripwire` is that guard: a table of `(predicate over the supplied
+ * documents) -> (kind that MUST have been declared)`, evaluated by
+ * `fjs/form1040/core` beside {@link classifyScope} and, like it, before any
+ * line computes. It refuses through {@link tripwireRefusal}, which shares this
+ * module's refusal SHAPE and its single constructor — one refusal vocabulary,
+ * two questions, two failure modes. The predicate is deliberately NOT the
+ * store-driven guard rejected above: it never asks whether a document is
+ * ABSENT (which is unknowable), only whether a document that IS present proves
+ * an obligation.
  *
  * ## The partition, and why `tsc` owns it
  *
@@ -406,16 +441,37 @@ export const unmodeledKindRefusals = /** @type {const} */ ([
  */
 
 /**
- * **The ONLY place a scope refusal is built.** Plan 10-08's Schedule D Tax
- * Worksheet arm and its three line-16 wrapper arms import this function; they
- * do not construct a `{ kind: 'error' }` of their own. Mutating this one body
- * is therefore the only way to change what any call site refuses with.
+ * **The ONLY place a `ScopeError` VALUE is constructed.** Both public builders
+ * below — {@link scopeRefusal} (the taxpayer declared something unmodeled) and
+ * {@link tripwireRefusal} (the DOCUMENTS prove something the taxpayer did not
+ * declare) — route through this one body, so mutating it is the only way to
+ * change what any call site in the engine refuses with.
  *
  * That sentence is copied from `fjs/report/guard`'s `classifyRunOutcome`
  * deliberately, and so is the reason: the zero-read kill condition once existed
  * in two places, every proof bound to the copy that did not ship, and the
  * shipped rule had no coverage at all while 258 tests were green. A second,
- * parallel scope-refusal builder would reproduce that defect exactly.
+ * parallel scope-refusal builder would reproduce that defect exactly — which is
+ * why Phase 22 added a second QUESTION here rather than a second refusal TYPE.
+ *
+ * `preamble` and `parts` are joined by `'; '` and `' | '` respectively, which
+ * is the format {@link expectedUnreportedTipsRefusalMessage} has pinned
+ * character-for-character since Phase 10; extracting this function changed no
+ * byte of it.
+ * @type {(preamble: string) => (parts: readonly string[]) => (kinds: readonly UnmodeledKind[]) => ScopeError}
+ */
+const scopeError = preamble => parts => kinds => ({
+    kind: 'error',
+    message: `${preamble}; ${parts.join(' | ')}`,
+    unmodeled: kinds,
+})
+
+/**
+ * **The declared-scope refusal**: the taxpayer DECLARED a kind this engine does
+ * not model. Plan 10-08's Schedule D Tax Worksheet arm and its three line-16
+ * wrapper arms import this function; they do not construct a
+ * `{ kind: 'error' }` of their own, and neither does {@link tripwireRefusal},
+ * which shares {@link scopeError} with it.
  *
  * The message names, for each kind, the 1040 line that cannot be computed, the
  * human label, and the remedy — because a refusal that does not say WHAT is
@@ -442,12 +498,78 @@ export const scopeRefusal = kinds => {
         ['a scope refusal must name at least one unmodeled kind', kinds],
     )
     const entries = unmodeledKindRefusals.filter(r => kinds.includes(r.kind))
-    return {
-        kind: 'error',
-        message: `scope refusal: this return declares ${entries.length} kind(s) this engine does not model, so no Form 1040 is produced; `
-            + entries.map(r => `${r.kind} at ${r.line} (${r.label}): ${r.remedy}`).join(' | '),
-        unmodeled: entries.map(r => r.kind),
-    }
+    return scopeError(
+        `scope refusal: this return declares ${entries.length} kind(s) this engine does not model, so no Form 1040 is produced`,
+    )(
+        entries.map(r => `${r.kind} at ${r.line} (${r.label}): ${r.remedy}`),
+    )(
+        entries.map(r => r.kind),
+    )
+}
+
+/**
+ * One tripwire that fired: the kind the supplied documents PROVE must have been
+ * declared, and the compiled-in prose naming the evidence that proves it.
+ *
+ * `evidence` is a `string` the CALLER supplies, and every caller supplies a
+ * literal compiled into `fjs/return/tripwire`'s own table — never a value read
+ * off a taxpayer document. That is what keeps T-10-07-04 (no taxpayer amount,
+ * name or document hash reaches a refusal message) true of this arm as well as
+ * the declared-scope arm — and `fjs/return/tripwire`'s own
+ * `noTaxpayerAmountRidesOutThroughATripwireRefusal` leaf is what stops it from
+ * being a convention nobody checks, since this module cannot see where a
+ * caller's string came from. The evidence names the BOX and the FORM the
+ * amount would have gone to, which is the half a reader can act on; the amount
+ * itself they already have in front of them.
+ * @typedef {{ readonly kind: UnmodeledKind, readonly evidence: string }} TripwireFinding
+ */
+
+/**
+ * **The documents-prove-it refusal** (TAX-19, Phase 22) — the complementary
+ * half of {@link classifyScope}, and deliberately NOT folded into it.
+ *
+ * `classifyScope` answers *"is what the taxpayer declared computable?"*. This
+ * answers a different question with a different failure mode: *"did the
+ * taxpayer fail to declare something the supplied documents PROVE?"* A single
+ * filer with $300,000 in W-2 box 5 owes Additional Medicare Tax whether or not
+ * they have heard of Form 8959, and `classifyScope` is silent on that case by
+ * construction — its soundness rests on the taxpayer knowing what they owe,
+ * which is the thing they came to a tax engine not to have to know
+ * (`.planning/PERSONA-COVERAGE.md`, "The structural finding").
+ *
+ * It shares this module's ONE refusal shape and ONE constructor
+ * ({@link scopeError}), for the reason that function's own docstring records.
+ * What differs is the sentence: this one says the DOCUMENTS require the kind,
+ * where {@link scopeRefusal} says the RETURN declared it — reading a tripwire
+ * refusal as though the taxpayer had declared something would send them looking
+ * for a declaration they never made.
+ *
+ * Ordering, totality and the empty-argument refusal are all
+ * {@link scopeRefusal}'s, for the same reasons: the walk is over
+ * {@link unmodeledKindRefusals}, so two tripwires firing in either order
+ * produce byte-identical messages, and every lookup takes its `kind` from the
+ * record it came from rather than from an index.
+ * @type {(findings: readonly TripwireFinding[]) => ScopeError}
+ */
+export const tripwireRefusal = findings => {
+    assert(
+        findings.length !== 0,
+        ['a tripwire refusal must name at least one required kind', findings],
+    )
+    // Walk the refusal TABLE (1040 form order), pairing each entry with the
+    // finding that named it — never the findings list, whose order is the
+    // tripwire table's rather than the form's.
+    const paired = unmodeledKindRefusals.flatMap(r => {
+        const finding = findings.find(f => f.kind === r.kind)
+        return finding === undefined ? [] : [{ entry: r, evidence: finding.evidence }]
+    })
+    return scopeError(
+        `tripwire refusal: the supplied documents require ${paired.length} kind(s) this return did not declare, so no Form 1040 is produced`,
+    )(
+        paired.map(p => `${p.entry.kind} at ${p.entry.line} (${p.entry.label}): ${p.evidence} — ${p.entry.remedy}`),
+    )(
+        paired.map(p => p.entry.kind),
+    )
 }
 
 /**
@@ -543,6 +665,29 @@ const expectedUnreportedTipsRefusalMessage
     = 'scope refusal: this return declares 1 kind(s) this engine does not model, '
     + 'so no Form 1040 is produced; unreportedTips at 1040 line 1c '
     + '(unreported tips): requires Form 4137 (no phase yet)'
+
+/**
+ * The complete refusal message for a tripwire naming exactly `unreportedTips`
+ * with a one-clause evidence string — hand-typed here, character for
+ * character, from the fields {@link unmodeledKindRefusals} carries plus the
+ * evidence the fixture supplies, rather than produced by running
+ * {@link tripwireRefusal} and pasting what came out.
+ *
+ * `unreportedTips` is the control kind this file already pins the
+ * declared-scope message against (see
+ * {@link expectedUnreportedTipsRefusalMessage}), reused here so the two
+ * sentences can be compared directly: SAME kind, SAME line, SAME label, SAME
+ * remedy, DIFFERENT preamble and one extra evidence clause. That contrast is
+ * the property this constant exists to pin — a tripwire refusal must not read
+ * as though the taxpayer had declared something, because a reader would then
+ * go looking for a declaration they never made.
+ * @type {string}
+ */
+const expectedUnreportedTipsTripwireMessage
+    = 'tripwire refusal: the supplied documents require 1 kind(s) this return did not declare, '
+    + 'so no Form 1040 is produced; unreportedTips at 1040 line 1c '
+    + '(unreported tips): Form W-2 box 8 (allocated tips) is non-zero '
+    + '— requires Form 4137 (no phase yet)'
 
 export const proof = {
     partition: {
@@ -958,6 +1103,148 @@ export const proof = {
                 )
             }
             assert(threw, 'expected scopeRefusal to refuse building a refusal that names nothing')
+        },
+    },
+    // ── The complementary guard's refusal builder (Phase 22, TAX-19) ─────
+    //
+    // These leaves test the SHAPE and the SENTENCE only. Whether any
+    // particular document actually fires a tripwire is `fjs/return/tripwire`'s
+    // question, and every leaf there routes through the builder proven here.
+    tripwireRefusal: {
+        // The exact sentence, against a hand-typed expectation — the same
+        // whole-message discipline `theRefusalMessageIsExactlyTheHandTypedSentence`
+        // applies to the declared-scope arm, so the tripwire arm's format
+        // cannot silently lose the evidence clause, the remedy, or the line.
+        theMessageIsExactlyTheHandTypedSentence: () => {
+            const outcome = tripwireRefusal([
+                { kind: 'unreportedTips', evidence: 'Form W-2 box 8 (allocated tips) is non-zero' },
+            ])
+            assertEq(outcome.kind, 'error')
+            assertEq(
+                outcome.message,
+                expectedUnreportedTipsTripwireMessage,
+                ['the tripwire refusal must be exactly the hand-typed sentence', outcome.message],
+            )
+            assertEq(outcome.unmodeled.length, 1, ['expected exactly one kind named', outcome.unmodeled])
+            assertEq(outcome.unmodeled[0], 'unreportedTips', ['expected the required kind named', outcome.unmodeled])
+        },
+        // The two sentences must not be confusable. Same kind, same line,
+        // same label, same remedy — and a reader must still be able to tell
+        // "you declared something unmodeled" from "your documents prove
+        // something you did not declare", because those call for opposite
+        // actions. Asserted as a DIFFERENCE plus the two distinguishing
+        // phrases, so collapsing either preamble into the other reddens here.
+        aTripwireRefusalDoesNotReadAsADeclaredOne: () => {
+            const declared = classifyScope(['unreportedTips'])
+            const tripped = tripwireRefusal([
+                { kind: 'unreportedTips', evidence: 'Form W-2 box 8 (allocated tips) is non-zero' },
+            ])
+            assert(declared.kind === 'error', ['expected a declared-scope refusal', declared])
+            if (declared.kind !== 'error') {
+                return
+            }
+            assert(
+                declared.message !== tripped.message,
+                ['the two refusals must not be the same sentence', tripped.message],
+            )
+            assert(
+                declared.message.includes('this return declares'),
+                ['the declared-scope refusal must say the RETURN declared it', declared.message],
+            )
+            assert(
+                tripped.message.includes('the supplied documents require'),
+                ['the tripwire refusal must say the DOCUMENTS require it', tripped.message],
+            )
+            // …and it must not claim a declaration that was never made.
+            assert(
+                !tripped.message.includes('this return declares'),
+                ['a tripwire refusal must not say the return declared anything', tripped.message],
+            )
+        },
+        // Both kinds named, in 1040 FORM order, from findings supplied in the
+        // OPPOSITE order — the same property
+        // `unmodeledFollowsFormOrderNotDeclarationOrder` pins on the other
+        // arm, and for the same reason: two taxpayers whose documents trip the
+        // same two tripwires must see one sentence, not two orderings of it.
+        // `householdEmployeeWages` (1040 line 1b) and `unreportedTips` (line
+        // 1c) are the pair this file already uses for form-order control
+        // (13-CONTEXT.md Decision 1.4 keeps both refused).
+        twoFindingsAreNamedInFormOrderNotFindingOrder: () => {
+            const outcome = tripwireRefusal([
+                { kind: 'unreportedTips', evidence: 'evidence for line 1c' },
+                { kind: 'householdEmployeeWages', evidence: 'evidence for line 1b' },
+            ])
+            assertEq(outcome.unmodeled.length, 2, ['expected both required kinds', outcome.unmodeled])
+            assertEq(outcome.unmodeled[0], 'householdEmployeeWages', ['expected line 1b named first', outcome.unmodeled])
+            assertEq(outcome.unmodeled[1], 'unreportedTips', ['expected line 1c named second', outcome.unmodeled])
+            // Each finding's OWN evidence must travel with its OWN kind — a
+            // build that paired them by POSITION rather than by kind would
+            // produce the same two kinds with one evidence clause used twice,
+            // and the `unmodeled` assertions above could not see it. Both
+            // clauses are asserted PRESENT first, because an `indexOf`
+            // comparison alone is satisfied by a missing string (`-1` is less
+            // than everything) — the exact way an ordering assertion passes
+            // over a message that lost half its content.
+            assert(
+                outcome.message.includes('evidence for line 1b'),
+                ['the line-1b finding\'s own evidence must be carried', outcome.message],
+            )
+            assert(
+                outcome.message.includes('evidence for line 1c'),
+                ['the line-1c finding\'s own evidence must be carried', outcome.message],
+            )
+            assert(
+                outcome.message.indexOf('evidence for line 1b') < outcome.message.indexOf('evidence for line 1c'),
+                ['each kind must carry its own evidence, in form order', outcome.message],
+            )
+        },
+        // A tripwire refusal naming nothing is the silent partial return this
+        // module exists to prevent, exactly as on the other arm — and the
+        // thrown value's CONTENT is asserted, never merely that it threw.
+        aRefusalNamingNothingIsItselfRefused: () => {
+            let threw = false
+            try {
+                tripwireRefusal([])
+            } catch (e) {
+                threw = true
+                assert(typeof e === 'string' || Array.isArray(e), ['expected a bare thrown value, not an Error', e])
+                const message = typeof e === 'string' ? e : Array.isArray(e) ? e.join(' ') : ''
+                assert(
+                    message.includes('must name at least one required kind'),
+                    ['expected the thrown value to say what was missing', e],
+                )
+            }
+            assert(threw, 'expected tripwireRefusal to refuse building a refusal that names nothing')
+        },
+        // Every entry in the refusal table is reachable through THIS arm too,
+        // naming its own line, label and remedy — so a kind a future tripwire
+        // points at cannot turn out to be undescribable. The loop iterates the
+        // code under test and therefore cannot see the table shrinking; what
+        // stands behind it is `unmodeledRefusalsIsExactlyThirty`'s hand-typed
+        // count and `_EveryKindIsEitherModeledOrRefused`, exactly as recorded
+        // for the declared-scope loop above.
+        everyKindIsDescribableThroughTheTripwireArm: () => {
+            for (const r of unmodeledKindRefusals) {
+                const outcome = tripwireRefusal([{ kind: r.kind, evidence: 'a document proves it' }])
+                assertEq(outcome.unmodeled.length, 1, ['expected exactly this kind named', r.kind, outcome.unmodeled])
+                assertEq(outcome.unmodeled[0], r.kind, ['expected exactly this kind named', r.kind, outcome.unmodeled])
+                assert(
+                    outcome.message.includes(r.line),
+                    ['expected the refusal to name this kind\'s 1040 line', r.kind, outcome.message],
+                )
+                assert(
+                    outcome.message.includes(r.label),
+                    ['expected the refusal to name this kind\'s label', r.kind, outcome.message],
+                )
+                assert(
+                    outcome.message.includes(r.remedy),
+                    ['expected the refusal to name this kind\'s remedy', r.kind, outcome.message],
+                )
+                assert(
+                    outcome.message.includes('a document proves it'),
+                    ['expected the refusal to name the evidence', r.kind, outcome.message],
+                )
+            }
         },
     },
 }
