@@ -502,6 +502,63 @@ test(
                 assert.equal(countsTowardReproducibilityAcceptance(record), true)
             }
 
+            // ── The mixed-year refusal, through the REAL stored bytes ─────
+            //
+            // Run LAST, because it permanently adds a 2024 document to the
+            // store and every assertion above needs a store that computes.
+            //
+            // Every other proof of this rule exercises the function TWIN;
+            // this is the only place the literal `taxReturnReportSource`
+            // bytes are checked against it, in a real process, which is the
+            // same reason `payer-report-integration.test.js` exists for its
+            // own program. The refusal is a returned VALUE, not an `fjs_run`
+            // failure: the program computed an answer, and the answer is
+            // "I will not compute this". So `fjs_run` itself succeeds.
+            const w2PriorYear = {
+                dialect: w2Dialect,
+                payerTin: '66-6666666',
+                recipientTin,
+                accountNumber: 'ACC-W2-PRIOR',
+                taxYear: 2024,
+                formRevision: '2024',
+                box1WagesTipsOtherCompensation: '80000.00',
+            }
+            assert.equal(validateW2(w2PriorYear)[0], 'ok', 'expected the seeded 2024 W-2 to validate')
+            const w2PriorYearHash = await casAdd(JSON.stringify(w2PriorYear))
+            await evoAdd({
+                parents: [],
+                subject: 'tax-return-integration-w2-prior-year',
+                snapshot: w2PriorYearHash,
+            })
+
+            const mixedYearResponse = await call('fjs_run', { hash: programHash, taxYear: 2025 })
+            assert.equal(
+                mixedYearResponse.result.isError, undefined,
+                `fjs_run itself must succeed; the refusal is the program's own value: ${JSON.stringify(mixedYearResponse)}`)
+            const mixedYear = JSON.parse(mixedYearResponse.result.content[0].text)
+            const mixedYearResult = JSON.parse(await casGetText(mixedYear.resultHash))
+            assert.equal(
+                mixedYearResult.kind, 'error',
+                `expected the stored program to refuse a mixed-year store: ${JSON.stringify(mixedYearResult).slice(0, 400)}`)
+            // All four facts, against the REAL document hash the server
+            // itself assigned — a hash this test could not have predicted,
+            // so the message is genuinely carrying it rather than echoing a
+            // literal.
+            assert.ok(
+                mixedYearResult.message.includes(w2PriorYearHash),
+                `the refusal must name the offending document hash: ${mixedYearResult.message}`)
+            assert.ok(
+                mixedYearResult.message.includes('vnd.fjs.w2'),
+                `the refusal must name the offending dialect: ${mixedYearResult.message}`)
+            assert.ok(
+                mixedYearResult.message.includes('2024'),
+                `the refusal must name the document's own tax year: ${mixedYearResult.message}`)
+            assert.ok(
+                mixedYearResult.message.includes('2025'),
+                `the refusal must name the year this run computes: ${mixedYearResult.message}`)
+            // It refused instead of computing: no lines were produced at all.
+            assert.equal(mixedYearResult.lines, undefined)
+
             // Clean EOF shutdown — the established real-process pattern.
             serverProc.stdin.end()
             const exitCode = await new Promise((resolve, reject) => {
