@@ -4,6 +4,17 @@
 derived by reading the code, not from the roadmap. The inventory command is at the bottom; re-run
 it rather than trusting this document's counts.
 
+> **SUPERSEDED IN PART, and deliberately not rewritten.** This is a dated measurement, and
+> rewriting it in place would destroy the record of what was true when the survey was run. Three
+> of its four verdicts have since moved, and each was moved by the phase the survey pointed at:
+> **FAANG employee** by Phase 23 (Forms 8959 and 8960), **startup founder** by Phases 27 and 28
+> (Schedule C, Schedule SE, Form 8995), and the retiree's remaining gaps by Phase 26. The
+> founder section below reads *"Nothing about self-employment or pass-through business exists"*;
+> as of **2026-08-16** the first four rows of its table are Schedule C ✔, Schedule SE ✔, the
+> 1099-NEC dialect ✔, and Schedule E / K-1 still absent (Phase 30). Form 8995 computes the
+> simplified case and refuses Form 8995-A by name. ROADMAP.md's phase entries carry the detail;
+> re-run the survey rather than editing this one.
+
 ---
 
 ## Verdict

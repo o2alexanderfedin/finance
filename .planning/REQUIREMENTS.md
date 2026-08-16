@@ -720,22 +720,78 @@ itemizing, which is complete apart from the eight open MAINT items.
         is NOT elective and the scope guard only refuses a kind the taxpayer declares. A
         filer declaring `businessIncomeOrLoss` alone would otherwise have received a
         complete-looking 1040 with Schedule 2 line 4 at zero — about $7,000 short on a
-        $50,000 profit. TAX-31 (Phase 28) is what lifts this.
+        $50,000 profit. **TAX-31 (Phase 28) lifted this on 2026-08-16**: the refusal is
+        deleted, Schedule SE computes, and a $50,000 profit now carries $7,064.78 of
+        self-employment tax to Schedule 2 line 4.
       - **A statutory-employee W-2 refuses.** `vnd.fjs.w2`'s `box13StatutoryEmployee` had
         been modeled since the dialect was written and read by nothing; those wages belong
         on Schedule C line 1, not 1040 line 1a, and this engine puts them on line 1a where
         no expense can reach them.
 
-      So the largest Schedule C this engine will put on a 1040 today is one whose net
-      profit is under $400. Everything above that computes every printed line and then
-      refuses, by name, at the last step.
-- [ ] **TAX-31** *(M2, T3)*: **Schedule SE**, self-employment tax — the 92.35% net-earnings
+      So the largest Schedule C this engine would put on a 1040 was one whose net profit
+      was under $400. Everything above that computed every printed line and then refused,
+      by name, at the last step — **until TAX-31 landed on 2026-08-16**. Of the three
+      refusals above, the second is gone and the other two stand unchanged: a net LOSS
+      still refuses on §465 grounds, and a statutory-employee W-2 still refuses.
+- [x] **TAX-31** *(M2, T3)*: **Schedule SE**, self-employment tax — the 92.35% net-earnings
       factor, the Social Security wage base ceiling coordinated with W-2 box 3 wages already
       counted, and the uncapped Medicare component. Feeds Schedule 2 line 4, and its deductible
       half feeds Schedule 1 line 15 (a hard zero today). **Depends on TAX-20/22**, since both
       land on Schedule 2.
+
+      Delivered 2026-08-16, and every clause of the sentence above is real. Part I's twenty
+      printed lines compute; line 12 reaches Schedule 2 line 4 → 1040 line 23 and line 13
+      reaches Schedule 1 line 15 → 1040 line 10, out of ONE execution. The 92.35% factor is
+      **derived** from §1401's two rates per §1402(a)(12) rather than stored, so the printed
+      0.9235 has one source of truth. The wage base is shared with **Form W-2 box 3** (never box
+      5) plus box 7, wages first, and matched on `recipientTin` so a spouse's wages cannot
+      shelter the proprietor's earnings. Form 8959 Part II line 8 now reads Schedule SE line 6,
+      which is what Phase 23 wrote its threshold coordination for.
+
+      **Phase 27's §1402(b)(2) ceiling is gone**: a Schedule C net profit of any size now
+      computes end to end, and the $400 question is asked once, on the form that prints it,
+      against net EARNINGS rather than net profit.
+
+      **What the tick does NOT mean.** Four printed things on this form still refuse by name:
+      Part II's farm and non-farm **optional methods** (elective, and no document records an
+      election), **church employee income** and §1402(g)'s Form 4029/4361 **exemption** (nothing
+      on a W-2 marks either), Schedule F farm income on lines 1a/1b, and Form 4137/8919 amounts
+      on lines 8b/8c. The first two are new `fjs/return/scope` kinds, so a taxpayer with either
+      is told. A **non-joint** return carrying a Form W-2 issued to a different `recipientTin`
+      with Social Security wages on it also refuses, because the wage base is per person and the
+      engine cannot tell which of the two records is wrong.
 - [ ] **TAX-32** *(M2, T3)*: **Form 8995 / 8995-A**, the QBI deduction → 1040 line 13a, with
       the SSTB phase-in and the W-2-wage/UBIA limitations. Depends on TAX-30.
+
+      **PARTIALLY delivered 2026-08-16, and the box stays unchecked because two of the three
+      things this requirement names were not built.** Form **8995**, the simplified
+      computation, is complete: all seventeen printed lines, reaching 1040 line 13a. Qualified
+      business income is Schedule C net profit **reduced by the deductible half of
+      self-employment tax** (§199A(c)(1)), which is the step most often missed and which lowers
+      the deduction. Line 11's "taxable income before the QBI deduction" subtracts 1040 line 12
+      **and line 13b**, because the 2025 face splits the old line 13 in two.
+
+      Form **8995-A** is not modeled, so **the SSTB phase-in and the W-2-wage/UBIA limitations
+      this requirement names do not exist**. Above §199A(e)(2)'s threshold ($197,300, or
+      $394,600 on a joint return) the engine REFUSES by name, and the refusal states both
+      limitations, the fact that a sole proprietor with no employees has no W-2 wages, and both
+      directions the error would run. It fires only when there is qualified business income, so
+      a high-income return with no business is untouched.
+
+      Form 8995 lines 6-9, **qualified REIT dividends and PTP income**, are documented zeros:
+      Form 1099-DIV box 5 is stored and read by nothing, and PTP income needs Schedule K-1
+      (DOC-24, Phase 30). `qualifiedReitDividendsAndPtpIncome` is a new refused kind.
+
+      **`vnd.fjs.business_expenses` gains one field**,
+      `priorYearQualifiedBusinessLossCarryforward`. §199A(c)(2) carries a negative year forward
+      and this engine holds one tax year; reading an absent carryforward as zero would overstate
+      the deduction for the year-one-loss founder the section is written for, so absence is
+      *unstated* and refuses, and `"0.00"` is the assertion that there was none.
+
+      **No SSTB field is stored, deliberately.** §199A(d)(3) makes the SSTB question irrelevant
+      below the threshold and the engine refuses above it, so the field would have no reader —
+      the `box13StatutoryEmployee` defect Phase 27 found, avoided rather than repeated. It
+      acquires a reader the day Form 8995-A is modeled.
 
 ### Equity Compensation and AMT (DOC, TAX)
 
@@ -769,7 +825,7 @@ itemizing, which is complete apart from the eight open MAINT items.
 | TAX-25, TAX-26, TAX-27 | T2 | 25 - Schedule 3 Credits | Non-profit worker |
 | TAX-28, TAX-29 | T2 | 26 - Retiree Completion | Retiree |
 | DOC-20, DOC-21, TAX-30 | T3 | 27 - 1099-NEC and Schedule C | Startup founder |
-| TAX-31, TAX-32 | T3 | 28 - Schedule SE and QBI | **Startup founder** |
+| TAX-31, TAX-32 | T3 | 28 - Schedule SE and QBI | **Startup founder** — TAX-31 delivered; TAX-32 delivers Form 8995 only and stays open for 8995-A |
 | DOC-22, DOC-23, TAX-33, TAX-34 | T3 | 29 - Equity Compensation and AMT | FAANG + founder |
 | DOC-24, TAX-35 | T3 | 30 - Pass-Through Income | Startup founder |
 
