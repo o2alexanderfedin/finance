@@ -676,14 +676,59 @@ itemizing, which is complete apart from the eight open MAINT items.
 
 ### Startup Founder: Self-Employment (DOC, TAX) — reversed from Out of Scope 2026-08-15
 
-- [ ] **DOC-20** *(M2, T2)*: `vnd.fjs.1099nec` — nonemployee compensation. Three boxes and
+- [x] **DOC-20** *(M2, T2)*: `vnd.fjs.1099nec` — nonemployee compensation. Three boxes and
       genuinely a morning's work; the Out-of-Scope entry that forbade it until today called
       that simplicity "a trap" and was right about what follows.
-- [ ] **DOC-21** *(M2, T2)*: `vnd.fjs.business_expenses` — the taxpayer-asserted record behind
+
+      Delivered 2026-08-16. Box 1, box 2 (the direct-sales checkbox), box 3 (the printed
+      form's own reserved box, refused when non-zero), box 4 and boxes 5-7 as an ARRAY of
+      state rows. **Box 2 is not inert**: a ticked one means the recipient resells consumer
+      products, so the goods are inventory (Part III) and the resale proceeds appear on no
+      information return — `fjs/schedule/c` refuses it by name rather than reading a
+      reseller's wholesale purchases as their gross receipts.
+- [x] **DOC-21** *(M2, T2)*: `vnd.fjs.business_expenses` — the taxpayer-asserted record behind
       Schedule C Part II, categorised to the printed form's own expense lines. Same asserted
       shape as DOC-19 and `vnd.fjs.medical_expenses`.
-- [ ] **TAX-30** *(M2, T3)*: **Schedule C**, all parts, one named pure function per printed
+
+      Delivered 2026-08-16. Three departures from DOC-19, each stated at the site: one
+      document is one BUSINESS (so `accountNumber` is required and DOC-01's subject key
+      separates two Schedule Cs), the date rule is the strict same-year one, and a negative
+      amount is refused. It also carries
+      `grossReceiptsFullyReportedOnForms1099Nec` — a field that exists only so an
+      uncomputable return can say so out loud, because §6041A requires a 1099-NEC only at
+      $600 and only from a trade or business, so a Schedule C line 1 read from Forms
+      1099-NEC alone would silently understate gross receipts.
+- [x] **TAX-30** *(M2, T3)*: **Schedule C**, all parts, one named pure function per printed
       line group, feeding Schedule 1 line 3 → 1040 line 8.
+
+      Delivered 2026-08-16, and the tick means the SCHEDULE, not the self-employed return.
+      Eighteen of the twenty-five printed expense lines compute, Part I's income arithmetic
+      and Part V's line 48 compute, and line 31 reaches Schedule 1 line 3 → 1040 line 8
+      through Schedule 1's own Part I total. Parts III and IV are named functions for named
+      printed parts that refuse. Seven expense categories refuse by name, each naming the
+      form or the facts that would supply it.
+
+      **Three refusals bound what a taxpayer can actually file, and they are the reason
+      Phase 28 exists rather than being optional:**
+
+      - **A net LOSS refuses.** The printed form's own "if a loss, you must go to line 32"
+        is an at-risk determination §465 makes from a multi-year basis history no document
+        here holds; §469 and §461(l) stand behind it. The arithmetic loss is an upper bound
+        on the deductible loss, so letting it reach Schedule 1 line 3 would understate tax
+        while moving AGI and everything downstream of it.
+      - **A net profit at or above §1402(b)(2)'s $400 refuses**, because self-employment tax
+        is NOT elective and the scope guard only refuses a kind the taxpayer declares. A
+        filer declaring `businessIncomeOrLoss` alone would otherwise have received a
+        complete-looking 1040 with Schedule 2 line 4 at zero — about $7,000 short on a
+        $50,000 profit. TAX-31 (Phase 28) is what lifts this.
+      - **A statutory-employee W-2 refuses.** `vnd.fjs.w2`'s `box13StatutoryEmployee` had
+        been modeled since the dialect was written and read by nothing; those wages belong
+        on Schedule C line 1, not 1040 line 1a, and this engine puts them on line 1a where
+        no expense can reach them.
+
+      So the largest Schedule C this engine will put on a 1040 today is one whose net
+      profit is under $400. Everything above that computes every printed line and then
+      refuses, by name, at the last step.
 - [ ] **TAX-31** *(M2, T3)*: **Schedule SE**, self-employment tax — the 92.35% net-earnings
       factor, the Social Security wage base ceiling coordinated with W-2 box 3 wages already
       counted, and the uncapped Medicare component. Feeds Schedule 2 line 4, and its deductible

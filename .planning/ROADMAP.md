@@ -884,6 +884,34 @@ absence refuses by name, and the one derivable direction (the 12d box is NECESSA
 ### Phase 27: 1099-NEC and Schedule C
 **Requirements**: DOC-20, DOC-21, TAX-30 · **Tier**: T3
 **Note**: This phase reverses an Out-of-Scope decision made 2026-08-03 and struck through on 2026-08-15. The original rationale — *"the three-box simplicity is a trap; the downstream is Schedule C / SE / QBI"* — is preserved in REQUIREMENTS.md as a warning, because it was correct.
+**Status**: complete for all three, and **the struck-through warning was right twice over**. The
+1099-NEC dialect really was a morning's work; `fjs/schedule/c` is the largest module this project
+has written, and the downstream really is Schedule SE.
+
+`scheduleOneAdditionalIncome` — the LAST of the five coarse kinds this roadmap's Phase 13 finding
+paragraph listed, and the one Phase 25's own status note said was all that remained — splits into
+seven per-printed-line kinds. None of the five is left. Counts: `modeledKinds` 29 → 30,
+`unmodeledKindRefusals` 57 → 63 → 62, `kindVocabulary` 86 → 92.
+
+**What the phase actually put on a 1040 is smaller than "Schedule C computes" sounds, and
+deliberately so.** Self-employment tax is NOT elective, and the scope guard only refuses a kind
+the taxpayer DECLARES — so a filer declaring `businessIncomeOrLoss` alone would have received a
+complete-looking return with Schedule 2 line 4 at zero, roughly $7,000 short on a $50,000 profit.
+`fjs/schedule/c` therefore refuses any net profit at or above §1402(b)(2)'s $400 floor, and
+refuses a net LOSS outright (line 32's at-risk determination, plus §469 and §461(l), all
+unmodeled). Every printed line still computes; only the last step refuses. **Phase 28 is what
+lifts the $400 ceiling**, which makes it a continuation of this phase rather than a separate
+feature.
+
+**Two boxes that had been stored and read by nothing now refuse.** `vnd.fjs.w2`'s
+`box13StatutoryEmployee` (those wages belong on Schedule C line 1, not 1040 line 1a, so this
+engine was overstating a statutory employee's income by the whole of their Part II) and Form
+1099-NEC box 2 (a direct-sales reseller has inventory and cash receipts on no information
+return). Both were found by the deliberate hunt AGENTS.md asks for after wiring anything.
+
+A FOURTH tripwire fires on a stored 1099-NEC with box 1 undeclared, and it is only the second
+entry ever to point at a MODELED kind — so its remedy is "declare it and this engine computes it"
+rather than a form hunt.
 
 ### Phase 28: Schedule SE and QBI — unblocks the startup founder
 **Requirements**: TAX-31 (Schedule SE), TAX-32 (Form 8995/8995-A) · **Tier**: T3
