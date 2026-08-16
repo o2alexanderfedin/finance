@@ -20,9 +20,11 @@
  * *"1099-NEC and self-employment — the three-box simplicity is a trap; the
  * downstream is Schedule C / SE / QBI."* It is struck through rather than
  * deleted, because **it was right**. `fjs/document/1099nec` really is a
- * morning's work; this file is not, and the two forms it still cannot reach —
- * Schedule SE (Phase 28) and Form 8995 (Phase 28) — are named in refusals
- * throughout rather than quietly skipped.
+ * morning's work; this file is not, and the two forms it could not reach when
+ * it was written — Schedule SE and Form 8995 — were named in refusals
+ * throughout rather than quietly skipped. **Phase 28 built both**
+ * (`fjs/schedule/se`, `fjs/form8995`), so this module's own §1402(b)(2)
+ * refusal is gone and the only refusals left here are Schedule C's own.
  *
  * ## WHAT COMPUTES AND WHAT REFUSES, in one table
  *
@@ -42,7 +44,7 @@
  * | 27b | documented zero | the printed form reserves it |
  * | 28, 29 | ✔ | arithmetic |
  * | 30 business use of home | documented zero, and REFUSES if asserted | Form 8829 or the simplified method's square footage |
- * | 31 net profit | ✔ **only when it is a profit UNDER $400**; REFUSES a loss, and refuses $400 or more | see "The net-loss decision" and "Schedule SE and QBI" |
+ * | 31 net profit | ✔ **any profit, and a break-even zero**; REFUSES a loss | see "The net-loss decision" |
  * | 32 at risk | never reached | it exists only for a loss, which refuses |
  * | Part III (33-42) | REFUSES by name | beginning and ending inventory |
  * | Part IV (43-47) | REFUSES by name | it exists only to support line 9, which refuses |
@@ -151,34 +153,32 @@
  * A statutory employee with no business record at all is exactly the case that
  * would otherwise stay silently overstated.
  *
- * ## What this module deliberately does NOT do: Schedule SE and QBI — and why
- * that costs a REFUSAL rather than nothing
+ * ## Line 31's OTHER printed destination, and the refusal that is no longer
+ * here
  *
  * Line 31's own instruction is *"enter on both Schedule 1 (Form 1040), line 3,
- * **and on Schedule SE, line 2**."* This module reaches the first and not the
- * second, and that is Phase 28's whole content (TAX-31/TAX-32). Nothing here
- * computes self-employment tax, nothing here computes its deductible half
- * (Schedule 1 line 15, still a documented zero), and nothing here computes the
- * §199A qualified business income deduction (1040 line 13a, still refused).
- * `selfEmploymentTax` and `qualifiedBusinessIncomeDeduction` both remain
- * `fjs/return/scope` refusals, each naming Phase 28.
+ * **and on Schedule SE, line 2**."* Phase 27 reached the first and not the
+ * second, and it could not simply leave the gap: the scope guard only refuses
+ * a kind the taxpayer DECLARES, and self-employment tax is not elective, so a
+ * filer who declared `businessIncomeOrLoss` and nothing else would have
+ * received a complete-looking 1040 with Schedule 2 line 4 at zero —
+ * understating tax by roughly 15.3% of 92.35% of their net profit, about
+ * $7,000 on a $50,000 profit. So `selfEmploymentTaxReachIsUnmodeled` refused
+ * every net profit at or above §1402(b)(2)'s $400, and this section recorded
+ * the consequence: *"until Phase 28, the only Schedule C this engine will put
+ * on a 1040 is one whose net profit is under $400."*
  *
- * **Leaving it there would have shipped a silently wrong return, and this is
- * the finding that most nearly went unnoticed in this phase.** The scope guard
- * only refuses a kind the taxpayer DECLARES, and self-employment tax is not
- * elective: a filer who declares `businessIncomeOrLoss` and nothing else has
- * declared truthfully, passes both guards, and would have received a complete-
- * looking 1040 with Schedule 2 line 4 at zero — understating tax by roughly
- * 15.3% of 92.35% of their net profit, about $7,000 on a $50,000 profit. That
- * is `fjs/return/tripwire`'s own motivating failure, one schedule over and an
- * order of magnitude larger.
+ * **Phase 28 (TAX-31/TAX-32) removed that ceiling, and the function with it.**
+ * `fjs/schedule/se` computes Schedule SE, its line 12 reaches Schedule 2 line
+ * 4 and its line 13 reaches Schedule 1 line 15; `fjs/form8995` computes the
+ * §199A deduction on 1040 line 13a. Line 31 now reaches BOTH of its printed
+ * destinations, and the $400 question is asked exactly once, on the form that
+ * prints it — applied to §1402(a)(12)'s net EARNINGS rather than to net
+ * profit, which is what this module could not do without starting Schedule SE.
  *
- * So {@link selfEmploymentTaxReachIsUnmodeled} refuses any net profit at or
- * above §1402(b)(2)'s $400 floor, and its own docstring carries the reasoning
- * and the deliberate over-approximation. The consequence is worth stating
- * plainly: **until Phase 28, the only Schedule C this engine will put on a
- * 1040 is one whose net profit is under $400.** Everything above that computes
- * every printed line and then refuses, by name, at the last step.
+ * The one thing this module lost with that function is its `TaxParamSet`: see
+ * {@link scheduleC}, which now takes none, because not one figure on the
+ * printed Schedule C is indexed, statutory or a rate.
  *
  * @module
  */

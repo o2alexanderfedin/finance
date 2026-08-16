@@ -489,15 +489,16 @@ const storedFilingStatusNamed = status =>
 /**
  * Computes Form 1040 lines 1a through 15 for an in-scope return.
  *
- * Every `1b`-`1i`, `8`, `10`, `13a` and `13b` line is a
- * {@link profileDeclaredZeroLine}: zero only because the corresponding kind
- * was not declared. Had it been declared, `fjs/return/scope` would already
- * have refused the whole report, so "declared but unmodeled" never reaches
- * this function. Lines 3a, 3b and 7a are no longer in that group as of Plan
- * 12.1-04; lines 4a, 4b, 5a, 5b and 6a are no longer in it as of Plan 13-02
- * (Slice 1, TAX-10) — see the comments above their construction below. Line
- * 6b is never a placeholder at all: it is the 18-line Social Security
- * Benefits Worksheet's own output (`fjs/tax/ssb`).
+ * Every `1b`-`1i` line is a {@link profileDeclaredZeroLine}: zero only
+ * because the corresponding kind was not declared. Had it been declared,
+ * `fjs/return/scope` would already have refused the whole report, so
+ * "declared but unmodeled" never reaches this function. Lines 3a, 3b and 7a
+ * left that group in Plan 12.1-04; lines 4a, 4b, 5a, 5b and 6a in Plan 13-02
+ * (Slice 1, TAX-10); lines 8, 10 and 13b as Schedules 1 and 1-A were wired;
+ * and **line 13a in Phase 28** (TAX-32), which is the last of them — see the
+ * comments above each line's construction below. Line 6b was never a
+ * placeholder at all: it is the 18-line Social Security Benefits Worksheet's
+ * own output (`fjs/tax/ssb`).
  *
  * `taxParamSet` is read by exactly one line — 12e, the standard deduction. It
  * is threaded through the outer arrow rather than looked up here, so the tax
@@ -3411,9 +3412,12 @@ export const proof = {
         },
     },
     line14: {
-        // 12e + 13a + 13b. 13a and 13b are both profile-declared zeros citing
-        // the SAME `declaredKinds` box, so the union deduplicates them to one:
-        // the filing-status box plus one declaration box = 2.
+        // 12e + 13a + 13b. For a return with NO business, 13a is a
+        // profile-declared zero and 13b's own sources are the filing-status
+        // and 12d boxes 12e already cites, so the union deduplicates to one
+        // declaration box: the filing-status box plus it = 2. Phase 28 left
+        // this untouched precisely because `scheduleC.filed` keeps line 13a a
+        // declared zero for such a return.
         sumsTwelveEAndThirteenAAndThirteenBDeduplicatingTheProfileCitation: () => {
             const { line14 } = linesForProfile(singleProfile)
             assertEq(line14.value, 1575000n)

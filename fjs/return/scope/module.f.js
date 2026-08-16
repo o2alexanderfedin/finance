@@ -232,9 +232,11 @@
  *
  * The other twelve stay refused, by name, and two of them are load-bearing
  * proof that this guard still guards something: `alternativeMinimumTax`
- * (Form 6251, Phase 29) and `selfEmploymentTax` (Schedule SE, Phase 28) are
- * both on Schedule 2, both refuse on their own after this phase, and both
- * are named in `theTwelveScheduleTwoKindsThisPhaseDidNotWireStillRefuse`.
+ * (Form 6251, Phase 29) and `selfEmploymentTax` (Schedule SE) are both on
+ * Schedule 2, both refused on their own after Phase 23, and both were named
+ * in the leaf now called `theScheduleTwoKindsStillUnwiredRefuse`. **Phase 28
+ * wired `selfEmploymentTax`**, so eleven stay refused today and that leaf
+ * carries the correction; the AMT half of the claim is unchanged.
  *
  * **The Phase 22 tripwire survives this reclassification rather than dying
  * with it**, which is the one thing about this slice that is not simply
@@ -260,11 +262,14 @@
  *    from {@link unmodeledKindRefusals} to {@link modeledKinds} in the SAME
  *    commit as that wiring.
  *
- * The other ten stay refused, by name. Two of them are load-bearing proof
+ * The other ten stay refused, by name. Two of them were load-bearing proof
  * that this guard still guards something on this schedule: `iraDeduction`
  * (Schedule 1 line 20) and `deductiblePartOfSelfEmploymentTax` (line 15,
- * Schedule SE, Phase 28) both refuse on their own after this phase, and both
- * are named in `theTenScheduleOneKindsThisPhaseDidNotWireStillRefuse`.
+ * Schedule SE) both refused on their own after Phase 24. **Phase 28 wired the
+ * second**, so nine stay refused today and the leaf now called
+ * `theScheduleOneKindsStillUnwiredRefuse` carries the correction; the
+ * IRA-deduction half of the claim is unchanged, since that fixed point is
+ * still unmodeled.
  *
  * **`iraDeduction` now overlaps `vnd.fjs.return_profile`'s own
  * `iraDeductionDeclared` field, and both are kept.** Phase 13 introduced that
