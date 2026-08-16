@@ -914,6 +914,230 @@ export const netInvestmentIncomeTaxThreshold = {
 export const netInvestmentIncomeTaxRateBasisPoints = 380
 
 /**
+ * Schedule 1 line 21's student loan interest deduction — IRC §221, TAX-23,
+ * Phase 24.
+ *
+ * ## These figures ARE inflation-indexed, and that is the opposite of the two
+ * parameter groups directly above
+ *
+ * {@link additionalMedicareTaxThreshold} and {@link netInvestmentIncomeTaxThreshold}
+ * each state, at length, that their dollar amounts are written into the
+ * statute and that **no Revenue Procedure adjusts them**. That reasoning does
+ * NOT carry over here, and copying it would be a silent error one tax year
+ * from now: **§221(f)(1) requires the phase-out thresholds to be
+ * inflation-adjusted every year**, rounded to the next lowest multiple of
+ * $5,000. The figures below are TY2025's and TY2025's alone. When a second
+ * tax year is added to {@link taxParamsByYear}, `maximumDeduction` may well
+ * stay $2,500 (§221(b)(1) is a flat statutory cap that §221(f) does NOT
+ * index — see below) while every threshold moves.
+ *
+ * The movement is real rather than theoretical: $70,000/$140,000 (2021),
+ * $70,000/$145,000 (2022), $75,000/$155,000 (2023), $80,000/$165,000 (2024),
+ * $85,000/$170,000 (2025). Five consecutive years, four changes.
+ *
+ * ## Two figures, not three — `phaseoutRange`, never a stored end point
+ *
+ * A reader of §221(b)(2)(B) sees the deduction "begin to phase out" at
+ * $85,000 ($170,000 joint) and be "completely phased out" at $100,000
+ * ($200,000 joint) — three numbers per status, of which only two are
+ * independent. **The printed Student Loan Interest Deduction Worksheet uses
+ * exactly the two stored here**: its line 5 is {@link phaseoutThreshold} and
+ * its line 7 divides by {@link phaseoutRange} ("Divide line 6 by $15,000
+ * ($30,000 if married filing jointly)"). Storing the completely-phased-out
+ * end point as a THIRD figure would be a second source of truth able to
+ * disagree with the two the computation actually reads;
+ * `studentLoanInterestPhaseoutEndPointsMatchTheStatutoryFigures` asserts the
+ * DERIVED sum against a hand-typed $100,000/$200,000 instead, which is the
+ * check a third stored field would have made impossible.
+ *
+ * ## `marriedFilingSeparately` has no entry, and that is a filing-status gate
+ *
+ * §221(e)(2) — *"if the taxpayer is married at the close of the taxable
+ * year, the deduction shall be allowed ... only if the taxpayer and the
+ * taxpayer's spouse file a joint return"* — makes the deduction $0
+ * UNCONDITIONALLY for a married-filing-separately filer, at ANY income. So
+ * there is no dollar threshold for a status whose amount never depends on
+ * one, exactly as {@link seniorDeduction}'s own `phaseoutThreshold` omits the
+ * same status for the same reason. `fjs/schedule/1` is where that
+ * short-circuit lives, ahead of the worksheet's own line 1.
+ *
+ * ## Citation kind
+ *
+ * `kind: 'code'`, §221's own subsections — the same "governing provision, not
+ * the literal source" position {@link childTaxCredit} records as Carried
+ * finding C-3. §221(b)(2)(B) genuinely is where the phase-out mechanism and
+ * its base amounts live, and §221(f) is genuinely what indexes them; what
+ * §221 does NOT contain is the TY2025 dollar figures themselves, which come
+ * from the printed 2025 Student Loan Interest Deduction Worksheet (Schedule 1
+ * line 21) in the Form 1040 instructions. Guessing a Rev. Proc. section
+ * number this research never opened would be the sourcing error this module's
+ * own header exists to prevent.
+ * @type {{
+ *   readonly maximumDeduction: AmountWithCitation,
+ *   readonly phaseoutThreshold: {
+ *     readonly single: AmountWithCitation,
+ *     readonly marriedFilingJointly: AmountWithCitation,
+ *     readonly headOfHousehold: AmountWithCitation,
+ *     readonly qualifyingSurvivingSpouse: AmountWithCitation,
+ *   },
+ *   readonly phaseoutRange: {
+ *     readonly single: AmountWithCitation,
+ *     readonly marriedFilingJointly: AmountWithCitation,
+ *     readonly headOfHousehold: AmountWithCitation,
+ *     readonly qualifyingSurvivingSpouse: AmountWithCitation,
+ *   },
+ * }}
+ */
+export const studentLoanInterestDeduction = {
+    // §221(b)(1) writes "$2,500" into the statute and §221(f) indexes only
+    // subsection (b)(2)(B)'s threshold amounts, never this cap. It has been
+    // $2,500 since 2001 and is the one figure in this group that is NOT
+    // expected to move with the tax year.
+    maximumDeduction: {
+        amount: '2500.00',
+        citation: { kind: 'code', section: '§221(b)(1)', effectiveDate: '2025-01-01' },
+    },
+    phaseoutThreshold: {
+        single: {
+            amount: '85000.00',
+            citation: { kind: 'code', section: '§221(b)(2)(B)', effectiveDate: '2025-01-01' },
+        },
+        marriedFilingJointly: {
+            amount: '170000.00',
+            citation: { kind: 'code', section: '§221(b)(2)(B)', effectiveDate: '2025-01-01' },
+        },
+        // The printed worksheet's line 5 groups "Single, head of household,
+        // or qualifying surviving spouse" on ONE row, so these two carry the
+        // same figure as `single`. Hand-typed per status anyway, never spread
+        // from `single`, for the reason `standardDeduction` states: a spread
+        // makes two statuses impossible to observe drifting apart.
+        headOfHousehold: {
+            amount: '85000.00',
+            citation: { kind: 'code', section: '§221(b)(2)(B)', effectiveDate: '2025-01-01' },
+        },
+        qualifyingSurvivingSpouse: {
+            amount: '85000.00',
+            citation: { kind: 'code', section: '§221(b)(2)(B)', effectiveDate: '2025-01-01' },
+        },
+    },
+    // The printed worksheet's line 7 divisor. NOT a rate and NOT derivable
+    // from the thresholds above — see this group's own docstring, "Two
+    // figures, not three".
+    phaseoutRange: {
+        single: {
+            amount: '15000.00',
+            citation: { kind: 'code', section: '§221(b)(2)(B)', effectiveDate: '2025-01-01' },
+        },
+        marriedFilingJointly: {
+            amount: '30000.00',
+            citation: { kind: 'code', section: '§221(b)(2)(B)', effectiveDate: '2025-01-01' },
+        },
+        headOfHousehold: {
+            amount: '15000.00',
+            citation: { kind: 'code', section: '§221(b)(2)(B)', effectiveDate: '2025-01-01' },
+        },
+        qualifyingSurvivingSpouse: {
+            amount: '15000.00',
+            citation: { kind: 'code', section: '§221(b)(2)(B)', effectiveDate: '2025-01-01' },
+        },
+    },
+}
+
+/**
+ * Schedule 1 line 11's educator expense deduction — IRC §62(a)(2)(D), TAX-24,
+ * Phase 24.
+ *
+ * **ONE figure is stored, and the printed form's "$600" is deliberately NOT a
+ * second one.** Schedule 1's own instruction reads *"If you and your spouse
+ * are filing jointly and both of you were eligible educators, the maximum
+ * deduction is $600. Neither spouse can deduct more than $300 of qualified
+ * expenses."* The $600 is therefore two applications of the $300 cap, not an
+ * independent parameter — storing it would create a figure that could
+ * disagree with twice the one below, and `fjs/schedule/1` applies the cap
+ * per eligible educator so the joint maximum falls out rather than being
+ * asserted.
+ *
+ * **Indexed, like {@link studentLoanInterestDeduction} and unlike §3101(b)(2).**
+ * §62(d)(3) inflation-adjusts the $250 base amount in $50 increments; the $50
+ * step is coarse enough that the figure has sat at $300 since TY2022, which
+ * is exactly the shape of parameter a reader is most likely to mistake for a
+ * flat statutory constant. It is not one.
+ *
+ * **What this engine cannot check, and does not pretend to.** §62(d)(1)
+ * defines an *eligible educator* as a kindergarten-through-grade-12 teacher,
+ * instructor, counselor, principal or aide who worked **at least 900 hours**
+ * during a school year in a school providing elementary or secondary
+ * education. Neither the hours nor the role is reported by any information
+ * return, and no document this engine models carries either. Eligibility is
+ * therefore ASSERTED — by the taxpayer, through a `vnd.fjs.adjustments` entry
+ * tagged for this line — and `fjs/document/adjustments`'s own docstring is
+ * where that trust boundary is stated in full.
+ * @type {{ readonly maximumPerEligibleEducator: AmountWithCitation }}
+ */
+export const educatorExpenses = {
+    maximumPerEligibleEducator: {
+        amount: '300.00',
+        citation: { kind: 'code', section: '§62(a)(2)(D)', effectiveDate: '2025-01-01' },
+    },
+}
+
+/**
+ * Schedule 1 line 13's health savings account deduction (Form 8889 Part I) —
+ * IRC §223, TAX-24, Phase 24.
+ *
+ * **This group holds BOTH kinds of figure at once, which is why it is worth
+ * reading rather than skimming.** The two annual contribution limits are
+ * inflation-indexed (§223(g)(1), adjusted every year and published in a
+ * standalone Revenue Procedure each May, well before the annual §1(f) one);
+ * the catch-up amount is NOT — §223(b)(3)(B) writes "$1,000" into the statute
+ * and §223(g) indexes only subsection (b)(2), so the catch-up has been
+ * $1,000 every year since 2009. A reader who assumes the group is uniformly
+ * one or the other gets the wrong answer about half of it, which is the same
+ * failure mode {@link childTaxCredit}'s own docstring names (Pitfall 5,
+ * inverted).
+ *
+ * `selfOnly` versus `family` is Form 8889 line 1's own checkbox, and it is
+ * the taxpayer's HDHP coverage type, not their filing status: a
+ * married-filing-jointly couple with self-only coverage gets $4,300, and a
+ * single filer with family coverage gets $8,550. Keying this by filing status
+ * would be the most natural wrong thing to do with it, so it is keyed by
+ * coverage type at the type level and there is no `IndividualFilingStatus`
+ * anywhere in this group.
+ *
+ * `kind: 'code'` for all three, per the same "governing provision, not the
+ * literal source" position {@link studentLoanInterestDeduction} records:
+ * §223(b)(2)(A)/(B) is where the self-only/family limits live and §223(g) is
+ * what indexes them, but the TY2025 dollar figures come from the printed 2025
+ * Form 8889 and its instructions.
+ * @type {{
+ *   readonly annualLimit: {
+ *     readonly selfOnly: AmountWithCitation,
+ *     readonly family: AmountWithCitation,
+ *   },
+ *   readonly catchUpContribution: AmountWithCitation,
+ * }}
+ */
+export const healthSavingsAccount = {
+    annualLimit: {
+        selfOnly: {
+            amount: '4300.00',
+            citation: { kind: 'code', section: '§223(b)(2)(A)', effectiveDate: '2025-01-01' },
+        },
+        family: {
+            amount: '8550.00',
+            citation: { kind: 'code', section: '§223(b)(2)(B)', effectiveDate: '2025-01-01' },
+        },
+    },
+    // §223(b)(3)(B)'s flat statutory $1,000, for an account beneficiary who
+    // has attained age 55 before the close of the taxable year. NOT indexed
+    // — see this group's own docstring.
+    catchUpContribution: {
+        amount: '1000.00',
+        citation: { kind: 'code', section: '§223(b)(3)(B)', effectiveDate: '2025-01-01' },
+    },
+}
+
+/**
  * A full tax-year parameter set: every TY2025 parameter this phase
  * requires, together.
  *
@@ -952,6 +1176,9 @@ export const netInvestmentIncomeTaxRateBasisPoints = 380
  *   readonly additionalMedicareTaxRates: typeof additionalMedicareTaxRates,
  *   readonly netInvestmentIncomeTaxThreshold: typeof netInvestmentIncomeTaxThreshold,
  *   readonly netInvestmentIncomeTaxRateBasisPoints: typeof netInvestmentIncomeTaxRateBasisPoints,
+ *   readonly studentLoanInterestDeduction: typeof studentLoanInterestDeduction,
+ *   readonly educatorExpenses: typeof educatorExpenses,
+ *   readonly healthSavingsAccount: typeof healthSavingsAccount,
  * }} TaxParamSet
  */
 
@@ -981,6 +1208,9 @@ export const taxParamsByYear = {
         additionalMedicareTaxRates,
         netInvestmentIncomeTaxThreshold,
         netInvestmentIncomeTaxRateBasisPoints,
+        studentLoanInterestDeduction,
+        educatorExpenses,
+        healthSavingsAccount,
     },
 }
 
@@ -1069,6 +1299,19 @@ const everyDollarStringField = [
     childTaxCredit.actcEarnedIncomeThreshold.amount,
     ...individualFilingStatuses.map(status => additionalMedicareTaxThreshold[status].amount),
     ...individualFilingStatuses.map(status => netInvestmentIncomeTaxThreshold[status].amount),
+    studentLoanInterestDeduction.maximumDeduction.amount,
+    studentLoanInterestDeduction.phaseoutThreshold.single.amount,
+    studentLoanInterestDeduction.phaseoutThreshold.marriedFilingJointly.amount,
+    studentLoanInterestDeduction.phaseoutThreshold.headOfHousehold.amount,
+    studentLoanInterestDeduction.phaseoutThreshold.qualifyingSurvivingSpouse.amount,
+    studentLoanInterestDeduction.phaseoutRange.single.amount,
+    studentLoanInterestDeduction.phaseoutRange.marriedFilingJointly.amount,
+    studentLoanInterestDeduction.phaseoutRange.headOfHousehold.amount,
+    studentLoanInterestDeduction.phaseoutRange.qualifyingSurvivingSpouse.amount,
+    educatorExpenses.maximumPerEligibleEducator.amount,
+    healthSavingsAccount.annualLimit.selfOnly.amount,
+    healthSavingsAccount.annualLimit.family.amount,
+    healthSavingsAccount.catchUpContribution.amount,
 ]
 
 export const proof = {
@@ -1660,5 +1903,166 @@ export const proof = {
         const revProcSourced = allChildTaxCreditAmounts.filter(entry => entry.citation.kind === 'revProc')
         assertEq(revProcSourced.length, 1, ['expected exactly one revProc-sourced figure', revProcSourced])
         assertEq(revProcSourced[0], childTaxCredit.ctcAmount)
+    },
+    // TAX-23: §221's cap, thresholds and phase-out ranges, hand-typed here
+    // from the printed 2025 Student Loan Interest Deduction Worksheet
+    // (Schedule 1 line 21) -- never read back off the stored object, so a
+    // wrong stored figure cannot pass by comparing against itself.
+    //
+    // Four statuses, asserted individually rather than looped with one shared
+    // expectation, because the printed worksheet's line 5 GROUPS "Single,
+    // head of household, or qualifying surviving spouse" onto one row while
+    // giving married-filing-jointly its own: three of the four agreeing is a
+    // fact about the form, and a loop would make the one that differs
+    // indistinguishable from a typo.
+    studentLoanInterestFiguresMatchThePrintedWorksheet: () => {
+        assertEq(studentLoanInterestDeduction.maximumDeduction.amount, '2500.00', '§221(b)(1)')
+        /** @type {Record<'single' | 'marriedFilingJointly' | 'headOfHousehold' | 'qualifyingSurvivingSpouse', readonly [string, string]>} */
+        const expected = {
+            // [worksheet line 5 threshold, worksheet line 7 divisor]
+            single: ['85000.00', '15000.00'],
+            marriedFilingJointly: ['170000.00', '30000.00'],
+            headOfHousehold: ['85000.00', '15000.00'],
+            qualifyingSurvivingSpouse: ['85000.00', '15000.00'],
+        }
+        assertEq(studentLoanInterestDeduction.phaseoutThreshold.single.amount, expected.single[0])
+        assertEq(studentLoanInterestDeduction.phaseoutRange.single.amount, expected.single[1])
+        assertEq(studentLoanInterestDeduction.phaseoutThreshold.marriedFilingJointly.amount, expected.marriedFilingJointly[0])
+        assertEq(studentLoanInterestDeduction.phaseoutRange.marriedFilingJointly.amount, expected.marriedFilingJointly[1])
+        assertEq(studentLoanInterestDeduction.phaseoutThreshold.headOfHousehold.amount, expected.headOfHousehold[0])
+        assertEq(studentLoanInterestDeduction.phaseoutRange.headOfHousehold.amount, expected.headOfHousehold[1])
+        assertEq(studentLoanInterestDeduction.phaseoutThreshold.qualifyingSurvivingSpouse.amount, expected.qualifyingSurvivingSpouse[0])
+        assertEq(studentLoanInterestDeduction.phaseoutRange.qualifyingSurvivingSpouse.amount, expected.qualifyingSurvivingSpouse[1])
+        // The married-filing-jointly divisor is exactly twice the other
+        // three, which is what makes a transposed pair of figures visible
+        // rather than merely wrong.
+        assert(
+            centsFromString(studentLoanInterestDeduction.phaseoutRange.marriedFilingJointly.amount)
+                === 2n * centsFromString(studentLoanInterestDeduction.phaseoutRange.single.amount),
+            [
+                'the printed worksheet line 7 divides by $30,000 on a joint return and $15,000 otherwise',
+                studentLoanInterestDeduction.phaseoutRange.marriedFilingJointly.amount,
+            ],
+        )
+    },
+    // The check a THIRD stored figure would have made impossible: threshold
+    // plus range must land exactly on §221(b)(2)(B)'s own "completely phased
+    // out" figures, hand-typed from the statute's TY2025 adjusted amounts
+    // ($100,000, and $200,000 for a joint return). See
+    // `studentLoanInterestDeduction`'s own docstring, "Two figures, not
+    // three" -- the end point is DERIVED here precisely so it can never be a
+    // second source of truth in the module itself.
+    studentLoanInterestPhaseoutEndPointsMatchTheStatutoryFigures: () => {
+        /** @type {readonly [string, string][]} */
+        const expected = [
+            ['single', '100000.00'],
+            ['marriedFilingJointly', '200000.00'],
+            ['headOfHousehold', '100000.00'],
+            ['qualifyingSurvivingSpouse', '100000.00'],
+        ]
+        assertEq(expected.length, 4, 'four statuses can claim this deduction; MFS cannot claim it at all')
+        for (const [status, completelyPhasedOut] of expected) {
+            const entry = status === 'single' ? studentLoanInterestDeduction.phaseoutThreshold.single
+                : status === 'marriedFilingJointly' ? studentLoanInterestDeduction.phaseoutThreshold.marriedFilingJointly
+                : status === 'headOfHousehold' ? studentLoanInterestDeduction.phaseoutThreshold.headOfHousehold
+                : studentLoanInterestDeduction.phaseoutThreshold.qualifyingSurvivingSpouse
+            const range = status === 'single' ? studentLoanInterestDeduction.phaseoutRange.single
+                : status === 'marriedFilingJointly' ? studentLoanInterestDeduction.phaseoutRange.marriedFilingJointly
+                : status === 'headOfHousehold' ? studentLoanInterestDeduction.phaseoutRange.headOfHousehold
+                : studentLoanInterestDeduction.phaseoutRange.qualifyingSurvivingSpouse
+            assertEq(
+                centsToString(centsFromString(entry.amount) + centsFromString(range.amount)),
+                completelyPhasedOut,
+                ['threshold + range must equal §221(b)(2)(B)\'s completely-phased-out figure', status],
+            )
+        }
+    },
+    // TAX-23: §221 is INDEXED (§221(f)), unlike §3101(b)(2) and §1411(b) one
+    // parameter group up, whose own docstrings say at length that nothing
+    // adjusts them. This leaf pins the citation kind and section for every
+    // §221 figure so the two groups cannot be conflated by a reader who
+    // notices that both are `kind: 'code'` -- the citation KIND is the same
+    // for both, and the indexing behaviour is the opposite.
+    studentLoanInterestFiguresCiteIrc221Only: () => {
+        /** @type {readonly (readonly [AmountWithCitation, string])[]} */
+        const entries = [
+            [studentLoanInterestDeduction.maximumDeduction, '§221(b)(1)'],
+            [studentLoanInterestDeduction.phaseoutThreshold.single, '§221(b)(2)(B)'],
+            [studentLoanInterestDeduction.phaseoutThreshold.marriedFilingJointly, '§221(b)(2)(B)'],
+            [studentLoanInterestDeduction.phaseoutThreshold.headOfHousehold, '§221(b)(2)(B)'],
+            [studentLoanInterestDeduction.phaseoutThreshold.qualifyingSurvivingSpouse, '§221(b)(2)(B)'],
+            [studentLoanInterestDeduction.phaseoutRange.single, '§221(b)(2)(B)'],
+            [studentLoanInterestDeduction.phaseoutRange.marriedFilingJointly, '§221(b)(2)(B)'],
+            [studentLoanInterestDeduction.phaseoutRange.headOfHousehold, '§221(b)(2)(B)'],
+            [studentLoanInterestDeduction.phaseoutRange.qualifyingSurvivingSpouse, '§221(b)(2)(B)'],
+        ]
+        assertEq(entries.length, 9, 'one cap, four thresholds, four ranges')
+        for (const [entry, section] of entries) {
+            assertEq(entry.citation.kind, 'code', ['expected a bare-IRC citation', entry])
+            assertEq(entry.citation.section, section, ['wrong governing subsection', entry])
+            assertEq(entry.citation.effectiveDate, '2025-01-01', ['expected the TY2025 effective date', entry])
+        }
+    },
+    // TAX-24: the educator-expense cap, hand-typed from Schedule 1's own
+    // printed line 11 instruction. The second half is the point of the leaf:
+    // the printed "$600 if both spouses are eligible educators" must NOT be
+    // stored, because it is two applications of the $300 cap rather than an
+    // independent figure -- and a field quietly added here later would fail
+    // the key count.
+    educatorExpenseCapIsPerEligibleEducatorAndNotAJointFigure: () => {
+        assertEq(educatorExpenses.maximumPerEligibleEducator.amount, '300.00', '§62(a)(2)(D), TY2025')
+        assertEq(educatorExpenses.maximumPerEligibleEducator.citation.kind, 'code')
+        assertEq(educatorExpenses.maximumPerEligibleEducator.citation.section, '§62(a)(2)(D)')
+        assertEq(educatorExpenses.maximumPerEligibleEducator.citation.effectiveDate, '2025-01-01')
+        assertEq(
+            Object.keys(educatorExpenses).length,
+            1,
+            'the joint $600 is twice the stored $300, never a second stored figure',
+        )
+    },
+    // TAX-24: Form 8889's two indexed limits and its unindexed catch-up,
+    // hand-typed from the printed 2025 Form 8889. The catch-up assertion is
+    // separated from the two limits deliberately -- it is the one figure in
+    // this group §223(g) does NOT index, and grouping it with the two that
+    // move would invite exactly the uniform-sourcing error this module's own
+    // header exists to prevent.
+    healthSavingsAccountLimitsMatchThePrintedForm8889: () => {
+        assertEq(healthSavingsAccount.annualLimit.selfOnly.amount, '4300.00', 'TY2025 self-only')
+        assertEq(healthSavingsAccount.annualLimit.family.amount, '8550.00', 'TY2025 family')
+        assertEq(healthSavingsAccount.annualLimit.selfOnly.citation.section, '§223(b)(2)(A)')
+        assertEq(healthSavingsAccount.annualLimit.family.citation.section, '§223(b)(2)(B)')
+        assertEq(healthSavingsAccount.annualLimit.selfOnly.citation.kind, 'code')
+        assertEq(healthSavingsAccount.annualLimit.family.citation.kind, 'code')
+        assertEq(healthSavingsAccount.annualLimit.selfOnly.citation.effectiveDate, '2025-01-01')
+        assertEq(healthSavingsAccount.annualLimit.family.citation.effectiveDate, '2025-01-01')
+        // Family coverage is NOT twice self-only, and that asymmetry is the
+        // single most likely place for a wrong figure to hide: $8,550 is
+        // $8,600 minus $50, so a reader who "simplifies" to 2x self-only
+        // overstates the limit by $50 for every family-coverage filer.
+        assert(
+            centsFromString(healthSavingsAccount.annualLimit.family.amount)
+                !== 2n * centsFromString(healthSavingsAccount.annualLimit.selfOnly.amount),
+            [
+                'the family limit is NOT twice the self-only limit; §223(b)(2) adjusts the two independently',
+                healthSavingsAccount.annualLimit.family.amount,
+            ],
+        )
+    },
+    healthSavingsAccountCatchUpIsTheFlatUnindexedStatutoryFigure: () => {
+        assertEq(healthSavingsAccount.catchUpContribution.amount, '1000.00', '§223(b)(3)(B)')
+        assertEq(healthSavingsAccount.catchUpContribution.citation.kind, 'code')
+        assertEq(healthSavingsAccount.catchUpContribution.citation.section, '§223(b)(3)(B)')
+        assertEq(healthSavingsAccount.catchUpContribution.citation.effectiveDate, '2025-01-01')
+        // §223(g) indexes subsection (b)(2) only, so the catch-up cites a
+        // DIFFERENT subsection from the two limits above -- the structural
+        // fact that says "this one does not move".
+        assert(
+            healthSavingsAccount.catchUpContribution.citation.section
+                !== healthSavingsAccount.annualLimit.selfOnly.citation.section,
+            [
+                'the unindexed catch-up must not share a subsection with the indexed limits',
+                healthSavingsAccount.catchUpContribution.citation.section,
+            ],
+        )
     },
 }
