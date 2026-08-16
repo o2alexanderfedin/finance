@@ -78,12 +78,32 @@
  * takes about its own income measure (13-CONTEXT.md Decision 5.6, TAX-15).
  * `theTwoAdjustmentTotalsAreSeparateRulesThatHappenToAgree` says so out loud.
  *
- * ## Line 7 (Phase 20) and what remains a documented zero
+ * ## Line 7 (Phase 20), line 3 (Phase 27) and what remains a documented zero
  *
  * Line 7, unemployment compensation, is summed from `vnd.fjs.1099g` box 1.
+ *
+ * **Line 3, business income or loss, is Phase 27's** (TAX-30): it is
+ * `fjs/schedule/c`'s own line 31, restated under this schedule's printed
+ * number and never recomputed here. That is the first line on PART I to read
+ * anything but a single box, and it changes this function's shape — see
+ * {@link scheduleOnePartI}, which now takes an input object and returns an
+ * OUTCOME, because Schedule C can refuse.
+ *
  * Every remaining line on this schedule is a `profileDeclaredZeroLine`,
  * citing the profile's own `declaredKinds` box — `fjs/schedule/b`'s Form 8815
  * boundary treatment, copied verbatim in shape.
+ *
+ * **Line 15, the deductible part of self-employment tax, is STILL a documented
+ * zero, and Phase 27 deliberately leaves it one.** Schedule C's line 31 now
+ * reaches line 3, so a reader might reasonably expect the other half of
+ * self-employment to have arrived with it. It has not: §164(f)'s deduction is
+ * Schedule SE's line 13, and Schedule SE is Phase 28 (TAX-31).
+ * `deductiblePartOfSelfEmploymentTax` remains an `fjs/return/scope` refusal
+ * naming that phase, and `selfEmploymentTax` (Schedule 2 line 4) remains one
+ * too — so a taxpayer whose Schedule C now computes still cannot file a return
+ * claiming either. `lineFifteenIsStillADocumentedZeroAfterScheduleCComputes`
+ * asserts it against a return with a real profit, which is the only fixture
+ * that could ever have caught it silently changing.
  *
  * ## The 26/11 sub-line collapses (lines 8/9 and 24/25)
  *
@@ -148,12 +168,16 @@ import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
 import { of, halfUp } from '../../types/rational/module.f.js'
 import { centsFromString } from '../../exact/module.f.js'
 import { form8889PartI } from '../../form8889/module.f.js'
+import { scheduleC } from '../c/module.f.js'
 import { taxParamsByYear } from '../../tax/params/module.f.js'
 
 /** @import { ReturnProfile } from '../../return/profile/module.f.js' */
 /** @import { OneZeroNineNineG } from '../../document/1099g/module.f.js' */
 /** @import { OneZeroNineEightE } from '../../document/1098e/module.f.js' */
 /** @import { Adjustments } from '../../document/adjustments/module.f.js' */
+/** @import { BusinessExpenses } from '../../document/business_expenses/module.f.js' */
+/** @import { OneZeroNineNineNec } from '../../document/1099nec/module.f.js' */
+/** @import { ScheduleC } from '../c/module.f.js' */
 /** @import { W2 } from '../../document/w2/module.f.js' */
 /** @import { ReportLine, Source } from '../../report/line/module.f.js' */
 /** @import { TaxParamSet, IndividualFilingStatus } from '../../tax/params/module.f.js' */
@@ -287,26 +311,80 @@ const unemploymentCompensationLine = profile => forms => {
 
 /**
  * Part I's ten printed fields (lines 1 through 10, `line8`/`line9` being the
- * 26-sub-line collapse).
+ * 26-sub-line collapse), plus the Schedule C that produced line 3.
+ *
+ * `scheduleC` is carried out rather than discarded so a caller that wants to
+ * report Schedule C's own printed lines can, and so nothing has to run
+ * `fjs/schedule/c` a second time to get them — the same reason
+ * {@link ScheduleOnePartII} carries its `studentLoanInterestWorksheet`.
  * @typedef {{
+ *   readonly kind: 'ok',
  *   readonly line1: ReportLine, readonly line2a: ReportLine, readonly line3: ReportLine,
  *   readonly line4: ReportLine, readonly line5: ReportLine, readonly line6: ReportLine,
  *   readonly line7: ReportLine, readonly line8: ReportLine, readonly line9: ReportLine,
  *   readonly line10: ReportLine,
+ *   readonly scheduleC: ScheduleC,
  * }} ScheduleOnePartI
+ */
+
+/** @typedef {ScheduleOnePartI | ScheduleOneRefusal} ScheduleOnePartIOutcome */
+
+/**
+ * @typedef {{
+ *   readonly profile: Stored<ReturnProfile>,
+ *   readonly unemploymentForms: readonly Stored<OneZeroNineNineG>[],
+ *   readonly nonemployeeCompensationForms: readonly Stored<OneZeroNineNineNec>[],
+ *   readonly businessExpenseForms: readonly Stored<BusinessExpenses>[],
+ *   readonly w2Forms: readonly Stored<W2>[],
+ * }} ScheduleOnePartIInput
  */
 
 /**
  * Schedule 1 Part I — Additional Income, lines 1 through 10. Line 10 feeds
- * 1040 line 8. Exactly one line computes from a document: line 7,
- * unemployment compensation (Phase 20).
- * @type {(profile: Stored<ReturnProfile>) => (unemploymentForms: readonly Stored<OneZeroNineNineG>[]) => ScheduleOnePartI}
+ * 1040 line 8.
+ *
+ * **TWO lines now compute from documents**, and this function's shape changed
+ * with the second:
+ *
+ * | Line | What it reads | Requirement |
+ * |---|---|---|
+ * | 3 business income or loss | `fjs/schedule/c` line 31, from `vnd.fjs.1099nec` and `vnd.fjs.business_expenses` | TAX-30 |
+ * | 7 unemployment compensation | `vnd.fjs.1099g` box 1 | Phase 20 |
+ *
+ * It takes an INPUT OBJECT and returns an OUTCOME rather than a bare record,
+ * because Schedule C can refuse — a net loss, a second business, an
+ * unrecognized expense category, an unmodeled printed line. Those are
+ * document-data-sufficiency refusals in exactly the sense Part II's already
+ * are, so `fjs/form1040/core` threads them through the arm it already has.
+ *
+ * **Line 3 is a `profileDeclaredZeroLine` for a return with no business**, not
+ * a refusal and not an absent line: `fjs/schedule/c` returns `filed: false`
+ * with a schedule of documented zeros, so PROV-01 holds and a return with no
+ * self-employment computes byte for byte what it computed before Phase 27.
+ * `theEmptyReturnComputesExactlyWhatItComputedBeforeThisPhase` is where that
+ * is asserted.
+ * @type {(taxParamSet: TaxParamSet) => (input: ScheduleOnePartIInput) => ScheduleOnePartIOutcome}
  */
-export const scheduleOnePartI = profile => unemploymentForms => {
+export const scheduleOnePartI = taxParamSet => input => {
+    const {
+        profile, unemploymentForms, nonemployeeCompensationForms, businessExpenseForms, w2Forms,
+    } = input
     const zero = profileDeclaredZeroLine(profile)
+    const scheduleCOutcome = scheduleC(taxParamSet)({
+        profile, nonemployeeCompensationForms, businessExpenseForms, w2Forms,
+    })
+    if (scheduleCOutcome.kind === 'error') {
+        return scheduleCOutcome
+    }
     const line1 = zero('Schedule 1 line 1 (taxable state/local income tax refunds)')
     const line2a = zero('Schedule 1 line 2a (alimony received)')
-    const line3 = zero('Schedule 1 line 3 (business income/loss, Schedule C)')
+    // 3. "Business income or (loss). Attach Schedule C." -- Schedule C's own
+    //    line 31, restated under this schedule's printed number, never
+    //    recomputed here. TAX-30.
+    const line3 = {
+        ...scheduleCOutcome.partII.line31,
+        rule: 'Schedule 1 line 3 (business income/loss, Schedule C line 31)',
+    }
     const line4 = zero('Schedule 1 line 4 (other gains/losses, Form 4797/4684)')
     const line5 = zero('Schedule 1 line 5 (rental real estate, royalties, Schedule E)')
     const line6 = zero('Schedule 1 line 6 (farm income/loss, Schedule F)')
@@ -321,7 +399,11 @@ export const scheduleOnePartI = profile => unemploymentForms => {
     const line10 = totalLine('Schedule 1 line 10 (total additional income -> 1040 line 8)')([
         line1, line2a, line3, line4, line5, line6, line7, line9,
     ])
-    return { line1, line2a, line3, line4, line5, line6, line7, line8, line9, line10 }
+    return {
+        kind: 'ok',
+        line1, line2a, line3, line4, line5, line6, line7, line8, line9, line10,
+        scheduleC: scheduleCOutcome,
+    }
 }
 
 // ── Part II, stage 1: every adjustment that does not depend on income ────────
@@ -973,6 +1055,8 @@ export const scheduleOnePartII = taxParamSet => input => {
  *   readonly profile: Stored<ReturnProfile>,
  *   readonly status: IndividualFilingStatus,
  *   readonly unemploymentForms: readonly Stored<OneZeroNineNineG>[],
+ *   readonly nonemployeeCompensationForms: readonly Stored<OneZeroNineNineNec>[],
+ *   readonly businessExpenseForms: readonly Stored<BusinessExpenses>[],
  *   readonly adjustmentForms: readonly Stored<Adjustments>[],
  *   readonly studentLoanInterestForms: readonly Stored<OneZeroNineEightE>[],
  *   readonly w2Forms: readonly Stored<W2>[],
@@ -990,10 +1074,15 @@ export const scheduleOnePartII = taxParamSet => input => {
  */
 export const scheduleOne = taxParamSet => input => {
     const {
-        profile, status, unemploymentForms, adjustmentForms,
-        studentLoanInterestForms, w2Forms, totalIncomeLine,
+        profile, status, unemploymentForms, nonemployeeCompensationForms, businessExpenseForms,
+        adjustmentForms, studentLoanInterestForms, w2Forms, totalIncomeLine,
     } = input
-    const partI = scheduleOnePartI(profile)(unemploymentForms)
+    const partI = scheduleOnePartI(taxParamSet)({
+        profile, unemploymentForms, nonemployeeCompensationForms, businessExpenseForms, w2Forms,
+    })
+    if (partI.kind === 'error') {
+        return partI
+    }
     const stageOne = scheduleOnePartIIExceptStudentLoanInterest(taxParamSet)({
         profile, status, adjustmentForms, w2Forms,
     })
@@ -1111,6 +1200,39 @@ const fullYearCoverage = individual => coverageType => ({
     hadHighDeductibleCoverageAllYear: true,
 })
 
+/** @type {(amount: string) => Stored<OneZeroNineNineNec>} */
+const nonemployeeCompensationDoc = amount => ({
+    documentHash: 'sha256-1099nec-a',
+    value: {
+        dialect: 'vnd.fjs.1099nec',
+        payerTin: '66-6666666', recipientTin: '222-22-2222', accountNumber: 'CLIENT-1',
+        taxYear: 2025, formRevision: '2025',
+        box1NonemployeeCompensation: amount,
+    },
+})
+
+/** @type {(amount: string) => BusinessExpenses['entries'][number]} */
+const advertisingEntry = amount => ({
+    category: 'advertising',
+    datePaid: '2025-03-14',
+    description: 'search advertising',
+    amount,
+})
+
+/** @type {(entries: readonly BusinessExpenses['entries'][number][]) => Stored<BusinessExpenses>} */
+const businessDoc = entries => ({
+    documentHash: 'sha256-business-a',
+    value: {
+        dialect: 'vnd.fjs.business_expenses',
+        recipientTin: '222-22-2222',
+        accountNumber: 'BUS-0001',
+        taxYear: 2025,
+        principalBusiness: 'software consulting',
+        grossReceiptsFullyReportedOnForms1099Nec: true,
+        entries,
+    },
+})
+
 /** @type {(amount: string) => Stored<OneZeroNineEightE>} */
 const oneZeroNineEightEDoc = amount => ({
     documentHash: 'sha256-1098e-a',
@@ -1158,6 +1280,34 @@ const w2WithEmployerHsa = {
     },
 }
 
+/**
+ * Part I for one fixture set. Every leaf below that predates Phase 27 passes
+ * no business documents at all, which is exactly the regression question
+ * those leaves exist to answer: unemployment compensation must reach line 7
+ * and line 10 identically whether or not a Schedule C exists.
+ * @type {(profile: Stored<ReturnProfile>) => (unemploymentForms: readonly Stored<OneZeroNineNineG>[]) => (nonemployeeCompensationForms: readonly Stored<OneZeroNineNineNec>[]) => (businessExpenseForms: readonly Stored<BusinessExpenses>[]) => ScheduleOnePartIOutcome}
+ */
+const partIOf = profile => unemploymentForms => nonemployeeCompensationForms => businessExpenseForms =>
+    scheduleOnePartI(taxParams2025)({
+        profile, unemploymentForms, nonemployeeCompensationForms, businessExpenseForms,
+        w2Forms: [],
+    })
+
+/** Narrows a Part I outcome to its OK arm, throwing (never casting).
+ * @type {(outcome: ScheduleOnePartIOutcome) => ScheduleOnePartI}
+ */
+const okPartI = outcome => {
+    assert(outcome.kind === 'ok', ['expected a computed Part I', outcome])
+    return outcome
+}
+
+/** Part I with NO business documents — the pre-Phase-27 shape, which every
+ * unemployment leaf below uses unchanged.
+ * @type {(profile: Stored<ReturnProfile>) => (unemploymentForms: readonly Stored<OneZeroNineNineG>[]) => ScheduleOnePartI}
+ */
+const partIWithoutBusiness = profile => unemploymentForms =>
+    okPartI(partIOf(profile)(unemploymentForms)([])([]))
+
 /** Narrows a Part II stage-1 outcome to its OK arm, throwing (never casting).
  * @type {(outcome: ScheduleOnePartIIStageOneOutcome) => ScheduleOnePartIIExceptStudentLoanInterest}
  */
@@ -1175,7 +1325,7 @@ const okPartII = outcome => {
 }
 
 /** Narrows any outcome to its refusal arm, throwing (never casting).
- * @type {(outcome: ScheduleOnePartIIStageOneOutcome | ScheduleOnePartIIOutcome | ScheduleOneOutcome) => ScheduleOneRefusal}
+ * @type {(outcome: ScheduleOnePartIOutcome | ScheduleOnePartIIStageOneOutcome | ScheduleOnePartIIOutcome | ScheduleOneOutcome) => ScheduleOneRefusal}
  */
 const refusal = outcome => {
     assert(outcome.kind === 'error', ['expected a refusal', outcome])
@@ -1222,7 +1372,7 @@ export const proof = {
      * proof could not tell a sum from a "read the first one" bug.
      */
     line7SumsEveryUnemploymentFormCitingEach: () => {
-        const result = scheduleOnePartI(profileNoDeclaredKinds)([unemploymentA, unemploymentB])
+        const result = partIWithoutBusiness(profileNoDeclaredKinds)([unemploymentA, unemploymentB])
         assertEq(result.line7.value, 555400n, '$4,554.00 + $1,000.00 = $5,554.00')
         assertEq(result.line7.sources.length, 2)
         const [firstSource, secondSource] = result.line7.sources
@@ -1238,8 +1388,8 @@ export const proof = {
      * the total would leave the return understated with every leaf green.
      */
     line7ReachesTheLine10TotalThatFeeds1040Line8: () => {
-        const withForms = scheduleOnePartI(profileNoDeclaredKinds)([unemploymentA])
-        const without = scheduleOnePartI(profileNoDeclaredKinds)([])
+        const withForms = partIWithoutBusiness(profileNoDeclaredKinds)([unemploymentA])
+        const without = partIWithoutBusiness(profileNoDeclaredKinds)([])
         assertEq(withForms.line10.value, 455400n, 'line 10 carries the unemployment')
         assertEq(without.line10.value, 0n, 'and is zero without it')
         assertEq(withForms.line10.value - without.line10.value, withForms.line7.value)
@@ -1251,7 +1401,7 @@ export const proof = {
      * profile's own `declaredKinds`.
      */
     absentUnemploymentIsZeroWithProfileProvenance: () => {
-        const result = scheduleOnePartI(profileNoDeclaredKinds)([])
+        const result = partIWithoutBusiness(profileNoDeclaredKinds)([])
         assertEq(result.line7.value, 0n)
         assertEq(result.line7.sources.length, 1)
         assertEq(result.line7.sources[0].boxPath, 'declaredKinds')
@@ -1266,9 +1416,103 @@ export const proof = {
             documentHash: 'sha256-1099g-c',
             value: { ...unemploymentA.value, box1UnemploymentCompensation: undefined },
         }
-        const result = scheduleOnePartI(profileNoDeclaredKinds)([withholdingOnly])
+        const result = partIWithoutBusiness(profileNoDeclaredKinds)([withholdingOnly])
         assertEq(result.line7.value, 0n)
         assertEq(result.line7.sources[0].boxPath, 'declaredKinds')
+    },
+
+    // ── Part I line 3: business income or loss (Schedule C, TAX-30) ─────────
+
+    businessIncome: {
+        // Schedule C's line 31 reaches Schedule 1 line 3 — and line 3 reaches
+        // line 10, which is what 1040 line 8 reads. Both halves asserted, and
+        // the second is the one that matters: a line 3 that computes
+        // correctly but never lands in the Part I total would leave the return
+        // understated with every other leaf green (the identical pairing
+        // `line7ReachesTheLine10TotalThatFeeds1040Line8` already makes for
+        // unemployment).
+        //
+        //   1099-NEC box 1                                     $350.00
+        //   Schedule C line 8   advertising                     $90.00
+        //   Schedule C line 31  350.00 - 90.00                 $260.00
+        //   Schedule 1 line 3                                  $260.00
+        //   Schedule 1 line 10  (nothing else on Part I)       $260.00
+        //
+        // $260.00 rather than a realistic freelance figure because
+        // §1402(b)(2)'s $400 floor is the boundary above which `fjs/schedule/c`
+        // refuses until Phase 28 builds Schedule SE — see that module's own
+        // docstring.
+        lineThreeIsScheduleCLineThirtyOneAndReachesLineTen: () => {
+            const partI = okPartI(partIOf(profileNoDeclaredKinds)([])(
+                [nonemployeeCompensationDoc('350.00')])([businessDoc([advertisingEntry('90.00')])]))
+            assertEq(partI.scheduleC.partII.line31.value, 26000n, '$350.00 - $90.00 = $260.00')
+            assertEq(partI.line3.value, 26000n, 'Schedule C line 31 IS Schedule 1 line 3')
+            assertEq(partI.line10.value, 26000n, 'and it reaches the Part I total')
+            // The hard zero is REPLACED, not supplemented: line 3 cites the
+            // 1099-NEC box and the expense entry it actually read.
+            //
+            // **It ALSO cites `declaredKinds`, and that is correct rather
+            // than a leak** — a discovery this leaf made by asserting the
+            // opposite first and watching it fail. Line 31 is line 29 minus
+            // line 30, line 30 is the home-office deduction, and it is zero
+            // BECAUSE nothing was asserted for it. Citing the declaration for
+            // a zero that comes from the declaration is exactly PROV-02, so
+            // what this leaf checks is that the document readings are
+            // PRESENT, not that the profile is absent.
+            const paths = partI.line3.sources.map(source => source.boxPath)
+            assert(
+                paths.includes('box1NonemployeeCompensation'),
+                ['line 3 must cite the Form 1099-NEC box it read', paths])
+            assert(
+                paths.includes('entries[category=advertising]'),
+                ['line 3 must cite the expense entry it read', paths])
+            assert(
+                partI.line3.rule.includes('Schedule C line 31'),
+                ['line 3 must name where it came from', partI.line3.rule])
+        },
+        // Line 3 and line 7 both carry real figures, and line 10 is their SUM.
+        // A "read the last one" bug in the total would pass every single-line
+        // leaf above.
+        //
+        //   line 3  Schedule C net profit                      $260.00
+        //   line 7  1099-G box 1                             $4,554.00
+        //   line 10 260.00 + 4,554.00                        $4,814.00
+        theTwoComputingPartOneLinesBothReachTheTotal: () => {
+            const partI = okPartI(partIOf(profileNoDeclaredKinds)([unemploymentA])(
+                [nonemployeeCompensationDoc('350.00')])([businessDoc([advertisingEntry('90.00')])]))
+            assertEq(partI.line3.value, 26000n, '$260.00')
+            assertEq(partI.line7.value, 455400n, '$4,554.00')
+            assertEq(partI.line10.value, 481400n, '$260.00 + $4,554.00 = $4,814.00')
+        },
+        // A Schedule C refusal must reach a Part I caller rather than being
+        // swallowed. A net loss is the refusal most likely to be met in
+        // practice, and it must stop the schedule, not zero the line.
+        aScheduleCRefusalPropagatesOutOfPartOne: () => {
+            const result = refusal(partIOf(profileNoDeclaredKinds)([])(
+                [nonemployeeCompensationDoc('100.00')])([businessDoc([advertisingEntry('900.00')])]))
+            assert(
+                result.message.includes('line 32'),
+                ['the Schedule C loss refusal must reach Schedule 1 unchanged', result.message])
+        },
+        // **CRITERION 6, as a checked claim.** Schedule 1 line 15 — the
+        // deductible half of self-employment tax — is still a documented zero
+        // on a return whose Schedule C now computes a real profit. Phase 28
+        // owns it, and this is the fixture that could catch it silently
+        // becoming something else: every other line-15 assertion in this file
+        // runs on a return with no business income at all, where a zero would
+        // be right for the wrong reason.
+        lineFifteenIsStillADocumentedZeroAfterScheduleCComputes: () => {
+            const partI = okPartI(partIOf(profileNoDeclaredKinds)([])(
+                [nonemployeeCompensationDoc('350.00')])([businessDoc([advertisingEntry('90.00')])]))
+            assertEq(partI.line3.value, 26000n, 'the control: Schedule C really did compute')
+            const partII = okPartII(emptyPartII())
+            assertEq(partII.line15.value, 0n)
+            assertEq(partII.line15.sources.length, 1)
+            assertEq(partII.line15.sources[0].boxPath, 'declaredKinds')
+            assert(
+                partII.line15.rule.includes('self-employment tax'),
+                ['line 15 must still name what it is', partII.line15.rule])
+        },
     },
 
     // ── THE REGRESSION CONTROL ───────────────────────────────────────────────
@@ -1279,7 +1523,7 @@ export const proof = {
     // file — it is the property that says Phase 24 moved nothing for the
     // millions of returns that claim none of these three adjustments.
     theEmptyReturnComputesExactlyWhatItComputedBeforeThisPhase: () => {
-        const partI = scheduleOnePartI(profileNoDeclaredKinds)([])
+        const partI = partIWithoutBusiness(profileNoDeclaredKinds)([])
         const partII = okPartII(emptyPartII())
         assertEq(partI.line10.value, 0n, 'line 10 = $0.00')
         assertEq(partII.line26.value, 0n, 'line 26 = $0.00')
@@ -1299,9 +1543,17 @@ export const proof = {
     // Zero stored documents still produce valid ReportLines, each citing the
     // profile's declaredKinds box -- mirrors `fjs/schedule/b`'s own leaf.
     zeroStoredDocumentsStillProduceValidReportLinesCitingProfile: () => {
-        const partI = scheduleOnePartI(profileNoDeclaredKinds)([])
+        const partI = partIWithoutBusiness(profileNoDeclaredKinds)([])
         const partII = okPartII(emptyPartII())
-        for (const line of [...Object.values(partI), partII.line11, partII.line12, partII.line13,
+        // Part I's ten lines named ONE BY ONE rather than through
+        // `Object.values(partI)`, which is how this leaf read until Phase 27.
+        // That spread stopped being a list of lines the moment Part I gained a
+        // `kind` discriminant and a `scheduleC` field — and naming them is the
+        // better shape anyway: a line quietly dropped from the returned record
+        // vanishes from a spread and is caught by an explicit list.
+        for (const line of [partI.line1, partI.line2a, partI.line3, partI.line4, partI.line5,
+            partI.line6, partI.line7, partI.line8, partI.line9, partI.line10,
+            partII.line11, partII.line12, partII.line13,
             partII.line14, partII.line15, partII.line16, partII.line17, partII.line18,
             partII.line19a, partII.line20, partII.line21, partII.line22, partII.line23,
             partII.line24, partII.line25, partII.line26]) {
@@ -1858,6 +2110,8 @@ export const proof = {
             profile: profileNoDeclaredKinds,
             status: 'single',
             unemploymentForms: [unemploymentA],
+            nonemployeeCompensationForms: [],
+            businessExpenseForms: [],
             adjustmentForms,
             studentLoanInterestForms,
             w2Forms: [],
@@ -1881,6 +2135,8 @@ export const proof = {
             profile: profileNoDeclaredKinds,
             status: 'single',
             unemploymentForms: [],
+            nonemployeeCompensationForms: [],
+            businessExpenseForms: [],
             adjustmentForms: [adjustmentsDoc([educatorEntry('250.00')('spouse')])([])],
             studentLoanInterestForms: [],
             w2Forms: [],
@@ -1946,6 +2202,8 @@ export const proof = {
             profile: profileNoDeclaredKinds,
             status: 'single',
             unemploymentForms: [],
+            nonemployeeCompensationForms: [],
+            businessExpenseForms: [],
             adjustmentForms: [],
             studentLoanInterestForms: [],
             w2Forms: [],
@@ -1962,7 +2220,7 @@ export const proof = {
     // This module computes a schedule, not a stored document -- no
     // `dialect`/`mediaType`, mirroring `fjs/schedule/b`'s own leaf.
     dialectIndependence: () => {
-        const result = scheduleOnePartI(profileNoDeclaredKinds)([])
+        const result = partIWithoutBusiness(profileNoDeclaredKinds)([])
         assert(!('dialect' in result), 'scheduleOne output must not carry a dialect tag')
         assert(!('mediaType' in result), 'scheduleOne output must not carry a mediaType')
     },

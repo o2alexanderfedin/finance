@@ -32,8 +32,8 @@
  * `dialectEntry`'s own documented default: no second argument, structural
  * (rtti) match alone.
  *
- * `financeDialects` carries TWENTY entries: the nineteen local dialects
- * below, plus `revisionDialect`, reused unchanged from upstream — not
+ * `financeDialects` carries TWENTY-TWO entries: the twenty-one local
+ * dialects below, plus `revisionDialect`, reused unchanged from upstream — not
  * reconstructed locally, since `fjs/media/revision` already IS one of this
  * repo's dialects (`vnd.fjs.revision` blobs are written directly into the
  * CAS store — see `fjs/server/module.f.js`'s `casRefresh.*` proofs).
@@ -140,12 +140,22 @@ import {
     priorYearIraBasisSchema,
     checkReferences as checkPriorYearIraBasis,
 } from '../../document/prior_year_ira_basis/module.f.js'
+import {
+    dialect as oneZeroNineNineNecDialect,
+    oneZeroNineNineNecSchema,
+    checkReferences as checkOneZeroNineNineNec,
+} from '../../document/1099nec/module.f.js'
+import {
+    dialect as businessExpensesDialect,
+    businessExpensesSchema,
+    checkReferences as checkBusinessExpenses,
+} from '../../document/business_expenses/module.f.js'
 
 /** @import { DialectEntry } from 'functionalscript/fjs/media/module.f.js' */
 
 /**
  * Every one of this repo's own dialects, registered for {@link detect}: the
- * nineteen local finance document/return/run dialects wrapped via
+ * twenty-one local finance document/return/run dialects wrapped via
  * {@link dialectEntry}, plus upstream's own {@link revisionDialect} reused
  * unchanged. See this module's own docstring for why `ocr` is the one entry
  * with no `extraValidate` second argument.
@@ -171,6 +181,8 @@ export const financeDialects = [
     dialectEntry(creditsSchema, v => checkCredits(v)[0] === 'ok'),
     dialectEntry(iraSchema, v => checkIra(v)[0] === 'ok'),
     dialectEntry(priorYearIraBasisSchema, v => checkPriorYearIraBasis(v)[0] === 'ok'),
+    dialectEntry(oneZeroNineNineNecSchema, v => checkOneZeroNineNineNec(v)[0] === 'ok'),
+    dialectEntry(businessExpensesSchema, v => checkBusinessExpenses(v)[0] === 'ok'),
     revisionDialect,
 ]
 
@@ -186,7 +198,7 @@ export const detectFinance = detect(financeDialects)
 
 /**
  * Independently hand-typed: the number of entries {@link financeDialects}
- * is expected to carry today — NINETEEN local dialects plus
+ * is expected to carry today — TWENTY-ONE local dialects plus
  * {@link revisionDialect}, which is upstream's. Deliberately NOT derived from
  * `financeDialects.length` itself (AGENTS.md's hand-typed-count idiom,
  * mirroring `fjs/document/1099b`'s `expectedMoneyBoxFieldCount`): a dialect
@@ -197,7 +209,7 @@ export const detectFinance = detect(financeDialects)
  * collection shrinking").
  * @type {number}
  */
-const expectedDialectCount = 20
+const expectedDialectCount = 22
 
 /** A sample cbase32 hash — {@link revisionDialect}'s own `snapshot`/`parents` shape needs a decodable one; the value itself is arbitrary. */
 const revisionSampleHash = vecToCBase32(vec8(0x77n))
@@ -359,6 +371,23 @@ const fixtures = {
         recipientTin: '222-22-2222',
         taxYear: 2024,
         priorYearForm8606Line14: '20000.00',
+    },
+    [oneZeroNineNineNecDialect]: {
+        dialect: oneZeroNineNineNecDialect,
+        payerTin: '66-6666666',
+        recipientTin: '222-22-2222',
+        accountNumber: 'ACC-0001',
+        taxYear: 2025,
+        formRevision: '2025',
+        box1NonemployeeCompensation: '48000.00',
+    },
+    [businessExpensesDialect]: {
+        dialect: businessExpensesDialect,
+        recipientTin: '222-22-2222',
+        accountNumber: 'BUS-0001',
+        taxYear: 2025,
+        principalBusiness: 'software consulting',
+        entries: [],
     },
     [revisionDialectTag]: {
         dialect: revisionDialectTag,

@@ -65,6 +65,8 @@ import { dialect as oneZeroNineEightTDialect, oneZeroNineEightTSchema } from '..
 import { dialect as creditsDialect, creditsSchema } from '../../document/credits/module.f.js'
 import { dialect as iraDialect, iraSchema } from '../../document/ira/module.f.js'
 import { dialect as priorYearIraBasisDialect, priorYearIraBasisSchema } from '../../document/prior_year_ira_basis/module.f.js'
+import { dialect as oneZeroNineNineNecDialect, oneZeroNineNineNecSchema } from '../../document/1099nec/module.f.js'
+import { dialect as businessExpensesDialect, businessExpensesSchema } from '../../document/business_expenses/module.f.js'
 import { stringify as jsonText } from '../../json/module.f.js'
 
 /** @import { Type } from 'functionalscript/fjs/types/rtti/module.f.js' */
@@ -98,6 +100,8 @@ const dialectSchemas = {
     [creditsDialect]: creditsSchema,
     [iraDialect]: iraSchema,
     [priorYearIraBasisDialect]: priorYearIraBasisSchema,
+    [oneZeroNineNineNecDialect]: oneZeroNineNineNecSchema,
+    [businessExpensesDialect]: businessExpensesSchema,
 }
 
 /** The known dialect tags, in declaration order — used in the refusal message. */
@@ -138,9 +142,13 @@ const knownDialects = /** @type {readonly string[]} */ (Object.keys(dialectSchem
  * Phase 26 (TAX-28/TAX-29) registers the FIFTEENTH AND SIXTEENTH
  * (`vnd.fjs.ira`, `vnd.fjs.prior_year_ira_basis`), moving the count from 14
  * to 16 in one step, and both gained their own `*Resolves` leaf below.
+ *
+ * Phase 27 (DOC-20/DOC-21/TAX-30) registers the SEVENTEENTH AND EIGHTEENTH
+ * (`vnd.fjs.1099nec`, `vnd.fjs.business_expenses`), moving the count from 16
+ * to 18 in one step, and both gained their own `*Resolves` leaf below.
  * @type {number}
  */
-const expectedKnownDialectCount = 16
+const expectedKnownDialectCount = 18
 
 /**
  * `finance_schema(dialect)`: the MCP tool. Looks `dialect` up in
@@ -283,6 +291,26 @@ export const proof = {
         assertEq(
             JSON.stringify(JSON.parse(textOf(result))),
             JSON.stringify(toJsonSchema(priorYearIraBasisSchema)),
+        )
+    },
+    // Phase 27 (DOC-20/DOC-21/TAX-30): Form 1099-NEC and the taxpayer-asserted
+    // Schedule C Part II expenses record behind it. The tag is hand-typed
+    // here, never read back off `dialectSchemas`, for the reason
+    // `expectedKnownDialectCount`'s own docstring gives at length.
+    oneZeroNineNineNecResolves: () => {
+        const result = call('vnd.fjs.1099nec')
+        assertEq(result.isError, undefined)
+        assertEq(
+            JSON.stringify(JSON.parse(textOf(result))),
+            JSON.stringify(toJsonSchema(oneZeroNineNineNecSchema)),
+        )
+    },
+    businessExpensesResolves: () => {
+        const result = call('vnd.fjs.business_expenses')
+        assertEq(result.isError, undefined)
+        assertEq(
+            JSON.stringify(JSON.parse(textOf(result))),
+            JSON.stringify(toJsonSchema(businessExpensesSchema)),
         )
     },
     medicalExpensesResolves: () => {

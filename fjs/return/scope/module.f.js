@@ -398,6 +398,7 @@ export const modeledKinds = /** @type {const} */ ([
     'pensionsAndAnnuities',        // 1099-R (not box7bIraSepSimple) -> 1040 lines 5a/5b
     'socialSecurityBenefits',      // SSA-1099 box 5 + SSB worksheet -> 1040 lines 6a/6b
     'unemploymentCompensation',    // 1099-G box 1 -> Schedule 1 line 7 -> 1040 line 8
+    'businessIncomeOrLoss',        // Schedule C line 31 -> Schedule 1 line 3 -> 1040 line 8
     'capitalGainDistributions',    // 1099-DIV box 2a                -> 1040 line 7a
     'capitalGainsOrLosses',        // Form 8949 + Schedule D          -> 1040 line 7a
     'unrecaptured1250Gain',        // 1099-DIV box 2b + Sch D worksheet -> Schedule D line 19
@@ -546,7 +547,6 @@ export const unmodeledKindRefusals = /** @type {const} */ ([
     // it was grouped with before this schedule was taken apart.
     { kind: 'taxableStateLocalRefunds', line: 'Schedule 1 line 1 -> 1040 line 8', label: 'taxable refunds, credits or offsets of state and local income taxes', remedy: 'requires the Pub. 525 tax-benefit-rule recovery worksheet, whose inputs are the PRIOR year’s itemized deductions and standard deduction — this engine models one tax year and holds no prior-year return, which is also why `vnd.fjs.1099g` refuses a non-zero box 2 at storage (no phase yet)' },
     { kind: 'alimonyReceived', line: 'Schedule 1 line 2a -> 1040 line 8', label: 'alimony received', remedy: 'requires the divorce-decree date, since only a pre-2019 decree makes alimony taxable to the recipient, and no dialect models it (no phase yet)' },
-    { kind: 'businessIncomeOrLoss', line: 'Schedule 1 line 3 -> 1040 line 8', label: 'business income or loss', remedy: 'requires Schedule C (TAX-30, Phase 27)' },
     { kind: 'otherGainsOrLosses', line: 'Schedule 1 line 4 -> 1040 line 8', label: 'other gains or losses', remedy: 'requires Form 4797, and for a casualty or theft Form 4684 (no phase yet)' },
     { kind: 'rentalRealEstateRoyaltiesPartnershipsSCorps', line: 'Schedule 1 line 5 -> 1040 line 8', label: 'rental real estate, royalties, partnerships, S corporations and trusts', remedy: 'requires Schedule E, and for a partnership or S-corporation stake the Schedule K-1 dialects (DOC-24/TAX-35, Phase 30)' },
     { kind: 'farmIncomeOrLoss', line: 'Schedule 1 line 6 -> 1040 line 8', label: 'farm income or loss', remedy: 'requires Schedule F (no phase yet)' },
@@ -761,6 +761,16 @@ export const modeledKindDeclarationRemedies = /** @type {const} */ ([
         label: 'Additional Medicare Tax',
         remedy: 'declare additionalMedicareTax on the return profile and this engine computes Form 8959 '
             + 'from Form W-2 boxes 5 and 6, including the withholding your employer already made (TAX-20, Phase 23)',
+    },
+    {
+        kind: 'businessIncomeOrLoss',
+        line: 'Schedule 1 line 3 -> 1040 line 8',
+        label: 'business income or loss',
+        remedy: 'declare businessIncomeOrLoss on the return profile and this engine computes '
+            + 'Schedule C from your Forms 1099-NEC and a vnd.fjs.business_expenses record '
+            + '(TAX-30, Phase 27). Note that Schedule C is where this ends: self-employment tax '
+            + 'on Schedule SE and the qualified business income deduction on Form 8995 are still '
+            + 'refused by name (TAX-31/TAX-32, Phase 28)',
     },
 ])
 
@@ -1084,7 +1094,7 @@ export const classifyScope = declaredKinds => {
  * landed beside the Schedule 3 wiring that makes all three computable.
  * @type {number}
  */
-const expectedModeledKindCount = 29
+const expectedModeledKindCount = 30
 
 /**
  * The modeled set, hand-typed a SECOND time and in {@link kindVocabulary}'s
@@ -1111,6 +1121,7 @@ const everyModeledKindHandTyped = [
     'pensionsAndAnnuities',
     'socialSecurityBenefits',
     'unemploymentCompensation',
+    'businessIncomeOrLoss',
     'capitalGainDistributions',
     'capitalGainsOrLosses',
     'unrecaptured1250Gain',
@@ -1183,7 +1194,7 @@ const everyModeledKindHandTyped = [
  * computable.
  * @type {number}
  */
-const expectedUnmodeledKindCount = 63
+const expectedUnmodeledKindCount = 62
 
 /**
  * The complete refusal message for a return declaring exactly
@@ -1249,11 +1260,11 @@ export const proof = {
         // Plan 13-10's own two-kind move) targets: removing one entry from
         // `modeledKinds` without touching `expectedModeledKindCount` must
         // redden this leaf.
-        modeledKindsIsExactlyTwentyNine: () => {
+        modeledKindsIsExactlyThirty: () => {
             assertEq(modeledKinds.length, expectedModeledKindCount)
             assertEq(new Set(modeledKinds).size, expectedModeledKindCount)
         },
-        unmodeledRefusalsIsExactlySixtyThree: () => {
+        unmodeledRefusalsIsExactlySixtyTwo: () => {
             assertEq(unmodeledKindRefusals.length, expectedUnmodeledKindCount)
             assertEq(
                 new Set(unmodeledKindRefusals.map(r => r.kind)).size,
@@ -1674,9 +1685,9 @@ export const proof = {
         // hand-typed constant, not `modeledKinds.length` — so the two
         // independent statements of the modeled set have to agree with each
         // other, and a kind added to one of them alone reddens.
-        allTwentyNineModeledKindsDeclaredTogetherAreInScope: () => {
+        allThirtyModeledKindsDeclaredTogetherAreInScope: () => {
             const outcome = classifyScope(everyModeledKindHandTyped)
-            assertEq(outcome.kind, 'ok', ['the twenty-nine modeled kinds must be in scope', outcome])
+            assertEq(outcome.kind, 'ok', ['the thirty modeled kinds must be in scope', outcome])
         },
         theHandTypedListNamesEveryModeledKind: () => {
             assertEq(
@@ -1693,6 +1704,44 @@ export const proof = {
                 expectedModeledKindCount,
                 'and it names each kind once',
             )
+        },
+        // TAX-30, Phase 27: the ONE kind this phase reclassified, alone —
+        // every reclassification since Phase 12.1 has added exactly this leaf,
+        // and `unemploymentCompensationIsInScopeAlone`'s own comment records
+        // what it cost the one phase that skipped it. With a single kind the
+        // declared-together and declared-alone leaves would be the same
+        // assertion, so there is one leaf here rather than two.
+        businessIncomeOrLossIsInScopeAlone: () => {
+            const outcome = classifyScope(['businessIncomeOrLoss'])
+            assertEq(outcome.kind, 'ok', ['Schedule C\'s kind alone must be in scope', outcome])
+        },
+        // …and the boundary this phase deliberately did NOT cross, stated as
+        // a checked claim rather than as prose in a docstring. A taxpayer
+        // whose Schedule C now computes still cannot file a return that
+        // declares self-employment TAX or the qualified business income
+        // deduction: both are Phase 28's, and both must still refuse. The day
+        // either stops refusing without Phase 28 having landed, this reddens.
+        theTwoPhase28KindsBesideScheduleCStillRefuse: () => {
+            const selfEmployment = classifyScope(['businessIncomeOrLoss', 'selfEmploymentTax'])
+            assert(
+                selfEmployment.kind === 'error',
+                ['self-employment tax must still refuse beside a computable Schedule C', selfEmployment])
+            assert(
+                selfEmployment.message.includes('Schedule SE'),
+                ['it must still name Schedule SE', selfEmployment.message])
+            const qbi = classifyScope(['businessIncomeOrLoss', 'qualifiedBusinessIncomeDeduction'])
+            assert(
+                qbi.kind === 'error',
+                ['the QBI deduction must still refuse beside a computable Schedule C', qbi])
+            assert(
+                qbi.message.includes('8995'),
+                ['it must still name Form 8995', qbi.message])
+            const deductibleHalf = classifyScope([
+                'businessIncomeOrLoss', 'deductiblePartOfSelfEmploymentTax',
+            ])
+            assert(
+                deductibleHalf.kind === 'error',
+                ['Schedule 1 line 15 must still refuse', deductibleHalf])
         },
         // TAX-25/TAX-26, Phase 25: the three kinds this phase reclassified,
         // declared TOGETHER and WITHOUT any of the other twenty-six — the
@@ -1804,27 +1853,33 @@ export const proof = {
             const outcome = classifyScope(['netInvestmentIncomeTax'])
             assertEq(outcome.kind, 'ok', ['Form 8960\'s kind alone must be in scope', outcome])
         },
-        // TAX-30, Phase 27, SPLIT COMMIT: all SEVEN Schedule 1 Part I kinds
-        // still refuse. Nothing is reclassified by the commit that adds them —
-        // wire before reclassify — so this leaf's job is to say that the split
-        // widened what the engine can NAME without widening one inch what it
-        // claims to compute. The next commit turns this into a six-kind list
-        // and adds `businessIncomeOrLoss`'s own in-scope leaf beside it.
+        // TAX-30, Phase 27: the SIX Schedule 1 Part I kinds this phase did NOT
+        // wire must still refuse on their own, or the split quietly widened
+        // the engine's claims rather than named them. The SAME property the
+        // three leaves below state for Schedules 1 Part II, 2 and 3.
         //
-        // Hand-typed, in Schedule 1 order, and deliberately NOT derived from
-        // the table under test.
-        theSevenScheduleOnePartOneKindsAllStillRefuse: () => {
+        // This leaf read `theSevenScheduleOnePartOneKindsAllStillRefuse` in
+        // the split commit, which reclassified nothing — wire before
+        // reclassify — and became this six-kind list in the commit that wired
+        // `fjs/schedule/c`. Both halves of that two-step are recorded here
+        // rather than only in a commit message, because the ordering is the
+        // discipline and a reader of this file is who needs it.
+        //
+        // Hand-typed, in Schedule 1 order, and deliberately NOT derived by
+        // subtracting the wired kind from the seven: a list computed from the
+        // tables under test could never notice a seventh kind silently
+        // becoming modeled.
+        theSixScheduleOnePartOneKindsThisPhaseDidNotWireStillRefuse: () => {
             /** @type {readonly Kind[]} */
             const stillRefused = [
                 'taxableStateLocalRefunds',
                 'alimonyReceived',
-                'businessIncomeOrLoss',
                 'otherGainsOrLosses',
                 'rentalRealEstateRoyaltiesPartnershipsSCorps',
                 'farmIncomeOrLoss',
                 'otherIncome',
             ]
-            assertEq(stillRefused.length, 7, 'seven printed Part I lines, hand-counted off the form')
+            assertEq(stillRefused.length, 6, 'seven printed Part I lines minus the one this phase wired')
             for (const kind of stillRefused) {
                 const outcome = classifyScope([kind])
                 assert(
@@ -1832,18 +1887,20 @@ export const proof = {
                     ['this Schedule 1 Part I kind must still refuse after the split', kind, outcome],
                 )
             }
-            // The one this phase is about to wire, with the form it names —
-            // so a refusal that stopped naming Schedule C reddens here rather
+            // Two of the six, each with the form it still needs — so a refusal
+            // that stopped naming Schedule F or Schedule E reddens here rather
             // than only in the table loop.
-            const business = classifyScope(['businessIncomeOrLoss'])
-            assert(business.kind === 'error', ['business income must still refuse before it is wired', business])
+            const farm = classifyScope(['farmIncomeOrLoss'])
+            assert(farm.kind === 'error', ['farm income must still refuse', farm])
             assert(
-                business.message.includes('Schedule C'),
-                ['the business-income refusal must name Schedule C', business.message],
+                farm.message.includes('Schedule F'),
+                ['the farm refusal must name Schedule F', farm.message],
             )
+            const rental = classifyScope(['rentalRealEstateRoyaltiesPartnershipsSCorps'])
+            assert(rental.kind === 'error', ['rental and pass-through income must still refuse', rental])
             assert(
-                business.message.includes('Schedule 1 line 3'),
-                ['the business-income refusal must name its own Schedule 1 line', business.message],
+                rental.message.includes('Schedule E'),
+                ['the rental refusal must name Schedule E', rental.message],
             )
         },
         // THE CONTROL FOR THE RECLASSIFICATION ABOVE, and the criterion the
@@ -2522,11 +2579,13 @@ export const proof = {
         // here, beside the sentence, rather than only in `partition`: the
         // runtime half of `_EveryDeclarationRequiredKindIsModeled`.
         everyDeclarationRequiredKindIsModeledAndDescribable: () => {
-            const expectedDeclarationRequiredCount = 1
+            // `1 -> 2` is Phase 27's own `businessIncomeOrLoss`, the second
+            // and only other use of this table since Phase 23 built it.
+            const expectedDeclarationRequiredCount = 2
             assertEq(
                 modeledKindDeclarationRemedies.length,
                 expectedDeclarationRequiredCount,
-                ['exactly one modeled kind is declaration-required today', modeledKindDeclarationRemedies],
+                ['exactly two modeled kinds are declaration-required today', modeledKindDeclarationRemedies],
             )
             for (const entry of modeledKindDeclarationRemedies) {
                 assert(

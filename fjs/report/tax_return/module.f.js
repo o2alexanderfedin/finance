@@ -163,6 +163,8 @@ import { dialect as adjustmentsDialect } from '../../document/adjustments/module
 import { dialect as oneZeroNineEightEDialect } from '../../document/1098e/module.f.js'
 import { dialect as oneZeroNineEightTDialect } from '../../document/1098t/module.f.js'
 import { dialect as creditsDialect } from '../../document/credits/module.f.js'
+import { dialect as oneZeroNineNineNecDialect } from '../../document/1099nec/module.f.js'
+import { dialect as businessExpensesDialect } from '../../document/business_expenses/module.f.js'
 import { dialect as iraDialect } from '../../document/ira/module.f.js'
 import { dialect as priorYearIraBasisDialect } from '../../document/prior_year_ira_basis/module.f.js'
 
@@ -186,6 +188,8 @@ import { dialect as priorYearIraBasisDialect } from '../../document/prior_year_i
 /** @import { OneZeroNineEightE } from '../../document/1098e/module.f.js' */
 /** @import { OneZeroNineEightT } from '../../document/1098t/module.f.js' */
 /** @import { Credits } from '../../document/credits/module.f.js' */
+/** @import { OneZeroNineNineNec } from '../../document/1099nec/module.f.js' */
+/** @import { BusinessExpenses } from '../../document/business_expenses/module.f.js' */
 /** @import { Ira } from '../../document/ira/module.f.js' */
 /** @import { PriorYearIraBasis } from '../../document/prior_year_ira_basis/module.f.js' */
 
@@ -229,7 +233,7 @@ import { dialect as priorYearIraBasisDialect } from '../../document/prior_year_i
  * `vnd.fjs.revision`, a future addition) falls straight through
  * {@link collectDocument} untouched — never coerced into a bucket, never
  * treated as a zero.
- * @typedef {ReturnProfile | W2 | OneZeroNineNineInt | OneZeroNineNineDiv | OneZeroNineNineB | OneZeroNineNineR | Ssa1099 | ItemizedDeductions | MedicalExpenses | PriorYearCapitalLoss | OneZeroNineNineG | Adjustments | OneZeroNineEightE | OneZeroNineEightT | Credits | Ira | PriorYearIraBasis} EngineDocument
+ * @typedef {ReturnProfile | W2 | OneZeroNineNineInt | OneZeroNineNineDiv | OneZeroNineNineB | OneZeroNineNineR | Ssa1099 | ItemizedDeductions | MedicalExpenses | PriorYearCapitalLoss | OneZeroNineNineG | Adjustments | OneZeroNineEightE | OneZeroNineEightT | Credits | Ira | PriorYearIraBasis | OneZeroNineNineNec | BusinessExpenses} EngineDocument
  */
 
 /**
@@ -258,6 +262,8 @@ import { dialect as priorYearIraBasisDialect } from '../../document/prior_year_i
  *   readonly medicalExpenseForms: readonly Stored<MedicalExpenses>[],
  *   readonly capitalLossCarryoverForms: readonly Stored<PriorYearCapitalLoss>[],
  *   readonly unemploymentForms: readonly Stored<OneZeroNineNineG>[],
+ *   readonly nonemployeeCompensationForms: readonly Stored<OneZeroNineNineNec>[],
+ *   readonly businessExpenseForms: readonly Stored<BusinessExpenses>[],
  *   readonly adjustmentForms: readonly Stored<Adjustments>[],
  *   readonly studentLoanInterestForms: readonly Stored<OneZeroNineEightE>[],
  *   readonly tuitionForms: readonly Stored<OneZeroNineEightT>[],
@@ -326,6 +332,8 @@ export const taxReturnReportSource = [
     '        medicalExpenseForms: [],',
     '        capitalLossCarryoverForms: [],',
     '        unemploymentForms: [],',
+    '        nonemployeeCompensationForms: [],',
+    '        businessExpenseForms: [],',
     '        adjustmentForms: [],',
     '        studentLoanInterestForms: [],',
     '        tuitionForms: [],',
@@ -360,6 +368,8 @@ export const taxReturnReportSource = [
     '        if (doc.dialect === \'vnd.fjs.medical_expenses\') { return { ...acc, medicalExpenseForms: [...acc.medicalExpenseForms, stored] } }',
     '        if (doc.dialect === \'vnd.fjs.prior_year_capital_loss\') { return { ...acc, capitalLossCarryoverForms: [...acc.capitalLossCarryoverForms, stored] } }',
     '        if (doc.dialect === \'vnd.fjs.1099g\') { return { ...acc, unemploymentForms: [...acc.unemploymentForms, stored] } }',
+    '        if (doc.dialect === \'vnd.fjs.1099nec\') { return { ...acc, nonemployeeCompensationForms: [...acc.nonemployeeCompensationForms, stored] } }',
+    '        if (doc.dialect === \'vnd.fjs.business_expenses\') { return { ...acc, businessExpenseForms: [...acc.businessExpenseForms, stored] } }',
     '        if (doc.dialect === \'vnd.fjs.adjustments\') { return { ...acc, adjustmentForms: [...acc.adjustmentForms, stored] } }',
     '        if (doc.dialect === \'vnd.fjs.1098e\') { return { ...acc, studentLoanInterestForms: [...acc.studentLoanInterestForms, stored] } }',
     '        if (doc.dialect === \'vnd.fjs.1098t\') { return { ...acc, tuitionForms: [...acc.tuitionForms, stored] } }',
@@ -414,6 +424,8 @@ export const taxReturnReportSource = [
     '            medicalExpenseForms: acc.medicalExpenseForms,',
     '            capitalLossCarryoverForms: acc.capitalLossCarryoverForms,',
     '            unemploymentForms: acc.unemploymentForms,',
+    '            nonemployeeCompensationForms: acc.nonemployeeCompensationForms,',
+    '            businessExpenseForms: acc.businessExpenseForms,',
     '            adjustmentForms: acc.adjustmentForms,',
     '            studentLoanInterestForms: acc.studentLoanInterestForms,',
     '            tuitionForms: acc.tuitionForms,',
@@ -482,6 +494,8 @@ const emptyCollected = {
     medicalExpenseForms: [],
     capitalLossCarryoverForms: [],
     unemploymentForms: [],
+    nonemployeeCompensationForms: [],
+    businessExpenseForms: [],
     adjustmentForms: [],
     studentLoanInterestForms: [],
     tuitionForms: [],
@@ -525,6 +539,8 @@ const routeDocument = documentHash => doc => acc => {
     if (doc.dialect === adjustmentsDialect) { return { ...acc, adjustmentForms: [...acc.adjustmentForms, { documentHash, value: doc }] } }
     if (doc.dialect === oneZeroNineEightEDialect) { return { ...acc, studentLoanInterestForms: [...acc.studentLoanInterestForms, { documentHash, value: doc }] } }
     if (doc.dialect === oneZeroNineEightTDialect) { return { ...acc, tuitionForms: [...acc.tuitionForms, { documentHash, value: doc }] } }
+    if (doc.dialect === oneZeroNineNineNecDialect) { return { ...acc, nonemployeeCompensationForms: [...acc.nonemployeeCompensationForms, { documentHash, value: doc }] } }
+    if (doc.dialect === businessExpensesDialect) { return { ...acc, businessExpenseForms: [...acc.businessExpenseForms, { documentHash, value: doc }] } }
     if (doc.dialect === creditsDialect) { return { ...acc, creditForms: [...acc.creditForms, { documentHash, value: doc }] } }
     if (doc.dialect === iraDialect) { return { ...acc, iraForms: [...acc.iraForms, { documentHash, value: doc }] } }
     if (doc.dialect === priorYearIraBasisDialect) { return { ...acc, priorYearIraBasisForms: [...acc.priorYearIraBasisForms, { documentHash, value: doc }] } }
@@ -636,6 +652,8 @@ const renderReturn = ctx => acc => {
         medicalExpenseForms: acc.medicalExpenseForms,
         capitalLossCarryoverForms: acc.capitalLossCarryoverForms,
         unemploymentForms: acc.unemploymentForms,
+        nonemployeeCompensationForms: acc.nonemployeeCompensationForms,
+        businessExpenseForms: acc.businessExpenseForms,
         adjustmentForms: acc.adjustmentForms,
         studentLoanInterestForms: acc.studentLoanInterestForms,
         tuitionForms: acc.tuitionForms,
@@ -746,6 +764,9 @@ const fixtureRetiree1099RHash = 'sha256-tax-return-retiree-1099r'
 const fixtureRetireeIraHash = 'sha256-tax-return-retiree-ira'
 const fixtureRetireeBasisHash = 'sha256-tax-return-retiree-basis'
 const fixtureRetireeProfileOnlyHash = 'sha256-tax-return-retiree-profile-only'
+const fixtureFounderProfileHash = 'sha256-tax-return-founder-profile'
+const fixtureFounderNecHash = 'sha256-tax-return-founder-1099nec'
+const fixtureFounderExpensesHash = 'sha256-tax-return-founder-expenses'
 
 const subjectProfile = 'tax-return-subject-profile'
 const subjectW2A = 'tax-return-subject-w2-a'
@@ -772,6 +793,9 @@ const subjectRetiree1099R = 'tax-return-subject-retiree-1099r'
 const subjectRetireeIra = 'tax-return-subject-retiree-ira'
 const subjectRetireeBasis = 'tax-return-subject-retiree-basis'
 const subjectRetireeProfileOnly = 'tax-return-subject-retiree-profile-only'
+const subjectFounderProfile = 'tax-return-subject-founder-profile'
+const subjectFounderNec = 'tax-return-subject-founder-1099nec'
+const subjectFounderExpenses = 'tax-return-subject-founder-expenses'
 
 /** @type {Readonly<Record<string, EngineDocument | { readonly dialect: string, readonly taxYear?: number }>>} */
 const documentByHash = {
@@ -1008,6 +1032,48 @@ const documentByHash = {
         taxpayerBornBeforeJan2_1961: true,
         declaredKinds: ['iraDistributions', 'seniorAndOtherScheduleOneADeductions'],
     },
+    // ── Phase 27's own three documents (DOC-20/DOC-21/TAX-30) ───────────
+    //
+    // The startup founder, at the only scale this engine can put on a 1040
+    // until Phase 28 supplies Schedule SE: §1402(b)(2) exempts net earnings
+    // from self-employment below $400, and `fjs/schedule/c` refuses anything
+    // at or above it rather than emitting a return with Schedule 2 line 4 at
+    // zero. See that module's own docstring.
+    //
+    // Without these three fixtures the two new `route` branches could be
+    // deleted and nothing would notice — the Phase 24 lesson, restated by
+    // Phases 25 and 26 and followed here.
+    [fixtureFounderProfileHash]: {
+        dialect: returnProfileDialect,
+        taxYear: 2025,
+        filingStatus: 'single',
+        dependentCount: 0,
+        declaredKinds: ['businessIncomeOrLoss', 'federalTaxWithheldOnOther1099'],
+    },
+    [fixtureFounderNecHash]: {
+        dialect: oneZeroNineNineNecDialect,
+        payerTin: '66-6666666',
+        recipientTin: '222-22-2222',
+        accountNumber: 'CLIENT-0001',
+        taxYear: 2025,
+        formRevision: '2025',
+        box1NonemployeeCompensation: '350.00',
+        box4FederalIncomeTaxWithheld: '40.00',
+    },
+    [fixtureFounderExpensesHash]: {
+        dialect: businessExpensesDialect,
+        recipientTin: '222-22-2222',
+        accountNumber: 'BUS-0001',
+        taxYear: 2025,
+        principalBusiness: 'software consulting',
+        grossReceiptsFullyReportedOnForms1099Nec: true,
+        entries: [{
+            category: 'advertising',
+            datePaid: '2025-03-14',
+            description: 'search advertising',
+            amount: '90.00',
+        }],
+    },
 }
 
 /** @type {Readonly<Record<string, string>>} */
@@ -1032,6 +1098,9 @@ const snapshotBySubject = {
     [subjectRetireeIra]: fixtureRetireeIraHash,
     [subjectRetireeBasis]: fixtureRetireeBasisHash,
     [subjectRetireeProfileOnly]: fixtureRetireeProfileOnlyHash,
+    [subjectFounderProfile]: fixtureFounderProfileHash,
+    [subjectFounderNec]: fixtureFounderNecHash,
+    [subjectFounderExpenses]: fixtureFounderExpensesHash,
 }
 
 /**
@@ -1072,6 +1141,11 @@ const creditsSubjects = [
 /** Phase 26's own four subjects, likewise NOT in sorted order. */
 const retireeSubjects = [
     subjectRetireeBasis, subjectRetireeIra, subjectRetiree1099R, subjectRetireeProfile,
+]
+
+/** Phase 27's own three subjects, likewise NOT in sorted order. */
+const founderSubjects = [
+    subjectFounderExpenses, subjectFounderNec, subjectFounderProfile,
 ]
 
 /**
@@ -1149,10 +1223,15 @@ const dispatchedDialects = [
     creditsDialect,
     iraDialect,
     priorYearIraBasisDialect,
+    // Phase 27's own two (DOC-20/DOC-21), the EIGHTEENTH and NINETEENTH:
+    // added here in the SAME commit that adds them to the source text and
+    // to the twin, which is the discipline the paragraph above asks for.
+    oneZeroNineNineNecDialect,
+    businessExpensesDialect,
 ]
 
 /** @type {number} */
-const expectedDispatchedDialectCount = 17
+const expectedDispatchedDialectCount = 19
 
 export const proof = {
     // The phase's central number check, and the reason this module exists:
@@ -1431,7 +1510,7 @@ export const proof = {
     // {@link taxReturnReport}, the function twin, and the literal source text
     // is executed only by `tax-return-integration.test.js`. The sentence is
     // narrowed to what is true; the source text's own branches are covered by
-    // {@link proof.sourceAndTwinDispatchOnTheSameSeventeenDialects}'s
+    // {@link proof.sourceAndTwinDispatchOnTheSameNineteenDialects}'s
     // verbatim-tag grep alone, and Phase 26's own retiree leaf below states
     // the same gap for the two dialects it adds.
     storedProgramRoutesTheTwoCreditDialectsAndComputesBothCredits: () => {
@@ -1527,7 +1606,7 @@ export const proof = {
     //
     // The SOURCE TEXT's own branches are a separate question, and this file
     // covers them only through
-    // {@link proof.sourceAndTwinDispatchOnTheSameSeventeenDialects}'s
+    // {@link proof.sourceAndTwinDispatchOnTheSameNineteenDialects}'s
     // verbatim-tag grep. The one place the literal source is EXECUTED is
     // `tax-return-integration.test.js`, whose fixture is Phase 21's two W-2s
     // and one 1099-G and carries no Form 1099-R at all — so the source's
@@ -1590,12 +1669,73 @@ export const proof = {
         assertEq(cents('1040 line 16 (Tax Table)'), 291500n, '$2,915.00')
         assertEq(cents('1040 line 37'), 291500n, '$2,915.00 owed')
     },
+    // ── Phase 27 (DOC-20/DOC-21/TAX-30): the two new dialects, through the
+    //    STORED PROGRAM rather than only through the host twin ─────────────
+    //
+    // Every figure hand-derived here, independently of any other file. A
+    // single filer with one client and one business expense:
+    //
+    //   Form 1099-NEC box 1                                     $350.00
+    //   Schedule C line 8    advertising                         $90.00
+    //   Schedule C line 31   350.00 - 90.00                     $260.00
+    //   Schedule 1 line 3, then line 10                         $260.00
+    //   1040 line 8                                             $260.00
+    //   1040 line 9          nothing else at all                $260.00
+    //   1040 line 11a        adjusted gross income              $260.00
+    //   1040 line 12e        single standard deduction       $15,750.00
+    //   1040 line 15         max(0, 260.00 - 15,750.00)           $0.00
+    //   Form 1099-NEC box 4                                      $40.00
+    //   1040 line 25b        1099-family withholding             $40.00
+    //   1040 line 34         overpaid, refunded in full          $40.00
+    //
+    // What this leaf proves that `fjs/form1040/core`'s own end-to-end leaf
+    // cannot: the TWIN's `route` branches for `vnd.fjs.1099nec` and
+    // `vnd.fjs.business_expenses` are real. Delete either and the business
+    // income vanishes, because no other fixture in this repository carries a
+    // document of either dialect through this program.
+    //
+    // The same narrowing Phase 26's own leaf records applies here: `runTwin`
+    // interprets the function twin, and the literal SOURCE text is executed
+    // only by `tax-return-integration.test.js`, whose fixture carries neither
+    // dialect. The source's own two branches are covered by
+    // {@link proof.sourceAndTwinDispatchOnTheSameNineteenDialects}'s
+    // verbatim-tag grep alone. That is a real gap, named rather than papered
+    // over, and it is the identical one Phases 25 and 26 each left.
+    storedProgramRoutesTheTwoBusinessDialectsAndComputesScheduleC: () => {
+        const result = runTwin(founderSubjects)
+        assert(result.kind === 'ok', ['expected a computed return', result])
+        if (result.kind !== 'ok') {
+            return
+        }
+        const cents = renderedCents(result)
+        assertEq(cents('1040 line 8'), 26000n, '$260.00 through Schedule 1 Part I')
+        assertEq(cents('1040 line 9'), 26000n, 'and it is the whole of total income')
+        assertEq(cents('1040 line 11a'), 26000n, 'AGI = $260.00')
+        assertEq(cents('1040 line 15'), 0n, 'taxable income floors at zero')
+        assertEq(cents('1040 line 25b'), 4000n, '$40.00 of §3406 backup withholding')
+        assertEq(cents('1040 line 34'), 4000n, '$40.00 overpaid')
+    },
+    // THE CONTROL: the SAME filer with the two business documents withheld.
+    // Everything goes to zero, and the return still computes — so the leaf
+    // above is evidence about the DOCUMENTS rather than about the profile.
+    theSameStoredFilerWithoutTheBusinessDocumentsComputesZeros: () => {
+        const result = runTwin([subjectFounderProfile])
+        assert(result.kind === 'ok', ['expected a computed return', result])
+        if (result.kind !== 'ok') {
+            return
+        }
+        const cents = renderedCents(result)
+        assertEq(cents('1040 line 8'), 0n)
+        assertEq(cents('1040 line 9'), 0n)
+        assertEq(cents('1040 line 25b'), 0n)
+        assertEq(cents('1040 line 34'), 0n)
+    },
     // The one mechanical half of the source/twin hand-sync (see the module
     // header): every dialect tag the TWIN dispatches on appears verbatim in
     // the SOURCE text, against a hand-typed count. The twin imports these
     // constants; the source cannot, so it spells them out — this is what
     // stops a rename from quietly desynchronizing the two.
-    sourceAndTwinDispatchOnTheSameSeventeenDialects: () => {
+    sourceAndTwinDispatchOnTheSameNineteenDialects: () => {
         assertEq(dispatchedDialects.length, expectedDispatchedDialectCount)
         for (const tag of dispatchedDialects) {
             assert(

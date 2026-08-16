@@ -41,7 +41,7 @@
  * here asks only whether a document that IS PRESENT proves an obligation.
  * Absence is never evidence of anything, here or there.
  *
- * ## The table, and why each of the three entries earns its place
+ * ## The table, and why each of the four entries earns its place
  *
  * 1. **W-2 box 5 above the Additional Medicare Tax threshold ->
  *    `additionalMedicareTax`.** The phase's motivating case. Box 5 is UNCAPPED
@@ -83,6 +83,33 @@
  *    in `fjs/` reads box 8 — it is stored, exactness-checked, and silently
  *    dropped. Understating, threshold-free, and entirely knowledge-dependent
  *    on a taxpayer's part: exactly this module's shape.
+ * 4. **1099-NEC box 1 (nonemployee compensation) non-zero ->
+ *    `businessIncomeOrLoss`** (Phase 27, TAX-30). The clearest entry in the
+ *    table, and the one whose absence would have been the worst: a stored
+ *    Form 1099-NEC PROVES self-employment. The payer filed one precisely
+ *    because the recipient was not an employee, so the amount is Schedule C
+ *    gross receipts and nothing else. Without this row, a filer who does not
+ *    declare `businessIncomeOrLoss` gets a return with box 1 nowhere on it —
+ *    Schedule C line 1 never runs, Schedule 1 line 3 stays a documented zero,
+ *    and 1040 line 8 is short by the whole of their business income, silently.
+ *
+ *    **This is the SECOND entry to point at a MODELED kind**, and only the
+ *    second since Phase 23 built the mechanism for it. `businessIncomeOrLoss`
+ *    is computable as of the same phase, so its remedy in
+ *    `fjs/return/scope`'s `modeledKindDeclarationRemedies` says "declare it
+ *    and this engine computes it" rather than "go and get a form" — see that
+ *    table's own docstring, whose reasoning is `additionalMedicareTax`'s and
+ *    needed no restating.
+ *
+ *    **It is deliberately NOT paired with a Schedule SE entry.** A 1099-NEC
+ *    also proves self-employment TAX, which `selfEmploymentTax` (Schedule 2
+ *    line 4) refuses. But a second tripwire on the same document would refuse
+ *    the same return twice for one fact, and — worse — a taxpayer who fixed
+ *    the first by declaring `businessIncomeOrLoss` would then be refused by
+ *    the second with no way to proceed at all, since declaring
+ *    `selfEmploymentTax` is itself a scope refusal until Phase 28. One
+ *    tripwire, one fact; the Schedule SE gap is the scope guard's to state
+ *    when a taxpayer declares it.
  *
  * ## The fourth entry that was specified and is NOT here, and why
  *
@@ -147,12 +174,14 @@ import { taxParamsByYear } from '../../tax/params/module.f.js'
 import { dialect as w2Dialect } from '../../document/w2/module.f.js'
 import { dialect as oneZeroNineNineRDialect } from '../../document/1099r/module.f.js'
 import { dialect as oneZeroNineNineGDialect, validate as validate1099g } from '../../document/1099g/module.f.js'
+import { dialect as oneZeroNineNineNecDialect } from '../../document/1099nec/module.f.js'
 
 /** @import { IndividualFilingStatus, TaxParamSet } from '../../tax/params/module.f.js' */
 /** @import { Kind } from '../profile/module.f.js' */
 /** @import { RefusableKind, ScopeOutcome, TripwireFinding } from '../scope/module.f.js' */
 /** @import { W2 } from '../../document/w2/module.f.js' */
 /** @import { OneZeroNineNineR } from '../../document/1099r/module.f.js' */
+/** @import { OneZeroNineNineNec } from '../../document/1099nec/module.f.js' */
 
 // ── What a tripwire reads ────────────────────────────────────────────────────
 
@@ -176,6 +205,7 @@ import { dialect as oneZeroNineNineGDialect, validate as validate1099g } from '.
  * @typedef {{
  *   readonly w2s: readonly { readonly value: W2 }[],
  *   readonly retirementForms: readonly { readonly value: OneZeroNineNineR }[],
+ *   readonly nonemployeeCompensationForms: readonly { readonly value: OneZeroNineNineNec }[],
  * }} SuppliedDocuments
  */
 
@@ -286,6 +316,17 @@ export const tripwires = [
                 context.taxParamSet.additionalMedicareTaxThreshold[context.filingStatus].amount,
             ),
     },
+    {
+        kind: 'businessIncomeOrLoss',
+        evidence: 'a stored Form 1099-NEC reports non-zero box 1 nonemployee compensation, which is '
+            + 'self-employment income by definition — the payer filed a 1099-NEC precisely because '
+            + 'the recipient was not an employee — and it reaches 1040 line 8 through Schedule C '
+            + 'line 31 and Schedule 1 line 3, neither of which is computed for a return that does '
+            + 'not declare it',
+        triggered: context =>
+            context.documents.nonemployeeCompensationForms.some(
+                form => boxIsNonZero(form.value.box1NonemployeeCompensation)),
+    },
 ]
 
 // ── The rule ─────────────────────────────────────────────────────────────────
@@ -340,11 +381,13 @@ assert(taxParams2025 !== undefined, 'expected TY2025 parameters to be present in
  * loop in the same instant (AGENTS.md's fourth shipped defect). The duplication
  * is the mechanism, not a smell.
  *
- * Three, not the four this phase's brief specified: see this module's own
- * docstring for why the 1099-G box 2 entry is unreachable and omitted.
+ * Phase 22 shipped THREE, not the four its brief specified: see this module's
+ * own docstring for why the 1099-G box 2 entry is unreachable and omitted.
+ * Phase 27 adds the fourth, and it is a different one — 1099-NEC box 1 ->
+ * `businessIncomeOrLoss`.
  * @type {number}
  */
-const expectedTripwireCount = 3
+const expectedTripwireCount = 4
 
 /** A W-2 carrying nothing but the fields its schema requires. @type {W2} */
 const bareW2 = {
@@ -366,8 +409,18 @@ const bare1099R = {
     formRevision: '2025',
 }
 
+/** A 1099-NEC carrying nothing but the fields its schema requires. @type {OneZeroNineNineNec} */
+const bare1099Nec = {
+    dialect: oneZeroNineNineNecDialect,
+    payerTin: '44-4444444',
+    recipientTin: '222-22-2222',
+    accountNumber: '',
+    taxYear: 2025,
+    formRevision: '2025',
+}
+
 /** No documents at all — the base every fixture below widens. @type {SuppliedDocuments} */
-const noDocuments = { w2s: [], retirementForms: [] }
+const noDocuments = { w2s: [], retirementForms: [], nonemployeeCompensationForms: [] }
 
 /**
  * A document set holding W-2s with exactly these box-5 amounts, one per entry.
@@ -432,7 +485,7 @@ export const proof = {
     // rows, three DISTINCT kinds, and no empty evidence string. A tripwire
     // whose evidence were blank would refuse without saying what proved it,
     // which is the silence this whole module replaces.
-    theTableIsExactlyThreeDistinctTripwires: () => {
+    theTableIsExactlyFourDistinctTripwires: () => {
         assertEq(tripwires.length, expectedTripwireCount)
         assertEq(new Set(tripwires.map(t => t.kind)).size, expectedTripwireCount)
         for (const tripwire of tripwires) {
@@ -674,6 +727,89 @@ export const proof = {
             assertEq(outcome.kind, 'ok', ['a declared kind must not trip its own tripwire', outcome])
         },
     },
+    // ── Entry 4: 1099-NEC box 1 -> businessIncomeOrLoss ──────────────────
+    nonemployeeCompensation: {
+        // PHASE 27'S MOTIVATING CASE, and the one the phase brief states as
+        // its own criterion 3: a stored 1099-NEC with self-employment
+        // undeclared must refuse, NAMING SCHEDULE C. Each of the four things
+        // a reader can act on is asserted SEPARATELY, so erasing any one
+        // reddens this leaf and says which went missing.
+        aStored1099NecUndeclaredRefusesNamingScheduleC: () => {
+            const outcome = classify('single')(['wages'])({
+                ...noDocuments,
+                nonemployeeCompensationForms: [
+                    { value: { ...bare1099Nec, box1NonemployeeCompensation: '48000.00' } },
+                ],
+            })
+            assert(outcome.kind === 'error', ['a stored 1099-NEC must refuse when undeclared', outcome])
+            if (outcome.kind !== 'error') {
+                return
+            }
+            assertEq(outcome.unmodeled.length, 1, ['expected exactly one required kind', outcome.unmodeled])
+            assertEq(outcome.unmodeled[0], 'businessIncomeOrLoss', ['expected Schedule 1 line 3 named', outcome.unmodeled])
+            assert(
+                outcome.message.includes('Schedule C'),
+                ['the refusal must name the form the income belongs on', outcome.message])
+            assert(
+                outcome.message.includes('Schedule 1 line 3'),
+                ['the refusal must name the Schedule 1 line it reaches', outcome.message])
+            assert(
+                outcome.message.includes('box 1'),
+                ['the refusal must name the box that proved it', outcome.message])
+            // The REMEDY is the half that distinguishes this entry from the
+            // other three: `businessIncomeOrLoss` is MODELED, so the fix is a
+            // declaration rather than a form the taxpayer has to go and find.
+            // A remedy that still said "requires Schedule C" would send them
+            // looking for something this engine already computes.
+            assert(
+                outcome.message.includes('declare businessIncomeOrLoss'),
+                ['the remedy must be the declaration, not a form hunt', outcome.message])
+        },
+        // THE NEGATIVE CONTROL: a return with no 1099-NEC at all computes,
+        // and so does one whose box 1 is absent or zero. DOC-11 at the guard.
+        anAbsentOrZeroBoxOneNeverFires: () => {
+            const none = classify('single')(['wages'])(noDocuments)
+            assertEq(none.kind, 'ok', ['no 1099-NEC must not fire', none])
+            const absent = classify('single')(['wages'])({
+                ...noDocuments,
+                nonemployeeCompensationForms: [{ value: bare1099Nec }],
+            })
+            assertEq(absent.kind, 'ok', ['an absent box 1 must not fire', absent])
+            const zero = classify('single')(['wages'])({
+                ...noDocuments,
+                nonemployeeCompensationForms: [
+                    { value: { ...bare1099Nec, box1NonemployeeCompensation: '0.00' } },
+                ],
+            })
+            assertEq(zero.kind, 'ok', ['a zero box 1 must not fire', zero])
+        },
+        // A 1099-NEC carrying ONLY backup withholding — box 4 with no box 1 —
+        // is a real, if unusual, document, and it must NOT fire: box 4 is a
+        // payment, not income, and it reaches 1040 line 25b whether or not a
+        // Schedule C exists. A predicate written against the wrong box would
+        // refuse this return and no other leaf here would notice.
+        aFormWithOnlyBoxFourDoesNotFire: () => {
+            const outcome = classify('single')(['wages'])({
+                ...noDocuments,
+                nonemployeeCompensationForms: [
+                    { value: { ...bare1099Nec, box4FederalIncomeTaxWithheld: '1200.00' } },
+                ],
+            })
+            assertEq(outcome.kind, 'ok', ['box 4 alone must not fire the box-1 tripwire', outcome])
+        },
+        // Declaring the kind silences it, exactly as on the other three
+        // entries — and here that declaration also makes the return
+        // COMPUTABLE, which is what the remedy promises.
+        aDeclaredBusinessIncomeSilencesTheTripwire: () => {
+            const outcome = classify('single')(['wages', 'businessIncomeOrLoss'])({
+                ...noDocuments,
+                nonemployeeCompensationForms: [
+                    { value: { ...bare1099Nec, box1NonemployeeCompensation: '48000.00' } },
+                ],
+            })
+            assertEq(outcome.kind, 'ok', ['a declared kind must not trip its own tripwire', outcome])
+        },
+    },
     // ── The whole table's behaviour ──────────────────────────────────────
     //
     // Nothing supplied, nothing declared: compute. This is the strongest
@@ -722,12 +858,15 @@ export const proof = {
         const outcome = classify('single')(['wages'])({
             w2s: [{ value: { ...bareW2, box5MedicareWagesAndTips: '387654.32', box8AllocatedTips: '1234.56' } }],
             retirementForms: [{ value: { ...bare1099R, box3CapitalGain: '7654.21' } }],
+            nonemployeeCompensationForms: [
+                { value: { ...bare1099Nec, box1NonemployeeCompensation: '9876.54' } },
+            ],
         })
         assert(outcome.kind === 'error', ['expected a refusal', outcome])
         if (outcome.kind !== 'error') {
             return
         }
-        for (const amount of ['387654.32', '1234.56', '7654.21']) {
+        for (const amount of ['387654.32', '1234.56', '7654.21', '9876.54']) {
             assert(
                 !outcome.message.includes(amount),
                 ['a taxpayer amount reached the refusal message', amount, outcome.message])
@@ -735,7 +874,7 @@ export const proof = {
         // The control: the message is not empty, and it really did describe
         // all three findings — otherwise "contains no amount" would be
         // satisfied by a message containing nothing.
-        assertEq(outcome.unmodeled.length, 3, ['expected all three tripwires to have fired', outcome.unmodeled])
+        assertEq(outcome.unmodeled.length, 4, ['expected all four tripwires to have fired', outcome.unmodeled])
     },
     // The rejected fourth entry, recorded as a CHECKED claim rather than as
     // prose (see this module's docstring). `fjs/document/1099g` refuses a

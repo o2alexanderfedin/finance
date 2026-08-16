@@ -42,7 +42,7 @@
  * | 27b | documented zero | the printed form reserves it |
  * | 28, 29 | ✔ | arithmetic |
  * | 30 business use of home | documented zero, and REFUSES if asserted | Form 8829 or the simplified method's square footage |
- * | 31 net profit | ✔ **when it is a profit**; REFUSES when it is a loss | see "The net-loss decision" |
+ * | 31 net profit | ✔ **only when it is a profit UNDER $400**; REFUSES a loss, and refuses $400 or more | see "The net-loss decision" and "Schedule SE and QBI" |
  * | 32 at risk | never reached | it exists only for a loss, which refuses |
  * | Part III (33-42) | REFUSES by name | beginning and ending inventory |
  * | Part IV (43-47) | REFUSES by name | it exists only to support line 9, which refuses |
@@ -151,7 +151,8 @@
  * A statutory employee with no business record at all is exactly the case that
  * would otherwise stay silently overstated.
  *
- * ## What this module deliberately does NOT do: Schedule SE and QBI
+ * ## What this module deliberately does NOT do: Schedule SE and QBI — and why
+ * that costs a REFUSAL rather than nothing
  *
  * Line 31's own instruction is *"enter on both Schedule 1 (Form 1040), line 3,
  * **and on Schedule SE, line 2**."* This module reaches the first and not the
@@ -162,16 +163,35 @@
  * `selfEmploymentTax` and `qualifiedBusinessIncomeDeduction` both remain
  * `fjs/return/scope` refusals, each naming Phase 28.
  *
+ * **Leaving it there would have shipped a silently wrong return, and this is
+ * the finding that most nearly went unnoticed in this phase.** The scope guard
+ * only refuses a kind the taxpayer DECLARES, and self-employment tax is not
+ * elective: a filer who declares `businessIncomeOrLoss` and nothing else has
+ * declared truthfully, passes both guards, and would have received a complete-
+ * looking 1040 with Schedule 2 line 4 at zero — understating tax by roughly
+ * 15.3% of 92.35% of their net profit, about $7,000 on a $50,000 profit. That
+ * is `fjs/return/tripwire`'s own motivating failure, one schedule over and an
+ * order of magnitude larger.
+ *
+ * So {@link selfEmploymentTaxReachIsUnmodeled} refuses any net profit at or
+ * above §1402(b)(2)'s $400 floor, and its own docstring carries the reasoning
+ * and the deliberate over-approximation. The consequence is worth stating
+ * plainly: **until Phase 28, the only Schedule C this engine will put on a
+ * 1040 is one whose net profit is under $400.** Everything above that computes
+ * every printed line and then refuses, by name, at the last step.
+ *
  * @module
  */
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
 import { centsFromString } from '../../exact/module.f.js'
+import { taxParamsByYear } from '../../tax/params/module.f.js'
 
 /** @import { ReturnProfile } from '../../return/profile/module.f.js' */
 /** @import { OneZeroNineNineNec } from '../../document/1099nec/module.f.js' */
 /** @import { BusinessExpenses } from '../../document/business_expenses/module.f.js' */
 /** @import { W2 } from '../../document/w2/module.f.js' */
 /** @import { ReportLine, Source } from '../../report/line/module.f.js' */
+/** @import { TaxParamSet } from '../../tax/params/module.f.js' */
 
 // ── Inputs ───────────────────────────────────────────────────────────────────
 
@@ -676,6 +696,68 @@ export const scheduleCPartIV = entries => refusalForCategory(entries)('carAndTru
 /** @typedef {ScheduleCPartII | ScheduleCRefusal} ScheduleCPartIIOutcome */
 
 /**
+ * **Line 31's OTHER printed destination**, and the refusal Phase 27 would have
+ * been dishonest without.
+ *
+ * Line 31's own instruction reads *"enter on both Schedule 1 (Form 1040), line
+ * 3, **and on Schedule SE, line 2**."* This engine reaches the first. It does
+ * not reach the second, and Schedule SE is Phase 28 (TAX-31).
+ *
+ * **The scope guard cannot cover this, and that is the whole reason this
+ * function exists.** `selfEmploymentTax` is a refused kind, so a taxpayer who
+ * DECLARES it is refused before any line computes. But self-employment tax is
+ * not elective: a filer who declares `businessIncomeOrLoss` and nothing else
+ * has made a true declaration, passes the scope guard, and — without this
+ * check — would receive a confident, complete-looking 1040 with Schedule 2
+ * line 4 at zero, understating their tax by roughly 15.3% of 92.35% of their
+ * net profit. On a $50,000 profit that is about $7,000. That is precisely the
+ * failure `fjs/return/tripwire`'s own docstring describes for Form 8959, one
+ * schedule over and an order of magnitude larger.
+ *
+ * ## The threshold is compared against NET PROFIT, not net earnings
+ *
+ * §1402(b)(2) exempts net earnings from self-employment below $400, and net
+ * earnings are 92.35% of net profit (§1402(a)(12)) — so they are always
+ * SMALLER than the figure compared here. Comparing net profit against $400
+ * therefore refuses a band of returns, net profit $400.00 through $433.12,
+ * that owe no self-employment tax at all.
+ *
+ * **That over-approximation is deliberate and goes in the refusing
+ * direction.** Applying the 92.35% factor to tighten it would be computing
+ * §1402(a)'s net earnings, which is Schedule SE line 4 — the exact form this
+ * phase must not attempt. So this function uses only §1402(b)(2)'s own stored
+ * $400 and the fact that net earnings never exceed net profit, and the band it
+ * over-refuses is named in the message so a reader in it knows why.
+ *
+ * A net profit BELOW $400 owes no self-employment tax under any reading, so
+ * that return computes — which is what keeps this from being a blanket refusal
+ * of every Schedule C, and what gives Phase 27 a return that reaches 1040 line
+ * 8 end to end.
+ * @type {(taxParamSet: TaxParamSet) => (netProfitCents: bigint) => ScheduleCRefusal | { readonly kind: 'ok' }}
+ */
+export const selfEmploymentTaxReachIsUnmodeled = taxParamSet => netProfitCents => {
+    const minimumCents = centsFromString(taxParamSet.selfEmploymentTax.minimumNetEarnings.amount)
+    if (netProfitCents < minimumCents) {
+        return { kind: 'ok' }
+    }
+    return {
+        kind: 'error',
+        message: `Schedule C line 31 is a net profit of ${netProfitCents} cents, and the printed `
+            + `line's own instruction is to enter it "on both Schedule 1 (Form 1040), line 3, AND `
+            + `on Schedule SE, line 2". This engine reaches the first and not the second: `
+            + `self-employment tax is Schedule SE, its deductible half is Schedule 1 line 15, and `
+            + `neither is modeled (TAX-31, Phase 28). Emitting a 1040 with Schedule 2 line 4 at `
+            + `zero would understate the tax by roughly 15.3% of 92.35% of this profit, and `
+            + `declaring selfEmploymentTax does not help — that kind is refused too. Only a net `
+            + `profit below §1402(b)(2)'s ${taxParamSet.selfEmploymentTax.minimumNetEarnings.amount} `
+            + `owes no self-employment tax at all and can be computed here. This engine compares `
+            + `that floor against NET PROFIT rather than against §1402(a)(12)'s 92.35% net `
+            + `earnings, which are always smaller, so a profit between $400.00 and $433.12 is `
+            + `refused although it owes nothing — tightening that would be computing Schedule SE`,
+    }
+}
+
+/**
  * **Line 32, the at-risk determination.** *"If you have a loss, check the box
  * that describes your investment in this activity ... 32a All investment is at
  * risk. 32b Some investment is not at risk ... If you checked 32b, you must
@@ -870,9 +952,9 @@ export const scheduleCPartII = profile => entries => line7GrossIncome => {
  * 6. **An unrecognized category**, then **Part III**, **Part IV** and the two
  *    refused lines outside the line-28 block. All before arithmetic.
  * 7. The parts, and finally the **net-loss** refusal.
- * @type {(input: ScheduleCInput) => ScheduleCOutcome}
+ * @type {(taxParamSet: TaxParamSet) => (input: ScheduleCInput) => ScheduleCOutcome}
  */
-export const scheduleC = input => {
+export const scheduleC = taxParamSet => input => {
     const { profile, nonemployeeCompensationForms, businessExpenseForms, w2Forms } = input
 
     // 1. A statutory employee's box 1 wages belong on THIS form's line 1, not
@@ -1005,6 +1087,13 @@ export const scheduleC = input => {
     if (partII.line31.value < 0n) {
         return atRiskDeterminationLine32(partII.line31.value)
     }
+    // 8. Line 31's OTHER printed destination, Schedule SE line 2. Checked
+    //    LAST, after the loss, because a loss is refused for a reason that is
+    //    true of the at-risk rules whatever Schedule SE would have said.
+    const selfEmployment = selfEmploymentTaxReachIsUnmodeled(taxParamSet)(partII.line31.value)
+    if (selfEmployment.kind === 'error') {
+        return selfEmployment
+    }
     return { kind: 'ok', filed: true, partI, partII }
 }
 
@@ -1072,14 +1161,48 @@ const bareW2Value = {
     taxYear: 2025, formRevision: '2025',
 }
 
+/** TY2025's parameter set, narrowed exactly ONCE at module scope. */
+const taxParams2025 = taxParamsByYear[2025]
+assert(taxParams2025 !== undefined, 'expected TY2025 parameters to be present in taxParamsByYear')
+
 /** @type {(input: Partial<ScheduleCInput>) => ScheduleCOutcome} */
-const run = input => scheduleC({
+const run = input => scheduleC(taxParams2025)({
     profile,
     nonemployeeCompensationForms: [],
     businessExpenseForms: [],
     w2Forms: [],
     ...input,
 })
+
+/**
+ * Parts I and II computed DIRECTLY, without {@link scheduleC}'s two
+ * whole-schedule refusals.
+ *
+ * **This helper exists because of §1402(b)(2), and that is worth saying out
+ * loud rather than leaving as a convenience.** A Schedule C net profit of $400
+ * or more refuses through the product path until Phase 28 builds Schedule SE,
+ * so a leaf about line 18's arithmetic cannot use `run(...)` on a realistic
+ * $48,000 return — it would only ever observe the self-employment refusal.
+ * The printed LINES are `scheduleCPartI`'s and `scheduleCPartII`'s, both
+ * exported named functions per TAX-15, and this is where they are exercised at
+ * realistic amounts.
+ *
+ * `run(...)` still covers everything `scheduleC` itself decides — the two
+ * whole-schedule refusals, the business cardinality, the gross-receipts
+ * assertion, the category vocabulary and the statutory-employee W-2 — and
+ * `aSubFourHundredDollarProfitComputesEndToEnd` is the leaf that pins the two
+ * halves together, so this helper cannot drift into testing a composition the
+ * product path does not perform.
+ * @type {(forms: readonly Stored<OneZeroNineNineNec>[]) => (entries: readonly BusinessExpenses['entries'][number][]) => { readonly partI: ScheduleCPartI, readonly partII: ScheduleCPartII }}
+ */
+const partsOf = forms => entries => {
+    /** @type {readonly StoredEntry[]} */
+    const stored = entries.map(value => ({ documentHash: 'sha256-business-a', value }))
+    const partI = scheduleCPartI(profile)(forms)
+    const partII = scheduleCPartII(profile)(stored)(partI.line7)
+    assert(partII.kind === 'ok', ['expected a computed Part II', partII])
+    return { partI, partII }
+}
 
 /** Narrows an outcome to its OK arm, throwing (never casting).
  * @type {(outcome: ScheduleCOutcome) => ScheduleC}
@@ -1265,13 +1388,10 @@ export const proof = {
         //
         // $48,000.00 + $12,500.00 = $60,500.00, hand-added.
         lineOneSumsEveryFormCitingEach: () => {
-            const result = ok(run({
-                nonemployeeCompensationForms: [
-                    necDoc('48000.00')('sha256-nec-a'),
-                    necDoc('12500.00')('sha256-nec-b'),
-                ],
-                businessExpenseForms: [businessDoc([])],
-            }))
+            const result = partsOf([
+                necDoc('48000.00')('sha256-nec-a'),
+                necDoc('12500.00')('sha256-nec-b'),
+            ])([])
             assertEq(result.partI.line1.value, 6050000n, '$48,000.00 + $12,500.00 = $60,500.00')
             assertEq(result.partI.line1.sources.length, 2)
             const [first, second] = result.partI.line1.sources
@@ -1290,10 +1410,7 @@ export const proof = {
         // minus line 1 — reddens on line 3 rather than surviving as a sign
         // error nothing looks at.
         theIncomeArithmeticCarriesLineOneThroughToLineSeven: () => {
-            const result = ok(run({
-                nonemployeeCompensationForms: [necDoc('48000.00')('sha256-nec-a')],
-                businessExpenseForms: [businessDoc([])],
-            }))
+            const result = partsOf([necDoc('48000.00')('sha256-nec-a')])([])
             assertEq(result.partI.line1.value, 4800000n)
             assertEq(result.partI.line2.value, 0n, 'returns and allowances: a documented zero')
             assertEq(result.partI.line3.value, 4800000n, 'line 1 - line 2')
@@ -1313,10 +1430,7 @@ export const proof = {
                     box4FederalIncomeTaxWithheld: '1200.00',
                 },
             }
-            const result = ok(run({
-                nonemployeeCompensationForms: [withholdingOnly],
-                businessExpenseForms: [businessDoc([])],
-            }))
+            const result = partsOf([withholdingOnly])([])
             assertEq(result.partI.line1.value, 0n)
             assertEq(result.partI.line1.sources[0].boxPath, 'declaredKinds')
         },
@@ -1339,13 +1453,8 @@ export const proof = {
                 if (!computes) {
                     continue
                 }
-                const result = ok(run({
-                    // Receipts large enough that no single category can turn
-                    // line 31 into a loss — which would refuse, and would make
-                    // this leaf measure the loss rule instead of the mapping.
-                    nonemployeeCompensationForms: [necDoc('48000.00')('sha256-nec-a')],
-                    businessExpenseForms: [businessDoc([entryOf(category)('1234.56')])],
-                }))
+                const result = partsOf([necDoc('48000.00')('sha256-nec-a')])(
+                    [entryOf(category)('1234.56')])
                 const { partII } = result
                 assertEq(partII.line28.value, cents, ['line 28 must carry this category', category])
                 // Found by each line's own printed `rule` string rather than
@@ -1373,15 +1482,12 @@ export const proof = {
         // the total reddens. The count is hand-typed too: `totalLine` would
         // happily add twenty-two.
         lineTwentyEightIsExactlyTheTwentyThreePrintedSummands: () => {
-            const result = ok(run({
-                businessExpenseForms: [businessDoc([
-                    entryOf('advertising')('1250.00'),
-                    entryOf('officeExpense')('184.99'),
-                    entryOf('travel')('900.01'),
-                    entryOf('otherExpenses')('42.00'),
-                ])],
-                nonemployeeCompensationForms: [necDoc('48000.00')('sha256-nec-a')],
-            }))
+            const result = partsOf([necDoc('48000.00')('sha256-nec-a')])([
+                entryOf('advertising')('1250.00'),
+                entryOf('officeExpense')('184.99'),
+                entryOf('travel')('900.01'),
+                entryOf('otherExpenses')('42.00'),
+            ])
             const { partII } = result
             /** @type {readonly (readonly [string, ReportLine])[]} */
             const summands = [
@@ -1415,13 +1521,10 @@ export const proof = {
         //
         // $42.00 + $19.95 = $61.95, hand-added.
         partVTotalReachesLineTwentySevenAUnchanged: () => {
-            const result = ok(run({
-                nonemployeeCompensationForms: [necDoc('48000.00')('sha256-nec-a')],
-                businessExpenseForms: [businessDoc([
-                    entryOf('otherExpenses')('42.00'),
-                    entryOf('otherExpenses')('19.95'),
-                ])],
-            }))
+            const result = partsOf([necDoc('48000.00')('sha256-nec-a')])([
+                entryOf('otherExpenses')('42.00'),
+                entryOf('otherExpenses')('19.95'),
+            ])
             assertEq(result.partII.line48.value, 6195n, '$42.00 + $19.95 = $61.95')
             assertEq(result.partII.line27a.value, result.partII.line48.value)
             assertEq(result.partII.line48.sources.length, 2)
@@ -1448,17 +1551,13 @@ export const proof = {
         //   line 30 business use of home                             $0.00
         //   line 31 net profit        44,803.05 - 0.00    = $44,803.05
         aWorkedProfitComputesEveryPrintedLine: () => {
-            const result = ok(run({
-                nonemployeeCompensationForms: [necDoc('48000.00')('sha256-nec-a')],
-                businessExpenseForms: [businessDoc([
-                    entryOf('advertising')('1250.00'),
-                    entryOf('officeExpense')('184.99'),
-                    entryOf('taxesAndLicenses')('800.00'),
-                    entryOf('travel')('900.01'),
-                    entryOf('otherExpenses')('61.95'),
-                ])],
-            }))
-            assertEq(result.filed, true)
+            const result = partsOf([necDoc('48000.00')('sha256-nec-a')])([
+                entryOf('advertising')('1250.00'),
+                entryOf('officeExpense')('184.99'),
+                entryOf('taxesAndLicenses')('800.00'),
+                entryOf('travel')('900.01'),
+                entryOf('otherExpenses')('61.95'),
+            ])
             assertEq(result.partI.line7.value, 4800000n, 'gross income $48,000.00')
             assertEq(result.partII.line8.value, 125000n, '$1,250.00')
             assertEq(result.partII.line18.value, 18499n, '$184.99')
@@ -1482,6 +1581,31 @@ export const proof = {
             }))
             assertEq(result.partII.line31.value, 0n, '$1,250.00 - $1,250.00 = $0.00')
             assertEq(result.filed, true)
+        },
+        // THE END-TO-END LEAF, and the one that keeps `partsOf` honest: a
+        // whole Schedule C through the PRODUCT path, `scheduleC` itself,
+        // producing a real non-zero line 31.
+        //
+        //   line 1  gross receipts   1099-NEC box 1            $500.00
+        //   line 8  advertising                                $150.00
+        //   line 28 total expenses                             $150.00
+        //   line 31 net profit       500.00 - 150.00           $350.00
+        //
+        // $350.00 is below §1402(b)(2)'s $400, which is why this composition
+        // survives the self-employment refusal — see
+        // `selfEmployment.theFourHundredDollarBoundaryPair`.
+        aSubFourHundredDollarProfitComputesEndToEnd: () => {
+            const result = ok(run({
+                nonemployeeCompensationForms: [necDoc('500.00')('sha256-nec-a')],
+                businessExpenseForms: [businessDoc([entryOf('advertising')('150.00')])],
+            }))
+            assertEq(result.filed, true)
+            assertEq(result.partI.line1.value, 50000n, '$500.00')
+            assertEq(result.partI.line7.value, 50000n, 'gross income $500.00')
+            assertEq(result.partII.line8.value, 15000n, '$150.00')
+            assertEq(result.partII.line28.value, 15000n, '$150.00')
+            assertEq(result.partII.line29.value, 35000n, '$500.00 - $150.00 = $350.00')
+            assertEq(result.partII.line31.value, 35000n, '$350.00 reaches Schedule 1 line 3')
         },
     },
 
@@ -1536,6 +1660,92 @@ export const proof = {
         },
     },
 
+    selfEmployment: {
+        // THE BOUNDARY PAIR, one cent apart, against a hand-typed §1402(b)(2)
+        // floor. $399.99 of net profit computes; $400.00 refuses. This is the
+        // pair that catches `<` silently becoming `<=` — and the pair that
+        // says Phase 27 ships a return that computes rather than a Schedule C
+        // nothing can reach.
+        theFourHundredDollarBoundaryPair: () => {
+            const below = ok(run({
+                nonemployeeCompensationForms: [necDoc('399.99')('sha256-nec-a')],
+                businessExpenseForms: [businessDoc([])],
+            }))
+            assertEq(below.partII.line31.value, 39999n, 'one cent below §1402(b)(2)\'s $400.00')
+            const at = refusal(run({
+                nonemployeeCompensationForms: [necDoc('400.00')('sha256-nec-a')],
+                businessExpenseForms: [businessDoc([])],
+            }))
+            assert(
+                at.message.includes('Schedule SE'),
+                ['the refusal must name the form that is missing', at.message])
+            assert(
+                at.message.includes('Schedule 1 line 15'),
+                ['the refusal must name the deductible half too', at.message])
+            assert(
+                at.message.includes('Schedule 2 line 4'),
+                ['the refusal must name the line the tax would land on', at.message])
+            assert(
+                at.message.includes('Phase 28'),
+                ['the refusal must name the phase that supplies it', at.message])
+        },
+        // The hand-typed floor above must be the SAME figure `fjs/tax/params`
+        // stores. Stated as its own leaf so a disagreement names itself
+        // rather than surfacing as a confusing pair of boundary failures —
+        // `fjs/return/tripwire`'s `theHandTypedBoundariesAgreeWithTheStored\
+        // Parameters` idiom, one schedule over.
+        theHandTypedFloorAgreesWithTheStoredParameter: () => {
+            assertEq(taxParams2025.selfEmploymentTax.minimumNetEarnings.amount, '400.00')
+            assertEq(
+                taxParams2025.selfEmploymentTax.minimumNetEarnings.citation.section,
+                '§1402(b)(2)')
+        },
+        // The refusal fires on a REALISTIC profit too, and quotes it — the
+        // interpolation-erasure mutation AGENTS.md says almost nobody runs.
+        // $48,000.00 of receipts and $3,000.00 of advertising leaves
+        // $45,000.00 = 4500000 cents.
+        aRealisticProfitRefusesQuotingIt: () => {
+            const result = refusal(run({
+                nonemployeeCompensationForms: [necDoc('48000.00')('sha256-nec-a')],
+                businessExpenseForms: [businessDoc([entryOf('advertising')('3000.00')])],
+            }))
+            assert(
+                result.message.includes('4500000'),
+                ['the refusal must quote the profit it is refusing', result.message])
+        },
+        // The named function directly, at the exact boundary and either side
+        // of it. `scheduleC` decides WHEN to call it; this is what it answers.
+        theNamedFunctionIsTheWholeRule: () => {
+            assertEq(selfEmploymentTaxReachIsUnmodeled(taxParams2025)(0n).kind, 'ok')
+            assertEq(selfEmploymentTaxReachIsUnmodeled(taxParams2025)(39999n).kind, 'ok')
+            assertEq(selfEmploymentTaxReachIsUnmodeled(taxParams2025)(40000n).kind, 'error')
+            assertEq(selfEmploymentTaxReachIsUnmodeled(taxParams2025)(4500000n).kind, 'error')
+        },
+        // The OVER-APPROXIMATION, stated as a checked claim rather than only
+        // in prose: a net profit of $433.12 owes no self-employment tax
+        // (92.35% of it is $399.99, below §1402(b)(2)'s floor) and is refused
+        // anyway, because this engine compares the floor against net PROFIT to
+        // avoid importing §1402(a)(12)'s 92.35% factor, which is Schedule SE's.
+        //
+        // The day Phase 28 lands and this stops being true, this leaf reddens
+        // and somebody has to decide deliberately — which is the whole reason
+        // it is a leaf and not a comment.
+        theBandThisOverRefusesIsNamedRatherThanHidden: () => {
+            const result = refusal(run({
+                nonemployeeCompensationForms: [necDoc('433.12')('sha256-nec-a')],
+                businessExpenseForms: [businessDoc([])],
+            }))
+            assert(
+                result.message.includes('$433.12'),
+                ['the refusal must name the top of the band it over-refuses', result.message])
+            // 92.35% of $433.12 is $399.99 (43312 x 9235 / 10000 = 39998.6,
+            // which is under 40000 cents at any rounding), so no
+            // self-employment tax is owed on it — hand-derived here rather
+            // than computed, because computing it would be Schedule SE.
+            assertEq(43312n * 9235n / 10000n, 39998n, '92.35% of $433.12 is under $400.00')
+        },
+    },
+
     refusals: {
         // One generated leaf per refused category: an entry in it stops the
         // whole schedule, and the message names the printed line, the printed
@@ -1570,11 +1780,11 @@ export const proof = {
         // business expense would pass all seven generated leaves.
         theSameAmountInAComputedCategoryComputes: () => {
             const result = ok(run({
-                nonemployeeCompensationForms: [necDoc('48000.00')('sha256-nec-a')],
+                nonemployeeCompensationForms: [necDoc('3300.00')('sha256-nec-a')],
                 businessExpenseForms: [businessDoc([entryOf('advertising')('3000.00')])],
             }))
             assertEq(result.partII.line28.value, 300000n, '$3,000.00')
-            assertEq(result.partII.line31.value, 4500000n, '$48,000.00 - $3,000.00 = $45,000.00')
+            assertEq(result.partII.line31.value, 30000n, '$3,300.00 - $3,000.00 = $300.00')
         },
         // An unrecognized category is refused, quoting the category, the
         // description and the amount. `vnd.fjs.business_expenses` accepts any
@@ -1678,10 +1888,10 @@ export const proof = {
         theSameReturnWithTheAssertionComputes: () => {
             assertEq(
                 ok(run({
-                    nonemployeeCompensationForms: [necDoc('48000.00')('sha256-nec-a')],
+                    nonemployeeCompensationForms: [necDoc('399.99')('sha256-nec-a')],
                     businessExpenseForms: [businessDoc([])],
                 })).partII.line31.value,
-                4800000n,
+                39999n,
             )
         },
         // A Form 1099-NEC with no business record at all cannot produce a
