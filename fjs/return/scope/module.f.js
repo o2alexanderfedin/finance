@@ -241,6 +241,45 @@
  * Phase 13's pattern repeated. See {@link modeledKindDeclarationRemedies}
  * for the decision and the mechanism.
  *
+ * ## Schedule 1 Part II's adjustments boundary, as of Phase 24
+ * (TAX-23/TAX-24/DOC-19)
+ *
+ * The same two-commit shape as Phase 23's, one schedule over, and for the
+ * same reason: `scheduleOneAdjustments` was one COARSE kind covering all
+ * sixteen printed lines of Part II, so nothing on that part was nameable and
+ * nothing on it could be reclassified one line at a time.
+ *
+ * 1. The coarse kind becomes THIRTEEN per-printed-line kinds, ALL still
+ *    refused. Nothing is reclassified; the refusals only become nameable.
+ *    See {@link unmodeledKindRefusals}' own Schedule 1 block.
+ * 2. `fjs/schedule/1` wires lines 11, 13 and 21 to real
+ *    `vnd.fjs.adjustments`, `vnd.fjs.1098e` and Form W-2 box 12 code W
+ *    figures through `fjs/form8889` and the printed Student Loan Interest
+ *    Deduction Worksheet — and `educatorExpenses`,
+ *    `healthSavingsAccountDeduction` and `studentLoanInterestDeduction` move
+ *    from {@link unmodeledKindRefusals} to {@link modeledKinds} in the SAME
+ *    commit as that wiring.
+ *
+ * The other ten stay refused, by name. Two of them are load-bearing proof
+ * that this guard still guards something on this schedule: `iraDeduction`
+ * (Schedule 1 line 20) and `deductiblePartOfSelfEmploymentTax` (line 15,
+ * Schedule SE, Phase 28) both refuse on their own after this phase, and both
+ * are named in `theTenScheduleOneKindsThisPhaseDidNotWireStillRefuse`.
+ *
+ * **`iraDeduction` now overlaps `vnd.fjs.return_profile`'s own
+ * `iraDeductionDeclared` field, and both are kept.** Phase 13 introduced that
+ * field precisely because the coarse kind "cannot distinguish an IRA
+ * deduction (which creates the Pub. 590-A / taxable-Social-Security cycle)
+ * from an HSA or educator-expense adjustment, which does not" — a limitation
+ * this split removes. The two now answer the same question by two routes: the
+ * KIND refuses at the scope layer, before any line computes, and the FIELD
+ * refuses inside `fjs/form1040/core` with a message about the fixed point
+ * itself. Removing the field would edit a stored dialect and move every
+ * `programHash` that quotes it (PROV-03/PROV-05), which is not a change this
+ * phase has any business making for a redundancy; so both stay, the kind
+ * fires first, and this paragraph is the record that the redundancy is known
+ * rather than accidental.
+ *
  * @module
  */
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
@@ -253,7 +292,7 @@ import { kindVocabulary } from '../profile/module.f.js'
 // ── The frozen modeled set ───────────────────────────────────────────────────
 
 /**
- * The twenty-three kinds this engine models today, each with the document it
+ * The twenty-six kinds this engine models today, each with the document it
  * actually reads. Frozen in `fjs/guest`'s sense: growing this list is a
  * deliberate act that must be paired with a deletion from
  * {@link unmodeledKindRefusals}, or {@link _EveryKindIsEitherModeledOrRefused}
@@ -320,7 +359,7 @@ const modeledKindNames = modeledKinds
 // ── The refusal table ────────────────────────────────────────────────────────
 
 /**
- * The forty-one declared kinds this engine does not model, each naming the
+ * The fifty-three declared kinds this engine does not model, each naming the
  * form line that cannot be computed, a human label, and the remedy — the form
  * or schedule required and, where one exists, the requirement ID and phase
  * that will supply it. `10-RESEARCH.md`'s "Form 1040 Lines 1a-37" table is the
@@ -372,9 +411,13 @@ const modeledKindNames = modeledKinds
 // lines" diagnosis above was exactly right, and the remedy for it was to
 // stop having a coarse kind rather than to keep describing one. It is now
 // fourteen rows, one per printed Schedule 2 line group, each naming its own
-// form. The two remaining Schedule 3 entries and the two Schedule 1 entries
-// still read the way this note describes, and are the same argument waiting
-// for the same treatment.
+// form.
+//
+// **Phase 24 (TAX-23/TAX-24) closed the second.** `scheduleOneAdjustments`
+// no longer exists either; it is now thirteen rows, one per printed Schedule
+// 1 Part II line. `scheduleOneAdditionalIncome` and the two Schedule 3
+// entries are what remain of the five, and they still read the way this note
+// describes -- the same argument waiting for the same treatment.
 export const unmodeledKindRefusals = /** @type {const} */ ([
     { kind: 'householdEmployeeWages', line: '1040 line 1b', label: 'household employee wages', remedy: 'no dialect models it (no phase yet)' },
     { kind: 'unreportedTips', line: '1040 line 1c', label: 'unreported tips', remedy: 'requires Form 4137 (no phase yet)' },
@@ -387,7 +430,39 @@ export const unmodeledKindRefusals = /** @type {const} */ ([
     { kind: 'section1202Gain', line: 'Form 1099-DIV box 2c', label: 'section 1202 gain', remedy: 'requires the §1202 exclusion percentage, which no 1099-DIV box carries (no phase yet)' },
     { kind: 'investmentInterestForm4952', line: 'Form 4952 line 4g', label: 'investment interest expense election', remedy: 'requires Form 4952 and the Schedule D Tax Worksheet (TAX-11, Phase 12)' },
     { kind: 'scheduleOneAdditionalIncome', line: '1040 line 8', label: 'additional income from Schedule 1', remedy: 'this coarse kind covers many distinct Schedule 1 line items with no per-line dialect to attribute a real amount to any one of them (no phase yet)' },
-    { kind: 'scheduleOneAdjustments', line: '1040 line 10', label: 'adjustments to income from Schedule 1', remedy: 'this coarse kind covers many distinct Schedule 1 line items with no per-line dialect to attribute a real amount to any one of them (no phase yet)' },
+    // ── Schedule 1 Part II's thirteen per-line kinds (TAX-23/24, Phase 24) ──
+    //
+    // `scheduleOneAdjustments` -- one coarse row covering this whole block --
+    // stood here until Phase 24 split it. Its remedy said, honestly, that
+    // "this coarse kind covers many distinct Schedule 1 line items with no
+    // per-line dialect to attribute a real amount to any one of them", which
+    // is a sentence a taxpayer can do nothing with: it named neither the line
+    // that cannot be computed nor the form that would compute it. Each row
+    // below names both, and `line` names the SCHEDULE 1 line first and the
+    // 1040 line it reaches second, exactly as the Schedule 2 block above
+    // does.
+    //
+    // **Nothing is reclassified in this step.** All thirteen rows are
+    // refusals, including the three this phase goes on to compute
+    // (`educatorExpenses`, `healthSavingsAccountDeduction`,
+    // `studentLoanInterestDeduction`). They move to {@link modeledKinds} one
+    // commit later, beside the `fjs/schedule/1`/`fjs/form1040/core` wiring
+    // that makes them computable -- wire before reclassify, in the SAME
+    // commit, exactly as Phase 23's own two-step Schedule 2 split did and as
+    // every slice this docstring records already established.
+    { kind: 'educatorExpenses', line: 'Schedule 1 line 11 -> 1040 line 10', label: 'educator expenses', remedy: 'no dialect models it (TAX-24, Phase 24)' },
+    { kind: 'reservistPerformingArtistFeeBasisExpenses', line: 'Schedule 1 line 12 -> 1040 line 10', label: 'certain business expenses of reservists, performing artists and fee-basis government officials', remedy: 'requires Form 2106 (no phase yet)' },
+    { kind: 'healthSavingsAccountDeduction', line: 'Schedule 1 line 13 -> 1040 line 10', label: 'the health savings account deduction', remedy: 'requires Form 8889 (TAX-24, Phase 24)' },
+    { kind: 'movingExpensesArmedForces', line: 'Schedule 1 line 14 -> 1040 line 10', label: 'moving expenses for members of the Armed Forces', remedy: 'requires Form 3903 (no phase yet)' },
+    { kind: 'deductiblePartOfSelfEmploymentTax', line: 'Schedule 1 line 15 -> 1040 line 10', label: 'the deductible part of self-employment tax', remedy: 'requires Schedule SE (TAX-31, Phase 28)' },
+    { kind: 'selfEmployedRetirementPlans', line: 'Schedule 1 line 16 -> 1040 line 10', label: 'self-employed SEP, SIMPLE and qualified plan contributions', remedy: 'requires the Pub. 560 deduction worksheet, whose limit depends on net self-employment earnings this engine does not compute (no phase yet)' },
+    { kind: 'selfEmployedHealthInsuranceDeduction', line: 'Schedule 1 line 17 -> 1040 line 10', label: 'the self-employed health insurance deduction', remedy: 'requires the Pub. 535 self-employed health insurance deduction worksheet and a Schedule C or Schedule K-1 this engine does not model (no phase yet)' },
+    { kind: 'penaltyOnEarlyWithdrawalOfSavings', line: 'Schedule 1 line 18 -> 1040 line 10', label: 'the penalty on early withdrawal of savings', remedy: 'requires Form 1099-INT box 2, which `vnd.fjs.1099int` stores but no computation reads (no phase yet)' },
+    { kind: 'alimonyPaid', line: 'Schedule 1 line 19a -> 1040 line 10', label: 'alimony paid', remedy: 'requires the recipient\u2019s SSN and the divorce-decree date, since only a pre-2019 decree makes alimony deductible, and no dialect models either (no phase yet)' },
+    { kind: 'iraDeduction', line: 'Schedule 1 line 20 -> 1040 line 10', label: 'the IRA deduction', remedy: 'requires Pub. 590-A Worksheet 1-1, whose own modified adjusted gross income depends on 1040 line 6b while line 6b depends on this deduction \u2014 a fixed point this engine does not model (no phase yet)' },
+    { kind: 'studentLoanInterestDeduction', line: 'Schedule 1 line 21 -> 1040 line 10', label: 'the student loan interest deduction', remedy: 'requires the Student Loan Interest Deduction Worksheet and a Form 1098-E dialect (TAX-23, Phase 24)' },
+    { kind: 'archerMsaDeduction', line: 'Schedule 1 line 23 -> 1040 line 10', label: 'the Archer MSA deduction', remedy: 'requires Form 8853 (no phase yet)' },
+    { kind: 'otherAdjustments', line: 'Schedule 1 line 24a-24z -> 1040 line 10', label: 'other adjustments to income', remedy: 'the printed form itself collapses eleven lettered sub-lines here and this engine models none of them (no phase yet)' },
     { kind: 'netQualifiedDisasterLoss', line: '1040 line 12e', label: 'net qualified disaster loss', remedy: 'requires Form 4684 (no phase yet)' },
     { kind: 'qualifiedBusinessIncomeDeduction', line: '1040 line 13a', label: 'qualified business income deduction', remedy: 'requires Form 8995 or 8995-A (no phase yet)' },
     // ── Schedule 2's fourteen per-line kinds (TAX-22, Phase 23) ─────────────
@@ -849,9 +924,17 @@ const expectedModeledKindCount = 23
  * one commit later (`additionalMedicareTax` and `netInvestmentIncomeTax`),
  * beside the Schedule 2 wiring that makes both computable — wire before
  * reclassify, in the SAME commit, as every earlier slice did.
+ *
+ * `41 -> 53` is Phase 24's own Schedule 1 Part II split (TAX-23/TAX-24):
+ * `41 - 1 + 13`, one coarse `scheduleOneAdjustments` row replaced by thirteen
+ * per-printed-line rows, with NO kind reclassified in the same step. `53 ->
+ * 50` is that phase's own three-kind reclassification one commit later
+ * (`educatorExpenses`, `healthSavingsAccountDeduction`,
+ * `studentLoanInterestDeduction`), beside the Schedule 1 wiring that makes
+ * all three computable.
  * @type {number}
  */
-const expectedUnmodeledKindCount = 41
+const expectedUnmodeledKindCount = 53
 
 /**
  * The complete refusal message for a return declaring exactly
@@ -972,6 +1055,12 @@ export const proof = {
                     // -> 1040 line 23`), because a coarse `1040 lines 17 and
                     // 23` is what made the kind they replaced unactionable.
                     || r.line.startsWith('Schedule 2 line')
+                    // Phase 24's own addition, the same shape one schedule
+                    // over: the thirteen Schedule 1 Part II rows name their
+                    // SCHEDULE 1 line first (`Schedule 1 line 20 -> 1040
+                    // line 10`), for the same reason -- a coarse "1040 line
+                    // 10" is what made the kind they replaced unactionable.
+                    || r.line.startsWith('Schedule 1 line')
                     || r.line.startsWith('Form '),
                     ['refusal entry does not name a form location', r.kind, r.line],
                 )
@@ -1071,6 +1160,70 @@ export const proof = {
                         kind,
                         row.line,
                     ],
+                )
+            }
+        },
+        // TAX-23/TAX-24, Phase 24: the thirteen Schedule 1 Part II kinds, in
+        // SCHEDULE 1's own printed order, each naming its own printed line.
+        // The identical shape as the Schedule 2 leaf above, one schedule
+        // over, and identical in what it is for: a table with thirteen rows
+        // where a coarse kind used to sit is only an improvement if each row
+        // names something a taxpayer can act on.
+        //
+        // Printed lines 21 through 26 are NOT all here. Line 22 is "Reserved
+        // for future use" with no box to fill, line 25 is the TOTAL of the
+        // 24a-24z block `otherAdjustments` already covers, and line 26 is the
+        // Part II total itself -- a kind for any of the three would be a
+        // declaration a taxpayer could never truthfully make.
+        theThirteenScheduleOneKindsNameTheirOwnPrintedLine: () => {
+            /** @type {readonly (readonly [string, string])[]} */
+            const expected = [
+                ['educatorExpenses', 'Schedule 1 line 11'],
+                ['reservistPerformingArtistFeeBasisExpenses', 'Schedule 1 line 12'],
+                ['healthSavingsAccountDeduction', 'Schedule 1 line 13'],
+                ['movingExpensesArmedForces', 'Schedule 1 line 14'],
+                ['deductiblePartOfSelfEmploymentTax', 'Schedule 1 line 15'],
+                ['selfEmployedRetirementPlans', 'Schedule 1 line 16'],
+                ['selfEmployedHealthInsuranceDeduction', 'Schedule 1 line 17'],
+                ['penaltyOnEarlyWithdrawalOfSavings', 'Schedule 1 line 18'],
+                ['alimonyPaid', 'Schedule 1 line 19a'],
+                ['iraDeduction', 'Schedule 1 line 20'],
+                ['studentLoanInterestDeduction', 'Schedule 1 line 21'],
+                ['archerMsaDeduction', 'Schedule 1 line 23'],
+                ['otherAdjustments', 'Schedule 1 line 24a-24z'],
+            ]
+            assertEq(expected.length, 13, 'the split produced thirteen kinds, hand-counted off the printed form')
+            expected
+                .map(([kind]) => kindVocabulary.findIndex(candidate => candidate === kind))
+                .reduce((previous, position) => {
+                    assert(
+                        position > previous,
+                        ['a Schedule 1 kind is missing from the vocabulary, or is out of Schedule 1 order', position, previous],
+                    )
+                    return position
+                }, -1)
+            for (const [kind, line] of expected) {
+                const row = unmodeledKindRefusals.find(r => r.kind === kind)
+                if (row === undefined) {
+                    assert(
+                        modeledKindNames.includes(kind),
+                        ['a Schedule 1 kind is neither refused nor modeled', kind],
+                    )
+                    continue
+                }
+                // The trailing space is what stops `Schedule 1 line 1` from
+                // matching `Schedule 1 line 12`, and `line 2` from matching
+                // `line 24a-24z`.
+                assert(
+                    row.line === line || row.line.startsWith(`${line} `),
+                    ['a Schedule 1 refusal row names the wrong printed line', kind, line, row.line],
+                )
+                // EVERY Part II row reaches the same 1040 line, because every
+                // one of them is a summand of line 26. There is no memo-line
+                // exception here, unlike Schedule 2's section 965 row.
+                assert(
+                    row.line.includes('1040 line 10'),
+                    ['every Schedule 1 Part II row must also name the 1040 line it reaches', kind, row.line],
                 )
             }
         },
@@ -1262,6 +1415,65 @@ export const proof = {
             assert(
                 selfEmployment.message.includes('Schedule 2 line 4'),
                 ['the self-employment refusal must name its own Schedule 2 line', selfEmployment.message],
+            )
+        },
+        // TAX-23/TAX-24, Phase 24: the SAME property one schedule over. The
+        // ten Schedule 1 Part II kinds this phase did NOT wire must still
+        // refuse on their own, or the split quietly widened the engine's
+        // claims rather than named them.
+        //
+        // Hand-typed, in Schedule 1 order, and deliberately NOT derived by
+        // subtracting the three wired kinds from the thirteen: a list
+        // computed from the tables under test could never notice an eleventh
+        // kind silently becoming modeled.
+        theTenScheduleOneKindsThisPhaseDidNotWireStillRefuse: () => {
+            /** @type {readonly Kind[]} */
+            const stillRefused = [
+                'reservistPerformingArtistFeeBasisExpenses',
+                'movingExpensesArmedForces',
+                'deductiblePartOfSelfEmploymentTax',
+                'selfEmployedRetirementPlans',
+                'selfEmployedHealthInsuranceDeduction',
+                'penaltyOnEarlyWithdrawalOfSavings',
+                'alimonyPaid',
+                'iraDeduction',
+                'archerMsaDeduction',
+                'otherAdjustments',
+            ]
+            assertEq(stillRefused.length, 10, 'thirteen Schedule 1 Part II kinds minus the three this phase wired')
+            for (const kind of stillRefused) {
+                const outcome = classifyScope([kind])
+                assert(
+                    outcome.kind === 'error',
+                    ['this Schedule 1 Part II kind must still refuse after the split', kind, outcome],
+                )
+            }
+            // The two the phase's brief names specifically, each with the
+            // reason it still cannot be computed -- so a refusal that stopped
+            // naming the fixed point, or Schedule SE, reddens here rather
+            // than only in the table loop.
+            const ira = classifyScope(['iraDeduction'])
+            assert(ira.kind === 'error', ['the IRA deduction must still refuse', ira])
+            assert(
+                ira.message.includes('590-A'),
+                ['the IRA refusal must still name the worksheet it needs', ira.message],
+            )
+            assert(
+                ira.message.includes('Schedule 1 line 20'),
+                ['the IRA refusal must name its own Schedule 1 line', ira.message],
+            )
+            const selfEmploymentHalf = classifyScope(['deductiblePartOfSelfEmploymentTax'])
+            assert(
+                selfEmploymentHalf.kind === 'error',
+                ['the deductible half of self-employment tax must still refuse', selfEmploymentHalf],
+            )
+            assert(
+                selfEmploymentHalf.message.includes('Schedule SE'),
+                ['it must still name Schedule SE', selfEmploymentHalf.message],
+            )
+            assert(
+                selfEmploymentHalf.message.includes('Schedule 1 line 15'),
+                ['it must name its own Schedule 1 line', selfEmploymentHalf.message],
             )
         },
         // The gate. Its control is the leaf immediately below, which is this
