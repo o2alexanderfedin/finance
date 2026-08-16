@@ -623,6 +623,31 @@ export const proof = {
         assertEq(10000n - (1240n + 290n) / 2n, printedNetEarningsFactorBasisPoints)
     },
 
+    // **THE HAND-TYPED CONSTANTS ABOVE MUST BE THE FIGURES `fjs/tax/params`
+    // STORES.** Its own leaf, so a disagreement names itself rather than
+    // surfacing as a confusing set of boundary failures — `fjs/return/
+    // tripwire`'s `theHandTypedBoundariesAgreeWithTheStoredParameters` idiom,
+    // one form over.
+    //
+    // This leaf INHERITS `fjs/schedule/c`'s own
+    // `theHandTypedFloorAgreesWithTheStoredParameter`, which Phase 27 wrote
+    // for the $400 floor when that module was the parameter's only reader.
+    // Phase 28 moved the reader here, so the check moved with it — and gained
+    // the wage base, which is the one figure in this group that is INDEXED
+    // and therefore the one most likely to be stale a tax year from now.
+    theHandTypedFiguresAgreeWithTheStoredParameters: () => {
+        const { selfEmploymentTax } = taxParams2025
+        assertEq(centsFromString(selfEmploymentTax.minimumNetEarnings.amount),
+            printedMinimumNetEarningsCents, 'Schedule SE line 4c\'s $400.00')
+        assertEq(selfEmploymentTax.minimumNetEarnings.citation.section, '§1402(b)(2)')
+        assertEq(centsFromString(selfEmploymentTax.socialSecurityWageBase.amount),
+            printedWageBaseCents, 'Schedule SE line 7\'s $176,100.00')
+        assertEq(selfEmploymentTax.socialSecurityWageBase.citation.section, '§1402(b)(1)')
+        // …and the derived factor against the printed page's own 0.9235,
+        // which is the third hand-typed constant in this file.
+        assertEq(netEarningsFactorBasisPoints(taxParams2025), printedNetEarningsFactorBasisPoints)
+    },
+
     partI: {
         // THE WORKED FOUNDER RETURN, hand-derived end to end. A single filer
         // with a $50,000.00 Schedule C net profit and no wages at all.
