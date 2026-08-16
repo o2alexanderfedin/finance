@@ -140,6 +140,7 @@ export const kindVocabulary = /** @type {const} */ ([
     'iraDistributions',                     // 4a/4b
     'pensionsAndAnnuities',                 // 5a/5b
     'socialSecurityBenefits',               // 6a/6b
+    'unemploymentCompensation',             // Schedule 1 line 7 -> 8
     'capitalGainDistributions',             // 7a
     'capitalGainsOrLosses',                 // 7a via Schedule D
     'unrecaptured1250Gain',                 // Schedule D line 19
@@ -547,14 +548,14 @@ const expectedMoneyBoxFieldCount = 4
  * for the same reason.
  * @type {number}
  */
-const expectedKindCount = 50
+const expectedKindCount = 51
 
 export const proof = {
     dialectAndMediaType: () => {
         assertEq(dialect, 'vnd.fjs.return_profile')
         assertEq(mediaType, 'application/vnd.fjs.return_profile+json')
     },
-    kindVocabularyIsExactlyFifty: () => {
+    kindVocabularyIsExactlyFiftyOne: () => {
         assertEq(kindVocabulary.length, expectedKindCount)
         assertEq(new Set(kindVocabulary).size, kindVocabulary.length)
     },

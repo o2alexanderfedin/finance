@@ -17,21 +17,29 @@
  * ## Read this before Schedule 2 or Schedule 3 — the shape is identical
  *
  * Every printed line on this schedule is modeled — no line is silently
- * omitted. For the declared 65+/dependents/itemizing profile this project
- * targets, research (13-RESEARCH.md §5) confirms **none of Schedule 1's
- * Part I income items and none of Part II's adjustments are populated by
- * any kind this engine models.** Every line below is a
- * `profileDeclaredZeroLine`, citing the profile's own `declaredKinds` box —
- * `fjs/schedule/b`'s Form 8815 boundary treatment, copied verbatim in
- * shape, applied to an entire schedule rather than one line.
+ * omitted. **Exactly one line computes from a document: line 7,
+ * unemployment compensation, summed from `vnd.fjs.1099g` box 1 (Phase 20).**
+ * Every other line is a `profileDeclaredZeroLine`, citing the profile's own
+ * `declaredKinds` box — `fjs/schedule/b`'s Form 8815 boundary treatment,
+ * copied verbatim in shape, applied to almost an entire schedule rather
+ * than one line.
+ *
+ * The paragraph above read *"none of Schedule 1's Part I income items and
+ * none of Part II's adjustments are populated by any kind this engine
+ * models"* until 2026-08-15, which stopped being true the day before, when
+ * line 7 began computing. Corrected after Phase 20's verification pass found
+ * it. Research (13-RESEARCH.md §5) established that claim honestly for the
+ * declared 65+/dependents/itemizing profile; **a finding is true of the
+ * moment it was made, and a docstring that quotes one inherits its expiry.**
  *
  * ## Why the whole schedule collapses to documented zero, and why that is
  * honest rather than a shortcut
  *
- * The frozen 50-kind `kindVocabulary` (`fjs/return/scope`) carries exactly
- * TWO kinds for the whole of this schedule: `scheduleOneAdditionalIncome`
- * (all of Part I, lines 1-10) and `scheduleOneAdjustments` (all of Part II,
- * lines 11-26). Each covers many distinct line items — Part I's line 8
+ * The frozen 51-kind `kindVocabulary` (`fjs/return/scope`) carries exactly
+ * two COARSE kinds for this schedule: `scheduleOneAdditionalIncome` (all of
+ * Part I *except* line 7) and `scheduleOneAdjustments` (all of Part II,
+ * lines 11-26) — plus `unemploymentCompensation`, the one fine-grained kind
+ * that carved line 7 out of the first of those in Phase 20. Each covers many distinct line items — Part I's line 8
  * alone has 26 sub-lines (8a-8z: NOL, gambling, cancellation of debt, the
  * foreign earned income exclusion, Alaska PFD, jury duty, digital assets,
  * and nineteen more), and Part II's line 24 has 11 (24a-24z). This engine
@@ -83,8 +91,10 @@
  * @module
  */
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
+import { centsFromString } from '../../exact/module.f.js'
 
 /** @import { ReturnProfile } from '../../return/profile/module.f.js' */
+/** @import { OneZeroNineNineG } from '../../document/1099g/module.f.js' */
 /** @import { ReportLine, Source } from '../../report/line/module.f.js' */
 
 // ── Inputs ───────────────────────────────────────────────────────────────────
@@ -153,6 +163,40 @@ const totalLine = rule => lines => ({
     rule,
 })
 
+/**
+ * Line 7, unemployment compensation: the sum of box 1 across every stored
+ * `vnd.fjs.1099g`, citing ONE source per document.
+ *
+ * **Absence is a legitimate zero, not a refusal** — the same cardinality
+ * decision Phase 15 made for the prior-year capital-loss carryover
+ * (15-05): a taxpayer with no 1099-G has no unemployment, and the caller
+ * simply passes no documents. A document that EXISTS with an unparseable or
+ * unmodeled box is refused, but that refusal lives in the dialect's own
+ * `checkReferences`, not here.
+ *
+ * When there are no forms the line falls back to
+ * {@link profileDeclaredZeroLine} so it still carries provenance — a
+ * `ReportLine` may never exist without sources (PROV-01).
+ * @type {(profile: Stored<ReturnProfile>) => (forms: readonly Stored<OneZeroNineNineG>[]) => ReportLine}
+ */
+const unemploymentCompensationLine = profile => forms => {
+    const rule = 'Schedule 1 line 7 (unemployment compensation)'
+    const withBox1 = forms.filter(form => form.value.box1UnemploymentCompensation !== undefined)
+    const [first, ...rest] = withBox1.map(form => {
+        const printed = form.value.box1UnemploymentCompensation
+        assert(printed !== undefined, ['filtered to present box 1', form.documentHash])
+        return { documentHash: form.documentHash, boxPath: 'box1UnemploymentCompensation', value: printed }
+    })
+    if (first === undefined) {
+        return profileDeclaredZeroLine(profile)(rule)
+    }
+    return {
+        value: [first, ...rest].reduce((total, source) => total + centsFromString(source.value), 0n),
+        sources: [first, ...rest],
+        rule,
+    }
+}
+
 // ── Schedule 1 itself ───────────────────────────────────────────────────────
 
 /**
@@ -183,9 +227,9 @@ const totalLine = rule => lines => ({
  * `scheduleOneAdditionalIncome`/`scheduleOneAdjustments` — see this
  * module's own docstring for why that is the honest, complete answer for
  * this phase, not a shortcut.
- * @type {(profile: Stored<ReturnProfile>) => ScheduleOne}
+ * @type {(profile: Stored<ReturnProfile>) => (unemploymentForms: readonly Stored<OneZeroNineNineG>[]) => ScheduleOne}
  */
-export const scheduleOne = profile => {
+export const scheduleOne = profile => unemploymentForms => {
     const zero = profileDeclaredZeroLine(profile)
 
     // ── Part I: Additional Income ────────────────────────────────────────
@@ -195,7 +239,7 @@ export const scheduleOne = profile => {
     const line4 = zero('Schedule 1 line 4 (other gains/losses, Form 4797/4684)')
     const line5 = zero('Schedule 1 line 5 (rental real estate, royalties, Schedule E)')
     const line6 = zero('Schedule 1 line 6 (farm income/loss, Schedule F)')
-    const line7 = zero('Schedule 1 line 7 (unemployment compensation)')
+    const line7 = unemploymentCompensationLine(profile)(unemploymentForms)
     // 8. "Other income" -- a collapsed stand-in for 8a-8z (26 sub-lines);
     //    see this module's own docstring, "The 26/11 sub-line collapses".
     const line8 = zero('Schedule 1 line 8 (other income, 8a-8z collapsed -- none separately reachable)')
@@ -256,10 +300,92 @@ const minimalProfileValue = {
 /** @type {Stored<ReturnProfile>} */
 const profileNoDeclaredKinds = { documentHash: 'profile-hash-0001', value: minimalProfileValue }
 
+/** @type {Stored<OneZeroNineNineG>} */
+const unemploymentA = {
+    documentHash: 'sha256-1099g-a',
+    value: {
+        dialect: 'vnd.fjs.1099g',
+        payerTin: '11-1111111', recipientTin: '222-22-2222', accountNumber: 'EDD-1',
+        taxYear: 2025, formRevision: '2025',
+        box1UnemploymentCompensation: '4554.00',
+        box4FederalIncomeTaxWithheld: '454.00',
+    },
+}
+
+/** A second payer, to prove line 7 SUMS rather than reading only the first. */
+/** @type {Stored<OneZeroNineNineG>} */
+const unemploymentB = {
+    documentHash: 'sha256-1099g-b',
+    value: {
+        dialect: 'vnd.fjs.1099g',
+        payerTin: '33-3333333', recipientTin: '222-22-2222', accountNumber: 'EDD-2',
+        taxYear: 2025, formRevision: '2025',
+        box1UnemploymentCompensation: '1000.00',
+    },
+}
+
 export const proof = {
+    // ── Line 7: unemployment compensation (1099-G box 1) ──────────────────
+
+    /**
+     * Two 1099-Gs sum, and EACH cites its own document. A single-document
+     * proof could not tell a sum from a "read the first one" bug.
+     */
+    line7SumsEveryUnemploymentFormCitingEach: () => {
+        const result = scheduleOne(profileNoDeclaredKinds)([unemploymentA, unemploymentB])
+        assertEq(result.line7.value, 555400n, '$4,554.00 + $1,000.00 = $5,554.00')
+        assertEq(result.line7.sources.length, 2)
+        const [firstSource, secondSource] = result.line7.sources
+        assert(secondSource !== undefined, ['two forms must yield two sources', result.line7.sources])
+        assertEq(firstSource.documentHash, 'sha256-1099g-a')
+        assertEq(secondSource.documentHash, 'sha256-1099g-b')
+        assertEq(firstSource.boxPath, 'box1UnemploymentCompensation')
+    },
+
+    /**
+     * Line 10 is the Part I total that reaches 1040 line 8. Unemployment must
+     * actually REACH it — a line 7 that computes correctly but never lands in
+     * the total would leave the return understated with every leaf green.
+     */
+    line7ReachesTheLine10TotalThatFeeds1040Line8: () => {
+        const withForms = scheduleOne(profileNoDeclaredKinds)([unemploymentA])
+        const without = scheduleOne(profileNoDeclaredKinds)([])
+        assertEq(withForms.line10.value, 455400n, 'line 10 carries the unemployment')
+        assertEq(without.line10.value, 0n, 'and is zero without it')
+        assertEq(withForms.line10.value - without.line10.value, withForms.line7.value)
+    },
+
+    /**
+     * DOC-11 / 15-05's cardinality decision: NO 1099-G is a legitimate zero,
+     * not a refusal — a taxpayer who was never unemployed simply has no
+     * document. The line still carries provenance (PROV-01: no line without
+     * sources), citing the profile's own `declaredKinds`.
+     */
+    absentUnemploymentIsZeroWithProfileProvenance: () => {
+        const result = scheduleOne(profileNoDeclaredKinds)([])
+        assertEq(result.line7.value, 0n)
+        assertEq(result.line7.sources.length, 1)
+        assertEq(result.line7.sources[0].boxPath, 'declaredKinds')
+    },
+
+    /**
+     * A 1099-G with NO box 1 (withholding only — possible on a corrected
+     * form) contributes nothing and is not counted as a source. Absent is not
+     * zero-valued: it is not present at all.
+     */
+    formWithoutBox1ContributesNoSource: () => {
+        const withholdingOnly = {
+            documentHash: 'sha256-1099g-c',
+            value: { ...unemploymentA.value, box1UnemploymentCompensation: undefined },
+        }
+        const result = scheduleOne(profileNoDeclaredKinds)([withholdingOnly])
+        assertEq(result.line7.value, 0n)
+        assertEq(result.line7.sources[0].boxPath, 'declaredKinds')
+    },
+
     // Task 1's own acceptance criterion.
     noDeclaredScheduleOneKindGivesZeroTotals: () => {
-        const result = scheduleOne(profileNoDeclaredKinds)
+        const result = scheduleOne(profileNoDeclaredKinds)([])
         assertEq(result.line10.value, 0n, 'line 10 = $0.00')
         assertEq(result.line26.value, 0n, 'line 26 = $0.00')
         assertEq(result.line10.sources[0].boxPath, 'declaredKinds')
@@ -269,7 +395,7 @@ export const proof = {
     // ReportLines, each citing the profile's declaredKinds box -- mirrors
     // `fjs/schedule/b`'s own `zeroStoredDocumentsStillProduceValidReportLinesCitingProfile`.
     zeroStoredDocumentsStillProduceValidReportLinesCitingProfile: () => {
-        const result = scheduleOne(profileNoDeclaredKinds)
+        const result = scheduleOne(profileNoDeclaredKinds)([])
         for (const line of Object.values(result)) {
             assertEq(line.value, 0n)
             assertEq(line.sources.length, 1)
@@ -281,7 +407,7 @@ export const proof = {
     // exactly (value and sources), only the rule differs -- mirrors
     // `fjs/schedule/b`'s own line4 = { ...line2, rule: ... } pin.
     line9RestatesLine8ExactlyAndLine25RestatesLine24Exactly: () => {
-        const result = scheduleOne(profileNoDeclaredKinds)
+        const result = scheduleOne(profileNoDeclaredKinds)([])
         assertEq(result.line9.value, result.line8.value)
         assertEq(result.line9.sources[0].boxPath, result.line8.sources[0].boxPath)
         assert(result.line9.rule !== result.line8.rule, 'line9 and line8 must carry DIFFERENT rule strings')
@@ -295,7 +421,7 @@ export const proof = {
     // count" mutation-gate idiom, applied to line COUNT rather than a
     // vocabulary size).
     everyPrintedLineIsNamed: () => {
-        const result = scheduleOne(profileNoDeclaredKinds)
+        const result = scheduleOne(profileNoDeclaredKinds)([])
         const expectedFieldCount = 26
         assertEq(Object.keys(result).length, expectedFieldCount, 'expected exactly 26 named Schedule 1 fields')
     },
@@ -303,7 +429,7 @@ export const proof = {
     // `dialect`/`mediaType`, mirroring `fjs/schedule/b`'s own
     // `dialectIndependence` leaf.
     dialectIndependence: () => {
-        const result = scheduleOne(profileNoDeclaredKinds)
+        const result = scheduleOne(profileNoDeclaredKinds)([])
         assert(!('dialect' in result), 'scheduleOne output must not carry a dialect tag')
         assert(!('mediaType' in result), 'scheduleOne output must not carry a mediaType')
     },

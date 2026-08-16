@@ -86,6 +86,11 @@ import {
     checkReferences as checkSsa1099,
 } from '../../document/ssa1099/module.f.js'
 import {
+    dialect as oneZeroNineNineGDialect,
+    oneZeroNineNineGSchema,
+    checkReferences as checkOneZeroNineNineG,
+} from '../../document/1099g/module.f.js'
+import {
     dialect as w2Dialect,
     w2Schema,
     checkReferences as checkW2,
@@ -125,6 +130,7 @@ export const financeDialects = [
     dialectEntry(medicalExpensesSchema, v => checkMedicalExpenses(v)[0] === 'ok'),
     dialectEntry(ocrSchema),
     dialectEntry(ssa1099Schema, v => checkSsa1099(v)[0] === 'ok'),
+    dialectEntry(oneZeroNineNineGSchema, v => checkOneZeroNineNineG(v)[0] === 'ok'),
     dialectEntry(w2Schema, v => checkW2(v)[0] === 'ok'),
     dialectEntry(runSchema, v => checkRun(v)[0] === 'ok'),
     dialectEntry(returnProfileSchema, v => checkReturnProfile(v)[0] === 'ok'),
@@ -155,7 +161,7 @@ export const detectFinance = detect(financeDialects)
  * collection shrinking").
  * @type {number}
  */
-const expectedDialectCount = 13
+const expectedDialectCount = 14
 
 /** A sample cbase32 hash — {@link revisionDialect}'s own `snapshot`/`parents` shape needs a decodable one; the value itself is arbitrary. */
 const revisionSampleHash = vecToCBase32(vec8(0x77n))
@@ -230,6 +236,16 @@ const fixtures = {
         accountNumber: 'CLAIM-0001',
         taxYear: 2025,
         formRevision: '2025',
+    },
+    [oneZeroNineNineGDialect]: {
+        dialect: oneZeroNineNineGDialect,
+        payerTin: '11-1111111',
+        recipientTin: '222-22-2222',
+        accountNumber: 'ACC-0001',
+        taxYear: 2025,
+        formRevision: '2025',
+        box1UnemploymentCompensation: '4554.00',
+        box4FederalIncomeTaxWithheld: '454.00',
     },
     [w2Dialect]: {
         dialect: w2Dialect,

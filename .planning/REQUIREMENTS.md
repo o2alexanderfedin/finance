@@ -293,6 +293,17 @@ structural (RTTI) and semantic passes.
       our own validation does not need `detect`, which matters only for classifying a blob
       of unknown provenance. *Found independently by both the research pass and Sergey.*
 
+- [x] **DOC-18** *(T2, RETROFITTED — see the note below)*: `vnd.fjs.1099g` — Certain Government
+      Payments. Two boxes are **computed**: box 1 (unemployment compensation) and box 4
+      (federal income tax withheld). Boxes **2, 5, 6, 7 and 9 are refused by name when
+      present and non-zero**, and accepted when zero, because each feeds a line this engine
+      does not compute — box 2's state-refund taxability needs the *prior* year's return
+      under the tax-benefit rule, and this engine holds one year. Box 11 (state income tax
+      withheld) is deliberately **not** refused: state withholding never reaches a federal
+      return, so storing it without computing it is correct rather than a gap.
+      Registered in `kindVocabulary`, `modeledKinds`, `finance_schema` and
+      `fjs/media/dialects` in the same commit, per the Phase 8/11/12 precedent.
+
 ### Exact Arithmetic (EXACT)
 
 - [x] **EXACT-01** *(T0)*: An upstreamable exact-arithmetic module — integer cents, exact
@@ -356,6 +367,14 @@ structural (RTTI) and semantic passes.
       wrong, and it is how REQ TAX-05's "full line-by-line" claim stays truthful.
 - [x] **TAX-17** *(T3)*: Multi-year support, including capital loss carryover, which the
       brokerage profile promotes from optional to required.
+- [x] **TAX-18** *(T2, RETROFITTED — see the note below)*: Unemployment compensation reaching
+      the return. Schedule 1 line 7 becomes a real computed line summing box 1 across every
+      1099-G, flowing to **1040 line 8** via Schedule 1's Part I total; 1099-G box 4 joins
+      **1040 line 25b**. Before this, Schedule 1 line 7 was a declared zero whose only scope
+      kind was a coarse catch-all — which is precisely why TAX-16's guard **refused a real
+      taxpayer's transcript**, correctly, on the first real document the engine ever saw.
+      `Form1040Inputs.unemploymentForms` is a **required** field, so `tsc` enforces it on
+      every production caller.
 
 ### Provenance and Reporting (PROV)
 
@@ -470,7 +489,9 @@ so they are scheduled rather than remembered. All are T3 — none blocks the v1 
       are hand-transcribed and the remaining ~2,000 are checked against invariants that share code
       with the generator; DOC-04 describes `Number.isSafeInteger`-guarded integer cents when storage
       is canonical decimal strings; the v1 requirement total is written as 79 in one place and 83 in
-      another while **85** IDs are defined.
+      another while **95** IDs are defined. (That last figure read 85 until 2026-08-15 — it was
+      already stale before the DOC-18/TAX-18 retrofit, not made stale by it. A pending item whose
+      job is to fix wrong counts, carrying a wrong count, is the defect describing itself.)
 
 - [ ] **MAINT-04** *(T3)*: Fix the documentation that contradicts the code. DOCC-01 is checked and
       its own verification document asserts a grep is clean, but `fjs/todo/implement-mcp-server.md`
@@ -505,6 +526,163 @@ so they are scheduled rather than remembered. All are T3 — none blocks the v1 
 
 ---
 
+## v2 Requirements — The Product Path and Four Personas
+
+**Opened 2026-08-15 by owner decision**, triggered by `.planning/PERSONA-COVERAGE.md`, which
+measured the engine against four taxpayers: a retiree, a non-profit employee, a FAANG engineer
+and a startup founder. One of the four is supported. One computes a *wrong* return. Two refuse.
+
+**These 25 requirements are counted separately from v1's 95** and do not move v1's completion
+figure. v1 remains what it always was: a 65+ TY2025 return with brokerage, dependents and
+itemizing, which is complete apart from the eight open MAINT items.
+
+> **Read the ordering constraint before planning any of this.** TAX-19 (computable tripwires)
+> comes first and is not negotiable. Every requirement below adds a form the engine will
+> compute, and each one that lands *without* TAX-19 widens the window in which the engine
+> answers confidently and wrongly. The survey's central finding is that declaration-driven
+> scoping cannot see a tax that triggers on a threshold from data the engine already holds —
+> so a $300k W-2 silently understates by ~$900 today. Adding forms before closing that is
+> building faster on the one foundation known to be cracked.
+
+### The Product Path (EXEC, PROV)
+
+- [ ] **EXEC-14** *(M2, T0)*: The 1040 engine reachable from a stored guest program — **via
+      `guestCtx`, never via a server tool.** `guestCtx` already carries pure non-effect helpers
+      (`step`, `pure`, `centsFromString`, `centsToString`) alongside the four frozen CAS
+      commands, and `_CasOpIsExactlyTheFourCommands` pins the *effect* vocabulary, not the
+      context. `form1040Report` and the dialect validators join that pure list. The agent still
+      authors the program; the program calls the engine and decides what to report. **This is
+      the deliberate alternative to the forbidden `finance_compute_1040` tool** — see Out of
+      Scope, where the distinction is recorded and the tool re-affirmed as forbidden.
+- [ ] **PROV-09** *(M2, T0)*: A real return produced through the product path end to end —
+      documents stored via `evo_add`, a program stored in CAS and executed by `fjs_run`, the
+      result written as a `vnd.fjs.run` record. This is what makes Phase 19's provenance header
+      and PROV-05's pinned reproduction apply to an actual 1040 rather than to a fixture; today
+      neither has ever run against one.
+
+### The Safety Net (TAX)
+
+- [ ] **TAX-19** *(M2, T0)*: **Computable tripwires** — a table of (predicate over the stored
+      documents) → (kind that MUST have been declared), asserted before any line is computed.
+      Box 5 over the Additional Medicare Tax threshold implies `scheduleTwoTaxes`; any 1099-NEC
+      implies self-employment; non-zero 1099-R box 3 implies capital-gain treatment. This is
+      the complement to `fjs/return/scope`'s declaration-driven guard, not a replacement:
+      that guard is sound against the store-driven alternative for the reason its own docstring
+      records, but it rests on the taxpayer knowing what they owe — which is the thing they
+      came to a tax engine not to have to know. Converts silent understatement into refusal.
+
+### FAANG: Schedule 2 Populated (TAX)
+
+- [ ] **TAX-20** *(M2, T1)*: **Form 8959**, Additional Medicare Tax — 0.9% above $200,000
+      single / $250,000 MFJ / $125,000 MFS, thresholds statutory and **not inflation-indexed**.
+      Feeds Schedule 2 line 11 → 1040 line 23. Mandatory, not elective: this is what blocks
+      every high-wage return today.
+- [ ] **TAX-21** *(M2, T1)*: **Form 8960**, Net Investment Income Tax — 3.8% on the lesser of
+      net investment income or MAGI over the same unindexed thresholds. Note AGENTS-relevant
+      hazard: this MAGI has its own add-back list, so TAX-15's "no variable named `magi`" rule
+      applies with full force.
+- [ ] **TAX-22** *(M2, T2)*: `scheduleTwoTaxes` splits from one coarse refused kind into
+      per-line kinds, so what remains refused on Schedule 2 is nameable. Reclassify **only**
+      the lines actually wired, in the same commit — the wire-before-reclassify discipline
+      Phases 12.1, 13 and 20 all followed.
+
+### Non-Profit: Schedule 1 Part II and Schedule 3 (TAX, DOC)
+
+- [ ] **TAX-23** *(M2, T2)*: **Schedule 1 line 21**, student loan interest deduction, with its
+      phase-out. Today a hard zero — the single largest silent overstatement for this persona.
+- [ ] **TAX-24** *(M2, T2)*: **Schedule 1 line 11**, educator expenses; **line 13**, HSA
+      deduction (Form 8889). Both hard zeros today.
+- [ ] **TAX-25** *(M2, T2)*: **Form 8880**, the Saver's Credit → Schedule 3 line 4.
+- [ ] **TAX-26** *(M2, T2)*: **Form 8863**, American Opportunity and Lifetime Learning credits
+      → Schedule 3 line 3 and 1040 line 29.
+- [ ] **TAX-27** *(M2, T2)*: **Earned Income Credit** → 1040 line 27, with the qualifying-child
+      rules the existing Schedule 8812 dependent model already carries most of.
+- [ ] **DOC-19** *(M2, T2)*: `vnd.fjs.adjustments` — the taxpayer-asserted record behind the
+      Schedule 1 Part II adjustments, following `vnd.fjs.medical_expenses` exactly: no IRS
+      information return reports educator expenses or HSA contributions to the filer, so the
+      dialect is asserted rather than transcribed, and carries no computed total.
+
+### Retiree Completion (TAX)
+
+- [ ] **TAX-28** *(M2, T2)*: **Qualified Charitable Distributions.** A QCD is a taxpayer
+      *election*, not a 1099-R box — the custodian reports the gross distribution and the filer
+      writes "QCD" beside 1040 line 4b. Today the engine taxes it in full and **overstates
+      silently**. Needs a profile-level election plus the line-4b reduction, with the $108,000
+      (TY2025, indexed) per-person cap.
+- [ ] **TAX-29** *(M2, T2)*: **Form 8606**, nondeductible IRA basis and the pro-rata rule.
+      Without it, after-tax IRA money is taxed twice. Also the piece that makes a backdoor Roth
+      computable, which is why it serves the FAANG persona as much as the retiree.
+
+### Startup Founder: Self-Employment (DOC, TAX) — reversed from Out of Scope 2026-08-15
+
+- [ ] **DOC-20** *(M2, T2)*: `vnd.fjs.1099nec` — nonemployee compensation. Three boxes and
+      genuinely a morning's work; the Out-of-Scope entry that forbade it until today called
+      that simplicity "a trap" and was right about what follows.
+- [ ] **DOC-21** *(M2, T2)*: `vnd.fjs.business_expenses` — the taxpayer-asserted record behind
+      Schedule C Part II, categorised to the printed form's own expense lines. Same asserted
+      shape as DOC-19 and `vnd.fjs.medical_expenses`.
+- [ ] **TAX-30** *(M2, T3)*: **Schedule C**, all parts, one named pure function per printed
+      line group, feeding Schedule 1 line 3 → 1040 line 8.
+- [ ] **TAX-31** *(M2, T3)*: **Schedule SE**, self-employment tax — the 92.35% net-earnings
+      factor, the Social Security wage base ceiling coordinated with W-2 box 3 wages already
+      counted, and the uncapped Medicare component. Feeds Schedule 2 line 4, and its deductible
+      half feeds Schedule 1 line 15 (a hard zero today). **Depends on TAX-20/22**, since both
+      land on Schedule 2.
+- [ ] **TAX-32** *(M2, T3)*: **Form 8995 / 8995-A**, the QBI deduction → 1040 line 13a, with
+      the SSTB phase-in and the W-2-wage/UBIA limitations. Depends on TAX-30.
+
+### Equity Compensation and AMT (DOC, TAX)
+
+- [ ] **DOC-22** *(M2, T2)*: `vnd.fjs.form3921` — ISO exercise. Not filed with the return, but
+      it carries the exercise price and FMV that drive both the AMT preference and basis.
+- [ ] **DOC-23** *(M2, T2)*: `vnd.fjs.form3922` — ESPP transfer, carrying what a qualifying vs
+      disqualifying disposition needs.
+- [ ] **TAX-33** *(M2, T3)*: **Form 6251**, Alternative Minimum Tax → Schedule 2 line 1. The
+      hardest computation remaining in the project, and the reason an ISO exercise can generate
+      tax on income never received.
+- [ ] **TAX-34** *(M2, T2)*: **Form 8949 basis adjustment codes**, particularly code B for
+      equity compensation. Brokers routinely report $0 or unadjusted basis on 1099-B for RSU
+      and ESPP sales; without the adjustment the vested value is **taxed twice**. Form 8949
+      already exists — this is the adjustment column and its codes, not a new form.
+
+### Pass-Through Income (DOC, TAX)
+
+- [ ] **DOC-24** *(M2, T3)*: `vnd.fjs.k1_1065` and `vnd.fjs.k1_1120s` — partnership and S-corp
+      Schedule K-1. Two dialects, not one: the box numbering differs.
+- [ ] **TAX-35** *(M2, T3)*: **Schedule E** Parts II and III → Schedule 1 line 5. A founder
+      with a partnership stake or S-corp shares cannot file without it.
+
+### v2 Traceability
+
+| REQ-ID | Tier | Phase | Persona unblocked |
+|--------|------|-------|-------------------|
+| EXEC-14, PROV-09 | T0 | 21 - The Last Mile | *all four — nothing is reachable today* |
+| TAX-19 | T0 | 22 - Computable Tripwires | *all four — the safety net* |
+| TAX-20, TAX-21, TAX-22 | T1 | 23 - Schedule 2 Populated | **FAANG employee** |
+| TAX-23, TAX-24, DOC-19 | T2 | 24 - Schedule 1 Adjustments | **Non-profit worker** |
+| TAX-25, TAX-26, TAX-27 | T2 | 25 - Schedule 3 Credits | Non-profit worker |
+| TAX-28, TAX-29 | T2 | 26 - Retiree Completion | Retiree |
+| DOC-20, DOC-21, TAX-30 | T3 | 27 - 1099-NEC and Schedule C | Startup founder |
+| TAX-31, TAX-32 | T3 | 28 - Schedule SE and QBI | **Startup founder** |
+| DOC-22, DOC-23, TAX-33, TAX-34 | T3 | 29 - Equity Compensation and AMT | FAANG + founder |
+| DOC-24, TAX-35 | T3 | 30 - Pass-Through Income | Startup founder |
+
+**25 requirements across 10 phases** — 120 in the document, 95 of them v1's. Each phase is a
+vertical slice that ends with something that works: a persona whose return computes, or a named
+refusal that replaces a silent wrong answer. No phase leaves a layer that only pays off later.
+
+> **That figure read 26 in this document's first draft.** Written by hand, one over, in the same
+> file whose central lesson is that hand-written counts drift — and caught within a minute by the
+> re-derivation command below, which is the entire argument for having one. Both figures here are
+> now derived:
+> ```sh
+> sed -n '/^## v1 Requirements/,/^## v2 Requirements/p' .planning/REQUIREMENTS.md | grep -cE '^- \[[ x]\] \*\*[A-Z]+-[0-9]+'   # 95
+> sed -n '/^## v2 Requirements/,/^## v2 (Deferred)/p'   .planning/REQUIREMENTS.md | grep -cE '^- \[[ x]\] \*\*[A-Z]+-[0-9]+'   # 25
+> grep -oE '^- \[[ x]\] \*\*[A-Z]+-[0-9]+' .planning/REQUIREMENTS.md | grep -oE '[A-Z]+-[0-9]+' | sort | uniq -d              # must be empty
+> ```
+
+---
+
 ## v2 (Deferred)
 
 - **Remote transport** — HTTPS + OAuth + tenancy, which is what ChatGPT support requires.
@@ -532,13 +710,26 @@ so they are scheduled rather than remembered. All are T3 — none blocks the v1 
 - **CSV / OFX / QFX parsers** — the vision-to-dialect path covers ingestion; a second
   parallel parser stack duplicates it for marginal gain.
 - **State tax returns** — store W-2 boxes 15–20 faithfully, compute nothing.
-- **1099-NEC and self-employment** — the three-box simplicity is a trap; the downstream is
-  Schedule C / SE / QBI.
+- ~~**1099-NEC and self-employment** — the three-box simplicity is a trap; the downstream is
+  Schedule C / SE / QBI.~~ **REVERSED by the owner on 2026-08-15.** Struck through rather than
+  deleted, because the reason it was written is still true and is now a warning to whoever
+  builds it: the 1099-NEC dialect is a morning's work and Schedule C → Schedule SE → Form 8995
+  is the largest single body of work in the project. It moves to **v2 Phases 27-28**, not into
+  v1. The trigger was a coverage survey (`.planning/PERSONA-COVERAGE.md`) showing this one
+  entry is the *entire* startup-founder persona.
 - **Non-US jurisdictions.**
 - **Multi-user operation** — no auth, no tenancy, no per-user store isolation in v1.
 - **E-filing or transmission** — output is figures to review and transcribe.
 - **A `finance_compute_1040` tool** — would destroy the thesis permanently. The agent would
-  call it and never author a program again.
+  call it and never author a program again. **STILL OUT OF SCOPE, and re-affirmed on
+  2026-08-15** — see EXEC-14, which reaches the same end by the opposite route. The
+  "last mile" as described in the 2026-08-15 handoff (*"a server tool that reads stored
+  documents, assembles `Form1040Inputs`, and calls `form1040Report`"*) **is precisely this
+  forbidden tool**, and would have been built without anyone noticing had the survey not
+  re-read this list. The engine reaches guest programs through `guestCtx`, which already
+  carries pure non-effect helpers (`step`, `pure`, `centsFromString`, `centsToString`) — so
+  the agent still authors the program, and the frozen `CasOp` effect vocabulary does not
+  widen by a single entry.
 - **A "tax engine" module** — recreates precisely the thing the architecture exists to avoid.
 
 ---
@@ -560,7 +751,18 @@ to be written down with its consequences rather than left implicit.
 ## Traceability
 
 Populated by the roadmapper from [`.planning/ROADMAP.md`](ROADMAP.md).
-**All 93 requirements map to exactly one phase. No orphans, no duplicates.**
+**All 95 requirements map to a phase. No orphans, no duplicates.** One — TEST-03 — maps to a
+*range* of phases ("Phases 8-15, standing") rather than to one; the older wording of this
+sentence said "exactly one phase" and was false for that row alone.
+
+> **Two of these 95 (DOC-18, TAX-18) were written AFTER the code shipped.** The `vnd.fjs.1099g`
+> dialect and its Schedule 1 line 7 wiring were built mid-session on 2026-08-14 in response to
+> a real taxpayer document that the scope guard refused, entirely outside the GSD structure —
+> no requirement, no phase, no CONTEXT or VALIDATION artifact. The retrofit (2026-08-15,
+> commit `8d00990` for the code) assigns the IDs, adds **Phase 20** to the roadmap labelled as
+> written after the fact, and subjects the work to the same verification gate every other
+> phase cleared. **It is recorded as retrofitted rather than presented as planned**, because
+> the value of this table is that its history is true, not that it is tidy.
 
 Milestones are `todo/plan.md`'s weeks and keep its names; phases are sliced underneath
 them. Week 0 is research's addition in front of the plan's Week 1.
@@ -645,6 +847,7 @@ them. Week 0 is research's addition in front of the plan's Week 1.
 | DOC-15 | T2 | Phase 11 - Wage, Retirement, Benefit Documents | Week 3 | Complete |
 | DOC-16 | T3 | Phase 15 - Realism Polish and Upstream | Week 5 | Complete |
 | DOC-17 | T2 | Phase 5 - Document Base and First Dialects (added) | Week 1 | Complete |
+| DOC-18 | T2 | Phase 20 - Unemployment Compensation (retrofitted) | Week 5 | Complete |
 | EXACT-01 | T0 | Phase 4 - Exact Arithmetic | Week 1 | Done |
 | EXACT-02 | T0 | Phase 4 - Exact Arithmetic | Week 1 | Done |
 | EXACT-03 | T0 | Phase 4 - Exact Arithmetic | Week 1 | Done |
@@ -667,6 +870,7 @@ them. Week 0 is research's addition in front of the plan's Week 1.
 | TAX-15 | T2 | Phase 12.1 - The Capital-Gain Chain | Week 3 | Complete |
 | TAX-16 | T1 | Phase 10 - 1040 Core and Scope Guard | Week 2 | Complete |
 | TAX-17 | T3 | Phase 15 - Realism Polish and Upstream | Week 5 | Complete |
+| TAX-18 | T2 | Phase 20 - Unemployment Compensation (retrofitted) | Week 5 | Complete |
 | PROV-01 | T1 | Phase 9 - Traceable Report Lines | Week 2 | Complete |
 | PROV-02 | T1 | Phase 9 - Traceable Report Lines | Week 2 | Complete |
 | PROV-03 | T1 | Phase 7 - `fjs_run` and Run Records | Week 1 | Complete |
@@ -690,7 +894,7 @@ them. Week 0 is research's addition in front of the plan's Week 1.
 | 4. Exact Arithmetic | Week 1 | EXACT-01, EXACT-02, EXACT-03, EXACT-04, EXACT-05 | 5 | T0, T1 |
 | 5. Document Base and First Dialects | Week 1 | DOC-00, DOC-01, DOC-03, DOC-04, DOC-05, DOC-10, DOC-11, DOC-12, DOC-14, DOC-17 | 10 | T0, T1, T2 |
 | 6. Guest ABI and Materialization | Week 1 | EXEC-07, EXEC-09, SEC-02, SEC-03 | 4 | T0, T1 |
-| 7. `fjs_run` and Run Records | Week 1 | EXEC-08, EXEC-10, EXEC-11, EXEC-12, PROV-03, MCP-06 | 6 | T1 |
+| 7. `fjs_run` and Run Records | Week 1 | EXEC-08, EXEC-10, EXEC-11, EXEC-12, PROV-03, MCP-06, TEST-01, TEST-02, TEST-04 | 9 | T1 |
 | 8. TY2025 Parameters and Tax Table | Week 2 | TAX-01, TAX-02, TAX-04, MCP-07 | 4 | T1 |
 | 9. Traceable Report Lines | Week 2 | PROV-01, PROV-02, PROV-07 | 3 | T1, T2 |
 | 10. 1040 Core and Scope Guard | Week 2 | TAX-03, TAX-05, TAX-06, TAX-16 | 4 | T1 |
@@ -699,7 +903,33 @@ them. Week 0 is research's addition in front of the plan's Week 1.
 | 13. The 65+ Profile and Schedules | Week 3 | TAX-09, TAX-10, TAX-12, TAX-13, TAX-14 | 5 | T2 |
 | 14. Acceptance | Week 4 | *(none - moved to Phase 19)* | 0 | T2 |
 | 15. Realism Polish and Upstream | Week 5 | MCP-09, DOC-16, TAX-17, PROV-06, PROV-08 | 5 | T3 |
+| 16. The Orphan Ingestion Island *(deferred)* | Week 5 | MAINT-01 | 1 | T3 |
+| 17. Documentation Truth Pass | Week 5 | MAINT-02, MAINT-03, MAINT-04, MAINT-05 | 4 | T3 |
+| 18. Dependency and Duplication Debt | Week 5 | MAINT-06, MAINT-07, MAINT-08 | 3 | T3 |
 | 19. Reproducibility and Report Provenance | Week 4 | EXEC-13, PROV-04, PROV-05 | 3 | T2 |
+| 20. Unemployment Compensation *(retrofitted)* | Week 5 | DOC-18, TAX-18 | 2 | T2 |
+| *(standing, not a phase)* | Weeks 2-5 | TEST-03 | 1 | T2 |
+| **Total** | | | **95** | |
+
+> **This table under-counted by twelve until 2026-08-15.** It summed to 81 against a declared
+> 93: Phase 7's row omitted the three TEST requirements the traceability table already assigned
+> to it, phases 16, 17 and 18 had no rows at all, and TEST-03 — which maps to a phase *range* —
+> had nowhere to go. Every one of those requirements was correctly listed twenty lines above, in
+> the traceability table. **This is the project's most-repeated defect: a count that is true of
+> the part someone examined and false of the whole.** Re-derive rather than read:
+> ```sh
+> # rows in the v1 traceability table -- SCOPED, because v2 has its own table below
+> sed -n '/^## Traceability/,/^## v2 Requirements/p' .planning/REQUIREMENTS.md \
+>   | grep -cE '^\| [A-Z]+-[0-9]+ \|'
+> # sum of this table's Count column, excluding the Total row
+> awk -F'|' '/^\| ([0-9]+[.] |\*\(standing)/{gsub(/ /,"",$5); s+=$5} END{print s}' .planning/REQUIREMENTS.md
+> # the two MUST agree, at 95
+> ```
+> **The `sed` scoping is load-bearing, not tidiness.** The unscoped `grep` returned **96** the
+> moment the v2 section was added, because v2's own traceability table has one single-ID row
+> (`| TAX-19 |`) that matches the same pattern. A verification command that silently changes
+> meaning when the document grows is not a check — and this one had been correct for exactly
+> one day before a new section broke it.
 
 **Cut line.** Phases 1-10 constitute a defensible v1 - the scope guard (TAX-16) is what
 makes a partial 1040 honest rather than quietly wrong. Phases 11-13 complete the declared

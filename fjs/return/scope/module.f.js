@@ -27,7 +27,7 @@
  *
  * ## The partition, and why `tsc` owns it
  *
- * Every one of the fifty kinds is either in {@link modeledKinds} or carries an
+ * Every one of the fifty-one kinds is either in {@link modeledKinds} or carries an
  * entry in {@link unmodeledKindRefusals}. There is deliberately no third
  * option: {@link _EveryKindIsEitherModeledOrRefused} states the partition as a
  * conditional type, so a kind added to the vocabulary and classified nowhere
@@ -190,7 +190,7 @@ import { kindVocabulary } from '../profile/module.f.js'
 // ── The frozen modeled set ───────────────────────────────────────────────────
 
 /**
- * The eighteen kinds this engine models today, each with the document it
+ * The twenty-one kinds this engine models today, each with the document it
  * actually reads. Frozen in `fjs/guest`'s sense: growing this list is a
  * deliberate act that must be paired with a deletion from
  * {@link unmodeledKindRefusals}, or {@link _EveryKindIsEitherModeledOrRefused}
@@ -219,6 +219,7 @@ export const modeledKinds = /** @type {const} */ ([
     'iraDistributions',            // 1099-R (box7bIraSepSimple)     -> 1040 lines 4a/4b
     'pensionsAndAnnuities',        // 1099-R (not box7bIraSepSimple) -> 1040 lines 5a/5b
     'socialSecurityBenefits',      // SSA-1099 box 5 + SSB worksheet -> 1040 lines 6a/6b
+    'unemploymentCompensation',    // 1099-G box 1 -> Schedule 1 line 7 -> 1040 line 8
     'capitalGainDistributions',    // 1099-DIV box 2a                -> 1040 line 7a
     'capitalGainsOrLosses',        // Form 8949 + Schedule D          -> 1040 line 7a
     'unrecaptured1250Gain',        // 1099-DIV box 2b + Sch D worksheet -> Schedule D line 19
@@ -491,7 +492,7 @@ export const classifyScope = declaredKinds => {
  * reclassification (Phase 13 Wave 4, TAX-12).
  * @type {number}
  */
-const expectedModeledKindCount = 20
+const expectedModeledKindCount = 21
 
 /**
  * Independently hand-typed: the number of entries
@@ -554,7 +555,7 @@ export const proof = {
         // Plan 13-10's own two-kind move) targets: removing one entry from
         // `modeledKinds` without touching `expectedModeledKindCount` must
         // redden this leaf.
-        modeledKindsIsExactlyTwenty: () => {
+        modeledKindsIsExactlyTwentyOne: () => {
             assertEq(modeledKinds.length, expectedModeledKindCount)
             assertEq(new Set(modeledKinds).size, expectedModeledKindCount)
         },
@@ -633,10 +634,20 @@ export const proof = {
             const outcome = classifyScope([])
             assertEq(outcome.kind, 'ok', ['declaring nothing must be in scope', outcome])
         },
-        // All twenty modeled kinds, hand-typed rather than read from
+        // All twenty-one modeled kinds, hand-typed rather than read from
         // `modeledKinds`, so this leaf states independently what the engine
         // claims to be able to compute.
-        allTwentyModeledKindsDeclaredTogetherAreInScope: () => {
+        //
+        // **This leaf silently fell one short between 2026-08-14 and
+        // 2026-08-15.** Phase 20 added `unemploymentCompensation` to
+        // `modeledKinds` and did not add it here, so the leaf that exists
+        // precisely to state the modeled set INDEPENDENTLY went on asserting a
+        // twenty-kind set against a twenty-one-kind engine — and stayed green,
+        // because declaring a subset is in scope. An independent statement that
+        // is never compared to the thing it mirrors is not independent, it is
+        // just a second place to be wrong. `modeledKindCountIsExact` below is
+        // what makes the omission visible.
+        allTwentyOneModeledKindsDeclaredTogetherAreInScope: () => {
             const outcome = classifyScope([
                 'wages',
                 'taxExemptInterest',
@@ -646,6 +657,7 @@ export const proof = {
                 'iraDistributions',
                 'pensionsAndAnnuities',
                 'socialSecurityBenefits',
+                'unemploymentCompensation',
                 'capitalGainDistributions',
                 'capitalGainsOrLosses',
                 'unrecaptured1250Gain',
@@ -659,7 +671,29 @@ export const proof = {
                 'estimatedTaxPayments',
                 'additionalChildTaxCredit',
             ])
-            assertEq(outcome.kind, 'ok', ['the twenty modeled kinds must be in scope', outcome])
+            assertEq(outcome.kind, 'ok', ['the twenty-one modeled kinds must be in scope', outcome])
+        },
+        // NOTE: no count leaf is added here. A `modeledKinds.length === 21`
+        // assertion was written at this spot on 2026-08-15 and then DELETED
+        // once a mutation showed it reddening alongside
+        // `partition.modeledKindsIsExactlyTwentyOne`, which has asserted
+        // exactly that against a hand-typed constant since Phase 10. Two
+        // proofs failing for one cause is not twice the confidence; it is one
+        // proof and one thing to keep in sync. What the count leaf does NOT
+        // catch — and what actually went wrong in Phase 20 — is the
+        // hand-typed list above falling short while the count stays right,
+        // because the two are maintained in different places.
+        //
+        // `unemploymentCompensation` ALONE. Phases 12.1, 13 (twice) and 20's
+        // own reclassifications each added a single-kind leaf beside the
+        // declared-together one; Phase 20 broke that four-phase convention and
+        // added none, which left NO proof that the exact condition starting the
+        // phase — a real transcript refused because unemployment was unmodeled —
+        // is now in scope on its own. The declared-together leaf cannot cover
+        // this: it passes even with the kind absent.
+        unemploymentCompensationIsInScopeAlone: () => {
+            const outcome = classifyScope(['unemploymentCompensation'])
+            assertEq(outcome.kind, 'ok', ['unemployment compensation alone must be in scope', outcome])
         },
         // Plan 13-02's own four newly-reclassified kinds, declared TOGETHER
         // and WITHOUT any of the other twelve — the atomic transition's own

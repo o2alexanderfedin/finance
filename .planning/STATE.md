@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
-status: shipped
-stopped_at: Phase 19 complete on feature/phase-19-reproducibility - 3/3 plans, reviewed (0 critical), verified 4/4, both mutation gates independently re-run. Not yet merged. Next: Phase 18.
-last_updated: "2026-08-12T10:05:00.000Z"
-last_activity: 2026-08-12
+status: executing
+stopped_at: PAUSED. Phase 18 planned, ZERO executed. An UNPLANNED vnd.fjs.1099g feature shipped on feature/1099g-unemployment and owns no requirement ID - resolve that first. See .planning/.continue-here.md.
+last_updated: "2026-08-15T03:30:00.000Z"
+last_activity: 2026-08-14
 progress:
   total_phases: 20
   completed_phases: 16
-  total_plans: 85
+  total_plans: 89
   completed_plans: 85
   percent: 80
 ---
@@ -586,13 +586,26 @@ server and asking it instead of grepping. Green does not mean verified.
 
 ## Session Continuity
 
-Last session: 2026-08-12T06:41:00.000Z
-Stopped at: Session resumed at a clean phase boundary. Phase 15 shipped; Phase 16 awaits an
-owner decision. Nothing is mid-edit, the working tree is clean, there are no open PRs.
+Last session: 2026-08-14
+Stopped at: **Phase 18 planned, zero plans executed.** 4 plans across 3 waves, plan-checked
+twice, 3 blockers fixed. Phase 19 is complete and MERGED to `develop` (PR #66), as are the
+Phase 18 criteria corrections (PR #67).
 
-`develop` @ `4c8e6f9`, in sync with origin. One worktree (the main checkout). Suite green:
-**exit 0, 6296/6296, 907 de-duplicated project-local proofs** (measured on `c54bfa7`; `4c8e6f9`
-differs from it only by two `.planning/` markdown files, so the measurement still holds).
+> **This block was corrupted for the FOURTH time on 2026-08-14, the third time by an SDK
+> write.** It arrived reading `status: verifying`, `stopped_at: context exhaustion at 75%`,
+> `completed_plans: 87` against `total_plans: 88` — claiming plans complete that had not been
+> executed — and with the sentence below truncated mid-clause, leaving a dangling
+> "owner decision." fragment whose subject had been clobbered. Rewritten from measurement.
+>
+> **The mechanism is now confirmed rather than suspected.** Phase 19's Wave 1 executor reported
+> `gsd-sdk query state.advance-plan` corrupting this same file the same way (inflating
+> `completed_plans` past `total_plans`, truncating a status sentence), and reverted to a manual
+> edit. Waves 2 and 3 were instructed not to call it. **Do not run `state.advance-plan` against
+> this file.** Hand-edit, scoped to the phase you are in.
+
+Suite measured on `27ba2c2`: **exit 0, 6314/6314, 916 de-duplicated project-local proofs**,
+`duration_ms 25337`. Nothing is mid-edit apart from this file's own correction; there are no
+open PRs and `develop` is in sync.
 
 **HANDOFF.json and `.continue-here.md` were consumed and deleted on resume** — they are
 one-shot artifacts, and this file's own history records stale phase-09/phase-10 handoffs having
@@ -748,6 +761,7 @@ up is **Phase 18**.
   de-duplicated project-local proofs unchanged at **916** (this plan's new assertions live in
   the root-level integration test, not under `fjs/`). See `19-03-SUMMARY.md`. **This closes
   Phase 19.**
+
 - **Phase 18 — Dependency and Duplication Debt** (Backlog, T3, MAINT-06…08). Now next.
 - **Phase 17 — Documentation Truth Pass** (Backlog, T3, MAINT-02…05). Its criterion 5 is the
   requirement count, which read **79** in ROADMAP's Coverage table and **83** in
@@ -758,5 +772,5 @@ up is **Phase 18**.
 
 **Phase 16** is deferred and **Phase 14** is skipped; neither is part of this run.
 
-Resume file: None — Plan 19-03 complete, Phase 19 COMPLETE (3/3 plans, EXEC-13/PROV-04/PROV-05
+Resume file: None
 all closed); next is Phase 18 (Dependency and Duplication Debt)

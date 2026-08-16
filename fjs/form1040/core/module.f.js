@@ -83,6 +83,7 @@ import { baseTaxForAmount } from '../../tax/table/module.f.js'
 /** @import { Ssa1099 } from '../../document/ssa1099/module.f.js' */
 /** @import { ItemizedDeductions } from '../../document/itemized_deductions/module.f.js' */
 /** @import { MedicalExpenses } from '../../document/medical_expenses/module.f.js' */
+/** @import { OneZeroNineNineG } from '../../document/1099g/module.f.js' */
 /** @import { PriorYearCapitalLoss } from '../../document/prior_year_capital_loss/module.f.js' */
 /** @import { Kind, ReturnProfile } from '../../return/profile/module.f.js' */
 /** @import { IndividualFilingStatus, TaxParamSet } from '../../tax/params/module.f.js' */
@@ -153,6 +154,7 @@ import { baseTaxForAmount } from '../../tax/table/module.f.js'
  *   readonly itemizedDeductionForms: readonly Stored<ItemizedDeductions>[],
  *   readonly medicalExpenseForms: readonly Stored<MedicalExpenses>[],
  *   readonly capitalLossCarryoverForms: readonly Stored<PriorYearCapitalLoss>[],
+ *   readonly unemploymentForms: readonly Stored<OneZeroNineNineG>[],
  * }} Form1040Inputs
  */
 
@@ -442,6 +444,7 @@ export const form1040IncomeLines = taxParamSet => inputs => {
         retirementForms, socialSecurityForms,
         itemizedDeductionForms, medicalExpenseForms,
         capitalLossCarryoverForms,
+        unemploymentForms,
     } = inputs
     const declaredZero = profileDeclaredZeroLine(profile)
     const fromDocuments = documentLine(profile)
@@ -622,13 +625,15 @@ export const form1040IncomeLines = taxParamSet => inputs => {
     // I's total additional income (line10) feeds 1040 line 8, Part II's
     // total adjustments (line26) feeds 1040 line 10 — ONE `scheduleOne(...)`
     // call, never two, so the two 1040 lines can never read two different
-    // Schedule 1 computations. `scheduleOneAdditionalIncome`/
-    // `scheduleOneAdjustments` stay in `unmodeledKindRefusals`
-    // (`fjs/return/scope`) for the whole of this phase — every field
-    // `scheduleOne` returns is a `profileDeclaredZeroLine`, so both totals
-    // are `0n` for every profile this engine can otherwise compute (this
-    // plan's own objective: citation granularity, not a value change).
-    const scheduleOneResult = scheduleOne(profile)
+    // Schedule 1 computations. The COARSE `scheduleOneAdditionalIncome`/
+    // `scheduleOneAdjustments` kinds stay in `unmodeledKindRefusals`
+    // (`fjs/return/scope`) — each covers many distinct Schedule 1 line items
+    // with no per-line dialect to attribute an amount to. **Line 7 is now the
+    // exception:** `vnd.fjs.1099g` box 1 attributes unemployment compensation
+    // to its own printed line, so `unemploymentCompensation` is modeled in its
+    // own right and does not need the coarse kind. Every OTHER field
+    // `scheduleOne` returns is still a `profileDeclaredZeroLine`.
+    const scheduleOneResult = scheduleOne(profile)(unemploymentForms)
     const line8 = {
         value: scheduleOneResult.line10.value,
         sources: scheduleOneResult.line10.sources,
@@ -1125,7 +1130,7 @@ const profileMoneyBox = profile => boxPath => {
  * @type {(taxParamSet: TaxParamSet) => (inputs: Form1040Inputs) => (income: Form1040IncomeLines) => { readonly kind: 'ok', readonly tax: Form1040TaxAndPaymentLines, readonly line16Method: Line16Method } | Form1040Error}
  */
 const form1040TaxAndPaymentLines = taxParamSet => inputs => income => {
-    const { profile, w2s, interestForms, dividendForms, brokerageForms, retirementForms } = inputs
+    const { profile, w2s, interestForms, dividendForms, brokerageForms, retirementForms, unemploymentForms } = inputs
     const declaredZero = profileDeclaredZeroLine(profile)
     const fromDocuments = documentLine(profile)
     const status = storedFilingStatusNamed(profile.value.filingStatus)
@@ -1322,9 +1327,12 @@ const form1040TaxAndPaymentLines = taxParamSet => inputs => income => {
                 sumBoxOverDocuments(retirementForms)('box4FederalIncomeTaxWithheld')(
                     form => form.box4FederalIncomeTaxWithheld)))(
             addBoxSums(
-                sumBoxOverDocuments(dividendForms)('box4FederalIncomeTaxWithheld')(
-                    form => form.box4FederalIncomeTaxWithheld))(
-                sumBoxOverDocuments(brokerageForms)('box4FederalIncomeTaxWithheld')(
+                addBoxSums(
+                    sumBoxOverDocuments(dividendForms)('box4FederalIncomeTaxWithheld')(
+                        form => form.box4FederalIncomeTaxWithheld))(
+                    sumBoxOverDocuments(brokerageForms)('box4FederalIncomeTaxWithheld')(
+                        form => form.box4FederalIncomeTaxWithheld)))(
+                sumBoxOverDocuments(unemploymentForms)('box4FederalIncomeTaxWithheld')(
                     form => form.box4FederalIncomeTaxWithheld))))
     const line25c = declaredZero('1040 line 25c')
     const line25d = totalLine('1040 line 25d')([line25a, line25b, line25c])
@@ -1878,6 +1886,13 @@ const inputsOf = profile => w2s => interestForms => dividendForms => brokerageFo
                 retirementForms, socialSecurityForms,
                 itemizedDeductionForms, medicalExpenseForms,
                 capitalLossCarryoverForms,
+                // TEST-HELPER DEFAULT. `unemploymentForms` is REQUIRED on
+                // `Form1040Inputs` — a production caller must supply it and
+                // `tsc` enforces that. This helper defaults it to empty so the
+                // forty existing proof call sites, none of which concern
+                // unemployment, read exactly as they did before. Proofs that
+                // DO concern it spread this result and override the field.
+                unemploymentForms: [],
             })
 
 /**
@@ -2058,6 +2073,44 @@ const withholdingProfile = {
         'federalTaxWithheldOn1099Int',
     ],
 }
+
+/**
+ * A profile declaring wages plus unemployment compensation and both
+ * withholding kinds — the shape of a real Wage-and-Income transcript that
+ * carries W-2s and a 1099-G.
+ */
+const unemploymentProfile = {
+    ...marriedFilingJointlyProfile,
+    declaredKinds: [
+        'wages',
+        'unemploymentCompensation',
+        'federalTaxWithheldOnW2',
+        'federalTaxWithheldOnOther1099',
+    ],
+}
+
+/** @type {(documentHash: string) => (box1: string) => (box4: string) => Stored<OneZeroNineNineG>} */
+const unemploymentDocument = documentHash => box1 => box4 => ({
+    documentHash,
+    value: {
+        dialect: 'vnd.fjs.1099g',
+        payerTin: '11-1111111',
+        recipientTin: '222-22-2222',
+        accountNumber: 'EDD-0001',
+        taxYear: 2025,
+        formRevision: '2025',
+        box1UnemploymentCompensation: box1,
+        box4FederalIncomeTaxWithheld: box4,
+    },
+})
+
+/**
+ * Overrides `inputsOf`'s empty `unemploymentForms` default. Written as a
+ * spread rather than an eleventh curried parameter so the forty existing
+ * call sites, none of which concern unemployment, stay untouched.
+ * @type {(inputs: Form1040Inputs) => (forms: readonly Stored<OneZeroNineNineG>[]) => Form1040Inputs}
+ */
+const withUnemployment = inputs => forms => ({ ...inputs, unemploymentForms: forms })
 
 /**
  * Runs the WHOLE line assembly — 1a-15 and then 16-37 — and hands back both
@@ -2629,6 +2682,90 @@ export const proof = {
         // forms. Four = two W-2 box-2 citations, one 1099-INT box-4 citation,
         // and the profile's `declaredKinds` box behind the legitimately zero
         // line 25c.
+        /**
+         * **The end-to-end claim for the 1099-G work.** Unemployment
+         * compensation must travel 1099-G box 1 → Schedule 1 line 7 → line 10
+         * → 1040 line 8, and its withholding must travel box 4 → 1040 line 25b.
+         *
+         * Asserted against a HAND-TYPED expectation at each hop, and paired
+         * with the no-1099-G control below: an assertion that a line carries
+         * $4,554 proves nothing on its own if the line would carry $4,554
+         * anyway.
+         */
+        unemploymentReachesLineEightAndItsWithholdingReachesLineTwentyFiveB: () => {
+            const base = inputsOf(storedProfile(unemploymentProfile))([
+                w2WithWithholding('sha256-w2-01')('45505.00')('8962.00'),
+            ])([])([])([])([])([])([])([])([])
+            const { income, tax } = computedLines(withUnemployment(base)([
+                unemploymentDocument('sha256-1099g-01')('4554.00')('454.00'),
+            ]))
+            assertEq(income.line8.value, 455400n, '1040 line 8 carries the $4,554.00 of unemployment')
+            assertEq(income.line1a.value, 4550500n, 'and wages are untouched at $45,505.00')
+            assertEq(income.line9.value, 5005900n, 'total income = $45,505.00 + $4,554.00')
+            assertEq(tax.line25b.value, 45400n, '1040 line 25b carries the $454.00 withheld on the 1099-G')
+            // Line 8 is Schedule 1's Part I TOTAL, so it unions the sources of
+            // every Part I line — the profile's `declaredKinds` (behind the six
+            // still-zero lines) AND the 1099-G behind line 7. The 1099-G must be
+            // PRESENT; it is not first, and asserting that it were would be
+            // asserting an accident of union order rather than provenance.
+            assert(
+                income.line8.sources.some(source =>
+                    source.documentHash === 'sha256-1099g-01'
+                    && source.boxPath === 'box1UnemploymentCompensation'),
+                ['line 8 must cite the 1099-G box it came from', income.line8.sources])
+        },
+
+        /**
+         * The control. The SAME return with no 1099-G: line 8 falls to zero
+         * and line 25b loses exactly the 1099-G's withholding. Without this,
+         * the leaf above could pass on a line that was never reading the
+         * document at all.
+         */
+        withoutAnyUnemploymentFormLineEightIsZeroAndTwentyFiveBDrops: () => {
+            const base = inputsOf(storedProfile(unemploymentProfile))([
+                w2WithWithholding('sha256-w2-01')('45505.00')('8962.00'),
+            ])([])([])([])([])([])([])([])([])
+            const { income, tax } = computedLines(withUnemployment(base)([]))
+            assertEq(income.line8.value, 0n, 'no 1099-G means no line 8 income')
+            assertEq(income.line9.value, 4550500n, 'total income is wages alone')
+            assertEq(tax.line25b.value, 0n, 'and no 1099-family withholding')
+            const [line8Source] = income.line8.sources
+            assertEq(line8Source.boxPath, 'declaredKinds', 'the zero still carries profile provenance')
+        },
+
+        /**
+         * The same return through the **FULL `form1040Report(...)` entry
+         * point**, so the outer scope guard runs on the way.
+         *
+         * Both leaves above call `computedLines`, which reaches
+         * `form1040IncomeLines`/`form1040TaxAndPaymentLines` directly and
+         * **bypasses the scope guard entirely**. That makes them proofs about
+         * the line assembly, not about the return — and it means neither of
+         * them would have failed if `unemploymentCompensation` had been left
+         * out of `modeledKinds`. The whole phase began with a real transcript
+         * REFUSED at exactly that guard, so a proof that the refusal is now a
+         * computation has to go through the thing that refused.
+         *
+         * $45,505.00 of wages plus $4,554.00 of unemployment is $50,059.00 of
+         * total income; less the $31,500.00 MFJ standard deduction leaves
+         * $18,559.00 taxable — hand-computed here, never read back off the
+         * code under test.
+         */
+        unemploymentComputesThroughTheFullEntryPointWithTheGuardSatisfied: () => {
+            const inputs = withUnemployment(
+                inputsOf(storedProfile(unemploymentProfile))([
+                    w2WithWithholding('sha256-w2-01')('45505.00')('8962.00'),
+                ])([])([])([])([])([])([])([])([]))([
+                    unemploymentDocument('sha256-1099g-01')('4554.00')('454.00'),
+                ])
+            const outcome = form1040Report(taxParams2025)(inputs)
+            assert(outcome.kind === 'ok', ['the guard must now PASS on a declared unemployment return', outcome])
+            assertEq(lineRuled(outcome.lines)('1040 line 8').value, 455400n, '$4,554.00 of unemployment')
+            assertEq(lineRuled(outcome.lines)('1040 line 9').value, 5005900n, '$50,059.00 total income')
+            assertEq(lineRuled(outcome.lines)('1040 line 15').value, 1855900n, '$18,559.00 taxable income')
+            assertEq(lineRuled(outcome.lines)('1040 line 25b').value, 45400n, '$454.00 withheld on the 1099-G')
+        },
+
         twentyFiveDSumsTwentyFiveAAndTwentyFiveBCitingEveryBox: () => {
             const { tax } = computedLines(inputsOf(storedProfile(withholdingProfile))([
                 w2WithWithholding('sha256-w2-01')('50000.00')('5000.00'),
@@ -3530,13 +3667,20 @@ export const proof = {
             const [pension5aSource] = lines.line5a.sources
             assertEq(pension5aSource.documentHash, 'sha256-r-pension')
         },
-        // line25b now sums FOUR document types: 1099-INT, 1099-R, 1099-DIV
-        // and 1099-B, each `box4FederalIncomeTaxWithheld` — matching
-        // `federalTaxWithheldOnOther1099`'s own remedy string, which names
-        // all three of the latter three (`fjs/return/scope`). $10 + $100 +
-        // $50 + $25 = $185.00, hand-typed, never re-derived from the code
-        // under test.
-        line25bSumsAllFourWithholdingDocumentTypes: () => {
+        // line25b now sums FIVE document types: 1099-INT, 1099-R, 1099-DIV,
+        // 1099-B and 1099-G, each `box4FederalIncomeTaxWithheld` — matching
+        // `federalTaxWithheldOnOther1099`'s own remedy string
+        // (`fjs/return/scope`). $10 + $100 + $50 + $25 + $20 = $205.00,
+        // hand-typed, never re-derived from the code under test.
+        //
+        // **This leaf said FOUR, and tested four, for a day after line 25b
+        // began summing five.** Phase 20 added the 1099-G term and its own
+        // dedicated leaf, but left the leaf whose entire job is to assert the
+        // COMPLETE set still asserting the old set — and green, because four
+        // of five summing correctly is a true statement about a subset. It is
+        // the same defect as the hand-typed modeled-kind list in
+        // `fjs/return/scope`, on the same day, from the same commit.
+        line25bSumsAllFiveWithholdingDocumentTypes: () => {
             const retirementForm = retirementDocument('sha256-r-wh')({
                 box4FederalIncomeTaxWithheld: '100.00',
             })
@@ -3549,11 +3693,12 @@ export const proof = {
             const interestForm = interestDocument('sha256-int-wh')({
                 box4FederalIncomeTaxWithheld: '10.00',
             })
-            const { tax } = computedLines(
+            const unemploymentForm = unemploymentDocument('sha256-1099g-wh')('0.00')('20.00')
+            const { tax } = computedLines(withUnemployment(
                 inputsOf(storedProfile(singleProfile))([])([interestForm])([dividendForm])([brokerageForm])(
-                    [retirementForm])([])([])([])([]))
-            assertEq(tax.line25b.value, 18500n, '$185.00 across all four document types')
-            assertEq(tax.line25b.sources.length, 4)
+                    [retirementForm])([])([])([])([]))([unemploymentForm]))
+            assertEq(tax.line25b.value, 20500n, '$205.00 across all five document types')
+            assertEq(tax.line25b.sources.length, 5)
         },
         // The IRA-deduction circularity refusal (Decision 3.3/5.1): a
         // profile declaring `iraDeductionDeclared: true` refuses the WHOLE
