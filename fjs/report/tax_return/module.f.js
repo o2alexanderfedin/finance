@@ -1421,11 +1421,19 @@ export const proof = {
     // 22 = $855.00; the refundable 40% of the $2,500.00 American Opportunity
     // Credit = $1,000.00 on line 29; $1,000.00 - $855.00 = $145.00 overpaid.
     //
-    // What this leaf proves that the direct one cannot: the SOURCE TEXT's own
-    // `route` branches for `vnd.fjs.1098t` and `vnd.fjs.credits` are real.
-    // Delete either and the credits vanish, because no other fixture in this
-    // repository carries a document of either dialect through the stored
-    // program.
+    // What this leaf proves that the direct one cannot: the `route` branches
+    // for `vnd.fjs.1098t` and `vnd.fjs.credits` are real. Delete either and
+    // the credits vanish, because no other fixture in this repository carries
+    // a document of either dialect through this program.
+    //
+    // `[CORRECTED, Phase 26]` This paragraph said "the SOURCE TEXT's own
+    // `route` branches", which is not what it proves: `runTwin` interprets
+    // {@link taxReturnReport}, the function twin, and the literal source text
+    // is executed only by `tax-return-integration.test.js`. The sentence is
+    // narrowed to what is true; the source text's own branches are covered by
+    // {@link proof.sourceAndTwinDispatchOnTheSameSeventeenDialects}'s
+    // verbatim-tag grep alone, and Phase 26's own retiree leaf below states
+    // the same gap for the two dialects it adds.
     storedProgramRoutesTheTwoCreditDialectsAndComputesBothCredits: () => {
         const result = runTwin(creditsSubjects)
         assert(result.kind === 'ok', ['expected a computed return', result])
@@ -1508,11 +1516,26 @@ export const proof = {
     //     is $291.25, rounded to the nearest dollar                $291.00
     //   line 37 amount owed                               $291.00
     //
-    // What this leaf proves that `fjs/form1040/core`'s cannot: the SOURCE
-    // TEXT's own `route` branches for `vnd.fjs.ira` and
-    // `vnd.fjs.prior_year_ira_basis` are real. Delete either and the QCD or
-    // the basis vanishes, because no other fixture in this repository carries
-    // a document of either dialect through the stored program.
+    // **What this leaf proves, stated precisely, because the neighbouring
+    // Phase 25 leaf overstates the same claim and it was worth checking.**
+    // `runTwin` interprets {@link taxReturnReport} — the TWIN — so what is
+    // proven here is that the twin's `route` and `noteYearMismatch` branches
+    // for `vnd.fjs.ira` and `vnd.fjs.prior_year_ira_basis` are real: delete
+    // either and the QCD or the basis vanishes, because no other fixture in
+    // this repository carries a document of either dialect through this
+    // program.
+    //
+    // The SOURCE TEXT's own branches are a separate question, and this file
+    // covers them only through
+    // {@link proof.sourceAndTwinDispatchOnTheSameSeventeenDialects}'s
+    // verbatim-tag grep. The one place the literal source is EXECUTED is
+    // `tax-return-integration.test.js`, whose fixture is Phase 21's two W-2s
+    // and one 1099-G and carries no Form 1099-R at all — so the source's
+    // handling of these two dialects is checked by a `String.includes`, not
+    // by a computed figure. **That is a real gap and it is named here rather
+    // than papered over**; closing it means adding an IRA to that harness's
+    // seeded document set, which also moves its hand-typed `readCount` and is
+    // a change to a server integration test rather than to a proof.
     storedProgramRoutesTheTwoIraDialectsAndComputesTheQcdAndTheBasis: () => {
         const result = runTwin(retireeSubjects)
         assert(result.kind === 'ok', ['expected a computed return', result])

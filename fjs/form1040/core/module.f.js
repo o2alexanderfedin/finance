@@ -681,6 +681,14 @@ export const form1040IncomeLines = taxParamSet => inputs => {
     if (iraOutcome.kind === 'error') {
         return { kind: 'error', message: iraOutcome.message, unmodeled: [] }
     }
+    // `[VERIFIED]` Substituting `line4bBeforeIraRecords` here — the mutation
+    // that says "the Form 8606/QCD figure is never actually used" — reddens
+    // five leaves across this file and `fjs/report/tax_return`. Written first
+    // as `iraOutcome.kind === 'ok' ? line4bBeforeIraRecords : iraOutcome.line4b`
+    // it does not compile: the guard above narrows `iraOutcome` to its `ok`
+    // arm, so the false branch is `never` and `tsc` reports TS2339. Recorded
+    // because a mutation that fails to compile measures the compiler
+    // (AGENTS.md's first failure mode), and the reshaped one is the result.
     const line4b = fromDocuments('1040 line 4b')(iraOutcome.line4b)
     const line5a = fromDocuments('1040 line 5a')(
         sumBoxOverDocuments(pensionRetirementForms)('box1GrossDistribution')(
