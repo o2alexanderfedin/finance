@@ -4036,6 +4036,81 @@ export const proof = {
             assertEq(535505n - 415505n, 120000n, '$1,200.00 = 20% of the senior deduction')
         },
         /**
+         * **A FOUNDER WITH A DAY JOB, and the THIRD leaf a mutation
+         * demanded** — the subtlest of the three, and an "equivalent mutant"
+         * that turned out not to be equivalent at all.
+         *
+         * Zeroing `deductibleHalfOfSelfEmploymentTaxCents` at the Form 8995
+         * call site — i.e. NOT reducing qualified business income by the
+         * §164(f) half, the step this form's docstring calls the one most
+         * commonly missed — left the suite green even after the two fixtures
+         * above were added. The reason is a property of the form rather than
+         * a gap in intent: **in every fixture this file had, the INCOME
+         * LIMITATION on line 14 was the smaller of the two, so line 15 took
+         * it and nothing about line 10 could be observed at all.** A sole
+         * proprietor with no other income always lands there, because the
+         * standard deduction has already come off the limitation base.
+         *
+         * The reduction becomes observable only when line 10 is the smaller —
+         * when taxable income is large relative to the business. A $120,000
+         * salary beside the same $48,000 business is that return, and it is
+         * also the commonest founder household there is:
+         *
+         *   1040 line 1a   W-2 box 1                        $120,000.00
+         *   1040 line 8    Schedule C line 31                $47,910.00
+         *   1040 line 10   the deductible half                $3,384.74
+         *   1040 line 11a  167,910.00 - 3,384.74            $164,525.26
+         *   Form 8995 4    47,910.00 - 3,384.74              $44,525.26
+         *   Form 8995 10   20% of 4,452,526 = 890,505.2       $8,905.05
+         *   Form 8995 11   164,525.26 - 15,750.00           $148,775.26
+         *   Form 8995 14   20% of 14,877,526 = 2,975,505.2   $29,755.05
+         *   1040 line 13a  the lesser — now line 10           $8,905.05
+         *
+         * **Without the reduction, qualified business income would be the
+         * whole $47,910.00 and line 13a would be $9,582.00** — $676.95 too
+         * much, which is 20% of the deductible half. Both are asserted.
+         *
+         * The wage base is shared here too: $120,000 of box 3 leaves
+         * $56,100 of it, which is more than the $44,244.89 of net earnings,
+         * so the cap does NOT bind and Schedule SE line 12 is the same
+         * $6,769.47 as with no wages at all. That is asserted, because a
+         * reader comparing this leaf with
+         * `theWageBaseIsSharedWithWTwoBoxThreeWagesEndToEnd` should be able
+         * to see why one shares and the other binds.
+         */
+        theDeductibleHalfReducesQualifiedBusinessIncomeWhenTheLimitationDoesNotBind: () => {
+            const base = inputsOf(storedProfile(selfEmploymentProfile))([
+                w2WithSocialSecurityWages('sha256-w2-day-job')('120000.00'),
+            ])([])([])([])([])([])([])([])([])
+            const { income, tax } = computedLines(withBusiness(base)([
+                nonemployeeCompensationDocument('sha256-1099nec-01')('48000.00')('0.00'),
+            ])([businessExpensesDocument('sha256-business-01')('90.00')]))
+            assertEq(income.line1a.value, 12000000n, '$120,000.00 of wages')
+            assertEq(income.line8.value, 4791000n, '$47,910.00 of business income')
+            assertEq(income.line10.value, 338474n, 'the deductible half, $3,384.74')
+            assertEq(income.line11a.value, 16452526n, 'AGI = $164,525.26')
+            assertEq(income.line13a.value, 890505n, '1040 line 13a = $8,905.05')
+            // The WRONG answer, hand-computed and asserted to differ: 20% of
+            // the UNREDUCED $47,910.00 is $9,582.00.
+            assertEq(4791000n * 20n / 100n, 958200n, 'unreduced QBI would give $9,582.00')
+            assert(
+                income.line13a.value !== 958200n,
+                ['§199A(c)(1) reduces QBI by the §164(f) half', income.line13a.value])
+            assertEq(958200n - 890505n, 67695n, '$676.95 = 20% of $3,384.74')
+            // …and the income limitation genuinely does NOT bind here, which
+            // is the whole reason this fixture can see the reduction: 20% of
+            // $148,775.26 is $29,755.05, hand-computed.
+            assertEq(14877526n * 20n / 100n, 2975505n, 'the limitation is $29,755.05, far larger')
+            // The wage base is shared and does not bind: $176,100.00 less
+            // $120,000.00 is $56,100.00, more than the $44,244.89 of net
+            // earnings, so the Social Security portion is the same as with no
+            // wages at all.
+            assertEq(income.selfEmployment.lines.line8a, 12000000n, '$120,000.00 of box 3')
+            assertEq(income.selfEmployment.lines.line9, 5610000n, '$56,100.00 of base left')
+            assertEq(income.selfEmployment.lines.line12, 676947n, '$6,769.47, the uncapped figure')
+            assertEq(tax.line23.value, 676947n, '1040 line 23 = $6,769.47')
+        },
+        /**
          * **A FOUNDER WITH DIVIDENDS, and the second leaf a mutation
          * demanded.** Zeroing `netCapitalGainCents` at the Form 8995 call
          * site also left the suite green: no fixture had both a business and
