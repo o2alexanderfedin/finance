@@ -3987,6 +3987,114 @@ export const proof = {
             assert(outcome.message.includes('§199A(c)(2)'), ['must name the section', outcome.message])
         },
         /**
+         * **A SENIOR FOUNDER, and the leaf a mutation demanded.** Zeroing
+         * `additionalDeductionsCents` at the Form 8995 call site — i.e.
+         * leaving 1040 line 13b INSIDE the limitation base — left the whole
+         * suite green, because no fixture in this repository had both a
+         * business and a senior deduction. AGENTS.md: *"after wiring
+         * anything, ask what fixture actually observes it."* Nothing did.
+         *
+         * A 65-or-over single filer with the same $48,000.00 business:
+         *
+         *   1040 line 11a  AGI, as in the leaf above          $44,525.26
+         *   1040 line 12e  15,750.00 + 2,000.00 aged          $17,750.00
+         *   1040 line 13b  Schedule 1-A, unphased at this AGI  $6,000.00
+         *   Form 8995 11   44,525.26 - 17,750.00 - 6,000.00   $20,775.26
+         *   Form 8995 14   20% of 2,077,526 = 415,505.2        $4,155.05
+         *   Form 8995 10   20% of the QBI, as above            $8,905.05
+         *   1040 line 13a  the lesser                          $4,155.05
+         *
+         * **Leaving line 13b in would give $26,775.26 on Form 8995 line 11
+         * and $5,355.05 on line 13a** — $1,200.00 too much deduction, which
+         * is 20% of the senior deduction, for exactly the filer OBBBA's
+         * senior deduction was written for. Both figures are asserted.
+         */
+        theSeniorDeductionComesOutOfTheSectionOneNineNineALimitationBase: () => {
+            const seniorFounder = {
+                ...selfEmploymentProfile,
+                taxpayerBornBeforeJan2_1961: /** @type {const} */ (true),
+                declaredKinds: [
+                    'businessIncomeOrLoss',
+                    'federalTaxWithheldOnOther1099',
+                    'seniorAndOtherScheduleOneADeductions',
+                ],
+            }
+            const base = inputsOf(storedProfile(seniorFounder))([])([])([])([])([])([])([])([])([])
+            const { income } = computedLines(withBusiness(base)([
+                nonemployeeCompensationDocument('sha256-1099nec-01')('48000.00')('0.00'),
+            ])([businessExpensesDocument('sha256-business-01')('90.00')]))
+            assertEq(income.line11a.value, 4452526n, 'AGI = $44,525.26, unchanged by age')
+            assertEq(income.line12e.value, 1775000n, '$15,750.00 + $2,000.00 for the aged box')
+            assertEq(income.line13b.value, 600000n, 'the full $6,000.00 senior deduction')
+            assertEq(income.line13a.value, 415505n, '1040 line 13a = $4,155.05')
+            // The WRONG answer, hand-computed and asserted to differ.
+            assertEq(4452526n - 1775000n, 2677526n, 'leaving line 13b in gives $26,775.26')
+            assertEq(2677526n * 20n / 100n, 535505n, 'and $5,355.05 of deduction')
+            assert(
+                income.line13a.value !== 535505n,
+                ['line 13b must come out of the limitation base', income.line13a.value])
+            assertEq(535505n - 415505n, 120000n, '$1,200.00 = 20% of the senior deduction')
+        },
+        /**
+         * **A FOUNDER WITH DIVIDENDS, and the second leaf a mutation
+         * demanded.** Zeroing `netCapitalGainCents` at the Form 8995 call
+         * site also left the suite green: no fixture had both a business and
+         * a capital gain, so Form 8995 line 12 was $0.00 everywhere and the
+         * whole line-12/13 subtraction was unobservable through the product
+         * path.
+         *
+         * The same $48,000.00 business plus $12,000.00 of qualified
+         * dividends:
+         *
+         *   1040 line 3a/3b  qualified = ordinary dividends   $12,000.00
+         *   1040 line 11a    47,910.00 + 12,000.00 - 3,384.74 $56,525.26
+         *   Form 8995 11     56,525.26 - 15,750.00            $40,775.26
+         *   Form 8995 12     net capital gain = line 3a       $12,000.00
+         *   Form 8995 13     40,775.26 - 12,000.00            $28,775.26
+         *   Form 8995 14     20% of 2,877,526 = 575,505.2      $5,755.05
+         *   Form 8995 10     20% of the QBI                    $8,905.05
+         *   1040 line 13a    the lesser                        $5,755.05
+         *
+         * **Without the line-12 subtraction line 13 would be $40,775.26 and
+         * line 14 $8,155.05**, which is $2,400.00 — 20% of the dividends —
+         * too much deduction. Both are asserted.
+         *
+         * The dividends are QUALIFIED, which is what makes them net capital
+         * gain at all: ordinary dividends alone are not, and this fixture
+         * sets box 1a and box 1b to the same amount so the two 1040 lines
+         * carry the same figure and only line 3a reaches Form 8995.
+         */
+        netCapitalGainComesOutOfTheSectionOneNineNineALimitationBase: () => {
+            const dividendFounder = {
+                ...selfEmploymentProfile,
+                declaredKinds: [
+                    'businessIncomeOrLoss',
+                    'federalTaxWithheldOnOther1099',
+                    'qualifiedDividends',
+                    'ordinaryDividends',
+                ],
+            }
+            const base = inputsOf(storedProfile(dividendFounder))([])([])([
+                dividendDocument('sha256-1099div-01')({
+                    box1aTotalOrdinaryDividends: '12000.00',
+                    box1bQualifiedDividends: '12000.00',
+                }),
+            ])([])([])([])([])([])([])
+            const { income } = computedLines(withBusiness(base)([
+                nonemployeeCompensationDocument('sha256-1099nec-01')('48000.00')('0.00'),
+            ])([businessExpensesDocument('sha256-business-01')('90.00')]))
+            assertEq(income.line3a.value, 1200000n, '$12,000.00 of qualified dividends')
+            assertEq(income.line11a.value, 5652526n, 'AGI = $56,525.26')
+            assertEq(income.line13a.value, 575505n, '1040 line 13a = $5,755.05')
+            // The WRONG answer, hand-computed and asserted to differ.
+            assertEq(5652526n - 1575000n, 4077526n, 'Form 8995 line 11 = $40,775.26')
+            assertEq(4077526n * 20n / 100n, 815505n, 'without line 12 the limitation is $8,155.05')
+            assert(
+                income.line13a.value !== 815505n,
+                ['net capital gain must come out of the limitation base', income.line13a.value])
+            assertEq(815505n - 575505n, 240000n, '$2,400.00 = 20% of the qualified dividends')
+        },
+        /**
          * **ONE RULE, ONE PLACE, checked**: Form 8995 line 12's "net capital
          * gain" and the Qualified Dividends and Capital Gain Tax Worksheet's
          * lines 2 + 3 are the same quantity, transcribed twice — once in
