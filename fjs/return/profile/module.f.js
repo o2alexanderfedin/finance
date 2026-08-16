@@ -153,7 +153,41 @@ export const kindVocabulary = /** @type {const} */ ([
     'netQualifiedDisasterLoss',             // 12e exception 5
     'qualifiedBusinessIncomeDeduction',     // 13a
     'seniorAndOtherScheduleOneADeductions', // 13b
-    'scheduleTwoTaxes',                     // 17 and 23
+    // ── Schedule 2's own lines, one kind each (TAX-22, Phase 23) ────────────
+    //
+    // `scheduleTwoTaxes` stood here as ONE coarse kind for the whole of
+    // Schedule 2 -- Part I's alternative minimum tax and repayments, Part
+    // II's self-employment tax, Additional Medicare Tax, net investment
+    // income tax and eleven more printed lines. A single kind covering that
+    // many distinct taxes could only ever refuse them together, so nothing
+    // on Schedule 2 was nameable and nothing on it could be reclassified
+    // one line at a time. It is split here into one kind per printed line
+    // group, in SCHEDULE 2's own order -- which is 1040 form order for the
+    // block as a whole, since every one of these feeds either line 17
+    // (Part I) or line 23 (Part II).
+    //
+    // **Schedule 2 lines 5 and 6 deliberately get no kind of their own.**
+    // Line 5 is the Social Security and Medicare tax on unreported tips,
+    // computed on Form 4137 -- which is exactly the remedy `unreportedTips`
+    // (1040 line 1c, above) already names, for the same taxpayer fact. Line
+    // 6 is the uncollected tax on Form 8919 wages, which `form8919Wages`
+    // (1040 line 1g) already names. Adding a second kind for either would
+    // give one fact two declarations and let a taxpayer declare the income
+    // half without the tax half.
+    'advancePremiumTaxCreditAndOtherRepayments', // Schedule 2 line 1a-1z -> 17
+    'alternativeMinimumTax',                // Schedule 2 line 2  -> 17
+    'selfEmploymentTax',                    // Schedule 2 line 4  -> 23
+    'additionalTaxOnTaxFavoredAccounts',    // Schedule 2 line 8  -> 23
+    'householdEmploymentTaxes',             // Schedule 2 line 9  -> 23
+    'additionalMedicareTax',                // Schedule 2 line 11 -> 23
+    'netInvestmentIncomeTax',               // Schedule 2 line 12 -> 23
+    'uncollectedTaxOnTipsOrGroupTermLife',  // Schedule 2 line 13 -> 23
+    'interestOnResidentialLotAndTimeshareInstallments', // Schedule 2 line 14 -> 23
+    'interestOnDeferredInstallmentSaleTax', // Schedule 2 line 15 -> 23
+    'lowIncomeHousingCreditRecapture',      // Schedule 2 line 16 -> 23
+    'otherAdditionalTaxes',                 // Schedule 2 line 17a-17z -> 23
+    'premiumTaxCreditReconciliation',       // Schedule 2 line 19 -> 23
+    'section965NetTaxLiabilityInstallment', // Schedule 2 line 20 (memo)
     'childTaxCreditOrOtherDependents',      // 19
     'scheduleThreeNonrefundableCredits',    // 20
     'federalTaxWithheldOnW2',               // 25a
@@ -546,16 +580,22 @@ const expectedMoneyBoxFieldCount = 4
  * Independently hand-typed: the size of the frozen {@link kindVocabulary},
  * counted off the 1040 face rather than read from `kindVocabulary.length`,
  * for the same reason.
+ *
+ * `51 -> 64` is Phase 23's own Schedule 2 split (TAX-22): one coarse
+ * `scheduleTwoTaxes` removed and fourteen per-printed-line kinds added in
+ * its place. The arithmetic is `51 - 1 + 14`, and it is written out because
+ * a count that moves by thirteen without a stated reason is indistinguishable
+ * from a count somebody adjusted until the suite went green.
  * @type {number}
  */
-const expectedKindCount = 51
+const expectedKindCount = 64
 
 export const proof = {
     dialectAndMediaType: () => {
         assertEq(dialect, 'vnd.fjs.return_profile')
         assertEq(mediaType, 'application/vnd.fjs.return_profile+json')
     },
-    kindVocabularyIsExactlyFiftyOne: () => {
+    kindVocabularyIsExactlySixtyFour: () => {
         assertEq(kindVocabulary.length, expectedKindCount)
         assertEq(new Set(kindVocabulary).size, kindVocabulary.length)
     },

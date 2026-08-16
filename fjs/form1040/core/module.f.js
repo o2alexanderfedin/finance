@@ -1212,9 +1212,11 @@ const form1040TaxAndPaymentLines = taxParamSet => inputs => income => {
     // 17/23 — Schedule 2 (`fjs/schedule/2`, Plan 13-11/13-12, TAX-14): Part
     // I's total tax (line3) feeds 1040 line 17, Part II's total other taxes
     // (line21) feeds 1040 line 23 — ONE `scheduleTwo(...)` call, mirroring
-    // Schedule 1's own single-call precedent above. `scheduleTwoTaxes`
-    // stays in `unmodeledKindRefusals`, so both totals are `0n` for every
-    // profile this engine can otherwise compute.
+    // Schedule 1's own single-call precedent above. Every one of Schedule
+    // 2's fourteen kinds (TAX-22's split of the former coarse
+    // `scheduleTwoTaxes`) is still in `unmodeledKindRefusals` as of this
+    // commit, so both totals are `0n` for every profile this engine can
+    // otherwise compute.
     const scheduleTwoResult = scheduleTwo(profile)
     const line17 = {
         value: scheduleTwoResult.line3.value,
@@ -3300,7 +3302,7 @@ export const proof = {
                 return
             }
             assertEq(outcome.unmodeled.length, 1, ['expected exactly one required kind', outcome.unmodeled])
-            assertEq(outcome.unmodeled[0], 'scheduleTwoTaxes', ['expected Schedule 2 named', outcome.unmodeled])
+            assertEq(outcome.unmodeled[0], 'additionalMedicareTax', ['expected Schedule 2 line 11 named', outcome.unmodeled])
             assert(
                 outcome.message.includes('Form 8959'),
                 ['the refusal must name the form the taxpayer needs', outcome.message])
@@ -3373,7 +3375,7 @@ export const proof = {
             }
             assertEq(
                 racedOutcome.unmodeled[0],
-                'scheduleTwoTaxes',
+                'additionalMedicareTax',
                 ['the tripwire must win the race against a line-computation refusal', racedOutcome.unmodeled])
             assert(
                 racedOutcome.message.includes('Form 8959'),

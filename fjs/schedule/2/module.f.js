@@ -16,7 +16,9 @@
  *
  * ## Every line is modeled; for this profile every line is zero
  *
- * The frozen 50-kind `kindVocabulary` carries exactly ONE kind for the
+ * **Superseded in part by Phase 23 (TAX-22); read the note at the end of
+ * this section.** The frozen 50-kind `kindVocabulary` carried exactly ONE
+ * kind for the
  * whole of this schedule, `scheduleTwoTaxes`, covering both Part I (AMT,
  * excess advance premium tax credit repayment, and the clean-vehicle-
  * credit/EPE-recapture sub-lines) and Part II (self-employment tax, the
@@ -39,6 +41,18 @@
  * at the scope layer — a decision this module never makes; it is correct
  * for every return the engine can otherwise compute, where the kind is
  * undeclared and every one of these taxes is genuinely zero.
+ *
+ * **PHASE 23 (TAX-22): the coarse kind is gone, and the argument above is
+ * what removed it.** `scheduleTwoTaxes` no longer exists in
+ * `kindVocabulary`; it is fourteen per-printed-line kinds, one for each of
+ * this schedule's line groups (`fjs/return/profile`'s own vocabulary
+ * comment lists them, and `fjs/return/scope`'s refusal table names each
+ * one's form). Every one of the fourteen is still refused as of THIS
+ * commit, so every line below is still a documented zero and nothing about
+ * this module's arithmetic has changed. Lines 11 and 12 are wired to real
+ * Form 8959 and Form 8960 figures in the NEXT commit, in the same change
+ * that reclassifies their two kinds — wire before reclassify, the
+ * discipline every prior phase followed.
  *
  * ## The 1a-1z and 17a-17z sub-line collapses
  *
@@ -150,8 +164,8 @@ const totalLine = rule => lines => ({
 /**
  * Computes Schedule 2 for one return from the declared return profile
  * alone. Every line is `value: 0n` for any profile that does not declare
- * `scheduleTwoTaxes` — see this module's own docstring for why that is the
- * honest, complete answer for this phase.
+ * any of this schedule's fourteen declared kinds — see this module's own
+ * docstring for why that is the honest, complete answer for this phase.
  * @type {(profile: Stored<ReturnProfile>) => ScheduleTwo}
  */
 export const scheduleTwo = profile => {
