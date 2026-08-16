@@ -1644,6 +1644,53 @@ export const proof = {
                 ],
             )
         },
+        // THE ORDERING PROPERTY THE NEW TABLE COULD HAVE BROKEN, and the
+        // pair that is capable of noticing. `describableKinds` is built by
+        // walking `kindVocabulary`, NOT by concatenating the two tables, and
+        // that distinction is invisible for most pairs: `additionalMedicareTax`
+        // sits after every 1040-line-1-through-13 kind, so pairing it with
+        // `unreportedTips` (1040 line 1c) gives the same order either way,
+        // which is why `fjs/return/tripwire`'s own two-tripwire leaf cannot
+        // see this.
+        //
+        // `earnedIncomeCredit` (1040 line 27a) is the kind that CAN. In
+        // vocabulary — that is, 1040 form — order it comes AFTER
+        // `additionalMedicareTax` (Schedule 2 line 11 -> 1040 line 23). Under
+        // a concatenated `[...unmodeledKindRefusals, ...modeledKindDeclarationRemedies]`
+        // it would come FIRST, because it lives in the first table and the
+        // modeled kind is appended after the whole of it. Findings are
+        // supplied here in the WRONG order too, so the leaf pins the walk
+        // rather than the argument.
+        aModeledKindIsOrderedByTheVocabularyNotByWhichTableItCameFrom: () => {
+            const outcome = tripwireRefusal([
+                { kind: 'earnedIncomeCredit', evidence: 'evidence for 1040 line 27a' },
+                { kind: 'additionalMedicareTax', evidence: 'evidence for Schedule 2 line 11' },
+            ])
+            assertEq(outcome.unmodeled.length, 2, ['expected both kinds named', outcome.unmodeled])
+            assertEq(
+                outcome.unmodeled[0],
+                'additionalMedicareTax',
+                ['Schedule 2 line 11 reaches 1040 line 23, which comes before line 27a', outcome.unmodeled],
+            )
+            assertEq(outcome.unmodeled[1], 'earnedIncomeCredit', ['1040 line 27a comes second', outcome.unmodeled])
+            // Both clauses asserted PRESENT before their positions are
+            // compared, since `indexOf` returns -1 for a missing string and
+            // -1 is less than everything -- the way an ordering assertion
+            // passes over a message that lost half its content.
+            assert(
+                outcome.message.includes('evidence for Schedule 2 line 11'),
+                ['the modeled kind\'s own evidence must be carried', outcome.message],
+            )
+            assert(
+                outcome.message.includes('evidence for 1040 line 27a'),
+                ['the refused kind\'s own evidence must be carried', outcome.message],
+            )
+            assert(
+                outcome.message.indexOf('evidence for Schedule 2 line 11')
+                    < outcome.message.indexOf('evidence for 1040 line 27a'),
+                ['the two tables must be interleaved in form order, not concatenated', outcome.message],
+            )
+        },
         // …and the kind really is MODELED, which is what makes the remedy
         // above true rather than a promise the engine cannot keep. Stated
         // here, beside the sentence, rather than only in `partition`: the
