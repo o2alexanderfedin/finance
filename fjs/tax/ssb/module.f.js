@@ -57,11 +57,28 @@
  *
  * Line 6 (Schedule 1 lines 11-20, 23, and 25, total) is threaded in as
  * `scheduleOneAdjustmentsTotalCents` rather than computed inside this
- * module. In this phase's Wave 1 slice, Schedule 1 adjustments stay
- * unmodeled-refused (13-CONTEXT.md Decisions 3.2/6.1), so every real
- * caller passes `0n` here today — but the field exists and is genuinely
- * read, rather than hardcoded, so a later wave that wires Schedule 1 needs
- * no change to this module at all.
+ * module.
+ *
+ * **That prediction came true in Phase 24, and this paragraph is its
+ * correction.** It read, until 2026-08-16: *"In this phase's Wave 1 slice,
+ * Schedule 1 adjustments stay unmodeled-refused (13-CONTEXT.md Decisions
+ * 3.2/6.1), so every real caller passes `0n` here today — but the field
+ * exists and is genuinely read, rather than hardcoded, so a later wave that
+ * wires Schedule 1 needs no change to this module at all."* TAX-23/TAX-24
+ * wired Schedule 1 Part II lines 11, 13 and 21, and this module needed no
+ * change: `fjs/form1040/core` now passes
+ * `socialSecurityWorksheetAdjustmentsTotal(...)`, a real figure. A docstring
+ * that quotes a finding inherits its expiry (`fjs/schedule/1`'s own header
+ * makes the same point about the same phase), so the claim is corrected here
+ * rather than left to be believed.
+ *
+ * **Line 21 is deliberately OUTSIDE the range this line sums**, and that is
+ * what makes the whole computation orderable rather than circular: the
+ * student loan interest deduction's own worksheet takes 1040 line 9 as its
+ * input, line 9 includes this worksheet's own output, and the cycle would
+ * close if the printed range were "11 through 21" instead of "11 through 20,
+ * and 23 and 25". See `fjs/schedule/1`'s own header for the argument in
+ * full.
  *
  * ## `socialSecurityCombinedIncome` — one of TAX-15's four named income
  * functions

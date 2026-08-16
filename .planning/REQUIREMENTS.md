@@ -588,16 +588,16 @@ itemizing, which is complete apart from the eight open MAINT items.
 
 ### Non-Profit: Schedule 1 Part II and Schedule 3 (TAX, DOC)
 
-- [ ] **TAX-23** *(M2, T2)*: **Schedule 1 line 21**, student loan interest deduction, with its
+- [x] **TAX-23** *(M2, T2)*: **Schedule 1 line 21**, student loan interest deduction, with its
       phase-out. Today a hard zero — the single largest silent overstatement for this persona.
-- [ ] **TAX-24** *(M2, T2)*: **Schedule 1 line 11**, educator expenses; **line 13**, HSA
+- [x] **TAX-24** *(M2, T2)*: **Schedule 1 line 11**, educator expenses; **line 13**, HSA
       deduction (Form 8889). Both hard zeros today.
 - [ ] **TAX-25** *(M2, T2)*: **Form 8880**, the Saver's Credit → Schedule 3 line 4.
 - [ ] **TAX-26** *(M2, T2)*: **Form 8863**, American Opportunity and Lifetime Learning credits
       → Schedule 3 line 3 and 1040 line 29.
 - [ ] **TAX-27** *(M2, T2)*: **Earned Income Credit** → 1040 line 27, with the qualifying-child
       rules the existing Schedule 8812 dependent model already carries most of.
-- [ ] **DOC-19** *(M2, T2)*: `vnd.fjs.adjustments` — the taxpayer-asserted record behind the
+- [x] **DOC-19** *(M2, T2)*: `vnd.fjs.adjustments` — the taxpayer-asserted record behind the
       Schedule 1 Part II adjustments, following `vnd.fjs.medical_expenses` exactly: no IRS
       information return reports educator expenses or HSA contributions to the filer, so the
       dialect is asserted rather than transcribed, and carries no computed total.
