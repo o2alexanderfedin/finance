@@ -112,6 +112,30 @@
  * tripwire that fired on it would refuse nearly every return, which is the
  * failure mode "a tripwire that always fires is not a tripwire" names.
  *
+ * ## Two mutation findings worth keeping
+ *
+ * Sixteen mutations were run against this phase's code, each in its own
+ * snapshot, and every one turned the suite red. Two of them found a property
+ * of this code nobody had written down, so they are recorded here rather than
+ * only in a report (AGENTS.md: "a surprise in either direction usually means
+ * the code has a property nobody had written down"):
+ *
+ * - **Reading 1099-R box 2a instead of box 3 reddens FOUR PRE-EXISTING
+ *   `fjs/form1040/core` proofs**, not merely this module's own two — because
+ *   real retirement fixtures in that file DO carry `box2aTaxableAmount`, so a
+ *   tripwire on box 2a would refuse ordinary pension and IRA returns that
+ *   compute correctly today. The box choice is load-bearing against the
+ *   existing fixture population, not only against this module's own; had the
+ *   predicate been written one box off, the failure would have been an outage
+ *   rather than a subtle wrong number.
+ * - **The 1099-G finding is guarded from the other side.** Deleting
+ *   `box2StateOrLocalIncomeTaxRefunds` from `fjs/document/1099g`'s
+ *   `unmodeledMoneyBoxes` reddens
+ *   {@link proof.theRejectedFourthEntryIsUnreachableBecauseValidationRefusesIt}
+ *   — so the omission recorded above is not a claim that decays quietly. The
+ *   day that validation stops refusing, this module fails and someone has to
+ *   decide whether to add the fourth row.
+ *
  * @module
  */
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
