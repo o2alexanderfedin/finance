@@ -77,6 +77,38 @@
  * and for the same reason: a serializer that helpfully materializes every key
  * cannot smuggle a false assertion in as a true one.
  *
+ * ## `priorYearQualifiedBusinessLossCarryforward` — the SECOND field of that
+ * kind, added in Phase 28 (TAX-32), and it guards the sharpest hole in THAT
+ * phase
+ *
+ * §199A(c)(2): *"if the net amount of qualified business income … for any
+ * taxable year is less than zero, such amount shall be treated as a loss from
+ * a qualified trade or business in the succeeding taxable year."* Form 8995
+ * line 3 is where that carryforward lands, and it REDUCES the §199A deduction.
+ *
+ * **This engine holds one tax year, so it cannot know the figure — and the
+ * direction of the error is the dangerous one.** Reading an absent
+ * carryforward as zero would overstate the deduction and understate the tax,
+ * which is exactly TAX-16's failure mode. And the case is not exotic: a
+ * startup founder with a loss in year one and a profit in year two is the
+ * canonical §199A(c)(2) taxpayer, and is precisely the persona Phase 28 exists
+ * to unblock.
+ *
+ * The engine's own precedent for a prior-year figure is
+ * `vnd.fjs.prior_year_capital_loss`, a separate dialect whose ABSENCE means
+ * none — a reading that is safe there, because a capital-loss carryover is a
+ * DEDUCTION and assuming none overstates the tax. Here absence would go the
+ * other way, so absence cannot mean none. It means *unstated*, and
+ * `fjs/form8995` refuses the return by name when a §199A deduction would
+ * otherwise be computed.
+ *
+ * **A `string` rather than `option(true)`**, unlike the field above it,
+ * because this one carries an AMOUNT and not a checkbox: `'0.00'` is the
+ * assertion "I had no prior-year qualified business loss", and it is a
+ * different statement from the field being absent. It holds the SIZE of the
+ * loss as a non-negative amount; Form 8995 line 3 prints it in parentheses and
+ * is where it becomes a subtraction.
+ *
  * ## The date rule is `vnd.fjs.medical_expenses`', not `vnd.fjs.adjustments`'
  *
  * An HSA contribution may be made in the FOLLOWING calendar year and
@@ -159,6 +191,7 @@ export const businessExpensesSchema = /** @type {const} */ ({
     principalBusiness: string,
     businessName: option(string),
     grossReceiptsFullyReportedOnForms1099Nec: option(true),
+    priorYearQualifiedBusinessLossCarryforward: option(string),
     entries: array(expenseEntry),
 })
 
@@ -191,6 +224,11 @@ const isoDate = /^(\d{4})-(\d{2})-(\d{2})$/
  *    `vnd.fjs.medical_expenses`' and not `vnd.fjs.adjustments`' looser one.
  * 3. Every `amount` is an exact decimal within safe magnitude, and is NOT
  *    negative.
+ * 4. `priorYearQualifiedBusinessLossCarryforward`, when present, is an exact
+ *    decimal within safe magnitude and is NOT negative — it is the SIZE of a
+ *    loss, not a signed figure. Form 8995 line 3 prints it in parentheses and
+ *    `fjs/form8995` negates it there; storing it signed would put the minus
+ *    sign in two places and let the two disagree.
  *
  * Every refusal names the offending VALUE and the entry it came from: a
  * message saying "an amount is negative" tells a reader what the rule is, and
@@ -198,6 +236,22 @@ const isoDate = /^(\d{4})-(\d{2})-(\d{2})$/
  * @type {(r: BusinessExpenses) => Result<BusinessExpenses, BusinessExpensesError>}
  */
 export const checkReferences = r => {
+    const carryforward = r.priorYearQualifiedBusinessLossCarryforward
+    if (carryforward !== undefined) {
+        const carryforwardMessage = moneyFieldError(
+            'priorYearQualifiedBusinessLossCarryforward')(carryforward)
+        if (carryforwardMessage !== undefined) {
+            return error(carryforwardMessage)
+        }
+        if (centsFromString(carryforward) < 0n) {
+            return error(
+                `priorYearQualifiedBusinessLossCarryforward ${carryforward} is negative — this `
+                + `field holds the SIZE of a prior-year qualified business loss, and Form 8995 `
+                + `line 3 is where it becomes a subtraction. A negative value here would subtract `
+                + `it twice, INCREASING the §199A deduction that the carryforward exists to `
+                + `reduce`)
+        }
+    }
     if (r.principalBusiness.trim() === '') {
         return error(
             `principalBusiness must not be empty or whitespace-only — Schedule C line A names the `
@@ -378,6 +432,79 @@ export const proof = {
             })
             assert(t === 'ok', ['expected ok', t, v])
             assertEq(v.grossReceiptsFullyReportedOnForms1099Nec, true)
+        },
+    },
+    priorYearQualifiedBusinessLossCarryforward: {
+        // A STRING, not a checkbox, and `'0.00'` is a real assertion rather
+        // than a synonym for absence — the whole difference between this
+        // field and the one above it. `fjs/form8995` reads absence as
+        // "unstated" and refuses; it reads `'0.00'` as "none" and computes.
+        zeroIsAnAssertionAndAbsenceIsNot: () => {
+            const [t, v] = validate({
+                ...minimal,
+                priorYearQualifiedBusinessLossCarryforward: '0.00',
+            })
+            assert(t === 'ok', ['expected ok', t, v])
+            assertEq(v.priorYearQualifiedBusinessLossCarryforward, '0.00')
+            const [absentTag, absent] = validate(minimal)
+            assert(absentTag === 'ok', ['expected ok', absentTag, absent])
+            assertEq(absent.priorYearQualifiedBusinessLossCarryforward, undefined)
+            assertEq(
+                Object.keys(absent).includes('priorYearQualifiedBusinessLossCarryforward'),
+                false,
+                'absent is absent, never a materialized undefined')
+        },
+        aRealCarryforwardRoundTrips: () => {
+            const [t, v] = validate({
+                ...minimal,
+                priorYearQualifiedBusinessLossCarryforward: '18400.00',
+            })
+            assert(t === 'ok', ['expected ok', t, v])
+            assertEq(v.priorYearQualifiedBusinessLossCarryforward, '18400.00')
+        },
+        // The SIZE of a loss, so a negative is refused — and the refusal says
+        // what a negative would DO, which is the actionable half: it would
+        // increase the very deduction the carryforward exists to reduce.
+        aNegativeIsRefusedNamingWhatItWouldDo: () => {
+            const [t, v] = validate({
+                ...minimal,
+                priorYearQualifiedBusinessLossCarryforward: '-18400.00',
+            })
+            assertEq(t, 'error')
+            assert(
+                typeof v === 'string' && v.includes('-18400.00'),
+                ['the refusal must quote the value', v])
+            assert(
+                typeof v === 'string' && v.includes('INCREASING'),
+                ['the refusal must say which way the error would run', v])
+            assert(
+                typeof v === 'string' && v.includes('line 3'),
+                ['the refusal must name the printed line it feeds', v])
+        },
+        // …and it is a MONEY field, so `fjs/document/money_field`'s exactness
+        // rule applies to it exactly as it does to every entry amount.
+        commaGroupedAndOverPreciseAreRefused: () => {
+            assertEq(
+                validate({
+                    ...minimal,
+                    priorYearQualifiedBusinessLossCarryforward: '18,400.00',
+                })[0],
+                'error')
+            assertEq(
+                validate({
+                    ...minimal,
+                    priorYearQualifiedBusinessLossCarryforward: '18400.001',
+                })[0],
+                'error')
+            // …and the CONTROL, which is what says the two above are refused
+            // for their shape rather than for existing at all: the same
+            // magnitude written exactly is accepted.
+            assertEq(
+                validate({
+                    ...minimal,
+                    priorYearQualifiedBusinessLossCarryforward: '18400.00',
+                })[0],
+                'ok')
         },
     },
     datePaid: {
