@@ -71,7 +71,9 @@ already holds: taxable interest (1040 line 2b), tax-exempt interest (line 2a),
 ordinary dividends (line 3b) and capital gain net income (line 7a) are all
 real figures. What is missing is the rest of §32(i)(2)'s list — net rent and
 royalty income and net passive income — which arrive on Schedule E, which this
-engine does not model and whose kind (`scheduleOneAdditionalIncome`) refuses.
+engine does not model and whose kind (`rentalRealEstateRoyaltiesPartnershipsS\
+Corps`, the coarse `scheduleOneAdditionalIncome` until Phase 27 split Schedule
+1 Part I) refuses.
 
 So even the *disqualifier* would be an under-approximation: it would clear
 some taxpayers it should not. A partial EIC built on a partial disqualifier is

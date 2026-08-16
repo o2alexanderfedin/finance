@@ -97,6 +97,8 @@ import { baseTaxForAmount } from '../../tax/table/module.f.js'
 /** @import { OneZeroNineEightT } from '../../document/1098t/module.f.js' */
 /** @import { Credits } from '../../document/credits/module.f.js' */
 /** @import { OneZeroNineNineG } from '../../document/1099g/module.f.js' */
+/** @import { OneZeroNineNineNec } from '../../document/1099nec/module.f.js' */
+/** @import { BusinessExpenses } from '../../document/business_expenses/module.f.js' */
 /** @import { PriorYearCapitalLoss } from '../../document/prior_year_capital_loss/module.f.js' */
 /** @import { Ira } from '../../document/ira/module.f.js' */
 /** @import { PriorYearIraBasis } from '../../document/prior_year_ira_basis/module.f.js' */
@@ -180,6 +182,19 @@ import { baseTaxForAmount } from '../../tax/table/module.f.js'
  * `capitalLossCarryoverForms` gets below, would be wrong rather than merely
  * lossy.
  *
+ * `nonemployeeCompensationForms`/`businessExpenseForms` are Phase 27's own
+ * widening (DOC-20/DOC-21/TAX-30): Schedule 1 Part I line 3 reads them through
+ * `fjs/schedule/c`, and 1040 line 25b reads `vnd.fjs.1099nec` box 4 directly.
+ * `nonemployeeCompensationForms` is a list because it genuinely is one — a
+ * freelancer with six clients receives six Forms 1099-NEC, and §6041A obliges
+ * each of them to file separately. `businessExpenseForms` is a list for a
+ * DIFFERENT reason from every other list here: not this typedef's "one running
+ * record per taxpayer per year" convention, but because Schedule C is filed
+ * PER BUSINESS and a taxpayer may run two. `fjs/schedule/c` supports one and
+ * REFUSES a second by name; the list shape is what lets it see the second one
+ * in order to refuse it, which a flattening to a single optional document
+ * would silently prevent.
+ *
  * `capitalLossCarryoverForms` is Plan 15-05's own widening (TAX-17): a LIST,
  * matching this typedef's own established "one running record per taxpayer
  * per year" convention (see `itemizedDeductionForms`/`medicalExpenseForms`
@@ -200,6 +215,8 @@ import { baseTaxForAmount } from '../../tax/table/module.f.js'
  *   readonly medicalExpenseForms: readonly Stored<MedicalExpenses>[],
  *   readonly capitalLossCarryoverForms: readonly Stored<PriorYearCapitalLoss>[],
  *   readonly unemploymentForms: readonly Stored<OneZeroNineNineG>[],
+ *   readonly nonemployeeCompensationForms: readonly Stored<OneZeroNineNineNec>[],
+ *   readonly businessExpenseForms: readonly Stored<BusinessExpenses>[],
  *   readonly adjustmentForms: readonly Stored<Adjustments>[],
  *   readonly studentLoanInterestForms: readonly Stored<OneZeroNineEightE>[],
  *   readonly tuitionForms: readonly Stored<OneZeroNineEightT>[],
@@ -496,6 +513,7 @@ export const form1040IncomeLines = taxParamSet => inputs => {
         itemizedDeductionForms, medicalExpenseForms,
         capitalLossCarryoverForms,
         unemploymentForms,
+        nonemployeeCompensationForms, businessExpenseForms,
         adjustmentForms, studentLoanInterestForms,
         iraForms, priorYearIraBasisForms,
     } = inputs
@@ -723,11 +741,25 @@ export const form1040IncomeLines = taxParamSet => inputs => {
         })
     // 8 — Schedule 1 Part I's total additional income (line10). `vnd.fjs.1099g`
     // box 1 attributes unemployment compensation to its own printed line 7
-    // (Phase 20); every other Part I line is a `profileDeclaredZeroLine`, and
-    // the COARSE `scheduleOneAdditionalIncome` kind stays in
-    // `unmodeledKindRefusals` because it still covers many distinct Schedule 1
-    // line items with no per-line dialect to attribute an amount to.
-    const scheduleOnePartIResult = scheduleOnePartI(profile)(unemploymentForms)
+    // (Phase 20); every other Part I line is a `profileDeclaredZeroLine` whose
+    // own per-printed-line kind stays in `unmodeledKindRefusals` (Phase 27's
+    // split of the coarse `scheduleOneAdditionalIncome`).
+    //
+    // **Line 3 is Phase 27's** (TAX-30): `fjs/schedule/c`'s own line 31,
+    // reaching 1040 line 8 THROUGH Schedule 1's own Part I total, never by a
+    // side channel — the identical discipline line 10 already follows for Part
+    // II's line 26. Part I can now REFUSE (a Schedule C net loss, a second
+    // business, an unmodeled expense line), threaded exactly like the Part II
+    // stage-1 guard immediately below and like the Schedule D and Schedule A
+    // guards above: `unmodeled: []`, since this names no `fjs/return/scope`
+    // kind.
+    const scheduleOnePartIResult = scheduleOnePartI(taxParamSet)({
+        profile, unemploymentForms, nonemployeeCompensationForms, businessExpenseForms,
+        w2Forms: w2s,
+    })
+    if (scheduleOnePartIResult.kind === 'error') {
+        return { kind: 'error', message: scheduleOnePartIResult.message, unmodeled: [] }
+    }
     const line8 = {
         value: scheduleOnePartIResult.line10.value,
         sources: scheduleOnePartIResult.line10.sources,
@@ -1266,7 +1298,10 @@ const profileMoneyBox = profile => boxPath => {
  * @type {(taxParamSet: TaxParamSet) => (inputs: Form1040Inputs) => (income: Form1040IncomeLines) => { readonly kind: 'ok', readonly tax: Form1040TaxAndPaymentLines, readonly line16Method: Line16Method } | Form1040Error}
  */
 const form1040TaxAndPaymentLines = taxParamSet => inputs => income => {
-    const { profile, w2s, interestForms, dividendForms, brokerageForms, retirementForms, unemploymentForms } = inputs
+    const {
+        profile, w2s, interestForms, dividendForms, brokerageForms, retirementForms,
+        unemploymentForms, nonemployeeCompensationForms,
+    } = inputs
     const declaredZero = profileDeclaredZeroLine(profile)
     const fromDocuments = documentLine(profile)
     const status = storedFilingStatusNamed(profile.value.filingStatus)
@@ -1535,8 +1570,18 @@ const form1040TaxAndPaymentLines = taxParamSet => inputs => income => {
                         form => form.box4FederalIncomeTaxWithheld))(
                     sumBoxOverDocuments(brokerageForms)('box4FederalIncomeTaxWithheld')(
                         form => form.box4FederalIncomeTaxWithheld)))(
-                sumBoxOverDocuments(unemploymentForms)('box4FederalIncomeTaxWithheld')(
-                    form => form.box4FederalIncomeTaxWithheld))))
+                addBoxSums(
+                    sumBoxOverDocuments(unemploymentForms)('box4FederalIncomeTaxWithheld')(
+                        form => form.box4FederalIncomeTaxWithheld))(
+                    // Phase 27 (DOC-20). §3406 backup withholding on a
+                    // 1099-NEC reaches line 25b exactly as the 1099-G's own
+                    // box 4 does (Phase 20's precedent, followed rather than
+                    // re-argued) — it is 1099-family withholding, and
+                    // `federalTaxWithheldOnOther1099`'s remedy already names
+                    // that family. Omitting it would overstate the balance due
+                    // by money the payer has already sent the IRS.
+                    sumBoxOverDocuments(nonemployeeCompensationForms)('box4FederalIncomeTaxWithheld')(
+                        form => form.box4FederalIncomeTaxWithheld)))))
     // 25c — Form 8959 Part V line 24, the Additional Medicare Tax an employer
     // already withheld, off the SAME `scheduleTwoResult` line 11 came from.
     //
@@ -2236,6 +2281,8 @@ const inputsOf = profile => w2s => interestForms => dividendForms => brokerageFo
                 // unemployment, read exactly as they did before. Proofs that
                 // DO concern it spread this result and override the field.
                 unemploymentForms: [],
+                nonemployeeCompensationForms: [],
+                businessExpenseForms: [],
                 adjustmentForms: [],
                 studentLoanInterestForms: [],
                 tuitionForms: [],
@@ -2451,6 +2498,71 @@ const unemploymentDocument = documentHash => box1 => box4 => ({
         box1UnemploymentCompensation: box1,
         box4FederalIncomeTaxWithheld: box4,
     },
+})
+
+/**
+ * A SINGLE filer declaring business income and the 1099-family withholding
+ * that comes with it — the startup-founder shape Phase 27 (DOC-20/DOC-21/
+ * TAX-30) exists for, at the only scale this engine can put on a 1040 until
+ * Phase 28 builds Schedule SE. See `fjs/schedule/c`'s own docstring on
+ * §1402(b)(2).
+ *
+ * It declares NEITHER `wages` NOR `selfEmploymentTax`, and both omissions are
+ * deliberate. No wages, so 1040 line 8 is the only thing feeding line 9 and a
+ * figure landing there cannot be mistaken for something else. No
+ * `selfEmploymentTax`, because declaring it is a scope refusal — that kind is
+ * Phase 28's and stays refused, which is exactly what
+ * `fjs/return/scope`'s `theTwoPhase28KindsBesideScheduleCStillRefuse` pins.
+ */
+const selfEmploymentProfile = {
+    ...singleProfile,
+    declaredKinds: ['businessIncomeOrLoss', 'federalTaxWithheldOnOther1099'],
+}
+
+/** @type {(documentHash: string) => (box1: string) => (box4: string) => Stored<OneZeroNineNineNec>} */
+const nonemployeeCompensationDocument = documentHash => box1 => box4 => ({
+    documentHash,
+    value: {
+        dialect: 'vnd.fjs.1099nec',
+        payerTin: '66-6666666',
+        recipientTin: '222-22-2222',
+        accountNumber: 'CLIENT-0001',
+        taxYear: 2025,
+        formRevision: '2025',
+        box1NonemployeeCompensation: box1,
+        box4FederalIncomeTaxWithheld: box4,
+    },
+})
+
+/** @type {(documentHash: string) => (advertisingAmount: string) => Stored<BusinessExpenses>} */
+const businessExpensesDocument = documentHash => advertisingAmount => ({
+    documentHash,
+    value: {
+        dialect: 'vnd.fjs.business_expenses',
+        recipientTin: '222-22-2222',
+        accountNumber: 'BUS-0001',
+        taxYear: 2025,
+        principalBusiness: 'software consulting',
+        grossReceiptsFullyReportedOnForms1099Nec: true,
+        entries: [{
+            category: 'advertising',
+            datePaid: '2025-03-14',
+            description: 'search advertising',
+            amount: advertisingAmount,
+        }],
+    },
+})
+
+/**
+ * Overrides `inputsOf`'s empty business-document defaults, exactly as
+ * {@link withUnemployment} does for the 1099-G — a spread rather than two more
+ * curried parameters, so the existing call sites stay untouched.
+ * @type {(inputs: Form1040Inputs) => (forms: readonly Stored<OneZeroNineNineNec>[]) => (records: readonly Stored<BusinessExpenses>[]) => Form1040Inputs}
+ */
+const withBusiness = inputs => forms => records => ({
+    ...inputs,
+    nonemployeeCompensationForms: forms,
+    businessExpenseForms: records,
 })
 
 /**
@@ -3281,6 +3393,140 @@ export const proof = {
                 flooringTestLine(150000n)('1040 line 18'))(
                 flooringTestLine(100000n)('1040 line 21'))
             assertEq(line22.value, 50000n)
+        },
+    },
+    // ── Phase 27 (DOC-20/DOC-21/TAX-30): self-employment, end to end ─────────
+    selfEmployment: {
+        /**
+         * **THE END-TO-END CLAIM FOR THE WHOLE PHASE**, and the leaf that
+         * answers AGENTS.md's own question — *after wiring anything, ask what
+         * fixture actually observes it.* Three of this phase's success
+         * criteria are unobservable without it: nothing else runs a 1099-NEC
+         * and a business-expenses record through `form1040Report`'s own line
+         * assembly, so nothing else could notice Schedule C being wired to a
+         * side channel, or to nothing at all.
+         *
+         * Every figure hand-derived, in printed order:
+         *
+         *   1099-NEC box 1                                     $350.00
+         *   Schedule C line 8   advertising                     $90.00
+         *   Schedule C line 28  total expenses                  $90.00
+         *   Schedule C line 31  350.00 - 90.00                 $260.00
+         *   Schedule 1 line 3   = Schedule C line 31           $260.00
+         *   Schedule 1 line 10  Part I total                   $260.00
+         *   1040 line 8         = Schedule 1 line 10           $260.00
+         *   1040 line 9         total income (nothing else)    $260.00
+         *   1040 line 10        adjustments                      $0.00
+         *   1040 line 11a       adjusted gross income          $260.00
+         *   1040 line 12e       standard deduction, single  $15,750.00
+         *   1040 line 15        max(0, 260.00 - 15,750.00)       $0.00
+         *   1040 line 16        tax on $0.00                     $0.00
+         *   1040 line 24        total tax                        $0.00
+         *   1099-NEC box 4                                      $40.00
+         *   1040 line 25b       1099-family withholding         $40.00
+         *   1040 line 33        total payments                  $40.00
+         *   1040 line 34        overpaid  40.00 - 0.00          $40.00
+         *
+         * $350.00 of receipts rather than a realistic freelance figure
+         * because §1402(b)(2)'s $400 floor is where `fjs/schedule/c` starts
+         * refusing until Phase 28 supplies Schedule SE — see that module's
+         * own docstring, "Schedule SE and QBI". The scale is small; the path
+         * is the whole path.
+         */
+        scheduleCReachesLineEightAndTheWithholdingReachesLineTwentyFiveB: () => {
+            const base = inputsOf(storedProfile(selfEmploymentProfile))([])([])([])([])([])([])([])([])([])
+            const { income, tax } = computedLines(withBusiness(base)([
+                nonemployeeCompensationDocument('sha256-1099nec-01')('350.00')('40.00'),
+            ])([businessExpensesDocument('sha256-business-01')('90.00')]))
+            assertEq(income.line8.value, 26000n, '1040 line 8 carries Schedule C\'s $260.00 net profit')
+            assertEq(income.line9.value, 26000n, 'total income is the business income alone')
+            assertEq(income.line10.value, 0n, 'no adjustments')
+            assertEq(income.line11a.value, 26000n, 'AGI = $260.00')
+            assertEq(income.line12e.value, 1575000n, 'the single standard deduction, $15,750.00')
+            assertEq(income.line15.value, 0n, 'taxable income floors at zero')
+            assertEq(tax.line16.value, 0n, 'no tax on zero taxable income')
+            assertEq(tax.line24.value, 0n, 'and no other tax')
+            assertEq(tax.line25b.value, 4000n, '1040 line 25b carries the $40.00 withheld on the 1099-NEC')
+            assertEq(tax.line33.value, 4000n, 'total payments')
+            assertEq(tax.line34.value, 4000n, 'overpaid, and refunded in full')
+            // Line 8 is Schedule 1's Part I TOTAL, so it unions the sources of
+            // every Part I line — the profile's `declaredKinds` behind the
+            // still-zero ones AND the two business documents behind line 3.
+            // Both must be PRESENT; neither is asserted to be first, since
+            // that would be asserting an accident of union order.
+            const hashes = income.line8.sources.map(source => source.documentHash)
+            assert(
+                hashes.includes('sha256-1099nec-01'),
+                ['1040 line 8 must cite the Form 1099-NEC behind it', income.line8.sources])
+            assert(
+                hashes.includes('sha256-business-01'),
+                ['1040 line 8 must cite the business expenses record behind it', income.line8.sources])
+            // …and line 25b cites the 1099-NEC's own box, not the profile.
+            const [withholdingSource] = tax.line25b.sources
+            assertEq(withholdingSource.documentHash, 'sha256-1099nec-01')
+            assertEq(withholdingSource.boxPath, 'box4FederalIncomeTaxWithheld')
+        },
+        /**
+         * THE CONTROL, and it matters as much as the claim: the SAME profile
+         * with NO business documents computes zeros. Without it, the leaf
+         * above proves nothing — a line 8 of $260.00 would be evidence only if
+         * something could have made it $0.00.
+         */
+        theSameProfileWithNoBusinessDocumentsComputesZeros: () => {
+            const base = inputsOf(storedProfile(selfEmploymentProfile))([])([])([])([])([])([])([])([])([])
+            const { income, tax } = computedLines(withBusiness(base)([])([]))
+            assertEq(income.line8.value, 0n, 'no 1099-NEC means no line 8 income')
+            assertEq(income.line9.value, 0n)
+            assertEq(tax.line25b.value, 0n, 'and no 1099-family withholding')
+            const [line8Source] = income.line8.sources
+            assertEq(line8Source.boxPath, 'declaredKinds', 'the zero still carries profile provenance')
+        },
+        /**
+         * A Schedule C refusal must stop the WHOLE report, threaded through
+         * `form1040IncomeLines`' error arm with `unmodeled: []` — never
+         * swallowed into a zero line. A net profit at or above §1402(b)(2)'s
+         * floor is the refusal a real freelancer meets first, so it is the one
+         * pinned here.
+         */
+        aScheduleCRefusalStopsTheWholeReport: () => {
+            const base = inputsOf(storedProfile(selfEmploymentProfile))([])([])([])([])([])([])([])([])([])
+            const outcome = form1040IncomeLines(taxParams2025)(withBusiness(base)([
+                nonemployeeCompensationDocument('sha256-1099nec-01')('48000.00')('0.00'),
+            ])([businessExpensesDocument('sha256-business-01')('90.00')]))
+            assert(outcome.kind === 'error', ['a Schedule C refusal must stop the report', outcome])
+            if (outcome.kind !== 'error') {
+                return
+            }
+            assertEq(outcome.unmodeled.length, 0, 'a document-data-sufficiency refusal names no scope kind')
+            assert(
+                outcome.message.includes('Schedule SE'),
+                ['the refusal must reach the caller unchanged', outcome.message])
+        },
+        /**
+         * **CRITERION 5, as a checked claim**: a return with no business
+         * income computes EXACTLY what it computed before this phase. The
+         * fixture is the $45,505.00 wage-earner this file has carried since
+         * Phase 10 — the same box-1 figure Phase 21's own end-to-end leaf
+         * pins through the stored program (`1040 line 1a = $45,505.00`,
+         * `1040 line 34 = $5,535.00`), which is why it is the one worth
+         * re-stating here.
+         *
+         * What this leaf adds to the assertions already in this file is the
+         * statement that those figures are unmoved BY THIS PHASE
+         * specifically, with the new `nonemployeeCompensationForms` and
+         * `businessExpenseForms` fields present and explicitly EMPTY — so a
+         * future change that starts reading something out of an empty list
+         * has one place that says what the answer was.
+         */
+        theWageEarnerReturnIsUnmovedByThisPhase: () => {
+            const base = inputsOf(storedProfile(unemploymentProfile))([
+                w2WithWithholding('sha256-w2-01')('45505.00')('8962.00'),
+            ])([])([])([])([])([])([])([])([])
+            const { income, tax } = computedLines(withBusiness(base)([])([]))
+            assertEq(income.line1a.value, 4550500n, '$45,505.00, exactly as before Phase 27')
+            assertEq(income.line8.value, 0n, 'and nothing on Schedule 1 Part I')
+            assertEq(tax.line25b.value, 0n)
+            assertEq(income.line11a.value, 4550500n, 'AGI is wages alone')
         },
     },
     withholding: {

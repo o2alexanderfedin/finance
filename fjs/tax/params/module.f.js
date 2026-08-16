@@ -1516,6 +1516,43 @@ export const qualifiedCharitableDistribution = {
 }
 
 /**
+ * **§1402(b)(2)'s $400 self-employment floor** — the ONE self-employment
+ * figure Phase 27 stores, and the one it needs in order to REFUSE honestly
+ * rather than to compute.
+ *
+ * *"…the term 'net earnings from self-employment' [shall not include] …if such
+ * net earnings for the taxable year are less than $400."* Below it, no
+ * self-employment tax is due at all; at or above it, Schedule SE is required.
+ *
+ * **Nothing here stores the 92.35% factor or the 12.4%/2.9% rates**, and that
+ * omission is the point: this phase does NOT compute self-employment tax
+ * (TAX-31 is Phase 28). A rate would be a parameter with no reader, which is
+ * exactly the YAGNI note {@link additionalMedicareTaxThreshold} carries about
+ * its own 0.9% before Phase 23 added the form that reads it.
+ *
+ * The single reader is `fjs/schedule/c`, which compares this figure against
+ * Schedule C line 31's NET PROFIT rather than against net earnings from
+ * self-employment — a conservative over-approximation, since net earnings are
+ * 92.35% of net profit and therefore always smaller. That module's own
+ * docstring records why the approximation goes in the refusing direction on
+ * purpose, and why importing the 92.35% factor to tighten it would be
+ * starting Schedule SE.
+ *
+ * **Not inflation-indexed.** §1402(b)(2) has read $400 since 1990 and there is
+ * no annual revenue procedure to cite, so this is a `kind: 'code'` citation
+ * for the same reason {@link additionalMedicareTaxThreshold}'s is.
+ * `effectiveDate` still reads `'2025-01-01'`: every citation here states the
+ * year the figure is being APPLIED for.
+ * @type {{ readonly minimumNetEarnings: AmountWithCitation }}
+ */
+export const selfEmploymentTax = {
+    minimumNetEarnings: {
+        amount: '400.00',
+        citation: { kind: 'code', section: '§1402(b)(2)', effectiveDate: '2025-01-01' },
+    },
+}
+
+/**
  * A full tax-year parameter set: every TY2025 parameter this phase
  * requires, together.
  *
@@ -1560,6 +1597,7 @@ export const qualifiedCharitableDistribution = {
  *   readonly retirementSavingsContributionsCredit: typeof retirementSavingsContributionsCredit,
  *   readonly educationCredits: typeof educationCredits,
  *   readonly qualifiedCharitableDistribution: typeof qualifiedCharitableDistribution,
+ *   readonly selfEmploymentTax: typeof selfEmploymentTax,
  * }} TaxParamSet
  */
 
@@ -1595,6 +1633,7 @@ export const taxParamsByYear = {
         retirementSavingsContributionsCredit,
         educationCredits,
         qualifiedCharitableDistribution,
+        selfEmploymentTax,
     },
 }
 
@@ -1716,6 +1755,7 @@ const everyDollarStringField = [
     educationCredits.phaseoutRange.qualifyingSurvivingSpouse.amount,
     qualifiedCharitableDistribution.annualLimitPerIndividual.amount,
     qualifiedCharitableDistribution.splitInterestOneTimeLimit.amount,
+    selfEmploymentTax.minimumNetEarnings.amount,
 ]
 
 export const proof = {
