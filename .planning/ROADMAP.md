@@ -860,6 +860,26 @@ through three interlocking Credit Limit Worksheets, which is what made this phas
 ### Phase 26: Retiree Completion
 **Requirements**: TAX-28 (QCD election, $108,000 TY2025 cap), TAX-29 (Form 8606 pro-rata) · **Tier**: T2
 **Note**: TAX-28 closes a **silent overstatement** — today a QCD'd RMD is taxed in full. It is the mirror image of Phase 22's understatement, and neither is visible to the taxpayer.
+**Status**: complete for TAX-28; **TAX-29 is DELIVERED IN PART and stays unticked**. Form 8606
+**Part I** computes — §408(d)(2)'s pro-rata rule over the AGGREGATED year-end value of all a
+person's traditional/SEP/SIMPLE IRAs, basis carried forward from the prior year's line 14, and
+line 15c reaching 1040 line 4b. **Parts II and III refuse by name**, and Part II is what the
+requirement's own second sentence asks for: a backdoor Roth is a nondeductible contribution
+*plus a conversion*, the conversion is Part II, and a return carrying one is refused rather than
+computed. So TAX-29's first sentence ships and its second does not. See REQUIREMENTS.md.
+**The phase priced what it was fixing.** On a hand-derived retiree — $50,000 IRA distribution,
+$20,000 given straight to charity, $20,000 of prior-year nondeductible basis, $150,000 of
+aggregated IRAs at 31 December — this engine charged **$2,915.00 where the law charges $291.00**.
+Line 4b also feeds the Social Security Benefits Worksheet, so on a second fixture a $20,000 gift
+took **$17,000 off taxable Social Security on top of the $20,000** it took off the distribution:
+exactly the newly-real-read shape Phase 24 found, gone looking for deliberately this time.
+**The 70½ finding**: §408(d)(8)(B)(ii)'s age test is **not determinable** from anything stored —
+no birth date exists anywhere in the repository, the nearest fact is 1040 line 12d's
+*born-before-2-January-1961* checkbox (a **65** test), and the statute tests age at the DATE OF
+THE DISTRIBUTION, which only 1099-R box 13 carries and only as free text. It is asserted, its
+absence refuses by name, and the one derivable direction (the 12d box is NECESSARY) is checked.
+**Note**: two new dialects, `vnd.fjs.ira` and `vnd.fjs.prior_year_ira_basis`. The second is the
+**second exemption** from Phase 21's mixed-year refusal, for the same reason the first is.
 
 ### Phase 27: 1099-NEC and Schedule C
 **Requirements**: DOC-20, DOC-21, TAX-30 · **Tier**: T3

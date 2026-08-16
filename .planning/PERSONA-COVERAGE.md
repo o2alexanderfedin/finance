@@ -10,7 +10,7 @@ it rather than trusting this document's counts.
 
 | Persona | Can the engine produce a return? | Decisive blocker |
 |---|---|---|
-| **Retired person** | **Yes**, for the mainstream case | None. Four named gaps, all narrow — see below. |
+| **Retired person** | **Yes**, and as of Phase 26 without the silent overstatement | None. **Two of the four named gaps are closed**; what remains refuses by name. See below. |
 | **Non-profit employee** | **Yes** — Phase 24 (TAX-23/TAX-24/DOC-19) closed the silent overstatement | Student loan interest, educator expenses and the HSA deduction all compute. The remaining gaps (Saver's Credit, EIC, education credits) are REFUSALS, not silent zeros. |
 | **FAANG employee** | **No** | Form 8959 (Additional Medicare Tax) is mandatory above $200k of wages and is unmodeled. Also Form 8960 (NIIT). |
 | **Startup founder / early employee** | **No, and not close** | No Schedule C, no Schedule SE, no Schedule E, no K-1, no 1099-NEC dialect, no QBI deduction, no Form 6251 (AMT on ISO exercise). |
@@ -34,12 +34,29 @@ into fourteen per-printed-line kinds and Phase 24 split `scheduleOneAdjustments`
 the vocabulary grew without the engine's claims growing: what changed is that a refusal on either
 schedule can now name the line and the form it needs.)
 
-**Input dialects (13 that compute):** `w2`, `1099int`, `1099div`, `1099b`, `1099r`, `ssa1099`,
-`1099g`, `1098e`, `itemized_deductions`, `medical_expenses`, `adjustments`,
-`prior_year_capital_loss`, `return_profile`.
+> **`76` is stale and is left standing deliberately, flagged rather than guessed at.**
+> `fjs/return/profile`'s own asserted `expectedKindCount` is **86** — Phase 25 removed two coarse
+> Schedule 3 kinds and added twelve per-printed-line ones. The modeled/refused SPLIT beneath it
+> is not asserted anywhere, so correcting `76` without recounting the split would replace one
+> stale number with a matched pair of them. Phase 26 added no kind at all (a QCD is not income
+> and Form 8606 is not a credit), so nothing here moved this phase. Re-derive with the command
+> at the bottom of this document before quoting either figure.
 
-**Output forms (13 that compute):** Form 1040 (all 56 printed lines), Schedules 1, 1-A, 2, 3, A,
-B, D, Form 8949, Schedule 8812, Form 8959, Form 8960, Form 8889 (Part I only).
+**Input dialects (17 that compute):** `w2`, `1099int`, `1099div`, `1099b`, `1099r`, `ssa1099`,
+`1099g`, `1098e`, `1098t`, `itemized_deductions`, `medical_expenses`, `adjustments`,
+`credits`, `ira`, `prior_year_capital_loss`, `prior_year_ira_basis`, `return_profile`.
+
+> **That figure read 13 until Phase 26, and it was already wrong by two before this phase
+> touched it** — `vnd.fjs.1098t` and `vnd.fjs.credits` landed in Phase 25 and were never added
+> here. Corrected to 17 by counting the list rather than by adding this phase's two to the
+> stale total. The number in this document is checked against nothing;
+> `fjs/server/finance_schema`'s `expectedKnownDialectCount` and `fjs/media/dialects`'
+> `expectedDialectCount` are the two that are, and they count a wider set (they include
+> `vnd.fjs.ocr` and `vnd.fjs.run`, which compute no line).
+
+**Output forms (16 that compute):** Form 1040 (all 56 printed lines), Schedules 1, 1-A, 2, 3, A,
+B, D, Form 8949, Schedule 8812, Form 8959, Form 8960, Form 8889 (Part I only), Form 8880,
+Form 8863, Form 8606 (Part I only).
 
 **A caution about that output list.** Schedule 3 is *structurally* complete — every printed line
 is named and wired into 1040 lines 20/31 — but **every line on it is a documented zero**, because
@@ -52,8 +69,10 @@ of Part I except line 7. Counting a form as "supported" because it is *present* 
 
 ## Retired person — supported
 
-This is the persona the project was actually built for; Phase 13 is literally titled "The 65+
-Profile". Everything the mainstream retiree needs computes:
+**Rewritten 2026-08-16, after Phase 26.** This is the persona the project was actually built
+for; Phase 13 is literally titled "The 65+ Profile". Everything the mainstream retiree needs
+computes — and the two SILENT gaps this section used to list are gone, which matters more than
+the count: both were cases where the engine produced a confident, fully-cited, wrong number.
 
 - **SSA-1099** → 1040 line 6a, with the full 18-line Social Security Benefits Worksheet at 6b.
 - **1099-R** → lines 4a/4b (IRA) and 5a/5b (pensions), routed by each document's own
@@ -62,21 +81,45 @@ Profile". Everything the mainstream retiree needs computes:
 - Interest, dividends, brokerage sales, capital-loss carryover, Schedule A with the 7.5%-of-AGI
   medical floor, estimated tax payments. All real.
 
-**Four named gaps, none of which blocks a return:**
+**Closed by Phase 26 — the two that were SILENT:**
 
-1. **Qualified Charitable Distributions.** A QCD is a taxpayer *election*, not a 1099-R box — the
-   custodian reports the full distribution and the taxpayer writes "QCD" beside line 4b. This
-   engine has no such election, so it will treat a QCD'd RMD as **fully taxable and overstate the
-   tax**. For a retiree giving $20k/yr from an IRA that is a material error, and — critically —
-   **it is silent.** It does not refuse, because nothing in the data says a QCD happened.
-2. **Form 8606** — nondeductible IRA basis. Absent entirely. Anyone with after-tax IRA money is
-   taxed twice on it.
-3. **Form 5329** — the RMD-shortfall excise tax. Falls under the refused `scheduleTwoTaxes`.
-4. **Schedule R** (Credit for the Elderly) — refused, but its income limits are so low it almost
+- **Qualified Charitable Distributions** (TAX-28) → the taxpayer's `vnd.fjs.ira` election
+  reduces 1040 line 4b while line 4a stays gross, capped at §408(d)(8)(A)'s $108,000 per
+  INDIVIDUAL. Each gift names the distribution it came out of, so a QCD from a 401(k), or one
+  larger than the distribution it claims, is refused rather than silently allowed.
+- **Form 8606 Part I** (TAX-29) → nondeductible IRA basis and §408(d)(2)'s pro-rata rule, over
+  the AGGREGATED year-end value of every traditional/SEP/SIMPLE IRA the person owns — not per
+  account, which is the mistake that understates tax for anyone with two IRAs.
+
+**What that was worth, in dollars.** On a hand-derived retiree — a $50,000 IRA distribution,
+$20,000 of it given straight to a food bank, $20,000 of prior-year nondeductible basis, and
+$150,000 of aggregated IRAs left at 31 December — this engine charged **$2,915.00 where the law
+charges $291.00**. And because line 4b feeds the Social Security Benefits Worksheet, a second
+fixture shows a $20,000 gift taking **$17,000 off taxable Social Security on top of the
+$20,000** it takes off the distribution itself.
+
+**Two named gaps remain, and neither is silent:**
+
+1. **Form 5329** — the RMD-shortfall excise tax. Falls under the refused
+   `additionalTaxOnTaxFavoredAccounts` kind (Phase 23 split the coarse `scheduleTwoTaxes` this
+   line used to name).
+2. **Schedule R** (Credit for the Elderly) — refused, but its income limits are so low it almost
    never applies.
 
-Gaps 1 and 2 share a shape worth noting: both are cases where the *document is complete and the
-engine reads it correctly*, and the missing thing is a taxpayer election the document cannot carry.
+**And four things INSIDE what now computes refuse by name rather than compute** — the honest
+failure rather than the silent one: §408(d)(8)(F)'s one-time split-interest QCD election; Form
+8606 Parts II and III (Roth conversions and Roth distributions, which is why a **backdoor Roth
+is still not computable** and why TAX-29 stays unticked); an aggregated year-end IRA value the
+taxpayer has not asserted; and — the one worth reading twice — **a QCD whose 70½ eligibility
+the engine cannot determine.** §408(d)(8)(B)(ii) tests age at the DATE OF THE DISTRIBUTION, and
+this repository stores **no birth date at all**: the nearest fact is 1040 line 12d's
+*born-before-2-January-1961* checkbox, which is a **65** test, four and a half years short. The
+fact is asserted by the taxpayer and refused when absent, never approximated from the 65 box.
+
+The two closed gaps shared a shape worth keeping on record: both were cases where the *document
+is complete and the engine reads it correctly*, and the missing thing was a taxpayer election
+or assertion the document cannot carry. **That shape is what makes a gap silent**, and it is
+the one to go looking for in the remaining three personas.
 
 ---
 
