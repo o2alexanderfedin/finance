@@ -1,174 +1,140 @@
 {
   "version": "1.0",
-  "timestamp": "2026-08-15T03:30:00.000Z",
-  "phase": "18",
-  "phase_name": "dependency-and-duplication-debt",
-  "phase_dir": ".planning/phases/18-dependency-and-duplication-debt",
+  "timestamp": "2026-08-16T07:15:00.000Z",
+  "phase": "21",
+  "phase_name": "the-last-mile",
+  "phase_dir": ".planning/phases/21-the-last-mile",
   "plan": 0,
   "task": 0,
-  "total_tasks": 4,
-  "status": "paused_between_planning_and_execution",
-  "position_note": "Phase 18 is fully planned (4 plans, 3 waves, plan-checked twice, 3 blockers fixed) and has executed ZERO plans. Separately, a complete unplanned feature (vnd.fjs.1099g + unemployment wiring) shipped mid-session in response to a real user document; it is proven and committed but owns no requirement ID and appears in no phase.",
+  "total_tasks": 0,
+  "status": "clean_board_milestone_v2_open",
+  "position_note": "Everything is merged to develop via PR #68 and every local branch has ZERO unmerged commits. Phase 20 is complete, verified and its two human_needed items are closed. Milestone v2 (10 phases, 25 requirements) is open and nothing in it has started. Phase 21 is next.",
   "git": {
-    "branch": "feature/1099g-unemployment",
-    "head": "8d00990",
+    "branch": "develop",
+    "head": "01476f9",
     "working_tree": "clean",
     "open_prs": 0,
     "worktrees": 1,
-    "develop": "6d6d8b8",
-    "branches_ahead_of_develop": {
-      "feature/1099g-unemployment": 8,
-      "feature/phase-18-dependency-and-duplication-debt": 7
-    },
-    "branch_relationship": "feature/1099g-unemployment is a STRICT SUPERSET of the phase-18 branch (git rev-list --count feature/1099g-unemployment..feature/phase-18-... returns 0). Merge the 1099-G branch only; the phase-18 branch is then redundant and can be deleted without loss."
+    "main": "ab6771d",
+    "branches_with_unmerged_commits": 0,
+    "deleted_this_session": [
+      "feature/1099g-unemployment (merged via PR #68, local + remote)",
+      "feature/phase-18-dependency-and-duplication-debt (strict subset of the above, local only — it never had a remote)"
+    ],
+    "verify_nothing_is_stranded": "for b in $(git for-each-ref --format='%(refname:short)' refs/heads | grep -v '^develop$'); do echo \"$(git rev-list --count develop..$b)  $b\"; done | sort -rn   # every row must read 0"
   },
   "suite": {
     "command": "npm test",
     "exit": 0,
-    "tests": "6384/6384",
-    "deduplicated_project_local_proofs": 951,
+    "tests": "6394/6394",
+    "deduplicated_project_local_proofs": 953,
     "tsc": "clean",
-    "runtime_range_seconds": "25-140, varying ~5x with load across eight runs",
-    "measured_on": "8d00990"
+    "runtime_range_seconds": "25-140, varying ~5x with load",
+    "measured_on": "develop @ 01476f9, after the merge"
   },
   "completed_this_session": [
     {
       "id": 1,
-      "name": "Phase 19 (EXEC-13, PROV-04, PROV-05) executed, reviewed, verified 4/4, merged",
-      "commit": "addc23c",
-      "pr": 66
+      "name": "Traceability retrofit: DOC-18/TAX-18 and Phase 20, both labelled RETROFITTED",
+      "commit": "d05d5ce"
     },
     {
       "id": 2,
-      "name": "Phase 18 criteria corrections (0.43.0 stale; 'two dialect files' is six) merged",
-      "commit": "6d6d8b8",
-      "pr": 67
+      "name": "Persona coverage survey against four taxpayers, measured from the code",
+      "commit": "e57b922"
     },
     {
       "id": 3,
-      "name": "Phase 18 planned: CONTEXT, VALIDATION, PATTERNS, 4 plans; plan-checked twice; 3 blockers fixed",
-      "commit": "27ba2c2"
+      "name": "Milestone v2 opened: 25 requirements, 10 phases; 1099-NEC out-of-scope decision reversed and struck through, not deleted",
+      "commit": "b7fcc22"
     },
     {
       "id": 4,
-      "name": "STATE.md fourth corruption repaired (third caused by state.advance-plan)",
-      "commit": "e7837a3"
+      "name": "Phase 20 verification gaps closed, including a SURVIVING MUTANT (erased refusal destination)",
+      "commit": "1697896"
     },
     {
       "id": 5,
-      "name": "CAPABILITIES.md re-measured from a live server probe",
-      "commit": "1535dbe"
+      "name": "Boxes 10a/10b modelled; both human_needed items closed; real transcript re-verified through the full entry point",
+      "commit": "95e67c3"
     },
     {
       "id": 6,
-      "name": "UNPLANNED: vnd.fjs.1099g dialect + unemployment wired to Schedule 1 line 7 / 1040 line 8 / line 25b, 3 mutation gates",
-      "commit": "8d00990"
-    },
-    {
-      "id": 7,
-      "name": "First real-world return computed end to end: refund $5,535, corroborated by an independent hand calculation",
-      "commit": null
+      "name": "Merged to develop; both work branches deleted; STATE.md's fourth stale-prose drift repaired",
+      "pr": 68,
+      "commit": "01476f9"
     }
   ],
   "remaining_tasks": [
     {
+      "id": 7,
+      "name": "Phase 21 THE LAST MILE: reach the 1040 engine from a stored guest program VIA guestCtx. A server tool that assembles inputs and calls form1040Report is the forbidden finance_compute_1040 tool -- read the ROADMAP entry before writing anything.",
+      "status": "next"
+    },
+    {
       "id": 8,
-      "name": "Resolve the 1099-G traceability gap (requirement IDs + phase entry, or an explicit out-of-band declaration)",
-      "status": "blocking_honest_reporting"
+      "name": "Phase 22 COMPUTABLE TRIPWIRES: hard prerequisite for phases 23-30, must not be reordered",
+      "status": "blocked_on_21"
     },
     {
       "id": 9,
-      "name": "Merge feature/1099g-unemployment to develop; delete the redundant phase-18 branch",
-      "status": "ready"
+      "name": "Phases 23-30: Schedule 2, Schedule 1 adjustments, Schedule 3 credits, retiree completion, Schedule C/SE/QBI, AMT, K-1",
+      "status": "blocked_on_22"
     },
     {
       "id": 10,
-      "name": "Phase 18 Wave 1 (18-01): functionalscript 0.44.0 bump, alone in its own commit",
-      "status": "ready"
+      "name": "Phase 18 (v1) -- planned, 4 plans, 3 waves, zero executed. Plans state a proof floor of 916; it is now 953.",
+      "status": "open"
     },
     {
       "id": 11,
-      "name": "Phase 18 Wave 2 (18-02 + 18-04, parallel), then Wave 3 (18-03)",
-      "status": "blocked_on_wave_1"
+      "name": "Phase 17 (v1) -- Documentation Truth Pass, not started",
+      "status": "open"
     },
     {
       "id": 12,
-      "name": "Phase 17 \u2014 Documentation Truth Pass (MAINT-02..05)",
-      "status": "not_started"
-    },
-    {
-      "id": 13,
-      "name": "THE LAST MILE: wire a server tool that reads stored documents and calls form1040Report. Today there is NO production caller and no server path produces a 1040 (demo/steps/00-about.js:140 states this). Guests cannot import, so fjs_run can never reach the engine. Everything this needs now exists.",
-      "status": "highest_value_unbuilt"
+      "name": "Sweep the erased-message-interpolation mutation across the other five dialects that carry refusal strings",
+      "status": "open"
     }
   ],
-  "blockers": [
-    {
-      "description": "The 1099-G feature has no requirement ID and no phase. REQUIREMENTS.md still reads 85 of 93 with no mention of a shipped dialect, and the Coverage table's category counts no longer match reality. Every defect class caught this session was caught BY the GSD structure this work bypassed.",
-      "type": "human_action",
-      "workaround": "Retrofit DOC-xx/TAX-xx requirement IDs and a Phase 20 entry written after the fact and labelled as such, or declare it explicitly out of band in REQUIREMENTS.md. Silence is the only wrong option."
-    },
-    {
-      "description": "Phase 18's plans state a proof-count floor of 916. The real floor is now 951 after the 1099-G work. Plan 18-03's wave-3 placement depends on that floor, so the number must be re-derived before execution rather than read from the plan.",
-      "type": "technical",
-      "workaround": "node --test 2>&1 | grep '^\\u2714 import(\"./fjs/' | sed 's/ ([0-9.]*ms)$//' | sort -u | wc -l"
-    }
-  ],
+  "blockers": [],
   "human_actions_pending": [
     {
-      "action": "Decide how the 1099-G work is recorded in REQUIREMENTS.md and ROADMAP.md",
-      "blocking": true
-    },
-    {
-      "action": "Approve merging feature/1099g-unemployment to develop",
+      "action": "Decide Phase 16 (orphan OCR island) -- deferred 2026-08-12, still unowned",
       "blocking": false
     },
     {
-      "action": "Decide Phase 16 (orphan OCR island) \u2014 still deferred; the 1099-G work just showed the manual-authoring path works",
+      "action": "Decide release timing -- develop is >125 commits ahead of main",
       "blocking": false
     },
     {
-      "action": "Decide release timing \u2014 develop is >110 commits ahead of main",
-      "blocking": false
-    },
-    {
-      "action": "Close standing verification debt: Phases 05/06/07 have no VERIFICATION.md; Phase 10 and 13 human_needed items remain unowned. PARTIALLY REDUCED: TY2025 standard deduction verified against IRS published figures for all five filing statuses, exact match. Nine other parameter groups unchecked.",
+      "action": "Close standing verification debt: Phases 05/06/07 have no VERIFICATION.md; Phase 10 and 13 human_needed items remain unowned. Phase 20's two are now CLOSED.",
       "blocking": false
     }
   ],
   "decisions": [
     {
-      "decision": "Phase 18 targets functionalscript 0.44.0, not the 0.43.0 its criterion named",
-      "rationale": "package.json already declared ^0.43.1, so the literal text was satisfiable by doing nothing. Owner chose the criterion's intent: the vendored dependency is current.",
-      "phase": "18"
+      "decision": "The last mile reaches the engine through guestCtx, NOT through a server tool",
+      "rationale": "A tool that assembles Form1040Inputs and calls form1040Report is the finance_compute_1040 tool REQUIREMENTS.md forbids -- 'would destroy the thesis permanently'. guestCtx already carries pure non-effect helpers beside the four frozen CAS commands, and _CasOpIsExactlyTheFourCommands pins the EFFECT vocabulary, not the context. The agent still authors the program and the effect whitelist does not widen.",
+      "phase": "21"
     },
     {
-      "decision": "The formRevision duplication is shared across all SIX dialects and the ROADMAP corrected",
-      "rationale": "The criterion said two. Measured six. It was written when four of those dialects did not exist and nothing re-derived it.",
-      "phase": "18"
+      "decision": "1099-NEC and self-employment REVERSED from Out of Scope",
+      "rationale": "Owner decision 2026-08-15, triggered by the persona survey showing that one entry is the entire startup-founder persona. Struck through rather than deleted: the original rationale is still true and is now a warning to whoever builds it.",
+      "phase": "27"
     },
     {
-      "decision": "WR-03 (splitting fjs-run-integration.test.js) folded into Phase 18",
-      "rationale": "Owner decision. The masking is proven, not theoretical: it cost two agents real work during Phase 19's gate M1.",
-      "phase": "18"
+      "decision": "1099-G boxes 10a/10b modelled as an array of state rows",
+      "rationale": "Box 11 was stored on the grounds 'a state return would want it' while neither the state nor its payer ID was modelled -- a withheld amount with no state attached is useless to a state return. Follows fjs/document/w2's stateLocalEntry precedent; an array because the printed form carries two rows.",
+      "phase": "20"
     },
     {
-      "decision": "The test split uses node:test SUBTESTS, not describe/before",
-      "rationale": "No root-level test file in this repo uses describe/before, so those would be a new convention. Subtests verified by probe: an early failure does not stop later subtests and each is reported by name, while shared setup stays in the outer scope.",
-      "phase": "18"
-    },
-    {
-      "decision": "1099-G boxes 2/5/6/7/9 are REFUSED when non-zero, not stored-and-ignored",
-      "rationale": "Box 2 is taxable only under the tax-benefit rule, which needs the prior year's return; this engine holds one year. Ignoring it would understate income for anyone who itemized last year. Box 11 is deliberately NOT refused: state withholding never reaches a federal return.",
-      "phase": "unplanned"
-    },
-    {
-      "decision": "inputsOf keeps ten curried parameters and defaults unemploymentForms to empty",
-      "rationale": "It is a test helper. The field is REQUIRED on Form1040Inputs and tsc enforces that on production callers; defaulting in the helper left forty existing proof call sites untouched.",
-      "phase": "unplanned"
+      "decision": "v2's 25 requirements are counted separately from v1's 95",
+      "rationale": "So v2 does not move v1's completion figure. 120 in the document, no ID collisions, all counts derived by commands recorded beside them.",
+      "phase": "v2"
     }
   ],
   "uncommitted_files": [],
-  "next_action": "Resolve the 1099-G traceability gap first (requirement IDs and a phase entry, or an explicit out-of-band note). Then merge feature/1099g-unemployment to develop and delete the redundant phase-18 branch. Then /gsd-execute-phase 18, starting with Wave 1's isolated 0.44.0 bump \u2014 but re-derive the proof-count floor first, since the plans say 916 and it is now 951.",
-  "context_notes": "The through-line of this session was one defect class appearing SIX times: a count or population that was true of the part someone examined and false of the whole. Phase 19's four pre-execution blockers, Phase 18's ROADMAP saying 'two dialect files' when it is six, and my own suite-runtime figure taken from a single sample. The prevention is not care, it is method: re-derive every population with a command that does not depend on the method that found it, because different discovery methods find different subsets. Second: three of Phase 18's mutation gates would have failed to COMPILE, which is the same failure as a vacuous proof one level up - a gate that cannot run proves nothing while appearing performed. Third, and most valuable: the engine REFUSED a real user document correctly, on the first one it ever saw, and that refusal is what produced the 1099-G feature. FOURTH, surfaced at the very end: form1040Report has NO production caller. The proven 1040 engine and the proven program-execution spine have never been joined, and cannot be by the guest path since guests cannot import. Phase 19's provenance and reproduction work has therefore never run against a real 1040. Wiring a server tool that reads stored documents and calls the engine is the highest-value unbuilt thing in the project."
+  "next_action": "Start Phase 21 (The Last Mile). Read its ROADMAP entry FIRST -- the obvious implementation is explicitly forbidden and the correct route runs through guestCtx, not a new server tool.",
+  "context_notes": "Two findings dominate. FIRST, the defect this project keeps hitting reached eight occurrences: a count true of the part someone examined and false of the whole. Latest instances -- REQUIREMENTS.md's own coverage table summed to 81 against its declared 93, and STATE.md's prose described Phase 15 for four days while its own frontmatter directly above said 16 phases complete. Two statements of one fact with no check between them. The fix that works is putting the re-derivation COMMAND next to the number, which both documents now do. SECOND, Phase 20's verification found a SURVIVING MUTANT: erasing a refusal message's destination interpolation left the entire suite green, because five proofs asserted the box name and the phrase 'cannot compute' and none asserted where the amount would have gone -- the only actionable part of the message. That class is unswept across the other five dialects carrying refusal strings. Also corrected: AGENTS.md's own '&& false' mutation recipe does not work inside an if statement under allowUnreachableCode: false, so any pre-2026-08-16 plan specifying one will silently fail to run rather than fail to pass."
 }
