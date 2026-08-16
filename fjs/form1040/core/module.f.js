@@ -3850,6 +3850,13 @@ export const proof = {
             assertEq(income.line10.sources[0].boxPath, 'declaredKinds')
             assertEq(tax.line23.value, 0n, 'Schedule 2 line 4 adds nothing to line 23')
             assertEq(income.line13a.value, 0n, 'no qualified business income, no §199A deduction')
+            // …and line 13a is still the DOCUMENTED ZERO it has always been,
+            // citing the profile alone rather than a union of facts Form 8995
+            // read. `scheduleC.filed` is what tells a return with no business
+            // apart from a break-even one, and this is the assertion that
+            // makes that branch load-bearing.
+            assertEq(income.line13a.sources.length, 1, 'one citation, the profile')
+            assertEq(income.line13a.sources[0].boxPath, 'declaredKinds')
             // This fixture is a JOINT return, so the deduction is $31,500.00
             // rather than single's $15,750.00: $45,505.00 - $31,500.00 =
             // $14,005.00 of taxable income, and the printed Tax Table's
@@ -4109,6 +4116,54 @@ export const proof = {
             assertEq(income.selfEmployment.lines.line9, 5610000n, '$56,100.00 of base left')
             assertEq(income.selfEmployment.lines.line12, 676947n, '$6,769.47, the uncapped figure')
             assertEq(tax.line23.value, 676947n, '1040 line 23 = $6,769.47')
+        },
+        /**
+         * **A PRIOR-YEAR LOSS CARRYFORWARD, through the product path** — and
+         * the FOURTH gap the mutation hunt found. Reading the stored
+         * assertion's VALUE as `'0.00'` whenever it was present left the
+         * suite green: every product-path fixture asserted `'0.00'`, so the
+         * one figure the field exists to carry was never non-zero anywhere.
+         *
+         * The same $120,000-salary founder, whose line 10 binds so the
+         * carryforward is visible in the deduction at all, with an
+         * $18,400.00 loss carried in from the business's first year:
+         *
+         *   Form 8995 2   QBI, as above                       $44,525.26
+         *   Form 8995 3   the carryforward, NEGATED           -$18,400.00
+         *   Form 8995 4   44,525.26 - 18,400.00               $26,125.26
+         *   Form 8995 5   20% of 2,612,526 = 522,505.2         $5,225.05
+         *   1040 line 13a the lesser (line 14 is $29,755.05)   $5,225.05
+         *
+         * **$3,680.00 less deduction than the identical return without the
+         * carryforward** — 20% of $18,400.00 — and that is the whole reason
+         * the field cannot be allowed to default to zero. Year one's loss and
+         * year two's profit is the canonical §199A(c)(2) sequence, and it is
+         * this phase's own persona.
+         */
+        aPriorYearLossCarryforwardReachesLineThirteenA: () => {
+            const record = businessExpensesDocument('sha256-business-01')('90.00')
+            /** @type {Stored<BusinessExpenses>} */
+            const withCarryforward = {
+                documentHash: record.documentHash,
+                value: {
+                    ...record.value,
+                    priorYearQualifiedBusinessLossCarryforward: '18400.00',
+                },
+            }
+            const base = inputsOf(storedProfile(selfEmploymentProfile))([
+                w2WithSocialSecurityWages('sha256-w2-day-job')('120000.00'),
+            ])([])([])([])([])([])([])([])([])
+            const { income } = computedLines(withBusiness(base)([
+                nonemployeeCompensationDocument('sha256-1099nec-01')('48000.00')('0.00'),
+            ])([withCarryforward]))
+            assertEq(income.line13a.value, 522505n, '1040 line 13a = $5,225.05')
+            // …and the identical return WITHOUT it, so the reduction is
+            // observable rather than merely present.
+            const { income: without } = computedLines(withBusiness(base)([
+                nonemployeeCompensationDocument('sha256-1099nec-01')('48000.00')('0.00'),
+            ])([record]))
+            assertEq(without.line13a.value, 890505n, 'without the carryforward, $8,905.05')
+            assertEq(without.line13a.value - income.line13a.value, 368000n, '$3,680.00 = 20% of $18,400.00')
         },
         /**
          * **A FOUNDER WITH DIVIDENDS, and the second leaf a mutation
