@@ -766,6 +766,154 @@ export const additionalMedicareTaxThreshold = {
 }
 
 /**
+ * Form 8959's two rates, in BASIS POINTS (hundredths of one percent): the
+ * 0.9% Additional Medicare Tax itself (IRC §3101(b)(2)) and the 1.45%
+ * ordinary Medicare tax (IRC §3101(b)(1)) that Form 8959 Part V line 21
+ * subtracts back out of Form W-2 box 6. TAX-20, Phase 23 — the rate
+ * {@link additionalMedicareTaxThreshold}'s own docstring says this phase
+ * adds "beside these thresholds when it adds the form."
+ *
+ * **Basis points, not `ratePercent`, and the reason is arithmetic rather
+ * than taste.** Every other rate in this module — `ordinaryBrackets`'
+ * 10/12/22/24/32/35/37, `seniorDeduction.phaseoutRatePercent`'s 6,
+ * `childTaxCredit.phaseoutRatePercent`'s 5, `actcEarnedIncomeRatePercent`'s
+ * 15 — is a whole number of percent, so a `ratePercent: number` field is
+ * exact. Neither of these two is: 0.9 and 1.45 are not integers, and
+ * storing either as a JavaScript `number` of percent would put a
+ * non-terminating binary fraction where this module's whole discipline is
+ * exactness (`0.9` and `1.45` are both inexact as IEEE 754 doubles). One
+ * hundredth of a percent is the coarsest unit that expresses BOTH exactly as
+ * integers, so both are stored that way and the consumer multiplies by
+ * `basisPoints / 10000`. `fjs/form8959` performs that multiplication through
+ * `fjs/types/rational`, cent-exact, half-up — never through a float.
+ *
+ * Both are `kind: 'code'` citations for the same reason the thresholds are:
+ * §3101(b) writes both rates into the statute (1.45% in `(b)(1)`, "0.9
+ * percent" in `(b)(2)`), no Revenue Procedure adjusts either, and inventing
+ * a Rev. Proc. number would be the sourcing error this module's own header
+ * exists to prevent. The rates carry their citation on a `citation` field of
+ * their own rather than through `AmountWithCitation`, because
+ * `AmountWithCitation`'s `amount` is a DOLLAR string (T-08-02 checks every
+ * one of them round-trips through `centsFromString`) and a rate is not money.
+ * @type {{
+ *   readonly additionalRateBasisPoints: number,
+ *   readonly regularMedicareRateBasisPoints: number,
+ *   readonly citation: Citation,
+ * }}
+ */
+export const additionalMedicareTaxRates = {
+    // 0.9% — IRC §3101(b)(2), the Additional Medicare Tax itself.
+    additionalRateBasisPoints: 90,
+    // 1.45% — IRC §3101(b)(1), the ordinary Medicare tax an employer
+    // withholds on EVERY dollar of box 5. Form 8959 Part V's whole job is to
+    // separate this from the line above it inside one box-6 figure; see
+    // `fjs/form8959`'s own Part V docstring for how the printed form does it.
+    regularMedicareRateBasisPoints: 145,
+    citation: { kind: 'code', section: '§3101(b)', effectiveDate: '2025-01-01' },
+}
+
+/**
+ * Form 8960's Net Investment Income Tax thresholds — IRC **§1411(b)**,
+ * TAX-21, Phase 23. The 3.8% tax applies to the LESSER of net investment
+ * income and the excess of §1411's own modified adjusted gross income over
+ * the figure below for the filer's status.
+ *
+ * **These are a DIFFERENT STATUTE's thresholds that happen to share three of
+ * §3101(b)(2)'s four dollar figures, and they are stored separately for
+ * exactly that reason.** Aliasing this parameter to
+ * {@link additionalMedicareTaxThreshold} — spreading it, re-exporting it,
+ * or having `fjs/form8960` read the Medicare one — would make the two
+ * impossible to observe drifting apart, which is the same argument
+ * {@link standardDeduction} makes about spreading one status's entry onto
+ * another, one level up. They already differ TODAY, in the one row below
+ * that a reader is most likely to copy wrong:
+ *
+ * **`qualifyingSurvivingSpouse` is $250,000 here, and $200,000 under
+ * §3101(b)(2) — the two statutes disagree, and this is the direction that
+ * disagreement runs.** §1411(b)(1) reads *"in the case of a taxpayer making
+ * a joint return under section 6013 **or a surviving spouse (as defined in
+ * section 2(a))**, $250,000"* — the surviving-spouse clause is written into
+ * the statute itself, and §2(a) is precisely the qualifying-surviving-spouse
+ * filing status. §3101(b)(2)(A) has NO such clause; it says only "in the
+ * case of a joint return", so a QSS return falls to that statute's
+ * `(C)` "any other case" at $200,000. Form 8960's own printed threshold
+ * table says $250,000 for a qualifying surviving spouse and Form 8959's says
+ * $200,000, which is the check that resolves the two against paper rather
+ * than against memory. Getting this backwards in EITHER direction is a
+ * silent wrong number: copying §3101's answer here understates the NIIT
+ * threshold by $50,000 for a widow(er), and copying this one there
+ * overstates the Medicare one by the same amount.
+ *
+ * `marriedFilingSeparately` is **½ of the joint figure** by §1411(b)(2)'s own
+ * words rather than a separately-enacted amount, which is why it lands on the
+ * same $125,000 §3101(b)(2)(B) states outright. Hand-typed per status anyway,
+ * never computed from the joint row and never spread from it: a halving
+ * performed here would be a rule this module states twice.
+ *
+ * Like §3101(b)(2)'s, these figures are **not inflation-indexed** — §1411 has
+ * carried the same three amounts since it took effect for taxable years
+ * beginning after December 31, 2012, with no Revenue Procedure adjusting
+ * them. Hence `kind: 'code'`, for the reason
+ * {@link additionalMedicareTaxThreshold} records in full.
+ *
+ * No `estatesAndTrusts` entry: §1411(a)(2) taxes an estate or trust against
+ * the dollar amount at which the highest income-tax bracket BEGINS, not
+ * against a threshold of its own, and Form 8960 Part III splits into
+ * individual (lines 13-17) and estate/trust (lines 18a-21) halves to say so.
+ * This map is keyed by {@link IndividualFilingStatus} so that boundary is a
+ * type rather than a comment.
+ * @type {Record<IndividualFilingStatus, AmountWithCitation>}
+ */
+export const netInvestmentIncomeTaxThreshold = {
+    single: {
+        amount: '200000.00',
+        citation: { kind: 'code', section: '§1411(b)(3)', effectiveDate: '2025-01-01' },
+    },
+    marriedFilingJointly: {
+        amount: '250000.00',
+        citation: { kind: 'code', section: '§1411(b)(1)', effectiveDate: '2025-01-01' },
+    },
+    marriedFilingSeparately: {
+        amount: '125000.00',
+        citation: { kind: 'code', section: '§1411(b)(2)', effectiveDate: '2025-01-01' },
+    },
+    headOfHousehold: {
+        amount: '200000.00',
+        citation: { kind: 'code', section: '§1411(b)(3)', effectiveDate: '2025-01-01' },
+    },
+    // See this group's own docstring: §1411(b)(1)'s "or a surviving spouse
+    // (as defined in section 2(a))" clause puts QSS on the JOINT figure here
+    // -- the OPPOSITE of `additionalMedicareTaxThreshold`, where the same
+    // status gets $200,000 because §3101(b)(2)(A) has no such clause.
+    qualifyingSurvivingSpouse: {
+        amount: '250000.00',
+        citation: { kind: 'code', section: '§1411(b)(1)', effectiveDate: '2025-01-01' },
+    },
+}
+
+/**
+ * Form 8960's single rate, in BASIS POINTS: 3.8% — IRC §1411(a)(1), TAX-21.
+ *
+ * A bare number rather than an object, unlike {@link additionalMedicareTaxRates},
+ * because §1411 has exactly ONE rate to store: Form 8960 never has to
+ * subtract a second, ordinary rate back out of a withholding box the way
+ * Form 8959 Part V does with the 1.45% Medicare tax. Grouping one field into
+ * an object to look symmetric with a two-field neighbour would be a shape
+ * chosen for tidiness over what the statute says.
+ *
+ * Basis points for the same exactness reason {@link additionalMedicareTaxRates}
+ * records: 3.8 is not a whole number of percent, and `3.8` is not exact as an
+ * IEEE 754 double. 380 hundredths of a percent is.
+ *
+ * Its citation travels with the thresholds' rather than on a field of its
+ * own: §1411(a)(1) is the same sentence that imposes the tax the thresholds
+ * bound, and {@link netInvestmentIncomeTaxThreshold}'s own entries cite
+ * §1411(b), one subsection over.
+ * @type {number}
+ */
+export const netInvestmentIncomeTaxRateBasisPoints = 380
+
+/**
  * A full tax-year parameter set: every TY2025 parameter this phase
  * requires, together.
  *
@@ -801,6 +949,9 @@ export const additionalMedicareTaxThreshold = {
  *   readonly medicalExpenseFloor: typeof medicalExpenseFloor,
  *   readonly childTaxCredit: typeof childTaxCredit,
  *   readonly additionalMedicareTaxThreshold: typeof additionalMedicareTaxThreshold,
+ *   readonly additionalMedicareTaxRates: typeof additionalMedicareTaxRates,
+ *   readonly netInvestmentIncomeTaxThreshold: typeof netInvestmentIncomeTaxThreshold,
+ *   readonly netInvestmentIncomeTaxRateBasisPoints: typeof netInvestmentIncomeTaxRateBasisPoints,
  * }} TaxParamSet
  */
 
@@ -827,6 +978,9 @@ export const taxParamsByYear = {
         medicalExpenseFloor,
         childTaxCredit,
         additionalMedicareTaxThreshold,
+        additionalMedicareTaxRates,
+        netInvestmentIncomeTaxThreshold,
+        netInvestmentIncomeTaxRateBasisPoints,
     },
 }
 
@@ -914,6 +1068,7 @@ const everyDollarStringField = [
     childTaxCredit.phaseoutThreshold.other.amount,
     childTaxCredit.actcEarnedIncomeThreshold.amount,
     ...individualFilingStatuses.map(status => additionalMedicareTaxThreshold[status].amount),
+    ...individualFilingStatuses.map(status => netInvestmentIncomeTaxThreshold[status].amount),
 ]
 
 export const proof = {
@@ -1031,6 +1186,120 @@ export const proof = {
                 additionalMedicareTaxThreshold.qualifyingSurvivingSpouse.amount,
             ],
         )
+    },
+    // TAX-21: Form 8960's thresholds, hand-typed from IRC §1411(b)'s own
+    // three dollar figures and Form 8960's printed threshold table -- never
+    // read back from the stored object, and never derived from
+    // `additionalMedicareTaxThreshold`, whose three shared figures are a
+    // coincidence of two statutes rather than one rule.
+    //
+    // Asserted per status, with the subsection letter beside the amount, for
+    // the same reason the §3101 leaf above is: a QSS amount that drifted onto
+    // the wrong figure would have to arrive with the wrong subsection too,
+    // and it would still fail on the amount.
+    netInvestmentIncomeTaxThresholdsAreTheUnindexedStatutoryFigures: () => {
+        /** @type {Record<IndividualFilingStatus, readonly [string, string]>} */
+        const expected = {
+            single: ['200000.00', '§1411(b)(3)'],
+            marriedFilingJointly: ['250000.00', '§1411(b)(1)'],
+            marriedFilingSeparately: ['125000.00', '§1411(b)(2)'],
+            headOfHousehold: ['200000.00', '§1411(b)(3)'],
+            // §1411(b)(1)'s "or a surviving spouse (as defined in section
+            // 2(a))" -- the JOINT figure, unlike §3101(b)(2).
+            qualifyingSurvivingSpouse: ['250000.00', '§1411(b)(1)'],
+        }
+        for (const status of individualFilingStatuses) {
+            const entry = netInvestmentIncomeTaxThreshold[status]
+            const [amount, section] = expected[status]
+            assertEq(entry.amount, amount, ['wrong net investment income tax threshold', status, entry.amount])
+            assertEq(entry.citation.kind, 'code', ['expected a bare-IRC citation', status, entry.citation])
+            assertEq(entry.citation.section, section, ['wrong governing subsection', status, entry.citation])
+            assertEq(entry.citation.effectiveDate, '2025-01-01')
+        }
+    },
+    // THE TRAP, stated as a leaf of its own rather than left implicit in the
+    // two tables above: the two statutes AGREE on four filing statuses and
+    // DISAGREE on the fifth, and the disagreement runs in a specific
+    // direction. §1411(b)(1) names "a surviving spouse (as defined in section
+    // 2(a))" beside the joint return; §3101(b)(2)(A) names only the joint
+    // return, so QSS falls to its (C) "any other case". Copying either
+    // statute's answer onto the other is a silent $50,000 error, and this
+    // leaf is what refuses to let the two parameters be unified by anyone who
+    // notices four of the five rows match.
+    //
+    // The four agreeing rows are asserted too, deliberately: a leaf that only
+    // asserted the disagreement would still pass if someone changed BOTH
+    // parameters in the same direction, and the agreement is what makes the
+    // one disagreement meaningful rather than noise.
+    theTwoStatutesAgreeOnFourStatusesAndDisagreeOnlyOnASurvivingSpouse: () => {
+        /** The four statuses the two statutes agree on — hand-typed, never
+         * derived by filtering `individualFilingStatuses` against the data,
+         * so a fifth status quietly joining the agreement is visible.
+         * @type {readonly IndividualFilingStatus[]} */
+        const agreeingStatuses = ['single', 'marriedFilingJointly', 'marriedFilingSeparately', 'headOfHousehold']
+        for (const status of agreeingStatuses) {
+            const medicare = additionalMedicareTaxThreshold[status]
+            const netInvestment = netInvestmentIncomeTaxThreshold[status]
+            assertEq(
+                medicare.amount,
+                netInvestment.amount,
+                ['§3101(b)(2) and §1411(b) state the same figure for this status', status],
+            )
+            // …and they are still two separate statutes saying it, which is
+            // what makes the fifth row possible at all.
+            assert(
+                medicare.citation.section !== netInvestment.citation.section,
+                ['the same figure must still cite two different statutes', status, medicare.citation.section],
+            )
+        }
+        assertEq(
+            netInvestmentIncomeTaxThreshold.qualifyingSurvivingSpouse.amount,
+            netInvestmentIncomeTaxThreshold.marriedFilingJointly.amount,
+            '§1411(b)(1) puts a surviving spouse ON the joint figure',
+        )
+        assert(
+            additionalMedicareTaxThreshold.qualifyingSurvivingSpouse.amount
+                !== netInvestmentIncomeTaxThreshold.qualifyingSurvivingSpouse.amount,
+            [
+                'the two statutes must NOT agree for a qualifying surviving spouse: §1411(b)(1) says $250,000 '
+                + 'and §3101(b)(2)(C) says $200,000',
+                additionalMedicareTaxThreshold.qualifyingSurvivingSpouse.amount,
+                netInvestmentIncomeTaxThreshold.qualifyingSurvivingSpouse.amount,
+            ],
+        )
+    },
+    // The three rates, hand-typed as basis points from the two statutes'
+    // own words: §3101(b)(1) "1.45 percent", §3101(b)(2) "0.9 percent",
+    // §1411(a)(1) "3.8 percent".
+    //
+    // The second half of this leaf is the REASON the unit is basis points
+    // rather than percent, asserted rather than left to the docstring: not
+    // one of the three is a whole number of percent, so a `ratePercent:
+    // number` field would have had to carry `0.9`, `1.45` or `3.8` — each an
+    // inexact IEEE 754 double — into a module whose entire discipline is
+    // exactness. If a future rate IS a whole percent, this half stays green
+    // for it and the assertion below names which one broke the pattern.
+    theStatutoryRatesAreStoredExactlyAsBasisPoints: () => {
+        assertEq(additionalMedicareTaxRates.additionalRateBasisPoints, 90, '0.9% — IRC §3101(b)(2)')
+        assertEq(additionalMedicareTaxRates.regularMedicareRateBasisPoints, 145, '1.45% — IRC §3101(b)(1)')
+        assertEq(netInvestmentIncomeTaxRateBasisPoints, 380, '3.8% — IRC §1411(a)(1)')
+        assertEq(additionalMedicareTaxRates.citation.kind, 'code')
+        assertEq(additionalMedicareTaxRates.citation.section, '§3101(b)')
+        assertEq(additionalMedicareTaxRates.citation.effectiveDate, '2025-01-01')
+        for (const basisPoints of [
+            additionalMedicareTaxRates.additionalRateBasisPoints,
+            additionalMedicareTaxRates.regularMedicareRateBasisPoints,
+            netInvestmentIncomeTaxRateBasisPoints,
+        ]) {
+            assert(
+                basisPoints % 100 !== 0,
+                [
+                    'this rate IS a whole number of percent, so the basis-point unit is no longer what makes it '
+                    + 'exact — revisit whether it belongs beside `ratePercent` instead',
+                    basisPoints,
+                ],
+            )
+        }
     },
     // T-08-02: every stored dollar amount is a `string`, never a JSON
     // number, and round-trips exactly through

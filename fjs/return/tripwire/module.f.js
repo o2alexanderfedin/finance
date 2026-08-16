@@ -19,7 +19,8 @@
  *
  * > A single filer with $300,000 in W-2 box 5 owes Additional Medicare Tax.
  * > Full stop. If they do not know Form 8959 exists — and most people do not —
- * > they will not declare `scheduleTwoTaxes`, the guard stays silent, and the
+ * > they will not declare `scheduleTwoTaxes` [renamed `additionalMedicareTax`
+ * > by Phase 23's TAX-22 split], the guard stays silent, and the
  * > engine emits a confident return understating tax by roughly $900.
  *
  * The scope guard's soundness rests on the taxpayer knowing what they owe,
@@ -43,7 +44,7 @@
  * ## The table, and why each of the three entries earns its place
  *
  * 1. **W-2 box 5 above the Additional Medicare Tax threshold ->
- *    `scheduleTwoTaxes`.** The phase's motivating case. Box 5 is UNCAPPED
+ *    `additionalMedicareTax`.** The phase's motivating case. Box 5 is UNCAPPED
  *    (unlike box 3, which stops at the Social Security wage base), the
  *    thresholds are statutory and NOT inflation-indexed, and they live in
  *    `fjs/tax/params` with their own IRC §3101(b)(2) citation rather than as
@@ -148,7 +149,7 @@ import { dialect as oneZeroNineNineGDialect, validate as validate1099g } from '.
 
 /** @import { IndividualFilingStatus, TaxParamSet } from '../../tax/params/module.f.js' */
 /** @import { Kind } from '../profile/module.f.js' */
-/** @import { ScopeOutcome, TripwireFinding, UnmodeledKind } from '../scope/module.f.js' */
+/** @import { RefusableKind, ScopeOutcome, TripwireFinding } from '../scope/module.f.js' */
 /** @import { W2 } from '../../document/w2/module.f.js' */
 /** @import { OneZeroNineNineR } from '../../document/1099r/module.f.js' */
 
@@ -192,18 +193,28 @@ import { dialect as oneZeroNineNineGDialect, validate as validate1099g } from '.
  * One row of the table: the kind the documents may prove is required, the
  * compiled-in prose naming the evidence, and the predicate.
  *
- * `kind` is an {@link UnmodeledKind}, not a `Kind`, and `tsc` owns that
- * restriction: `fjs/return/scope`'s `tripwireRefusal` names each kind's 1040
- * line, human label and remedy by looking it up in `unmodeledKindRefusals`, so
- * a tripwire pointing at a MODELED kind could not be described. A kind that
- * later moves from `unmodeledKindRefusals` to `modeledKinds` therefore stops
- * this file compiling, which is the right moment to decide whether its tripwire
- * still means anything.
+ * `kind` is a {@link RefusableKind}, not a `Kind`, and `tsc` owns that
+ * restriction: `fjs/return/scope`'s `tripwireRefusal` names each kind's form
+ * line, human label and remedy by looking it up, so a tripwire pointing at a
+ * kind neither table describes could not be described at all.
+ *
+ * **This used to read `UnmodeledKind`, and the sentence that followed it said
+ * a kind moving to `modeledKinds` "stops this file compiling, which is the
+ * right moment to decide whether its tripwire still means anything."** Phase
+ * 23 was that moment for entry 3 below, and the decision was to keep the
+ * tripwire: `additionalMedicareTax` became a modeled kind, and rather than
+ * delete the guard, `fjs/return/scope` gained
+ * `modeledKindDeclarationRemedies` so a modeled kind can still be named — with
+ * a remedy that now says "declare it and this engine computes it" instead of
+ * "go and get Form 8959". That table's own docstring records the reasoning in
+ * full. The compile-time trip still works, one table over: a
+ * declaration-required kind that is NOT modeled fails
+ * `_EveryDeclarationRequiredKindIsModeled`.
  *
  * `evidence` is a compiled-in literal, never interpolated from a document. See
  * {@link proof.noTaxpayerAmountRidesOutThroughATripwireRefusal}.
  * @typedef {{
- *   readonly kind: UnmodeledKind,
+ *   readonly kind: RefusableKind,
  *   readonly evidence: string,
  *   readonly triggered: (context: TripwireContext) => boolean,
  * }} Tripwire
@@ -259,7 +270,7 @@ export const tripwires = [
             context.documents.retirementForms.some(form => boxIsNonZero(form.value.box3CapitalGain)),
     },
     {
-        kind: 'scheduleTwoTaxes',
+        kind: 'additionalMedicareTax',
         evidence: 'Form W-2 box 5 (Medicare wages and tips), summed across every W-2 supplied, is above this '
             + 'filing status\'s Additional Medicare Tax threshold (IRC §3101(b)(2), not inflation-indexed), '
             + 'so Form 8959 is required and its tax reaches 1040 line 23 through Schedule 2 line 11',
@@ -427,10 +438,10 @@ export const proof = {
             assert(tripwire.evidence.length > 0, ['a tripwire carries no evidence', tripwire.kind])
         }
     },
-    // ── Entry 1: W-2 box 5 -> scheduleTwoTaxes ───────────────────────────
+    // ── Entry 1: W-2 box 5 -> additionalMedicareTax ──────────────────────
     additionalMedicareTax: {
         // THE PHASE'S MOTIVATING CASE. A single filer with $300,000 in box 5
-        // and no `scheduleTwoTaxes` declaration refuses, and the refusal names
+        // and no `additionalMedicareTax` declaration refuses, and the refusal names
         // the three things a reader can act on: the box that proved it, the
         // form they need, and the 1040 line it lands on. Each is asserted
         // SEPARATELY so erasing any one of the three reddens this leaf and
@@ -442,7 +453,7 @@ export const proof = {
                 return
             }
             assertEq(outcome.unmodeled.length, 1, ['expected exactly one required kind', outcome.unmodeled])
-            assertEq(outcome.unmodeled[0], 'scheduleTwoTaxes', ['expected Schedule 2 named', outcome.unmodeled])
+            assertEq(outcome.unmodeled[0], 'additionalMedicareTax', ['expected Schedule 2 line 11 named', outcome.unmodeled])
             assert(
                 outcome.message.includes('Form 8959'),
                 ['the refusal must name the form the taxpayer needs', outcome.message])
@@ -490,7 +501,7 @@ export const proof = {
                         outcome.kind === 'error',
                         ['one cent above the threshold must refuse', status, outcome])
                     if (outcome.kind === 'error') {
-                        assertEq(outcome.unmodeled[0], 'scheduleTwoTaxes', [status, outcome.unmodeled])
+                        assertEq(outcome.unmodeled[0], 'additionalMedicareTax', [status, outcome.unmodeled])
                     }
                 }
             },
@@ -548,14 +559,14 @@ export const proof = {
             const zero = classify('single')([])(w2sWithMedicareWages(['0.00']))
             assertEq(zero.kind, 'ok', ['a zero box 5 must not fire', zero])
         },
-        // The taxpayer who DOES know: declaring `scheduleTwoTaxes` silences
+        // The taxpayer who DOES know: declaring `additionalMedicareTax` silences
         // this tripwire entirely, at any wage. It does not make the return
         // computable — `classifyScope` refuses that declaration on its own,
         // one guard over — but the two guards must not both fire for one
         // fact, and this is the leaf that says the tripwire's job ends where
         // the declaration begins.
         aDeclaredScheduleTwoSilencesTheTripwire: () => {
-            const outcome = classify('single')(['wages', 'scheduleTwoTaxes'])(
+            const outcome = classify('single')(['wages', 'additionalMedicareTax'])(
                 w2sWithMedicareWages(['300000.00']))
             assertEq(outcome.kind, 'ok', ['a declared kind must not trip its own tripwire', outcome])
         },
@@ -693,7 +704,7 @@ export const proof = {
         }
         assertEq(outcome.unmodeled.length, 2, ['expected both required kinds', outcome.unmodeled])
         assertEq(outcome.unmodeled[0], 'unreportedTips', ['expected 1040 line 1c named first', outcome.unmodeled])
-        assertEq(outcome.unmodeled[1], 'scheduleTwoTaxes', ['expected 1040 lines 17 and 23 named second', outcome.unmodeled])
+        assertEq(outcome.unmodeled[1], 'additionalMedicareTax', ['expected Schedule 2 line 11 named second', outcome.unmodeled])
         // Both remedies present, so neither is silently dropped when the
         // other is named.
         assert(outcome.message.includes('Form 4137'), ['expected the tips remedy', outcome.message])
