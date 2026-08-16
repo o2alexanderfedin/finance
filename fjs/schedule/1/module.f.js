@@ -736,16 +736,36 @@ export const studentLoanInterestPhaseoutIncome = totalIncomeCents => otherAdjust
  * places). If the result is 1.000 or more, enter 1.000."* So the printed page
  * rounds ONCE, at the ratio, to three decimal places — and only then
  * multiplies. `w7Thousandths` is that ratio in thousandths, an exact integer,
- * and `w8` rounds the product to the cent. Computing `w1 × w6 / range` in one
- * step and rounding at the end would be a different, un-printed order: it
- * agrees for most inputs and disagrees near the bottom of the range, where
- * the printed three-decimal rounding takes a small excess to exactly 0.000.
+ * and `w8` rounds the product to the cent.
  *
- * That is not a curiosity. **One cent over the threshold produces the FULL
- * deduction**, because 1 cent over $85,000 is a ratio of 0.00000067, which
- * rounds to 0.000 — and `theOneCentOverTheThresholdCase` pins it, precisely
- * because an implementation that rounded later would give a deduction one
- * cent short and no other fixture would notice.
+ * ## Where that rounding point is observable, and where it is NOT
+ *
+ * **This section was rewritten after a mutation.** It first claimed that the
+ * one-cent-over-the-threshold case distinguishes the printed order from the
+ * obvious alternative (`round(w1 × w6 ÷ range)`, one rounding at the end). It
+ * does not, and the mutation proved it: at $0.01 over the threshold the
+ * printed order gives `w1 × 0.000 = $0.00` and the alternative gives
+ * `round($0.0012) = $0.00`. Both are zero. Every other fixture in this file
+ * agreed too, and the whole suite stayed green with the rounding point moved
+ * — the "equivalent mutant" AGENTS.md describes, except that this one is not
+ * equivalent at all; the fixtures simply never reached an input where the two
+ * differ.
+ *
+ * They differ **only when the exact ratio is close to a half-thousandth**,
+ * where the printed three-decimal rounding moves the multiplier by up to
+ * 0.0005 and so moves the deduction by up to `w1 × 0.0005`. At a phase-out
+ * income of $92,507.50 the exact ratio is 7,507.50 ÷ 15,000 = 0.5005, which
+ * the printed line 7 rounds UP to 0.501: line 8 is $923.16 by the printed
+ * order and $922.24 by the alternative, and line 9 is $919.47 or $920.39 —
+ * ninety-two cents apart. `theRoundingPointIsTheRatioNotTheProduct` is that
+ * fixture, and it is the ONLY leaf in this file that constrains the order.
+ *
+ * The one-cent case is still worth pinning, for a different property: **one
+ * cent over the threshold produces the FULL deduction**, because 0.01 ÷
+ * 15,000 rounds to 0.000. That is a real and surprising consequence of the
+ * printed page, and `theOneCentOverTheThresholdCase` records it — but it is
+ * evidence about the THRESHOLD comparison, not about the rounding point, and
+ * this paragraph exists so nobody reads it as the latter again.
  *
  * "Rounded to AT LEAST three places" permits more precision; exactly three is
  * what the printed line's own `. _ _ _` boxes hold, so exactly three is what
@@ -1528,10 +1548,16 @@ export const proof = {
         // Worksheet line 6 = $0.01. Line 7 divides it by $15,000 and rounds
         // to three decimal places: 0.01 / 15,000 = 0.00000067, which rounds
         // to 0.000. Line 8 is $1,842.63 x 0.000 = $0.00, and line 9 is the
-        // whole amount. An implementation that multiplied first and rounded
-        // last would give $1,842.62 — one cent short, and no other fixture in
-        // this file would notice. See this module's own docstring on why the
-        // printed rounding POINT is part of the rule.
+        // whole amount.
+        //
+        // **This leaf does NOT constrain the rounding POINT**, and this
+        // comment used to claim that it did. Verification moved the rounding
+        // from the ratio to the product and the whole suite stayed green: at
+        // one cent over, the alternative order gives round($0.0012) = $0.00
+        // too. `theRoundingPointIsTheRatioNotTheProduct` below is the leaf
+        // that actually bites; see this module's own docstring for the
+        // arithmetic and for why the correction is recorded rather than
+        // quietly fixed.
         theOneCentOverTheThresholdCase: () => {
             const result = okPartII(partIIOf(profileNoDeclaredKinds)('single')([])(
                 [oneZeroNineEightEDoc('1842.63')])([])(8500001n))
@@ -1555,6 +1581,39 @@ export const proof = {
             assertEq(result.studentLoanInterestWorksheet.w7Thousandths, 500n, '0.500')
             assertEq(result.studentLoanInterestWorksheet.w8, 92132n, '$921.315 half-up to $921.32')
             assertEq(result.line21.value, 92131n, '$1,842.63 - $921.32 = $921.31')
+        },
+        // **The rounding POINT, and the only fixture in this file that
+        // constrains it** — added after a mutation moved the rounding from
+        // the printed line 7 ratio to the line 8 product and every existing
+        // leaf stayed green.
+        //
+        // Total income $92,507.50, so worksheet line 6 is $7,507.50 and the
+        // exact ratio is 7,507.50 / 15,000 = 0.5005 — exactly half a
+        // thousandth, the worst case for the printed three-decimal rounding.
+        // Line 7 rounds it half-up to 0.501, so line 8 is $1,842.63 x 0.501 =
+        // $923.15763, half-up to $923.16, and line 9 is $1,842.63 - $923.16 =
+        // $919.47.
+        //
+        // Rounding the PRODUCT instead would give $1,842.63 x 0.5005 =
+        // $922.2363, half-up to $922.24, and a line 9 of $920.39 — ninety-two
+        // cents higher. Both figures are hand-computed here so a reader can
+        // see which order produced which.
+        theRoundingPointIsTheRatioNotTheProduct: () => {
+            const result = okPartII(partIIOf(profileNoDeclaredKinds)('single')([])(
+                [oneZeroNineEightEDoc('1842.63')])([])(9250750n))
+            assertEq(result.studentLoanInterestWorksheet.w6, 750750n, '$7,507.50 over the threshold')
+            assertEq(result.studentLoanInterestWorksheet.w7Thousandths, 501n,
+                '0.5005 rounded half-up to three places is 0.501, NOT 0.500')
+            assertEq(result.studentLoanInterestWorksheet.w8, 92316n,
+                '$1,842.63 x 0.501 = $923.15763, half-up to $923.16')
+            assertEq(result.line21.value, 91947n, '$1,842.63 - $923.16 = $919.47')
+            // The figure the un-printed order would have produced, named so
+            // the leaf says what it is refusing rather than only what it
+            // expects.
+            assert(
+                result.line21.value !== 92039n,
+                ['rounding the product instead of the ratio would give $920.39', result.line21.value],
+            )
         },
         // FULLY PHASED OUT, exactly at the top of the range: $100,000.00 is
         // $15,000.00 over the threshold, line 7 is 1.000, and line 9 is $0.00.
