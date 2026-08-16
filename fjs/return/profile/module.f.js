@@ -230,6 +230,14 @@ export const kindVocabulary = /** @type {const} */ ([
     'itemizedDeductions',                   // 12e
     'netQualifiedDisasterLoss',             // 12e exception 5
     'qualifiedBusinessIncomeDeduction',     // 13a
+    // ── Phase 28 (TAX-32): the ONE §199A input this engine cannot reach ─────
+    //
+    // Form 8995 lines 6-9 are the REIT/PTP component, and they are a
+    // SEPARATE fact from the deduction itself: a taxpayer can have qualified
+    // REIT dividends with no trade or business at all. Form 1099-DIV box 5
+    // carries §199A dividends and `vnd.fjs.1099div` stores them, but nothing
+    // reads that box, and PTP income needs Schedule K-1 (DOC-24, Phase 30).
+    'qualifiedReitDividendsAndPtpIncome',   // Form 8995 lines 6-9 -> 13a
     'seniorAndOtherScheduleOneADeductions', // 13b
     // ── Schedule 2's own lines, one kind each (TAX-22, Phase 23) ────────────
     //
@@ -255,6 +263,15 @@ export const kindVocabulary = /** @type {const} */ ([
     'advancePremiumTaxCreditAndOtherRepayments', // Schedule 2 line 1a-1z -> 17
     'alternativeMinimumTax',                // Schedule 2 line 2  -> 17
     'selfEmploymentTax',                    // Schedule 2 line 4  -> 23
+    // ── Phase 28 (TAX-31): the two Schedule SE facts nothing stored can
+    // reveal, each its own kind because they are separate taxpayer facts
+    // with separate remedies ─────────────────────────────────────────────
+    //
+    // Neither has a kind of its own before this phase because Schedule SE
+    // did not exist; both are on the printed page this phase transcribes,
+    // and both change the tax rather than merely the presentation.
+    'churchEmployeeIncome',                 // Schedule SE line 5a -> Sch 2 line 4
+    'selfEmploymentOptionalMethods',        // Schedule SE Part II -> Sch 2 line 4
     'additionalTaxOnTaxFavoredAccounts',    // Schedule 2 line 8  -> 23
     'householdEmploymentTaxes',             // Schedule 2 line 9  -> 23
     'additionalMedicareTax',                // Schedule 2 line 11 -> 23
@@ -744,16 +761,26 @@ const expectedMoneyBoxFieldCount = 4
  * than nine because printed line 7 already has `unemploymentCompensation`
  * (Phase 20) and lines 9 and 10 are totals — see the vocabulary's own comment
  * above.
+ *
+ * `92 -> 95` is Phase 28's own (TAX-31/TAX-32), and it is NOT a split: no
+ * coarse kind is removed, because none was left. Three kinds are ADDED for
+ * three facts the two new forms print and nothing stored can reveal —
+ * `churchEmployeeIncome` (Schedule SE line 5a and §1402(g)'s exemption
+ * behind it), `selfEmploymentOptionalMethods` (Schedule SE Part II) and
+ * `qualifiedReitDividendsAndPtpIncome` (Form 8995 lines 6-9). A vocabulary
+ * grows when a form arrives that can name something it could not name
+ * before, and this is the first phase since Phase 20 where it grew for that
+ * reason rather than by taking a coarse kind apart.
  * @type {number}
  */
-const expectedKindCount = 92
+const expectedKindCount = 95
 
 export const proof = {
     dialectAndMediaType: () => {
         assertEq(dialect, 'vnd.fjs.return_profile')
         assertEq(mediaType, 'application/vnd.fjs.return_profile+json')
     },
-    kindVocabularyIsExactlyEightySix: () => {
+    kindVocabularyIsExactlyNinetyFive: () => {
         assertEq(kindVocabulary.length, expectedKindCount)
         assertEq(new Set(kindVocabulary).size, kindVocabulary.length)
     },

@@ -101,15 +101,22 @@
  *    table's own docstring, whose reasoning is `additionalMedicareTax`'s and
  *    needed no restating.
  *
- *    **It is deliberately NOT paired with a Schedule SE entry.** A 1099-NEC
- *    also proves self-employment TAX, which `selfEmploymentTax` (Schedule 2
- *    line 4) refuses. But a second tripwire on the same document would refuse
- *    the same return twice for one fact, and — worse — a taxpayer who fixed
- *    the first by declaring `businessIncomeOrLoss` would then be refused by
- *    the second with no way to proceed at all, since declaring
- *    `selfEmploymentTax` is itself a scope refusal until Phase 28. One
- *    tripwire, one fact; the Schedule SE gap is the scope guard's to state
- *    when a taxpayer declares it.
+ *    **It is deliberately NOT paired with a Schedule SE entry**, and Phase
+ *    28 makes that decision better rather than obsolete. A 1099-NEC also
+ *    proves self-employment TAX, and when this paragraph was written
+ *    `selfEmploymentTax` was a scope refusal, so a second tripwire would have
+ *    refused the same return twice for one fact — and, worse, a taxpayer who
+ *    fixed the first by declaring `businessIncomeOrLoss` would then have been
+ *    refused by the second with no way to proceed at all.
+ *
+ *    **That last clause is now false: `selfEmploymentTax` is MODELED** (Phase
+ *    28, TAX-31), so declaring it is no longer a dead end. The entry still
+ *    does not exist, for the FIRST reason alone and for a new one: Schedule 2
+ *    line 4 is computed UNCONDITIONALLY, off the same Schedule SE execution
+ *    that produces Schedule 1 line 15, so a filer who declares nothing at all
+ *    still gets their self-employment tax. There is no silent understatement
+ *    left for a tripwire to catch — which is the only thing this module
+ *    exists for.
  *
  * ## The fourth entry that was specified and is NOT here, and why
  *

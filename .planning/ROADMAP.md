@@ -224,7 +224,7 @@ deliberately left untaken, so that discovering it did not become a reason to sto
 - [ ] **Phase 25: Schedule 3 Credits** - Saver's Credit, education credits, EITC
 - [ ] **Phase 26: Retiree Completion** - Qualified Charitable Distributions and Form 8606
 - [ ] **Phase 27: 1099-NEC and Schedule C** - Reversed from Out of Scope on 2026-08-15
-- [ ] **Phase 28: Schedule SE and QBI** - **unblocks the startup founder**
+- [ ] **Phase 28: Schedule SE and QBI** - **unblocks the startup founder**; TAX-31 complete, TAX-32 delivers Form 8995 and leaves 8995-A open
 - [ ] **Phase 29: Equity Compensation and AMT** - Forms 3921/3922, Form 6251, Form 8949 basis adjustment codes
 - [ ] **Phase 30: Pass-Through Income** - Schedule K-1 and Schedule E
 
@@ -916,6 +916,64 @@ rather than a form hunt.
 ### Phase 28: Schedule SE and QBI — unblocks the startup founder
 **Requirements**: TAX-31 (Schedule SE), TAX-32 (Form 8995/8995-A) · **Tier**: T3
 **Depends on**: Phase 23 — Schedule SE feeds Schedule 2 line 4, so it cannot land before Schedule 2 computes. **Also note the wage-base coordination**: the Social Security ceiling is shared with W-2 box 3 wages already counted, so this is not a standalone computation.
+**Status**: **TAX-31 complete; TAX-32 delivers Form 8995 only and its box stays UNCHECKED.**
+The persona is unblocked either way: a realistic self-employed return now computes end to end,
+which no return with $400 or more of net profit could do before this phase.
+
+**The ceiling Phase 27 built is gone.** `selfEmploymentTaxReachIsUnmodeled` is deleted and every
+leaf that asserted it is re-pointed to the computation that replaced it — including the
+$400.00-to-$433.12 band Phase 27 named as deliberately over-refused, which now computes a $0.00
+self-employment tax because the floor is applied to §1402(a)(12)'s net EARNINGS on Schedule SE
+line 4c rather than to net profit. The real boundary is one cent higher than Phase 27's arithmetic
+suggested, at **$433.13** of net profit, and it is half-up rounding at line 4a that puts it there.
+
+**The wage base is shared with Form W-2 box 3, never box 5, and matched on `recipientTin`.** Box 3
+stops at §1402(b)(1)'s base by construction and box 5 is uncapped, so reading box 5 would
+over-consume the base. Matching on the recipient is what stops a spouse's $170,000 from sheltering
+the proprietor's earnings on a joint return; on a NON-joint return a mismatch refuses, because the
+engine cannot tell which of the two records is wrong. Two jobs plus a business is priced against
+the naive answer: $4,575.48 of tax rather than $7,064.78, a $2,489.30 difference.
+
+**Two ceilings, not one, and they are different ceilings.** §1402(b)(1)'s $176,100 wage base is
+shared between box 3 and self-employment earnings on Schedule SE lines 7-9; §3101(b)(2)'s $200,000
+threshold is shared between box 5 and self-employment income on Form 8959 lines 9-11. Phase 23
+wrote the second against a permanent zero and said so; this phase supplies the argument that makes
+it bite, and one leaf holds both ceilings on one return to keep them from being conflated.
+
+**§164(f)(1) halves the §1401 taxes alone.** The deductible half on Schedule 1 line 15 is 50% of
+Schedule SE line 12 and NOT 50% of everything a self-employed filer pays on those earnings: Form
+8959's Additional Medicare Tax on the same income lands on Schedule 2 line **11**, not line 4. On a
+$220,000 profit the two readings differ by $14.26, and both figures are asserted.
+
+**Form 8995 computes; Form 8995-A refuses by name.** Qualified business income is Schedule C net
+profit reduced by the deductible half (§199A(c)(1) — the step most often missed, and it LOWERS the
+deduction). Line 11 subtracts 1040 line 12 **and line 13b**, because the 2025 face splits the old
+line 13 in two — so 1040 line 13a must be computed AFTER 13b, which is not the printed order.
+Above §199A(e)(2)'s threshold the engine refuses, naming the W-2-wage/UBIA cap, the SSTB phase-in,
+and both directions the error would run. **No SSTB field is stored**: §199A(d)(3) makes it
+irrelevant below the threshold and the engine refuses above it, so the field would have no reader
+— the `box13StatutoryEmployee` defect Phase 27 found, avoided rather than repeated.
+
+**One dialect field is added**: `vnd.fjs.business_expenses` gains
+`priorYearQualifiedBusinessLossCarryforward`, because §199A(c)(2) carries a negative year forward
+and reading its absence as zero would overstate the deduction for exactly the year-one-loss founder
+this phase exists for. Absence is *unstated* and refuses; `"0.00"` is the assertion.
+
+**The kind vocabulary GROWS rather than splitting**, for the first time since Phase 20: none of the
+five coarse kinds was left to take apart. Three kinds are reclassified to modeled
+(`selfEmploymentTax`, `deductiblePartOfSelfEmploymentTax`, `qualifiedBusinessIncomeDeduction`) and
+three are added for facts the two new printed forms carry and nothing stored reveals
+(`churchEmployeeIncome`, `selfEmploymentOptionalMethods`, `qualifiedReitDividendsAndPtpIncome`).
+Counts: `modeledKinds` 30 → 33, `unmodeledKindRefusals` 62 → 62 (`62 - 3 + 3`), `kindVocabulary`
+92 → 95. **Two remedies had gone false** — `selfEmployedRetirementPlans` and
+`selfEmployedHealthInsuranceDeduction` both named net self-employment earnings as their blocker,
+and this phase computes that figure — so both now name what is actually still missing.
+
+**The mutation hunt found five real coverage gaps**, every one of them a newly-real read that no
+fixture observed: 1040 line 13b inside the §199A limitation base, net capital gain out of it, the
+§164(f) reduction of QBI (invisible in every fixture because the income limitation bound in all of
+them), the carryforward's VALUE (every fixture asserted `"0.00"`), and line 13a's `filed` branch.
+All five are closed with fixtures that assert the wrong answer beside the right one.
 
 ### Phase 29: Equity Compensation and AMT
 **Requirements**: DOC-22 (3921), DOC-23 (3922), TAX-33 (Form 6251), TAX-34 (Form 8949 basis codes) · **Tier**: T3

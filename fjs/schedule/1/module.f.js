@@ -93,17 +93,35 @@
  * citing the profile's own `declaredKinds` box — `fjs/schedule/b`'s Form 8815
  * boundary treatment, copied verbatim in shape.
  *
- * **Line 15, the deductible part of self-employment tax, is STILL a documented
- * zero, and Phase 27 deliberately leaves it one.** Schedule C's line 31 now
- * reaches line 3, so a reader might reasonably expect the other half of
- * self-employment to have arrived with it. It has not: §164(f)'s deduction is
- * Schedule SE's line 13, and Schedule SE is Phase 28 (TAX-31).
- * `deductiblePartOfSelfEmploymentTax` remains an `fjs/return/scope` refusal
- * naming that phase, and `selfEmploymentTax` (Schedule 2 line 4) remains one
- * too — so a taxpayer whose Schedule C now computes still cannot file a return
- * claiming either. `lineFifteenIsStillADocumentedZeroAfterScheduleCComputes`
- * asserts it against a return with a real profit, which is the only fixture
- * that could ever have caught it silently changing.
+ * **Line 15, the deductible part of self-employment tax, is REAL as of Phase
+ * 28 (TAX-31), and it is the largest single change this schedule has had.**
+ * The paragraph that stood here said it was "STILL a documented zero, and
+ * Phase 27 deliberately leaves it one"; that is now false, and what replaces
+ * it matters more than the line itself:
+ *
+ * **Line 15 reduces adjusted gross income.** AGI drives the 7.5% medical
+ * floor, Schedule 1-A's senior-deduction phase-out, Form 8960's §1411
+ * threshold, the Social Security Benefits Worksheet and every credit Phases
+ * 24 and 25 wired — so this one line moves six figures downstream of it.
+ * Nothing about a return WITHOUT self-employment moves, and that is asserted
+ * rather than assumed: with no business record both of line 15's cited
+ * inputs are `profileDeclaredZeroLine`s, their union deduplicates to the
+ * single `declaredKinds` citation the hard zero always carried, and the value
+ * is still $0.00.
+ *
+ * **Schedule SE runs HERE, in stage 1, and travels out on the result.** This
+ * schedule is the first consumer — `fjs/schedule/2` needs the same
+ * execution's line 12 for its line 4 and line 6 for Form 8959 Part II, and a
+ * second execution would be pricing a return this one had already changed
+ * through AGI. `scheduleSelfEmploymentPartI` is called once,
+ * {@link ScheduleOnePartIIExceptStudentLoanInterest} carries the whole
+ * `SelfEmploymentOutcome`, and `fjs/form1040/core` threads it onward.
+ *
+ * **The Social Security Benefits Worksheet subtracts line 15**, because its
+ * own line 6 asks for "lines 11 through 20", and 15 is inside that range.
+ * That was true before and cost nothing while the line was zero; it is a live
+ * dependency now, and {@link socialSecurityWorksheetAdjustmentsTotal} is
+ * where it is stated.
  *
  * ## The 26/11 sub-line collapses (lines 8/9 and 24/25)
  *
@@ -169,6 +187,11 @@ import { of, halfUp } from '../../types/rational/module.f.js'
 import { centsFromString } from '../../exact/module.f.js'
 import { form8889PartI } from '../../form8889/module.f.js'
 import { scheduleC } from '../c/module.f.js'
+import {
+    scheduleSelfEmploymentPartI,
+    socialSecurityWagesAlreadyTaxed,
+    wagesAttributionRefusal,
+} from '../se/module.f.js'
 import { taxParamsByYear } from '../../tax/params/module.f.js'
 
 /** @import { ReturnProfile } from '../../return/profile/module.f.js' */
@@ -178,6 +201,7 @@ import { taxParamsByYear } from '../../tax/params/module.f.js'
 /** @import { BusinessExpenses } from '../../document/business_expenses/module.f.js' */
 /** @import { OneZeroNineNineNec } from '../../document/1099nec/module.f.js' */
 /** @import { ScheduleC } from '../c/module.f.js' */
+/** @import { SelfEmploymentOutcome } from '../se/module.f.js' */
 /** @import { W2 } from '../../document/w2/module.f.js' */
 /** @import { ReportLine, Source } from '../../report/line/module.f.js' */
 /** @import { TaxParamSet, IndividualFilingStatus } from '../../tax/params/module.f.js' */
@@ -363,14 +387,21 @@ const unemploymentCompensationLine = profile => forms => {
  * self-employment computes byte for byte what it computed before Phase 27.
  * `theEmptyReturnComputesExactlyWhatItComputedBeforeThisPhase` is where that
  * is asserted.
- * @type {(taxParamSet: TaxParamSet) => (input: ScheduleOnePartIInput) => ScheduleOnePartIOutcome}
+ * **This function takes no `TaxParamSet` as of Phase 28.** It threaded one
+ * through to `fjs/schedule/c` for that module's single parameter read, the
+ * §1402(b)(2) floor it compared net profit against; Phase 28 moved that
+ * comparison to printed Schedule SE line 4c, Schedule C was left with no
+ * tax-year parameter at all, and so is this. See `fjs/schedule/c`'s own
+ * {@link scheduleC} docstring for why keeping an unread argument "for
+ * symmetry" is the thing not to do.
+ * @type {(input: ScheduleOnePartIInput) => ScheduleOnePartIOutcome}
  */
-export const scheduleOnePartI = taxParamSet => input => {
+export const scheduleOnePartI = input => {
     const {
         profile, unemploymentForms, nonemployeeCompensationForms, businessExpenseForms, w2Forms,
     } = input
     const zero = profileDeclaredZeroLine(profile)
-    const scheduleCOutcome = scheduleC(taxParamSet)({
+    const scheduleCOutcome = scheduleC({
         profile, nonemployeeCompensationForms, businessExpenseForms, w2Forms,
     })
     if (scheduleCOutcome.kind === 'error') {
@@ -425,17 +456,27 @@ export const scheduleOnePartI = taxParamSet => input => {
  *   readonly line17: ReportLine, readonly line18: ReportLine, readonly line19a: ReportLine,
  *   readonly line20: ReportLine, readonly line22: ReportLine, readonly line23: ReportLine,
  *   readonly line24: ReportLine, readonly line25: ReportLine,
+ *   readonly selfEmployment: SelfEmploymentOutcome,
  * }} ScheduleOnePartIIExceptStudentLoanInterest
  */
 
 /** @typedef {ScheduleOnePartIIExceptStudentLoanInterest | ScheduleOneRefusal} ScheduleOnePartIIStageOneOutcome */
 
 /**
+ * `businessNetProfit` is **Schedule C's own line 31**, which printed Schedule
+ * SE line 2 asks for by that name — passed in from Part I's already-computed
+ * result rather than recomputed, so line 3 and line 15 can never disagree
+ * about the same profit. `businessExpenseForms` is here for exactly ONE
+ * field, the proprietor's `recipientTin`, which decides whose Forms W-2
+ * consume the §1402(b)(1) wage base; `fjs/schedule/se`'s own docstring
+ * carries that argument.
  * @typedef {{
  *   readonly profile: Stored<ReturnProfile>,
  *   readonly status: IndividualFilingStatus,
  *   readonly adjustmentForms: readonly Stored<Adjustments>[],
  *   readonly w2Forms: readonly Stored<W2>[],
+ *   readonly businessNetProfit: ReportLine,
+ *   readonly businessExpenseForms: readonly Stored<BusinessExpenses>[],
  * }} ScheduleOnePartIIStageOneInput
  */
 
@@ -497,7 +538,9 @@ const employerHsaContributionSources = w2s => w2s.flatMap(form =>
  * @type {(taxParamSet: TaxParamSet) => (input: ScheduleOnePartIIStageOneInput) => ScheduleOnePartIIStageOneOutcome}
  */
 export const scheduleOnePartIIExceptStudentLoanInterest = taxParamSet => input => {
-    const { profile, status, adjustmentForms, w2Forms } = input
+    const {
+        profile, status, adjustmentForms, w2Forms, businessNetProfit, businessExpenseForms,
+    } = input
     const zero = profileDeclaredZeroLine(profile)
     /** @type {readonly StoredEntry[]} */
     const entries = adjustmentForms.flatMap(form =>
@@ -670,7 +713,53 @@ export const scheduleOnePartIIExceptStudentLoanInterest = taxParamSet => input =
         line13Value)(line13Sources)
 
     const line14 = zero('Schedule 1 line 14 (moving expenses for Armed Forces members)')
-    const line15 = zero('Schedule 1 line 15 (deductible part of self-employment tax)')
+
+    // ── Line 15: the deductible half of self-employment tax (TAX-31) ────────
+    //
+    // **Schedule SE is executed HERE, once, and travels out on the result.**
+    // This schedule needs its line 13 for the line below; `fjs/schedule/2`
+    // needs its line 12 for that schedule's line 4 and its line 6 for Form
+    // 8959 Part II. Running it twice would not merely risk drift: line 13
+    // reduces adjusted gross income, so a second execution would be pricing a
+    // return the first one had already changed. `fjs/schedule/se`'s own
+    // `SelfEmploymentOutcome` carries the argument in full.
+    const [firstBusiness] = businessExpenseForms
+    const proprietorTin = firstBusiness === undefined
+        ? undefined
+        : firstBusiness.value.recipientTin
+    // Whose Forms W-2 consume the wage base is decidable on a joint return
+    // and not on any other; the refusal is `fjs/schedule/se`'s, threaded
+    // exactly like Form 8889's below.
+    if (proprietorTin !== undefined) {
+        const attribution = wagesAttributionRefusal(status)(w2Forms)(proprietorTin)
+        if (attribution.kind === 'error') {
+            return attribution
+        }
+    }
+    const wages = socialSecurityWagesAlreadyTaxed(w2Forms)(proprietorTin)
+    const socialSecurityWages = documentLine(profile)(
+        'Schedule SE line 8a (social security wages and tips already subject to tax)')(
+        wages.cents)(wages.sources)
+    const selfEmploymentLines = scheduleSelfEmploymentPartI(taxParamSet)({
+        netProfitCents: businessNetProfit.value,
+        socialSecurityWagesCents: wages.cents,
+    })
+    // 15. "Deductible part of self-employment tax. Attach Schedule SE."
+    //     Schedule SE line 13, restated under this schedule's printed number
+    //     and never recomputed here -- the same copy-line discipline line 3
+    //     follows for Schedule C's line 31.
+    //
+    //     **On a return with no business both cited lines are
+    //     `profileDeclaredZeroLine`s, so the union deduplicates to the single
+    //     `declaredKinds` citation this line has always carried.** That is
+    //     what keeps a return without self-employment byte-identical, and
+    //     `lineFifteenIsAComputedZeroCitingOnlyTheProfileWhenThereIsNoBusiness`
+    //     is the leaf that pins it rather than leaving it to be noticed.
+    const line15 = {
+        value: selfEmploymentLines.line13,
+        sources: unionSources([businessNetProfit, socialSecurityWages]),
+        rule: 'Schedule 1 line 15 (deductible part of self-employment tax, Schedule SE line 13)',
+    }
     const line16 = zero('Schedule 1 line 16 (SEP/SIMPLE/qualified plans)')
     const line17 = zero('Schedule 1 line 17 (self-employed health insurance deduction)')
     const line18 = zero('Schedule 1 line 18 (penalty on early withdrawal of savings)')
@@ -689,6 +778,11 @@ export const scheduleOnePartIIExceptStudentLoanInterest = taxParamSet => input =
         kind: 'ok',
         line11, line12, line13, line14, line15, line16, line17, line18, line19a,
         line20, line22, line23, line24, line25,
+        selfEmployment: {
+            lines: selfEmploymentLines,
+            netProfit: businessNetProfit,
+            socialSecurityWages,
+        },
     }
 }
 
@@ -1077,7 +1171,7 @@ export const scheduleOne = taxParamSet => input => {
         profile, status, unemploymentForms, nonemployeeCompensationForms, businessExpenseForms,
         adjustmentForms, studentLoanInterestForms, w2Forms, totalIncomeLine,
     } = input
-    const partI = scheduleOnePartI(taxParamSet)({
+    const partI = scheduleOnePartI({
         profile, unemploymentForms, nonemployeeCompensationForms, businessExpenseForms, w2Forms,
     })
     if (partI.kind === 'error') {
@@ -1085,6 +1179,11 @@ export const scheduleOne = taxParamSet => input => {
     }
     const stageOne = scheduleOnePartIIExceptStudentLoanInterest(taxParamSet)({
         profile, status, adjustmentForms, w2Forms,
+        // Printed Schedule SE line 2 asks for "Schedule C, line 31" by name,
+        // so that is the line handed over -- never Part I's line 3, which is
+        // the same figure under a different printed number.
+        businessNetProfit: partI.scheduleC.partII.line31,
+        businessExpenseForms,
     })
     if (stageOne.kind === 'error') {
         return stageOne
@@ -1288,7 +1387,7 @@ const w2WithEmployerHsa = {
  * @type {(profile: Stored<ReturnProfile>) => (unemploymentForms: readonly Stored<OneZeroNineNineG>[]) => (nonemployeeCompensationForms: readonly Stored<OneZeroNineNineNec>[]) => (businessExpenseForms: readonly Stored<BusinessExpenses>[]) => ScheduleOnePartIOutcome}
  */
 const partIOf = profile => unemploymentForms => nonemployeeCompensationForms => businessExpenseForms =>
-    scheduleOnePartI(taxParams2025)({
+    scheduleOnePartI({
         profile, unemploymentForms, nonemployeeCompensationForms, businessExpenseForms,
         w2Forms: [],
     })
@@ -1324,6 +1423,28 @@ const okPartII = outcome => {
     return outcome
 }
 
+/**
+ * **Schedule C line 31 for a return with NO business** — which is a
+ * `profileDeclaredZeroLine` citing `declaredKinds`, not a bare zero, and the
+ * distinction is the whole of why Phase 28 moved nothing for such a return.
+ *
+ * Built by calling the real `fjs/schedule/c` rather than hand-written here:
+ * this is an INPUT, and an input hand-written to the shape the code under
+ * test happens to expect is exactly the fixture that stops noticing when that
+ * shape changes.
+ * @type {(profile: Stored<ReturnProfile>) => ReportLine}
+ */
+const noBusinessNetProfit = profile => {
+    const outcome = scheduleC({
+        profile,
+        nonemployeeCompensationForms: [],
+        businessExpenseForms: [],
+        w2Forms: [],
+    })
+    assert(outcome.kind === 'ok', ['an empty Schedule C cannot refuse', outcome])
+    return outcome.partII.line31
+}
+
 /** Narrows any outcome to its refusal arm, throwing (never casting).
  * @type {(outcome: ScheduleOnePartIOutcome | ScheduleOnePartIIStageOneOutcome | ScheduleOnePartIIOutcome | ScheduleOneOutcome) => ScheduleOneRefusal}
  */
@@ -1340,6 +1461,8 @@ const refusal = outcome => {
 const partIIOf = profile => status => adjustmentForms => studentLoanInterestForms => w2Forms => totalIncomeCents => {
     const stageOne = scheduleOnePartIIExceptStudentLoanInterest(taxParams2025)({
         profile, status, adjustmentForms, w2Forms,
+        businessNetProfit: noBusinessNetProfit(profile),
+        businessExpenseForms: [],
     })
     if (stageOne.kind === 'error') {
         return stageOne
@@ -1355,12 +1478,56 @@ const partIIOf = profile => status => adjustmentForms => studentLoanInterestForm
 /** @type {() => ScheduleOnePartIIOutcome} */
 const emptyPartII = () => partIIOf(profileNoDeclaredKinds)('single')([])([])([])(0n)
 
-/** Every Part II line this phase does NOT claim — hand-typed, so a line that
+/**
+ * Stage 1 for a return WITH a business — Schedule C run first, exactly as
+ * `scheduleOne` and `fjs/form1040/core` run it, so `businessNetProfit` is the
+ * real line 31 rather than a figure typed to match. Phase 28's own fixture
+ * shape.
+ * @type {(profile: Stored<ReturnProfile>) => (status: IndividualFilingStatus) => (nonemployeeCompensationForms: readonly Stored<OneZeroNineNineNec>[]) => (businessExpenseForms: readonly Stored<BusinessExpenses>[]) => (w2Forms: readonly Stored<W2>[]) => ScheduleOnePartIIStageOneOutcome}
+ */
+const stageOneWithBusiness = profile => status => nonemployeeCompensationForms =>
+    businessExpenseForms => w2Forms => {
+        const partI = okPartI(scheduleOnePartI({
+            profile,
+            unemploymentForms: [],
+            nonemployeeCompensationForms,
+            businessExpenseForms,
+            w2Forms,
+        }))
+        return scheduleOnePartIIExceptStudentLoanInterest(taxParams2025)({
+            profile, status, adjustmentForms: [], w2Forms,
+            businessNetProfit: partI.scheduleC.partII.line31,
+            businessExpenseForms,
+        })
+    }
+
+/**
+ * A Form W-2 carrying box 3 Social Security wages for a named recipient — the
+ * box Schedule SE line 8a reads, and NOT box 5, which is Form 8959's.
+ * @type {(documentHash: string) => (recipientTin: string) => (amount: string) => Stored<W2>}
+ */
+const w2WithSocialSecurityWages = documentHash => recipientTin => amount => ({
+    documentHash,
+    value: {
+        dialect: 'vnd.fjs.w2',
+        payerTin: '11-1111111', recipientTin, accountNumber: 'ACC-W2',
+        taxYear: 2025, formRevision: '2025',
+        box1WagesTipsOtherCompensation: amount,
+        box3SocialSecurityWages: amount,
+    },
+})
+
+/** Every Part II line NO phase has claimed — hand-typed, so a line that
  * quietly stops being a documented zero is caught by name rather than by a
  * loop derived from the code under test.
+ *
+ * **Line 15 left this list in Phase 28.** It is a COMPUTED zero on a return
+ * with no business rather than a declared one, and the difference is exactly
+ * what `lineFifteenIsAComputedZeroCitingOnlyTheProfileWhenThereIsNoBusiness`
+ * exists to state: the assertions look identical and the reason does not.
  * @type {readonly string[]} */
 const partIILinesStillDocumentedZero = [
-    'line12', 'line14', 'line15', 'line16', 'line17', 'line18', 'line19a',
+    'line12', 'line14', 'line16', 'line17', 'line18', 'line19a',
     'line20', 'line22', 'line23', 'line24', 'line25',
 ]
 
@@ -1494,24 +1661,177 @@ export const proof = {
                 result.message.includes('line 32'),
                 ['the Schedule C loss refusal must reach Schedule 1 unchanged', result.message])
         },
-        // **CRITERION 6, as a checked claim.** Schedule 1 line 15 — the
-        // deductible half of self-employment tax — is still a documented zero
-        // on a return whose Schedule C now computes a real profit. Phase 28
-        // owns it, and this is the fixture that could catch it silently
-        // becoming something else: every other line-15 assertion in this file
-        // runs on a return with no business income at all, where a zero would
-        // be right for the wrong reason.
-        lineFifteenIsStillADocumentedZeroAfterScheduleCComputes: () => {
-            const partI = okPartI(partIOf(profileNoDeclaredKinds)([])(
-                [nonemployeeCompensationDoc('350.00')])([businessDoc([advertisingEntry('90.00')])]))
-            assertEq(partI.line3.value, 26000n, 'the control: Schedule C really did compute')
+    },
+
+    // ── Line 15: the deductible half of self-employment tax (Phase 28) ───────
+    //
+    // This group replaces Phase 27's single
+    // `lineFifteenIsStillADocumentedZeroAfterScheduleCComputes`, which
+    // asserted that line 15 stayed a hard zero on a return whose Schedule C
+    // computed. It does not stay one, and the leaf that said so was written
+    // to redden when this phase landed.
+    lineFifteen: {
+        // **THE REGRESSION PROPERTY.** With no business, line 15's two cited
+        // inputs are both `profileDeclaredZeroLine`s and their union
+        // deduplicates to the single `declaredKinds` citation the hard zero
+        // always carried. Same value, same source count, same box path — so
+        // a return with no self-employment computes exactly what it computed
+        // before Phase 28, and 1040 line 10's own sources are unmoved with
+        // it.
+        lineFifteenIsAComputedZeroCitingOnlyTheProfileWhenThereIsNoBusiness: () => {
             const partII = okPartII(emptyPartII())
             assertEq(partII.line15.value, 0n)
-            assertEq(partII.line15.sources.length, 1)
+            assertEq(partII.line15.sources.length, 1, 'the two profile zeros dedup to one citation')
+            assertEq(partII.line15.sources[0].documentHash, profileNoDeclaredKinds.documentHash)
             assertEq(partII.line15.sources[0].boxPath, 'declaredKinds')
             assert(
-                partII.line15.rule.includes('self-employment tax'),
-                ['line 15 must still name what it is', partII.line15.rule])
+                partII.line15.rule.includes('Schedule SE line 13'),
+                ['line 15 must name the form line it implements', partII.line15.rule])
+            assertEq(partII.line26.value, 0n, 'and line 26 is untouched')
+        },
+        // A sub-$400 business: Schedule C computes a real profit, and line 15
+        // is STILL $0.00 — because §1402(b)(2)'s floor is applied to net
+        // EARNINGS on Schedule SE line 4c. The citations DO change here, and
+        // they should: a zero derived from real documents cites those
+        // documents.
+        //
+        // $350.00 of receipts less $90.00 of advertising is $260.00; 92.35%
+        // of it is $240.11, below $400.00.
+        aSubFourHundredDollarProfitStillDeductsNothingButCitesTheDocuments: () => {
+            const stageOne = okStageOne(stageOneWithBusiness(profileNoDeclaredKinds)('single')(
+                [nonemployeeCompensationDoc('350.00')])([businessDoc([advertisingEntry('90.00')])])([]))
+            assertEq(stageOne.selfEmployment.netProfit.value, 26000n, 'the control: Schedule C computed $260.00')
+            assertEq(26000n * 9235n / 10000n, 24011n, '92.35% of $260.00 is $240.11, below the floor')
+            assertEq(stageOne.line15.value, 0n, 'no self-employment tax, so no deductible half')
+            const paths = stageOne.line15.sources.map(source => source.boxPath)
+            assert(
+                paths.includes('box1NonemployeeCompensation'),
+                ['a zero derived from documents cites them', paths])
+        },
+        // **THE REAL FIGURE.** $48,000.00 of receipts less $90.00 of
+        // advertising is $47,910.00 of net profit. Hand-derived:
+        //
+        //   Sch SE 4a  4,791,000 x 9235 / 10,000 = 4,424,488.5  $44,244.89
+        //   Sch SE 10  4,424,489 x 1240 / 10,000 = 548,636.636   $5,486.37
+        //   Sch SE 11  4,424,489 x  290 / 10,000 = 128,310.181   $1,283.10
+        //   Sch SE 12  5,486.37 + 1,283.10                       $6,769.47
+        //   Sch SE 13  676,947 x 50 / 100 = 338,473.5            $3,384.74
+        //
+        // Line 13's own rounding is a HALF-CENT here, and half-up takes it
+        // up: truncation would give $3,384.73. That is not an accident of the
+        // fixture — an odd number of cents on line 12 is the ordinary case,
+        // since two independently-rounded portions are added.
+        lineFifteenIsScheduleSeLineThirteenOnARealProfit: () => {
+            const stageOne = okStageOne(stageOneWithBusiness(profileNoDeclaredKinds)('single')(
+                [nonemployeeCompensationDoc('48000.00')])(
+                [businessDoc([advertisingEntry('90.00')])])([]))
+            assertEq(stageOne.selfEmployment.lines.line12, 676947n, 'Schedule SE line 12 = $6,769.47')
+            assertEq(stageOne.line15.value, 338474n, 'line 15 = $3,384.74')
+            assertEq(676947n / 2n, 338473n, 'truncation would give $3,384.73; half-up gives $3,384.74')
+            // Line 15 is HALF the tax, and half of the TAX -- not of the
+            // Social Security portion, not of net earnings, not of the
+            // profit. Each of those is a real number on the same record and
+            // each is wrong here.
+            assert(stageOne.line15.value !== stageOne.selfEmployment.lines.line10, 'not half of line 10')
+            assert(stageOne.line15.value !== stageOne.selfEmployment.lines.line6, 'not net earnings')
+            assert(stageOne.line15.value * 2n - 1n === stageOne.selfEmployment.lines.line12,
+                'twice line 15 is line 12, up to the half-cent rounded up')
+            // …and it reaches line 26, the total that feeds 1040 line 10.
+            const partII = okPartII(scheduleOnePartII(taxParams2025)({
+                profile: profileNoDeclaredKinds,
+                status: 'single',
+                exceptStudentLoanInterest: stageOne,
+                adjustmentForms: [],
+                studentLoanInterestForms: [],
+                totalIncomeLine: totalIncomeOf(4791000n),
+            }))
+            assertEq(partII.line26.value, 338474n, 'line 26 = $3,384.74 -> 1040 line 10')
+        },
+        // The Social Security Benefits Worksheet's own line 6 asks for
+        // "lines 11 through 20", and line 15 is INSIDE that range. That cost
+        // nothing while the line was a hard zero; it is a live dependency
+        // now, and this is the leaf that says the worksheet total moved with
+        // it. A retiree with a Schedule C is exactly the filer this affects.
+        theSocialSecurityWorksheetTotalIncludesLineFifteen: () => {
+            const stageOne = okStageOne(stageOneWithBusiness(profileNoDeclaredKinds)('single')(
+                [nonemployeeCompensationDoc('48000.00')])(
+                [businessDoc([advertisingEntry('90.00')])])([]))
+            assertEq(
+                socialSecurityWorksheetAdjustmentsTotal(stageOne), 338474n,
+                'lines 11-20, 23 and 25 now carry the deductible half')
+            assertEq(
+                studentLoanInterestWorksheetOtherAdjustments(stageOne), 338474n,
+                'lines 11-20 plus write-ins carry it too -- 15 is in both ranges')
+            // THE CONTROL: with no business both totals are zero, so the
+            // figure above is the deduction rather than anything else on
+            // Part II.
+            assertEq(socialSecurityWorksheetAdjustmentsTotal(okStageOne(
+                stageOneWithBusiness(profileNoDeclaredKinds)('single')([])([])([]))), 0n)
+        },
+        // **THE WAGE BASE, SHARED, at the schedule that computes it.** Two
+        // Forms W-2 for the proprietor totalling $150,000.00 of box 3 beside
+        // a $50,000.00 net profit. Line 15 is half of $4,575.48, and the
+        // naive no-sharing answer would be half of $7,064.78 -- both asserted.
+        theWageBaseIsSharedBeforeTheHalfIsTaken: () => {
+            const shared = okStageOne(stageOneWithBusiness(profileNoDeclaredKinds)('single')(
+                [nonemployeeCompensationDoc('50000.00')])([businessDoc([])])([
+                w2WithSocialSecurityWages('sha256-w2-a')('222-22-2222')('85000.00'),
+                w2WithSocialSecurityWages('sha256-w2-b')('222-22-2222')('65000.00'),
+            ]))
+            assertEq(shared.selfEmployment.lines.line8a, 15000000n, '$150,000.00 of box 3')
+            assertEq(shared.selfEmployment.lines.line12, 457548n, '$4,575.48 of tax')
+            assertEq(shared.line15.value, 228774n, 'line 15 = $2,287.74')
+            const naive = okStageOne(stageOneWithBusiness(profileNoDeclaredKinds)('single')(
+                [nonemployeeCompensationDoc('50000.00')])([businessDoc([])])([]))
+            assertEq(naive.selfEmployment.lines.line12, 706478n, 'no wages: $7,064.78 of tax')
+            assertEq(naive.line15.value, 353239n, 'and a $3,532.39 deduction')
+            // …and line 15's sources include the W-2 box the sharing read.
+            const paths = shared.line15.sources.map(source => source.boxPath)
+            assert(
+                paths.includes('box3SocialSecurityWages'),
+                ['line 15 must cite the wages that consumed the base', paths])
+            assert(
+                !paths.includes('box5MedicareWagesAndTips'),
+                ['and NOT box 5, which is Form 8959\'s', paths])
+        },
+        // **A SPOUSE'S WAGES DO NOT SHELTER THE PROPRIETOR**, on a joint
+        // return where they legitimately sit beside one Schedule C. The
+        // spouse earns $170,000.00 of box 3 and the proprietor nothing, so
+        // the proprietor's whole $176,100 base is intact and the tax is the
+        // no-wages figure -- NOT the $1,339.08 a shared base would give.
+        aSpousesWagesDoNotShelterTheProprietorsEarnings: () => {
+            const joint = okStageOne(stageOneWithBusiness(profileJoint)('marriedFilingJointly')(
+                [nonemployeeCompensationDoc('50000.00')])([businessDoc([])])([
+                w2WithSocialSecurityWages('sha256-w2-spouse')('333-33-3333')('170000.00'),
+            ]))
+            assertEq(joint.selfEmployment.lines.line8a, 0n, 'the spouse\'s box 3 is not the proprietor\'s')
+            assertEq(joint.selfEmployment.lines.line12, 706478n, '$7,064.78, the full-base figure')
+            assertEq(joint.line15.value, 353239n, 'line 15 = $3,532.39')
+            // …and the SAME wages under the proprietor's own TIN give the
+            // other answer, which is what makes this a filter rather than a
+            // W-2 that is simply never read.
+            const own = okStageOne(stageOneWithBusiness(profileJoint)('marriedFilingJointly')(
+                [nonemployeeCompensationDoc('50000.00')])([businessDoc([])])([
+                w2WithSocialSecurityWages('sha256-w2-own')('222-22-2222')('170000.00'),
+            ]))
+            assertEq(own.selfEmployment.lines.line8a, 17000000n, '$170,000.00 of the proprietor\'s own')
+            assertEq(own.selfEmployment.lines.line9, 610000n, '$6,100.00 of base left')
+            // 12.4% of $6,100.00 = 75,640 cents; 2.9% of $46,175.00 =
+            // 133,908 cents; total $2,095.48.
+            assertEq(own.selfEmployment.lines.line12, 209548n, '$2,095.48')
+        },
+        // …and on a NON-joint return the same mismatch REFUSES, threaded out
+        // of stage 1 exactly as Form 8889's refusals are. The control above
+        // is the joint case; this is the case where the engine cannot tell
+        // whose wages they are.
+        aForeignW2OnANonJointReturnRefusesOutOfStageOne: () => {
+            const outcome = stageOneWithBusiness(profileNoDeclaredKinds)('single')(
+                [nonemployeeCompensationDoc('50000.00')])([businessDoc([])])([
+                w2WithSocialSecurityWages('sha256-w2-other')('333-33-3333')('170000.00'),
+            ])
+            const message = refusal(outcome).message
+            assert(message.includes('Schedule SE line 8a'), ['must name the printed line', message])
+            assert(message.includes('333-33-3333'), ['must name the other recipient', message])
         },
     },
 
@@ -2024,6 +2344,8 @@ export const proof = {
                 hsaEntry('700.00')('taxpayer'),
             ])([fullYearCoverage('taxpayer')('selfOnly')])],
             w2Forms: [],
+            businessNetProfit: noBusinessNetProfit(profileNoDeclaredKinds),
+            businessExpenseForms: [],
         }))
         assertEq(socialSecurityWorksheetAdjustmentsTotal(stageOne), 100000n, 'lines 11-20, 23, 25')
         assertEq(studentLoanInterestWorksheetOtherAdjustments(stageOne), 100000n,
@@ -2077,10 +2399,10 @@ export const proof = {
         // still be documented zeros, so a line quietly re-pointed at a
         // document is caught by name. Derived from the printed form, never
         // from the returned object.
-        assertEq(partIILinesStillDocumentedZero.length, 12, 'sixteen Part II lines, less 11/13/21/26')
+        assertEq(partIILinesStillDocumentedZero.length, 11, 'sixteen Part II lines, less 11/13/15/21/26')
         /** @type {Record<string, ReportLine>} */
         const byName = {
-            line12: result.line12, line14: result.line14, line15: result.line15,
+            line12: result.line12, line14: result.line14,
             line16: result.line16, line17: result.line17, line18: result.line18,
             line19a: result.line19a, line20: result.line20, line22: result.line22,
             line23: result.line23, line24: result.line24, line25: result.line25,

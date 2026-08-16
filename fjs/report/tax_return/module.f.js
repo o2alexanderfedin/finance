@@ -1067,6 +1067,11 @@ const documentByHash = {
         taxYear: 2025,
         principalBusiness: 'software consulting',
         grossReceiptsFullyReportedOnForms1099Nec: true,
+        // Phase 28 (TAX-32): "0.00" is the ASSERTION that there was no
+        // prior-year qualified business loss, and it is a different statement
+        // from the field being absent -- `fjs/form8995` refuses an absent one
+        // rather than reading it as none.
+        priorYearQualifiedBusinessLossCarryforward: '0.00',
         entries: [{
             category: 'advertising',
             datePaid: '2025-03-14',

@@ -40,31 +40,42 @@
  * and a SHARED threshold. This engine has neither of the other two, and the
  * reasons differ:
  *
- * - **Part II (self-employment income, lines 8-13.)** Line 8 reads Schedule
- *   SE Part I line 6, which is Phase 28's work (TAX-31). Two independent
- *   things keep it zero today: no dialect carries self-employment income
- *   into this engine at all (Form 1099-NEC is Phase 27), and
- *   `selfEmploymentTax` is a REFUSED kind, so a return that declares it is
- *   refused whole before any line computes.
+ * - **Part II (self-employment income, lines 8-13.) NO LONGER ZERO as of
+ *   Phase 28 (TAX-31).** Line 8 reads Schedule SE Part I line 6, and
+ *   `fjs/schedule/se` now computes it: `fjs/schedule/2` hands this module the
+ *   figure off the SAME Schedule SE execution that produced Schedule 2 line 4
+ *   and Schedule 1 line 15. The paragraph that stood here said "two
+ *   independent things keep it zero today", and Phase 28 removed both — Form
+ *   1099-NEC and Schedule C arrived in Phase 27, and `selfEmploymentTax` is a
+ *   MODELED kind now.
  * - **Part III (RRTA compensation, lines 14-17.)** Railroad Retirement Tax
  *   Act compensation is reported in Form W-2 **box 14**, and
  *   `fjs/document/w2`'s schema has no box-14 field — a stored W-2 cannot
- *   carry it, so this part is not merely unmodelled but unreachable.
+ *   carry it, so this part is not merely unmodelled but unreachable. It is
+ *   written out as documented zeros carrying its own line numbers rather than
+ *   dropped, because a form whose lines silently disappear is exactly
+ *   TAX-16's failure mode one layer down: a reader comparing this output
+ *   against the printed page must be able to find every line.
  *
- * Both are written out as documented zeros carrying their own line numbers
- * rather than dropped, because a form whose lines silently disappear is
- * exactly TAX-16's failure mode one layer down: a reader comparing this
- * output against the printed page must be able to find every line.
- *
- * **Part II's line 11 is computed for real even though line 8 is zero**, and
- * that is deliberate. Line 11 subtracts the wages already counted in Part I
+ * **Part II's line 11 was computed for real BEFORE line 8 had anything to
+ * subtract it from, and that is the whole reason this phase needed no
+ * rethinking here.** Line 11 subtracts the wages already counted in Part I
  * (line 10, which restates line 4) from the threshold, so the threshold is
- * consumed by wages FIRST and self-employment income is taxed only on what
- * is left of it. Writing that coordination now, with a proof that watches it
- * bite ({@link proof.partII.theThresholdIsConsumedByWagesBeforeSelfEmploymentIncome}),
- * is what stops Phase 28 from having to discover it: a Part II written later
- * against a full threshold would double-count $200,000 of head-room for
- * anyone with both wages and a Schedule C.
+ * consumed by wages FIRST and self-employment income is taxed only on what is
+ * left of it. Phase 23 wrote that coordination with a proof that watched it
+ * bite ({@link proof.partII.theThresholdIsConsumedByWagesBeforeSelfEmploymentIncome})
+ * precisely so this phase would not have to discover it; a Part II written
+ * now against a full threshold would have double-counted $200,000 of
+ * head-room for anyone with both wages and a Schedule C. **Phase 28's whole
+ * change to this file is one input field and line 8 reading it.**
+ *
+ * Note what line 11 does NOT coordinate: §3101(b)(2)'s threshold is a
+ * DIFFERENT ceiling from §1402(b)(1)'s Social Security wage base, shared by a
+ * different rule. Schedule SE lines 7-9 share the wage base between W-2 box 3
+ * and self-employment earnings; Form 8959 lines 9-11 share this threshold
+ * between W-2 box 5 and self-employment income. Two ceilings, two boxes, two
+ * orders of consumption that happen to agree on "wages first" — and
+ * `fjs/schedule/se`'s own docstring is where the other one is argued.
  *
  * ## Part V, and how the printed form splits one box 6 in two
  *
@@ -217,21 +228,21 @@ export const form8959PartI = taxParamSet => input => {
  */
 
 /**
- * Form 8959 Part II, lines 8-13 — the self-employment arm. Line 8 is a
- * documented zero (see this module's own docstring); lines 9-11 are computed
- * for real anyway, because line 11 is where the threshold's head-room is
- * consumed by wages, and getting that coordination written down now is the
- * point.
- * @type {(taxParamSet: TaxParamSet) => (input: { readonly status: IndividualFilingStatus, readonly partILine4: bigint }) => Form8959PartII}
+ * Form 8959 Part II, lines 8-13 — the self-employment arm, real as of Phase
+ * 28. Line 8 is Schedule SE Part I line 6, handed in by `fjs/schedule/2` off
+ * the one Schedule SE execution; line 11 is where the threshold's head-room
+ * is consumed by wages before any of it shelters self-employment income.
+ * @type {(taxParamSet: TaxParamSet) => (input: { readonly status: IndividualFilingStatus, readonly partILine4: bigint, readonly selfEmploymentIncomeCents: bigint }) => Form8959PartII}
  */
 export const form8959PartII = taxParamSet => input => {
-    const { status, partILine4 } = input
+    const { status, partILine4, selfEmploymentIncomeCents } = input
     // 8. "Self-employment income from Schedule SE, Part I, line 6. If zero or
-    //    less, enter -0-." No dialect carries self-employment income into
-    //    this engine (Form 1099-NEC is Phase 27, Schedule SE is Phase 28),
-    //    and `selfEmploymentTax` is a REFUSED kind -- two independent reasons
-    //    this is zero for every return this engine can compute.
-    const line8 = 0n
+    //    less, enter -0-." Schedule SE line 6 is net earnings from
+    //    self-employment AFTER §1402(a)(12)'s 92.35% factor, so this line is
+    //    already reduced -- `fjs/schedule/se` owns that arithmetic and this
+    //    module never re-applies it. The printed floor is applied here rather
+    //    than assumed of the caller.
+    const line8 = selfEmploymentIncomeCents > 0n ? selfEmploymentIncomeCents : 0n
     // 9. The SAME per-status threshold as line 5.
     const line9 = additionalMedicareTaxThresholdCents(taxParamSet)(status)
     // 10. "Enter the amount from line 4" -- the wages already counted.
@@ -327,10 +338,17 @@ export const form8959PartV = taxParamSet => input => {
 // ── The whole form ──────────────────────────────────────────────────────────
 
 /**
+ * `selfEmploymentIncomeCents` is Schedule SE Part I line 6 — net earnings
+ * from self-employment, already reduced by §1402(a)(12)'s 92.35% factor. It
+ * arrives as an argument rather than being recomputed here for the reason
+ * every other figure on this form does: `fjs/schedule/2` runs Schedule SE
+ * exactly once, and the tax on line 13 must be charged against the same net
+ * earnings Schedule 2 line 4's tax was.
  * @typedef {{
  *   readonly status: IndividualFilingStatus,
  *   readonly medicareWagesCents: bigint,
  *   readonly medicareTaxWithheldCents: bigint,
+ *   readonly selfEmploymentIncomeCents: bigint,
  * }} Form8959Input
  */
 
@@ -355,9 +373,11 @@ export const form8959PartV = taxParamSet => input => {
  * @type {(taxParamSet: TaxParamSet) => (input: Form8959Input) => Form8959}
  */
 export const form8959 = taxParamSet => input => {
-    const { status, medicareWagesCents, medicareTaxWithheldCents } = input
+    const { status, medicareWagesCents, medicareTaxWithheldCents, selfEmploymentIncomeCents } = input
     const partI = form8959PartI(taxParamSet)({ status, medicareWagesCents })
-    const partII = form8959PartII(taxParamSet)({ status, partILine4: partI.line4 })
+    const partII = form8959PartII(taxParamSet)({
+        status, partILine4: partI.line4, selfEmploymentIncomeCents,
+    })
     const partIII = form8959PartIII(taxParamSet)({ status })
     // 18. "Add lines 7, 13, and 17." -- Part IV, the whole form's total, and
     //     the only line Schedule 2 reads.
@@ -378,11 +398,28 @@ const taxParams2025 = taxParamsByYear[2025]
 assert(taxParams2025 !== undefined, 'expected TY2025 parameters to be present in taxParamsByYear')
 
 /**
- * Runs the whole form against TY2025's real parameter set.
+ * Runs the whole form against TY2025's real parameter set, for a return with
+ * NO self-employment income — the shape every leaf written before Phase 28
+ * exercises, kept three-argument so those leaves still say what they said.
  * @type {(status: IndividualFilingStatus) => (medicareWagesCents: bigint) => (medicareTaxWithheldCents: bigint) => Form8959}
  */
 const run = status => medicareWagesCents => medicareTaxWithheldCents =>
-    form8959(taxParams2025)({ status, medicareWagesCents, medicareTaxWithheldCents })
+    form8959(taxParams2025)({
+        status, medicareWagesCents, medicareTaxWithheldCents, selfEmploymentIncomeCents: 0n,
+    })
+
+/**
+ * The same, with Schedule SE Part I line 6 supplied — Phase 28's own
+ * fixtures. A SEPARATE helper rather than a fourth curried argument on
+ * {@link run}, so that every pre-existing leaf keeps reading as the
+ * wages-only return it was written for and the new ones are visibly the
+ * self-employment ones.
+ * @type {(status: IndividualFilingStatus) => (medicareWagesCents: bigint) => (selfEmploymentIncomeCents: bigint) => Form8959}
+ */
+const runWithSelfEmployment = status => medicareWagesCents => selfEmploymentIncomeCents =>
+    form8959(taxParams2025)({
+        status, medicareWagesCents, medicareTaxWithheldCents: 0n, selfEmploymentIncomeCents,
+    })
 
 /** Every individual filing status, hand-typed so a status dropped from
  * `fjs/tax/params`' own exported list still fails the loops below.
@@ -536,17 +573,93 @@ export const proof = {
             const over = run('single')(30000000n)(0n)
             assertEq(over.line11, 0n, 'line 11 = $0.00 -- $300,000 of wages consumed the whole threshold')
         },
-        // The self-employment arm itself is a documented zero, in both the
-        // has-head-room and the no-head-room case, so neither branch of line
-        // 12 can quietly start producing a figure this engine has no
-        // Schedule SE to support.
-        lineEightIsZeroSoTheSelfEmploymentTaxIsZero: () => {
+        // A return with NO self-employment income is still zero on this arm,
+        // at every level of wages — the regression control for Phase 28's
+        // change, and the property that says wiring line 8 moved nothing for
+        // the returns this engine could already compute. This leaf said
+        // "Schedule SE is Phase 28" until Phase 28; the assertion is
+        // unchanged and only its reason is.
+        noSelfEmploymentIncomeIsStillZeroOnThisArm: () => {
             for (const wages of [0n, 15000000n, 30000000n]) {
                 const result = run('single')(wages)(0n)
-                assertEq(result.line8, 0n, ['line 8 = $0.00 (Schedule SE is Phase 28)', wages])
+                assertEq(result.line8, 0n, ['line 8 = $0.00 (no Schedule SE income)', wages])
                 assertEq(result.line12, 0n, ['line 12 = $0.00', wages])
                 assertEq(result.line13, 0n, ['line 13 = $0.00', wages])
             }
+        },
+        // PHASE 28's OWN FIGURE. A single filer with NO wages and $250,000.00
+        // of Schedule SE line 6 net earnings: the whole $200,000 threshold is
+        // available (line 10 is zero, so line 11 is the full threshold), and
+        // 0.9% of the $50,000 excess is $450.00. Hand-computed.
+        selfEmploymentIncomeAloneIsTaxedAgainstTheWholeThreshold: () => {
+            const result = runWithSelfEmployment('single')(0n)(25000000n)
+            assertEq(result.line8, 25000000n, 'line 8 = $250,000.00, Schedule SE Part I line 6')
+            assertEq(result.line10, 0n, 'line 10 = $0.00, no wages counted in Part I')
+            assertEq(result.line11, 20000000n, 'line 11 = $200,000.00 of threshold, untouched')
+            assertEq(result.line12, 5000000n, 'line 12 = $50,000.00 = $250,000.00 - $200,000.00')
+            // 0.9% of 5,000,000 cents = 5,000,000 * 90 / 10,000 = 45,000.
+            assertEq(result.line13, 45000n, 'line 13 = $450.00')
+            assertEq(result.line7, 0n, 'line 7 = $0.00 -- no wages, so Part I charges nothing')
+            assertEq(result.line18, 45000n, 'line 18 = $450.00 -> Schedule 2 line 11')
+        },
+        // THE COORDINATION, now that both sides of it carry real figures, and
+        // priced against the answer a fresh threshold would give. Wages
+        // $150,000.00 and self-employment income $100,000.00: NEITHER alone
+        // exceeds $200,000, and together they exceed it by $50,000.
+        //
+        //   line 4  wages                                     $150,000.00
+        //   line 6  $150,000 is below the threshold                  $0.00
+        //   line 9  threshold                                  $200,000.00
+        //   line 10 = line 4                                   $150,000.00
+        //   line 11 200,000.00 - 150,000.00                     $50,000.00
+        //   line 12 100,000.00 - 50,000.00                      $50,000.00
+        //   line 13 0.9% of $50,000.00                             $450.00
+        //
+        // A Part II written against a FRESH $200,000 threshold would give
+        // line 11 = $200,000, line 12 = $0.00 and NO tax at all — a $450.00
+        // understatement for exactly the filer this phase exists to serve.
+        // Both figures are asserted.
+        wagesAndSelfEmploymentIncomeShareOneThreshold: () => {
+            const result = runWithSelfEmployment('single')(15000000n)(10000000n)
+            assertEq(result.line6, 0n, 'line 6 = $0.00 -- wages alone are below the threshold')
+            assertEq(result.line7, 0n, 'line 7 = $0.00 -- Part I charges nothing')
+            assertEq(result.line10, 15000000n, 'line 10 = $150,000.00, restating line 4')
+            assertEq(result.line11, 5000000n, 'line 11 = $50,000.00 of head-room left')
+            assertEq(result.line12, 5000000n, 'line 12 = $50,000.00 of self-employment income taxed')
+            assertEq(result.line13, 45000n, 'line 13 = $450.00')
+            assertEq(result.line18, 45000n, 'line 18 = $450.00 -> Schedule 2 line 11')
+            // THE NAIVE ANSWER, hand-computed: a fresh threshold shelters the
+            // whole $100,000 and charges nothing.
+            assert(
+                10000000n < 20000000n,
+                'a fresh $200,000 threshold would shelter the whole $100,000 and charge $0.00')
+        },
+        // BOTH ARMS AT ONCE, which is the return a founder with a day job
+        // actually files. Wages $300,000.00 and self-employment income
+        // $50,000.00: Part I charges 0.9% on $100,000 of excess wages
+        // ($900.00), the threshold is entirely consumed so line 11 is zero,
+        // and Part II charges 0.9% on the WHOLE $50,000 ($450.00). Line 18
+        // adds both to $1,350.00 -- hand-added.
+        bothArmsChargeOnOneReturn: () => {
+            const result = runWithSelfEmployment('single')(30000000n)(5000000n)
+            assertEq(result.line6, 10000000n, 'line 6 = $100,000.00 of excess wages')
+            assertEq(result.line7, 90000n, 'line 7 = $900.00')
+            assertEq(result.line11, 0n, 'line 11 = $0.00 -- the wages consumed the whole threshold')
+            assertEq(result.line12, 5000000n, 'line 12 = $50,000.00, all of it taxed')
+            assertEq(result.line13, 45000n, 'line 13 = $450.00')
+            assertEq(result.line18, 135000n, 'line 18 = $1,350.00 = $900.00 + $450.00')
+        },
+        // Line 8's own printed floor: "if zero or less, enter -0-". A
+        // Schedule SE that produced a negative figure -- which
+        // `fjs/schedule/se` will not, since a Schedule C loss refuses one
+        // module earlier -- must not create a NEGATIVE tax here. The printed
+        // rule, implemented at the printed line rather than assumed of the
+        // caller.
+        aNegativeSelfEmploymentIncomeEntersZero: () => {
+            const result = runWithSelfEmployment('single')(0n)(-5000000n)
+            assertEq(result.line8, 0n, 'line 8 = $0.00, floored')
+            assertEq(result.line12, 0n, 'line 12 = $0.00')
+            assertEq(result.line13, 0n, 'line 13 = $0.00')
         },
     },
     partIII: {
