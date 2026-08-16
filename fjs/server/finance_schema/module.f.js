@@ -61,6 +61,8 @@ import { dialect as oneZeroNineNineDivDialect, oneZeroNineNineDivSchema } from '
 import { dialect as oneZeroNineNineBDialect, oneZeroNineNineBSchema } from '../../document/1099b/module.f.js'
 import { dialect as adjustmentsDialect, adjustmentsSchema } from '../../document/adjustments/module.f.js'
 import { dialect as oneZeroNineEightEDialect, oneZeroNineEightESchema } from '../../document/1098e/module.f.js'
+import { dialect as oneZeroNineEightTDialect, oneZeroNineEightTSchema } from '../../document/1098t/module.f.js'
+import { dialect as creditsDialect, creditsSchema } from '../../document/credits/module.f.js'
 import { stringify as jsonText } from '../../json/module.f.js'
 
 /** @import { Type } from 'functionalscript/fjs/types/rtti/module.f.js' */
@@ -90,6 +92,8 @@ const dialectSchemas = {
     [oneZeroNineNineBDialect]: oneZeroNineNineBSchema,
     [adjustmentsDialect]: adjustmentsSchema,
     [oneZeroNineEightEDialect]: oneZeroNineEightESchema,
+    [oneZeroNineEightTDialect]: oneZeroNineEightTSchema,
+    [creditsDialect]: creditsSchema,
 }
 
 /** The known dialect tags, in declaration order — used in the refusal message. */
@@ -122,9 +126,13 @@ const knownDialects = /** @type {readonly string[]} */ (Object.keys(dialectSchem
  * (`vnd.fjs.adjustments`, `vnd.fjs.1098e`), moving the count from 10 to 12
  * in one step, and both gained their own `*Resolves` leaf below — the same
  * paired discipline this docstring's own last paragraph asks for.
+ *
+ * Phase 25 (TAX-25/TAX-26) registers the THIRTEENTH AND FOURTEENTH
+ * (`vnd.fjs.1098t`, `vnd.fjs.credits`), moving the count from 12 to 14 in one
+ * step, and both gained their own `*Resolves` leaf below.
  * @type {number}
  */
-const expectedKnownDialectCount = 12
+const expectedKnownDialectCount = 14
 
 /**
  * `finance_schema(dialect)`: the MCP tool. Looks `dialect` up in
@@ -228,6 +236,24 @@ export const proof = {
         assertEq(
             JSON.stringify(JSON.parse(textOf(result))),
             JSON.stringify(toJsonSchema(oneZeroNineEightESchema)),
+        )
+    },
+    // Phase 25 (TAX-26): the transcribed half of the education credits.
+    oneZeroNineEightTResolves: () => {
+        const result = call('vnd.fjs.1098t')
+        assertEq(result.isError, undefined)
+        assertEq(
+            JSON.stringify(JSON.parse(textOf(result))),
+            JSON.stringify(toJsonSchema(oneZeroNineEightTSchema)),
+        )
+    },
+    // Phase 25 (TAX-25/TAX-26): the taxpayer-asserted Schedule 3 credits record.
+    creditsResolves: () => {
+        const result = call('vnd.fjs.credits')
+        assertEq(result.isError, undefined)
+        assertEq(
+            JSON.stringify(JSON.parse(textOf(result))),
+            JSON.stringify(toJsonSchema(creditsSchema)),
         )
     },
     medicalExpensesResolves: () => {
