@@ -149,7 +149,7 @@ import { dialect as oneZeroNineNineGDialect, validate as validate1099g } from '.
 
 /** @import { IndividualFilingStatus, TaxParamSet } from '../../tax/params/module.f.js' */
 /** @import { Kind } from '../profile/module.f.js' */
-/** @import { ScopeOutcome, TripwireFinding, UnmodeledKind } from '../scope/module.f.js' */
+/** @import { RefusableKind, ScopeOutcome, TripwireFinding } from '../scope/module.f.js' */
 /** @import { W2 } from '../../document/w2/module.f.js' */
 /** @import { OneZeroNineNineR } from '../../document/1099r/module.f.js' */
 
@@ -193,18 +193,28 @@ import { dialect as oneZeroNineNineGDialect, validate as validate1099g } from '.
  * One row of the table: the kind the documents may prove is required, the
  * compiled-in prose naming the evidence, and the predicate.
  *
- * `kind` is an {@link UnmodeledKind}, not a `Kind`, and `tsc` owns that
- * restriction: `fjs/return/scope`'s `tripwireRefusal` names each kind's 1040
- * line, human label and remedy by looking it up in `unmodeledKindRefusals`, so
- * a tripwire pointing at a MODELED kind could not be described. A kind that
- * later moves from `unmodeledKindRefusals` to `modeledKinds` therefore stops
- * this file compiling, which is the right moment to decide whether its tripwire
- * still means anything.
+ * `kind` is a {@link RefusableKind}, not a `Kind`, and `tsc` owns that
+ * restriction: `fjs/return/scope`'s `tripwireRefusal` names each kind's form
+ * line, human label and remedy by looking it up, so a tripwire pointing at a
+ * kind neither table describes could not be described at all.
+ *
+ * **This used to read `UnmodeledKind`, and the sentence that followed it said
+ * a kind moving to `modeledKinds` "stops this file compiling, which is the
+ * right moment to decide whether its tripwire still means anything."** Phase
+ * 23 was that moment for entry 3 below, and the decision was to keep the
+ * tripwire: `additionalMedicareTax` became a modeled kind, and rather than
+ * delete the guard, `fjs/return/scope` gained
+ * `modeledKindDeclarationRemedies` so a modeled kind can still be named — with
+ * a remedy that now says "declare it and this engine computes it" instead of
+ * "go and get Form 8959". That table's own docstring records the reasoning in
+ * full. The compile-time trip still works, one table over: a
+ * declaration-required kind that is NOT modeled fails
+ * `_EveryDeclarationRequiredKindIsModeled`.
  *
  * `evidence` is a compiled-in literal, never interpolated from a document. See
  * {@link proof.noTaxpayerAmountRidesOutThroughATripwireRefusal}.
  * @typedef {{
- *   readonly kind: UnmodeledKind,
+ *   readonly kind: RefusableKind,
  *   readonly evidence: string,
  *   readonly triggered: (context: TripwireContext) => boolean,
  * }} Tripwire

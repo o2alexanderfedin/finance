@@ -89,7 +89,7 @@ import { baseTaxForAmount } from '../../tax/table/module.f.js'
 /** @import { Kind, ReturnProfile } from '../../return/profile/module.f.js' */
 /** @import { IndividualFilingStatus, TaxParamSet } from '../../tax/params/module.f.js' */
 /** @import { Line16Method } from '../../tax/line16/module.f.js' */
-/** @import { UnmodeledKind } from '../../return/scope/module.f.js' */
+/** @import { RefusableKind } from '../../return/scope/module.f.js' */
 /** @import { ScheduleDOutcome } from '../../schedule/d/module.f.js' */
 /** @import { ScheduleAOutcome } from '../../schedule/a/module.f.js' */
 
@@ -1037,7 +1037,7 @@ export const form1040IncomeLines = taxParamSet => inputs => {
  * } | {
  *   readonly kind: 'error',
  *   readonly message: string,
- *   readonly unmodeled: readonly UnmodeledKind[],
+ *   readonly unmodeled: readonly RefusableKind[],
  *   readonly lines?: undefined,
  * }} Form1040Outcome
  */
@@ -1209,15 +1209,47 @@ const form1040TaxAndPaymentLines = taxParamSet => inputs => income => {
         sources: unionSources([income.line15]),
         rule: `1040 line 16 (${line16MethodNames[line16Outcome.method]})`,
     }
-    // 17/23 — Schedule 2 (`fjs/schedule/2`, Plan 13-11/13-12, TAX-14): Part
-    // I's total tax (line3) feeds 1040 line 17, Part II's total other taxes
-    // (line21) feeds 1040 line 23 — ONE `scheduleTwo(...)` call, mirroring
-    // Schedule 1's own single-call precedent above. Every one of Schedule
-    // 2's fourteen kinds (TAX-22's split of the former coarse
-    // `scheduleTwoTaxes`) is still in `unmodeledKindRefusals` as of this
-    // commit, so both totals are `0n` for every profile this engine can
-    // otherwise compute.
-    const scheduleTwoResult = scheduleTwo(profile)
+    // 17/23/25c — Schedule 2 (`fjs/schedule/2`, Plan 13-11/13-12, TAX-14):
+    // Part I's total tax (line3) feeds 1040 line 17, Part II's total other
+    // taxes (line21) feeds 1040 line 23 — ONE `scheduleTwo(...)` call,
+    // mirroring Schedule 1's own single-call precedent above.
+    //
+    // Since Phase 23 (TAX-20/TAX-21) that call also computes Schedule 2 line
+    // 11 (Form 8959, the Additional Medicare Tax) and line 12 (Form 8960, the
+    // net investment income tax), so line 23 is a REAL figure for a filer
+    // above either statute's threshold, and Form 8959 Part V's line 24 joins
+    // 1040 line 25c below — off THIS result, never a second, independently
+    // stale execution. The other twelve Schedule 2 kinds stay in
+    // `unmodeledKindRefusals`, so every other line of the schedule is still
+    // `0n` for any profile this engine can compute.
+    //
+    // The two W-2 boxes Form 8959 reads have no 1040 line of their own, so
+    // they are summed HERE, where the documents are, exactly like line 25a's
+    // box 2 — DOC-11's absent-is-absent rule applied once rather than a
+    // second time inside the schedule. Box 5 is UNCAPPED (box 3 stops at the
+    // Social Security wage base), which is why it and not box 3 is what
+    // §3101(b)(2) taxes.
+    const medicareWages = fromDocuments('Form 8959 line 1 (Form W-2 box 5)')(
+        sumBoxOverDocuments(w2s)('box5MedicareWagesAndTips')(
+            w2 => w2.box5MedicareWagesAndTips))
+    const medicareTaxWithheld = fromDocuments('Form 8959 line 19 (Form W-2 box 6)')(
+        sumBoxOverDocuments(w2s)('box6MedicareTaxWithheld')(
+            w2 => w2.box6MedicareTaxWithheld))
+    const scheduleTwoResult = scheduleTwo(taxParamSet)({
+        profile,
+        status,
+        medicareWages,
+        medicareTaxWithheld,
+        // Form 8960's three investment incomes, read off the 1040 lines that
+        // already carry them -- line 2b and NOT line 2a, because §103(a)
+        // keeps tax-exempt interest out of gross income and so out of
+        // §1411(c)(1)(A)(i)'s reach. `fjs/form8960`'s own docstring lists
+        // every exclusion with the provision behind it.
+        taxableInterest: income.line2b,
+        ordinaryDividends: income.line3b,
+        netCapitalGainOrLoss: income.line7a,
+        adjustedGrossIncome: income.line11b,
+    })
     const line17 = {
         value: scheduleTwoResult.line3.value,
         sources: scheduleTwoResult.line3.sources,
@@ -1337,7 +1369,46 @@ const form1040TaxAndPaymentLines = taxParamSet => inputs => income => {
                         form => form.box4FederalIncomeTaxWithheld)))(
                 sumBoxOverDocuments(unemploymentForms)('box4FederalIncomeTaxWithheld')(
                     form => form.box4FederalIncomeTaxWithheld))))
-    const line25c = declaredZero('1040 line 25c')
+    // 25c — Form 8959 Part V line 24, the Additional Medicare Tax an employer
+    // already withheld, off the SAME `scheduleTwoResult` line 11 came from.
+    //
+    // The printed form says so directly: line 24's own caption is "Total
+    // Additional Medicare Tax withholding ... Also include this amount with
+    // federal income tax withholding on Form 1040, 1040-SR, or 1040-NR, line
+    // 25c." Omitting it would be a SILENT OVERSTATEMENT of exactly the size
+    // of the tax line 11 just added, for the commonest high-wage case there
+    // is: a single filer with one employer above $200,000 has already had
+    // the whole 0.9% withheld, and a return that charged the tax without
+    // crediting the withholding would tell them they owe $900 they do not.
+    //
+    // `federalTaxWithheldOnOtherForms` (the kind that used to make this line
+    // a declared zero) is still REFUSED, so nothing else can reach line 25c;
+    // a profile declaring it is refused whole before this function runs. The
+    // profile-declared-zero fallback therefore still applies whenever Form
+    // 8959 withheld nothing, which `documentLine` handles by construction --
+    // `medicareTaxWithheld`'s own sources are what it cites, and they are
+    // the profile's when no W-2 carried box 6.
+    const line25c = {
+        value: scheduleTwoResult.form8959.line24,
+        sources: unionSources([medicareTaxWithheld, medicareWages]),
+        // Just `'1040 line 25c'`, the way every other 1040 line in this file
+        // is ruled -- NOT "(Form 8959 line 24)". Two reasons, and the second
+        // is a proof:
+        //
+        // - The convention. Lines 19 and 28 do not name Schedule 8812, lines
+        //   17 and 23 do not name Schedule 2, line 12e does not name Schedule
+        //   A. A 1040 line is named by its 1040 line number; line 16 is the
+        //   sole exception, and it names a METHOD rather than a form. What
+        //   the amount came from is carried by `sources`, which cite the two
+        //   W-2 boxes a reader can actually go and look at.
+        // - Phase 22's `controlTheSameReturnBelowTheThresholdComputesSilently`
+        //   asserts that a return BELOW the threshold mentions Form 8959
+        //   nowhere in any line's rule, and that leaf caught the first draft
+        //   of this line, which did. The property is worth keeping: an
+        //   ordinary wage earner's return should be byte-identical to what it
+        //   was before this phase, and a rule string is part of the report.
+        rule: '1040 line 25c',
+    }
     const line25d = totalLine('1040 line 25d')([line25a, line25b, line25c])
 
     // 26 — estimated tax payments, declared on the profile rather than read off
@@ -1771,6 +1842,29 @@ const w2WithWithholding = documentHash => box1WagesTipsOtherCompensation =>
 const w2WithMedicareWages = documentHash => amount => {
     const base = w2Document(documentHash)(amount)
     return { ...base, value: { ...base.value, box5MedicareWagesAndTips: amount } }
+}
+
+/**
+ * A W-2 carrying box 1 = box 5 AND box 6, the two boxes Form 8959 reads
+ * (Phase 23). Built ON TOP of {@link w2WithMedicareWages} so the identity
+ * fields and the box-1/box-5 equality cannot drift from it.
+ *
+ * Box 6 is the ORDINARY 1.45% Medicare tax PLUS whatever Additional Medicare
+ * Tax the employer withheld above $200,000 of ITS OWN payroll, in one figure
+ * with nothing separating them — which is the whole reason Form 8959 Part V
+ * exists. Every caller below hand-computes the box-6 amount from those two
+ * rates, so the fixture states what an employer would really have printed
+ * rather than what makes a leaf pass.
+ *
+ * **No fixture in this repository set box 6 before Phase 23** — verified by
+ * grep across `fjs/`, the root integration tests and `demo/` — so 1040 line
+ * 25c stayed $0.00 for every pre-existing fixture when Form 8959 Part V was
+ * wired into it.
+ * @type {(documentHash: string) => (amount: string) => (box6MedicareTaxWithheld: string) => Stored<W2>}
+ */
+const w2WithMedicareBoxes = documentHash => amount => box6MedicareTaxWithheld => {
+    const base = w2WithMedicareWages(documentHash)(amount)
+    return { ...base, value: { ...base.value, box6MedicareTaxWithheld } }
 }
 
 /**
@@ -3422,6 +3516,357 @@ export const proof = {
             assert(
                 !outcome.message.includes('the supplied documents require'),
                 ['only one of the two guards may speak', outcome.message])
+        },
+    },
+    // ── Phase 23 (TAX-20/TAX-21): Schedule 2 lines 11 and 12, END TO END ──
+    //
+    // Every leaf here goes through `form1040Report`, the real entry point,
+    // rather than through `fjs/schedule/2` or the two form modules directly.
+    // That is the difference between "the arithmetic is right" and "the
+    // arithmetic reaches the return", and only the second is what the
+    // FAANG-engineer persona was blocked on.
+    scheduleTwoPopulated: {
+        // **THE PHASE'S WHOLE POINT, and the other half of Phase 22's
+        // tripwire pair.** `computableTripwires.aThreeHundredThousandDollarBoxFive...`
+        // above proves an UNDECLARED $300,000 box 5 still refuses; this
+        // proves the SAME return, with `additionalMedicareTax` declared,
+        // COMPUTES. Both directions, one phase, and the tripwire's remedy
+        // ("declare it and this engine computes Form 8959") is now true.
+        //
+        // Every figure hand-computed from the printed forms, in order:
+        //   box 1 = box 5 = $300,000.00, box 2 = $60,000.00
+        //   box 6 = 1.45% of $300,000 ($4,350.00) + 0.9% of the $100,000 this
+        //           ONE employer paid above $200,000 ($900.00) = $5,250.00
+        //   line 12e = $15,750.00, single's TY2025 standard deduction
+        //   line 15  = $300,000.00 - $15,750.00 = $284,250.00
+        //   line 16, the Tax Computation Worksheet over single's brackets:
+        //       10% x  11,925.00            =  1,192.50
+        //       12% x ( 48,475 -  11,925)   =  4,386.00
+        //       22% x (103,350 -  48,475)   = 12,072.50
+        //       24% x (197,300 - 103,350)   = 22,548.00
+        //       32% x (250,525 - 197,300)   = 17,032.00
+        //       35% x (284,250 - 250,525)   = 11,803.75
+        //                                     ---------
+        //                                     69,034.75
+        //   line 23  = Form 8959 line 18 = 0.9% x $100,000.00 =    $900.00
+        //   line 24  = $69,034.75 + $900.00                   = $69,934.75
+        //   line 25c = Form 8959 line 24 = $5,250.00 - $4,350.00 = $900.00
+        //   line 33  = $60,000.00 + $900.00                   = $60,900.00
+        //   line 37  = $69,934.75 - $60,900.00                 = $9,034.75
+        theFaangReturnComputesInsteadOfRefusing: () => {
+            const outcome = form1040Report(taxParams2025)(
+                inputsOf(storedProfile({
+                    ...singleProfile,
+                    declaredKinds: ['wages', 'federalTaxWithheldOnW2', 'additionalMedicareTax'],
+                }))([{
+                    ...w2WithMedicareBoxes('sha256-w2-faang-computes')('300000.00')('5250.00'),
+                    value: {
+                        ...w2WithMedicareBoxes('sha256-w2-faang-computes')('300000.00')('5250.00').value,
+                        box2FederalIncomeTaxWithheld: '60000.00',
+                    },
+                }])([])([])([])([])([])([])([])([]))
+            assert(outcome.kind === 'ok', ['a declared $300,000 box 5 must COMPUTE, not refuse', outcome])
+            if (outcome.kind !== 'ok') {
+                return
+            }
+            assertEq(outcome.lines.length, expectedWholeReportLineCount)
+            const at = lineRuled(outcome.lines)
+            assertEq(at('1040 line 1a').value, 30000000n, '$300,000.00')
+            assertEq(at('1040 line 15').value, 28425000n, '$284,250.00')
+            assertEq(at('1040 line 16').value, 6903475n, '$69,034.75, hand-computed over single\'s brackets')
+            assertEq(at('1040 line 17').value, 0n, '$0.00 — Schedule 2 Part I is untouched by either new tax')
+            assertEq(at('1040 line 23').value, 90000n, '$900.00 — Schedule 2 line 11, through Part II\'s own total')
+            assertEq(at('1040 line 24').value, 6993475n, '$69,934.75')
+            assertEq(at('1040 line 25a').value, 6000000n, '$60,000.00 of box 2 withholding')
+            assertEq(at('1040 line 25c').value, 90000n, '$900.00 — Form 8959 line 24, already withheld in box 6')
+            assertEq(at('1040 line 33').value, 6090000n, '$60,900.00 of total payments')
+            assertEq(at('1040 line 37').value, 903475n, '$9,034.75 owed')
+        },
+        // …and line 23 really does arrive THROUGH Schedule 2's own Part II
+        // total rather than by a side channel. Criterion 1's own words. Line
+        // 23's `sources` are Schedule 2 line 21's, which unions every addend
+        // it summed — so the W-2 box 5 that produced line 11 must be citable
+        // from 1040 line 23 itself.
+        lineTwentyThreeArrivesThroughScheduleTwosOwnPartTwoTotal: () => {
+            const outcome = form1040Report(taxParams2025)(
+                inputsOf(storedProfile({
+                    ...singleProfile,
+                    declaredKinds: ['wages', 'additionalMedicareTax'],
+                }))([w2WithMedicareBoxes('sha256-w2-through-sch2')('300000.00')('5250.00')])([])([])([])([])([])([])([])([]))
+            assert(outcome.kind === 'ok', ['expected the return to compute', outcome])
+            if (outcome.kind !== 'ok') {
+                return
+            }
+            const line23 = lineRuled(outcome.lines)('1040 line 23')
+            assertEq(line23.value, 90000n, '$900.00')
+            const boxes = line23.sources.map(source => source.boxPath)
+            assert(
+                boxes.includes('box5MedicareWagesAndTips'),
+                ['1040 line 23 must be able to cite the box that produced it', boxes])
+            // …and it still cites the profile, because twelve of Schedule 2's
+            // fourteen kinds are still declared zeros summed into the same
+            // total. A line 23 that had stopped citing `declaredKinds` would
+            // mean those twelve had silently left the sum.
+            assert(
+                boxes.includes('declaredKinds'),
+                ['1040 line 23 must still cite the twelve declared zeros it also sums', boxes])
+        },
+        // **THE CASE WHERE THE FILER ACTUALLY OWES.** A joint couple with two
+        // $150,000 employers: NEITHER employer paid anyone above $200,000, so
+        // neither withheld a cent of Additional Medicare Tax, yet the couple
+        // is $50,000 over the $250,000 joint threshold. This is the return
+        // where the phase changes the bottom line rather than merely the
+        // presentation, and its control is the identical return with the two
+        // Medicare boxes absent.
+        //
+        // Hand-computed:
+        //   box 5 total = $300,000.00; box 6 total = 1.45% of it = $4,350.00
+        //   line 12e = $31,500.00, the MFJ standard deduction
+        //   line 15  = $300,000.00 - $31,500.00 = $268,500.00
+        //   line 16, over MFJ's brackets:
+        //       10% x  23,850.00            =  2,385.00
+        //       12% x ( 96,950 -  23,850)   =  8,772.00
+        //       22% x (206,700 -  96,950)   = 24,145.00
+        //       24% x (268,500 - 206,700)   = 14,832.00
+        //                                     ---------
+        //                                     50,134.00
+        //   line 23  = 0.9% x ($300,000 - $250,000) = $450.00
+        //   line 25c = $4,350.00 - 1.45% x $300,000 = $0.00, floored
+        //   line 37  = $50,134.00 + $450.00 = $50,584.00
+        twoEmployersBelowTheThresholdMakeAJointCoupleOweFourHundredAndFifty: () => {
+            /** @type {(declaredKinds: readonly Kind[]) => (w2s: readonly Stored<W2>[]) => Form1040Outcome} */
+            const jointReturn = declaredKinds => w2s => form1040Report(taxParams2025)(
+                inputsOf(storedProfile({
+                    ...singleProfile,
+                    filingStatus: 'marriedFilingJointly',
+                    declaredKinds,
+                }))(w2s)([])([])([])([])([])([])([])([]))
+
+            const outcome = jointReturn(['wages', 'additionalMedicareTax'])([
+                w2WithMedicareBoxes('sha256-w2-mfj-a')('150000.00')('2175.00'),
+                w2WithMedicareBoxes('sha256-w2-mfj-b')('150000.00')('2175.00'),
+            ])
+            assert(outcome.kind === 'ok', ['expected the joint return to compute', outcome])
+            if (outcome.kind !== 'ok') {
+                return
+            }
+            const at = lineRuled(outcome.lines)
+            assertEq(at('1040 line 16').value, 5013400n, '$50,134.00, hand-computed over MFJ\'s brackets')
+            assertEq(at('1040 line 23').value, 45000n, '$450.00 — 0.9% of the $50,000 over $250,000')
+            assertEq(at('1040 line 25c').value, 0n, '$0.00 — neither employer withheld any of it')
+            assertEq(at('1040 line 37').value, 5058400n, '$50,584.00 owed')
+
+            // THE CONTROL, and it is what prices the phase: the identical
+            // wages with NO box 5 or box 6 — the shape every fixture in this
+            // repository had before Phase 23 — owes $450.00 LESS, and that
+            // $450.00 is exactly the understatement this phase closes.
+            const control = jointReturn(['wages'])([
+                w2Document('sha256-w2-mfj-control-a')('150000.00'),
+                w2Document('sha256-w2-mfj-control-b')('150000.00'),
+            ])
+            assert(control.kind === 'ok', ['expected the control return to compute', control])
+            if (control.kind !== 'ok') {
+                return
+            }
+            const controlAt = lineRuled(control.lines)
+            assertEq(controlAt('1040 line 16').value, 5013400n, 'the same $50,134.00 of ordinary tax')
+            assertEq(controlAt('1040 line 23').value, 0n, '$0.00 — no Medicare wages were supplied')
+            assertEq(controlAt('1040 line 37').value, 5013400n, '$50,134.00 owed, $450.00 less')
+        },
+        // **THE REGRESSION CONTROL, and it matters more than either gate.** A
+        // return BELOW every threshold computes exactly what it computed
+        // before this phase: line 23 and line 25c both $0.00, on a return
+        // that carries real Medicare boxes. Paired with a hand-typed line 37
+        // so a "control" that had quietly started refusing — and therefore
+        // produced no lines to check — cannot pass.
+        //
+        // Hand-computed: $150,000.00 of wages — comfortably below every one of
+        // the five §3101(b)(2) thresholds and every one of the five §1411(b)
+        // ones — standard deduction $15,750.00, taxable income $134,250.00,
+        // and over single's brackets
+        //       10% x  11,925.00           =  1,192.50
+        //       12% x ( 48,475 -  11,925)  =  4,386.00
+        //       22% x (103,350 -  48,475)  = 12,072.50
+        //       24% x (134,250 - 103,350)  =  7,416.00
+        //                                    ---------
+        //                                    25,067.00
+        // with $30,000.00 withheld, so $4,933.00 is refunded on line 34.
+        //
+        // Taxable income ABOVE $100,000 on purpose: below it, line 16 comes
+        // off the printed Tax Table, which taxes the MIDPOINT of a $50 band
+        // and rounds the result to a whole dollar, so straight bracket
+        // arithmetic is the wrong method and would be a hand-computed
+        // expectation of something this leaf is not testing. (Learned by
+        // writing this leaf at $50,000 first: $34,250 of taxable income is
+        // $3,875.00 off the table, not the $3,871.50 the brackets give.)
+        anOrdinaryWageEarnerBelowEveryThresholdIsUnchanged: () => {
+            const w2 = w2WithMedicareBoxes('sha256-w2-ordinary-both-boxes')('150000.00')('2175.00')
+            const outcome = form1040Report(taxParams2025)(
+                inputsOf(storedProfile({
+                    ...singleProfile,
+                    declaredKinds: ['wages', 'federalTaxWithheldOnW2'],
+                }))([{
+                    ...w2,
+                    value: { ...w2.value, box2FederalIncomeTaxWithheld: '30000.00' },
+                }])([])([])([])([])([])([])([])([]))
+            assert(outcome.kind === 'ok', ['an ordinary wage earner must still compute', outcome])
+            if (outcome.kind !== 'ok') {
+                return
+            }
+            const at = lineRuled(outcome.lines)
+            // Box 6 here is EXACTLY 1.45% of box 5 ($150,000 x 0.0145 =
+            // $2,175.00), which is what an employer under the threshold
+            // really prints -- so Part V line 22 subtracts to exactly zero,
+            // and the FLOOR is not what produces the zero. That distinction
+            // is why this leaf carries a real box 6 rather than omitting it.
+            assertEq(at('1040 line 23').value, 0n, '$0.00 — nothing on Schedule 2')
+            assertEq(at('1040 line 25c').value, 0n, '$0.00 — box 6 is exactly the ordinary 1.45%')
+            assertEq(at('1040 line 16').value, 2506700n, '$25,067.00, hand-computed')
+            assertEq(at('1040 line 34').value, 493300n, '$4,933.00 refunded')
+        },
+        // THE BOUNDARY PAIR at the report, and one cent is what it costs.
+        // "In excess of" is the statute's own word, so exactly AT $200,000
+        // there is no tax; 56 cents above, 0.9% first rounds up to a cent
+        // (0.9% of 56 cents = 0.504 cents). The middle probe, one cent above,
+        // is what shows the RATE rather than the comparison is why line 23 is
+        // still zero there.
+        theBoundaryPairAtTheReport: () => {
+            /** @type {(boxFive: string) => bigint} */
+            const lineTwentyThreeAt = boxFive => {
+                const outcome = form1040Report(taxParams2025)(
+                    inputsOf(storedProfile({
+                        ...singleProfile,
+                        declaredKinds: ['wages', 'additionalMedicareTax'],
+                    }))([w2WithMedicareWages('sha256-w2-boundary')(boxFive)])([])([])([])([])([])([])([])([]))
+                assert(outcome.kind === 'ok', ['the boundary probe must compute', boxFive, outcome])
+                if (outcome.kind !== 'ok') {
+                    return -1n
+                }
+                return lineRuled(outcome.lines)('1040 line 23').value
+            }
+            assertEq(lineTwentyThreeAt('200000.00'), 0n, 'exactly AT the threshold is not "in excess of" it')
+            assertEq(lineTwentyThreeAt('200000.01'), 0n, 'one cent above: 0.9% of a cent rounds to $0.00')
+            assertEq(lineTwentyThreeAt('200000.56'), 1n, '$0.01 — 0.9% of 56 cents rounds up to one cent')
+        },
+        // **FORM 8960, END TO END.** A filer with no wages at all and
+        // $300,000 of taxable interest: §1411's threshold is $200,000, the
+        // excess is $100,000, the net investment income is $300,000, and the
+        // SMALLER of the two is taxed at 3.8% = $3,800.00. Hand-computed.
+        //
+        // No tripwire watches §1411, so this return would have computed
+        // silently and $3,800.00 short before this phase — the mirror image
+        // of the Additional Medicare Tax gap Phase 22 found, closed by
+        // COMPUTING rather than by refusing.
+        netInvestmentIncomeTaxReachesLineTwentyThree: () => {
+            const outcome = form1040Report(taxParams2025)(
+                inputsOf(storedProfile({
+                    ...singleProfile,
+                    declaredKinds: ['taxableInterest', 'netInvestmentIncomeTax'],
+                }))([])([interestDocument('sha256-int-niit')({ box1InterestIncome: '300000.00' })])(
+                    [])([])([])([])([])([])([]))
+            assert(outcome.kind === 'ok', ['expected the investor\'s return to compute', outcome])
+            if (outcome.kind !== 'ok') {
+                return
+            }
+            const at = lineRuled(outcome.lines)
+            assertEq(at('1040 line 2b').value, 30000000n, '$300,000.00 of taxable interest')
+            assertEq(at('1040 line 11b').value, 30000000n, '$300,000.00 of AGI')
+            assertEq(at('1040 line 23').value, 380000n, '$3,800.00 — 3.8% of the $100,000 excess')
+            assertEq(at('1040 line 25c').value, 0n, '$0.00 — no W-2, so no Form 8959 withholding')
+        },
+        // **THE EXCLUSIONS, END TO END, and this is the leaf that would catch
+        // an over-inclusion.** The SAME $300,000 of adjusted gross income and
+        // the SAME §1411 threshold — but made of an IRA distribution rather
+        // than interest, with $50,000 of tax-exempt interest beside it. Net
+        // investment income is $0.00, so the tax is $0.00:
+        //
+        // - §1411(c)(5) excludes distributions from §408 plans, so the
+        //   1099-R's $300,000 is not net investment income even though it IS
+        //   in AGI and does put the filer over the threshold;
+        // - §103(a) keeps the $50,000 of tax-exempt interest out of gross
+        //   income entirely, so it is neither in AGI nor in Part I.
+        //
+        // Getting either exclusion wrong overstates the tax silently:
+        // counting the IRA distribution would charge $3,800.00 and counting
+        // the municipal interest would charge $1,900.00, on a return that
+        // owes neither. The control is the leaf immediately above, where
+        // $300,000 of the RIGHT kind of income does produce $3,800.00.
+        theExclusionsHoldEndToEnd: () => {
+            const outcome = form1040Report(taxParams2025)(
+                inputsOf(storedProfile({
+                    ...singleProfile,
+                    declaredKinds: ['taxExemptInterest', 'iraDistributions', 'netInvestmentIncomeTax'],
+                }))([])([interestDocument('sha256-int-exempt')({ box8TaxExemptInterest: '50000.00' })])(
+                    [])([])([retirementDocument('sha256-r-niit')({
+                        box1GrossDistribution: '300000.00',
+                        box2aTaxableAmount: '300000.00',
+                        box7bIraSepSimple: true,
+                    })])([])([])([])([]))
+            assert(outcome.kind === 'ok', ['expected the retiree\'s return to compute', outcome])
+            if (outcome.kind !== 'ok') {
+                return
+            }
+            const at = lineRuled(outcome.lines)
+            assertEq(at('1040 line 2a').value, 5000000n, '$50,000.00 of tax-exempt interest, reported')
+            assertEq(at('1040 line 2b').value, 0n, '$0.00 of TAXABLE interest')
+            assertEq(at('1040 line 4b').value, 30000000n, '$300,000.00 of taxable IRA distribution')
+            assertEq(at('1040 line 11b').value, 30000000n, '$300,000.00 of AGI — over §1411\'s $200,000')
+            assertEq(at('1040 line 23').value, 0n, '$0.00 — neither exclusion is net investment income')
+        },
+        // **THE §1411 QUALIFYING-SURVIVING-SPOUSE TRAP, END TO END**, against
+        // the head-of-household control that tells the two statutes apart.
+        // $240,000 of AGI, all of it taxable interest:
+        //   - QSS falls under §1411(b)(1)'s "or a surviving spouse (as
+        //     defined in section 2(a))" clause and gets the JOINT $250,000,
+        //     so there is no excess and no tax;
+        //   - head of household gets §1411(b)(3)'s $200,000, so $40,000 is in
+        //     excess and 3.8% of it is $1,520.00.
+        // Had `fjs/form8960` read Form 8959's §3101(b)(2) threshold — where a
+        // QSS filer gets $200,000 — the first half would charge $1,520.00 too.
+        aQualifyingSurvivingSpouseGetsTheJointNiitThreshold: () => {
+            /** @type {(filingStatus: string) => bigint} */
+            const lineTwentyThreeFor = filingStatus => {
+                const outcome = form1040Report(taxParams2025)(
+                    inputsOf(storedProfile({
+                        ...singleProfile,
+                        filingStatus,
+                        declaredKinds: ['taxableInterest', 'netInvestmentIncomeTax'],
+                    }))([])([interestDocument('sha256-int-qss')({ box1InterestIncome: '240000.00' })])(
+                        [])([])([])([])([])([])([]))
+                assert(outcome.kind === 'ok', ['expected the return to compute', filingStatus, outcome])
+                if (outcome.kind !== 'ok') {
+                    return -1n
+                }
+                return lineRuled(outcome.lines)('1040 line 23').value
+            }
+            assertEq(lineTwentyThreeFor('qualifyingSurvivingSpouse'), 0n, '$240,000 is below §1411(b)(1)\'s $250,000')
+            assertEq(lineTwentyThreeFor('headOfHousehold'), 152000n, '$1,520.00 — 3.8% of the $40,000 excess')
+        },
+        // BOTH taxes on ONE return, added rather than one replacing the
+        // other: $900.00 of Additional Medicare Tax on $300,000 of wages plus
+        // 3.8% on the smaller of $100,000 of investment income and the
+        // $200,000 of excess income = $3,800.00, so line 23 is $4,700.00.
+        // Hand-added.
+        //   AGI = $300,000 wages + $100,000 interest = $400,000.00
+        //   §1411 excess = $400,000 - $200,000 = $200,000.00
+        //   net investment income = $100,000.00, the smaller
+        //   3.8% x $100,000.00 = $3,800.00; 0.9% x $100,000.00 = $900.00
+        bothTaxesOnOneReturnAddIntoLineTwentyThree: () => {
+            const outcome = form1040Report(taxParams2025)(
+                inputsOf(storedProfile({
+                    ...singleProfile,
+                    declaredKinds: ['wages', 'taxableInterest', 'additionalMedicareTax', 'netInvestmentIncomeTax'],
+                }))([w2WithMedicareBoxes('sha256-w2-both-taxes')('300000.00')('5250.00')])(
+                    [interestDocument('sha256-int-both-taxes')({ box1InterestIncome: '100000.00' })])(
+                    [])([])([])([])([])([])([]))
+            assert(outcome.kind === 'ok', ['expected the return to compute', outcome])
+            if (outcome.kind !== 'ok') {
+                return
+            }
+            const at = lineRuled(outcome.lines)
+            assertEq(at('1040 line 11b').value, 40000000n, '$400,000.00 of AGI')
+            assertEq(at('1040 line 23').value, 470000n, '$4,700.00 = $900.00 + $3,800.00')
+            assertEq(at('1040 line 25c').value, 90000n, '$900.00 of Additional Medicare Tax already withheld')
         },
     },
     // ROADMAP criterion 5, on a REAL line aggregating ten REAL documents.
