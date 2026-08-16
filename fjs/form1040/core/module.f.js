@@ -2577,6 +2577,68 @@ const phaseTwentyFourInputs = {
 }
 
 
+/**
+ * A return carrying BOTH Social Security benefits and a Schedule 1
+ * adjustment — the interaction `fjs/tax/ssb`'s own line 6 exists for, and the
+ * one no fixture in this repository covered until a mutation found the gap.
+ * @type {Form1040Inputs}
+ */
+const socialSecurityWithHsaInputs = {
+    ...inputsOf(storedProfile({
+        ...phaseTwentyFourProfile,
+        declaredKinds: [
+            'socialSecurityBenefits', 'pensionsAndAnnuities', 'healthSavingsAccountDeduction',
+        ],
+    }))([])([])([])([])([
+        retirementDocument('sha256-p24-pension')({
+            box1GrossDistribution: '30000.00',
+            box2aTaxableAmount: '30000.00',
+        }),
+    ])([socialSecurityDocument('sha256-p24-ssa')('30000.00')])([])([])([]),
+    adjustmentForms: [{
+        documentHash: 'sha256-p24-hsa-only',
+        value: {
+            dialect: adjustmentsDialect,
+            recipientTin: '222-22-2222',
+            taxYear: 2025,
+            entries: [{
+                lineTag: 'hsaContribution',
+                datePaid: '2025-06-30',
+                description: 'HSA contribution',
+                amount: '2000.00',
+                individual: 'taxpayer',
+            }],
+            hsaCoverage: [{
+                individual: 'taxpayer',
+                coverageType: 'selfOnly',
+                hadHighDeductibleCoverageAllYear: true,
+            }],
+        },
+    }],
+}
+
+/**
+ * A return whose income sits INSIDE §221(b)(2)(B)'s phase-out range, so the
+ * worksheet's own line 7 ratio actually bites. The persona fixture above
+ * cannot do this job: at $52,000.00 the deduction is unreduced, and a
+ * worksheet fed no income at all would produce the identical answer.
+ * @type {Form1040Inputs}
+ */
+const phaseOutInputs = {
+    ...inputsOf(storedProfile({
+        ...phaseTwentyFourProfile,
+        declaredKinds: ['wages', 'studentLoanInterestDeduction'],
+    }))([w2Document('sha256-p24-w2-highwage')('95000.00')])([])([])([])([])([])([])([])([]),
+    studentLoanInterestForms: [{
+        documentHash: 'sha256-p24-1098e-highwage',
+        value: {
+            ...phaseTwentyFourOneZeroNineEightE.value,
+            box1StudentLoanInterestReceived: '2000.00',
+        },
+    }],
+}
+
+
 export const proof = {
     unionSources: {
         // The same box of the same document, cited by two different lines, is
@@ -5774,6 +5836,104 @@ export const proof = {
                     'studentLoanInterestDeduction', 'federalTaxWithheldOnW2',
                 ]),
                 'the fixture really does declare all three, or the leaf above proves nothing',
+            )
+        },
+        // **THE SOCIAL SECURITY INTERACTION — added after a mutation.**
+        //
+        // `fjs/tax/ssb`'s line 6 subtracts Schedule 1 "lines 11 through 20,
+        // and 23 and 25", and this phase made that a REAL figure where it was
+        // a hardcoded `0n`. Verification neutralized the wiring
+        // (`socialSecurityWorksheetAdjustmentsTotal(...) * 0n`) and the whole
+        // suite stayed green: not one fixture anywhere carried BOTH Social
+        // Security benefits and a Schedule 1 adjustment, so the newly-real
+        // read was observed by nothing. This leaf is that fixture.
+        //
+        // Single filer, $30,000.00 of SSA-1099 box 5, a $30,000.00 taxable
+        // pension, and a $2,000.00 HSA contribution. Hand-computed from the
+        // printed worksheet:
+        //
+        //   line 1  $30,000.00   line 2  $15,000.00 (half)
+        //   line 3  $30,000.00 (the pension, 1040 line 5b)
+        //   line 4  $0.00        line 5  $45,000.00
+        //   line 6  $2,000.00 <- Schedule 1 line 13, the figure at issue
+        //   line 7  $43,000.00   line 8  $25,000.00 (single base)
+        //   line 9  $18,000.00   line 10 $9,000.00 (single second threshold)
+        //   line 11 $9,000.00    line 12 $9,000.00 (smaller of 9 and 10)
+        //   line 13 $4,500.00    line 14 $4,500.00 (smaller of 2 and 13)
+        //   line 15 $7,650.00 (85% of line 11)
+        //   line 16 $12,150.00   line 17 $25,500.00 (85% of line 1)
+        //   line 18 $12,150.00 -> 1040 line 6b
+        //
+        // The differential is the sharp half: with line 6 at $0.00 the same
+        // worksheet gives line 9 $20,000.00, line 11 $11,000.00, line 15
+        // $9,350.00 and line 18 $13,850.00 — exactly $1,700.00 more, which is
+        // 85% of the $2,000.00 adjustment. That 85% relationship can only
+        // hold if line 6 is genuinely read.
+        aScheduleOneAdjustmentReducesTaxableSocialSecurityThroughWorksheetLineSix: () => {
+            const withAdjustment = form1040Report(taxParams2025)(socialSecurityWithHsaInputs)
+            const without = form1040Report(taxParams2025)({
+                ...socialSecurityWithHsaInputs,
+                adjustmentForms: [],
+            })
+            assert(withAdjustment.kind === 'ok', ['expected ok', withAdjustment])
+            assert(without.kind === 'ok', ['expected ok', without])
+            if (withAdjustment.kind !== 'ok' || without.kind !== 'ok') {
+                throw ['expected two computed returns', withAdjustment, without]
+            }
+            const sixBWith = lineRuled(withAdjustment.lines)('1040 line 6b').value
+            const sixBWithout = lineRuled(without.lines)('1040 line 6b').value
+            assertEq(sixBWith, 1215000n, '$12,150.00, hand-computed from the worksheet with line 6 = $2,000.00')
+            assertEq(sixBWithout, 1385000n, '$13,850.00, the SAME worksheet with line 6 = $0.00')
+            assertEq(sixBWithout - sixBWith, 170000n,
+                '$1,700.00 — exactly 85% of the $2,000.00 adjustment, the 85% tier this return sits in')
+            // …and the adjustment ALSO reduces AGI directly through line 10,
+            // so the total effect is larger than either half alone: taxable
+            // Social Security falls $1,700.00 AND line 10 removes $2,000.00.
+            assertEq(lineRuled(withAdjustment.lines)('1040 line 10').value, 200000n)
+            assertEq(
+                lineRuled(without.lines)('1040 line 11a').value
+                    - lineRuled(withAdjustment.lines)('1040 line 11a').value,
+                370000n,
+                '$1,700.00 of taxable benefits plus the $2,000.00 adjustment itself',
+            )
+        },
+        // **THE PHASE-OUT, END TO END — also added after a mutation.**
+        //
+        // Verification replaced the `totalIncomeLine` passed into Part II
+        // stage 2 with a zero-valued line, and the suite stayed green: the
+        // persona fixture above sits at $52,000.00, far below the $85,000.00
+        // threshold, so a zero income and a $52,000.00 income both produce
+        // the full deduction. Nothing end to end observed 1040 line 9
+        // reaching the worksheet at all.
+        //
+        // Single filer, $95,000.00 of wages, $2,000.00 of student loan
+        // interest, no other adjustments. Hand-computed from the printed
+        // worksheet: line 1 min($2,000.00, $2,500.00) = $2,000.00; line 2
+        // $95,000.00; line 3 $0.00; line 4 $95,000.00; line 5 $85,000.00;
+        // line 6 $10,000.00; line 7 = 10,000 / 15,000 = 0.6666…, rounded to
+        // three places = 0.667; line 8 $2,000.00 x 0.667 = $1,334.00; line 9
+        // $2,000.00 - $1,334.00 = $666.00.
+        thePhaseOutBitesThroughTheFullEntryPoint: () => {
+            const outcome = form1040Report(taxParams2025)(phaseOutInputs)
+            assert(outcome.kind === 'ok', ['expected the phased-out return to compute', outcome])
+            if (outcome.kind !== 'ok') {
+                throw ['expected ok', outcome]
+            }
+            assertEq(lineRuled(outcome.lines)('1040 line 9').value, 9500000n, '$95,000.00 total income')
+            assertEq(lineRuled(outcome.lines)('1040 line 10').value, 66600n,
+                '$666.00 — the phased-out remainder of a $2,000.00 deduction')
+            assertEq(lineRuled(outcome.lines)('1040 line 11a').value, 9433400n, '$94,334.00 AGI')
+            // The two figures a wrong wiring would produce instead, named so
+            // the leaf says what it refuses: $2,000.00 is the whole,
+            // un-phased-out deduction (a worksheet fed no income at all), and
+            // $0.00 is line 21 never reaching line 26.
+            assert(
+                lineRuled(outcome.lines)('1040 line 10').value !== 200000n,
+                'a worksheet fed a zero total income would deduct the whole $2,000.00',
+            )
+            assert(
+                lineRuled(outcome.lines)('1040 line 10').value !== 0n,
+                'and a line 21 that never reached line 26 would deduct nothing',
             )
         },
         // A Part II refusal must stop the WHOLE return, threaded through the
