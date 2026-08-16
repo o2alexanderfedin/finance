@@ -17,34 +17,43 @@
  *
  * ## Every line is modeled; for this profile every line is zero
  *
- * The frozen 50-kind `kindVocabulary` carries exactly TWO kinds for the
- * whole of this schedule: `scheduleThreeNonrefundableCredits` (Part I —
- * the foreign tax credit, the dependent care credit, education credits,
- * the retirement savings contributions credit, residential clean energy,
- * energy-efficient home improvements, and thirteen more sub-lines at line
- * 6a-6z alone) and `scheduleThreeRefundableCredits` (Part II — net premium
- * tax credit, the extension payment, excess Social Security withholding,
- * the fuel tax credit, and five more sub-lines at line 13a-13z). This
- * engine has no per-line dialect for ANY of Part I's credits — no Form
- * 1116 (foreign tax credit), no Form 2441 (dependent care), no Form 8863
- * (education credits), no Form 8880 (retirement savings), no Form 5695
- * (residential energy). For the declared 65+/dependents/itemizing profile
- * this project targets, research (13-RESEARCH.md §5) confirms **none of
- * Schedule 3's lines are reachable by any input this engine models**, with
- * one partial exception addressed below (line 11).
+ * **This section describes the state of this module up to Phase 25, and the
+ * correction that follows it is the point of reading it.** Through Phase 24
+ * the frozen `kindVocabulary` carried exactly TWO kinds for the whole of this
+ * schedule: `scheduleThreeNonrefundableCredits` (Part I — the foreign tax
+ * credit, the dependent care credit, education credits, the retirement
+ * savings contributions credit, residential clean energy, energy-efficient
+ * home improvements, and thirteen more sub-lines at line 6a-6z alone) and
+ * `scheduleThreeRefundableCredits` (Part II — net premium tax credit, the
+ * extension payment, excess Social Security withholding, the fuel tax credit,
+ * and five more sub-lines at line 13a-13z). This engine had no per-line
+ * dialect for ANY of Part I's credits. For the declared 65+/dependents/
+ * itemizing profile Phase 13 targeted, research (13-RESEARCH.md §5) confirmed
+ * **none of Schedule 3's lines were reachable by any input this engine
+ * modeled**, with one partial exception addressed below (line 11).
  *
- * A taxpayer who genuinely claims, say, the foreign tax credit and
- * declares `scheduleThreeNonrefundableCredits` cannot have that real
- * dollar figure represented here — this module could only ever return
- * `$0` for it. Reclassifying either coarse kind would let that real,
- * undeclared amount compute silently as `$0` — exactly TAX-16's failure
- * mode. So **both `scheduleThreeNonrefundableCredits` and
- * `scheduleThreeRefundableCredits` stay in `unmodeledKindRefusals` for the
- * whole of this phase** (13-RESEARCH.md Open Question 2). Declaring either
- * refuses the WHOLE return at the scope layer — a decision this module
- * never makes; it is correct for every return the engine can otherwise
- * compute, where neither kind is declared and every one of these credits
- * is genuinely zero.
+ * A taxpayer who genuinely claimed, say, the foreign tax credit and declared
+ * `scheduleThreeNonrefundableCredits` could not have that real dollar figure
+ * represented here — this module could only ever return `$0` for it.
+ * Reclassifying either coarse kind would have let that real, undeclared
+ * amount compute silently as `$0` — exactly TAX-16's failure mode. So both
+ * coarse kinds stayed in `unmodeledKindRefusals` for the whole of Phase 13
+ * (13-RESEARCH.md Open Question 2).
+ *
+ * ## Phase 25 (TAX-25/TAX-26) splits both coarse kinds
+ *
+ * The diagnosis above was exactly right, and the remedy for it was to stop
+ * having a coarse kind rather than to keep describing one — the identical
+ * move Phase 23 made on Schedule 2 and Phase 24 on Schedule 1 Part II. The
+ * two coarse kinds are now TWELVE per-printed-line kinds, seven for Part I
+ * and five for Part II, so what remains refused on this schedule is something
+ * a taxpayer can be told rather than one sentence about coarseness.
+ *
+ * **That split alone changes nothing this module computes.** Every line below
+ * is still a `profileDeclaredZeroLine`, and every one of the twelve kinds is
+ * still refused — wire before reclassify, so the nameability lands first and
+ * on its own. TAX-25 and TAX-26 wire lines 4 and 3 in a later commit, and
+ * this docstring is corrected there rather than here.
  *
  * ## Schedule 3 line 6d — NOT this phase's senior deduction
  *
@@ -68,9 +77,15 @@
  * entitled to the excess back, and the data to compute it already exists
  * in this engine's own dialects. It is nonetheless **explicitly out of
  * THIS phase's scope** (13-RESEARCH.md Open Question 2's resolution;
- * ROADMAP.md's Wave 5 finding paragraph) — no kind in the frozen
- * vocabulary expresses it, and it is not named in 13-CONTEXT.md's scope
- * for this phase. `line11` below is a `profileDeclaredZeroLine` exactly
+ * ROADMAP.md's Wave 5 finding paragraph) — and, as of Phase 25, a kind in
+ * the frozen vocabulary DOES now express it: `excessSocialSecurityWithheld`,
+ * whose remedy string in `fjs/return/scope` is the only one in that whole
+ * table that says no form is missing. That sentence — "no kind in the frozen
+ * vocabulary expresses it" — stood here until Phase 25 and is corrected
+ * rather than deleted, because a docstring that quotes a finding inherits its
+ * expiry (`fjs/schedule/1`'s own header records the same kind of correction).
+ * What has NOT changed is the boundary itself: `line11` below is a
+ * `profileDeclaredZeroLine` exactly
  * like every other line on this module, not a document-derived
  * computation — a documented boundary, not a silent omission, mirroring
  * `fjs/schedule/b`'s Form 8815 treatment (money the underlying documents
@@ -170,10 +185,10 @@ const totalLine = rule => lines => ({
 
 /**
  * Computes Schedule 3 for one return from the declared return profile
- * alone. Every line is `value: 0n` for any profile that does not declare
- * `scheduleThreeNonrefundableCredits`/`scheduleThreeRefundableCredits` —
- * see this module's own docstring for why that is the honest, complete
- * answer for this phase.
+ * alone. Every line is `value: 0n`; declaring any of the twelve Schedule 3
+ * kinds refuses the WHOLE return at the scope layer instead — see this
+ * module's own docstring for why that is the honest, complete answer for
+ * this phase.
  * @type {(profile: Stored<ReturnProfile>) => ScheduleThree}
  */
 export const scheduleThree = profile => {

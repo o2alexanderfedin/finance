@@ -1134,8 +1134,8 @@ const line16MethodNames = {
  * The floor is UNREACHABLE through a whole report in this phase, and that is a
  * property of the scope guard rather than of this line: line 21 is `19 + 20`,
  * both of which are profile-declared zeros, because a return declaring
- * `childTaxCreditOrOtherDependents` (line 19) or
- * `scheduleThreeNonrefundableCredits` (line 20) is refused whole. So line 21
+ * `childTaxCreditOrOtherDependents` (line 19) or any of Schedule 3 Part I's
+ * seven per-line kinds (line 20) is refused whole. So line 21
  * is always `0n` here and `18 - 21` can never go negative — a neighbouring
  * rule ABSORBS the floor exactly the way `fjs/tax/line16/qdcgt`'s line 3 guard
  * is absorbed by the `min` below it (AGENTS.md, "the equivalent mutant"). A
@@ -1379,9 +1379,9 @@ const form1040TaxAndPaymentLines = taxParamSet => inputs => income => {
     // Part II's total other payments/refundable credits (line15) feeds
     // 1040 line 31 — ONE `scheduleThree(...)` call, mirroring Schedule 1
     // and Schedule 2's own single-call precedent above.
-    // `scheduleThreeNonrefundableCredits`/`scheduleThreeRefundableCredits`
-    // stay in `unmodeledKindRefusals`, so both totals are `0n` for every
-    // profile this engine can otherwise compute.
+    // Every one of Schedule 3's twelve per-line kinds stays in
+    // `unmodeledKindRefusals` after Phase 25's split commit, so both totals
+    // are `0n` for every profile this engine can otherwise compute.
     const scheduleThreeResult = scheduleThree(profile)
     const line20 = {
         value: scheduleThreeResult.line8.value,
