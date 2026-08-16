@@ -16,6 +16,68 @@ cannot yet be reached from the server.
 
 ## Unreleased
 
+### Phase 26: Retiree Completion — the retiree stops being overcharged
+
+Two new dialects, one new form module, and one figure worth stating up front: on a
+hand-derived retiree with a $50,000 IRA distribution, $20,000 of it given straight to
+charity and $20,000 of prior-year nondeductible basis, **this engine charged $2,915.00
+where the law charges $291.00** — silently, with full citations and no warning.
+
+Project-local proofs: **1,347 → 1,434**.
+
+#### What is here
+
+- **Qualified Charitable Distributions (TAX-28).** A QCD is a taxpayer ELECTION, not a
+  1099-R box: the custodian reports the full distribution and there is no distribution
+  code for it. The new `vnd.fjs.ira` dialect carries the election, and 1040 line 4b falls
+  while **line 4a stays gross**, exactly as the printed instruction requires. Capped at
+  §408(d)(8)(A)'s **$108,000 per individual** for TY2025 — a figure `fjs/tax/params` now
+  stores with its indexing history, because it was $100,000 through 2023 and $105,000 for
+  2024.
+- **Form 8606 Part I (TAX-29, in part).** §408(d)(2)'s pro-rata rule over the
+  **aggregated** year-end value of every traditional, SEP and SIMPLE IRA one person owns —
+  never per account, which is the mistake that understates tax for anyone with two IRAs.
+  Basis carries forward from the prior year's line 14 through a second new dialect,
+  `vnd.fjs.prior_year_ira_basis`, which becomes the **second exemption** from Phase 21's
+  mixed-year refusal.
+- **The ordering between them, pinned with arithmetic.** §408(d)(8)(D) makes a QCD come
+  first out of the pre-tax portion, which the printed Form 8606 implements in exactly one
+  place: line 7 excludes QCDs. Two consequences are proven rather than described — a QCD
+  does not absorb basis (next year's line 2 is *larger* with the gift than without it),
+  and it makes the remaining distributions *more* nontaxable, not less.
+- **A second-order effect that was looked for on purpose.** Line 4b is the Social Security
+  Benefits Worksheet's own line 3, so a $20,000 gift takes **$17,000 off taxable Social
+  Security on top of the $20,000** it takes off the distribution. Phase 24 shipped a
+  newly-real read in that worksheet that no fixture exercised; this phase went looking for
+  the same shape and found it.
+
+#### What refuses, by name
+
+Every one of these is a sentence a taxpayer can act on rather than a number quietly
+missing: the **70½ eligibility test** when unasserted (see below) or when contradicted by
+the profile's own age boxes; §408(d)(8)(F)'s **one-time split-interest election**; a QCD
+from a 401(k) rather than an IRA, from no stored 1099-R, from two of them, or larger than
+the distribution it claims; an **unasserted aggregated year-end IRA value**; a stored
+basis with no IRA record beside it; **Form 8606 Part II** (Roth conversions) and **Part
+III** (Roth distributions, detected off box 7a codes J/T/Q rather than off an assertion).
+
+#### The 70½ finding
+
+§408(d)(8)(B)(ii) requires age 70½ **at the time of the distribution**, and **this engine
+cannot determine that**. Two independent reasons, either fatal on its own: no birth date
+is stored anywhere in this repository — the nearest fact is 1040 line 12d's
+*born-before-2-January-1961* checkbox, a **65** test — and the statute tests age at a
+DATE, which only Form 1099-R box 13 carries and only as free text. The fact is therefore
+asserted by the taxpayer and refused when absent, never approximated from the 65 box. The
+one derivable direction (that box is NECESSARY) is checked, so an unchecked box
+contradicts the assertion.
+
+#### What is NOT here
+
+**A backdoor Roth is still not computable**, so TAX-29's checkbox stays empty. A backdoor
+Roth is a nondeductible contribution plus a *conversion*, the conversion is Form 8606 Part
+II, and Part II refuses. The requirement's first sentence ships and its second does not.
+
 ## 0.12.0
 
 Phases 11 and 12: the documents a real return actually arrives as. Four new

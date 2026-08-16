@@ -63,6 +63,8 @@ import { dialect as adjustmentsDialect, adjustmentsSchema } from '../../document
 import { dialect as oneZeroNineEightEDialect, oneZeroNineEightESchema } from '../../document/1098e/module.f.js'
 import { dialect as oneZeroNineEightTDialect, oneZeroNineEightTSchema } from '../../document/1098t/module.f.js'
 import { dialect as creditsDialect, creditsSchema } from '../../document/credits/module.f.js'
+import { dialect as iraDialect, iraSchema } from '../../document/ira/module.f.js'
+import { dialect as priorYearIraBasisDialect, priorYearIraBasisSchema } from '../../document/prior_year_ira_basis/module.f.js'
 import { stringify as jsonText } from '../../json/module.f.js'
 
 /** @import { Type } from 'functionalscript/fjs/types/rtti/module.f.js' */
@@ -94,6 +96,8 @@ const dialectSchemas = {
     [oneZeroNineEightEDialect]: oneZeroNineEightESchema,
     [oneZeroNineEightTDialect]: oneZeroNineEightTSchema,
     [creditsDialect]: creditsSchema,
+    [iraDialect]: iraSchema,
+    [priorYearIraBasisDialect]: priorYearIraBasisSchema,
 }
 
 /** The known dialect tags, in declaration order — used in the refusal message. */
@@ -130,9 +134,13 @@ const knownDialects = /** @type {readonly string[]} */ (Object.keys(dialectSchem
  * Phase 25 (TAX-25/TAX-26) registers the THIRTEENTH AND FOURTEENTH
  * (`vnd.fjs.1098t`, `vnd.fjs.credits`), moving the count from 12 to 14 in one
  * step, and both gained their own `*Resolves` leaf below.
+ *
+ * Phase 26 (TAX-28/TAX-29) registers the FIFTEENTH AND SIXTEENTH
+ * (`vnd.fjs.ira`, `vnd.fjs.prior_year_ira_basis`), moving the count from 14
+ * to 16 in one step, and both gained their own `*Resolves` leaf below.
  * @type {number}
  */
-const expectedKnownDialectCount = 14
+const expectedKnownDialectCount = 16
 
 /**
  * `finance_schema(dialect)`: the MCP tool. Looks `dialect` up in
@@ -254,6 +262,27 @@ export const proof = {
         assertEq(
             JSON.stringify(JSON.parse(textOf(result))),
             JSON.stringify(toJsonSchema(creditsSchema)),
+        )
+    },
+    // Phase 26 (TAX-28/TAX-29): the taxpayer-asserted IRA record behind the
+    // QCD election and Form 8606 Part I, and the prior-year basis carried
+    // into that form's line 2. The tag is hand-typed here, never read back
+    // off `dialectSchemas`, for the reason `expectedKnownDialectCount`'s own
+    // docstring gives at length.
+    iraResolves: () => {
+        const result = call('vnd.fjs.ira')
+        assertEq(result.isError, undefined)
+        assertEq(
+            JSON.stringify(JSON.parse(textOf(result))),
+            JSON.stringify(toJsonSchema(iraSchema)),
+        )
+    },
+    priorYearIraBasisResolves: () => {
+        const result = call('vnd.fjs.prior_year_ira_basis')
+        assertEq(result.isError, undefined)
+        assertEq(
+            JSON.stringify(JSON.parse(textOf(result))),
+            JSON.stringify(toJsonSchema(priorYearIraBasisSchema)),
         )
     },
     medicalExpensesResolves: () => {

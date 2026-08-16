@@ -17,7 +17,7 @@
  * that tool. So the assembling is done **here, by the guest**, in a stored
  * blob with zero `import` statements: the program enumerates subjects,
  * walks head -> revision -> snapshot, decides for itself which stored
- * dialect belongs in which of `Form1040Inputs`' eleven fields, and decides
+ * dialect belongs in which of `Form1040Inputs`' seventeen fields, and decides
  * what to return. The engine reaches it as one pure value on `ctx`
  * (`fjs/guest/tax/module.f.js`), beside `step`/`pure`/`centsFromString`/
  * `centsToString`. No tool is added; `tools/list` is unchanged.
@@ -38,7 +38,7 @@
  * The two are kept in sync by hand, with one mechanical assist the payer
  * report does not have: {@link proof.sourceAndTwinDispatchOnTheSameElevenDialects}
  * asserts that every dialect tag the twin dispatches on appears **verbatim
- * inside the source text**, against a hand-typed count of eleven. That
+ * inside the source text**, against a hand-typed count of seventeen. That
  * catches the one drift that would otherwise be silent and expensive — a
  * dialect renamed in a `fjs/document/*` module, picked up automatically by
  * the twin (which imports the constant) and missed by the source (which
@@ -78,13 +78,23 @@
  *   A profile disagreeing with it is therefore itself a mismatch worth
  *   refusing — and is refused, since the profile is checked like every other
  *   document.
- * - **`vnd.fjs.prior_year_capital_loss` is exempt BY NAME**, for the reason
- *   above: its year is supposed to differ. It is the one exemption, it is
- *   stated at {@link noteYearMismatch}, and
- *   {@link proof.taxYearRefusal.aPriorYearCarryoverIsExemptAndStillComputes}
- *   is the control proving the exemption is real rather than assumed.
- * - **Verified rather than assumed**: all twelve dialects this program routes
- *   into the engine declare `taxYear: number` as a REQUIRED schema field —
+ * - **`vnd.fjs.prior_year_capital_loss` and `vnd.fjs.prior_year_ira_basis` are
+ *   exempt BY NAME**, for the reason above: their years are supposed to
+ *   differ. They are the only two exemptions, both are stated at
+ *   {@link noteYearMismatch}, and each has its own control leaf
+ *   ({@link proof.taxYearRefusal.aPriorYearCarryoverIsExemptAndStillComputes},
+ *   {@link proof.taxYearRefusal.aPriorYearIraBasisIsExemptAndStillComputes})
+ *   proving the exemption is real rather than assumed.
+ *
+ *   **The second one was added in Phase 26, and it is the case that shows why
+ *   the exemption list is a hazard rather than a convenience.** A dialect
+ *   whose year is supposed to differ, added WITHOUT its name here, refuses
+ *   every return that uses it — loudly, so not the silent failure — but a
+ *   dialect added here WRONGLY lets a genuinely stale document through
+ *   silently. Neither direction is checkable from the data, which is exactly
+ *   why the list is short, by name, and paired with controls.
+ * - **Verified rather than assumed**: all seventeen dialects this program
+ *   routes into the engine declare `taxYear: number` as a REQUIRED schema field —
  *   including `vnd.fjs.medical_expenses`, checked by name because it was the
  *   one in doubt, and Phase 24's `vnd.fjs.adjustments` and `vnd.fjs.1098e`,
  *   both of which declare it required for the same reason. The `typeof` guard in {@link noteYearMismatch} is
@@ -153,6 +163,8 @@ import { dialect as adjustmentsDialect } from '../../document/adjustments/module
 import { dialect as oneZeroNineEightEDialect } from '../../document/1098e/module.f.js'
 import { dialect as oneZeroNineEightTDialect } from '../../document/1098t/module.f.js'
 import { dialect as creditsDialect } from '../../document/credits/module.f.js'
+import { dialect as iraDialect } from '../../document/ira/module.f.js'
+import { dialect as priorYearIraBasisDialect } from '../../document/prior_year_ira_basis/module.f.js'
 
 /** @import { Effect, OperationMap } from 'functionalscript/fjs/effects/module.f.js' */
 /** @import { CasOp } from '../../guest/module.f.js' */
@@ -174,6 +186,8 @@ import { dialect as creditsDialect } from '../../document/credits/module.f.js'
 /** @import { OneZeroNineEightE } from '../../document/1098e/module.f.js' */
 /** @import { OneZeroNineEightT } from '../../document/1098t/module.f.js' */
 /** @import { Credits } from '../../document/credits/module.f.js' */
+/** @import { Ira } from '../../document/ira/module.f.js' */
+/** @import { PriorYearIraBasis } from '../../document/prior_year_ira_basis/module.f.js' */
 
 // ── The rendered wire shape ──────────────────────────────────────────────────
 
@@ -215,11 +229,11 @@ import { dialect as creditsDialect } from '../../document/credits/module.f.js'
  * `vnd.fjs.revision`, a future addition) falls straight through
  * {@link collectDocument} untouched — never coerced into a bucket, never
  * treated as a zero.
- * @typedef {ReturnProfile | W2 | OneZeroNineNineInt | OneZeroNineNineDiv | OneZeroNineNineB | OneZeroNineNineR | Ssa1099 | ItemizedDeductions | MedicalExpenses | PriorYearCapitalLoss | OneZeroNineNineG | Adjustments | OneZeroNineEightE | OneZeroNineEightT | Credits} EngineDocument
+ * @typedef {ReturnProfile | W2 | OneZeroNineNineInt | OneZeroNineNineDiv | OneZeroNineNineB | OneZeroNineNineR | Ssa1099 | ItemizedDeductions | MedicalExpenses | PriorYearCapitalLoss | OneZeroNineNineG | Adjustments | OneZeroNineEightE | OneZeroNineEightT | Credits | Ira | PriorYearIraBasis} EngineDocument
  */
 
 /**
- * `Form1040Inputs` mid-collection: the same thirteen fields, with `profile`
+ * `Form1040Inputs` mid-collection: the same seventeen fields, with `profile`
  * not yet found and a flag for the one ambiguity a second profile creates.
  *
  * `duplicateProfile` is a flag rather than an early return because the walk
@@ -248,6 +262,8 @@ import { dialect as creditsDialect } from '../../document/credits/module.f.js'
  *   readonly studentLoanInterestForms: readonly Stored<OneZeroNineEightE>[],
  *   readonly tuitionForms: readonly Stored<OneZeroNineEightT>[],
  *   readonly creditForms: readonly Stored<Credits>[],
+ *   readonly iraForms: readonly Stored<Ira>[],
+ *   readonly priorYearIraBasisForms: readonly Stored<PriorYearIraBasis>[],
  * }} Collected
  */
 
@@ -314,11 +330,14 @@ export const taxReturnReportSource = [
     '        studentLoanInterestForms: [],',
     '        tuitionForms: [],',
     '        creditForms: [],',
+    '        iraForms: [],',
+    '        priorYearIraBasisForms: [],',
     '    }',
     '    const runYear = ctx.taxParams.taxYear',
     '    const noteYearMismatch = documentHash => doc => acc => {',
     '        if (acc.yearMismatch !== undefined) { return acc }',
     '        if (doc.dialect === \'vnd.fjs.prior_year_capital_loss\') { return acc }',
+    '        if (doc.dialect === \'vnd.fjs.prior_year_ira_basis\') { return acc }',
     '        const year = doc.taxYear',
     '        if (typeof year !== \'number\') { return acc }',
     '        if (year === runYear) { return acc }',
@@ -345,6 +364,8 @@ export const taxReturnReportSource = [
     '        if (doc.dialect === \'vnd.fjs.1098e\') { return { ...acc, studentLoanInterestForms: [...acc.studentLoanInterestForms, stored] } }',
     '        if (doc.dialect === \'vnd.fjs.1098t\') { return { ...acc, tuitionForms: [...acc.tuitionForms, stored] } }',
     '        if (doc.dialect === \'vnd.fjs.credits\') { return { ...acc, creditForms: [...acc.creditForms, stored] } }',
+    '        if (doc.dialect === \'vnd.fjs.ira\') { return { ...acc, iraForms: [...acc.iraForms, stored] } }',
+    '        if (doc.dialect === \'vnd.fjs.prior_year_ira_basis\') { return { ...acc, priorYearIraBasisForms: [...acc.priorYearIraBasisForms, stored] } }',
     '        return undefined',
     '    }',
     '    const collect = documentHash => doc => acc => {',
@@ -397,6 +418,8 @@ export const taxReturnReportSource = [
     '            studentLoanInterestForms: acc.studentLoanInterestForms,',
     '            tuitionForms: acc.tuitionForms,',
     '            creditForms: acc.creditForms,',
+    '            iraForms: acc.iraForms,',
+    '            priorYearIraBasisForms: acc.priorYearIraBasisForms,',
     '        })',
     '        if (outcome.kind === \'error\') {',
     '            return { kind: \'error\', message: outcome.message, unmodeled: outcome.unmodeled }',
@@ -463,6 +486,8 @@ const emptyCollected = {
     studentLoanInterestForms: [],
     tuitionForms: [],
     creditForms: [],
+    iraForms: [],
+    priorYearIraBasisForms: [],
 }
 
 /**
@@ -474,7 +499,7 @@ const emptyCollected = {
  * a computed key (`{ ...acc, [field]: [...] }`), which no type can express
  * without discarding exactly the per-dialect element type
  * `Form1040Inputs` exists to guarantee. Thirteen explicit branches cost
- * thirteen lines and keep `tsc` checking that a 1099-R never lands in `w2s`.
+ * seventeen lines and keep `tsc` checking that a 1099-R never lands in `w2s`.
  * Returns `undefined` — never `acc` — for a dialect the engine has no field
  * for, so {@link collectDocument} can tell "routed" apart from "skipped"
  * without comparing object identities that every spread would break.
@@ -501,6 +526,8 @@ const routeDocument = documentHash => doc => acc => {
     if (doc.dialect === oneZeroNineEightEDialect) { return { ...acc, studentLoanInterestForms: [...acc.studentLoanInterestForms, { documentHash, value: doc }] } }
     if (doc.dialect === oneZeroNineEightTDialect) { return { ...acc, tuitionForms: [...acc.tuitionForms, { documentHash, value: doc }] } }
     if (doc.dialect === creditsDialect) { return { ...acc, creditForms: [...acc.creditForms, { documentHash, value: doc }] } }
+    if (doc.dialect === iraDialect) { return { ...acc, iraForms: [...acc.iraForms, { documentHash, value: doc }] } }
+    if (doc.dialect === priorYearIraBasisDialect) { return { ...acc, priorYearIraBasisForms: [...acc.priorYearIraBasisForms, { documentHash, value: doc }] } }
     return undefined
 }
 
@@ -510,12 +537,22 @@ const routeDocument = documentHash => doc => acc => {
  * See the module header for the whole rule and why refusing is not the same
  * decision as filtering.
  *
- * `vnd.fjs.prior_year_capital_loss` is the ONE exemption, by name: a capital
- * loss carryover records a PRIOR year by definition
- * (`fjs/document/prior_year_capital_loss`'s own docstring — its `taxYear`
- * "names the PRIOR year these four figures come off"), so its year is
- * SUPPOSED to differ and refusing on it would make every carryover
- * unusable.
+ * There are exactly TWO exemptions, both by name, and both for the identical
+ * reason — the document records a PRIOR year by definition, so its year is
+ * SUPPOSED to differ and refusing on it would make the fact unusable:
+ *
+ * - `vnd.fjs.prior_year_capital_loss` — a capital loss carryover
+ *   (`fjs/document/prior_year_capital_loss`'s own docstring: its `taxYear`
+ *   "names the PRIOR year these four figures come off").
+ * - `vnd.fjs.prior_year_ira_basis` — Form 8606's line 2, which its
+ *   instructions resolve to "the amount from line 14 of that Form 8606",
+ *   meaning last year's (Phase 26, TAX-29).
+ *
+ * They are written as an explicit two-term disjunction rather than as a
+ * membership test against a list, deliberately: two named constants a reader
+ * can check against the two modules that declare them beats a collection that
+ * could quietly grow. See the module header for why an exemption added
+ * wrongly is the dangerous direction.
  *
  * The `typeof` guard is how "carries a `taxYear` field" is expressed as a
  * property of the DATA rather than as a list of dialects. Every dialect this
@@ -533,7 +570,7 @@ const noteYearMismatch = runYear => documentHash => doc => acc => {
     if (acc.yearMismatch !== undefined) {
         return acc
     }
-    if (doc.dialect === priorYearCapitalLossDialect) {
+    if (doc.dialect === priorYearCapitalLossDialect || doc.dialect === priorYearIraBasisDialect) {
         return acc
     }
     const year = doc.taxYear
@@ -564,7 +601,7 @@ const collectDocument = runYear => documentHash => doc => acc => {
 
 /**
  * Turns the collected document set into the wire result —
- * {@link taxReturnReportSource}'s own `render`, typed. The eleven fields are
+ * {@link taxReturnReportSource}'s own `render`, typed. The seventeen fields are
  * spelled out rather than spread, because `Collected` carries two members
  * `Form1040Inputs` does not (`duplicateProfile`, and a `profile` that may
  * still be `undefined`) and a spread would carry the first of those into the
@@ -603,6 +640,8 @@ const renderReturn = ctx => acc => {
         studentLoanInterestForms: acc.studentLoanInterestForms,
         tuitionForms: acc.tuitionForms,
         creditForms: acc.creditForms,
+        iraForms: acc.iraForms,
+        priorYearIraBasisForms: acc.priorYearIraBasisForms,
     })
     if (outcome.kind === 'error') {
         return { kind: 'error', message: outcome.message, unmodeled: outcome.unmodeled }
@@ -701,6 +740,12 @@ const fixtureCreditsW2Hash = 'sha256-tax-return-credits-w2'
 const fixtureCreditsTuitionHash = 'sha256-tax-return-credits-1098t'
 const fixtureCreditsRecordHash = 'sha256-tax-return-credits-record'
 const fixtureCreditsProfileUndeclaredHash = 'sha256-tax-return-credits-profile-undeclared'
+// Phase 26 (TAX-28/TAX-29): a retiree with a QCD and a nondeductible basis.
+const fixtureRetireeProfileHash = 'sha256-tax-return-retiree-profile'
+const fixtureRetiree1099RHash = 'sha256-tax-return-retiree-1099r'
+const fixtureRetireeIraHash = 'sha256-tax-return-retiree-ira'
+const fixtureRetireeBasisHash = 'sha256-tax-return-retiree-basis'
+const fixtureRetireeProfileOnlyHash = 'sha256-tax-return-retiree-profile-only'
 
 const subjectProfile = 'tax-return-subject-profile'
 const subjectW2A = 'tax-return-subject-w2-a'
@@ -719,6 +764,14 @@ const subjectCreditsW2 = 'tax-return-subject-credits-w2'
 const subjectCreditsTuition = 'tax-return-subject-credits-1098t'
 const subjectCreditsRecord = 'tax-return-subject-credits-record'
 const subjectCreditsProfileUndeclared = 'tax-return-subject-credits-profile-undeclared'
+// Phase 26 (TAX-28/TAX-29): a THIRD separate subject set, for the same reason
+// Phase 25 took a second one — so both earlier fixtures keep computing byte
+// for byte what they always have.
+const subjectRetireeProfile = 'tax-return-subject-retiree-profile'
+const subjectRetiree1099R = 'tax-return-subject-retiree-1099r'
+const subjectRetireeIra = 'tax-return-subject-retiree-ira'
+const subjectRetireeBasis = 'tax-return-subject-retiree-basis'
+const subjectRetireeProfileOnly = 'tax-return-subject-retiree-profile-only'
 
 /** @type {Readonly<Record<string, EngineDocument | { readonly dialect: string, readonly taxYear?: number }>>} */
 const documentByHash = {
@@ -893,6 +946,68 @@ const documentByHash = {
         dependentCount: 0,
         declaredKinds: ['wages'],
     },
+    // ── Phase 26's own five documents (TAX-28/TAX-29) ───────────────────
+    //
+    // A 65-or-older retiree with one IRA: $50,000 distributed, $20,000 of it
+    // given straight to a food bank, $20,000 of prior-year nondeductible
+    // basis, and $150,000 of aggregated traditional IRAs left at 31 December.
+    // A separate subject set, so every figure Phases 21 and 25 pinned keeps
+    // computing byte for byte what it always has.
+    [fixtureRetireeProfileHash]: {
+        dialect: returnProfileDialect,
+        taxYear: 2025,
+        filingStatus: 'single',
+        dependentCount: 0,
+        taxpayerBornBeforeJan2_1961: true,
+        declaredKinds: ['iraDistributions', 'seniorAndOtherScheduleOneADeductions'],
+    },
+    [fixtureRetiree1099RHash]: {
+        dialect: oneZeroNineNineRDialect,
+        payerTin: '66-6666666',
+        recipientTin: '222-22-2222',
+        accountNumber: 'ACC-IRA',
+        taxYear: 2025,
+        formRevision: '2025',
+        box1GrossDistribution: '50000.00',
+        box2aTaxableAmount: '50000.00',
+        // What a custodian actually checks on a traditional IRA, and the
+        // reason a QCD cannot be read off the document: the payer does not
+        // know what the taxpayer did with the money.
+        box2bTaxableAmountNotDetermined: true,
+        box7bIraSepSimple: true,
+    },
+    [fixtureRetireeIraHash]: {
+        dialect: iraDialect,
+        recipientTin: '222-22-2222',
+        taxYear: 2025,
+        attainedAgeSeventyAndAHalfAtEveryDistributionBelow: true,
+        qualifiedCharitableDistributions: [{
+            payerTin: '66-6666666',
+            accountNumber: 'ACC-IRA',
+            charity: 'Riverside Food Bank',
+            amount: '20000.00',
+        }],
+        yearEndValueOfAllTraditionalSepSimpleIras: '150000.00',
+    },
+    // The PRIOR-year document, and the second exemption from the mixed-year
+    // refusal: its 2024 must not refuse a 2025 run.
+    [fixtureRetireeBasisHash]: {
+        dialect: priorYearIraBasisDialect,
+        recipientTin: '222-22-2222',
+        taxYear: 2024,
+        priorYearForm8606Line14: '20000.00',
+    },
+    // The same retiree with neither election nor basis — the return this
+    // engine computed before Phase 26, and the control that prices what it
+    // was silently overstating.
+    [fixtureRetireeProfileOnlyHash]: {
+        dialect: returnProfileDialect,
+        taxYear: 2025,
+        filingStatus: 'single',
+        dependentCount: 0,
+        taxpayerBornBeforeJan2_1961: true,
+        declaredKinds: ['iraDistributions', 'seniorAndOtherScheduleOneADeductions'],
+    },
 }
 
 /** @type {Readonly<Record<string, string>>} */
@@ -912,6 +1027,11 @@ const snapshotBySubject = {
     [subjectCreditsTuition]: fixtureCreditsTuitionHash,
     [subjectCreditsRecord]: fixtureCreditsRecordHash,
     [subjectCreditsProfileUndeclared]: fixtureCreditsProfileUndeclaredHash,
+    [subjectRetireeProfile]: fixtureRetireeProfileHash,
+    [subjectRetiree1099R]: fixtureRetiree1099RHash,
+    [subjectRetireeIra]: fixtureRetireeIraHash,
+    [subjectRetireeBasis]: fixtureRetireeBasisHash,
+    [subjectRetireeProfileOnly]: fixtureRetireeProfileOnlyHash,
 }
 
 /**
@@ -949,6 +1069,11 @@ const creditsSubjects = [
     subjectCreditsTuition, subjectCreditsW2, subjectCreditsRecord, subjectCreditsProfile,
 ]
 
+/** Phase 26's own four subjects, likewise NOT in sorted order. */
+const retireeSubjects = [
+    subjectRetireeBasis, subjectRetireeIra, subjectRetiree1099R, subjectRetireeProfile,
+]
+
 /**
  * Runs the twin against a subject enumeration and returns its result.
  * @type {(subjects: readonly string[]) => TaxReturnResult}
@@ -983,8 +1108,15 @@ const renderedCents = result => rule => {
  * independently HAND-TYPED count of them.
  *
  * The count is the point: a loop over this list alone could never notice the
- * list shrinking (AGENTS.md's fourth shipped defect), so eleven is written
+ * list shrinking (AGENTS.md's fourth shipped defect), so seventeen is written
  * out here and asserted beside the loop.
+ *
+ * **Every prose count in this file's docstrings was stale before Phase 26**
+ * — the module header said "eleven fields" and "twelve dialects" while the
+ * twin dispatched on fifteen, because prose is not asserted and only
+ * {@link expectedDispatchedDialectCount} below is. They are corrected in
+ * this commit, and the correction is itself the argument: a number a reader
+ * is asked to trust belongs beside an assertion, not inside a sentence.
  */
 const dispatchedDialects = [
     returnProfileDialect,
@@ -1005,14 +1137,22 @@ const dispatchedDialects = [
     // silently stopped covering the two newest dialects — the same
     // hand-typed-list drift `fjs/return/scope`'s own modeled-kind list
     // suffered twice. Corrected here, with the two this phase adds.
+    //
+    // Phase 26 adds the SIXTEENTH and SEVENTEENTH, `vnd.fjs.ira` and
+    // `vnd.fjs.prior_year_ira_basis`, moving the count from 15 to 17 in one
+    // step — added to this list in the SAME commit that adds them to the
+    // source and the twin, which is the discipline the paragraph above
+    // exists to ask for.
     adjustmentsDialect,
     oneZeroNineEightEDialect,
     oneZeroNineEightTDialect,
     creditsDialect,
+    iraDialect,
+    priorYearIraBasisDialect,
 ]
 
 /** @type {number} */
-const expectedDispatchedDialectCount = 15
+const expectedDispatchedDialectCount = 17
 
 export const proof = {
     // The phase's central number check, and the reason this module exists:
@@ -1213,6 +1353,38 @@ export const proof = {
                 assertEq(renderedCents(result)('1040 line 34'), 553500n)
             }
         },
+        // The SECOND exemption, added in Phase 26 (TAX-29) and proven real
+        // rather than assumed exactly as the first is: Form 8606's line 2 is
+        // "the amount from line 14 of THAT Form 8606", meaning last year's,
+        // so a 2024 basis document must not refuse a 2025 run — and the
+        // return it produces is still the fixture's own, unchanged.
+        // It is deliberately NOT bolted onto the Phase 21 fixture the way the
+        // capital-loss control above is. A stored basis with no
+        // `vnd.fjs.ira` record beside it is itself a REFUSAL
+        // (`fjs/form8606`'s own "ignoring the basis would tax after-tax money
+        // a second time"), so that arrangement would refuse for a reason that
+        // has nothing to do with the year rule and would prove nothing about
+        // it. The retiree fixture, which carries both, is the honest control.
+        aPriorYearIraBasisIsExemptAndStillComputes: () => {
+            const result = runTwin(retireeSubjects)
+            assert(result.kind === 'ok', ['a prior-year IRA basis must not refuse the run', result])
+            if (result.kind === 'ok') {
+                assertEq(renderedCents(result)('1040 line 4b'), 2667000n, '$26,670.00')
+            }
+            // And the direct evidence: dropping the exemption would produce
+            // the MIXED-YEAR message specifically, so its absence is what is
+            // asserted — not merely that some error did not occur.
+            const withoutTheBasis = runTwin(
+                retireeSubjects.filter(subject => subject !== subjectRetireeBasis))
+            assertEq(withoutTheBasis.kind, 'ok')
+            if (withoutTheBasis.kind === 'ok') {
+                // Without the basis document, Form 8606 Part I does not apply
+                // at all and line 4b is simply the box-2a sum less the QCD:
+                // $50,000.00 - $20,000.00 = $30,000.00. So the 2024 document
+                // is genuinely being READ rather than merely tolerated.
+                assertEq(renderedCents(withoutTheBasis)('1040 line 4b'), 3000000n, '$30,000.00')
+            }
+        },
         // The deliberate narrowing (module header): a dialect the engine has
         // no field for is never handed to it, so its year cannot make a line
         // wrong and must not block the return. Without this leaf the
@@ -1249,11 +1421,19 @@ export const proof = {
     // 22 = $855.00; the refundable 40% of the $2,500.00 American Opportunity
     // Credit = $1,000.00 on line 29; $1,000.00 - $855.00 = $145.00 overpaid.
     //
-    // What this leaf proves that the direct one cannot: the SOURCE TEXT's own
-    // `route` branches for `vnd.fjs.1098t` and `vnd.fjs.credits` are real.
-    // Delete either and the credits vanish, because no other fixture in this
-    // repository carries a document of either dialect through the stored
-    // program.
+    // What this leaf proves that the direct one cannot: the `route` branches
+    // for `vnd.fjs.1098t` and `vnd.fjs.credits` are real. Delete either and
+    // the credits vanish, because no other fixture in this repository carries
+    // a document of either dialect through this program.
+    //
+    // `[CORRECTED, Phase 26]` This paragraph said "the SOURCE TEXT's own
+    // `route` branches", which is not what it proves: `runTwin` interprets
+    // {@link taxReturnReport}, the function twin, and the literal source text
+    // is executed only by `tax-return-integration.test.js`. The sentence is
+    // narrowed to what is true; the source text's own branches are covered by
+    // {@link proof.sourceAndTwinDispatchOnTheSameSeventeenDialects}'s
+    // verbatim-tag grep alone, and Phase 26's own retiree leaf below states
+    // the same gap for the two dialects it adds.
     storedProgramRoutesTheTwoCreditDialectsAndComputesBothCredits: () => {
         const result = runTwin(creditsSubjects)
         assert(result.kind === 'ok', ['expected a computed return', result])
@@ -1307,12 +1487,115 @@ export const proof = {
             )
         }
     },
+    // ── Phase 26 (TAX-28/TAX-29): the two new dialects, through the STORED
+    //    PROGRAM rather than only through the host twin ─────────────────────
+    //
+    // Every figure below is hand-derived here, independently of any other
+    // file. A 65-or-older single retiree, one IRA:
+    //
+    //   1099-R box 1 = box 2a                          $50,000.00
+    //   QCD to a food bank                             $20,000.00
+    //   prior-year Form 8606 line 14 (2024)            $20,000.00
+    //   value of ALL traditional IRAs at 31 Dec       $150,000.00
+    //
+    //   line 4a                                        $50,000.00  (GROSS)
+    //   Form 8606 line 7 = 50,000 - 20,000             $30,000.00
+    //   line 9 = 150,000 + 30,000                     $180,000.00
+    //   line 10 = 20,000 / 180,000 = 0.1111 -> 0.111        0.111
+    //   line 12 = 30,000 x 0.111                        $3,330.00
+    //   line 15c = 30,000 - 3,330 -> 1040 line 4b      $26,670.00
+    //
+    //   line 9 / line 11 (AGI)                         $26,670.00
+    //   line 12e = 15,750 + 2,000 (one age box)        $17,750.00
+    //   line 13b senior deduction (AGI under 75,000)    $6,000.00
+    //   line 14                                        $23,750.00
+    //   line 15 = 26,670 - 23,750                       $2,920.00
+    //   line 16: $2,920 falls in a $25-WIDE Tax Table row (the band
+    //     structure is $25 below $3,000 and $50 above it), so the row is
+    //     $2,900.00-$2,925.00, its midpoint is $2,912.50, and 10% of that
+    //     is $291.25, rounded to the nearest dollar                $291.00
+    //   line 37 amount owed                               $291.00
+    //
+    // **What this leaf proves, stated precisely, because the neighbouring
+    // Phase 25 leaf overstates the same claim and it was worth checking.**
+    // `runTwin` interprets {@link taxReturnReport} — the TWIN — so what is
+    // proven here is that the twin's `route` and `noteYearMismatch` branches
+    // for `vnd.fjs.ira` and `vnd.fjs.prior_year_ira_basis` are real: delete
+    // either and the QCD or the basis vanishes, because no other fixture in
+    // this repository carries a document of either dialect through this
+    // program.
+    //
+    // The SOURCE TEXT's own branches are a separate question, and this file
+    // covers them only through
+    // {@link proof.sourceAndTwinDispatchOnTheSameSeventeenDialects}'s
+    // verbatim-tag grep. The one place the literal source is EXECUTED is
+    // `tax-return-integration.test.js`, whose fixture is Phase 21's two W-2s
+    // and one 1099-G and carries no Form 1099-R at all — so the source's
+    // handling of these two dialects is checked by a `String.includes`, not
+    // by a computed figure. **That is a real gap and it is named here rather
+    // than papered over**; closing it means adding an IRA to that harness's
+    // seeded document set, which also moves its hand-typed `readCount` and is
+    // a change to a server integration test rather than to a proof.
+    storedProgramRoutesTheTwoIraDialectsAndComputesTheQcdAndTheBasis: () => {
+        const result = runTwin(retireeSubjects)
+        assert(result.kind === 'ok', ['expected a computed return', result])
+        if (result.kind !== 'ok') {
+            return
+        }
+        const cents = renderedCents(result)
+        assertEq(cents('1040 line 4a'), 5000000n, '$50,000.00 — line 4a stays GROSS')
+        assertEq(cents('1040 line 4b'), 2667000n, '$26,670.00')
+        assertEq(cents('1040 line 11a'), 2667000n, '$26,670.00 AGI')
+        assertEq(cents('1040 line 13b'), 600000n, '$6,000.00 senior deduction')
+        assertEq(cents('1040 line 15'), 292000n, '$2,920.00')
+        assertEq(cents('1040 line 16 (Tax Table)'), 29100n, '$291.00')
+        assertEq(cents('1040 line 37'), 29100n, '$291.00 owed')
+        // PROV-01/PROV-02 survive the crossing: line 4b still names the gift
+        // it was reduced by, and the prior-year basis it was computed with.
+        const line4b = assertNotNullish(
+            result.lines.find(candidate => candidate.rule === '1040 line 4b'), 'expected line 4b')
+        assert(
+            line4b.sources.some(source =>
+                source.documentHash === fixtureRetireeIraHash
+                && source.boxPath === 'qualifiedCharitableDistributions[charity=Riverside Food Bank]'),
+            ['line 4b must cite the gift', line4b.sources])
+        assert(
+            line4b.sources.some(source =>
+                source.documentHash === fixtureRetireeBasisHash
+                && source.boxPath === 'priorYearForm8606Line14'),
+            ['line 4b must cite the prior-year basis', line4b.sources])
+    },
+    // **Criterion 4 through the stored program, and the price of the silence.**
+    // The SAME 1099-R and the SAME profile with both new documents withheld:
+    // line 4b is the full $50,000.00, AGI is $50,000.00, line 15 is
+    // $50,000.00 - $23,750.00 = $26,250.00, which is above $3,000 and so
+    // falls in a $50-wide row ($26,250.00-$26,300.00, midpoint $26,275.00);
+    // 11,925 x 10% + (26,275 - 11,925) x 12% = 1,192.50 + 1,722.00 =
+    // $2,914.50, rounded to $2,915.00.
+    //
+    // So this engine charged this retiree **$2,915.00 where the law charges
+    // $291.00** — $2,624.00 too much, silently, with full citations and no
+    // warning. That is the number TAX-28 and TAX-29 exist for, and it is
+    // written here rather than described.
+    theSameRetireeWithoutTheTwoDocumentsIsTheOverstatementThisPhaseCloses: () => {
+        const result = runTwin([subjectRetiree1099R, subjectRetireeProfileOnly])
+        assert(result.kind === 'ok', ['expected a computed return', result])
+        if (result.kind !== 'ok') {
+            return
+        }
+        const cents = renderedCents(result)
+        assertEq(cents('1040 line 4a'), 5000000n, 'the same gross figure')
+        assertEq(cents('1040 line 4b'), 5000000n, 'taxed in full')
+        assertEq(cents('1040 line 15'), 2625000n, '$26,250.00')
+        assertEq(cents('1040 line 16 (Tax Table)'), 291500n, '$2,915.00')
+        assertEq(cents('1040 line 37'), 291500n, '$2,915.00 owed')
+    },
     // The one mechanical half of the source/twin hand-sync (see the module
     // header): every dialect tag the TWIN dispatches on appears verbatim in
     // the SOURCE text, against a hand-typed count. The twin imports these
     // constants; the source cannot, so it spells them out — this is what
     // stops a rename from quietly desynchronizing the two.
-    sourceAndTwinDispatchOnTheSameFifteenDialects: () => {
+    sourceAndTwinDispatchOnTheSameSeventeenDialects: () => {
         assertEq(dispatchedDialects.length, expectedDispatchedDialectCount)
         for (const tag of dispatchedDialects) {
             assert(

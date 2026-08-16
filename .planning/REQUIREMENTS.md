@@ -617,14 +617,62 @@ itemizing, which is complete apart from the eight open MAINT items.
 
 ### Retiree Completion (TAX)
 
-- [ ] **TAX-28** *(M2, T2)*: **Qualified Charitable Distributions.** A QCD is a taxpayer
+- [x] **TAX-28** *(M2, T2)*: **Qualified Charitable Distributions.** A QCD is a taxpayer
       *election*, not a 1099-R box — the custodian reports the gross distribution and the filer
       writes "QCD" beside 1040 line 4b. Today the engine taxes it in full and **overstates
       silently**. Needs a profile-level election plus the line-4b reduction, with the $108,000
       (TY2025, indexed) per-person cap.
+
+      **Shipped (Phase 26), with one deliberate deviation and two named gaps.** The election
+      reduces 1040 line 4b while line 4a stays gross, capped at §408(d)(8)(A)'s $108,000 per
+      INDIVIDUAL (`fjs/tax/params`, with its indexing history and a citation, never a literal).
+
+      *The deviation*: the election is **document-level, not profile-level** — a new
+      `vnd.fjs.ira` dialect rather than fields on `vnd.fjs.return_profile`. Three reasons, all
+      of which the profile cannot meet: the cap is per person and the profile carries no TIN at
+      all; each gift must name the distribution it came out of by `(payerTin, accountNumber)`,
+      which is what makes "this came from a 401(k), not an IRA" and "this exceeds the
+      distribution it claims to come from" refusable rather than merely wrong; and a joint
+      return has two elections, not one.
+
+      *Gap 1 — the 70½ test is ASSERTED, not derived, and its absence REFUSES.* §408(d)(8)(B)(ii)
+      requires age 70½ **at the time of the distribution**. This engine cannot determine that:
+      **no birth date is stored anywhere in this repository**, the nearest fact is 1040 line
+      12d's `taxpayerBornBeforeJan2_1961` (a **65** test, four and a half years short), and even
+      a birth date would not settle a test taken at a *date* the engine only has as 1099-R box
+      13 free text. The one derivable direction — attaining 70½ in 2025 implies the 12d box —
+      IS checked, so an unchecked box contradicts the assertion and refuses. Residual: on a
+      joint return the check uses the UNION of the two 12d boxes, because no TIN links a record
+      to a person, so a 60-year-old spouse's QCD passes on the elder's box.
+
+      *Gap 2 — §408(d)(8)(F)'s one-time split-interest election refuses by name*, quoting both
+      its own $54,000 sub-cap and the $108,000 it sits inside. It is once per LIFETIME, spanning
+      years this engine cannot see, and needs a statement attached to the return.
 - [ ] **TAX-29** *(M2, T2)*: **Form 8606**, nondeductible IRA basis and the pro-rata rule.
       Without it, after-tax IRA money is taxed twice. Also the piece that makes a backdoor Roth
       computable, which is why it serves the FAANG persona as much as the retiree.
+
+      **UNTICKED DELIBERATELY: the first sentence ships and the second does not.** Phase 26
+      built Form 8606 **Part I** in full — §408(d)(2)'s pro-rata rule over the **aggregated**
+      year-end value of every traditional/SEP/SIMPLE IRA one person owns (a two-IRA case is
+      proven distinct from a one-IRA case at the same total), the prior year's line 14 carried
+      forward through a new `vnd.fjs.prior_year_ira_basis` dialect, and line 15c reaching 1040
+      line 4b. So after-tax IRA money is no longer taxed twice, which is the requirement's own
+      stated harm.
+
+      **But a backdoor Roth is not computable, and this requirement says it should be.** A
+      backdoor Roth is a nondeductible contribution *plus a conversion to a Roth IRA*; the
+      conversion is Form 8606 **Part II**, which is refused by name (`netAmountConvertedToRoth\
+      Iras`), because line 18 is a second amount landing on 1040 line 4b beside line 15c and
+      §408A(d)(3)'s recapture regime is unmodelled. **Part III** (distributions from Roth IRAs)
+      is likewise refused, detected off Form 1099-R box 7a codes J/T/Q rather than off an
+      assertion, since a Roth distribution arrives as a document. So the FAANG half of this
+      requirement is untouched and the box stays empty.
+
+      Also refused by name rather than ignored: an absent aggregated year-end value (the
+      pro-rata denominator, which no document reports and which has no defensible default), an
+      outstanding rollover or recharacterization, a Form 8915-F qualified disaster distribution,
+      and a stored basis with no `vnd.fjs.ira` record beside it.
 
 ### Startup Founder: Self-Employment (DOC, TAX) — reversed from Out of Scope 2026-08-15
 

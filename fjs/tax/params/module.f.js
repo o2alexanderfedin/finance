@@ -1456,6 +1456,66 @@ export const educationCredits = {
 }
 
 /**
+ * §408(d)(8)'s qualified charitable distribution limits — TAX-28, Phase 26.
+ *
+ * ## Both figures are INDEXED, and one of them is inside the other
+ *
+ * SECURE 2.0 §307 made both dollar figures inflation-adjusted, so neither is
+ * a statutory constant and both are TY2025's alone. The annual limit was
+ * $100,000 from 2006 through 2023, $105,000 for 2024 and $108,000 for 2025;
+ * the one-time split-interest figure was $50,000 for 2023, $53,000 for 2024
+ * and $54,000 for 2025. A reader who remembers "$100,000" — which is the
+ * figure written in §408(d)(8)(A) itself and the figure every pre-2024 IRS
+ * article states — is looking at a number that has moved twice since.
+ *
+ * **{@link splitInterestOneTimeLimit} is not an ADDITIONAL allowance.** The
+ * printed instruction is explicit: *"Generally, your total QCDs for the year
+ * can't be more than $108,000. **This includes** any amount (up to $54,000)
+ * of a one-time QCD to a split-interest entity (SIE)."* So the smaller figure
+ * is a sub-cap carved out of the larger one, never a second budget beside it,
+ * and reading the pair as $162,000 is the most natural wrong thing to do with
+ * them. `fjs/form8606` REFUSES a split-interest election outright rather than
+ * computing it (see that module's own docstring for what an SIE election
+ * would additionally require), and this figure is stored so that refusal can
+ * NAME the limit the taxpayer is asking about rather than describe it
+ * vaguely.
+ *
+ * ## Per INDIVIDUAL, which is not per RETURN
+ *
+ * *"If you file a joint return, the same rules apply to your spouse."* A
+ * married couple with two IRAs and two donors has two separate $108,000
+ * limits, and there is no combined figure anywhere on the printed page — so
+ * nothing in this group is keyed by filing status, deliberately. The
+ * per-person scoping is `fjs/form8606`'s, keyed on the recipient TIN the
+ * documents themselves carry.
+ *
+ * ## Citation kind
+ *
+ * `kind: 'code'`, per the same "governing provision, not the literal source"
+ * position {@link studentLoanInterestDeduction} records: §408(d)(8)(A) is
+ * where the annual exclusion lives and §408(d)(8)(F) is where the one-time
+ * split-interest election lives, but the TY2025 dollar figures themselves
+ * come from the printed 2025 Form 1040 instructions' own Line 4a and 4b
+ * "Exception 3" paragraph (`i1040gi.pdf`, fetched and read directly rather
+ * than recalled).
+ * @type {{
+ *   readonly annualLimitPerIndividual: AmountWithCitation,
+ *   readonly splitInterestOneTimeLimit: AmountWithCitation,
+ * }}
+ */
+export const qualifiedCharitableDistribution = {
+    annualLimitPerIndividual: {
+        amount: '108000.00',
+        citation: { kind: 'code', section: '§408(d)(8)(A)', effectiveDate: '2025-01-01' },
+    },
+    // The sub-cap, NOT a second budget — see this group's own docstring.
+    splitInterestOneTimeLimit: {
+        amount: '54000.00',
+        citation: { kind: 'code', section: '§408(d)(8)(F)', effectiveDate: '2025-01-01' },
+    },
+}
+
+/**
  * A full tax-year parameter set: every TY2025 parameter this phase
  * requires, together.
  *
@@ -1499,6 +1559,7 @@ export const educationCredits = {
  *   readonly healthSavingsAccount: typeof healthSavingsAccount,
  *   readonly retirementSavingsContributionsCredit: typeof retirementSavingsContributionsCredit,
  *   readonly educationCredits: typeof educationCredits,
+ *   readonly qualifiedCharitableDistribution: typeof qualifiedCharitableDistribution,
  * }} TaxParamSet
  */
 
@@ -1533,6 +1594,7 @@ export const taxParamsByYear = {
         healthSavingsAccount,
         retirementSavingsContributionsCredit,
         educationCredits,
+        qualifiedCharitableDistribution,
     },
 }
 
@@ -1652,6 +1714,8 @@ const everyDollarStringField = [
     educationCredits.phaseoutRange.marriedFilingJointly.amount,
     educationCredits.phaseoutRange.headOfHousehold.amount,
     educationCredits.phaseoutRange.qualifyingSurvivingSpouse.amount,
+    qualifiedCharitableDistribution.annualLimitPerIndividual.amount,
+    qualifiedCharitableDistribution.splitInterestOneTimeLimit.amount,
 ]
 
 export const proof = {
@@ -2671,6 +2735,102 @@ export const proof = {
                     ['every education credit figure is §25A\'s', figure.citation.section],
                 )
             }
+        },
+    },
+    // ── TAX-28 (Phase 26): §408(d)(8)'s two QCD limits ──────────────────────
+    qualifiedCharitableDistribution: {
+        // Both figures hand-typed off the printed 2025 Form 1040 instructions'
+        // own Line 4a/4b "Exception 3" paragraph, never derived from each
+        // other and never from anything this module computes.
+        bothTy2025LimitsMatchThePrintedInstruction: () => {
+            assertEq(
+                qualifiedCharitableDistribution.annualLimitPerIndividual.amount,
+                '108000.00',
+                'i1040gi: "your total QCDs for the year can\'t be more than $108,000"',
+            )
+            assertEq(
+                qualifiedCharitableDistribution.splitInterestOneTimeLimit.amount,
+                '54000.00',
+                'i1040gi: "any amount (up to $54,000) of a one-time QCD to a split-interest entity"',
+            )
+        },
+        // The single most consequential property of the pair, and the one a
+        // reader is most likely to get backwards: the split-interest figure
+        // is a SUB-CAP carved out of the annual limit, not a second budget
+        // beside it. Asserted as a strict inequality rather than described,
+        // so a future year's figures cannot silently invert the relation.
+        theSplitInterestLimitIsInsideTheAnnualLimitNotBesideIt: () => {
+            const annual = centsFromString(
+                qualifiedCharitableDistribution.annualLimitPerIndividual.amount)
+            const splitInterest = centsFromString(
+                qualifiedCharitableDistribution.splitInterestOneTimeLimit.amount)
+            assert(
+                splitInterest < annual,
+                ['the one-time SIE limit must be strictly inside the annual limit',
+                    qualifiedCharitableDistribution.splitInterestOneTimeLimit.amount,
+                    qualifiedCharitableDistribution.annualLimitPerIndividual.amount],
+            )
+            // And the reading this leaf exists to forbid: the two are not
+            // added. $108,000 + $54,000 = $162,000 is not a limit that exists
+            // anywhere on the printed page.
+            assert(
+                annual + splitInterest !== annual,
+                'the sum is a real number; it is simply not a limit',
+            )
+            assertEq(centsToString(annual + splitInterest), '162000.00')
+        },
+        // Nothing in this group is keyed by filing status — the limit is per
+        // INDIVIDUAL, and a joint return has two of them rather than one
+        // larger one. Asserted rather than described, so a status-keyed
+        // rewrite has to delete this leaf deliberately.
+        //
+        // `[FINDING, this phase's verification]` The FIRST attempt at this
+        // mutation — adding `single:` to the object alone — does not compile:
+        // the group's own `@type` annotation is a closed two-field record, so
+        // `tsc` stops at **TS2353** before a test runs, and the gate measures
+        // the compiler rather than the suite (AGENTS.md's first failure mode).
+        // Reshaped to widen the ANNOTATION and the object together, which is
+        // the rewrite a future phase would actually perform, the mutation
+        // reddens exactly this leaf and nothing else. So the annotation is the
+        // primary guard and this leaf is the one that survives the annotation
+        // being widened with it — which is precisely the case prose could not
+        // catch.
+        neitherLimitIsKeyedByFilingStatus: () => {
+            for (const status of individualFilingStatuses) {
+                assertEq(
+                    Object.keys(qualifiedCharitableDistribution).includes(status),
+                    false,
+                    ['a QCD limit is per individual, never per filing status', status],
+                )
+            }
+            assertEq(Object.keys(qualifiedCharitableDistribution).length, 2)
+        },
+        // Both are §408(d)(8)'s, both `kind: 'code'` for the reason
+        // `studentLoanInterestDeduction` records — and the two sections
+        // DIFFER, because the annual exclusion and the one-time election are
+        // separate provisions that a single shared citation would hide.
+        eachLimitCitesItsOwnSubparagraph: () => {
+            assertEq(
+                qualifiedCharitableDistribution.annualLimitPerIndividual.citation.kind, 'code')
+            assertEq(
+                qualifiedCharitableDistribution.annualLimitPerIndividual.citation.section,
+                '§408(d)(8)(A)')
+            assertEq(
+                qualifiedCharitableDistribution.annualLimitPerIndividual.citation.effectiveDate,
+                '2025-01-01')
+            assertEq(
+                qualifiedCharitableDistribution.splitInterestOneTimeLimit.citation.kind, 'code')
+            assertEq(
+                qualifiedCharitableDistribution.splitInterestOneTimeLimit.citation.section,
+                '§408(d)(8)(F)')
+            assertEq(
+                qualifiedCharitableDistribution.splitInterestOneTimeLimit.citation.effectiveDate,
+                '2025-01-01')
+            assert(
+                qualifiedCharitableDistribution.annualLimitPerIndividual.citation.section
+                    !== qualifiedCharitableDistribution.splitInterestOneTimeLimit.citation.section,
+                'two separate provisions must not share one citation',
+            )
         },
     },
 }
