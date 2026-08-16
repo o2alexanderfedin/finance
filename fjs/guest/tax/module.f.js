@@ -168,6 +168,8 @@ const parameterProbeInputs = {
     studentLoanInterestForms: [],
     tuitionForms: [],
     creditForms: [],
+    iraForms: [],
+    priorYearIraBasisForms: [],
 }
 
 /**

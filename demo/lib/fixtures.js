@@ -171,6 +171,8 @@ export const inputs = {
     studentLoanInterestForms: [],
     tuitionForms: [],
     creditForms: [],
+    iraForms: [],
+    priorYearIraBasisForms: [],
 }
 
 /**

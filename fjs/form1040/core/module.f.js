@@ -80,6 +80,7 @@ import {
 import { scheduleTwo } from '../../schedule/2/module.f.js'
 import { scheduleThree } from '../../schedule/3/module.f.js'
 import { form8812 } from '../../form8812/module.f.js'
+import { iraTaxableAmount } from '../../form8606/module.f.js'
 import { baseTaxForAmount } from '../../tax/table/module.f.js'
 
 /** @import { ReportLine, Source } from '../../report/line/module.f.js' */
@@ -97,6 +98,8 @@ import { baseTaxForAmount } from '../../tax/table/module.f.js'
 /** @import { Credits } from '../../document/credits/module.f.js' */
 /** @import { OneZeroNineNineG } from '../../document/1099g/module.f.js' */
 /** @import { PriorYearCapitalLoss } from '../../document/prior_year_capital_loss/module.f.js' */
+/** @import { Ira } from '../../document/ira/module.f.js' */
+/** @import { PriorYearIraBasis } from '../../document/prior_year_ira_basis/module.f.js' */
 /** @import { Kind, ReturnProfile } from '../../return/profile/module.f.js' */
 /** @import { IndividualFilingStatus, TaxParamSet } from '../../tax/params/module.f.js' */
 /** @import { Line16Method } from '../../tax/line16/module.f.js' */
@@ -165,6 +168,18 @@ import { baseTaxForAmount } from '../../tax/table/module.f.js'
  * is a list because it genuinely is one — a borrower whose loans were sold
  * mid-year receives one 1098-E per servicer.
  *
+ * `iraForms`/`priorYearIraBasisForms` are Phase 26's own widening
+ * (TAX-28/TAX-29): line 4b reads `vnd.fjs.ira` for the §408(d)(8) qualified
+ * charitable distribution election and Form 8606 Part I's asserted inputs, and
+ * `vnd.fjs.prior_year_ira_basis` for that form's own line 2. **Both are LISTS,
+ * and here that is not merely this typedef's convention** — Form 8606's own
+ * header says "if married, file a separate form for each spouse required to
+ * file 2025 Form 8606", so a joint return genuinely carries two of each, one
+ * per person, and `fjs/form8606` scopes each to the Forms 1099-R bearing the
+ * matching `recipientTin`. A flattening to a single optional document, as
+ * `capitalLossCarryoverForms` gets below, would be wrong rather than merely
+ * lossy.
+ *
  * `capitalLossCarryoverForms` is Plan 15-05's own widening (TAX-17): a LIST,
  * matching this typedef's own established "one running record per taxpayer
  * per year" convention (see `itemizedDeductionForms`/`medicalExpenseForms`
@@ -189,6 +204,8 @@ import { baseTaxForAmount } from '../../tax/table/module.f.js'
  *   readonly studentLoanInterestForms: readonly Stored<OneZeroNineEightE>[],
  *   readonly tuitionForms: readonly Stored<OneZeroNineEightT>[],
  *   readonly creditForms: readonly Stored<Credits>[],
+ *   readonly iraForms: readonly Stored<Ira>[],
+ *   readonly priorYearIraBasisForms: readonly Stored<PriorYearIraBasis>[],
  * }} Form1040Inputs
  */
 
@@ -480,6 +497,7 @@ export const form1040IncomeLines = taxParamSet => inputs => {
         capitalLossCarryoverForms,
         unemploymentForms,
         adjustmentForms, studentLoanInterestForms,
+        iraForms, priorYearIraBasisForms,
     } = inputs
     const declaredZero = profileDeclaredZeroLine(profile)
     const fromDocuments = documentLine(profile)
@@ -619,12 +637,51 @@ export const form1040IncomeLines = taxParamSet => inputs => {
     // different, correctly-routed totals.
     const iraRetirementForms = retirementForms.filter(form => form.value.box7bIraSepSimple === true)
     const pensionRetirementForms = retirementForms.filter(form => form.value.box7bIraSepSimple !== true)
+    //
+    // **Line 4a stays GROSS, and Phase 26 does not touch it.** The printed
+    // instruction is explicit for a qualified charitable distribution: "enter
+    // the total distribution on line 4a. If the total amount distributed is a
+    // QCD, enter -0- on line 4b." The reduction is a TAXABLE-amount reduction,
+    // never a gross one, and `lineFourAStaysGrossWhileFourBFalls` is the leaf
+    // that says so.
     const line4a = fromDocuments('1040 line 4a')(
         sumBoxOverDocuments(iraRetirementForms)('box1GrossDistribution')(
             form => form.box1GrossDistribution))
-    const line4b = fromDocuments('1040 line 4b')(
-        sumBoxOverDocuments(iraRetirementForms)('box2aTaxableAmount')(
-            form => form.box2aTaxableAmount))
+    // 4b — the box-2a sum this engine has always taken, THEN handed to
+    // `fjs/form8606` (Phase 26, TAX-28/TAX-29) for §408(d)(8)'s QCD exclusion
+    // and Form 8606 Part I's pro-rata rule. Passing the already-computed sum
+    // in rather than letting that module rebuild it is what makes "a retiree
+    // with neither a QCD nor a basis computes exactly what they computed
+    // before" a structural identity: with no `vnd.fjs.ira` document,
+    // `iraTaxableAmount` returns this very object back.
+    const line4bBeforeIraRecords = sumBoxOverDocuments(iraRetirementForms)('box2aTaxableAmount')(
+        form => form.box2aTaxableAmount)
+    const iraOutcome = iraTaxableAmount(taxParamSet)({
+        iraRecords: iraForms,
+        priorYearBasisForms: priorYearIraBasisForms,
+        iraRetirementForms,
+        // ALL Forms 1099-R, not only the IRA ones: a QCD claimed against a
+        // 401(k) must be refused BY NAME, which needs the pension document in
+        // hand rather than merely absent from the IRA set.
+        allRetirementForms: retirementForms,
+        // The union of the two line-12d age boxes. `fjs/form8606`'s own
+        // docstring carries the whole argument: the box is a NECESSARY
+        // condition for having attained 70½ and nowhere near a sufficient
+        // one, and the union is the weakest sound form of it, because
+        // `vnd.fjs.return_profile` carries no TIN and this file cannot map a
+        // recipient TIN to "taxpayer" or "spouse".
+        anyFilerBornBeforeJan2_1961: profile.value.taxpayerBornBeforeJan2_1961 === true
+            || profile.value.spouseBornBeforeJan2_1961 === true,
+        line4bBeforeIraRecords,
+    })
+    // A document-data-sufficiency refusal from Form 8606 or the QCD election
+    // stops the WHOLE return before any later line is built, threaded exactly
+    // like the Schedule D absent-basis guard and the Schedule A guard above:
+    // `unmodeled: []`, since this names no `fjs/return/scope` kind.
+    if (iraOutcome.kind === 'error') {
+        return { kind: 'error', message: iraOutcome.message, unmodeled: [] }
+    }
+    const line4b = fromDocuments('1040 line 4b')(iraOutcome.line4b)
     const line5a = fromDocuments('1040 line 5a')(
         sumBoxOverDocuments(pensionRetirementForms)('box1GrossDistribution')(
             form => form.box1GrossDistribution))
@@ -2076,9 +2133,17 @@ const brokerageDocument = documentHash => overrides => ({
  * The 1099-R boxes lines 4a/4b/5a/5b/25b read, plus the box 7b IRA/SEP/SIMPLE
  * checkbox that routes a document between the two pairs of lines
  * (13-RESEARCH.md Pitfall 4).
+ *
+ * `box2bTaxableAmountNotDetermined` is Phase 26's own addition, and it is a
+ * FIDELITY field rather than a read one: nothing in this engine branches on
+ * it, but it is what a custodian actually checks on a traditional IRA's Form
+ * 1099-R, and a QCD fixture that omitted it would be describing a document no
+ * payer issues. `fjs/document/1099r`'s own header is where the box's meaning
+ * lives.
  * @typedef {{
  *   readonly box1GrossDistribution?: string,
  *   readonly box2aTaxableAmount?: string,
+ *   readonly box2bTaxableAmountNotDetermined?: true,
  *   readonly box4FederalIncomeTaxWithheld?: string,
  *   readonly box7bIraSepSimple?: true,
  * }} RetirementBoxes
@@ -2167,6 +2232,8 @@ const inputsOf = profile => w2s => interestForms => dividendForms => brokerageFo
                 studentLoanInterestForms: [],
                 tuitionForms: [],
                 creditForms: [],
+                iraForms: [],
+                priorYearIraBasisForms: [],
             })
 
 /**
@@ -6375,6 +6442,375 @@ export const proof = {
             // A document-data-sufficiency refusal, never a scope one: it
             // names no `fjs/return/scope` kind.
             assertEq(outcome.unmodeled.length, 0)
+        },
+    },
+    // ── Phase 26 (TAX-28/TAX-29): the QCD and Form 8606 through the FULL
+    //    report, and the second-order effects nothing else would have seen ───
+    //
+    // `fjs/form8606` proves its own arithmetic against facts. What only THIS
+    // file can prove is that the figure reaches the return through the
+    // ordinary path — line 4b, and thence line 9, AGI, and everything AGI
+    // drives.
+    retireeCompletion: {
+        // **Criterion 1.** The printed instruction, verbatim: *"enter the
+        // total distribution on line 4a. … If only part of the distribution
+        // is a QCD, enter the part that is not a QCD on line 4b."* So line 4a
+        // stays GROSS while line 4b falls. A design that netted the gift off
+        // the gross would be invisible on line 4b alone.
+        lineFourAStaysGrossWhileFourBFalls: () => {
+            const iraDistribution = retirementDocument('sha256-26-r')({
+                box1GrossDistribution: '50000.00',
+                box2aTaxableAmount: '50000.00',
+                box2bTaxableAmountNotDetermined: true,
+                box7bIraSepSimple: true,
+            })
+            /** @type {Stored<Ira>} */
+            const record = {
+                documentHash: 'sha256-26-ira',
+                value: {
+                    dialect: 'vnd.fjs.ira',
+                    recipientTin: '222-22-2222',
+                    taxYear: 2025,
+                    attainedAgeSeventyAndAHalfAtEveryDistributionBelow: true,
+                    qualifiedCharitableDistributions: [{
+                        payerTin: '66-6666666',
+                        accountNumber: 'ACC-R',
+                        charity: 'Riverside Food Bank',
+                        amount: '20000.00',
+                    }],
+                },
+            }
+            /** @type {ReturnProfile} */
+            const profile = {
+                ...singleProfile,
+                taxpayerBornBeforeJan2_1961: true,
+                declaredKinds: ['iraDistributions'],
+            }
+            const withGift = expectIncomeOk(form1040IncomeLines(taxParams2025)({
+                ...inputsOf(storedProfile(profile))([])([])([])([])(
+                    [iraDistribution])([])([])([])([]),
+                iraForms: [record],
+            }))
+            assertEq(withGift.line4a.value, 5000000n, '$50,000.00 — line 4a is UNTOUCHED')
+            assertEq(withGift.line4b.value, 3000000n, '$50,000.00 - $20,000.00')
+            // The same return with no `vnd.fjs.ira` document at all: BOTH
+            // lines are the gross figure, which is what this engine did
+            // before Phase 26 and is the overstatement TAX-28 closes.
+            const withoutGift = expectIncomeOk(form1040IncomeLines(taxParams2025)(
+                inputsOf(storedProfile(profile))([])([])([])([])(
+                    [iraDistribution])([])([])([])([])))
+            assertEq(withoutGift.line4a.value, 5000000n)
+            assertEq(withoutGift.line4b.value, 5000000n, 'taxed in full, silently, before this phase')
+            // Line 4a is not merely equal across the two — it is the SAME
+            // figure the gross box reports, cited to that box.
+            assert(
+                withGift.line4a.sources.some(source =>
+                    source.boxPath === 'box1GrossDistribution' && source.value === '50000.00'),
+                ['line 4a must still cite the gross box', withGift.line4a.sources])
+        },
+        // **The deliberate regression hunt.** AGENTS.md and this phase's own
+        // brief both record that Phase 24 shipped a newly-real read in the
+        // Social Security Benefits Worksheet that no fixture exercised. Line
+        // 4b is worksheet line 3's own summand, so a QCD moves TAXABLE SOCIAL
+        // SECURITY as well as the distribution itself — and that second-order
+        // effect is larger than a reader would guess.
+        //
+        // $30,000 of Social Security, a $40,000 IRA distribution, $20,000 of
+        // it given to charity. Both worksheets hand-derived:
+        //
+        //   WITHOUT the gift            WITH the gift
+        //   1  30,000                   1  30,000
+        //   2  15,000  (50%)            2  15,000
+        //   3  40,000  (line 4b)        3  20,000  (line 4b)
+        //   4       0                   4       0
+        //   5  55,000  (2+3+4)          5  35,000
+        //   7  55,000                   7  35,000
+        //   8  25,000  (single base)    8  25,000
+        //   9  30,000                   9  10,000
+        //   10  9,000                   10  9,000
+        //   11 21,000                   11  1,000
+        //   12  9,000  (min of 9,10)    12  9,000
+        //   13  4,500  (50% of 12)      13  4,500
+        //   14  4,500  (min of 2,13)    14  4,500
+        //   15 17,850  (85% of 11)      15    850  (85% of 1,000)
+        //   16 22,350                   16  5,350
+        //   17 25,500  (85% of 1)       17 25,500
+        //   18 22,350  -> line 6b       18  5,350  -> line 6b
+        //
+        // So a $20,000 gift takes $17,000 off taxable Social Security ON TOP
+        // of the $20,000 it takes off the distribution. Taxable income falls
+        // from $38,600.00 to $1,600.00 and the tax from $4,397.00 to $161.00
+        // — $4,236.00 on a $20,000 gift, where the distribution alone would
+        // have accounted for about $2,400.
+        //
+        // `[MOVED FIGURE, and the reason it moved]` This comment first said
+        // $163.00, from a hand derivation that assumed the Tax Table's rows
+        // are $50 wide everywhere. **They are not**: `fjs/tax/table`'s own
+        // verified five-region band structure puts $25 rows between $25.00
+        // and $3,000.00, and $50 rows only above that. So the $1,600.00 row
+        // is "$1,600.00 but less than $1,625.00", its midpoint is $1,612.50
+        // rather than $1,625.00, and 10% of it is $161.25, which rounds to
+        // $161.00. The $38,600.00 row is above $3,000.00 and IS $50 wide, so
+        // that half of the derivation was right — which is exactly why the
+        // error survived being written down. Corrected by re-deriving off the
+        // printed band structure, not by copying the engine's answer.
+        theQcdReachesTheSocialSecurityWorksheetThroughLineFourB: () => {
+            const iraDistribution = retirementDocument('sha256-26-ssb-r')({
+                box1GrossDistribution: '40000.00',
+                box2aTaxableAmount: '40000.00',
+                box2bTaxableAmountNotDetermined: true,
+                box7bIraSepSimple: true,
+            })
+            const ssaForm = socialSecurityDocument('sha256-26-ssb-ssa')('30000.00')
+            /** @type {Stored<Ira>} */
+            const record = {
+                documentHash: 'sha256-26-ssb-ira',
+                value: {
+                    dialect: 'vnd.fjs.ira',
+                    recipientTin: '222-22-2222',
+                    taxYear: 2025,
+                    attainedAgeSeventyAndAHalfAtEveryDistributionBelow: true,
+                    qualifiedCharitableDistributions: [{
+                        payerTin: '66-6666666',
+                        accountNumber: 'ACC-R',
+                        charity: 'Riverside Food Bank',
+                        amount: '20000.00',
+                    }],
+                },
+            }
+            /** @type {ReturnProfile} */
+            const profile = {
+                ...singleProfile,
+                taxpayerBornBeforeJan2_1961: true,
+                declaredKinds: [
+                    'iraDistributions', 'socialSecurityBenefits',
+                    'seniorAndOtherScheduleOneADeductions',
+                ],
+            }
+            const base = inputsOf(storedProfile(profile))([])([])([])([])(
+                [iraDistribution])([ssaForm])([])([])([])
+            const without = form1040Report(taxParams2025)(base)
+            const with_ = form1040Report(taxParams2025)({ ...base, iraForms: [record] })
+            assert(without.kind === 'ok' && with_.kind === 'ok', ['expected both to compute'])
+            if (without.kind !== 'ok' || with_.kind !== 'ok') {
+                return
+            }
+            assertEq(lineRuled(without.lines)('1040 line 4b').value, 4000000n, '$40,000.00')
+            assertEq(lineRuled(without.lines)('1040 line 6b').value, 2235000n, '$22,350.00')
+            assertEq(lineRuled(with_.lines)('1040 line 4b').value, 2000000n, '$20,000.00')
+            assertEq(lineRuled(with_.lines)('1040 line 6b').value, 535000n, '$5,350.00')
+            // The claim this leaf exists for, as an inequality rather than as
+            // prose: line 6b MOVED, and by more than nothing.
+            assert(
+                lineRuled(with_.lines)('1040 line 6b').value
+                    < lineRuled(without.lines)('1040 line 6b').value,
+                ['a QCD must reduce taxable Social Security too, through line 4b'],
+            )
+            // Independent cross-check: an isolated call to the worksheet with
+            // the reduced line 3 must reach the same figure, so the wiring is
+            // proven to feed the SAME facts rather than merely to produce a
+            // number that happens to be smaller.
+            assertEq(
+                socialSecurityBenefitsWorksheet(taxParams2025)({
+                    status: 'single',
+                    mfsLivedWithSpouseAtAnyTimeInYear: false,
+                    totalSsaAndRrbBox5Cents: 3000000n,
+                    otherIncomeLine3Cents: 2000000n,
+                    taxExemptInterestCents: 0n,
+                    scheduleOneAdjustmentsTotalCents: 0n,
+                }).line18,
+                535000n,
+                'an independent worksheet call over the REDUCED line 3 reaches the same $5,350.00')
+            // …and all the way through to the tax. AGI without =
+            // $40,000.00 + $22,350.00 = $62,350.00; with = $20,000.00 +
+            // $5,350.00 = $25,350.00. Both are under the $75,000.00 senior
+            // phase-out threshold, so line 13b is the full $6,000.00 in each
+            // and the deduction is $15,750.00 + $2,000.00 + $6,000.00 =
+            // $23,750.00. Taxable income $38,600.00 and $1,600.00; Tax Table
+            // midpoints $38,625.00 and $1,625.00 give
+            // 11,925 x 10% + 26,700 x 12% = $4,396.50 -> $4,397.00, and
+            // 1,625 x 10% = $162.50 -> $163.00.
+            assertEq(lineRuled(without.lines)('1040 line 11b').value, 6235000n, '$62,350.00 AGI')
+            assertEq(lineRuled(with_.lines)('1040 line 11b').value, 2535000n, '$25,350.00 AGI')
+            assertEq(lineRuled(without.lines)('1040 line 13b').value, 600000n, 'full senior deduction')
+            assertEq(lineRuled(with_.lines)('1040 line 13b').value, 600000n, 'full senior deduction')
+            assertEq(lineRuled(without.lines)('1040 line 15').value, 3860000n, '$38,600.00')
+            assertEq(lineRuled(with_.lines)('1040 line 15').value, 160000n, '$1,600.00')
+            assertEq(lineRuled(without.lines)('1040 line 16').value, 439700n, '$4,397.00')
+            assertEq(lineRuled(with_.lines)('1040 line 16').value, 16100n, '$161.00 — a $25-wide Tax Table row, midpoint $1,612.50')
+        },
+        // Form 8606's line 15c reaches line 4b through the same path, and it
+        // REPLACES the box-2a reading rather than adjusting it — which is the
+        // printed instruction ("see Form 8606 and its instructions to figure
+        // the amount to enter on line 4b").
+        //
+        // $50,000 distributed, $20,000 of prior-year basis, $150,000 of
+        // aggregated IRAs left at 31 December: line 9 = 200,000, line 10 =
+        // 0.100, line 12 = $5,000.00, line 15c = $45,000.00.
+        formEightSixZeroSixsLineFifteenCReachesLineFourB: () => {
+            const iraDistribution = retirementDocument('sha256-26-8606-r')({
+                box1GrossDistribution: '50000.00',
+                box2aTaxableAmount: '50000.00',
+                box2bTaxableAmountNotDetermined: true,
+                box7bIraSepSimple: true,
+            })
+            /** @type {Stored<Ira>} */
+            const record = {
+                documentHash: 'sha256-26-8606-ira',
+                value: {
+                    dialect: 'vnd.fjs.ira',
+                    recipientTin: '222-22-2222',
+                    taxYear: 2025,
+                    yearEndValueOfAllTraditionalSepSimpleIras: '150000.00',
+                },
+            }
+            /** @type {Stored<PriorYearIraBasis>} */
+            const basis = {
+                documentHash: 'sha256-26-8606-basis',
+                value: {
+                    dialect: 'vnd.fjs.prior_year_ira_basis',
+                    recipientTin: '222-22-2222',
+                    taxYear: 2024,
+                    priorYearForm8606Line14: '20000.00',
+                },
+            }
+            /** @type {ReturnProfile} */
+            const profile = { ...singleProfile, declaredKinds: ['iraDistributions'] }
+            const lines = expectIncomeOk(form1040IncomeLines(taxParams2025)({
+                ...inputsOf(storedProfile(profile))([])([])([])([])(
+                    [iraDistribution])([])([])([])([]),
+                iraForms: [record],
+                priorYearIraBasisForms: [basis],
+            }))
+            assertEq(lines.line4a.value, 5000000n, 'still gross')
+            assertEq(lines.line4b.value, 4500000n, '$45,000.00, not the $50,000.00 box 2a reports')
+            assertEq(lines.line9.value, 4500000n, 'and it is line 9 that the reduction reaches')
+        },
+        // A `fjs/form8606` refusal stops the WHOLE return, threaded like every
+        // other document-data-sufficiency refusal in this file: `unmodeled` is
+        // empty, and no partial line list can be constructed.
+        aFormEightSixZeroSixRefusalStopsTheWholeReturn: () => {
+            const iraDistribution = retirementDocument('sha256-26-refuse-r')({
+                box1GrossDistribution: '50000.00',
+                box2aTaxableAmount: '50000.00',
+                box7bIraSepSimple: true,
+            })
+            /** @type {Stored<Ira>} */
+            const record = {
+                documentHash: 'sha256-26-refuse-ira',
+                value: {
+                    dialect: 'vnd.fjs.ira',
+                    recipientTin: '222-22-2222',
+                    taxYear: 2025,
+                    attainedAgeSeventyAndAHalfAtEveryDistributionBelow: true,
+                    qualifiedCharitableDistributions: [{
+                        payerTin: '66-6666666',
+                        accountNumber: 'ACC-R',
+                        charity: 'Riverside Food Bank',
+                        amount: '20000.00',
+                    }],
+                },
+            }
+            /** @type {ReturnProfile} */
+            const profile = { ...singleProfile, declaredKinds: ['iraDistributions'] }
+            // The profile checks NO line-12d age box, so the 70½ assertion is
+            // contradicted by the return's own declaration.
+            const outcome = form1040Report(taxParams2025)({
+                ...inputsOf(storedProfile(profile))([])([])([])([])(
+                    [iraDistribution])([])([])([])([]),
+                iraForms: [record],
+            })
+            assertEq(outcome.kind, 'error')
+            if (outcome.kind !== 'error') {
+                throw ['expected a refusal', outcome]
+            }
+            assert(outcome.message.includes('line-12d'), ['name the contradiction', outcome.message])
+            assertEq(outcome.unmodeled.length, 0, 'a data-sufficiency refusal names no scope kind')
+            assertEq(Object.hasOwn(outcome, 'lines'), false, 'no partial return is constructible')
+            // The CONTROL: the identical return with the age box checked
+            // computes, so the gate is a gate rather than a wall.
+            const control = form1040Report(taxParams2025)({
+                ...inputsOf(storedProfile({ ...profile, taxpayerBornBeforeJan2_1961: true }))(
+                    [])([])([])([])([iraDistribution])([])([])([])([]),
+                iraForms: [record],
+            })
+            assertEq(control.kind, 'ok')
+        },
+        // **Criterion 4, at the whole-report level.** The Phase 21 fixture
+        // has no Form 1099-R at all, so this phase must be invisible to it —
+        // and the two figures its own module pins (line 1a $45,505.00, line
+        // 34 $5,535.00) are restated HERE, hand-typed a second time, so that
+        // a change to this file which moved them would fail in this file too
+        // rather than only one module over.
+        thePhaseTwentyOneFixtureIsUntouchedByThisPhase: () => {
+            /** @type {ReturnProfile} */
+            const profile = {
+                ...singleProfile,
+                declaredKinds: [
+                    'wages', 'unemploymentCompensation',
+                    'federalTaxWithheldOnW2', 'federalTaxWithheldOnOther1099',
+                ],
+            }
+            const outcome = form1040Report(taxParams2025)({
+                ...inputsOf(storedProfile(profile))([
+                    w2Document('sha256-26-p21-a')('35937.00'),
+                    w2Document('sha256-26-p21-b')('9568.00'),
+                ])([])([])([])([])([])([])([])([]),
+                w2s: [
+                    {
+                        documentHash: 'sha256-26-p21-a',
+                        value: {
+                            dialect: w2Dialect,
+                            payerTin: '11-1111111',
+                            recipientTin: '222-22-2222',
+                            accountNumber: 'ACC-W2-A',
+                            taxYear: 2025,
+                            formRevision: '2025',
+                            box1WagesTipsOtherCompensation: '35937.00',
+                            box2FederalIncomeTaxWithheld: '6384.00',
+                        },
+                    },
+                    {
+                        documentHash: 'sha256-26-p21-b',
+                        value: {
+                            dialect: w2Dialect,
+                            payerTin: '44-4444444',
+                            recipientTin: '222-22-2222',
+                            accountNumber: 'ACC-W2-B',
+                            taxYear: 2025,
+                            formRevision: '2025',
+                            box1WagesTipsOtherCompensation: '9568.00',
+                            box2FederalIncomeTaxWithheld: '2578.00',
+                        },
+                    },
+                ],
+                unemploymentForms: [{
+                    documentHash: 'sha256-26-p21-g',
+                    value: {
+                        dialect: 'vnd.fjs.1099g',
+                        payerTin: '55-5555555',
+                        recipientTin: '222-22-2222',
+                        accountNumber: 'ACC-1099G',
+                        taxYear: 2025,
+                        formRevision: '2025',
+                        box1UnemploymentCompensation: '4554.00',
+                        box4FederalIncomeTaxWithheld: '454.00',
+                    },
+                }],
+            })
+            assert(outcome.kind === 'ok', ['expected the Phase 21 fixture to compute', outcome])
+            if (outcome.kind !== 'ok') {
+                return
+            }
+            assertEq(lineRuled(outcome.lines)('1040 line 1a').value, 4550500n, '$45,505.00')
+            assertEq(lineRuled(outcome.lines)('1040 line 34').value, 553500n, '$5,535.00')
+            // …and this phase genuinely did nothing: line 4a and line 4b are
+            // the profile-declared zero they always were, citing the
+            // declaration rather than any 1099-R.
+            const line4b = lineRuled(outcome.lines)('1040 line 4b')
+            assertEq(line4b.value, 0n)
+            assertEq(line4b.sources.length, 1)
+            assertEq(line4b.sources[0]?.boxPath, 'declaredKinds')
         },
     },
 }

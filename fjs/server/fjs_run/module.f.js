@@ -965,6 +965,7 @@ export const proof = {
                             unemploymentForms: [],
                             adjustmentForms: [],
                             studentLoanInterestForms: [], tuitionForms: [], creditForms: [],
+                            iraForms: [], priorYearIraBasisForms: [],
                         })
                         assert(outcome.kind === 'ok', ['expected the engine to compute', outcome])
                         if (outcome.kind !== 'ok') {
