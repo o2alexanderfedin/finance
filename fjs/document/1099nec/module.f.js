@@ -21,19 +21,27 @@
  *   1099-family withholding under `federalTaxWithheldOnOther1099`. Backup
  *   withholding under §3406 is the usual reason a 1099-NEC carries one.
  *
+ * A third box carries no amount and is nonetheless READ:
+ *
+ * - **Box 2** is a CHECKBOX: *"Payer made direct sales totaling $5,000 or more
+ *   of consumer products to recipient for resale."* It reports no dollar
+ *   figure — the payer ticks it and reports the sales nowhere — and it follows
+ *   DOC-12's checkbox convention (`option(true)`), so a `false` blob is
+ *   rejected structurally and absence is the only way to say "not checked".
+ *
+ *   **A ticked box 2 makes `fjs/schedule/c` REFUSE the whole return**, and
+ *   that is worth reading twice, because a checkbox that reports no amount
+ *   looks like the safest thing on the form. Two consequences follow from it,
+ *   and this engine can compute neither: the goods are INVENTORY, so Schedule
+ *   C Part III applies and line 4 is not zero; and the resale proceeds are
+ *   cash sales to consumers, reported on no information return at all, so a
+ *   line 1 read from Forms 1099-NEC box 1 is short by the whole of what the
+ *   business actually took in. Reading a reseller's WHOLESALE PURCHASES as
+ *   their gross receipts is not a small error — it is the wrong figure
+ *   entirely, in the understating direction.
+ *
  * Everything else is stored and computed on by nothing:
  *
- * - **Box 2** is a CHECKBOX, not an amount: *"Payer made direct sales
- *   totaling $5,000 or more of consumer products to recipient for resale."*
- *   It reports no dollar figure at all — the payer ticks it and reports the
- *   sales nowhere — so there is nothing for a computation to read and nothing
- *   to refuse. It follows DOC-12's checkbox convention (`option(true)`), so a
- *   `false` blob is rejected structurally and absence is the only way to say
- *   "not checked". **It is not silently harmless, though**: a recipient of
- *   $5,000 of consumer products for resale is running a reselling business
- *   whose receipts appear on NO information return, which is precisely the
- *   gap `fjs/schedule/c`'s `grossReceiptsFullyReportedOnForms1099Nec`
- *   assertion exists to make explicit rather than silent.
  * - **Box 3** is *"Reserved for future use"* on the current revision — the
  *   printed form's own inert box, exactly like Schedule 1's line 22. It is
  *   modeled for line-number completeness so a transcriber cannot mistake box

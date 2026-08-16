@@ -914,6 +914,12 @@ export const scheduleCPartII = profile => entries => line7GrossIncome => {
  * false` and a schedule of documented zeros — not a refusal, and not an
  * absent schedule, because `fjs/schedule/1` still needs a `ReportLine` with
  * provenance for its own line 3 (PROV-01).
+ *
+ * **It is not derivable from the lines**, which is why it is a field rather
+ * than a computation a caller could do: a business that broke exactly even
+ * and a taxpayer with no business at all both produce a Schedule C of zeros,
+ * and only the sources tell them apart. A caller reading `.value` — which is
+ * what a report does — cannot.
  * @typedef {{
  *   readonly kind: 'ok',
  *   readonly filed: boolean,
@@ -934,6 +940,22 @@ export const scheduleCPartII = profile => entries => line7GrossIncome => {
  */
 
 /**
+ * One business as a refusal can name it: the printed line A description,
+ * plus the printed line C trading name when the record carries one.
+ *
+ * **Line C is what makes a two-business refusal readable in the case that
+ * actually happens.** A taxpayer running two consultancies may describe both
+ * as `'consulting'` on line A, and a message quoting that string twice would
+ * name neither. Line C is optional on the printed form ("if no separate
+ * business name, leave blank"), so it is appended only when present rather
+ * than rendered as an empty parenthesis.
+ * @type {(business: BusinessExpenses) => string}
+ */
+const businessLabel = business => business.businessName === undefined
+    ? `'${business.principalBusiness}'`
+    : `'${business.principalBusiness}' (${business.businessName})`
+
+/**
  * The whole of Schedule C.
  *
  * The order of the checks below is the order they must run in, and each is
@@ -942,16 +964,19 @@ export const scheduleCPartII = profile => entries => line7GrossIncome => {
  * 1. **A statutory-employee W-2**, before anything else, because it refuses
  *    whether or not the taxpayer has a business record at all — see this
  *    module's docstring.
- * 2. **A second business record.** Schedule C is per business.
- * 3. **The no-business case**, which is an OK of documented zeros rather than
+ * 2. **A Form 1099-NEC with box 2 checked**, a direct-sales reseller, for the
+ *    same reason: it refuses with or without a business record.
+ * 3. **A second business record.** Schedule C is per business.
+ * 4. **The no-business case**, which is an OK of documented zeros rather than
  *    a refusal.
- * 4. **Forms 1099-NEC with no business record**, which cannot produce a
+ * 5. **Forms 1099-NEC with no business record**, which cannot produce a
  *    Schedule C: printed line A is required and the gross-receipts assertion
  *    is missing.
- * 5. **A business record without the gross-receipts assertion.**
- * 6. **An unrecognized category**, then **Part III**, **Part IV** and the two
+ * 6. **A business record without the gross-receipts assertion.**
+ * 7. **An unrecognized category**, then **Part III**, **Part IV** and the two
  *    refused lines outside the line-28 block. All before arithmetic.
- * 7. The parts, and finally the **net-loss** refusal.
+ * 8. The parts, then the **net-loss** refusal, then the **self-employment
+ *    tax** refusal.
  * @type {(taxParamSet: TaxParamSet) => (input: ScheduleCInput) => ScheduleCOutcome}
  */
 export const scheduleC = taxParamSet => input => {
@@ -976,15 +1001,41 @@ export const scheduleC = taxParamSet => input => {
         }
     }
 
-    // 2. Schedule C is filed PER BUSINESS, and this engine supports one.
+    // 2. Form 1099-NEC box 2: "Payer made direct sales totaling $5,000 or
+    //    more of consumer products to recipient for resale." Two consequences
+    //    follow from that one checkbox, and this engine can compute neither.
+    //    The goods are INVENTORY, so Part III applies and line 4 is not zero;
+    //    and the resale proceeds are cash sales to consumers, which appear on
+    //    no information return at all, so line 1 read from Forms 1099-NEC is
+    //    short by the whole of the business's actual receipts. Checked BEFORE
+    //    the gross-receipts assertion below, because a taxpayer could
+    //    truthfully assert that their Forms 1099-NEC are their whole
+    //    1099-reported income and still be a reseller.
+    const directSales = nonemployeeCompensationForms.find(
+        form => form.value.box2DirectSalesOfFiveThousandOrMore === true)
+    if (directSales !== undefined) {
+        return {
+            kind: 'error',
+            message: 'Schedule C: a stored Form 1099-NEC has box 2 checked — the payer made '
+                + 'direct sales of $5,000 or more of consumer products to this recipient FOR '
+                + 'RESALE. Two things follow that this engine cannot compute. The goods are '
+                + 'inventory, so Part III (cost of goods sold) applies and line 4 is not zero; '
+                + 'and the resale proceeds are cash sales to consumers, reported on no '
+                + 'information return, so line 1 read from Forms 1099-NEC box 1 is short by the '
+                + 'whole of what the business actually took in. Refusing rather than reporting a '
+                + 'reseller’s gross receipts as their payer’s wholesale purchases (no phase yet)',
+        }
+    }
+
+    // 3. Schedule C is filed PER BUSINESS, and this engine supports one.
     const [firstBusiness, secondBusiness] = businessExpenseForms
     if (firstBusiness !== undefined && secondBusiness !== undefined) {
         return {
             kind: 'error',
             message: `Schedule C: this return carries ${businessExpenseForms.length} business `
                 + `expenses records, and Schedule C is filed PER BUSINESS — `
-                + `'${firstBusiness.value.principalBusiness}' and `
-                + `'${secondBusiness.value.principalBusiness}' are two Schedule Cs, with two `
+                + `${businessLabel(firstBusiness.value)} and `
+                + `${businessLabel(secondBusiness.value)} are two Schedule Cs, with two `
                 + `line 31s and two at-risk determinations. This engine computes one. Merging `
                 + `them is not an approximation: it would net one business’s loss against `
                 + `the other’s profit, which is the arithmetic §465 exists to stop `
@@ -992,7 +1043,7 @@ export const scheduleC = taxParamSet => input => {
         }
     }
 
-    // 3. No business at all. Not a refusal — a schedule of documented zeros,
+    // 4. No business at all. Not a refusal — a schedule of documented zeros,
     //    so `fjs/schedule/1`'s line 3 still carries provenance (PROV-01) and a
     //    return with no self-employment computes exactly what it computed
     //    before this phase existed.
@@ -1003,7 +1054,7 @@ export const scheduleC = taxParamSet => input => {
         return { kind: 'ok', filed: false, partI, partII }
     }
 
-    // 4. Receipts with no business record. Printed line A is required, and
+    // 5. Receipts with no business record. Printed line A is required, and
     //    without the record there is no gross-receipts assertion either.
     if (firstBusiness === undefined) {
         return {
@@ -1019,7 +1070,7 @@ export const scheduleC = taxParamSet => input => {
         }
     }
 
-    // 5. The gross-receipts assertion. `fjs/document/business_expenses`' own
+    // 6. The gross-receipts assertion. `fjs/document/business_expenses`' own
     //    header carries the whole argument for why its absence is a refusal
     //    rather than an assumption.
     if (firstBusiness.value.grossReceiptsFullyReportedOnForms1099Nec !== true) {
@@ -1041,7 +1092,7 @@ export const scheduleC = taxParamSet => input => {
     const entries = businessExpenseForms.flatMap(form =>
         form.value.entries.map(entry => ({ documentHash: form.documentHash, value: entry })))
 
-    // 6a. An unrecognized category. `vnd.fjs.business_expenses` keeps
+    // 7a. An unrecognized category. `vnd.fjs.business_expenses` keeps
     //     `category` a free string on purpose, so this is the layer that owns
     //     the vocabulary — and it refuses rather than dropping an amount it
     //     does not understand, exactly as `fjs/schedule/a` does with its own
@@ -1061,7 +1112,7 @@ export const scheduleC = taxParamSet => input => {
         }
     }
 
-    // 6b. Part III (line 4) and Part IV (line 9's substantiation), then line
+    // 7b. Part III (line 4) and Part IV (line 9's substantiation), then line
     //     30 — the two refused categories that are NOT summands of line 28,
     //     which is why they are checked here rather than inside Part II.
     //     Part IV's own check duplicates line 9's, deliberately: the printed
@@ -1082,12 +1133,12 @@ export const scheduleC = taxParamSet => input => {
     if (partII.kind === 'error') {
         return partII
     }
-    // 7. The net-loss decision. Zero computes; anything below it goes to the
+    // 8. The net-loss decision. Zero computes; anything below it goes to the
     //    printed line 32 this engine cannot fill in.
     if (partII.line31.value < 0n) {
         return atRiskDeterminationLine32(partII.line31.value)
     }
-    // 8. Line 31's OTHER printed destination, Schedule SE line 2. Checked
+    // 9. Line 31's OTHER printed destination, Schedule SE line 2. Checked
     //    LAST, after the loss, because a loss is refused for a reason that is
     //    true of the at-risk rules whatever Schedule SE would have said.
     const selfEmployment = selfEmploymentTaxReachIsUnmodeled(taxParamSet)(partII.line31.value)
@@ -1143,6 +1194,19 @@ const businessDoc = entries => ({
         entries,
     },
 })
+
+/**
+ * A Form 1099-NEC with box 2 checked: the payer made $5,000 or more of direct
+ * sales of consumer products to this recipient for resale.
+ * @type {Stored<OneZeroNineNineNec>}
+ */
+const directSalesDoc = {
+    documentHash: 'sha256-nec-a',
+    value: {
+        ...necDoc('6000.00')('sha256-nec-a').value,
+        box2DirectSalesOfFiveThousandOrMore: /** @type {const} */ (true),
+    },
+}
 
 /** A second business, which must refuse. @type {Stored<BusinessExpenses>} */
 const secondBusinessDoc = {
@@ -1854,6 +1918,79 @@ export const proof = {
         eitherBusinessAloneComputes: () => {
             assertEq(ok(run({ businessExpenseForms: [businessDoc([])] })).filed, true)
             assertEq(ok(run({ businessExpenseForms: [secondBusinessDoc] })).filed, true)
+        },
+        // THE CASE THAT ACTUALLY HAPPENS, and the reason printed line C is
+        // stored at all: two businesses a taxpayer described identically on
+        // line A. A refusal quoting `principalBusiness` twice would name
+        // neither, so line C's trading name is appended when present — and
+        // this is the leaf that makes `businessName` a field with a reader
+        // rather than a field with a docstring.
+        twoIdenticallyDescribedBusinessesAreStillToldApart: () => {
+            /** @type {Stored<BusinessExpenses>} */
+            const first = {
+                documentHash: 'sha256-business-a',
+                value: { ...businessDoc([]).value, principalBusiness: 'consulting', businessName: 'Acme' },
+            }
+            /** @type {Stored<BusinessExpenses>} */
+            const second = {
+                documentHash: 'sha256-business-b',
+                value: {
+                    ...businessDoc([]).value,
+                    accountNumber: 'BUS-0002',
+                    principalBusiness: 'consulting',
+                    businessName: 'Beta',
+                },
+            }
+            const result = refusal(run({ businessExpenseForms: [first, second] }))
+            assert(result.message.includes('Acme'), ['must name the first trading name', result.message])
+            assert(result.message.includes('Beta'), ['must name the second trading name', result.message])
+        },
+        // …and the CONTROL for that: a record with no line C renders no empty
+        // parenthesis, because the printed form's own instruction is to leave
+        // it blank when there is no separate business name.
+        aBusinessWithNoTradingNameRendersNoEmptyParenthesis: () => {
+            const result = refusal(run({
+                businessExpenseForms: [businessDoc([]), secondBusinessDoc],
+            }))
+            assert(
+                !result.message.includes('()'),
+                ['an absent line C must not render as an empty parenthesis', result.message])
+        },
+    },
+
+    directSales: {
+        // Form 1099-NEC box 2, made load-bearing. It is the one box on that
+        // form nothing read until this leaf existed, and its meaning is
+        // consequential twice over: the goods are inventory (Part III), and
+        // the resale proceeds appear on no information return (line 1).
+        aCheckedBoxTwoRefusesNamingBothConsequences: () => {
+            const reseller = directSalesDoc
+            const result = refusal(run({
+                nonemployeeCompensationForms: [reseller],
+                businessExpenseForms: [businessDoc([])],
+            }))
+            assert(result.message.includes('box 2'), ['must name the box', result.message])
+            assert(result.message.includes('Part III'), ['must name the inventory consequence', result.message])
+            assert(
+                result.message.includes('no information return'),
+                ['must name the unreported-receipts consequence', result.message])
+        },
+        // It refuses with NO business record at all, for the same reason the
+        // statutory-employee check does: the reseller who stores only their
+        // Form 1099-NEC is exactly the case that would otherwise be silent.
+        itRefusesEvenWithNoBusinessRecordAtAll: () => {
+            const reseller = directSalesDoc
+            assertEq(run({ nonemployeeCompensationForms: [reseller] }).kind, 'error')
+        },
+        // THE CONTROL: the identical Form 1099-NEC with box 2 ABSENT — the
+        // shape of every other 1099-NEC fixture in this repository — computes.
+        // A check written against box 2's presence in the object rather than
+        // its value would refuse every freelancer.
+        anOrdinaryFormWithNoBoxTwoComputes: () => {
+            assertEq(ok(run({
+                nonemployeeCompensationForms: [necDoc('350.00')('sha256-nec-a')],
+                businessExpenseForms: [businessDoc([])],
+            })).partII.line31.value, 35000n)
         },
     },
 
