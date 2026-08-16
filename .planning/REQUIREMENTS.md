@@ -595,8 +595,13 @@ itemizing, which is complete apart from the eight open MAINT items.
 - [x] **TAX-25** *(M2, T2)*: **Form 8880**, the Saver's Credit → Schedule 3 line 4.
 - [x] **TAX-26** *(M2, T2)*: **Form 8863**, American Opportunity and Lifetime Learning credits
       → Schedule 3 line 3 and 1040 line 29.
-- [x] **TAX-27** *(M2, T2)*: **Earned Income Credit** → 1040 line 27. **Delivered as a NAMED
-      REFUSAL, not a computation, and the sentence above is what Phase 25 found to be false**:
+- [ ] **TAX-27** *(M2, T2)*: **Earned Income Credit** → 1040 line 27. **NOT DELIVERED as a
+      computation — deliberately, and the box stays unchecked because of it.** Phase 25 shipped a
+      named refusal plus a fact-by-fact spec, which is honest work and the right outcome, but it is
+      not the credit. A `[x]` here would tell every count derived from these checkboxes that EIC
+      computes. It does not. Re-scoped: the refusal and the spec are done; the computation needs a
+      profile widening and belongs to a later phase.
+      **The sentence above is what Phase 25 found to be false**:
       the existing Schedule 8812 dependent model carries almost none of §32(c)(3)'s
       qualifying-child rules. `dependents` was built for a two-fact test (age under 17, an
       employment-valid SSN); §32(c)(3) needs a checked relationship vocabulary, full-time-student
