@@ -102,7 +102,8 @@
  * Short-circuiting first would have made that recapture silently disappear
  * for exactly one filing status.
  *
- * ## §25A(g)(6): a married-filing-separately return is a determinate ZERO
+ * ## §25A(g)(6): a married-filing-separately return is a determinate ZERO,
+ * and `tsc` is what enforces it
  *
  * No education credit at all is allowed on a separate return, at any income —
  * which is why `fjs/tax/params`' {@link educationCredits} stores no threshold
@@ -110,6 +111,21 @@
  * before line 1 is assigned, mirroring `fjs/schedule/1`'s own §221(e)(2)
  * ordering discipline: MFS has no stored threshold at all, so leaving it to
  * fall out of the arithmetic is not merely untidy, it is unrepresentable.
+ *
+ * **That last word turns out to be literal, and a mutation found it rather
+ * than a reading.** Weakening this gate's condition does not produce a wrong
+ * number — it stops the build, with TS7053 at printed lines 2 and 13: the
+ * early return is what NARROWS `status` out of `IndividualFilingStatus` and
+ * into the four keys `phaseoutCeiling` and `phaseoutRange` actually have. So
+ * the parameters' omission of a `marriedFilingSeparately` threshold and this
+ * gate's presence are ONE mechanism, not two, and neither can be removed
+ * while the other stands.
+ *
+ * Worth knowing before editing either: adding an MFS threshold "for
+ * symmetry" would silently make this gate deletable, and deleting the gate is
+ * caught only because the threshold is absent. `fjs/schedule/1`'s own
+ * §221(e)(2) short-circuit has the same shape for the same reason, and nobody
+ * had written it down there either.
  *
  * ## Rounding: the ratio first, then each product — the printed order
  *

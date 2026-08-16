@@ -1329,6 +1329,15 @@ export const retirementSavingsContributionsCredit = {
  * identical kind of reason, as {@link studentLoanInterestDeduction}'s under
  * §221(e)(2). `fjs/form8863` is where that short-circuit lives.
  *
+ * **The omission and that short-circuit are ONE mechanism, and `tsc` is what
+ * joins them** — a property found by mutating rather than by reading, and
+ * recorded in full in `fjs/form8863`'s own docstring. Because these two
+ * records have four keys rather than five, `fjs/form8863`'s early return for
+ * a separate filer is the only thing that narrows `IndividualFilingStatus`
+ * down to what they carry; weakening it stops the build at TS7053 rather than
+ * producing a wrong number. **Adding a `marriedFilingSeparately` entry here
+ * "for symmetry" would silently make that gate deletable.** Do not.
+ *
  * ## Citation kind
  *
  * `kind: 'code'` throughout, at the subsection depth this work can actually
