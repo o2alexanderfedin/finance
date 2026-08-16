@@ -1744,6 +1744,241 @@ export const qualifiedBusinessIncomeDeduction = {
 }
 
 /**
+ * **§55's alternative minimum tax** — the exemption, its phase-out, and the
+ * two rates. TAX-33, Phase 29, for `fjs/form6251`.
+ *
+ * Source, fetched and read directly (2026-08-16), not from recall:
+ * `https://www.irs.gov/pub/irs-drop/rp-24-40.pdf` §2.11, which carries every
+ * dollar figure below in three printed tables; cross-checked against
+ * `https://www.irs.gov/pub/irs-pdf/f6251.pdf` (2025, "Created 9/17/25"),
+ * whose own line 5 chart and line 7 bullet print the same numbers on the face
+ * of the form, and against `i6251.pdf` (2025, `Jan 8, 2026`), whose Exemption
+ * Worksheet prints the complete-phase-out amounts.
+ *
+ * ## Rev. Proc. 2025-32 does NOT touch these, and that had to be checked
+ *
+ * {@link standardDeduction} cites Rev. Proc. **2025-32** because the OBBBA
+ * revised it mid-year, and copying that reasoning here would be wrong.
+ * Rev. Proc. 2025-32's own "SECTION 3. 2025 ADJUSTED ITEMS AS MODIFIED,
+ * SUPERSEDED OR SUPPLEMENTED" removes exactly two sections of Rev. Proc.
+ * 2024-40 — §2.15(1), the standard deduction, and §2.25, the §179 expensing
+ * election. §2.11 is not among them, so Rev. Proc. 2024-40 is still the
+ * governing TY2025 authority for every figure here. **The OBBBA does amend
+ * §55(d)**: its §70107 makes the increased exemption permanent and resets the
+ * phase-out thresholds, but Rev. Proc. 2025-32 §2.07's own words are *"for
+ * any taxable year beginning before January 1, 2027"* for the new $1,000,000
+ * figure, and its AMT table is printed under "SECTION 4. **2026** ADJUSTED
+ * ITEMS". None of it reaches TY2025. A second tax year added to
+ * {@link taxParamsByYear} must carry Rev. Proc. 2025-32 §4.10's figures and a
+ * phase-out rate that is no longer 25%.
+ *
+ * ## `exemptionCompletePhaseout` is STORED, not derived, and something
+ * compares it
+ *
+ * The third column is arithmetically redundant: a complete phase-out amount
+ * is the threshold plus four times the exemption, because 25 cents of
+ * exemption goes for every dollar of excess. It is stored anyway, for two
+ * reasons that are not tidiness.
+ *
+ * It is a figure the IRS PRINTS — Rev. Proc. 2024-40 §2.11's own
+ * "Complete Phaseout Amount" column, and the Exemption Worksheet's own
+ * opening note ("If Form 6251, line 4, is equal to or more than $978,750 …
+ * your exemption is zero") — so storing it keeps this module a transcription
+ * of what was read rather than a mix of transcription and arithmetic. And it
+ * has a SECOND reader that is not the phase-out at all: the married-filing-
+ * separately AMTI add-back at Form 6251 line 4, whose own threshold is the
+ * MFS complete-phase-out amount ($900,350) and whose cap is the MFS exemption
+ * ($68,500) — see `fjs/form6251`'s own line 4.
+ *
+ * `theCompletePhaseoutAmountsAgreeWithTheirOwnArithmetic` is what keeps the
+ * redundancy honest: it COMPARES the stored third column against the first
+ * two and the rate, per status. A hand-typed list that nothing compares
+ * drifts (AGENTS.md); this one cannot drift without saying so.
+ *
+ * ## Head of household reads the UNMARRIED row, and qualifying surviving
+ * spouse reads the JOINT one
+ *
+ * Rev. Proc. 2024-40 §2.11 prints four rows, and neither of the two names a
+ * filing status this module keys by: *"Joint Returns or Surviving Spouses"*
+ * and *"Unmarried Individuals (other than Surviving Spouses)"*. So head of
+ * household — an unmarried individual who is not a surviving spouse — takes
+ * $88,100/$626,350, and qualifying surviving spouse takes $137,000/$1,252,700.
+ * Form 6251's own printed line 5 chart says the same in the other direction
+ * ("Single or head of household … $88,100"; "Married filing jointly or
+ * qualifying surviving spouse … $137,000"), which is the check that resolves
+ * the mapping against paper rather than against memory.
+ *
+ * **This is the fourth time this module has had to decide what a qualifying
+ * surviving spouse gets, and the FIRST three disagreed with each other**:
+ * §3101(b)(2) gives it the single figure, §1411(b)(1) the joint one,
+ * §199A(e)(2) the single one. Here it is the joint one, and it is written out
+ * per status rather than spread from `marriedFilingJointly` for the reason
+ * {@link standardDeduction} records.
+ *
+ * **The `estatesAndTrusts` row is deliberately absent**, even though
+ * Rev. Proc. 2024-40 §2.11 prints one ($30,700 / $102,500 / $225,300). Form
+ * 6251 is *Alternative Minimum Tax — Individuals*; an estate or trust
+ * computes its AMT on Schedule I (Form 1041), which this engine does not
+ * model at all. Keying by {@link IndividualFilingStatus} makes that boundary a
+ * type rather than a comment — the same decision
+ * {@link netInvestmentIncomeTaxThreshold} records one statute over.
+ *
+ * ## The two rates are whole percents, and the printed "$4,782" is NOT stored
+ *
+ * §55(b)(1)(A) writes "26 percent" and "28 percent", both whole numbers, so
+ * they are `ratePercent` fields rather than basis points — this module's own
+ * rule (see {@link additionalMedicareTaxRates} for the case that goes the
+ * other way).
+ *
+ * Form 6251's line 7 prints the 28% branch as *"multiply line 6 by 28% (0.28)
+ * and subtract $4,782 ($2,391 if married filing separately)"*. That constant
+ * is nothing but `upperRateThreshold × (28 − 26)%` — $239,100 × 2% = $4,782,
+ * and $119,550 × 2% = $2,391 — i.e. the printed form's way of writing a
+ * two-bracket schedule as one multiplication. Storing it would be storing the
+ * same fact twice, in a form that could drift from the threshold it is
+ * derived from. `fjs/form6251` computes the two brackets directly instead, and
+ * that module's own `theTwentySixTwentyEightScheduleMatchesThePrintedShortcut`
+ * is the leaf that hand-types $4,782 and $2,391 and proves the two forms of
+ * the rule agree.
+ * @type {{
+ *   readonly exemption: Record<IndividualFilingStatus, AmountWithCitation>,
+ *   readonly exemptionPhaseoutThreshold: Record<IndividualFilingStatus, AmountWithCitation>,
+ *   readonly exemptionCompletePhaseout: Record<IndividualFilingStatus, AmountWithCitation>,
+ *   readonly exemptionPhaseoutRatePercent: number,
+ *   readonly exemptionPhaseoutRateCitation: Citation,
+ *   readonly lowerRatePercent: number,
+ *   readonly upperRatePercent: number,
+ *   readonly rateCitation: Citation,
+ *   readonly upperRateThreshold: Record<IndividualFilingStatus, AmountWithCitation>,
+ * }}
+ */
+export const alternativeMinimumTax = {
+    // Rev. Proc. 2024-40 §2.11, first table -- "the exemption amounts under
+    // § 55(d)(1)".
+    exemption: {
+        single: {
+            amount: '88100.00',
+            citation: { kind: 'revProc', revProc: '2024-40', section: '§2.11', effectiveDate: '2025-01-01' },
+        },
+        marriedFilingJointly: {
+            amount: '137000.00',
+            citation: { kind: 'revProc', revProc: '2024-40', section: '§2.11', effectiveDate: '2025-01-01' },
+        },
+        marriedFilingSeparately: {
+            amount: '68500.00',
+            citation: { kind: 'revProc', revProc: '2024-40', section: '§2.11', effectiveDate: '2025-01-01' },
+        },
+        // "Unmarried Individuals (other than Surviving Spouses)" -- see this
+        // group's own docstring.
+        headOfHousehold: {
+            amount: '88100.00',
+            citation: { kind: 'revProc', revProc: '2024-40', section: '§2.11', effectiveDate: '2025-01-01' },
+        },
+        // "Joint Returns or Surviving Spouses" -- the JOINT figure, unlike
+        // §3101(b)(2) and §199A(e)(2), which both give this status the single
+        // one.
+        qualifyingSurvivingSpouse: {
+            amount: '137000.00',
+            citation: { kind: 'revProc', revProc: '2024-40', section: '§2.11', effectiveDate: '2025-01-01' },
+        },
+    },
+    // Rev. Proc. 2024-40 §2.11, third table, "Threshold Phaseout Amount"
+    // column -- "the amounts used under § 55(d)(2) to determine the phaseout
+    // of the exemption amounts". Married filing separately shares the
+    // UNMARRIED threshold here ($626,350) while taking half the exemption,
+    // which is why its complete phase-out lands lower than anyone else's.
+    exemptionPhaseoutThreshold: {
+        single: {
+            amount: '626350.00',
+            citation: { kind: 'revProc', revProc: '2024-40', section: '§2.11', effectiveDate: '2025-01-01' },
+        },
+        marriedFilingJointly: {
+            amount: '1252700.00',
+            citation: { kind: 'revProc', revProc: '2024-40', section: '§2.11', effectiveDate: '2025-01-01' },
+        },
+        marriedFilingSeparately: {
+            amount: '626350.00',
+            citation: { kind: 'revProc', revProc: '2024-40', section: '§2.11', effectiveDate: '2025-01-01' },
+        },
+        headOfHousehold: {
+            amount: '626350.00',
+            citation: { kind: 'revProc', revProc: '2024-40', section: '§2.11', effectiveDate: '2025-01-01' },
+        },
+        qualifyingSurvivingSpouse: {
+            amount: '1252700.00',
+            citation: { kind: 'revProc', revProc: '2024-40', section: '§2.11', effectiveDate: '2025-01-01' },
+        },
+    },
+    // Rev. Proc. 2024-40 §2.11, third table, "Complete Phaseout Amount"
+    // column. Stored rather than derived, and compared against the
+    // arithmetic -- see this group's own docstring.
+    exemptionCompletePhaseout: {
+        single: {
+            amount: '978750.00',
+            citation: { kind: 'revProc', revProc: '2024-40', section: '§2.11', effectiveDate: '2025-01-01' },
+        },
+        marriedFilingJointly: {
+            amount: '1800700.00',
+            citation: { kind: 'revProc', revProc: '2024-40', section: '§2.11', effectiveDate: '2025-01-01' },
+        },
+        // ALSO the married-filing-separately AMTI add-back threshold at Form
+        // 6251 line 4 -- a second, unrelated reader of this one figure.
+        marriedFilingSeparately: {
+            amount: '900350.00',
+            citation: { kind: 'revProc', revProc: '2024-40', section: '§2.11', effectiveDate: '2025-01-01' },
+        },
+        headOfHousehold: {
+            amount: '978750.00',
+            citation: { kind: 'revProc', revProc: '2024-40', section: '§2.11', effectiveDate: '2025-01-01' },
+        },
+        qualifyingSurvivingSpouse: {
+            amount: '1800700.00',
+            citation: { kind: 'revProc', revProc: '2024-40', section: '§2.11', effectiveDate: '2025-01-01' },
+        },
+    },
+    // 25 cents of exemption for every dollar of AMTI above the threshold.
+    // A WHOLE percent, so `ratePercent` rather than basis points.
+    exemptionPhaseoutRatePercent: 25,
+    // Rev. Proc. 2024-40 §2.11 names this provision by number in its own
+    // sentence ("the amounts used under § 55(d)(2)"), which is where this
+    // section reference was read rather than recalled.
+    exemptionPhaseoutRateCitation: { kind: 'code', section: '§55(d)(2)', effectiveDate: '2025-01-01' },
+    // §55(b)(1)(A): 26% on the first slice of the AMT base, 28% above it.
+    lowerRatePercent: 26,
+    upperRatePercent: 28,
+    rateCitation: { kind: 'code', section: '§55(b)(1)(A)', effectiveDate: '2025-01-01' },
+    // Rev. Proc. 2024-40 §2.11, second table -- "under § 55(b)(1), the excess
+    // taxable income above which the 28 percent tax rate applies". The
+    // Rev. Proc. prints exactly TWO rows, "Married Individuals Filing Separate
+    // Returns" and "All Other Taxpayers", so the MFS figure is HALF and every
+    // other status shares one amount. Written out per status regardless.
+    upperRateThreshold: {
+        single: {
+            amount: '239100.00',
+            citation: { kind: 'revProc', revProc: '2024-40', section: '§2.11', effectiveDate: '2025-01-01' },
+        },
+        marriedFilingJointly: {
+            amount: '239100.00',
+            citation: { kind: 'revProc', revProc: '2024-40', section: '§2.11', effectiveDate: '2025-01-01' },
+        },
+        // The one status the Rev. Proc.'s second table separates out, and the
+        // only halved figure in this whole group.
+        marriedFilingSeparately: {
+            amount: '119550.00',
+            citation: { kind: 'revProc', revProc: '2024-40', section: '§2.11', effectiveDate: '2025-01-01' },
+        },
+        headOfHousehold: {
+            amount: '239100.00',
+            citation: { kind: 'revProc', revProc: '2024-40', section: '§2.11', effectiveDate: '2025-01-01' },
+        },
+        qualifyingSurvivingSpouse: {
+            amount: '239100.00',
+            citation: { kind: 'revProc', revProc: '2024-40', section: '§2.11', effectiveDate: '2025-01-01' },
+        },
+    },
+}
+
+/**
  * A full tax-year parameter set: every TY2025 parameter this phase
  * requires, together.
  *
@@ -1790,6 +2025,7 @@ export const qualifiedBusinessIncomeDeduction = {
  *   readonly qualifiedCharitableDistribution: typeof qualifiedCharitableDistribution,
  *   readonly selfEmploymentTax: typeof selfEmploymentTax,
  *   readonly qualifiedBusinessIncomeDeduction: typeof qualifiedBusinessIncomeDeduction,
+ *   readonly alternativeMinimumTax: typeof alternativeMinimumTax,
  * }} TaxParamSet
  */
 
@@ -1827,6 +2063,7 @@ export const taxParamsByYear = {
         qualifiedCharitableDistribution,
         selfEmploymentTax,
         qualifiedBusinessIncomeDeduction,
+        alternativeMinimumTax,
     },
 }
 
@@ -1952,6 +2189,12 @@ const everyDollarStringField = [
     selfEmploymentTax.socialSecurityWageBase.amount,
     ...individualFilingStatuses.map(
         status => qualifiedBusinessIncomeDeduction.thresholdAmount[status].amount),
+    ...individualFilingStatuses.flatMap(status => [
+        alternativeMinimumTax.exemption[status].amount,
+        alternativeMinimumTax.exemptionPhaseoutThreshold[status].amount,
+        alternativeMinimumTax.exemptionCompletePhaseout[status].amount,
+        alternativeMinimumTax.upperRateThreshold[status].amount,
+    ]),
 ]
 
 export const proof = {
@@ -3251,6 +3494,141 @@ export const proof = {
                     !== twentyFourPercentCeiling('qualifyingSurvivingSpouse'),
                 'a qualifying surviving spouse\'s §199A threshold is NOT the joint bracket ceiling',
             )
+        },
+    },
+    // ── TAX-33 (Phase 29): §55's exemption, phase-out and two rates ─────────
+    alternativeMinimumTax: {
+        // Every dollar figure hand-typed from Rev. Proc. 2024-40 §2.11's own
+        // three tables and cross-checked against Form 6251's printed line 5
+        // chart, per status, so a figure copied from the wrong Rev. Proc. row
+        // names itself. The two rows the Rev. Proc. prints are "Joint Returns
+        // or Surviving Spouses" and "Unmarried Individuals (other than
+        // Surviving Spouses)", neither of which is a filing status this
+        // module keys by -- so the MAPPING is what this leaf really pins.
+        everyExemptionAndThresholdMatchesTheRevenueProcedure: () => {
+            /** @type {Record<IndividualFilingStatus, readonly [string, string, string, string]>} */
+            const expected = {
+                single: ['88100.00', '626350.00', '978750.00', '239100.00'],
+                marriedFilingJointly: ['137000.00', '1252700.00', '1800700.00', '239100.00'],
+                marriedFilingSeparately: ['68500.00', '626350.00', '900350.00', '119550.00'],
+                // "Unmarried Individuals (other than Surviving Spouses)".
+                headOfHousehold: ['88100.00', '626350.00', '978750.00', '239100.00'],
+                // "Joint Returns or Surviving Spouses".
+                qualifyingSurvivingSpouse: ['137000.00', '1252700.00', '1800700.00', '239100.00'],
+            }
+            for (const status of individualFilingStatuses) {
+                const [exemption, threshold, complete, upper] = expected[status]
+                assertEq(
+                    alternativeMinimumTax.exemption[status].amount, exemption,
+                    ['§55(d)(1) exemption for this status', status])
+                assertEq(
+                    alternativeMinimumTax.exemptionPhaseoutThreshold[status].amount, threshold,
+                    ['§55(d)(2) threshold phase-out amount for this status', status])
+                assertEq(
+                    alternativeMinimumTax.exemptionCompletePhaseout[status].amount, complete,
+                    ['§55(d)(2) complete phase-out amount for this status', status])
+                assertEq(
+                    alternativeMinimumTax.upperRateThreshold[status].amount, upper,
+                    ['§55(b)(1) 28%-rate threshold for this status', status])
+            }
+        },
+        // The Rev. Proc. is the authority, and it is 2024-40 rather than
+        // 2025-32 -- checked, not assumed: Rev. Proc. 2025-32's own SECTION 3
+        // removes only §2.15(1) and §2.25 of Rev. Proc. 2024-40 for TY2025,
+        // and §2.11 is neither. The section string is asserted beside the
+        // Rev. Proc. number for the reason `unmodifiedParametersCite2024_40Only`
+        // records: a citation whose section was never read is the sourcing
+        // error this module's header exists to prevent.
+        everyStoredAmountCitesRevProc2024_40Section2_11: () => {
+            /** @type {readonly Record<IndividualFilingStatus, AmountWithCitation>[]} */
+            const maps = [
+                alternativeMinimumTax.exemption,
+                alternativeMinimumTax.exemptionPhaseoutThreshold,
+                alternativeMinimumTax.exemptionCompletePhaseout,
+                alternativeMinimumTax.upperRateThreshold,
+            ]
+            // Hand-typed beside the loop: four maps, five statuses, twenty
+            // citations. A map deleted from the list above would otherwise
+            // vanish from the iteration set in the same instant.
+            assertEq(maps.length, 4, 'expected exactly the four per-status amount maps')
+            for (const map of maps) {
+                for (const status of individualFilingStatuses) {
+                    const entry = map[status]
+                    assertEq(assertRevProcCitation(entry.citation).revProc, '2024-40', status)
+                    assertEq(entry.citation.section, '§2.11', status)
+                    assertEq(entry.citation.effectiveDate, '2025-01-01', status)
+                }
+            }
+        },
+        // THE COMPARISON that keeps the stored third column honest (see this
+        // group's own docstring). A complete phase-out amount is the
+        // threshold plus `exemption / rate` -- 100/25 = four times the
+        // exemption -- so this is the one place the redundancy is checked
+        // rather than trusted. The MFS row is the interesting one: it shares
+        // the UNMARRIED threshold and takes HALF the exemption, so its
+        // complete phase-out is $900,350 rather than $978,750, and a row
+        // copied from `single` would redden here and nowhere else.
+        theCompletePhaseoutAmountsAgreeWithTheirOwnArithmetic: () => {
+            const rate = BigInt(alternativeMinimumTax.exemptionPhaseoutRatePercent)
+            for (const status of individualFilingStatuses) {
+                const exemption = centsFromString(alternativeMinimumTax.exemption[status].amount)
+                const threshold = centsFromString(
+                    alternativeMinimumTax.exemptionPhaseoutThreshold[status].amount)
+                const complete = centsFromString(
+                    alternativeMinimumTax.exemptionCompletePhaseout[status].amount)
+                assertEq(
+                    complete,
+                    threshold + exemption * 100n / rate,
+                    [
+                        'the stored complete phase-out amount disagrees with threshold + exemption/rate',
+                        status, centsToString(complete),
+                        centsToString(threshold + exemption * 100n / rate),
+                    ],
+                )
+            }
+            // …and the MFS row really is the one that differs from the
+            // unmarried row despite sharing its threshold, so the loop above
+            // is not passing on five identical shapes.
+            assertEq(
+                alternativeMinimumTax.exemptionPhaseoutThreshold.marriedFilingSeparately.amount,
+                alternativeMinimumTax.exemptionPhaseoutThreshold.single.amount,
+                'MFS shares the unmarried THRESHOLD')
+            assert(
+                alternativeMinimumTax.exemptionCompletePhaseout.marriedFilingSeparately.amount
+                    !== alternativeMinimumTax.exemptionCompletePhaseout.single.amount,
+                'MFS does NOT share the unmarried COMPLETE phase-out, because its exemption is half')
+        },
+        // The three rates, hand-typed off §55's own words, with their
+        // citation kinds. `kind: 'code'` for all three: the Rev. Proc.
+        // publishes the DOLLAR amounts, not the percentages.
+        theRatesAreTheStatutoryWholePercents: () => {
+            assertEq(alternativeMinimumTax.lowerRatePercent, 26, '§55(b)(1)(A)(i): "26 percent"')
+            assertEq(alternativeMinimumTax.upperRatePercent, 28, '§55(b)(1)(A)(ii): "28 percent"')
+            assertEq(alternativeMinimumTax.rateCitation.kind, 'code')
+            assertEq(alternativeMinimumTax.rateCitation.section, '§55(b)(1)(A)')
+            assertEq(alternativeMinimumTax.rateCitation.effectiveDate, '2025-01-01')
+            assertEq(
+                alternativeMinimumTax.exemptionPhaseoutRatePercent, 25,
+                '25 cents of exemption per dollar of AMTI over the threshold')
+            assertEq(alternativeMinimumTax.exemptionPhaseoutRateCitation.kind, 'code')
+            assertEq(alternativeMinimumTax.exemptionPhaseoutRateCitation.section, '§55(d)(2)')
+            assertEq(alternativeMinimumTax.exemptionPhaseoutRateCitation.effectiveDate, '2025-01-01')
+        },
+        // No `estatesAndTrusts` row, deliberately -- Rev. Proc. 2024-40 §2.11
+        // prints one ($30,700 exemption) and Form 6251 is *Individuals*. The
+        // absence is asserted rather than left to the type, so widening the
+        // map to `FilingStatus` later has to be a decision someone makes on
+        // purpose.
+        thereIsNoEstateOrTrustRow: () => {
+            for (const name of ['exemption', 'exemptionPhaseoutThreshold', 'exemptionCompletePhaseout', 'upperRateThreshold']) {
+                const map = alternativeMinimumTax[
+                    /** @type {'exemption' | 'exemptionPhaseoutThreshold' | 'exemptionCompletePhaseout' | 'upperRateThreshold'} */
+                    (name)]
+                assertEq(Object.keys(map).length, individualFilingStatuses.length, name)
+                assert(
+                    !Object.keys(map).includes('estatesAndTrusts'),
+                    ['an estate or trust computes AMT on Schedule I (Form 1041), not Form 6251', name])
+            }
         },
     },
 }
