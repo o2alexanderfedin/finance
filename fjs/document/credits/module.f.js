@@ -115,6 +115,27 @@
  * one direction for all four gets three of them backwards, so each is named
  * for the fact it asserts rather than for the outcome it produces.
  *
+ * ## The filer's own age, and why ONE field settles a four-part rule
+ *
+ * §25A(i) denies the REFUNDABLE 40% of the American Opportunity Credit to a
+ * filer who, at year end, was under 18; or was 18 with earned income not
+ * exceeding half their own support; or was over 18 and under 24, a full-time
+ * student, with earned income not exceeding half their own support — in each
+ * case only where a parent was alive at year end and the filer is not filing
+ * jointly. This engine holds none of those facts: `vnd.fjs.return_profile`
+ * carries a 65-or-older checkbox and no other age at all.
+ *
+ * `filerAttainedAgeTwentyFourBeforeTheEndOfTheYear` settles the whole rule in
+ * the affirmative direction for almost everyone, because a filer who reached
+ * 24 is outside EVERY branch of it whatever the other facts say. Its absence
+ * does not deny the credit — `fjs/form8863` REFUSES instead, naming the
+ * provision — so a filer genuinely under 24 gets a sentence they can act on
+ * rather than a number that is quietly missing 40% of itself.
+ *
+ * It is at the TOP LEVEL rather than inside a student entry because it is a
+ * fact about the person filing, not about anyone being educated; a filer with
+ * two students has one age.
+ *
  * ## The two expense fields, and why they are two
  *
  * `qualifiedExpensesNotReportedOnForm1098T` is tuition and required fees the
@@ -251,6 +272,12 @@ export const creditsSchema = /** @type {const} */ ({
     retirementContributions: option(array(retirementContributionEntry)),
     saversCreditEligibility: option(array(saversCreditEligibilityEntry)),
     educationStudents: option(array(educationStudentEntry)),
+    // §25A(i)'s under-24 restriction on the REFUNDABLE American Opportunity
+    // Credit — a fact about the FILER rather than about any one student,
+    // which is why it sits at the top level beside the three arrays rather
+    // than inside `educationStudents`. See this module's own docstring, "The
+    // filer's own age".
+    filerAttainedAgeTwentyFourBeforeTheEndOfTheYear: option(true),
 })
 
 /** @typedef {Ts<typeof creditsSchema>} Credits */
@@ -812,6 +839,43 @@ export const proof = {
         assertEq(Object.keys(v).includes('total'), false)
         assertEq(Object.keys(v).includes('saversCreditAmount'), false)
         assertEq(Object.keys(v).includes('qualifiedExpensesTotal'), false)
+    },
+    filerAge: {
+        // The field is at the TOP LEVEL, not inside a student entry — a
+        // filer with two students has one age. Asserted rather than
+        // described, so moving it into `educationStudents` has to delete this
+        // leaf deliberately.
+        theFilersAgeIsATopLevelFactAndNotAPerStudentOne: () => {
+            const [t, v] = validate({
+                ...minimal,
+                educationStudents: [undergraduateStudent],
+                filerAttainedAgeTwentyFourBeforeTheEndOfTheYear: true,
+            })
+            assert(t === 'ok', ['expected ok', t, v])
+            assertEq(v.filerAttainedAgeTwentyFourBeforeTheEndOfTheYear, true)
+            assertEq(
+                Object.keys(v.educationStudents?.[0] ?? {})
+                    .includes('filerAttainedAgeTwentyFourBeforeTheEndOfTheYear'),
+                false,
+            )
+        },
+        // DOC-12: `false` is structurally rejected, and DOC-11: absent stays
+        // absent. Absence here is what makes `fjs/form8863` REFUSE rather
+        // than deny, so a materialized `false` and a genuine absence must not
+        // be confusable — they lead to the same behaviour today only because
+        // one of the two cannot be stored at all.
+        falseIsStructurallyRejectedAndAbsentStaysAbsent: () => {
+            assertEq(
+                validate({ ...minimal, filerAttainedAgeTwentyFourBeforeTheEndOfTheYear: false })[0],
+                'error',
+            )
+            const [t, v] = validate(minimal)
+            assert(t === 'ok', ['expected ok', t, v])
+            assert(
+                !('filerAttainedAgeTwentyFourBeforeTheEndOfTheYear' in v),
+                ['an absent assertion must stay absent', v],
+            )
+        },
     },
     // DOC-10: no `formRevision`, and its absence is asserted rather than left
     // to be noticed — the field is not merely unset on this fixture, it is
