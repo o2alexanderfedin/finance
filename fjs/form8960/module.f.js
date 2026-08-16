@@ -231,7 +231,20 @@ export const form8960PartI = input => {
     const line3 = 0n
     // 4a. "Rental real estate, royalties, partnerships, S corporations,
     //     trusts, etc." Zero: no Schedule E and no Schedule K-1 dialect
-    //     (Phase 30), and `scheduleOneAdditionalIncome` is a REFUSED kind.
+    //     (Phase 30), and `rentalRealEstateRoyaltiesPartnershipsSCorps` is a
+    //     REFUSED kind. (It was the coarse `scheduleOneAdditionalIncome` until
+    //     Phase 27 split Schedule 1 Part I; the per-line kind names exactly
+    //     this printed line, which is why the citation is now precise.)
+    //
+    //     **Phase 27's Schedule C does NOT reach this line**, and that is
+    //     worth stating where it could be assumed otherwise: §1411(c)(2)(A)
+    //     excludes income from a trade or business the taxpayer materially
+    //     participates in, and Schedule 1 line 3 is not one of the §1411
+    //     categories at all. A sole proprietor's net profit is subject to
+    //     self-employment tax (Phase 28), not to the net investment income
+    //     tax. What business income CAN reach line 4a is a passive activity
+    //     or a §1411(c)(2)(B) trading business, and both arrive on Schedule E
+    //     rather than Schedule C.
     const line4a = 0n
     // 4b. "Adjustment for net income or loss derived in the ordinary course
     //     of a non-section 1411 trade or business." Zero: there is nothing on

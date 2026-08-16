@@ -87,8 +87,9 @@
  * ## The fourth entry that was specified and is NOT here, and why
  *
  * This phase's brief proposed **1099-G box 2 (state/local income tax refunds)
- * non-zero -> `scheduleOneAdditionalIncome`**, and asked whether it is
- * reachable. **It is not.** `fjs/document/1099g`'s own `checkReferences` lists
+ * non-zero -> `scheduleOneAdditionalIncome`** (the kind Phase 27 renamed to
+ * the per-line `taxableStateLocalRefunds` when it split Schedule 1 Part I),
+ * and asked whether it is reachable. **It is not.** `fjs/document/1099g`'s own `checkReferences` lists
  * `box2StateOrLocalIncomeTaxRefunds` in its `unmodeledMoneyBoxes` table and
  * REFUSES any present, non-zero value at validation time — so a 1099-G that
  * would trip such a tripwire cannot be stored in CAS at all, and by the time
@@ -767,8 +768,17 @@ export const proof = {
             ['the control: a zero box 2 validates, so the refusal above is about the AMOUNT, not the shape'])
         // …and no tripwire in the table names this kind, so nothing here
         // claims coverage it does not have.
+        //
+        // **The kind named here changed in Phase 27, and the change is an
+        // improvement this leaf could not have had before.** It read
+        // `scheduleOneAdditionalIncome` — the COARSE kind covering the whole
+        // of Schedule 1 Part I — because that was the only kind a 1099-G box
+        // 2 could have been said to require. Phase 27 split that kind into one
+        // per printed line, so the rejected fourth entry can now name the
+        // exact line it would have pointed at: `taxableStateLocalRefunds`,
+        // Schedule 1 line 1.
         assert(
-            !tripwires.some(t => t.kind === 'scheduleOneAdditionalIncome'),
+            !tripwires.some(t => t.kind === 'taxableStateLocalRefunds'),
             'no tripwire may point at a kind whose documents cannot reach the engine')
     },
 }

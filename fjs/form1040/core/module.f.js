@@ -723,10 +723,9 @@ export const form1040IncomeLines = taxParamSet => inputs => {
         })
     // 8 — Schedule 1 Part I's total additional income (line10). `vnd.fjs.1099g`
     // box 1 attributes unemployment compensation to its own printed line 7
-    // (Phase 20); every other Part I line is a `profileDeclaredZeroLine`, and
-    // the COARSE `scheduleOneAdditionalIncome` kind stays in
-    // `unmodeledKindRefusals` because it still covers many distinct Schedule 1
-    // line items with no per-line dialect to attribute an amount to.
+    // (Phase 20); every other Part I line is a `profileDeclaredZeroLine` whose
+    // own per-printed-line kind stays in `unmodeledKindRefusals` (Phase 27's
+    // split of the coarse `scheduleOneAdditionalIncome`).
     const scheduleOnePartIResult = scheduleOnePartI(profile)(unemploymentForms)
     const line8 = {
         value: scheduleOnePartIResult.line10.value,

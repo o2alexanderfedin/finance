@@ -147,7 +147,52 @@ export const kindVocabulary = /** @type {const} */ ([
     'collectibles28RateGain',               // Schedule D line 18
     'section1202Gain',                      // 1099-DIV box 2c
     'investmentInterestForm4952',           // Form 4952 line 4g
-    'scheduleOneAdditionalIncome',          // 8
+    // ── Schedule 1 Part I's own lines, one kind each (DOC-20/21/TAX-30, Phase 27) ─
+    //
+    // `scheduleOneAdditionalIncome` stood here as ONE coarse kind for the
+    // whole of Part I -- taxable state and local refunds, alimony received,
+    // business income on Schedule C, other gains on Form 4797, rental and
+    // pass-through income on Schedule E, farm income on Schedule F, and the
+    // twenty-six lettered sub-lines at 8a-8z. A single kind covering that
+    // many distinct income items could only ever refuse them together, so
+    // nothing on Part I was nameable and nothing on it could be reclassified
+    // one line at a time. It is split here into one kind per printed line, in
+    // SCHEDULE 1's own order -- which is 1040 form order for the block as a
+    // whole, since every one of these feeds line 10 and thence 1040 line 8.
+    //
+    // **This was the LAST of the five coarse kinds.** `fjs/return/scope`'s
+    // own Wave-5 note named all five (`scheduleOneAdditionalIncome`,
+    // `scheduleOneAdjustments`, `scheduleTwoTaxes`,
+    // `scheduleThreeNonrefundableCredits`, `scheduleThreeRefundableCredits`)
+    // and recorded, phase by phase, which had been taken apart; Phase 23 took
+    // Schedule 2, Phase 24 Schedule 1 Part II, Phase 25 both halves of
+    // Schedule 3, and this one takes the schedule that entry was still
+    // waiting on.
+    //
+    // **Printed line 7 deliberately gets no kind HERE.** Unemployment
+    // compensation already has one -- `unemploymentCompensation`, far above,
+    // beside the 1040 lines it sits among in this vocabulary since Phase 20 --
+    // and a second kind for one printed line would let a taxpayer declare the
+    // income twice. It is the one Part I line whose kind is out of Schedule 1
+    // order in this list, and that is history rather than design.
+    //
+    // Lines 9 and 10 get no kind either: line 9 is the TOTAL of the 8a-8z
+    // block `otherIncome` already covers, and line 10 is Part I's own total.
+    // A kind for either would be a declaration a taxpayer could never
+    // truthfully make -- the identical reasoning Schedule 3's lines 7/8/14/15
+    // already carry.
+    //
+    // One of the seven is MODELED as of this phase -- `businessIncomeOrLoss`,
+    // Schedule C. The other six refuse by name, which is the whole point of
+    // splitting: what remains unmodeled on Part I is now something a taxpayer
+    // can be told.
+    'taxableStateLocalRefunds',             // Schedule 1 line 1   -> 8
+    'alimonyReceived',                      // Schedule 1 line 2a  -> 8
+    'businessIncomeOrLoss',                 // Schedule 1 line 3   -> 8
+    'otherGainsOrLosses',                   // Schedule 1 line 4   -> 8
+    'rentalRealEstateRoyaltiesPartnershipsSCorps', // Schedule 1 line 5 -> 8
+    'farmIncomeOrLoss',                     // Schedule 1 line 6   -> 8
+    'otherIncome',                          // Schedule 1 line 8a-8z -> 8
     // ── Schedule 1 Part II's own lines, one kind each (TAX-23/24, Phase 24) ─
     //
     // `scheduleOneAdjustments` stood here as ONE coarse kind for the whole of
@@ -677,16 +722,31 @@ const expectedMoneyBoxFieldCount = 4
  * block plus its own total — see the vocabulary's own comment above.
  *
  * `76 -> 86` is Phase 25's own Schedule 3 split (TAX-25/TAX-26), the same
- * shape one schedule further on and the last of the five coarse kinds
- * `fjs/return/scope`'s Wave 5 note listed. TWO coarse kinds are removed here
- * rather than one — `scheduleThreeNonrefundableCredits` and
+ * shape one schedule further on. TWO coarse kinds are removed here rather
+ * than one — `scheduleThreeNonrefundableCredits` and
  * `scheduleThreeRefundableCredits` — and twelve per-printed-line kinds added,
  * `76 - 2 + 12`. Seven for Part I (lines 1, 2, 3, 4, 5a, 5b and the collapsed
  * 6a-6z) and five for Part II (lines 9, 10, 11, 12 and the collapsed
  * 13a-13z); lines 7, 8, 14 and 15 get none, because all four are totals.
+ *
+ * **This paragraph said "and the last of the five coarse kinds
+ * `fjs/return/scope`'s Wave 5 note listed" until Phase 27, and that was
+ * false when it was written.** `scheduleOneAdditionalIncome` was still
+ * standing — that note's own text says so, in the same repository, in the
+ * words *"`scheduleOneAdditionalIncome` is the ONLY one of the original five
+ * left"*. The claim is corrected rather than deleted, because a count
+ * docstring that overstates what a phase finished is exactly how the next
+ * phase comes to believe there is nothing left to split.
+ *
+ * `86 -> 92` is Phase 27's own Schedule 1 PART I split (DOC-20/DOC-21/
+ * TAX-30), which really is the last: one coarse `scheduleOneAdditionalIncome`
+ * removed and seven per-printed-line kinds added, `86 - 1 + 7`. Seven rather
+ * than nine because printed line 7 already has `unemploymentCompensation`
+ * (Phase 20) and lines 9 and 10 are totals — see the vocabulary's own comment
+ * above.
  * @type {number}
  */
-const expectedKindCount = 86
+const expectedKindCount = 92
 
 export const proof = {
     dialectAndMediaType: () => {

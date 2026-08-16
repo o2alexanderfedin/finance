@@ -33,7 +33,14 @@ export const tier = 'must'
  */
 const offered = [
     'unreportedTips',
-    'scheduleOneAdditionalIncome',
+    // `scheduleOneAdditionalIncome` — the coarse kind for the whole of
+    // Schedule 1 Part I — was split into seven per-printed-line kinds in
+    // Phase 27 (TAX-30) and no longer exists. `farmIncomeOrLoss` (Schedule 1
+    // line 6, Schedule F) is its replacement here: a Part I line that is
+    // still refused after that split, so this toggle still demonstrates the
+    // same block of the same schedule. Deliberately NOT `businessIncomeOrLoss`
+    // — that one is MODELED as of the same phase.
+    'farmIncomeOrLoss',
     'qualifiedBusinessIncomeDeduction',
     // `itemizedDeductions` moved to `modeledKinds` in Plan 13-07 (Phase 13
     // Wave 3, TAX-13) — swapped for `netQualifiedDisasterLoss`, its former
@@ -175,7 +182,7 @@ export const render = root => {
 
     root.append(sourceFooter([
         { label: 'fjs/return/scope — classification and the one place a refusal is built', path: 'fjs/return/scope/module.f.js', line: 326, proofLine: 386 },
-        { label: 'fjs/return/scope — the 38-entry refusal table', path: 'fjs/return/scope/module.f.js', line: 152 },
+        { label: 'fjs/return/scope — the 63-entry refusal table', path: 'fjs/return/scope/module.f.js', line: 152 },
         { label: 'fjs/form1040/core — the guard runs before any line is computed', path: 'fjs/form1040/core/module.f.js', line: 1130, proofLine: 1648 },
         { label: 'fjs/return/profile — the frozen kind vocabulary', path: 'fjs/return/profile/module.f.js', line: 104, proofLine: 469 },
     ]))
