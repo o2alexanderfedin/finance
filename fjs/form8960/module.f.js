@@ -32,6 +32,24 @@
  * today, and that is a coincidence of what remains unmodelled rather than a
  * shared rule — the same caution Schedule 1-A's own docstring records.
  *
+ * ## A mutation finding worth keeping: three of the five statuses cannot see
+ * this module read the wrong statute
+ *
+ * Replacing this module's `netInvestmentIncomeTaxThreshold` lookup with
+ * `additionalMedicareTaxThreshold` — copying Form 8959's answer, the exact
+ * error `fjs/tax/params` warns about at length — reddens **four** proof
+ * leaves, not the whole Part III group. Every leaf built on a SINGLE filer
+ * stays green, and correctly: §1411(b)(3) and §3101(b)(2)(C) both say
+ * $200,000, so for single, head of household and married filing separately
+ * the two statutes are indistinguishable by output.
+ *
+ * **A qualifying surviving spouse is the only filer whose return can tell
+ * them apart** ($250,000 here, $200,000 there), which is why the QSS pair in
+ * `proof.partIII` is not one boundary case among several — it is the entire
+ * observable difference between reading the right statute and the wrong one.
+ * A phase that had tested this module with single filers alone would have
+ * shipped the wrong lookup with a fully green suite.
+ *
  * ## What counts as net investment income here, and what deliberately does not
  *
  * Of the documents this engine models, exactly three feed Part I:

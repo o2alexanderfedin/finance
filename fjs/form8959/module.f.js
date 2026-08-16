@@ -98,6 +98,30 @@
  *   the printed page computes, and departing from it would be this module
  *   inventing the split it exists not to invent.
  *
+ * ## A mutation finding worth keeping: Part V's floor is the widest-reach
+ * line on this form
+ *
+ * Deleting the `line19 > line21 ? ... : 0n` guard on line 22 — the single
+ * token that makes the floor a floor — was predicted to redden the two Part V
+ * leaves written for it. It reddened **seventeen project proof leaves across
+ * four modules**, including every Part I, II and III leaf on this form and
+ * Phase 22's own `controlTheSameReturnBelowTheThresholdComputesSilently`.
+ *
+ * The reason is a property of this code nobody had written down. **No W-2
+ * fixture in this repository carries box 6 except the ones Phase 23 added**,
+ * while several carry box 5 — so for most fixtures line 19 is `0` and line 21
+ * is a real 1.45% of a real wage, and an unfloored line 22 is a large
+ * NEGATIVE number. {@link form8959}'s `assert(partV.line24 >= 0n)` then throws
+ * before any leaf can read a figure, which is why leaves that never look at
+ * Part V go red too. `theFaangReturnComputesInsteadOfRefusing` was the leaf
+ * that stayed GREEN, and correctly: its box 6 of $5,250.00 genuinely exceeds
+ * 1.45% of $300,000, so the floor never fires for it.
+ *
+ * Two things follow. The floor is not defensive — without it, a routine
+ * return would carry a negative payment to 1040 line 25c — and the
+ * module-level invariant assert is what turns a wrong number into a loud
+ * failure rather than a quiet one.
+ *
  * The reconciliation is why a high-wage return usually owes far less than
  * line 18 suggests: a single filer with one $300,000 employer owes $900 on
  * line 18 and has already had exactly $900 withheld, so the two cancel. It
