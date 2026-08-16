@@ -1,17 +1,17 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.1
-milestone_name: milestone
+milestone: v2
+milestone_name: The Product Path and Four Personas
 status: executing
-stopped_at: PAUSED. Phase 18 planned, ZERO executed. An UNPLANNED vnd.fjs.1099g feature shipped on feature/1099g-unemployment and owns no requirement ID - resolve that first. See .planning/.continue-here.md.
-last_updated: "2026-08-15T03:30:00.000Z"
-last_activity: 2026-08-14
+stopped_at: Everything is merged to develop (PR #68) and every local branch has ZERO unmerged commits. Next is Phase 21, The Last Mile - and read its ROADMAP entry first, because the obvious implementation is explicitly forbidden.
+last_updated: "2026-08-16T07:15:00.000Z"
+last_activity: 2026-08-16
 progress:
-  total_phases: 20
+  total_phases: 30
   completed_phases: 16
   total_plans: 89
   completed_plans: 85
-  percent: 80
+  percent: 53
 ---
 
 # Project State
@@ -26,32 +26,44 @@ the server executes it as a pure function of `(documents, tax-year parameters) �
 
 ## Current Position
 
-Phase: 15 (realism-polish-and-upstream) — **COMPLETE AND MERGED**
-  6 plans across 2 waves. Delivered all five requirements: PROV-08, TAX-17, MCP-09,
-  PROV-06, DOC-16. Proofs went 845 → 907.
-Plan: 6 of 6 — all six have SUMMARY files
-Status: **Shipped.** `15-VERIFICATION.md` scores **5/5 ROADMAP success criteria**, and unlike
-  Phases 10 and 13 it added **zero** new `human_needed` debt — the verifier fetched the live
-  IRS `i1040sd.pdf` and closed the phase's only manual-only item rather than deferring it.
-  `15-REVIEW.md` found 1 critical (CR-01) + 2 warnings; all three are remedied and committed.
-  Merged to `develop` via **PR #63** on 2026-08-12, alongside Phase 13's **PR #62**.
+Phase: 20 (unemployment-compensation) — **COMPLETE, VERIFIED AND MERGED**
+  0 plans; none were written. The `vnd.fjs.1099g` dialect and the Schedule 1 line 7 wiring were
+  built on 2026-08-14 outside the GSD structure, in response to a real IRS transcript the scope
+  guard **correctly refused**, and retrofitted into the record on 2026-08-15 as `DOC-18`/`TAX-18`
+  and Phase 20 — labelled RETROFITTED, not presented as planned.
+Plan: n/a — the `0/0` in ROADMAP's progress table is literal, not a placeholder.
+Status: **Shipped.** `20-VERIFICATION.md` scores **5/6 criteria MET, 1 PARTIAL**, and the PARTIAL
+  was a **surviving mutant**: erasing the destination from a refusal message left the whole suite
+  green, because five proofs asserted the box name and none asserted where the amount would have
+  gone. Fixed, watched to redden, restored byte-identical. Both `human_needed` items were closed
+  the same day — the real transcript re-fed through the full `form1040Report` entry point (line 8
+  = $4,554.00, line 25b = $454.00, both **citing** the 1099-G's boxes), and boxes 10a/10b modelled
+  so box 11's "a state return would want it" justification finally holds.
+  Merged to `develop` via **PR #68** on 2026-08-16, carrying Phase 18's planning commits with it.
 
-Next phase: **16 — The Orphan Ingestion Island.** Blocked on an owner decision, not on work.
-  ROADMAP states outright: *"Research: No — the decision needs the author's intent, not
-  investigation."* **Phases 17 and 18 are unblocked and independent of 16 and of each other.**
-  Phase 14 remains skipped by owner decision; read the CARRIED, NOW UNOWNED block under
-  "Session Continuity" before closing v1.
+Next phase: **21 — The Last Mile** (milestone v2). `form1040Report` has **no production caller**;
+  the proven engine and the proven execution spine have never been joined. **The obvious
+  implementation is forbidden** — a server tool that assembles inputs and calls the engine is the
+  `finance_compute_1040` tool REQUIREMENTS.md rules out. The route that preserves the thesis is
+  `guestCtx`, which already carries pure non-effect helpers beside the four frozen CAS commands.
+  **Phase 22 (computable tripwires) is a hard prerequisite for 23-30 and must not be reordered.**
+  Phases 16 (deferred), 17 and 18 (planned, zero executed) remain open from v1.
 
-Progress: [████████░░] 79% — **15 of 19 phases**
-  Phase-based, never plan-based. Plans are 82 of 82, which is *not* the project's progress
-  figure: it only says every plan that was written has been executed. Two FIX-SUMMARY.md
-  files sit beside their plans' own summaries and are deliberately excluded from both counts.
-  (Note 14 is skipped by decision, so 15 of the 18 *achievable* phases = 83%; the 79% figure
-  is kept because 19 is what ROADMAP declares.)
-Last activity: 2026-08-12
+Progress: [████████░░] 80% — **16 of 20 phases**, v1. Milestone v2 adds 10 more (21-30), 0 done.
+  Phase-based, never plan-based. Requirements are **95 in v1 (87 complete)** plus **25 in v2**,
+  120 in the document, counted separately so v2 does not move v1's figure. Every one of those
+  counts is derived by a command recorded beside it in REQUIREMENTS.md, not transcribed.
+  (Note 14 is skipped and 16 deferred by owner decision, so 16 of the 18 *achievable* v1 phases
+  = 89%; the 80% figure is kept because 20 is what ROADMAP declares.)
+Last activity: 2026-08-16
 
-> **This block has now been wrong THREE times, always in the same direction: stale text left
-> under a newer heading.** It carried Phase 10's text under a 12.1 heading until 2026-08-09;
+> **This block has now been wrong FOUR times, always in the same direction: stale text left
+> under a newer heading.** The fourth was found on 2026-08-16 during a post-merge sweep: it still
+> carried **Phase 15's** text — PR #63, "6 plans across 2 waves", "Next phase: 16" — while the
+> frontmatter directly above it read `completed_phases: 16` and three further phases had shipped.
+> **The frontmatter and the prose disagreed for four days and nothing compared them.** That is the
+> same defect as every count in this project that was true of the part someone examined: two
+> statements of one fact, no check between them. It carried Phase 10's text under a 12.1 heading until 2026-08-09;
 > it carried Phase 12.1's wave breakdown under a Phase 13 heading until 2026-08-11; and on
 > 2026-08-12 it was found carrying **Phase 13's** text (`13-VERIFICATION.md`, PR #62, "13 plans
 > across 5 waves") under a **Phase 15** heading, reading EXECUTING for a phase that was
@@ -582,6 +594,8 @@ server and asking it instead of grepping. Green does not mean verified.
 | Doc truth (→ Phase 17) | **The "~8 min / 481s full suite" figure is wrong, but so was my first correction.** Two measurements on 2026-08-12: `0038eed` → `duration_ms 44707` (**44.7s**, 6296 tests); `20f5459` → `duration_ms 136059` (**136s**, 6314 tests). Both exit 0. So the honest figure is a **range of roughly 45-140s that varies ~3x with machine load**, not the single 44.7s I first recorded, and not the 481s in STATE.md's Infrastructure notes / `19-VALIDATION.md` / `15-VALIDATION.md`. **Note the shape of my own error: I measured once and reported a point value as if it were the property.** That is the same defect as reporting one grep's population as the whole — which this phase hit four times. Phase 17 should record a range with the measurement conditions, and correct every copy. Consequence is not cosmetic: plans avoided per-task full-suite runs on the strength of the 481s figure, trading real feedback for imagined cost. | Open | 2026-08-12 |
 | Doc truth (→ Phase 17) | `amendmentDiff` refusing unpinned runs — deferred from Phase 19 Area 2 by owner decision. Revisit only if a real caller is misled. | Open | 2026-08-12 |
 | Structure (→ Phase 18) | **`fjs-run-integration.test.js` is one giant `test()` block, and the masking is not hypothetical.** Phase 19's code review raised it as WR-03 after it cost real work: under Mutation Gate M1, Node reported the failure as the *pre-existing* pin proof, which shares the block and runs first — the new PROV-05 assertion's independent redness could only be established with a throwaway diagnostic copy. **Two separate agents hit this.** The consequence beyond mutation testing: a future regression in any later assertion of that block is invisible while an earlier one fails, so the file reports one failure no matter how many things break. Splitting it into per-concern `test()` blocks belongs with Phase 18's structural work; doing it inside a phase close would have been unreviewed churn. | Open | 2026-08-12 |
+| Verification (→ Phase 21+) | **A proof that asserts a message must assert the part that carries information.** Phase 20's verification erased a refusal's `${destination}` interpolation and the entire suite stayed green: five leaves asserted the box name and the phrase "cannot compute", none asserted *where the amount would have gone* — the only actionable part. Fixed in `1697896` and folded into AGENTS.md, but the general form is unswept: **no other dialect's refusal messages have had this mutation run against them.** Five dialects carry refusal or error strings. | Open | 2026-08-16 |
+| Verification (→ Phase 21+) | **`&& false` does not work inside an `if`.** `allowUnreachableCode: false` makes the block unreachable, `tsc` reports TS7027, no `ℹ tests` line appears, and the gate proves nothing while looking performed. AGENTS.md's own recipe recommended it; corrected in `1697896` with working forms. Any plan written before 2026-08-16 that specifies an `&& false` mutation inside a condition **will not run** — reshape it rather than recording the result. | Open | 2026-08-16 |
 | Process (→ any phase) | **Never run a code reviewer concurrently with a verifier that re-runs mutation gates.** My error in Phase 19: I parallelized them to save wall-clock, but the verifier mutates and restores production files while the reviewer reads them. The reviewer caught a target line changing under it mid-review (IN-02) — it detected the interference rather than being fooled, which was diligence, not design. Mutation-running agents need exclusive access to the tree. | Open | 2026-08-12 |
 
 ## Session Continuity
