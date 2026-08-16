@@ -63,6 +63,7 @@ import {
     validate as validateReturnProfile,
 } from '../../return/profile/module.f.js'
 import { classifyScope } from '../../return/scope/module.f.js'
+import { classifyTripwires } from '../../return/tripwire/module.f.js'
 import { deductionChoice } from '../../tax/deduction/module.f.js'
 import { individualFilingStatuses, taxParamsByYear } from '../../tax/params/module.f.js'
 import { scheduleD } from '../../schedule/d/module.f.js'
@@ -1543,9 +1544,26 @@ const declaredKindsOf = profile => {
  *    reason recorded there — the zero-read kill condition once existed in two
  *    places, every proof bound to the copy that did not ship, and 258 tests
  *    were green over a rule with no coverage at all.
- * 2. Compute lines 1a-37. Line 16's own refusing arm comes back out as the
+ * 2. **Classify the SUPPLIED DOCUMENTS against what they prove must have been
+ *    declared** (TAX-19, Phase 22) — also before any line is computed, and
+ *    also refusing through `fjs/return/scope`'s single constructor. This is
+ *    the complementary guard `fjs/return/tripwire` owns, and it exists because
+ *    step 1 alone is silent in exactly the case a taxpayer cannot help
+ *    themselves with: a $300,000 W-2 box 5 owes Additional Medicare Tax
+ *    whether or not the filer has heard of Form 8959, and a declaration-driven
+ *    guard has nothing to compare against when the declaration was never made.
+ *    See that module's docstring, and `.planning/PERSONA-COVERAGE.md`'s "The
+ *    structural finding", for the whole argument.
+ *
+ *    **Order within the two guards is deliberate: declared-scope first.** A
+ *    return that declares an unmodeled kind AND trips a tripwire refuses
+ *    either way, so the choice is only about which sentence the taxpayer
+ *    reads — and the one naming what they themselves wrote down is the one
+ *    they can act on first. It also keeps every pre-existing refusal message
+ *    byte-identical to what it was before this phase.
+ * 3. Compute lines 1a-37. Line 16's own refusing arm comes back out as the
  *    whole report's outcome by the same rule.
- * 3. Apply the taxpayer's whole-dollar election ONCE, over the whole line
+ * 4. Apply the taxpayer's whole-dollar election ONCE, over the whole line
  *    list, at the end. The election is all-or-nothing for the entire return
  *    (i1040gi p23, "If you do round to whole dollars, you must round all
  *    amounts"), and applying it here — to the exact cents values, once — is
@@ -1556,9 +1574,28 @@ const declaredKindsOf = profile => {
  */
 export const form1040Report = taxParamSet => inputs => {
     const { profile } = inputs
-    const scope = classifyScope(declaredKindsOf(profile))
+    const declaredKinds = declaredKindsOf(profile)
+    const scope = classifyScope(declaredKinds)
     if (scope.kind === 'error') {
         return { kind: 'error', message: scope.message, unmodeled: scope.unmodeled }
+    }
+    // The filing status is narrowed HERE, a third time in this module, rather
+    // than threaded down from `form1040IncomeLines`: the tripwire table's
+    // Additional Medicare Tax threshold is per-status, and this guard runs
+    // strictly BEFORE any line function is called, so there is nothing yet to
+    // thread it from. Same narrowing, same `assert`, same unreachable-for-a-
+    // validated-profile reasoning as the other two call sites.
+    const status = storedFilingStatusNamed(profile.value.filingStatus)
+    assert(
+        status !== undefined,
+        [
+            'the return profile carries a filing status this engine has no parameters for',
+            profile.value.filingStatus,
+        ],
+    )
+    const tripwires = classifyTripwires(taxParamSet)(status)(declaredKinds)(inputs)
+    if (tripwires.kind === 'error') {
+        return { kind: 'error', message: tripwires.message, unmodeled: tripwires.unmodeled }
     }
     const computed = computeForm1040(taxParamSet)(inputs)
     if (computed.kind === 'error') {
@@ -1713,6 +1750,26 @@ const w2WithWithholding = documentHash => box1WagesTipsOtherCompensation =>
             value: { ...withoutWithholding.value, box2FederalIncomeTaxWithheld },
         }
     }
+
+/**
+ * A W-2 whose box 1 and box 5 carry the SAME amount — the ordinary case for a
+ * wage earner with no pre-tax deferrals, and the shape TAX-19's Additional
+ * Medicare Tax tripwire reads. Built ON TOP of {@link w2Document}, like
+ * {@link w2WithWithholding}, so the identity fields cannot drift.
+ *
+ * Box 5 is uncapped (unlike box 3, which stops at the Social Security wage
+ * base), which is why it and not box 3 is the box Form 8959 reads.
+ *
+ * **No fixture in this repository set box 5 before Phase 22** — verified by
+ * grep across `fjs/`, the root integration tests and `demo/` — so this helper
+ * introduces the box rather than sharing it, and no pre-existing proof can
+ * trip the tripwire it feeds.
+ * @type {(documentHash: string) => (amount: string) => Stored<W2>}
+ */
+const w2WithMedicareWages = documentHash => amount => {
+    const base = w2Document(documentHash)(amount)
+    return { ...base, value: { ...base.value, box5MedicareWagesAndTips: amount } }
+}
 
 /**
  * The 1099-INT money boxes lines 2a, 2b and 25b read. A box the fixture OMITS
@@ -3209,6 +3266,160 @@ export const proof = {
             )
             assertEq(lineRuled(outcome.lines)('1040 line 1a').value, 0n)
             assertEq(lineRuled(outcome.lines)('1040 line 12e').value, 1575000n, 'the deduction is not zero')
+        },
+    },
+    // ── TAX-19: the computable tripwires, through the ENTRY POINT ────────
+    //
+    // `fjs/return/tripwire` proves the table and every predicate in isolation.
+    // What can only be proven HERE is that the guard is actually WIRED — that
+    // `form1040Report` runs it, that it runs before any line is computed, and
+    // that it does not disturb the returns it has nothing to say about.
+    //
+    // The negative control below is not decoration and is not weaker than the
+    // gate: a tripwire that always fires is not a tripwire, it is an outage,
+    // and this engine's whole existing fixture set is the population it must
+    // stay silent for.
+    computableTripwires: {
+        // THE CASE THE PHASE EXISTS FOR, end to end. A single filer with
+        // $300,000 in W-2 box 5 owes Additional Medicare Tax whether or not
+        // they have heard of Form 8959. Before this phase, this exact input
+        // produced a confident, fully-cited 1040 understating the tax by
+        // roughly $900, and nothing in the report said so.
+        //
+        // Each of the three actionable facts is asserted SEPARATELY, so
+        // erasing any one of them reddens here and names which went missing
+        // (AGENTS.md: assert the part of a message that carries information).
+        aThreeHundredThousandDollarWageRefusesNamingForm8959AndLine23: () => {
+            const outcome = form1040Report(taxParams2025)(
+                inputsOf(storedProfile({
+                    ...singleProfile,
+                    declaredKinds: ['wages', 'federalTaxWithheldOnW2'],
+                }))([w2WithMedicareWages('sha256-w2-faang')('300000.00')])([])([])([])([])([])([])([])([]))
+            assert(outcome.kind === 'error', ['a $300,000 box 5 must refuse the whole return', outcome])
+            if (outcome.kind !== 'error') {
+                return
+            }
+            assertEq(outcome.unmodeled.length, 1, ['expected exactly one required kind', outcome.unmodeled])
+            assertEq(outcome.unmodeled[0], 'scheduleTwoTaxes', ['expected Schedule 2 named', outcome.unmodeled])
+            assert(
+                outcome.message.includes('Form 8959'),
+                ['the refusal must name the form the taxpayer needs', outcome.message])
+            assert(
+                outcome.message.includes('1040 line 23'),
+                ['the refusal must name the 1040 line the tax lands on', outcome.message])
+            assert(
+                outcome.message.includes('box 5'),
+                ['the refusal must name the box that proved it', outcome.message])
+            // 10-CONTEXT.md Decision 2 holds for this arm as for every other:
+            // a partial 1040 is never returned, and the error arm cannot
+            // carry one at the type level.
+            assert(
+                !Object.hasOwn(outcome, 'lines'),
+                ['a tripped return must carry no line list at all', Object.keys(outcome)])
+        },
+        // THE NEGATIVE CONTROL, and it is the more important half. The SAME
+        // return shape, below the threshold, declaring nothing about Schedule
+        // 2, computes a complete fifty-six-line 1040 — silently, with no
+        // warning, no mention of Form 8959 anywhere in it. Both the line
+        // count and a real line's cents are hand-typed, so a "control" that
+        // silently started refusing (and therefore produced no lines to
+        // check) cannot pass this.
+        controlTheSameReturnBelowTheThresholdComputesSilently: () => {
+            const outcome = form1040Report(taxParams2025)(
+                inputsOf(storedProfile({
+                    ...singleProfile,
+                    declaredKinds: ['wages', 'federalTaxWithheldOnW2'],
+                }))([w2WithMedicareWages('sha256-w2-ordinary')('150000.00')])([])([])([])([])([])([])([])([]))
+            assert(outcome.kind === 'ok', ['a box 5 below the threshold must compute', outcome])
+            if (outcome.kind !== 'ok') {
+                return
+            }
+            assertEq(outcome.lines.length, expectedWholeReportLineCount)
+            assertEq(lineRuled(outcome.lines)('1040 line 1a').value, 15000000n, '$150,000.00, hand-typed')
+            for (const line of outcome.lines) {
+                assert(
+                    !line.rule.includes('8959'),
+                    ['a silent return must not mention Form 8959 anywhere', line.rule])
+            }
+        },
+        // CRITERION 1, the half a shape assertion cannot reach: the tripwire
+        // is evaluated BEFORE any line computes.
+        //
+        // Proven by racing it against a refusal that can only arise DURING
+        // line computation — Schedule D's absent-basis refusal, which needs
+        // Form 8949 to have been assembled. The same inputs that produce that
+        // refusal, plus one $300,000 W-2, must come back with the TRIPWIRE's
+        // refusal instead. If the tripwire ran after the lines, the
+        // absent-basis message would win, because it is raised first in
+        // `computeForm1040`'s own order.
+        //
+        // Distinguished BY MECHANISM rather than by `kind === 'error'`, the
+        // same discipline `absentBasisRefusesTheWholeIncomeLinesCallBeforeAnyLineIsBuilt`
+        // records: the absent-basis arm refuses with an EMPTY `unmodeled` and
+        // a message naming the missing box; this one names a kind and a form.
+        theTripwireIsEvaluatedBeforeAnyLineComputes: () => {
+            const absentBasisForm = brokerageDocument('sha256-b-absent-basis-tripwire')({
+                box1dProceeds: '10000.00',
+                box2LongTermGainOrLoss: true,
+                box5NoncoveredSecurity: true,
+                // box1eCostOrOtherBasis genuinely OMITTED.
+            })
+            const racedOutcome = form1040Report(taxParams2025)(
+                inputsOf(storedProfile(declaringCapitalGainsOrLossesProfile))(
+                    [w2WithMedicareWages('sha256-w2-race')('300000.00')])([])([])([absentBasisForm])([])([])([])([])([]))
+            assert(racedOutcome.kind === 'error', ['expected a refusal', racedOutcome])
+            if (racedOutcome.kind !== 'error') {
+                return
+            }
+            assertEq(
+                racedOutcome.unmodeled[0],
+                'scheduleTwoTaxes',
+                ['the tripwire must win the race against a line-computation refusal', racedOutcome.unmodeled])
+            assert(
+                racedOutcome.message.includes('Form 8959'),
+                ['expected the tripwire refusal, not the absent-basis one', racedOutcome.message])
+            assert(
+                !racedOutcome.message.includes('box1eCostOrOtherBasis'),
+                ['no line may be computed once a tripwire has fired', racedOutcome.message])
+            // THE CONTROL that makes the race real: the identical inputs
+            // WITHOUT the $300,000 W-2 do reach line computation and do come
+            // back with the absent-basis refusal. Without this half, the
+            // assertions above would pass even if Schedule D had quietly
+            // stopped refusing at all.
+            const unracedOutcome = form1040Report(taxParams2025)(
+                inputsOf(storedProfile(declaringCapitalGainsOrLossesProfile))([])([])([])([absentBasisForm])([])([])([])([])([]))
+            assert(unracedOutcome.kind === 'error', ['expected the absent-basis refusal', unracedOutcome])
+            if (unracedOutcome.kind !== 'error') {
+                return
+            }
+            assertEq(unracedOutcome.unmodeled.length, 0, ['the absent-basis arm names no kind', unracedOutcome.unmodeled])
+            assert(
+                unracedOutcome.message.includes('box1eCostOrOtherBasis is genuinely absent'),
+                ['expected the absent-basis message when no tripwire fires', unracedOutcome.message])
+        },
+        // The documented ORDER of the two guards, pinned. A return that
+        // declares an unmodeled kind AND trips a tripwire refuses either way,
+        // so which sentence it gets is a decision rather than an accident —
+        // and the one naming what the taxpayer THEMSELVES wrote down is the
+        // one they can act on first. This is also what keeps every refusal
+        // message that existed before this phase byte-identical.
+        theDeclaredScopeGuardStillRunsFirstWhenBothWouldRefuse: () => {
+            const outcome = form1040Report(taxParams2025)(
+                inputsOf(storedProfile({
+                    ...singleProfile,
+                    declaredKinds: ['wages', 'unreportedTips'],
+                }))([w2WithMedicareWages('sha256-w2-both')('300000.00')])([])([])([])([])([])([])([])([]))
+            assert(outcome.kind === 'error', ['expected a refusal', outcome])
+            if (outcome.kind !== 'error') {
+                return
+            }
+            assert(
+                outcome.message.includes('this return declares'),
+                ['the declared-scope guard runs first', outcome.message])
+            assertEq(outcome.unmodeled[0], 'unreportedTips', ['expected the DECLARED kind named', outcome.unmodeled])
+            assert(
+                !outcome.message.includes('the supplied documents require'),
+                ['only one of the two guards may speak', outcome.message])
         },
     },
     // ROADMAP criterion 5, on a REAL line aggregating ten REAL documents.
