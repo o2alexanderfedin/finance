@@ -576,7 +576,7 @@ export const unmodeledKindRefusals = /** @type {const} */ ([
     { kind: 'energyEfficientHomeImprovementCredit', line: 'Schedule 3 line 5b -> 1040 line 20', label: 'the energy efficient home improvement credit', remedy: 'requires Form 5695 Part II (no phase yet)' },
     { kind: 'otherNonrefundableCredits', line: 'Schedule 3 line 6a-6z -> 1040 line 20', label: 'other nonrefundable credits', remedy: 'the printed form itself collapses thirteen lettered sub-lines here — among them the general business credit, the prior-year minimum tax credit, the NONrefundable half of the adoption credit and the credit for the elderly or disabled on Schedule R — and this engine models none of them (no phase yet)' },
     { kind: 'federalTaxWithheldOnOtherForms', line: '1040 line 25c', label: 'federal income tax withheld on other forms', remedy: 'no dialect models it (no phase yet)' },
-    { kind: 'earnedIncomeCredit', line: '1040 line 27a', label: 'earned income credit', remedy: 'requires Schedule EIC (no phase yet)' },
+    { kind: 'earnedIncomeCredit', line: '1040 line 27a', label: 'earned income credit', remedy: '§32(c)(3)’s qualifying-child test needs four facts `vnd.fjs.return_profile`’s dependents array does not carry — a checked relationship vocabulary, full-time-student status, permanent and total disability, and residency in the United States for more than half the year — and §32(c)(1) needs three about the filer that it does not carry either: an age between 25 and 65 for the childless credit, a valid social security number, and not being another taxpayer’s qualifying child. This engine holds none of the seven, and a wrong earned income credit is the most audited figure on the return; see fjs/todo/tax-27-earned-income-credit.md (no phase yet)' },
     { kind: 'refundableAdoptionCredit', line: '1040 line 30', label: 'refundable adoption credit', remedy: 'requires Form 8839 (no phase yet)' },
     // ── Schedule 3 Part II's five per-line kinds (Phase 25) ─────────────────
     //
@@ -1752,6 +1752,68 @@ export const proof = {
             assert(
                 selfEmploymentHalf.message.includes('Schedule 1 line 15'),
                 ['it must name its own Schedule 1 line', selfEmploymentHalf.message],
+            )
+        },
+        // **TAX-27, Phase 25: the requirement whose whole delivery is this
+        // refusal.** The Earned Income Credit is NOT computed by this phase
+        // and `earnedIncomeCredit` stays refused, which is a decision rather
+        // than an omission — see `fjs/todo/tax-27-earned-income-credit.md`
+        // for the fact-by-fact analysis.
+        //
+        // What Phase 25 changed is the REMEDY. It used to read "requires
+        // Schedule EIC (no phase yet)", which tells a taxpayer to go and find
+        // a form and tells the next engineer nothing at all. It now names the
+        // specific facts `vnd.fjs.return_profile` does not carry, and this
+        // leaf asserts the part of the message that carries the information
+        // rather than the part that is easy to assert — AGENTS.md's own
+        // recorded lesson from the Phase 20 mutant that erased a destination
+        // and survived five refusal proofs.
+        theEarnedIncomeCreditRefusalNamesTheFactsThatAreMissing: () => {
+            const outcome = classifyScope(['earnedIncomeCredit'])
+            assert(outcome.kind === 'error', ['the earned income credit must still refuse', outcome])
+            if (outcome.kind !== 'error') {
+                throw ['unreachable', outcome]
+            }
+            assert(
+                outcome.message.includes('1040 line 27a'),
+                ['must name the line that cannot be computed', outcome.message],
+            )
+            // The four qualifying-child facts, each named. A remedy that
+            // dropped one would leave a reader believing a widening was
+            // smaller than it is.
+            for (const fact of [
+                'relationship vocabulary',
+                'full-time-student status',
+                'permanent and total disability',
+                'more than half the year',
+            ]) {
+                assert(
+                    outcome.message.includes(fact),
+                    ['the refusal must name this missing qualifying-child fact', fact, outcome.message],
+                )
+            }
+            // …and the three about the filer.
+            for (const fact of [
+                'between 25 and 65',
+                'social security number',
+                'another taxpayer’s qualifying child',
+            ]) {
+                assert(
+                    outcome.message.includes(fact),
+                    ['the refusal must name this missing filer fact', fact, outcome.message],
+                )
+            }
+            // The provisions, so a reader can go to the statute rather than
+            // to a form that would not help them.
+            assert(
+                outcome.message.includes('§32(c)(3)') && outcome.message.includes('§32(c)(1)'),
+                ['the refusal must name both provisions', outcome.message],
+            )
+            // And the file that carries the whole analysis, which is the one
+            // part of this message the NEXT ENGINEER can act on.
+            assert(
+                outcome.message.includes('fjs/todo/tax-27-earned-income-credit.md'),
+                ['the refusal must point at the recorded analysis', outcome.message],
             )
         },
         // TAX-25/TAX-26, Phase 25: the SAME property one schedule further on.
