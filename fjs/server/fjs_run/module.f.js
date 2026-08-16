@@ -963,6 +963,8 @@ export const proof = {
                             medicalExpenseForms: [],
                             capitalLossCarryoverForms: [],
                             unemploymentForms: [],
+                            adjustmentForms: [],
+                            studentLoanInterestForms: [],
                         })
                         assert(outcome.kind === 'ok', ['expected the engine to compute', outcome])
                         if (outcome.kind !== 'ok') {

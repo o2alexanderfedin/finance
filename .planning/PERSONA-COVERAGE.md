@@ -11,7 +11,7 @@ it rather than trusting this document's counts.
 | Persona | Can the engine produce a return? | Decisive blocker |
 |---|---|---|
 | **Retired person** | **Yes**, for the mainstream case | None. Four named gaps, all narrow — see below. |
-| **Non-profit employee** | **Yes, but the return is likely wrong in their favour's opposite** — it overstates tax | Every Schedule 1 adjustment is a hard zero, including student-loan interest and educator expenses. Not a refusal — a silent zero. |
+| **Non-profit employee** | **Yes** — Phase 24 (TAX-23/TAX-24/DOC-19) closed the silent overstatement | Student loan interest, educator expenses and the HSA deduction all compute. The remaining gaps (Saver's Credit, EIC, education credits) are REFUSALS, not silent zeros. |
 | **FAANG employee** | **No** | Form 8959 (Additional Medicare Tax) is mandatory above $200k of wages and is unmodeled. Also Form 8960 (NIIT). |
 | **Startup founder / early employee** | **No, and not close** | No Schedule C, no Schedule SE, no Schedule E, no K-1, no 1099-NEC dialect, no QBI deduction, no Form 6251 (AMT on ISO exercise). |
 
@@ -28,21 +28,25 @@ blockers, below.
 
 ## What is actually modeled
 
-The scope guard partitions a frozen vocabulary of **51 income/deduction/credit kinds** into
-modeled and refused. **21 are modeled; 30 refuse.**
+The scope guard partitions a frozen vocabulary of **76 income/deduction/credit kinds** into
+modeled and refused. **26 are modeled; 50 refuse.** (Phase 23 split the coarse `scheduleTwoTaxes`
+into fourteen per-printed-line kinds and Phase 24 split `scheduleOneAdjustments` into thirteen, so
+the vocabulary grew without the engine's claims growing: what changed is that a refusal on either
+schedule can now name the line and the form it needs.)
 
-**Input dialects (11 that compute):** `w2`, `1099int`, `1099div`, `1099b`, `1099r`, `ssa1099`,
-`1099g`, `itemized_deductions`, `medical_expenses`, `prior_year_capital_loss`, `return_profile`.
+**Input dialects (13 that compute):** `w2`, `1099int`, `1099div`, `1099b`, `1099r`, `ssa1099`,
+`1099g`, `1098e`, `itemized_deductions`, `medical_expenses`, `adjustments`,
+`prior_year_capital_loss`, `return_profile`.
 
-**Output forms (10 that compute):** Form 1040 (all 56 printed lines), Schedules 1, 1-A, 2, 3, A,
-B, D, Form 8949, Schedule 8812.
+**Output forms (13 that compute):** Form 1040 (all 56 printed lines), Schedules 1, 1-A, 2, 3, A,
+B, D, Form 8949, Schedule 8812, Form 8959, Form 8960, Form 8889 (Part I only).
 
-**A caution about that output list.** Schedules 2 and 3 are *structurally* complete — every
-printed line is named and wired into 1040 lines 17/23 and 20/31 — but **every line on both is a
-documented zero**, because no dialect feeds either one. The same is true of all sixteen Schedule 1
-Part II adjustments (lines 11–26) and all of Part I except line 7. Counting these as "supported
-forms" is the difference between a form that is *present* and a form that is *populated*. This
-document counts populated.
+**A caution about that output list.** Schedule 3 is *structurally* complete — every printed line
+is named and wired into 1040 lines 20/31 — but **every line on it is a documented zero**, because
+no dialect feeds it. Schedule 2 lines 11 and 12 compute (Phase 23); its other twelve lines do not.
+Schedule 1 Part II lines 11, 13 and 21 compute (Phase 24); its other thirteen do not, nor does any
+of Part I except line 7. Counting a form as "supported" because it is *present* rather than
+*populated* is the distinction this document exists to keep; this document counts populated.
 
 ---
 
@@ -76,7 +80,32 @@ engine reads it correctly*, and the missing thing is a taxpayer election the doc
 
 ---
 
-## Non-profit employee — computes, but overstates the tax
+## Non-profit employee — computes, and no longer overstates the tax
+
+**Rewritten 2026-08-16, after Phase 24.** The section below described a return that computed
+completely and confidently while overstating the tax, because every Schedule 1 adjustment was a
+hard zero rather than a refusal — the most dangerous shape in this project, since nothing in the
+output said anything was missing. Three of those hard zeros are gone: **student loan interest
+(Schedule 1 line 21, with its $85,000/$100,000 phase-out), educator expenses (line 11, capped per
+eligible educator), and the HSA deduction (line 13, through Form 8889 Part I)** all read real
+documents and reach 1040 line 10.
+
+What is left is genuinely different in kind. The Saver's Credit, the Earned Income Credit and the
+education credits are all *refused* kinds — a taxpayer who declares one gets no return at all,
+with a message naming the form. That is the honest failure, not the silent one.
+
+Two named gaps remain inside what now computes, and neither is silent:
+
+1. **Interest paid to a lender who files no Form 1098-E** — §6050S's duty starts at $600 and
+   reaches only persons in the trade or business of lending. `vnd.fjs.adjustments` carries a
+   `studentLoanInterest` tag for exactly this, so the amount is *expressible*; what is missing is
+   any substantiation for it, which is a product question rather than an engine one.
+2. **Form 8889 beyond Part I.** Partial-year HDHP eligibility, the last-month rule, the spouse
+   allocation of a family limit, qualified HSA funding distributions, and an excess employer
+   contribution are each **refused by name** rather than computed. Parts II and III (distributions)
+   are unmodeled and land inside collapsed lettered blocks whose kinds already refuse.
+
+### The original section, kept for the record
 
 A 403(b)/457(b) salary reduction already reduces W-2 box 1, and box 12 is modeled as code/amount
 pairs, so the wage side is fine. The problem is everything a modestly paid public-service worker

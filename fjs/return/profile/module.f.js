@@ -148,7 +148,40 @@ export const kindVocabulary = /** @type {const} */ ([
     'section1202Gain',                      // 1099-DIV box 2c
     'investmentInterestForm4952',           // Form 4952 line 4g
     'scheduleOneAdditionalIncome',          // 8
-    'scheduleOneAdjustments',               // 10
+    // ── Schedule 1 Part II's own lines, one kind each (TAX-23/24, Phase 24) ─
+    //
+    // `scheduleOneAdjustments` stood here as ONE coarse kind for the whole of
+    // Part II -- educator expenses, the HSA deduction, the deductible half of
+    // self-employment tax, the IRA deduction, alimony paid, student loan
+    // interest and ten more printed lines. A single kind covering that many
+    // distinct adjustments could only ever refuse them together, so nothing
+    // on Part II was nameable and nothing on it could be reclassified one
+    // line at a time. It is split here into one kind per printed line, in
+    // SCHEDULE 1's own order -- which is 1040 form order for the block as a
+    // whole, since every one of these feeds line 26 and thence 1040 line 10.
+    //
+    // **Printed line 22 deliberately gets no kind.** The form itself reserves
+    // that line number with no box to fill, so a kind for it would be a
+    // declaration a taxpayer could never truthfully make.
+    //
+    // Three of the thirteen are MODELED as of this phase --
+    // `educatorExpenses`, `healthSavingsAccountDeduction` and
+    // `studentLoanInterestDeduction`. The other ten refuse by name, which is
+    // the whole point of splitting: what remains unmodeled on Part II is now
+    // something a taxpayer can be told.
+    'educatorExpenses',                     // Schedule 1 line 11  -> 10
+    'reservistPerformingArtistFeeBasisExpenses', // Schedule 1 line 12 -> 10
+    'healthSavingsAccountDeduction',        // Schedule 1 line 13  -> 10
+    'movingExpensesArmedForces',            // Schedule 1 line 14  -> 10
+    'deductiblePartOfSelfEmploymentTax',    // Schedule 1 line 15  -> 10
+    'selfEmployedRetirementPlans',          // Schedule 1 line 16  -> 10
+    'selfEmployedHealthInsuranceDeduction', // Schedule 1 line 17  -> 10
+    'penaltyOnEarlyWithdrawalOfSavings',    // Schedule 1 line 18  -> 10
+    'alimonyPaid',                          // Schedule 1 line 19a -> 10
+    'iraDeduction',                         // Schedule 1 line 20  -> 10
+    'studentLoanInterestDeduction',         // Schedule 1 line 21  -> 10
+    'archerMsaDeduction',                   // Schedule 1 line 23  -> 10
+    'otherAdjustments',                     // Schedule 1 line 24a-24z -> 10
     'itemizedDeductions',                   // 12e
     'netQualifiedDisasterLoss',             // 12e exception 5
     'qualifiedBusinessIncomeDeduction',     // 13a
@@ -586,16 +619,23 @@ const expectedMoneyBoxFieldCount = 4
  * its place. The arithmetic is `51 - 1 + 14`, and it is written out because
  * a count that moves by thirteen without a stated reason is indistinguishable
  * from a count somebody adjusted until the suite went green.
+ *
+ * `64 -> 76` is Phase 24's own Schedule 1 Part II split (TAX-23/TAX-24), the
+ * same shape one schedule over: one coarse `scheduleOneAdjustments` removed
+ * and thirteen per-printed-line kinds added in its place, `64 - 1 + 13`.
+ * Thirteen rather than sixteen because the printed Part II's line 22 is
+ * reserved with no box to fill, and lines 24/25 are one collapsed lettered
+ * block plus its own total — see the vocabulary's own comment above.
  * @type {number}
  */
-const expectedKindCount = 64
+const expectedKindCount = 76
 
 export const proof = {
     dialectAndMediaType: () => {
         assertEq(dialect, 'vnd.fjs.return_profile')
         assertEq(mediaType, 'application/vnd.fjs.return_profile+json')
     },
-    kindVocabularyIsExactlySixtyFour: () => {
+    kindVocabularyIsExactlySeventySix: () => {
         assertEq(kindVocabulary.length, expectedKindCount)
         assertEq(new Set(kindVocabulary).size, kindVocabulary.length)
     },

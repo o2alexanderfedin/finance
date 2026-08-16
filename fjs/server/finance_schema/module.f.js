@@ -59,6 +59,8 @@ import { dialect as ssa1099Dialect, ssa1099Schema } from '../../document/ssa1099
 import { dialect as oneZeroNineNineGDialect, oneZeroNineNineGSchema } from '../../document/1099g/module.f.js'
 import { dialect as oneZeroNineNineDivDialect, oneZeroNineNineDivSchema } from '../../document/1099div/module.f.js'
 import { dialect as oneZeroNineNineBDialect, oneZeroNineNineBSchema } from '../../document/1099b/module.f.js'
+import { dialect as adjustmentsDialect, adjustmentsSchema } from '../../document/adjustments/module.f.js'
+import { dialect as oneZeroNineEightEDialect, oneZeroNineEightESchema } from '../../document/1098e/module.f.js'
 import { stringify as jsonText } from '../../json/module.f.js'
 
 /** @import { Type } from 'functionalscript/fjs/types/rtti/module.f.js' */
@@ -86,6 +88,8 @@ const dialectSchemas = {
     [oneZeroNineNineGDialect]: oneZeroNineNineGSchema,
     [oneZeroNineNineDivDialect]: oneZeroNineNineDivSchema,
     [oneZeroNineNineBDialect]: oneZeroNineNineBSchema,
+    [adjustmentsDialect]: adjustmentsSchema,
+    [oneZeroNineEightEDialect]: oneZeroNineEightESchema,
 }
 
 /** The known dialect tags, in declaration order — used in the refusal message. */
@@ -113,9 +117,14 @@ const knownDialects = /** @type {readonly string[]} */ (Object.keys(dialectSchem
  * commit registers the EIGHTH AND NINTH dialects (`vnd.fjs.1099div`,
  * `vnd.fjs.1099b`), so the count moves from 7 to 9 in one step and both new
  * dialects gained their own `*Resolves` leaf below.
+ *
+ * Phase 24 (DOC-19/TAX-23) registers the ELEVENTH AND TWELFTH
+ * (`vnd.fjs.adjustments`, `vnd.fjs.1098e`), moving the count from 10 to 12
+ * in one step, and both gained their own `*Resolves` leaf below — the same
+ * paired discipline this docstring's own last paragraph asks for.
  * @type {number}
  */
-const expectedKnownDialectCount = 10
+const expectedKnownDialectCount = 12
 
 /**
  * `finance_schema(dialect)`: the MCP tool. Looks `dialect` up in
@@ -201,6 +210,24 @@ export const proof = {
         assertEq(
             JSON.stringify(JSON.parse(textOf(result))),
             JSON.stringify(toJsonSchema(w2Schema)),
+        )
+    },
+    // Phase 24 (DOC-19): the taxpayer-asserted Schedule 1 Part II record.
+    adjustmentsResolves: () => {
+        const result = call('vnd.fjs.adjustments')
+        assertEq(result.isError, undefined)
+        assertEq(
+            JSON.stringify(JSON.parse(textOf(result))),
+            JSON.stringify(toJsonSchema(adjustmentsSchema)),
+        )
+    },
+    // Phase 24 (TAX-23): the transcribed half of Schedule 1 line 21.
+    oneZeroNineEightEResolves: () => {
+        const result = call('vnd.fjs.1098e')
+        assertEq(result.isError, undefined)
+        assertEq(
+            JSON.stringify(JSON.parse(textOf(result))),
+            JSON.stringify(toJsonSchema(oneZeroNineEightESchema)),
         )
     },
     medicalExpensesResolves: () => {
