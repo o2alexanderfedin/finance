@@ -328,6 +328,9 @@ export const modeledKinds = /** @type {const} */ ([
     'capitalGainsOrLosses',        // Form 8949 + Schedule D          -> 1040 line 7a
     'unrecaptured1250Gain',        // 1099-DIV box 2b + Sch D worksheet -> Schedule D line 19
     'collectibles28RateGain',      // 1099-DIV box 2d + Sch D worksheet -> Schedule D line 18
+    'educatorExpenses',            // vnd.fjs.adjustments -> Schedule 1 line 11 -> 1040 line 10
+    'healthSavingsAccountDeduction', // Form 8889 Part I  -> Schedule 1 line 13 -> 1040 line 10
+    'studentLoanInterestDeduction', // 1098-E + worksheet -> Schedule 1 line 21 -> 1040 line 10
     'itemizedDeductions',          // Schedule A + deductionChoice   -> 1040 line 12e
     'seniorAndOtherScheduleOneADeductions', // Schedule 1-A Parts I/V/VI -> 1040 line 13b
     'additionalMedicareTax',       // Form 8959 -> Schedule 2 line 11 -> 1040 lines 23/25c
@@ -359,7 +362,7 @@ const modeledKindNames = modeledKinds
 // ── The refusal table ────────────────────────────────────────────────────────
 
 /**
- * The fifty-three declared kinds this engine does not model, each naming the
+ * The fifty declared kinds this engine does not model, each naming the
  * form line that cannot be computed, a human label, and the remedy — the form
  * or schedule required and, where one exists, the requirement ID and phase
  * that will supply it. `10-RESEARCH.md`'s "Form 1040 Lines 1a-37" table is the
@@ -442,17 +445,16 @@ export const unmodeledKindRefusals = /** @type {const} */ ([
     // 1040 line it reaches second, exactly as the Schedule 2 block above
     // does.
     //
-    // **Nothing is reclassified in this step.** All thirteen rows are
-    // refusals, including the three this phase goes on to compute
-    // (`educatorExpenses`, `healthSavingsAccountDeduction`,
-    // `studentLoanInterestDeduction`). They move to {@link modeledKinds} one
-    // commit later, beside the `fjs/schedule/1`/`fjs/form1040/core` wiring
-    // that makes them computable -- wire before reclassify, in the SAME
-    // commit, exactly as Phase 23's own two-step Schedule 2 split did and as
-    // every slice this docstring records already established.
-    { kind: 'educatorExpenses', line: 'Schedule 1 line 11 -> 1040 line 10', label: 'educator expenses', remedy: 'no dialect models it (TAX-24, Phase 24)' },
+    // **Three of the thirteen are NOT here**, because they are MODELED:
+    // `educatorExpenses` (line 11), `healthSavingsAccountDeduction` (line 13)
+    // and `studentLoanInterestDeduction` (line 21) moved to
+    // {@link modeledKinds} in the SAME commit as the
+    // `fjs/schedule/1`/`fjs/form1040/core` wiring that makes them computable
+    // -- wire before reclassify, exactly as Phase 23's own two-step Schedule
+    // 2 split did and as every slice this module's docstring records already
+    // established. The split commit before it added all thirteen as
+    // refusals and reclassified nothing.
     { kind: 'reservistPerformingArtistFeeBasisExpenses', line: 'Schedule 1 line 12 -> 1040 line 10', label: 'certain business expenses of reservists, performing artists and fee-basis government officials', remedy: 'requires Form 2106 (no phase yet)' },
-    { kind: 'healthSavingsAccountDeduction', line: 'Schedule 1 line 13 -> 1040 line 10', label: 'the health savings account deduction', remedy: 'requires Form 8889 (TAX-24, Phase 24)' },
     { kind: 'movingExpensesArmedForces', line: 'Schedule 1 line 14 -> 1040 line 10', label: 'moving expenses for members of the Armed Forces', remedy: 'requires Form 3903 (no phase yet)' },
     { kind: 'deductiblePartOfSelfEmploymentTax', line: 'Schedule 1 line 15 -> 1040 line 10', label: 'the deductible part of self-employment tax', remedy: 'requires Schedule SE (TAX-31, Phase 28)' },
     { kind: 'selfEmployedRetirementPlans', line: 'Schedule 1 line 16 -> 1040 line 10', label: 'self-employed SEP, SIMPLE and qualified plan contributions', remedy: 'requires the Pub. 560 deduction worksheet, whose limit depends on net self-employment earnings this engine does not compute (no phase yet)' },
@@ -460,7 +462,6 @@ export const unmodeledKindRefusals = /** @type {const} */ ([
     { kind: 'penaltyOnEarlyWithdrawalOfSavings', line: 'Schedule 1 line 18 -> 1040 line 10', label: 'the penalty on early withdrawal of savings', remedy: 'requires Form 1099-INT box 2, which `vnd.fjs.1099int` stores but no computation reads (no phase yet)' },
     { kind: 'alimonyPaid', line: 'Schedule 1 line 19a -> 1040 line 10', label: 'alimony paid', remedy: 'requires the recipient\u2019s SSN and the divorce-decree date, since only a pre-2019 decree makes alimony deductible, and no dialect models either (no phase yet)' },
     { kind: 'iraDeduction', line: 'Schedule 1 line 20 -> 1040 line 10', label: 'the IRA deduction', remedy: 'requires Pub. 590-A Worksheet 1-1, whose own modified adjusted gross income depends on 1040 line 6b while line 6b depends on this deduction \u2014 a fixed point this engine does not model (no phase yet)' },
-    { kind: 'studentLoanInterestDeduction', line: 'Schedule 1 line 21 -> 1040 line 10', label: 'the student loan interest deduction', remedy: 'requires the Student Loan Interest Deduction Worksheet and a Form 1098-E dialect (TAX-23, Phase 24)' },
     { kind: 'archerMsaDeduction', line: 'Schedule 1 line 23 -> 1040 line 10', label: 'the Archer MSA deduction', remedy: 'requires Form 8853 (no phase yet)' },
     { kind: 'otherAdjustments', line: 'Schedule 1 line 24a-24z -> 1040 line 10', label: 'other adjustments to income', remedy: 'the printed form itself collapses eleven lettered sub-lines here and this engine models none of them (no phase yet)' },
     { kind: 'netQualifiedDisasterLoss', line: '1040 line 12e', label: 'net qualified disaster loss', remedy: 'requires Form 4684 (no phase yet)' },
@@ -900,7 +901,7 @@ export const classifyScope = declaredKinds => {
  * Schedule 2 line 11/12 wiring that makes both computable.
  * @type {number}
  */
-const expectedModeledKindCount = 23
+const expectedModeledKindCount = 26
 
 /**
  * Independently hand-typed: the number of entries
@@ -934,7 +935,7 @@ const expectedModeledKindCount = 23
  * all three computable.
  * @type {number}
  */
-const expectedUnmodeledKindCount = 53
+const expectedUnmodeledKindCount = 50
 
 /**
  * The complete refusal message for a return declaring exactly

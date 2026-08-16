@@ -54,6 +54,8 @@ import { dialect as oneZeroNineNineBDialect } from '../../document/1099b/module.
 import { dialect as oneZeroNineNineRDialect } from '../../document/1099r/module.f.js'
 import { dialect as ssa1099Dialect } from '../../document/ssa1099/module.f.js'
 import { dialect as itemizedDeductionsDialect } from '../../document/itemized_deductions/module.f.js'
+import { dialect as adjustmentsDialect } from '../../document/adjustments/module.f.js'
+import { dialect as oneZeroNineEightEDialect } from '../../document/1098e/module.f.js'
 import { qdcgt } from '../../tax/line16/qdcgt/module.f.js'
 import { sdtw } from '../../tax/line16/sdtw/module.f.js'
 import { socialSecurityBenefitsWorksheet } from '../../tax/ssb/module.f.js'
@@ -69,7 +71,12 @@ import { individualFilingStatuses, taxParamsByYear } from '../../tax/params/modu
 import { scheduleD } from '../../schedule/d/module.f.js'
 import { scheduleOneA } from '../../schedule/1a/module.f.js'
 import { scheduleA } from '../../schedule/a/module.f.js'
-import { scheduleOne } from '../../schedule/1/module.f.js'
+import {
+    scheduleOnePartI,
+    scheduleOnePartIIExceptStudentLoanInterest,
+    scheduleOnePartII,
+    socialSecurityWorksheetAdjustmentsTotal,
+} from '../../schedule/1/module.f.js'
 import { scheduleTwo } from '../../schedule/2/module.f.js'
 import { scheduleThree } from '../../schedule/3/module.f.js'
 import { form8812 } from '../../form8812/module.f.js'
@@ -84,6 +91,8 @@ import { baseTaxForAmount } from '../../tax/table/module.f.js'
 /** @import { Ssa1099 } from '../../document/ssa1099/module.f.js' */
 /** @import { ItemizedDeductions } from '../../document/itemized_deductions/module.f.js' */
 /** @import { MedicalExpenses } from '../../document/medical_expenses/module.f.js' */
+/** @import { Adjustments } from '../../document/adjustments/module.f.js' */
+/** @import { OneZeroNineEightE } from '../../document/1098e/module.f.js' */
 /** @import { OneZeroNineNineG } from '../../document/1099g/module.f.js' */
 /** @import { PriorYearCapitalLoss } from '../../document/prior_year_capital_loss/module.f.js' */
 /** @import { Kind, ReturnProfile } from '../../return/profile/module.f.js' */
@@ -136,6 +145,14 @@ import { baseTaxForAmount } from '../../tax/table/module.f.js'
  * each, but the shape stays a list for the same reason `profile` alone is
  * not: consistency with every other document field here.
  *
+ * `adjustmentForms`/`studentLoanInterestForms` are Phase 24's own widening
+ * (TAX-23/TAX-24): Schedule 1 Part II lines 11, 13 and 21 read
+ * `vnd.fjs.adjustments` and `vnd.fjs.1098e` documents. `adjustmentForms` is a
+ * list under this typedef's own "one running record per taxpayer per year"
+ * convention, exactly like `itemizedDeductionForms`; `studentLoanInterestForms`
+ * is a list because it genuinely is one — a borrower whose loans were sold
+ * mid-year receives one 1098-E per servicer.
+ *
  * `capitalLossCarryoverForms` is Plan 15-05's own widening (TAX-17): a LIST,
  * matching this typedef's own established "one running record per taxpayer
  * per year" convention (see `itemizedDeductionForms`/`medicalExpenseForms`
@@ -156,6 +173,8 @@ import { baseTaxForAmount } from '../../tax/table/module.f.js'
  *   readonly medicalExpenseForms: readonly Stored<MedicalExpenses>[],
  *   readonly capitalLossCarryoverForms: readonly Stored<PriorYearCapitalLoss>[],
  *   readonly unemploymentForms: readonly Stored<OneZeroNineNineG>[],
+ *   readonly adjustmentForms: readonly Stored<Adjustments>[],
+ *   readonly studentLoanInterestForms: readonly Stored<OneZeroNineEightE>[],
  * }} Form1040Inputs
  */
 
@@ -446,6 +465,7 @@ export const form1040IncomeLines = taxParamSet => inputs => {
         itemizedDeductionForms, medicalExpenseForms,
         capitalLossCarryoverForms,
         unemploymentForms,
+        adjustmentForms, studentLoanInterestForms,
     } = inputs
     const declaredZero = profileDeclaredZeroLine(profile)
     const fromDocuments = documentLine(profile)
@@ -622,24 +642,37 @@ export const form1040IncomeLines = taxParamSet => inputs => {
             value: scheduleDOk.line7aCapitalGainOrLoss,
             sources: scheduleDOk.sources,
         })
-    // 8/10 — Schedule 1 (`fjs/schedule/1`, Plan 13-11/13-12, TAX-14): Part
-    // I's total additional income (line10) feeds 1040 line 8, Part II's
-    // total adjustments (line26) feeds 1040 line 10 — ONE `scheduleOne(...)`
-    // call, never two, so the two 1040 lines can never read two different
-    // Schedule 1 computations. The COARSE `scheduleOneAdditionalIncome`/
-    // `scheduleOneAdjustments` kinds stay in `unmodeledKindRefusals`
-    // (`fjs/return/scope`) — each covers many distinct Schedule 1 line items
-    // with no per-line dialect to attribute an amount to. **Line 7 is now the
-    // exception:** `vnd.fjs.1099g` box 1 attributes unemployment compensation
-    // to its own printed line, so `unemploymentCompensation` is modeled in its
-    // own right and does not need the coarse kind. Every OTHER field
-    // `scheduleOne` returns is still a `profileDeclaredZeroLine`.
-    const scheduleOneResult = scheduleOne(profile)(unemploymentForms)
+    // 8 — Schedule 1 Part I's total additional income (line10). `vnd.fjs.1099g`
+    // box 1 attributes unemployment compensation to its own printed line 7
+    // (Phase 20); every other Part I line is a `profileDeclaredZeroLine`, and
+    // the COARSE `scheduleOneAdditionalIncome` kind stays in
+    // `unmodeledKindRefusals` because it still covers many distinct Schedule 1
+    // line items with no per-line dialect to attribute an amount to.
+    const scheduleOnePartIResult = scheduleOnePartI(profile)(unemploymentForms)
     const line8 = {
-        value: scheduleOneResult.line10.value,
-        sources: scheduleOneResult.line10.sources,
+        value: scheduleOnePartIResult.line10.value,
+        sources: scheduleOnePartIResult.line10.sources,
         rule: '1040 line 8',
     }   // additional income, Schedule 1 Part I total (line10)
+
+    // Schedule 1 Part II, STAGE 1 (Phase 24, TAX-23/TAX-24): every adjustment
+    // that does not depend on income — lines 11 (educator expenses) and 13
+    // (the HSA deduction) compute here from real documents. Line 21's
+    // worksheet needs 1040 line 9, which is not built yet, so it waits for
+    // stage 2 below; `fjs/schedule/1`'s own header carries the whole ordering
+    // argument and the fixed point it avoids.
+    const scheduleOneStageOne = scheduleOnePartIIExceptStudentLoanInterest(taxParamSet)({
+        profile, status, adjustmentForms, w2Forms: w2s,
+    })
+    // A document-data-sufficiency refusal from Part II — an unrecognized
+    // `lineTag`, a following-year educator expense, a spouse entry on a
+    // non-joint return, or anything `fjs/form8889` itself refuses — stops the
+    // WHOLE return, threaded exactly like the Schedule D absent-basis guard
+    // and the Schedule A guard: `unmodeled: []`, since this names no
+    // `fjs/return/scope` kind.
+    if (scheduleOneStageOne.kind === 'error') {
+        return { kind: 'error', message: scheduleOneStageOne.message, unmodeled: [] }
+    }
 
     // 6a — total Social Security/Railroad Retirement benefits (SSA-1099/
     // RRB-1099 box 5), read UNCONDITIONALLY from stored documents, exactly
@@ -656,11 +689,19 @@ export const form1040IncomeLines = taxParamSet => inputs => {
     // gating here means a profile that declares the flag inconsistently
     // (e.g. without MFS) is read as `false` rather than crashing the whole
     // computation on an internal invariant (Rule 2 — input validation at the
-    // boundary, not an unhandled throw one module in). Schedule 1 stays
-    // unmodeled-refused for the whole of this phase (13-CONTEXT.md Decisions
-    // 3.2/6.1), so `scheduleOneAdjustmentsTotalCents` is always `0n` from
-    // this, the only real caller this phase — genuinely read by the
-    // worksheet, never hardcoded there (`fjs/tax/ssb`'s own docstring).
+    // boundary, not an unhandled throw one module in).
+    //
+    // **`scheduleOneAdjustmentsTotalCents` is a REAL figure as of Phase 24**,
+    // where it was a hardcoded `0n` before. `fjs/tax/ssb`'s own header
+    // predicted exactly this — "the field exists and is genuinely read,
+    // rather than hardcoded, so a later wave that wires Schedule 1 needs no
+    // change to this module at all" — and that is what happened: the change
+    // is one argument here. The worksheet's own line 6 asks for Schedule 1
+    // "lines 11 through 20, and 23 and 25", which
+    // `socialSecurityWorksheetAdjustmentsTotal` states once, in the module
+    // that owns those lines. **Line 21 is outside that printed range**, which
+    // is precisely what lets this call happen before line 21 is computed —
+    // see `fjs/schedule/1`'s own header.
     const mfsLivedWithSpouseAtAnyTimeInYear = status === 'marriedFilingSeparately'
         && profile.value.mfsLivedWithSpouseAtAnyTimeInYear === true
     const ssbResult = socialSecurityBenefitsWorksheet(taxParamSet)({
@@ -671,7 +712,8 @@ export const form1040IncomeLines = taxParamSet => inputs => {
             line1z.value + line2b.value + line3b.value + line4b.value
             + line5b.value + line7a.value + line8.value,
         taxExemptInterestCents: line2a.value,
-        scheduleOneAdjustmentsTotalCents: 0n,
+        scheduleOneAdjustmentsTotalCents:
+            socialSecurityWorksheetAdjustmentsTotal(scheduleOneStageOne),
     })
     // Cites line6a (worksheet line 1) plus every income line that fed
     // worksheet line 3 (1z, 2b, 3b, 4b, 5b, 7a, 8) plus line2a (worksheet
@@ -690,12 +732,26 @@ export const form1040IncomeLines = taxParamSet => inputs => {
     const line9 = totalLine('1040 line 9')([
         line1z, line2b, line3b, line4b, line5b, line6b, line7a, line8,
     ])
-    // 10 — Schedule 1 Part II's own total (line26), from the SAME
-    // `scheduleOneResult` computed at line 8, above — never a second,
-    // independently stale `scheduleOne(...)` call.
+    // Schedule 1 Part II, STAGE 2 (Phase 24, TAX-23): line 21's own printed
+    // worksheet, whose line 2 is the 1040 line 9 just computed above, and the
+    // line 26 total. Stage 1's already-computed lines are PASSED IN rather
+    // than recomputed, so lines 11 and 13 cannot differ between the figure
+    // the Social Security worksheet subtracted and the figure line 26 adds.
+    const scheduleOnePartIIResult = scheduleOnePartII(taxParamSet)({
+        profile, status,
+        exceptStudentLoanInterest: scheduleOneStageOne,
+        adjustmentForms, studentLoanInterestForms,
+        totalIncomeLine: line9,
+    })
+    if (scheduleOnePartIIResult.kind === 'error') {
+        return { kind: 'error', message: scheduleOnePartIIResult.message, unmodeled: [] }
+    }
+    // 10 — Schedule 1 Part II's own total (line26), read from the schedule
+    // itself rather than re-added here: lines 11, 13 and 21 reach 1040 line
+    // 10 THROUGH Schedule 1's own Part II total, never by a side channel.
     const line10 = {
-        value: scheduleOneResult.line26.value,
-        sources: scheduleOneResult.line26.sources,
+        value: scheduleOnePartIIResult.line26.value,
+        sources: scheduleOnePartIIResult.line26.sources,
         rule: '1040 line 10',
     } // adjustments, Schedule 1 Part II total (line26)
 
@@ -2046,6 +2102,8 @@ const inputsOf = profile => w2s => interestForms => dividendForms => brokerageFo
                 // unemployment, read exactly as they did before. Proofs that
                 // DO concern it spread this result and override the field.
                 unemploymentForms: [],
+                adjustmentForms: [],
+                studentLoanInterestForms: [],
             })
 
 /**
@@ -2430,6 +2488,94 @@ const syntheticTaxParamSetForGenericityProof = {
         },
     },
 }
+
+// ── Phase 24 (TAX-23/TAX-24/DOC-19) fixtures ─────────────────────────────────
+
+/**
+ * The non-profit employee `.planning/PERSONA-COVERAGE.md` names: a modestly
+ * paid single filer with an educator expense, a health savings account and a
+ * student loan. Every one of the three was a hard zero before this phase.
+ * @type {ReturnProfile}
+ */
+const phaseTwentyFourProfile = {
+    dialect: returnProfileDialect,
+    taxYear: 2025,
+    filingStatus: 'single',
+    dependentCount: 0,
+    declaredKinds: [
+        'wages', 'educatorExpenses', 'healthSavingsAccountDeduction',
+        'studentLoanInterestDeduction', 'federalTaxWithheldOnW2',
+    ],
+}
+
+/**
+ * The W-2, carrying box 12 code W beside a much larger code DD amount — so a
+ * wiring that read "any box 12 entry" rather than code W alone produces a
+ * wildly different HSA limit and is caught end to end, not only in
+ * `fjs/schedule/1`'s unit proofs.
+ * @type {Stored<W2>}
+ */
+const phaseTwentyFourW2 = {
+    documentHash: 'sha256-p24-w2',
+    value: {
+        ...w2Document('sha256-p24-w2')('52000.00').value,
+        box2FederalIncomeTaxWithheld: '4200.00',
+        box12: [{ code: 'DD', amount: '9800.00' }, { code: 'W', amount: '500.00' }],
+    },
+}
+
+/** @type {Stored<Adjustments>} */
+const phaseTwentyFourAdjustments = {
+    documentHash: 'sha256-p24-adjustments',
+    value: {
+        dialect: adjustmentsDialect,
+        recipientTin: '222-22-2222',
+        taxYear: 2025,
+        entries: [
+            {
+                lineTag: 'educatorExpenses',
+                datePaid: '2025-09-02',
+                description: 'classroom supplies',
+                amount: '300.00',
+                individual: 'taxpayer',
+            },
+            {
+                lineTag: 'hsaContribution',
+                datePaid: '2025-06-30',
+                description: 'HSA contribution',
+                amount: '2000.00',
+                individual: 'taxpayer',
+            },
+        ],
+        hsaCoverage: [{
+            individual: 'taxpayer',
+            coverageType: 'selfOnly',
+            hadHighDeductibleCoverageAllYear: true,
+        }],
+    },
+}
+
+/** @type {Stored<OneZeroNineEightE>} */
+const phaseTwentyFourOneZeroNineEightE = {
+    documentHash: 'sha256-p24-1098e',
+    value: {
+        dialect: oneZeroNineEightEDialect,
+        payerTin: '55-5555555',
+        recipientTin: '222-22-2222',
+        accountNumber: 'LOAN-0001',
+        taxYear: 2025,
+        formRevision: '2025',
+        box1StudentLoanInterestReceived: '1842.63',
+    },
+}
+
+/** @type {Form1040Inputs} */
+const phaseTwentyFourInputs = {
+    ...inputsOf(storedProfile(phaseTwentyFourProfile))([phaseTwentyFourW2])([])([])([])([])([])([])([])([]),
+    adjustmentForms: [phaseTwentyFourAdjustments],
+    studentLoanInterestForms: [phaseTwentyFourOneZeroNineEightE],
+}
+
 
 export const proof = {
     unionSources: {
@@ -5510,6 +5656,155 @@ export const proof = {
             const taxCrossCheck = baseTaxForAmount(taxParams2025)('single')(4750000n)
             assertEq(taxCrossCheck.cents, 546500n, 'independent baseTaxForAmount(...) call must reach the SAME $5,465.00 tax')
             assertEq(line18, 546500n, '$5,465.00 — line16 (tax) + line17 (Schedule 2 Part I, $0.00)')
+        },
+    },
+    // ── Phase 24 (TAX-23/TAX-24/DOC-19): Schedule 1 Part II, end to end ─────
+    //
+    // The persona this phase exists for. Until this phase a non-profit
+    // employee's return COMPUTED — completely, confidently, with every line
+    // cited — and OVERSTATED the tax, because every Schedule 1 adjustment was
+    // a hard zero rather than a refusal. Nothing in the return said so.
+    //
+    // These leaves run the whole `form1040Report` entry point, so they prove
+    // the thing the unit proofs in `fjs/schedule/1` cannot: that lines 11, 13
+    // and 21 reach 1040 line 10 **through Schedule 1's own Part II total**
+    // and go on to move AGI and taxable income.
+    scheduleOneAdjustments: {
+        theNonProfitEmployeeReturnDeductsAllThreeAdjustmentsThroughLineTen: () => {
+            const outcome = form1040Report(taxParams2025)(phaseTwentyFourInputs)
+            assert(outcome.kind === 'ok', ['expected the non-profit employee return to compute', outcome])
+            if (outcome.kind !== 'ok') {
+                throw ['expected ok', outcome]
+            }
+            // Hand-computed from the printed forms, independently of the code
+            // under test:
+            //
+            //   1040 line 1a/1z = W-2 box 1                       $52,000.00
+            //   1040 line 9  (total income)                       $52,000.00
+            //   Sch 1 line 11 = min($300.00, §62's $300.00 cap)       $300.00
+            //   Sch 1 line 13 = Form 8889: line 3 $4,300.00, line 9
+            //       $500.00 (W-2 box 12 code W), line 12 $3,800.00,
+            //       line 2 $2,000.00, line 13 = min of the two     $2,000.00
+            //   Sch 1 line 21 = worksheet: line 1 min($1,842.63,
+            //       $2,500.00) = $1,842.63; line 2 $52,000.00; line 3
+            //       $300.00 + $2,000.00 = $2,300.00; line 4 $49,700.00;
+            //       line 5 $85,000.00; line 4 is NOT more than line 5, so
+            //       line 8 is $0.00 and line 9 is                  $1,842.63
+            //   Sch 1 line 26 -> 1040 line 10                      $4,142.63
+            //   1040 line 11a/11b (AGI) = $52,000.00 - $4,142.63  $47,857.37
+            //   1040 line 12e = single standard deduction          $15,750.00
+            //   1040 line 15 = $47,857.37 - $15,750.00            $32,107.37
+            assertEq(lineRuled(outcome.lines)('1040 line 1a').value, 5200000n, '$52,000.00 of wages')
+            assertEq(lineRuled(outcome.lines)('1040 line 9').value, 5200000n, '$52,000.00 total income')
+            assertEq(lineRuled(outcome.lines)('1040 line 10').value, 414263n,
+                '$300.00 + $2,000.00 + $1,842.63 = $4,142.63')
+            assertEq(lineRuled(outcome.lines)('1040 line 11a').value, 4785737n, '$47,857.37 AGI')
+            assertEq(lineRuled(outcome.lines)('1040 line 11b').value, 4785737n, 'restated on page 2')
+            assertEq(lineRuled(outcome.lines)('1040 line 12e').value, 1575000n, '$15,750.00')
+            assertEq(lineRuled(outcome.lines)('1040 line 15').value, 3210737n, '$32,107.37 taxable income')
+            assert(
+                lineRuled(outcome.lines)('1040 line 10').value > 0n,
+                ['line 10 must be a REAL figure, not the hard zero this phase replaced',
+                    lineRuled(outcome.lines)('1040 line 10').value],
+            )
+        },
+        // The DIFFERENTIAL, and the strongest single statement in this group:
+        // the identical return with no adjustment documents at all must have
+        // a taxable income exactly $4,142.63 HIGHER. That is the overstatement
+        // this phase removes, priced.
+        //
+        // Deliberately a difference rather than two absolute figures: it does
+        // not depend on the Tax Table, the standard deduction, or anything
+        // else that could move for an unrelated reason, so it can only fail
+        // if the adjustments stop flowing through to taxable income.
+        theSameReturnWithoutTheDocumentsIsExactlyThatMuchMoreTaxable: () => {
+            const withAdjustments = form1040Report(taxParams2025)(phaseTwentyFourInputs)
+            const without = form1040Report(taxParams2025)({
+                ...phaseTwentyFourInputs,
+                adjustmentForms: [],
+                studentLoanInterestForms: [],
+                w2s: [w2Document('sha256-p24-w2')('52000.00')],
+            })
+            assert(withAdjustments.kind === 'ok', ['expected ok', withAdjustments])
+            assert(without.kind === 'ok', ['expected ok', without])
+            if (withAdjustments.kind !== 'ok' || without.kind !== 'ok') {
+                throw ['expected two computed returns', withAdjustments, without]
+            }
+            const taxableWith = lineRuled(withAdjustments.lines)('1040 line 15').value
+            const taxableWithout = lineRuled(without.lines)('1040 line 15').value
+            assertEq(taxableWithout - taxableWith, 414263n,
+                'the adjustments must reduce taxable income by exactly Schedule 1 line 26')
+            assertEq(lineRuled(without.lines)('1040 line 10').value, 0n,
+                'and the same return with no adjustment documents is still a legitimate zero')
+        },
+        // PROV-02, end to end: 1040 line 10 must cite the documents the
+        // adjustments actually came from, by the CAS hash a reader can look
+        // up — not merely carry a number.
+        lineTenCitesEveryDocumentTheAdjustmentsCameFrom: () => {
+            const outcome = form1040Report(taxParams2025)(phaseTwentyFourInputs)
+            assert(outcome.kind === 'ok', ['expected ok', outcome])
+            if (outcome.kind !== 'ok') {
+                throw ['expected ok', outcome]
+            }
+            const sources = lineRuled(outcome.lines)('1040 line 10').sources
+            const hashes = sources.map(source => source.documentHash)
+            assert(hashes.includes('sha256-p24-adjustments'),
+                ['line 10 must cite the adjustments document', sources])
+            assert(hashes.includes('sha256-p24-1098e'),
+                ['line 10 must cite the 1098-E', sources])
+            assert(hashes.includes('sha256-p24-w2'),
+                ['line 10 must cite the W-2 whose box 12 code W reduced the HSA limit', sources])
+            const boxPaths = sources.map(source => source.boxPath)
+            assert(boxPaths.includes('box1StudentLoanInterestReceived'),
+                ['line 10 must cite the 1098-E BOX, not merely the document', boxPaths])
+            assert(boxPaths.includes('box12[code=W]'),
+                ['line 10 must cite the W-2 box that reduced the deduction', boxPaths])
+        },
+        // The three kinds are MODELED as of this phase, so declaring them is
+        // IN SCOPE — the reclassification, exercised through the entry point
+        // rather than only against `classifyScope`. Before this phase the
+        // identical declaration refused the whole return.
+        decliningToDeclareIsNotRequiredAndDeclaringIsInScope: () => {
+            const outcome = form1040Report(taxParams2025)(phaseTwentyFourInputs)
+            assertEq(outcome.kind, 'ok', 'the three reclassified kinds must not refuse')
+            assertEq(
+                JSON.stringify(phaseTwentyFourProfile.declaredKinds),
+                JSON.stringify([
+                    'wages', 'educatorExpenses', 'healthSavingsAccountDeduction',
+                    'studentLoanInterestDeduction', 'federalTaxWithheldOnW2',
+                ]),
+                'the fixture really does declare all three, or the leaf above proves nothing',
+            )
+        },
+        // A Part II refusal must stop the WHOLE return, threaded through the
+        // same error arm the Schedule A and Schedule D guards use — never a
+        // partial 1040 with a quietly dropped adjustment.
+        aPartTwoRefusalStopsTheWholeReturn: () => {
+            const outcome = form1040Report(taxParams2025)({
+                ...phaseTwentyFourInputs,
+                adjustmentForms: [{
+                    documentHash: 'sha256-p24-adjustments',
+                    value: {
+                        ...phaseTwentyFourAdjustments.value,
+                        entries: [{
+                            lineTag: 'alimonyPaid',
+                            datePaid: '2025-04-01',
+                            description: 'court-ordered alimony',
+                            amount: '9000.00',
+                            individual: 'taxpayer',
+                        }],
+                    },
+                }],
+            })
+            assertEq(outcome.kind, 'error')
+            if (outcome.kind !== 'error') {
+                throw ['expected a refusal', outcome]
+            }
+            assert(outcome.message.includes('alimonyPaid'),
+                ['the refusal must name the tag it could not compute', outcome.message])
+            // A document-data-sufficiency refusal, never a scope one: it
+            // names no `fjs/return/scope` kind.
+            assertEq(outcome.unmodeled.length, 0)
         },
     },
 }

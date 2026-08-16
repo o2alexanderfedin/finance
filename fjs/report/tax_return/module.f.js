@@ -83,10 +83,11 @@
  *   stated at {@link noteYearMismatch}, and
  *   {@link proof.taxYearRefusal.aPriorYearCarryoverIsExemptAndStillComputes}
  *   is the control proving the exemption is real rather than assumed.
- * - **Verified rather than assumed**: all ten dialects this program routes
+ * - **Verified rather than assumed**: all twelve dialects this program routes
  *   into the engine declare `taxYear: number` as a REQUIRED schema field —
  *   including `vnd.fjs.medical_expenses`, checked by name because it was the
- *   one in doubt. The `typeof` guard in {@link noteYearMismatch} is
+ *   one in doubt, and Phase 24's `vnd.fjs.adjustments` and `vnd.fjs.1098e`,
+ *   both of which declare it required for the same reason. The `typeof` guard in {@link noteYearMismatch} is
  *   therefore unreachable for any validated document; it is kept because the
  *   rule is about what a document carries, and writing it as a dialect list
  *   instead would be the defect above.
@@ -148,6 +149,8 @@ import { dialect as itemizedDeductionsDialect } from '../../document/itemized_de
 import { dialect as medicalExpensesDialect } from '../../document/medical_expenses/module.f.js'
 import { dialect as priorYearCapitalLossDialect } from '../../document/prior_year_capital_loss/module.f.js'
 import { dialect as oneZeroNineNineGDialect } from '../../document/1099g/module.f.js'
+import { dialect as adjustmentsDialect } from '../../document/adjustments/module.f.js'
+import { dialect as oneZeroNineEightEDialect } from '../../document/1098e/module.f.js'
 
 /** @import { Effect, OperationMap } from 'functionalscript/fjs/effects/module.f.js' */
 /** @import { CasOp } from '../../guest/module.f.js' */
@@ -165,6 +168,8 @@ import { dialect as oneZeroNineNineGDialect } from '../../document/1099g/module.
 /** @import { MedicalExpenses } from '../../document/medical_expenses/module.f.js' */
 /** @import { PriorYearCapitalLoss } from '../../document/prior_year_capital_loss/module.f.js' */
 /** @import { OneZeroNineNineG } from '../../document/1099g/module.f.js' */
+/** @import { Adjustments } from '../../document/adjustments/module.f.js' */
+/** @import { OneZeroNineEightE } from '../../document/1098e/module.f.js' */
 
 // ── The rendered wire shape ──────────────────────────────────────────────────
 
@@ -206,11 +211,11 @@ import { dialect as oneZeroNineNineGDialect } from '../../document/1099g/module.
  * `vnd.fjs.revision`, a future addition) falls straight through
  * {@link collectDocument} untouched — never coerced into a bucket, never
  * treated as a zero.
- * @typedef {ReturnProfile | W2 | OneZeroNineNineInt | OneZeroNineNineDiv | OneZeroNineNineB | OneZeroNineNineR | Ssa1099 | ItemizedDeductions | MedicalExpenses | PriorYearCapitalLoss | OneZeroNineNineG} EngineDocument
+ * @typedef {ReturnProfile | W2 | OneZeroNineNineInt | OneZeroNineNineDiv | OneZeroNineNineB | OneZeroNineNineR | Ssa1099 | ItemizedDeductions | MedicalExpenses | PriorYearCapitalLoss | OneZeroNineNineG | Adjustments | OneZeroNineEightE} EngineDocument
  */
 
 /**
- * `Form1040Inputs` mid-collection: the same eleven fields, with `profile`
+ * `Form1040Inputs` mid-collection: the same thirteen fields, with `profile`
  * not yet found and a flag for the one ambiguity a second profile creates.
  *
  * `duplicateProfile` is a flag rather than an early return because the walk
@@ -235,6 +240,8 @@ import { dialect as oneZeroNineNineGDialect } from '../../document/1099g/module.
  *   readonly medicalExpenseForms: readonly Stored<MedicalExpenses>[],
  *   readonly capitalLossCarryoverForms: readonly Stored<PriorYearCapitalLoss>[],
  *   readonly unemploymentForms: readonly Stored<OneZeroNineNineG>[],
+ *   readonly adjustmentForms: readonly Stored<Adjustments>[],
+ *   readonly studentLoanInterestForms: readonly Stored<OneZeroNineEightE>[],
  * }} Collected
  */
 
@@ -297,6 +304,8 @@ export const taxReturnReportSource = [
     '        medicalExpenseForms: [],',
     '        capitalLossCarryoverForms: [],',
     '        unemploymentForms: [],',
+    '        adjustmentForms: [],',
+    '        studentLoanInterestForms: [],',
     '    }',
     '    const runYear = ctx.taxParams.taxYear',
     '    const noteYearMismatch = documentHash => doc => acc => {',
@@ -324,6 +333,8 @@ export const taxReturnReportSource = [
     '        if (doc.dialect === \'vnd.fjs.medical_expenses\') { return { ...acc, medicalExpenseForms: [...acc.medicalExpenseForms, stored] } }',
     '        if (doc.dialect === \'vnd.fjs.prior_year_capital_loss\') { return { ...acc, capitalLossCarryoverForms: [...acc.capitalLossCarryoverForms, stored] } }',
     '        if (doc.dialect === \'vnd.fjs.1099g\') { return { ...acc, unemploymentForms: [...acc.unemploymentForms, stored] } }',
+    '        if (doc.dialect === \'vnd.fjs.adjustments\') { return { ...acc, adjustmentForms: [...acc.adjustmentForms, stored] } }',
+    '        if (doc.dialect === \'vnd.fjs.1098e\') { return { ...acc, studentLoanInterestForms: [...acc.studentLoanInterestForms, stored] } }',
     '        return undefined',
     '    }',
     '    const collect = documentHash => doc => acc => {',
@@ -372,6 +383,8 @@ export const taxReturnReportSource = [
     '            medicalExpenseForms: acc.medicalExpenseForms,',
     '            capitalLossCarryoverForms: acc.capitalLossCarryoverForms,',
     '            unemploymentForms: acc.unemploymentForms,',
+    '            adjustmentForms: acc.adjustmentForms,',
+    '            studentLoanInterestForms: acc.studentLoanInterestForms,',
     '        })',
     '        if (outcome.kind === \'error\') {',
     '            return { kind: \'error\', message: outcome.message, unmodeled: outcome.unmodeled }',
@@ -434,6 +447,8 @@ const emptyCollected = {
     medicalExpenseForms: [],
     capitalLossCarryoverForms: [],
     unemploymentForms: [],
+    adjustmentForms: [],
+    studentLoanInterestForms: [],
 }
 
 /**
@@ -444,8 +459,8 @@ const emptyCollected = {
  * `{ dialect: fieldName }` lookup table, deliberately: the table form needs
  * a computed key (`{ ...acc, [field]: [...] }`), which no type can express
  * without discarding exactly the per-dialect element type
- * `Form1040Inputs` exists to guarantee. Eleven explicit branches cost eleven
- * lines and keep `tsc` checking that a 1099-R never lands in `w2s`.
+ * `Form1040Inputs` exists to guarantee. Thirteen explicit branches cost
+ * thirteen lines and keep `tsc` checking that a 1099-R never lands in `w2s`.
  * Returns `undefined` — never `acc` — for a dialect the engine has no field
  * for, so {@link collectDocument} can tell "routed" apart from "skipped"
  * without comparing object identities that every spread would break.
@@ -468,6 +483,8 @@ const routeDocument = documentHash => doc => acc => {
     if (doc.dialect === medicalExpensesDialect) { return { ...acc, medicalExpenseForms: [...acc.medicalExpenseForms, { documentHash, value: doc }] } }
     if (doc.dialect === priorYearCapitalLossDialect) { return { ...acc, capitalLossCarryoverForms: [...acc.capitalLossCarryoverForms, { documentHash, value: doc }] } }
     if (doc.dialect === oneZeroNineNineGDialect) { return { ...acc, unemploymentForms: [...acc.unemploymentForms, { documentHash, value: doc }] } }
+    if (doc.dialect === adjustmentsDialect) { return { ...acc, adjustmentForms: [...acc.adjustmentForms, { documentHash, value: doc }] } }
+    if (doc.dialect === oneZeroNineEightEDialect) { return { ...acc, studentLoanInterestForms: [...acc.studentLoanInterestForms, { documentHash, value: doc }] } }
     return undefined
 }
 
@@ -566,6 +583,8 @@ const renderReturn = ctx => acc => {
         medicalExpenseForms: acc.medicalExpenseForms,
         capitalLossCarryoverForms: acc.capitalLossCarryoverForms,
         unemploymentForms: acc.unemploymentForms,
+        adjustmentForms: acc.adjustmentForms,
+        studentLoanInterestForms: acc.studentLoanInterestForms,
     })
     if (outcome.kind === 'error') {
         return { kind: 'error', message: outcome.message, unmodeled: outcome.unmodeled }
