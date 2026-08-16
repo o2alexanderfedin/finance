@@ -133,10 +133,12 @@ import { interpret } from '../../exec/module.f.js'
 import { countNumericLiterals } from '../../report/audit/module.f.js'
 import { classifyRunOutcome } from '../../report/guard/module.f.js'
 import { guestCtx } from '../../guest/module.f.js'
+import { taxGuestCtx } from '../../guest/tax/module.f.js'
 import { materializeProgram, loadProgram, materializeHome, programPath } from '../../guest/materialize/module.f.js'
 import { buildRunSnapshot, buildHostMap } from './snapshot/module.f.js'
 import { dialect, validate as validateRun } from '../../run/module.f.js'
 import { taxParamsByYear } from '../../tax/params/module.f.js'
+import { dialect as returnProfileDialect } from '../../return/profile/module.f.js'
 import { paramSetHash, reviewedEstimateFraming } from '../../report/provenance/module.f.js'
 import { sizeGuard, previewBytes, guardBytes } from '../response/module.f.js'
 import { readUtf8File } from 'functionalscript/fjs/effects/node/module.f.js'
@@ -152,6 +154,9 @@ import { stringify as jsonText } from '../../json/module.f.js'
 /** @import { ToolEntry, ToolsCallResult } from 'functionalscript/fjs/protocol/mcp/module.f.js' */
 /** @import { Vec } from 'functionalscript/fjs/types/bit_vec/module.f.js' */
 /** @import { CasOp, Report } from '../../guest/module.f.js' */
+/** @import { TaxReport } from '../../guest/tax/module.f.js' */
+/** @import { TaxParamSet } from '../../tax/params/module.f.js' */
+/** @import { ReturnProfile } from '../../return/profile/module.f.js' */
 /** @import { State, Dir, JsModule } from 'functionalscript/fjs/effects/node/virtual/module.f.js' */
 /** @import { Run } from '../../run/module.f.js' */
 /** @import { RunOutcome } from '../../report/guard/module.f.js' */
@@ -174,7 +179,38 @@ import { stringify as jsonText } from '../../json/module.f.js'
  * for the five-step sequence this composes, unchanged, from Plan 05
  * (`materializeProgram`/`buildRunSnapshot`/`buildHostMap`), Phase 6
  * (`programPath`/`loadProgram`), and Phase 3 (`interpret`).
- * @type {(materializeHomeRoot: string) => (cas: Cas<FileCasOperation>) => (evoApi: Evo<FileCasOperation>) => (input: { readonly hash: string, readonly args: readonly string[], readonly subject?: string, readonly parents?: readonly string[] }) => Effect<FileCasOperation | Mkdir | WriteFile | Import | MemOp, RunOutcome<unknown>>}
+ *
+ * ## `input.taxParams` (Phase 21, EXEC-14)
+ *
+ * The ALREADY-RESOLVED parameter set the guest computes against. It is a
+ * required field and it is **passed in, never looked up here** — this
+ * function must not touch `taxParamsByYear`. `fjsRunTool` has already
+ * resolved `args.taxYear` (refusing an unknown year before anything runs)
+ * and has already hashed that exact object into the run record's
+ * `paramSetHash`; a second lookup here could disagree with it, and a run
+ * record that names parameters the guest did not use is precisely the lie
+ * PROV-04 exists to prevent.
+ *
+ * The whole (wider) context goes to EVERY program, tax or not: a program
+ * that does not read `ctx.form1040Report`/`ctx.taxParams` is unaffected by
+ * their presence, which is why `fjs/report/payer`'s own stored program
+ * still runs here unchanged.
+ *
+ * **The "never re-resolve" half of that rule is currently UNPROVEN, and
+ * measured to be so.** Replacing `input.taxParams` below with a fresh
+ * `taxParamsByYear[2025]` lookup was run as a mutation gate on 2026-08-16
+ * and **survived the entire suite** (6419/6419, exit 0). It cannot fail
+ * today for a reason that has nothing to do with test quality:
+ * `taxParamsByYear` holds exactly ONE year, so threading the caller's
+ * object and re-resolving it are observationally identical at every input
+ * that exists. The first phase to add a second tax year should re-run that
+ * gate — it will bite then — and until it does, this paragraph is the only
+ * thing standing between the rule and a silent regression. What IS proven:
+ * the parameter set actually reaches the guest (substituting a different
+ * standard deduction here reddens `tax-return-integration.test.js`), and
+ * `tsc` refuses a bare `guestCtx` in its place (TS2739, `taxParams` and
+ * `form1040Report` missing).
+ * @type {(materializeHomeRoot: string) => (cas: Cas<FileCasOperation>) => (evoApi: Evo<FileCasOperation>) => (input: { readonly hash: string, readonly args: readonly string[], readonly taxParams: TaxParamSet, readonly subject?: string, readonly parents?: readonly string[] }) => Effect<FileCasOperation | Mkdir | WriteFile | Import | MemOp, RunOutcome<unknown>>}
  */
 export const executeRun = materializeHomeRoot => cas => evoApi => input => {
     const hashVec = cBase32ToVec(input.hash)
@@ -203,8 +239,8 @@ export const executeRun = materializeHomeRoot => cas => evoApi => input => {
                     : undefined
                 return step(buildRunSnapshot(cas)(evoApi)(pin), snapshot => {
                     const hostMap = buildHostMap(snapshot)
-                    const loaded = /** @type {{ readonly report: Report<unknown> }} */ (loadResult[1])
-                    const [t, v] = interpret(hostMap)(loaded.report(guestCtx)(input.args))
+                    const loaded = /** @type {{ readonly report: TaxReport<unknown> }} */ (loadResult[1])
+                    const [t, v] = interpret(hostMap)(loaded.report(taxGuestCtx(input.taxParams))(input.args))
                     if (t === 'error') {
                         return pure(/** @type {RunOutcome<unknown>} */ ({ kind: 'error', message: v, reads: [] }))
                     }
@@ -485,6 +521,12 @@ export const fjsRunTool = materializeHomeRoot => cas => evoApi => toolEntry(
             executeRun(materializeHomeRoot)(cas)(evoApi)({
                 hash: args.hash,
                 args: programArgs,
+                // EXEC-14: the SAME `taxParamSet` object the unknown-year
+                // refusal above already accepted and `resolvedParamSetHash`
+                // was computed over — threaded through, never re-resolved.
+                // Re-looking it up would let the run record's paramSetHash
+                // and the guest's actual parameters disagree.
+                taxParams: taxParamSet,
                 ...pinFields,
             }),
             outcome => handleRunOutcome(cas)(args.hash)(programArgs)(pinned)(pinFields)({ taxYear: args.taxYear, paramSetHash: resolvedParamSetHash })(outcome),
@@ -493,6 +535,21 @@ export const fjsRunTool = materializeHomeRoot => cas => evoApi => toolEntry(
 )
 
 // ── Tests ────────────────────────────────────────────────────────────────────
+
+/**
+ * TY2025's parameter set, narrowed exactly once — the value every proof
+ * below hands to `executeRun`/{@link runExecuteRunViaFixture} in place of
+ * the one `fjsRunTool` resolves from its caller's `taxYear`.
+ * `noUncheckedIndexedAccess` makes the open year-keyed lookup yield
+ * `TaxParamSet | undefined`, and a cast or `!` is banned, so `assert` is the
+ * only compliant narrowing path.
+ *
+ * Every proof below passes THIS object rather than a year, which is the
+ * shape the production caller uses too — the year-to-parameters resolution
+ * happens once, in `fjsRunTool`, and nothing downstream repeats it.
+ */
+const taxParamsFixture = taxParamsByYear[2025]
+assert(taxParamsFixture !== undefined, 'expected TY2025 parameters to be present in taxParamsByYear')
 
 /** Single-chunk UTF-8 CAS write, mirroring the proofs `fjs/server/fjs_run/snapshot/module.f.js` and `fjs/server/module.f.js` already establish. @type {<O extends Operation>(cas: Cas<O>) => (text: string) => Effect<O, string>} */
 const seedText = cas => text => {
@@ -569,9 +626,17 @@ export const placeJsModuleFixture = root => path => fn => {
  * freshly-written bytes does. Real Node has no such limitation, which is
  * exactly why `fjs-run-integration.test.js` exists as the decisive,
  * single-call, real-process proof of the SAME round trip.
- * @type {(home: string) => (cas: Cas<FileCasOperation>) => (evoApi: Evo<FileCasOperation>) => (hash: string) => (source: string) => (report: Report<unknown>) => (args: readonly string[]) => (pin: { readonly subject: string, readonly parents: readonly string[] } | undefined) => (state: State) => readonly [State, RunOutcome<unknown>]}
+ *
+ * Phase 21 (EXEC-14): `taxParams` is now a parameter of this helper too,
+ * for the same reason everything else here is a faithful replay —
+ * `executeRun` supplies `taxGuestCtx(input.taxParams)` to the loaded
+ * program, so a helper that supplied a bare `guestCtx` would be replaying a
+ * sequence production does not run, and a stored program reaching for
+ * `ctx.form1040Report` would fail here for a reason no production caller
+ * could ever hit.
+ * @type {(home: string) => (taxParams: TaxParamSet) => (cas: Cas<FileCasOperation>) => (evoApi: Evo<FileCasOperation>) => (hash: string) => (source: string) => (report: TaxReport<unknown>) => (args: readonly string[]) => (pin: { readonly subject: string, readonly parents: readonly string[] } | undefined) => (state: State) => readonly [State, RunOutcome<unknown>]}
  */
-const runExecuteRunViaFixture = home => cas => evoApi => hash => source => report => args => pin => state => {
+const runExecuteRunViaFixture = home => taxParams => cas => evoApi => hash => source => report => args => pin => state => {
     // PROV-07: mirrors executeRun's own literalCount computation, from the
     // SAME `source` parameter this helper already receives.
     const literalCount = countNumericLiterals(source)
@@ -587,8 +652,8 @@ const runExecuteRunViaFixture = home => cas => evoApi => hash => source => repor
             }
             return step(buildRunSnapshot(cas)(evoApi)(pin), snapshot => {
                 const hostMap = buildHostMap(snapshot)
-                const loaded = /** @type {{ readonly report: Report<unknown> }} */ (loadResult[1])
-                const [t, v] = interpret(hostMap)(loaded.report(guestCtx)(args))
+                const loaded = /** @type {{ readonly report: TaxReport<unknown> }} */ (loadResult[1])
+                const [t, v] = interpret(hostMap)(loaded.report(taxGuestCtx(taxParams))(args))
                 if (t === 'error') {
                     return pure(/** @type {RunOutcome<unknown>} */ ({ kind: 'error', message: v, reads: [] }))
                 }
@@ -707,7 +772,7 @@ const assertSessionSurvivesAFollowingCall = home => cas => e => state => goodHas
     // RunOutcome typedef and the zero-read gate in executeRun above).
     /** @type {Report<string>} */
     const goodReport = ctx => () => ctx.step(ctx.evoList('false'), () => ctx.pure('ok'))
-    const [state1, outcome] = runExecuteRunViaFixture(home)(cas)(e)(goodHash)(goodProgramSource)(goodReport)([])(undefined)(state)
+    const [state1, outcome] = runExecuteRunViaFixture(home)(taxParamsFixture)(cas)(e)(goodHash)(goodProgramSource)(goodReport)([])(undefined)(state)
     const [, followUp] = virtual(state1)(handleRunOutcome(cas)(goodHash)([])(false)({})({ taxYear: 2025, paramSetHash: 'sha256-paramset1' })(outcome))
     assertEq(followUp.isError, undefined)
 }
@@ -767,7 +832,7 @@ export const proof = {
                 ctx.evoList('false'),
                 activeJson => sumOverSubjects(/** @type {readonly string[]} */ (JSON.parse(activeJson)))(0n))
 
-            const [, outcome] = runExecuteRunViaFixture(home)(cas)(e)(programHash)(programSource)(sumReport)([])(undefined)(state5)
+            const [, outcome] = runExecuteRunViaFixture(home)(taxParamsFixture)(cas)(e)(programHash)(programSource)(sumReport)([])(undefined)(state5)
             assert(outcome.kind === 'ok', ['expected an ok outcome', outcome])
             if (outcome.kind === 'ok') {
                 assertEq(outcome.value, '30.00')
@@ -785,7 +850,7 @@ export const proof = {
             const [state0, cacheKey] = virtual(emptyState)(initEvo(cas))
             const e = evo(cas)(cacheKey)
             const [state1, outcome] = virtual(state0)(
-                executeRun(home)(cas)(e)({ hash: 'not-a-real-hash', args: [] }))
+                executeRun(home)(cas)(e)({ hash: 'not-a-real-hash', args: [], taxParams: taxParamsFixture }))
             assertEq(outcome.kind, 'error')
             if (outcome.kind === 'error') {
                 assert(outcome.message.includes('not-a-real-hash'), outcome.message)
@@ -803,7 +868,7 @@ export const proof = {
             const e = evo(cas)(cacheKey)
             const [state1, dirtyHash] = virtual(state0)(
                 seedText(cas)(`import fs from 'node:fs'\nexport const report = ctx => args => ctx.pure('x')`))
-            const [, outcome] = virtual(state1)(executeRun(home)(cas)(e)({ hash: dirtyHash, args: [] }))
+            const [, outcome] = virtual(state1)(executeRun(home)(cas)(e)({ hash: dirtyHash, args: [], taxParams: taxParamsFixture }))
             assertEq(outcome.kind, 'error')
             if (outcome.kind === 'error') {
                 assert(outcome.message.includes('node:fs'), outcome.message)
@@ -828,7 +893,7 @@ export const proof = {
             /** @type {Report<string>} */
             const pinReport = ctx => runArgs => ctx.evoHead(runArgs[0] ?? '')
 
-            const [, outcome] = runExecuteRunViaFixture(home)(cas)(e)(programHash)(programSource)(pinReport)(['subjectS'])(
+            const [, outcome] = runExecuteRunViaFixture(home)(taxParamsFixture)(cas)(e)(programHash)(programSource)(pinReport)(['subjectS'])(
                 { subject: 'subjectS', parents: ['PINNED_INSTEAD'] })(state3)
             assert(outcome.kind === 'ok', ['expected an ok outcome', outcome])
             if (outcome.kind === 'ok') {
@@ -836,6 +901,90 @@ export const proof = {
                 assert(
                     outcome.value !== JSON.stringify([addResult[1]]),
                     'must not resolve to the live head')
+            }
+        },
+        // EXEC-14: the 1040 engine reaches a LOADED guest program through
+        // executeRun's OWN materialize -> load -> snapshot -> interpret
+        // sequence, computing from a document really stored in a real CAS
+        // and read back through the frozen four commands.
+        //
+        // Deliberately a small local fixture rather than an import of
+        // `fjs/report/tax_return`: `fjs_run` imports no report module (see
+        // that module's own header — a stored program is materialized text
+        // imported by hash at run time, never a call into the module that
+        // documents it), and this leaf is about the WIRING, not about the
+        // 1040 arithmetic, which `fjs/report/tax_return` and
+        // `fjs/form1040/core` prove between them.
+        //
+        // Expected value hand-typed: $15,750.00 is TY2025's single standard
+        // deduction as printed in Rev. Proc. 2025-32 §3.01. It is not read
+        // back out of `taxParamsFixture`, so this leaf notices the engine
+        // being handed the wrong parameters, not merely being handed some.
+        theEngineReachesALoadedProgramThroughFullExecuteRun: () => {
+            const home = '/tax-engine'
+            const cas = fileCas(sha256)(home)
+            const [state0, cacheKey] = virtual(emptyState)(initEvo(cas))
+            const e = evo(cas)(cacheKey)
+            const [state1, profileHash] = virtual(state0)(seedText(cas)(jsonText({
+                dialect: returnProfileDialect,
+                taxYear: 2025,
+                filingStatus: 'single',
+                dependentCount: 0,
+                declaredKinds: ['wages'],
+            })))
+            const [state2, addResult] = virtual(state1)(
+                e.add({ parents: [], subject: 'subjectProfile', snapshot: profileHash }))
+            assert(addResult[0] === 'ok', ['expected the profile revision add to succeed', addResult])
+
+            const programSource = 'export const report = ctx => args => ctx.pure("unused")'
+            const [state3, programHash] = virtual(state2)(seedText(cas)(programSource))
+
+            /** @type {TaxReport<string>} */
+            const engineReport = ctx => runArgs => ctx.step(ctx.evoHead(runArgs[0] ?? ''), headsJson => {
+                /** @type {readonly string[]} */
+                const heads = JSON.parse(headsJson)
+                const headHash = assertNotNullish(heads[0], 'expected at least one head')
+                return ctx.step(ctx.evoRevision(headHash), revJson => {
+                    /** @type {{ readonly snapshot: string }} */
+                    const rev = JSON.parse(revJson)
+                    return ctx.step(ctx.casRead(rev.snapshot), docJson => {
+                        const outcome = ctx.form1040Report({
+                            profile: {
+                                documentHash: rev.snapshot,
+                                value: /** @type {ReturnProfile} */ (JSON.parse(docJson)),
+                            },
+                            w2s: [],
+                            interestForms: [],
+                            dividendForms: [],
+                            brokerageForms: [],
+                            retirementForms: [],
+                            socialSecurityForms: [],
+                            itemizedDeductionForms: [],
+                            medicalExpenseForms: [],
+                            capitalLossCarryoverForms: [],
+                            unemploymentForms: [],
+                        })
+                        assert(outcome.kind === 'ok', ['expected the engine to compute', outcome])
+                        if (outcome.kind !== 'ok') {
+                            return ctx.pure('')
+                        }
+                        const deduction = assertNotNullish(
+                            outcome.lines.find(line => line.rule === '1040 line 12e'),
+                            'expected line 12e')
+                        return ctx.pure(ctx.centsToString(deduction.value))
+                    })
+                })
+            })
+
+            const [, outcome] = runExecuteRunViaFixture(home)(taxParamsFixture)(cas)(e)(programHash)(
+                programSource)(engineReport)(['subjectProfile'])(undefined)(state3)
+            assert(outcome.kind === 'ok', ['expected an ok outcome', outcome])
+            if (outcome.kind === 'ok') {
+                assertEq(outcome.value, '15750.00')
+                // The reads really happened through the frozen commands —
+                // three of them, on a program that computed a tax line. A
+                // 1040 assembled without touching the store would show none.
+                assertEq(outcome.reads.length, 3)
             }
         },
     },
@@ -877,7 +1026,7 @@ export const proof = {
                 // outcome is produced via the decomposed materialize/load
                 // sequence and handed to handleRunOutcome directly —
                 // fjsRunTool's OWN post-outcome logic, unchanged.
-                const [state3b, outcome] = runExecuteRunViaFixture(home)(cas)(e)(programHash)(programSource)(adversarialReport)([])(undefined)(state3)
+                const [state3b, outcome] = runExecuteRunViaFixture(home)(taxParamsFixture)(cas)(e)(programHash)(programSource)(adversarialReport)([])(undefined)(state3)
                 const [state4, callResult] = virtual(state3b)(handleRunOutcome(cas)(programHash)([])(false)({})({ taxYear: 2025, paramSetHash: 'sha256-paramset1' })(outcome))
                 assertEq(callResult.isError, undefined)
                 const first = callResult.content[0]
@@ -924,7 +1073,7 @@ export const proof = {
                 // handleRunOutcome — see the adversarial proof above for
                 // why a direct fjsRunTool.handle call can no longer succeed
                 // under virtual.
-                const [state1b, outcome] = runExecuteRunViaFixture(home)(cas)(e)(programHash)(programSource)(trivialReport)([])(undefined)(state1)
+                const [state1b, outcome] = runExecuteRunViaFixture(home)(taxParamsFixture)(cas)(e)(programHash)(programSource)(trivialReport)([])(undefined)(state1)
                 const [state2, callResult] = virtual(state1b)(handleRunOutcome(cas)(programHash)([])(false)({})({ taxYear: 2025, paramSetHash: 'sha256-paramset1' })(outcome))
                 assertEq(callResult.isError, undefined)
                 const first = callResult.content[0]
@@ -973,7 +1122,7 @@ export const proof = {
                 /** @type {Report<unknown>} */
                 const objectReport = ctx => () => ctx.step(ctx.evoList('false'), () => ctx.pure({ total: '1234.56' }))
 
-                const [state1b, outcome] = runExecuteRunViaFixture(home)(cas)(e)(programHash)(programSource)(objectReport)([])(undefined)(state1)
+                const [state1b, outcome] = runExecuteRunViaFixture(home)(taxParamsFixture)(cas)(e)(programHash)(programSource)(objectReport)([])(undefined)(state1)
                 const [state2, callResult] = virtual(state1b)(handleRunOutcome(cas)(programHash)([])(false)({})({ taxYear: 2025, paramSetHash: 'sha256-paramset1' })(outcome))
                 assertEq(callResult.isError, undefined)
                 const first = callResult.content[0]
@@ -1012,7 +1161,7 @@ export const proof = {
                 /** @type {Report<unknown>} */
                 const countedReport = ctx => () => ctx.step(ctx.evoList('false'), () => ctx.pure({ a: 1, b: 2, c: 3 }))
 
-                const [state1b, outcome] = runExecuteRunViaFixture(home)(cas)(e)(programHash)(programSource)(countedReport)([])(undefined)(state1)
+                const [state1b, outcome] = runExecuteRunViaFixture(home)(taxParamsFixture)(cas)(e)(programHash)(programSource)(countedReport)([])(undefined)(state1)
                 assert(outcome.kind === 'ok', ['expected an ok outcome', outcome])
                 const expected = outcome.literalCount
                 assert(expected > 0, ['the fixture must have numeric literals to count', expected])
@@ -1038,7 +1187,7 @@ export const proof = {
                 /** @type {Report<unknown>} */
                 const stringReport = ctx => () => ctx.step(ctx.evoList('false'), () => ctx.pure('0.00'))
 
-                const [state1b, outcome] = runExecuteRunViaFixture(home)(cas)(e)(programHash)(programSource)(stringReport)([])(undefined)(state1)
+                const [state1b, outcome] = runExecuteRunViaFixture(home)(taxParamsFixture)(cas)(e)(programHash)(programSource)(stringReport)([])(undefined)(state1)
                 const [state2, callResult] = virtual(state1b)(handleRunOutcome(cas)(programHash)([])(false)({})({ taxYear: 2025, paramSetHash: 'sha256-paramset1' })(outcome))
                 const first = callResult.content[0]
                 if (first === undefined || first.type !== 'text') {
@@ -1063,7 +1212,7 @@ export const proof = {
                 /** @type {Report<unknown>} */
                 const bigintReport = ctx => () => ctx.step(ctx.evoList('false'), () => ctx.pure(1n))
 
-                const [state1b, outcome] = runExecuteRunViaFixture(home)(cas)(e)(programHash)(programSource)(bigintReport)([])(undefined)(state1)
+                const [state1b, outcome] = runExecuteRunViaFixture(home)(taxParamsFixture)(cas)(e)(programHash)(programSource)(bigintReport)([])(undefined)(state1)
                 const [state2, callResult] = virtual(state1b)(handleRunOutcome(cas)(programHash)([])(false)({})({ taxYear: 2025, paramSetHash: 'sha256-paramset1' })(outcome))
                 assertEq(callResult.isError, true)
                 const first = callResult.content[0]
@@ -1105,7 +1254,7 @@ export const proof = {
                 // handleRunOutcome — see the adversarial proof above for
                 // why a direct fjsRunTool.handle call can no longer succeed
                 // under virtual.
-                const [state1b, outcome] = runExecuteRunViaFixture(home)(cas)(e)(programHash)(programSource)(tinyReport)([])(undefined)(state1)
+                const [state1b, outcome] = runExecuteRunViaFixture(home)(taxParamsFixture)(cas)(e)(programHash)(programSource)(tinyReport)([])(undefined)(state1)
                 const [state2, callResult] = virtual(state1b)(handleRunOutcome(cas)(programHash)([])(false)({})({ taxYear: 2025, paramSetHash: 'sha256-paramset1' })(outcome))
                 assertEq(callResult.isError, undefined)
                 const first = callResult.content[0]
@@ -1257,7 +1406,7 @@ export const proof = {
                 const [state1, programHash] = virtual(state0)(seedText(cas)(programSource))
                 /** @type {Report<string>} */
                 const trivialReport = ctx => () => ctx.step(ctx.evoList('false'), () => ctx.pure('pinned-ok-value'))
-                const [state1b, outcome] = runExecuteRunViaFixture(home)(cas)(e)(programHash)(programSource)(trivialReport)([])(undefined)(state1)
+                const [state1b, outcome] = runExecuteRunViaFixture(home)(taxParamsFixture)(cas)(e)(programHash)(programSource)(trivialReport)([])(undefined)(state1)
                 assert(outcome.kind === 'ok', ['expected an ok outcome', outcome])
                 const pinFields = /** @type {{ readonly subject?: string, readonly parents?: readonly string[] }} */ ({ subject: 'pinnedSubject', parents: ['pinnedParent'] })
                 const [state2, callResult] = virtual(state1b)(handleRunOutcome(cas)(programHash)([])(true)(pinFields)({ taxYear: 2025, paramSetHash: 'sha256-paramset1' })(outcome))
@@ -1340,7 +1489,7 @@ export const proof = {
                 const [state1, programHash] = virtual(state0)(seedText(cas)(programSource))
                 /** @type {Report<string>} */
                 const trivialReport = ctx => () => ctx.step(ctx.evoList('false'), () => ctx.pure('args-proof-value'))
-                const [state1b, outcome] = runExecuteRunViaFixture(home)(cas)(e)(programHash)(programSource)(trivialReport)([])(undefined)(state1)
+                const [state1b, outcome] = runExecuteRunViaFixture(home)(taxParamsFixture)(cas)(e)(programHash)(programSource)(trivialReport)([])(undefined)(state1)
                 assert(outcome.kind === 'ok', ['expected an ok outcome', outcome])
                 const distinctiveArgs = ['distinctive-arg-alpha', 'distinctive-arg-beta']
                 const [state2, callResult] = virtual(state1b)(handleRunOutcome(cas)(programHash)(distinctiveArgs)(false)({})({ taxYear: 2025, paramSetHash: 'sha256-paramset1' })(outcome))
@@ -1397,7 +1546,7 @@ export const proof = {
                 // collide with executeRun's OWN real materialize-write at
                 // the SAME path (see the module header), masking the
                 // refusal this leaf exists to prove.
-                const [state2b, outcome] = runExecuteRunViaFixture(home)(cas)(e)(escapingHash)(programSource)(escapingReport)([])(undefined)(state2)
+                const [state2b, outcome] = runExecuteRunViaFixture(home)(taxParamsFixture)(cas)(e)(escapingHash)(programSource)(escapingReport)([])(undefined)(state2)
                 const [state3, callResult] = virtual(state2b)(handleRunOutcome(cas)(escapingHash)([])(false)({})({ taxYear: 2025, paramSetHash: 'sha256-paramset1' })(outcome))
                 assertEq(callResult.isError, true)
                 const first = callResult.content[0]
@@ -1544,7 +1693,7 @@ export const proof = {
             /** @type {Report<string>} */
             const zeroReadReport = ctx => () => ctx.pure('unused')
 
-            const [state1b, outcome] = runExecuteRunViaFixture(home)(cas)(e)(programHash)(programSource)(zeroReadReport)([])(undefined)(state1)
+            const [state1b, outcome] = runExecuteRunViaFixture(home)(taxParamsFixture)(cas)(e)(programHash)(programSource)(zeroReadReport)([])(undefined)(state1)
             assertEq(outcome.kind, 'error')
 
             const [state2, callResult] = virtual(state1b)(handleRunOutcome(cas)(programHash)([])(false)({})({ taxYear: 2025, paramSetHash: 'sha256-paramset1' })(outcome))
@@ -1652,7 +1801,7 @@ export const proof = {
                 })
             })
 
-            const [state4, outcome1] = runExecuteRunViaFixture(home)(cas)(e)(programHash)(programSource)(demoReport)([])(undefined)(state3)
+            const [state4, outcome1] = runExecuteRunViaFixture(home)(taxParamsFixture)(cas)(e)(programHash)(programSource)(demoReport)([])(undefined)(state3)
             assert(outcome1.kind === 'ok', ['expected the first run to succeed', outcome1])
             if (outcome1.kind === 'ok') {
                 const parsed1 = /** @type {{ readonly value: string, readonly sources: readonly [{ readonly documentHash: string, readonly boxPath: string, readonly value: string }], readonly rule: string }} */ (JSON.parse(String(outcome1.value)))
@@ -1685,7 +1834,7 @@ export const proof = {
             // targets its own, fresh path instead.
             const [state6b, programHash2] = virtual(state6)(seedText(cas)(programSource + '\n'))
 
-            const [, outcome2] = runExecuteRunViaFixture(home)(cas)(e)(programHash2)(programSource + '\n')(demoReport)([])(undefined)(state6b)
+            const [, outcome2] = runExecuteRunViaFixture(home)(taxParamsFixture)(cas)(e)(programHash2)(programSource + '\n')(demoReport)([])(undefined)(state6b)
             assert(outcome2.kind === 'ok', ['expected the second run to succeed', outcome2])
             if (outcome2.kind === 'ok') {
                 const parsed2 = /** @type {{ readonly value: string, readonly sources: readonly [{ readonly documentHash: string, readonly boxPath: string, readonly value: string }], readonly rule: string }} */ (JSON.parse(String(outcome2.value)))
@@ -1726,7 +1875,7 @@ export const proof = {
             /** @type {Report<{ readonly line16: number }>} */
             const adversaryReport = ctx => () => ctx.pure({ line16: 9137 })
 
-            const [state4, outcome1] = runExecuteRunViaFixture(home)(cas)(e)(adversaryHash)(adversarySource)(adversaryReport)([])(undefined)(state3)
+            const [state4, outcome1] = runExecuteRunViaFixture(home)(taxParamsFixture)(cas)(e)(adversaryHash)(adversarySource)(adversaryReport)([])(undefined)(state3)
             assert(outcome1.kind === 'error', ['expected the verbatim adversary to be refused', outcome1])
             // The literal count is computed by calling countNumericLiterals
             // directly on this exact adversary source — never hand-computed
@@ -1757,7 +1906,7 @@ export const proof = {
             // assertion below is unaffected.
             const [state6b, adversaryHash2] = virtual(state6)(seedText(cas)(adversarySource + '\n'))
 
-            const [state7, outcome2] = runExecuteRunViaFixture(home)(cas)(e)(adversaryHash2)(adversarySource + '\n')(adversaryReport)([])(undefined)(state6b)
+            const [state7, outcome2] = runExecuteRunViaFixture(home)(taxParamsFixture)(cas)(e)(adversaryHash2)(adversarySource + '\n')(adversaryReport)([])(undefined)(state6b)
             assert(outcome2.kind === 'error', ['expected the verbatim adversary to be refused again', outcome2])
             // The control: the document changed; the adversary's outcome
             // did not, character for character, because it never read the

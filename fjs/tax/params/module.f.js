@@ -102,7 +102,7 @@
  *
  * @module
  */
-import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
+import { assert, assertEq, assertNotNullish } from 'functionalscript/fjs/asserts/module.f.js'
 import { centsFromString, centsToString } from '../../exact/module.f.js'
 
 /**
@@ -702,7 +702,28 @@ export const childTaxCredit = {
 /**
  * A full tax-year parameter set: every TY2025 parameter this phase
  * requires, together.
+ *
+ * **`taxYear` is a member, and it is FIRST.** Added in Phase 21 (EXEC-14),
+ * when a parameter set first began travelling on its own: `taxGuestCtx`
+ * hands one to a stored guest program, which has no `taxParamsByYear` to
+ * look anything up in and no way to learn which year it is computing unless
+ * the set says so. A parameter set that cannot name its own year is a
+ * value that loses meaning the moment it leaves the map it was keyed by.
+ *
+ * It also closes a latent provenance defect. `paramSetHash` fingerprints
+ * this object's serialization, so two different years whose figures
+ * happened to coincide would have hashed IDENTICALLY, and two runs against
+ * genuinely different years would have looked like the same parameters.
+ * The year is part of the identity of a parameter set, so it is part of the
+ * hash. (This does change every `paramSetHash` value relative to before
+ * Phase 21 — deliberately, and in the same commit as the reason.)
+ *
+ * FIRST rather than appended, mirroring `fjs/document/base`'s `dialect`:
+ * the discriminant reads first in the serialization a human inspects, and
+ * `paramSetHash` is source-order sensitive (see `fjs/report/provenance`), so
+ * the position is a decision rather than an accident.
  * @typedef {{
+ *   readonly taxYear: number,
  *   readonly standardDeduction: typeof standardDeduction,
  *   readonly agedOrBlindAdditional: typeof agedOrBlindAdditional,
  *   readonly dependentStandardDeductionCap: typeof dependentStandardDeductionCap,
@@ -727,6 +748,7 @@ export const childTaxCredit = {
  */
 export const taxParamsByYear = {
     2025: {
+        taxYear: 2025,
         standardDeduction,
         agedOrBlindAdditional,
         dependentStandardDeductionCap,
@@ -826,6 +848,28 @@ const everyDollarStringField = [
 ]
 
 export const proof = {
+    // Phase 21 (EXEC-14): every parameter set agrees with the KEY it is
+    // stored under. A set travelling on its own — which is what
+    // `taxGuestCtx` now does with it — is only trustworthy if its own
+    // `taxYear` is the year the caller asked for, and this is the one place
+    // that correspondence can be checked.
+    //
+    // The hand-typed count is not decoration: `Object.keys(taxParamsByYear)`
+    // is the iteration set AND the thing under test, so the loop alone could
+    // never notice a year disappearing (AGENTS.md's fourth shipped defect).
+    // One year today; adding a second is meant to fail this line and be
+    // updated deliberately.
+    everyParameterSetKnowsTheYearItIsKeyedBy: () => {
+        assertEq(Object.keys(taxParamsByYear).length, 1)
+        for (const key of Object.keys(taxParamsByYear)) {
+            const set = taxParamsByYear[Number(key)]
+            assertEq(assertNotNullish(set, ['expected a parameter set at', key]).taxYear, Number(key))
+        }
+        // Read once more by the literal key a caller would actually use, so
+        // this leaf also fails if 2025 stops being present at all rather
+        // than merely disagreeing with itself.
+        assertEq(assertNotNullish(taxParamsByYear[2025], 'expected TY2025').taxYear, 2025)
+    },
     // T-08-05: the standard deduction is the OBBBA-revised figure, citing
     // Rev. Proc. 2025-32 §3.01 — never the original 2024-40 release.
     standardDeductionCitesObbbaRevision: () => {
