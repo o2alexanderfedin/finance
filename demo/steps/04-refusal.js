@@ -41,7 +41,11 @@ const offered = [
     // same block of the same schedule. Deliberately NOT `businessIncomeOrLoss`
     // — that one is MODELED as of the same phase.
     'farmIncomeOrLoss',
-    'qualifiedBusinessIncomeDeduction',
+    // `qualifiedBusinessIncomeDeduction` moved to `modeledKinds` in Phase 28
+    // (TAX-32) — swapped for the §199A component that is STILL refused, so
+    // this toggle keeps demonstrating the same deduction and the same 1040
+    // line while naming something the engine genuinely cannot compute.
+    'qualifiedReitDividendsAndPtpIncome',
     // `itemizedDeductions` moved to `modeledKinds` in Plan 13-07 (Phase 13
     // Wave 3, TAX-13) — swapped for `netQualifiedDisasterLoss`, its former
     // neighbor in the refusal table, which stays refused per Decision 1.4.

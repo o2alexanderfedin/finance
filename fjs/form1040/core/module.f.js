@@ -78,6 +78,11 @@ import {
     socialSecurityWorksheetAdjustmentsTotal,
 } from '../../schedule/1/module.f.js'
 import { scheduleTwo } from '../../schedule/2/module.f.js'
+import {
+    netCapitalGainLine12,
+    qualifiedBusinessIncomeDeduction,
+    taxableIncomeBeforeQualifiedBusinessIncomeDeduction,
+} from '../../form8995/module.f.js'
 import { scheduleThree } from '../../schedule/3/module.f.js'
 import { form8812 } from '../../form8812/module.f.js'
 import { iraTaxableAmount } from '../../form8606/module.f.js'
@@ -1020,7 +1025,6 @@ export const form1040IncomeLines = taxParamSet => inputs => {
         sources: twelveESources,
         rule: '1040 line 12e',
     }
-    const line13a = declaredZero('1040 line 13a') // QBI deduction, Form 8995
     // 13b — additional deductions from Schedule 1-A (Plan 13-03/13-04,
     // TAX-09): the senior deduction's continuous 6% phase-out, Parts I/V/VI.
     // Read UNCONDITIONALLY, exactly like lines 3a/3b/4a-6b above — a MODELED
@@ -1065,6 +1069,76 @@ export const form1040IncomeLines = taxParamSet => inputs => {
         sources: thirteenBSources,
         rule: '1040 line 13b',
     }
+    // 13a — the §199A qualified business income deduction (Phase 28,
+    // TAX-32), through `fjs/form8995`.
+    //
+    // **It is computed AFTER line 13b, which is not the printed order**, and
+    // that is the whole ordering point Form 8995 turns on. Printed line 11 of
+    // that form is "taxable income BEFORE qualified business income
+    // deduction", and on the 2025 face 1040 line 14 adds 12, 13a AND 13b — so
+    // the figure Form 8995 measures its 20% limitation against is
+    // `line 11 − line 12 − line 13b`, which cannot be computed until 13b
+    // exists. Computing 13a first, as the printed line numbers suggest, would
+    // leave the senior deduction inside the limitation base and overstate the
+    // deduction for a senior with a business.
+    //
+    // There is no circularity here, only that order: line 11 of Form 8995
+    // excludes the very deduction being computed, by its own wording.
+    const [firstBusinessRecord] = businessExpenseForms
+    const qbiOutcome = qualifiedBusinessIncomeDeduction(taxParamSet)({
+        status,
+        // Schedule C line 31, and the SAME Schedule SE execution line 10
+        // already deducted half of -- §199A(c)(1) reduces qualified business
+        // income by that half, so the two uses are one figure read twice
+        // rather than two figures that could drift.
+        netProfitCents: scheduleOnePartIResult.scheduleC.partII.line31.value,
+        deductibleHalfOfSelfEmploymentTaxCents: scheduleOneStageOne.selfEmployment.lines.line13,
+        assertedPriorYearLossCarryforward: firstBusinessRecord === undefined
+            ? undefined
+            : firstBusinessRecord.value.priorYearQualifiedBusinessLossCarryforward,
+        taxableIncomeBeforeQbiCents: taxableIncomeBeforeQualifiedBusinessIncomeDeduction({
+            adjustedGrossIncomeCents: line11b.value,
+            deductionCents: line12e.value,
+            additionalDeductionsCents: line13b.value,
+        }),
+        // Form 8995 line 12's own definition, which is the Qualified
+        // Dividends and Capital Gain Tax Worksheet's lines 2 and 3 written a
+        // second time -- `formEightNineNineFivesNetCapitalGainIsTheWorksheets\
+        // Own` is the leaf that COMPARES the two, here where both are in
+        // scope.
+        netCapitalGainCents: netCapitalGainLine12({
+            qualifiedDividendsCents: line3a.value,
+            filingScheduleD,
+            scheduleD15Cents: scheduleDOk === undefined ? 0n : scheduleDOk.line15,
+            scheduleD16Cents: scheduleDOk === undefined ? 0n : scheduleDOk.line16,
+            line7aCents: line7a.value,
+        }),
+    })
+    // An unstated prior-year carryforward, or a return above §199A(e)(2)'s
+    // threshold, stops the WHOLE report -- threaded exactly like the Schedule
+    // D, Schedule A and Schedule C guards above: `unmodeled: []`, since
+    // neither names an `fjs/return/scope` kind.
+    if (qbiOutcome.kind === 'error') {
+        return { kind: 'error', message: qbiOutcome.message, unmodeled: [] }
+    }
+    // A return with no business filed keeps the documented zero it has always
+    // carried, citing the profile alone -- `scheduleC.filed` is the field
+    // that tells a break-even business apart from no business at all, and
+    // this is the second reader it has ever had.
+    const line13a = scheduleOnePartIResult.scheduleC.filed
+        ? {
+            value: qbiOutcome.form.line15,
+            // Every fact the deduction reads: the business documents behind
+            // the net profit and the deductible half, the AGI, and the
+            // filing-status/12d-box/itemized sources behind line 12e and line
+            // 13b that decide the limitation base.
+            sources: unionSources([
+                scheduleOnePartIResult.scheduleC.partII.line31,
+                line11b, line12e, line13b, line3a, line7a,
+            ]),
+            rule: '1040 line 13a (qualified business income deduction, Form 8995 line 15)',
+        }
+        : declaredZero('1040 line 13a')
     const line14 = totalLine('1040 line 14')([line12e, line13a, line13b])
 
     // 15 — taxable income. The printed form says "If zero or less, enter -0-",
@@ -2599,6 +2673,11 @@ const businessExpensesDocument = documentHash => advertisingAmount => ({
         taxYear: 2025,
         principalBusiness: 'software consulting',
         grossReceiptsFullyReportedOnForms1099Nec: true,
+        // Phase 28 (TAX-32): the §199A(c)(2) carryforward assertion. "0.00"
+        // says there was none; ABSENCE refuses, and
+        // `aBusinessWithNoCarryforwardAssertionRefuses` is the leaf that
+        // exercises the other side by overriding this field.
+        priorYearQualifiedBusinessLossCarryforward: '0.00',
         entries: [{
             category: 'advertising',
             datePaid: '2025-03-14',
@@ -3609,11 +3688,24 @@ export const proof = {
          * $44,244.89 is $6,769.47 to the cent, which is the arithmetic check
          * that the two rates and the factor all landed where they belong.
          *
-         * Lines 12e through 16, 24 and 34 are deliberately NOT asserted here:
-         * 1040 line 13a is still a documented zero at this commit, and
-         * `theFounderReturnIsCompleteWithQbi` states the whole page once the
-         * §199A deduction lands. Asserting a taxable income that is about to
-         * change would be recording a figure this phase does not stand behind.
+         * …and the rest of the page, once §199A lands (TAX-32):
+         *
+         *   1040 line 12e  standard deduction, single       $15,750.00
+         *   1040 line 13b  no senior deduction                   $0.00
+         *   Form 8995 2/4  QBI = 47,910.00 - 3,384.74      $44,525.26
+         *   Form 8995 5/10 20% of 4,452,526 = 890,505.2      $8,905.05
+         *   Form 8995 11   44,525.26 - 15,750.00 - 0.00     $28,775.26
+         *   Form 8995 14   20% of 2,877,526 = 575,505.2      $5,755.05
+         *   Form 8995 15   the LESSER of 10 and 14           $5,755.05
+         *   1040 line 13a  = Form 8995 line 15               $5,755.05
+         *   1040 line 14   15,750.00 + 5,755.05 + 0.00      $21,505.05
+         *   1040 line 15   44,525.26 - 21,505.05            $23,020.21
+         *
+         * The income limitation BINDS: $8,905.05 is 20% of the business's own
+         * income and $5,755.05 is 20% of what is left of it after the
+         * standard deduction, and the printed line 15 takes the lesser. That
+         * is the ordinary case for a proprietor with no other income, not an
+         * edge case.
          */
         aRealisticFounderReturnComputesEndToEnd: () => {
             const base = inputsOf(storedProfile(selfEmploymentProfile))([])([])([])([])([])([])([])([])([])
@@ -3645,6 +3737,36 @@ export const proof = {
             assert(
                 hashes.includes('sha256-1099nec-01') && hashes.includes('sha256-business-01'),
                 ['line 10 must cite the business documents the deduction came from', income.line10.sources])
+            // ── §199A, on the same return (TAX-32) ───────────────────────
+            assertEq(income.line12e.value, 1575000n, 'the single standard deduction')
+            assertEq(income.line13b.value, 0n, 'no senior deduction on this return')
+            assertEq(income.line13a.value, 575505n, '1040 line 13a = $5,755.05')
+            assertEq(income.line14.value, 2150505n, '1040 line 14 = $21,505.05')
+            assertEq(income.line15.value, 2302021n, '1040 line 15 = $23,020.21 of taxable income')
+            // The income limitation really is what chose it: 20% of the QBI
+            // is $8,905.05, hand-computed, and it is the LARGER.
+            assertEq(4452526n * 20n / 100n, 890505n, '20% of the QBI is $8,905.05')
+            assert(
+                income.line13a.value < 890505n,
+                ['the income limitation must bind here', income.line13a.value])
+            // …and line 13a cites the documents, never the profile alone.
+            const thirteenAHashes = income.line13a.sources.map(source => source.documentHash)
+            assert(
+                thirteenAHashes.includes('sha256-1099nec-01'),
+                ['line 13a must cite the business income it deducts against', income.line13a.sources])
+            // ── The bottom of the page ────────────────────────────────────
+            //
+            // The printed Tax Table's $23,000-$23,050 row prices the
+            // $23,025.00 midpoint: 10% of $11,925.00 is $1,192.50 and 12% of
+            // the remaining $11,100.00 is $1,332.00, so the row reads
+            // $2,524.50 -> $2,525.00. Nothing was withheld, so the whole of
+            // the income tax and the whole of the self-employment tax are
+            // owed.
+            assertEq(1192500n + 1332000n, 2524500n, 'the Tax Table row\'s own arithmetic')
+            assertEq(tax.line16.value, 252500n, '1040 line 16 = $2,525.00')
+            assertEq(tax.line24.value, 929447n, '1040 line 24 = $9,294.47 = $2,525.00 + $6,769.47')
+            assertEq(tax.line33.value, 0n, 'nothing was withheld on this 1099-NEC')
+            assertEq(tax.line37.value, 929447n, '1040 line 37: $9,294.47 owed')
         },
         /**
          * **THE WAGE-BASE COORDINATION, end to end**, and the fixture the
@@ -3751,44 +3873,163 @@ export const proof = {
          * §3101(b)(2)'s 0.9% is not among them, and it is charged on Form
          * 8959 reaching Schedule 2 line **11**, not line 4.
          *
-         * A single filer with a $300,000.00 Schedule C net profit and no
-         * wages. Hand-derived:
+         * A single filer with a **$220,000.00** Schedule C net profit and no
+         * wages. That figure is chosen to sit in a narrow band: net earnings
+         * must exceed §3101(b)(2)'s $200,000 for Form 8959 Part II to charge
+         * anything at all, while taxable income before §199A must stay at or
+         * below §199A(e)(2)'s $197,300 or Form 8995-A applies and this engine
+         * refuses. `aReturnAboveTheSectionOneNineNineAThresholdRefuses` is
+         * that other side, at $300,000.
          *
-         *   Sch SE 4a/6  92.35% of $300,000.00              $277,050.00
+         * Hand-derived:
+         *
+         *   Sch SE 4a/6  92.35% of $220,000.00              $203,170.00
          *   Sch SE 10    12.4% of the $176,100.00 base       $21,836.40
-         *   Sch SE 11    2.9% of $277,050.00                  $8,034.45
-         *   Sch SE 12    -> Schedule 2 line 4                $29,870.85
-         *   Sch SE 13    2,987,085 x 50 / 100 = 1,493,542.5  $14,935.43
-         *   8959 12      277,050.00 - 200,000.00             $77,050.00
-         *   8959 13      0.9% of $77,050.00                     $693.45
-         *   1040 line 23 29,870.85 + 693.45                  $30,564.30
+         *   Sch SE 11    2.9% of $203,170.00                  $5,891.93
+         *   Sch SE 12    -> Schedule 2 line 4                $27,728.33
+         *   Sch SE 13    2,772,833 x 50 / 100 = 1,386,416.5  $13,864.17
+         *   8959 12      203,170.00 - 200,000.00              $3,170.00
+         *   8959 13      0.9% of $3,170.00                       $28.53
+         *   1040 line 23 27,728.33 + 28.53                   $27,756.86
          *
-         * **Half of $30,564.30 is $15,282.15**, which is $346.72 more than
-         * the $14,935.43 §164(f) actually allows. Both figures are asserted,
-         * so a line 15 built as "half of everything on line 23" lands on the
-         * wrong one and says so.
+         * **Half of $27,756.86 is $13,878.43**, which is $14.26 more than the
+         * $13,864.17 §164(f) actually allows. Both figures are asserted, so a
+         * line 15 built as "half of everything on line 23" lands on the wrong
+         * one and says so.
          */
         theDeductibleHalfExcludesTheAdditionalMedicareTax: () => {
             const base = inputsOf(storedProfile(selfEmploymentProfile))([])([])([])([])([])([])([])([])([])
             const { income, tax } = computedLines(withBusiness(base)([
+                nonemployeeCompensationDocument('sha256-1099nec-01')('220000.00')('0.00'),
+            ])([businessExpensesDocument('sha256-business-01')('0.00')]))
+            assertEq(income.selfEmployment.lines.line6, 20317000n, 'net earnings $203,170.00')
+            assertEq(income.selfEmployment.lines.line10, 2183640n, '12.4% of the capped base')
+            assertEq(income.selfEmployment.lines.line11, 589193n, '2.9%, uncapped')
+            assertEq(income.selfEmployment.lines.line12, 2772833n, 'Schedule SE line 12 = $27,728.33')
+            assertEq(income.line10.value, 1386417n, 'line 15 = $13,864.17, half-up from 1,386,416.5')
+            assertEq(tax.line23.value, 2775686n, '1040 line 23 = $27,756.86, INCLUDING the 0.9%')
+            // The wrong answer, hand-computed, and asserted to differ.
+            assertEq(2775686n / 2n, 1387843n, 'half of everything on line 23 would be $13,878.43')
+            assert(
+                income.line10.value !== 1387843n,
+                ['§164(f)(1) halves the §1401 taxes alone', income.line10.value])
+            assertEq(1387843n - 1386417n, 1426n, '$14.26 of deduction that is not allowed')
+            // …and the $28.53 really is on Schedule 2 line 11 rather than
+            // line 4, which is the structural reason the two halves differ.
+            assertEq(tax.line23.value - income.selfEmployment.lines.line12, 2853n,
+                'the Additional Medicare Tax on self-employment income, $28.53')
+        },
+        /**
+         * **THE §199A THRESHOLD, at the report.** The same fixture one step
+         * larger — a $300,000.00 net profit — puts taxable income before the
+         * deduction at $269,314.57, above §199A(e)(2)'s $197,300, so Form
+         * 8995-A applies and this engine refuses the WHOLE report rather than
+         * computing the simplified form anyway.
+         *
+         * This is the leaf that says the threshold is measured against
+         * TAXABLE income rather than against the profit or the AGI: a
+         * $300,000 profit is nowhere near $197,300, but the figure the form
+         * compares is what is left after the standard deduction, and it is
+         * $269,314.57 rather than $300,000.00.
+         */
+        aReturnAboveTheSectionOneNineNineAThresholdRefuses: () => {
+            const base = inputsOf(storedProfile(selfEmploymentProfile))([])([])([])([])([])([])([])([])([])
+            const outcome = form1040IncomeLines(taxParams2025)(withBusiness(base)([
                 nonemployeeCompensationDocument('sha256-1099nec-01')('300000.00')('0.00'),
             ])([businessExpensesDocument('sha256-business-01')('0.00')]))
-            assertEq(income.selfEmployment.lines.line6, 27705000n, 'net earnings $277,050.00')
-            assertEq(income.selfEmployment.lines.line10, 2183640n, '12.4% of the capped base')
-            assertEq(income.selfEmployment.lines.line11, 803445n, '2.9%, uncapped')
-            assertEq(income.selfEmployment.lines.line12, 2987085n, 'Schedule SE line 12 = $29,870.85')
-            assertEq(income.line10.value, 1493543n, 'line 15 = $14,935.43, half-up from 1,493,542.5')
-            assertEq(tax.line23.value, 3056430n, '1040 line 23 = $30,564.30, INCLUDING the 0.9%')
-            // The wrong answer, hand-computed, and asserted to differ.
-            assertEq(3056430n / 2n, 1528215n, 'half of everything on line 23 would be $15,282.15')
+            assert(outcome.kind === 'error', ['expected a refusal', outcome])
+            if (outcome.kind !== 'error') {
+                return
+            }
+            assertEq(outcome.unmodeled.length, 0, 'a document-data-sufficiency refusal names no kind')
+            assert(outcome.message.includes('8995-A'), ['must name the form', outcome.message])
             assert(
-                income.line10.value !== 1528215n,
-                ['§164(f)(1) halves the §1401 taxes alone', income.line10.value])
-            assertEq(1528215n - 1493543n, 34672n, '$346.72 of deduction that is not allowed')
-            // …and the $693.45 really is on line 11 rather than line 4, which
-            // is the structural reason the two halves differ.
-            assertEq(tax.line23.value - income.selfEmployment.lines.line12, 69345n,
-                'the Additional Medicare Tax on self-employment income, $693.45')
+                outcome.message.includes('26931457'),
+                ['must quote the taxable income it compared', outcome.message])
+            // Hand-derived, so the figure above is checkable without running
+            // the engine: 92.35% of $300,000 is $277,050; 12.4% of the
+            // $176,100 base is $21,836.40 and 2.9% of $277,050 is $8,034.45,
+            // so Schedule SE line 12 is $29,870.85 and line 13 is $14,935.43.
+            // AGI is $300,000.00 - $14,935.43 = $285,064.57, and taxable
+            // income before §199A is that less the $15,750.00 standard
+            // deduction: $269,314.57.
+            assertEq(2987085n / 2n + 1n, 1493543n, 'the deductible half, half-up')
+            assertEq(30000000n - 1493543n - 1575000n, 26931457n, '$269,314.57')
+        },
+        /**
+         * **THE CARRYFORWARD ASSERTION, at the report.** The identical
+         * fixture with the field REMOVED refuses, so §199A(c)(2)'s
+         * carryforward cannot be silently read as zero for the year-one-loss
+         * founder it exists for. The control is every other leaf in this
+         * group, all of which supply `'0.00'`.
+         */
+        aBusinessWithNoCarryforwardAssertionRefuses: () => {
+            const record = businessExpensesDocument('sha256-business-01')('90.00')
+            /** @type {Stored<BusinessExpenses>} */
+            const withoutAssertion = {
+                documentHash: record.documentHash,
+                value: {
+                    ...record.value,
+                    priorYearQualifiedBusinessLossCarryforward: undefined,
+                },
+            }
+            const base = inputsOf(storedProfile(selfEmploymentProfile))([])([])([])([])([])([])([])([])([])
+            const outcome = form1040IncomeLines(taxParams2025)(withBusiness(base)([
+                nonemployeeCompensationDocument('sha256-1099nec-01')('48000.00')('0.00'),
+            ])([withoutAssertion]))
+            assert(outcome.kind === 'error', ['expected a refusal', outcome])
+            if (outcome.kind !== 'error') {
+                return
+            }
+            assert(
+                outcome.message.includes('priorYearQualifiedBusinessLossCarryforward'),
+                ['must name the field that fixes it', outcome.message])
+            assert(outcome.message.includes('§199A(c)(2)'), ['must name the section', outcome.message])
+        },
+        /**
+         * **ONE RULE, ONE PLACE, checked**: Form 8995 line 12's "net capital
+         * gain" and the Qualified Dividends and Capital Gain Tax Worksheet's
+         * lines 2 + 3 are the same quantity, transcribed twice — once in
+         * `fjs/form8995` and once inside `fjs/tax/line16/qdcgt`'s own big
+         * transcription, where it is a private `const` that cannot be
+         * imported.
+         *
+         * AGENTS.md: *"a hand-typed list drifts unless something COMPARES it
+         * to what it mirrors."* This is that comparison, run over the four
+         * shapes that distinguish the rule — with and without a Schedule D,
+         * with a loss on one of its lines, and with two unequal gains where
+         * the `min` matters.
+         */
+        formEightNineNineFivesNetCapitalGainIsTheWorksheetsOwn: () => {
+            /** @type {readonly (readonly [boolean, bigint, bigint, bigint, bigint])[]} */
+            const shapes = [
+                // filingScheduleD, D15, D16, line7a, qualifiedDividends
+                [false, 0n, 0n, 40000n, 30000n],
+                [true, 100000n, 150000n, 150000n, 30000n],
+                [true, 150000n, 100000n, 100000n, 30000n],
+                [true, -300000n, 150000n, 0n, 30000n],
+                [true, 0n, 150000n, 150000n, 0n],
+            ]
+            assertEq(shapes.length, 5, 'five shapes, hand-typed')
+            for (const [filingScheduleD, d15, d16, line7aCents, qualifiedDividendsCents] of shapes) {
+                const worksheet = qdcgt(taxParams2025)({
+                    status: 'single',
+                    line1Cents: 10000000n,
+                    line2Cents: qualifiedDividendsCents,
+                    filingScheduleD,
+                    scheduleD15Cents: d15,
+                    scheduleD16Cents: d16,
+                    line7aCents,
+                })
+                assertEq(
+                    netCapitalGainLine12({
+                        qualifiedDividendsCents, filingScheduleD,
+                        scheduleD15Cents: d15, scheduleD16Cents: d16, line7aCents,
+                    }),
+                    worksheet.line2 + worksheet.line3,
+                    ['Form 8995 line 12 must equal QDCGT lines 2 + 3', filingScheduleD, d15, d16],
+                )
+            }
         },
     },
     withholding: {
