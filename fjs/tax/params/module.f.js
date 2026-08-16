@@ -1516,39 +1516,230 @@ export const qualifiedCharitableDistribution = {
 }
 
 /**
- * **§1402(b)(2)'s $400 self-employment floor** — the ONE self-employment
- * figure Phase 27 stores, and the one it needs in order to REFUSE honestly
- * rather than to compute.
+ * **Schedule SE's four parameters** — §1402(b)(2)'s $400 floor, §1402(b)(1)'s
+ * Social Security wage base, §1401's two rates and §164(f)(1)'s half. TAX-31,
+ * Phase 28.
  *
- * *"…the term 'net earnings from self-employment' [shall not include] …if such
- * net earnings for the taxable year are less than $400."* Below it, no
- * self-employment tax is due at all; at or above it, Schedule SE is required.
+ * Phase 27 stored ONE of these, the $400 floor, and its docstring said
+ * plainly why the other three were absent: *"a rate would be a parameter with
+ * no reader"*, because that phase refused self-employment tax rather than
+ * computing it. Phase 28 supplies the reader — `fjs/schedule/se` — and the
+ * three arrive with it, in the same commit, exactly as
+ * {@link additionalMedicareTaxRates}' own 0.9% arrived beside Form 8959.
  *
- * **Nothing here stores the 92.35% factor or the 12.4%/2.9% rates**, and that
- * omission is the point: this phase does NOT compute self-employment tax
- * (TAX-31 is Phase 28). A rate would be a parameter with no reader, which is
- * exactly the YAGNI note {@link additionalMedicareTaxThreshold} carries about
- * its own 0.9% before Phase 23 added the form that reads it.
+ * ## The four figures, and which of them moves with inflation
  *
- * The single reader is `fjs/schedule/c`, which compares this figure against
- * Schedule C line 31's NET PROFIT rather than against net earnings from
- * self-employment — a conservative over-approximation, since net earnings are
- * 92.35% of net profit and therefore always smaller. That module's own
- * docstring records why the approximation goes in the refusing direction on
- * purpose, and why importing the 92.35% factor to tighten it would be
- * starting Schedule SE.
+ * **`minimumNetEarnings` — $400, §1402(b)(2), NOT indexed.** *"…the term 'net
+ * earnings from self-employment' [shall not include] …if such net earnings
+ * for the taxable year are less than $400."* It has read $400 since 1990.
+ * Schedule SE line 4c is the printed line that applies it, and it applies it
+ * to NET EARNINGS — 92.35% of net profit — never to net profit itself. Phase
+ * 27's `fjs/schedule/c` deliberately compared it against net PROFIT because
+ * applying the 92.35% factor would have been computing Schedule SE; Phase 28
+ * computes Schedule SE, so that over-approximation is gone and the comparison
+ * now happens where the printed form puts it.
  *
- * **Not inflation-indexed.** §1402(b)(2) has read $400 since 1990 and there is
- * no annual revenue procedure to cite, so this is a `kind: 'code'` citation
- * for the same reason {@link additionalMedicareTaxThreshold}'s is.
- * `effectiveDate` still reads `'2025-01-01'`: every citation here states the
- * year the figure is being APPLIED for.
- * @type {{ readonly minimumNetEarnings: AmountWithCitation }}
+ * **`socialSecurityWageBase` — $176,100, INDEXED, and the only figure in this
+ * group that moves.** §1402(b)(1) caps the amount of combined wages and
+ * self-employment earnings subject to the Social Security portion at *"the
+ * contribution and benefit base (as determined under section 230 of the
+ * Social Security Act)"*. That base is set each year by the Social Security
+ * Administration, not by an IRS Revenue Procedure: $160,200 (2023), $168,600
+ * (2024), $176,100 (2025). **This figure is TY2025's and TY2025's alone**, and
+ * a second tax year added to {@link taxParamsByYear} must carry its own —
+ * the same warning {@link studentLoanInterestDeduction} carries, and the
+ * OPPOSITE of the two rates below it.
+ *
+ * Its citation is `kind: 'code'` at §1402(b)(1), which is the GOVERNING
+ * PROVISION rather than the literal source of the digits — precisely the
+ * position {@link qualifiedCharitableDistribution} already records for its own
+ * two limits, whose figures likewise come off a printed page rather than out
+ * of the cited section. Naming a Revenue Procedure here would be worse than
+ * imprecise: no Revenue Procedure sets this base, and inventing a number for
+ * one is the sourcing error this module's own header exists to prevent.
+ *
+ * **`rates` — 12.4% and 2.9%, §1401(a) and §1401(b), NOT indexed.** Both are
+ * written into the statute and neither has moved since 1990. Stored in BASIS
+ * POINTS for the exactness reason {@link additionalMedicareTaxRates} states in
+ * full: 12.4 and 2.9 are not whole numbers of percent, and neither `0.124` nor
+ * `0.029` is exact as an IEEE 754 double. One shared `citation` for the two,
+ * because §1401 is one section with a subsection per rate — the same shape,
+ * for the same reason, as {@link additionalMedicareTaxRates}' §3101(b).
+ *
+ * **`deductibleHalf` — 50%, §164(f)(1), NOT indexed.** Schedule SE line 13,
+ * which reaches Schedule 1 line 15. A WHOLE number of percent, so
+ * `ratePercent` rather than basis points — this module's own stated rule, and
+ * the reason the field name differs from its neighbour's.
+ *
+ * ## What is deliberately NOT stored: the 92.35% factor
+ *
+ * Schedule SE line 4a prints *"multiply line 3 by 92.35% (0.9235)"*, and this
+ * group does not store 9235. **It is derivable from the two rates above, and
+ * §1402(a)(12) is the provision that derives it**: the deduction it allows is
+ * *"the product of the taxpayer's net earnings from self-employment
+ * (determined without regard to this paragraph) and one-half of the sum of
+ * the rates imposed by subsections (a) and (b) of section 1401"* — half of
+ * 12.4% + 2.9% is 7.65%, and 100% − 7.65% = 92.35%.
+ *
+ * So a stored 9235 would be a SECOND copy of a rule these two rates already
+ * fix, and the two copies could disagree. `fjs/schedule/se`'s own
+ * `netEarningsFactorBasisPoints` performs §1402(a)(12)'s arithmetic on the
+ * rates below, and that module's `theNinetyTwoPointThreeFiveFactorIsDerived\
+ * FromTheTwoRatesRatherThanStored` leaf checks the result against the printed
+ * page's own 0.9235. That is the AGENTS.md idiom — the hand-typed figure
+ * exists and something COMPARES it — applied to a rate rather than to a list.
+ * @type {{
+ *   readonly minimumNetEarnings: AmountWithCitation,
+ *   readonly socialSecurityWageBase: AmountWithCitation,
+ *   readonly rates: {
+ *     readonly oldAgeSurvivorsAndDisabilityInsuranceBasisPoints: number,
+ *     readonly hospitalInsuranceBasisPoints: number,
+ *     readonly citation: Citation,
+ *   },
+ *   readonly deductibleHalf: {
+ *     readonly ratePercent: number,
+ *     readonly citation: Citation,
+ *   },
+ * }}
  */
 export const selfEmploymentTax = {
     minimumNetEarnings: {
         amount: '400.00',
         citation: { kind: 'code', section: '§1402(b)(2)', effectiveDate: '2025-01-01' },
+    },
+    // The ONE figure in this group that moves with inflation -- see this
+    // group's own docstring. Schedule SE line 7 prints it.
+    socialSecurityWageBase: {
+        amount: '176100.00',
+        citation: { kind: 'code', section: '§1402(b)(1)', effectiveDate: '2025-01-01' },
+    },
+    rates: {
+        // 12.4% -- §1401(a), old-age, survivors, and disability insurance.
+        // Schedule SE line 10 multiplies by it, and it is the ONLY one of the
+        // two the wage base caps.
+        oldAgeSurvivorsAndDisabilityInsuranceBasisPoints: 1240,
+        // 2.9% -- §1401(b)(1), hospital insurance. Schedule SE line 11
+        // multiplies by it, and it is UNCAPPED: there is no wage base for the
+        // Medicare portion, which is why line 11 reads line 6 directly rather
+        // than the `min` line 10 takes.
+        hospitalInsuranceBasisPoints: 290,
+        citation: { kind: 'code', section: '§1401', effectiveDate: '2025-01-01' },
+    },
+    deductibleHalf: {
+        // 50% -- §164(f)(1). Schedule SE line 13 -> Schedule 1 line 15.
+        ratePercent: 50,
+        citation: { kind: 'code', section: '§164(f)(1)', effectiveDate: '2025-01-01' },
+    },
+}
+
+/**
+ * **§199A's qualified business income deduction** — the 20% rate and the
+ * per-status threshold above which Form 8995 stops applying and Form 8995-A
+ * takes over. TAX-32, Phase 28.
+ *
+ * ## The rate is a WHOLE percent, unlike its two neighbours
+ *
+ * §199A(b)(2)(A) and §199A(a)(1)(B) both read *"20 percent"*, and
+ * §199A(b)(3)/(e) never fractionalise it. So `ratePercent: 20` rather than
+ * basis points — this module's own rule ("a rate that is a whole number of
+ * percent is exact as a `number`"), and the reason this group's field name
+ * differs from {@link selfEmploymentTax}' `...BasisPoints` immediately above.
+ * Form 8995 multiplies by it on lines 5, 9 and 14; all three read this ONE
+ * field, so the three printed lines cannot drift apart.
+ *
+ * ## The threshold is INDEXED, and it is stored rather than derived
+ *
+ * §199A(e)(2)(A) sets $157,500 ($315,000 for a joint return) and
+ * §199A(e)(2)(B) inflation-adjusts both every year. TY2025's are $197,300 and
+ * $394,600, and a second tax year added to {@link taxParamsByYear} must carry
+ * its own — the {@link studentLoanInterestDeduction} warning again, not
+ * {@link additionalMedicareTaxThreshold}'s "no Revenue Procedure adjusts
+ * them".
+ *
+ * **Four of these five figures are identical, today, to the 24%-bracket
+ * ceilings already stored in {@link ordinaryBrackets} — and they are stored
+ * anyway. The fifth is not identical at all, which is the whole argument.**
+ *
+ * The agreement is not an accident of drafting: TCJA set §199A's 2018
+ * threshold at the same $157,500/$315,000 where the 24% bracket ended, and
+ * both have been indexed from that base ever since. But they are indexed
+ * SEPARATELY, by two provisions with their own rounding rules (§1(f)(3) for
+ * the brackets, §199A(e)(2)(B) for this), so nothing makes them stay equal.
+ *
+ * And for a **qualifying surviving spouse they are already $197,300 apart
+ * TODAY**: that status reads the JOINT rate schedule (§1(a), via §2(a)), so
+ * its 24% bracket ends at $394,600 — while §199A(e)(2)(A) doubles its
+ * threshold only *"in the case of a taxpayer filing a joint return"*, which a
+ * surviving spouse is not, so §199A gives that status the general $197,300.
+ * **This is the §3101(b)(2)-versus-§1411(b) trap for the third time in this
+ * module**, and the third time it lands on qualifying surviving spouse:
+ * §1411(b)(1) writes "or a surviving spouse" into the statute and §3101(b)(2)
+ * does not, and §199A(e)(2) does not either. A derivation from the bracket
+ * ceiling would have silently doubled a widow(er)'s §199A threshold and let
+ * a return that must use Form 8995-A compute on Form 8995 instead.
+ *
+ * `theThresholdCoincidesWithTheBracketCeilingForFourStatusesAndNotForTheFifth`
+ * is the leaf that states both halves. **If its first half reddens, that is
+ * information rather than a defect**: one of the two moved, and a reader has
+ * to find out which. The SDTW's own line-19 breakpoint is the opposite case
+ * and IS derived from the bracket ceiling, because §1(h)(1)(A)(ii) defines it
+ * *by reference to* "the dollar amount at which the 32-percent bracket
+ * begins". §199A(e)(2) contains no such reference.
+ *
+ * **`marriedFilingSeparately` gets the non-joint figure**, $197,300, not half
+ * of the joint one — the general rule applies at its FULL amount, the
+ * opposite of §1411(b)(2)'s explicit halving one parameter group up.
+ * Hand-typed per status anyway, never spread from `single`, for the reason
+ * {@link standardDeduction} records.
+ *
+ * ## Citation kind
+ *
+ * `kind: 'code'` at §199A(e)(2), the governing provision — the same position
+ * {@link qualifiedCharitableDistribution} records. The TY2025 digits are the
+ * inflation-adjusted amounts an annual Revenue Procedure publishes, and this
+ * project has NOT verified which section of Rev. Proc. 2024-40 carries them
+ * against the PDF itself. Naming a section that was not read would be the
+ * precise sourcing error this module's header exists to prevent, and it is
+ * strictly worse than citing the statute that governs the figure.
+ * @type {{
+ *   readonly ratePercent: number,
+ *   readonly rateCitation: Citation,
+ *   readonly thresholdAmount: Record<IndividualFilingStatus, AmountWithCitation>,
+ * }}
+ */
+export const qualifiedBusinessIncomeDeduction = {
+    // 20% -- §199A(a)(1)(B)/(b)(2)(A). Form 8995 lines 5, 9 and 14.
+    ratePercent: 20,
+    rateCitation: { kind: 'code', section: '§199A(b)(2)(A)', effectiveDate: '2025-01-01' },
+    thresholdAmount: {
+        single: {
+            amount: '197300.00',
+            citation: { kind: 'code', section: '§199A(e)(2)', effectiveDate: '2025-01-01' },
+        },
+        marriedFilingJointly: {
+            amount: '394600.00',
+            citation: { kind: 'code', section: '§199A(e)(2)(B)', effectiveDate: '2025-01-01' },
+        },
+        // The general rule's figure, NOT half the joint one -- see this
+        // group's own docstring.
+        marriedFilingSeparately: {
+            amount: '197300.00',
+            citation: { kind: 'code', section: '§199A(e)(2)', effectiveDate: '2025-01-01' },
+        },
+        headOfHousehold: {
+            amount: '197300.00',
+            citation: { kind: 'code', section: '§199A(e)(2)', effectiveDate: '2025-01-01' },
+        },
+        // See this group's own docstring: §199A(e)(2)(A) doubles the
+        // threshold only for "a taxpayer filing a joint return", and a
+        // surviving spouse does not file one -- so this status gets the
+        // general $197,300 even though its BRACKETS are the joint schedule's
+        // and its 24% ceiling is $394,600. The same trap §3101(b)(2) and
+        // §1411(b)(1) already disagree about, one status at a time.
+        qualifyingSurvivingSpouse: {
+            amount: '197300.00',
+            citation: { kind: 'code', section: '§199A(e)(2)', effectiveDate: '2025-01-01' },
+        },
     },
 }
 
@@ -1598,6 +1789,7 @@ export const selfEmploymentTax = {
  *   readonly educationCredits: typeof educationCredits,
  *   readonly qualifiedCharitableDistribution: typeof qualifiedCharitableDistribution,
  *   readonly selfEmploymentTax: typeof selfEmploymentTax,
+ *   readonly qualifiedBusinessIncomeDeduction: typeof qualifiedBusinessIncomeDeduction,
  * }} TaxParamSet
  */
 
@@ -1634,6 +1826,7 @@ export const taxParamsByYear = {
         educationCredits,
         qualifiedCharitableDistribution,
         selfEmploymentTax,
+        qualifiedBusinessIncomeDeduction,
     },
 }
 
@@ -1756,6 +1949,9 @@ const everyDollarStringField = [
     qualifiedCharitableDistribution.annualLimitPerIndividual.amount,
     qualifiedCharitableDistribution.splitInterestOneTimeLimit.amount,
     selfEmploymentTax.minimumNetEarnings.amount,
+    selfEmploymentTax.socialSecurityWageBase.amount,
+    ...individualFilingStatuses.map(
+        status => qualifiedBusinessIncomeDeduction.thresholdAmount[status].amount),
 ]
 
 export const proof = {
@@ -2870,6 +3066,190 @@ export const proof = {
                 qualifiedCharitableDistribution.annualLimitPerIndividual.citation.section
                     !== qualifiedCharitableDistribution.splitInterestOneTimeLimit.citation.section,
                 'two separate provisions must not share one citation',
+            )
+        },
+    },
+    // ── TAX-31 (Phase 28): Schedule SE's four parameters ────────────────────
+    selfEmploymentTax: {
+        // Every figure hand-typed off the printed 2025 Schedule SE face and
+        // the two statutes, never derived from each other and never from
+        // anything this module computes. The two rates are the ones a reader
+        // is most likely to transpose (12.4 for the CAPPED portion, 2.9 for
+        // the uncapped one), so each is asserted with the printed line that
+        // multiplies by it named in the message.
+        everyFigureMatchesTheStatuteAndThePrintedPage: () => {
+            assertEq(
+                selfEmploymentTax.minimumNetEarnings.amount, '400.00',
+                'Schedule SE line 4c: "if less than $400, stop; you don\'t owe self-employment tax"')
+            assertEq(
+                selfEmploymentTax.socialSecurityWageBase.amount, '176100.00',
+                'Schedule SE line 7: "maximum amount of combined wages and self-employment earnings subject to social security tax ... for 2025"')
+            assertEq(
+                selfEmploymentTax.rates.oldAgeSurvivorsAndDisabilityInsuranceBasisPoints, 1240,
+                'Schedule SE line 10: "multiply the smaller of line 6 or line 9 by 12.4% (0.124)" — §1401(a)')
+            assertEq(
+                selfEmploymentTax.rates.hospitalInsuranceBasisPoints, 290,
+                'Schedule SE line 11: "multiply line 6 by 2.9% (0.029)" — §1401(b)')
+            assertEq(
+                selfEmploymentTax.deductibleHalf.ratePercent, 50,
+                'Schedule SE line 13: "multiply line 12 by 50% (0.50)" — §164(f)(1)')
+        },
+        // The two rates ADD to the 15.3% every reader knows self-employment
+        // tax by, and that sum is the figure §1402(a)(12) halves. Asserted as
+        // its own leaf because it is the one relation between them: a
+        // transposition (290/1240) would leave both figures present and both
+        // individually plausible while making the sum unchanged — so this
+        // leaf alone would NOT catch it, and the leaf above is what does.
+        // Both exist deliberately.
+        theTwoRatesSumToFifteenPointThreePercent: () => {
+            assertEq(
+                selfEmploymentTax.rates.oldAgeSurvivorsAndDisabilityInsuranceBasisPoints
+                    + selfEmploymentTax.rates.hospitalInsuranceBasisPoints,
+                1530,
+                '12.4% + 2.9% = 15.3%, the combined §1401 rate',
+            )
+            // …and §1402(a)(12)'s "one-half of the sum of the rates" is
+            // therefore 7.65%, which is a WHOLE number of basis points. If a
+            // future year's rates summed to an odd number of basis points,
+            // the derivation `fjs/schedule/se` performs would not be exact,
+            // and this is where that would be noticed.
+            assertEq(1530 % 2, 0, 'half the combined rate must be a whole number of basis points')
+        },
+        // Exactly ONE of the four moves with inflation, and the citations say
+        // which. Every figure here is `kind: 'code'` — none is Rev.-Proc.-
+        // sourced, and the wage base is SSA-sourced rather than IRS-sourced,
+        // so naming a Revenue Procedure for any of them would be an invented
+        // citation (this module's header's own named failure).
+        everyFigureCitesItsOwnGoverningProvision: () => {
+            /** @type {readonly (readonly [string, Citation])[]} */
+            const every = [
+                ['minimumNetEarnings', selfEmploymentTax.minimumNetEarnings.citation],
+                ['socialSecurityWageBase', selfEmploymentTax.socialSecurityWageBase.citation],
+                ['rates', selfEmploymentTax.rates.citation],
+                ['deductibleHalf', selfEmploymentTax.deductibleHalf.citation],
+            ]
+            assertEq(every.length, 4, 'four parameters, four citations')
+            for (const [name, citation] of every) {
+                assertEq(citation.kind, 'code', ['no Revenue Procedure sets this figure', name])
+                assertEq(citation.effectiveDate, '2025-01-01', name)
+            }
+            assertEq(selfEmploymentTax.minimumNetEarnings.citation.section, '§1402(b)(2)')
+            assertEq(selfEmploymentTax.socialSecurityWageBase.citation.section, '§1402(b)(1)')
+            assertEq(selfEmploymentTax.rates.citation.section, '§1401')
+            assertEq(selfEmploymentTax.deductibleHalf.citation.section, '§164(f)(1)')
+            // Four DISTINCT sections. A citation copied from a neighbour --
+            // the failure `standardDeductionCitesObbbaRevision`'s opposite
+            // number exists for -- would collapse this set.
+            assertEq(
+                new Set(every.map(([, citation]) => citation.section)).size, 4,
+                'four separately-enacted provisions must not share a citation')
+        },
+        // The 92.35% factor is NOT here, and this leaf is what stops it
+        // quietly arriving as a fifth field. `fjs/schedule/se` derives it from
+        // the two rates per §1402(a)(12); a stored copy would be a second
+        // source of truth for a rule those rates already fix.
+        theNinetyTwoPointThreeFiveFactorIsNotStored: () => {
+            const stored = Object.keys(selfEmploymentTax)
+            assertEq(stored.length, 4, ['four fields, no factor', stored])
+            for (const name of stored) {
+                assert(
+                    !name.toLowerCase().includes('factor')
+                        && !name.toLowerCase().includes('netearnings9235'),
+                    ['the 92.35% factor is derived in `fjs/schedule/se`, never stored here', name],
+                )
+            }
+        },
+    },
+    // ── TAX-32 (Phase 28): §199A's rate and threshold ───────────────────────
+    qualifiedBusinessIncomeDeduction: {
+        // Hand-typed off the statute and the printed 2025 Form 8995 threshold
+        // sentence, per status, so a figure copied from the wrong row names
+        // itself.
+        everyThresholdMatchesTheStatute: () => {
+            /** @type {Record<IndividualFilingStatus, string>} */
+            const expected = {
+                single: '197300.00',
+                marriedFilingJointly: '394600.00',
+                marriedFilingSeparately: '197300.00',
+                headOfHousehold: '197300.00',
+                qualifyingSurvivingSpouse: '197300.00',
+            }
+            for (const status of individualFilingStatuses) {
+                assertEq(
+                    qualifiedBusinessIncomeDeduction.thresholdAmount[status].amount,
+                    expected[status],
+                    ['§199A(e)(2) threshold for this status', status],
+                )
+                assertEq(qualifiedBusinessIncomeDeduction.thresholdAmount[status].citation.kind, 'code')
+                assert(
+                    qualifiedBusinessIncomeDeduction.thresholdAmount[status].citation.section
+                        .startsWith('§199A(e)(2)'),
+                    ['every threshold is §199A(e)(2)\'s', status])
+            }
+            assertEq(
+                qualifiedBusinessIncomeDeduction.ratePercent, 20,
+                '§199A(b)(2)(A): "20 percent of the taxpayer\'s qualified business income"')
+            assertEq(qualifiedBusinessIncomeDeduction.rateCitation.kind, 'code')
+            assertEq(qualifiedBusinessIncomeDeduction.rateCitation.section, '§199A(b)(2)(A)')
+        },
+        // ONE status gets the doubled figure, and it is the JOINT one alone.
+        // Asserted as an inequality against every other status rather than
+        // only as a value, so a QSS row quietly copied from the MFJ row --
+        // the exact mistake §3101(b)(2) and §1411(b)(1) already disagree
+        // about, twice, in this module -- reddens here.
+        onlyAJointReturnGetsTheDoubledThreshold: () => {
+            const joint = centsFromString(
+                qualifiedBusinessIncomeDeduction.thresholdAmount.marriedFilingJointly.amount)
+            const general = centsFromString(
+                qualifiedBusinessIncomeDeduction.thresholdAmount.single.amount)
+            assertEq(joint, general * 2n, '§199A(e)(2)(A): "200 percent of such amount"')
+            for (const status of individualFilingStatuses) {
+                if (status === 'marriedFilingJointly') {
+                    continue
+                }
+                assertEq(
+                    centsFromString(qualifiedBusinessIncomeDeduction.thresholdAmount[status].amount),
+                    general,
+                    ['only "a taxpayer filing a joint return" doubles; this status does not', status],
+                )
+            }
+        },
+        // THE COINCIDENCE WATCH, and the status it already fails for. See
+        // this group's own docstring: four statuses agree with the
+        // 24%-bracket ceiling and a qualifying surviving spouse does not,
+        // because §199A(e)(2)(A)'s doubling turns on FILING a joint return
+        // while §2(a) only lends that status the joint RATE SCHEDULE.
+        //
+        // If the first half reddens, that is information rather than a
+        // defect: the two amounts are indexed by different provisions and
+        // may legitimately part. If the SECOND half reddens, a derivation
+        // has crept in and a widow(er)'s §199A threshold has doubled.
+        theThresholdCoincidesWithTheBracketCeilingForFourStatusesAndNotForTheFifth: () => {
+            /** @type {(status: IndividualFilingStatus) => string} */
+            const twentyFourPercentCeiling = status => {
+                const bracket = ordinaryBrackets[status].brackets.find(
+                    candidate => candidate.ratePercent === 24)
+                return assertNotNullish(
+                    assertNotNullish(bracket, ['no 24% bracket', status]).ceiling,
+                    ['the 24% bracket has no ceiling', status])
+            }
+            for (const status of ['single', 'marriedFilingJointly', 'marriedFilingSeparately', 'headOfHousehold']) {
+                const narrowed = individualFilingStatuses.find(candidate => candidate === status)
+                const only = assertNotNullish(narrowed, ['not a filing status', status])
+                assertEq(
+                    qualifiedBusinessIncomeDeduction.thresholdAmount[only].amount,
+                    twentyFourPercentCeiling(only),
+                    ['§199A and the 24% bracket coincide today for this status', only],
+                )
+            }
+            assertEq(
+                qualifiedBusinessIncomeDeduction.thresholdAmount.qualifyingSurvivingSpouse.amount,
+                '197300.00')
+            assertEq(twentyFourPercentCeiling('qualifyingSurvivingSpouse'), '394600.00')
+            assert(
+                qualifiedBusinessIncomeDeduction.thresholdAmount.qualifyingSurvivingSpouse.amount
+                    !== twentyFourPercentCeiling('qualifyingSurvivingSpouse'),
+                'a qualifying surviving spouse\'s §199A threshold is NOT the joint bracket ceiling',
             )
         },
     },
