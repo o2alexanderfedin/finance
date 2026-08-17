@@ -1,7 +1,9 @@
 /**
- * Form 8606, *Nondeductible IRAs* — **Part I only** (TAX-29) — together with
- * §408(d)(8)'s qualified charitable distribution exclusion (TAX-28), which
- * shares this module because the two interact arithmetically. Phase 26.
+ * Form 8606, *Nondeductible IRAs* — **Parts I and II, and Part III's one
+ * computable code** (TAX-29) — together with §408(d)(8)'s qualified charitable
+ * distribution exclusion (TAX-28), which shares this module because the two
+ * interact arithmetically. Phase 26 built Part I; Phase 31 built Part II and
+ * decided Part III.
  *
  * Sources, fetched and read directly rather than recalled: `f8606.pdf` and
  * `i8606.pdf` (2025 revisions, "Created 5/7/25"), and `i1040gi.pdf`'s own
@@ -19,38 +21,74 @@
  * | Part I 5 line 3 − line 4 | computed |
  * | Part I 6 value of ALL traditional/SEP/SIMPLE IRAs at 31 Dec | computed — asserted; **refused when absent and needed** |
  * | Part I 7 distributions, QCDs excluded | computed — 1099-R box 1, less the QCD |
- * | Part I 8 net converted to Roth | **refused** when non-zero (that is Part II) |
+ * | Part I 8 net converted to Roth | computed — `vnd.fjs.ira`, asserted |
  * | Part I 9 lines 6 + 7 + 8 | computed |
  * | Part I 10 line 5 ÷ line 9 | computed — three decimal places, clamped at 1.000 |
- * | Part I 11 line 8 × line 10 | structurally zero — line 8 is refused when non-zero |
+ * | Part I 11 line 8 × line 10 | computed — the conversion's nontaxable portion |
  * | Part I 12 line 7 × line 10 | computed — the nontaxable portion |
  * | Part I 13 lines 11 + 12 | computed |
- * | Part I 14 line 3 − line 13 | computed — next year's line 2 |
+ * | Part I 14 line 3 − line 13 | computed — next year's line 2, floored at zero |
  * | Part I 15a line 7 − line 12 | computed |
  * | Part I 15b qualified disaster distributions (Form 8915-F) | **refused** when declared |
  * | Part I 15c taxable amount → 1040 line 4b | computed |
- * | **Part II** conversions to Roth IRAs | **NOT MODELLED — refused by name** |
- * | **Part III** distributions from Roth IRAs | **NOT MODELLED — refused by name** |
+ * | **Part II** 16 amount from line 8 | computed |
+ * | **Part II** 17 amount from line 11 | computed |
+ * | **Part II** 18 line 16 − line 17 → 1040 line 4b | computed |
+ * | **Part III** qualified Roth distribution (box 7a code `Q`) | computed — tax-free, no Part III |
+ * | **Part III** nonqualified Roth distribution (codes `J`, `T`) | **refused by name** |
  *
- * **Parts II and III are refused, not computed, and they are refused
- * differently from each other** — which is the detail worth stating, because
- * a uniform treatment would have missed one of them entirely:
+ * ## Part II is COMPUTED, and it shares Part I's fraction rather than its own
  *
- * - **Part II arrives as an ASSERTION.** A Roth conversion is a taxpayer act
- *   the engine cannot see on any document, so `vnd.fjs.ira` carries
- *   `netAmountConvertedToRothIras` for it and {@link iraTaxableAmount}
- *   refuses on a non-zero value. What Part II would additionally require is
- *   real work rather than plumbing: the conversion's own nontaxable portion
- *   (line 11) feeds line 17, line 18 is a SECOND amount landing on 1040 line
- *   4b beside line 15c, and §408A(d)(3) has a recapture regime this engine
- *   models nothing of.
- * - **Part III arrives as a DOCUMENT.** A Roth IRA distribution is reported
- *   on a Form 1099-R with box 7b (IRA/SEP/SIMPLE) deliberately UNCHECKED and
- *   a Roth distribution code in box 7a, so there is nothing for a taxpayer to
- *   assert and no assertion field would ever be filled in. {@link
- *   iraTaxableAmount} therefore detects it off {@link rothDistributionCodes}
- *   and refuses by name. This is the half a fields-only design would have
- *   silently ignored.
+ * A Roth conversion arrives as an ASSERTION — it is a taxpayer act no box
+ * reports — so `vnd.fjs.ira` carries `netAmountConvertedToRothIras`, and
+ * Phase 31 feeds it to printed **line 8** instead of refusing it.
+ *
+ * **The taxable part of a conversion is `line8 × line10`, and line 10 is Part
+ * I's own pro-rata fraction.** That is why line 8 is an input to {@link
+ * form8606PartI} rather than to a separate Part II function: two derivations
+ * of §408(d)(2) would be two rules for one number, and
+ * {@link proof.form8606PartI.aPartialConversionSplitsByPartIsOwnProRataFraction}
+ * asserts `line17 === line11` as an identity so that no later refactor can
+ * reintroduce the second one. Printed line 7 excludes the converted amount
+ * (beside the QCD), so line 9 counts it exactly once.
+ *
+ * §408A(d)(3)'s recapture regime is a Part III concern — it applies to a
+ * conversion later DISTRIBUTED inside its five-year window — so it is refused
+ * there, by code, rather than here.
+ *
+ * ## Part III: one code computes, two refuse, and they refuse differently
+ *
+ * A Roth IRA distribution arrives as a DOCUMENT, not an assertion: Form 1099-R
+ * with box 7b (IRA/SEP/SIMPLE) deliberately UNCHECKED and a Roth distribution
+ * code in box 7a. So {@link iraTaxableAmount} detects it off {@link
+ * rothDistributionCodes}, and the honest split is by code, not by part:
+ *
+ * - **`Q` — qualified distribution — COMPUTES.** §408A(d)(2) excludes it from
+ *   gross income in full and Part III's own instruction excludes it from the
+ *   part. This is computable from ONE year precisely because the CUSTODIAN did
+ *   the multi-year work: code `Q` is the payer certifying both the five-year
+ *   period and an exception. See {@link qualifiedRothDistributionCode}.
+ * - **`T` — exception applies, clock unknown — REFUSES**, naming
+ *   §408A(d)(2)(B)'s five-year period, which is the whole difference between
+ *   `T` and `Q`.
+ * - **`J` — early, no exception — REFUSES**, naming lines 22 and 24 (cumulative
+ *   Roth contribution and conversion bases over EVERY prior year) and
+ *   §408A(d)(3)(F)'s per-conversion clock.
+ *
+ * **This is the "model less and refuse precisely" line, and it is drawn where
+ * the multi-year facts start.** A Roth basis carried wrong is not a one-year
+ * error; it silently misstates every later year too, which is why no default
+ * was invented for lines 22 and 24.
+ *
+ * `[THE GATE MOVED, and that was a BUG FIX]` Phase 26 ran this scan inside
+ * {@link oneRecord}, behind `partIApplies`, so it fired only for a taxpayer who
+ * ALSO had a traditional-IRA basis. A Roth distribution alone reached no gate —
+ * and because box 7b is unchecked, `fjs/form1040/core` classified it as a
+ * PENSION. Probed at the full report: a code-`J` distribution of $20,000.00
+ * with box 2a blank (what a Roth custodian actually prints) gave 1040 line 5b =
+ * $0.00 and a tax of $0.00, refusing nothing. The gate now sits at the top of
+ * {@link iraTaxableAmount}, over the documents, and `fjs/form1040/core`
+ * partitions Forms 1099-R three ways rather than two.
  *
  * ## §408(d)(8): what a QCD is, and the four refusals that guard it
  *
@@ -233,16 +271,25 @@ import { taxParamsByYear } from '../tax/params/module.f.js'
  * PRINTED LINE NUMBER (TAX-15), so the call site can be diffed against the
  * form face.
  *
- * There is deliberately no `line8` input: a non-zero Roth conversion is Part
- * II and is refused by {@link iraTaxableAmount} before this function is ever
- * called, so line 8 is structurally zero here and {@link
- * proof.lineElevenIsUnreachableBecauseLineEightIsRefused} says so.
+ * `line8NetAmountConvertedToRothIrasCents` is Part II's own input, and it
+ * arrives HERE rather than in a separate Part II function for the reason
+ * Phase 31 exists to enforce: the taxable part of a conversion is
+ * `line8 × line10`, and line 10 is Part I's pro-rata fraction. **One rule,
+ * one place.** A Part II that re-derived the fraction would be a second
+ * implementation of §408(d)(2) that could disagree with the first.
+ *
+ * Line 7 is the distributions **excluding both** the QCD and the converted
+ * amount — the printed line 7's own parenthetical ("do not include ...
+ * amounts converted to a Roth IRA") beside §408(d)(8)'s. Both exclusions are
+ * the caller's, and {@link iraTaxableAmount} refuses when the assertion
+ * exceeds what the documents report rather than letting this go negative.
  * @typedef {{
  *   readonly line1NondeductibleContributionsCents: bigint,
  *   readonly line2PriorYearBasisCents: bigint,
  *   readonly line4ContributionsMadeAfterYearEndCents: bigint,
  *   readonly line6YearEndValueOfAllIrasCents: bigint,
  *   readonly line7DistributionsExcludingQcdCents: bigint,
+ *   readonly line8NetAmountConvertedToRothIrasCents: bigint,
  * }} Form8606PartIInput
  */
 
@@ -264,6 +311,7 @@ import { taxParamsByYear } from '../tax/params/module.f.js'
  *   readonly line11: bigint, readonly line12: bigint, readonly line13: bigint,
  *   readonly line14: bigint,
  *   readonly line15a: bigint, readonly line15b: bigint, readonly line15c: bigint,
+ *   readonly line16: bigint, readonly line17: bigint, readonly line18: bigint,
  * }} Form8606PartI
  */
 
@@ -298,6 +346,7 @@ export const form8606PartI = input => {
         line4ContributionsMadeAfterYearEndCents,
         line6YearEndValueOfAllIrasCents,
         line7DistributionsExcludingQcdCents,
+        line8NetAmountConvertedToRothIrasCents,
     } = input
     // 1. "Enter your nondeductible contributions to traditional IRAs for
     //    2025, including those made for 2025 from January 1, 2026, through
@@ -307,9 +356,10 @@ export const form8606PartI = input => {
     const line2 = line2PriorYearBasisCents
     // 3. "Add lines 1 and 2."
     const line3 = line1 + line2
-    // 8. "Enter the net amount you converted from traditional IRAs to Roth
-    //    IRAs in 2025." Structurally zero -- Part II is refused upstream.
-    const line8 = 0n
+    // 8. "Enter the net amount you converted from traditional IRAs, SEP IRAs,
+    //    and SIMPLE IRAs to Roth IRAs in 2025." Part II's own input --
+    //    asserted, because a conversion is a taxpayer act no box reports.
+    const line8 = line8NetAmountConvertedToRothIrasCents
     // 7. "Enter your distributions from traditional IRAs in 2025 ... do not
     //    include qualified charitable distributions." The caller has already
     //    subtracted the QCD; see this module's own docstring for why that
@@ -324,6 +374,7 @@ export const form8606PartI = input => {
             line11: 0n, line12: 0n, line13: 0n,
             line14: line3,
             line15a: 0n, line15b: 0n, line15c: 0n,
+            line16: 0n, line17: 0n, line18: 0n,
         }
     }
     // 4. "Enter those contributions included on line 1 that were made from
@@ -355,7 +406,8 @@ export const form8606PartI = input => {
     assert(line9 > 0n, ['line 9 cannot be zero once the No branch is taken', line9])
     const ratioThousandths = halfUp(of(line5 * 1000n)(line9))
     const line10Thousandths = ratioThousandths < 1000n ? ratioThousandths : 1000n
-    // 11. "Multiply line 8 by line 10." Zero, because line 8 is.
+    // 11. "Multiply line 8 by line 10. This is the nontaxable portion of the
+    //     amount you converted to Roth IRAs." Part II's line 17.
     const line11 = halfUp(of(line8 * line10Thousandths)(1000n))
     // 12. "Multiply line 7 by line 10. This is the nontaxable portion of your
     //     distributions that you did not convert to a Roth IRA." The second
@@ -365,7 +417,28 @@ export const form8606PartI = input => {
     const line13 = line11 + line12
     // 14. "Subtract line 13 from line 3. This is your total basis in
     //     traditional IRAs for 2025 and earlier years." Next year's line 2.
-    const line14 = line3 - line13
+    //
+    //     **Floored at zero, and the floor is a ROUNDING artifact rather than
+    //     a tax judgement.** In exact arithmetic line 13 can never exceed line
+    //     3: line 13 is `(line7 + line8) × line5 ÷ line9`, line 7 + line 8 is
+    //     at most line 9 (which is line 6 + line 7 + line 8), so line 13 is at
+    //     most line 5, which is at most line 3. The printed page's line 10 is
+    //     rounded to three places FIRST, and rounding UP is what breaks the
+    //     inequality: a true ratio of 0.9996 becomes 1.000, and line 13 then
+    //     overshoots line 5 by up to 0.05% of line 9. `[FOUND BY BUILDING THE
+    //     FIXTURE]` A $7,000.00 nondeductible contribution converted in full
+    //     at $7,001.00 (one dollar of earnings, line 6 zero) gives ratio
+    //     7,000,00 ÷ 7,001,00 = 0.99985... -> 1.000, line 11 = 7,001.00, line
+    //     13 = 7,001.00 and line 3 = 7,000.00, so the unfloored subtraction is
+    //     **-1.00** and the `assert` below threw a BARE value. A ratio of
+    //     1.000 says the whole basis was recovered, so zero remaining basis is
+    //     the printed clamp's own conclusion carried through; refusing an
+    //     ordinary convert-everything return over a rounding artifact would
+    //     not be. `line15a` and `line18` need no such floor — at a ratio of
+    //     1.000 they are exactly zero, which
+    //     {@link proof.rothConversion.theRatioClampCannotDriveBasisNegative}
+    //     asserts rather than assumes.
+    const line14 = line3 - line13 > 0n ? line3 - line13 : 0n
     // 15a. "Subtract line 12 from line 7."
     const line15a = line7 - line12
     // 15b. The Form 8915-F qualified disaster portion -- refused upstream
@@ -374,11 +447,34 @@ export const form8606PartI = input => {
     // 15c. "Taxable amount. ... If more than zero, also include this amount
     //      on 2025 Form 1040 ... line 4b."
     const line15c = line15a - line15b
+    // ── Part II: 2025 Conversions From Traditional, SEP, or SIMPLE IRAs to
+    //    Roth IRAs ──────────────────────────────────────────────────────────
+    //
+    // 16. "If you completed Part I, enter the amount from line 8. Otherwise,
+    //     enter the net amount you converted from traditional, SEP, and SIMPLE
+    //     IRAs to Roth IRAs in 2025."
+    // 17. "If you completed Part I, enter the amount from line 11. Otherwise,
+    //     enter your basis in the amount on line 16."
+    //
+    // Part I is ALWAYS completed when a conversion reaches this function —
+    // {@link iraTaxableAmount}'s `partIApplies` includes a non-zero conversion
+    // precisely so that the "Otherwise" arms above are unreachable and there
+    // is exactly one pro-rata fraction on the return. So lines 16 and 17 read
+    // straight off lines 8 and 11, and no second §408(d)(2) derivation exists
+    // anywhere in this module.
+    const line16 = line8
+    const line17 = line11
+    // 18. "Subtract line 17 from line 16. This is the taxable amount. ... also
+    //     include this amount on 2025 Form 1040 ... line 4b." A SECOND amount
+    //     landing on line 4b beside line 15c, which is why {@link oneRecord}'s
+    //     delta adds both.
+    const line18 = line16 - line17
     assert(line15c >= 0n, ['Form 8606 line 15c must never be negative', line15c])
-    assert(line14 >= 0n, ['Form 8606 line 14 must never be negative', line14])
+    assert(line18 >= 0n, ['Form 8606 line 18 must never be negative', line18])
     return {
         line1, line2, line3, line4, line5, line6, line7, line8, line9,
         line10Thousandths, line11, line12, line13, line14, line15a, line15b, line15c,
+        line16, line17, line18,
     }
 }
 
@@ -400,6 +496,56 @@ export const form8606PartI = input => {
  * IRA flag cannot distinguish a Roth IRA from an ordinary pension.
  */
 export const rothDistributionCodes = /** @type {const} */ (['J', 'T', 'Q'])
+
+/**
+ * The ONE Roth distribution code Part III does not apply to — `Q`, *"qualified
+ * distribution from a Roth IRA"*.
+ *
+ * **This is the whole of what a single tax year supports, and it is supported
+ * because the CUSTODIAN did the multi-year work.** Part III's own instruction
+ * says to complete it *"only if you took a distribution from a Roth IRA in
+ * 2025 (other than a qualified distribution ...)"*, and a qualified
+ * distribution under §408A(d)(2) is entirely excluded from gross income. Code
+ * `Q` is the payer stating that both limbs hold — the §408A(d)(2)(B) five-year
+ * period is met AND an exception (age 59½, death, disability) applies — so
+ * there is no basis ordering to perform and nothing to carry forward.
+ *
+ * Codes `J` and `T` are the cases this engine REFUSES, and they are refused
+ * for two different missing facts:
+ *
+ * - **`T`** is *"Roth IRA distribution, exception applies"* — the payer knows
+ *   an exception applies but explicitly **does not know whether the five-year
+ *   period is met**, which is the entire difference between `T` and `Q`. That
+ *   is a fact about the year the first Roth contribution was made, which this
+ *   engine cannot see and no document on the return reports.
+ * - **`J`** is an early distribution with no known exception, so it IS a
+ *   nonqualified distribution and Part III genuinely applies. Its lines 22
+ *   (*"your basis in Roth IRA contributions"*) and 24 (*"your basis in
+ *   conversions from traditional, SEP, and SIMPLE IRAs"*) are cumulative
+ *   totals over EVERY prior year, and §408A(d)(3)(F) gives each conversion its
+ *   own separate five-year clock for the §72(t) recapture. One year of
+ *   documents cannot produce either figure.
+ *
+ * Refusing rather than defaulting matters more here than almost anywhere else
+ * in this repository: a Roth basis carried forward wrong is not a one-year
+ * error, it silently misstates every later year's distribution too.
+ */
+export const qualifiedRothDistributionCode = 'Q'
+
+/**
+ * The Roth-IRA distribution code a Form 1099-R carries, or `undefined` for a
+ * form that reports no Roth IRA distribution at all.
+ *
+ * Exported because `fjs/form1040/core` needs the IDENTICAL test to route the
+ * form to 1040 line 4a rather than to line 5a — AGENTS.md's "one rule, one
+ * place". A second copy of this predicate in the caller would let the two
+ * disagree about which forms are Roth, and the disagreement would be a
+ * distribution on neither line.
+ * @type {(form: OneZeroNineNineR) => string | undefined}
+ */
+export const rothDistributionCodeOf = form =>
+    (form.box7aDistributionCodes ?? [])
+        .find(code => rothDistributionCodes.some(known => known === code))
 
 /**
  * Everything the document layer reads. `line4bBeforeIraRecords` is the caller's
@@ -482,6 +628,99 @@ export const iraTaxableAmount = taxParamSet => input => {
         iraRecords, priorYearBasisForms, iraRetirementForms, allRetirementForms,
         anyFilerBornBeforeJan2_1961, line4bBeforeIraRecords,
     } = input
+    // ── Part III, gated on the DOCUMENTS and nothing else ───────────────────
+    //
+    // `[FOUND BY PROBING THE FULL REPORT, and it was a silent understatement]`
+    // Phase 26 ran this scan inside `oneRecord`, behind `partIApplies` — so it
+    // fired only for a taxpayer who ALSO had a traditional-IRA basis. A Roth
+    // distribution on its own reached no gate at all, and because the IRS
+    // deliberately leaves box 7b (IRA/SEP/SIMPLE) UNCHECKED on a Roth IRA
+    // Form 1099-R, `fjs/form1040/core` classified it as a PENSION: a code-`J`
+    // distribution of $20,000.00 with box 2a blank (which is what a Roth
+    // custodian actually prints, beside box 2b "taxable amount not
+    // determined") produced 1040 line 5b = $0.00 and a tax of $0.00, with
+    // nothing refused and nothing said. The nonqualified earnings in that
+    // distribution are taxable and §72(t) applies to them.
+    //
+    // So the gate belongs HERE, before the no-record early return, where it
+    // sees every Form 1099-R whether or not a `vnd.fjs.ira` record exists.
+    for (const form of allRetirementForms) {
+        const rothCode = rothDistributionCodeOf(form.value)
+        if (rothCode === undefined) {
+            continue
+        }
+        const tin = form.value.recipientTin
+        // A contradictory document, refused before it is interpreted: the
+        // Form 1099-R instructions say to check box 7b for a traditional, SEP
+        // or SIMPLE IRA and NOT to check it for a Roth IRA, so a form doing
+        // both does not say which contract the money came out of — and that
+        // decides both which 1040 line it lands on and whether §408(d)(2)'s
+        // pro-rata fraction applies to it at all.
+        if (form.value.box7bIraSepSimple === true) {
+            return {
+                kind: 'error',
+                message: `a Form 1099-R for ${tin} carries box 7a distribution code ${rothCode} `
+                    + `(a distribution from a Roth IRA) AND checks box 7b (IRA/SEP/SIMPLE), which `
+                    + `the Form 1099-R instructions reserve for traditional, SEP and SIMPLE IRAs `
+                    + `and direct NOT to check for a Roth IRA. The two cannot both be true, and `
+                    + `which one is decides whether §408(d)(2)'s pro-rata fraction reaches this `
+                    + `distribution. Refusing rather than picking one`,
+            }
+        }
+        if (rothCode === qualifiedRothDistributionCode) {
+            // A qualified distribution is excluded from gross income IN FULL,
+            // so a non-zero box 2a beside code Q is the payer contradicting
+            // itself — and the direction matters: silently keeping the code Q
+            // and dropping the box would exclude an amount the payer says is
+            // taxable, while silently keeping the box would tax a qualified
+            // distribution. Neither is defensible, so refuse. Box 2a of
+            // `"0.00"` is NOT a contradiction; that is what a correct Roth
+            // Form 1099-R prints.
+            const printedTaxable = form.value.box2aTaxableAmount
+            if (printedTaxable !== undefined && centsFromString(printedTaxable) > 0n) {
+                return {
+                    kind: 'error',
+                    message: `a Form 1099-R for ${tin} carries box 7a distribution code Q `
+                        + `(qualified distribution from a Roth IRA) and a box 2a taxable amount of `
+                        + `${printedTaxable}. A §408A(d)(2) qualified distribution is excluded from `
+                        + `gross income in full, so those two cannot both be right: honouring the `
+                        + `code would exclude an amount the payer reports as taxable, and honouring `
+                        + `box 2a would tax a distribution the same payer certified as qualified. `
+                        + `Refusing rather than choosing`,
+                }
+            }
+            // Nothing else to compute and nothing to refuse. See
+            // {@link qualifiedRothDistributionCode}: the payer has certified
+            // both limbs of §408A(d)(2), the distribution is excluded from
+            // gross income in full, and Part III's own instruction excludes a
+            // qualified distribution from the part. The form still belongs on
+            // 1040 line 4a as gross, which `fjs/form1040/core` routes.
+            continue
+        }
+        return {
+            kind: 'error',
+            message: rothCode === 'T'
+                ? `a Form 1099-R for ${tin} carries box 7a distribution code T (Roth IRA `
+                    + `distribution, exception applies). Code T is the payer stating that an `
+                    + `exception applies but that it does NOT know whether §408A(d)(2)(B)'s `
+                    + `five-year period is met — that is the entire difference between code T and `
+                    + `code Q, and it turns on the year of the first Roth contribution, a fact no `
+                    + `document on this return reports and this engine cannot hold. If the `
+                    + `five-year period IS met the distribution is qualified and wholly tax-free; `
+                    + `if it is not, Form 8606 Part III applies and its lines 22 and 24 are `
+                    + `cumulative Roth bases over every prior year. Refusing rather than guessing `
+                    + `between nothing and everything (no phase yet)`
+                : `a Form 1099-R for ${tin} carries box 7a distribution code ${rothCode}, an early `
+                    + `distribution from a Roth IRA with no exception — a NONQUALIFIED `
+                    + `distribution, so Form 8606 Part III applies. Part III cannot be computed `
+                    + `from one year: line 22 is the basis in Roth IRA CONTRIBUTIONS accumulated `
+                    + `over every prior year, line 24 is the basis in CONVERSIONS from `
+                    + `traditional, SEP and SIMPLE IRAs, and §408A(d)(3)(F) gives each conversion `
+                    + `its own separate five-year clock for §72(t). Refusing rather than treating `
+                    + `the distribution as a pension on 1040 line 5b, which is what this engine `
+                    + `did before and which taxed the earnings at nothing (no phase yet)`,
+        }
+    }
     if (iraRecords.length === 0) {
         // A basis carry-forward with no `vnd.fjs.ira` record beside it cannot
         // be used: Form 8606's pro-rata fraction needs line 6, and line 6
@@ -617,18 +856,10 @@ const oneRecord = taxParamSet => input => {
     } = input
     const ira = record.value
     const tin = ira.recipientTin
-    // ── The three facts stored only so they can be refused by name ──────────
-    if (centsOrZero(ira.netAmountConvertedToRothIras) > 0n) {
-        return {
-            kind: 'error',
-            message: `Form 8606 line 8 (net amount converted from traditional IRAs to Roth IRAs) `
-                + `is ${ira.netAmountConvertedToRothIras} for ${tin}, and this engine does not `
-                + `model Part II: the conversion's own nontaxable portion feeds line 17, line 18 `
-                + `is a second amount landing on 1040 line 4b beside line 15c, and §408A(d)(3)'s `
-                + `recapture regime is unmodelled. Refusing rather than dropping the conversion `
-                + `out of line 9's denominator and understating the tax (no phase yet)`,
-        }
-    }
+    // Part II's asserted input (printed line 8) — COMPUTED since Phase 31,
+    // sharing Part I's own pro-rata fraction rather than re-deriving it.
+    const line8Cents = centsOrZero(ira.netAmountConvertedToRothIras)
+    // ── The two facts stored only so they can be refused by name ────────────
     if (ira.hadOutstandingRolloverOrRecharacterization !== undefined) {
         return {
             kind: 'error',
@@ -806,11 +1037,24 @@ const oneRecord = taxParamSet => input => {
         ? 0n
         : centsFromString(basisDocument.value.priorYearForm8606Line14)
     const line1Cents = centsOrZero(ira.nondeductibleContributionsThisYear)
-    // The printed Part I's own "complete this part only if" test, in the two
+    // The printed Part I's own "complete this part only if" test, in the three
     // forms that can reach this engine: a nondeductible contribution made for
-    // this year, or a distribution taken while an earlier year's basis is
-    // still outstanding.
-    const partIApplies = line1Cents > 0n || line2Cents > 0n
+    // this year, a distribution taken while an earlier year's basis is still
+    // outstanding, or a conversion to a Roth IRA.
+    //
+    // **The conversion term is what makes Part II's "Otherwise" arms
+    // unreachable**, and that is the point rather than a side effect. Part
+    // II's printed lines 16 and 17 each begin *"If you completed Part I, enter
+    // the amount from line 8 / line 11. Otherwise, ..."*; by always completing
+    // Part I when a conversion exists, this module has exactly ONE pro-rata
+    // fraction and no second path to a basis figure. A pure backdoor Roth —
+    // nondeductible contribution plus immediate conversion, no other
+    // distribution — reaches Part I through `line1Cents` anyway; a conversion
+    // out of a WHOLLY DEDUCTIBLE IRA (no basis at all) reaches it only through
+    // this term, and its answer is the printed form's own: line 5 is zero, so
+    // line 10 is 0.000, line 11 is zero, and line 18 is the conversion in
+    // full, taxable. That is correct and it is not the degenerate case.
+    const partIApplies = line1Cents > 0n || line2Cents > 0n || line8Cents > 0n
     const myIraForms = iraRetirementForms.filter(form => form.value.recipientTin === tin)
     const grossDistributionCents = myIraForms.reduce(
         (total, form) => total + centsOrZero(form.value.box1GrossDistribution), 0n)
@@ -833,37 +1077,53 @@ const oneRecord = taxParamSet => input => {
             partI: undefined,
         }
     }
-    // Part II and Part III, refused by name -- Part III off the DOCUMENT,
-    // since a Roth IRA distribution is never an assertion. Gated on Part I
-    // applying, because a Roth distribution changes nothing about a QCD.
-    for (const form of allRetirementForms) {
-        if (form.value.recipientTin !== tin) {
-            continue
-        }
-        const rothCode = (form.value.box7aDistributionCodes ?? [])
-            .find(code => rothDistributionCodes.some(known => known === code))
-        if (rothCode !== undefined) {
-            return {
-                kind: 'error',
-                message: `a Form 1099-R for ${tin} carries box 7a distribution code ${rothCode}, `
-                    + `a distribution from a Roth IRA, and this return also files Form 8606 Part `
-                    + `I. Part III (distributions from Roth IRAs) is not modelled by this engine `
-                    + `— it needs an ordering of contributions, conversions and earnings across `
-                    + `every prior year, and a §408A(d)(2) five-year clock. Refusing rather than `
-                    + `filing a Form 8606 that is missing a part the return requires (no phase `
-                    + `yet)`,
-            }
+    // Part III is gated in {@link iraTaxableAmount} on the DOCUMENTS, before
+    // this function is reached — see the comment there for why moving it out
+    // of this per-record, `partIApplies`-gated position was a fix rather than
+    // a tidy-up.
+    //
+    // Printed line 7's own exclusions, BOTH of them: *"do not include ...
+    // qualified charitable distributions ... or amounts converted to a Roth
+    // IRA"*. The conversion is excluded here and enters at line 8, so line 9
+    // counts it exactly once. `[THE MOST LIKELY SILENT ERROR IN THIS PHASE]`
+    // Omitting `- line8Cents` leaves the conversion in line 7 as well, which
+    // double-counts it in line 9's denominator, understates line 10 and
+    // therefore understates the nontaxable portion of everything.
+    const line7Cents = grossDistributionCents - qcdExclusionCents - line8Cents
+    if (line7Cents < 0n) {
+        // An ASSERTION contradicting the DOCUMENTS, so a refusal by name and
+        // never a bare `assert`: a conversion is made out of a distribution
+        // the custodian reports on a Form 1099-R (box 7 code 2 or 7, box 7b
+        // checked), so an asserted conversion larger than the gross
+        // distributions less the QCD cannot have happened as described.
+        return {
+            kind: 'error',
+            message: `${tin} asserts ${centsToString(line8Cents)} converted from traditional, SEP `
+                + `and SIMPLE IRAs to Roth IRAs, but that person's Forms 1099-R report only `
+                + `${centsToString(grossDistributionCents)} of gross IRA distributions, of which `
+                + `${centsToString(qcdExclusionCents)} is a qualified charitable distribution — `
+                + `leaving ${centsToString(grossDistributionCents - qcdExclusionCents)} that could `
+                + `have been converted. A conversion is a distribution the custodian reports, so `
+                + `Form 8606's printed line 7 (which excludes both the QCD and the converted `
+                + `amount) would be negative. Refusing rather than computing §408(d)(2)'s `
+                + `fraction over a line 9 that no document supports`,
         }
     }
-    const line7Cents = grossDistributionCents - qcdExclusionCents
-    assert(line7Cents >= 0n, ['Form 8606 line 7 must never be negative', tin, line7Cents])
     const line4Cents = centsOrZero(ira.contributionsMadeAfterYearEnd)
     const printedYearEndValue = ira.yearEndValueOfAllTraditionalSepSimpleIras
-    if (line7Cents > 0n && printedYearEndValue === undefined) {
+    // A CONVERSION needs line 6 exactly as a distribution does — it is line
+    // 9's own summand beside line 6, and line 10 is line 5 over line 9. A
+    // conversion-only record that defaulted line 6 to zero would be
+    // accidentally right for a backdoor Roth (whose year-end value genuinely
+    // IS zero) and silently wrong for everyone converting part of a balance
+    // they still hold, which is the larger population. So absence still
+    // refuses, and a backdoor Roth asserts `"0.00"` explicitly.
+    if ((line7Cents > 0n || line8Cents > 0n) && printedYearEndValue === undefined) {
         return {
             kind: 'error',
             message: `${tin} has ${centsToString(line7Cents)} of traditional IRA distributions `
-                + `and a Form 8606 basis of ${centsToString(line1Cents + line2Cents)}, but no `
+                + `and ${centsToString(line8Cents)} converted to Roth IRAs, against a Form 8606 `
+                + `basis of ${centsToString(line1Cents + line2Cents)}, but no `
                 + `yearEndValueOfAllTraditionalSepSimpleIras is asserted. Form 8606's printed `
                 + `line 6 is the value of ALL that person's traditional, SEP and SIMPLE IRAs at `
                 + `December 31 — §408(d)(2) aggregates them as one contract — and it is the `
@@ -911,6 +1171,7 @@ const oneRecord = taxParamSet => input => {
         line4ContributionsMadeAfterYearEndCents: line4Cents,
         line6YearEndValueOfAllIrasCents: line6Cents,
         line7DistributionsExcludingQcdCents: line7Cents,
+        line8NetAmountConvertedToRothIrasCents: line8Cents,
     })
     if (ira.nondeductibleContributionsThisYear !== undefined) {
         sources.push({
@@ -940,7 +1201,14 @@ const oneRecord = taxParamSet => input => {
         // instructions to figure the amount to enter on line 4b"), and is why
         // the delta is a replacement rather than a subtraction. Box 2a is
         // exactly the figure Form 8606 exists to correct.
-        deltaCents: partI.line15c - printedTaxableCents,
+        //
+        // **Line 18 is added because it is a SECOND amount on line 4b.** Part
+        // II's printed line 18 says *"also include this amount on 2025 Form
+        // 1040 ... line 4b"*, beside line 15c's own instruction to do the
+        // same. `[MUTATION TARGET]` Dropping `+ partI.line18` makes every
+        // conversion tax-free, which is the understatement Phase 26 refused
+        // rather than risk.
+        deltaCents: partI.line15c + partI.line18 - printedTaxableCents,
         qcdExclusionCents,
         sources,
         partI,
@@ -1000,6 +1268,29 @@ const pensionForm = hash => payerTin => accountNumber => box1 => ({
         formRevision: '2025',
         box1GrossDistribution: box1,
         box2aTaxableAmount: box1,
+    },
+})
+
+/**
+ * A Roth IRA Form 1099-R: box 7b DELIBERATELY unchecked (the Form 1099-R
+ * instructions direct that it not be checked for a Roth IRA), one box 7a code,
+ * and box 2a absent by default — which is what a Roth custodian actually
+ * prints, since it does not know the recipient's basis. `$20,000.00` gross.
+ * @type {(hash: string) => (code: string) => (box2a: string | undefined) => Stored<OneZeroNineNineR>}
+ */
+const rothForm = hash => code => box2a => ({
+    documentHash: hash,
+    value: {
+        dialect: 'vnd.fjs.1099r',
+        payerTin: '11-1111111',
+        recipientTin: recipient,
+        accountNumber: 'ROTH-0001',
+        taxYear: 2025,
+        formRevision: '2025',
+        box1GrossDistribution: '20000.00',
+        box7aDistributionCodes: [code],
+        box2bTaxableAmountNotDetermined: true,
+        ...box2a === undefined ? {} : { box2aTaxableAmount: box2a },
     },
 })
 
@@ -1757,45 +2048,454 @@ export const proof = {
             assertEq(partI.line10Thousandths, 0n)
             assertEq(ok.line4b.value, 0n)
         },
-        // Line 8 is structurally zero because a non-zero one is refused, so
-        // line 11 can never be non-zero. Asserted rather than described —
-        // `fjs/form8889`'s own `theCatchUpIsInLineThreeAndLineSevenIsUnreachable`
-        // idiom.
-        lineElevenIsUnreachableBecauseLineEightIsRefused: () => {
-            const partI = form8606PartI({
-                line1NondeductibleContributionsCents: 0n,
-                line2PriorYearBasisCents: 2000000n,
-                line4ContributionsMadeAfterYearEndCents: 0n,
-                line6YearEndValueOfAllIrasCents: 15000000n,
-                line7DistributionsExcludingQcdCents: 5000000n,
-            })
-            assertEq(partI.line8, 0n)
-            assertEq(partI.line11, 0n)
-            // …and the refusal that makes it so.
-            const message = refusalMessage(run({
+        // `MERGE NOTE — DELIBERATE REPLACEMENT, do not revert.` Until Phase 31
+        // this leaf was `lineElevenIsUnreachableBecauseLineEightIsRefused`, and
+        // it asserted that line 8 is structurally zero and line 11 therefore
+        // unreachable. **That property stopped being true when Part II was
+        // built**, so the leaf is replaced by the arithmetic that now runs
+        // rather than weakened or deleted. The refusal half of the old leaf
+        // (which checked that a non-zero conversion is refused) is gone for the
+        // same reason; what took its place is
+        // {@link proof.rothConversion} below, which is strictly stronger — it
+        // pins every printed line rather than a message.
+        //
+        // **Part II's whole point, as arithmetic: the taxable part of a
+        // conversion is `line8 × line10`, and line 10 is PART I's fraction.**
+        // Hand-derived from the printed form face, every figure independent of
+        // this module:
+        //
+        //   1  nondeductible contributions for 2025            0.00
+        //   2  total basis in traditional IRAs             6,000.00   (asserted)
+        //   3  add lines 1 and 2                           6,000.00
+        //   4  contributions made Jan 1 - Apr 15               0.00
+        //   5  subtract line 4 from line 3                 6,000.00
+        //   6  value of ALL traditional/SEP/SIMPLE IRAs   14,000.00   (asserted)
+        //   7  distributions, less QCD, less converted         0.00   (10,000 - 0 - 10,000)
+        //   8  net converted to Roth IRAs                 10,000.00   (asserted)
+        //   9  add lines 6, 7 and 8                       24,000.00
+        //  10  line 5 / line 9  = 6,000 / 24,000 = 0.250      0.250
+        //  11  line 8 x line 10 = 10,000 x 0.250          2,500.00
+        //  12  line 7 x line 10 =      0 x 0.250              0.00
+        //  13  add lines 11 and 12                        2,500.00
+        //  14  line 3 - line 13 = 6,000 - 2,500           3,500.00   -> next year's line 2
+        //  15a line 7 - line 12                               0.00
+        //  15c taxable amount from Part I                     0.00
+        //  16  from line 8                                10,000.00
+        //  17  from line 11                                2,500.00
+        //  18  line 16 - line 17                           7,500.00   -> 1040 line 4b
+        //
+        // Deliberately chosen so that NO two quantities coincide: line 11
+        // (2,500) differs from line 12 (0), line 16 (10,000) from line 17
+        // (2,500), line 18 (7,500) from both, and the ratio is neither 0.000
+        // nor 1.000. A fixture where the conversion is the whole basis makes
+        // lines 16 and 17 equal and line 18 zero, at which point dropping
+        // line 17 entirely would still pass — which is why the backdoor Roth
+        // is NOT the fixture this leaf uses.
+        aPartialConversionSplitsByPartIsOwnProRataFraction: () => {
+            const converted = iraForm('sha256-1099r-conv')('11-1111111')('IRA-0001')('10000.00')
+            const ok = computed(run({
                 iraRecords: [storedRecord({
                     ...bareRecord,
                     netAmountConvertedToRothIras: '10000.00',
-                    yearEndValueOfAllTraditionalSepSimpleIras: '150000.00',
+                    yearEndValueOfAllTraditionalSepSimpleIras: '14000.00',
                 })],
-                priorYearBasisForms: [storedBasis(recipient)('20000.00')],
-                iraRetirementForms: [singleIra],
+                priorYearBasisForms: [storedBasis(recipient)('6000.00')],
+                iraRetirementForms: [converted],
             }))
-            assert(message.includes('Part II'), ['name the part', message])
-            assert(message.includes('line 18'), ['name what would also land on 1040 line 4b', message])
-            assert(message.includes('§408A(d)(3)'), ['name the unmodelled regime', message])
-            // A conversion of exactly zero is a real assertion and is NOT
-            // refused — the control that keeps the gate from firing on
-            // everything.
+            const partI = ok.partIByRecipientTin[recipient]
+            assert(partI !== undefined, ['expected a Form 8606', ok])
+            assertEq(partI.line3, 600000n, '$6,000.00')
+            assertEq(partI.line5, 600000n, '$6,000.00')
+            assertEq(partI.line7, 0n, '$10,000.00 gross less $10,000.00 converted')
+            assertEq(partI.line8, 1000000n, '$10,000.00')
+            assertEq(partI.line9, 2400000n, '$14,000.00 + $0.00 + $10,000.00')
+            assertEq(partI.line10Thousandths, 250n, '6,000 / 24,000 = 0.250')
+            assertEq(partI.line11, 250000n, '$10,000.00 x 0.250 = $2,500.00')
+            assertEq(partI.line12, 0n, '$0.00 x 0.250')
+            assertEq(partI.line13, 250000n, '$2,500.00')
+            assertEq(partI.line14, 350000n, '$6,000.00 - $2,500.00 = $3,500.00 carried forward')
+            assertEq(partI.line15c, 0n, 'nothing was distributed other than the conversion')
+            assertEq(partI.line16, 1000000n, 'from line 8')
+            assertEq(partI.line17, 250000n, 'from line 11')
+            assertEq(partI.line18, 750000n, '$10,000.00 - $2,500.00 = $7,500.00')
+            // …and it REACHES 1040 line 4b. The caller's own box-2a sum was
+            // $10,000.00; Form 8606 replaces it with line 15c + line 18.
+            assertEq(ok.line4b.value, 750000n, '$7,500.00 on 1040 line 4b')
+            // The property the requirement turns on, stated as an identity
+            // rather than as prose: line 17 IS line 11, so there is exactly one
+            // pro-rata fraction on the return. A Part II that re-derived it
+            // could not make this assertion hold by construction.
+            assertEq(partI.line17, partI.line11, 'ONE rule, ONE place')
+            assertEq(partI.line16, partI.line8)
+        },
+        // The mixed return: a distribution AND a QCD AND a conversion at once,
+        // which is the only shape in which printed line 7's TWO exclusions are
+        // both observable and lines 11 and 12 differ. Hand-derived:
+        //
+        //   gross distributions        40,000.00   (one Form 1099-R, box 2a the same)
+        //   QCD                        10,000.00
+        //   converted (line 8)         12,000.00
+        //   7  40,000 - 10,000 - 12,000            18,000.00
+        //   2  prior-year basis                     8,000.00
+        //   3, 5                                    8,000.00
+        //   6  year-end value of all IRAs          60,000.00
+        //   9  60,000 + 18,000 + 12,000            90,000.00
+        //  10  8,000 / 90,000 = 0.08888...            0.089   (halfUp of 88.888...)
+        //  11  12,000 x 0.089                      1,068.00
+        //  12  18,000 x 0.089                      1,602.00
+        //  13  1,068 + 1,602                       2,670.00
+        //  14  8,000 - 2,670                       5,330.00
+        //  15a 18,000 - 1,602                     16,398.00
+        //  15c                                    16,398.00
+        //  16, 17, 18  12,000 / 1,068 / 10,932.00
+        //   1040 line 4b  16,398 + 10,932         27,330.00
+        //
+        // Checked a second way, independently of the form: $40,000 distributed,
+        // $10,000 of it a QCD, so $30,000 remains, of which $2,670.00 of basis
+        // was recovered — 30,000 - 2,670 = 27,330. The two derivations agree.
+        aQcdAndAConversionAndADistributionAtOnce: () => {
+            const big = iraForm('sha256-1099r-mixed')('11-1111111')('IRA-0001')('40000.00')
+            const ok = computed(run({
+                iraRecords: [storedRecord({
+                    ...bareRecord,
+                    attainedAgeSeventyAndAHalfAtEveryDistributionBelow: true,
+                    qualifiedCharitableDistributions: [{
+                        payerTin: '11-1111111',
+                        accountNumber: 'IRA-0001',
+                        charity: 'Riverside Food Bank',
+                        amount: '10000.00',
+                    }],
+                    netAmountConvertedToRothIras: '12000.00',
+                    yearEndValueOfAllTraditionalSepSimpleIras: '60000.00',
+                })],
+                priorYearBasisForms: [storedBasis(recipient)('8000.00')],
+                iraRetirementForms: [big],
+            }))
+            const partI = ok.partIByRecipientTin[recipient]
+            assert(partI !== undefined, ['expected a Form 8606', ok])
+            assertEq(partI.line7, 1800000n, '$40,000 - $10,000 QCD - $12,000 converted')
+            assertEq(partI.line8, 1200000n, '$12,000.00')
+            assertEq(partI.line9, 9000000n, '$90,000.00')
+            assertEq(partI.line10Thousandths, 89n, 'halfUp(88.888...) = 89 thousandths')
+            assertEq(partI.line11, 106800n, '$12,000.00 x 0.089 = $1,068.00')
+            assertEq(partI.line12, 160200n, '$18,000.00 x 0.089 = $1,602.00')
+            assert(partI.line11 !== partI.line12, ['the two products MUST differ here'])
+            assertEq(partI.line14, 533000n, '$8,000.00 - $2,670.00 = $5,330.00')
+            assertEq(partI.line15c, 1639800n, '$18,000.00 - $1,602.00 = $16,398.00')
+            assertEq(partI.line18, 1093200n, '$12,000.00 - $1,068.00 = $10,932.00')
+            assertEq(ok.qcdExclusionCents, 1000000n, '$10,000.00')
+            assertEq(ok.line4b.value, 2733000n, '$16,398.00 + $10,932.00 = $27,330.00')
+            // The second derivation, in the proof rather than only in the
+            // comment: gross less the QCD less the basis recovered.
+            assertEq(ok.line4b.value, 4000000n - 1000000n - (partI.line11 + partI.line12))
+        },
+        // A conversion out of a WHOLLY DEDUCTIBLE IRA — no basis anywhere, so
+        // Part I is reached ONLY through `partIApplies`' conversion term, and
+        // the answer is that the conversion is taxable in full.
+        //
+        //   3, 5  no basis at all                       0.00
+        //   6  year-end value                      30,000.00
+        //   7  20,000 gross - 20,000 converted          0.00
+        //   8, 16                                  20,000.00
+        //   9  30,000 + 0 + 20,000                 50,000.00
+        //  10  0 / 50,000                             0.000
+        //  11, 17                                      0.00
+        //  18  20,000 - 0                          20,000.00  -> fully taxable
+        //
+        // 1040 line 4b is $20,000.00 — numerically what this engine produced
+        // BEFORE Phase 31, and that coincidence is the reason this leaf asserts
+        // the printed lines and not only the total: the right answer for the
+        // wrong reason is indistinguishable from the right answer on line 4b
+        // alone.
+        aConversionWithNoBasisIsTaxableInFull: () => {
+            const converted = iraForm('sha256-1099r-nobasis')('11-1111111')('IRA-0001')('20000.00')
+            const ok = computed(run({
+                iraRecords: [storedRecord({
+                    ...bareRecord,
+                    netAmountConvertedToRothIras: '20000.00',
+                    yearEndValueOfAllTraditionalSepSimpleIras: '30000.00',
+                })],
+                iraRetirementForms: [converted],
+            }))
+            const partI = ok.partIByRecipientTin[recipient]
+            assert(partI !== undefined, ['Part I must be completed for a bare conversion', ok])
+            assertEq(partI.line3, 0n, 'no basis anywhere')
+            assertEq(partI.line10Thousandths, 0n, '0 / 50,000 = 0.000')
+            assertEq(partI.line17, 0n, 'no basis, so no nontaxable portion')
+            assertEq(partI.line18, 2000000n, 'the conversion is taxable in full')
+            assertEq(ok.line4b.value, 2000000n, '$20,000.00')
+        },
+    },
+    // ── TAX-29 Part II and Part III (Phase 31) ──────────────────────────────
+    rothConversion: {
+        // **The acceptance case for TAX-29: a backdoor Roth.** A $7,000.00
+        // nondeductible contribution to a traditional IRA, converted
+        // immediately to a Roth. Hand-derived:
+        //
+        //   1  nondeductible contributions for 2025      7,000.00
+        //   2  prior-year basis                              0.00
+        //   3, 5                                         7,000.00
+        //   6  year-end value of all traditional IRAs        0.00  (asserted: emptied)
+        //   7  7,000 gross - 0 QCD - 7,000 converted         0.00
+        //   8, 16                                        7,000.00
+        //   9  0 + 0 + 7,000                             7,000.00
+        //  10  7,000 / 7,000 = 1.000                        1.000
+        //  11, 17  7,000 x 1.000                         7,000.00
+        //  13                                            7,000.00
+        //  14  7,000 - 7,000                                 0.00  (basis fully used)
+        //  15c                                               0.00
+        //  18  7,000 - 7,000                                 0.00  -> NOTHING taxable
+        //
+        // So 1040 line 4b is $0.00 against a box 2a of $7,000.00 — which is the
+        // entire point of the manoeuvre, and was REFUSED outright before this
+        // phase. `fjs/form1040/core`'s own
+        // `aBackdoorRothComputesEndToEndThroughTheFullReport` runs the same
+        // facts through `form1040Report`, which is the acceptance criterion;
+        // this leaf pins the printed lines behind it.
+        aBackdoorRothIsWhollyNontaxable: () => {
+            const converted = iraForm('sha256-1099r-backdoor')('11-1111111')('IRA-0001')('7000.00')
+            const ok = computed(run({
+                iraRecords: [storedRecord({
+                    ...bareRecord,
+                    nondeductibleContributionsThisYear: '7000.00',
+                    netAmountConvertedToRothIras: '7000.00',
+                    yearEndValueOfAllTraditionalSepSimpleIras: '0.00',
+                })],
+                iraRetirementForms: [converted],
+            }))
+            const partI = ok.partIByRecipientTin[recipient]
+            assert(partI !== undefined, ['expected a Form 8606', ok])
+            assertEq(partI.line1, 700000n, '$7,000.00')
+            assertEq(partI.line7, 0n, 'the whole distribution was converted')
+            assertEq(partI.line8, 700000n, '$7,000.00')
+            assertEq(partI.line9, 700000n, '$0.00 + $0.00 + $7,000.00')
+            assertEq(partI.line10Thousandths, 1000n, '7,000 / 7,000 = 1.000')
+            assertEq(partI.line11, 700000n, 'the conversion is entirely nontaxable')
+            assertEq(partI.line14, 0n, 'the basis is fully used up, nothing carries forward')
+            assertEq(partI.line15c, 0n)
+            assertEq(partI.line18, 0n, 'NOTHING is taxable — the backdoor Roth')
+            assertEq(ok.line4b.value, 0n, '$0.00, against a box 2a of $7,000.00')
+        },
+        // `[FOUND BY BUILDING THE FIXTURE, and it threw a BARE value]` One
+        // dollar of earnings between contribution and conversion. Printed line
+        // 10 is rounded to three places FIRST, so 7,000.00 / 7,001.00 =
+        // 0.99985... becomes 1.000, line 11 becomes the whole 7,001.00 and line
+        // 13 EXCEEDS line 3 by $1.00. Before the floor, line 14 was -$1.00 and
+        // `assert(line14 >= 0n)` threw.
+        //
+        // Two things are asserted here, not one. The floor holds line 14 at
+        // zero — a ratio of 1.000 says the basis is exhausted. And line 18 is
+        // zero WITHOUT a floor, because at a ratio of 1.000 line 17 equals line
+        // 16 exactly; that is why no floor was added to the taxable lines, and
+        // asserting it is what would catch a later change that made one
+        // necessary. The escaping $1.00 is the printed form's own answer: a
+        // taxpayer filling in three decimal places writes 1.000 too.
+        theRatioClampCannotDriveBasisNegative: () => {
+            const converted = iraForm('sha256-1099r-round')('11-1111111')('IRA-0001')('7001.00')
+            const ok = computed(run({
+                iraRecords: [storedRecord({
+                    ...bareRecord,
+                    nondeductibleContributionsThisYear: '7000.00',
+                    netAmountConvertedToRothIras: '7001.00',
+                    yearEndValueOfAllTraditionalSepSimpleIras: '0.00',
+                })],
+                iraRetirementForms: [converted],
+            }))
+            const partI = ok.partIByRecipientTin[recipient]
+            assert(partI !== undefined, ['expected a Form 8606', ok])
+            assertEq(partI.line3, 700000n, '$7,000.00 of basis')
+            assertEq(partI.line10Thousandths, 1000n, 'halfUp(999.857...) = 1000, then clamped')
+            assertEq(partI.line13, 700100n, '$7,001.00 — MORE than line 3')
+            assert(partI.line13 > partI.line3, ['the overshoot this leaf exists for'])
+            assertEq(partI.line14, 0n, 'floored, not -$1.00')
+            assertEq(partI.line16, partI.line17, 'at a ratio of 1.000 these coincide exactly')
+            assertEq(partI.line18, 0n, 'zero WITHOUT a floor — nothing to clamp')
+            assertEq(partI.line15c, 0n)
+        },
+        // A conversion needs line 6 exactly as a distribution does — it is line
+        // 9's own summand. The gate, and the CONTROL that keeps it from
+        // refusing everything.
+        aConversionWithNoYearEndValueRefuses: () => {
+            /** @type {(yearEnd: string | undefined) => IraTaxableAmountOutcome} */
+            const withYearEnd = yearEnd => run({
+                iraRecords: [storedRecord({
+                    ...bareRecord,
+                    nondeductibleContributionsThisYear: '7000.00',
+                    netAmountConvertedToRothIras: '7000.00',
+                    ...yearEnd === undefined
+                        ? {}
+                        : { yearEndValueOfAllTraditionalSepSimpleIras: yearEnd },
+                })],
+                iraRetirementForms: [
+                    iraForm('sha256-1099r-noline6')('11-1111111')('IRA-0001')('7000.00'),
+                ],
+            })
+            const message = refusalMessage(withYearEnd(undefined))
+            assert(
+                message.includes('yearEndValueOfAllTraditionalSepSimpleIras'),
+                ['name the field', message])
+            assert(message.includes('converted to Roth IRAs'), ['name the conversion', message])
+            // The control: `"0.00"` is a real assertion — a backdoor Roth's
+            // year-end value genuinely IS zero — and it computes. So the gate
+            // is on ABSENCE, never on the value being zero, which is the
+            // distinction that makes refusing rather than defaulting mean
+            // anything at all.
+            assertEq(withYearEnd('0.00').kind, 'ok')
+            assertEq(withYearEnd('30000.00').kind, 'ok')
+        },
+        // An ASSERTION contradicting the DOCUMENTS: more converted than was
+        // ever distributed. A refusal by name, never the bare `assert` that a
+        // negative line 7 used to raise.
+        aConversionLargerThanTheDistributionsRefuses: () => {
+            const message = refusalMessage(run({
+                iraRecords: [storedRecord({
+                    ...bareRecord,
+                    netAmountConvertedToRothIras: '20000.00',
+                    yearEndValueOfAllTraditionalSepSimpleIras: '30000.00',
+                })],
+                iraRetirementForms: [
+                    iraForm('sha256-1099r-short')('11-1111111')('IRA-0001')('10000.00'),
+                ],
+            }))
+            assert(message.includes('20000.00'), ['name what was asserted', message])
+            assert(message.includes('10000.00'), ['name what the documents report', message])
+            assert(message.includes('line 7'), ['name the printed line that would go negative', message])
+            // The control: the same conversion against a distribution that
+            // covers it computes.
             assertEq(run({
                 iraRecords: [storedRecord({
                     ...bareRecord,
-                    netAmountConvertedToRothIras: '0.00',
-                    yearEndValueOfAllTraditionalSepSimpleIras: '150000.00',
+                    netAmountConvertedToRothIras: '20000.00',
+                    yearEndValueOfAllTraditionalSepSimpleIras: '30000.00',
                 })],
-                priorYearBasisForms: [storedBasis(recipient)('20000.00')],
-                iraRetirementForms: [singleIra],
+                iraRetirementForms: [
+                    iraForm('sha256-1099r-ok')('11-1111111')('IRA-0001')('20000.00'),
+                ],
             }).kind, 'ok')
+        },
+    },
+    // ── Part III: the ONE code that computes, and the two that refuse ────────
+    rothDistributions: {
+        // The hand-typed inventory of {@link rothDistributionCodes}, kept
+        // beside the split so that adding a fourth code without deciding which
+        // side it falls on fails here. NOT `rothDistributionCodes.length` on
+        // the expected side — AGENTS.md's fourth shipped defect.
+        theCodeSplitIsHandCounted: () => {
+            assertEq(rothDistributionCodes.length, 3, 'hand-counted: J, T and Q')
+            assertEq(qualifiedRothDistributionCode, 'Q')
+            assert(
+                rothDistributionCodes.some(code => code === qualifiedRothDistributionCode),
+                ['the qualified code must be one of the Roth codes'])
+            // Exactly ONE of the three computes; the other two refuse. Written
+            // as a hand-typed count of each side rather than derived.
+            assertEq(
+                rothDistributionCodes.filter(code => code === qualifiedRothDistributionCode).length,
+                1, 'exactly one code is qualified')
+            assertEq(
+                rothDistributionCodes.filter(code => code !== qualifiedRothDistributionCode).length,
+                2, 'exactly two refuse: J and T')
+        },
+        // **Code Q computes, and it computes because the CUSTODIAN did the
+        // multi-year work.** A qualified distribution is excluded from gross
+        // income in full, so nothing lands on line 4b and no Form 8606 is
+        // produced — with no `vnd.fjs.ira` record on the return at all, which
+        // is the position the old gate could not reach.
+        aQualifiedRothDistributionIsTaxFreeAndNeedsNoForm: () => {
+            const ok = computed(run({
+                iraRecords: [],
+                iraRetirementForms: [],
+                allRetirementForms: [rothForm('sha256-q')('Q')(undefined)],
+            }))
+            assertEq(ok.line4b.value, 0n, 'excluded from gross income in full')
+            assertEq(Object.keys(ok.partIByRecipientTin).length, 0, 'no Form 8606 is required')
+        },
+        // Codes J and T refuse, and they refuse for DIFFERENT missing facts —
+        // which is the distinction this phase exists to draw. A uniform "Part
+        // III is unmodelled" message would pass a weaker version of this leaf.
+        aNonqualifiedRothDistributionRefusesByName: () => {
+            const jMessage = refusalMessage(run({
+                allRetirementForms: [rothForm('sha256-j')('J')(undefined)],
+            }))
+            assert(jMessage.includes('NONQUALIFIED'), ['say which kind it is', jMessage])
+            assert(jMessage.includes('line 22'), ['name the contribution-basis line', jMessage])
+            assert(jMessage.includes('line 24'), ['name the conversion-basis line', jMessage])
+            assert(jMessage.includes('§408A(d)(3)(F)'), ['name the per-conversion clock', jMessage])
+            assert(
+                jMessage.includes('line 5b'),
+                ['say where it used to go, which is the bug being closed', jMessage])
+            const tMessage = refusalMessage(run({
+                allRetirementForms: [rothForm('sha256-t')('T')(undefined)],
+            }))
+            assert(
+                tMessage.includes('§408A(d)(2)(B)'),
+                ['code T is missing the five-year period specifically', tMessage])
+            assert(
+                tMessage.includes('first Roth contribution'),
+                ['name the fact that would settle it', tMessage])
+            // The two refusals are DISTINCT, not one message reached twice.
+            assert(jMessage !== tMessage, ['J and T are missing different facts'])
+            assert(
+                !jMessage.includes('§408A(d)(2)(B)'),
+                ['J is nonqualified regardless of the clock', jMessage])
+        },
+        // **The control, and it is the one Phase 26 already got right.** Code B
+        // is a designated Roth ACCOUNT inside an employer plan — a 1040 line 5b
+        // pension, nothing to do with Form 8606 — so it must NOT be caught.
+        // Without this, a gate that refused every 1099-R would pass every leaf
+        // above.
+        aDesignatedRothAccountIsAPensionAndIsNotCaught: () => {
+            assertEq(rothDistributionCodeOf(rothForm('sha256-b')('B')(undefined).value), undefined)
+            assertEq(run({
+                allRetirementForms: [rothForm('sha256-b')('B')(undefined)],
+            }).kind, 'ok')
+            // And an ordinary traditional-IRA distribution, which carries no
+            // Roth code at all.
+            assertEq(rothDistributionCodeOf(singleIra.value), undefined)
+            assertEq(run({ iraRetirementForms: [singleIra] }).kind, 'ok')
+        },
+        // Two contradictory documents, refused rather than interpreted.
+        contradictoryRothFormsRefuse: () => {
+            // Code Q with a non-zero box 2a: the payer says both "wholly
+            // excluded" and "this much is taxable".
+            const qWithBox2a = refusalMessage(run({
+                allRetirementForms: [rothForm('sha256-q2a')('Q')('500.00')],
+            }))
+            assert(qWithBox2a.includes('qualified'), ['name the code', qWithBox2a])
+            assert(qWithBox2a.includes('500.00'), ['name the amount', qWithBox2a])
+            // …and `"0.00"` is NOT a contradiction: that is what a correct Roth
+            // Form 1099-R prints. The control, without which the gate above
+            // would refuse every properly-filled Roth form.
+            assertEq(run({
+                allRetirementForms: [rothForm('sha256-q0')('Q')('0.00')],
+            }).kind, 'ok')
+            // A Roth code beside a CHECKED box 7b, which the Form 1099-R
+            // instructions forbid.
+            const both = refusalMessage(run({
+                allRetirementForms: [{
+                    documentHash: 'sha256-qboth',
+                    value: {
+                        ...rothForm('sha256-qboth')('Q')(undefined).value,
+                        box7bIraSepSimple: true,
+                    },
+                }],
+            }))
+            assert(both.includes('box 7b'), ['name the checkbox', both])
+            assert(both.includes('§408(d)(2)'), ['say what turns on it', both])
+        },
+        // The gate fires with NO `vnd.fjs.ira` record present — the position
+        // the Phase 26 gate could not reach, because it sat behind
+        // `partIApplies` inside the per-record loop. This is the leaf that
+        // would have caught the silent understatement.
+        theGateDoesNotNeedAnIraRecord: () => {
+            const message = refusalMessage(iraTaxableAmount(params)({
+                iraRecords: [],
+                priorYearBasisForms: [],
+                iraRetirementForms: [],
+                allRetirementForms: [rothForm('sha256-alone')('J')(undefined)],
+                anyFilerBornBeforeJan2_1961: false,
+                line4bBeforeIraRecords: { value: 0n, sources: [] },
+            }))
+            assert(message.includes('code J'), ['the gate must fire on documents alone', message])
         },
     },
     // ── TAX-29's refusals ───────────────────────────────────────────────────
@@ -1877,14 +2577,32 @@ export const proof = {
             assert(message.includes('one figure'), ['say the rule', message])
         },
         // Part III, detected off the DOCUMENT rather than off an assertion —
-        // the half a fields-only design would have missed. One leaf per Roth
-        // code, generated from the list, plus the hand-typed count beside it.
-        everyRothDistributionCodeRefusesPartThree: () => {
-            assertEq(rothDistributionCodes.length, 3, 'hand-counted: J, T and Q')
+        // the half a fields-only design would have missed.
+        //
+        // `MERGE NOTE — DELIBERATE NARROWING, do not revert.` Through Phase 30
+        // this leaf was `everyRothDistributionCodeRefusesPartThree` and looped
+        // over ALL THREE codes. **Code `Q` no longer refuses** — Phase 31
+        // computes it, because a §408A(d)(2) qualified distribution is excluded
+        // from gross income in full and the payer's own code is what certifies
+        // both limbs of the test. So the loop narrows to the two codes that
+        // still refuse, and the list it walks is now HAND-TYPED here rather
+        // than taken from `rothDistributionCodes` — which is the stronger
+        // shape anyway (AGENTS.md's fourth shipped defect: a loop built from
+        // the code under test cannot notice that collection changing).
+        // `proof.rothDistributions` carries the positive half: that `Q`
+        // computes, that `J` and `T` refuse for DIFFERENT named facts, and
+        // that the two lists still agree on their sizes.
+        theTwoNonqualifiedRothCodesRefusePartThree: () => {
+            /** Hand-typed, NOT filtered from `rothDistributionCodes`. */
+            const refusingCodes = /** @type {const} */ (['J', 'T'])
+            assertEq(refusingCodes.length, 2, 'hand-counted: J and T')
+            // …and pinned against the exported list, so a fourth code added
+            // there without a decision here fails.
+            assertEq(rothDistributionCodes.length, refusingCodes.length + 1, 'plus Q')
             assertEq(rothDistributionCodes[0], 'J')
             assertEq(rothDistributionCodes[1], 'T')
             assertEq(rothDistributionCodes[2], 'Q')
-            for (const code of rothDistributionCodes) {
+            for (const code of refusingCodes) {
                 /** @type {Stored<OneZeroNineNineR>} */
                 const roth = {
                     documentHash: `sha256-1099r-roth-${code}`,
@@ -1910,7 +2628,9 @@ export const proof = {
                 }))
                 assert(message.includes(`code ${code}`), ['quote the code', code, message])
                 assert(message.includes('Part III'), ['name the part', code, message])
-                assert(message.includes('§408A(d)(2)'), ['name the five-year clock', code, message])
+                assert(
+                    message.includes('five-year'),
+                    ['name the five-year clock', code, message])
             }
             // The CONTROL, and the one that stops this gate from firing on
             // every retiree: code `B` is a designated Roth account inside an
@@ -2117,6 +2837,7 @@ export const proof = {
             line4ContributionsMadeAfterYearEndCents: 0n,
             line6YearEndValueOfAllIrasCents: 30000000n,
             line7DistributionsExcludingQcdCents: 5000000n,
+            line8NetAmountConvertedToRothIrasCents: 0n,
         })
         assertEq(partI.line9, 35000000n)
         assertEq(partI.line10Thousandths, 57n)
@@ -2126,14 +2847,22 @@ export const proof = {
         assertEq(halfUp(of(5000000n * 2000000n)(35000000n)), 285714n, 'one rounding: $2,857.14')
         assert(partI.line12 !== 285714n, 'the two orders must genuinely differ here')
     },
-    // Nothing on this module's own output is a rounded-then-summed figure:
-    // there are exactly two rounding points, and both are inside line 10 and
-    // line 12. Stated as a leaf so a third one added later has to argue.
-    thereAreExactlyTwoRoundingPoints: () => {
+    // `MERGE NOTE — DELIBERATE RENAME, do not revert.` This leaf was
+    // `thereAreExactlyTwoRoundingPoints` through Phase 30, when line 11 was
+    // structurally zero and the only `halfUp` calls that could bite were line
+    // 10's ratio and line 12's product. **Building Part II made line 11 a real
+    // third rounding point**, so the claim was renumbered rather than left to
+    // read as true — and the fixture now carries a conversion, so line 11 is
+    // actually exercised instead of multiplying zero.
+    //
+    // Nothing on this module's output is a rounded-then-summed figure: the
+    // rounding happens at the ratio and at the two products it multiplies, and
+    // nowhere else. Stated as a leaf so a fourth one added later has to argue.
+    theRoundingPointsAreTheRatioAndItsTwoProducts: () => {
         // Every other line is a sum, a difference or a comparison over exact
         // cents, so doubling every input doubles every line EXCEPT where a
         // ratio rounds. line 10's ratio is scale-invariant, so doubling the
-        // inputs must double lines 12, 13, 15a and 15c exactly.
+        // inputs must double lines 11, 12, 13, 14, 15c and 18 exactly.
         /** @type {(scale: bigint) => Form8606PartI} */
         const at = scale => form8606PartI({
             line1NondeductibleContributionsCents: 0n,
@@ -2141,6 +2870,7 @@ export const proof = {
             line4ContributionsMadeAfterYearEndCents: 0n,
             line6YearEndValueOfAllIrasCents: 15000000n * scale,
             line7DistributionsExcludingQcdCents: 5000000n * scale,
+            line8NetAmountConvertedToRothIrasCents: 1000000n * scale,
         })
         const single = at(1n)
         const doubled = at(2n)
@@ -2148,5 +2878,11 @@ export const proof = {
         assertEq(doubled.line12, single.line12 * 2n)
         assertEq(doubled.line15c, single.line15c * 2n)
         assertEq(doubled.line14, single.line14 * 2n)
+        // Part II's own two, which the Phase 28 form of this leaf could not
+        // have asserted because both were structurally zero.
+        assert(single.line11 > 0n, ['line 11 must be exercised, not zero', single.line11])
+        assertEq(doubled.line11, single.line11 * 2n)
+        assert(single.line18 > 0n, ['line 18 must be exercised, not zero', single.line18])
+        assertEq(doubled.line18, single.line18 * 2n)
     },
 }
