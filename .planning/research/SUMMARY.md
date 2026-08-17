@@ -53,7 +53,7 @@ There is one dependency and there will be one dependency. `functionalscript@0.40
 
 **Defer (v2+):**
 - 1099-B / Form 8949 / Schedule D (and note capital loss carryover drags multi-year support from "nice" to "required").
-- 1099-R, SSA-1099 (the Social Security Benefits Worksheet is a genuinely nasty 19-line near-circular computation).
+- 1099-R, SSA-1099 (the Social Security Benefits Worksheet is a genuinely nasty 18-line near-circular computation — research originally said 19; corrected in Phase 13 against `[VERIFIED: i1040gi.pdf (2025) p32]`).
 - Schedule A, Schedule 1 breadth, Schedules 2/3/8812, K-1/Schedule E.
 - **Never:** state returns (store boxes 15–20 faithfully, compute nothing), 1099-NEC (its three-box simplicity is a trap — the downstream is Schedule C/SE/QBI, explicitly out of scope), a "tax engine" module (recreates the thing the architecture exists to avoid), `finance_compute_1040` (would destroy the thesis permanently — the agent would call it and never author a program).
 

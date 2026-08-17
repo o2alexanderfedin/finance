@@ -1,0 +1,140 @@
+{
+  "version": "1.0",
+  "timestamp": "2026-08-16T07:15:00.000Z",
+  "phase": "21",
+  "phase_name": "the-last-mile",
+  "phase_dir": ".planning/phases/21-the-last-mile",
+  "plan": 0,
+  "task": 0,
+  "total_tasks": 0,
+  "status": "clean_board_milestone_v2_open",
+  "position_note": "Everything is merged to develop via PR #68 and every local branch has ZERO unmerged commits. Phase 20 is complete, verified and its two human_needed items are closed. Milestone v2 (10 phases, 25 requirements) is open and nothing in it has started. Phase 21 is next.",
+  "git": {
+    "branch": "develop",
+    "head": "01476f9",
+    "working_tree": "clean",
+    "open_prs": 0,
+    "worktrees": 1,
+    "main": "ab6771d",
+    "branches_with_unmerged_commits": 0,
+    "deleted_this_session": [
+      "feature/1099g-unemployment (merged via PR #68, local + remote)",
+      "feature/phase-18-dependency-and-duplication-debt (strict subset of the above, local only — it never had a remote)"
+    ],
+    "verify_nothing_is_stranded": "for b in $(git for-each-ref --format='%(refname:short)' refs/heads | grep -v '^develop$'); do echo \"$(git rev-list --count develop..$b)  $b\"; done | sort -rn   # every row must read 0"
+  },
+  "suite": {
+    "command": "npm test",
+    "exit": 0,
+    "tests": "6394/6394",
+    "deduplicated_project_local_proofs": 953,
+    "tsc": "clean",
+    "runtime_range_seconds": "25-140, varying ~5x with load",
+    "measured_on": "develop @ 01476f9, after the merge"
+  },
+  "completed_this_session": [
+    {
+      "id": 1,
+      "name": "Traceability retrofit: DOC-18/TAX-18 and Phase 20, both labelled RETROFITTED",
+      "commit": "d05d5ce"
+    },
+    {
+      "id": 2,
+      "name": "Persona coverage survey against four taxpayers, measured from the code",
+      "commit": "e57b922"
+    },
+    {
+      "id": 3,
+      "name": "Milestone v2 opened: 25 requirements, 10 phases; 1099-NEC out-of-scope decision reversed and struck through, not deleted",
+      "commit": "b7fcc22"
+    },
+    {
+      "id": 4,
+      "name": "Phase 20 verification gaps closed, including a SURVIVING MUTANT (erased refusal destination)",
+      "commit": "1697896"
+    },
+    {
+      "id": 5,
+      "name": "Boxes 10a/10b modelled; both human_needed items closed; real transcript re-verified through the full entry point",
+      "commit": "95e67c3"
+    },
+    {
+      "id": 6,
+      "name": "Merged to develop; both work branches deleted; STATE.md's fourth stale-prose drift repaired",
+      "pr": 68,
+      "commit": "01476f9"
+    }
+  ],
+  "remaining_tasks": [
+    {
+      "id": 7,
+      "name": "Phase 21 THE LAST MILE: reach the 1040 engine from a stored guest program VIA guestCtx. A server tool that assembles inputs and calls form1040Report is the forbidden finance_compute_1040 tool -- read the ROADMAP entry before writing anything.",
+      "status": "next"
+    },
+    {
+      "id": 8,
+      "name": "Phase 22 COMPUTABLE TRIPWIRES: hard prerequisite for phases 23-30, must not be reordered",
+      "status": "blocked_on_21"
+    },
+    {
+      "id": 9,
+      "name": "Phases 23-30: Schedule 2, Schedule 1 adjustments, Schedule 3 credits, retiree completion, Schedule C/SE/QBI, AMT, K-1",
+      "status": "blocked_on_22"
+    },
+    {
+      "id": 10,
+      "name": "Phase 18 (v1) -- planned, 4 plans, 3 waves, zero executed. Plans state a proof floor of 916; it is now 953.",
+      "status": "open"
+    },
+    {
+      "id": 11,
+      "name": "Phase 17 (v1) -- Documentation Truth Pass, not started",
+      "status": "open"
+    },
+    {
+      "id": 12,
+      "name": "Sweep the erased-message-interpolation mutation across the other five dialects that carry refusal strings",
+      "status": "open"
+    }
+  ],
+  "blockers": [],
+  "human_actions_pending": [
+    {
+      "action": "Decide Phase 16 (orphan OCR island) -- deferred 2026-08-12, still unowned",
+      "blocking": false
+    },
+    {
+      "action": "Decide release timing -- develop is >125 commits ahead of main",
+      "blocking": false
+    },
+    {
+      "action": "Close standing verification debt: Phases 05/06/07 have no VERIFICATION.md; Phase 10 and 13 human_needed items remain unowned. Phase 20's two are now CLOSED.",
+      "blocking": false
+    }
+  ],
+  "decisions": [
+    {
+      "decision": "The last mile reaches the engine through guestCtx, NOT through a server tool",
+      "rationale": "A tool that assembles Form1040Inputs and calls form1040Report is the finance_compute_1040 tool REQUIREMENTS.md forbids -- 'would destroy the thesis permanently'. guestCtx already carries pure non-effect helpers beside the four frozen CAS commands, and _CasOpIsExactlyTheFourCommands pins the EFFECT vocabulary, not the context. The agent still authors the program and the effect whitelist does not widen.",
+      "phase": "21"
+    },
+    {
+      "decision": "1099-NEC and self-employment REVERSED from Out of Scope",
+      "rationale": "Owner decision 2026-08-15, triggered by the persona survey showing that one entry is the entire startup-founder persona. Struck through rather than deleted: the original rationale is still true and is now a warning to whoever builds it.",
+      "phase": "27"
+    },
+    {
+      "decision": "1099-G boxes 10a/10b modelled as an array of state rows",
+      "rationale": "Box 11 was stored on the grounds 'a state return would want it' while neither the state nor its payer ID was modelled -- a withheld amount with no state attached is useless to a state return. Follows fjs/document/w2's stateLocalEntry precedent; an array because the printed form carries two rows.",
+      "phase": "20"
+    },
+    {
+      "decision": "v2's 25 requirements are counted separately from v1's 95",
+      "rationale": "So v2 does not move v1's completion figure. 120 in the document, no ID collisions, all counts derived by commands recorded beside them.",
+      "phase": "v2"
+    }
+  ],
+  "uncommitted_files": [],
+  "next_action": "Start Phase 21 (The Last Mile). Read its ROADMAP entry FIRST -- the obvious implementation is explicitly forbidden and the correct route runs through guestCtx, not a new server tool.",
+  "context_notes": "Two findings dominate. FIRST, the defect this project keeps hitting reached eight occurrences: a count true of the part someone examined and false of the whole. Latest instances -- REQUIREMENTS.md's own coverage table summed to 81 against its declared 93, and STATE.md's prose described Phase 15 for four days while its own frontmatter directly above said 16 phases complete. Two statements of one fact with no check between them. The fix that works is putting the re-derivation COMMAND next to the number, which both documents now do. SECOND, Phase 20's verification found a SURVIVING MUTANT: erasing a refusal message's destination interpolation left the entire suite green, because five proofs asserted the box name and the phrase 'cannot compute' and none asserted where the amount would have gone -- the only actionable part of the message. That class is unswept across the other five dialects carrying refusal strings. Also corrected: AGENTS.md's own '&& false' mutation recipe does not work inside an if statement under allowUnreachableCode: false, so any pre-2026-08-16 plan specifying one will silently fail to run rather than fail to pass."
+}

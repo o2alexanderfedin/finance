@@ -5,7 +5,15 @@ workaround for an fjs gap must never be silent, even though the workaround (belo
 small and does not block progress.
 
 Target: `functionalscript` `fjs/effects/node/module.f.ts` / `module.js`. Checked against
-the version pinned in this repo's `package.json` (`functionalscript ^0.41.0`).
+the version pinned in this repo's `package.json` (`functionalscript ^0.43.1`).
+
+**Re-checked 2026-08-17 against 0.45.0** (release commit `8804e783`, the current npm release),
+reading `fjs/effects/node/types.ts` at that SHA. **Still open, unchanged.** There is no `Spawn`
+type and no `'spawn'` operation; `Exec` is still the only subprocess primitive, and the `Fs` union
+is still `Mkdir | ReadFile | ReadBytes | Readdir | WriteFile | Rm | Rename | Exec | Access |
+CreateExclusive | WriteBytes | Stat`. The workaround below stands. (The bump itself did not land:
+0.44.0+ is not consumable here — see
+[upstream-mjs-migration.md](./upstream-mjs-migration.md).)
 
 ## The gap, precisely
 
@@ -21,7 +29,7 @@ string**, one optional `stdin` string handed in up front, and a `Promise` that r
 only once the whole process has exited, with the whole of `stdout`/`stderr` collected. It
 is genuinely useful for exactly the shape it supports — "run this, wait for it to finish,
 give me everything it printed" — and this plan's local workaround (below) could in
-principle have used it for the short-lived `npx functionalscript cas add` invocations.
+principle have used it for the short-lived `fjs cas add` invocations.
 
 What does **not** exist is a **long-lived, streaming** spawn effect: something that
 returns a live process handle a caller can write to incrementally, read incremental output
@@ -58,8 +66,14 @@ existing effect system at all, regardless of `Exec`'s existence.
 no `@types/node` — forbidden by AGENTS.md's no-new-dependency rule without owner approval
 — and no fjs effect exists that could express this test's control flow either way). It
 uses `node:child_process`'s `spawn` throughout — for the long-lived server, and (awaited,
-not overlapping with the server) for the short-lived `npx functionalscript cas add`
-invocations too. `Exec` was not used for the latter either, to keep the whole harness in
+not overlapping with the server) for the short-lived `fjs cas add`
+invocations too. Those short-lived calls spawn `node` against an absolute path into this
+repo's pinned `node_modules/functionalscript`, **not** `npx`: the package declares its bin
+as `fjs`, so `npx functionalscript` could not resolve locally and fell through to npm's
+registry-touching resolution path — 84% of the test's wall clock, and the reason it timed
+out under the full suite's parallel load. See `cas-refresh-cross-process.test.js`'s
+`fjsCliPath` docstring for the measurements.
+`Exec` was not used for the latter either, to keep the whole harness in
 one consistent, already-impure idiom rather than mixing a `virtual`/real effect-runner
 invocation into a file that is impure by necessity anyway. This file is scoped outside the
 pure `fjs/` tree, alongside `index.js` and `all.test.js` — the same "root-level entry

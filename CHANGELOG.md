@@ -16,6 +16,113 @@ cannot yet be reached from the server.
 
 ## Unreleased
 
+### TAX-33 closed: Form 6251 Part III, the AMT's capital-gains worksheet
+
+Phase 29 shipped Form 6251 Parts I and II and **refused** every return with
+capital gains or qualified dividends, because Part III — the twenty-nine-line
+worksheet reconciling the AMT's 26/28% schedule with §1(h)'s preferential rates
+— was unbuilt. That refusal hit the FAANG persona's most likely combination: a
+large incentive stock option spread beside qualified dividends. It now computes.
+
+- **`fjs/form6251/part3`** — lines 12-40, transcribed from `f6251.pdf` page 2,
+  one named `const` per printed line. All four preferential bands: 0% (line 23),
+  15% (line 31), 20% (line 34) and the 25% unrecaptured-§1250 band (lines 35-37).
+  Both printed skips kept as skips; both printed floors floored; the four lines
+  with no printed floor asserted instead, per `fjs/tax/line16/qdcgt`'s stated
+  rule. Every dollar figure is a `fjs/tax/params` lookup — lines 19 and 25 read
+  the same `capitalGainsBreakpoints` rows the QDCGT's lines 6 and 13 read,
+  because §55(b)(3) applies §1(h) unchanged inside the AMT.
+- **`fjs/form6251/rate`** — §55(b)(1)(A)'s two-bracket schedule, which this form
+  prints THREE times (lines 7, 18 and 39), written once. The breakpoint's halving
+  for married filing separately is a stored parameter row, never arithmetic.
+- **The regular tax's own worksheet is threaded, never re-executed.** `Line16Ok`
+  now carries the QDCGT or Schedule D Tax Worksheet that produced 1040 line 16,
+  because Part III's lines 13/15/20/27 read four of its lines and lines 20 and 27
+  say *"as figured for the regular tax"* on the printed page.
+- **The FAANG return, end to end through `form1040Report`**: a single filer with
+  $250,000.00 of salary, $20,000.00 of qualified dividends and a $1,000,000.00
+  ISO spread pays **$55,023.00** of regular tax and **$293,195.00** of AMT,
+  **$348,218.00** in all. Part III is worth $2,600.00 of it — the qualified
+  dividends taking 15% rather than the AMT's flat 28%.
+- **Phase 29's upper bound is unchanged and still runs first.** A return whose
+  flat 26/28% figure already loses to the regular tax still gets an exact
+  `$0.00` without Part III running at all, and `line7IsAnUpperBound` still says
+  which path produced the answer. `fjs/form6251/part3` proves the stronger
+  statement the mechanism rests on: **line 38 never exceeds line 39 at any
+  input**, because every preferential rate the page charges is strictly below the
+  AMT's own 26% — so the printed `min` on line 40 is a clause that never binds.
+- **What still refuses, by name**: Part III required while the regular tax
+  completed *neither* preferential worksheet, reachable only when 1040 line 15 is
+  zero or less. Every Form 2555 clause on the page is structurally unreachable.
+  There is no 28% collectibles band on this page and its absence is the printed
+  form's own decision, not an omission — documented with a proof leaf.
+- Three proof leaves that asserted the removed refusal are **rewritten as
+  computing leaves** with hand-derived figures, not weakened to bare `throw:`
+  shapes. Two mutations found coverage gaps in the new wiring and both are now
+  pinned at the module that produces the value rather than two modules away.
+
+### Phase 26: Retiree Completion — the retiree stops being overcharged
+
+Two new dialects, one new form module, and one figure worth stating up front: on a
+hand-derived retiree with a $50,000 IRA distribution, $20,000 of it given straight to
+charity and $20,000 of prior-year nondeductible basis, **this engine charged $2,915.00
+where the law charges $291.00** — silently, with full citations and no warning.
+
+Project-local proofs: **1,347 → 1,434**.
+
+#### What is here
+
+- **Qualified Charitable Distributions (TAX-28).** A QCD is a taxpayer ELECTION, not a
+  1099-R box: the custodian reports the full distribution and there is no distribution
+  code for it. The new `vnd.fjs.ira` dialect carries the election, and 1040 line 4b falls
+  while **line 4a stays gross**, exactly as the printed instruction requires. Capped at
+  §408(d)(8)(A)'s **$108,000 per individual** for TY2025 — a figure `fjs/tax/params` now
+  stores with its indexing history, because it was $100,000 through 2023 and $105,000 for
+  2024.
+- **Form 8606 Part I (TAX-29, in part).** §408(d)(2)'s pro-rata rule over the
+  **aggregated** year-end value of every traditional, SEP and SIMPLE IRA one person owns —
+  never per account, which is the mistake that understates tax for anyone with two IRAs.
+  Basis carries forward from the prior year's line 14 through a second new dialect,
+  `vnd.fjs.prior_year_ira_basis`, which becomes the **second exemption** from Phase 21's
+  mixed-year refusal.
+- **The ordering between them, pinned with arithmetic.** §408(d)(8)(D) makes a QCD come
+  first out of the pre-tax portion, which the printed Form 8606 implements in exactly one
+  place: line 7 excludes QCDs. Two consequences are proven rather than described — a QCD
+  does not absorb basis (next year's line 2 is *larger* with the gift than without it),
+  and it makes the remaining distributions *more* nontaxable, not less.
+- **A second-order effect that was looked for on purpose.** Line 4b is the Social Security
+  Benefits Worksheet's own line 3, so a $20,000 gift takes **$17,000 off taxable Social
+  Security on top of the $20,000** it takes off the distribution. Phase 24 shipped a
+  newly-real read in that worksheet that no fixture exercised; this phase went looking for
+  the same shape and found it.
+
+#### What refuses, by name
+
+Every one of these is a sentence a taxpayer can act on rather than a number quietly
+missing: the **70½ eligibility test** when unasserted (see below) or when contradicted by
+the profile's own age boxes; §408(d)(8)(F)'s **one-time split-interest election**; a QCD
+from a 401(k) rather than an IRA, from no stored 1099-R, from two of them, or larger than
+the distribution it claims; an **unasserted aggregated year-end IRA value**; a stored
+basis with no IRA record beside it; **Form 8606 Part II** (Roth conversions) and **Part
+III** (Roth distributions, detected off box 7a codes J/T/Q rather than off an assertion).
+
+#### The 70½ finding
+
+§408(d)(8)(B)(ii) requires age 70½ **at the time of the distribution**, and **this engine
+cannot determine that**. Two independent reasons, either fatal on its own: no birth date
+is stored anywhere in this repository — the nearest fact is 1040 line 12d's
+*born-before-2-January-1961* checkbox, a **65** test — and the statute tests age at a
+DATE, which only Form 1099-R box 13 carries and only as free text. The fact is therefore
+asserted by the taxpayer and refused when absent, never approximated from the 65 box. The
+one derivable direction (that box is NECESSARY) is checked, so an unchecked box
+contradicts the assertion.
+
+#### What is NOT here
+
+**A backdoor Roth is still not computable**, so TAX-29's checkbox stays empty. A backdoor
+Roth is a nondeductible contribution plus a *conversion*, the conversion is Form 8606 Part
+II, and Part II refuses. The requirement's first sentence ships and its second does not.
+
 ## 0.12.0
 
 Phases 11 and 12: the documents a real return actually arrives as. Four new

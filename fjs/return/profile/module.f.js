@@ -62,6 +62,28 @@
  *   `hadForeignFinancialAccount`: the two printed sub-questions are independent
  *   facts, and it is Schedule B, not this dialect, that decides what to do with
  *   the combination.
+ * - **`itemizeEvenThoughLessThanStandardDeduction` (Schedule A line 18,
+ *   TAX-13, 13-CONTEXT.md Decision 2.5) is a taxpayer ELECTION no document
+ *   reports** — exactly like `hadForeignFinancialAccount`: no 1099 or W-2
+ *   states that a taxpayer wants to itemize when the standard deduction is
+ *   larger, so this dialect is the only possible source. Read only by
+ *   `fjs/tax/deduction`'s `deductionChoice` (13-06); without it, a
+ *   legitimate itemize-anyway return could not be expressed at all.
+ * - **`dependents` (TAX-12, 13-CONTEXT.md Decision 4.1) is ADDITIVE, and
+ *   `dependentCount` is KEPT rather than replaced.** `dependentCount` stays
+ *   the load-bearing declaration existing proofs and the scope guard read;
+ *   `dependents` is a per-dependent array Schedule 8812 needs to tell a
+ *   qualifying child from an other dependent, which a bare count cannot
+ *   express. Check 8 below enforces `dependents.length === dependentCount`
+ *   whenever the array is present, so the two can never silently diverge.
+ *   **Citizenship/national/resident-alien status is deliberately NOT one of
+ *   this array's fields.** Schedule 8812's own docstring (Wave 4's later
+ *   plan, `fjs/schedule/8812`) documents that trust boundary — the
+ *   taxpayer's act of declaring a dependent already asserts it, and the
+ *   printed form keys the CTC-vs-ODC classification itself on only two
+ *   facts (age, SSN validity), both of which this array carries
+ *   (13-CONTEXT.md Decision 5.7). This mirrors how `fjs/schedule/b`
+ *   documents its own Form 8815 boundary.
  *
  * @module
  */
@@ -118,21 +140,265 @@ export const kindVocabulary = /** @type {const} */ ([
     'iraDistributions',                     // 4a/4b
     'pensionsAndAnnuities',                 // 5a/5b
     'socialSecurityBenefits',               // 6a/6b
+    'unemploymentCompensation',             // Schedule 1 line 7 -> 8
     'capitalGainDistributions',             // 7a
     'capitalGainsOrLosses',                 // 7a via Schedule D
     'unrecaptured1250Gain',                 // Schedule D line 19
     'collectibles28RateGain',               // Schedule D line 18
     'section1202Gain',                      // 1099-DIV box 2c
     'investmentInterestForm4952',           // Form 4952 line 4g
-    'scheduleOneAdditionalIncome',          // 8
-    'scheduleOneAdjustments',               // 10
+    // ── Schedule 1 Part I's own lines, one kind each (DOC-20/21/TAX-30, Phase 27) ─
+    //
+    // `scheduleOneAdditionalIncome` stood here as ONE coarse kind for the
+    // whole of Part I -- taxable state and local refunds, alimony received,
+    // business income on Schedule C, other gains on Form 4797, rental and
+    // pass-through income on Schedule E, farm income on Schedule F, and the
+    // twenty-six lettered sub-lines at 8a-8z. A single kind covering that
+    // many distinct income items could only ever refuse them together, so
+    // nothing on Part I was nameable and nothing on it could be reclassified
+    // one line at a time. It is split here into one kind per printed line, in
+    // SCHEDULE 1's own order -- which is 1040 form order for the block as a
+    // whole, since every one of these feeds line 10 and thence 1040 line 8.
+    //
+    // **This was the LAST of the five coarse kinds.** `fjs/return/scope`'s
+    // own Wave-5 note named all five (`scheduleOneAdditionalIncome`,
+    // `scheduleOneAdjustments`, `scheduleTwoTaxes`,
+    // `scheduleThreeNonrefundableCredits`, `scheduleThreeRefundableCredits`)
+    // and recorded, phase by phase, which had been taken apart; Phase 23 took
+    // Schedule 2, Phase 24 Schedule 1 Part II, Phase 25 both halves of
+    // Schedule 3, and this one takes the schedule that entry was still
+    // waiting on.
+    //
+    // **Printed line 7 deliberately gets no kind HERE.** Unemployment
+    // compensation already has one -- `unemploymentCompensation`, far above,
+    // beside the 1040 lines it sits among in this vocabulary since Phase 20 --
+    // and a second kind for one printed line would let a taxpayer declare the
+    // income twice. It is the one Part I line whose kind is out of Schedule 1
+    // order in this list, and that is history rather than design.
+    //
+    // Lines 9 and 10 get no kind either: line 9 is the TOTAL of the 8a-8z
+    // block `otherIncome` already covers, and line 10 is Part I's own total.
+    // A kind for either would be a declaration a taxpayer could never
+    // truthfully make -- the identical reasoning Schedule 3's lines 7/8/14/15
+    // already carry.
+    //
+    // One of the seven is MODELED as of this phase -- `businessIncomeOrLoss`,
+    // Schedule C. The other six refuse by name, which is the whole point of
+    // splitting: what remains unmodeled on Part I is now something a taxpayer
+    // can be told.
+    'taxableStateLocalRefunds',             // Schedule 1 line 1   -> 8
+    'alimonyReceived',                      // Schedule 1 line 2a  -> 8
+    'businessIncomeOrLoss',                 // Schedule 1 line 3   -> 8
+    'otherGainsOrLosses',                   // Schedule 1 line 4   -> 8
+    // ── Schedule 1 line 5's own five kinds, one per Schedule E PART ────────
+    //
+    // `rentalRealEstateRoyaltiesPartnershipsSCorps` stood here as ONE kind
+    // for the whole of Schedule E, and it is the coarse kind Phase 27's own
+    // split created rather than removed — its printed caption really does
+    // name five different things, because printed Schedule 1 line 5 is the
+    // total of a schedule with five parts. So this is the one place in this
+    // vocabulary where a per-printed-LINE kind was still too coarse: line 5
+    // has one line number and five sources, each with its own form, its own
+    // documents and its own limitation rules.
+    //
+    // Split here by PART, in Schedule E's own order, which is also Schedule
+    // 1 order for the block as a whole since all five feed line 5.
+    //
+    // **Printed Schedule E line 41 gets no kind, and neither do lines 42 or
+    // 43.** Line 41 is Part V's TOTAL of the five parts above it — a kind for
+    // it would let a taxpayer declare a sum without declaring anything it is a
+    // sum of, the identical reasoning Schedule 1's lines 9/10 and Schedule 3's
+    // lines 7/8/14/15 already carry. Lines 42 and 43 are reconciliations that
+    // change no figure: line 42 restates farming and fishing income already on
+    // line 41 for the §6654(i) estimated-tax exception, and line 43 restates a
+    // real estate professional's participation. Neither adds to any total.
+    //
+    // One of the five is MODELED as of Phase 30 —
+    // `partnershipAndSCorporationIncome`, Schedule E Part II, which
+    // `fjs/schedule/e` computes from the two Schedule K-1 dialects. The other
+    // four refuse by name, which is the whole point of splitting: a filer with
+    // rental property is now told that Part I is what is missing, rather than
+    // being refused for "Schedule E" as a whole or, worse, receiving a return
+    // silently missing it.
+    'rentalRealEstateAndRoyalties',         // Schedule E Part I (3-26)   -> Schedule 1 line 5 -> 8
+    'partnershipAndSCorporationIncome',     // Schedule E Part II (27-32) -> Schedule 1 line 5 -> 8
+    'estateAndTrustIncome',                 // Schedule E Part III (33-37) -> Schedule 1 line 5 -> 8
+    'remicResidualInterest',                // Schedule E Part IV (38-39) -> Schedule 1 line 5 -> 8
+    'netFarmRentalIncomeForm4835',          // Schedule E Part V line 40  -> Schedule 1 line 5 -> 8
+    'farmIncomeOrLoss',                     // Schedule 1 line 6   -> 8
+    'otherIncome',                          // Schedule 1 line 8a-8z -> 8
+    // ── Schedule 1 Part II's own lines, one kind each (TAX-23/24, Phase 24) ─
+    //
+    // `scheduleOneAdjustments` stood here as ONE coarse kind for the whole of
+    // Part II -- educator expenses, the HSA deduction, the deductible half of
+    // self-employment tax, the IRA deduction, alimony paid, student loan
+    // interest and ten more printed lines. A single kind covering that many
+    // distinct adjustments could only ever refuse them together, so nothing
+    // on Part II was nameable and nothing on it could be reclassified one
+    // line at a time. It is split here into one kind per printed line, in
+    // SCHEDULE 1's own order -- which is 1040 form order for the block as a
+    // whole, since every one of these feeds line 26 and thence 1040 line 10.
+    //
+    // **Printed line 22 deliberately gets no kind.** The form itself reserves
+    // that line number with no box to fill, so a kind for it would be a
+    // declaration a taxpayer could never truthfully make.
+    //
+    // Three of the thirteen are MODELED as of this phase --
+    // `educatorExpenses`, `healthSavingsAccountDeduction` and
+    // `studentLoanInterestDeduction`. The other ten refuse by name, which is
+    // the whole point of splitting: what remains unmodeled on Part II is now
+    // something a taxpayer can be told.
+    'educatorExpenses',                     // Schedule 1 line 11  -> 10
+    'reservistPerformingArtistFeeBasisExpenses', // Schedule 1 line 12 -> 10
+    'healthSavingsAccountDeduction',        // Schedule 1 line 13  -> 10
+    'movingExpensesArmedForces',            // Schedule 1 line 14  -> 10
+    'deductiblePartOfSelfEmploymentTax',    // Schedule 1 line 15  -> 10
+    'selfEmployedRetirementPlans',          // Schedule 1 line 16  -> 10
+    'selfEmployedHealthInsuranceDeduction', // Schedule 1 line 17  -> 10
+    'penaltyOnEarlyWithdrawalOfSavings',    // Schedule 1 line 18  -> 10
+    'alimonyPaid',                          // Schedule 1 line 19a -> 10
+    'iraDeduction',                         // Schedule 1 line 20  -> 10
+    'studentLoanInterestDeduction',         // Schedule 1 line 21  -> 10
+    'archerMsaDeduction',                   // Schedule 1 line 23  -> 10
+    'otherAdjustments',                     // Schedule 1 line 24a-24z -> 10
     'itemizedDeductions',                   // 12e
     'netQualifiedDisasterLoss',             // 12e exception 5
     'qualifiedBusinessIncomeDeduction',     // 13a
+    // ── Phase 28 (TAX-32): the ONE §199A input this engine cannot reach ─────
+    //
+    // Form 8995 lines 6-9 are the REIT/PTP component, and they are a
+    // SEPARATE fact from the deduction itself: a taxpayer can have qualified
+    // REIT dividends with no trade or business at all. Form 1099-DIV box 5
+    // carries §199A dividends and `vnd.fjs.1099div` stores them, but nothing
+    // reads that box, and PTP income needs Schedule K-1 (DOC-24, Phase 30).
+    'qualifiedReitDividendsAndPtpIncome',   // Form 8995 lines 6-9 -> 13a
     'seniorAndOtherScheduleOneADeductions', // 13b
-    'scheduleTwoTaxes',                     // 17 and 23
+    // ── Schedule 2's own lines, one kind each (TAX-22, Phase 23) ────────────
+    //
+    // `scheduleTwoTaxes` stood here as ONE coarse kind for the whole of
+    // Schedule 2 -- Part I's alternative minimum tax and repayments, Part
+    // II's self-employment tax, Additional Medicare Tax, net investment
+    // income tax and eleven more printed lines. A single kind covering that
+    // many distinct taxes could only ever refuse them together, so nothing
+    // on Schedule 2 was nameable and nothing on it could be reclassified
+    // one line at a time. It is split here into one kind per printed line
+    // group, in SCHEDULE 2's own order -- which is 1040 form order for the
+    // block as a whole, since every one of these feeds either line 17
+    // (Part I) or line 23 (Part II).
+    //
+    // **Schedule 2 lines 5 and 6 deliberately get no kind of their own.**
+    // Line 5 is the Social Security and Medicare tax on unreported tips,
+    // computed on Form 4137 -- which is exactly the remedy `unreportedTips`
+    // (1040 line 1c, above) already names, for the same taxpayer fact. Line
+    // 6 is the uncollected tax on Form 8919 wages, which `form8919Wages`
+    // (1040 line 1g) already names. Adding a second kind for either would
+    // give one fact two declarations and let a taxpayer declare the income
+    // half without the tax half.
+    'advancePremiumTaxCreditAndOtherRepayments', // Schedule 2 line 1a-1z -> 17
+    'alternativeMinimumTax',                // Schedule 2 line 2  -> 17
+    // ── Phase 29 (TAX-33): Form 6251 Part I's own lines, one kind each ──────
+    //
+    // Not a coarse kind being split -- `alternativeMinimumTax` above stays,
+    // and it is the kind for the TAX ITSELF, which Phase 29 computes. These
+    // fifteen are the §56/§57 ADJUSTMENTS AND PREFERENCES that feed it and
+    // which this engine cannot compute, one per printed line of Form 6251
+    // Part I, in the form's own order.
+    //
+    // **The reason they exist as kinds at all is the direction the error
+    // runs.** A zero on a Form 6251 Part I line does not merely omit
+    // something: it UNDERSTATES alternative minimum taxable income, and
+    // therefore the tax. Every other unmodeled item in this vocabulary has a
+    // printed line a reader can see is blank; these are add-backs, and a
+    // blank add-back looks exactly like no add-back. So each is nameable and
+    // each refuses the whole return when declared.
+    //
+    // **Lines 2c and 2h deliberately get no kind here.** Line 2c is the
+    // investment interest expense difference, which needs Form 4952 --
+    // exactly what `investmentInterestForm4952` (above, at the Schedule D Tax
+    // Worksheet) already names, for the same missing form. Line 2h is 7% of a
+    // §1202 exclusion, which needs the exclusion percentage `section1202Gain`
+    // already refuses. A second kind for either would give one taxpayer fact
+    // two declarations.
+    //
+    // **Lines 2e and 2f share ONE kind**, against this vocabulary's usual
+    // one-per-printed-line rule. They are two halves of a single fact: 2e adds
+    // the regular net operating loss deduction back and 2f allows the
+    // alternative-tax one in its place. A taxpayer has an NOL or does not, and
+    // could never truthfully declare one half.
+    //
+    // Line 2b (a state or local tax refund) gets no kind either, and that is
+    // the one case where a zero is COMPUTED rather than unmodeled:
+    // `fjs/document/1099g` refuses a non-zero box 2 at validation, so
+    // Schedule 1 line 1 cannot be non-zero here, and line 8z is `otherIncome`,
+    // already above.
+    'amtDepletion',                         // Form 6251 line 2d -> Sch 2 line 2
+    'amtNetOperatingLossDeduction',         // Form 6251 lines 2e/2f -> Sch 2 line 2
+    'amtPrivateActivityBondInterest',       // Form 6251 line 2g -> Sch 2 line 2
+    'amtEstatesAndTrusts',                  // Form 6251 line 2j -> Sch 2 line 2
+    'amtDispositionOfProperty',             // Form 6251 line 2k -> Sch 2 line 2
+    'amtDepreciation',                      // Form 6251 line 2l -> Sch 2 line 2
+    'amtPassiveActivities',                 // Form 6251 line 2m -> Sch 2 line 2
+    'amtLossLimitations',                   // Form 6251 line 2n -> Sch 2 line 2
+    'amtCirculationCosts',                  // Form 6251 line 2o -> Sch 2 line 2
+    'amtLongTermContracts',                 // Form 6251 line 2p -> Sch 2 line 2
+    'amtMiningCosts',                       // Form 6251 line 2q -> Sch 2 line 2
+    'amtResearchAndExperimentalCosts',      // Form 6251 line 2r -> Sch 2 line 2
+    'amtPre1987InstallmentSales',           // Form 6251 line 2s -> Sch 2 line 2
+    'amtIntangibleDrillingCosts',           // Form 6251 line 2t -> Sch 2 line 2
+    'amtOtherAdjustments',                  // Form 6251 line 3  -> Sch 2 line 2
+    'selfEmploymentTax',                    // Schedule 2 line 4  -> 23
+    // ── Phase 28 (TAX-31): the two Schedule SE facts nothing stored can
+    // reveal, each its own kind because they are separate taxpayer facts
+    // with separate remedies ─────────────────────────────────────────────
+    //
+    // Neither has a kind of its own before this phase because Schedule SE
+    // did not exist; both are on the printed page this phase transcribes,
+    // and both change the tax rather than merely the presentation.
+    'churchEmployeeIncome',                 // Schedule SE line 5a -> Sch 2 line 4
+    'selfEmploymentOptionalMethods',        // Schedule SE Part II -> Sch 2 line 4
+    'additionalTaxOnTaxFavoredAccounts',    // Schedule 2 line 8  -> 23
+    'householdEmploymentTaxes',             // Schedule 2 line 9  -> 23
+    'additionalMedicareTax',                // Schedule 2 line 11 -> 23
+    'netInvestmentIncomeTax',               // Schedule 2 line 12 -> 23
+    'uncollectedTaxOnTipsOrGroupTermLife',  // Schedule 2 line 13 -> 23
+    'interestOnResidentialLotAndTimeshareInstallments', // Schedule 2 line 14 -> 23
+    'interestOnDeferredInstallmentSaleTax', // Schedule 2 line 15 -> 23
+    'lowIncomeHousingCreditRecapture',      // Schedule 2 line 16 -> 23
+    'otherAdditionalTaxes',                 // Schedule 2 line 17a-17z -> 23
+    'premiumTaxCreditReconciliation',       // Schedule 2 line 19 -> 23
+    'section965NetTaxLiabilityInstallment', // Schedule 2 line 20 (memo)
     'childTaxCreditOrOtherDependents',      // 19
-    'scheduleThreeNonrefundableCredits',    // 20
+    // ── Schedule 3 Part I's own lines, one kind each (TAX-25/26, Phase 25) ──
+    //
+    // `scheduleThreeNonrefundableCredits` stood here as ONE coarse kind for
+    // the whole of Part I -- the foreign tax credit, the dependent care
+    // credit, education credits, the saver's credit, two residential energy
+    // credits and thirteen more sub-lines at 6a-6z alone. A single kind
+    // covering that many distinct credits could only ever refuse them
+    // together, so nothing on Part I was nameable and nothing on it could be
+    // reclassified one line at a time. It is split here into one kind per
+    // printed line, in SCHEDULE 3's own order -- which is 1040 form order for
+    // the block as a whole, since every one of these feeds line 8 and thence
+    // 1040 line 20.
+    //
+    // **6a-6z stays ONE collapsed kind**, exactly as Schedule 1's
+    // `otherAdjustments` (24a-24z) and Schedule 2's `otherAdditionalTaxes`
+    // (17a-17z) do: the printed line 6 is a header over lettered sub-lines
+    // with no dollar box of its own, this engine models none of them, and
+    // inventing a kind per sub-line would put names in this frozen vocabulary
+    // that no work here read off the printed page.
+    //
+    // Line 7 deliberately gets no kind: it is the TOTAL of the 6a-6z block
+    // `otherNonrefundableCredits` already covers, and line 8 is Part I's own
+    // total. A kind for either would be a declaration a taxpayer could never
+    // truthfully make.
+    'foreignTaxCredit',                     // Schedule 3 line 1  -> 20
+    'dependentCareCredit',                  // Schedule 3 line 2  -> 20
+    'educationCredits',                     // Schedule 3 line 3  -> 20
+    'retirementSavingsContributionsCredit', // Schedule 3 line 4  -> 20
+    'residentialCleanEnergyCredit',         // Schedule 3 line 5a -> 20
+    'energyEfficientHomeImprovementCredit', // Schedule 3 line 5b -> 20
+    'otherNonrefundableCredits',            // Schedule 3 line 6a-6z -> 20
     'federalTaxWithheldOnW2',               // 25a
     'federalTaxWithheldOn1099Int',          // 25b
     'federalTaxWithheldOnOther1099',        // 25b
@@ -142,7 +408,26 @@ export const kindVocabulary = /** @type {const} */ ([
     'additionalChildTaxCredit',             // 28
     'americanOpportunityCredit',            // 29
     'refundableAdoptionCredit',             // 30
-    'scheduleThreeRefundableCredits',       // 31
+    // ── Schedule 3 Part II's own lines, one kind each (Phase 25) ────────────
+    //
+    // `scheduleThreeRefundableCredits` stood here as ONE coarse kind for the
+    // whole of Part II, and is split for the identical reason as Part I's
+    // above. Every one of these feeds Schedule 3 line 15 and thence 1040 line
+    // 31; 13a-13z stays one collapsed kind, and lines 14 and 15 get none
+    // because they are totals.
+    //
+    // **None of the five is MODELED after this phase.** TAX-25 and TAX-26
+    // reach Part I's lines 3 and 4 only; Part II is untouched. `excessSocial\
+    // SecurityWithheld` is nonetheless the most interesting entry in this
+    // block, because it is the one line on this schedule whose amount is
+    // already derivable from documents this engine holds -- see its own
+    // remedy string in `fjs/return/scope` and `fjs/schedule/3`'s own
+    // docstring.
+    'netPremiumTaxCredit',                  // Schedule 3 line 9  -> 31
+    'amountPaidWithExtensionRequest',       // Schedule 3 line 10 -> 31
+    'excessSocialSecurityWithheld',         // Schedule 3 line 11 -> 31
+    'federalFuelTaxCredit',                 // Schedule 3 line 12 -> 31
+    'otherPaymentsAndRefundableCredits',    // Schedule 3 line 13a-13z -> 31
     'foreignEarnedIncomeForm2555',          // line 16 wrapper
     'childsUnearnedIncomeForm8615',         // line 16 wrapper
     'farmIncomeAveragingScheduleJ',         // line 16 wrapper
@@ -157,6 +442,27 @@ export const kindVocabulary = /** @type {const} */ ([
 /** One member of {@link kindVocabulary}.
  * @typedef {typeof kindVocabulary[number]} Kind
  */
+
+/**
+ * One entry of {@link returnProfileSchema}'s `dependents` array — the exact
+ * four facts Schedule 8812 itself keys its CTC/ODC classification on
+ * (13-RESEARCH.md §4): `relationship` (free text, the dependency-test detail
+ * this array does not otherwise model), `ssnValidForEmployment` (line4's
+ * "required SSN" test), `ageAtYearEnd` (line4's "under 17" test), and
+ * `livedWithTaxpayer` (a fact every dependency claim relies on, though no
+ * single 8812 line names it directly). The three boolean-shaped facts are
+ * `option(true)`, DOC-12's convention extended to a taxpayer-asserted fact
+ * rather than a printed checkbox: ABSENT means "not asserted true", the
+ * conservative default for a credit-eligibility fact — a serializer that
+ * helpfully materializes every key as `false` cannot smuggle a false
+ * assertion in as a true one.
+ */
+const dependentEntrySchema = /** @type {const} */ ({
+    relationship: string,
+    ssnValidForEmployment: option(true),
+    ageAtYearEnd: number,
+    livedWithTaxpayer: option(true),
+})
 
 /**
  * rtti schema for a `return_profile` BLOB. `dialect` is spread first (via
@@ -202,6 +508,34 @@ export const returnProfileSchema = /** @type {const} */ ({
     foreignAccountCountries: option(array(string)),
     // Schedule B Part III, line 8.
     receivedForeignTrustDistributionOrWasGrantorOrTransferor: option(true),
+    // Phase 13 Slice 1 (TAX-10), 13-CONTEXT.md Decision 5.1: the IRA-
+    // deduction circularity refusal fires on THIS FIELD, not on the coarse
+    // `scheduleOneAdjustments` kind — that kind cannot distinguish an IRA
+    // deduction (which creates the Pub. 590-A / taxable-Social-Security
+    // cycle) from an HSA or educator-expense adjustment, which does not.
+    // Read only by `fjs/form1040/core`; no cross-field check needed here.
+    iraDeductionDeclared: option(true),
+    // Phase 13 Slice 1 (TAX-10): the Social Security Benefits Worksheet's
+    // line 8 branches on this fact for a married-filing-separately filer —
+    // no other 1040 line already carries it. Additive, taxpayer-declared,
+    // and read only by `fjs/form1040/core`, mirroring
+    // `spouseHadNoIncomeIsNotFilingAndIsNotADependent`'s own precedent: no
+    // cross-field check here, since `fjs/form1040/core` gates the value by
+    // `filingStatus` itself before ever passing it to the worksheet.
+    mfsLivedWithSpouseAtAnyTimeInYear: option(true),
+    // Schedule A line 18 (TAX-13, 13-CONTEXT.md Decision 2.5) — "elect to
+    // itemize deductions even though they are less than your standard
+    // deduction". A taxpayer election no document reports, exactly like
+    // hadForeignFinancialAccount. Read only by `fjs/tax/deduction`'s
+    // `deductionChoice` (13-06); no cross-field check needed here.
+    itemizeEvenThoughLessThanStandardDeduction: option(true),
+    // TAX-12 (13-CONTEXT.md Decision 4.1) — per-dependent facts Schedule
+    // 8812 needs to classify a qualifying child versus an other dependent.
+    // Additive, ABSENT for a return declaring `dependentCount: 0` and
+    // itemizing nothing about its dependents (check 8 below). See this
+    // module's own docstring, "schema decisions worth stating", for why
+    // citizenship is deliberately NOT a fifth field here.
+    dependents: option(array(dependentEntrySchema)),
 })
 
 /** @typedef {Ts<typeof returnProfileSchema>} ReturnProfile */
@@ -282,6 +616,7 @@ const statusesWithoutSpouseBoxes = ['single', 'headOfHousehold', 'qualifyingSurv
  * 5b. Married filing separately's spouse boxes require the footnote condition.
  * 6. Every PRESENT money box is an exact decimal string at the cents scale.
  * 7. A present line-26 amount has `'estimatedTaxPayments'` declared.
+ * 8. A present `dependents` array's length equals `dependentCount`.
  *
  * Nothing here throws: every refusal is an `error(...)` the caller unwraps, so
  * a hostile blob can never escape `validate` as an exception.
@@ -375,6 +710,17 @@ export const checkReferences = r => {
             + "'estimatedTaxPayments'",
         )
     }
+    // 8 — TAX-12/13-CONTEXT.md Decision 4.1: `dependentCount` stays the
+    // load-bearing declaration; `dependents`, when present, must agree with
+    // it exactly, or Schedule 8812's per-dependent classification and the
+    // scope guard's coarse count would silently describe two different
+    // returns.
+    if (r.dependents !== undefined && r.dependents.length !== r.dependentCount) {
+        return error(
+            `dependents array length (${r.dependents.length}) does not match `
+            + `dependentCount (${r.dependentCount})`,
+        )
+    }
     return ok(r)
 }
 
@@ -462,16 +808,84 @@ const expectedMoneyBoxFieldCount = 4
  * Independently hand-typed: the size of the frozen {@link kindVocabulary},
  * counted off the 1040 face rather than read from `kindVocabulary.length`,
  * for the same reason.
+ *
+ * `51 -> 64` is Phase 23's own Schedule 2 split (TAX-22): one coarse
+ * `scheduleTwoTaxes` removed and fourteen per-printed-line kinds added in
+ * its place. The arithmetic is `51 - 1 + 14`, and it is written out because
+ * a count that moves by thirteen without a stated reason is indistinguishable
+ * from a count somebody adjusted until the suite went green.
+ *
+ * `64 -> 76` is Phase 24's own Schedule 1 Part II split (TAX-23/TAX-24), the
+ * same shape one schedule over: one coarse `scheduleOneAdjustments` removed
+ * and thirteen per-printed-line kinds added in its place, `64 - 1 + 13`.
+ * Thirteen rather than sixteen because the printed Part II's line 22 is
+ * reserved with no box to fill, and lines 24/25 are one collapsed lettered
+ * block plus its own total — see the vocabulary's own comment above.
+ *
+ * `76 -> 86` is Phase 25's own Schedule 3 split (TAX-25/TAX-26), the same
+ * shape one schedule further on. TWO coarse kinds are removed here rather
+ * than one — `scheduleThreeNonrefundableCredits` and
+ * `scheduleThreeRefundableCredits` — and twelve per-printed-line kinds added,
+ * `76 - 2 + 12`. Seven for Part I (lines 1, 2, 3, 4, 5a, 5b and the collapsed
+ * 6a-6z) and five for Part II (lines 9, 10, 11, 12 and the collapsed
+ * 13a-13z); lines 7, 8, 14 and 15 get none, because all four are totals.
+ *
+ * **This paragraph said "and the last of the five coarse kinds
+ * `fjs/return/scope`'s Wave 5 note listed" until Phase 27, and that was
+ * false when it was written.** `scheduleOneAdditionalIncome` was still
+ * standing — that note's own text says so, in the same repository, in the
+ * words *"`scheduleOneAdditionalIncome` is the ONLY one of the original five
+ * left"*. The claim is corrected rather than deleted, because a count
+ * docstring that overstates what a phase finished is exactly how the next
+ * phase comes to believe there is nothing left to split.
+ *
+ * `86 -> 92` is Phase 27's own Schedule 1 PART I split (DOC-20/DOC-21/
+ * TAX-30), which really is the last: one coarse `scheduleOneAdditionalIncome`
+ * removed and seven per-printed-line kinds added, `86 - 1 + 7`. Seven rather
+ * than nine because printed line 7 already has `unemploymentCompensation`
+ * (Phase 20) and lines 9 and 10 are totals — see the vocabulary's own comment
+ * above.
+ *
+ * `92 -> 95` is Phase 28's own (TAX-31/TAX-32), and it is NOT a split: no
+ * coarse kind is removed, because none was left. Three kinds are ADDED for
+ * three facts the two new forms print and nothing stored can reveal —
+ * `churchEmployeeIncome` (Schedule SE line 5a and §1402(g)'s exemption
+ * behind it), `selfEmploymentOptionalMethods` (Schedule SE Part II) and
+ * `qualifiedReitDividendsAndPtpIncome` (Form 8995 lines 6-9). A vocabulary
+ * grows when a form arrives that can name something it could not name
+ * before, and this is the first phase since Phase 20 where it grew for that
+ * reason rather than by taking a coarse kind apart.
+ *
+ * `95 -> 110` is Phase 29's own (TAX-33), and it grows for that same reason
+ * a second time: Form 6251 arrives and can name fifteen §56/§57 adjustments
+ * and preferences that had no printed line in this engine before. NOTHING was
+ * split — `alternativeMinimumTax` stays exactly where it was and is the kind
+ * for the tax itself, which that phase computes.
+ *
+ * `110 -> 114` is Phase 30's own (DOC-24/TAX-35), and it IS a split — the
+ * seventh, and the one that contradicts the paragraph five above which called
+ * Phase 27's "really the last". It was the last split of a coarse kind
+ * covering many printed LINES; this one takes apart a kind covering ONE
+ * printed line whose single caption names five different schedules-within-a-
+ * schedule. `rentalRealEstateRoyaltiesPartnershipsSCorps` is removed and five
+ * per-Schedule-E-PART kinds added, `110 - 1 + 5`. Five rather than six
+ * because Schedule E's line 41 is Part V's own total — see the vocabulary's
+ * own comment above.
+ *
+ * **The lesson is stated here rather than left to be relearned**: "one kind
+ * per printed line" is the rule Phases 23 through 27 applied, and it is not
+ * quite the rule. The real rule is one kind per thing a taxpayer can
+ * truthfully declare having, and printed Schedule 1 line 5 is five of those.
  * @type {number}
  */
-const expectedKindCount = 50
+const expectedKindCount = 114
 
 export const proof = {
     dialectAndMediaType: () => {
         assertEq(dialect, 'vnd.fjs.return_profile')
         assertEq(mediaType, 'application/vnd.fjs.return_profile+json')
     },
-    kindVocabularyIsExactlyFifty: () => {
+    kindVocabularyIsExactlyOneHundredAndFourteen: () => {
         assertEq(kindVocabulary.length, expectedKindCount)
         assertEq(new Set(kindVocabulary).size, kindVocabulary.length)
     },
@@ -717,6 +1131,131 @@ export const proof = {
             assertEq(v.foreignAccountCountries?.length, 2)
             assertEq(v.foreignAccountCountries?.[0], 'Japan')
             assertEq(v.foreignAccountCountries?.[1], 'Canada')
+        },
+    },
+    // Phase 13 Slice 1 (TAX-10), Decision 5.1: two additive fields, both
+    // read only by `fjs/form1040/core`, both structurally independent of
+    // every check above — no leaf here touches `checkReferences`'s order or
+    // `declaredKinds`.
+    scheduleOneCircularityFields: {
+        iraDeductionDeclaredValidates: () => {
+            const [t, v] = validate({ ...minimal, iraDeductionDeclared: true })
+            assert(t === 'ok', ['expected ok', t, v])
+            assertEq(v.iraDeductionDeclared, true)
+        },
+        mfsLivedWithSpouseAtAnyTimeInYearValidates: () => {
+            const [t, v] = validate({
+                ...minimal,
+                filingStatus: 'marriedFilingSeparately',
+                mfsLivedWithSpouseAtAnyTimeInYear: true,
+            })
+            assert(t === 'ok', ['expected ok', t, v])
+            assertEq(v.mfsLivedWithSpouseAtAnyTimeInYear, true)
+        },
+        // DOC-12, same discipline as every other checkbox on this dialect: a
+        // structural `false` is rejected, not accepted as "not applicable".
+        eachCheckboxRejectsFalse: () => {
+            const [t1] = validate({ ...minimal, iraDeductionDeclared: false })
+            assertEq(t1, 'error')
+            const [t2] = validate({ ...minimal, mfsLivedWithSpouseAtAnyTimeInYear: false })
+            assertEq(t2, 'error')
+        },
+    },
+    // TAX-13 (13-CONTEXT.md Decision 2.5): Schedule A line 18's
+    // itemize-anyway election. Structurally independent of every check
+    // above — no leaf here touches `checkReferences`'s order or
+    // `declaredKinds`.
+    scheduleALine18Election: {
+        itemizeEvenThoughLessThanStandardDeductionValidates: () => {
+            const [t, v] = validate({ ...minimal, itemizeEvenThoughLessThanStandardDeduction: true })
+            assert(t === 'ok', ['expected ok', t, v])
+            assertEq(v.itemizeEvenThoughLessThanStandardDeduction, true)
+        },
+        // DOC-12, same discipline as every other checkbox on this dialect: a
+        // structural `false` is rejected, not accepted as "not applicable".
+        falseRejected: () => {
+            const [t] = validate({ ...minimal, itemizeEvenThoughLessThanStandardDeduction: false })
+            assertEq(t, 'error')
+        },
+    },
+    // TAX-12 (13-CONTEXT.md Decision 4.1): the `dependents` array and its
+    // cross-field length check against `dependentCount` (checkReferences
+    // step 8). Structurally independent of every check above.
+    dependentsArray: {
+        // Test 1 — a matching length validates.
+        matchingLengthValidates: () => {
+            const [t, v] = validate({
+                ...minimal,
+                dependentCount: 1,
+                dependents: [
+                    { relationship: 'daughter', ssnValidForEmployment: true, ageAtYearEnd: 10, livedWithTaxpayer: true },
+                ],
+            })
+            assert(t === 'ok', ['expected ok', t, v])
+        },
+        // Test 2 — a mismatched length is refused, naming both numbers.
+        mismatchedLengthRefusedNamingBothNumbers: () => {
+            const [t, v] = validate({
+                ...minimal,
+                dependentCount: 2,
+                dependents: [
+                    { relationship: 'son', ssnValidForEmployment: true, ageAtYearEnd: 15, livedWithTaxpayer: true },
+                ],
+            })
+            assertEq(t, 'error')
+            assert(typeof v === 'string', ['expected a semantic string refusal', v])
+            assert(v.includes('1'), ['expected the array length named', v])
+            assert(v.includes('2'), ['expected dependentCount named', v])
+        },
+        // Test 3 — `dependents` omitted entirely, with `dependentCount: 0`,
+        // is a real, valid state: the array is present only when there is
+        // something to itemize.
+        omittedWithZeroCountValidates: () => {
+            const [t] = validate(minimal)
+            assertEq(t, 'ok')
+        },
+        // Test 4 — a dependent entry round-trips all four fields.
+        entryRoundTripsAllFourFields: () => {
+            const [t, v] = validate({
+                ...minimal,
+                dependentCount: 1,
+                dependents: [
+                    {
+                        relationship: 'grandson',
+                        ssnValidForEmployment: true,
+                        ageAtYearEnd: 12,
+                        livedWithTaxpayer: true,
+                    },
+                ],
+            })
+            assert(t === 'ok', ['expected ok', t, v])
+            const entry = v.dependents?.[0]
+            assert(entry !== undefined, ['expected a dependent entry', v])
+            assertEq(entry.relationship, 'grandson')
+            assertEq(entry.ssnValidForEmployment, true)
+            assertEq(entry.ageAtYearEnd, 12)
+            assertEq(entry.livedWithTaxpayer, true)
+        },
+        // DOC-12, same discipline as every other checkbox on this dialect: a
+        // structural `false` on either boolean-shaped fact is rejected, not
+        // accepted as "not applicable".
+        eachCheckboxRejectsFalse: () => {
+            const [t1] = validate({
+                ...minimal,
+                dependentCount: 1,
+                dependents: [
+                    { relationship: 'son', ssnValidForEmployment: false, ageAtYearEnd: 10, livedWithTaxpayer: true },
+                ],
+            })
+            assertEq(t1, 'error')
+            const [t2] = validate({
+                ...minimal,
+                dependentCount: 1,
+                dependents: [
+                    { relationship: 'son', ssnValidForEmployment: true, ageAtYearEnd: 10, livedWithTaxpayer: false },
+                ],
+            })
+            assertEq(t2, 'error')
         },
     },
     crossDialect: {

@@ -1,17 +1,17 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.1
-milestone_name: milestone
-status: verifying
-stopped_at: "Phase 12.1 (The Capital-Gain Chain) COMPLETE — 4/4 plans; a brokerage sale flows 1099-B -> Form 8949 -> Schedule D -> the Schedule D Tax Worksheet -> Form 1040 line 16. TAX-11/TAX-15 marked complete. 663 project-local proofs, tsc clean. Branch feature/phase-12.1-capital-gain-chain is 22 commits ahead of origin/main and UNPUSHED. Audit F-01 closed against the real 2025 Form 1040 PDF; F-02 closable the same way; F-03 needs a real filed return. Phase 12.1 has NO VERIFICATION.md yet."
-last_updated: "2026-08-09T19:14:05.778Z"
-last_activity: 2026-08-09
+milestone: v2
+milestone_name: The Product Path and Four Personas
+status: milestone_v2_complete
+stopped_at: ALL TEN v2 phases (21-30) are shipped and merged, PRs #71-#82. All four personas compute. 13 requirements remain open - 8 MAINT (Phases 16/17/18, the v1 documentation and dependency debt) and 5 tax, each stating in its own body why it is open rather than done. Nothing is in flight.
+last_updated: "2026-08-17T10:20:00.000Z"
+last_activity: 2026-08-17
 progress:
-  total_phases: 19
-  completed_phases: 13
-  total_plans: 62
-  completed_plans: 65
-  percent: 68
+  total_phases: 30
+  completed_phases: 26
+  total_plans: 89
+  completed_plans: 85
+  percent: 87
 ---
 
 # Project State
@@ -22,36 +22,98 @@ See: .planning/PROJECT.md (updated 2026-08-03)
 
 **Core value:** The report is a program, not an answer — the agent emits FunctionalScript;
 the server executes it as a pure function of `(documents, tax-year parameters) → report`.
-**Current focus:** Phase 12.1 — The Capital-Gain Chain
+**Current focus:** Between phases — Phase 15 shipped, Phase 16 awaiting an owner decision
 
 ## Current Position
 
-Phase: 12.1 (The Capital-Gain Chain) — COMPLETE, NOT YET VERIFIED
-  Four plans across three waves. The plan set was returned ISSUES FOUND by
-  `gsd-plan-checker` twice (2 blockers, then 2 more), revised each time, and only
-  executed after a third pass returned VERIFICATION PASSED.
-Plan: 4 of 4 — all summaries written
-  Wave 1: 12.1-01 (Form 8949 category derivation + the absent-basis refusal) and
-  12.1-02 (the 47-line Schedule D Tax Worksheet). Wave 2: 12.1-03 (Schedule D
-  lines 1a-21, the loss-cap three-way branch, two bounded sub-worksheets).
-  Wave 3: 12.1-04 (Form 1040 wiring FIRST, then the six-kind scope
-  reclassification — the atomic transition — then mutation gates M3/M4/M5).
-Status: Implemented and self-verified by its own plans; **no `12.1-VERIFICATION.md`
-  exists**. Every phase 01-12 has one. Execute-phase ran with `--no-transition` and
-  stopped after the final wave, so the phase has never been independently verified
-  against its goal. That is the next action.
+Phase: 30 (pass-through-income) — **COMPLETE AND MERGED. Milestone v2 is closed.**
+  All ten v2 phases shipped 2026-08-16/17 as PRs #71–#82. Suite went 6394 → **8533** tests and
+  953 → **~2010** proof leaves. **All four personas from `.planning/PERSONA-COVERAGE.md` now
+  compute**: retiree, non-profit worker, FAANG engineer, startup founder.
+  Requirements: **120 defined, 107 complete, 13 open** — derived, and the command is beside the
+  number in REQUIREMENTS.md.
 
-Progress: [███████░░░] 68%  (13 of 19 phases)
-  Phase-based, never plan-based: `completed_plans` (65) exceeds `total_plans` (62)
-  because three phases carry an extra FIX-SUMMARY.md beside a plan's own summary,
-  which rounds the plan-based figure to a misleading 100%. See `percent_note`.
-Last activity: 2026-08-09
+> **The four tax requirements left open are open ON PURPOSE and say so in their own bodies.**
+> TAX-27 (Earned Income Credit — the dependent model carries almost none of §32(c)(3), spec in
+> `fjs/todo/`), TAX-29 (Form 8606 Part I computes; Parts II/III refuse, so no backdoor Roth),
+> TAX-32 (Form 8995 computes; 8995-A, the SSTB phase-in and the wage/UBIA limits do not),
+> TAX-35 (Schedule E Part II computes; Part III needs a THIRD K-1
+> numbering, and no separately stated item is routed).
+>
+> **A tick that needs a paragraph of caveats is a tick that should not be there.** Phase 25 once
+> checked TAX-27 while its own prose said the credit was not computed; that was corrected, and
+> every phase after it held the line.
 
-> **This block carried Phase 10's text under a 12.1 heading until 2026-08-09** — "Ten plans
-> across six waves", `10-03 Tax Computation Worksheet`, "Phase 11 not started" — while
-> `Progress` read 100% against a frontmatter `percent` of 68. Rewritten from measurement.
-> The same class of defect as the coverage-table drift fixed in `REQUIREMENTS.md` the same
-> day: a hand-maintained second source that nothing compares against.
+**The eight open MAINT requirements are v1's, not v2's** — Phase 16 (deferred, the orphan OCR
+island), Phase 17 (Documentation Truth Pass, never started) and Phase 18 (planned, four plans,
+**zero executed**; its plans state a proof floor of 916 and the real figure is now ~2010, so
+re-derive before trusting it). Phase 17 is the natural next move: this file was itself found four
+times carrying stale text under a newer heading, and the v2 roadmap rows sat reading "Not started"
+for shipped phases until the milestone-close sweep.
+
+### The previous position, kept because it is still the shape of the work
+
+Phase: 20 (unemployment-compensation) — **COMPLETE, VERIFIED AND MERGED**
+  0 plans; none were written. The `vnd.fjs.1099g` dialect and the Schedule 1 line 7 wiring were
+  built on 2026-08-14 outside the GSD structure, in response to a real IRS transcript the scope
+  guard **correctly refused**, and retrofitted into the record on 2026-08-15 as `DOC-18`/`TAX-18`
+  and Phase 20 — labelled RETROFITTED, not presented as planned.
+Plan: n/a — the `0/0` in ROADMAP's progress table is literal, not a placeholder.
+Status: **Shipped.** `20-VERIFICATION.md` scores **5/6 criteria MET, 1 PARTIAL**, and the PARTIAL
+  was a **surviving mutant**: erasing the destination from a refusal message left the whole suite
+  green, because five proofs asserted the box name and none asserted where the amount would have
+  gone. Fixed, watched to redden, restored byte-identical. Both `human_needed` items were closed
+  the same day — the real transcript re-fed through the full `form1040Report` entry point (line 8
+  = $4,554.00, line 25b = $454.00, both **citing** the 1099-G's boxes), and boxes 10a/10b modelled
+  so box 11's "a state return would want it" justification finally holds.
+  Merged to `develop` via **PR #68** on 2026-08-16, carrying Phase 18's planning commits with it.
+
+Next phase: **21 — The Last Mile** (milestone v2). `form1040Report` has **no production caller**;
+  the proven engine and the proven execution spine have never been joined. **The obvious
+  implementation is forbidden** — a server tool that assembles inputs and calls the engine is the
+  `finance_compute_1040` tool REQUIREMENTS.md rules out. The route that preserves the thesis is
+  `guestCtx`, which already carries pure non-effect helpers beside the four frozen CAS commands.
+  **Phase 22 (computable tripwires) is a hard prerequisite for 23-30 and must not be reordered.**
+  Phases 16 (deferred), 17 and 18 (planned, zero executed) remain open from v1.
+
+Progress: [████████░░] 80% — **16 of 20 phases**, v1. Milestone v2 adds 10 more (21-30), 0 done.
+  Phase-based, never plan-based. Requirements are **95 in v1 (87 complete)** plus **25 in v2**,
+  120 in the document, counted separately so v2 does not move v1's figure. Every one of those
+  counts is derived by a command recorded beside it in REQUIREMENTS.md, not transcribed.
+  (Note 14 is skipped and 16 deferred by owner decision, so 16 of the 18 *achievable* v1 phases
+  = 89%; the 80% figure is kept because 20 is what ROADMAP declares.)
+Last activity: 2026-08-16
+
+> **This block has now been wrong FOUR times, always in the same direction: stale text left
+> under a newer heading.** The fourth was found on 2026-08-16 during a post-merge sweep: it still
+> carried **Phase 15's** text — PR #63, "6 plans across 2 waves", "Next phase: 16" — while the
+> frontmatter directly above it read `completed_phases: 16` and three further phases had shipped.
+> **The frontmatter and the prose disagreed for four days and nothing compared them.** That is the
+> same defect as every count in this project that was true of the part someone examined: two
+> statements of one fact, no check between them. It carried Phase 10's text under a 12.1 heading until 2026-08-09;
+> it carried Phase 12.1's wave breakdown under a Phase 13 heading until 2026-08-11; and on
+> 2026-08-12 it was found carrying **Phase 13's** text (`13-VERIFICATION.md`, PR #62, "13 plans
+> across 5 waves") under a **Phase 15** heading, reading EXECUTING for a phase that was
+> complete, reviewed, verified and merged.
+>
+> **The third recurrence has a known mechanism, which the first two did not.** `git log` shows
+> the last writer was `f59b6a3` — the `15-06` plan executor. A correction made earlier in the
+> same session was overwritten by the next agent to touch this file, because the per-plan
+> state update rewrites the header without reading what it replaces. Correcting the text again
+> without recording that will simply schedule a fourth occurrence.
+>
+> **Do not read this block and believe it. Measure:**
+> ```
+> ls .planning/phases/*/*-PLAN.md | wc -l                          # plans written
+> ls .planning/phases/*/*-SUMMARY.md | grep -v FIX | wc -l         # plans executed
+> git log --oneline -1 -- .planning/STATE.md                       # who wrote this last
+> ```
+> A mismatch between the last writer and the phase named above means the block is stale again.
+
+> **Known artifact gap (not a work gap):** `05-05-SUMMARY.md` exists with no `05-05-PLAN.md`
+> beside it — the only such mismatch in the project. The work shipped (ROADMAP records Phase 5
+> as 5/5); the plan file is simply absent. This is why "plans executed" reads 82 against 81
+> `*-PLAN.md` files on disk.
 
 ### Test metrics — MEASURE, do not read
 
@@ -59,18 +121,40 @@ Last activity: 2026-08-09
 
 ```
 npm test                                        # tsc && node --test
-node --test 2>&1 | grep -c '^✔ import("./fjs/'  # project-local proofs — the ONLY honest metric
 npm run test:integration                        # real-process subset (also included in npm test)
+
+# project-local proofs — the ONLY honest metric. MUST be de-duplicated:
+
+node --test 2>&1 | grep '^✔ import("./fjs/' | sed 's/ ([0-9.]*ms)$//' | sort -u | wc -l
 ```
+
+**The `grep -c` form of that last command double-counts and was wrong from the day it was
+written here.** Corrected 2026-08-11 from measurement. When the `functionalscript` submodule is
+initialized, `node --test` discovers *its* `all.test.js` as well as this repo's, and the
+submodule's emergent-testing entry re-scans the same working directory — so every finance proof
+is executed and printed **twice**. Measured on `e36ef1a`: `grep -c` reports **1690**, the
+de-duplicated count is **845**, and CI (which never checks out the submodule) reports **845**.
+The full local run is 6166 = 845 + 845 + 4472 submodule proofs + 4 root-level tests.
+
+Anything quoting the `grep -c` figure — including this file's own history — overstated
+project-local proofs by exactly 2x.
 
 Pasted counts were kept here through Phases 7-9 and went stale every single time, including once
 *after* a note was added saying they go stale. The note did not help; removing the numbers does.
-Only two figures are worth recording, because they are historical facts rather than current state:
+Only landmark figures are worth recording, because they are historical facts rather than current
+state:
 
-| Landmark | Project-local proofs |
-|---|---|
-| End of Phase 7 | 185 |
-| End of Phase 9 | 260 |
+| Landmark | Project-local proofs | How measured |
+|---|---|---|
+| End of Phase 7 | 185 | `grep -c` — **suspect**, see below |
+| End of Phase 9 | 260 | `grep -c` — **suspect**, see below |
+| End of Phase 13 | 845 | de-duplicated; independently confirmed by CI |
+| End of Phase 19 | 916 | de-duplicated; `node --test 2>&1 \| grep '^✔ import("./fjs/' \| sed 's/ ([0-9.]*ms)$//' \| sort -u \| wc -l` |
+
+The two older figures were taken with the double-counting `grep -c` command. Whether they are
+inflated depends on whether the submodule was initialized in that session, which is not
+recorded — so treat them as an upper bound, not a fact. They were not re-derived here because
+doing so means checking out old commits, which is a task of its own, not a resume-time aside.
 
 **Never gate on `npm test`'s total.** It includes ~2,100 vendored `functionalscript` submodule
 proofs and moves with submodule initialization state — which is exactly how a Phase 7 gate
@@ -137,6 +221,25 @@ proofs and moves with submodule initialization state — which is exactly how a 
 | Phase 12.1 P02 | 55min | 2 tasks | 1 files |
 | Phase 12.1 P03 | 35min | 2 tasks | 1 files |
 | Phase 12.1 P04 | 70min | 3 tasks | 9 files |
+| Phase 13 P01 | 35min | 2 tasks | 3 files |
+| Phase 13 P02 | 100min | 3 tasks | 6 files |
+| Phase 13 P03 | 35min | 2 tasks | 3 files |
+| Phase 13 P04 | 25min | 3 tasks | 2 files |
+| Phase 13 P05 | 25min | 2 tasks | 3 files |
+| Phase 13 P06 | 35min | 2 tasks | 4 files |
+| Phase 13 P07 | 70min | 3 tasks | 6 files |
+| Phase 13 P08 | 30min | 2 tasks | 2 files |
+| Phase 13 P09 | 55min | 1 tasks | 2 files |
+| Phase 13-the-65-profile-and-the-remaining-schedules P10 | 11min | 3 tasks | 3 files |
+| Phase 13-the-65-profile-and-the-remaining-schedules P11 | 30min | 2 tasks | 3 files |
+| Phase 13 P12 | 35min | 2 tasks | 1 files |
+| Phase 13 P13 | 20min | 3 tasks | 8 files |
+| Phase 15 P01 | 35min | 3 tasks | 3 files |
+| Phase 15 P02 | 40min | 3 tasks | 3 files |
+| Phase 15 P03 | 45min | 2 tasks | 4 files |
+| Phase 15 P04 | 50min | 2 tasks | 1 files |
+| Phase 15 P05 | 55min | 2 tasks | 5 files |
+| Phase 15 P06 | 55min | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -302,6 +405,60 @@ Full log in PROJECT.md Key Decisions. Recent decisions affecting current work:
 - [Phase ?]: [Phase 12.1-04]: filingScheduleD derives verbatim from declaredKinds.includes('capitalGainsOrLosses'), never document presence (Decision 1.6) -- status is now computed once near the top of form1040IncomeLines since Schedule D's loss-cap threshold needs it too
 - [Phase ?]: [Phase 12.1-04]: Mutation Gate M4's literal instruction (remove one modeledKinds entry, leave the count) does not compile -- it trips _EveryKindIsEitherModeledOrRefused (TS2344), a stronger correctly-caught defect. Ran the semantically-equivalent compiling form instead: migrate the kind into unmodeledKindRefusals without updating expectedModeledKindCount
 - [Phase ?]: [Phase 12.1-04]: TAX-11 and TAX-15 marked complete -- this plan is where Form 8949/Schedule D/the Schedule D Tax Worksheet actually get wired into a computing Form 1040, closing both requirements that spanned all four plans of Phase 12.1
+- [Phase 13]: 13-01: Citation widening pulled forward from Slice 2 into this plan, since socialSecurityBenefitsWorksheetBaseAmounts needed the 'code' arm immediately
+- [Phase 13]: 13-01: MFS-lived-with-spouse SSB worksheet branch computes line16 as 85% of line7 (not line1 as the plan text said), corrected against 13-RESEARCH.md's verified transcription
+- [Phase 13]: 13-01: TAX-10 NOT marked complete -- this plan builds Slice 1's foundation only; wiring into Form 1040 is Plan 13-02's job
+- [Phase 13]: 13-02: The IRA-deduction circularity refuses via a document-data-sufficiency error-arm on a new profile field (iraDeductionDeclared), never a fjs/return/scope kind -- the 50-kind vocabulary cannot distinguish an IRA deduction from any other Schedule 1 adjustment
+- [Phase 13]: 13-02: retirementForms/socialSecurityForms appended at the END of Form1040Inputs's curried parameter list, mirroring 12.1-04's own dividendForms/brokerageForms widening -- every existing call site needed only two trailing empty-array arguments
+- [Phase 13]: 13-02: TAX-10 marked COMPLETE -- vertical slice 1 closes here; a 65+ return with SSA-1099 and 1099-R income computes real lines 4a-6b/25b and a correct AGI through the full form1040Report entry point
+- [Phase 13]: 13-03: The plan's own $174,999.99 -> $0.06 boundary example was wrong under correct half-up cent rounding; corrected against independently verified arithmetic -- the 6% rate is coarser than one cent of MAGI, so the floor/start boundary trios are legitimately flat at both points
+- [Phase 13]: 13-03: magiCents renamed to phaseoutIncomeCents before commit -- caught the forbidden lowercase 'magi' substring (Decision 3.6) during the plan's own verification sweep
+- [Phase 13]: 13-04: scheduleOneA's actual return shape is { partI, partV, partVI }, not the flat record the plan's own interfaces sketch described -- line13b reads scheduleOneAResult.partVI.line38, and the call also passes the required profile field the plan's four-field list omitted
+- [Phase 13]: 13-04: line13b's wiring is unconditional, not gated on declaredKinds -- the same design Plan 13-02 established for lines 3a/3b/4a-6b: a modeled line reports the facts, declaredKinds governs only whole-return refusal
+- [Phase 13]: 13-04: TAX-09 marked COMPLETE -- vertical slice 2 closes here, a 65+ TY2025 return's line 13b is a real Schedule 1-A figure through the full form1040Report entry point, mirroring slice 1's (TAX-10) precedent
+- [Phase 13]: 13-05: saltCap stores only the worksheet's flat, non-MFS dollar figures -- only the SALT worksheet's final line (w10) halves the result for MFS (13-RESEARCH.md Pitfall 2)
+- [Phase 13]: 13-05: medicalExpenseFloor and saltCap.phasedownRatePercent are plain number rates, not AmountWithCitation, excluded from the dollar-string round-trip proof
+- [Phase 13]: SALT worksheet w1/w9 computed flat for every filing status; the ONE halving step for MFS applies to w9 only when constructing w10 (13-06)
+- [Phase 13]: Mortgage-interest and charitable Schedule A entries pass through at face value with no Pub. 936/526 limitation arithmetic (13-06)
+- [Phase 13]: Decision 2.2's withholding-drift proof gates on presence of a saltIncomeTax-tagged entry, never a separate election flag (13-06)
+- [Phase 13]: deductionChoice lives in fjs/tax/deduction beside standardDeductionCents, comparing against Schedule A's already-computed total; the comparison is a strict > with the line 18 election overriding outright
+- [Phase 13]: itemizedDeductions reclassified to modeledKinds in kindVocabulary order (before seniorAndOtherScheduleOneADeductions); netQualifiedDisasterLoss stays refused per Decision 1.4 -- TAX-13 closed
+- [Phase 13]: 13-08: dependentEntrySchema's boolean-shaped facts (ssnValidForEmployment, livedWithTaxpayer) use option(true), extending DOC-12's checkbox convention to a taxpayer-asserted credit-eligibility fact rather than a printed checkbox
+- [Phase 13]: 13-08: citizenship/resident-alien status is deliberately NOT a fifth dependents field (Decision 5.7) -- documented as an accepted trust boundary in the profile module's own docstring, mirroring fjs/schedule/b's Form 8815 boundary
+- [Phase 13]: 13-08: childTaxCredit.odcAmount/actcCap/phaseoutThreshold all cite kind:'code' section §24(h), never kind:'revProc' -- Rev. Proc. 2025-32 backs only the CTC figure among this phase's new numbers (Pitfall 5); first fjs/tax/params group with mixed citation kinds among sibling figures
+- [Phase 13]: roundUpToNextThousandDollars kept module-local (13-09) -- fjs/tax/boundary only needs the phase-out's crossing point, not the $1,000-step rounding shape
+- [Phase 13]: childTaxCreditPhaseoutIncome (13-09) written independently of seniorDeductionPhaseoutIncome/saltCapPhasedownIncome with its own docstring and a dedicated equality proof, TAX-15's fourth named income function
+- [Phase 13]: fjs/tax/boundary registers only the CTC/ODC phase-out's START threshold (2 entries) -- no floor entry, since line12's own STOP is the effective floor rather than a fixed income ceiling
+- [Phase 13-the-65-profile-and-the-remaining-schedules]: TAX-12: Schedule 8812 wired into 1040 lines 19/28 from one form8812() call sharing Part I and Part II-A state (Decision 4.3); childTaxCreditOrOtherDependents/additionalChildTaxCredit reclassified atomically (modeledKinds 20/unmodeledKindRefusals 30); sixtyFivePlusProfile -- the fixture this whole phase was written for -- now computes end to end, closing all four vertical slices
+- [Phase 13-11]: The five coarse kinds (scheduleOneAdditionalIncome, scheduleOneAdjustments, scheduleTwoTaxes, scheduleThreeNonrefundableCredits, scheduleThreeRefundableCredits) stay refused, not reclassified -- modeledKinds/unmodeledKindRefusals stay at 20/30
+- [Phase 13-11]: Schedule 3 line 11 (excess Social Security/tier-1 RRTA withheld) is a documented zero, not a W-2-derived computation, even though the underlying data exists in stored W-2s -- explicitly out of this phase's scope
+- [Phase 13]: No typedef/orderedLines/count-constant change: all six lines (8/10/17/20/23/31) already existed as declaredZero placeholders since Phase 10
+- [Phase 13]: No scope reclassification in 13-12: the five coarse Schedule 1/2/3 kinds stay in unmodeledKindRefusals -- modeledKinds/unmodeledKindRefusals stay 20/30
+- [Phase ?]: MAGI gate regex: [a-zA-Z]*[Mm]agi[a-zA-Z]* (case-insensitive on M/m, fixed lowercase agi), stronger than criterion 5's literal grep, matching 13-VALIDATION.md C-1's own verify command — criterion 5 is case-sensitive and misses camelCase Magi (carried finding C-1); the gate must catch identifier-level mixed-case while still permitting all-uppercase MAGI in prose
+- [Phase ?]: C-3 resolved via childTaxCredit docstring precision (verified-against-printed-form + governing-provision language), not a guessed Rev. Proc. number — research only confirmed Rev. Proc. 2025-32 section 2.03 for ctcAmount by full-document grep; odcAmount/actcCap/phaseoutThreshold have no confirmed Rev. Proc. citation, so guessing one would repeat the exact sourcing error Pitfall 5 names
+- [Phase 15]: 15-01: payerReportSource and payerReport are two independently hand-authored artifacts, kept in sync across two test tiers rather than a runtime cross-check (07-08/07-09 precedent)
+- [Phase 15]: 15-01: fjs/report/payer's two-dialect scope boundary (1099-INT box1, 1099-DIV box1a only) is deliberate and mechanically additive to widen, documented in Schedule D's Decision-2.5 boundary-comment style
+- [Phase 15]: 15-02: Corrected the year-genericity gate's own suggested regex, which failed its own required positive control (bare 4-letter 'year' identifier); made the leading identifier-prefix group optional and re-verified all controls
+- [Phase 15]: 15-02: Added carryoverWorksheetInputsFromDocument bridging fjs/tax/carryover to fjs/document/prior_year_capital_loss via centsFromString, required by the plan's own frontmatter must_haves.key_links but not spelled out in Task 3's action text
+- [Phase 15]: 15-02: All four money fields in vnd.fjs.prior_year_capital_loss are required, never option -- absent-document-is-zero is handled by the caller never constructing the document, not by an optional field
+- [Phase 15]: [Phase 15]: 15-03: The unit-level never-executes proof for fjs_check cannot call the composed export itself under fjs/effects/node/virtual (writeFile/import_ representational split, same limitation as fjs_run's executeRun) -- discovered by mutation (a real report invocation left the unit suite green); the decisive proof against the shipped tool is fjs-run-integration.test.js's real-process call, using a program whose report would throw if invoked paired with a following-call session-survival assertion
+- [Phase 15]: programHash equality (defensively paired with args) is the complete parameter-set guard for the amendment diff — no new vnd.fjs.run field added — Guest programs cannot import and guestCtx exposes no tax-parameter lookup, so every parameter a stored program uses is a literal baked into its own source, already covered by programHash (15-RESEARCH.md Pitfall 1).
+- [Phase 15]: The whole-dollar election is applied host-side, independently per side, as an explicit elected argument to amendmentDiff — never re-derived from stored CAS content — applyWholeDollarElection is not part of guestCtx, so a guest program cannot have applied it; re-deriving elected from stored CAS content would only be sound if both runs pinned the same return-profile revision, which can silently be false.
+- [Phase 15]: 15-05: priorYearCapitalLossCarryover is OPTIONAL on ScheduleDInputs, not option()-wrapped inside a document -- absence-is-zero lives at the caller's cardinality, mirroring 15-02's own caller-never-constructs-the-document decision one layer up
+- [Phase 15]: 15-05: The full-return reachability proof compares against an independent scheduleD(...) call fed the SAME carryover document, checking line16 (the only Schedule D total form1040IncomeLines exposes) rather than a nonexistent scheduleD6Cents field -- a dropped capitalLossCarryoverForms argument makes the two sides differ by exactly $6,000.00
+- [Phase 15]: 15-05: TAX-17 marked complete -- absence-is-zero, presence-drives-the-worksheet through the full form1040IncomeLines entry point, and year-genericity via a synthetic second TaxParamSet are all delivered and mutation-verified
+- [Phase 15]: DOC-16 verified the real dialect count directly (grep against fjs/) rather than trusting the plan's own table -- 12 local dialects + upstream revisionDialect = 13
+- [Phase 15]: DOC-16: cas_refresh's dialectCounts counts an unregistered-dialect blob under its detectVec text/plain fallback -- present, never absorbed into a registered dialect's count
+- [Phase 15]: DOC-16: each dialect's extraValidate written inline rather than factored into a shared generic helper, avoiding an any/cast under dialectEntry's contextual Ts<T> typing
+- [Phase 19-01]: paramSetHash's jsonText(taxParamSet) call needs NO JsonUnknown cast, contradicting 19-PATTERNS.md's own excerpt -- verified against the live fjs/server/finance_tax_params/module.f.js:157 precedent (jsonText(response), a TaxParamSet-shaped value including the ceiling: string | undefined required-field case) and confirmed empirically with npx tsc --noEmit before finalizing
+- [Phase 19-01]: countsTowardReproducibilityAcceptance reads run.pinned alone and deliberately does not re-derive fjs/run/module.f.js's checkReferences both-or-neither invariant -- verified independently load-bearing per arm by mutation (run.pinned || true reddens only rejectsAnUnpinnedRun)
+- [Phase 19-01]: matchesFileCassOwnHashOfTheIdenticalBytes is the ONLY leaf that catches paramSetHash's derivation drifting from the exact primitive fileCas uses on identical bytes -- confirmed by a computeSync(sha256)([bytes, bytes]) mutation that reddened that one leaf alone, none of the other three
+- [Phase 19-02]: fjs/report/provenance/module.f.js's own unpinnedRun TEST-FIXTURE (shipped by 19-01, typed @type {Run} directly) is a FIFTH Run-literal-construction population, missed by the plan's and the earlier plan-check's four-file enumeration because it postdates both -- found by re-deriving the population via `grep -rn "pinned:" fjs *.js` rather than trusting either the plan's checklist or the prior plan-check's grep, and fixed in the same atomic commit as a Rule 3 blocking-issue auto-fix
+- [Phase 19-02]: Mutation Gate M2 (&& -> ||) reddens exactly the one leaf 19-VALIDATION.md's corrected gate table names (fjsRunTool.pinIntegrity.subjectOnlyWithoutParentsPersistsPinnedFalse) via handleRunOutcome's own record-assembly assert firing on the mixed-pin case, before any Run value is built -- countsTowardReproducibilityAcceptance's own two proof leaves independently confirmed to stay green under the identical mutation, positively confirming the structurally-unreachable-input claim rather than merely observing an absence of failure
+- [Phase 19-02]: The responseShape and sizeGuard proofs both hand-count fjs_run's envelope keys (six -> ten); both updated in this plan's own commit rather than left to silently under-cover the widened envelope
+- [Phase 19-03]: The unpinned control leg's movement was verified as a genuinely independent observation, not inferred from the pinned leg passing: controlBytes1/controlBytes2 differed (two distinct revision-hash-array JSON strings) after the SAME amendment shape landed between two unpinned runs, confirmed BEFORE the pinned leg's code was trusted, per 19-VALIDATION.md's "the control leaf is not optional"
+- [Phase 19-03]: Mutation Gate M1's naive full-suite run showed only the PRE-EXISTING real-process pin proof failing (the whole integration test is one node:test `test()` block, so the first thrown assertion aborts everything after it in source order) -- confirmed the NEW PROV-05 pinned-reproduction assertion is independently load-bearing by a diagnostic run with the earlier pin block's assertions neutralized: `pinnedRun1.resultHash !== pinnedRun2.resultHash` then reddened on its own line, isolated from the earlier assertion. The two `buildRunSnapshot`-level unit proofs (`buildRunSnapshotResolvesTheStore.pinOverridesTheResolvedHead`, `executeRun.pinOverridesTheLiveHeadThroughFullExecuteRun`) also reddened, both predicted by 19-VALIDATION.md/the plan
+- [Phase 19-03]: EXEC-13 marked complete on the reasoning that `countsTowardReproducibilityAcceptance` has no other consumption point to gate in this codebase (grepped: zero production call sites of `.pinned` beyond `fjs_run`'s own record-assembly and this predicate's own module) -- its docstring frames it as consumer-side by design, and this plan is the first caller to exercise it against two REAL, CAS-fetched persisted run records rather than hand-typed fixtures, correctly discriminating pinned (true) from unpinned (false)
 
 ### Pending Todos
 
@@ -438,68 +595,223 @@ None yet.
   branch, 90 ahead of `develop`. Nothing to reconcile; any merge is a fast-forward. The branch
   is **not yet pushed** to origin, which is the only remaining action.
 
+## Anti-Patterns — every row is an actual failure, not a prediction
+
+Folded in from `.planning/.continue-here.md` on 2026-08-12 when that one-shot handoff was
+consumed. These are session-independent lessons; they belong somewhere permanent.
+
+| Pattern | What happened | Severity | Prevention |
+|---------|---------------|----------|------------|
+| **Vacuous proof** | A proof that is green and *permanently unable to fail*. Happened **twice in Phase 15**: 15-02's year-genericity gate regex could not match its own required positive control (`[A-Za-z_$][\w$]*[Yy]ear` needs ≥5 chars, so a bare `year` never matched); 15-03's never-executes proof called a decomposed helper instead of the composed export, so mutating `fjsCheck` to *actually run the guest program* left the unit suite green at 3110/3110. | **blocking** | Mutate the **production body** the proof guards and watch that specific leaf go red, then restore byte-identical. Mutating the fixture is not the same test. AGENTS.md already requires this; both failures came from skipping it. |
+| **Trusting a plan's own literals** | Plan text contained values that could not produce their own stated expectations. 15-04's plan used `'100000'`/`'150000'` where `centsFromString` has no implied cents scaling, so its own expected columns were unreachable. 15-06's hand-typed dialect count predated 15-02 adding a dialect. | **blocking** | Verify each literal against the function that will consume it *before* implementing. **Every one of Phase 15's six plans contained at least one real defect.** |
+| **Grepping for a runtime surface** | The MCP tool count was reported wrong three times (7, then 8, then 12; the answer is **13**) because finance-local `toolEntry(` declarations miss the upstream `casToolRegistry`/`evoToolRegistry` spread into `financeMcpHandlers`. This produced a *false headline claim* — "no document-write tool is registered" — when `evo_add` has always been there. | **blocking** | Start `node index.js` and ask it (`initialize` → `notifications/initialized` → `tools/list`). `cas-refresh-cross-process.test.js` has the spawn-and-speak pattern to copy. Never derive an advertised surface from source. |
+| **Two sources of truth drifting** | `REQUIREMENTS.md`'s traceability table read `Pending` for PROV-06/PROV-08 while their own checkboxes read `[x]` — the **identical defect Phase 13 closed out with**, recurring one phase later. STATE.md's Current Position block is the same disease (three occurrences, see above). | advisory | When marking a requirement complete, update the checkbox **and** the table row, then sweep *all* complete requirements rather than only the ones you noticed. |
+| **Double-counted proof metric** — **ROOT CAUSE FOUND AND FIXED 2026-08-17** | The observation was right and the diagnosis it implied was wrong. `node --test` did not merely *count* the proofs twice, it **ran them twice**: bare discovery matched `functionalscript/fjs/emergent_testing/all.test.ts` — the vendored submodule's own entry point, a **`.ts`** file, which Node 25 executes natively — and that re-walked the entire proof set. 4273 (the eight root files) + 4260 (the duplicate walk) = 8533. Cost: **~53 seconds on every run**, for years, described the whole time as a display artifact. Fixed by pinning `npm test` to `node --test *.test.js`: 8533 tests → **4273**, wall clock ~60s → **~30s**, and raw proof lines now equal unique ones (2024 = 2024, zero duplicates). | **fixed** | The `sort -u` is no longer load-bearing and is kept only as a cheap assertion that it stays that way. **The lesson is not about globs:** "the number is inflated" was treated as a fact about the *reporter* and never tested as a fact about the *runner*, so a real 2× cost hid behind a documented workaround. A workaround that works is the most expensive kind of bug, because nothing pushes anyone to look again. |
+| **`npx` in a real-process test** | `npx functionalscript` can never resolve (the package's bin is named `fjs`), so it fell through to npm's registry-touching path: 84% of one test's wall clock, and the reason `npm test` went red under parallel load. Pre-existing since Phase 5. | advisory | Spawn `node` against an absolute path into `node_modules`. See `fjsCliPath` in `cas-refresh-cross-process.test.js`. Fixed in `e36ef1a`; do not reintroduce. |
+
+**The through-line:** nine real defects surfaced in Phase 15 and **not one was caught by reading
+code.** They were caught by mutating production and watching a specific test go red, by
+re-deriving a plan's literals against the function that consumes them, and by starting the
+server and asking it instead of grepping. Green does not mean verified.
+
 ## Deferred Items
 
 | Category | Item | Status | Deferred At |
 |----------|------|--------|-------------|
-| *(none)* | | | |
+| Doc truth (→ Phase 17) | **The "~8 min / 481s full suite" figure is wrong, but so was my first correction.** Two measurements on 2026-08-12: `0038eed` → `duration_ms 44707` (**44.7s**, 6296 tests); `20f5459` → `duration_ms 136059` (**136s**, 6314 tests). Both exit 0. So the honest figure is a **range of roughly 45-140s that varies ~3x with machine load**, not the single 44.7s I first recorded, and not the 481s in STATE.md's Infrastructure notes / `19-VALIDATION.md` / `15-VALIDATION.md`. **Note the shape of my own error: I measured once and reported a point value as if it were the property.** That is the same defect as reporting one grep's population as the whole — which this phase hit four times. Phase 17 should record a range with the measurement conditions, and correct every copy. Consequence is not cosmetic: plans avoided per-task full-suite runs on the strength of the 481s figure, trading real feedback for imagined cost. | Open | 2026-08-12 |
+| Doc truth (→ Phase 17) | `amendmentDiff` refusing unpinned runs — deferred from Phase 19 Area 2 by owner decision. Revisit only if a real caller is misled. | Open | 2026-08-12 |
+| Structure (→ Phase 18) | **`fjs-run-integration.test.js` is one giant `test()` block, and the masking is not hypothetical.** Phase 19's code review raised it as WR-03 after it cost real work: under Mutation Gate M1, Node reported the failure as the *pre-existing* pin proof, which shares the block and runs first — the new PROV-05 assertion's independent redness could only be established with a throwaway diagnostic copy. **Two separate agents hit this.** The consequence beyond mutation testing: a future regression in any later assertion of that block is invisible while an earlier one fails, so the file reports one failure no matter how many things break. Splitting it into per-concern `test()` blocks belongs with Phase 18's structural work; doing it inside a phase close would have been unreviewed churn. | Open | 2026-08-12 |
+| Verification (→ Phase 21+) | **A proof that asserts a message must assert the part that carries information.** Phase 20's verification erased a refusal's `${destination}` interpolation and the entire suite stayed green: five leaves asserted the box name and the phrase "cannot compute", none asserted *where the amount would have gone* — the only actionable part. Fixed in `1697896` and folded into AGENTS.md, but the general form is unswept: **no other dialect's refusal messages have had this mutation run against them.** Five dialects carry refusal or error strings. | Open | 2026-08-16 |
+| Verification (→ Phase 21+) | **`&& false` does not work inside an `if`.** `allowUnreachableCode: false` makes the block unreachable, `tsc` reports TS7027, no `ℹ tests` line appears, and the gate proves nothing while looking performed. AGENTS.md's own recipe recommended it; corrected in `1697896` with working forms. Any plan written before 2026-08-16 that specifies an `&& false` mutation inside a condition **will not run** — reshape it rather than recording the result. | Open | 2026-08-16 |
+| Process (→ any phase) | **Never run a code reviewer concurrently with a verifier that re-runs mutation gates.** My error in Phase 19: I parallelized them to save wall-clock, but the verifier mutates and restores production files while the reviewer reads them. The reviewer caught a target line changing under it mid-review (IN-02) — it detected the interference rather than being fooled, which was diligence, not design. Mutation-running agents need exclusive access to the tree. | Open | 2026-08-12 |
 
 ## Session Continuity
 
-Last session: 2026-08-09
-Stopped at: **Phase 12.1 (The Capital-Gain Chain) COMPLETE — 4/4 plans, 4/4 summaries.** A
-brokerage sale now flows 1099-B → Form 8949 → Schedule D → the Schedule D Tax Worksheet → Form
-1040 line 16. TAX-11 and TAX-15 marked complete. Nothing is mid-edit.
+Last session: 2026-08-14
+Stopped at: **Phase 18 planned, zero plans executed.** 4 plans across 3 waves, plan-checked
+twice, 3 blockers fixed. Phase 19 is complete and MERGED to `develop` (PR #66), as are the
+Phase 18 criteria corrections (PR #67).
 
-> **An automated state write clobbered this block on 2026-08-09** (`stopped_at` replaced with
-> "context exhaustion at 75%", the continuity text truncated mid-sentence into a dangling
-> fragment, and the quoted metrics left two waves stale at `555f11c`/629 proofs). Restored here
-> from measurement. Its one *correct* edit was kept: `percent: 100 → 68`, which is 13/19 phases —
-> the plan-based figure is unusable (`completed_plans` 65 exceeds `total_plans` 62; see
-> `percent_note`).
+> **This block was corrupted for the FOURTH time on 2026-08-14, the third time by an SDK
+> write.** It arrived reading `status: verifying`, `stopped_at: context exhaustion at 75%`,
+> `completed_plans: 87` against `total_plans: 88` — claiming plans complete that had not been
+> executed — and with the sentence below truncated mid-clause, leaving a dangling
+> "owner decision." fragment whose subject had been clobbered. Rewritten from measurement.
+>
+> **The mechanism is now confirmed rather than suspected.** Phase 19's Wave 1 executor reported
+> `gsd-sdk query state.advance-plan` corrupting this same file the same way (inflating
+> `completed_plans` past `total_plans`, truncating a status sentence), and reverted to a manual
+> edit. Waves 2 and 3 were instructed not to call it. **Do not run `state.advance-plan` against
+> this file.** Hand-edit, scoped to the phase you are in.
 
-Measure the suite rather than quoting it — see "Test metrics" above. Measured on `d111258`:
-`tsc` clean, **663** project-local proofs (629 → 663 across Phase 12.1), 0 failures.
+Suite measured on `27ba2c2`: **exit 0, 6314/6314, 916 de-duplicated project-local proofs**,
+`duration_ms 25337`. Nothing is mid-edit apart from this file's own correction; there are no
+open PRs and `develop` is in sync.
 
-**Branch `feature/phase-12.1-capital-gain-chain` is 22 commits ahead of `origin/main` and
-UNPUSHED.** No PR opened yet. `main` and `develop` are both still at `555f11c`.
+**HANDOFF.json and `.continue-here.md` were consumed and deleted on resume** — they are
+one-shot artifacts, and this file's own history records stale phase-09/phase-10 handoffs having
+to be deleted because a handoff left lying around reads as unfinished work. Everything durable
+in them was folded into this file first: the anti-pattern table above, and the pending human
+decisions below. Nothing was lost; both remain in git history at `4c8e6f9`.
 
-Also landed this session, outside the phase:
-- **`REQUIREMENTS.md` coverage table reconciled** — 28 rows said `Pending` for requirements whose
-  checkbox already said `[x]`, drift reaching back to Phase 3. Now 72 complete / 21 pending / 93
-  total, and the header's stale "79 requirements" corrected to 93. Phase 17 owns turning the
-  recompute command into an actual gate.
-- **Audit finding F-01 closed** — the 2025 Form 1040 face was fetched and its 56 printed money
-  lines enumerated against `orderedLines`: exact match. This item had been `human_needed` since
-  Phase 10 on the grounds that "the verifier has no access to the IRS PDF", which is no longer
-  true. **F-02 (Standard Deduction Chart) is closable the same way.** F-03 (assumption A2) is
-  NOT — it asks for confirmation against a real filed return, which no public PDF supplies.
+### What the resume found
 
-**Known gap: Phase 12.1 has no `12.1-VERIFICATION.md`.** Every phase 01-12 has one. Execute-phase
-ran with `--no-transition` and stopped after the final wave, so the phase is implemented and
-self-verified by its own plans but never independently verified against its goal.
+STATE.md's Current Position block had **drifted for the third time**, describing Phase 15 as
+EXECUTING while carrying Phase 13's text. Corrected from measurement, with the mechanism
+recorded this time — see the margin note under "Current Position". No other artifact was stale:
+82 plans, 82 summaries, no PLAN-without-SUMMARY, no interrupted agents, no pending todos, and
+the ROADMAP progress table was already accurate.
 
-**Why the recorded HEAD drifted, and the general lesson:** the three handoff files each named
-`694d580` — the tip at the moment their text was written — while the commit that merged that very
-text moved the tip to `555f11c`. A handoff that states its own HEAD is always one commit stale by
-construction. Corrected at this resume; do not treat a recorded SHA as authoritative when
-`git rev-parse HEAD` is one command away.
+### What the previous session did
 
-Next: **Phase 12.1 — The Capital-Gain Chain**, which has no directory, no CONTEXT, no research and
-no plans. Read its BLOCKING constraint before planning it (below).
+1. **Resumed and found Phase 13 already complete** — 13 plans, 13 summaries, CONTEXT /
+   PATTERNS / RESEARCH / VALIDATION / REVIEW / VERIFICATION all present, all six code-review
+   remedies (CR-01, WR-01..WR-05) committed. No `HANDOFF.json`, no `.continue-here`, no
+   PLAN-without-SUMMARY, no interrupted agents.
+
+2. **Found `npm test` RED and fixed the cause** (`e36ef1a`).
+   `cas-refresh-cross-process.test.js` timed out against its 30s budget under the full
+   suite's parallel, process-isolated load, while passing in isolation at 20.16s.
+   Root cause: `functionalscript` declares its bin as `fjs`, not `functionalscript`, so no
+   `node_modules/.bin/functionalscript` exists; `npx functionalscript` could never resolve
+   locally and fell through to npm's registry-touching resolution path. The child leaked
+   npm's own "New minor version of npm available!" notice, proving the network call. The two
+   `cas add` invocations were 84% of wall clock. Now spawns `node` against an absolute path
+   into the pinned `node_modules/functionalscript/fjs/module.js` — the convention this same
+   file already used for its long-lived server and that `fjs-run-integration.test.js:149`
+   uses throughout. Byte-identical content hash verified before the change, so the
+   separate-OS-process proof is unweakened. Isolated 20.16s -> 5.84s; under full suite load
+   >30s (timeout) -> 11.2s; on CI's Linux runner, 1.01s.
+   **Pre-existing since Phase 5 (`f25ca2d`) — not a Phase 13 regression.**
+   It also closed a provenance hole: `npx` was free to hand the test a *registry* build
+   rather than the pinned one, in a project whose thesis is content-addressed provenance.
+
+3. **Corrected this file's own proof-counting instruction** — see "Test metrics" above. The
+   documented `grep -c` command double-counts by exactly 2x whenever the submodule is
+   initialized. 845 is the real number, and CI agrees.
+
+4. **Shipped Phase 13.** Branch `feature/phase-13-the-65-profile-and-schedules` pushed (it
+   had been 70 commits ahead of `origin/main` and entirely unpushed — the largest standing
+   risk in the project). **PR #62** open against `develop`, 71 commits, MERGEABLE, CI green.
+
+Measured on `e36ef1a`: `tsc` clean, **6166/6166 passing, 0 failures, 0 cancelled**;
+**845** de-duplicated project-local proofs.
+
+### Decisions taken this session (phase owner, 2026-08-11)
+
+- **Phase 13 ships now** as PR #62 rather than waiting for self-review.
+- **Phase 14 is skipped; Phase 15 is next.** This re-affirms the 2026-08-07 autonomous run
+  (12.1 -> 13 -> 15 -> 16 -> 17 -> 18, 14 skipped) over Phase 13's close-out note, which had
+  proposed deferring the IRS-figure transcription check *into* Phase 14.
+
+> **CARRIED, NOW UNOWNED — read before closing v1.** Skipping Phase 14 leaves two
+> `human_needed` items with no scheduled owner, because Phase 14's acceptance run against the
+> user's real filed return was the thing that would have resolved both:
+>
+> 1. **Phase 13** — the TY2025 figures (senior deduction $6,000/6%/$75k-$150k; SSB base
+>    amounts $25k/$32k; SALT cap $40,000/30%/$500k-$250k/$10,000 floor; CTC $2,200 / ODC $500
+>    / ACTC cap $1,700 / phase-out $400k-$200k at 5% per $1,000; medical floor 7.5%) have
+>    never been checked by a human against the printed IRS PDFs. A green suite proves the
+>    engine agrees with the constants it was given, never that a constant was transcribed
+>    correctly. See `13-VERIFICATION.md` and `deferred-items.md`.
+> 2. **Phase 10** — whether the Tax Computation Worksheet is cent-exact or whole-dollar,
+>    pinned at $184,094.50 for MFJ at $700,000 taxable.
+>
+> Note also that **Phase 15's ROADMAP entry declares `Depends on: Phase 14`.** That
+> dependency is being waived by decision, not satisfied.
+
+### Decisions taken 2026-08-12 (phase owner, autonomous run)
+
+- **Phase 16 is DEFERRED, not skipped and not cancelled.** The wire-or-delete decision was
+  postponed rather than made; MAINT-01 stays open and the phase stays in the milestone.
+  **Its ROADMAP criterion 1 was found factually wrong and has been corrected in place:**
+  `fjs/document/subject` is NOT an orphan — `fjs/document/consolidated_provenance/module.f.js:41`
+  imports `formSubject` and calls it at lines 117-118 (Phase 12's shipped DOC-13 proof).
+  Deleting the three modules as the criterion instructed would have broken verified work. The
+  real orphan is **396 lines across two** modules (`from_ocr`, `ocr_amount`), not 576 across
+  three. The error came from grepping bare names — `subject` appears in four docstrings that
+  are not imports. **Grep for `import` statements, not for names.**
+
+- **EXEC-13 / PROV-04 / PROV-05 re-homed into new Phase 19** — *Reproducibility and Report
+  Provenance*. None of the three needs the taxpayer's filed return: they are the pinned-run
+  flag, the tax-year/parameter-set/program-hash header on report output, and adversarial
+  byte-identical reproduction. Phase 14 had bundled them with an acceptance run that genuinely
+  did need the owner; skipping the phase stranded all five criteria together. Phase 14 keeps
+  only criteria 1 and 2 and stays skipped. The milestone now has **no homeless requirements**.
+
+- **Remaining execution order is deliberately non-numeric: 19 → 18 → 17.** Phases 19 and 18
+  both touch `executeRun`, so 18's step-sequence sharing should happen after 19 stops changing
+  it; and 17 is the documentation truth pass, which must run last or the code changes in 18/19
+  re-stale the claims it exists to make true.
+
+### Human decisions still pending
+
+1. **Phase 16 — wire it or delete it.** Deferred above, not answered. When it is taken:
+   *if wired*, TEST-03 requires a real-process integration call; *if removed*, `todo/plan.md`'s
+   Track B must be amended so the next reader does not rebuild it, and **`fjs/document/subject`
+   is out of scope either way.**
+
+2. **Release timing.** `develop` is **110 commits ahead of `main`**. A release means bumping
+   `package.json` from `0.12.0`, writing CHANGELOG entries for Phases 13 and 15, merging to
+   `main`, and tagging. Note an existing test asserts `serverInfo.version` equals
+   `package.json`'s version, so the bump is a code change, not just metadata. Owner chose on
+   2026-08-12 to stop at `develop`.
+
+4. **Standing verification debt** — see the CARRIED, NOW UNOWNED block above. Phases **05, 06,
+   07** have no VERIFICATION.md under any name; Phase 10's Tax Computation Worksheet
+   cent-exactness and Phase 13's TY2025 IRS figures remain `human_needed`.
+
+### Next
+
+Autonomous run in progress, executing **19 → 18 → 17** (see the ordering rationale above).
+**Phase 19 is now COMPLETE** — all three plans executed, all three requirements closed. Next
+up is **Phase 18**.
+
+- **Phase 19 — Reproducibility and Report Provenance — COMPLETE (2026-08-12).**
+  (Week 4, T2, EXEC-13/PROV-04/PROV-05). CONTEXT/PATTERNS/VALIDATION and Plans
+  19-01/19-02/19-03 written and executed 2026-08-12. ROADMAP marks it **Research: No** —
+  every mechanism it needs already ships and is proven.
+  **Plan 19-01 executed and committed** (`d42cc2d`): `fjs/report/provenance/module.f.js` —
+  `paramSetHash`, `reviewedEstimateFraming`, `countsTowardReproducibilityAcceptance`, all 7
+  proof leaves mutation-gate-verified. See `19-01-SUMMARY.md`.
+  **Plan 19-02 executed and committed** (`7a58c76`): `runSchema`/`fjsRunInputSchema` widened
+  with required `taxYear`/`paramSetHash`; `fjs_run`'s response envelope and persisted
+  `vnd.fjs.run` record both now carry `taxYear`/`paramSetHash`/`programHash`/
+  `reviewedEstimateFraming` alongside the existing six/eight keys; an unknown `taxYear` is
+  refused by name before `executeRun` ever runs. All four independent Run-shaped-literal/
+  call-site populations updated in the one commit, plus a fifth population
+  (`fjs/report/provenance/module.f.js`'s own `unpinnedRun` fixture, shipped by 19-01 after
+  the plan's population enumeration was frozen) found and fixed the same way. Mutation Gate
+  M2 performed and confirmed against 19-VALIDATION.md's corrected red set (observation only,
+  no code change survives it — `&&`/`||` restored byte-identical). See `19-02-SUMMARY.md`.
+  PROV-04 marked complete; EXEC-13 stays Pending (its second sentence needs 19-03's gate).
+  **Plan 19-03 executed and committed** (`0315577`): PROV-05's control-then-pinned
+  byte-identical reproduction proof added to `fjs-run-integration.test.js`. The unpinned
+  control leg was built and OBSERVED to move (two distinct fetched-byte values, one head
+  hash before the amendment, a different one after) before the pinned leg's stability was
+  trusted, per 19-VALIDATION.md. The pinned leg then reproduced byte-identically across the
+  same amendment, both by `resultHash` string equality AND by fetched-byte equality.
+  `countsTowardReproducibilityAcceptance` was called against two REAL, CAS-fetched persisted
+  run records (never hand-built fixtures): `true` for the pinned run, `false` for the
+  control. **Mutation Gate M1** (pinned branch resolves the live head instead of
+  `pin.parents`) reddened the new PROV-05 assertion — confirmed independently load-bearing
+  via a diagnostic run isolating it from the pre-existing pin proof that also reddens in the
+  same mutated pass — plus both `buildRunSnapshot`-level unit proofs 19-VALIDATION.md
+  predicted; restored byte-identical, `git status` clean, suite green again. **EXEC-13 and
+  PROV-05 both marked complete** (checkbox + traceability row). `npm test` 6314/6314;
+  de-duplicated project-local proofs unchanged at **916** (this plan's new assertions live in
+  the root-level integration test, not under `fjs/`). See `19-03-SUMMARY.md`. **This closes
+  Phase 19.**
+
+- **Phase 18 — Dependency and Duplication Debt** (Backlog, T3, MAINT-06…08). Now next.
+- **Phase 17 — Documentation Truth Pass** (Backlog, T3, MAINT-02…05). Its criterion 5 is the
+  requirement count, which read **79** in ROADMAP's Coverage table and **83** in
+  REQUIREMENTS.md while the real figure is **93** (82 complete, 11 open). The Coverage table
+  was corrected on 2026-08-12 — it had also omitted the entire MAINT category and its own rows
+  summed to 90, not the 79 it declared. REQUIREMENTS.md's prose claim is still uncorrected and
+  is Phase 17's to fix.
+
+**Phase 16** is deferred and **Phase 14** is skipped; neither is part of this run.
 
 Resume file: None
-plus `.planning/HANDOFF.json`. The stale `.continue-here.md` files in phases 09 and 10 were deleted
-during this pause — they were one-shot artifacts from earlier sessions and would have misdirected a
-resuming agent.
-
-**The one constraint that gates Phase 12.1:** the dividend scope reclassification
-(`fjs/return/scope`) and the Form 1040 lines-3a/3b wiring (`fjs/form1040/core`, which today sets
-them to `declaredZero` and hardcodes `qualifiedDividendsCents: 0n`) must land as **one atomic
-change**. Doing either half alone makes the engine report a confident **zero** for dividend income
-where it currently refuses honestly — strictly worse than the refusal, and the exact failure TAX-16
-exists to prevent.
-
-**Approved autonomous run** (phase owner, 2026-08-07): 12.1 → 13 → 15 → 16 → 17 → 18, with **14
-skipped** — Acceptance needs the taxpayer's real filed return and real documents, and is marked
-NOT AUTONOMOUS-EXECUTABLE in ROADMAP.md itself.
+all closed); next is Phase 18 (Dependency and Duplication Debt)

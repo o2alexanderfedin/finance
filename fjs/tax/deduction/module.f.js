@@ -250,6 +250,79 @@ export const standardDeductionCents = taxParamSet => input => {
     return basicCents + BigInt(agedOrBlindBoxes) * incrementCents
 }
 
+// ── Form 1040 line 12e's standard-vs-itemized comparison (TAX-13) ─────────────
+
+/**
+ * Everything {@link deductionChoice} needs beyond
+ * {@link StandardDeductionInput}: Schedule A's own already-computed grand
+ * total (line 17), and the taxpayer's line 18 election.
+ * @typedef {StandardDeductionInput & {
+ *   readonly itemizedCents: bigint,
+ *   readonly itemizeEvenThoughLessThanStandardDeduction: boolean,
+ * }} DeductionChoiceInput
+ */
+
+/**
+ * The discriminated union {@link deductionChoice} returns: which figure was
+ * chosen, and BOTH figures that were compared to make that choice — never
+ * only the winner.
+ * @typedef {{
+ *   readonly chosen: 'standard' | 'itemized',
+ *   readonly standard: bigint,
+ *   readonly itemized: bigint,
+ * }} DeductionChoiceResult
+ */
+
+/**
+ * Form 1040 line 12e's standard-vs-itemized comparison (13-CONTEXT.md
+ * Decision 2.4) — the comparison lives HERE, beside the standard deduction
+ * it compares against, not in `fjs/schedule/a` (which would make Schedule A
+ * responsible for deciding whether it is used) and not in
+ * `fjs/form1040/core` (which would bury a tax rule in a wiring module).
+ *
+ * `itemized` is taken DIRECTLY from `input.itemizedCents` — this function
+ * never calls `scheduleA` itself. It has no document inputs of its own;
+ * Schedule A has already computed the total by the time anything calls this.
+ *
+ * The order of the two steps below mirrors {@link standardDeductionCents}'s
+ * own "compute both figures, then decide" discipline, copied into this
+ * function's own docstring rather than merely followed silently:
+ *
+ * 1. **Compute BOTH figures unconditionally, before any comparison.** The
+ *    standard deduction (with every age/blindness/dependent/exception rule
+ *    {@link standardDeductionCents} already implements) and the itemized
+ *    total are both computed regardless of which one will be used.
+ * 2. **Decide.** `itemizeEvenThoughLessThanStandardDeduction` (Decision 2.5,
+ *    Schedule A line 18) OVERRIDES the comparison outright — a taxpayer may
+ *    elect to itemize even at a loss (it can still reduce state tax), and
+ *    silently ignoring that election would make the field inert. Absent the
+ *    election, itemized wins ONLY on a STRICT `>`: a tie takes the standard
+ *    deduction, since itemizing at a tie gains nothing and adds
+ *    substantiation risk the standard deduction does not carry.
+ *
+ * **Both figures are always returned, win or lose — never only the
+ * winner** — so a caller (1040 line 12e) can cite what was COMPARED, not
+ * only what won.
+ *
+ * The failure mode this function exists to close: an engine where itemizing
+ * automatically wins above the base standard-deduction figure. It does not —
+ * a filer whose OWN standard deduction is raised by age/blindness boxes can
+ * have itemized deductions above the BASE figure and still take the
+ * standard deduction, because the comparison is always against THIS
+ * filer's own standard deduction, never the bare chart minimum.
+ * {@link proof.standardWinsAboveTheBaseThresholdTheLoadBearingCase} is that
+ * exact case.
+ * @type {(taxParamSet: TaxParamSet) => (input: DeductionChoiceInput) => DeductionChoiceResult}
+ */
+export const deductionChoice = taxParamSet => input => {
+    const standard = standardDeductionCents(taxParamSet)(input)
+    const itemized = input.itemizedCents
+    const chosen = input.itemizeEvenThoughLessThanStandardDeduction || itemized > standard
+        ? 'itemized'
+        : 'standard'
+    return { chosen, standard, itemized }
+}
+
 // ── Tests ────────────────────────────────────────────────────────────────────
 
 /**
@@ -383,6 +456,194 @@ const generatedChartProof = Object.fromEntries(
         },
     ]),
 )
+
+// ── deductionChoice's own tests (TAX-13) ────────────────────────────────────
+
+/**
+ * A {@link DeductionChoiceInput} built on {@link chartInput}'s own base
+ * (every exception switched off) — the two new fields are the only ones a
+ * leaf built on this needs to name, matching {@link chartInput}'s own
+ * "one fact each leaf changes" discipline one level up.
+ * @type {(status: IndividualFilingStatus, boxes: number, itemizedCents: bigint, elects: boolean) => DeductionChoiceInput}
+ */
+const deductionChoiceInput = (status, boxes, itemizedCents, elects) => ({
+    ...chartInput(status, boxes),
+    itemizedCents,
+    itemizeEvenThoughLessThanStandardDeduction: elects,
+})
+
+/**
+ * One row of {@link deductionChoiceCombinations} — hand-typed, mirroring
+ * {@link ChartRow}'s own discipline one level up: `expectedStandardCents` is
+ * copied from {@link chartCombinations}'s own already-hand-typed figures
+ * (never re-derived from {@link standardDeductionCents}), so this table adds
+ * no new hand-typed standard-deduction dollar amount of its own.
+ * @typedef {{
+ *   readonly name: string, readonly status: IndividualFilingStatus, readonly boxes: number,
+ *   readonly itemizedCents: bigint, readonly elects: boolean,
+ *   readonly expectedStandardCents: bigint, readonly expectedChosen: 'standard' | 'itemized',
+ * }} DeductionChoiceRow
+ */
+
+/**
+ * A small matrix — standard-wins / itemized-wins / election-overrides, each
+ * crossed with a couple of filing statuses — per {@link chartCombinations}'s
+ * own generated-leaf-per-combination precedent.
+ * @type {readonly DeductionChoiceRow[]}
+ */
+const deductionChoiceCombinations = [
+    // single, no boxes ($15,750 base) — itemized wins, itemized loses.
+    {
+        name: 'singleNoBoxesItemizedWins', status: 'single', boxes: 0,
+        itemizedCents: 2000000n, elects: false,
+        expectedStandardCents: 1575000n, expectedChosen: 'itemized',
+    },
+    {
+        name: 'singleNoBoxesStandardWins', status: 'single', boxes: 0,
+        itemizedCents: 1000000n, elects: false,
+        expectedStandardCents: 1575000n, expectedChosen: 'standard',
+    },
+    // single, TWO boxes checked ($19,750, not the base $15,750) — the
+    // LOAD-BEARING case (criterion 3): itemized ($18,000) exceeds the BASE
+    // $15,750 and still LOSES, because this filer's own standard deduction
+    // is $19,750, not the bare chart minimum.
+    {
+        name: 'singleTwoBoxesStandardWinsAboveTheBaseThreshold', status: 'single', boxes: 2,
+        itemizedCents: 1800000n, elects: false,
+        expectedStandardCents: 1975000n, expectedChosen: 'standard',
+    },
+    // marriedFilingJointly, no boxes ($31,500 base) — itemized wins.
+    {
+        name: 'marriedFilingJointlyNoBoxesItemizedWins', status: 'marriedFilingJointly', boxes: 0,
+        itemizedCents: 4000000n, elects: false,
+        expectedStandardCents: 3150000n, expectedChosen: 'itemized',
+    },
+    // marriedFilingJointly, no boxes — the line 18 election OVERRIDES even
+    // though itemized ($10,000) is well below standard ($31,500).
+    {
+        name: 'marriedFilingJointlyNoBoxesElectionOverridesEvenThoughLosing',
+        status: 'marriedFilingJointly', boxes: 0,
+        itemizedCents: 1000000n, elects: true,
+        expectedStandardCents: 3150000n, expectedChosen: 'itemized',
+    },
+    // single, no boxes — an exact TIE goes to the standard deduction: the
+    // comparison is a STRICT `>`, never `>=`.
+    {
+        name: 'singleNoBoxesTieGoesToStandard', status: 'single', boxes: 0,
+        itemizedCents: 1575000n, elects: false,
+        expectedStandardCents: 1575000n, expectedChosen: 'standard',
+    },
+]
+
+/**
+ * Independently HAND-TYPED, mirroring {@link expectedChartCombinationCount}'s
+ * own discipline: the count of {@link deductionChoiceCombinations}, stated
+ * separately from its own `.length` so a row dropped from the table cannot
+ * take its own proof leaf away with it.
+ * @type {number}
+ */
+const expectedDeductionChoiceCombinationCount = 6
+
+/**
+ * One generated proof leaf per {@link deductionChoiceCombinations} row,
+ * keyed by the row's own `name` — mirrors {@link generatedChartProof}'s own
+ * `Object.fromEntries` idiom one level up.
+ * @type {StringMap<() => void>}
+ */
+const generatedDeductionChoiceProof = Object.fromEntries(
+    deductionChoiceCombinations.map(row => [
+        row.name,
+        () => {
+            const result = deductionChoice(taxParams2025)(
+                deductionChoiceInput(row.status, row.boxes, row.itemizedCents, row.elects))
+            assertEq(result.standard, row.expectedStandardCents, ['standard mismatch', row.name])
+            assertEq(result.itemized, row.itemizedCents, ['itemized mismatch', row.name])
+            assertEq(result.chosen, row.expectedChosen, ['chosen mismatch', row.name])
+        },
+    ]),
+)
+
+/**
+ * The proof group `export const proof` spreads in below, keeping
+ * {@link deductionChoice}'s own tests visually grouped even though they are
+ * spread into the same top-level `proof` object as every other leaf in this
+ * file (`node --test`'s discovery walks the whole tree regardless of
+ * nesting).
+ */
+const deductionChoiceProof = {
+    ...generatedDeductionChoiceProof,
+    // A row dropped from the table above — or a leaf lost during this
+    // proof's own generation — fails here explicitly, checked against the
+    // INDEPENDENTLY-stated count, never against the table's own length.
+    everyDeductionChoiceCombinationIsCovered: () => {
+        assertEq(
+            deductionChoiceCombinations.length,
+            expectedDeductionChoiceCombinationCount,
+            [
+                'expected exactly the independently-stated combination count',
+                deductionChoiceCombinations.length,
+                expectedDeductionChoiceCombinationCount,
+            ],
+        )
+        assertEq(
+            Object.keys(generatedDeductionChoiceProof).length,
+            expectedDeductionChoiceCombinationCount,
+            [
+                'expected one generated proof leaf per combination',
+                Object.keys(generatedDeductionChoiceProof).length,
+                expectedDeductionChoiceCombinationCount,
+            ],
+        )
+    },
+    // Test 1 (itemizing wins): standard $15,750 (single), itemized $20,000.
+    itemizingWinsAboveTheStandardDeduction: () => {
+        const result = deductionChoice(taxParams2025)(
+            deductionChoiceInput('single', 0, 2000000n, false))
+        assertEq(result.chosen, 'itemized')
+        assertEq(result.itemized, 2000000n)
+        assertEq(result.standard, 1575000n)
+    },
+    // Test 2 (standard wins ABOVE the base threshold — the load-bearing
+    // case, criterion 3): a single filer with TWO age/blindness boxes
+    // checked has a REAL standard deduction of $19,750 ($15,750 + two
+    // $2,000 increments), not the bare chart minimum. $18,000 of itemized
+    // deductions exceeds that $15,750 BASE figure and still loses, because
+    // it is compared against THIS filer's own $19,750, never the base.
+    standardWinsAboveTheBaseThresholdTheLoadBearingCase: () => {
+        const result = deductionChoice(taxParams2025)(
+            deductionChoiceInput('single', 2, 1800000n, false))
+        assertEq(result.chosen, 'standard', 'itemizing must NOT automatically win above the base $15,750')
+        assertEq(result.standard, 1975000n, '$15,750 + two $2,000 increments')
+        assertEq(result.itemized, 1800000n, 'above the BASE $15,750, still below this filer\'s own $19,750')
+    },
+    // Test 3 (the line 18 election overrides, itemizing when it loses):
+    // itemized $10,000 < standard $15,750, but the election is elected.
+    electionOverridesEvenThoughItemizingLoses: () => {
+        const result = deductionChoice(taxParams2025)(
+            deductionChoiceInput('single', 0, 1000000n, true))
+        assertEq(result.chosen, 'itemized', 'the line 18 election must override the comparison')
+        assertEq(result.standard, 1575000n)
+        assertEq(result.itemized, 1000000n)
+    },
+    // Test 4 (both figures always present): regardless of which arm wins,
+    // BOTH `standard` and `itemized` are bigints on the returned record —
+    // never only the winner. Checked on the itemized-wins fixture (where a
+    // buggy implementation returning only the winner would be least likely
+    // to be noticed, since `itemized` alone already matches the assertion
+    // a careless leaf might write).
+    bothFiguresAlwaysPresentRegardlessOfWinner: () => {
+        const itemizedWins = deductionChoice(taxParams2025)(
+            deductionChoiceInput('single', 0, 2000000n, false))
+        assertEq(typeof itemizedWins.standard, 'bigint')
+        assertEq(typeof itemizedWins.itemized, 'bigint')
+        assertEq(itemizedWins.standard, 1575000n, 'the LOSING figure is still carried')
+        const standardWins = deductionChoice(taxParams2025)(
+            deductionChoiceInput('single', 0, 1000000n, false))
+        assertEq(typeof standardWins.standard, 'bigint')
+        assertEq(typeof standardWins.itemized, 'bigint')
+        assertEq(standardWins.itemized, 1000000n, 'the LOSING figure is still carried')
+    },
+}
 
 export const proof = {
     ...generatedChartProof,
@@ -614,4 +875,5 @@ export const proof = {
             assert(message.includes('maximum=4'), ['expected the refusal to name the maximum', message])
         })
     },
+    ...deductionChoiceProof,
 }

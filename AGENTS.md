@@ -78,8 +78,13 @@ These are cited by name throughout the source. They are stated here so the citat
 - **No new dependency, including a devDependency, without every repo owner's approval.**
 - **A missing generic capability is written here in this project, shaped so it could be lifted
   upstream unchanged** — no locale or domain assumptions baked into a generic module. See
-  `fjs/types/decimal` (scale as a parameter, zero finance-specific content) versus
-  `fjs/document/ocr_amount` (comma degrouping, a US printed-form convention, kept one layer out).
+  `fjs/types/decimal` (scale as a parameter, zero finance-specific content) versus `fjs/exact`
+  (integer cents, `centsFromString`/`centsToString`, a money convention kept one layer out).
+
+  This example was `fjs/document/ocr_amount` until MAINT-01 deleted it as an orphan, which is
+  the second-order cost of dead code worth naming: **a rule illustrated by an unreachable module
+  is a rule nobody can check.** Pick live code for an example, or the example outlives the thing
+  it describes.
 
 ## A proof is not known to work until you have watched it fail
 
@@ -164,12 +169,26 @@ So after any non-trivial merge, verify coverage rather than trusting the exit co
 
 ```
 # 1. both parents' proof-leaf sets must be subsets of the result
-node --test 2>&1 | grep -o '^✔ import("\./fjs/[^ ]*' | sort -u   # run in each parent and in the result
+npm test 2>&1 | grep -o '^✔ import("\./fjs/[^ ]*' | sort -u      # run in each parent and in the result
 comm -23 parent.txt result.txt      # must be empty, or every line individually explained
 
 # 2. a name-set diff is NOT sufficient — a leaf can keep its name and lose its assertions
 grep -cE '\bassert(Eq|NotNullish)?\(' <changed file>   # before vs after; a drop is a regression
 ```
+
+**Use `npm test`, not bare `node --test`, and the difference is not cosmetic.** Until 2026-08-17
+`npm test` *was* bare `node --test`, whose default discovery matches `*.test.ts` as well as
+`*.test.js`. That picked up `functionalscript/fjs/emergent_testing/all.test.ts` — the vendored
+submodule's own entry point — and **ran the entire proof suite a second time**, doubling both the
+reported count and roughly 53 seconds of wall clock. `npm test` is now pinned to
+`node --test *.test.js`, which is why root-level `*.test.js` files are the documented exception
+and a test placed anywhere else will simply not run.
+
+The `sort -u` above is therefore no longer load-bearing; keep it as a cheap assertion that raw and
+unique counts still agree. **The reason this survived for months is worth more than the fix:** the
+inflation was recorded as a fact about the *reporter* and never tested as a fact about the
+*runner*, so the documented `sort -u` workaround removed all pressure to look again. A workaround
+that works is the most expensive kind of bug.
 
 Step 1 caught the dropped leaf; step 2 is what catches the case step 1 cannot see. Where a merge
 deliberately replaces a proof with a stronger one, say so in a `MERGE NOTE` comment at the site, so
@@ -243,6 +262,27 @@ edit in a form that keeps the binding live, and record both the compile error an
 (cents / 100n) * 100n          ->  halfUp(of(cents / 100n)(1n)) * 100n   // keeps `of`/`halfUp` used
 delete the `spouseItemizes` term  ->  (spouseItemizes && false)          // keeps the binding used
 ```
+
+**`&& false` does NOT work inside an `if` condition.** `tsconfig.json` sets
+`allowUnreachableCode: false`, so `if (x && false) { ... }` makes the whole block unreachable and
+`tsc` reports **TS7027** — no `ℹ tests` line, nothing runs, and the gate proves nothing while
+looking performed. The recipe above is sound only where the value is *consumed* rather than
+*branched on*. Inside a condition, keep the binding live with a comparison that is false for the
+fixture but not statically dead:
+
+```
+if (printed !== undefined)        ->  if (printed !== undefined && printed.length > 1000)
+if (cents !== 0n)                 ->  if (cents !== 0n && cents > 10n ** 12n)
+```
+
+Found on 2026-08-15 during Phase 20's verification, running this file's own recipe.
+
+**Erasing a string interpolation is a mutation worth running, and almost nobody runs it.** The
+same verification found `${destination}` -> `${destination.slice(0, 0)}` survived the entire
+suite: five refusal proofs asserted the box name and the phrase "cannot compute", and not one
+asserted *where the amount would have gone* — the only part of the message a reader can act on. If
+a message is part of the contract, assert the part that carries the information, not the part that
+is easy to assert.
 
 ### The equivalent mutant: a mutation a neighbouring operation absorbs
 

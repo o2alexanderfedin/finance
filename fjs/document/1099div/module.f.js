@@ -81,6 +81,7 @@ import { error, ok } from 'functionalscript/fjs/types/result/module.f.js'
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
 import { isHash } from 'functionalscript/fjs/media/revision/module.f.js'
 import { base, mediaTypeOf } from '../base/module.f.js'
+import { formRevisionError } from '../form_revision/module.f.js'
 import { moneyFieldError } from '../money_field/module.f.js'
 import { centsFromString } from '../../exact/module.f.js'
 
@@ -230,8 +231,9 @@ const expectedStateLocalMoneyFieldCount = 1
  * @type {(r: OneZeroNineNineDiv) => Result<OneZeroNineNineDiv, OneZeroNineNineDivError>}
  */
 export const checkReferences = r => {
-    if (r.formRevision.trim() === '') {
-        return error(`formRevision must not be empty or whitespace-only`)
+    const formRevisionMessage = formRevisionError(r.formRevision)
+    if (formRevisionMessage !== undefined) {
+        return error(formRevisionMessage)
     }
     if (!isHash(r.sourceArtifactHash)) {
         return error(`sourceArtifactHash is not a valid hash: ${r.sourceArtifactHash}`)

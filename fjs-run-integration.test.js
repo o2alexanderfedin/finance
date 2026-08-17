@@ -59,6 +59,7 @@ import { centsFromString, centsToString } from './fjs/exact/module.f.js'
 import { dialect as oneZeroNineNineIntDialect, validate as validateOneZeroNineNineInt } from './fjs/document/1099int/module.f.js'
 import { dialect as revisionDialect } from 'functionalscript/fjs/media/revision/module.f.js'
 import { materializeHome, programPath } from './fjs/guest/materialize/module.f.js'
+import { countsTowardReproducibilityAcceptance } from './fjs/report/provenance/module.f.js'
 
 const repoRoot = fileURLToPath(new URL('.', import.meta.url))
 
@@ -121,7 +122,7 @@ const programSource = [
 test(
     'TEST-01/TEST-02: fjs_run end to end through a real separate node index.js process and a real filesystem, with full tool coverage',
     { timeout: 60_000 },
-    async () => {
+    async t => {
         // T-07-09-03: a fresh CAS home under os.tmpdir(), never the repo tree.
         const home = mkdtempSync(join(tmpdir(), 'finance-fjs-run-integration-home-'))
         let serverProc = null
@@ -202,327 +203,598 @@ test(
                 return waitForId(id)
             }
 
-            // ── initialize -> notifications/initialized ──────────────────
-            const initId = nextId()
-            send(initializeRequest(initId))
-            send(initializedNotification)
-            const initResponse = await waitForId(initId)
-            assert.ok(!('error' in initResponse), `initialize failed: ${JSON.stringify(initResponse)}`)
-            assert.equal(initResponse.result.serverInfo.name, 'finance-mcp')
-            // The advertised version must be the released one. `financeConfig`
-            // carries it as a LITERAL — it is a pure module with no filesystem
-            // to read the manifest from — so this is the only place the two can
-            // be compared, and without it a release that bumps `package.json`
-            // and forgets the server would ship a wrong version silently.
-            assert.equal(
-                initResponse.result.serverInfo.version,
-                JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')).version,
-                'MCP serverInfo.version must equal package.json version — bump both together')
+            // ── Hoisted for the subtests below ───────────────────────────
+            // These fourteen values are produced by one concern and read by a
+            // later one, so they cannot stay `const` inside the subtest that
+            // computes them. Nothing else moved: the ASSIGNMENTS are still at
+            // their original sites, in their original order, and every
+            // assertion below is the one that was there before the split.
+            // (WR-03, Phase 18. The split itself is `await t.test(...)`
+            // subtests, not `describe`/`before` — no root-level test file in
+            // this repo uses those, and a subtest keeps the ONE real server
+            // process and its seeded CAS in this outer scope, created once.)
+            let advertisedTools
+            let casAdd
+            let docAHash
+            let docBHash
+            let subjectA
+            let subjectC
+            let revAHash
+            let revBHash
+            let programHash
+            let parsed
+            let pinProgramHash
+            let pinRunRecord
+            let controlRun1
+            let pinnedRun1
 
-            // ── tools/list, read at runtime (TEST-02) — never a hardcoded
-            // array, so a tool added later without integration coverage
-            // fails THIS test rather than passing unnoticed ──────────────
-            const listId = nextId()
-            send({ jsonrpc: '2.0', method: 'tools/list', id: listId })
-            const listResponse = await waitForId(listId)
-            assert.ok(!('error' in listResponse), `tools/list failed: ${JSON.stringify(listResponse)}`)
-            const advertisedTools = new Set(listResponse.result.tools.map(t => t.name))
-            assert.ok(advertisedTools.size > 0, 'expected at least one advertised tool')
+            await t.test('initialize handshake: the advertised protocol version is the released one', async () => {
+                // ── initialize -> notifications/initialized ──────────────────
+                const initId = nextId()
+                send(initializeRequest(initId))
+                send(initializedNotification)
+                const initResponse = await waitForId(initId)
+                assert.ok(!('error' in initResponse), `initialize failed: ${JSON.stringify(initResponse)}`)
+                assert.equal(initResponse.result.serverInfo.name, 'finance-mcp')
+                // The advertised version must be the released one. `financeConfig`
+                // carries it as a LITERAL — it is a pure module with no filesystem
+                // to read the manifest from — so this is the only place the two can
+                // be compared, and without it a release that bumps `package.json`
+                // and forgets the server would ship a wrong version silently.
+                assert.equal(
+                    initResponse.result.serverInfo.version,
+                    JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')).version,
+                    'MCP serverInfo.version must equal package.json version — bump both together')
 
-            // ── Seed three vnd.fjs.1099int documents through the REAL
-            // cas_add tool, over the real session, against the real
-            // filesystem — the difference from 07-08's virtual seed, whose
-            // store is a virtual root, not a real directory. One deliberately
-            // OMITS box1InterestIncome entirely (never '0.00') ──────────────
-            const docCommon = {
-                dialect: oneZeroNineNineIntDialect,
-                payerTin: '11-1111111',
-                recipientTin: '222-22-2222',
-                taxYear: 2024,
-                formRevision: '2024',
-            }
-            const docWithInterest = { ...docCommon, accountNumber: 'ACC-0001', box1InterestIncome: '1234.56' }
-            const docWithSmallerInterest = { ...docCommon, accountNumber: 'ACC-0002', box1InterestIncome: '10.00' }
-            const docWithAbsentInterest = { ...docCommon, accountNumber: 'ACC-0003' }
-            for (const doc of [docWithInterest, docWithSmallerInterest, docWithAbsentInterest]) {
-                const [vt, vv] = validateOneZeroNineNineInt(doc)
-                assert.equal(vt, 'ok', `expected the seeded 1099-INT to validate: ${JSON.stringify(vv)}`)
-            }
-
-            const casAdd = async content => {
-                const response = await call('cas_add', { content, type: 'text' })
-                assert.ok(!response.result.isError, `cas_add failed: ${JSON.stringify(response)}`)
-                return response.result.content[0].text
-            }
-
-            const docAHash = await casAdd(JSON.stringify(docWithInterest))
-            const docBHash = await casAdd(JSON.stringify(docWithSmallerInterest))
-            const docCHash = await casAdd(JSON.stringify(docWithAbsentInterest))
-
-            // Revisions written directly as raw vnd.fjs.revision blobs via
-            // cas_add (bypassing evo_add, mirroring 07-08/casRefresh's own
-            // technique) — cas_add's own handler folds a recognized revision
-            // blob into the live Evo cache via syncRevision as it is
-            // written, so these are visible to evo_head/evo_list without a
-            // restart or an explicit cas_refresh.
-            const subjectA = 'finance-integration-subject-A'
-            const subjectB = 'finance-integration-subject-B'
-            const subjectC = 'finance-integration-subject-C'
-            const revisionText = (subject, snapshot) => JSON.stringify({
-                dialect: revisionDialect,
-                subject,
-                parents: [],
-                snapshot,
-                generation: 0,
             })
-            const revAHash = await casAdd(revisionText(subjectA, docAHash))
-            const revBHash = await casAdd(revisionText(subjectB, docBHash))
-            await casAdd(revisionText(subjectC, docCHash))
 
-            // The program's real source, written for real via cas_add.
-            const programHash = await casAdd(programSource)
+            await t.test('tools/list is read at runtime, never hardcoded (TEST-02)', async () => {
+                // ── tools/list, read at runtime (TEST-02) — never a hardcoded
+                // array, so a tool added later without integration coverage
+                // fails THIS test rather than passing unnoticed ──────────────
+                const listId = nextId()
+                send({ jsonrpc: '2.0', method: 'tools/list', id: listId })
+                const listResponse = await waitForId(listId)
+                assert.ok(!('error' in listResponse), `tools/list failed: ${JSON.stringify(listResponse)}`)
+                advertisedTools = new Set(listResponse.result.tools.map(t => t.name))
+                assert.ok(advertisedTools.size > 0, 'expected at least one advertised tool')
 
-            // An agent reads the dialect's own field names before authoring
-            // a program against them — MCP-06's whole purpose.
-            const schemaResponse = await call('finance_schema', { dialect: 'vnd.fjs.1099int' })
-            assert.ok(!schemaResponse.result.isError, `finance_schema failed: ${JSON.stringify(schemaResponse)}`)
-            assert.ok(
-                schemaResponse.result.content[0].text.includes('box1InterestIncome'),
-                'expected the schema response to name box1InterestIncome')
-
-            // MCP-07: an agent reads TY2025's parameters through a real tool
-            // call rather than recalling them — the decisive reachability
-            // proof 08-VALIDATION.md (T-08-04) requires alongside the
-            // financeMcpHandlers registry entry, in this SAME real session.
-            const taxParamsResponse = await call('finance_tax_params', { year: 2025 })
-            assert.ok(!taxParamsResponse.result.isError, `finance_tax_params failed: ${JSON.stringify(taxParamsResponse)}`)
-            assert.ok(
-                taxParamsResponse.result.content[0].text.includes('31500.00'),
-                'expected the finance_tax_params response to name the MFJ standard deduction amount')
-            assert.ok(
-                taxParamsResponse.result.content[0].text.includes('2025-32'),
-                'expected the finance_tax_params response to name its own Rev. Proc. citation')
-
-            // MCP-08: an agent enumerates stored documents through a real
-            // tool call, over this SAME real session, against the three
-            // subjects/revisions already seeded above (subjectA/B/C) — the
-            // decisive reachability proof this SAME-commit ordering
-            // constraint exists to require alongside the financeMcpHandlers
-            // registry entry (see fjs/server/module.f.js).
-            const documentsListResponse = await call('finance_documents_list', {})
-            assert.ok(
-                !documentsListResponse.result.isError,
-                `finance_documents_list failed: ${JSON.stringify(documentsListResponse)}`)
-            const documentsListed = JSON.parse(documentsListResponse.result.content[0].text)
-            assert.ok(Array.isArray(documentsListed), 'expected finance_documents_list to answer a JSON array')
-            assert.ok(
-                [subjectA, subjectB, subjectC].every(
-                    s => documentsListed.some(entry => entry.subject === s)),
-                `expected finance_documents_list to include all three seeded subjects: ${JSON.stringify(documentsListed)}`)
-
-            // ── The decisive call: fjs_run through the real, separate
-            // process — a real write-then-import of the materialized
-            // program, something no virtual proof can do ──────────────────
-            const runResponse = await call('fjs_run', { hash: programHash })
-            assert.equal(runResponse.result.isError, undefined, `fjs_run failed: ${JSON.stringify(runResponse)}`)
-            const parsed = JSON.parse(runResponse.result.content[0].text)
-            assert.ok(typeof parsed.resultHash === 'string' && parsed.resultHash !== '', 'expected a resultHash')
-            assert.ok(typeof parsed.runHash === 'string' && parsed.runHash !== '', 'expected a runHash')
-            // PROV-07 (09-CONTEXT.md): the read count and numeric-literal
-            // count surface beside the two hashes. This run's own program
-            // dispatches evoList plus, per seeded subject, evoHead/
-            // evoRevision/casRead — several observed reads; its own stored
-            // source text contains at least the `0n` accumulator literal.
-            assert.ok(typeof parsed.readCount === 'number' && parsed.readCount > 0, 'expected a positive readCount')
-            assert.ok(typeof parsed.literalCount === 'number' && parsed.literalCount >= 1, 'expected literalCount to be at least 1')
-
-            // The expected total, computed INDEPENDENTLY here from the two
-            // PRESENT seeded values via centsFromString/centsToString —
-            // never a bare literal.
-            const expectedTotal = centsToString(centsFromString('1234.56') + centsFromString('10.00'))
-
-            const resultGet = await call('cas_get', { hash: parsed.resultHash, content: true })
-            assert.ok(!resultGet.result.isError, `cas_get(resultHash) failed: ${JSON.stringify(resultGet)}`)
-            const resultMeta = JSON.parse(resultGet.result.content[0].text)
-            assert.equal(resultMeta.text, expectedTotal)
-
-            const runGet = await call('cas_get', { hash: parsed.runHash, content: true })
-            assert.ok(!runGet.result.isError, `cas_get(runHash) failed: ${JSON.stringify(runGet)}`)
-            const runMeta = JSON.parse(runGet.result.content[0].text)
-            const runRecord = JSON.parse(runMeta.text)
-            assert.equal(runRecord.status, 'ok')
-            // The absent-field document's subject IS enumerated — its
-            // evoHead read appears in the PERSISTED record — proving the
-            // program actively visited and skipped it, not that this test
-            // simply never presented it.
-            assert.ok(
-                runRecord.inputs.some(i => i.command === 'evoHead' && i.payload[0] === subjectC),
-                'expected subjectC (the absent-field document) to have been enumerated')
-
-            // ── 09-07: the pin path through the SHIPPED fjs_run tool,
-            // against a real separate process — the assertion that fails
-            // when `...pinFields` is dropped from fjsRunTool's own
-            // `executeRun(...)` call (E2). No virtual proof can make this
-            // assertion at all: `fjsRunTool.handle` cannot reach an 'ok'
-            // outcome under `fjs/effects/node/virtual` in a single call
-            // (the write/import split `fjs/server/fjs_run/module.f.js`'s
-            // own header documents), so every virtual-level pin proof in
-            // that file drives `runExecuteRunViaFixture` — a decomposed
-            // replay of `executeRun`'s OWN steps — directly, bypassing
-            // `fjsRunTool.handle` entirely. This is the one place the gap
-            // can be closed for real: a genuinely separate process has no
-            // such limitation ──────────────────────────────────────────
-            const pinSubject = 'finance-integration-pin-subject'
-            const pinLiveRevResponse = await call('evo_add', {
-                parents: [],
-                subject: pinSubject,
-                snapshot: docAHash,
             })
-            assert.ok(
-                !pinLiveRevResponse.result.isError,
-                `evo_add (pin setup) failed: ${JSON.stringify(pinLiveRevResponse)}`)
-            const pinLiveRevHash = pinLiveRevResponse.result.content[0].text
 
-            // A program that reads exactly one subject's head — the SAME
-            // shape `fjs/server/fjs_run/module.f.js`'s own
-            // `pinOverridesTheLiveHeadThroughFullExecuteRun` proof uses at
-            // the decomposed-fixture layer, written here as real source
-            // text a real process really writes and really imports.
-            const pinProgramSource = 'export const report = ctx => args => ctx.evoHead(args[0])'
-            const pinProgramHash = await casAdd(pinProgramSource)
+            await t.test('seeding: three vnd.fjs.1099int documents, two revisions, the program, and the read-only tools', async () => {
+                // ── Seed three vnd.fjs.1099int documents through the REAL
+                // cas_add tool, over the real session, against the real
+                // filesystem — the difference from 07-08's virtual seed, whose
+                // store is a virtual root, not a real directory. One deliberately
+                // OMITS box1InterestIncome entirely (never '0.00') ──────────────
+                const docCommon = {
+                    dialect: oneZeroNineNineIntDialect,
+                    payerTin: '11-1111111',
+                    recipientTin: '222-22-2222',
+                    taxYear: 2024,
+                    formRevision: '2024',
+                }
+                const docWithInterest = { ...docCommon, accountNumber: 'ACC-0001', box1InterestIncome: '1234.56' }
+                const docWithSmallerInterest = { ...docCommon, accountNumber: 'ACC-0002', box1InterestIncome: '10.00' }
+                const docWithAbsentInterest = { ...docCommon, accountNumber: 'ACC-0003' }
+                for (const doc of [docWithInterest, docWithSmallerInterest, docWithAbsentInterest]) {
+                    const [vt, vv] = validateOneZeroNineNineInt(doc)
+                    assert.equal(vt, 'ok', `expected the seeded 1099-INT to validate: ${JSON.stringify(vv)}`)
+                }
 
-            const pinnedParents = ['PINNED-INSTEAD-OF-LIVE-HEAD']
-            const pinRunResponse = await call('fjs_run', {
-                hash: pinProgramHash,
-                args: [pinSubject],
-                subject: pinSubject,
-                parents: pinnedParents,
+                casAdd = async content => {
+                    const response = await call('cas_add', { content, type: 'text' })
+                    assert.ok(!response.result.isError, `cas_add failed: ${JSON.stringify(response)}`)
+                    return response.result.content[0].text
+                }
+
+                docAHash = await casAdd(JSON.stringify(docWithInterest))
+                docBHash = await casAdd(JSON.stringify(docWithSmallerInterest))
+                const docCHash = await casAdd(JSON.stringify(docWithAbsentInterest))
+
+                // Revisions written directly as raw vnd.fjs.revision blobs via
+                // cas_add (bypassing evo_add, mirroring 07-08/casRefresh's own
+                // technique) — cas_add's own handler folds a recognized revision
+                // blob into the live Evo cache via syncRevision as it is
+                // written, so these are visible to evo_head/evo_list without a
+                // restart or an explicit cas_refresh.
+                subjectA = 'finance-integration-subject-A'
+                const subjectB = 'finance-integration-subject-B'
+                subjectC = 'finance-integration-subject-C'
+                const revisionText = (subject, snapshot) => JSON.stringify({
+                    dialect: revisionDialect,
+                    subject,
+                    parents: [],
+                    snapshot,
+                    generation: 0,
+                })
+                revAHash = await casAdd(revisionText(subjectA, docAHash))
+                revBHash = await casAdd(revisionText(subjectB, docBHash))
+                await casAdd(revisionText(subjectC, docCHash))
+
+                // The program's real source, written for real via cas_add.
+                programHash = await casAdd(programSource)
+
+                // An agent reads the dialect's own field names before authoring
+                // a program against them — MCP-06's whole purpose.
+                const schemaResponse = await call('finance_schema', { dialect: 'vnd.fjs.1099int' })
+                assert.ok(!schemaResponse.result.isError, `finance_schema failed: ${JSON.stringify(schemaResponse)}`)
+                assert.ok(
+                    schemaResponse.result.content[0].text.includes('box1InterestIncome'),
+                    'expected the schema response to name box1InterestIncome')
+
+                // MCP-07: an agent reads TY2025's parameters through a real tool
+                // call rather than recalling them — the decisive reachability
+                // proof 08-VALIDATION.md (T-08-04) requires alongside the
+                // financeMcpHandlers registry entry, in this SAME real session.
+                const taxParamsResponse = await call('finance_tax_params', { year: 2025 })
+                assert.ok(!taxParamsResponse.result.isError, `finance_tax_params failed: ${JSON.stringify(taxParamsResponse)}`)
+                assert.ok(
+                    taxParamsResponse.result.content[0].text.includes('31500.00'),
+                    'expected the finance_tax_params response to name the MFJ standard deduction amount')
+                assert.ok(
+                    taxParamsResponse.result.content[0].text.includes('2025-32'),
+                    'expected the finance_tax_params response to name its own Rev. Proc. citation')
+
+                // MCP-08: an agent enumerates stored documents through a real
+                // tool call, over this SAME real session, against the three
+                // subjects/revisions already seeded above (subjectA/B/C) — the
+                // decisive reachability proof this SAME-commit ordering
+                // constraint exists to require alongside the financeMcpHandlers
+                // registry entry (see fjs/server/module.f.js).
+                const documentsListResponse = await call('finance_documents_list', {})
+                assert.ok(
+                    !documentsListResponse.result.isError,
+                    `finance_documents_list failed: ${JSON.stringify(documentsListResponse)}`)
+                const documentsListed = JSON.parse(documentsListResponse.result.content[0].text)
+                assert.ok(Array.isArray(documentsListed), 'expected finance_documents_list to answer a JSON array')
+                assert.ok(
+                    [subjectA, subjectB, subjectC].every(
+                        s => documentsListed.some(entry => entry.subject === s)),
+                    `expected finance_documents_list to include all three seeded subjects: ${JSON.stringify(documentsListed)}`)
+
             })
-            assert.equal(
-                pinRunResponse.result.isError, undefined,
-                `pinned fjs_run failed: ${JSON.stringify(pinRunResponse)}`)
-            const pinParsed = JSON.parse(pinRunResponse.result.content[0].text)
 
-            const pinResultGet = await call('cas_get', { hash: pinParsed.resultHash, content: true })
-            assert.ok(!pinResultGet.result.isError, `cas_get(pin resultHash) failed: ${JSON.stringify(pinResultGet)}`)
-            const pinResultMeta = JSON.parse(pinResultGet.result.content[0].text)
-            // The decisive assertion: the run's OWN result reflects the
-            // PINNED parents just supplied, never the live head `evo_add`
-            // established a moment ago. If `...pinFields` is ever dropped
-            // from `fjsRunTool`'s own `executeRun(...)` call, `executeRun`
-            // sees no pin at all and resolves the subject's LIVE head
-            // instead — this assertion is what catches that.
-            assert.equal(pinResultMeta.text, JSON.stringify(pinnedParents))
-            assert.notEqual(pinResultMeta.text, JSON.stringify([pinLiveRevHash]))
+            await t.test('fjs_run end to end: provenance, the independently computed total, and the run record', async () => {
+                // ── The decisive call: fjs_run through the real, separate
+                // process — a real write-then-import of the materialized
+                // program, something no virtual proof can do ──────────────────
+                const runResponse = await call('fjs_run', { hash: programHash, taxYear: 2025 })
+                assert.equal(runResponse.result.isError, undefined, `fjs_run failed: ${JSON.stringify(runResponse)}`)
+                parsed = JSON.parse(runResponse.result.content[0].text)
+                assert.ok(typeof parsed.resultHash === 'string' && parsed.resultHash !== '', 'expected a resultHash')
+                assert.ok(typeof parsed.runHash === 'string' && parsed.runHash !== '', 'expected a runHash')
+                // PROV-07 (09-CONTEXT.md): the read count and numeric-literal
+                // count surface beside the two hashes. This run's own program
+                // dispatches evoList plus, per seeded subject, evoHead/
+                // evoRevision/casRead — several observed reads; its own stored
+                // source text contains at least the `0n` accumulator literal.
+                assert.ok(typeof parsed.readCount === 'number' && parsed.readCount > 0, 'expected a positive readCount')
+                assert.ok(typeof parsed.literalCount === 'number' && parsed.literalCount >= 1, 'expected literalCount to be at least 1')
+                // PROV-04: the provenance header reaches a REAL fjs_run response
+                // over a live MCP session — taxYear/paramSetHash/programHash
+                // alongside the existing six keys.
+                assert.equal(parsed.taxYear, 2025)
+                assert.ok(typeof parsed.paramSetHash === 'string' && parsed.paramSetHash !== '', 'expected a non-empty paramSetHash')
+                assert.equal(parsed.programHash, programHash)
 
-            // The persisted run record itself claims the pin it actually
-            // applied — the same fields E1/E11's mutations would silently
-            // misreport (PROV-03: a record cannot lie about what ran).
-            const pinRunGet = await call('cas_get', { hash: pinParsed.runHash, content: true })
-            assert.ok(!pinRunGet.result.isError, `cas_get(pin runHash) failed: ${JSON.stringify(pinRunGet)}`)
-            const pinRunRecord = JSON.parse(JSON.parse(pinRunGet.result.content[0].text).text)
-            assert.equal(pinRunRecord.pinned, true)
-            assert.equal(pinRunRecord.subject, pinSubject)
-            assert.deepEqual(pinRunRecord.parents, pinnedParents)
+                // The expected total, computed INDEPENDENTLY here from the two
+                // PRESENT seeded values via centsFromString/centsToString —
+                // never a bare literal.
+                const expectedTotal = centsToString(centsFromString('1234.56') + centsFromString('10.00'))
 
-            // ── 09-05: the zero-read adversary through the REAL server —
-            // the exact verbatim ROADMAP adversary, `() => pure({ line16:
-            // 9137 })`, stored for real via THIS SAME live session's cas_add
-            // and run through THIS SAME session's fjs_run call. Every other
-            // proof of this gate (fjs/server/fjs_run/module.f.js's
-            // antiHardcodingGate/zeroReadGate proofs) drives the adversary
-            // only under fjs/effects/node/virtual, through
-            // runExecuteRunViaFixture — a test-only helper that shares the
-            // gate (classifyRunOutcome, 09-05) with the production
-            // `executeRun` fjsRunTool actually calls, but has still never,
-            // until now, been run against a genuinely separate process. This
-            // is the assertion no virtual proof can make: the adversary is
-            // refused by the actual shipped code path, in a real process,
-            // against a real filesystem ──────────────────────────────────
-            const adversarySource = 'export const report = ctx => () => ctx.pure({ line16: 9137 })'
-            const adversaryHash = await casAdd(adversarySource)
-            const adversaryRunResponse = await call('fjs_run', { hash: adversaryHash })
-            assert.equal(
-                adversaryRunResponse.result.isError, true,
-                `expected the zero-read adversary to be refused: ${JSON.stringify(adversaryRunResponse)}`)
-            const adversaryText = adversaryRunResponse.result.content[0].text
-            assert.ok(
-                adversaryText.includes('zero observed reads'),
-                `expected the refusal to name the zero-read condition: ${adversaryText}`)
+                const resultGet = await call('cas_get', { hash: parsed.resultHash, content: true })
+                assert.ok(!resultGet.result.isError, `cas_get(resultHash) failed: ${JSON.stringify(resultGet)}`)
+                const resultMeta = JSON.parse(resultGet.result.content[0].text)
+                assert.equal(resultMeta.text, expectedTotal)
 
-            // EXEC-12 session survival, proven for the refused call, not
-            // merely the successful one above: the SAME live process still
-            // answers a FOLLOWING request rather than dying or dropping the
-            // connection.
-            const survivesAdversaryResponse = await call('cas_list', {})
-            assert.ok(
-                !survivesAdversaryResponse.result.isError,
-                `cas_list after the refused adversary call failed: ${JSON.stringify(survivesAdversaryResponse)}`)
+                const runGet = await call('cas_get', { hash: parsed.runHash, content: true })
+                assert.ok(!runGet.result.isError, `cas_get(runHash) failed: ${JSON.stringify(runGet)}`)
+                const runMeta = JSON.parse(runGet.result.content[0].text)
+                const runRecord = JSON.parse(runMeta.text)
+                assert.equal(runRecord.status, 'ok')
+                // The absent-field document's subject IS enumerated — its
+                // evoHead read appears in the PERSISTED record — proving the
+                // program actively visited and skipped it, not that this test
+                // simply never presented it.
+                assert.ok(
+                    runRecord.inputs.some(i => i.command === 'evoHead' && i.payload[0] === subjectC),
+                    'expected subjectC (the absent-field document) to have been enumerated')
 
-            // ── The one assertion no virtual proof can make: the
-            // materialized program .mjs exists on the REAL filesystem,
-            // because a real separate process really wrote it and really
-            // imported it ────────────────────────────────────────────────
-            const materializedPath = programPath(materializeHome(home))(programHash)
-            assert.ok(
-                existsSync(materializedPath),
-                `expected the materialized program to exist at ${materializedPath}`)
-
-            // ── Full tool coverage (TEST-02): every remaining advertised
-            // tool reached at least once in this SAME real session ────────
-            const evoListResponse = await call('evo_list', {})
-            assert.ok(!evoListResponse.result.isError, `evo_list failed: ${JSON.stringify(evoListResponse)}`)
-
-            const evoHeadResponse = await call('evo_head', { subject: subjectA })
-            assert.ok(!evoHeadResponse.result.isError, `evo_head failed: ${JSON.stringify(evoHeadResponse)}`)
-
-            const evoRevisionResponse = await call('evo_revision', { hash: revAHash })
-            assert.ok(!evoRevisionResponse.result.isError, `evo_revision failed: ${JSON.stringify(evoRevisionResponse)}`)
-            void revBHash
-
-            const casListResponse = await call('cas_list', {})
-            assert.ok(!casListResponse.result.isError, `cas_list failed: ${JSON.stringify(casListResponse)}`)
-
-            // A distinct evo_add call (not cas_add's own auto-sync path),
-            // pointed at an already-stored snapshot so it needs no separate
-            // seed write of its own. Runs AFTER the decisive fjs_run call
-            // above, so the new subject it creates never perturbs that
-            // call's already-made assertions.
-            const evoAddResponse = await call('evo_add', {
-                parents: [],
-                subject: 'finance-integration-coverage-subject',
-                snapshot: docAHash,
             })
-            assert.ok(!evoAddResponse.result.isError, `evo_add failed: ${JSON.stringify(evoAddResponse)}`)
 
-            const casRefreshResponse = await call('cas_refresh', {})
-            assert.ok(!casRefreshResponse.result.isError, `cas_refresh failed: ${JSON.stringify(casRefreshResponse)}`)
+            await t.test('MCP-09: fjs_check reports without executing, and the live session survives', async () => {
+                // ── MCP-09: fjs_check reachable from a real MCP tools/call —
+                // against the SAME already-materialized programHash this file
+                // seeded above, over this SAME real session ────────────────────
+                const checkResponse = await call('fjs_check', { hash: programHash })
+                assert.equal(checkResponse.result.isError, undefined, `fjs_check failed: ${JSON.stringify(checkResponse)}`)
+                const checkParsed = JSON.parse(checkResponse.result.content[0].text)
+                assert.equal(checkParsed.exportsReport, true, 'expected the seeded interest-summing program to export a report')
 
-            // The self-enforcing check (TEST-02): the set of tools actually
-            // called must equal the set tools/list advertised. A tool added
-            // in a later phase without integration coverage fails HERE,
-            // rather than passing unnoticed.
-            assert.equal(
-                [...toolsCalled].sort().join(','),
-                [...advertisedTools].sort().join(','),
-                `expected every advertised tool to be called at least once: ` +
-                `called=[${[...toolsCalled].sort()}] advertised=[${[...advertisedTools].sort()}]`)
+                // The decisive proof that fjs_check never executes the program —
+                // not "fjs_check returned quickly", not "it didn't throw" on its
+                // OWN response, but that the SAME live process still answers a
+                // FOLLOWING call afterward. This program's report would THROW
+                // the instant it is actually invoked; import() alone (which
+                // fjs_check cannot avoid — the module's top-level code always
+                // runs on import) never reaches that throw, since it lives
+                // inside the exported function body, not at module scope. If
+                // fjs_check's shipped implementation ever called this report,
+                // the throw would surface here as a crashed connection or a
+                // dead process — waitForId's own timeout is what would catch
+                // that, since nothing in fjs/protocol/mcp/module.f.js's handler
+                // dispatch wraps a throw in a try/catch.
+                const throwingReportSource = 'export const report = ctx => args => { throw new Error(\'fjs_check must never invoke report\') }'
+                const throwingProgramHash = await casAdd(throwingReportSource)
+                const throwingCheckResponse = await call('fjs_check', { hash: throwingProgramHash })
+                assert.equal(
+                    throwingCheckResponse.result.isError, undefined,
+                    `expected fjs_check to succeed against a program whose report would throw if invoked: ${JSON.stringify(throwingCheckResponse)}`)
+                const throwingCheckParsed = JSON.parse(throwingCheckResponse.result.content[0].text)
+                assert.equal(throwingCheckParsed.exportsReport, true)
+                // EXEC-12-style session survival, proven for THIS call
+                // specifically: the SAME live process still answers a
+                // FOLLOWING request rather than having died invoking the
+                // throwing report.
+                const checkSurvivesResponse = await call('cas_list', {})
+                assert.ok(
+                    !checkSurvivesResponse.result.isError,
+                    `cas_list after fjs_check against a throwing report failed: ${JSON.stringify(checkSurvivesResponse)}`)
 
-            // MCP-05's invariant, proven against a real process for the
-            // first time (previously only asserted under virtual): every
-            // line the server wrote to stdout, across the WHOLE session,
-            // parses as JSON-RPC. Each line was already JSON.parsed as it
-            // arrived (the `serverProc.stdout.on('data', ...)` handler
-            // above) — a parse failure there would already have thrown and
-            // failed this test — so this re-checks explicitly, by line,
-            // naming the offending line rather than surfacing only as an
-            // opaque parse crash mid-session.
-            assert.ok(rawStdoutLines.length > 0, 'expected at least one stdout line')
-            for (const line of rawStdoutLines) {
-                assert.doesNotThrow(
-                    () => JSON.parse(line),
-                    `expected every stdout line to parse as JSON-RPC, got: ${line}`)
-            }
+            })
+
+            await t.test('09-07: the pin path through the shipped fjs_run tool', async () => {
+                // ── 09-07: the pin path through the SHIPPED fjs_run tool,
+                // against a real separate process — the assertion that fails
+                // when `...pinFields` is dropped from fjsRunTool's own
+                // `executeRun(...)` call (E2). No virtual proof can make this
+                // assertion at all: `fjsRunTool.handle` cannot reach an 'ok'
+                // outcome under `fjs/effects/node/virtual` in a single call
+                // (the write/import split `fjs/server/fjs_run/module.f.js`'s
+                // own header documents), so every virtual-level pin proof in
+                // that file drives `runExecuteRunViaFixture` — a decomposed
+                // replay of `executeRun`'s OWN steps — directly, bypassing
+                // `fjsRunTool.handle` entirely. This is the one place the gap
+                // can be closed for real: a genuinely separate process has no
+                // such limitation ──────────────────────────────────────────
+                const pinSubject = 'finance-integration-pin-subject'
+                const pinLiveRevResponse = await call('evo_add', {
+                    parents: [],
+                    subject: pinSubject,
+                    snapshot: docAHash,
+                })
+                assert.ok(
+                    !pinLiveRevResponse.result.isError,
+                    `evo_add (pin setup) failed: ${JSON.stringify(pinLiveRevResponse)}`)
+                const pinLiveRevHash = pinLiveRevResponse.result.content[0].text
+
+                // A program that reads exactly one subject's head — the SAME
+                // shape `fjs/server/fjs_run/module.f.js`'s own
+                // `pinOverridesTheLiveHeadThroughFullExecuteRun` proof uses at
+                // the decomposed-fixture layer, written here as real source
+                // text a real process really writes and really imports.
+                const pinProgramSource = 'export const report = ctx => args => ctx.evoHead(args[0])'
+                pinProgramHash = await casAdd(pinProgramSource)
+
+                const pinnedParents = ['PINNED-INSTEAD-OF-LIVE-HEAD']
+                const pinRunResponse = await call('fjs_run', {
+                    hash: pinProgramHash,
+                    args: [pinSubject],
+                    taxYear: 2025,
+                    subject: pinSubject,
+                    parents: pinnedParents,
+                })
+                assert.equal(
+                    pinRunResponse.result.isError, undefined,
+                    `pinned fjs_run failed: ${JSON.stringify(pinRunResponse)}`)
+                const pinParsed = JSON.parse(pinRunResponse.result.content[0].text)
+
+                const pinResultGet = await call('cas_get', { hash: pinParsed.resultHash, content: true })
+                assert.ok(!pinResultGet.result.isError, `cas_get(pin resultHash) failed: ${JSON.stringify(pinResultGet)}`)
+                const pinResultMeta = JSON.parse(pinResultGet.result.content[0].text)
+                // The decisive assertion: the run's OWN result reflects the
+                // PINNED parents just supplied, never the live head `evo_add`
+                // established a moment ago. If `...pinFields` is ever dropped
+                // from `fjsRunTool`'s own `executeRun(...)` call, `executeRun`
+                // sees no pin at all and resolves the subject's LIVE head
+                // instead — this assertion is what catches that.
+                assert.equal(pinResultMeta.text, JSON.stringify(pinnedParents))
+                assert.notEqual(pinResultMeta.text, JSON.stringify([pinLiveRevHash]))
+
+                // The persisted run record itself claims the pin it actually
+                // applied — the same fields E1/E11's mutations would silently
+                // misreport (PROV-03: a record cannot lie about what ran).
+                const pinRunGet = await call('cas_get', { hash: pinParsed.runHash, content: true })
+                assert.ok(!pinRunGet.result.isError, `cas_get(pin runHash) failed: ${JSON.stringify(pinRunGet)}`)
+                pinRunRecord = JSON.parse(JSON.parse(pinRunGet.result.content[0].text).text)
+                assert.equal(pinRunRecord.pinned, true)
+                assert.equal(pinRunRecord.subject, pinSubject)
+                assert.deepEqual(pinRunRecord.parents, pinnedParents)
+
+            })
+
+            await t.test('PROV-05: control-then-pinned - the unpinned output moves, the pinned one does not', async () => {
+                // ── PROV-05: the control-then-pinned adversarial reproduction
+                // proof — the phase's central deliverable. PROV-05 asserts a
+                // NEGATIVE: that a pinned run's output did NOT move after an
+                // amendment lands on the subject it is pinned against. An
+                // assertion that nothing happened passes trivially if the
+                // mechanism under test never ran at all — exactly how Phase 15
+                // shipped two proofs that were green and permanently unable to
+                // fail. 19-VALIDATION.md therefore makes the unpinned CONTROL
+                // leg mandatory and ordered FIRST: build it, and OBSERVE it
+                // actually move, before the pinned leg is written or trusted.
+                // Both legs reuse `pinProgramHash` (`ctx.evoHead(args[0])`) —
+                // its report is directly the JSON-stringified array of head
+                // hashes for whatever subject the pin/live resolution yields —
+                // and `docBHash`, already seeded above, as the amendment. ──────
+
+                // ── Step 1: the control leg (UNPINNED) — build and observe
+                // movement FIRST ──────────────────────────────────────────────
+                const controlSubject = 'finance-integration-prov05-control'
+                const controlAdd1Response = await call('evo_add', {
+                    parents: [],
+                    subject: controlSubject,
+                    snapshot: docAHash,
+                })
+                assert.ok(
+                    !controlAdd1Response.result.isError,
+                    `evo_add (control setup) failed: ${JSON.stringify(controlAdd1Response)}`)
+                const controlRev1 = controlAdd1Response.result.content[0].text
+
+                const controlRun1Response = await call('fjs_run', {
+                    hash: pinProgramHash,
+                    args: [controlSubject],
+                    taxYear: 2025,
+                })
+                assert.equal(
+                    controlRun1Response.result.isError, undefined,
+                    `control fjs_run #1 (unpinned) failed: ${JSON.stringify(controlRun1Response)}`)
+                controlRun1 = JSON.parse(controlRun1Response.result.content[0].text)
+                const controlBytes1Get = await call('cas_get', { hash: controlRun1.resultHash, content: true })
+                assert.ok(
+                    !controlBytes1Get.result.isError,
+                    `cas_get(control resultHash #1) failed: ${JSON.stringify(controlBytes1Get)}`)
+                const controlBytes1 = JSON.parse(controlBytes1Get.result.content[0].text).text
+
+                // The amendment: a second revision on the SAME control subject,
+                // landing BETWEEN the two control runs.
+                const controlAdd2Response = await call('evo_add', {
+                    parents: [controlRev1],
+                    subject: controlSubject,
+                    snapshot: docBHash,
+                })
+                assert.ok(
+                    !controlAdd2Response.result.isError,
+                    `evo_add (control amendment) failed: ${JSON.stringify(controlAdd2Response)}`)
+
+                // The SAME unpinned fjs_run call, identical arguments, run again.
+                const controlRun2Response = await call('fjs_run', {
+                    hash: pinProgramHash,
+                    args: [controlSubject],
+                    taxYear: 2025,
+                })
+                assert.equal(
+                    controlRun2Response.result.isError, undefined,
+                    `control fjs_run #2 (unpinned) failed: ${JSON.stringify(controlRun2Response)}`)
+                const controlRun2 = JSON.parse(controlRun2Response.result.content[0].text)
+                const controlBytes2Get = await call('cas_get', { hash: controlRun2.resultHash, content: true })
+                assert.ok(
+                    !controlBytes2Get.result.isError,
+                    `cas_get(control resultHash #2) failed: ${JSON.stringify(controlBytes2Get)}`)
+                const controlBytes2 = JSON.parse(controlBytes2Get.result.content[0].text).text
+
+                // The decisive control assertion: the UNPINNED output MOVED
+                // after the amendment. If this does not hold, the pinned leg
+                // below would be measuring nothing against a scenario that
+                // never demonstrates movement at all — 19-VALIDATION.md's own
+                // instruction is to stop rather than trust the pinned leg in
+                // that case. (See this file's own docstring block above this
+                // assertion, and 19-VALIDATION.md's "The control leaf is not
+                // optional" section.)
+                assert.notEqual(controlBytes1, controlBytes2)
+
+                // ── Step 2 (only reached because Step 1's assertion passed):
+                // the pinned leg — the decisive PROV-05 assertion ──────────────
+                const prov05PinnedSubject = 'finance-integration-prov05-pinned'
+                const prov05PinnedAdd1Response = await call('evo_add', {
+                    parents: [],
+                    subject: prov05PinnedSubject,
+                    snapshot: docAHash,
+                })
+                assert.ok(
+                    !prov05PinnedAdd1Response.result.isError,
+                    `evo_add (pinned setup) failed: ${JSON.stringify(prov05PinnedAdd1Response)}`)
+                const pinnedRev1 = prov05PinnedAdd1Response.result.content[0].text
+
+                const pinnedRun1Response = await call('fjs_run', {
+                    hash: pinProgramHash,
+                    args: [prov05PinnedSubject],
+                    subject: prov05PinnedSubject,
+                    parents: [pinnedRev1],
+                    taxYear: 2025,
+                })
+                assert.equal(
+                    pinnedRun1Response.result.isError, undefined,
+                    `pinned fjs_run #1 failed: ${JSON.stringify(pinnedRun1Response)}`)
+                pinnedRun1 = JSON.parse(pinnedRun1Response.result.content[0].text)
+                const pinnedBytes1Get = await call('cas_get', { hash: pinnedRun1.resultHash, content: true })
+                assert.ok(
+                    !pinnedBytes1Get.result.isError,
+                    `cas_get(pinned resultHash #1) failed: ${JSON.stringify(pinnedBytes1Get)}`)
+                const pinnedBytes1 = JSON.parse(pinnedBytes1Get.result.content[0].text).text
+
+                // The SAME shape of amendment as the control leg, landing on the
+                // PINNED subject BETWEEN the two pinned runs.
+                const prov05PinnedAdd2Response = await call('evo_add', {
+                    parents: [pinnedRev1],
+                    subject: prov05PinnedSubject,
+                    snapshot: docBHash,
+                })
+                assert.ok(
+                    !prov05PinnedAdd2Response.result.isError,
+                    `evo_add (pinned amendment) failed: ${JSON.stringify(prov05PinnedAdd2Response)}`)
+
+                // The SAME pinned fjs_run call again — SAME subject, SAME
+                // parents: [pinnedRev1] (the FIRST revision, never the new one
+                // the amendment just added).
+                const pinnedRun2Response = await call('fjs_run', {
+                    hash: pinProgramHash,
+                    args: [prov05PinnedSubject],
+                    subject: prov05PinnedSubject,
+                    parents: [pinnedRev1],
+                    taxYear: 2025,
+                })
+                assert.equal(
+                    pinnedRun2Response.result.isError, undefined,
+                    `pinned fjs_run #2 failed: ${JSON.stringify(pinnedRun2Response)}`)
+                const pinnedRun2 = JSON.parse(pinnedRun2Response.result.content[0].text)
+                const pinnedBytes2Get = await call('cas_get', { hash: pinnedRun2.resultHash, content: true })
+                assert.ok(
+                    !pinnedBytes2Get.result.isError,
+                    `cas_get(pinned resultHash #2) failed: ${JSON.stringify(pinnedBytes2Get)}`)
+                const pinnedBytes2 = JSON.parse(pinnedBytes2Get.result.content[0].text).text
+
+                // The decisive PROV-05 assertion, in both forms 19-CONTEXT.md
+                // requires: hash-string equality is close to a
+                // content-addressing tautology on its own, so this also
+                // compares the actual fetched bytes.
+                assert.equal(pinnedRun1.resultHash, pinnedRun2.resultHash)
+                assert.equal(pinnedBytes1, pinnedBytes2)
+
+            })
+
+            await t.test('EXEC-13: consumption against real, CAS-fetched run records', async () => {
+                // ── Step 3: EXEC-13 consumption against REAL, CAS-fetched run
+                // records — never a hand-built fixture. Mirrors the
+                // pinRunRecord pattern above (double JSON.parse: cas_get's own
+                // response envelope, then the persisted vnd.fjs.run text it
+                // carries) ───────────────────────────────────────────────────
+                const pinnedRun1Get = await call('cas_get', { hash: pinnedRun1.runHash, content: true })
+                assert.ok(
+                    !pinnedRun1Get.result.isError,
+                    `cas_get(pinned runHash) failed: ${JSON.stringify(pinnedRun1Get)}`)
+                const pinnedRunRecord = JSON.parse(JSON.parse(pinnedRun1Get.result.content[0].text).text)
+
+                const controlRun1Get = await call('cas_get', { hash: controlRun1.runHash, content: true })
+                assert.ok(
+                    !controlRun1Get.result.isError,
+                    `cas_get(control runHash) failed: ${JSON.stringify(controlRun1Get)}`)
+                const controlRunRecord = JSON.parse(JSON.parse(controlRun1Get.result.content[0].text).text)
+
+                assert.equal(countsTowardReproducibilityAcceptance(pinnedRunRecord), true)
+                assert.equal(countsTowardReproducibilityAcceptance(controlRunRecord), false)
+
+            })
+
+            await t.test('09-05: the zero-read adversary is refused by the real server', async () => {
+                // ── 09-05: the zero-read adversary through the REAL server —
+                // the exact verbatim ROADMAP adversary, `() => pure({ line16:
+                // 9137 })`, stored for real via THIS SAME live session's cas_add
+                // and run through THIS SAME session's fjs_run call. Every other
+                // proof of this gate (fjs/server/fjs_run/module.f.js's
+                // antiHardcodingGate/zeroReadGate proofs) drives the adversary
+                // only under fjs/effects/node/virtual, through
+                // runExecuteRunViaFixture — a test-only helper that shares the
+                // gate (classifyRunOutcome, 09-05) with the production
+                // `executeRun` fjsRunTool actually calls, but has still never,
+                // until now, been run against a genuinely separate process. This
+                // is the assertion no virtual proof can make: the adversary is
+                // refused by the actual shipped code path, in a real process,
+                // against a real filesystem ──────────────────────────────────
+                const adversarySource = 'export const report = ctx => () => ctx.pure({ line16: 9137 })'
+                const adversaryHash = await casAdd(adversarySource)
+                const adversaryRunResponse = await call('fjs_run', { hash: adversaryHash, taxYear: 2025 })
+                assert.equal(
+                    adversaryRunResponse.result.isError, true,
+                    `expected the zero-read adversary to be refused: ${JSON.stringify(adversaryRunResponse)}`)
+                const adversaryText = adversaryRunResponse.result.content[0].text
+                assert.ok(
+                    adversaryText.includes('zero observed reads'),
+                    `expected the refusal to name the zero-read condition: ${adversaryText}`)
+
+                // EXEC-12 session survival, proven for the refused call, not
+                // merely the successful one above: the SAME live process still
+                // answers a FOLLOWING request rather than dying or dropping the
+                // connection.
+                const survivesAdversaryResponse = await call('cas_list', {})
+                assert.ok(
+                    !survivesAdversaryResponse.result.isError,
+                    `cas_list after the refused adversary call failed: ${JSON.stringify(survivesAdversaryResponse)}`)
+
+            })
+
+            await t.test('the materialized program exists on the real filesystem', async () => {
+                // ── The one assertion no virtual proof can make: the
+                // materialized program .mjs exists on the REAL filesystem,
+                // because a real separate process really wrote it and really
+                // imported it ────────────────────────────────────────────────
+                const materializedPath = programPath(materializeHome(home))(programHash)
+                assert.ok(
+                    existsSync(materializedPath),
+                    `expected the materialized program to exist at ${materializedPath}`)
+
+            })
+
+            await t.test('full tool coverage (TEST-02): every advertised tool was called, and stdout is all JSON-RPC', async () => {
+                // ── Full tool coverage (TEST-02): every remaining advertised
+                // tool reached at least once in this SAME real session ────────
+                const evoListResponse = await call('evo_list', {})
+                assert.ok(!evoListResponse.result.isError, `evo_list failed: ${JSON.stringify(evoListResponse)}`)
+
+                const evoHeadResponse = await call('evo_head', { subject: subjectA })
+                assert.ok(!evoHeadResponse.result.isError, `evo_head failed: ${JSON.stringify(evoHeadResponse)}`)
+
+                const evoRevisionResponse = await call('evo_revision', { hash: revAHash })
+                assert.ok(!evoRevisionResponse.result.isError, `evo_revision failed: ${JSON.stringify(evoRevisionResponse)}`)
+                void revBHash
+
+                const casListResponse = await call('cas_list', {})
+                assert.ok(!casListResponse.result.isError, `cas_list failed: ${JSON.stringify(casListResponse)}`)
+
+                // A distinct evo_add call (not cas_add's own auto-sync path),
+                // pointed at an already-stored snapshot so it needs no separate
+                // seed write of its own. Runs AFTER the decisive fjs_run call
+                // above, so the new subject it creates never perturbs that
+                // call's already-made assertions.
+                const evoAddResponse = await call('evo_add', {
+                    parents: [],
+                    subject: 'finance-integration-coverage-subject',
+                    snapshot: docAHash,
+                })
+                assert.ok(!evoAddResponse.result.isError, `evo_add failed: ${JSON.stringify(evoAddResponse)}`)
+
+                const casRefreshResponse = await call('cas_refresh', {})
+                assert.ok(!casRefreshResponse.result.isError, `cas_refresh failed: ${JSON.stringify(casRefreshResponse)}`)
+
+                // The self-enforcing check (TEST-02): the set of tools actually
+                // called must equal the set tools/list advertised. A tool added
+                // in a later phase without integration coverage fails HERE,
+                // rather than passing unnoticed.
+                assert.equal(
+                    [...toolsCalled].sort().join(','),
+                    [...advertisedTools].sort().join(','),
+                    `expected every advertised tool to be called at least once: ` +
+                    `called=[${[...toolsCalled].sort()}] advertised=[${[...advertisedTools].sort()}]`)
+
+                // MCP-05's invariant, proven against a real process for the
+                // first time (previously only asserted under virtual): every
+                // line the server wrote to stdout, across the WHOLE session,
+                // parses as JSON-RPC. Each line was already JSON.parsed as it
+                // arrived (the `serverProc.stdout.on('data', ...)` handler
+                // above) — a parse failure there would already have thrown and
+                // failed this test — so this re-checks explicitly, by line,
+                // naming the offending line rather than surfacing only as an
+                // opaque parse crash mid-session.
+                assert.ok(rawStdoutLines.length > 0, 'expected at least one stdout line')
+                for (const line of rawStdoutLines) {
+                    assert.doesNotThrow(
+                        () => JSON.parse(line),
+                        `expected every stdout line to parse as JSON-RPC, got: ${line}`)
+                }
+
+            })
 
             // Clean EOF shutdown — the established real-process pattern
             // (see cas-refresh-cross-process.test.js).

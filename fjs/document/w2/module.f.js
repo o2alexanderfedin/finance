@@ -18,12 +18,29 @@
  * - **Boxes 15–20 are a repeating array, stored faithfully and never
  *   computed on.** One W-2 can carry several states and several localities.
  *   They are recorded because they are on the form, not because anything
- *   here reads them: this project computes a FEDERAL return, and a state
- *   figure that silently reached a federal line would be a wrong return.
- *   That constraint is a design commitment for later phases, not something
- *   this file can enforce — nothing computes yet. The proofs below pin
- *   faithful round-tripping, including two entries for the same state,
- *   which is what "faithfully" has to mean.
+ *   here COMPUTES from them: this project computes a FEDERAL return, and a
+ *   state figure that silently reached a federal line would be a wrong
+ *   return. That constraint is a design commitment for later phases, not
+ *   something this file can enforce — nothing computes from these boxes
+ *   yet. The proofs below pin faithful round-tripping, including two
+ *   entries for the same state, which is what "faithfully" has to mean.
+ *
+ *   **As of Phase 13 (TAX-13, 13-CONTEXT.md Decision 2.2), `fjs/schedule/a`
+ *   now READS `stateIncomeTax` from this array in its own REAL computation**
+ *   (WR-02, 13-REVIEW.md widened this from "a PROOF reads it" to "the
+ *   production path reads it": `scheduleA`'s own withholding-drift check is
+ *   wired into every return `fjs/form1040/core` processes, not merely into
+ *   this module's own hand-written fixtures) — not to compute anything, but
+ *   to WATCH whether the taxpayer-asserted Schedule A line 5a (state/local
+ *   income tax paid, under the income-tax election) is at least the amount
+ *   already withheld here, since withheld tax is necessarily paid, refusing
+ *   the whole return if it is not. That check never feeds `stateIncomeTax`
+ *   into any computed VALUE — line 5a stays taxpayer-asserted, never
+ *   derived from this box — so the claim above stays true of COMPUTING A
+ *   FEDERAL LINE FROM IT. It is no longer true that "nothing here reads
+ *   them": a reader now exists, and it runs on every return, not merely a
+ *   drift check that only proofs exercise. Both claims are deliberately
+ *   narrower than the original paragraph and are both true today.
  *
  * Boxes 9 and 14 are deliberately not modelled (YAGNI): box 9 is defunct,
  * and box 14 is a free-form employer field with no defined semantics —
@@ -37,6 +54,7 @@ import { validate as rttiValidate } from 'functionalscript/fjs/types/rtti/valida
 import { error, ok } from 'functionalscript/fjs/types/result/module.f.js'
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
 import { base, mediaTypeOf } from '../base/module.f.js'
+import { formRevisionError } from '../form_revision/module.f.js'
 import { moneyFieldError } from '../money_field/module.f.js'
 
 /** @import { Result } from 'functionalscript/fjs/types/result/module.f.js' */
@@ -175,8 +193,9 @@ const stateLocalMoneyFields = /** @type {const} */ ([
  * @type {(r: W2) => Result<W2, W2Error>}
  */
 export const checkReferences = r => {
-    if (r.formRevision.trim() === '') {
-        return error(`formRevision must not be empty or whitespace-only`)
+    const formRevisionMessage = formRevisionError(r.formRevision)
+    if (formRevisionMessage !== undefined) {
+        return error(formRevisionMessage)
     }
     for (const field of moneyBoxFields) {
         const printed = r[field]
