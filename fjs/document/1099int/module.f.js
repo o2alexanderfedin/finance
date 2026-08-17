@@ -38,6 +38,33 @@
  * is a non-breaking, localized change to this one file, not a reopening of
  * the shared base.
  *
+ * ## Box 9 is INSIDE box 8, and that is a checked invariant
+ *
+ * `box9SpecifiedPrivateActivityBondInterest` is the §57(a)(5) alternative
+ * minimum tax preference item — municipal bond interest that the regular tax
+ * excludes and the AMT adds straight back, on Form 6251 line 2g. The printed
+ * form's own box 9 caption is *"Specified private activity bond interest"* and
+ * its instruction reads *"shows tax-exempt interest subject to the alternative
+ * minimum tax. **This amount is included in box 8.**"*
+ *
+ * So the two boxes are not independent readings: box 9 is a COMPONENT of box 8,
+ * and a document whose box 9 exceeds its box 8 is internally inconsistent —
+ * refused by {@link checkReferences}, quoting BOTH figures, exactly as
+ * `fjs/document/ira` refuses a Form 8606 line 4 exceeding line 1 for the same
+ * structural reason. The absent cases follow DOC-11 rather than arithmetic:
+ * box 9 present with box 8 absent is inconsistent (a component of nothing),
+ * both absent is the ordinary case, and box 8 present with box 9 absent is the
+ * ordinary MUNICIPAL case — the payer's determination that none of it is
+ * private-activity.
+ *
+ * **The subset relationship is also why nothing here changes 1040 line 2a.**
+ * That line reads box 8, box 9 is already inside box 8, and adding box 9 as a
+ * second summand anywhere in the REGULAR tax would count the same interest
+ * twice. Box 9 therefore has exactly one reader, in the ALTERNATIVE minimum
+ * tax — `fjs/form6251` line 2g — and `fjs/form1040/core` is where the
+ * no-double-count property is asserted rather than assumed, because that is
+ * the one module where both lines are visible at once.
+ *
  * @module
  */
 import { number, option, string } from 'functionalscript/fjs/types/rtti/module.f.js'
@@ -46,6 +73,7 @@ import { error, ok } from 'functionalscript/fjs/types/result/module.f.js'
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
 import { base, mediaTypeOf } from '../base/module.f.js'
 import { moneyFieldError } from '../money_field/module.f.js'
+import { centsFromString } from '../../exact/module.f.js'
 import { dialect as ocrDialect, ocrSchema, validate as ocrValidate } from '../ocr/module.f.js'
 
 /** @import { Result } from 'functionalscript/fjs/types/result/module.f.js' */
@@ -80,6 +108,7 @@ export const oneZeroNineNineIntSchema = /** @type {const} */ ({
     box4FederalIncomeTaxWithheld: option(string),
     box6ForeignTaxPaid: option(string),
     box8TaxExemptInterest: option(string),
+    box9SpecifiedPrivateActivityBondInterest: option(string),
     payerName: option(string),
     recipientName: option(string),
 })
@@ -90,8 +119,8 @@ export const oneZeroNineNineIntSchema = /** @type {const} */ ({
 const validateShape = rttiValidate(oneZeroNineNineIntSchema)
 
 /**
- * The six money-box field names this MVP models, walked in a loop so the
- * `centsFromString` re-parse (DRY) is written once, not six times. Typed via
+ * The seven money-box field names this MVP models, walked in a loop so the
+ * `centsFromString` re-parse (DRY) is written once, not seven times. Typed via
  * `@type {const}` (not a wider `keyof OneZeroNineNineInt` annotation) so
  * `r[field]` below resolves to exactly `string | undefined` — every listed
  * field is `option(string)` — rather than the union of every field's type.
@@ -103,7 +132,24 @@ const moneyBoxFields = /** @type {const} */ ([
     'box4FederalIncomeTaxWithheld',
     'box6ForeignTaxPaid',
     'box8TaxExemptInterest',
+    'box9SpecifiedPrivateActivityBondInterest',
 ])
+
+/**
+ * {@link moneyBoxFields} widened to a plain string list — an ordinary widening
+ * ASSIGNMENT, not a cast: the tuple's literal member types are a subtype of
+ * `string`, so nothing is silenced. Same device, same reason, as
+ * `fjs/return/scope`'s `modeledKindNames`.
+ *
+ * It exists so `theComparedBoxesAreBothWalkedByTheExactnessLoop` below can ask
+ * whether a NAMED box is in the list. Asked of the tuple directly, the question
+ * would be answered by `tsc` instead of at run time: a box dropped from the
+ * list stops being a member of the argument type, so the proof would fail to
+ * COMPILE and the mutation that removes it could never be run against the
+ * suite (AGENTS.md: "a mutation must still typecheck").
+ * @type {readonly string[]}
+ */
+const moneyBoxFieldNames = moneyBoxFields
 
 /**
  * Either a structural validation error or a semantic (string) error message.
@@ -123,6 +169,13 @@ const moneyBoxFields = /** @type {const} */ ([
  *   within `Number.MAX_SAFE_INTEGER`, compared bigint-to-bigint — never
  *   converted through `Number()`, which would reintroduce the precision
  *   hazard `fjs/types/decimal`'s docstring warns about.
+ * - **Box 9 does not exceed box 8, and is not present without it.** Box 9 is a
+ *   COMPONENT of box 8 by the printed instruction's own words ("This amount is
+ *   included in box 8"), so neither shape is a document a payer could have
+ *   issued. The refusal quotes BOTH figures, because a reader holding the form
+ *   needs to see which of the two is wrong; `fjs/document/ira`'s Form 8606
+ *   line 4/line 1 check is the precedent, and it is the same invariant one
+ *   dialect over.
  * @type {(r: OneZeroNineNineInt) => Result<OneZeroNineNineInt, OneZeroNineNineIntError>}
  */
 export const checkReferences = r => {
@@ -137,6 +190,23 @@ export const checkReferences = r => {
         const message = moneyFieldError(field)(printed)
         if (message !== undefined) {
             return error(message)
+        }
+    }
+    const box8 = r.box8TaxExemptInterest
+    const box9 = r.box9SpecifiedPrivateActivityBondInterest
+    if (box9 !== undefined) {
+        if (box8 === undefined) {
+            return error(
+                `box9SpecifiedPrivateActivityBondInterest (${box9}) is present without `
+                + `box8TaxExemptInterest — the printed box 9 instruction is "this amount is `
+                + `INCLUDED IN BOX 8", so it cannot exist on its own`)
+        }
+        if (centsFromString(box9) > centsFromString(box8)) {
+            return error(
+                `box9SpecifiedPrivateActivityBondInterest (${box9}) exceeds `
+                + `box8TaxExemptInterest (${box8}) — box 9 is a SUBSET of box 8, the `
+                + `§57(a)(5) private-activity part of the same tax-exempt interest, so this `
+                + `document is internally inconsistent`)
         }
     }
     return ok(r)
@@ -186,7 +256,7 @@ const minimal = {
  * amount in a dropped box would then validate as ok. One generated leaf per
  * NAMED box supplies a comma-grouped value to that box alone and asserts
  * `validate` refuses, built by mapping {@link moneyBoxFields} itself into
- * `[field, assertion]` pairs (never as six hand-written near-identical
+ * `[field, assertion]` pairs (never as seven hand-written near-identical
  * leaves) — the same idiom `fjs/tax/boundary`'s generated threshold leaves
  * use — so a box added to the list later is covered automatically.
  *
@@ -196,13 +266,27 @@ const minimal = {
  * hand-typed count, exactly as `fjs/tax/boundary`'s `expectedThresholdCount`
  * guards `allThresholds`. The duplication is the mechanism (AGENTS.md: "a
  * proof's expected value must not be produced by the code under test").
+ *
+ * **Every fixture carries a real `box8TaxExemptInterest`, and box 9 is why.**
+ * Written against `minimal` alone, box 9's own generated leaf would have
+ * refused for the WRONG REASON — the box-9-without-box-8 check below, not the
+ * exactness loop — so it would have passed with box 9 absent from
+ * {@link moneyBoxFields} entirely, which is exactly the coverage this whole
+ * construction exists to provide. The companion box 8 makes each fixture
+ * internally consistent, so the ONLY thing wrong with it is the comma. For
+ * `field === 'box8TaxExemptInterest'` the computed key is written last and
+ * wins, so that box's own leaf is unaffected.
  * @type {{ readonly [field: string]: () => void }}
  */
 const generatedMoneyBoxExactnessProof = Object.fromEntries(
     moneyBoxFields.map(field => [
         field,
         () => {
-            const [t, v] = validate({ ...minimal, [field]: '1,234.56' })
+            const [t, v] = validate({
+                ...minimal,
+                box8TaxExemptInterest: '99999.00',
+                [field]: '1,234.56',
+            })
             assertEq(t, 'error', ['expected a comma-grouped amount in this box to be refused', field, t, v])
         },
     ]),
@@ -213,9 +297,12 @@ const generatedMoneyBoxExactnessProof = Object.fromEntries(
  * is expected to name today. Deliberately NOT derived from
  * `moneyBoxFields.length` — if it were, dropping a box from the list would
  * shrink both sides together and this check could never fail.
+ *
+ * `6 -> 7` is box 9, the §57(a)(5) specified private activity bond interest
+ * Form 6251 line 2g reads.
  * @type {number}
  */
-const expectedMoneyBoxFieldCount = 6
+const expectedMoneyBoxFieldCount = 7
 
 export const proof = {
     dialectAndMediaType: () => {
@@ -233,6 +320,9 @@ export const proof = {
                 box4FederalIncomeTaxWithheld: '5.00',
                 box6ForeignTaxPaid: '1.00',
                 box8TaxExemptInterest: '2.00',
+                // Inside box 8, per the printed instruction — $1.00 of the
+                // $2.00 of tax-exempt interest is private-activity.
+                box9SpecifiedPrivateActivityBondInterest: '1.00',
                 payerName: 'Some Bank',
                 recipientName: 'Some Person',
             })
@@ -245,6 +335,11 @@ export const proof = {
             assert(t === 'ok', ['expected ok', t, v])
             assertEq(v.box1InterestIncome, undefined)
             assertEq(v.corrected, undefined)
+            // Box 9 absent alongside box 8 absent is the ORDINARY case, not
+            // the inconsistent one — a filer with no tax-exempt interest at
+            // all. Asserted here so the subset invariant below cannot be
+            // written in a form that refuses it.
+            assertEq(v.box9SpecifiedPrivateActivityBondInterest, undefined)
         },
         // DOC-12: `corrected: false` is not a valid member of `option(true)`
         // — rejected structurally, never accepted as "not corrected".
@@ -300,6 +395,119 @@ export const proof = {
                         expectedMoneyBoxFieldCount,
                     ],
                 )
+            },
+        },
+        // BOX 9 IS INSIDE BOX 8, and this group is the invariant that says so.
+        // §57(a)(5) makes box 9 an alternative minimum tax preference item and
+        // the printed instruction makes it a COMPONENT of box 8 ("this amount
+        // is included in box 8"), so the two are one reading and its part —
+        // never two independent figures. `fjs/document/ira`'s Form 8606 line
+        // 4/line 1 group is the precedent this mirrors leaf for leaf.
+        boxNineIsInsideBoxEight: {
+            exceedingBoxEightIsRefusedQuotingBothFigures: () => {
+                const [t, v] = validate({
+                    ...minimal,
+                    box8TaxExemptInterest: '5000.00',
+                    box9SpecifiedPrivateActivityBondInterest: '5000.01',
+                })
+                assertEq(t, 'error')
+                assert(typeof v === 'string', ['expected a semantic string refusal', v])
+                // BOTH figures, each searched for separately: a reader holding
+                // the form has to be able to see which of the two is wrong,
+                // and a message quoting only one of them names a violation
+                // without showing it.
+                assert(v.includes('5000.01'), ['the refusal must quote box 9', v])
+                assert(v.includes('5000.00'), ['the refusal must quote box 8', v])
+                assert(
+                    v.includes('SUBSET'),
+                    ['the refusal must say WHY the pair is impossible', v])
+                assert(
+                    v.includes('§57(a)(5)'),
+                    ['the refusal must name the provision that makes box 9 mean something', v])
+            },
+            // EQUALITY is the ordinary case, not the boundary violation: a
+            // filer holding one private-activity bond and nothing else has box
+            // 9 exactly equal to box 8. This is the ±1¢ partner of the leaf
+            // above, and it is what catches `>` silently becoming `>=` —
+            // which would refuse that entirely ordinary document.
+            equalToBoxEightIsAccepted: () => {
+                const [t, v] = validate({
+                    ...minimal,
+                    box8TaxExemptInterest: '5000.00',
+                    box9SpecifiedPrivateActivityBondInterest: '5000.00',
+                })
+                assert(t === 'ok', ['the whole of box 8 may be private-activity', t, v])
+                assertEq(v.box9SpecifiedPrivateActivityBondInterest, '5000.00')
+            },
+            oneCentUnderBoxEightIsAccepted: () => {
+                const [t] = validate({
+                    ...minimal,
+                    box8TaxExemptInterest: '5000.00',
+                    box9SpecifiedPrivateActivityBondInterest: '4999.99',
+                })
+                assertEq(t, 'ok')
+            },
+            // DOC-11 at the invariant: box 9 present with box 8 ABSENT is a
+            // component of nothing, which is a different inconsistency from
+            // exceeding it and gets its own message. Absent is not zero, so
+            // this cannot be folded into the comparison above by defaulting.
+            withoutBoxEightAtAllIsRefused: () => {
+                const [t, v] = validate({
+                    ...minimal,
+                    box9SpecifiedPrivateActivityBondInterest: '100.00',
+                })
+                assertEq(t, 'error')
+                assert(typeof v === 'string', ['expected a semantic string refusal', v])
+                assert(v.includes('100.00'), ['the refusal must quote box 9', v])
+                assert(
+                    v.includes('INCLUDED IN BOX 8'),
+                    ['the refusal must quote the printed instruction it rests on', v])
+            },
+            // …and a present box 9 of ZERO still needs box 8, because DOC-11
+            // makes "printed 0.00" a real reading rather than an absence. A
+            // payer who printed a zero in box 9 printed something in box 8.
+            aZeroBoxNineStillNeedsBoxEight: () => {
+                assertEq(
+                    validate({
+                        ...minimal,
+                        box9SpecifiedPrivateActivityBondInterest: '0.00',
+                    })[0],
+                    'error')
+                assertEq(
+                    validate({
+                        ...minimal,
+                        box8TaxExemptInterest: '0.00',
+                        box9SpecifiedPrivateActivityBondInterest: '0.00',
+                    })[0],
+                    'ok')
+            },
+            // THE CONTROL, and the case that matters most because it is the
+            // common one: box 8 WITHOUT box 9 is the ordinary municipal bond
+            // holder, whose tax-exempt interest is not private-activity at
+            // all. A gate that refused this would refuse nearly every muni
+            // return (AGENTS.md: "a gate needs a control").
+            boxEightAloneIsTheOrdinaryMunicipalCase: () => {
+                const [t, v] = validate({ ...minimal, box8TaxExemptInterest: '5000.00' })
+                assert(t === 'ok', ['a muni holder with no private-activity bonds', t, v])
+                assertEq(v.box8TaxExemptInterest, '5000.00')
+                assertEq(v.box9SpecifiedPrivateActivityBondInterest, undefined)
+            },
+            // The invariant's own precondition, stated rather than left to the
+            // reading order of `checkReferences`: the comparison re-parses two
+            // printed strings through `centsFromString`, which THROWS on an
+            // inexact value, and what keeps that throw from escaping
+            // `validate` is that the exactness loop has already refused both
+            // boxes. Both field names are therefore in `moneyBoxFields`, and
+            // that is a fact worth checking rather than assuming — dropping
+            // either from the list is what would turn this module's graceful
+            // refusal into a bare throw.
+            theComparedBoxesAreBothWalkedByTheExactnessLoop: () => {
+                assert(
+                    moneyBoxFieldNames.includes('box8TaxExemptInterest'),
+                    'the subset check re-parses box 8, so the exactness loop must have refused it first')
+                assert(
+                    moneyBoxFieldNames.includes('box9SpecifiedPrivateActivityBondInterest'),
+                    'the subset check re-parses box 9, so the exactness loop must have refused it first')
             },
         },
     },
