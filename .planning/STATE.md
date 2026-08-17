@@ -33,16 +33,21 @@ Phase: 30 (pass-through-income) — **COMPLETE AND MERGED. Milestone v2 is close
   Requirements: **120 defined, 107 complete, 13 open** — derived, and the command is beside the
   number in REQUIREMENTS.md.
 
-> **The four tax requirements left open are open ON PURPOSE and say so in their own bodies.**
-> TAX-27 (Earned Income Credit — the dependent model carries almost none of §32(c)(3), spec in
-> `fjs/todo/`), TAX-29 (Form 8606 Part I computes; Parts II/III refuse, so no backdoor Roth),
-> TAX-32 (Form 8995 computes; 8995-A, the SSTB phase-in and the wage/UBIA limits do not),
+> **The tax requirements left open are open ON PURPOSE and say so in their own bodies.**
+> TAX-29 (Form 8606 Part I computes; Parts II/III refuse, so no backdoor Roth),
 > TAX-35 (Schedule E Part II computes; Part III needs a THIRD K-1
 > numbering, and no separately stated item is routed).
 >
+> **TAX-27 and TAX-32 are CLOSED as of Phase 32 and Phase 31 respectively**, and this note is
+> corrected rather than deleted because the reason TAX-27 stayed open for seven phases is worth
+> keeping: the Schedule 8812 dependent model really did carry almost none of §32(c)(3), and the
+> spec in `fjs/todo/tax-27-earned-income-credit.md` really was the honest output until the facts
+> it asked for existed. Phase 32 added them — ten checked vocabularies on
+> `vnd.fjs.return_profile` — and `fjs/schedule/eic` computes the credit to 1040 line 27a.
+>
 > **A tick that needs a paragraph of caveats is a tick that should not be there.** Phase 25 once
 > checked TAX-27 while its own prose said the credit was not computed; that was corrected, and
-> every phase after it held the line.
+> every phase after it held the line until the credit actually computed.
 
 **The eight open MAINT requirements are v1's, not v2's** — Phase 16 (deferred, the orphan OCR
 island), Phase 17 (Documentation Truth Pass, never started) and Phase 18 (planned, four plans,

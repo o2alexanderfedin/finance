@@ -446,7 +446,7 @@ import { kindVocabulary } from '../profile/module.f.js'
 // ── The frozen modeled set ───────────────────────────────────────────────────
 
 /**
- * The thirty-five kinds this engine models today, each with the document it
+ * The thirty-eight kinds this engine models today, each with the document it
  * actually reads. Frozen in `fjs/guest`'s sense: growing this list is a
  * deliberate act that must be paired with a deletion from
  * {@link unmodeledKindRefusals}, or {@link _EveryKindIsEitherModeledOrRefused}
@@ -505,6 +505,12 @@ export const modeledKinds = /** @type {const} */ ([
     'federalTaxWithheldOn1099Int', // 1099-INT box 4                -> 1040 line 25b
     'federalTaxWithheldOnOther1099', // 1099-R/1099-DIV/1099-B box 4 -> 1040 line 25b
     'estimatedTaxPayments',        // declared on the return profile -> 1040 line 26
+    // TAX-27's own (Phase 32), and reclassified in the SAME commit as the
+    // `fjs/form1040/core` line 27a wiring that makes it computable. What made
+    // it computable is not a form arriving but FACTS arriving: ten §32
+    // vocabularies on `vnd.fjs.return_profile`, which is why its refusal row
+    // named seven of them rather than naming a schedule.
+    'earnedIncomeCredit',          // §32 + the 2025 EIC Table    -> 1040 line 27a
     'additionalChildTaxCredit',    // Schedule 8812 Part II-A       -> 1040 line 28
     'americanOpportunityCredit',   // Form 8863 line 8              -> 1040 line 29
     // Reclassified the moment `vnd.fjs.1099int` gained box 9. Its refusal row
@@ -543,7 +549,7 @@ const modeledKindNames = modeledKinds
 // ── The refusal table ────────────────────────────────────────────────────────
 
 /**
- * The seventy-nine declared kinds this engine does not model, each naming the
+ * The seventy-six declared kinds this engine does not model, each naming the
  * form line that cannot be computed, a human label, and the remedy — the form
  * or schedule required and, where one exists, the requirement ID and phase
  * that will supply it. `10-RESEARCH.md`'s "Form 1040 Lines 1a-37" table is the
@@ -838,7 +844,6 @@ export const unmodeledKindRefusals = /** @type {const} */ ([
     { kind: 'energyEfficientHomeImprovementCredit', line: 'Schedule 3 line 5b -> 1040 line 20', label: 'the energy efficient home improvement credit', remedy: 'requires Form 5695 Part II (no phase yet)' },
     { kind: 'otherNonrefundableCredits', line: 'Schedule 3 line 6a-6z -> 1040 line 20', label: 'other nonrefundable credits', remedy: 'the printed form itself collapses thirteen lettered sub-lines here — among them the general business credit, the prior-year minimum tax credit on FORM 8801, the NONrefundable half of the adoption credit and the credit for the elderly or disabled on Schedule R — and this engine models none of them. Form 8801 is the one to read twice now that Phase 29 computes the alternative minimum tax: AMT paid on DEFERRAL items (most of all the §56(b)(3) incentive stock option spread) becomes a credit against the REGULAR tax in later years, so a filer who owes AMT this year is owed something next year that this engine will not compute for them, and a filer carrying one in from 2024 cannot claim it here. It is multi-year by construction and no document this engine holds records a prior year\'s minimum tax (no phase yet)' },
     { kind: 'federalTaxWithheldOnOtherForms', line: '1040 line 25c', label: 'federal income tax withheld on other forms', remedy: 'no dialect models it (no phase yet)' },
-    { kind: 'earnedIncomeCredit', line: '1040 line 27a', label: 'earned income credit', remedy: '§32(c)(3)’s qualifying-child test needs four facts `vnd.fjs.return_profile`’s dependents array does not carry — a checked relationship vocabulary, full-time-student status, permanent and total disability, and residency in the United States for more than half the year — and §32(c)(1) needs three about the filer that it does not carry either: an age between 25 and 65 for the childless credit, a valid social security number, and not being another taxpayer’s qualifying child. This engine holds none of the seven, and a wrong earned income credit is the most audited figure on the return; see fjs/todo/tax-27-earned-income-credit.md (no phase yet)' },
     { kind: 'refundableAdoptionCredit', line: '1040 line 30', label: 'refundable adoption credit', remedy: 'requires Form 8839 (no phase yet)' },
     // ── Schedule 3 Part II's five per-line kinds (Phase 25) ─────────────────
     //
@@ -1356,7 +1361,7 @@ export const classifyScope = declaredKinds => {
  * and `fjs/form8995` wiring that makes all three computable.
  * @type {number}
  */
-const expectedModeledKindCount = 37
+const expectedModeledKindCount = 38
 
 /**
  * The modeled set, hand-typed a SECOND time and in {@link kindVocabulary}'s
@@ -1407,6 +1412,7 @@ const everyModeledKindHandTyped = [
     'federalTaxWithheldOn1099Int',
     'federalTaxWithheldOnOther1099',
     'estimatedTaxPayments',
+    'earnedIncomeCredit',
     'additionalChildTaxCredit',
     'americanOpportunityCredit',
     'amtPrivateActivityBondInterest',
@@ -1491,7 +1497,7 @@ const everyModeledKindHandTyped = [
  * that makes it computable.
  * @type {number}
  */
-const expectedUnmodeledKindCount = 77
+const expectedUnmodeledKindCount = 76
 
 /**
  * The complete refusal message for a return declaring exactly
@@ -2614,53 +2620,61 @@ export const proof = {
         // rather than the part that is easy to assert — AGENTS.md's own
         // recorded lesson from the Phase 20 mutant that erased a destination
         // and survived five refusal proofs.
-        theEarnedIncomeCreditRefusalNamesTheFactsThatAreMissing: () => {
+         // **REPLACED in Phase 32 (TAX-27), which MODELED this kind.** The leaf
+        // here was `theEarnedIncomeCreditRefusalNamesTheFactsThatAreMissing`,
+        // and it pinned Phase 25's remedy string — the one naming the seven
+        // §32 facts `vnd.fjs.return_profile` did not carry. Those facts are now
+        // carried, `fjs/schedule/eic` computes the credit, and a remedy naming
+        // them would be false.
+        //
+        // Replaced with a STRONGER statement rather than deleted, and stated
+        // here so a later feedback pass does not revert it: the old leaf could
+        // only assert that a refusal said the right words, and this one
+        // asserts there is no refusal at all AND that the kind is where the
+        // partition says it is. A deletion would have left the reclassification
+        // pinned by nothing but the two hand-typed counts.
+        //
+        // `earnedIncomeCredit` gets no {@link modeledKindDeclarationRemedies}
+        // entry, for `netInvestmentIncomeTax`'s exact reason: no tripwire
+        // points at it. A tripwire would have to see a §32 fact on a stored
+        // document, and every one of the ten is a taxpayer ASSERTION that
+        // appears on no information return — so a row here would describe a
+        // refusal nothing can raise.
+        theEarnedIncomeCreditIsModeledAndNoLongerRefuses: () => {
             const outcome = classifyScope(['earnedIncomeCredit'])
-            assert(outcome.kind === 'error', ['the earned income credit must still refuse', outcome])
-            if (outcome.kind !== 'error') {
-                throw ['unreachable', outcome]
-            }
-            assert(
-                outcome.message.includes('1040 line 27a'),
-                ['must name the line that cannot be computed', outcome.message],
+            assertEq(
+                outcome.kind, 'ok',
+                ['§32 is computed as of Phase 32; declaring it must no longer refuse', outcome],
             )
-            // The four qualifying-child facts, each named. A remedy that
-            // dropped one would leave a reader believing a widening was
-            // smaller than it is.
-            for (const fact of [
-                'relationship vocabulary',
-                'full-time-student status',
-                'permanent and total disability',
-                'more than half the year',
-            ]) {
-                assert(
-                    outcome.message.includes(fact),
-                    ['the refusal must name this missing qualifying-child fact', fact, outcome.message],
-                )
-            }
-            // …and the three about the filer.
-            for (const fact of [
-                'between 25 and 65',
-                'social security number',
-                'another taxpayer’s qualifying child',
-            ]) {
-                assert(
-                    outcome.message.includes(fact),
-                    ['the refusal must name this missing filer fact', fact, outcome.message],
-                )
-            }
-            // The provisions, so a reader can go to the statute rather than
-            // to a form that would not help them.
+            // The partition, both halves: in the modeled list and absent from
+            // the refusal table. Asserting only the first would pass while a
+            // stale refusal row sat beside it — which is exactly the state
+            // `_EveryKindIsEitherModeledOrRefused` forbids at `tsc` level, and
+            // this leaf is the runtime witness that the tsc property is about
+            // the thing a reader thinks it is.
             assert(
-                outcome.message.includes('§32(c)(3)') && outcome.message.includes('§32(c)(1)'),
-                ['the refusal must name both provisions', outcome.message],
+                modeledKinds.some(kind => kind === 'earnedIncomeCredit'),
+                'earnedIncomeCredit must be in modeledKinds',
             )
-            // And the file that carries the whole analysis, which is the one
-            // part of this message the NEXT ENGINEER can act on.
+            // Widened to `string` before the comparison, deliberately: with
+            // the literal union `tsc` reports TS2367 ("no overlap") and the
+            // check cannot be written at all. That compile error IS the
+            // stronger guarantee — a stale row would stop the build — and the
+            // widening is what lets the runtime leaf state the same fact for a
+            // reader who is not running the compiler. An ordinary widening
+            // assignment, never a cast, the same device `modeledKindNames`
+            // uses one section up.
+            /** @type {readonly string[]} */
+            const refusedNames = unmodeledKindRefusals.map(entry => entry.kind)
             assert(
-                outcome.message.includes('fjs/todo/tax-27-earned-income-credit.md'),
-                ['the refusal must point at the recorded analysis', outcome.message],
+                !refusedNames.includes('earnedIncomeCredit'),
+                'earnedIncomeCredit must no longer carry a refusal row',
             )
+            // The control, so this leaf cannot pass on a `classifyScope` that
+            // stopped refusing anything at all: the neighbouring 1040 line 30
+            // credit is still refused, and by name.
+            const stillRefused = classifyScope(['refundableAdoptionCredit'])
+            assert(stillRefused.kind === 'error', ['1040 line 30 must still refuse', stillRefused])
         },
         // TAX-25/TAX-26, Phase 25: the SAME property one schedule further on.
         // The nine Schedule 3 kinds this phase did NOT wire must still refuse
@@ -3118,7 +3132,7 @@ export const proof = {
         // which is why `fjs/return/tripwire`'s own two-tripwire leaf cannot
         // see this.
         //
-        // `earnedIncomeCredit` (1040 line 27a) is the kind that CAN. In
+        // `refundableAdoptionCredit` (1040 line 30) is a kind that CAN. In
         // vocabulary — that is, 1040 form — order it comes AFTER
         // `additionalMedicareTax` (Schedule 2 line 11 -> 1040 line 23). Under
         // a concatenated `[...unmodeledKindRefusals, ...modeledKindDeclarationRemedies]`
@@ -3126,18 +3140,24 @@ export const proof = {
         // modeled kind is appended after the whole of it. Findings are
         // supplied here in the WRONG order too, so the leaf pins the walk
         // rather than the argument.
+        //
+        // **This leaf used `earnedIncomeCredit` (1040 line 27a) until Phase
+        // 32, which MODELED it.** Re-pointed rather than deleted: the property
+        // is about the walk and not about that kind, and any refused kind
+        // after Schedule 2 line 11 in the vocabulary exhibits it. Line 30's
+        // refundable adoption credit is the nearest one.
         aModeledKindIsOrderedByTheVocabularyNotByWhichTableItCameFrom: () => {
             const outcome = tripwireRefusal([
-                { kind: 'earnedIncomeCredit', evidence: 'evidence for 1040 line 27a' },
+                { kind: 'refundableAdoptionCredit', evidence: 'evidence for 1040 line 30' },
                 { kind: 'additionalMedicareTax', evidence: 'evidence for Schedule 2 line 11' },
             ])
             assertEq(outcome.unmodeled.length, 2, ['expected both kinds named', outcome.unmodeled])
             assertEq(
                 outcome.unmodeled[0],
                 'additionalMedicareTax',
-                ['Schedule 2 line 11 reaches 1040 line 23, which comes before line 27a', outcome.unmodeled],
+                ['Schedule 2 line 11 reaches 1040 line 23, which comes before line 30', outcome.unmodeled],
             )
-            assertEq(outcome.unmodeled[1], 'earnedIncomeCredit', ['1040 line 27a comes second', outcome.unmodeled])
+            assertEq(outcome.unmodeled[1], 'refundableAdoptionCredit', ['1040 line 30 comes second', outcome.unmodeled])
             // Both clauses asserted PRESENT before their positions are
             // compared, since `indexOf` returns -1 for a missing string and
             // -1 is less than everything -- the way an ordering assertion
@@ -3147,12 +3167,12 @@ export const proof = {
                 ['the modeled kind\'s own evidence must be carried', outcome.message],
             )
             assert(
-                outcome.message.includes('evidence for 1040 line 27a'),
+                outcome.message.includes('evidence for 1040 line 30'),
                 ['the refused kind\'s own evidence must be carried', outcome.message],
             )
             assert(
                 outcome.message.indexOf('evidence for Schedule 2 line 11')
-                    < outcome.message.indexOf('evidence for 1040 line 27a'),
+                    < outcome.message.indexOf('evidence for 1040 line 30'),
                 ['the two tables must be interleaved in form order, not concatenated', outcome.message],
             )
         },
