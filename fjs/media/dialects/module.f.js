@@ -32,7 +32,7 @@
  * `dialectEntry`'s own documented default: no second argument, structural
  * (rtti) match alone.
  *
- * `financeDialects` carries TWENTY-FOUR entries: the twenty-three local
+ * `financeDialects` carries TWENTY-SEVEN entries: the twenty-six local
  * dialects below, plus `revisionDialect`, reused unchanged from upstream — not
  * reconstructed locally, since `fjs/media/revision` already IS one of this
  * repo's dialects (`vnd.fjs.revision` blobs are written directly into the
@@ -41,12 +41,11 @@
  * Phase 30 (DOC-24) adds the twenty-second and twenty-third,
  * `vnd.fjs.k1_1065` and `vnd.fjs.k1_1120s`, and both gained a fixture below.
  *
- * ## This registry and `fjs/server/finance_schema`'s have DIVERGED
+ * ## This registry and `fjs/server/finance_schema`'s HAD diverged
  *
- * Recorded here as a measurement rather than repaired, because the repair
- * belongs to whoever owns the three dialects it concerns. The two lists are
- * both twenty-three long as of this phase and they are **not the same
- * twenty-three**:
+ * Until the milestone-v2 reconciliation this module's docstring recorded the
+ * divergence as a *measurement* and left it unrepaired. Both lists were
+ * twenty-three long and they were not the same twenty-three:
  *
  * - **Here and not there:** `vnd.fjs.itemized_deductions`, `vnd.fjs.run`,
  *   `vnd.fjs.prior_year_capital_loss`.
@@ -54,10 +53,20 @@
  *   `vnd.fjs.basis_correction` — Phase 29's three, registered with the MCP
  *   schema tool and never with `detect`.
  *
- * The consequence of the second group is concrete: a stored Form 3921 blob is
+ * The consequence of the second group was concrete: a stored Form 3921 blob was
  * classified by `cas_refresh` as `text/plain` rather than as
- * `application/vnd.fjs.form3921+json`, because nothing here recognises it.
- * Neither hand-typed count could notice, since each counts only its own list.
+ * `application/vnd.fjs.form3921+json`, because nothing here recognised it. The
+ * first group cost an agent the field names of two dialects that are REQUIRED
+ * fields on `Form1040Inputs`. **Neither hand-typed count could notice, since
+ * each counts only its own list** — which is the whole reason a comment saying
+ * so did not stop it.
+ *
+ * Both directions are now repaired: the three missing entries are registered
+ * below, the two missing schemas are registered in `finance_schema`, and
+ * `fjs/server/dialect_parity` COMPARES the two lists against each other so this
+ * class of drift cannot recur silently. `vnd.fjs.revision` and `vnd.fjs.run`
+ * remain classification-only by design and are named there individually as the
+ * only permitted asymmetry.
  *
  * @module
  */
@@ -181,15 +190,35 @@ import {
     k1SCorporationSchema,
     checkReferences as checkK1SCorporation,
 } from '../../document/k1_1120s/module.f.js'
+import {
+    dialect as formThirtyNineTwentyOneDialect,
+    formThirtyNineTwentyOneSchema,
+    checkReferences as checkFormThirtyNineTwentyOne,
+} from '../../document/form3921/module.f.js'
+import {
+    dialect as formThirtyNineTwentyTwoDialect,
+    formThirtyNineTwentyTwoSchema,
+    checkReferences as checkFormThirtyNineTwentyTwo,
+} from '../../document/form3922/module.f.js'
+import {
+    dialect as basisCorrectionDialect,
+    basisCorrectionSchema,
+    checkReferences as checkBasisCorrection,
+} from '../../document/basis_correction/module.f.js'
 
 /** @import { DialectEntry } from 'functionalscript/fjs/media/module.f.js' */
 
 /**
  * Every one of this repo's own dialects, registered for {@link detect}: the
- * twenty-three local finance document/return/run dialects wrapped via
+ * twenty-six local finance document/return/run dialects wrapped via
  * {@link dialectEntry}, plus upstream's own {@link revisionDialect} reused
  * unchanged. See this module's own docstring for why `ocr` is the one entry
  * with no `extraValidate` second argument.
+ *
+ * Every dialect `fjs/server/finance_schema` serves a schema for MUST appear
+ * here, and vice versa apart from the two classification-only tags —
+ * `fjs/server/dialect_parity` is the check that enforces it, and it is a
+ * comparison of the two lists rather than a comment asking for one.
  * @type {readonly DialectEntry[]}
  */
 export const financeDialects = [
@@ -216,6 +245,12 @@ export const financeDialects = [
     dialectEntry(businessExpensesSchema, v => checkBusinessExpenses(v)[0] === 'ok'),
     dialectEntry(k1PartnershipSchema, v => checkK1Partnership(v)[0] === 'ok'),
     dialectEntry(k1SCorporationSchema, v => checkK1SCorporation(v)[0] === 'ok'),
+    // Phase 29's three, registered with `finance_schema` in that phase and
+    // with `detect` only here. Until this entry existed, `cas_refresh` filed a
+    // stored Form 3921 blob as `text/plain`.
+    dialectEntry(formThirtyNineTwentyOneSchema, v => checkFormThirtyNineTwentyOne(v)[0] === 'ok'),
+    dialectEntry(formThirtyNineTwentyTwoSchema, v => checkFormThirtyNineTwentyTwo(v)[0] === 'ok'),
+    dialectEntry(basisCorrectionSchema, v => checkBasisCorrection(v)[0] === 'ok'),
     revisionDialect,
 ]
 
@@ -231,7 +266,7 @@ export const detectFinance = detect(financeDialects)
 
 /**
  * Independently hand-typed: the number of entries {@link financeDialects}
- * is expected to carry today — TWENTY-THREE local dialects plus
+ * is expected to carry today — TWENTY-SIX local dialects plus
  * {@link revisionDialect}, which is upstream's. Deliberately NOT derived from
  * `financeDialects.length` itself (AGENTS.md's hand-typed-count idiom,
  * mirroring `fjs/document/1099b`'s `expectedMoneyBoxFieldCount`): a dialect
@@ -242,7 +277,7 @@ export const detectFinance = detect(financeDialects)
  * collection shrinking").
  * @type {number}
  */
-const expectedDialectCount = 24
+const expectedDialectCount = 27
 
 /** A sample cbase32 hash — {@link revisionDialect}'s own `snapshot`/`parents` shape needs a decodable one; the value itself is arbitrary. */
 const revisionSampleHash = vecToCBase32(vec8(0x77n))
@@ -443,6 +478,39 @@ const fixtures = {
         accountNumber: 'SHR-0001',
         taxYear: 2025,
         formRevision: '2025',
+    },
+    // Phase 29's three. Each mirrors that dialect's OWN module-level fixture
+    // (`minimal` for the two equity-compensation forms, `rsuSameDaySale` for
+    // the basis correction), for the reason this map's docstring gives.
+    [formThirtyNineTwentyOneDialect]: {
+        dialect: formThirtyNineTwentyOneDialect,
+        payerTin: '11-1111111',
+        recipientTin: '222-22-2222',
+        accountNumber: 'ACC-0001',
+        taxYear: 2025,
+        formRevision: 'April 2025',
+        sourceArtifactHash: 'deadbeef00112233445566778899aabbccddeeff0011223344556677889900',
+    },
+    [formThirtyNineTwentyTwoDialect]: {
+        dialect: formThirtyNineTwentyTwoDialect,
+        payerTin: '11-1111111',
+        recipientTin: '222-22-2222',
+        accountNumber: 'ACC-0001',
+        taxYear: 2025,
+        formRevision: 'April 2025',
+        sourceArtifactHash: 'deadbeef00112233445566778899aabbccddeeff0011223344556677889900',
+    },
+    // `reason` is a REQUIRED semantic refinement, not merely a stored field:
+    // `checkBasisCorrection` refuses a blob whose reason is empty or
+    // whitespace-only, so the fixture that must DETECT has to carry one.
+    [basisCorrectionDialect]: {
+        dialect: basisCorrectionDialect,
+        recipientTin: '222-22-2222',
+        taxYear: 2025,
+        brokerageDocumentHash: 'sha256-rsu-vest-and-sell',
+        correctedCostOrOtherBasis: '150000.00',
+        reason: 'RSU vesting: the shares were included in Form W-2 box 1 as compensation, '
+            + 'and the broker reported $0.00 basis because that is what the employee paid.',
     },
     [revisionDialectTag]: {
         dialect: revisionDialectTag,

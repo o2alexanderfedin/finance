@@ -8,10 +8,12 @@
  *
  * ## The lookup map names WHICH schema, never re-describes it
  *
- * `dialectSchemas` below keys each of the seven known dialect tag strings to
- * that dialect's own exported schema const (`oneZeroNineNineIntSchema`,
- * `ocrSchema`, `w2Schema`, `medicalExpensesSchema`, `returnProfileSchema`,
- * `oneZeroNineNineRSchema`, `ssa1099Schema`). It contributes no field names of
+ * `dialectSchemas` below keys each known dialect tag string to that dialect's
+ * own exported schema const (`oneZeroNineNineIntSchema`, `ocrSchema`,
+ * `w2Schema`, and so on — the map itself is the list; a count enumerated in
+ * prose here would be a third copy, and the first version of this sentence,
+ * which said "seven", had been wrong by eighteen for six phases before anyone
+ * read it). It contributes no field names of
  * its own — `toJsonSchema` walks whichever schema constant the map names, so
  * every field an agent sees comes from the same RTTI the dialect's own
  * `validate` enforces. Per `07-CONTEXT.md`, a hand-written field list would be
@@ -72,6 +74,8 @@ import { dialect as formThirtyNineTwentyTwoDialect, formThirtyNineTwentyTwoSchem
 import { dialect as basisCorrectionDialect, basisCorrectionSchema } from '../../document/basis_correction/module.f.js'
 import { dialect as k1PartnershipDialect, k1PartnershipSchema } from '../../document/k1_1065/module.f.js'
 import { dialect as k1SCorporationDialect, k1SCorporationSchema } from '../../document/k1_1120s/module.f.js'
+import { dialect as itemizedDeductionsDialect, itemizedDeductionsSchema } from '../../document/itemized_deductions/module.f.js'
+import { dialect as priorYearCapitalLossDialect, priorYearCapitalLossSchema } from '../../document/prior_year_capital_loss/module.f.js'
 import { stringify as jsonText } from '../../json/module.f.js'
 
 /** @import { Type } from 'functionalscript/fjs/types/rtti/module.f.js' */
@@ -112,10 +116,23 @@ const dialectSchemas = {
     [basisCorrectionDialect]: basisCorrectionSchema,
     [k1PartnershipDialect]: k1PartnershipSchema,
     [k1SCorporationDialect]: k1SCorporationSchema,
+    // Both are REQUIRED fields on `Form1040Inputs` (`itemizedDeductionForms`,
+    // `capitalLossCarryoverForms`), classifiable by `fjs/media/dialects` since
+    // Phase 13/15, and until the milestone-v2 reconciliation served no schema
+    // at all — so an agent filing for anyone who itemizes, or anyone carrying a
+    // capital loss forward, had to GUESS the field names. That is the precise
+    // second-source-of-truth this tool exists to make unnecessary.
+    // `fjs/server/dialect_parity` is what now stops it recurring.
+    [itemizedDeductionsDialect]: itemizedDeductionsSchema,
+    [priorYearCapitalLossDialect]: priorYearCapitalLossSchema,
 }
 
-/** The known dialect tags, in declaration order — used in the refusal message. */
-const knownDialects = /** @type {readonly string[]} */ (Object.keys(dialectSchemas))
+/**
+ * The known dialect tags, in declaration order — used in the refusal message,
+ * and read by `fjs/server/dialect_parity` as one of the two sides it compares.
+ * @type {readonly string[]}
+ */
+export const knownDialects = /** @type {readonly string[]} */ (Object.keys(dialectSchemas))
 
 /**
  * Independently hand-typed: how many dialects {@link dialectSchemas} registers
@@ -169,10 +186,22 @@ const knownDialects = /** @type {readonly string[]} */ (Object.keys(dialectSchem
  * one step, and both gained their own `*Resolves` leaf below. **They are
  * registered with `fjs/media/dialects` in the same commit**, which Phase 29's
  * three were not — see that module's own docstring, "This registry and
- * `fjs/server/finance_schema`'s have DIVERGED", for the measurement.
+ * `fjs/server/finance_schema`'s HAD diverged", for the measurement.
+ *
+ * The milestone-v2 reconciliation registers the TWENTY-FOURTH AND TWENTY-FIFTH
+ * (`vnd.fjs.itemized_deductions`, `vnd.fjs.prior_year_capital_loss`), moving the
+ * count from 23 to 25 in one step, and both gained their own `*Resolves` leaf
+ * below. Neither is new work: both have been classifiable since Phases 13/15 and
+ * both are REQUIRED fields on `Form1040Inputs`. They were simply never served
+ * here, which is the half of the divergence that cost an agent field names.
+ *
+ * **`fjs/server/dialect_parity` is now what keeps this count and
+ * `fjs/media/dialects`'s in step.** Raising one of the two hand-typed counts
+ * without registering the dialect in BOTH places reddens that gate by name —
+ * which is the check the two paragraphs of prose above turned out not to be.
  * @type {number}
  */
-const expectedKnownDialectCount = 23
+const expectedKnownDialectCount = 25
 
 /**
  * `finance_schema(dialect)`: the MCP tool. Looks `dialect` up in
@@ -432,6 +461,27 @@ export const proof = {
         assertEq(
             JSON.stringify(JSON.parse(textOf(result))),
             JSON.stringify(toJsonSchema(k1SCorporationSchema)),
+        )
+    },
+    // The milestone-v2 reconciliation: the two dialects the 1040 engine
+    // REQUIRES (`itemizedDeductionForms` and `capitalLossCarryoverForms` are
+    // both non-optional members of `Form1040Inputs`) and this tool served no
+    // schema for until now. Each tag hand-typed, never read back off
+    // `dialectSchemas`.
+    itemizedDeductionsResolves: () => {
+        const result = call('vnd.fjs.itemized_deductions')
+        assertEq(result.isError, undefined)
+        assertEq(
+            JSON.stringify(JSON.parse(textOf(result))),
+            JSON.stringify(toJsonSchema(itemizedDeductionsSchema)),
+        )
+    },
+    priorYearCapitalLossResolves: () => {
+        const result = call('vnd.fjs.prior_year_capital_loss')
+        assertEq(result.isError, undefined)
+        assertEq(
+            JSON.stringify(JSON.parse(textOf(result))),
+            JSON.stringify(toJsonSchema(priorYearCapitalLossSchema)),
         )
     },
     // The two schemas the tool serves for those tags are DIFFERENT documents,

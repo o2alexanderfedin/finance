@@ -217,16 +217,21 @@ deliberately left untaken, so that discovering it did not become a reason to sto
 
 ### Milestone v2 — The Product Path and Four Personas (opened 2026-08-15)
 
-- [ ] **Phase 21: The Last Mile** - The 1040 engine reachable from a stored guest program via `guestCtx`, and a real return produced through `evo_add` → `fjs_run` → `vnd.fjs.run`
-- [ ] **Phase 22: Computable Tripwires** - Documents that imply a kind must have been declared; closes the silent-understatement hole
-- [ ] **Phase 23: Schedule 2 Populated** - Forms 8959 and 8960 — **unblocks the FAANG employee**
-- [ ] **Phase 24: Schedule 1 Adjustments** - Student loan interest, educator expenses, HSA — **unblocks the non-profit worker**
-- [ ] **Phase 25: Schedule 3 Credits** - Saver's Credit, education credits, EITC
-- [ ] **Phase 26: Retiree Completion** - Qualified Charitable Distributions and Form 8606
-- [ ] **Phase 27: 1099-NEC and Schedule C** - Reversed from Out of Scope on 2026-08-15
-- [ ] **Phase 28: Schedule SE and QBI** - **unblocks the startup founder**; TAX-31 complete, TAX-32 delivers Form 8995 and leaves 8995-A open
-- [ ] **Phase 29: Equity Compensation and AMT** - Forms 3921/3922, Form 6251, Form 8949 basis adjustment codes
-- [ ] **Phase 30: Pass-Through Income** - Schedule K-1 and Schedule E
+> **Every box below was `[ ]` until 2026-08-17** while all ten phases were merged into
+> `develop`. They are ticked from the same measurement the progress table above uses; a box is
+> ticked where the phase shipped, and the entry says so where the phase shipped with a
+> requirement still open. See the note under that table for the commands.
+
+- [x] **Phase 21: The Last Mile** - The 1040 engine reachable from a stored guest program via `guestCtx`, and a real return produced through `evo_add` → `fjs_run` → `vnd.fjs.run` (PR #71, 2026-08-16)
+- [x] **Phase 22: Computable Tripwires** - Documents that imply a kind must have been declared; closes the silent-understatement hole (PR #72, 2026-08-16)
+- [x] **Phase 23: Schedule 2 Populated** - Forms 8959 and 8960 — **unblocks the FAANG employee** (PR #73, 2026-08-16)
+- [x] **Phase 24: Schedule 1 Adjustments** - Student loan interest, educator expenses, HSA — **unblocks the non-profit worker** (PR #74, 2026-08-16)
+- [x] **Phase 25: Schedule 3 Credits** - Saver's Credit, education credits, EITC (PR #75, 2026-08-16) — **TAX-27 stays open**: the EIC is a named refusal plus a fact-by-fact spec, not the credit
+- [x] **Phase 26: Retiree Completion** - Qualified Charitable Distributions and Form 8606 (PR #76, 2026-08-16) — **TAX-29 stays open**: Form 8606 Part I only, so a backdoor Roth still refuses
+- [x] **Phase 27: 1099-NEC and Schedule C** - Reversed from Out of Scope on 2026-08-15 (PR #77, 2026-08-16)
+- [x] **Phase 28: Schedule SE and QBI** - **unblocks the startup founder**; TAX-31 complete, TAX-32 delivers Form 8995 and leaves 8995-A open (PR #78, 2026-08-16) — **TAX-32 stays open**
+- [x] **Phase 29: Equity Compensation and AMT** - Forms 3921/3922, Form 6251, Form 8949 basis adjustment codes (PR #79, 2026-08-16) — **TAX-33 stays open**: Form 6251 Parts I and II, not Part III
+- [x] **Phase 30: Pass-Through Income** - Schedule K-1 and Schedule E (PR #80, 2026-08-16) — **TAX-35 stays open**: Schedule E Part II only
 
 ---
 
@@ -1024,32 +1029,42 @@ is deferred, so three phases remain, and two reasons override the numeric defaul
 | 19. Reproducibility and Report Provenance | Week 4 | 3/3 | Complete | 2026-08-12 |
 | 20. Unemployment Compensation *(retrofitted)* | Week 5 | 0/0 — no plans were written | Complete (code 2026-08-14, recorded 2026-08-15) | 2026-08-14 |
 | **── Milestone v2 ──** | | | | |
-| 21. The Last Mile | v2 | 0/TBD | Not started | - |
-| 22. Computable Tripwires | v2 | 0/TBD | Not started | - |
-| 23. Schedule 2 Populated | v2 | 0/TBD | Not started | - |
-| 24. Schedule 1 Adjustments | v2 | 0/TBD | Not started | - |
-| 25. Schedule 3 Credits | v2 | 0/TBD | Not started | - |
-| 26. Retiree Completion | v2 | 0/TBD | Not started | - |
-| 27. 1099-NEC and Schedule C | v2 | 0/TBD | Not started | - |
-| 28. Schedule SE and QBI | v2 | 0/TBD | Not started | - |
-| 29. Equity Compensation and AMT | v2 | 0/TBD | Not started | - |
-| 30. Pass-Through Income | v2 | 0/0 — no plans were written | Complete (DOC-24; TAX-35 open for Part III) | 2026-08-16 |
+| 21. The Last Mile | v2 | 0/0 — no plans were written | Complete (EXEC-14, PROV-09) | 2026-08-16 · PR #71 `75b6f5b` |
+| 22. Computable Tripwires | v2 | 0/0 — no plans were written | Complete (TAX-19) | 2026-08-16 · PR #72 `c449e0e` |
+| 23. Schedule 2 Populated | v2 | 0/0 — no plans were written | Complete (TAX-20, TAX-21, TAX-22) | 2026-08-16 · PR #73 `1a3a80e` |
+| 24. Schedule 1 Adjustments | v2 | 0/0 — no plans were written | Complete (TAX-23, TAX-24, DOC-19) | 2026-08-16 · PR #74 `618df97` |
+| 25. Schedule 3 Credits | v2 | 0/0 — no plans were written | Shipped with one requirement OPEN (TAX-25, TAX-26 complete; **TAX-27 open** — an EIC refusal and a spec, not the credit) | 2026-08-16 · PR #75 `68a4aa2` |
+| 26. Retiree Completion | v2 | 0/0 — no plans were written | Shipped with one requirement OPEN (TAX-28 complete; **TAX-29 open** — Form 8606 Part I only; Parts II/III refuse, so no backdoor Roth) | 2026-08-16 · PR #76 `e672b46` |
+| 27. 1099-NEC and Schedule C | v2 | 0/0 — no plans were written | Complete (DOC-20, DOC-21, TAX-30) | 2026-08-16 · PR #77 `5ce3aa0` |
+| 28. Schedule SE and QBI | v2 | 0/0 — no plans were written | Shipped with one requirement OPEN (TAX-31 complete; **TAX-32 open** — Form 8995 only, no 8995-A) | 2026-08-16 · PR #78 `8d14463` |
+| 29. Equity Compensation and AMT | v2 | 0/0 — no plans were written | Shipped with one requirement OPEN (DOC-22, DOC-23, TAX-34 complete; **TAX-33 open** — Form 6251 Parts I and II, not Part III) | 2026-08-16 · PR #79 `106c17b` |
+| 30. Pass-Through Income | v2 | 0/0 — no plans were written | Shipped with one requirement OPEN (DOC-24 complete; **TAX-35 open** — Schedule E Part II only) | 2026-08-16 · PR #80 `0df734d` |
 
-> **EVERY MILESTONE v2 ROW BUT PHASE 30's IS STALE, and that is a measurement rather than a
-> guess.** Phases 21 through 29 have all shipped — `.planning/REQUIREMENTS.md` records each
-> one's delivery in the requirement entries themselves, and `git log` carries their commits —
-> and not one of them updated its row here or ticked its checkbox in the "Milestone v2" list
-> above. So nine rows read `0/TBD | Not started` for work that is in `develop`.
+> **The nine stale milestone-v2 rows were retro-filled on 2026-08-17, from measurement.** They
+> had read `0/TBD | Not started` for work that was in `develop`: phases 21 through 29 all
+> shipped and merged, and not one of them updated its row here. The note that stood in this
+> place said Phase 30 had deliberately left them alone because "inventing nine completion states
+> from the outside is how a table becomes confidently wrong rather than merely stale" — which was
+> the right caution and is why nothing above is inferred:
 >
-> Phase 30 recorded its own row on 2026-08-16 and did NOT retro-fill the other nine, because
-> each needs its own phase's judgment about what it actually delivered (several left a
-> requirement open on purpose) and inventing nine completion states from the outside is how a
-> table becomes confidently wrong rather than merely stale. **This is Phase 17's work**, and it
-> is exactly the defect Phase 17's success criterion 5 exists for.
+> - **The PR number and merge commit of each phase are `git log --oneline --merges develop`**,
+>   PRs #71 through #80 in phase order, and the Completed date is each merge commit's own
+>   (`git log -1 --format=%cd --date=short <sha>`). All ten landed on 2026-08-16.
+> - **What each phase delivered is REQUIREMENTS.md's own checkboxes**, not a judgment made here.
+>   Five phases — 25, 26, 28, 29 and 30 — each shipped with exactly ONE requirement open, and
+>   each row says so and names it. A row reading a bare "Complete" beside an open requirement
+>   would be the same defect as an unticked checkbox beside working code, in the other direction.
 >
-> The reliable statement of v2's state is REQUIREMENTS.md's own checkboxes, which every phase
-> from 21 on DID update: `grep -c '^- \[x\] \*\*' .planning/REQUIREMENTS.md` and its `[ ]`
-> counterpart, measured rather than transcribed.
+> **`0/0 — no plans were written` is literal for every v2 phase, not a placeholder.** None of
+> phases 21-30 went through GSD planning: `.planning/phases/` contains no directory for any of
+> them, so there are no PLAN files to have completed. This follows the convention Phase 20
+> already set in this table, for the reason stated below it — counting them as `1/1` would make
+> the plan totals lie in order to make the table look regular.
+>
+> The reliable statement of v2's state remains REQUIREMENTS.md's own checkboxes, which every
+> phase from 21 on DID update: `grep -c '^- \[x\] \*\*' .planning/REQUIREMENTS.md` and its `[ ]`
+> counterpart, measured rather than transcribed. Measured 2026-08-17, after ticking the six that
+> disagreed with the code: **120 total, 107 complete, 13 open.**
 
 > **Phase 12.1 was missing from this table** until 2026-08-12, which is why plan totals
 > computed from it came out four short. Added from measurement.
