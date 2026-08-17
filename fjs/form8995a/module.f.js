@@ -121,7 +121,8 @@ import { of, multiply, halfUp } from '../types/rational/module.f.js'
 import { centsFromString } from '../exact/module.f.js'
 import { taxParamsByYear } from '../tax/params/module.f.js'
 import {
-    qualifiedBusinessIncome, priorYearCarryforwardIsUnstated, form8995,
+    qualifiedBusinessIncome, priorYearCarryforwardIsUnstated,
+    qualifiedBusinessIncomeDeduction as simplifiedComputation,
 } from '../form8995/module.f.js'
 
 /** @import { TaxParamSet, IndividualFilingStatus } from '../tax/params/module.f.js' */
@@ -732,19 +733,24 @@ export const qualifiedBusinessIncomeDeduction = taxParamSet => input => {
         : centsFromString(assertedPriorYearLossCarryforward)
     const { aboveThreshold } = phaseInPosition(taxParamSet)(status)(taxableIncomeBeforeQbiCents)
     if (!aboveThreshold) {
-        // Form 8995, the simplified computation, delegated whole. `fjs/form8995`
-        // guards this boundary from its own side too, so calling it out of range
-        // refuses rather than computing quietly.
-        const simplified = form8995(taxParamSet)({
-            qualifiedBusinessIncomeCents,
-            priorYearLossCarryforwardCents,
-            taxableIncomeBeforeQbiCents,
-            netCapitalGainCents,
+        // Form 8995, the simplified computation, delegated WHOLE -- through that
+        // module's own end-to-end entry point rather than its bare form filler,
+        // so its threshold guard runs from its own side as well. That guard is
+        // unreachable from here by construction (this branch is the
+        // at-or-below case), and it stays live rather than becoming an orphan:
+        // one rule, one place, and Form 8995 refuses if it is ever asked for out
+        // of range by anything else.
+        const outcome = simplifiedComputation(taxParamSet)({
+            status, netProfitCents, deductibleHalfOfSelfEmploymentTaxCents,
+            assertedPriorYearLossCarryforward, taxableIncomeBeforeQbiCents, netCapitalGainCents,
         })
+        if (outcome.kind === 'error') {
+            return outcome
+        }
         return {
             kind: 'ok',
-            deductionCents: simplified.line15,
-            simplified,
+            deductionCents: outcome.form.line15,
+            simplified: outcome.form,
             comprehensive: undefined,
         }
     }
