@@ -489,11 +489,28 @@ test the thing that breaks."* It was a one-off; this section makes it a practice
       *exactly* 4260. **The proof suite executes twice under `npm test`.** STATE.md's anti-pattern
       table already recorded a 2× inflation in the proof *metric* when the `functionalscript`
       submodule is initialized; this shows the proofs are not merely double-*counted*, they are
-      double-*run*, at a real cost of about 53 seconds per invocation. The mechanism is **not
-      diagnosed** — no `*.test.js` exists under `functionalscript/` (a submodule with one tracked
-      gitlink), so simple double-discovery does not explain it. Stated as the measurement it is
-      rather than the guess it would otherwise be, and carried as its own open item.
-      `npm run test:proofs` exists now and is the separable path this requirement asked for.
+      double-*run*, at a real cost of about 53 seconds per invocation.
+
+      **DIAGNOSED AND FIXED the same day.** The paragraph above first said the mechanism was
+      undiagnosed, on the strength of *"no `*.test.js` exists under `functionalscript/`"* — which
+      was true and was the wrong search. Node's default discovery matches **`*.test.ts`** as well,
+      and Node 25 runs TypeScript natively, so bare `node --test` was picking up
+      `functionalscript/fjs/emergent_testing/all.test.ts` — the vendored submodule's own entry
+      point — and re-walking the whole proof set. 4273 + 4260 = 8533, exactly.
+
+      Fixed by pinning `npm test` to `node --test *.test.js`, which is also how `test:proofs` and
+      `test:integration` already name their files, and which matches AGENTS.md's rule that
+      root-level `*.test.js` are the documented exception:
+
+      | | before | after |
+      |---|---|---|
+      | `npm test` | 8533 tests | **4273** |
+      | wall clock | ~60s (25–140 under load) | **~30s** |
+      | raw proof lines vs unique | 4048 vs 2024 | **2024 vs 2024** |
+
+      **Nothing is skipped** — every proof and every root test still runs, once. `sort -u` in the
+      leaf-count command is no longer load-bearing and is kept as a cheap assertion that it stays
+      that way. `npm run test:proofs` is the separable path this requirement asked for.
 
 Scope note, deliberately: these requirements do **not** ask for the virtual proofs to be
 replaced. The virtual harness is fast, deterministic, and proves logic well. What it cannot do is
