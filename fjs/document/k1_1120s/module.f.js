@@ -185,7 +185,7 @@ export const codedBoxFields = /** @type {const} */ ([
 
 /**
  * **The separately stated items this engine cannot place, each naming where
- * the amount would have gone.** Eleven of the thirteen fixed-caption money
+ * the amount would have gone.** Seven of the thirteen fixed-caption money
  * boxes. The boxes that are NOT here are the ones this engine computes, and
  * they are LISTED rather than described, because there is now more than one of
  * them and the list grows every time a destination is wired:

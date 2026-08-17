@@ -442,8 +442,14 @@ export const scheduleD = inputs => {
     //      block, and its own printed running-total line 9, are documented
     //      0.
     const unrecap1250Line9 = 0n
-    // 10. Partnership §1250 gain share via Schedule K-1 — no K-1 dialect,
-    //     documented 0.
+    // 10. Partnership §1250 gain share via Schedule K-1 — documented 0,
+    //     and **the reason changed with TAX-35 even though the value did
+    //     not**. It used to be "no K-1 dialect"; there are three now, and
+    //     lines 5 and 12 above read them. This line stays 0 because the
+    //     §1250 slice BOXES still refuse at storage (1065 box 9c, 1120-S
+    //     box 8c, 1041 box 4c), so no stored document can carry one. A
+    //     reason that is merely still-true-by-accident is worse than a
+    //     wrong one, because the next reader trusts it.
     const unrecap1250Line10 = 0n
     // 11. "Total of amounts reported to you as unrecaptured section 1250
     //     gain on a Schedule K-1, Form 1099-DIV, or Form 2439 ... or in

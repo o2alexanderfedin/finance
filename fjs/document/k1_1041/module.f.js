@@ -223,7 +223,7 @@ export const codedBoxFields = /** @type {const} */ ([
  * refuses the document at storage; a present ZERO is accepted, because a
  * transcript that prints `0.00` into an unused box is ordinary.
  *
- * Ten of the twelve fixed-caption money boxes are here. The boxes that are NOT
+ * Six of the twelve fixed-caption money boxes are here. The boxes that are NOT
  * here are the ones this engine computes, and they are LISTED rather than
  * described, because there is now more than one of them and the list grows
  * every time a destination is wired. A sentence of the form "box 6 is the one
