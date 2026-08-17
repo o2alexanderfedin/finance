@@ -547,8 +547,11 @@ const emptyCollected = {
  * `{ dialect: fieldName }` lookup table, deliberately: the table form needs
  * a computed key (`{ ...acc, [field]: [...] }`), which no type can express
  * without discarding exactly the per-dialect element type
- * `Form1040Inputs` exists to guarantee. Thirteen explicit branches cost
- * seventeen lines and keep `tsc` checking that a 1099-R never lands in `w2s`.
+ * `Form1040Inputs` exists to guarantee. One explicit branch per dialect keeps
+ * `tsc` checking that a 1099-R never lands in `w2s`, and the number of them is
+ * NOT written here — `expectedDispatchedDialectCount` is where it lives,
+ * because that one is asserted. This sentence said "thirteen" while the answer
+ * was twenty-two.
  * Returns `undefined` — never `acc` — for a dialect the engine has no field
  * for, so {@link collectDocument} can tell "routed" apart from "skipped"
  * without comparing object identities that every spread would break.

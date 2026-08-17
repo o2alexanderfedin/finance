@@ -2526,7 +2526,8 @@ const itemizedDeductionsDocument = documentHash => entries => ({
 })
 
 /**
- * Assembles the ten input lists into a {@link Form1040Inputs}. Widened from
+ * Assembles the ten input lists into a {@link Form1040Inputs}, defaulting every
+ * later widening to an empty array. Widened from
  * three to five curried parameters by Plan 12.1-04 (`dividendForms`,
  * `brokerageForms`), from five to seven by Plan 13-02 (`retirementForms`,
  * `socialSecurityForms`), from seven to nine by Plan 13-07
@@ -2548,8 +2549,11 @@ const inputsOf = profile => w2s => interestForms => dividendForms => brokerageFo
                 // TEST-HELPER DEFAULT. `unemploymentForms` is REQUIRED on
                 // `Form1040Inputs` — a production caller must supply it and
                 // `tsc` enforces that. This helper defaults it to empty so the
-                // forty existing proof call sites, none of which concern
-                // unemployment, read exactly as they did before. Proofs that
+                // existing proof call sites, none of which concern
+                // unemployment, read exactly as they did before. (This comment
+                // said "forty" when Phase 20 wrote it; there are 117 today,
+                // and the number is dropped rather than re-transcribed —
+                // nothing asserts it and nothing can.) Proofs that
                 // DO concern it spread this result and override the field.
                 unemploymentForms: [],
                 nonemployeeCompensationForms: [],
@@ -2848,7 +2852,7 @@ const withBusiness = inputs => forms => records => ({
 
 /**
  * Overrides `inputsOf`'s empty `unemploymentForms` default. Written as a
- * spread rather than an eleventh curried parameter so the forty existing
+ * spread rather than an eleventh curried parameter so the existing
  * call sites, none of which concern unemployment, stay untouched.
  * @type {(inputs: Form1040Inputs) => (forms: readonly Stored<OneZeroNineNineG>[]) => Form1040Inputs}
  */

@@ -41,7 +41,11 @@
  * here asks only whether a document that IS PRESENT proves an obligation.
  * Absence is never evidence of anything, here or there.
  *
- * ## The table, and why each of the five entries earns its place
+ * ## The table, and why each of its entries earns its place
+ *
+ * There are SIX as of Phase 30, and the number is deliberately not repeated
+ * through this header: `expectedTripwireCount` is the one place it is written
+ * down, because that one is asserted.
  *
  * 1. **W-2 box 5 above the Additional Medicare Tax threshold ->
  *    `additionalMedicareTax`.** The phase's motivating case. Box 5 is UNCAPPED
@@ -230,7 +234,10 @@ import { dialect as k1SCorporationDialect } from '../../document/k1_1120s/module
  *
  * **Written as a structural subset rather than as `Form1040Inputs` itself**,
  * which is deliberate twice over. It states, at the type level, precisely which
- * of the engine's eleven document lists this guard is allowed to look at — a
+ * of the engine's document lists this guard is allowed to look at — six of the
+ * twenty-three `Form1040Inputs` carries as of Phase 30, and NOT a number stated
+ * here in prose, because that is how this sentence came to say "eleven" while
+ * the answer was twenty-two. Read the field list below; it is the statement. A
  * predicate cannot quietly start reading the return profile or the medical
  * expense records. And it keeps this module free of any dependency on
  * `fjs/form1040/core`, which imports THIS module at run time; a
@@ -1144,7 +1151,7 @@ export const proof = {
     //
     // Nothing supplied, nothing declared: compute. This is the strongest
     // statement of "a tripwire that always fires is not a tripwire" — the
-    // degenerate input every one of the five predicates sees, and none of
+    // degenerate input every one of the predicates sees, and none of
     // them may fire on it.
     noDocumentsAtAllComputes: () => {
         assertEq(classify('single')([])(noDocuments).kind, 'ok')
