@@ -88,6 +88,8 @@ import { scopeRefusal } from '../../return/scope/module.f.js'
 
 /** @import { TaxParamSet, IndividualFilingStatus } from '../params/module.f.js' */
 /** @import { ScopeError, UnmodeledKind } from '../../return/scope/module.f.js' */
+/** @import { Qdcgt } from './qdcgt/module.f.js' */
+/** @import { Sdtw } from './sdtw/module.f.js' */
 
 /**
  * Which of Form 1040 line 16's methods produced an outcome.
@@ -103,8 +105,36 @@ import { scopeRefusal } from '../../return/scope/module.f.js'
  *   | 'foreignEarnedIncomeTaxWorksheet' | 'form8615' | 'scheduleJ'} Line16Method
  */
 
-/** A computed line 16: the cents, and which method produced them.
- * @typedef {{ readonly kind: 'ok', readonly method: Line16Method, readonly cents: bigint }} Line16Ok
+/**
+ * Which preferential worksheet actually ran, carrying the filled-in worksheet
+ * with it — or `'none'` when neither did.
+ *
+ * It rides on the `ok` arm because **Form 6251 Part III reads the regular tax's
+ * own worksheet** (TAX-33): its lines 13, 15, 20 and 27 each read a line off the
+ * QDCGT or the Schedule D Tax Worksheet, and lines 20 and 27 say *"as figured for
+ * the regular tax"* in so many words. The alternative was a second
+ * `qdcgt(...)`/`sdtw(...)` execution at the AMT's own call site, from a second
+ * hand-built input — which is AGENTS.md's "one rule, one place" inverted, and the
+ * exact shape `fjs/form1040/core` already refuses for Schedule SE: *"its line 13
+ * has ALREADY reduced `income.line11b`, so a second execution here would be
+ * pricing a return the first one changed."*
+ *
+ * `'none'` is not merely the empty case. It is REACHABLE — level 1's *"taxable
+ * income is zero or less"* gate returns before level 2 selects a worksheet — and
+ * `fjs/form6251` refuses by name on it rather than substituting a zero.
+ * @typedef {{ readonly kind: 'qdcgt', readonly worksheet: Qdcgt }
+ *   | { readonly kind: 'scheduleDTaxWorksheet', readonly worksheet: Sdtw }
+ *   | { readonly kind: 'none' }} Line16Preferential
+ */
+
+/** A computed line 16: the cents, which method produced them, and the
+ * preferential worksheet that ran (if any).
+ * @typedef {{
+ *   readonly kind: 'ok',
+ *   readonly method: Line16Method,
+ *   readonly cents: bigint,
+ *   readonly preferential: Line16Preferential,
+ * }} Line16Ok
  */
 
 /**
@@ -182,11 +212,13 @@ export const dispatchLine16 = taxParamSet => inputs => {
     //
     // A function, called only on the arm that selects it: the worksheet
     // must not run for a return the dispatcher refuses.
+    //
+    // The worksheet is bound to a local and RETURNED alongside its line 25,
+    // rather than dereferenced inline: Form 6251 Part III reads four of its
+    // lines, and computing it twice is how two executions come to disagree.
     /** @type {() => Line16Outcome} */
-    const qdcgtOutcome = () => ({
-        kind: 'ok',
-        method: 'qdcgt',
-        cents: qdcgt(taxParamSet)({
+    const qdcgtOutcome = () => {
+        const worksheet = qdcgt(taxParamSet)({
             status,
             line1Cents: taxableIncomeCents,
             line2Cents: qualifiedDividendsCents,
@@ -194,17 +226,21 @@ export const dispatchLine16 = taxParamSet => inputs => {
             scheduleD15Cents,
             scheduleD16Cents,
             line7aCents: capitalGainDistributionsCents,
-        }).line25,
-    })
+        })
+        return {
+            kind: 'ok',
+            method: 'qdcgt',
+            cents: worksheet.line25,
+            preferential: { kind: 'qdcgt', worksheet },
+        }
+    }
     // The Schedule D Tax Worksheet arm, mirroring `qdcgtOutcome`'s own
     // shape — a function, called only on the arm that selects it (branch
     // 2a's guard, below, stays byte-identical; only its BODY changes, from
     // a refusal to this computation, in this one Plan 12.1-04 commit).
     /** @type {() => Line16Outcome} */
-    const sdtwOutcome = () => ({
-        kind: 'ok',
-        method: 'scheduleDTaxWorksheet',
-        cents: sdtw(taxParamSet)({
+    const sdtwOutcome = () => {
+        const worksheet = sdtw(taxParamSet)({
             status,
             line1Cents: taxableIncomeCents,
             line2Cents: qualifiedDividendsCents,
@@ -214,8 +250,14 @@ export const dispatchLine16 = taxParamSet => inputs => {
             scheduleD16Cents,
             scheduleD18Cents,
             scheduleD19Cents,
-        }).line47,
-    })
+        })
+        return {
+            kind: 'ok',
+            method: 'scheduleDTaxWorksheet',
+            cents: worksheet.line47,
+            preferential: { kind: 'scheduleDTaxWorksheet', worksheet },
+        }
+    }
     // ── LEVEL 0 — WRAPPERS, OUTERMOST ────────────────────────────────────
     //
     // "But if you are filing Form 2555, you must use the Foreign Earned
@@ -254,7 +296,7 @@ export const dispatchLine16 = taxParamSet => inputs => {
     //     that is the method the printed default names for an amount
     //     below $100,000 — not because a table lookup happened.
     if (taxableIncomeCents <= 0n) {
-        return { kind: 'ok', method: 'taxTable', cents: 0n }
+        return { kind: 'ok', method: 'taxTable', cents: 0n, preferential: { kind: 'none' } }
     }
     // 1b is NOT a separate branch here. 10-RESEARCH.md states it as
     // "(Sch D line 15 <= 0 OR Sch D line 16 <= 0) AND line 3a = 0 ->
@@ -333,7 +375,9 @@ export const dispatchLine16 = taxParamSet => inputs => {
     // `baseTaxForAmount` — which the QDCGT's lines 22 and 24 also call
     // back down into, so the $100,000 seam exists exactly once.
     const base = baseTaxForAmount(taxParamSet)(status)(taxableIncomeCents)
-    return { kind: 'ok', method: base.method, cents: base.cents }
+    return {
+        kind: 'ok', method: base.method, cents: base.cents, preferential: { kind: 'none' },
+    }
 }
 
 /**

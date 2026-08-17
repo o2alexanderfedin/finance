@@ -155,7 +155,8 @@ import { taxParamsByYear } from '../../tax/params/module.f.js'
 /** @import { IndividualFilingStatus, TaxParamSet } from '../../tax/params/module.f.js' */
 /** @import { Form8959 } from '../../form8959/module.f.js' */
 /** @import { Form8960 } from '../../form8960/module.f.js' */
-/** @import { Form6251Ok } from '../../form6251/module.f.js' */
+/** @import { Form6251Ok, NoRegularPreferentialWorksheet } from '../../form6251/module.f.js' */
+/** @import { RegularPreferentialWorksheet } from '../../form6251/part3/module.f.js' */
 /** @import { FormThirtyNineTwentyOne } from '../../document/form3921/module.f.js' */
 /** @import { SelfEmploymentOutcome } from '../se/module.f.js' */
 
@@ -295,6 +296,9 @@ const totalLine = rule => lines => ({
  *   readonly filingScheduleD: boolean,
  *   readonly scheduleD15Cents: bigint,
  *   readonly scheduleD16Cents: bigint,
+ *   readonly scheduleD19Cents: bigint,
+ *   readonly regularPreferentialWorksheet:
+ *     RegularPreferentialWorksheet | NoRegularPreferentialWorksheet,
  * }} ScheduleTwoInput
  */
 
@@ -366,7 +370,8 @@ export const scheduleTwo = taxParamSet => input => {
         itemizing, scheduleALine7Cents, scheduleOneALine37Cents, standardDeductionCents,
         specifiedPrivateActivityBondInterestCents,
         isoExerciseForms, aStoredNineteenNineBReportsASale,
-        filingScheduleD, scheduleD15Cents, scheduleD16Cents,
+        filingScheduleD, scheduleD15Cents, scheduleD16Cents, scheduleD19Cents,
+        regularPreferentialWorksheet,
     } = input
     const zero = profileDeclaredZeroLine(profile)
     // The two facts Schedule SE actually read, unioned wherever a line on
@@ -421,6 +426,14 @@ export const scheduleTwo = taxParamSet => input => {
         filingScheduleD,
         scheduleD15Cents,
         scheduleD16Cents,
+        // Form 6251 Part III (TAX-33). Schedule D line 19 is Part III's line
+        // 14, the unrecaptured §1250 gain its 25% band prices; the worksheet
+        // fork is the regular tax's OWN preferential worksheet, threaded off
+        // the single `dispatchLine16` execution that produced 1040 line 16 --
+        // never a second execution, which would price a return the first one
+        // changed.
+        scheduleD19Cents,
+        regularPreferentialWorksheet,
     })
     if (form6251Result.kind === 'error') {
         // Threaded VERBATIM -- the SAME shaped refusal, no new
@@ -677,6 +690,8 @@ const noAmounts = {
     filingScheduleD: false,
     scheduleD15Cents: 0n,
     scheduleD16Cents: 0n,
+    scheduleD19Cents: 0n,
+    regularPreferentialWorksheet: { kind: 'none' },
 }
 
 /**

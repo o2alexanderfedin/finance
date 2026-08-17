@@ -115,7 +115,9 @@ import { baseTaxForAmount } from '../../tax/table/module.f.js'
 /** @import { BasisCorrection } from '../../document/basis_correction/module.f.js' */
 /** @import { Kind, ReturnProfile } from '../../return/profile/module.f.js' */
 /** @import { IndividualFilingStatus, TaxParamSet } from '../../tax/params/module.f.js' */
-/** @import { Line16Method } from '../../tax/line16/module.f.js' */
+/** @import { Line16Method, Line16Preferential } from '../../tax/line16/module.f.js' */
+/** @import { NoRegularPreferentialWorksheet } from '../../form6251/module.f.js' */
+/** @import { RegularPreferentialWorksheet } from '../../form6251/part3/module.f.js' */
 /** @import { RefusableKind } from '../../return/scope/module.f.js' */
 /** @import { ScheduleDOutcome } from '../../schedule/d/module.f.js' */
 /** @import { SelfEmploymentOutcome } from '../../schedule/se/module.f.js' */
@@ -1550,6 +1552,41 @@ const form1040TaxAndPaymentLines = taxParamSet => inputs => income => {
     // the add-ons is exactly TAX-16's failure mode: every line above 16 agrees
     // with the taxpayer's own return, line 16 is quietly short, and nothing in
     // the report says why. That is what those nine vocabulary entries are for.
+    /**
+     * The four regular-tax worksheet lines Form 6251 Part III reads, off
+     * whichever worksheet `dispatchLine16` actually ran.
+     *
+     * `'none'` passes straight through: Part III's own no-worksheet fallbacks
+     * are an untranscribed printed rule, and `fjs/form6251` refuses by name on
+     * it rather than substituting a zero into a preferential band. That arm is
+     * reachable — `fjs/tax/line16`'s level-1 "taxable income is zero or less"
+     * gate returns before any worksheet is selected.
+     * @type {(preferential: Line16Preferential) => RegularPreferentialWorksheet | NoRegularPreferentialWorksheet}
+     */
+    const regularPreferentialWorksheetOf = preferential => {
+        switch (preferential.kind) {
+            // QDCGT line 4 is qualified dividends plus net capital gain; line 5
+            // is the ordinary remainder of taxable income.
+            case 'qdcgt': return {
+                kind: 'qdcgt',
+                qdcgtLine4Cents: preferential.worksheet.line4,
+                qdcgtLine5Cents: preferential.worksheet.line5,
+            }
+            // The Schedule D Tax Worksheet's lines 10 (the whole preferential
+            // slice), 13 (that slice less unrecaptured §1250 and 28%-rate
+            // gain), 14 (the ordinary remainder) and 21. Lines 14 and 21 are
+            // DIFFERENT figures and Part III reads them at different lines,
+            // which is why both travel — see `fjs/form6251/part3`'s line 27.
+            case 'scheduleDTaxWorksheet': return {
+                kind: 'scheduleDTaxWorksheet',
+                sdtwLine10Cents: preferential.worksheet.line10,
+                sdtwLine13Cents: preferential.worksheet.line13,
+                sdtwLine14Cents: preferential.worksheet.line14,
+                sdtwLine21Cents: preferential.worksheet.line21,
+            }
+            default: return { kind: 'none' }
+        }
+    }
     const line16Outcome = dispatchLine16(taxParamSet)({
         status,
         taxableIncomeCents: income.line15.value,
@@ -1666,6 +1703,20 @@ const form1040TaxAndPaymentLines = taxParamSet => inputs => income => {
         filingScheduleD: income.filingScheduleD,
         scheduleD15Cents: income.scheduleD15Cents,
         scheduleD16Cents: income.scheduleD16Cents,
+        // TAX-33, Form 6251 Part III. Line 14 is Schedule D line 19, the
+        // unrecaptured §1250 gain Part III's 25% band prices.
+        scheduleD19Cents: income.scheduleD19Cents,
+        // ...and the four lines Part III reads off whichever preferential
+        // worksheet the REGULAR tax completed, taken from the ONE
+        // `dispatchLine16` execution above rather than from a second one.
+        //
+        // The mapping is here, in the adapter between the two, and it names the
+        // SOURCE lines only: `fjs/form6251/part3` owns Part III's numbering and
+        // `fjs/tax/line16` owns the worksheets, so neither has to hold the
+        // other's line map. Which Part III line reads which of these four is
+        // written once, at the printed line that reads it.
+        regularPreferentialWorksheet: regularPreferentialWorksheetOf(
+            line16Outcome.preferential),
     })
     // Schedule 2 can REFUSE as of Phase 29, and all three of its refusals are
     // Form 6251's: the same-year incentive stock option disposition, a Form
