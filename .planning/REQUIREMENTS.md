@@ -970,49 +970,86 @@ itemizing, which is complete apart from the eight open MAINT items.
       the `box13StatutoryEmployee` defect Phase 27 found, avoided rather than repeated. It
       acquires a reader the day Form 8995-A is modeled.
 
-      **STILL OPEN after Phase 31, and deliberately left unticked rather than half-built.** Phase 31
-      attempted Form 8995-A and stopped before writing it, for one specific reason worth recording so
-      the next attempt does not rediscover it: **this repository's TAX-15 convention names every line
-      by its PRINTED line number, transcribed from the form face — and `f8995a.pdf` could not be
-      fetched in that session.** §199A's arithmetic is not the obstacle (see the design below); the
-      obstacle is that Form 8995-A's Part II/III line numbering and its four Schedules A-D cannot be
-      recalled reliably, and a transcription that invents line numbers is worse than no form, because
-      every later reader diffs it against a page it does not match. Fetch `f8995a.pdf` and
-      `i8995a.pdf` first.
+      **STILL OPEN after Phase 31. The reason is SESSION BUDGET and nothing else** — Form 8995-A is
+      a forty-line form plus four Schedules, and there was not enough of the session left to build it
+      to this repository's standard (transcribe, wire, reclassify the scope kind, separate every
+      `min`/`max` limb in a fixture, and watch each new proof fail). Nothing about it is undecidable.
 
-      *The design, worked out and cross-checked against the statute, so it is not lost:*
+      `[RECORD CORRECTED — read this before trusting any recorded reason, including this one]` The
+      first version of this note gave a different reason: that `f8995a.pdf` **could not be fetched**.
+      **That claim was never tested and it is FALSE** — `curl -sSL https://www.irs.gov/pub/irs-pdf/f8995a.pdf`
+      returns a 117,129-byte `%PDF-1.7` in one command, and the transcription below was taken from it.
+      The claim was written from an assumption about the environment while that same session had
+      already pushed twice over HTTPS. It is left visible rather than quietly overwritten because it
+      is AGENTS.md's "Verifying a claim before you record it" failing in the exact shape that section
+      warns about: **a recorded reason removes all pressure to look again**, so the next attempt would
+      have skipped the fetch on this file's authority. Fetch `i8995a.pdf` too.
 
-      - **Applicable percentage, §199A(d)(3)(B).** For an SSTB inside the phase-in range it is
-        `100% − (taxableIncomeBeforeQbi − threshold) / phaseInRange`, and QBI, W-2 wages AND UBIA are
-        each multiplied by it. Above threshold + range an SSTB has NO qualified business income at
-        all; a non-SSTB is unaffected by this limb at any income.
-      - **The wage/UBIA limitation, §199A(b)(2).** Per business, the deductible amount is the LESSER
-        of 20% of QBI, or the GREATER of (i) 50% of W-2 wages and (ii) 25% of W-2 wages + 2.5% of
-        UBIA. §199A(b)(3)(B) phases this limitation in across the same range.
-      - **The phase-in range is STATUTORY, not indexed**: $50,000, or $100,000 on a joint return
-        (§199A(e)(2)). Unlike the threshold, it does not move with inflation, so it is a new
-        hand-typed `fjs/tax/params` entry needing its own count-style proof — and a proof that it is
-        NOT derived from the threshold, since 25% of $197,300 is not $50,000 and a reader may assume
-        a ratio that does not exist.
+      *Transcribed from the printed `f8995a.pdf` face, "Form 8995-A (2025) Created 9/12/25". Forty
+      lines, so the next attempt needs no recall:*
+
+      - **Part I line 1**, per business A/B/C: (a) name, **(b) check if specified service**,
+        (c) check if aggregation, (d) TIN, (e) check if patron. **The SSTB flag is a Part I
+        checkbox** — which is the field `vnd.fjs.business_expenses` must acquire.
+      - **Part II, Determine Your Adjusted Qualified Business Income** — 2 QBI; **3 line 2 × 20%,
+        and its own printed short-circuit: *"If your taxable income is $197,300 or less ($394,600 if
+        married filing jointly), skip lines 4 through 12 and enter the amount from line 3 on line
+        13"*** (this is exactly Form 8995's simplified case, so the two forms must agree below the
+        threshold — a cross-form leaf worth writing); 4 allocable share of W-2 wages; 5 line 4 × 50%;
+        6 line 4 × 25%; 7 allocable share of UBIA; 8 line 7 × 2.5%; **9 lines 6 + 8**; **10 the
+        GREATER of line 5 or line 9**; **11 the SMALLER of line 3 or line 10** (the wage/UBIA
+        limitation); 12 the phased-in reduction from line 26; **13 the GREATER of line 11 or line
+        12**; 14 patron reduction from Schedule D line 6; 15 line 13 − line 14; 16 total of line 15.
+      - **Part III, Phased-in Reduction** — and note what it phases in: **the W-2-wage/UBIA
+        limitation, NOT the SSTB reduction.** Its printed condition is *"Complete Part III only if
+        your taxable income is more than $197,300 but not $247,300 ($394,600 and $494,600 if married
+        filing jointly) **and line 10 is less than line 3***" — so it runs only where the limitation
+        actually bites. 17 from line 3; 18 from line 10; 19 line 17 − line 18; 20 taxable income
+        before the QBI deduction; **21 threshold $197,300 ($394,600 MFJ)**; 22 line 20 − line 21;
+        **23 phase-in range $50,000 ($100,000 MFJ)**; 24 line 22 ÷ line 23, a PERCENTAGE; 25 line 19
+        × line 24; 26 line 17 − line 25 → line 12.
+      - **Part IV, Determine Your Qualified Business Income Deduction** — 27 from line 16; 28 REIT
+        dividends and PTP income; 29 their prior-year carryforward; 30 combine 28 + 29, if less than
+        zero enter -0-; 31 line 30 × 20%; 32 lines 27 + 31; 33 taxable income before the QBI
+        deduction; 34 net capital gain increased by qualified dividends; 35 line 33 − line 34, if
+        zero or less enter -0-; 36 line 35 × 20%; **37 the SMALLER of line 32 or line 36**; 38 the
+        §199A(g) DPAD, not more than line 33 − line 37; **39 lines 37 + 38 → 1040 line 13a**;
+        40 the REIT/PTP loss carryforward.
+      - **The $50,000/$100,000 phase-in range is confirmed by printed line 23, and it is NOT
+        indexed** — the threshold moves with inflation and the range does not, which is why the upper
+        bound is exactly $247,300 = $197,300 + $50,000. It is a new hand-typed `fjs/tax/params` entry
+        needing its own count-style proof, plus a proof that it is **not derived from the threshold**:
+        25% of $197,300 is $49,325, not $50,000, so a reader who assumes a ratio is wrong by $675.
+        (The earlier note cited §199A(e)(2) for the range; (e)(2) defines the THRESHOLD —
+        §199A(b)(3)(B) is the wage/UBIA phase-in and §199A(d)(3) the SSTB one. The printed figures
+        are the ones to trust here.)
+      - **The SSTB reduction lives in Schedule A, not Part II.** Part II has no
+        "applicable percentage" line at all — Schedule A (Form 8995-A), *Specified Service Trades or
+        Businesses*, computes the REDUCED QBI, W-2 wages and UBIA that then feed lines 2, 4 and 7.
+        Above threshold + range an SSTB's applicable percentage is zero, so all three are zero and
+        the deduction vanishes. This corrects the earlier note, which put the multiplication in Part
+        II.
       - **SSTB, W-2 wages and UBIA are all ASSERTED, and absence must REFUSE rather than default**,
         following `vnd.fjs.ira`'s `yearEndValueOfAllTraditionalSepSimpleIras` exactly: `"0.00"` is a
         real assertion that computes, absence is *unstated*. The SSTB gate must fire ONLY when
-        determinative — above the threshold — or it breaks every existing below-threshold fixture.
-        Defaulting is wrong in both directions: an SSTB read as non-SSTB overstates the deduction,
-        and the reverse zeroes a legitimate one.
+        determinative — above the threshold, which is where line 3's own short-circuit stops — or it
+        breaks every existing below-threshold fixture. Defaulting is wrong in both directions: an
+        SSTB read as non-SSTB overstates the deduction, and the reverse zeroes a legitimate one.
       - **The common case must be exercised, and it is the trap.** A sole proprietor with no
-        employees has NO W-2 wages, so the 50%-of-wages limb is zero and the `2.5% of UBIA` limb is
-        the whole limitation. A fixture must assert wages `"0.00"` with non-zero UBIA so that limb is
-        what survives the greater-of — otherwise the answer is right because both limbs are zero,
-        which is right for the wrong reason.
-      - **Fixtures must separate every limb**, per the discipline the Phase 31 Form 8606 work used:
-        one where 50%-of-wages wins, one where 25%+2.5%-UBIA wins, one where 20%-of-QBI wins, and
-        phase-in boundaries at the threshold exactly, one cent above, at threshold + range exactly
-        and one cent past — for SSTB and non-SSTB, which diverge only past the range.
+        employees has NO W-2 wages, so printed line 5 (50% of wages) is zero, line 6 is zero, and
+        line 9 = line 8 = 2.5% of UBIA is the whole of line 10. A fixture must assert wages `"0.00"`
+        with a NON-ZERO UBIA so that limb is what survives line 10's greater-of — otherwise line 10
+        is zero because both limbs are, and the answer is right for the wrong reason.
+      - **Fixtures must separate every limb**: line 10 where 50%-of-wages wins and where
+        25%+2.5%-UBIA wins; line 11 where line 3 wins and where line 10 wins; line 37 where line 32
+        wins and where line 36 wins; and the boundaries at $197,300 exactly (Form 8995 still
+        applies), one cent above, $247,300 exactly, and one cent past — SSTB and non-SSTB, which
+        diverge only past the range.
       - **Reclassify in the same commit as the wiring**: the `fjs/return/scope` kind currently
-        refused for the above-threshold case must move from refused to modeled alongside it, and
-        `formEightNineNineFiveAIsUnmodeled` narrows rather than disappears (a patron of an
-        agricultural cooperative and the REIT/PTP limbs still refuse).
+        refused for the above-threshold case moves from refused to modeled alongside it, and
+        `formEightNineNineFiveAIsUnmodeled` NARROWS rather than disappears — a patron of an
+        agricultural or horticultural cooperative (Schedule D, printed lines 14 and 38), aggregation
+        (Schedule B) and the REIT/PTP limbs (lines 28-31) still refuse.
 
 ### Equity Compensation and AMT (DOC, TAX)
 
