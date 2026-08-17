@@ -1,16 +1,102 @@
-# TAX-27: the Earned Income Credit, and why Phase 25 refused it
+# TAX-27: the Earned Income Credit — refused by Phase 25, COMPUTED by Phase 32
 
-Status: **refused by name, not implemented.** Phase 25 (TAX-25/TAX-26/TAX-27)
-shipped Form 8880 and Form 8863 and did **not** ship the Earned Income Credit.
-This file is the record of that decision and the specification for whichever
-phase reaches it.
+Status: **implemented.** `fjs/schedule/eic` computes §32 and 1040 line 27a
+carries it. `earnedIncomeCredit` is in `fjs/return/scope`'s `modeledKinds`.
 
-`earnedIncomeCredit` stays in `fjs/return/scope`'s `unmodeledKindRefusals`.
-What changed in Phase 25 is the remedy string: it used to say *"requires
+**This file is kept, not deleted, and the analysis below is kept in the present
+tense it was written in.** Everything it says about what the profile could not
+express was TRUE and was the reason to refuse; Phase 32 did not find a flaw in
+it, it added the facts it asked for. A spec rewritten into the past tense once
+it is satisfied stops being checkable against the thing that satisfied it.
+
+## What Phase 32 shipped, against this file's own five-item list
+
+The list is at the bottom, under "What a future phase must add". All five:
+
+1. **The per-dependent widening** — `earnedIncomeCreditRelationship` (a checked
+   §152(c)(2)/§152(f) vocabulary with an explicit negative arm),
+   `earnedIncomeCreditFullTimeStudent`,
+   `earnedIncomeCreditPermanentAndTotalDisability`,
+   `earnedIncomeCreditUnitedStatesResidency` and
+   `earnedIncomeCreditJointReturn`. **Not `option(true)`, against this file's
+   own suggestion**, and that is the one place Phase 32 departed from it: each
+   is two or more EXACT STRINGS, following `fjs/document/business_expenses`'
+   SSTB-flag precedent, because under `option(true)` absence and a denial are
+   the same stored state and here the wrong default GRANTS the credit. This
+   file wrote *"Every one of these is `option(true)` under DOC-12 except the
+   relationship"*; that was the wrong shape, for a reason the precedent that
+   settles it had not yet established when this was written.
+2. **The filer-level widening** — `filerSocialSecurityNumber`,
+   `spouseSocialSecurityNumber`, `filerQualifyingChildOfAnotherTaxpayer`,
+   `filerAttainedAgeTwentyFiveButNotSixtyFive` and
+   `filerPrincipalPlaceOfAbode`. §32(c)(1)(A)(ii)(III) got no field of its own:
+   `claimedAsDependent` (1040 line 12a) already carries exactly that fact.
+3. **Schedule EIC and the §32 parameters** — `fjs/tax/params`'
+   `earnedIncomeCredit`, four tiers each with citations, and
+   `fjs/schedule/eic`, which is Worksheet A, Worksheet B and the 2025 EIC
+   Table. The table is a RULE rather than stored data, and it reproduces all
+   10,856 published entries.
+4. **A §32(c)(2) earned income of its own** — 1040 line 1z plus Schedule SE
+   line 3 less line 13. Nothing reads the profile's `earnedIncome`, exactly as
+   this file demanded.
+5. **Schedule E, or an explicit refusal, before §32(i) can be trusted** — and
+   this is the item whose answer differs most from what this file expected. See
+   the next section.
+
+## §32(i): four components compute, one refuses
+
+This file's argument was that even the disqualifier would be an
+under-approximation. It named net rent and royalty income and net passive
+income as the two missing pieces. Phase 32 checked both, and they turn out not
+to be the same kind of problem at all:
+
+- **Net passive income, §32(i)(2)(E), COMPUTES.** `fjs/schedule/e` carries a
+  real §469 material-participation determination per entity
+  (`vnd.fjs.k1_common`'s two exact strings, absence refusing), so every row
+  this engine computes knows whether it is passive.
+  `disqualifiedPassiveIncomeCents` sums the passive rows with
+  §32(i)(2)(E)(i)'s own parenthetical applied — *"without regard to any amount
+  included in earned income under subsection (c)(2)"* — as a per-row
+  `max(0, income - self-employment earnings)`. It is zero for every return this
+  engine can compute today, because `passiveIncomeOutsideSelfEmployment\
+  Refusal` refuses the rows that would make it non-zero, but it is COMPUTED
+  and will start producing figures if that refusal is ever lifted.
+- **Net rent and royalty income, §32(i)(2)(C), REFUSES by name.** Schedule E
+  Part I is still unmodeled, so the component is genuinely not computable.
+  `rentAndRoyaltyRefusal` names it, for each of the three declarable kinds that
+  could carry it. Two independent gates already make a non-zero (C) unreachable
+  through a whole report — the scope refusal on those kinds, and document-level
+  validation refusing a non-zero rent or royalty box on all three Schedule K-1
+  dialects — and the module refuses anyway rather than relying on either,
+  because a component that is silently zero on account of an upstream refusal
+  is a component nobody can see go wrong when that refusal moves.
+
+So this file's *"a partial EIC built on a partial disqualifier is worse than no
+EIC"* still holds, and the answer to it was neither to refuse everything nor to
+compute optimistically: a precise refusal for the one uncomputable component,
+and a real computation for the other four.
+
+## The one §32(c)(3) clause that is a stated trust boundary
+
+**§152(c)(3)(A)'s *"younger than the taxpayer"* clause is not checked.** The
+profile carries a dependent's age and the filer's §32(c)(1)(A)(ii) age BAND,
+not the filer's age, so the comparison cannot be made. It is an accepted trust
+boundary on the taxpayer's own declaration, mirroring the citizenship boundary
+`fjs/schedule/8812` records. §152(c)(4)'s tie-breaker is the same, for the
+reason this file already gives below: expressing it needs another person's
+return. Both are recorded at the site, in `fjs/schedule/eic`'s docstring.
+
+## The record of the refusal, as it stood
+
+`earnedIncomeCredit` was in `fjs/return/scope`'s `unmodeledKindRefusals`, and
+what Phase 25 changed was the remedy string: it used to say *"requires
 Schedule EIC (no phase yet)"*, which tells a taxpayer to go and find a form
-and tells the next engineer nothing at all. It now names the specific facts
-this engine does not hold, so the refusal is something both of them can act
-on. `theEarnedIncomeCreditRefusalNamesTheFactsThatAreMissing` pins it.
+and tells the next engineer nothing at all. It then named the specific facts
+this engine did not hold, so the refusal was something both of them could act
+on. `theEarnedIncomeCreditRefusalNamesTheFactsThatAreMissing` pinned it; Phase
+32 replaced that leaf with `theEarnedIncomeCreditIsModeledAndNoLongerRefuses`,
+which asserts both halves of the partition rather than the wording of a message
+that no longer exists.
 
 ## Why refusing is the right outcome rather than a shortfall
 

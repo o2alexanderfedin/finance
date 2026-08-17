@@ -773,21 +773,28 @@ itemizing, which is complete apart from the eight open MAINT items.
 - [x] **TAX-25** *(M2, T2)*: **Form 8880**, the Saver's Credit → Schedule 3 line 4.
 - [x] **TAX-26** *(M2, T2)*: **Form 8863**, American Opportunity and Lifetime Learning credits
       → Schedule 3 line 3 and 1040 line 29.
-- [ ] **TAX-27** *(M2, T2)*: **Earned Income Credit** → 1040 line 27. **NOT DELIVERED as a
-      computation — deliberately, and the box stays unchecked because of it.** Phase 25 shipped a
-      named refusal plus a fact-by-fact spec, which is honest work and the right outcome, but it is
-      not the credit. A `[x]` here would tell every count derived from these checkboxes that EIC
-      computes. It does not. Re-scoped: the refusal and the spec are done; the computation needs a
-      profile widening and belongs to a later phase.
-      **The sentence above is what Phase 25 found to be false**:
-      the existing Schedule 8812 dependent model carries almost none of §32(c)(3)'s
-      qualifying-child rules. `dependents` was built for a two-fact test (age under 17, an
-      employment-valid SSN); §32(c)(3) needs a checked relationship vocabulary, full-time-student
-      status, permanent and total disability, and residency *in the United States* for more than
-      half the year, and §32(c)(1) needs three more about the filer. The refusal now names all
-      seven, and `fjs/todo/tax-27-earned-income-credit.md` carries the fact-by-fact analysis and
-      the five things a future phase must add. A wrong EIC is the most audited figure on the
-      return; shipping a partial one was the alternative and was rejected.
+- [x] **TAX-27** *(M2, T2)*: **Earned Income Credit** → 1040 line 27a, fully refundable.
+      **DELIVERED as a computation in Phase 32**, and the box is checked because the credit
+      genuinely computes end to end through `form1040Report` for a filer whose profile carries
+      §32's facts — not because a refusal got better prose.
+      Phases 25 through 31 left this box deliberately unchecked, and that record is kept rather
+      than deleted: the reason was that `vnd.fjs.return_profile`'s `dependents` array was built
+      for Schedule 8812's two-fact test (age under 17, an employment-valid SSN) and carries
+      almost none of §32(c)(3). That finding was correct. What Phase 32 did was add the facts
+      rather than argue with it — ten checked vocabularies on the profile, five per dependent
+      (§32(c)(3)'s relationship, full-time-student status, permanent and total disability,
+      United States residency for more than half the year, and the joint-return test) and five
+      about the filer (§32(m)'s two social security numbers, §32(c)(1)(B)'s
+      qualifying-child-of-another question, and §32(c)(1)(A)(ii)'s age band and abode). Each is
+      two or more exact strings rather than `option(true)`, following
+      `fjs/document/business_expenses`' SSTB precedent, because here the wrong default GRANTS a
+      credit.
+      `fjs/schedule/eic` is Worksheet A, Worksheet B and the 2025 EIC Table; the table is a rule
+      rather than stored data, and it reproduces all 10,856 published entries. §32(i)'s
+      disqualified-income test computes four of its five components and REFUSES by name for the
+      rent-and-royalty one. Every fact the profile does not carry refuses by name, and only where
+      the answer turns on it. A return that does not declare `earnedIncomeCredit` computes
+      exactly what it computed before.
 - [x] **DOC-19** *(M2, T2)*: `vnd.fjs.adjustments` — the taxpayer-asserted record behind the
       Schedule 1 Part II adjustments, following `vnd.fjs.medical_expenses` exactly: no IRS
       information return reports educator expenses or HSA contributions to the filer, so the
@@ -1285,7 +1292,8 @@ itemizing, which is complete apart from the eight open MAINT items.
 | TAX-19 | T0 | 22 - Computable Tripwires | *all four — the safety net* — **delivered** |
 | TAX-20, TAX-21, TAX-22 | T1 | 23 - Schedule 2 Populated | **FAANG employee** — all three delivered |
 | TAX-23, TAX-24, DOC-19 | T2 | 24 - Schedule 1 Adjustments | **Non-profit worker** — all three delivered |
-| TAX-25, TAX-26, TAX-27 | T2 | 25 - Schedule 3 Credits | Non-profit worker — TAX-25 and TAX-26 delivered; **TAX-27 stays open**, a named EIC refusal plus a fact-by-fact spec, not the credit |
+| TAX-25, TAX-26 | T2 | 25 - Schedule 3 Credits | Non-profit worker — both delivered |
+| TAX-27 | T2 | 32 - Earned Income Credit | Low-income working parent — the credit COMPUTES, on ten §32 facts added to `vnd.fjs.return_profile` |
 | TAX-28, TAX-29 | T2 | 26 - Retiree Completion, 31 - Backdoor Roth | Retiree — TAX-28 delivered (Phase 26); **TAX-29 CLOSED in Phase 31**: Part II computed off Part I's own fraction, Part III's code `Q` computed and codes `J`/`T` refused by name, backdoor Roth computes end to end |
 | DOC-20, DOC-21, TAX-30 | T3 | 27 - 1099-NEC and Schedule C | Startup founder — all three delivered |
 | TAX-31, TAX-32 | T3 | 28 - Schedule SE and QBI; 31 - Form 8995-A | **Startup founder** — TAX-31 delivered in Phase 28; TAX-32 delivered Form 8995 there and Form 8995-A, Schedule A, the SSTB reduction and the W-2-wage/UBIA phase-in in Phase 31 |
