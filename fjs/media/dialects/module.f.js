@@ -32,11 +32,32 @@
  * `dialectEntry`'s own documented default: no second argument, structural
  * (rtti) match alone.
  *
- * `financeDialects` carries TWENTY-TWO entries: the twenty-one local
+ * `financeDialects` carries TWENTY-FOUR entries: the twenty-three local
  * dialects below, plus `revisionDialect`, reused unchanged from upstream — not
  * reconstructed locally, since `fjs/media/revision` already IS one of this
  * repo's dialects (`vnd.fjs.revision` blobs are written directly into the
  * CAS store — see `fjs/server/module.f.js`'s `casRefresh.*` proofs).
+ *
+ * Phase 30 (DOC-24) adds the twenty-second and twenty-third,
+ * `vnd.fjs.k1_1065` and `vnd.fjs.k1_1120s`, and both gained a fixture below.
+ *
+ * ## This registry and `fjs/server/finance_schema`'s have DIVERGED
+ *
+ * Recorded here as a measurement rather than repaired, because the repair
+ * belongs to whoever owns the three dialects it concerns. The two lists are
+ * both twenty-three long as of this phase and they are **not the same
+ * twenty-three**:
+ *
+ * - **Here and not there:** `vnd.fjs.itemized_deductions`, `vnd.fjs.run`,
+ *   `vnd.fjs.prior_year_capital_loss`.
+ * - **There and not here:** `vnd.fjs.form3921`, `vnd.fjs.form3922`,
+ *   `vnd.fjs.basis_correction` — Phase 29's three, registered with the MCP
+ *   schema tool and never with `detect`.
+ *
+ * The consequence of the second group is concrete: a stored Form 3921 blob is
+ * classified by `cas_refresh` as `text/plain` rather than as
+ * `application/vnd.fjs.form3921+json`, because nothing here recognises it.
+ * Neither hand-typed count could notice, since each counts only its own list.
  *
  * @module
  */
@@ -150,12 +171,22 @@ import {
     businessExpensesSchema,
     checkReferences as checkBusinessExpenses,
 } from '../../document/business_expenses/module.f.js'
+import {
+    dialect as k1PartnershipDialect,
+    k1PartnershipSchema,
+    checkReferences as checkK1Partnership,
+} from '../../document/k1_1065/module.f.js'
+import {
+    dialect as k1SCorporationDialect,
+    k1SCorporationSchema,
+    checkReferences as checkK1SCorporation,
+} from '../../document/k1_1120s/module.f.js'
 
 /** @import { DialectEntry } from 'functionalscript/fjs/media/module.f.js' */
 
 /**
  * Every one of this repo's own dialects, registered for {@link detect}: the
- * twenty-one local finance document/return/run dialects wrapped via
+ * twenty-three local finance document/return/run dialects wrapped via
  * {@link dialectEntry}, plus upstream's own {@link revisionDialect} reused
  * unchanged. See this module's own docstring for why `ocr` is the one entry
  * with no `extraValidate` second argument.
@@ -183,6 +214,8 @@ export const financeDialects = [
     dialectEntry(priorYearIraBasisSchema, v => checkPriorYearIraBasis(v)[0] === 'ok'),
     dialectEntry(oneZeroNineNineNecSchema, v => checkOneZeroNineNineNec(v)[0] === 'ok'),
     dialectEntry(businessExpensesSchema, v => checkBusinessExpenses(v)[0] === 'ok'),
+    dialectEntry(k1PartnershipSchema, v => checkK1Partnership(v)[0] === 'ok'),
+    dialectEntry(k1SCorporationSchema, v => checkK1SCorporation(v)[0] === 'ok'),
     revisionDialect,
 ]
 
@@ -198,7 +231,7 @@ export const detectFinance = detect(financeDialects)
 
 /**
  * Independently hand-typed: the number of entries {@link financeDialects}
- * is expected to carry today — TWENTY-ONE local dialects plus
+ * is expected to carry today — TWENTY-THREE local dialects plus
  * {@link revisionDialect}, which is upstream's. Deliberately NOT derived from
  * `financeDialects.length` itself (AGENTS.md's hand-typed-count idiom,
  * mirroring `fjs/document/1099b`'s `expectedMoneyBoxFieldCount`): a dialect
@@ -209,7 +242,7 @@ export const detectFinance = detect(financeDialects)
  * collection shrinking").
  * @type {number}
  */
-const expectedDialectCount = 22
+const expectedDialectCount = 24
 
 /** A sample cbase32 hash — {@link revisionDialect}'s own `snapshot`/`parents` shape needs a decodable one; the value itself is arbitrary. */
 const revisionSampleHash = vecToCBase32(vec8(0x77n))
@@ -388,6 +421,28 @@ const fixtures = {
         taxYear: 2025,
         principalBusiness: 'software consulting',
         entries: [],
+    },
+    [k1PartnershipDialect]: {
+        dialect: k1PartnershipDialect,
+        payerTin: '33-3333333',
+        recipientTin: '222-22-2222',
+        accountNumber: 'PTR-0001',
+        taxYear: 2025,
+        formRevision: '2025',
+        // Box G is a REQUIRED semantic refinement, not merely a stored field:
+        // `checkK1Partnership` refuses a blob ticking neither box, so the
+        // fixture that must DETECT has to tick one. That is the whole point
+        // of `dialectEntry`'s second argument, exercised here rather than
+        // described.
+        boxGGeneralPartnerOrLlcMemberManager: true,
+    },
+    [k1SCorporationDialect]: {
+        dialect: k1SCorporationDialect,
+        payerTin: '44-4444444',
+        recipientTin: '222-22-2222',
+        accountNumber: 'SHR-0001',
+        taxYear: 2025,
+        formRevision: '2025',
     },
     [revisionDialectTag]: {
         dialect: revisionDialectTag,

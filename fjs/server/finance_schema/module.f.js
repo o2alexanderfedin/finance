@@ -70,6 +70,8 @@ import { dialect as businessExpensesDialect, businessExpensesSchema } from '../.
 import { dialect as formThirtyNineTwentyOneDialect, formThirtyNineTwentyOneSchema } from '../../document/form3921/module.f.js'
 import { dialect as formThirtyNineTwentyTwoDialect, formThirtyNineTwentyTwoSchema } from '../../document/form3922/module.f.js'
 import { dialect as basisCorrectionDialect, basisCorrectionSchema } from '../../document/basis_correction/module.f.js'
+import { dialect as k1PartnershipDialect, k1PartnershipSchema } from '../../document/k1_1065/module.f.js'
+import { dialect as k1SCorporationDialect, k1SCorporationSchema } from '../../document/k1_1120s/module.f.js'
 import { stringify as jsonText } from '../../json/module.f.js'
 
 /** @import { Type } from 'functionalscript/fjs/types/rtti/module.f.js' */
@@ -108,6 +110,8 @@ const dialectSchemas = {
     [formThirtyNineTwentyOneDialect]: formThirtyNineTwentyOneSchema,
     [formThirtyNineTwentyTwoDialect]: formThirtyNineTwentyTwoSchema,
     [basisCorrectionDialect]: basisCorrectionSchema,
+    [k1PartnershipDialect]: k1PartnershipSchema,
+    [k1SCorporationDialect]: k1SCorporationSchema,
 }
 
 /** The known dialect tags, in declaration order — used in the refusal message. */
@@ -159,9 +163,16 @@ const knownDialects = /** @type {readonly string[]} */ (Object.keys(dialectSchem
  * all three gained their own `*Resolves` leaf below. It is the first phase to
  * register THREE: two are the phase's own required dialects and the third is
  * the taxpayer assertion TAX-34's basis adjustment cannot be derived without.
+ *
+ * Phase 30 (DOC-24/TAX-35) registers the TWENTY-SECOND AND TWENTY-THIRD
+ * (`vnd.fjs.k1_1065`, `vnd.fjs.k1_1120s`), moving the count from 21 to 23 in
+ * one step, and both gained their own `*Resolves` leaf below. **They are
+ * registered with `fjs/media/dialects` in the same commit**, which Phase 29's
+ * three were not — see that module's own docstring, "This registry and
+ * `fjs/server/finance_schema`'s have DIVERGED", for the measurement.
  * @type {number}
  */
-const expectedKnownDialectCount = 21
+const expectedKnownDialectCount = 23
 
 /**
  * `finance_schema(dialect)`: the MCP tool. Looks `dialect` up in
@@ -400,6 +411,46 @@ export const proof = {
             JSON.stringify(JSON.parse(textOf(result))),
             JSON.stringify(toJsonSchema(basisCorrectionSchema)),
         )
+    },
+    // Phase 30 (DOC-24/TAX-35): the two Schedule K-1 dialects. Two, not one,
+    // because the printed box numbering differs between Form 1065 and Form
+    // 1120-S — and the tool that serves a schema to a program author is
+    // exactly where that difference has to be visible, since an author who
+    // reads the wrong schema writes a program that reads the wrong box. Each
+    // tag hand-typed, never read back off `dialectSchemas`.
+    k1PartnershipResolves: () => {
+        const result = call('vnd.fjs.k1_1065')
+        assertEq(result.isError, undefined)
+        assertEq(
+            JSON.stringify(JSON.parse(textOf(result))),
+            JSON.stringify(toJsonSchema(k1PartnershipSchema)),
+        )
+    },
+    k1SCorporationResolves: () => {
+        const result = call('vnd.fjs.k1_1120s')
+        assertEq(result.isError, undefined)
+        assertEq(
+            JSON.stringify(JSON.parse(textOf(result))),
+            JSON.stringify(toJsonSchema(k1SCorporationSchema)),
+        )
+    },
+    // The two schemas the tool serves for those tags are DIFFERENT documents,
+    // asserted rather than assumed. A registration that pointed both tags at
+    // one schema would satisfy both leaves above — each compares the tool's
+    // output against the schema it imported — and would be precisely the
+    // single-schema mistake DOC-24's "two dialects, not one" exists to
+    // prevent.
+    theTwoScheduleK1SchemasAreNotTheSameSchema: () => {
+        const partnership = textOf(call('vnd.fjs.k1_1065'))
+        const sCorporation = textOf(call('vnd.fjs.k1_1120s'))
+        assert(partnership !== sCorporation, 'the two K-1 schemas must differ')
+        // ...and they differ in the specific way that costs money: the
+        // partnership face carries a self-employment box and a partner type,
+        // and the S-corporation face carries neither.
+        assert(partnership.includes('box14SelfEmploymentEarnings'), [partnership])
+        assert(!sCorporation.includes('box14SelfEmploymentEarnings'), [sCorporation])
+        assert(partnership.includes('boxGGeneralPartnerOrLlcMemberManager'), [partnership])
+        assert(!sCorporation.includes('boxGGeneralPartnerOrLlcMemberManager'), [sCorporation])
     },
     // An unknown dialect is a tool-level errorResult, never a throw — names
     // the offending tag in the message (T-07-03-02).
