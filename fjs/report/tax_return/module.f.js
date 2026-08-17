@@ -167,6 +167,9 @@ import { dialect as oneZeroNineNineNecDialect } from '../../document/1099nec/mod
 import { dialect as businessExpensesDialect } from '../../document/business_expenses/module.f.js'
 import { dialect as iraDialect } from '../../document/ira/module.f.js'
 import { dialect as priorYearIraBasisDialect } from '../../document/prior_year_ira_basis/module.f.js'
+import { dialect as formThirtyNineTwentyOneDialect } from '../../document/form3921/module.f.js'
+import { dialect as formThirtyNineTwentyTwoDialect } from '../../document/form3922/module.f.js'
+import { dialect as basisCorrectionDialect } from '../../document/basis_correction/module.f.js'
 
 /** @import { Effect, OperationMap } from 'functionalscript/fjs/effects/module.f.js' */
 /** @import { CasOp } from '../../guest/module.f.js' */
@@ -192,6 +195,9 @@ import { dialect as priorYearIraBasisDialect } from '../../document/prior_year_i
 /** @import { BusinessExpenses } from '../../document/business_expenses/module.f.js' */
 /** @import { Ira } from '../../document/ira/module.f.js' */
 /** @import { PriorYearIraBasis } from '../../document/prior_year_ira_basis/module.f.js' */
+/** @import { FormThirtyNineTwentyOne } from '../../document/form3921/module.f.js' */
+/** @import { FormThirtyNineTwentyTwo } from '../../document/form3922/module.f.js' */
+/** @import { BasisCorrection } from '../../document/basis_correction/module.f.js' */
 
 // ── The rendered wire shape ──────────────────────────────────────────────────
 
@@ -233,7 +239,7 @@ import { dialect as priorYearIraBasisDialect } from '../../document/prior_year_i
  * `vnd.fjs.revision`, a future addition) falls straight through
  * {@link collectDocument} untouched — never coerced into a bucket, never
  * treated as a zero.
- * @typedef {ReturnProfile | W2 | OneZeroNineNineInt | OneZeroNineNineDiv | OneZeroNineNineB | OneZeroNineNineR | Ssa1099 | ItemizedDeductions | MedicalExpenses | PriorYearCapitalLoss | OneZeroNineNineG | Adjustments | OneZeroNineEightE | OneZeroNineEightT | Credits | Ira | PriorYearIraBasis | OneZeroNineNineNec | BusinessExpenses} EngineDocument
+ * @typedef {ReturnProfile | W2 | OneZeroNineNineInt | OneZeroNineNineDiv | OneZeroNineNineB | OneZeroNineNineR | Ssa1099 | ItemizedDeductions | MedicalExpenses | PriorYearCapitalLoss | OneZeroNineNineG | Adjustments | OneZeroNineEightE | OneZeroNineEightT | Credits | Ira | PriorYearIraBasis | OneZeroNineNineNec | BusinessExpenses | FormThirtyNineTwentyOne | FormThirtyNineTwentyTwo | BasisCorrection} EngineDocument
  */
 
 /**
@@ -270,6 +276,9 @@ import { dialect as priorYearIraBasisDialect } from '../../document/prior_year_i
  *   readonly creditForms: readonly Stored<Credits>[],
  *   readonly iraForms: readonly Stored<Ira>[],
  *   readonly priorYearIraBasisForms: readonly Stored<PriorYearIraBasis>[],
+ *   readonly isoExerciseForms: readonly Stored<FormThirtyNineTwentyOne>[],
+ *   readonly employeeStockPurchaseForms: readonly Stored<FormThirtyNineTwentyTwo>[],
+ *   readonly basisCorrectionForms: readonly Stored<BasisCorrection>[],
  * }} Collected
  */
 
@@ -340,6 +349,9 @@ export const taxReturnReportSource = [
     '        creditForms: [],',
     '        iraForms: [],',
     '        priorYearIraBasisForms: [],',
+    '        isoExerciseForms: [],',
+    '        employeeStockPurchaseForms: [],',
+    '        basisCorrectionForms: [],',
     '    }',
     '    const runYear = ctx.taxParams.taxYear',
     '    const noteYearMismatch = documentHash => doc => acc => {',
@@ -376,6 +388,9 @@ export const taxReturnReportSource = [
     '        if (doc.dialect === \'vnd.fjs.credits\') { return { ...acc, creditForms: [...acc.creditForms, stored] } }',
     '        if (doc.dialect === \'vnd.fjs.ira\') { return { ...acc, iraForms: [...acc.iraForms, stored] } }',
     '        if (doc.dialect === \'vnd.fjs.prior_year_ira_basis\') { return { ...acc, priorYearIraBasisForms: [...acc.priorYearIraBasisForms, stored] } }',
+    '        if (doc.dialect === \'vnd.fjs.form3921\') { return { ...acc, isoExerciseForms: [...acc.isoExerciseForms, stored] } }',
+    '        if (doc.dialect === \'vnd.fjs.form3922\') { return { ...acc, employeeStockPurchaseForms: [...acc.employeeStockPurchaseForms, stored] } }',
+    '        if (doc.dialect === \'vnd.fjs.basis_correction\') { return { ...acc, basisCorrectionForms: [...acc.basisCorrectionForms, stored] } }',
     '        return undefined',
     '    }',
     '    const collect = documentHash => doc => acc => {',
@@ -432,6 +447,9 @@ export const taxReturnReportSource = [
     '            creditForms: acc.creditForms,',
     '            iraForms: acc.iraForms,',
     '            priorYearIraBasisForms: acc.priorYearIraBasisForms,',
+    '            isoExerciseForms: acc.isoExerciseForms,',
+    '            employeeStockPurchaseForms: acc.employeeStockPurchaseForms,',
+    '            basisCorrectionForms: acc.basisCorrectionForms,',
     '        })',
     '        if (outcome.kind === \'error\') {',
     '            return { kind: \'error\', message: outcome.message, unmodeled: outcome.unmodeled }',
@@ -502,6 +520,9 @@ const emptyCollected = {
     creditForms: [],
     iraForms: [],
     priorYearIraBasisForms: [],
+    isoExerciseForms: [],
+    employeeStockPurchaseForms: [],
+    basisCorrectionForms: [],
 }
 
 /**
@@ -544,6 +565,9 @@ const routeDocument = documentHash => doc => acc => {
     if (doc.dialect === creditsDialect) { return { ...acc, creditForms: [...acc.creditForms, { documentHash, value: doc }] } }
     if (doc.dialect === iraDialect) { return { ...acc, iraForms: [...acc.iraForms, { documentHash, value: doc }] } }
     if (doc.dialect === priorYearIraBasisDialect) { return { ...acc, priorYearIraBasisForms: [...acc.priorYearIraBasisForms, { documentHash, value: doc }] } }
+    if (doc.dialect === formThirtyNineTwentyOneDialect) { return { ...acc, isoExerciseForms: [...acc.isoExerciseForms, { documentHash, value: doc }] } }
+    if (doc.dialect === formThirtyNineTwentyTwoDialect) { return { ...acc, employeeStockPurchaseForms: [...acc.employeeStockPurchaseForms, { documentHash, value: doc }] } }
+    if (doc.dialect === basisCorrectionDialect) { return { ...acc, basisCorrectionForms: [...acc.basisCorrectionForms, { documentHash, value: doc }] } }
     return undefined
 }
 
@@ -660,6 +684,9 @@ const renderReturn = ctx => acc => {
         creditForms: acc.creditForms,
         iraForms: acc.iraForms,
         priorYearIraBasisForms: acc.priorYearIraBasisForms,
+        isoExerciseForms: acc.isoExerciseForms,
+        employeeStockPurchaseForms: acc.employeeStockPurchaseForms,
+        basisCorrectionForms: acc.basisCorrectionForms,
     })
     if (outcome.kind === 'error') {
         return { kind: 'error', message: outcome.message, unmodeled: outcome.unmodeled }

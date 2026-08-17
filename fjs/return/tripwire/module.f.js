@@ -41,7 +41,7 @@
  * here asks only whether a document that IS PRESENT proves an obligation.
  * Absence is never evidence of anything, here or there.
  *
- * ## The table, and why each of the four entries earns its place
+ * ## The table, and why each of the five entries earns its place
  *
  * 1. **W-2 box 5 above the Additional Medicare Tax threshold ->
  *    `additionalMedicareTax`.** The phase's motivating case. Box 5 is UNCAPPED
@@ -118,6 +118,32 @@
  *    left for a tripwire to catch — which is the only thing this module
  *    exists for.
  *
+ * 5. **A stored Form 3921 -> `alternativeMinimumTax`** (Phase 29, TAX-33).
+ *    The sharpest predicate in this table, and the only one with no amount
+ *    test at all: it asks whether the DOCUMENT exists. A Form 3921 is issued
+ *    for nothing except the exercise of an incentive stock option, and
+ *    §56(b)(3) makes the excess of the stock's fair market value at exercise
+ *    over what was paid for it an alternative minimum taxable income
+ *    preference. There is no threshold to cross and no box that could be zero
+ *    in a way that matters; the only open question is the SIZE of the
+ *    preference, which `fjs/form6251` computes and which it refuses by name
+ *    when a box is missing rather than this predicate second-guessing it.
+ *
+ *    It is also the entry whose silence would be worst. An exercise-and-hold
+ *    produces **no cash**: nothing was sold, no broker reported anything, and
+ *    the regular tax does not know the exercise happened. A filer who does not
+ *    declare `alternativeMinimumTax` would receive a confident return with no
+ *    hint that a six-figure tax on income they never received is due — the
+ *    exact shape of the box-5 case this module was built for, at a much larger
+ *    magnitude.
+ *
+ *    **This is the THIRD entry to point at a MODELED kind**, so its remedy in
+ *    `fjs/return/scope`'s `modeledKindDeclarationRemedies` says "declare it and
+ *    this engine computes it". That remedy is unusually long, and deliberately:
+ *    declaring the kind makes the tax compute AND walks the filer into a form
+ *    whose Part I this engine mostly refuses, so it names both halves rather
+ *    than promising more than Phase 29 delivers.
+ *
  * ## The fourth entry that was specified and is NOT here, and why
  *
  * This phase's brief proposed **1099-G box 2 (state/local income tax refunds)
@@ -182,6 +208,7 @@ import { dialect as w2Dialect } from '../../document/w2/module.f.js'
 import { dialect as oneZeroNineNineRDialect } from '../../document/1099r/module.f.js'
 import { dialect as oneZeroNineNineGDialect, validate as validate1099g } from '../../document/1099g/module.f.js'
 import { dialect as oneZeroNineNineNecDialect } from '../../document/1099nec/module.f.js'
+import { dialect as formThirtyNineTwentyOneDialect } from '../../document/form3921/module.f.js'
 
 /** @import { IndividualFilingStatus, TaxParamSet } from '../../tax/params/module.f.js' */
 /** @import { Kind } from '../profile/module.f.js' */
@@ -189,6 +216,7 @@ import { dialect as oneZeroNineNineNecDialect } from '../../document/1099nec/mod
 /** @import { W2 } from '../../document/w2/module.f.js' */
 /** @import { OneZeroNineNineR } from '../../document/1099r/module.f.js' */
 /** @import { OneZeroNineNineNec } from '../../document/1099nec/module.f.js' */
+/** @import { FormThirtyNineTwentyOne } from '../../document/form3921/module.f.js' */
 
 // ── What a tripwire reads ────────────────────────────────────────────────────
 
@@ -213,6 +241,7 @@ import { dialect as oneZeroNineNineNecDialect } from '../../document/1099nec/mod
  *   readonly w2s: readonly { readonly value: W2 }[],
  *   readonly retirementForms: readonly { readonly value: OneZeroNineNineR }[],
  *   readonly nonemployeeCompensationForms: readonly { readonly value: OneZeroNineNineNec }[],
+ *   readonly isoExerciseForms: readonly { readonly value: FormThirtyNineTwentyOne }[],
  * }} SuppliedDocuments
  */
 
@@ -324,6 +353,22 @@ export const tripwires = [
             ),
     },
     {
+        kind: 'alternativeMinimumTax',
+        evidence: 'a stored Form 3921 reports the exercise of an incentive stock option, and '
+            + '§56(b)(3) makes the excess of the stock\'s fair market value at exercise over what '
+            + 'was paid for it an alternative minimum taxable income preference — tax on income '
+            + 'never received, in a year the shares may not even be sellable — which reaches 1040 '
+            + 'line 17 through Form 6251 line 2i and Schedule 2 line 2',
+        // NO threshold, and no non-zero box test either. The other three
+        // entries ask whether an amount crossed a line; this one asks only
+        // whether the DOCUMENT exists, because a Form 3921 is issued for
+        // nothing except an ISO exercise and an ISO exercise is a preference
+        // item at any size. `fjs/form6251` refuses a form whose boxes 3, 4 or
+        // 5 are missing rather than this predicate second-guessing it, so
+        // "exists" is the whole question here.
+        triggered: context => context.documents.isoExerciseForms.length > 0,
+    },
+    {
         kind: 'businessIncomeOrLoss',
         evidence: 'a stored Form 1099-NEC reports non-zero box 1 nonemployee compensation, which is '
             + 'self-employment income by definition — the payer filed a 1099-NEC precisely because '
@@ -391,10 +436,11 @@ assert(taxParams2025 !== undefined, 'expected TY2025 parameters to be present in
  * Phase 22 shipped THREE, not the four its brief specified: see this module's
  * own docstring for why the 1099-G box 2 entry is unreachable and omitted.
  * Phase 27 adds the fourth, and it is a different one — 1099-NEC box 1 ->
- * `businessIncomeOrLoss`.
+ * `businessIncomeOrLoss`. Phase 29 adds the fifth — a stored Form 3921 ->
+ * `alternativeMinimumTax`, the first with no amount test at all.
  * @type {number}
  */
-const expectedTripwireCount = 4
+const expectedTripwireCount = 5
 
 /** A W-2 carrying nothing but the fields its schema requires. @type {W2} */
 const bareW2 = {
@@ -427,7 +473,25 @@ const bare1099Nec = {
 }
 
 /** No documents at all — the base every fixture below widens. @type {SuppliedDocuments} */
-const noDocuments = { w2s: [], retirementForms: [], nonemployeeCompensationForms: [] }
+const noDocuments = {
+    w2s: [], retirementForms: [], nonemployeeCompensationForms: [], isoExerciseForms: [],
+}
+
+/** A Form 3921 carrying the three boxes the §56(b)(3) spread reads.
+ * @type {FormThirtyNineTwentyOne}
+ */
+const isoExercise = {
+    dialect: formThirtyNineTwentyOneDialect,
+    payerTin: '66-6666666',
+    recipientTin: '222-22-2222',
+    accountNumber: '',
+    taxYear: 2025,
+    formRevision: 'April 2025',
+    sourceArtifactHash: 'deadbeef00112233445566778899aabbccddeeff0011223344556677889900',
+    box3ExercisePricePerShare: '5.00',
+    box4FairMarketValuePerShareOnExerciseDate: '105.00',
+    box5NumberOfSharesTransferred: '10000',
+}
 
 /**
  * A document set holding W-2s with exactly these box-5 amounts, one per entry.
@@ -488,11 +552,11 @@ const everyStatus = [
 ]
 
 export const proof = {
-    // The hand-typed count, and the structural facts a loop cannot see: three
-    // rows, three DISTINCT kinds, and no empty evidence string. A tripwire
+    // The hand-typed count, and the structural facts a loop cannot see: five
+    // rows, five DISTINCT kinds, and no empty evidence string. A tripwire
     // whose evidence were blank would refuse without saying what proved it,
     // which is the silence this whole module replaces.
-    theTableIsExactlyFourDistinctTripwires: () => {
+    theTableIsExactlyFiveDistinctTripwires: () => {
         assertEq(tripwires.length, expectedTripwireCount)
         assertEq(new Set(tripwires.map(t => t.kind)).size, expectedTripwireCount)
         for (const tripwire of tripwires) {
@@ -734,6 +798,99 @@ export const proof = {
             assertEq(outcome.kind, 'ok', ['a declared kind must not trip its own tripwire', outcome])
         },
     },
+    // ── Entry 5: a stored Form 3921 -> alternativeMinimumTax ─────────────
+    incentiveStockOptionExercise: {
+        // PHASE 29'S MOTIVATING CASE, and the sharpest entry in this table: a
+        // stored Form 3921 does not merely SUGGEST an alternative minimum tax,
+        // it is an exercise of an incentive stock option, which §56(b)(3)
+        // makes a preference item outright. The only open question is the
+        // size. Each of the four things a reader can act on is asserted
+        // SEPARATELY, so erasing any one reddens this leaf and says which
+        // went missing.
+        aStoredFormThreeNineTwoOneUndeclaredRefusesNamingFormSixTwoFiveOne: () => {
+            const outcome = classify('single')(['wages'])({
+                ...noDocuments,
+                isoExerciseForms: [{ value: isoExercise }],
+            })
+            assert(outcome.kind === 'error', ['a stored Form 3921 must refuse when undeclared', outcome])
+            if (outcome.kind !== 'error') {
+                return
+            }
+            assertEq(outcome.unmodeled.length, 1, ['expected exactly one required kind', outcome.unmodeled])
+            assertEq(
+                outcome.unmodeled[0], 'alternativeMinimumTax',
+                ['expected Schedule 2 line 2 named', outcome.unmodeled])
+            assert(
+                outcome.message.includes('Form 6251'),
+                ['the refusal must name the form the tax is computed on', outcome.message])
+            assert(
+                outcome.message.includes('Schedule 2 line 2'),
+                ['the refusal must name the Schedule 2 line it lands on', outcome.message])
+            assert(
+                outcome.message.includes('1040 line 17'),
+                ['and the 1040 line that reaches', outcome.message])
+            assert(
+                outcome.message.includes('§56(b)(3)'),
+                ['the refusal must name the provision that makes it a preference', outcome.message])
+            // The half a reader most needs: this is tax on income NEVER
+            // RECEIVED. Without that clause the message names a form for no
+            // stated reason, and the filer has no idea why a year in which
+            // they sold nothing produced a tax bill.
+            assert(
+                outcome.message.includes('never received'),
+                ['the refusal must say WHY this is surprising', outcome.message])
+            // The REMEDY is a declaration, not a form hunt, because
+            // `alternativeMinimumTax` is MODELED as of this phase — the third
+            // kind ever to reach `modeledKindDeclarationRemedies`.
+            assert(
+                outcome.message.includes('declare alternativeMinimumTax'),
+                ['the remedy must be the declaration', outcome.message])
+        },
+        // THE NEGATIVE CONTROL, and it is the overwhelmingly common return: no
+        // Form 3921 at all, nothing declared, computes silently. Without this
+        // leaf a predicate that fired on every return would pass the gate
+        // above.
+        aReturnWithNoFormThreeNineTwoOneComputesSilently: () => {
+            assertEq(classify('single')(['wages'])(noDocuments).kind, 'ok')
+        },
+        // THE ONE ENTRY IN THIS TABLE WITH NO AMOUNT TEST, stated as its own
+        // leaf because it breaks the pattern the other four follow. Every
+        // other predicate here asks whether a box is present and NON-ZERO;
+        // this one asks only whether the document exists. A Form 3921 with all
+        // three money boxes absent still fires, and it must: the employer
+        // reported an exercise to the IRS, and `fjs/form6251` is where a form
+        // missing a box is refused by name rather than treated as an exercise
+        // of nothing.
+        aFormThreeNineTwoOneWithNoBoxesAtAllStillFires: () => {
+            /** @type {FormThirtyNineTwentyOne} */
+            const bare = {
+                dialect: formThirtyNineTwentyOneDialect,
+                payerTin: '66-6666666',
+                recipientTin: '222-22-2222',
+                accountNumber: '',
+                taxYear: 2025,
+                formRevision: 'April 2025',
+                sourceArtifactHash: 'deadbeef00112233445566778899aabbccddeeff0011223344556677889900',
+            }
+            const outcome = classify('single')(['wages'])({
+                ...noDocuments,
+                isoExerciseForms: [{ value: bare }],
+            })
+            assert(
+                outcome.kind === 'error',
+                ['an exercise is a preference item at any size, including an unstated one', outcome])
+        },
+        // Declaring the kind silences it, exactly as on the other four
+        // entries — and here that declaration also makes the return
+        // COMPUTABLE, which is what the remedy promises.
+        aDeclaredAlternativeMinimumTaxSilencesTheTripwire: () => {
+            const outcome = classify('single')(['wages', 'alternativeMinimumTax'])({
+                ...noDocuments,
+                isoExerciseForms: [{ value: isoExercise }],
+            })
+            assertEq(outcome.kind, 'ok', ['a declared kind must not trip its own tripwire', outcome])
+        },
+    },
     // ── Entry 4: 1099-NEC box 1 -> businessIncomeOrLoss ──────────────────
     nonemployeeCompensation: {
         // PHASE 27'S MOTIVATING CASE, and the one the phase brief states as
@@ -821,7 +978,7 @@ export const proof = {
     //
     // Nothing supplied, nothing declared: compute. This is the strongest
     // statement of "a tripwire that always fires is not a tripwire" — the
-    // degenerate input every one of the three predicates sees, and none of
+    // degenerate input every one of the five predicates sees, and none of
     // them may fire on it.
     noDocumentsAtAllComputes: () => {
         assertEq(classify('single')([])(noDocuments).kind, 'ok')
@@ -868,12 +1025,19 @@ export const proof = {
             nonemployeeCompensationForms: [
                 { value: { ...bare1099Nec, box1NonemployeeCompensation: '9876.54' } },
             ],
+            isoExerciseForms: [{
+                value: {
+                    ...isoExercise,
+                    box3ExercisePricePerShare: '3.21',
+                    box4FairMarketValuePerShareOnExerciseDate: '54.32',
+                },
+            }],
         })
         assert(outcome.kind === 'error', ['expected a refusal', outcome])
         if (outcome.kind !== 'error') {
             return
         }
-        for (const amount of ['387654.32', '1234.56', '7654.21', '9876.54']) {
+        for (const amount of ['387654.32', '1234.56', '7654.21', '9876.54', '3.21', '54.32']) {
             assert(
                 !outcome.message.includes(amount),
                 ['a taxpayer amount reached the refusal message', amount, outcome.message])
@@ -881,7 +1045,7 @@ export const proof = {
         // The control: the message is not empty, and it really did describe
         // all three findings — otherwise "contains no amount" would be
         // satisfied by a message containing nothing.
-        assertEq(outcome.unmodeled.length, 4, ['expected all four tripwires to have fired', outcome.unmodeled])
+        assertEq(outcome.unmodeled.length, 5, ['expected all five tripwires to have fired', outcome.unmodeled])
     },
     // The rejected fourth entry, recorded as a CHECKED claim rather than as
     // prose (see this module's docstring). `fjs/document/1099g` refuses a

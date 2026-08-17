@@ -107,6 +107,9 @@ import { baseTaxForAmount } from '../../tax/table/module.f.js'
 /** @import { PriorYearCapitalLoss } from '../../document/prior_year_capital_loss/module.f.js' */
 /** @import { Ira } from '../../document/ira/module.f.js' */
 /** @import { PriorYearIraBasis } from '../../document/prior_year_ira_basis/module.f.js' */
+/** @import { FormThirtyNineTwentyOne } from '../../document/form3921/module.f.js' */
+/** @import { FormThirtyNineTwentyTwo } from '../../document/form3922/module.f.js' */
+/** @import { BasisCorrection } from '../../document/basis_correction/module.f.js' */
 /** @import { Kind, ReturnProfile } from '../../return/profile/module.f.js' */
 /** @import { IndividualFilingStatus, TaxParamSet } from '../../tax/params/module.f.js' */
 /** @import { Line16Method } from '../../tax/line16/module.f.js' */
@@ -201,6 +204,16 @@ import { baseTaxForAmount } from '../../tax/table/module.f.js'
  * in order to refuse it, which a flattening to a single optional document
  * would silently prevent.
  *
+ * `isoExerciseForms`, `employeeStockPurchaseForms` and `basisCorrectionForms`
+ * are Phase 29's own widening (DOC-22/DOC-23/TAX-33/TAX-34). All three are
+ * LISTS and all three genuinely are: an employee who exercised twice in a year
+ * receives two Forms 3921, an employee stock purchase plan issues one Form
+ * 3922 per PURCHASE PERIOD (so two a year is the ordinary case on a six-month
+ * plan), and a basis correction is per SALE — a taxpayer who sold four
+ * mis-basised lots stores four. `fjs/form8949` matches each correction to its
+ * Form 1099-B by CAS hash and REFUSES one that matches nothing, which is what
+ * makes the list shape safe rather than merely convenient.
+ *
  * `capitalLossCarryoverForms` is Plan 15-05's own widening (TAX-17): a LIST,
  * matching this typedef's own established "one running record per taxpayer
  * per year" convention (see `itemizedDeductionForms`/`medicalExpenseForms`
@@ -229,6 +242,9 @@ import { baseTaxForAmount } from '../../tax/table/module.f.js'
  *   readonly creditForms: readonly Stored<Credits>[],
  *   readonly iraForms: readonly Stored<Ira>[],
  *   readonly priorYearIraBasisForms: readonly Stored<PriorYearIraBasis>[],
+ *   readonly isoExerciseForms: readonly Stored<FormThirtyNineTwentyOne>[],
+ *   readonly employeeStockPurchaseForms: readonly Stored<FormThirtyNineTwentyTwo>[],
+ *   readonly basisCorrectionForms: readonly Stored<BasisCorrection>[],
  * }} Form1040Inputs
  */
 
@@ -477,6 +493,9 @@ const storedFilingStatusNamed = status =>
  *   readonly line13b: ReportLine,
  *   readonly line14: ReportLine,
  *   readonly line15: ReportLine,
+ *   readonly itemizing: boolean,
+ *   readonly scheduleALine7Cents: bigint,
+ *   readonly scheduleOneALine37Cents: bigint,
  *   readonly filingScheduleD: boolean,
  *   readonly scheduleD15Cents: bigint,
  *   readonly scheduleD16Cents: bigint,
@@ -524,6 +543,7 @@ export const form1040IncomeLines = taxParamSet => inputs => {
         nonemployeeCompensationForms, businessExpenseForms,
         adjustmentForms, studentLoanInterestForms,
         iraForms, priorYearIraBasisForms,
+        employeeStockPurchaseForms, basisCorrectionForms,
     } = inputs
     const declaredZero = profileDeclaredZeroLine(profile)
     const fromDocuments = documentLine(profile)
@@ -561,10 +581,34 @@ export const form1040IncomeLines = taxParamSet => inputs => {
     // assigns the key holding `undefined` rather than omitting it, which
     // `ScheduleDInputs`'s optional field does not admit.
     const priorYearCapitalLossCarryover = capitalLossCarryoverForms[0]
+    // TAX-34/Phase 29: a stored basis correction that Schedule D will never
+    // run is an assertion the engine would DROP, and `fjs/form8949` refuses
+    // every other way that can happen (a correction naming no supplied
+    // document, two naming one, one naming a document with no sale). This is
+    // the fourth way, and it is the only one visible from here rather than
+    // from inside that module: Schedule D runs only for a return that declared
+    // `capitalGainsOrLosses`, so a correction on an undeclared return reaches
+    // nothing. A document-data-sufficiency refusal, `unmodeled: []`, exactly
+    // like the three guards below it.
+    const [firstBasisCorrection] = basisCorrectionForms
+    if (firstBasisCorrection !== undefined && !filingScheduleD) {
+        return {
+            kind: 'error',
+            message: `basis correction ${firstBasisCorrection.documentHash} names brokerage `
+                + `document ${firstBasisCorrection.value.brokerageDocumentHash}, but this return `
+                + `does not declare capitalGainsOrLosses, so no Schedule D is computed and the `
+                + `correction would reach no Form 8949 row at all. Declare capitalGainsOrLosses `
+                + `on the return profile, or remove the correction — refusing rather than `
+                + `silently dropping the taxpayer's assertion about their own basis.`,
+            unmodeled: [],
+        }
+    }
     /** @type {ScheduleDOutcome | undefined} */
     const scheduleDOutcome = filingScheduleD
         ? scheduleD({
             status, brokerageForms, dividendForms,
+            basisCorrections: basisCorrectionForms,
+            employeeStockPurchaseForms,
             ...(priorYearCapitalLossCarryover === undefined ? {} : { priorYearCapitalLossCarryover }),
         })
         : undefined
@@ -1169,6 +1213,27 @@ export const form1040IncomeLines = taxParamSet => inputs => {
         line13a, line13b,
         line14,
         line15,
+        // Three facts Form 6251 needs that no printed 1040 line carries, and
+        // which only this function can see (Phase 29, TAX-33).
+        //
+        // `itemizing` and `scheduleALine7Cents` decide Form 6251 line 2a: an
+        // itemizing return adds back Schedule A line 7's TAXES, and a
+        // non-itemizing one adds back the whole standard deduction. Both come
+        // off the ONE `deductionChoice`/`scheduleA` execution line 12e already
+        // performed, so the AMT cannot disagree with the regular tax about
+        // which deduction won.
+        //
+        // `scheduleOneALine37Cents` is Schedule 1-A line **37**, the senior
+        // deduction alone — NOT `partVI.line38`, the total that feeds 1040
+        // line 13b, which is what Form 6251 line 1a would read if this were
+        // copied from the line above it. The two are EQUAL today because this
+        // engine models only Parts I, V and VI of that schedule; the day Parts
+        // II/III/IV compute, tips and overtime deductions must stay OUT of
+        // alternative minimum taxable income and the senior deduction must go
+        // back into it, which is exactly what reading line 37 does.
+        itemizing: deductionChoiceResult.chosen === 'itemized',
+        scheduleALine7Cents: scheduleAResult.line7,
+        scheduleOneALine37Cents: scheduleOneAResult.partV.line37,
         filingScheduleD,
         scheduleD15Cents: scheduleDOk === undefined ? 0n : scheduleDOk.line15,
         scheduleD16Cents: scheduleDOk === undefined ? 0n : scheduleDOk.line16,
@@ -1394,7 +1459,7 @@ const profileMoneyBox = profile => boxPath => {
 const form1040TaxAndPaymentLines = taxParamSet => inputs => income => {
     const {
         profile, w2s, interestForms, dividendForms, brokerageForms, retirementForms,
-        unemploymentForms, nonemployeeCompensationForms,
+        unemploymentForms, nonemployeeCompensationForms, isoExerciseForms,
     } = inputs
     const declaredZero = profileDeclaredZeroLine(profile)
     const fromDocuments = documentLine(profile)
@@ -1499,7 +1564,7 @@ const form1040TaxAndPaymentLines = taxParamSet => inputs => income => {
     const medicareTaxWithheld = fromDocuments('Form 8959 line 19 (Form W-2 box 6)')(
         sumBoxOverDocuments(w2s)('box6MedicareTaxWithheld')(
             w2 => w2.box6MedicareTaxWithheld))
-    const scheduleTwoResult = scheduleTwo(taxParamSet)({
+    const scheduleTwoOutcome = scheduleTwo(taxParamSet)({
         profile,
         status,
         medicareWages,
@@ -1519,7 +1584,44 @@ const form1040TaxAndPaymentLines = taxParamSet => inputs => income => {
         // `income.line11b` above, so a second execution here would be pricing
         // a return the first one changed.
         selfEmployment: income.selfEmployment,
+        // Phase 29 (TAX-33): everything Form 6251 reads. The AMT recomputes
+        // taxable income from scratch, so it needs the deduction total, the
+        // deduction's COMPOSITION (which of Schedule A line 7 and line 12e
+        // feeds line 2a), Schedule 1-A line 37, and the regular tax it is
+        // measured against — all off the SAME `form1040IncomeLines` execution
+        // that produced 1040 lines 14 and 15, so the parallel system cannot
+        // disagree with the regular one about the inputs they share.
+        qualifiedDividends: income.line3a,
+        totalDeductions: income.line14,
+        regularTax: line16,
+        itemizing: income.itemizing,
+        scheduleALine7Cents: income.scheduleALine7Cents,
+        scheduleOneALine37Cents: income.scheduleOneALine37Cents,
+        standardDeductionCents: income.line12e.value,
+        isoExerciseForms,
+        // §56(b)(3)'s same-year-disposition rule: `fjs/form6251` cannot tell
+        // whether the shares sold were the shares exercised, so a stored Form
+        // 3921 alongside ANY reported sale refuses. Asked of `box1dProceeds`
+        // rather than of the presence of a Form 1099-B, and asked WITHOUT
+        // regard to whether Schedule D is being filed — an undeclared sale is
+        // still a sale, and the ambiguity it creates does not go away because
+        // the return failed to declare it.
+        aStoredNineteenNineBReportsASale:
+            brokerageForms.some(form => form.value.box1dProceeds !== undefined),
+        filingScheduleD: income.filingScheduleD,
+        scheduleD15Cents: income.scheduleD15Cents,
+        scheduleD16Cents: income.scheduleD16Cents,
     })
+    // Schedule 2 can REFUSE as of Phase 29, and all three of its refusals are
+    // Form 6251's: the same-year incentive stock option disposition, a Form
+    // 3921 missing a box, and Form 6251 Part III when the upper bound does not
+    // settle the AMT at zero. Each is a document-data-sufficiency refusal, so
+    // `unmodeled: []` — the same threading `scheduleThreeOutcome` and the
+    // Schedule D/A/C guards already use.
+    if (scheduleTwoOutcome.kind === 'error') {
+        return { kind: 'error', message: scheduleTwoOutcome.message, unmodeled: [] }
+    }
+    const scheduleTwoResult = scheduleTwoOutcome
     const line17 = {
         value: scheduleTwoResult.line3.value,
         sources: scheduleTwoResult.line3.sources,
@@ -2056,7 +2158,13 @@ const expectedIncomeLineCount = 31
  * before it are: it is a dispatcher input, not a printed 1040 line, and the
  * `Exclude<>` below is what makes forgetting to say so a compile error rather
  * than a crash on a missing `.sources`.
- * @type {readonly Exclude<keyof Form1040IncomeLines, 'kind' | 'filingScheduleD' | 'scheduleD15Cents' | 'scheduleD16Cents' | 'scheduleD18Cents' | 'scheduleD19Cents' | 'selfEmployment'>[]}
+ * Phase 29 adds THREE more, for the same reason a third time: `itemizing`,
+ * `scheduleALine7Cents` and `scheduleOneALine37Cents` are Form 6251 inputs
+ * that no printed 1040 line carries. `itemizing` is not even a money value,
+ * so the `Exclude<>` below is what turns forgetting one of them into a
+ * compile error rather than a crash on a missing `.sources` — which is
+ * exactly what it did when this phase first added them.
+ * @type {readonly Exclude<keyof Form1040IncomeLines, 'kind' | 'filingScheduleD' | 'scheduleD15Cents' | 'scheduleD16Cents' | 'scheduleD18Cents' | 'scheduleD19Cents' | 'selfEmployment' | 'itemizing' | 'scheduleALine7Cents' | 'scheduleOneALine37Cents'>[]}
  */
 const incomeLineFieldNames = /** @type {const} */ ([
     'line1a', 'line1b', 'line1c', 'line1d', 'line1e', 'line1f', 'line1g', 'line1h', 'line1i', 'line1z',
@@ -2419,6 +2527,9 @@ const inputsOf = profile => w2s => interestForms => dividendForms => brokerageFo
                 creditForms: [],
                 iraForms: [],
                 priorYearIraBasisForms: [],
+                isoExerciseForms: [],
+                employeeStockPurchaseForms: [],
+                basisCorrectionForms: [],
             })
 
 /**
@@ -7810,6 +7921,244 @@ export const proof = {
             assertEq(line4b.value, 0n)
             assertEq(line4b.sources.length, 1)
             assertEq(line4b.sources[0]?.boxPath, 'declaredKinds')
+        },
+    },
+    // ── Phase 29 (DOC-22/TAX-33): the alternative minimum tax, end to end ──
+    alternativeMinimumTax: {
+        // THE WHOLE VERTICAL SLICE, at the entry point: a stored Form 3921
+        // reaches Form 6251 line 2i, Schedule 2 line 2 and 1040 line 17, and
+        // the tax is the EXCESS over the regular tax.
+        //
+        // The fixture is chosen so that TWO wirings no other leaf could
+        // observe are observable here at once. It is a 65-year-old, so
+        // Schedule 1-A line 37 is NON-ZERO and 1040 line 14 therefore differs
+        // from line 12e — which is what makes Form 6251 line 2a's "line 12e,
+        // not line 14" reading load-bearing. And it exercises an incentive
+        // stock option and HOLDS, so the alternative minimum tax is a real
+        // six-figure number rather than a zero that would absorb any wiring
+        // error. Wages are $130,000.00 rather than $120,000.00 for a third
+        // reason: it puts taxable income above $100,000.00, so line 16 comes
+        // off the Tax Computation Worksheet exactly rather than off the Tax
+        // Table's $50-wide band, and every figure below can be hand-derived.
+        //
+        // EVERY FIGURE HAND-COMPUTED, in printed order:
+        //
+        //   1040 line 1a/1z   wages                            $130,000.00
+        //   1040 line 11b     AGI (no adjustments)             $130,000.00
+        //   1040 line 12e     15,750.00 + 2,000.00 aged         $17,750.00
+        //   Sch 1-A line 31   MAGI                             $130,000.00
+        //   Sch 1-A line 33   130,000.00 - 75,000.00            $55,000.00
+        //   Sch 1-A line 34   6% of 55,000.00                    $3,300.00
+        //   Sch 1-A line 35   6,000.00 - 3,300.00                $2,700.00
+        //   Sch 1-A line 37   one qualifying taxpayer            $2,700.00
+        //   1040 line 13b     = Sch 1-A line 38                  $2,700.00
+        //   1040 line 14      17,750.00 + 0 + 2,700.00          $20,450.00
+        //   1040 line 15      130,000.00 - 20,450.00           $109,550.00
+        //   1040 line 16      10% of 11,925.00                   $1,192.50
+        //                   + 12% of 36,550.00                   $4,386.00
+        //                   + 22% of 54,875.00                  $12,072.50
+        //                   + 24% of  6,200.00                   $1,488.00
+        //                                                       $19,139.00
+        //
+        //   Form 3921         (105.00 - 5.00) x 10,000       $1,000,000.00
+        //   6251 line 1a      20,450.00 - 2,700.00              $17,750.00
+        //   6251 line 1b      130,000.00 - 17,750.00           $112,250.00
+        //   6251 line 2a      1040 line 12e, NOT line 14        $17,750.00
+        //   6251 line 2i      the spread                     $1,000,000.00
+        //   6251 line 4       112,250 + 17,750 + 1,000,000   $1,130,000.00
+        //   6251 line 5       25% of (1,130,000 - 626,350) is 125,912.50,
+        //                     which exceeds the 88,100.00 exemption  $0.00
+        //   6251 line 6       1,130,000.00 - 0.00            $1,130,000.00
+        //   6251 line 7       26% of 239,100.00                 $62,166.00
+        //                   + 28% of 890,900.00                $249,452.00
+        //                                                      $311,618.00
+        //   6251 line 10      1040 line 16                      $19,139.00
+        //   6251 line 11      311,618.00 - 19,139.00           $292,479.00
+        //
+        //   1040 line 17      Schedule 2 line 3                $292,479.00
+        //   1040 line 18      19,139.00 + 292,479.00           $311,618.00
+        //
+        // $292,479.00 of tax on income never received, in a year the filer
+        // sold nothing.
+        anExerciseAndHoldReachesNineteenFortyLineSeventeen: () => {
+            /** @type {ReturnProfile} */
+            const profile = {
+                ...singleProfile,
+                taxpayerBornBeforeJan2_1961: true,
+                declaredKinds: ['wages', 'seniorAndOtherScheduleOneADeductions', 'alternativeMinimumTax'],
+            }
+            const outcome = form1040Report(taxParams2025)({
+                ...inputsOf(storedProfile(profile))([
+                    w2Document('sha256-29-amt-w2')('130000.00'),
+                ])([])([])([])([])([])([])([])([]),
+                isoExerciseForms: [{
+                    documentHash: 'sha256-29-amt-3921',
+                    value: {
+                        dialect: 'vnd.fjs.form3921',
+                        payerTin: '11-1111111',
+                        recipientTin: '222-22-2222',
+                        accountNumber: 'ACC-ISO',
+                        taxYear: 2025,
+                        formRevision: 'April 2025',
+                        sourceArtifactHash:
+                            'deadbeef00112233445566778899aabbccddeeff0011223344556677889900',
+                        box1DateOptionGranted: '01/03/2023',
+                        box2DateOptionExercised: '03/13/2025',
+                        box3ExercisePricePerShare: '5.00',
+                        box4FairMarketValuePerShareOnExerciseDate: '105.00',
+                        box5NumberOfSharesTransferred: '10000',
+                    },
+                }],
+            })
+            assert(outcome.kind === 'ok', ['expected the exercise-and-hold return to compute', outcome])
+            if (outcome.kind !== 'ok') {
+                return
+            }
+            const at = lineRuled(outcome.lines)
+            assertEq(at('1040 line 1a').value, 13000000n, '$130,000.00 of wages')
+            assertEq(at('1040 line 12e').value, 1775000n, '$15,750.00 + $2,000.00 aged')
+            assertEq(at('1040 line 13b').value, 270000n, 'the phased-out senior deduction, $2,700.00')
+            assertEq(at('1040 line 14').value, 2045000n, '$20,450.00 -- and it DIFFERS from line 12e')
+            assertEq(at('1040 line 15').value, 10955000n, '$109,550.00 of taxable income')
+            assertEq(at('1040 line 16').value, 1913900n, '$19,139.00 of regular tax')
+            assertEq(at('1040 line 17').value, 29247900n, '$292,479.00 of alternative minimum tax')
+            assertEq(at('1040 line 18').value, 31161800n, '$311,618.00 = $19,139.00 + $292,479.00')
+            // Provenance: 1040 line 17 cites the Form 3921 that put the tax
+            // there, by hash and by box, so an auditor can see the one
+            // document a filer would otherwise never connect to the figure.
+            const seventeen = at('1040 line 17')
+            const hashes = seventeen.sources.map(source => source.documentHash)
+            assert(
+                hashes.includes('sha256-29-amt-3921'),
+                ['1040 line 17 must cite the Form 3921', hashes])
+            const boxes = seventeen.sources.map(source => source.boxPath)
+            assert(
+                boxes.includes('box4FairMarketValuePerShareOnExerciseDate'),
+                ['and the box the spread was computed from', boxes])
+        },
+        // THE MUTATION GUARD THIS FIXTURE EXISTS FOR, stated as its own
+        // assertion rather than left implicit above.
+        //
+        // Form 6251 line 2a adds back **1040 line 12e**, the standard
+        // deduction — NOT 1040 line 14, the deduction TOTAL. On almost every
+        // fixture in this file the two are equal, because lines 13a and 13b
+        // are zero, so feeding line 14 to that input survives the whole suite.
+        // Here they differ by the $2,700.00 senior deduction, and the
+        // difference reaches the tax: 28% of $2,700.00 is $756.00, so the
+        // wrong wiring would report $293,235.00 instead of $292,479.00.
+        //
+        // Both figures are hand-typed, and the assertion is the DIFFERENCE
+        // rather than only the right answer, so this leaf says WHAT it is
+        // guarding rather than merely repeating the leaf above.
+        lineTwoAAddsBackLineTwelveENotLineFourteen: () => {
+            const rightAnswer = 29247900n
+            const ifLineFourteenWereUsed = 29323500n
+            assertEq(
+                ifLineFourteenWereUsed - rightAnswer, 75600n,
+                '28% of the $2,700.00 senior deduction = $756.00, hand-computed')
+            /** @type {ReturnProfile} */
+            const profile = {
+                ...singleProfile,
+                taxpayerBornBeforeJan2_1961: true,
+                declaredKinds: ['wages', 'seniorAndOtherScheduleOneADeductions', 'alternativeMinimumTax'],
+            }
+            const outcome = form1040Report(taxParams2025)({
+                ...inputsOf(storedProfile(profile))([
+                    w2Document('sha256-29-amt-2a-w2')('130000.00'),
+                ])([])([])([])([])([])([])([])([]),
+                isoExerciseForms: [{
+                    documentHash: 'sha256-29-amt-2a-3921',
+                    value: {
+                        dialect: 'vnd.fjs.form3921',
+                        payerTin: '11-1111111',
+                        recipientTin: '222-22-2222',
+                        accountNumber: 'ACC-ISO',
+                        taxYear: 2025,
+                        formRevision: 'April 2025',
+                        sourceArtifactHash:
+                            'deadbeef00112233445566778899aabbccddeeff0011223344556677889900',
+                        box3ExercisePricePerShare: '5.00',
+                        box4FairMarketValuePerShareOnExerciseDate: '105.00',
+                        box5NumberOfSharesTransferred: '10000',
+                    },
+                }],
+            })
+            assert(outcome.kind === 'ok', ['expected ok', outcome])
+            if (outcome.kind !== 'ok') {
+                return
+            }
+            const seventeen = lineRuled(outcome.lines)('1040 line 17').value
+            assertEq(seventeen, rightAnswer, 'line 2a read 1040 line 12e')
+            assert(
+                seventeen !== ifLineFourteenWereUsed,
+                ['line 2a must NOT read 1040 line 14, which includes the senior deduction', seventeen])
+        },
+        // THE TRIPWIRE, at the entry point: the IDENTICAL return without the
+        // declaration refuses, naming Form 6251 and the declaration that fixes
+        // it. Without this the engine would emit a confident 1040 understating
+        // the tax by $292,479.00 -- the largest silent understatement any
+        // tripwire in this engine guards against.
+        theSameReturnUndeclaredRefusesAtTheEntryPoint: () => {
+            /** @type {ReturnProfile} */
+            const profile = {
+                ...singleProfile,
+                taxpayerBornBeforeJan2_1961: true,
+                declaredKinds: ['wages', 'seniorAndOtherScheduleOneADeductions'],
+            }
+            const outcome = form1040Report(taxParams2025)({
+                ...inputsOf(storedProfile(profile))([
+                    w2Document('sha256-29-amt-undeclared-w2')('130000.00'),
+                ])([])([])([])([])([])([])([])([]),
+                isoExerciseForms: [{
+                    documentHash: 'sha256-29-amt-undeclared-3921',
+                    value: {
+                        dialect: 'vnd.fjs.form3921',
+                        payerTin: '11-1111111',
+                        recipientTin: '222-22-2222',
+                        accountNumber: 'ACC-ISO',
+                        taxYear: 2025,
+                        formRevision: 'April 2025',
+                        sourceArtifactHash:
+                            'deadbeef00112233445566778899aabbccddeeff0011223344556677889900',
+                        box3ExercisePricePerShare: '5.00',
+                        box4FairMarketValuePerShareOnExerciseDate: '105.00',
+                        box5NumberOfSharesTransferred: '10000',
+                    },
+                }],
+            })
+            assert(outcome.kind === 'error', ['an undeclared ISO exercise must refuse', outcome])
+            if (outcome.kind !== 'error') {
+                return
+            }
+            assertEq(outcome.unmodeled[0], 'alternativeMinimumTax', outcome.unmodeled)
+            assert(outcome.message.includes('Form 6251'), [outcome.message])
+            assert(outcome.message.includes('never received'), [outcome.message])
+            assert(outcome.message.includes('declare alternativeMinimumTax'), [outcome.message])
+        },
+        // CRITERION 5, at the entry point and in the direction that matters:
+        // the SAME return with no Form 3921 at all computes exactly what it
+        // computed before this phase — the AMT is $0.00, 1040 line 17 is
+        // $0.00, and line 18 is the regular tax alone.
+        theSameReturnWithNoIncentiveStockOptionAddsNothing: () => {
+            /** @type {ReturnProfile} */
+            const profile = {
+                ...singleProfile,
+                taxpayerBornBeforeJan2_1961: true,
+                declaredKinds: ['wages', 'seniorAndOtherScheduleOneADeductions'],
+            }
+            const outcome = form1040Report(taxParams2025)({
+                ...inputsOf(storedProfile(profile))([
+                    w2Document('sha256-29-amt-none-w2')('130000.00'),
+                ])([])([])([])([])([])([])([])([]),
+            })
+            assert(outcome.kind === 'ok', ['expected ok', outcome])
+            if (outcome.kind !== 'ok') {
+                return
+            }
+            const at = lineRuled(outcome.lines)
+            assertEq(at('1040 line 16').value, 1913900n, 'the same $19,139.00 of regular tax')
+            assertEq(at('1040 line 17').value, 0n, 'no alternative minimum tax')
+            assertEq(at('1040 line 18').value, 1913900n, 'line 18 is the regular tax alone')
         },
     },
 }

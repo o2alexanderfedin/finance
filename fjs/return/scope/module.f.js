@@ -454,6 +454,7 @@ export const modeledKinds = /** @type {const} */ ([
     'itemizedDeductions',          // Schedule A + deductionChoice   -> 1040 line 12e
     'qualifiedBusinessIncomeDeduction', // Form 8995 line 15         -> 1040 line 13a
     'seniorAndOtherScheduleOneADeductions', // Schedule 1-A Parts I/V/VI -> 1040 line 13b
+    'alternativeMinimumTax',       // Form 6251 line 11 -> Schedule 2 line 2 -> 1040 line 17
     'selfEmploymentTax',           // Schedule SE line 12 -> Schedule 2 line 4 -> 1040 line 23
     'additionalMedicareTax',       // Form 8959 -> Schedule 2 line 11 -> 1040 lines 23/25c
     'netInvestmentIncomeTax',      // Form 8960 -> Schedule 2 line 12 -> 1040 line 23
@@ -674,7 +675,6 @@ export const unmodeledKindRefusals = /** @type {const} */ ([
     // taxes, one 1040 line each, above. See `fjs/return/profile`'s own
     // vocabulary comment.
     { kind: 'advancePremiumTaxCreditAndOtherRepayments', line: 'Schedule 2 line 1a-1z -> 1040 line 17', label: 'excess advance premium tax credit repayment and the other Part I repayments', remedy: 'requires Form 8962, and for the clean-vehicle-credit and elective-payment-election recapture sub-lines Forms 8936 and 3800 (no phase yet)' },
-    { kind: 'alternativeMinimumTax', line: 'Schedule 2 line 2 -> 1040 line 17', label: 'alternative minimum tax', remedy: 'requires Form 6251 (TAX-33, Phase 29)' },
     // ── Form 6251 Part I's own lines, one kind each (TAX-33, Phase 29) ──────
     //
     // The fifteen §56/§57 adjustments and preferences this engine cannot
@@ -861,6 +861,16 @@ export const unmodeledKindRefusals = /** @type {const} */ ([
  * see `fjs/return/tripwire`'s own docstring for why an over-approximation
  * would be worse than no entry. An unused row here would be a description of
  * a refusal nothing can raise.
+ *
+ * **`alternativeMinimumTax` is the THIRD entry** (Phase 29, TAX-33), and it
+ * is the one whose tripwire is the most nearly conclusive of the three. A
+ * stored Form 3921 does not merely suggest an alternative minimum tax — it is
+ * an exercise of an incentive stock option, which §56(b)(3) makes a preference
+ * item, full stop; the only question left is the size of it. Its remedy is
+ * unusually long on purpose: declaring the kind makes the tax compute, and it
+ * ALSO walks the filer into a form whose Part I this engine mostly refuses, so
+ * the remedy names both halves rather than promising more than Phase 29
+ * delivers.
  */
 export const modeledKindDeclarationRemedies = /** @type {const} */ ([
     {
@@ -869,6 +879,18 @@ export const modeledKindDeclarationRemedies = /** @type {const} */ ([
         label: 'Additional Medicare Tax',
         remedy: 'declare additionalMedicareTax on the return profile and this engine computes Form 8959 '
             + 'from Form W-2 boxes 5 and 6, including the withholding your employer already made (TAX-20, Phase 23)',
+    },
+    {
+        kind: 'alternativeMinimumTax',
+        line: 'Schedule 2 line 2 -> 1040 line 17',
+        label: 'alternative minimum tax',
+        remedy: 'declare alternativeMinimumTax on the return profile and this engine computes '
+            + 'Form 6251 from your Forms 3921, the standard-deduction add-back and the '
+            + 'senior deduction, and charges only the EXCESS over your regular tax (TAX-33, '
+            + 'Phase 29). Note where that computation still stops: Form 6251 Part I\'s other '
+            + 'fifteen §56/§57 adjustments each refuse by name, and a return with qualified '
+            + 'dividends or capital gains refuses unless the Part III upper bound already '
+            + 'settles the tax at $0.00',
     },
     {
         kind: 'businessIncomeOrLoss',
@@ -1207,7 +1229,7 @@ export const classifyScope = declaredKinds => {
  * and `fjs/form8995` wiring that makes all three computable.
  * @type {number}
  */
-const expectedModeledKindCount = 33
+const expectedModeledKindCount = 34
 
 /**
  * The modeled set, hand-typed a SECOND time and in {@link kindVocabulary}'s
@@ -1246,6 +1268,7 @@ const everyModeledKindHandTyped = [
     'itemizedDeductions',
     'qualifiedBusinessIncomeDeduction',
     'seniorAndOtherScheduleOneADeductions',
+    'alternativeMinimumTax',
     'selfEmploymentTax',
     'additionalMedicareTax',
     'netInvestmentIncomeTax',
@@ -1325,12 +1348,13 @@ const everyModeledKindHandTyped = [
  * rather than a coarse kind split: Form 6251 Part I's §56/§57 adjustments and
  * preferences, one kind per printed line, none of them nameable before that
  * form existed. Nothing is reclassified in the same step —
- * `alternativeMinimumTax` is still refused here, and moves out in the NEXT
- * commit beside the wiring that computes it. Wire before reclassify, as every
- * slice since Phase 13 has done.
+ * `77 -> 76` is that phase's own ONE-kind reclassification one commit later
+ * (`alternativeMinimumTax`), beside the `fjs/schedule/2` line 2 wiring that
+ * makes it computable. Wire before reclassify, as every slice since Phase 13
+ * has done.
  * @type {number}
  */
-const expectedUnmodeledKindCount = 77
+const expectedUnmodeledKindCount = 76
 
 /**
  * The complete refusal message for a return declaring exactly
@@ -1396,11 +1420,11 @@ export const proof = {
         // Plan 13-10's own two-kind move) targets: removing one entry from
         // `modeledKinds` without touching `expectedModeledKindCount` must
         // redden this leaf.
-        modeledKindsIsExactlyThirty: () => {
+        modeledKindsIsExactlyThirtyFour: () => {
             assertEq(modeledKinds.length, expectedModeledKindCount)
             assertEq(new Set(modeledKinds).size, expectedModeledKindCount)
         },
-        unmodeledRefusalsIsExactlySeventySeven: () => {
+        unmodeledRefusalsIsExactlySeventySix: () => {
             assertEq(unmodeledKindRefusals.length, expectedUnmodeledKindCount)
             assertEq(
                 new Set(unmodeledKindRefusals.map(r => r.kind)).size,
@@ -2226,7 +2250,6 @@ export const proof = {
             /** @type {readonly Kind[]} */
             const stillRefused = [
                 'advancePremiumTaxCreditAndOtherRepayments',
-                'alternativeMinimumTax',
                 'additionalTaxOnTaxFavoredAccounts',
                 'householdEmploymentTaxes',
                 'uncollectedTaxOnTipsOrGroupTermLife',
@@ -2238,8 +2261,8 @@ export const proof = {
                 'section965NetTaxLiabilityInstallment',
             ]
             assertEq(
-                stillRefused.length, 11,
-                'fourteen Schedule 2 kinds, less Phase 23\'s two and Phase 28\'s one')
+                stillRefused.length, 10,
+                'fourteen Schedule 2 kinds, less Phase 23\'s two, Phase 28\'s one and Phase 29\'s one')
             for (const kind of stillRefused) {
                 const outcome = classifyScope([kind])
                 assert(
@@ -2248,20 +2271,37 @@ export const proof = {
                 )
             }
             // Phase 23's brief named AMT and self-employment tax
-            // specifically. AMT is still refused and still names Form 6251;
-            // self-employment tax is MODELED as of Phase 28, so the
-            // assertions that were paired here are re-pointed to the fact
-            // that replaced them rather than deleted.
-            const amt = classifyScope(['alternativeMinimumTax'])
-            assert(amt.kind === 'error', ['the alternative minimum tax must still refuse', amt])
-            assert(amt.message.includes('Form 6251'), ['the AMT refusal must still name Form 6251', amt.message])
-            assert(
-                amt.message.includes('Schedule 2 line 2'),
-                ['the AMT refusal must name its own Schedule 2 line', amt.message],
-            )
+            // specifically, as the two kinds whose continued refusal proved
+            // the split had named things rather than widened them. BOTH are
+            // MODELED now — self-employment tax as of Phase 28,
+            // `alternativeMinimumTax` as of Phase 29 — so the pair that once
+            // stood for "this guard still guards something" is gone, and what
+            // replaces it is stated rather than deleted.
+            //
+            // The ten above are what still refuses on this schedule. The AMT's
+            // own assertions move to `fjs/form6251` and to
+            // `theFifteenFormSixTwoFiveOneKindsNameTheirOwnPrintedLine`, where
+            // fifteen NEW Schedule-2-line-2 kinds refuse by name — so this
+            // schedule's refusal surface grew in the same phase its most
+            // prominent refusal was computed away.
             assertEq(
                 classifyScope(['selfEmploymentTax']).kind, 'ok',
                 'self-employment tax is Schedule 2 line 4, and Phase 28 computes it')
+            assertEq(
+                classifyScope(['alternativeMinimumTax']).kind, 'ok',
+                'the alternative minimum tax is Schedule 2 line 2, and Phase 29 computes it')
+            // …and declaring it names the DECLARATION as the remedy, not a
+            // form to go and find, because the engine computes it once told.
+            const amt = tripwireRefusal([{
+                kind: 'alternativeMinimumTax',
+                evidence: 'a stored Form 3921 proves an incentive stock option exercise',
+            }])
+            assert(
+                amt.message.includes('declare alternativeMinimumTax'),
+                ['the remedy must be the declaration, not a form hunt', amt.message])
+            assert(
+                amt.message.includes('Form 6251'),
+                ['and it must still name the form the tax is computed on', amt.message])
         },
         // TAX-23/TAX-24, Phase 24: the SAME property one schedule over. The
         // ten Schedule 1 Part II kinds this phase did NOT wire must still
@@ -2897,11 +2937,12 @@ export const proof = {
         everyDeclarationRequiredKindIsModeledAndDescribable: () => {
             // `1 -> 2` is Phase 27's own `businessIncomeOrLoss`, the second
             // and only other use of this table since Phase 23 built it.
-            const expectedDeclarationRequiredCount = 2
+            // `2 -> 3` is Phase 29's own `alternativeMinimumTax`.
+            const expectedDeclarationRequiredCount = 3
             assertEq(
                 modeledKindDeclarationRemedies.length,
                 expectedDeclarationRequiredCount,
-                ['exactly two modeled kinds are declaration-required today', modeledKindDeclarationRemedies],
+                ['exactly three modeled kinds are declaration-required today', modeledKindDeclarationRemedies],
             )
             for (const entry of modeledKindDeclarationRemedies) {
                 assert(

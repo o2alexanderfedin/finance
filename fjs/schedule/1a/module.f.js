@@ -340,6 +340,48 @@ const minimalProfileValue = {
 const profileNoDeclaredKinds = { documentHash: 'profile-hash-0001', value: minimalProfileValue }
 
 export const proof = {
+    // AN EQUIVALENT-MUTANT WATCH, added by Phase 29 (TAX-33), and it is here
+    // rather than in `fjs/form6251` because THIS is the module that can make
+    // the two figures differ.
+    //
+    // Form 6251 line 1a subtracts Schedule 1-A line **37** from 1040 line 14;
+    // 1040 line 13b takes line **38**. Line 38 is `line13 + line21 + line30 +
+    // line37` — tips, overtime, car-loan interest, and the senior deduction —
+    // and this engine models only Parts I, V and VI, so lines 13, 21 and 30
+    // are permanently zero and the two figures are EQUAL. Swapping line 37 for
+    // line 38 in `fjs/form1040/core`'s wiring therefore changes nothing, at
+    // any input: verified by mutation, which left the entire suite green.
+    //
+    // That is not a defect and it is not fixable with a fixture — no input
+    // this engine accepts can distinguish them. What is fixable is the
+    // SILENCE. The day Parts II, III or IV compute, this leaf reddens, and the
+    // reader is told exactly which wiring to re-check: tips and overtime
+    // deductions must stay OUT of alternative minimum taxable income and the
+    // senior deduction must go back INTO it, which is precisely what reading
+    // line 37 rather than line 38 does.
+    theSeniorDeductionIsStillTheWHOLEOfPartSix: () => {
+        const result = scheduleOneA(taxParams2025)({
+            status: 'single',
+            agiCents: 8000000n,
+            taxpayerHasValidSsnAndBornBefore1961Jan2: true,
+            spouseHasValidSsnAndBornBefore1961Jan2: false,
+            profile: profileNoDeclaredKinds,
+        })
+        assert(result.partV.line37 > 0n, ['the fixture must actually claim a senior deduction', result])
+        assertEq(
+            result.partVI.line38,
+            result.partV.line37,
+            [
+                'Parts II/III/IV now compute, so Form 6251 line 1a (which reads line 37) and '
+                + '1040 line 13b (which reads line 38) have come apart — re-check '
+                + '`fjs/form1040/core`\'s `scheduleOneALine37Cents` wiring',
+                result.partVI.line38, result.partV.line37,
+            ],
+        )
+        assertEq(result.partVI.line13.value, 0n, 'Part II, tips: not modeled')
+        assertEq(result.partVI.line21.value, 0n, 'Part III, overtime: not modeled')
+        assertEq(result.partVI.line30.value, 0n, 'Part IV, car loan interest: not modeled')
+    },
     // Test 1 (continuous phase-out, no stepping).
     continuousPhaseoutAtExactThreshold: () => {
         const result = scheduleOneAPartV(taxParams2025)({

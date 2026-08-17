@@ -175,6 +175,9 @@ export const inputs = {
     nonemployeeCompensationForms: [],
     businessExpenseForms: [],
     priorYearIraBasisForms: [],
+    isoExerciseForms: [],
+    employeeStockPurchaseForms: [],
+    basisCorrectionForms: [],
 }
 
 /**
