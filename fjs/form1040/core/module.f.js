@@ -90,7 +90,7 @@ import {
 } from '../../form8995/module.f.js'
 import { scheduleThree } from '../../schedule/3/module.f.js'
 import { form8812 } from '../../form8812/module.f.js'
-import { iraTaxableAmount } from '../../form8606/module.f.js'
+import { iraTaxableAmount, rothDistributionCodeOf } from '../../form8606/module.f.js'
 import { baseTaxForAmount } from '../../tax/table/module.f.js'
 
 /** @import { ReportLine, Source } from '../../report/line/module.f.js' */
@@ -747,8 +747,35 @@ export const form1040IncomeLines = taxParamSet => inputs => {
     // document to 5a/5b. Never summed uniformly across every 1099-R: a
     // taxpayer holding both an IRA and a pension 1099-R must see two
     // different, correctly-routed totals.
-    const iraRetirementForms = retirementForms.filter(form => form.value.box7bIraSepSimple === true)
-    const pensionRetirementForms = retirementForms.filter(form => form.value.box7bIraSepSimple !== true)
+    // **THREE ways since Phase 31, not two, and the third one is a Roth IRA.**
+    // The IRS deliberately leaves box 7b UNCHECKED on a Roth IRA distribution
+    // (the Form 1099-R instructions: *"Do not check the box for a distribution
+    // from a Roth IRA"*), so the two-way test above sent every Roth
+    // distribution to lines 5a/5b as a PENSION. A Roth IRA distribution
+    // belongs on lines 4a/4b — the 1040 instructions for those lines are what
+    // cover it — and the misrouting was not merely cosmetic: with box 2a blank,
+    // which is what a Roth custodian prints, line 5b took nothing and a
+    // nonqualified distribution's taxable earnings vanished. `fjs/form8606`'s
+    // own document gate is what refuses the nonqualified codes; this partition
+    // is what puts the qualified one (code `Q`) on the right line.
+    //
+    // The predicate is IMPORTED from `fjs/form8606` rather than rewritten
+    // (AGENTS.md, "one rule, one place"): two copies could disagree about
+    // which forms are Roth, and a form both copies excluded would land on
+    // neither line.
+    const rothIraRetirementForms = retirementForms.filter(form =>
+        rothDistributionCodeOf(form.value) !== undefined)
+    const traditionalIraRetirementForms = retirementForms.filter(form =>
+        form.value.box7bIraSepSimple === true
+        && rothDistributionCodeOf(form.value) === undefined)
+    // Lines 4a/4b's own set: traditional/SEP/SIMPLE plus Roth. `fjs/form8606`
+    // receives only the TRADITIONAL half as `iraRetirementForms`, because
+    // §408(d)(2) aggregates traditional, SEP and SIMPLE IRAs as one contract
+    // and a Roth IRA is a different contract that is not in that fraction.
+    const iraRetirementForms = traditionalIraRetirementForms
+    const pensionRetirementForms = retirementForms.filter(form =>
+        form.value.box7bIraSepSimple !== true
+        && rothDistributionCodeOf(form.value) === undefined)
     //
     // **Line 4a stays GROSS, and Phase 26 does not touch it.** The printed
     // instruction is explicit for a qualified charitable distribution: "enter
@@ -756,9 +783,12 @@ export const form1040IncomeLines = taxParamSet => inputs => {
     // QCD, enter -0- on line 4b." The reduction is a TAXABLE-amount reduction,
     // never a gross one, and `lineFourAStaysGrossWhileFourBFalls` is the leaf
     // that says so.
+    // Roth distributions are in line 4a's GROSS sum — a qualified Roth
+    // distribution is reported on line 4a and excluded on line 4b, exactly the
+    // shape a fully-QCD'd distribution has, so the same rule covers both.
     const line4a = fromDocuments('1040 line 4a')(
-        sumBoxOverDocuments(iraRetirementForms)('box1GrossDistribution')(
-            form => form.box1GrossDistribution))
+        sumBoxOverDocuments([...iraRetirementForms, ...rothIraRetirementForms])(
+            'box1GrossDistribution')(form => form.box1GrossDistribution))
     // 4b — the box-2a sum this engine has always taken, THEN handed to
     // `fjs/form8606` (Phase 26, TAX-28/TAX-29) for §408(d)(8)'s QCD exclusion
     // and Form 8606 Part I's pro-rata rule. Passing the already-computed sum
@@ -2547,6 +2577,7 @@ const brokerageDocument = documentHash => overrides => ({
  *   readonly box2aTaxableAmount?: string,
  *   readonly box2bTaxableAmountNotDetermined?: true,
  *   readonly box4FederalIncomeTaxWithheld?: string,
+ *   readonly box7aDistributionCodes?: readonly string[],
  *   readonly box7bIraSepSimple?: true,
  * }} RetirementBoxes
  */
@@ -8295,6 +8326,192 @@ export const proof = {
             assertEq(line4b.value, 0n)
             assertEq(line4b.sources.length, 1)
             assertEq(line4b.sources[0]?.boxPath, 'declaredKinds')
+        },
+    },
+    // ── Phase 31 (TAX-29): Form 8606 Parts II and III, end to end ───────────
+    //
+    // `fjs/form8606` proves the printed lines. What only THIS file can prove is
+    // that a backdoor Roth reaches the RETURN — that line 4b falls to zero
+    // against a box 2a that says $7,000.00, and that a Roth Form 1099-R is
+    // routed to lines 4a/4b rather than to 5a/5b as a pension.
+    rothConversionsAndDistributions: {
+        // **THE ACCEPTANCE CRITERION FOR TAX-29.** A backdoor Roth —
+        // nondeductible contribution plus immediate conversion — computed end
+        // to end through `form1040Report`, which is the entry point a caller
+        // actually uses. Before Phase 31 this return REFUSED outright.
+        //
+        // Hand-derived, every figure independent of this engine. $60,000 of
+        // wages, a $7,000.00 nondeductible traditional-IRA contribution and an
+        // immediate conversion of the whole $7,000.00 to a Roth:
+        //
+        //   Form 8606 line 1, 3, 5                          7,000.00
+        //   line 6 year-end value of all traditional IRAs        0.00
+        //   line 7 (7,000 gross - 7,000 converted)              0.00
+        //   line 8, 9, 16                                   7,000.00
+        //   line 10  7,000 / 7,000                             1.000
+        //   line 11, 13, 17                                 7,000.00
+        //   line 14 (7,000 - 7,000)                             0.00
+        //   line 15c, 18                                        0.00
+        //
+        //   1040 line 1z wages                             60,000.00
+        //   1040 line 4a gross IRA distributions            7,000.00
+        //   1040 line 4b taxable  (15c + 18)                    0.00
+        //   1040 line 9, 11 AGI  (60,000 + 0)              60,000.00
+        //   1040 line 12 standard deduction, single        15,750.00
+        //   1040 line 15 taxable income                    44,250.00
+        //
+        // **AGI is the wages alone, and that is the assertion that matters**:
+        // the conversion contributes NOTHING, so line 4b's zero has to survive
+        // all the way to line 11 rather than merely appear on line 4b. The tax
+        // itself is deliberately not asserted here — the conversion does not
+        // move it relative to any other zero-taxable-amount return, so it would
+        // be a `fjs/tax/table` assertion wearing this leaf's name. (The QCD leaf
+        // above DOES assert its tax, because there the gift moves it.)
+        aBackdoorRothComputesEndToEndThroughTheFullReport: () => {
+            const conversionForm = retirementDocument('sha256-31-conv')({
+                box1GrossDistribution: '7000.00',
+                box2aTaxableAmount: '7000.00',
+                box2bTaxableAmountNotDetermined: true,
+                box7bIraSepSimple: true,
+            })
+            /** @type {Stored<Ira>} */
+            const record = {
+                documentHash: 'sha256-31-ira',
+                value: {
+                    dialect: 'vnd.fjs.ira',
+                    recipientTin: '222-22-2222',
+                    taxYear: 2025,
+                    nondeductibleContributionsThisYear: '7000.00',
+                    netAmountConvertedToRothIras: '7000.00',
+                    // Explicitly zero, never absent — the year-end value of a
+                    // fully-converted traditional IRA genuinely IS zero, and
+                    // `fjs/form8606` refuses ABSENCE precisely so that this
+                    // assertion has to be made rather than assumed.
+                    yearEndValueOfAllTraditionalSepSimpleIras: '0.00',
+                },
+            }
+            /** @type {ReturnProfile} */
+            const profile = { ...singleProfile, declaredKinds: ['wages', 'iraDistributions'] }
+            const base = inputsOf(storedProfile(profile))([w2Document('sha256-31-w2')('60000.00')])(
+                [])([])([])([conversionForm])([])([])([])([])
+            const outcome = form1040Report(taxParams2025)({ ...base, iraForms: [record] })
+            assert(outcome.kind === 'ok', ['a backdoor Roth must COMPUTE', outcome])
+            if (outcome.kind !== 'ok') {
+                return
+            }
+            assertEq(lineRuled(outcome.lines)('1040 line 4a').value, 700000n, '$7,000.00 gross')
+            assertEq(
+                lineRuled(outcome.lines)('1040 line 4b').value, 0n,
+                '$0.00 taxable — the whole point of a backdoor Roth')
+            assertEq(lineRuled(outcome.lines)('1040 line 11a').value, 6000000n, 'AGI $60,000.00')
+            assertEq(lineRuled(outcome.lines)('1040 line 15').value, 4425000n, '$44,250.00')
+            // …and the same facts WITHOUT the `vnd.fjs.ira` record: the
+            // conversion's own Form 1099-R is taxed in full, which is what this
+            // engine does for anyone who does not assert the conversion, and is
+            // the $7,000.00 the record removes.
+            const without = form1040Report(taxParams2025)(base)
+            assert(without.kind === 'ok', ['expected the bare return to compute', without])
+            if (without.kind !== 'ok') {
+                return
+            }
+            assertEq(
+                lineRuled(without.lines)('1040 line 4b').value, 700000n,
+                'taxed in full without the assertion')
+            // The figure MOVED, stated as an inequality rather than as prose.
+            assert(
+                lineRuled(without.lines)('1040 line 15').value
+                    > lineRuled(outcome.lines)('1040 line 15').value,
+                ['the conversion must reduce taxable income'])
+        },
+        // **The silent understatement this phase found, as a refusal.** A Roth
+        // IRA Form 1099-R has box 7b DELIBERATELY unchecked, so before Phase 31
+        // `fjs/form1040/core` classified it as a PENSION and sent it to lines
+        // 5a/5b. With box 2a blank — which is what a Roth custodian prints —
+        // line 5b took NOTHING: a $20,000.00 nonqualified early distribution
+        // produced $0.00 of tax with nothing refused. Probed at the full report
+        // before the fix, and the numbers were 5a = $20,000.00, 5b = $0.00,
+        // line 15 = $0.00.
+        aNonqualifiedRothDistributionNoLongerEscapesAsAPension: () => {
+            const rothForm = retirementDocument('sha256-31-roth-j')({
+                box1GrossDistribution: '20000.00',
+                box2bTaxableAmountNotDetermined: true,
+                box7aDistributionCodes: ['J'],
+            })
+            /** @type {ReturnProfile} */
+            const profile = { ...singleProfile, declaredKinds: ['iraDistributions'] }
+            const outcome = form1040Report(taxParams2025)(
+                inputsOf(storedProfile(profile))([])([])([])([])([rothForm])([])([])([])([]))
+            assertEq(outcome.kind, 'error', 'it must no longer compute silently')
+            if (outcome.kind !== 'error') {
+                return
+            }
+            assert(outcome.message.includes('code J'), ['name the code', outcome.message])
+            assert(outcome.message.includes('Part III'), ['name the part', outcome.message])
+            // A document-data-sufficiency refusal, never a scope one.
+            assertEq(outcome.unmodeled.length, 0)
+        },
+        // Code Q — the one Part III case a single tax year supports, because
+        // the payer certified §408A(d)(2)'s five-year period itself. It is
+        // tax-free AND it is on the right LINE: 4a gross, nothing on 4b, and
+        // NOTHING on 5a, which is where it used to go.
+        //
+        // The line-5a assertion is the load-bearing one. A qualified Roth
+        // distribution's taxable amount is zero either way, so line 4b alone
+        // cannot distinguish the fix from the bug — the routing is only
+        // observable on the GROSS lines, and that is exactly the "right answer
+        // for the wrong reason" this repository keeps finding.
+        aQualifiedRothDistributionIsRoutedToLineFourAAndTaxedAtNothing: () => {
+            const qualified = retirementDocument('sha256-31-roth-q')({
+                box1GrossDistribution: '20000.00',
+                box2bTaxableAmountNotDetermined: true,
+                box7aDistributionCodes: ['Q'],
+            })
+            /** @type {ReturnProfile} */
+            const profile = {
+                ...singleProfile,
+                declaredKinds: ['wages', 'iraDistributions'],
+            }
+            const outcome = form1040Report(taxParams2025)(
+                inputsOf(storedProfile(profile))([w2Document('sha256-31-q-w2')('40000.00')])(
+                    [])([])([])([qualified])([])([])([])([]))
+            assert(outcome.kind === 'ok', ['a qualified Roth distribution must compute', outcome])
+            if (outcome.kind !== 'ok') {
+                return
+            }
+            assertEq(
+                lineRuled(outcome.lines)('1040 line 4a').value, 2000000n,
+                '$20,000.00 — an IRA distribution, on the IRA line')
+            assertEq(
+                lineRuled(outcome.lines)('1040 line 4b').value, 0n,
+                'excluded from gross income in full by §408A(d)(2)')
+            assertEq(
+                lineRuled(outcome.lines)('1040 line 5a').value, 0n,
+                'NOT a pension — this is the assertion the routing fix needs')
+            assertEq(lineRuled(outcome.lines)('1040 line 5b').value, 0n)
+            assertEq(lineRuled(outcome.lines)('1040 line 11a').value, 4000000n, 'AGI is the wages')
+        },
+        // The CONTROL for the routing change, and it is the case the whole
+        // three-way partition could break: code `B` is a designated Roth
+        // ACCOUNT inside an employer plan — a genuine 1040 line 5b pension. It
+        // must still land on 5a/5b, or the partition has simply moved the bug.
+        aDesignatedRothAccountIsStillAPensionOnLineFiveB: () => {
+            const designated = retirementDocument('sha256-31-code-b')({
+                box1GrossDistribution: '20000.00',
+                box2aTaxableAmount: '20000.00',
+                box7aDistributionCodes: ['B'],
+            })
+            /** @type {ReturnProfile} */
+            const profile = { ...singleProfile, declaredKinds: ['pensionsAndAnnuities'] }
+            const outcome = form1040Report(taxParams2025)(
+                inputsOf(storedProfile(profile))([])([])([])([])([designated])([])([])([])([]))
+            assert(outcome.kind === 'ok', ['a designated Roth account is an ordinary pension', outcome])
+            if (outcome.kind !== 'ok') {
+                return
+            }
+            assertEq(lineRuled(outcome.lines)('1040 line 5a').value, 2000000n, 'still a pension')
+            assertEq(lineRuled(outcome.lines)('1040 line 5b').value, 2000000n, 'and still taxable')
+            assertEq(lineRuled(outcome.lines)('1040 line 4a').value, 0n, 'NOT an IRA distribution')
+            assertEq(lineRuled(outcome.lines)('1040 line 4b').value, 0n)
         },
     },
     // ── Phase 29 (DOC-22/TAX-33): the alternative minimum tax, end to end ──

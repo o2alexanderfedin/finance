@@ -78,8 +78,13 @@ These are cited by name throughout the source. They are stated here so the citat
 - **No new dependency, including a devDependency, without every repo owner's approval.**
 - **A missing generic capability is written here in this project, shaped so it could be lifted
   upstream unchanged** — no locale or domain assumptions baked into a generic module. See
-  `fjs/types/decimal` (scale as a parameter, zero finance-specific content) versus
-  `fjs/document/ocr_amount` (comma degrouping, a US printed-form convention, kept one layer out).
+  `fjs/types/decimal` (scale as a parameter, zero finance-specific content) versus `fjs/exact`
+  (integer cents, `centsFromString`/`centsToString`, a money convention kept one layer out).
+
+  This example was `fjs/document/ocr_amount` until MAINT-01 deleted it as an orphan, which is
+  the second-order cost of dead code worth naming: **a rule illustrated by an unreachable module
+  is a rule nobody can check.** Pick live code for an example, or the example outlives the thing
+  it describes.
 
 ## A proof is not known to work until you have watched it fail
 

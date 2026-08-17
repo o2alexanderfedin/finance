@@ -132,20 +132,32 @@
  *   which is why `fjs/form8606` proves a two-IRA case distinct from a one-IRA
  *   case at the same total.
  *
- * ## Three fields that exist only to be refused by name
+ * ## Two fields that exist only to be refused by name — and one that graduated
  *
- * `netAmountConvertedToRothIras` (line 8, Part II),
  * `hadOutstandingRolloverOrRecharacterization` (lines 6 and 7's own
  * exclusions) and `hadQualifiedDisasterDistributionOrPlanRepayment` (lines
- * 15b and 15c's Form 8915-F and repayment adjustments) are all storable and
- * all refused by `fjs/form8606`. The reasoning is `vnd.fjs.credits`'
+ * 15b and 15c's Form 8915-F and repayment adjustments) are storable and
+ * refused by `fjs/form8606`. The reasoning is `vnd.fjs.credits`'
  * `filerAttainedAgeTwentyFourBeforeTheEndOfTheYear` exactly: a fact that
  * cannot be STORED cannot be REFUSED, and a computation that silently ignores
  * a fact it does not model is the failure this whole repository is organized
- * against. **Part III (distributions from Roth IRAs) has no field here**, and
- * `fjs/form8606` detects it a different way — off Form 1099-R box 7's own
- * Roth distribution codes — because a Roth distribution arrives on a document
- * rather than as an assertion.
+ * against.
+ *
+ * **`netAmountConvertedToRothIras` (line 8) was the third, and Phase 31
+ * promoted it from refused to COMPUTED** — the field did not change, only what
+ * reads it. That is the payoff of storing a fact in order to refuse it: the
+ * dialect needed no migration and no stored document became invalid when Part
+ * II was built. It is worth recording as the outcome this pattern was betting
+ * on, since the bet is usually made without evidence.
+ *
+ * **Part III (distributions from Roth IRAs) still has no field here**, and it
+ * never will: `fjs/form8606` detects it off Form 1099-R box 7a's own Roth
+ * distribution codes, because a Roth distribution arrives on a DOCUMENT rather
+ * than as an assertion. Phase 31 computes the one code a single year supports
+ * (`Q`, a qualified distribution, tax-free) and refuses `J` and `T` by name for
+ * the specific multi-year facts each is missing. What Part III would need —
+ * cumulative Roth contribution and conversion bases over every prior year — is
+ * a multi-year store, not another field on this record.
  *
  * Sources, fetched and read directly rather than recalled: `f8606.pdf` and
  * `i8606.pdf` (2025 revisions), and `i1040gi.pdf`'s own Line 4a/4b

@@ -522,7 +522,19 @@ Decisions that surfaced during Phases 7-9 and were deliberately **not** taken in
 each is a maintainer's call rather than an implementation detail. They are recorded as requirements
 so they are scheduled rather than remembered. All are T3 — none blocks the v1 tax result.
 
-- [ ] **MAINT-01** *(T3)*: Decide whether the OCR-conversion island is wired or removed.
+- [x] **MAINT-01** *(T3)*: Decide whether the OCR-conversion island is wired or removed.
+
+      **Closed (Phase 31): REMOVED.** `fjs/document/1099int/from_ocr` was imported by nothing and
+      `fjs/document/ocr_amount` only by it, so both are deleted. The conversion duplicated the live
+      path — this file puts PDF/OCR extraction in code permanently Out of Scope, and the agent's own
+      vision pass emits both `vnd.fjs.ocr` and the typed document directly.
+
+      **The `vnd.fjs.ocr` DIALECT stays**, registered in `fjs/server/finance_schema`; only the
+      conversion path was orphaned. All 5 `fjs/server/dialect_parity` leaves and `ocrResolves` are
+      green. The leaf-set diff is exactly the 17 leaves inside the two deleted modules — nothing
+      that guards a live path was lost, since the live 1099-INT box reads are proved by
+      `fjs/document/1099int` and `fjs/form1040/core`. AGENTS.md's layering rule cited `ocr_amount`
+      as its example and was repointed at `fjs/exact` in the same commit.
       `fjs/document/1099int/from_ocr`, `fjs/document/ocr_amount` and `fjs/document/subject` are
       **unreachable from the running server** — an import graph from `index.js` never touches them,
       and a guest program cannot reach them either, since EXEC-07 forbids imports inside a stored
@@ -814,7 +826,32 @@ itemizing, which is complete apart from the eight open MAINT items.
       *Gap 2 — §408(d)(8)(F)'s one-time split-interest election refuses by name*, quoting both
       its own $54,000 sub-cap and the $108,000 it sits inside. It is once per LIFETIME, spanning
       years this engine cannot see, and needs a statement attached to the return.
-- [ ] **TAX-29** *(M2, T2)*: **Form 8606**, nondeductible IRA basis and the pro-rata rule.
+- [x] **TAX-29** *(M2, T2)*: **Form 8606**, nondeductible IRA basis and the pro-rata rule.
+
+      **Closed (Phase 31): Part II computed, Part III decided by code.** Phase 26 shipped Part I and
+      refused Parts II and III, so a backdoor Roth was not computable — which is why this box stayed
+      unticked. Phase 31 closes it:
+
+      *Part II (conversions) is COMPUTED*, and it SHARES Part I's pro-rata fraction rather than
+      re-deriving it: printed line 8 became an input to `form8606PartI`, line 11 is the conversion's
+      nontaxable portion, and lines 16/17/18 read off lines 8/11. `line17 === line11` is asserted as
+      an identity so no second §408(d)(2) derivation can return. Printed line 7 now excludes the
+      converted amount beside the QCD. A backdoor Roth computes end to end through `form1040Report`.
+
+      *Part III is split by box 7a code, which is where the multi-year facts start.* Code `Q`
+      COMPUTES — tax-free, no Part III — because the payer certified §408A(d)(2)'s five-year period
+      itself. Codes `T` and `J` REFUSE BY NAME for different missing facts: `T` for
+      §408A(d)(2)(B)'s five-year period (the whole difference between `T` and `Q`), `J` for lines 22
+      and 24's cumulative Roth bases and §408A(d)(3)(F)'s per-conversion clock. **Refusing rather
+      than defaulting matters more here than almost anywhere else: a Roth basis carried forward
+      wrong misstates every later year, not just this one.**
+
+      *A silent understatement fixed on the way.* Phase 26's Part III gate sat behind `partIApplies`
+      inside the per-record loop, so a Roth distribution with no traditional-IRA basis reached no
+      gate — and because box 7b is deliberately unchecked on a Roth Form 1099-R, `fjs/form1040/core`
+      classified it as a PENSION. Probed at the full report: a code-`J` distribution of $20,000.00
+      with box 2a blank gave 1040 line 5b = $0.00 and a tax of $0.00, refusing nothing. The gate now
+      sits over the documents and Forms 1099-R partition three ways, not two.
       Without it, after-tax IRA money is taxed twice. Also the piece that makes a backdoor Roth
       computable, which is why it serves the FAANG persona as much as the retiree.
 
@@ -958,6 +995,87 @@ itemizing, which is complete apart from the eight open MAINT items.
       below the threshold and the engine refuses above it, so the field would have no reader —
       the `box13StatutoryEmployee` defect Phase 27 found, avoided rather than repeated. It
       acquires a reader the day Form 8995-A is modeled.
+
+      **STILL OPEN after Phase 31. The reason is SESSION BUDGET and nothing else** — Form 8995-A is
+      a forty-line form plus four Schedules, and there was not enough of the session left to build it
+      to this repository's standard (transcribe, wire, reclassify the scope kind, separate every
+      `min`/`max` limb in a fixture, and watch each new proof fail). Nothing about it is undecidable.
+
+      `[RECORD CORRECTED — read this before trusting any recorded reason, including this one]` The
+      first version of this note gave a different reason: that `f8995a.pdf` **could not be fetched**.
+      **That claim was never tested and it is FALSE** — `curl -sSL https://www.irs.gov/pub/irs-pdf/f8995a.pdf`
+      returns a 117,129-byte `%PDF-1.7` in one command, and the transcription below was taken from it.
+      The claim was written from an assumption about the environment while that same session had
+      already pushed twice over HTTPS. It is left visible rather than quietly overwritten because it
+      is AGENTS.md's "Verifying a claim before you record it" failing in the exact shape that section
+      warns about: **a recorded reason removes all pressure to look again**, so the next attempt would
+      have skipped the fetch on this file's authority. Fetch `i8995a.pdf` too.
+
+      *Transcribed from the printed `f8995a.pdf` face, "Form 8995-A (2025) Created 9/12/25". Forty
+      lines, so the next attempt needs no recall:*
+
+      - **Part I line 1**, per business A/B/C: (a) name, **(b) check if specified service**,
+        (c) check if aggregation, (d) TIN, (e) check if patron. **The SSTB flag is a Part I
+        checkbox** — which is the field `vnd.fjs.business_expenses` must acquire.
+      - **Part II, Determine Your Adjusted Qualified Business Income** — 2 QBI; **3 line 2 × 20%,
+        and its own printed short-circuit: *"If your taxable income is $197,300 or less ($394,600 if
+        married filing jointly), skip lines 4 through 12 and enter the amount from line 3 on line
+        13"*** (this is exactly Form 8995's simplified case, so the two forms must agree below the
+        threshold — a cross-form leaf worth writing); 4 allocable share of W-2 wages; 5 line 4 × 50%;
+        6 line 4 × 25%; 7 allocable share of UBIA; 8 line 7 × 2.5%; **9 lines 6 + 8**; **10 the
+        GREATER of line 5 or line 9**; **11 the SMALLER of line 3 or line 10** (the wage/UBIA
+        limitation); 12 the phased-in reduction from line 26; **13 the GREATER of line 11 or line
+        12**; 14 patron reduction from Schedule D line 6; 15 line 13 − line 14; 16 total of line 15.
+      - **Part III, Phased-in Reduction** — and note what it phases in: **the W-2-wage/UBIA
+        limitation, NOT the SSTB reduction.** Its printed condition is *"Complete Part III only if
+        your taxable income is more than $197,300 but not $247,300 ($394,600 and $494,600 if married
+        filing jointly) **and line 10 is less than line 3***" — so it runs only where the limitation
+        actually bites. 17 from line 3; 18 from line 10; 19 line 17 − line 18; 20 taxable income
+        before the QBI deduction; **21 threshold $197,300 ($394,600 MFJ)**; 22 line 20 − line 21;
+        **23 phase-in range $50,000 ($100,000 MFJ)**; 24 line 22 ÷ line 23, a PERCENTAGE; 25 line 19
+        × line 24; 26 line 17 − line 25 → line 12.
+      - **Part IV, Determine Your Qualified Business Income Deduction** — 27 from line 16; 28 REIT
+        dividends and PTP income; 29 their prior-year carryforward; 30 combine 28 + 29, if less than
+        zero enter -0-; 31 line 30 × 20%; 32 lines 27 + 31; 33 taxable income before the QBI
+        deduction; 34 net capital gain increased by qualified dividends; 35 line 33 − line 34, if
+        zero or less enter -0-; 36 line 35 × 20%; **37 the SMALLER of line 32 or line 36**; 38 the
+        §199A(g) DPAD, not more than line 33 − line 37; **39 lines 37 + 38 → 1040 line 13a**;
+        40 the REIT/PTP loss carryforward.
+      - **The $50,000/$100,000 phase-in range is confirmed by printed line 23, and it is NOT
+        indexed** — the threshold moves with inflation and the range does not, which is why the upper
+        bound is exactly $247,300 = $197,300 + $50,000. It is a new hand-typed `fjs/tax/params` entry
+        needing its own count-style proof, plus a proof that it is **not derived from the threshold**:
+        25% of $197,300 is $49,325, not $50,000, so a reader who assumes a ratio is wrong by $675.
+        (The earlier note cited §199A(e)(2) for the range; (e)(2) defines the THRESHOLD —
+        §199A(b)(3)(B) is the wage/UBIA phase-in and §199A(d)(3) the SSTB one. The printed figures
+        are the ones to trust here.)
+      - **The SSTB reduction lives in Schedule A, not Part II.** Part II has no
+        "applicable percentage" line at all — Schedule A (Form 8995-A), *Specified Service Trades or
+        Businesses*, computes the REDUCED QBI, W-2 wages and UBIA that then feed lines 2, 4 and 7.
+        Above threshold + range an SSTB's applicable percentage is zero, so all three are zero and
+        the deduction vanishes. This corrects the earlier note, which put the multiplication in Part
+        II.
+      - **SSTB, W-2 wages and UBIA are all ASSERTED, and absence must REFUSE rather than default**,
+        following `vnd.fjs.ira`'s `yearEndValueOfAllTraditionalSepSimpleIras` exactly: `"0.00"` is a
+        real assertion that computes, absence is *unstated*. The SSTB gate must fire ONLY when
+        determinative — above the threshold, which is where line 3's own short-circuit stops — or it
+        breaks every existing below-threshold fixture. Defaulting is wrong in both directions: an
+        SSTB read as non-SSTB overstates the deduction, and the reverse zeroes a legitimate one.
+      - **The common case must be exercised, and it is the trap.** A sole proprietor with no
+        employees has NO W-2 wages, so printed line 5 (50% of wages) is zero, line 6 is zero, and
+        line 9 = line 8 = 2.5% of UBIA is the whole of line 10. A fixture must assert wages `"0.00"`
+        with a NON-ZERO UBIA so that limb is what survives line 10's greater-of — otherwise line 10
+        is zero because both limbs are, and the answer is right for the wrong reason.
+      - **Fixtures must separate every limb**: line 10 where 50%-of-wages wins and where
+        25%+2.5%-UBIA wins; line 11 where line 3 wins and where line 10 wins; line 37 where line 32
+        wins and where line 36 wins; and the boundaries at $197,300 exactly (Form 8995 still
+        applies), one cent above, $247,300 exactly, and one cent past — SSTB and non-SSTB, which
+        diverge only past the range.
+      - **Reclassify in the same commit as the wiring**: the `fjs/return/scope` kind currently
+        refused for the above-threshold case moves from refused to modeled alongside it, and
+        `formEightNineNineFiveAIsUnmodeled` NARROWS rather than disappears — a patron of an
+        agricultural or horticultural cooperative (Schedule D, printed lines 14 and 38), aggregation
+        (Schedule B) and the REIT/PTP limbs (lines 28-31) still refuse.
 
 ### Equity Compensation and AMT (DOC, TAX)
 
@@ -1128,7 +1246,7 @@ itemizing, which is complete apart from the eight open MAINT items.
 | TAX-20, TAX-21, TAX-22 | T1 | 23 - Schedule 2 Populated | **FAANG employee** — all three delivered |
 | TAX-23, TAX-24, DOC-19 | T2 | 24 - Schedule 1 Adjustments | **Non-profit worker** — all three delivered |
 | TAX-25, TAX-26, TAX-27 | T2 | 25 - Schedule 3 Credits | Non-profit worker — TAX-25 and TAX-26 delivered; **TAX-27 stays open**, a named EIC refusal plus a fact-by-fact spec, not the credit |
-| TAX-28, TAX-29 | T2 | 26 - Retiree Completion | Retiree — TAX-28 delivered; **TAX-29 stays open**, Form 8606 Part I only (Parts II/III, and so the backdoor Roth, refuse) |
+| TAX-28, TAX-29 | T2 | 26 - Retiree Completion, 31 - Backdoor Roth | Retiree — TAX-28 delivered (Phase 26); **TAX-29 CLOSED in Phase 31**: Part II computed off Part I's own fraction, Part III's code `Q` computed and codes `J`/`T` refused by name, backdoor Roth computes end to end |
 | DOC-20, DOC-21, TAX-30 | T3 | 27 - 1099-NEC and Schedule C | Startup founder — all three delivered |
 | TAX-31, TAX-32 | T3 | 28 - Schedule SE and QBI | **Startup founder** — TAX-31 delivered; TAX-32 delivers Form 8995 only and stays open for 8995-A |
 | DOC-22, DOC-23, TAX-33, TAX-34 | T3 | 29 - Equity Compensation and AMT | **FAANG employee** — all four delivered. TAX-33 closed with Form 6251 Part III: an ISO spread beside qualified dividends computes end to end |
@@ -1275,7 +1393,7 @@ them. Week 0 is research's addition in front of the plan's Week 1.
 | TEST-02 | T1 | Phase 7 - `fjs_run` and Run Records | Week 1 | Complete |
 | TEST-03 | T2 | Phases 8-15 - standing, per phase | Weeks 2-5 | Complete |
 | TEST-04 | T2 | Phase 7 - `fjs_run` and Run Records | Week 1 | Complete |
-| MAINT-01 | T3 | Phase 16 - Orphan Ingestion Island | Backlog | Pending |
+| MAINT-01 | T3 | Phase 16 - Orphan Ingestion Island | Phase 31 | **Closed — REMOVED.** `from_ocr` + `ocr_amount` deleted (imported by nothing / only by it); the live `vnd.fjs.ocr` dialect and every `dialect_parity` leaf stay green |
 | MAINT-02 | T3 | Phase 17 - Documentation Truth Pass | Backlog | Pending |
 | MAINT-03 | T3 | Phase 17 - Documentation Truth Pass | Backlog | Pending |
 | MAINT-04 | T3 | Phase 17 - Documentation Truth Pass | Backlog | Pending |
