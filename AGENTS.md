@@ -164,12 +164,26 @@ So after any non-trivial merge, verify coverage rather than trusting the exit co
 
 ```
 # 1. both parents' proof-leaf sets must be subsets of the result
-node --test 2>&1 | grep -o '^✔ import("\./fjs/[^ ]*' | sort -u   # run in each parent and in the result
+npm test 2>&1 | grep -o '^✔ import("\./fjs/[^ ]*' | sort -u      # run in each parent and in the result
 comm -23 parent.txt result.txt      # must be empty, or every line individually explained
 
 # 2. a name-set diff is NOT sufficient — a leaf can keep its name and lose its assertions
 grep -cE '\bassert(Eq|NotNullish)?\(' <changed file>   # before vs after; a drop is a regression
 ```
+
+**Use `npm test`, not bare `node --test`, and the difference is not cosmetic.** Until 2026-08-17
+`npm test` *was* bare `node --test`, whose default discovery matches `*.test.ts` as well as
+`*.test.js`. That picked up `functionalscript/fjs/emergent_testing/all.test.ts` — the vendored
+submodule's own entry point — and **ran the entire proof suite a second time**, doubling both the
+reported count and roughly 53 seconds of wall clock. `npm test` is now pinned to
+`node --test *.test.js`, which is why root-level `*.test.js` files are the documented exception
+and a test placed anywhere else will simply not run.
+
+The `sort -u` above is therefore no longer load-bearing; keep it as a cheap assertion that raw and
+unique counts still agree. **The reason this survived for months is worth more than the fix:** the
+inflation was recorded as a fact about the *reporter* and never tested as a fact about the
+*runner*, so the documented `sort -u` workaround removed all pressure to look again. A workaround
+that works is the most expensive kind of bug.
 
 Step 1 caught the dropped leaf; step 2 is what catches the case step 1 cannot see. Where a merge
 deliberately replaces a proof with a stronger one, say so in a `MERGE NOTE` comment at the site, so
