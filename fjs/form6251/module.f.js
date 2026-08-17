@@ -41,12 +41,13 @@
  *
  * ## Part I: what is computed, and what is a documented zero
  *
- * Line 1a/1b and line 2a are computed for real. **Every other line of Part I
- * is a documented zero, and each has its own `fjs/return/scope` kind** so a
+ * Lines 1a/1b, 2a, 2g and 2i are computed for real. **Every other line of Part
+ * I is a documented zero, and each has its own `fjs/return/scope` kind** so a
  * taxpayer who has one is refused BY NAME rather than silently given a zero.
- * That distinction is the whole reason those fifteen kinds were added in this
- * phase: a zero here does not merely omit a line, it UNDERSTATES the tax, and
- * TAX-16 exists for exactly that.
+ * That distinction is the whole reason those fifteen kinds were added in Phase
+ * 29: a zero here does not merely omit a line, it UNDERSTATES the tax, and
+ * TAX-16 exists for exactly that. Fourteen of the fifteen still refuse; line
+ * 2g's kind was reclassified to `modeledKinds` the moment box 9 arrived.
  *
  * - **Line 1a** — 1040 line 14 minus Schedule 1-A line 37, and **line 37, not
  *   line 38**. Line 38 is the Schedule 1-A total that reaches 1040 line 13b;
@@ -79,11 +80,34 @@
  *   is `otherIncome`, a refused scope kind. `fjs/return/scope`'s own
  *   `theFormSixTwoFiveOneLinesAreNameableByKind` leaf is where those two
  *   claims are checked rather than asserted here.
+ * - **Line 2g** — *"Interest from specified private activity bonds exempt from
+ *   the regular tax."* The SECOND preference item this engine computes, and the
+ *   one that needs no election, no basis history and no worksheet: Form 1099-INT
+ *   **box 9** carries the figure outright. §57(a)(5) has exceptions — bonds
+ *   issued in certain years, and §141(e)'s qualified 501(c)(3) bonds, which are
+ *   not private activity bonds for this purpose at all — and **none of them is
+ *   this engine's to apply, because the PAYER already applied them.** Box 9's
+ *   printed instruction is *"shows tax-exempt interest subject to the
+ *   alternative minimum tax"*; the box IS the determination. So this line trusts
+ *   the payer's classification, which is precisely the posture this engine takes
+ *   toward every other transcribed box — W-2 box 1's characterization of what is
+ *   wages, 1099-R box 7's distribution code, 1099-DIV box 1b's qualification of
+ *   a dividend. Re-deriving §57(a)(5) here would need the CUSIP-level issuance
+ *   history of every bond held, and would be second-guessing the one party the
+ *   statute puts in a position to know.
+ *
+ *   Box 9 is a SUBSET of box 8, which 1040 line 2a already sums, so box 9 has
+ *   exactly ONE reader in this whole engine and it is this line — a second
+ *   summand in the regular tax would count the same interest twice. See
+ *   `vnd.fjs.1099int`'s own header for the invariant that keeps the pair
+ *   consistent, and `fjs/form1040/core` for the assertion that line 2a does not
+ *   move.
  * - **Line 2i** — the incentive stock option spread, from stored Forms 3921.
- *   The one preference item this engine computes, and the reason an ISO
- *   exercise can produce tax on income never received. See {@link isoSpread}.
- * - **Lines 2c-2h, 2j-2t and 3** — documented zeros, each with a kind. See the
- *   named constants below, one per printed line, in printed order.
+ *   The larger and stranger of the two preference items this engine computes,
+ *   and the reason an ISO exercise can produce tax on income never received. See
+ *   {@link isoSpread}.
+ * - **Lines 2c-2f, 2h, 2j-2t and 3** — documented zeros, each with a kind. See
+ *   the named constants below, one per printed line, in printed order.
  *
  * ## Part II, and the exemption's own phase-out
  *
@@ -205,6 +229,17 @@ const min = a => b => a < b ? a : b
  * brokerage forms — did the taxpayer sell anything? — and taking the whole
  * list would let a later edit start reading amounts off them, which is
  * Schedule D's job and would give two modules a say in one number.
+ *
+ * `specifiedPrivateActivityBondInterestCents` follows that same rule rather than
+ * `isoExerciseForms`'s, and the difference between the two is worth stating
+ * because both are document-derived. Line 2i is a per-document COMPUTATION
+ * (two products and a floored difference, per exercise, refusing a form with a
+ * box missing), so the forms themselves have to travel. Line 2g is a plain sum
+ * of one box, and the module that already sums 1099-INT boxes — with DOC-11's
+ * absent-is-absent rule written once — is `fjs/form1040/core`, where 1040 line
+ * 2a's own box-8 sum lives. Taking the interest documents here would put a
+ * second reader of that dialect in a second module, which is exactly how box 8
+ * and box 9 would come to be summed by two rules that disagree.
  * @typedef {{
  *   readonly status: IndividualFilingStatus,
  *   readonly adjustedGrossIncomeCents: bigint,
@@ -215,6 +250,7 @@ const min = a => b => a < b ? a : b
  *   readonly standardDeductionCents: bigint,
  *   readonly isoExerciseForms: readonly Stored<FormThirtyNineTwentyOne>[],
  *   readonly aStoredNineteenNineBReportsASale: boolean,
+ *   readonly specifiedPrivateActivityBondInterestCents: bigint,
  *   readonly regularTaxCents: bigint,
  *   readonly scheduleTwoLine1zCents: bigint,
  *   readonly scheduleThreeLine1Cents: bigint,
@@ -238,9 +274,11 @@ const min = a => b => a < b ? a : b
  * `line11` is nonetheless exact — see this module's own docstring. On every
  * other return it is `false` and all three lines are the printed figures.
  *
- * `isoSpreadCents` is line 2i restated on its own field, because it is the one
- * preference item this engine computes and a report that wants to say WHY a
- * return owes AMT needs it without re-deriving it.
+ * `isoSpreadCents` is line 2i restated on its own field, because it is the
+ * largest preference item this engine computes and a report that wants to say
+ * WHY a return owes AMT needs it without re-deriving it. Line 2g gets no such
+ * second field: it is a pass-through of one summed box rather than something
+ * this module derived, so `line2g` already IS the figure a report would quote.
  * @typedef {{
  *   readonly kind: 'ok',
  *   readonly line1a: bigint, readonly line1b: bigint,
@@ -402,6 +440,7 @@ export const form6251 = taxParamSet => input => {
         status, adjustedGrossIncomeCents, totalDeductionsCents, scheduleOneALine37Cents,
         itemizing, scheduleALine7Cents, standardDeductionCents,
         isoExerciseForms, aStoredNineteenNineBReportsASale,
+        specifiedPrivateActivityBondInterestCents,
         regularTaxCents, scheduleTwoLine1zCents, scheduleThreeLine1Cents,
         qualifiedDividendsCents, capitalGainDistributionsCents,
         filingScheduleD, scheduleD15Cents, scheduleD16Cents,
@@ -450,11 +489,26 @@ export const form6251 = taxParamSet => input => {
     //     adds the regular deduction back and 2f allows the AMT one, two
     //     halves of one taxpayer fact.
     const line2f = 0n
-    // 2g. Interest from specified private activity bonds --
-    //     `amtPrivateActivityBondInterest`. Its own scope row records the
-    //     sharpest gap in this form: 1099-INT box 9 carries the figure and
-    //     `vnd.fjs.1099int` does not model box 9.
-    const line2g = 0n
+    // 2g. "Interest from specified private activity bonds exempt from the
+    //     regular tax." Form 1099-INT BOX 9, summed across every supplied
+    //     document by `fjs/form1040/core` and handed over as cents.
+    //
+    //     §57(a)(5) has exceptions -- bonds issued in certain years, and
+    //     §141(e) qualified 501(c)(3) bonds, which are not private activity
+    //     bonds for this purpose at all -- and NONE of them is applied here,
+    //     because the PAYER already applied them. Box 9's printed instruction
+    //     is "shows tax-exempt interest subject to the alternative minimum
+    //     tax": the box IS the determination. This engine trusts the payer's
+    //     classification, the same posture it takes toward W-2 box 1's
+    //     characterization of wages and 1099-DIV box 1b's qualification of a
+    //     dividend. Re-deriving the exceptions would need the issuance history
+    //     of every bond held and would second-guess the one party the statute
+    //     puts in a position to know.
+    //
+    //     Box 9 is a SUBSET of box 8, which 1040 line 2a already sums, so this
+    //     is box 9's ONLY reader anywhere in the engine -- see
+    //     `fjs/form1040/core`'s own no-double-count leaf.
+    const line2g = specifiedPrivateActivityBondInterestCents
     // 2h. Qualified small business stock -- `section1202Gain`, the kind that
     //     already refuses the §1202 exclusion at 1099-DIV box 2c.
     const line2h = 0n
@@ -707,6 +761,7 @@ const nothing = {
     standardDeductionCents: 0n,
     isoExerciseForms: [],
     aStoredNineteenNineBReportsASale: false,
+    specifiedPrivateActivityBondInterestCents: 0n,
     regularTaxCents: 0n,
     scheduleTwoLine1zCents: 0n,
     scheduleThreeLine1Cents: 0n,
@@ -1350,6 +1405,156 @@ export const proof = {
             assertEq(
                 expectOk(run({ ...nothing, aStoredNineteenNineBReportsASale: true })).line11,
                 0n)
+        },
+    },
+    // ── Line 2g: specified private activity bond interest, §57(a)(5) ─────────
+    privateActivityBonds: {
+        // THE MOTIVATING RETURN FOR THIS LINE, and it is a quieter one than the
+        // incentive stock option's: a professional on a salary who also holds
+        // municipal bonds, some of them private-activity. Every figure
+        // hand-typed and derived independently below.
+        //
+        //   salary                                              $250,000.00
+        //   1040 line 14 / 12e   the standard deduction           $15,750.00
+        //   1099-INT box 8       tax-exempt interest              $60,000.00
+        //   1099-INT box 9       ...of which private-activity      $60,000.00
+        //
+        //   line 1a    the deduction, less $0.00 of Sch 1-A         $15,750.00
+        //   line 1b    250,000.00 - 15,750.00                     $234,250.00
+        //   line 2a    the standard-deduction add-back             $15,750.00
+        //   line 2g    box 9, added straight back                  $60,000.00
+        //   line 4     234,250.00 + 15,750.00 + 60,000.00         $310,000.00
+        //   line 5     310,000.00 is below the $626,350.00 phase-out
+        //              threshold, so the exemption survives whole   $88,100.00
+        //   line 6     310,000.00 - 88,100.00                     $221,900.00
+        //   line 7     221,900.00 is below the $239,100.00 breakpoint, so 26%
+        //              of the whole: 221,900.00 x 0.26             $57,694.00
+        //   line 10    a regular tax of                            $52,000.00
+        //   line 11    57,694.00 - 52,000.00                        $5,694.00
+        //
+        // $5,694.00 of tax the regular return cannot see at all — §103(a)
+        // excludes every cent of that interest from gross income, so 1040 line
+        // 2a reports it and line 15 does not tax it, and §57(a)(5) adds the
+        // private-activity part back for the AMT alone.
+        theMunicipalBondHolderWhoOwesAlternativeMinimumTax: () => {
+            const result = expectOk(run({
+                ...wageReturn(25000000n)(singleStandardDeduction)(5200000n),
+                specifiedPrivateActivityBondInterestCents: 6000000n,
+            }))
+            assertEq(result.line2g, 6000000n, 'line 2g = box 9 = $60,000.00')
+            assertEq(result.line1b, 23425000n, 'line 1b = $250,000.00 - $15,750.00 = $234,250.00')
+            assertEq(result.line2a, 1575000n, 'line 2a = the standard deduction, added back')
+            assertEq(result.line4, 31000000n, 'line 4 = AMTI = $310,000.00')
+            assertEq(result.line5, 8810000n, 'the full exemption: AMTI is below the phase-out threshold')
+            assertEq(result.line6, 22190000n, '$310,000.00 - $88,100.00 = $221,900.00')
+            assertEq(result.line7, 5769400n, '26% of $221,900.00 = $57,694.00')
+            assertEq(result.line10, 5200000n, 'line 10 = the regular tax')
+            assertEq(result.line11, 569400n, 'line 11 = $57,694.00 - $52,000.00 = $5,694.00')
+            assertEq(result.line7IsAnUpperBound, false, 'Part III was never reached')
+            // The ISO field is untouched, so the AMT above is attributable to
+            // line 2g and to nothing else this module computes.
+            assertEq(result.isoSpreadCents, 0n, 'no incentive stock option is involved')
+            assertEq(result.line2i, 0n)
+        },
+        // THE SAME RETURN WITH NO PRIVATE-ACTIVITY BONDS owes NOTHING, stated
+        // as a pair against the fixture above so the whole $5,694.00 is
+        // attributed to box 9 rather than to the salary. This is criterion 5 at
+        // this line: a return with no tax-exempt interest computes exactly what
+        // it computed before box 9 existed.
+        //
+        //   line 4     234,250.00 + 15,750.00                     $250,000.00
+        //   line 6     250,000.00 - 88,100.00                     $161,900.00
+        //   line 7     26% of 161,900.00                           $42,094.00
+        //   line 11    42,094.00 loses to a 52,000.00 regular tax       -0-
+        theSameReturnWithoutThemOwesNothing: () => {
+            const result = expectOk(run(wageReturn(25000000n)(singleStandardDeduction)(5200000n)))
+            assertEq(result.line2g, 0n, 'no box 9, no add-back')
+            assertEq(result.line4, 25000000n, 'AMTI is the whole $250,000.00 of AGI and no more')
+            assertEq(result.line6, 16190000n, '$250,000.00 - $88,100.00 = $161,900.00')
+            assertEq(result.line7, 4209400n, '26% of $161,900.00 = $42,094.00')
+            assertEq(result.line11, 0n, 'and it loses to the regular tax')
+        },
+        // LINE 2G REACHES AMTI ONE FOR ONE, asserted as a DIFFERENCE between
+        // two runs rather than against a second literal. This is what catches a
+        // wiring that computed line 2g correctly and then forgot to add it into
+        // line 4 -- the field would hold the right figure and the tax would be
+        // unchanged, and only a comparison across the pair notices.
+        theWholeOfBoxNineLandsInAlternativeMinimumTaxableIncome: () => {
+            const withBonds = expectOk(run({
+                ...wageReturn(25000000n)(singleStandardDeduction)(5200000n),
+                specifiedPrivateActivityBondInterestCents: 6000000n,
+            }))
+            const without = expectOk(run(wageReturn(25000000n)(singleStandardDeduction)(5200000n)))
+            assertEq(
+                withBonds.line4 - without.line4, 6000000n,
+                'AMTI rises by exactly box 9, no more and no less')
+            assertEq(
+                withBonds.line4BeforeAddBack - without.line4BeforeAddBack, 6000000n,
+                'and it is in line 4 BEFORE the married-filing-separately paragraph')
+            assert(
+                withBonds.line11 > without.line11,
+                ['and the tax rises with it', withBonds.line11, without.line11])
+        },
+        // ONE CENT of box 9 moves alternative minimum taxable income by one
+        // cent. Line 2g is a pass-through of a summed box, not a percentage or
+        // a limitation, so nothing rounds it -- and this is the leaf that says
+        // so rather than leaving it to be inferred from a round fixture.
+        oneCentOfBoxNineIsOneCentOfAmti: () => {
+            const result = expectOk(run({
+                ...wageReturn(25000000n)(singleStandardDeduction)(5200000n),
+                specifiedPrivateActivityBondInterestCents: 1n,
+            }))
+            assertEq(result.line2g, 1n)
+            assertEq(result.line4, 25000001n, '$250,000.00 plus one cent')
+        },
+        // The figure lands on line 2g and on NO OTHER Part I line. Written as
+        // an explicit sweep of the twenty printed 2a-2t fields, because the
+        // failure this guards against -- box 9 wired to the neighbouring 2f or
+        // 2h -- would leave line 4, line 11 and every tax figure IDENTICAL, and
+        // no assertion about the tax could ever see it. Line 2a is excluded
+        // from the sweep: it carries the standard-deduction add-back, which is a
+        // real non-zero figure on this fixture.
+        boxNineLandsOnTwoGAndOnNoOtherPartOneLine: () => {
+            const result = expectOk(run({
+                ...wageReturn(25000000n)(singleStandardDeduction)(5200000n),
+                specifiedPrivateActivityBondInterestCents: 6000000n,
+            }))
+            assertEq(result.line2g, 6000000n, 'on line 2g')
+            /** @type {readonly (readonly [string, bigint])[]} */
+            const everyOtherPartOneLine = [
+                ['line2b', result.line2b], ['line2c', result.line2c], ['line2d', result.line2d],
+                ['line2e', result.line2e], ['line2f', result.line2f], ['line2h', result.line2h],
+                ['line2i', result.line2i], ['line2j', result.line2j], ['line2k', result.line2k],
+                ['line2l', result.line2l], ['line2m', result.line2m], ['line2n', result.line2n],
+                ['line2o', result.line2o], ['line2p', result.line2p], ['line2q', result.line2q],
+                ['line2r', result.line2r], ['line2s', result.line2s], ['line2t', result.line2t],
+                ['line3', result.line3],
+            ]
+            assertEq(
+                everyOtherPartOneLine.length, 19,
+                'the nineteen Part I lines that are neither 2a nor 2g, hand-counted off the printed form')
+            for (const [name, value] of everyOtherPartOneLine) {
+                assertEq(value, 0n, ['box 9 must not land on this line', name, value])
+            }
+        },
+        // BOTH preference items on ONE return, and they ADD rather than one
+        // winning: §57(a)(5) and §56(b)(3) are separate printed lines and
+        // neither is a limitation on the other. Without this leaf a wiring that
+        // overwrote line 2i with line 2g -- or summed only the larger -- would
+        // pass every fixture above.
+        theTwoComputedPreferenceItemsBothLandAndAdd: () => {
+            const result = expectOk(run({
+                ...wageReturn(25000000n)(singleStandardDeduction)(5500000n),
+                specifiedPrivateActivityBondInterestCents: 6000000n,
+                isoExerciseForms: [isoForm('doc-iso-and-bonds')('5.00')('105.00')('10000')],
+            }))
+            assertEq(result.line2g, 6000000n, 'line 2g = $60,000.00 of box 9')
+            assertEq(result.line2i, 100000000n, 'line 2i = $1,000,000.00 of ISO spread')
+            // 234,250.00 + 15,750.00 + 60,000.00 + 1,000,000.00 = 1,310,000.00
+            assertEq(result.line4, 131000000n, 'AMTI = $1,310,000.00 -- both, added')
+            assert(
+                result.line2g !== result.line2i,
+                'this fixture is deliberately two DIFFERENT amounts, so a swap names itself')
         },
     },
     partThree: {
