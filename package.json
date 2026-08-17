@@ -14,6 +14,7 @@
   "main": "index.js",
   "scripts": {
     "test": "tsc && node --test",
+    "test:proofs": "tsc && node --test all.test.js",
     "test:integration": "node --test fjs-run-integration.test.js",
     "start": "node index.js",
     "fjs-start": "fjs r ./fjs/index.f.js"

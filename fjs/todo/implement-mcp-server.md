@@ -1,6 +1,19 @@
 # Implement the MCP server
 
-Status: **spec, not implemented.** Week 1 Track A of [../../todo/plan.md](../../todo/plan.md).
+Status: **IMPLEMENTED AND SHIPPED.** Corrected 2026-08-17 (MAINT-04); this line read
+*"spec, not implemented"* for the whole of the project's life, including the ten phases of
+milestone v2 that were built on top of the thing it said did not exist.
+
+The server ships as `finance-mcp 0.12.0` on MCP protocol `2025-11-25` with **13 tools** —
+`cas_add`/`cas_get`/`cas_list`/`cas_refresh`, `evo_add`/`evo_list`/`evo_head`/`evo_revision`,
+`finance_schema`/`finance_tax_params`/`finance_documents_list`, and `fjs_run`/`fjs_check`. Verify
+by starting it rather than by reading this file: `node index.js`, then `initialize` →
+`notifications/initialized` → `tools/list` over stdio.
+
+**Read the rest of this document as a historical spec, not as a description of the present.**
+Where a passage below says a thing is unbuilt or undecided, check the code first — several such
+passages were already false when this status line was corrected. Week 1 Track A of
+[../../todo/plan.md](../../todo/plan.md).
 
 ## Goal
 
@@ -197,13 +210,31 @@ is interpreted. A blob that runs `fs.rmSync` at module scope is not stopped by
 an empty operation map.
 
 Genuine FunctionalScript modules are side-effect-free by construction, but
-nothing verifies that for an arbitrary blob pulled out of CAS. Accepted for
-Week 1 because the only user is trusted and local. Week 5 revisits it — most
-plausibly by parsing the source with FunctionalScript's own `djs/parser` before
-importing, which would enforce the language subset rather than assume it.
+nothing verifies that for an arbitrary blob pulled out of CAS.
 
-This must not silently become the permanent design. If the audience ever widens
-beyond one local user, it is a blocker.
+**Corrected 2026-08-17 (MAINT-04).** This paragraph carried two things DOCC-05 was raised to
+remove, and they survived DOCC-01 being checked and its own verification document asserting a grep
+was clean:
+
+- *"Accepted for Week 1 because the only user is trusted and local."* That rationale was
+  **deliberately struck** from the project's accepted-risk record. It is not the reason the hole is
+  open. The reason is recorded in REQUIREMENTS.md's Accepted Risks and in the runner's own header:
+  the risk is **accepted and deferred**, named, with a v2 milestone entry for child-process
+  isolation — not excused by who is holding the keyboard.
+- *"most plausibly by parsing the source with FunctionalScript's own `djs/parser`."* That remedy
+  names a module this project does not use and would not reach for. A real FunctionalScript source
+  validator built on `fjs/js/tokenizer` + `fjs/bnf` is the recorded v2 item, and REQUIREMENTS.md
+  qualifies it *"if it is ever wanted — for portability, not security"*, which is close to the
+  opposite of what this sentence implied.
+
+**What is actually true today**, and it is narrower than either the old text or the obvious reading:
+a stored program asking for network access **through the effect system** is refused by name, and a
+disallowed import is refused before the module body runs — both proven, including against the
+inherited-property escape routes (`constructor`, `__defineGetter__`, `valueOf`, `hasOwnProperty`,
+`toString`), each with its own leaf. What is **not** defended is a program body calling
+`globalThis.fetch` directly, which runs with host privileges. The demo says so on its own first page.
+
+This must not silently become the permanent design.
 
 ## Testing
 
