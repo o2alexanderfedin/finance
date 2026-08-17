@@ -4,7 +4,7 @@ Status: **IMPLEMENTED AND SHIPPED.** Corrected 2026-08-17 (MAINT-04); this line 
 *"spec, not implemented"* for the whole of the project's life, including the ten phases of
 milestone v2 that were built on top of the thing it said did not exist.
 
-The server ships as `finance-mcp 0.12.0` on MCP protocol `2025-11-25` with **13 tools** —
+The server ships as `finance-mcp 1.0.0` on MCP protocol `2025-11-25` with **13 tools** —
 `cas_add`/`cas_get`/`cas_list`/`cas_refresh`, `evo_add`/`evo_list`/`evo_head`/`evo_revision`,
 `finance_schema`/`finance_tax_params`/`finance_documents_list`, and `fjs_run`/`fjs_check`. Verify
 by starting it rather than by reading this file: `node index.js`, then `initialize` →

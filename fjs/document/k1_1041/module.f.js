@@ -33,17 +33,30 @@
  *
  * ## What this dialect COMPUTES versus what it merely STORES
  *
- * Exactly ONE figure is consumed by a computation:
+ * SIX figures are consumed by a computation, on three different forms. The
+ * list is the authority; a bare count would not say which:
  *
  * - **Box 6, ordinary business income** → Schedule E Part III line 33 column
  *   (d) or (f) → line 35 → line 37 → line 41 → Schedule 1 line 5 → 1040 line 8.
  *   The printed page 2 routes it to *"Schedule E, line 33, column (d) or (f)"*,
  *   and which of the two is a §469 determination — see below.
+ * - **Box 1, interest income** → 1040 line 2b (TAX-35). **One here, where both
+ *   entity faces number their ordinary business income one** — the costliest
+ *   collision on this form, and the reason for a third dialect.
+ * - **Box 2a, ordinary dividends** → 1040 line 3b (TAX-35).
+ * - **Box 2b, qualified dividends** → 1040 line 3a ONLY (TAX-35), a subset of
+ *   box 2a that never joins line 3b a second time.
+ * - **Box 3, net short-term capital gain (loss)** → Schedule D line 5 (TAX-35).
+ * - **Box 4a, net long-term capital gain (loss)** → Schedule D line 12
+ *   (TAX-35); its boxes 4b/4c slices stay REFUSED at their worksheets.
  *
  * Every other fixed-caption money box is stored and refused by name when
  * non-zero, quoting the printed *"Report on"* destination, exactly as
- * `vnd.fjs.k1_1065`'s own {@link unmodeledMoneyBoxes} does. **Eleven of the
- * twelve** are here; box 6 is the one that is not.
+ * `vnd.fjs.k1_1065`'s own {@link unmodeledMoneyBoxes} does. **Six of the
+ * twelve** are here; the six listed above are the ones that are not. Box 5 is
+ * emphatically among the refused: it is other portfolio and nonbusiness income
+ * bound for Schedule E line 33 column (f), NOT the interest a partner's box 5
+ * carries.
  *
  * Boxes 7 and 8 deserve their own note, because their destination is the very
  * part this dialect exists to feed. The printed page routes both to *"Schedule
@@ -210,8 +223,34 @@ export const codedBoxFields = /** @type {const} */ ([
  * refuses the document at storage; a present ZERO is accepted, because a
  * transcript that prints `0.00` into an unused box is ordinary.
  *
- * Eleven of the twelve fixed-caption money boxes are here. Box 6 is the one
- * that is not, because box 6 is the one this engine computes.
+ * Six of the twelve fixed-caption money boxes are here. The boxes that are NOT
+ * here are the ones this engine computes, and they are LISTED rather than
+ * described, because there is now more than one of them and the list grows
+ * every time a destination is wired. A sentence of the form "box 6 is the one
+ * that is not" was true for exactly as long as it took to route a second box,
+ * and a count with no list cannot say WHICH box left.
+ *
+ * - box 6 — ordinary business income, through `fjs/schedule/e` Part III.
+ * - box 1 — interest income, through `fjs/form1040/core`'s 1040 line 2b
+ *   (TAX-35). Note that this face numbers its interest ONE where the
+ *   partnership numbers it five and the S corporation four; the three tables
+ *   are deliberately not shared for exactly this reason.
+ * - box 2a — ordinary dividends, 1040 line 3b (TAX-35).
+ * - box 2b — qualified dividends, 1040 line 3a (TAX-35). A SUBSET of 2a, on
+ *   its own line, never added to 3b a second time.
+ *
+ * - box 3 — net short-term capital gain or loss, Schedule D line 5 (TAX-35).
+ * - box 4a — net long-term capital gain or loss, Schedule D line 12 (TAX-35).
+ *
+ * **Boxes 4b and 4c stay refused** — the collectibles 28% slice and the
+ * unrecaptured §1250 slice are components OF box 4a bound for two worksheets
+ * this engine does not compute.
+ *
+ * **Box 5 stays refused and is the trap this list exists to keep visible.**
+ * `box5OtherPortfolioAndNonbusinessIncome` is not interest and not a
+ * dividend: it goes to Schedule E line 33 column (f) as PORTFOLIO income, and
+ * a shared "box 5 is interest" rule taken from the partnership's face would
+ * silently sweep it onto 1040 line 2b.
  *
  * **Every destination is quoted from the printed form's own page 2**, which
  * prints a *"Report on"* column against each box. That is what makes this table
@@ -219,11 +258,6 @@ export const codedBoxFields = /** @type {const} */ ([
  * where an item belongs.
  */
 export const unmodeledMoneyBoxes = /** @type {const} */ ([
-    ['box1InterestIncome', '1040 line 2b (taxable interest)'],
-    ['box2aOrdinaryDividends', '1040 line 3b (ordinary dividends)'],
-    ['box2bQualifiedDividends', '1040 line 3a (qualified dividends), and thence the Qualified Dividends and Capital Gain Tax Worksheet'],
-    ['box3NetShortTermCapitalGain', 'Schedule D line 5 (short-term gain or loss from partnerships, S corporations, estates and trusts)'],
-    ['box4aNetLongTermCapitalGain', 'Schedule D line 12 (long-term gain or loss from partnerships, S corporations, estates and trusts)'],
     ['box4bTwentyEightPercentRateGain', 'the 28% Rate Gain Worksheet line 4 (Schedule D instructions)'],
     ['box4cUnrecapturedSection1250Gain', 'the Unrecaptured Section 1250 Gain Worksheet line 11 (Schedule D instructions)'],
     ['box5OtherPortfolioAndNonbusinessIncome', 'Schedule E line 33 column (f) — but as PORTFOLIO income, which §469(e)(1) excludes from passive activity income and §1411(c)(1) makes net investment income on Form 8960, so it cannot ride into line 33 on box 6’s material-participation determination'],
@@ -430,8 +464,50 @@ const perUnmodeledBoxZeroAccepted = Object.fromEntries(unmodeledMoneyBoxes.map((
 const expectedMoneyBoxCount = 12
 /** Hand-typed: five coded boxes — 9, 11, 12, 13 and 14. */
 const expectedCodedBoxCount = 5
-/** Hand-typed: eleven of the twelve refuse. `12 - 1` — box 6 computes. */
-const expectedUnmodeledBoxCount = 11
+/** Hand-typed: six of the twelve refuse. `12 - 6` — box 6 computes (Schedule
+ * E Part III); boxes 1, 2a, 2b, 3 and 4a compute (1040 line 2b, 1040 lines
+ * 3b/3a, Schedule D lines 5 and 12), all five TAX-35. */
+const expectedUnmodeledBoxCount = 6
+
+/**
+ * **The hand-typed inverse of {@link unmodeledMoneyBoxes}**: every
+ * fixed-caption money box this engine COMPUTES, and therefore accepts at
+ * storage with a non-zero amount.
+ *
+ * Deliberately not derived by subtracting one list from the other — both would
+ * be the code under test, and AGENTS.md records four shipped defects of
+ * exactly that shape. This is the independent side, and it is what makes a box
+ * that silently leaves `unmodeledMoneyBoxes` WITHOUT its destination being
+ * wired impossible to miss: the arithmetic below stops balancing.
+ * @type {readonly string[]}
+ */
+const computedMoneyBoxes = [
+    'box6OrdinaryBusinessIncome',
+    'box1InterestIncome',
+    'box2aOrdinaryDividends',
+    'box2bQualifiedDividends',
+    'box3NetShortTermCapitalGain',
+    'box4aNetLongTermCapitalGain',
+]
+
+/**
+ * One generated leaf per computed box: a present, NON-ZERO amount must now be
+ * ACCEPTED at storage. This is the exact inverse of the
+ * {@link perUnmodeledBoxRefusal} leaf that each of these boxes used to have,
+ * and deleting a row from {@link unmodeledMoneyBoxes} without adding it here
+ * leaves the box neither refused nor proven storable.
+ */
+const perComputedBoxAcceptedWhenNonZero = Object.fromEntries(computedMoneyBoxes.map(field => [
+    `${field}IsAcceptedWhenNonZero`,
+    () => {
+        const [t, v] = validate({ ...minimal, [field]: '1234.56' })
+        assertEq(t, 'ok', `${field} is computed, so a non-zero amount must be stored, not refused`)
+        assert(
+            !unmodeledMoneyBoxes.some(([refused]) => refused === field),
+            ['a computed box must not also be listed as unmodeled', field, v],
+        )
+    },
+]))
 
 /**
  * **The independent statement of the whole Part III box layout**, hand-typed
@@ -495,6 +571,7 @@ export const proof = {
     ...perCodedBoxRejection,
     ...perUnmodeledBoxRefusal,
     ...perUnmodeledBoxZeroAccepted,
+    ...perComputedBoxAcceptedWhenNonZero,
 
     dialectAndMediaType: () => {
         assertEq(dialect, 'vnd.fjs.k1_1041')
@@ -511,9 +588,9 @@ export const proof = {
         assertEq(codedBoxFields.length, expectedCodedBoxCount)
         assertEq(unmodeledMoneyBoxes.length, expectedUnmodeledBoxCount)
         assertEq(
-            expectedMoneyBoxCount - 1,
+            expectedMoneyBoxCount - computedMoneyBoxes.length,
             expectedUnmodeledBoxCount,
-            'exactly one fixed-caption money box — box 6 — is computed rather than refused',
+            'every fixed-caption money box is either computed or refused, and none is both',
         )
     },
 
@@ -551,19 +628,27 @@ export const proof = {
         for (const [field] of unmodeledMoneyBoxes) {
             assert(money.includes(field), ['an unmodeled box is not a fixed-caption money box', field])
         }
-        // Box 6 is the ONE money box that is not refused, asserted by name
-        // rather than only by count — a count alone cannot see box 6 swapped
-        // for another box in the unmodeled list.
+        // **The partition, asserted BY NAME in both directions** — a count
+        // alone cannot see one box swapped for another in the unmodeled list,
+        // and cannot see a box leave that list without anything computing it.
+        // {@link computedMoneyBoxes} is the hand-typed side; the loop below is
+        // what turns "TAX-35 removed a row" into a red leaf unless the row was
+        // moved to a destination somebody named.
         const refused = unmodeledMoneyBoxes.map(([field]) => field)
         /** @type {readonly string[]} */
         const refusedNames = refused
-        assert(
-            !refusedNames.includes('box6OrdinaryBusinessIncome'),
-            ['box 6 is the computed box and must not be refused', refused])
+        for (const field of computedMoneyBoxes) {
+            assert(
+                !refusedNames.includes(field),
+                ['a computed box must not also be refused', field, refused])
+            assert(
+                money.includes(field),
+                ['a computed box must be a fixed-caption money box on this face', field])
+        }
         for (const field of money) {
             assert(
-                field === 'box6OrdinaryBusinessIncome' || refusedNames.includes(field),
-                ['every money box except box 6 must be refused by name', field])
+                computedMoneyBoxes.includes(field) || refusedNames.includes(field),
+                ['every money box is either computed or refused, and this one is neither', field])
         }
     },
 

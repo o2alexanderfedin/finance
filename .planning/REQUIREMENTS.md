@@ -773,21 +773,28 @@ itemizing, which is complete apart from the eight open MAINT items.
 - [x] **TAX-25** *(M2, T2)*: **Form 8880**, the Saver's Credit → Schedule 3 line 4.
 - [x] **TAX-26** *(M2, T2)*: **Form 8863**, American Opportunity and Lifetime Learning credits
       → Schedule 3 line 3 and 1040 line 29.
-- [ ] **TAX-27** *(M2, T2)*: **Earned Income Credit** → 1040 line 27. **NOT DELIVERED as a
-      computation — deliberately, and the box stays unchecked because of it.** Phase 25 shipped a
-      named refusal plus a fact-by-fact spec, which is honest work and the right outcome, but it is
-      not the credit. A `[x]` here would tell every count derived from these checkboxes that EIC
-      computes. It does not. Re-scoped: the refusal and the spec are done; the computation needs a
-      profile widening and belongs to a later phase.
-      **The sentence above is what Phase 25 found to be false**:
-      the existing Schedule 8812 dependent model carries almost none of §32(c)(3)'s
-      qualifying-child rules. `dependents` was built for a two-fact test (age under 17, an
-      employment-valid SSN); §32(c)(3) needs a checked relationship vocabulary, full-time-student
-      status, permanent and total disability, and residency *in the United States* for more than
-      half the year, and §32(c)(1) needs three more about the filer. The refusal now names all
-      seven, and `fjs/todo/tax-27-earned-income-credit.md` carries the fact-by-fact analysis and
-      the five things a future phase must add. A wrong EIC is the most audited figure on the
-      return; shipping a partial one was the alternative and was rejected.
+- [x] **TAX-27** *(M2, T2)*: **Earned Income Credit** → 1040 line 27a, fully refundable.
+      **DELIVERED as a computation in Phase 32**, and the box is checked because the credit
+      genuinely computes end to end through `form1040Report` for a filer whose profile carries
+      §32's facts — not because a refusal got better prose.
+      Phases 25 through 31 left this box deliberately unchecked, and that record is kept rather
+      than deleted: the reason was that `vnd.fjs.return_profile`'s `dependents` array was built
+      for Schedule 8812's two-fact test (age under 17, an employment-valid SSN) and carries
+      almost none of §32(c)(3). That finding was correct. What Phase 32 did was add the facts
+      rather than argue with it — ten checked vocabularies on the profile, five per dependent
+      (§32(c)(3)'s relationship, full-time-student status, permanent and total disability,
+      United States residency for more than half the year, and the joint-return test) and five
+      about the filer (§32(m)'s two social security numbers, §32(c)(1)(B)'s
+      qualifying-child-of-another question, and §32(c)(1)(A)(ii)'s age band and abode). Each is
+      two or more exact strings rather than `option(true)`, following
+      `fjs/document/business_expenses`' SSTB precedent, because here the wrong default GRANTS a
+      credit.
+      `fjs/schedule/eic` is Worksheet A, Worksheet B and the 2025 EIC Table; the table is a rule
+      rather than stored data, and it reproduces all 10,856 published entries. §32(i)'s
+      disqualified-income test computes four of its five components and REFUSES by name for the
+      rent-and-royalty one. Every fact the profile does not carry refuses by name, and only where
+      the answer turns on it. A return that does not declare `earnedIncomeCredit` computes
+      exactly what it computed before.
 - [x] **DOC-19** *(M2, T2)*: `vnd.fjs.adjustments` — the taxpayer-asserted record behind the
       Schedule 1 Part II adjustments, following `vnd.fjs.medical_expenses` exactly: no IRS
       information return reports educator expenses or HSA contributions to the filer, so the
@@ -1227,12 +1234,53 @@ itemizing, which is complete apart from the eight open MAINT items.
       vocabulary belongs to `fjs/schedule/e` — the identical division `vnd.fjs.business_expenses`
       makes with `fjs/schedule/c`. A row's amount is absent-able, because box 20 code Z prints
       `STMT`.
-- [ ] **TAX-35** *(M2, T3)*: **Schedule E** Parts II and III → Schedule 1 line 5. A founder
+- [x] **TAX-35** *(M2, T3)*: **Schedule E** Parts II and III → Schedule 1 line 5. A founder
       with a partnership stake or S-corp shares cannot file without it.
 
-      **Phase 30 delivers Part II and leaves this UNCHECKED for Part III.** The persona is
-      unblocked — a founder with a partnership stake or S-corporation shares can file — but the
-      requirement names two parts and one of them does not compute.
+      **CLOSED.** Phase 30 delivered Part II; the `vnd.fjs.k1_1041` dialect and Schedule E Part
+      III closed the second part; and the routing half — the last thing this entry stayed open
+      for — is done. All three are checked claims below rather than descriptions.
+
+      **Ticked because the routing genuinely computes**, in three slices, each with a fixture
+      where the destination line moves by EXACTLY the K-1's contribution and a control where it
+      does not move, and each asserting `boxPath` per box rather than a total. Sixteen boxes
+      across three faces, at sixteen different box numbers:
+
+      | Destination | 1065 | 1120-S | 1041 |
+      |---|---|---|---|
+      | 1040 line 2b, taxable interest | box 5 | box 4 | box 1 |
+      | 1040 line 3b, ordinary dividends | boxes 6a and 6c | box 5a | box 2a |
+      | 1040 line 3a, qualified dividends | box 6b | box 5b | box 2b |
+      | Schedule D line 5, short-term | box 8 | box 7 | box 3 |
+      | Schedule D line 12, long-term | box 9a | box 8a | box 4a |
+
+      **Every row is a different box number on every face, and that is the whole hazard.** "Box
+      5" means taxable interest on the 1065, the dividend pair on the 1120-S, and other
+      portfolio and nonbusiness income — bound for Schedule E line 33 column (f), NOT 1040 line
+      2b — on the 1041. The three destination tables are deliberately not shared, each dialect
+      now carries a hand-typed `computedMoneyBoxes` as the independent side of a by-name
+      "computed or refused, never both" partition, and the citations on 1040 line 2b are
+      dialect-qualified because the 1041's interest box shares the 1099-INT's field name exactly.
+
+      The partnership routes SIX boxes where the other two route five: `box6cDividendEquivalents`
+      is a §871(m) payment TREATED as a dividend rather than a slice of box 6a, so it is a
+      genuine second summand of line 3b. Its opposite, `box4cTotalGuaranteedPayments`, is the
+      printed total of boxes 4a and 4b and stays refused for exactly that reason.
+
+      **The 28%-rate and unrecaptured-§1250 boxes stay refused** (1065 9b/9c, 1120-S 8b/8c, 1041
+      4b/4c) — components of the long-term figure bound for two worksheets this engine computes
+      from Form 1099-DIV boxes 2d and 2b only. Routing 9a while accepting 9b would put a
+      collectibles gain into Schedule D line 15 at the ordinary long-term rate.
+
+      **The capital-gain slice could not ship without an eighth tripwire, and that is the part
+      worth remembering.** Lines 2b/3a/3b compute unconditionally, so routing to them is safe;
+      Schedule D does not — `filingScheduleD` is read VERBATIM off the declared kind and never
+      off document presence (12.1-CONTEXT.md Decision 1.6). Routing six boxes into a
+      declaration-gated schedule would have converted a loud storage refusal into a SILENT
+      understatement for any filer who did not declare `capitalGainsOrLosses`. `fjs/return/tripwire`
+      now treats a non-zero K-1 capital-gain box as proof of that obligation, and
+      `modeledKindDeclarationRemedies` names the remedy. **Routing a box is not finished when the
+      destination computes; it is finished when the destination is REACHABLE.**
 
       What computes: Part II lines 27-32 from both K-1 dialects, and Part V's line 41, which is
       the destination the requirement names. Line 41 combines printed lines 26, 32, 37, 39 and 40,
@@ -1270,12 +1318,12 @@ itemizing, which is complete apart from the eight open MAINT items.
       engine does not hold; an ABSENT one computes, under Reg. §1.199A-6(b)(3)(iii)'s presumption
       that an unreported share of positive qualified business income is zero.
 
-      **Nothing is routed.** TAX-35 asks to route the separately stated items this engine already
-      models and refuse the rest by name; every one of them refuses by name instead, quoting box,
-      code and amount. Each routing — box 5 interest to 1040 line 2b, box 6b to line 3a, boxes
-      8/9a to Schedule D — is a separate wiring into a line that already computes from its own
-      document family, and a wrong one is a silent error in a figure that already looks right.
-      That is the half of this requirement still open besides Part III.
+      **What still refuses by name, which is what the requirement asked for**: the rentals, the
+      royalties, the guaranteed payments, the §1231 gain, the §179 deduction, the foreign taxes,
+      the two capital-gain worksheet slices on each face, the 1041's box 5 portfolio income and
+      its box 10 estate-tax deduction. Each quotes the printed *"Report on"* destination, so a
+      filer holding one is told which line this engine cannot fill rather than having the amount
+      dropped.
 
 ### v2 Traceability
 
@@ -1285,12 +1333,13 @@ itemizing, which is complete apart from the eight open MAINT items.
 | TAX-19 | T0 | 22 - Computable Tripwires | *all four — the safety net* — **delivered** |
 | TAX-20, TAX-21, TAX-22 | T1 | 23 - Schedule 2 Populated | **FAANG employee** — all three delivered |
 | TAX-23, TAX-24, DOC-19 | T2 | 24 - Schedule 1 Adjustments | **Non-profit worker** — all three delivered |
-| TAX-25, TAX-26, TAX-27 | T2 | 25 - Schedule 3 Credits | Non-profit worker — TAX-25 and TAX-26 delivered; **TAX-27 stays open**, a named EIC refusal plus a fact-by-fact spec, not the credit |
+| TAX-25, TAX-26 | T2 | 25 - Schedule 3 Credits | Non-profit worker — both delivered |
+| TAX-27 | T2 | 32 - Earned Income Credit | Low-income working parent — the credit COMPUTES, on ten §32 facts added to `vnd.fjs.return_profile` |
 | TAX-28, TAX-29 | T2 | 26 - Retiree Completion, 31 - Backdoor Roth | Retiree — TAX-28 delivered (Phase 26); **TAX-29 CLOSED in Phase 31**: Part II computed off Part I's own fraction, Part III's code `Q` computed and codes `J`/`T` refused by name, backdoor Roth computes end to end |
 | DOC-20, DOC-21, TAX-30 | T3 | 27 - 1099-NEC and Schedule C | Startup founder — all three delivered |
 | TAX-31, TAX-32 | T3 | 28 - Schedule SE and QBI; 31 - Form 8995-A | **Startup founder** — TAX-31 delivered in Phase 28; TAX-32 delivered Form 8995 there and Form 8995-A, Schedule A, the SSTB reduction and the W-2-wage/UBIA phase-in in Phase 31 |
 | DOC-22, DOC-23, TAX-33, TAX-34 | T3 | 29 - Equity Compensation and AMT | **FAANG employee** — all four delivered. TAX-33 closed with Form 6251 Part III: an ISO spread beside qualified dividends computes end to end |
-| DOC-24, TAX-35 | T3 | 30 - Pass-Through Income | **Startup founder** — DOC-24 delivered; TAX-35 delivers Schedule E Part II end to end and stays open for Part III and for routing the separately stated items |
+| DOC-24, TAX-35 | T3 | 30 - Pass-Through Income | **Startup founder** — DOC-24 delivered; **TAX-35 CLOSED**: Schedule E Part II end to end in Phase 30, Part III with the `vnd.fjs.k1_1041` dialect, and the routing half in three slices — sixteen separately stated boxes across three faces reach 1040 lines 2b/3a/3b and Schedule D lines 5/12 at sixteen different box numbers, with an eighth tripwire so the declaration-gated Schedule D destination is reachable rather than silently skipped |
 
 **25 requirements across 10 phases** — 120 in the document, 95 of them v1's. Each phase is a
 vertical slice that ends with something that works: a persona whose return computes, or a named

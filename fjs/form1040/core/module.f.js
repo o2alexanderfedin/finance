@@ -96,6 +96,10 @@ import { scheduleThree } from '../../schedule/3/module.f.js'
 import { form8812 } from '../../form8812/module.f.js'
 import { iraTaxableAmount, rothDistributionCodeOf } from '../../form8606/module.f.js'
 import { baseTaxForAmount } from '../../tax/table/module.f.js'
+import {
+    earnedIncomeCredit,
+    disqualifiedPassiveIncomeCents as disqualifiedPassiveIncomeCents_,
+} from '../../schedule/eic/module.f.js'
 
 /** @import { ReportLine, Source } from '../../report/line/module.f.js' */
 /** @import { W2 } from '../../document/w2/module.f.js' */
@@ -536,6 +540,7 @@ const storedFilingStatusNamed = status =>
  *   readonly scheduleD19Cents: bigint,
  *   readonly selfEmployment: SelfEmploymentOutcome,
  *   readonly specifiedPrivateActivityBondInterest: ReportLine,
+ *   readonly disqualifiedPassiveIncomeCents: bigint,
  * }} Form1040IncomeLines
  */
 
@@ -644,6 +649,16 @@ export const form1040IncomeLines = taxParamSet => inputs => {
             status, brokerageForms, dividendForms,
             basisCorrections: basisCorrectionForms,
             employeeStockPurchaseForms,
+            // TAX-35: printed Schedule D lines 5 and 12 read the separately
+            // stated capital gain off all three K-1 faces. `filingScheduleD`
+            // above is still read VERBATIM off the declared kind rather than
+            // off document presence (Decision 1.6), so a filer holding such a
+            // K-1 and NOT declaring `capitalGainsOrLosses` would run no
+            // Schedule D at all -- which is why `fjs/return/tripwire` gained
+            // a `capitalGainsOrLosses` entry in the same commit as this
+            // wiring. Without it, routing these boxes would have traded a
+            // loud storage refusal for a silent understatement.
+            partnershipK1Forms, sCorporationK1Forms, estateTrustK1Forms,
             ...(priorYearCapitalLossCarryover === undefined ? {} : { priorYearCapitalLossCarryover }),
         })
         : undefined
@@ -705,11 +720,40 @@ export const form1040IncomeLines = taxParamSet => inputs => {
     const specifiedPrivateActivityBondInterest = fromDocuments('Form 6251 line 2g')(
         sumBoxOverDocuments(interestForms)('box9SpecifiedPrivateActivityBondInterest')(
             form => form.box9SpecifiedPrivateActivityBondInterest))
-    const line2b = fromDocuments('1040 line 2b')(addBoxSums(
+    // **TAX-35 — the separately stated interest on all three Schedule K-1
+    // faces lands here too**, and each face numbers it DIFFERENTLY: the
+    // partner's is box 5 (§702(a)(8)), the shareholder's box 4
+    // (§1366(a)(1)(A)), the beneficiary's box 1. Read from each dialect's own
+    // field name, never from a shared "interest is box N" rule — on the 1065
+    // "box 5" IS interest, on the 1120-S it is ordinary/qualified dividends,
+    // and on the 1041 it is other portfolio and nonbusiness income bound for
+    // Schedule E line 33 column (f). One shared table would misroute two of
+    // the three, which is why `fjs/document/k1_1120s`'s own table docstring
+    // says the three are deliberately not shared.
+    //
+    // Read UNCONDITIONALLY, with no `declaredKinds` gate, for the reason
+    // lines 3a/3b below already state: `declaredKinds` gates REFUSALS for
+    // kinds this engine cannot compute, and this is now a computed line.
+    //
+    // **The K-1 box paths are dialect-qualified and the 1099-INT's are not.**
+    // `k1_1041`'s interest box is literally `box1InterestIncome`, the same
+    // name the 1099-INT uses, so an unqualified citation on this line could
+    // not tell a beneficiary's interest from a bank's — and a `boxPath`
+    // assertion, which is the only thing that catches a transposition a sum
+    // absorbs, would have nothing to bind to. `fjs/schedule/d`'s
+    // `priorYearCapitalLossCarryoverWorksheet(shortTerm)` is the same
+    // qualification for the same reason.
+    const line2b = fromDocuments('1040 line 2b')(addBoxSums(addBoxSums(addBoxSums(addBoxSums(
         sumBoxOverDocuments(interestForms)('box1InterestIncome')(
             form => form.box1InterestIncome))(
         sumBoxOverDocuments(interestForms)('box3UsSavingsBondsAndTreasuryInterest')(
-            form => form.box3UsSavingsBondsAndTreasuryInterest)))
+            form => form.box3UsSavingsBondsAndTreasuryInterest)))(
+        sumBoxOverDocuments(partnershipK1Forms)('k1_1065.box5InterestIncome')(
+            k1 => k1.box5InterestIncome)))(
+        sumBoxOverDocuments(sCorporationK1Forms)('k1_1120s.box4InterestIncome')(
+            k1 => k1.box4InterestIncome)))(
+        sumBoxOverDocuments(estateTrustK1Forms)('k1_1041.box1InterestIncome')(
+            k1 => k1.box1InterestIncome)))
 
     // 3a/3b — qualified/ordinary dividends, read UNCONDITIONALLY from stored
     // 1099-DIVs, exactly like 1a/2a/2b already read from documents with no
@@ -719,12 +763,41 @@ export const form1040IncomeLines = taxParamSet => inputs => {
     // individual already-computable line. A taxpayer who never declares
     // `qualifiedDividends` but holds a real 1099-DIV gets their REAL figure —
     // strictly more correct than the `declaredZero` this replaces, never less.
-    const line3a = fromDocuments('1040 line 3a')(
+    //
+    // **TAX-35 adds each K-1 face's own dividend pair**, at three more sets of
+    // box numbers: the partner's 6a/6b, the shareholder's 5a/5b, the
+    // beneficiary's 2a/2b. The qualified box is a SUBSET of the ordinary one
+    // on every face — exactly as the 1099-DIV's box 1b is a subset of box 1a —
+    // so it feeds line 3a ONLY and is never added into 3b a second time. That
+    // is the same double-count trap `specifiedPrivateActivityBondInterest`
+    // above is kept out of line 2a for, and the same one the partnership's
+    // `box4cTotalGuaranteedPayments` stays refused for.
+    const line3a = fromDocuments('1040 line 3a')(addBoxSums(addBoxSums(addBoxSums(
         sumBoxOverDocuments(dividendForms)('box1bQualifiedDividends')(
-            div => div.box1bQualifiedDividends))
-    const line3b = fromDocuments('1040 line 3b')(
+            div => div.box1bQualifiedDividends))(
+        sumBoxOverDocuments(partnershipK1Forms)('k1_1065.box6bQualifiedDividends')(
+            k1 => k1.box6bQualifiedDividends)))(
+        sumBoxOverDocuments(sCorporationK1Forms)('k1_1120s.box5bQualifiedDividends')(
+            k1 => k1.box5bQualifiedDividends)))(
+        sumBoxOverDocuments(estateTrustK1Forms)('k1_1041.box2bQualifiedDividends')(
+            k1 => k1.box2bQualifiedDividends)))
+    // Line 3b takes FOUR K-1 summands, not three: the partnership face alone
+    // carries `box6cDividendEquivalents`, a §871(m) payment TREATED as a
+    // dividend rather than a slice of box 6a, so it is a genuine second
+    // partnership summand here. The other two faces have no counterpart, which
+    // is why the 1065 routes six boxes across TAX-35's three slices where the
+    // 1120-S and the 1041 route five each.
+    const line3b = fromDocuments('1040 line 3b')(addBoxSums(addBoxSums(addBoxSums(addBoxSums(
         sumBoxOverDocuments(dividendForms)('box1aTotalOrdinaryDividends')(
-            div => div.box1aTotalOrdinaryDividends))
+            div => div.box1aTotalOrdinaryDividends))(
+        sumBoxOverDocuments(partnershipK1Forms)('k1_1065.box6aOrdinaryDividends')(
+            k1 => k1.box6aOrdinaryDividends)))(
+        sumBoxOverDocuments(partnershipK1Forms)('k1_1065.box6cDividendEquivalents')(
+            k1 => k1.box6cDividendEquivalents)))(
+        sumBoxOverDocuments(sCorporationK1Forms)('k1_1120s.box5aOrdinaryDividends')(
+            k1 => k1.box5aOrdinaryDividends)))(
+        sumBoxOverDocuments(estateTrustK1Forms)('k1_1041.box2aOrdinaryDividends')(
+            k1 => k1.box2aOrdinaryDividends)))
     // Decision 3.3/5.1 — the IRA-deduction circularity refusal, threaded
     // BEFORE line 4a is built, exactly like the Schedule D absent-basis
     // guard above: a document-data-sufficiency/interaction refusal
@@ -1309,8 +1382,20 @@ export const form1040IncomeLines = taxParamSet => inputs => {
         rule: '1040 line 15',
     }
 
+    // §32(i)(2)(E), computed over the SAME Schedule E execution Schedule 1
+    // line 5 came from -- never a second one. It is here rather than at line
+    // 27a because this is the only function where those rows are in scope,
+    // and it is a `bigint` rather than a `ReportLine` because it is an input
+    // to a test, not a printed figure: no line of any form carries it. See
+    // `fjs/schedule/eic`'s own docstring for why it is COMPUTED rather than
+    // written as a zero.
+    const disqualifiedPassiveIncomeCents = disqualifiedPassiveIncomeCents_(
+        [...scheduleOnePartIResult.scheduleE.partII.rows,
+            ...scheduleOnePartIResult.scheduleE.parts.beneficiaryRows])
+
     return {
         kind: 'ok',
+        disqualifiedPassiveIncomeCents,
         line1a, line1b, line1c, line1d, line1e, line1f, line1g, line1h, line1i, line1z,
         line2a, line2b,
         line3a, line3b,
@@ -2003,7 +2088,52 @@ const form1040TaxAndPaymentLines = taxParamSet => inputs => income => {
     // see.
     const line26 = fromDocuments('1040 line 26')(
         profileMoneyBox(profile)('line26EstimatedTaxPayments'))
-    const line27a = declaredZero('1040 line 27a') // earned income credit
+    // 27a — §32, the earned income credit (TAX-27, Phase 32). FULLY
+    // REFUNDABLE, which is why it is here on line 27a among the payments
+    // rather than on Schedule 3 Part I among the nonrefundable credits: it is
+    // paid out whether or not there is any tax to offset, and line 32 adds it
+    // to the total payments.
+    //
+    // **A profile that does NOT declare `earnedIncomeCredit` keeps the
+    // `declaredZero` it has always had, byte for byte.** That is not a
+    // shortcut — it is what makes an ordinary return's report identical to
+    // what it was before this phase, `line27aIsAProfileDeclaredZeroWhenTheKind\
+    // IsNotDeclared` pins it, and the EXEC-14/PROV-09 pinned rerun (which
+    // computes a return declaring neither) is what proves it end to end.
+    // `fjs/schedule/eic` is not even called for such a return, so no §32 fact
+    // can be demanded of a filer who is not claiming the credit.
+    const earnedIncomeCreditOutcome = profile.value.declaredKinds.includes('earnedIncomeCredit')
+        ? earnedIncomeCredit(taxParamSet)({
+            profile: profile.value,
+            line1zCents: income.line1z.value,
+            scheduleSeLine3Cents: income.selfEmployment.lines.line3,
+            scheduleSeLine13Cents: income.selfEmployment.lines.line13,
+            adjustedGrossIncomeCents: income.line11b.value,
+            line2aCents: income.line2a.value,
+            line2bCents: income.line2b.value,
+            line3bCents: income.line3b.value,
+            line7aCents: income.line7a.value,
+            disqualifiedPassiveIncomeCents: income.disqualifiedPassiveIncomeCents,
+        })
+        : undefined
+    // A §32 refusal stops the WHOLE report, threaded exactly like the
+    // Schedule C and Schedule E refusals above: `unmodeled: []`, because it
+    // names no `fjs/return/scope` kind -- `earnedIncomeCredit` is MODELED as
+    // of this phase, and what is missing is a FACT rather than a form.
+    if (earnedIncomeCreditOutcome !== undefined && earnedIncomeCreditOutcome.kind === 'error') {
+        return { kind: 'error', message: earnedIncomeCreditOutcome.message, unmodeled: [] }
+    }
+    // Ruled just `'1040 line 27a'`, per this file's own convention that a 1040
+    // line is named by its 1040 line number -- the decision line 25c records
+    // at length. Its sources are the wage and dependent facts §32 read, which
+    // are what a reader can go and check.
+    const line27a = earnedIncomeCreditOutcome === undefined
+        ? declaredZero('1040 line 27a')
+        : {
+            value: earnedIncomeCreditOutcome.creditCents,
+            sources: unionSources([income.line1z, income.line11b]),
+            rule: '1040 line 27a',
+        }
     // 28 — additional child tax credit: Schedule 8812 Part II-A's line 27,
     // computed above alongside line 19 from the SAME `form8812Outcome`, per
     // Decision 4.3 — never independently re-derived here.
@@ -2334,7 +2464,7 @@ const expectedIncomeLineCount = 31
  * so the `Exclude<>` below is what turns forgetting one of them into a
  * compile error rather than a crash on a missing `.sources` — which is
  * exactly what it did when this phase first added them.
- * @type {readonly Exclude<keyof Form1040IncomeLines, 'kind' | 'filingScheduleD' | 'scheduleD15Cents' | 'scheduleD16Cents' | 'scheduleD18Cents' | 'scheduleD19Cents' | 'selfEmployment' | 'specifiedPrivateActivityBondInterest' | 'itemizing' | 'scheduleALine7Cents' | 'scheduleOneALine37Cents'>[]}
+ * @type {readonly Exclude<keyof Form1040IncomeLines, 'kind' | 'filingScheduleD' | 'scheduleD15Cents' | 'scheduleD16Cents' | 'scheduleD18Cents' | 'scheduleD19Cents' | 'selfEmployment' | 'specifiedPrivateActivityBondInterest' | 'itemizing' | 'scheduleALine7Cents' | 'scheduleOneALine37Cents' | 'disqualifiedPassiveIncomeCents'>[]}
  */
 const incomeLineFieldNames = /** @type {const} */ ([
     'line1a', 'line1b', 'line1c', 'line1d', 'line1e', 'line1f', 'line1g', 'line1h', 'line1i', 'line1z',
@@ -3082,6 +3212,120 @@ const withPassThrough = inputs => partnershipK1Forms => sCorporationK1Forms => (
 })
 
 /**
+ * Overrides `inputsOf`'s empty `estateTrustK1Forms` default — the third K-1
+ * dialect, which {@link withPassThrough} deliberately does not carry because
+ * its own leaves are about self-employment earnings and a beneficiary has
+ * none.
+ * @type {(inputs: Form1040Inputs) => (estateTrustK1Forms: readonly Stored<K1EstateTrust>[]) => Form1040Inputs}
+ */
+const withEstateTrust = inputs => estateTrustK1Forms => ({ ...inputs, estateTrustK1Forms })
+
+// ── TAX-35: the separately stated PORTFOLIO boxes, one fixture per face ──────
+//
+// Three separate box typedefs and three separate builders, never one shared
+// shape with a `dialect` parameter. The whole hazard TAX-35's routing exists
+// to survive is that the same portfolio item wears a different box NUMBER on
+// each face, so a fixture that could be pointed at any of the three by
+// changing one field would let a mis-numbered read pass by construction.
+
+/**
+ * The partner's portfolio boxes, numbered as the printed Schedule K-1 (Form
+ * 1065) numbers them.
+ * @typedef {{
+ *   readonly box5InterestIncome?: string,
+ *   readonly box6aOrdinaryDividends?: string,
+ *   readonly box6bQualifiedDividends?: string,
+ *   readonly box6cDividendEquivalents?: string,
+ *   readonly box8NetShortTermCapitalGain?: string,
+ *   readonly box9aNetLongTermCapitalGain?: string,
+ * }} PartnershipPortfolioBoxes
+ */
+
+/**
+ * A partner's Schedule K-1 carrying portfolio items and NO box 1 — the shape
+ * a partner in an investment partnership receives, and the shape that makes
+ * these leaves about line 2b rather than about Schedule E.
+ * @type {(documentHash: string) => (boxes: PartnershipPortfolioBoxes) => Stored<K1Partnership>}
+ */
+const partnershipPortfolioK1 = documentHash => boxes => ({
+    documentHash,
+    value: {
+        dialect: 'vnd.fjs.k1_1065',
+        payerTin: '33-3333333',
+        recipientTin: '222-22-2222',
+        accountNumber: 'PTR-0002',
+        taxYear: 2025,
+        formRevision: '2025',
+        payerName: 'Northwind Portfolio Partners LP',
+        boxGGeneralPartnerOrLlcMemberManager: /** @type {const} */ (true),
+        materialParticipation: 'materiallyParticipated',
+        ...boxes,
+    },
+})
+
+/**
+ * The shareholder's portfolio boxes, numbered as the printed Schedule K-1
+ * (Form 1120-S) numbers them — **four**, where the partner's is five.
+ * @typedef {{
+ *   readonly box4InterestIncome?: string,
+ *   readonly box5aOrdinaryDividends?: string,
+ *   readonly box5bQualifiedDividends?: string,
+ *   readonly box7NetShortTermCapitalGain?: string,
+ *   readonly box8aNetLongTermCapitalGain?: string,
+ * }} SCorporationPortfolioBoxes
+ */
+
+/**
+ * @type {(documentHash: string) => (boxes: SCorporationPortfolioBoxes) => Stored<K1SCorporation>}
+ */
+const sCorporationPortfolioK1 = documentHash => boxes => ({
+    documentHash,
+    value: {
+        dialect: 'vnd.fjs.k1_1120s',
+        payerTin: '44-4444444',
+        recipientTin: '222-22-2222',
+        accountNumber: 'SHR-0002',
+        taxYear: 2025,
+        formRevision: '2025',
+        payerName: 'Northwind Holdings Inc.',
+        materialParticipation: 'materiallyParticipated',
+        ...boxes,
+    },
+})
+
+/**
+ * The beneficiary's portfolio boxes, numbered as the printed Schedule K-1
+ * (Form 1041) numbers them — **one**, which is the same literal field name the
+ * 1099-INT uses for a bank's interest and the reason line 2b's K-1 citations
+ * are dialect-qualified.
+ * @typedef {{
+ *   readonly box1InterestIncome?: string,
+ *   readonly box2aOrdinaryDividends?: string,
+ *   readonly box2bQualifiedDividends?: string,
+ *   readonly box3NetShortTermCapitalGain?: string,
+ *   readonly box4aNetLongTermCapitalGain?: string,
+ * }} EstateTrustPortfolioBoxes
+ */
+
+/**
+ * @type {(documentHash: string) => (boxes: EstateTrustPortfolioBoxes) => Stored<K1EstateTrust>}
+ */
+const estateTrustPortfolioK1 = documentHash => boxes => ({
+    documentHash,
+    value: {
+        dialect: 'vnd.fjs.k1_1041',
+        payerTin: '66-6666666',
+        recipientTin: '222-22-2222',
+        taxYear: 2025,
+        formRevision: '2025',
+        payerName: 'The Harrow Family Trust',
+        boxHDomesticBeneficiary: /** @type {const} */ (true),
+        materialParticipation: 'materiallyParticipated',
+        ...boxes,
+    },
+})
+
+/**
  * Runs the WHOLE line assembly — 1a-15 and then 16-37 — and hands back both
  * records plus the selected line-16 method, asserting that the return
  * computed.
@@ -3628,6 +3872,205 @@ export const proof = {
                 ])([])([])([])([])([])([])([])))
             assertEq(lines.line2a.value, 700n)
             assertEq(lines.line2b.value, 10000n)
+        },
+        // ── TAX-35: the three K-1 faces' interest, on this same line ─────
+        //
+        // **THREE DIFFERENT AMOUNTS on purpose.** Two boxes carrying the
+        // same figure make a transposition invisible even to a per-line
+        // total, so each face contributes a distinct one and the arithmetic
+        // below only balances if each landed from the face it was put on.
+        //
+        // $100.00 bank + $700.00 partner + $30.00 shareholder + $4.00
+        // beneficiary = $834.00. Hand-typed: 10000 + 70000 + 3000 + 400
+        // = 83400 cents.
+        allThreeKOneFacesReachLineTwoBAtTheirOwnBoxNumbers: () => {
+            const lines = expectIncomeOk(form1040IncomeLines(taxParams2025)(
+                withEstateTrust(withPassThrough(
+                    inputsOf(storedProfile(singleProfile))([])([
+                        interestDocument('sha256-int-01')({ box1InterestIncome: '100.00' }),
+                    ])([])([])([])([])([])([])([])
+                )([
+                    partnershipPortfolioK1('sha256-k1-1065-int')({ box5InterestIncome: '700.00' }),
+                ])([
+                    sCorporationPortfolioK1('sha256-k1-1120s-int')({ box4InterestIncome: '30.00' }),
+                ]))([
+                    estateTrustPortfolioK1('sha256-k1-1041-int')({ box1InterestIncome: '4.00' }),
+                ])))
+            assertEq(lines.line2b.value, 83400n, '$100 + $700 + $30 + $4 = $834.00')
+            // **Per-box `boxPath`, not just the total.** `addBoxSums`
+            // concatenates `sources`, so a swap of two reads leaves the sum
+            // untouched and only the citations can see it (AGENTS.md's
+            // 1099-INT box-mapping finding, in its K-1 form).
+            const paths = lines.line2b.sources.map(source => source.boxPath)
+            assertEq(paths.length, 4, 'one citation per PRESENT box, four boxes')
+            assert(paths.includes('box1InterestIncome'), ['the 1099-INT box 1', paths])
+            assert(paths.includes('k1_1065.box5InterestIncome'), ['the partner box 5', paths])
+            assert(paths.includes('k1_1120s.box4InterestIncome'), ['the shareholder box 4', paths])
+            assert(paths.includes('k1_1041.box1InterestIncome'), ['the beneficiary box 1', paths])
+            // The amount cited against each K-1 path is that face's OWN
+            // figure. This is the assertion a transposition reddens: swap
+            // any two reads above and the sum is still $834.00 while these
+            // three pairings are wrong.
+            const citedAt = /** @type {(path: string) => string | undefined} */ (
+                path => lines.line2b.sources.find(source => source.boxPath === path)?.value)
+            assertEq(citedAt('k1_1065.box5InterestIncome'), '700.00')
+            assertEq(citedAt('k1_1120s.box4InterestIncome'), '30.00')
+            assertEq(citedAt('k1_1041.box1InterestIncome'), '4.00')
+            // The document each citation names, so a read that hits the
+            // right box on the WRONG collection is visible too.
+            const hashAt = /** @type {(path: string) => string | undefined} */ (
+                path => lines.line2b.sources.find(source => source.boxPath === path)?.documentHash)
+            assertEq(hashAt('k1_1065.box5InterestIncome'), 'sha256-k1-1065-int')
+            assertEq(hashAt('k1_1120s.box4InterestIncome'), 'sha256-k1-1120s-int')
+            assertEq(hashAt('k1_1041.box1InterestIncome'), 'sha256-k1-1041-int')
+        },
+        // **THE CONTROL.** The same three K-1s with their interest boxes
+        // ABSENT — every other box on each face left as the builder leaves
+        // it — must not move line 2b off the bank's $100.00, and must not
+        // cite a K-1 at all. A gate needs a control (AGENTS.md): a routing
+        // that added a phantom zero, or that read some neighbouring box,
+        // passes the leaf above and fails this one.
+        kOneFacesWithNoInterestBoxDoNotMoveLineTwoB: () => {
+            const lines = expectIncomeOk(form1040IncomeLines(taxParams2025)(
+                withEstateTrust(withPassThrough(
+                    inputsOf(storedProfile(singleProfile))([])([
+                        interestDocument('sha256-int-01')({ box1InterestIncome: '100.00' }),
+                    ])([])([])([])([])([])([])([])
+                )([
+                    partnershipPortfolioK1('sha256-k1-1065-int')({}),
+                ])([
+                    sCorporationPortfolioK1('sha256-k1-1120s-int')({}),
+                ]))([
+                    estateTrustPortfolioK1('sha256-k1-1041-int')({}),
+                ])))
+            assertEq(lines.line2b.value, 10000n, 'the bank interest alone')
+            assertEq(lines.line2b.sources.length, 1, 'DOC-11: an absent box cites nothing')
+            const [only] = lines.line2b.sources
+            assertEq(only.boxPath, 'box1InterestIncome')
+            assertEq(only.documentHash, 'sha256-int-01')
+        },
+        // A beneficiary's interest is NOT tax-exempt interest, and the
+        // 1041's box 1 must not leak into line 2a the way box 8 of a
+        // 1099-INT legitimately does. The second control, for the one pair
+        // of lines this face could be mis-wired between.
+        beneficiaryInterestIsLineTwoBNotTwoA: () => {
+            const lines = expectIncomeOk(form1040IncomeLines(taxParams2025)(
+                withEstateTrust(inputsOf(storedProfile(singleProfile))([])([])([])([])([])([])([])([])([]))([
+                    estateTrustPortfolioK1('sha256-k1-1041-int')({ box1InterestIncome: '4.00' }),
+                ])))
+            assertEq(lines.line2b.value, 400n)
+            assertEq(lines.line2a.value, 0n, 'a beneficiary’s taxable interest is not §103 interest')
+        },
+    },
+    // ── TAX-35 slice 2: the three K-1 faces' dividend pairs ─────────────
+    line3aAnd3b: {
+        // **Every box a DIFFERENT amount**, so no transposition can hide
+        // inside an equal pair, and the two lines are asserted separately —
+        // a 3a/3b swap leaves neither total's neighbour able to see it.
+        //
+        // Ordinary (line 3b): $500.00 bank + $90.00 partner box 6a +
+        //   $7.00 partner box 6c + $60.00 shareholder box 5a +
+        //   $11.00 beneficiary box 2a = $668.00. Hand-typed:
+        //   50000 + 9000 + 700 + 6000 + 1100 = 66800 cents.
+        // Qualified (line 3a): $300.00 bank + $40.00 partner box 6b +
+        //   $20.00 shareholder box 5b + $5.00 beneficiary box 2b =
+        //   $365.00. Hand-typed: 30000 + 4000 + 2000 + 500 = 36500 cents.
+        allThreeKOneFacesReachLinesThreeAAndThreeBAtTheirOwnBoxNumbers: () => {
+            const lines = expectIncomeOk(form1040IncomeLines(taxParams2025)(
+                withEstateTrust(withPassThrough(
+                    inputsOf(storedProfile(singleProfile))([])([])([
+                        dividendDocument('sha256-div-01')({
+                            box1aTotalOrdinaryDividends: '500.00',
+                            box1bQualifiedDividends: '300.00',
+                        }),
+                    ])([])([])([])([])([])([])
+                )([
+                    partnershipPortfolioK1('sha256-k1-1065-div')({
+                        box6aOrdinaryDividends: '90.00',
+                        box6bQualifiedDividends: '40.00',
+                        box6cDividendEquivalents: '7.00',
+                    }),
+                ])([
+                    sCorporationPortfolioK1('sha256-k1-1120s-div')({
+                        box5aOrdinaryDividends: '60.00',
+                        box5bQualifiedDividends: '20.00',
+                    }),
+                ]))([
+                    estateTrustPortfolioK1('sha256-k1-1041-div')({
+                        box2aOrdinaryDividends: '11.00',
+                        box2bQualifiedDividends: '5.00',
+                    }),
+                ])))
+            assertEq(lines.line3b.value, 66800n, '$500 + $90 + $7 + $60 + $11 = $668.00')
+            assertEq(lines.line3a.value, 36500n, '$300 + $40 + $20 + $5 = $365.00')
+            // Per-box `boxPath` AND the amount cited against it, on BOTH
+            // lines — a sum cannot see a transposition, and neither can a
+            // path list on its own.
+            const citedOn = /** @type {(line: ReportLine) => (path: string) => string | undefined} */ (
+                line => path => line.sources.find(source => source.boxPath === path)?.value)
+            const onThreeB = citedOn(lines.line3b)
+            assertEq(onThreeB('box1aTotalOrdinaryDividends'), '500.00')
+            assertEq(onThreeB('k1_1065.box6aOrdinaryDividends'), '90.00')
+            assertEq(onThreeB('k1_1065.box6cDividendEquivalents'), '7.00')
+            assertEq(onThreeB('k1_1120s.box5aOrdinaryDividends'), '60.00')
+            assertEq(onThreeB('k1_1041.box2aOrdinaryDividends'), '11.00')
+            assertEq(lines.line3b.sources.length, 5, 'five ordinary-dividend boxes, five citations')
+            const onThreeA = citedOn(lines.line3a)
+            assertEq(onThreeA('box1bQualifiedDividends'), '300.00')
+            assertEq(onThreeA('k1_1065.box6bQualifiedDividends'), '40.00')
+            assertEq(onThreeA('k1_1120s.box5bQualifiedDividends'), '20.00')
+            assertEq(onThreeA('k1_1041.box2bQualifiedDividends'), '5.00')
+            assertEq(lines.line3a.sources.length, 4, 'four qualified-dividend boxes, four citations')
+            // **The qualified boxes are a SUBSET, so line 3b must not cite
+            // them.** This is the double count that would be invisible in
+            // 3b's total alone if the two K-1 dividend boxes were simply
+            // added together, and it is the K-1 form of the box-9/line-2a
+            // rule this file already states above.
+            const threeBPaths = lines.line3b.sources.map(source => source.boxPath)
+            assert(!threeBPaths.includes('k1_1065.box6bQualifiedDividends'), threeBPaths)
+            assert(!threeBPaths.includes('k1_1120s.box5bQualifiedDividends'), threeBPaths)
+            assert(!threeBPaths.includes('k1_1041.box2bQualifiedDividends'), threeBPaths)
+        },
+        // **THE CONTROL.** The same three K-1s with their dividend boxes
+        // absent leave both lines on the 1099-DIV's own figures and cite no
+        // K-1 at all.
+        kOneFacesWithNoDividendBoxesDoNotMoveEitherLine: () => {
+            const lines = expectIncomeOk(form1040IncomeLines(taxParams2025)(
+                withEstateTrust(withPassThrough(
+                    inputsOf(storedProfile(singleProfile))([])([])([
+                        dividendDocument('sha256-div-01')({
+                            box1aTotalOrdinaryDividends: '500.00',
+                            box1bQualifiedDividends: '300.00',
+                        }),
+                    ])([])([])([])([])([])([])
+                )([
+                    partnershipPortfolioK1('sha256-k1-1065-div')({}),
+                ])([
+                    sCorporationPortfolioK1('sha256-k1-1120s-div')({}),
+                ]))([
+                    estateTrustPortfolioK1('sha256-k1-1041-div')({}),
+                ])))
+            assertEq(lines.line3b.value, 50000n, 'the bank dividends alone')
+            assertEq(lines.line3a.value, 30000n)
+            assertEq(lines.line3b.sources.length, 1, 'DOC-11: an absent box cites nothing')
+            assertEq(lines.line3a.sources.length, 1)
+        },
+        // The 1041's box 2a is a DIVIDEND and its box 1 is INTEREST, and the
+        // engine must not let either become the other. The cross-line
+        // control for slices 1 and 2 together: one document carrying both,
+        // with each line moving by exactly its own box.
+        aBeneficiarysInterestAndDividendsDoNotCrossLines: () => {
+            const lines = expectIncomeOk(form1040IncomeLines(taxParams2025)(
+                withEstateTrust(inputsOf(storedProfile(singleProfile))([])([])([])([])([])([])([])([])([]))([
+                    estateTrustPortfolioK1('sha256-k1-1041-both')({
+                        box1InterestIncome: '4.00',
+                        box2aOrdinaryDividends: '11.00',
+                        box2bQualifiedDividends: '5.00',
+                    }),
+                ])))
+            assertEq(lines.line2b.value, 400n, 'box 1 alone reaches line 2b')
+            assertEq(lines.line3b.value, 1100n, 'box 2a alone reaches line 3b')
+            assertEq(lines.line3a.value, 500n, 'box 2b alone reaches line 3a')
         },
     },
     line9: {
@@ -5376,6 +5819,182 @@ export const proof = {
         // `socialSecurityBenefits` itself now has its OWN "actually computes"
         // coverage: `retirementAndSocialSecurityBeforeTheScopeReclassificationLands`
         // above and `wave1RetirementAndSocialSecurity` below.
+        // ── TAX-27 (Phase 32): §32 through the FULL report entry point ──────
+        //
+        // ACCEPTANCE 1. A qualifying filer's earned income credit computed end
+        // to end, every figure hand-derived here and NONE of them read back
+        // out of the engine.
+        //
+        // A single filer, one qualifying nine-year-old daughter with every §32
+        // fact stated, and one Form W-2 for $25,000 with no withholding:
+        //
+        //   line 1a = 1z            $25,000.00   the one W-2's box 1
+        //   line 11b (AGI)          $25,000.00   no adjustments
+        //   line 12e                $15,750.00   single standard deduction
+        //   line 15                  $9,250.00   $25,000 - $15,750
+        //   line 16                    $928.00   Tax Table. Below $100,000 the
+        //                                        bands are $50 wide above
+        //                                        $3,000, so $9,250 sits in
+        //                                        [$9,250, $9,300) whose
+        //                                        midpoint is $9,275, and
+        //                                        10% x $9,275 = $927.50 -> $928
+        //                                        ($9,275 is inside single's 10%
+        //                                        bracket, which runs to $11,925)
+        //   line 19                    $928.00   Schedule 8812's child tax
+        //                                        credit, which runs off the
+        //                                        SAME `dependents` array and
+        //                                        is NONREFUNDABLE, so §24(a)
+        //                                        limits it to the tax
+        //   line 21                    $928.00   19 + 20, and 20 is zero
+        //   line 22                      $0.00   max(18 - 21, 0): the child
+        //                                        tax credit extinguishes the
+        //                                        tax exactly
+        //   line 24                      $0.00   no other taxes
+        //   line 27a                 $4,060.00   the EIC Table, one qualifying
+        //                                        child, all other filing
+        //                                        statuses: band [$25,000,
+        //                                        $25,050), midpoint $25,025,
+        //                                        which is above the $12,730
+        //                                        earned income amount so the
+        //                                        phase-in is the $4,328
+        //                                        maximum; the excess over the
+        //                                        $23,350 phaseout amount is
+        //                                        $1,675, and 15.98% x $1,675 =
+        //                                        $267.665, so $4,328 - $267.665
+        //                                        = $4,060.335 -> $4,060.
+        //                                        Printed 2025 EIC Table row
+        //                                        "25,000 25,050": 4,060
+        //   line 32                  $4,060.00   27a + 28 + 29 + 30 + 31, and
+        //                                        the last four are zero
+        //   line 33                  $4,060.00   25d + 26 + 32, both zero
+        //   line 34                  $4,060.00   $4,060.00 - $0.00
+        //
+        // **Line 34 is the whole point of the last figure**, and lines 19
+        // through 22 are why it is the strongest available statement of it.
+        // This return owes NO tax — Schedule 8812's nonrefundable child tax
+        // credit, computed off the same `dependents` array, already covers the
+        // whole $928 — so every cent of the earned income credit comes back as
+        // a refund. A nonrefundable §32 would have produced a $0.00 line 34
+        // here, which is exactly the difference between line 27a and Schedule 3
+        // Part I.
+        //
+        // **The first draft of this comment derived line 24 as $928.00 and
+        // line 34 as $3,132.00, and the leaf reddened.** Recorded rather than
+        // quietly corrected: the omission was line 19. The child tax credit
+        // does not wait to be declared — `childTaxCreditOrOtherDependents` is
+        // undeclared on this fixture and Schedule 8812 computes anyway, off the
+        // dependents array — so a hand-derivation of any §32 return with a
+        // qualifying child has to account for it. A figure adjusted until the
+        // suite went green would have hidden that.
+        theEarnedIncomeCreditComputesEndToEndAndIsRefunded: () => {
+            const outcome = form1040Report(taxParams2025)(inputsOf(storedProfile({
+                ...singleProfile,
+                declaredKinds: ['wages', 'earnedIncomeCredit'],
+                dependentCount: 1,
+                dependents: [{
+                    relationship: 'daughter',
+                    ssnValidForEmployment: true,
+                    ageAtYearEnd: 9,
+                    livedWithTaxpayer: true,
+                    earnedIncomeCreditRelationship: 'child',
+                    earnedIncomeCreditUnitedStatesResidency:
+                        'sharedTheTaxpayersUnitedStatesAbodeForMoreThanHalfTheYear',
+                    earnedIncomeCreditJointReturn: 'didNotFileAJointReturn',
+                }],
+                filerSocialSecurityNumber: 'validForEmployment',
+                filerQualifyingChildOfAnotherTaxpayer: 'isNotAnotherTaxpayersQualifyingChild',
+            }))([w2Document('sha256-w2-eic')('25000.00')])([])([])([])([])([])([])([])([]))
+            assert(outcome.kind === 'ok', ['a qualifying §32 filer must compute', outcome])
+            const at = lineRuled(outcome.lines)
+            assertEq(at('1040 line 15').value, 925000n, '$25,000.00 less the $15,750.00 standard deduction')
+            assertEq(at('1040 line 16').value, 92800n, '10% of the $9,275 Tax Table band midpoint')
+            assertEq(at('1040 line 19').value, 92800n, 'the NONREFUNDABLE child tax credit, limited to the tax')
+            assertEq(at('1040 line 24').value, 0n, 'the child tax credit extinguishes the tax exactly')
+            assertEq(at('1040 line 27a').value, 406000n, 'the 2025 EIC Table, one child, all other statuses')
+            assertEq(at('1040 line 32').value, 406000n, 'the credit is the whole of line 32')
+            assertEq(at('1040 line 33').value, 406000n, 'and the whole of the total payments')
+            assertEq(at('1040 line 34').value, 406000n, 'REFUNDED IN FULL: $4,060.00 of credit against $0.00 of tax')
+            // The credit's own line must cite documents, like every other
+            // line: an amount a reader cannot trace is a silently omitted one.
+            assert(
+                at('1040 line 27a').sources.length > 0,
+                ['the credit must cite what it was figured from', at('1040 line 27a').sources],
+            )
+        },
+        // ACCEPTANCE 2. A §32 fact the profile does not carry refuses the WHOLE
+        // report, naming the fact and the field — threaded exactly like the
+        // Schedule C and Schedule E refusals, with `unmodeled: []`, because
+        // `earnedIncomeCredit` is MODELED and what is missing is a fact rather
+        // than a form.
+        anUnstatedSectionThirtyTwoFactRefusesTheWholeReport: () => {
+            const outcome = form1040Report(taxParams2025)(inputsOf(storedProfile({
+                ...singleProfile,
+                declaredKinds: ['wages', 'earnedIncomeCredit'],
+                dependentCount: 1,
+                dependents: [{
+                    relationship: 'daughter',
+                    ssnValidForEmployment: true,
+                    ageAtYearEnd: 9,
+                    livedWithTaxpayer: true,
+                    // `earnedIncomeCreditUnitedStatesResidency` deliberately
+                    // absent: §32(c)(3)(C)'s United States abode test is the
+                    // fact the old `livedWithTaxpayer` boolean could not state.
+                    earnedIncomeCreditRelationship: 'child',
+                    earnedIncomeCreditJointReturn: 'didNotFileAJointReturn',
+                }],
+                filerSocialSecurityNumber: 'validForEmployment',
+                filerQualifyingChildOfAnotherTaxpayer: 'isNotAnotherTaxpayersQualifyingChild',
+            }))([w2Document('sha256-w2-eic')('25000.00')])([])([])([])([])([])([])([])([]))
+            assert(outcome.kind === 'error', ['an unstated §32 fact must stop the report', outcome])
+            assertEq(outcome.unmodeled.length, 0, 'a missing FACT names no unmodeled kind')
+            assert(
+                outcome.message.includes('earnedIncomeCreditUnitedStatesResidency'),
+                ['expected the profile field named', outcome.message],
+            )
+            assert(
+                outcome.message.includes('§32(c)(3)(C)'),
+                ['expected the statute named', outcome.message],
+            )
+            assert(
+                outcome.message.includes('dependents[0]'),
+                ['expected the dependent named by index', outcome.message],
+            )
+            // ...and NOT a single line comes back, per 10-CONTEXT.md Decision 2.
+            assert(
+                !Object.hasOwn(outcome, 'lines'),
+                ['a refusing report must carry no partial line list', outcome],
+            )
+        },
+        // ACCEPTANCE 3, and the leaf that keeps every pre-Phase-32 return
+        // BYTE-IDENTICAL. This is Phase 22's own
+        // `controlTheSameReturnBelowTheThresholdComputesSilently` pattern,
+        // applied to §32: a return that does not declare `earnedIncomeCredit`
+        // must reach line 27a as a profile-declared zero, and no rule string
+        // anywhere in the report may mention the credit at all. The EXEC-14/
+        // PROV-09 pinned rerun computes exactly such a return, so this leaf and
+        // that integration test are two witnesses to one property.
+        //
+        // The negative half is what makes it worth having: an implementation
+        // that ruled line 27a `'1040 line 27a (Earned Income Credit)'`, or that
+        // called `fjs/schedule/eic` unconditionally and thereby demanded a §32
+        // fact of a filer who is not claiming the credit, would pass the value
+        // assertion and fail this one.
+        line27aIsAProfileDeclaredZeroWhenTheKindIsNotDeclared: () => {
+            const outcome = form1040Report(taxParams2025)(
+                inputsOf(storedProfile(singleProfile))([
+                    w2Document('sha256-w2-01')('50000.00'),
+                ])([])([])([])([])([])([])([])([]))
+            assert(outcome.kind === 'ok', ['an ordinary return must still compute', outcome])
+            const line27a = lineRuled(outcome.lines)('1040 line 27a')
+            assertEq(line27a.value, 0n, 'declared zero, not computed and not refused')
+            assertEq(line27a.rule, '1040 line 27a', 'ruled by its line number, naming no form')
+            for (const line of outcome.lines) {
+                assert(
+                    !line.rule.includes('EIC') && !line.rule.toLowerCase().includes('earned income credit'),
+                    ['a return not claiming §32 must mention it in no rule string', line.rule],
+                )
+            }
+        },
         unreportedTipsRefuseTheWholeReportNamingTheLineAndTheRemedy: () => {
             const outcome = form1040Report(taxParams2025)(inputsOf(storedProfile({
                 ...singleProfile,
