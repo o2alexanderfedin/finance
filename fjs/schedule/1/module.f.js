@@ -1480,6 +1480,29 @@ const partIOf = profile => unemploymentForms => nonemployeeCompensationForms => 
     })
 
 /**
+ * A general partner's Schedule K-1 (Form 1065) with the same amount in box 1
+ * and in box 14 code A — what a partnership reports for a partner whose whole
+ * distributive share is ordinary trade-or-business income.
+ * @type {(box1: string) => Stored<K1Partnership>}
+ */
+const partnershipK1Doc = box1 => ({
+    documentHash: 'sha256-k1-1065-a',
+    value: {
+        dialect: 'vnd.fjs.k1_1065',
+        payerTin: '33-3333333',
+        recipientTin: '222-22-2222',
+        accountNumber: 'PTR-0001',
+        taxYear: 2025,
+        formRevision: '2025',
+        payerName: 'Northwind Ventures LP',
+        boxGGeneralPartnerOrLlcMemberManager: /** @type {const} */ (true),
+        materialParticipation: 'materiallyParticipated',
+        box1OrdinaryBusinessIncome: box1,
+        box14SelfEmploymentEarnings: [{ code: 'A', amount: box1 }],
+    },
+})
+
+/**
  * No pass-through income at all — the shape every leaf that predates Phase 30
  * supplies, and the regression question those leaves exist to answer: a return
  * with no Schedule K-1 must reach Schedule SE line 2 with the Schedule C
@@ -1760,6 +1783,94 @@ export const proof = {
             assert(
                 result.message.includes('line 32'),
                 ['the Schedule C loss refusal must reach Schedule 1 unchanged', result.message])
+        },
+        // ── Line 5: Schedule E line 41 (Phase 30, TAX-35) ────────────────
+        //
+        // **The regression property first.** With no Schedule K-1 at all,
+        // line 5 is the documented zero it has always been, citing the
+        // profile's `declaredKinds` box alone — the same value, the same
+        // source count and the same box path as before this phase. That is
+        // what says a return without pass-through income computes exactly
+        // what it computed before Schedule E existed.
+        lineFiveIsStillAProfileCitedZeroWithNoScheduleK1: () => {
+            const partI = okPartI(partIOf(profileNoDeclaredKinds)([])([])([]))
+            assertEq(partI.line5.value, 0n)
+            assertEq(partI.line5.sources.length, 1)
+            assertEq(partI.line5.sources[0].boxPath, 'declaredKinds')
+            assertEq(partI.scheduleE.filed, false)
+            assertEq(partI.line10.value, 0n, 'and the Part I total is unmoved')
+        },
+        // **CRITERION 2**: box 1 reaches 1040 line 8 through Schedule E line
+        // 41 and Schedule 1's OWN Part I total, never by a side channel.
+        //
+        //   K-1 (1065) box 1                                 $80,000.00
+        //   Sch E line 28(j)  nonpassive income               $80,000.00
+        //   Sch E line 32     line 30 + line 31               $80,000.00
+        //   Sch E line 41     lines 26+32+37+39+40            $80,000.00
+        //   Sch 1 line 5                                      $80,000.00
+        //   Sch 1 line 10     (nothing else on Part I)        $80,000.00
+        lineFiveIsScheduleELineFortyOneAndReachesLineTen: () => {
+            const withK1 = okPartI(scheduleOnePartI({
+                profile: profileNoDeclaredKinds,
+                unemploymentForms: [],
+                nonemployeeCompensationForms: [],
+                businessExpenseForms: [],
+                w2Forms: [],
+                partnershipK1Forms: [partnershipK1Doc('80000.00')],
+                sCorporationK1Forms: [],
+            }))
+            assertEq(withK1.scheduleE.parts.line41.value, 8000000n, 'Schedule E line 41')
+            assertEq(withK1.line5.value, 8000000n, 'Schedule E line 41 IS Schedule 1 line 5')
+            assertEq(withK1.line10.value, 8000000n, 'and it reaches the Part I total')
+            assertEq(withK1.scheduleE.filed, true)
+            // The hard zero is REPLACED: line 5 cites the Schedule K-1 box it
+            // read, and its rule names where the figure came from.
+            const paths = withK1.line5.sources.map(source => source.boxPath)
+            assert(
+                paths.includes('box1OrdinaryBusinessIncome'),
+                ['line 5 must cite the Schedule K-1 box it read', paths])
+            assert(
+                withK1.line5.rule.includes('Schedule E line 41'),
+                ['line 5 must name where it came from', withK1.line5.rule])
+        },
+        // **Line 3 and line 5 are DIFFERENT lines fed by DIFFERENT documents**,
+        // and line 10 is their sum. A wiring that put Schedule E's total on
+        // line 3, or Schedule C's on line 5, would leave line 10 identical —
+        // which is exactly why the two are asserted separately here.
+        //
+        //   line 3  Schedule C net profit                       $260.00
+        //   line 5  Schedule E line 41                       $80,000.00
+        //   line 10 260.00 + 80,000.00                       $80,260.00
+        linesThreeAndFiveAreDistinctAndBothReachTheTotal: () => {
+            const partI = okPartI(scheduleOnePartI({
+                profile: profileNoDeclaredKinds,
+                unemploymentForms: [],
+                nonemployeeCompensationForms: [nonemployeeCompensationDoc('350.00')],
+                businessExpenseForms: [businessDoc([advertisingEntry('90.00')])],
+                w2Forms: [],
+                partnershipK1Forms: [partnershipK1Doc('80000.00')],
+                sCorporationK1Forms: [],
+            }))
+            assertEq(partI.line3.value, 26000n, 'Schedule C: $350.00 - $90.00 = $260.00')
+            assertEq(partI.line5.value, 8000000n, 'Schedule E: $80,000.00')
+            assertEq(partI.line10.value, 8026000n, '$260.00 + $80,000.00 = $80,260.00')
+        },
+        // A Schedule E refusal must reach a Part I caller rather than being
+        // swallowed, exactly as Schedule C's does. A LOSS is the refusal most
+        // likely to be met in practice.
+        aScheduleERefusalPropagatesOutOfPartOne: () => {
+            const result = refusal(scheduleOnePartI({
+                profile: profileNoDeclaredKinds,
+                unemploymentForms: [],
+                nonemployeeCompensationForms: [],
+                businessExpenseForms: [],
+                w2Forms: [],
+                partnershipK1Forms: [partnershipK1Doc('-9000.00')],
+                sCorporationK1Forms: [],
+            }))
+            assert(
+                result.message.includes('§704(d)'),
+                ['the Schedule E loss refusal must reach Schedule 1 unchanged', result.message])
         },
     },
 
