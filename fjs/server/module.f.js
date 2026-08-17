@@ -239,7 +239,7 @@ export const financeMcpHandlers = home => cacheKey => fromRegistry([
  * @type {McpConfig}
  */
 export const financeConfig = {
-    serverInfo: { name: 'finance-mcp', version: '0.12.0' },
+    serverInfo: { name: 'finance-mcp', version: '1.0.0' },
     capabilities: { tools: {} },
     protocolVersion: '2025-11-25',
 }
