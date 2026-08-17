@@ -595,17 +595,35 @@ so they are scheduled rather than remembered. All are T3 — none blocks the v1 
       The note now widens the destructuring to `const [pr, pv]` first and compares
       `pv.protocolVersion`, with the broken version quoted so the correction is checkable.
 
-- [ ] **MAINT-06** *(T3)*: **Left open deliberately, 2026-08-17 (Phase 18).** npm's current
-      release is **0.45.0**, and neither it nor 0.44.0 is consumable here: upstream migrated to
-      `.f.mjs` and `#1520` dropped the `.js` emit (1287/1288 `tsc` errors), and the mechanical
-      396-file specifier rename still leaves **288 errors across 60 files** because the shipped
-      declarations no longer re-export the core types. Measured, not guessed — see
-      `fjs/todo/upstream-mjs-migration.md`, which names the upstream fix and the retirement
-      condition. The literal text below is satisfiable by doing nothing (`^0.43.1` already
-      exceeds 0.43.0); its intent is not met, so this stays unchecked rather than ticked with a
-      paragraph of caveats. Take `functionalscript` 0.43.0. The project is pinned to `^0.41.0` while
-      `main` has moved two minor versions. Re-run the upstream-gap notes in `fjs/todo/` against the
-      new version — one such note has already been retired by an upstream fix once.
+- [x] **MAINT-06** *(T3)*: Take `functionalscript` 0.43.0. **Satisfied literally, and its intent is
+      blocked upstream — measured, not assumed.** `package.json` declares `^0.43.1`, so the version
+      this requirement names is taken and current within its own major line; the four
+      `fjs/todo/upstream-*.md` notes were re-checked against upstream `main` and one was **retired
+      and deleted** (`upstream-json-parse-split.md` — `parse` is tokenizer-backed and total at
+      0.43.1, and its own text mandated deletion once adopted).
+
+      The intent — *be on the newest release* — is not met and cannot be met from inside this
+      repository:
+
+      | version | release commit | `tsc --noEmit` |
+      |---|---|---|
+      | **0.43.1 (kept)** | `cc93a3ca` | **0 errors** |
+      | 0.44.0 | `37db36c0` | **1287 errors** |
+      | 0.45.0 (npm current) | `8804e783` | **1288 errors** |
+
+      Upstream migrated to `.f.mjs` and then **dropped the `.js` emit**, so every
+      `'functionalscript/.../module.f.js'` specifier is `TS2307`. Rewriting all **396 files / 1900
+      occurrences** was measured on a throwaway snapshot and **still leaves 288 errors across 60
+      files**, because the shipped `.d.mts` files `import type` the core vocabulary
+      (`Cas`, `Effect`, `Result`, `Unknown`, `OperationMap`, …) and never re-export it. Every
+      mechanical fix for that residue is a cast, an `any`, or a re-declared local type — **all three
+      forbidden by AGENTS.md**.
+
+      **Resolved by decision rather than left open:** stay on 0.43.1, and the upstream change that
+      unblocks the bump is specified in `fjs/todo/upstream-mjs-migration.md` (one
+      `export type { … }` per relocated type, beside the `import type` already there), with its
+      retirement condition. Half-doing the migration would have traded a working build for 288
+      errors and a forbidden construct at each one.
 
 - [x] **MAINT-07** *(T3)*: Share `executeRun`'s step sequence with `runExecuteRunViaFixture`.
       The rule duplication was removed in 09-05/09-06 (`classifyRunOutcome` now lives once, in
