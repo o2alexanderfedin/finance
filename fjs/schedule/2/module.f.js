@@ -630,6 +630,11 @@ const profileZeroInput = rule => ({
 const selfEmploymentInput = netProfit => socialSecurityWages => ({
     lines: scheduleSelfEmploymentPartI(taxParams2025)({
         netProfitCents: netProfit.value,
+        // Schedule 2 reads Schedule SE's OUTPUT and never its inputs, so a
+        // pass-through share would reach these fixtures only through
+        // `netProfit`'s own value. Held at zero here deliberately: every
+        // assertion below is about Schedule 2's own arithmetic.
+        partnershipSelfEmploymentEarningsCents: 0n,
         socialSecurityWagesCents: socialSecurityWages.value,
     }),
     netProfit,

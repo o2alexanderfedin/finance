@@ -190,7 +190,41 @@ export const kindVocabulary = /** @type {const} */ ([
     'alimonyReceived',                      // Schedule 1 line 2a  -> 8
     'businessIncomeOrLoss',                 // Schedule 1 line 3   -> 8
     'otherGainsOrLosses',                   // Schedule 1 line 4   -> 8
-    'rentalRealEstateRoyaltiesPartnershipsSCorps', // Schedule 1 line 5 -> 8
+    // ── Schedule 1 line 5's own five kinds, one per Schedule E PART ────────
+    //
+    // `rentalRealEstateRoyaltiesPartnershipsSCorps` stood here as ONE kind
+    // for the whole of Schedule E, and it is the coarse kind Phase 27's own
+    // split created rather than removed — its printed caption really does
+    // name five different things, because printed Schedule 1 line 5 is the
+    // total of a schedule with five parts. So this is the one place in this
+    // vocabulary where a per-printed-LINE kind was still too coarse: line 5
+    // has one line number and five sources, each with its own form, its own
+    // documents and its own limitation rules.
+    //
+    // Split here by PART, in Schedule E's own order, which is also Schedule
+    // 1 order for the block as a whole since all five feed line 5.
+    //
+    // **Printed Schedule E line 41 gets no kind, and neither do lines 42 or
+    // 43.** Line 41 is Part V's TOTAL of the five parts above it — a kind for
+    // it would let a taxpayer declare a sum without declaring anything it is a
+    // sum of, the identical reasoning Schedule 1's lines 9/10 and Schedule 3's
+    // lines 7/8/14/15 already carry. Lines 42 and 43 are reconciliations that
+    // change no figure: line 42 restates farming and fishing income already on
+    // line 41 for the §6654(i) estimated-tax exception, and line 43 restates a
+    // real estate professional's participation. Neither adds to any total.
+    //
+    // One of the five is MODELED as of Phase 30 —
+    // `partnershipAndSCorporationIncome`, Schedule E Part II, which
+    // `fjs/schedule/e` computes from the two Schedule K-1 dialects. The other
+    // four refuse by name, which is the whole point of splitting: a filer with
+    // rental property is now told that Part I is what is missing, rather than
+    // being refused for "Schedule E" as a whole or, worse, receiving a return
+    // silently missing it.
+    'rentalRealEstateAndRoyalties',         // Schedule E Part I (3-26)   -> Schedule 1 line 5 -> 8
+    'partnershipAndSCorporationIncome',     // Schedule E Part II (27-32) -> Schedule 1 line 5 -> 8
+    'estateAndTrustIncome',                 // Schedule E Part III (33-37) -> Schedule 1 line 5 -> 8
+    'remicResidualInterest',                // Schedule E Part IV (38-39) -> Schedule 1 line 5 -> 8
+    'netFarmRentalIncomeForm4835',          // Schedule E Part V line 40  -> Schedule 1 line 5 -> 8
     'farmIncomeOrLoss',                     // Schedule 1 line 6   -> 8
     'otherIncome',                          // Schedule 1 line 8a-8z -> 8
     // ── Schedule 1 Part II's own lines, one kind each (TAX-23/24, Phase 24) ─
@@ -827,16 +861,31 @@ const expectedMoneyBoxFieldCount = 4
  * and preferences that had no printed line in this engine before. NOTHING was
  * split — `alternativeMinimumTax` stays exactly where it was and is the kind
  * for the tax itself, which that phase computes.
+ *
+ * `110 -> 114` is Phase 30's own (DOC-24/TAX-35), and it IS a split — the
+ * seventh, and the one that contradicts the paragraph five above which called
+ * Phase 27's "really the last". It was the last split of a coarse kind
+ * covering many printed LINES; this one takes apart a kind covering ONE
+ * printed line whose single caption names five different schedules-within-a-
+ * schedule. `rentalRealEstateRoyaltiesPartnershipsSCorps` is removed and five
+ * per-Schedule-E-PART kinds added, `110 - 1 + 5`. Five rather than six
+ * because Schedule E's line 41 is Part V's own total — see the vocabulary's
+ * own comment above.
+ *
+ * **The lesson is stated here rather than left to be relearned**: "one kind
+ * per printed line" is the rule Phases 23 through 27 applied, and it is not
+ * quite the rule. The real rule is one kind per thing a taxpayer can
+ * truthfully declare having, and printed Schedule 1 line 5 is five of those.
  * @type {number}
  */
-const expectedKindCount = 110
+const expectedKindCount = 114
 
 export const proof = {
     dialectAndMediaType: () => {
         assertEq(dialect, 'vnd.fjs.return_profile')
         assertEq(mediaType, 'application/vnd.fjs.return_profile+json')
     },
-    kindVocabularyIsExactlyOneHundredAndTen: () => {
+    kindVocabularyIsExactlyOneHundredAndFourteen: () => {
         assertEq(kindVocabulary.length, expectedKindCount)
         assertEq(new Set(kindVocabulary).size, kindVocabulary.length)
     },

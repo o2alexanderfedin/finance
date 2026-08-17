@@ -1033,7 +1033,23 @@ is deferred, so three phases remain, and two reasons override the numeric defaul
 | 27. 1099-NEC and Schedule C | v2 | 0/TBD | Not started | - |
 | 28. Schedule SE and QBI | v2 | 0/TBD | Not started | - |
 | 29. Equity Compensation and AMT | v2 | 0/TBD | Not started | - |
-| 30. Pass-Through Income | v2 | 0/TBD | Not started | - |
+| 30. Pass-Through Income | v2 | 0/0 — no plans were written | Complete (DOC-24; TAX-35 open for Part III) | 2026-08-16 |
+
+> **EVERY MILESTONE v2 ROW BUT PHASE 30's IS STALE, and that is a measurement rather than a
+> guess.** Phases 21 through 29 have all shipped — `.planning/REQUIREMENTS.md` records each
+> one's delivery in the requirement entries themselves, and `git log` carries their commits —
+> and not one of them updated its row here or ticked its checkbox in the "Milestone v2" list
+> above. So nine rows read `0/TBD | Not started` for work that is in `develop`.
+>
+> Phase 30 recorded its own row on 2026-08-16 and did NOT retro-fill the other nine, because
+> each needs its own phase's judgment about what it actually delivered (several left a
+> requirement open on purpose) and inventing nine completion states from the outside is how a
+> table becomes confidently wrong rather than merely stale. **This is Phase 17's work**, and it
+> is exactly the defect Phase 17's success criterion 5 exists for.
+>
+> The reliable statement of v2's state is REQUIREMENTS.md's own checkboxes, which every phase
+> from 21 on DID update: `grep -c '^- \[x\] \*\*' .planning/REQUIREMENTS.md` and its `[ ]`
+> counterpart, measured rather than transcribed.
 
 > **Phase 12.1 was missing from this table** until 2026-08-12, which is why plan totals
 > computed from it came out four short. Added from measurement.

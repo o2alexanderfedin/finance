@@ -230,11 +230,27 @@ export const form8960PartI = input => {
     //    see this module's own docstring.
     const line3 = 0n
     // 4a. "Rental real estate, royalties, partnerships, S corporations,
-    //     trusts, etc." Zero: no Schedule E and no Schedule K-1 dialect
-    //     (Phase 30), and `rentalRealEstateRoyaltiesPartnershipsSCorps` is a
-    //     REFUSED kind. (It was the coarse `scheduleOneAdditionalIncome` until
-    //     Phase 27 split Schedule 1 Part I; the per-line kind names exactly
-    //     this printed line, which is why the citation is now precise.)
+    //     trusts, etc." Zero, and as of Phase 30 it is zero for a REASON
+    //     rather than for want of a Schedule E.
+    //
+    //     `fjs/schedule/e` exists and computes Part II, so a Schedule K-1's
+    //     box 1 now reaches Schedule 1 line 5. It cannot reach THIS line,
+    //     because §1411(c)(2)(A) makes only a PASSIVE trade or business's
+    //     income net investment income and §1411(c)(6) then removes whatever
+    //     was taken into account in determining self-employment income. That
+    //     leaves exactly one shape of amount for line 4a — passive
+    //     pass-through income not covered by self-employment tax — and
+    //     `fjs/schedule/e`'s `passiveIncomeOutsideSelfEmploymentRefusal`
+    //     REFUSES it by name, naming this line. So every return this engine
+    //     computes has an honest $0.00 here, and every return that would not
+    //     has been stopped.
+    //
+    //     Schedule E's other four parts are each their own REFUSED
+    //     `fjs/return/scope` kind: `rentalRealEstateAndRoyalties` (Part I),
+    //     `estateAndTrustIncome` (Part III), `remicResidualInterest` (Part IV)
+    //     and `netFarmRentalIncomeForm4835` (Part V line 40). Rental real
+    //     estate and estate/trust income are the two that would most often
+    //     land here.
     //
     //     **Phase 27's Schedule C does NOT reach this line**, and that is
     //     worth stating where it could be assumed otherwise: §1411(c)(2)(A)
@@ -487,7 +503,11 @@ export const proof = {
                 netCapitalGainOrLossCents: 2500000n,
             })
             assertEq(result.line3, 0n, 'line 3 = $0.00 -- §1411(c)(5) excludes qualified-plan distributions')
-            assertEq(result.line4a, 0n, 'line 4a = $0.00 -- no Schedule E or K-1 (Phase 30)')
+            assertEq(
+                result.line4a,
+                0n,
+                'line 4a = $0.00 -- §1411(c)(6) excludes self-employment income and '
+                + 'fjs/schedule/e refuses passive pass-through income that it does not cover')
             assertEq(result.line4b, 0n, 'line 4b = $0.00')
             assertEq(result.line4c, 0n, 'line 4c = $0.00')
             assertEq(result.line5b, 0n, 'line 5b = $0.00 -- every disposition here is investment property')

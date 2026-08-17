@@ -309,6 +309,42 @@ export const wagesAttributionRefusal = status => w2Forms => proprietorTin => {
     }
 }
 
+/**
+ * **Two DIFFERENT people with self-employment income on one return.**
+ *
+ * Schedule SE is filed **per person** — the printed form says so at the top of
+ * Part I: *"If you had more than one source of self-employment income, ...
+ * file a separate Schedule SE for each spouse with self-employment income."*
+ * This engine computes ONE.
+ *
+ * Before Phase 30 the case could not arise, because the only source of
+ * self-employment income was a `vnd.fjs.business_expenses` record and
+ * `fjs/schedule/c` refuses a second one. A partnership Schedule K-1 is a
+ * SECOND source, and it carries its own `recipientTin` — so a joint return may
+ * now legitimately hold one spouse's Schedule C and the other spouse's K-1.
+ *
+ * **Merging them is not an approximation.** §1402(b)(1)'s contribution and
+ * benefit base is per person, so one combined line 6 would shelter the second
+ * person's earnings behind the first person's already-consumed base and
+ * UNDERSTATE the tax; and §1402(b)(2)'s $400 floor is per person too, so a
+ * combined figure can cross it where neither person's does. The two errors run
+ * in opposite directions.
+ * @type {(proprietorTin: string) => (partnerTin: string) => ScheduleSeRefusal}
+ */
+export const twoSelfEmployedPeopleRefusal = proprietorTin => partnerTin => ({
+    kind: 'error',
+    message: `Schedule SE: this return carries self-employment income for TWO different people — `
+        + `a business expenses record for '${proprietorTin}' and a Schedule K-1 (Form 1065) with `
+        + `box 14 code A net earnings for '${partnerTin}'. The printed form is filed PER PERSON `
+        + `("file a separate Schedule SE for each spouse with self-employment income") and this `
+        + `engine computes one. Merging them is not an approximation: §1402(b)(1)'s contribution `
+        + `and benefit base is per person, so a combined line 6 would shelter the second person's `
+        + `earnings behind the first person's already-consumed base and understate the tax, while `
+        + `§1402(b)(2)'s $400 floor is also per person and a combined figure can cross it where `
+        + `neither person's does. If the two records name the same person, correct whichever `
+        + `recipient is wrong (two Schedules SE, no phase yet)`,
+})
+
 // ── Part II and line 5a: the two printed parts that exist here only to refuse ─
 
 /**
@@ -405,8 +441,15 @@ export const churchEmployeeIncomeLine5a = () => ({
  */
 
 /**
+ * `partnershipSelfEmploymentEarningsCents` is the sum of **Schedule K-1 (Form
+ * 1065) box 14 code A** across every stored partnership K-1, which printed
+ * line 2 names in its own caption beside Schedule C line 31. It is `0n` for
+ * every return with no partnership stake, and `0n` for every S-corporation
+ * shareholder no matter how large their share — see {@link
+ * scheduleSelfEmploymentPartI}'s own line 2 comment.
  * @typedef {{
  *   readonly netProfitCents: bigint,
+ *   readonly partnershipSelfEmploymentEarningsCents: bigint,
  *   readonly socialSecurityWagesCents: bigint,
  * }} ScheduleSelfEmploymentPartIInput
  */
@@ -418,7 +461,9 @@ export const churchEmployeeIncomeLine5a = () => ({
  * @type {(taxParamSet: TaxParamSet) => (input: ScheduleSelfEmploymentPartIInput) => ScheduleSelfEmploymentPartI}
  */
 export const scheduleSelfEmploymentPartI = taxParamSet => input => {
-    const { netProfitCents, socialSecurityWagesCents } = input
+    const {
+        netProfitCents, partnershipSelfEmploymentEarningsCents, socialSecurityWagesCents,
+    } = input
     const { selfEmploymentTax } = taxParamSet
     const factor = netEarningsFactorBasisPoints(taxParamSet)
     // 1a. "Net farm profit or (loss) from Schedule F, line 34, and farm
@@ -432,10 +477,24 @@ export const scheduleSelfEmploymentPartI = taxParamSet => input => {
     //     page (the box is parenthesised), and zero for the same reason 1a
     //     is: there is no Schedule F to exclude anything from.
     const line1b = 0n
-    // 2. "Net profit or (loss) from Schedule C, line 31." The one line on
-    //    this part that carries a real figure -- Schedule C's own line 31,
-    //    never recomputed here.
-    const line2 = netProfitCents
+    // 2. "Net profit or (loss) from Schedule C, line 31; and Schedule K-1
+    //    (Form 1065), box 14, code A (other than farming)." TWO printed
+    //    sources as of Phase 30, and the caption names both by form and box.
+    //
+    //    **Schedule K-1 (Form 1120-S) is deliberately absent from that
+    //    caption, and its absence is the rule.** An S-corporation
+    //    shareholder's pro rata share is never net earnings from
+    //    self-employment (Rev. Rul. 59-221), which is why the printed line
+    //    names one Schedule K-1 and not the other, and why
+    //    `fjs/schedule/e` returns a structural zero for every 1120-S row.
+    //
+    //    **"(other than farming)" is where a farm partnership's code A goes
+    //    instead**: printed line 1a takes it, and this engine cannot tell a
+    //    farm partnership's code A from any other. It does not have to --
+    //    `farmIncomeOrLoss` is an `fjs/return/scope` refusal, so a partner
+    //    with farm income is refused whole before this form is reached, and
+    //    line 1a stays a documented zero.
+    const line2 = netProfitCents + partnershipSelfEmploymentEarningsCents
     // 3. "Combine lines 1a, 1b, and 2."
     const line3 = line1a + line1b + line2
     // 4a. "If line 3 is more than zero, multiply line 3 by 92.35% (0.9235).
@@ -561,7 +620,21 @@ assert(taxParams2025 !== undefined, 'expected TY2025 parameters to be present in
  * @type {(netProfitCents: bigint) => (socialSecurityWagesCents: bigint) => ScheduleSelfEmploymentPartI}
  */
 const run = netProfitCents => socialSecurityWagesCents =>
-    scheduleSelfEmploymentPartI(taxParams2025)({ netProfitCents, socialSecurityWagesCents })
+    scheduleSelfEmploymentPartI(taxParams2025)({
+        netProfitCents, partnershipSelfEmploymentEarningsCents: 0n, socialSecurityWagesCents,
+    })
+
+/**
+ * Runs Part I with the net profit and the partnership share supplied
+ * SEPARATELY, so a leaf can tell which of printed line 2's two sources a
+ * figure came from. {@link run} above holds the second at zero, which is what
+ * every pre-Phase-30 leaf below assumes.
+ * @type {(netProfitCents: bigint) => (partnershipSelfEmploymentEarningsCents: bigint) => ScheduleSelfEmploymentPartI}
+ */
+const runWithPartnershipShare = netProfitCents => partnershipSelfEmploymentEarningsCents =>
+    scheduleSelfEmploymentPartI(taxParams2025)({
+        netProfitCents, partnershipSelfEmploymentEarningsCents, socialSecurityWagesCents: 0n,
+    })
 
 /** @type {W2} */
 const bareW2Value = {
@@ -606,6 +679,84 @@ const printedNetEarningsFactorBasisPoints = 9235n
 const printedMinimumNetEarningsCents = 40000n
 
 export const proof = {
+    partnershipShare: {
+        /**
+         * **Printed line 2 has TWO sources and line 3 adds them**, and the two
+         * are asserted separately rather than only through their total —
+         * because a wiring that read the partnership share and dropped the
+         * Schedule C profit (or the reverse) produces the same line 3 whenever
+         * one of them is zero, which is every fixture that carries only one.
+         *
+         * $50,000.00 of Schedule C net profit and $80,000.00 of Schedule K-1
+         * box 14 code A. Line 2 = $130,000.00, hand-added; line 4a =
+         * 13,000,000 × 9235 ÷ 10,000 = 120,055,000 ÷ 10,000... written out:
+         * 13,000,000 × 9235 = 120,055,000,000, ÷ 10,000 = 12,005,500 cents =
+         * $120,055.00 exactly, no rounding involved.
+         */
+        printedLineTwoAddsScheduleCAndTheKOneShare: () => {
+            const both = runWithPartnershipShare(5000000n)(8000000n)
+            assertEq(both.line2, 13000000n, '$50,000.00 + $80,000.00 = $130,000.00')
+            assertEq(both.line3, 13000000n, 'line 3 combines lines 1a, 1b and 2')
+            assertEq(both.line4a, 12005500n, '13,000,000 x 0.9235 = $120,055.00')
+            // Each source ALONE, so neither can be the one that is actually
+            // being read while the other is ignored.
+            assertEq(runWithPartnershipShare(5000000n)(0n).line2, 5000000n, 'Schedule C alone')
+            assertEq(runWithPartnershipShare(0n)(8000000n).line2, 8000000n, 'the K-1 share alone')
+        },
+
+        /**
+         * **CRITERION 3's arithmetic, on this form.** An $80,000.00 general
+         * partner's share, with no wages and no Schedule C, hand-derived cent
+         * by cent:
+         *
+         * - line 2 = line 3 = **8,000,000** cents
+         * - line 4a = 8,000,000 × 9235 ÷ 10,000 = **7,388,000** = $73,880.00
+         *   (exact; 8,000,000 × 9,235 = 73,880,000,000)
+         * - line 4c = 7,388,000, which is not below §1402(b)(2)'s 40,000, so
+         *   line 6 = **7,388,000**
+         * - line 9 = 17,610,000 − 0 = 17,610,000, so line 10 multiplies
+         *   line 6: 7,388,000 × 1240 ÷ 10,000 = **916,112** = $9,161.12
+         * - line 11 = 7,388,000 × 290 ÷ 10,000 = **214,252** = $2,142.52
+         * - line 12 = 916,112 + 214,252 = **1,130,364** = **$11,303.64**
+         * - line 13 = 50% of 1,130,364 = **565,182** = $5,651.82 (exact)
+         *
+         * An S-corporation shareholder with the same $80,000.00 supplies
+         * NOTHING to line 2, so every figure above is $0.00 — which is the
+         * second half of the pair, asserted here on the form that charges the
+         * tax rather than only on the schedule that sources it.
+         */
+        theGeneralPartnersTaxIsElevenThousandThreeHundredAndThreeSixtyFour: () => {
+            const partner = runWithPartnershipShare(0n)(8000000n)
+            assertEq(partner.line2, 8000000n)
+            assertEq(partner.line4a, 7388000n, '$73,880.00')
+            assertEq(partner.line6, 7388000n)
+            assertEq(partner.line10, 916112n, '$9,161.12 at 12.4%')
+            assertEq(partner.line11, 214252n, '$2,142.52 at 2.9%')
+            assertEq(partner.line12, 1130364n, '$11,303.64 of self-employment tax')
+            assertEq(partner.line13, 565182n, '$5,651.82 deductible half')
+            // The S-corporation shareholder supplies nothing at all.
+            const shareholder = runWithPartnershipShare(0n)(0n)
+            assertEq(shareholder.line2, 0n)
+            assertEq(shareholder.line12, 0n, '$0.00 — Rev. Rul. 59-221')
+            assertEq(shareholder.line13, 0n)
+        },
+
+        /**
+         * The partnership share goes through §1402(a)(12)'s 92.35% and
+         * §1402(b)(2)'s $400 floor exactly as a Schedule C profit does — the
+         * two are ONE line 2, not two paths. Phase 28's $433.12/$433.13 pair,
+         * re-run with the amount arriving from a Schedule K-1 instead.
+         */
+        theKOneShareCrossesTheSameFourHundredDollarBoundary: () => {
+            assertEq(runWithPartnershipShare(0n)(43312n).line4a, 39999n, 'half-up to $399.99')
+            assertEq(runWithPartnershipShare(0n)(43312n).line6, 0n, 'below the floor: no tax')
+            assertEq(runWithPartnershipShare(0n)(43312n).line12, 0n)
+            assertEq(runWithPartnershipShare(0n)(43313n).line4a, 40000n, 'half-up to $400.00')
+            assertEq(runWithPartnershipShare(0n)(43313n).line6, 40000n, 'not below the floor')
+            assert(runWithPartnershipShare(0n)(43313n).line12 > 0n, 'a real tax is owed one cent later')
+        },
+    },
+
     // THE DERIVATION, compared against the printed page. `fjs/tax/params`
     // deliberately stores no 9235; this is the leaf that says the derivation
     // still lands on the figure the form prints. Mutating either §1401 rate

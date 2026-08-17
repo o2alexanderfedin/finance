@@ -72,6 +72,7 @@ import { scheduleD } from '../../schedule/d/module.f.js'
 import { scheduleOneA } from '../../schedule/1a/module.f.js'
 import { scheduleA } from '../../schedule/a/module.f.js'
 import {
+    passThroughOf,
     scheduleOnePartI,
     scheduleOnePartIIExceptStudentLoanInterest,
     scheduleOnePartII,
@@ -108,6 +109,8 @@ import { baseTaxForAmount } from '../../tax/table/module.f.js'
 /** @import { Ira } from '../../document/ira/module.f.js' */
 /** @import { PriorYearIraBasis } from '../../document/prior_year_ira_basis/module.f.js' */
 /** @import { FormThirtyNineTwentyOne } from '../../document/form3921/module.f.js' */
+/** @import { K1Partnership } from '../../document/k1_1065/module.f.js' */
+/** @import { K1SCorporation } from '../../document/k1_1120s/module.f.js' */
 /** @import { FormThirtyNineTwentyTwo } from '../../document/form3922/module.f.js' */
 /** @import { BasisCorrection } from '../../document/basis_correction/module.f.js' */
 /** @import { Kind, ReturnProfile } from '../../return/profile/module.f.js' */
@@ -214,6 +217,22 @@ import { baseTaxForAmount } from '../../tax/table/module.f.js'
  * Form 1099-B by CAS hash and REFUSES one that matches nothing, which is what
  * makes the list shape safe rather than merely convenient.
  *
+ * `partnershipK1Forms`/`sCorporationK1Forms` are Phase 30's own widening
+ * (DOC-24/TAX-35): Schedule 1 Part I line 5 reads them through
+ * `fjs/schedule/e`, and Schedule SE line 2 reads the partnership half's box 14
+ * code A. **Both are LISTS and both genuinely are** — printed Schedule E Part
+ * II line 28 is a FOUR-ROW table with a column (b) for "P for partnership, S
+ * for S corporation", so a founder with a partnership stake and an
+ * S-corporation holding fills two rows of one table. This is the OPPOSITE of
+ * `businessExpenseForms`, whose list shape exists so `fjs/schedule/c` can SEE
+ * a second business in order to refuse it: `fjs/schedule/e` combines its rows,
+ * which is what the printed form asks for, and it is safe to do so because
+ * every row that could carry a loss refuses before any total is formed.
+ *
+ * Two K-1s from the SAME entity refuse, which is the hazard the list shape
+ * genuinely introduces — a duplicate transcription, or an original beside its
+ * correction, would otherwise report the income twice.
+ *
  * `capitalLossCarryoverForms` is Plan 15-05's own widening (TAX-17): a LIST,
  * matching this typedef's own established "one running record per taxpayer
  * per year" convention (see `itemizedDeductionForms`/`medicalExpenseForms`
@@ -245,6 +264,8 @@ import { baseTaxForAmount } from '../../tax/table/module.f.js'
  *   readonly isoExerciseForms: readonly Stored<FormThirtyNineTwentyOne>[],
  *   readonly employeeStockPurchaseForms: readonly Stored<FormThirtyNineTwentyTwo>[],
  *   readonly basisCorrectionForms: readonly Stored<BasisCorrection>[],
+ *   readonly partnershipK1Forms: readonly Stored<K1Partnership>[],
+ *   readonly sCorporationK1Forms: readonly Stored<K1SCorporation>[],
  * }} Form1040Inputs
  */
 
@@ -544,6 +565,7 @@ export const form1040IncomeLines = taxParamSet => inputs => {
         adjustmentForms, studentLoanInterestForms,
         iraForms, priorYearIraBasisForms,
         employeeStockPurchaseForms, basisCorrectionForms,
+        partnershipK1Forms, sCorporationK1Forms,
     } = inputs
     const declaredZero = profileDeclaredZeroLine(profile)
     const fromDocuments = documentLine(profile)
@@ -808,6 +830,11 @@ export const form1040IncomeLines = taxParamSet => inputs => {
     const scheduleOnePartIResult = scheduleOnePartI({
         profile, unemploymentForms, nonemployeeCompensationForms, businessExpenseForms,
         w2Forms: w2s,
+        // **Line 5 is Phase 30's** (TAX-35): `fjs/schedule/e`'s own line 41,
+        // reaching 1040 line 8 THROUGH Schedule 1's own Part I total, never by
+        // a side channel -- the identical discipline line 3 already follows for
+        // Schedule C and line 10 for Part II's line 26.
+        partnershipK1Forms, sCorporationK1Forms,
     })
     if (scheduleOnePartIResult.kind === 'error') {
         return { kind: 'error', message: scheduleOnePartIResult.message, unmodeled: [] }
@@ -837,6 +864,12 @@ export const form1040IncomeLines = taxParamSet => inputs => {
         profile, status, adjustmentForms, w2Forms: w2s,
         businessNetProfit: scheduleOnePartIResult.scheduleC.partII.line31,
         businessExpenseForms,
+        // ...and printed Schedule SE line 2's OTHER named source, "Schedule
+        // K-1 (Form 1065), box 14, code A" -- read off the Schedule E
+        // execution Part I already performed, never a second one. It carries
+        // the recipient TIN with it, because §1402(b)(1)'s wage base is per
+        // PERSON and a partner's Forms W-2 must be told from a spouse's.
+        passThrough: passThroughOf(scheduleOnePartIResult.scheduleE),
     })
     // A document-data-sufficiency refusal from Part II — an unrecognized
     // `lineTag`, a following-year educator expense, a spouse entry on a
@@ -2493,7 +2526,8 @@ const itemizedDeductionsDocument = documentHash => entries => ({
 })
 
 /**
- * Assembles the ten input lists into a {@link Form1040Inputs}. Widened from
+ * Assembles the ten input lists into a {@link Form1040Inputs}, defaulting every
+ * later widening to an empty array. Widened from
  * three to five curried parameters by Plan 12.1-04 (`dividendForms`,
  * `brokerageForms`), from five to seven by Plan 13-02 (`retirementForms`,
  * `socialSecurityForms`), from seven to nine by Plan 13-07
@@ -2515,8 +2549,11 @@ const inputsOf = profile => w2s => interestForms => dividendForms => brokerageFo
                 // TEST-HELPER DEFAULT. `unemploymentForms` is REQUIRED on
                 // `Form1040Inputs` — a production caller must supply it and
                 // `tsc` enforces that. This helper defaults it to empty so the
-                // forty existing proof call sites, none of which concern
-                // unemployment, read exactly as they did before. Proofs that
+                // existing proof call sites, none of which concern
+                // unemployment, read exactly as they did before. (This comment
+                // said "forty" when Phase 20 wrote it; there are 117 today,
+                // and the number is dropped rather than re-transcribed —
+                // nothing asserts it and nothing can.) Proofs that
                 // DO concern it spread this result and override the field.
                 unemploymentForms: [],
                 nonemployeeCompensationForms: [],
@@ -2530,6 +2567,8 @@ const inputsOf = profile => w2s => interestForms => dividendForms => brokerageFo
                 isoExerciseForms: [],
                 employeeStockPurchaseForms: [],
                 basisCorrectionForms: [],
+                partnershipK1Forms: [],
+                sCorporationK1Forms: [],
             })
 
 /**
@@ -2813,11 +2852,84 @@ const withBusiness = inputs => forms => records => ({
 
 /**
  * Overrides `inputsOf`'s empty `unemploymentForms` default. Written as a
- * spread rather than an eleventh curried parameter so the forty existing
+ * spread rather than an eleventh curried parameter so the existing
  * call sites, none of which concern unemployment, stay untouched.
  * @type {(inputs: Form1040Inputs) => (forms: readonly Stored<OneZeroNineNineG>[]) => Form1040Inputs}
  */
 const withUnemployment = inputs => forms => ({ ...inputs, unemploymentForms: forms })
+
+/**
+ * **A SINGLE filer declaring pass-through income and nothing else** — the
+ * startup-founder shape Phase 30 (DOC-24/TAX-35) exists for.
+ *
+ * It declares NEITHER `wages` NOR `selfEmploymentTax`, and both omissions are
+ * deliberate, for the reasons {@link selfEmploymentProfile} gives: no wages, so
+ * 1040 line 8 is the only thing feeding line 9 and a figure landing there
+ * cannot be mistaken for something else; and `selfEmploymentTax` is a MODELED
+ * kind whose declaration this engine does not require, so leaving it out is
+ * what makes the pair of fixtures below differ in ONE fact only.
+ */
+const passThroughProfile = {
+    ...singleProfile,
+    declaredKinds: ['partnershipAndSCorporationIncome'],
+}
+
+/**
+ * A general partner's Schedule K-1 (Form 1065): box G ticked general, the §469
+ * determination stated, and the SAME amount in box 1 and box 14 code A —
+ * which is what a partnership reports for a partner whose whole distributive
+ * share is ordinary trade-or-business income.
+ * @type {(documentHash: string) => (box1: string) => Stored<K1Partnership>}
+ */
+const partnershipK1Document = documentHash => box1 => ({
+    documentHash,
+    value: {
+        dialect: 'vnd.fjs.k1_1065',
+        payerTin: '33-3333333',
+        recipientTin: '222-22-2222',
+        accountNumber: 'PTR-0001',
+        taxYear: 2025,
+        formRevision: '2025',
+        payerName: 'Northwind Ventures LP',
+        boxGGeneralPartnerOrLlcMemberManager: /** @type {const} */ (true),
+        materialParticipation: 'materiallyParticipated',
+        box1OrdinaryBusinessIncome: box1,
+        box14SelfEmploymentEarnings: [{ code: 'A', amount: box1 }],
+    },
+})
+
+/**
+ * An S-corporation shareholder's Schedule K-1 (Form 1120-S). **There is no box
+ * G and no box 14 code A**, and there cannot be: an S-corporation
+ * shareholder's pro rata share is never net earnings from self-employment
+ * (Rev. Rul. 59-221). That absence is the ONE difference between this fixture
+ * and {@link partnershipK1Document}, and the pair of leaves below prices it.
+ * @type {(documentHash: string) => (box1: string) => Stored<K1SCorporation>}
+ */
+const sCorporationK1Document = documentHash => box1 => ({
+    documentHash,
+    value: {
+        dialect: 'vnd.fjs.k1_1120s',
+        payerTin: '44-4444444',
+        recipientTin: '222-22-2222',
+        accountNumber: 'SHR-0001',
+        taxYear: 2025,
+        formRevision: '2025',
+        payerName: 'Northwind Software Inc.',
+        materialParticipation: 'materiallyParticipated',
+        box1OrdinaryBusinessIncome: box1,
+    },
+})
+
+/**
+ * Overrides `inputsOf`'s empty Schedule K-1 defaults — a spread, exactly as
+ * {@link withBusiness} and {@link withUnemployment} are, so no existing call
+ * site moves.
+ * @type {(inputs: Form1040Inputs) => (partnershipK1Forms: readonly Stored<K1Partnership>[]) => (sCorporationK1Forms: readonly Stored<K1SCorporation>[]) => Form1040Inputs}
+ */
+const withPassThrough = inputs => partnershipK1Forms => sCorporationK1Forms => ({
+    ...inputs, partnershipK1Forms, sCorporationK1Forms,
+})
 
 /**
  * Runs the WHOLE line assembly — 1a-15 and then 16-37 — and hands back both
@@ -3943,6 +4055,122 @@ export const proof = {
          * future change that starts reading something out of an empty list
          * has one place that says what the answer was.
          */
+        /**
+         * **CRITERION 3, END TO END, half one: the GENERAL PARTNER.**
+         *
+         * A single filer whose only income is an $80,000.00 general-partner
+         * share. Every figure hand-derived, in printed order:
+         *
+         *   Sch E line 28(j)  nonpassive income from Schedule K-1  $80,000.00
+         *   Sch E line 41     -> Schedule 1 line 5                 $80,000.00
+         *   1040 line 8       Schedule 1 line 10                   $80,000.00
+         *   1040 line 9       total income (no wages)              $80,000.00
+         *   Sch SE line 4a    92.35% of $80,000.00                 $73,880.00
+         *     8,000,000 x 9,235 = 73,880,000,000; / 10,000 = 7,388,000 exactly
+         *   Sch SE line 10    12.4% of $73,880.00                   $9,161.12
+         *   Sch SE line 11    2.9% of $73,880.00                    $2,142.52
+         *   Sch SE line 12    -> Schedule 2 line 4 -> 1040 line 23 $11,303.64
+         *   Sch SE line 13    50% -> Schedule 1 line 15 -> line 10  $5,651.82
+         *   1040 line 11      $80,000.00 - $5,651.82               $74,348.18
+         *   1040 line 12e     single standard deduction            $15,750.00
+         *   1040 line 15      $74,348.18 - $15,750.00              $58,598.18
+         *   1040 line 16      Tax Table                             $7,801.00
+         *   1040 line 24      $7,801.00 + $11,303.64               $19,104.64
+         *
+         * The Tax Table row is $58,550-$58,600 and prices its $58,575.00
+         * midpoint: 10% of $11,925.00 is $1,192.50, 12% of the $36,550.00 up
+         * to $48,475.00 is $4,386.00, and 22% of the remaining $10,100.00 is
+         * $2,222.00 — $7,800.50, rounded to $7,801.00.
+         */
+        theGeneralPartnersShareIsTaxedEndToEndAtElevenThousandThreeHundredAndThreeSixtyFour: () => {
+            const base = inputsOf(storedProfile(passThroughProfile))([])([])([])([])([])([])([])([])([])
+            const { income, tax } = computedLines(
+                withPassThrough(base)([partnershipK1Document('sha256-k1-1065-01')('80000.00')])([]))
+            // Criterion 2: the income reaches 1040 line 8 THROUGH Schedule 1's
+            // own Part I total, and line 8 CITES the Schedule K-1 rather than
+            // the profile — which is what distinguishes a real reading from a
+            // documented zero that happens to be the right size.
+            assertEq(income.line8.value, 8000000n, '1040 line 8 = $80,000.00')
+            const eightHashes = income.line8.sources.map(source => source.documentHash)
+            assert(
+                eightHashes.includes('sha256-k1-1065-01'),
+                ['line 8 must cite the Schedule K-1', income.line8.sources])
+            assertEq(income.line9.value, 8000000n, '1040 line 9: no wages, so line 8 is all of it')
+            // Schedule SE, cent by cent.
+            assertEq(income.selfEmployment.lines.line2, 8000000n, 'Sch SE line 2 = box 14 code A')
+            assertEq(income.selfEmployment.lines.line4a, 7388000n, 'Sch SE line 4a = $73,880.00')
+            assertEq(income.selfEmployment.lines.line10, 916112n, 'Sch SE line 10 = $9,161.12')
+            assertEq(income.selfEmployment.lines.line11, 214252n, 'Sch SE line 11 = $2,142.52')
+            assertEq(tax.line23.value, 1130364n, '1040 line 23 = $11,303.64 of self-employment tax')
+            assertEq(income.line10.value, 565182n, '1040 line 10 = $5,651.82, half of $11,303.64')
+            assertEq(income.line11a.value, 7434818n, 'AGI = $74,348.18')
+            assertEq(income.line12e.value, 1575000n, 'single standard deduction $15,750.00')
+            assertEq(income.line13a.value, 0n, 'no §199A deduction: Reg. §1.199A-6(b)(3)(iii)')
+            assertEq(income.line15.value, 5859818n, 'taxable income $58,598.18')
+            assertEq(1192500n + 438600n + 222200n, 1853300n, 'the Tax Table row\'s three brackets')
+            assertEq(tax.line16.value, 780100n, '1040 line 16 = $7,801.00')
+            assertEq(tax.line24.value, 1910464n, '1040 line 24 = $19,104.64')
+            assertEq(tax.line33.value, 0n, 'a Schedule K-1 carries no withholding')
+            assertEq(tax.line37.value, 1910464n, '1040 line 37: $19,104.64 owed')
+        },
+        /**
+         * **CRITERION 3, END TO END, half two: the S-CORPORATION
+         * SHAREHOLDER**, and the pair's whole point.
+         *
+         * The SAME $80,000.00, the same filing status, the same declared kind,
+         * the same everything — except that the share arrives on a Schedule
+         * K-1 (Form 1120-S) instead of a Schedule K-1 (Form 1065). Rev. Rul.
+         * 59-221 makes that difference worth **$11,303.64**:
+         *
+         *   1040 line 8       -> unchanged                        $80,000.00
+         *   1040 line 23      NO self-employment tax                   $0.00
+         *   1040 line 10      no deductible half                       $0.00
+         *   1040 line 11      AGI is the whole share               $80,000.00
+         *   1040 line 15      $80,000.00 - $15,750.00              $64,250.00
+         *   1040 line 16      Tax Table                             $9,055.00
+         *   1040 line 24      $9,055.00 + $0.00                     $9,055.00
+         *
+         * The Tax Table row is $64,250-$64,300 and prices its $64,275.00
+         * midpoint: $1,192.50 + $4,386.00 + 22% of the remaining $15,800.00,
+         * which is $3,476.00 — $9,054.50, rounded to $9,055.00.
+         *
+         * **The equalities are asserted as well as the differences**, because
+         * "the only difference is the entity type" is a claim about the
+         * fixtures and not only about the answer: a wiring that read the
+         * 1120-S box 1 into the wrong place would break the first line here
+         * rather than the last.
+         */
+        anSCorporationShareholderOwesNoSelfEmploymentTaxOnTheSameEightyThousand: () => {
+            const base = inputsOf(storedProfile(passThroughProfile))([])([])([])([])([])([])([])([])([])
+            const partner = computedLines(
+                withPassThrough(base)([partnershipK1Document('sha256-k1-1065-01')('80000.00')])([]))
+            const shareholder = computedLines(
+                withPassThrough(base)([])([sCorporationK1Document('sha256-k1-1120s-01')('80000.00')]))
+            // THE SAME.
+            assertEq(shareholder.income.line8.value, 8000000n, '1040 line 8 = $80,000.00')
+            assertEq(shareholder.income.line8.value, partner.income.line8.value)
+            assertEq(shareholder.income.line9.value, partner.income.line9.value)
+            assertEq(shareholder.income.line12e.value, partner.income.line12e.value)
+            // THE DIFFERENT.
+            assertEq(shareholder.income.selfEmployment.lines.line2, 0n, 'Sch SE line 2 = $0.00')
+            assertEq(shareholder.tax.line23.value, 0n, '1040 line 23 = $0.00 — Rev. Rul. 59-221')
+            assertEq(partner.tax.line23.value, 1130364n, 'and the partner owes $11,303.64')
+            assertEq(shareholder.income.line10.value, 0n, 'no deductible half to subtract')
+            assertEq(shareholder.income.line11a.value, 8000000n, 'AGI is the whole $80,000.00')
+            assertEq(
+                shareholder.income.line11a.value - partner.income.line11a.value,
+                565182n,
+                'the AGI gap is exactly Schedule SE line 13')
+            assertEq(shareholder.income.line15.value, 6425000n, 'taxable income $64,250.00')
+            assertEq(1192500n + 438600n + 347600n, 1978700n, 'the Tax Table row\'s three brackets')
+            assertEq(shareholder.tax.line16.value, 905500n, '1040 line 16 = $9,055.00')
+            assertEq(shareholder.tax.line24.value, 905500n, '1040 line 24 = $9,055.00')
+            // The whole difference, priced: $19,104.64 - $9,055.00.
+            assertEq(
+                partner.tax.line24.value - shareholder.tax.line24.value,
+                1004964n,
+                'the entity type is worth $10,049.64 of total tax on the same $80,000.00')
+        },
         theWageEarnerReturnIsUnmovedByThisPhase: () => {
             const base = inputsOf(storedProfile(unemploymentProfile))([
                 w2WithWithholding('sha256-w2-01')('45505.00')('8962.00'),

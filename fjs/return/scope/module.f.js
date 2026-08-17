@@ -63,7 +63,7 @@
  *
  * ## The partition, and why `tsc` owns it
  *
- * Every one of the ninety-five kinds is either in {@link modeledKinds} or carries an
+ * Every one of the one hundred and fourteen kinds is either in {@link modeledKinds} or carries an
  * entry in {@link unmodeledKindRefusals}. There is deliberately no third
  * option: {@link _EveryKindIsEitherModeledOrRefused} states the partition as a
  * conditional type, so a kind added to the vocabulary and classified nowhere
@@ -395,6 +395,45 @@
  * same repair Phase 27 made to the second row and the reason this paragraph
  * exists rather than a silent edit.
  *
+ * ## Schedule E's boundary, as of Phase 30 (DOC-24/TAX-35)
+ *
+ * The two-commit shape again, on the ONE kind Phase 27's own split left too
+ * coarse — and the paragraph above that called Phase 27's split "the last" is
+ * corrected here rather than deleted, because the correction is the finding.
+ *
+ * 1. `rentalRealEstateRoyaltiesPartnershipsSCorps` becomes FIVE kinds, one per
+ *    printed Schedule E PART, all still refused. Nothing is reclassified.
+ * 2. `fjs/schedule/e` computes Schedule E Part II from `vnd.fjs.k1_1065` and
+ *    `vnd.fjs.k1_1120s`, `fjs/schedule/1` wires its line 41 to printed line 5,
+ *    and `fjs/schedule/se` reads 1065 box 14 code A — and
+ *    `partnershipAndSCorporationIncome` moves from
+ *    {@link unmodeledKindRefusals} to {@link modeledKinds} in the SAME commit
+ *    as that wiring.
+ *
+ * **Why a per-printed-LINE kind was still too coarse, which is the lesson
+ * worth carrying forward.** Phases 23 through 27 split four coarse kinds by
+ * the rule "one kind per printed line", and that rule is very nearly right.
+ * Printed Schedule 1 line 5 is where it breaks: one line number, one caption,
+ * and five entirely different taxpayer facts behind it — rental real estate,
+ * partnership and S-corporation stakes, estates and trusts, REMIC residual
+ * interests and farm rentals, each with its own form, its own documents and
+ * its own limitation rules. A filer with rental property and a filer with an
+ * S-corporation share were refused by the SAME row naming the SAME whole
+ * schedule, so neither could be told what was actually missing and neither
+ * could be reclassified without the other. The rule is one kind per thing a
+ * taxpayer can truthfully declare having.
+ *
+ * The other four stay refused, by name, and two of them are load-bearing proof
+ * that this guard still guards something on Schedule E: a filer with rental
+ * real estate is refused by `rentalRealEstateAndRoyalties` naming **Part I**,
+ * not by a message about a schedule the engine now partly computes.
+ *
+ * **The Phase 22 tripwire mechanism is used a THIRD time.** A stored Schedule
+ * K-1 with non-zero box 1 proves pass-through income, so `fjs/return/tripwire`
+ * requires `partnershipAndSCorporationIncome` to have been declared — and
+ * because this phase MODELS that kind,
+ * {@link modeledKindDeclarationRemedies} gains its third entry.
+ *
  * @module
  */
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
@@ -407,7 +446,7 @@ import { kindVocabulary } from '../profile/module.f.js'
 // ── The frozen modeled set ───────────────────────────────────────────────────
 
 /**
- * The thirty-three kinds this engine models today, each with the document it
+ * The thirty-five kinds this engine models today, each with the document it
  * actually reads. Frozen in `fjs/guest`'s sense: growing this list is a
  * deliberate act that must be paired with a deletion from
  * {@link unmodeledKindRefusals}, or {@link _EveryKindIsEitherModeledOrRefused}
@@ -443,6 +482,7 @@ export const modeledKinds = /** @type {const} */ ([
     'socialSecurityBenefits',      // SSA-1099 box 5 + SSB worksheet -> 1040 lines 6a/6b
     'unemploymentCompensation',    // 1099-G box 1 -> Schedule 1 line 7 -> 1040 line 8
     'businessIncomeOrLoss',        // Schedule C line 31 -> Schedule 1 line 3 -> 1040 line 8
+    'partnershipAndSCorporationIncome', // Schedule E line 41 -> Schedule 1 line 5 -> 1040 line 8
     'capitalGainDistributions',    // 1099-DIV box 2a                -> 1040 line 7a
     'capitalGainsOrLosses',        // Form 8949 + Schedule D          -> 1040 line 7a
     'unrecaptured1250Gain',        // 1099-DIV box 2b + Sch D worksheet -> Schedule D line 19
@@ -488,7 +528,7 @@ const modeledKindNames = modeledKinds
 // ── The refusal table ────────────────────────────────────────────────────────
 
 /**
- * The sixty-two declared kinds this engine does not model, each naming the
+ * The seventy-nine declared kinds this engine does not model, each naming the
  * form line that cannot be computed, a human label, and the remedy — the form
  * or schedule required and, where one exists, the requirement ID and phase
  * that will supply it. `10-RESEARCH.md`'s "Form 1040 Lines 1a-37" table is the
@@ -596,7 +636,28 @@ export const unmodeledKindRefusals = /** @type {const} */ ([
     { kind: 'taxableStateLocalRefunds', line: 'Schedule 1 line 1 -> 1040 line 8', label: 'taxable refunds, credits or offsets of state and local income taxes', remedy: 'requires the Pub. 525 tax-benefit-rule recovery worksheet, whose inputs are the PRIOR year’s itemized deductions and standard deduction — this engine models one tax year and holds no prior-year return, which is also why `vnd.fjs.1099g` refuses a non-zero box 2 at storage (no phase yet)' },
     { kind: 'alimonyReceived', line: 'Schedule 1 line 2a -> 1040 line 8', label: 'alimony received', remedy: 'requires the divorce-decree date, since only a pre-2019 decree makes alimony taxable to the recipient, and no dialect models it (no phase yet)' },
     { kind: 'otherGainsOrLosses', line: 'Schedule 1 line 4 -> 1040 line 8', label: 'other gains or losses', remedy: 'requires Form 4797, and for a casualty or theft Form 4684 (no phase yet)' },
-    { kind: 'rentalRealEstateRoyaltiesPartnershipsSCorps', line: 'Schedule 1 line 5 -> 1040 line 8', label: 'rental real estate, royalties, partnerships, S corporations and trusts', remedy: 'requires Schedule E, and for a partnership or S-corporation stake the Schedule K-1 dialects (DOC-24/TAX-35, Phase 30)' },
+    // ── Schedule 1 line 5's five per-Schedule-E-PART kinds (TAX-35, Phase 30) ─
+    //
+    // `rentalRealEstateRoyaltiesPartnershipsSCorps` -- one row for the whole
+    // of Schedule E -- stood here until Phase 30 split it. Its remedy read
+    // "requires Schedule E, and for a partnership or S-corporation stake the
+    // Schedule K-1 dialects", which named a whole schedule for a filer who has
+    // one part of it, and could only ever be reclassified all at once. Each row
+    // below names its own printed PART, its own line range and its own missing
+    // form. `line` names the SCHEDULE E lines first, then Schedule 1's, then
+    // the 1040's, because the reader of this refusal is holding a Schedule E.
+    //
+    // **One of the five is NOT here**, because it is MODELED:
+    // `partnershipAndSCorporationIncome` (Part II) moved to
+    // {@link modeledKinds} in the SAME commit as the
+    // `fjs/schedule/e`/`fjs/schedule/1`/`fjs/form1040/core` wiring that makes
+    // it computable -- wire before reclassify, exactly as Phases 23, 24, 25 and
+    // 27 did. The split commit before it added all five as refusals and
+    // reclassified nothing.
+    { kind: 'rentalRealEstateAndRoyalties', line: 'Schedule E Part I lines 3-26 -> Schedule 1 line 5 -> 1040 line 8', label: 'rental real estate and royalty income or loss', remedy: 'requires Schedule E Part I, whose per-property columns need the rents received, the fair rental and personal-use days that §280A allocates by, and a depreciation figure from Form 4562 — the same asset basis history Schedule C line 13 already refuses for. A royalty additionally needs its own printed line 4, which is Part I’s and not Part II’s, so a Schedule K-1 royalty box cannot ride into line 41 on the partnership block (no phase yet)' },
+    { kind: 'estateAndTrustIncome', line: 'Schedule E Part III lines 33-37 -> Schedule 1 line 5 -> 1040 line 8', label: 'estate and trust income or loss', remedy: 'requires Schedule K-1 (Form 1041), which is a THIRD Schedule K-1 with its own box numbering — a beneficiary’s box 5 is other portfolio income where a partner’s is interest — and no dialect models it. Phase 30 built the 1065 and 1120-S faces and deliberately did not guess a third from them (no phase yet)' },
+    { kind: 'remicResidualInterest', line: 'Schedule E Part IV lines 38-39 -> Schedule 1 line 5 -> 1040 line 8', label: 'real estate mortgage investment conduit (REMIC) residual interest', remedy: 'requires Schedule Q (Form 1066), and §860E(a) taxes the excess inclusion whether or not it was received and forbids offsetting it with any net operating loss — so a zero here is not merely an omission but a floor this engine cannot enforce (no phase yet)' },
+    { kind: 'netFarmRentalIncomeForm4835', line: 'Schedule E Part V line 40 -> Schedule 1 line 5 -> 1040 line 8', label: 'net farm rental income or loss', remedy: 'requires Form 4835, which a landowner uses for crop-share rents received without materially participating — and materially participating instead moves the whole activity to Schedule F, which `farmIncomeOrLoss` already refuses. Neither form is modeled (no phase yet)' },
     { kind: 'farmIncomeOrLoss', line: 'Schedule 1 line 6 -> 1040 line 8', label: 'farm income or loss', remedy: 'requires Schedule F (no phase yet)' },
     { kind: 'otherIncome', line: 'Schedule 1 line 8a-8z -> 1040 line 8', label: 'other income', remedy: 'the printed form itself collapses twenty-six lettered sub-lines here — among them net operating loss, gambling winnings, jury duty pay, cancellation of debt and the taxable Olympic-medal exclusion — and this engine models none of them (no phase yet)' },
     // ── Schedule 1 Part II's thirteen per-line kinds (TAX-23/24, Phase 24) ──
@@ -901,6 +962,18 @@ export const modeledKindDeclarationRemedies = /** @type {const} */ ([
             + '(TAX-30, Phase 27). Note that Schedule C is where this ends: self-employment tax '
             + 'on Schedule SE and the qualified business income deduction on Form 8995 are still '
             + 'refused by name (TAX-31/TAX-32, Phase 28)',
+    },
+    {
+        kind: 'partnershipAndSCorporationIncome',
+        line: 'Schedule E Part II lines 27-32 -> Schedule 1 line 5 -> 1040 line 8',
+        label: 'partnership and S corporation income or loss',
+        remedy: 'declare partnershipAndSCorporationIncome on the return profile and this engine '
+            + 'computes Schedule E Part II from your Schedule K-1s (TAX-35, Phase 30), including '
+            + 'the self-employment tax a GENERAL partner owes on box 14 code A and the '
+            + 'self-employment tax an S-corporation shareholder does not. Note where it stops: a '
+            + 'LOSS refuses, because §704(d)/§1366(d) basis is a multi-year history; a separately '
+            + 'stated item other than box 1 refuses by name; and Schedule E Parts I, III and IV '
+            + 'each have their own declared kind and each refuses',
     },
 ])
 
@@ -1229,7 +1302,7 @@ export const classifyScope = declaredKinds => {
  * and `fjs/form8995` wiring that makes all three computable.
  * @type {number}
  */
-const expectedModeledKindCount = 34
+const expectedModeledKindCount = 35
 
 /**
  * The modeled set, hand-typed a SECOND time and in {@link kindVocabulary}'s
@@ -1257,6 +1330,7 @@ const everyModeledKindHandTyped = [
     'socialSecurityBenefits',
     'unemploymentCompensation',
     'businessIncomeOrLoss',
+    'partnershipAndSCorporationIncome',
     'capitalGainDistributions',
     'capitalGainsOrLosses',
     'unrecaptured1250Gain',
@@ -1352,9 +1426,16 @@ const everyModeledKindHandTyped = [
  * (`alternativeMinimumTax`), beside the `fjs/schedule/2` line 2 wiring that
  * makes it computable. Wire before reclassify, as every slice since Phase 13
  * has done.
+ *
+ * `76 -> 80` is Phase 30's own Schedule E split (DOC-24/TAX-35): `76 - 1 + 5`,
+ * one coarse `rentalRealEstateRoyaltiesPartnershipsSCorps` row replaced by
+ * five per-Schedule-E-PART rows, with NO kind reclassified in the same step.
+ * `80 -> 79` is that phase's own ONE-kind reclassification one commit later
+ * (`partnershipAndSCorporationIncome`), beside the `fjs/schedule/e` wiring
+ * that makes it computable.
  * @type {number}
  */
-const expectedUnmodeledKindCount = 76
+const expectedUnmodeledKindCount = 79
 
 /**
  * The complete refusal message for a return declaring exactly
@@ -1497,6 +1578,14 @@ export const proof = {
                     // its row names the PART.
                     || r.line.startsWith('Schedule SE line')
                     || r.line.startsWith('Schedule SE Part')
+                    // Phase 30's own addition, the same shape as Schedule
+                    // SE's: Schedule E's five rows name a SCHEDULE E PART and
+                    // its printed line range first, then trace it through
+                    // Schedule 1 line 5 to the 1040. The taxpayer fact lives on
+                    // a part of Schedule E, and all five parts land on one
+                    // Schedule 1 line — so a row naming only "Schedule 1 line
+                    // 5" would be indistinguishable from the other four.
+                    || r.line.startsWith('Schedule E Part')
                     || r.line.startsWith('Form '),
                     ['refusal entry does not name a form location', r.kind, r.line],
                 )
@@ -1533,18 +1622,26 @@ export const proof = {
         // totals; a kind for a total would let a taxpayer declare a sum
         // without declaring anything it is a sum of, the same reasoning
         // Schedule 3's lines 7/8/14/15 already carry.
-        theSevenScheduleOnePartOneKindsNameTheirOwnPrintedLine: () => {
+        theElevenScheduleOnePartOneKindsNameTheirOwnPrintedLine: () => {
             /** @type {readonly (readonly [string, string])[]} */
             const expected = [
                 ['taxableStateLocalRefunds', 'Schedule 1 line 1'],
                 ['alimonyReceived', 'Schedule 1 line 2a'],
                 ['businessIncomeOrLoss', 'Schedule 1 line 3'],
                 ['otherGainsOrLosses', 'Schedule 1 line 4'],
-                ['rentalRealEstateRoyaltiesPartnershipsSCorps', 'Schedule 1 line 5'],
+                // Printed line 5 is FIVE kinds as of Phase 30, one per
+                // Schedule E part, and they must sit in Schedule E order
+                // between line 4's kind and line 6's — so this list carries
+                // all five rather than a stand-in for the block.
+                ['rentalRealEstateAndRoyalties', 'Schedule 1 line 5'],
+                ['partnershipAndSCorporationIncome', 'Schedule 1 line 5'],
+                ['estateAndTrustIncome', 'Schedule 1 line 5'],
+                ['remicResidualInterest', 'Schedule 1 line 5'],
+                ['netFarmRentalIncomeForm4835', 'Schedule 1 line 5'],
                 ['farmIncomeOrLoss', 'Schedule 1 line 6'],
                 ['otherIncome', 'Schedule 1 line 8a-8z'],
             ]
-            assertEq(expected.length, 7, 'the split produced seven kinds, hand-counted off the printed form')
+            assertEq(expected.length, 11, 'Phase 27 produced seven kinds and Phase 30 expanded line 5 into five, 7 - 1 + 5')
             expected
                 .map(([kind]) => kindVocabulary.findIndex(candidate => candidate === kind))
                 .reduce((previous, position) => {
@@ -1575,8 +1672,15 @@ export const proof = {
                 // The trailing space is what stops `Schedule 1 line 1` from
                 // matching `Schedule 1 line 12`, and `line 8` from matching
                 // `line 8a-8z`.
+                //
+                // The third arm is Phase 30's: Schedule E's five rows name
+                // their own PART first and reach Schedule 1 line 5 in the
+                // MIDDLE of the trace rather than at its start. ` -> ` on both
+                // sides keeps that as unambiguous as the trailing space is.
                 assert(
-                    row.line === line || row.line.startsWith(`${line} `),
+                    row.line === line
+                    || row.line.startsWith(`${line} `)
+                    || row.line.includes(` -> ${line} -> `),
                     ['a Schedule 1 Part I refusal row names the wrong printed line', kind, line, row.line],
                 )
                 // EVERY Part I row reaches the same 1040 line, because every
@@ -1592,6 +1696,53 @@ export const proof = {
                 assert(
                     !row.line.includes('1040 line 10'),
                     ['a Schedule 1 Part I row names Part II\'s destination', kind, row.line],
+                )
+            }
+        },
+        // TAX-35's split, stated INDEPENDENTLY of the table it split, and it
+        // is the half the leaf above cannot state: five kinds share ONE
+        // Schedule 1 line, so an ordering check against that line number would
+        // pass with all five rows naming the same part.
+        //
+        // The five printed PART names and their line ranges are hand-typed off
+        // the 2025 `f1040se.pdf` face. Part V is deliberately absent as a
+        // refused kind for its own sake -- its line 41 is the TOTAL this engine
+        // computes, and only its line 40 (Form 4835) is refusable, which is
+        // what `netFarmRentalIncomeForm4835` names.
+        theFiveScheduleEKindsNameTheirOwnPrintedPart: () => {
+            /** @type {readonly (readonly [string, string])[]} */
+            const expected = [
+                ['rentalRealEstateAndRoyalties', 'Schedule E Part I lines 3-26'],
+                ['partnershipAndSCorporationIncome', 'Schedule E Part II lines 27-32'],
+                ['estateAndTrustIncome', 'Schedule E Part III lines 33-37'],
+                ['remicResidualInterest', 'Schedule E Part IV lines 38-39'],
+                ['netFarmRentalIncomeForm4835', 'Schedule E Part V line 40'],
+            ]
+            assertEq(expected.length, 5, 'Schedule E has five parts, hand-counted off the printed form')
+            // The five PART names must be distinct, which is the property the
+            // leaf above cannot check: all five reach `Schedule 1 line 5`, so
+            // only the part distinguishes them.
+            assertEq(
+                new Set(expected.map(([, part]) => part)).size,
+                5,
+                'two Schedule E kinds name the same printed part',
+            )
+            for (const [kind, part] of expected) {
+                const row = unmodeledKindRefusals.find(r => r.kind === kind)
+                if (row === undefined) {
+                    assert(
+                        modeledKindNames.includes(kind),
+                        ['a Schedule E kind is neither refused nor modeled', kind],
+                    )
+                    continue
+                }
+                assert(
+                    row.line.startsWith(`${part} -> `),
+                    ['a Schedule E refusal row names the wrong printed part', kind, part, row.line],
+                )
+                assert(
+                    row.line.includes('Schedule 1 line 5 -> 1040 line 8'),
+                    ['every Schedule E row must trace through Schedule 1 line 5 to 1040 line 8', kind, row.line],
                 )
             }
         },
@@ -1981,7 +2132,7 @@ export const proof = {
         // hand-typed constant, not `modeledKinds.length` — so the two
         // independent statements of the modeled set have to agree with each
         // other, and a kind added to one of them alone reddens.
-        allThirtyModeledKindsDeclaredTogetherAreInScope: () => {
+        everyModeledKindDeclaredTogetherIsInScope: () => {
             const outcome = classifyScope(everyModeledKindHandTyped)
             assertEq(outcome.kind, 'ok', ['the thirty modeled kinds must be in scope', outcome])
         },
@@ -2197,17 +2348,30 @@ export const proof = {
         // subtracting the wired kind from the seven: a list computed from the
         // tables under test could never notice a seventh kind silently
         // becoming modeled.
-        theSixScheduleOnePartOneKindsThisPhaseDidNotWireStillRefuse: () => {
+        //
+        // **Phase 30 replaced line 5's single entry with its five parts**, so
+        // this list is ten rather than six. `rentalRealEstate\
+        // RoyaltiesPartnershipsSCorps` is gone from the vocabulary entirely —
+        // a fact `tsc` enforces rather than this leaf, since `Kind` no longer
+        // holds the name — and the five that stand in its place are listed
+        // individually so the split cannot quietly reduce what still refuses.
+        theScheduleOnePartOneKindsNoPhaseHasWiredStillRefuse: () => {
             /** @type {readonly Kind[]} */
             const stillRefused = [
                 'taxableStateLocalRefunds',
                 'alimonyReceived',
                 'otherGainsOrLosses',
-                'rentalRealEstateRoyaltiesPartnershipsSCorps',
+                'rentalRealEstateAndRoyalties',
+                'estateAndTrustIncome',
+                'remicResidualInterest',
+                'netFarmRentalIncomeForm4835',
                 'farmIncomeOrLoss',
                 'otherIncome',
             ]
-            assertEq(stillRefused.length, 6, 'seven printed Part I lines minus the one this phase wired')
+            assertEq(
+                stillRefused.length,
+                9,
+                'six printed Part I lines Phase 27 left refused, line 5 expanded into its five Schedule E parts, less the one Phase 30 wired')
             for (const kind of stillRefused) {
                 const outcome = classifyScope([kind])
                 assert(
@@ -2215,7 +2379,7 @@ export const proof = {
                     ['this Schedule 1 Part I kind must still refuse after the split', kind, outcome],
                 )
             }
-            // Two of the six, each with the form it still needs — so a refusal
+            // Two of the ten, each with the form it still needs — so a refusal
             // that stopped naming Schedule F or Schedule E reddens here rather
             // than only in the table loop.
             const farm = classifyScope(['farmIncomeOrLoss'])
@@ -2224,11 +2388,11 @@ export const proof = {
                 farm.message.includes('Schedule F'),
                 ['the farm refusal must name Schedule F', farm.message],
             )
-            const rental = classifyScope(['rentalRealEstateRoyaltiesPartnershipsSCorps'])
-            assert(rental.kind === 'error', ['rental and pass-through income must still refuse', rental])
+            const rental = classifyScope(['rentalRealEstateAndRoyalties'])
+            assert(rental.kind === 'error', ['rental real estate must still refuse', rental])
             assert(
-                rental.message.includes('Schedule E'),
-                ['the rental refusal must name Schedule E', rental.message],
+                rental.message.includes('Schedule E Part I'),
+                ['the rental refusal must name Schedule E PART I, not the whole schedule', rental.message],
             )
         },
         // THE CONTROL FOR THE RECLASSIFICATION ABOVE, and the criterion the
@@ -2938,11 +3102,12 @@ export const proof = {
             // `1 -> 2` is Phase 27's own `businessIncomeOrLoss`, the second
             // and only other use of this table since Phase 23 built it.
             // `2 -> 3` is Phase 29's own `alternativeMinimumTax`.
-            const expectedDeclarationRequiredCount = 3
+            // `3 -> 4` is Phase 30's own `partnershipAndSCorporationIncome`.
+            const expectedDeclarationRequiredCount = 4
             assertEq(
                 modeledKindDeclarationRemedies.length,
                 expectedDeclarationRequiredCount,
-                ['exactly three modeled kinds are declaration-required today', modeledKindDeclarationRemedies],
+                ['exactly four modeled kinds are declaration-required today', modeledKindDeclarationRemedies],
             )
             for (const entry of modeledKindDeclarationRemedies) {
                 assert(
