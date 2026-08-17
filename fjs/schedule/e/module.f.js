@@ -1469,6 +1469,29 @@ const sCorporationDoc = overrides => ({
     },
 })
 
+/**
+ * The SAME $80,000.00 share again, this time a beneficiary's — in **box 6**,
+ * because on the Form 1041 face box 1 is interest income. Nothing else
+ * differs, which is what makes the three-way comparison below a comparison of
+ * the *rules* rather than of the amounts.
+ * @type {(overrides: Partial<K1EstateTrust>) => Stored<K1EstateTrust>}
+ */
+const estateTrustDoc = overrides => ({
+    documentHash: 'sha256-k1-1041-a',
+    value: {
+        dialect: 'vnd.fjs.k1_1041',
+        payerTin: '66-6666666',
+        recipientTin: '222-22-2222',
+        taxYear: 2025,
+        formRevision: '2025',
+        payerName: 'Northwind Family Trust',
+        boxHDomesticBeneficiary: true,
+        materialParticipation: 'materiallyParticipated',
+        box6OrdinaryBusinessIncome: '80000.00',
+        ...overrides,
+    },
+})
+
 /** @type {(input: Partial<ScheduleEInput>) => ScheduleEOutcome} */
 const run = input => scheduleE({
     profile,
@@ -1541,6 +1564,189 @@ export const proof = {
             assertEq(line.sources[0].documentHash, profile.documentHash)
             assertEq(line.sources[0].boxPath, 'declaredKinds')
         }
+    },
+
+    // ── PART III: the reader `vnd.fjs.k1_1041` did not have (TAX-35) ─────────
+    partIII: {
+        /**
+         * **THE MOVES-BY-EXACTLY FIXTURE.** A beneficiary who materially
+         * participated: box 6's $80,000.00 lands in printed column (f), reaches
+         * line 35, line 37 and line 41, and every figure is hand-typed in cents
+         * rather than derived from the input.
+         *
+         * Arithmetic a reader can check: 80,000.00 -> 8,000,000 cents. Column
+         * (d) is $0.00 because the row is nonpassive, so line 35 = (d) + (f) =
+         * 0 + 8,000,000. Line 36 = -((c) + (e)) = -0. Line 37 = 8,000,000 + 0.
+         * Line 41 = 26 + 32 + 37 + 39 + 40 = 0 + 0 + 8,000,000 + 0 + 0.
+         */
+        materiallyParticipatingBeneficiaryReachesColumnFAndLineFortyOne: () => {
+            const result = ok(run({ estateTrustK1Forms: [estateTrustDoc({})] }))
+            const { parts } = result
+            assertEq(parts.beneficiaryRows.length, 1)
+            assertEq(parts.line33d.value, 0n, 'nonpassive, so column (d) is empty')
+            assertEq(parts.line33f.value, 8000000n, 'column (f) carries box 6')
+            assertEq(parts.line33c.value, 0n)
+            assertEq(parts.line33e.value, 0n)
+            assertEq(parts.line35.value, 8000000n, 'line 35 = columns (d) + (f) of line 34a')
+            assertEq(parts.line36.value, 0n)
+            assertEq(parts.line37.value, 8000000n, 'line 37 -> Schedule 1 line 5')
+            assertEq(parts.line41.value, 8000000n, 'line 41 = 26 + 32 + 37 + 39 + 40')
+            // The CITATION, not merely the amount: the figure must be traceable
+            // to the stored box it came from, or a reader cannot check it.
+            assertEq(parts.line33f.sources.length, 1)
+            assertEq(parts.line33f.sources[0].documentHash, 'sha256-k1-1041-a')
+            assertEq(parts.line33f.sources[0].boxPath, 'box6OrdinaryBusinessIncome')
+            assertEq(parts.line33f.sources[0].value, '80000.00')
+            // Part II is untouched -- a beneficiary is not a partner, and a row
+            // that leaked into printed line 28 would show up here.
+            assertEq(result.partII.rows.length, 0)
+            assertEq(result.partII.line32.value, 0n)
+        },
+
+        /**
+         * **THE DOES-NOT-MOVE CONTROL.** The identical run with no Schedule
+         * K-1 (Form 1041) leaves every Part III line at zero, CITING THE
+         * PROFILE rather than a document. Without this, a Part III that
+         * carried $80,000.00 unconditionally would satisfy the leaf above.
+         */
+        controlNoEstateOrTrustK1LeavesPartIIIAtProfileCitedZeros: () => {
+            const { parts } = ok(run({}))
+            assertEq(parts.beneficiaryRows.length, 0)
+            for (const line of [parts.line33c, parts.line33d, parts.line33e, parts.line33f, parts.line37]) {
+                assertEq(line.value, 0n)
+            }
+            for (const line of [parts.line33d, parts.line33f]) {
+                assertEq(line.sources.length, 1)
+                assertEq(line.sources[0].documentHash, profile.documentHash)
+                assertEq(line.sources[0].boxPath, 'declaredKinds')
+            }
+        },
+
+        /**
+         * The §469 column is a determination, not a default: a beneficiary who
+         * did NOT materially participate goes in column (d) — and then the
+         * §1411(c)(6) gate bites, because their self-employment term is zero by
+         * construction. So the passive case REFUSES rather than computing, and
+         * the refusal is the pre-existing one reached one layer later.
+         */
+        theNonMateriallyParticipatingBeneficiaryIsRefusedByTheSection1411Gate: () => {
+            const message = refusal(run({
+                estateTrustK1Forms: [estateTrustDoc({ materialParticipation: 'didNotMateriallyParticipate' })],
+            })).message
+            assert(message.includes('§1411(c)(6)'), ['expected the net investment income gate', message])
+            assert(message.includes('Northwind Family Trust'), ['a refusal must name the entity', message])
+        },
+
+        /** An ABSENT determination refuses by name, and names Part III's own
+         * printed columns rather than Part II's four. */
+        anUnstatedDeterminationRefusesNamingPartIIIsOwnColumns: () => {
+            const message = refusal(run({
+                estateTrustK1Forms: [estateTrustDoc({ materialParticipation: undefined })],
+            })).message
+            assert(message.includes('Schedule E Part III line 33'), ['expected Part III named', message])
+            assert(message.includes('estate or trust'), ['expected the entity kind named', message])
+            assert(message.includes('column (d) or (f)'), ['expected page 2\'s own destination quoted', message])
+            assert(!message.includes('(h, i and j)'), ['Part II\'s columns must not appear', message])
+        },
+
+        /**
+         * **A LOSS refuses under §642(h)/§643, and NOT under §704(d).** The
+         * negative assertion is the load-bearing half: citing a partner's basis
+         * limitation at a beneficiary would be a plausible-looking wrong answer,
+         * and only asserting its ABSENCE can catch it.
+         */
+        aLossRefusesUnderSection642hAndNotSection704d: () => {
+            const message = refusal(run({
+                estateTrustK1Forms: [estateTrustDoc({ box6OrdinaryBusinessIncome: '-12345.67' })],
+            })).message
+            assert(message.includes('§642(h)'), ['expected §642(h)', message])
+            assert(message.includes('§643(a)'), ['expected §643(a)', message])
+            assert(message.includes('BOX 11'), ['a §642(h) loss arrives in box 11; say so', message])
+            // Part II's basis limitations appear only inside an explicit
+            // DISCLAIMER, and the disclaimer is the load-bearing part: a
+            // reader who knows Part II's rule needs to be told it does not
+            // apply here, and a message that cited §704(d) as the REASON would
+            // pass a bare "mentions §642(h)" check.
+            assert(
+                message.includes('deliberately not §704(d)\'s or §1366(d)\'s basis limitation'),
+                ['the partner and shareholder basis limitations must be disclaimed by name', message])
+            assert(
+                message.includes('neither statute reaches a beneficiary'),
+                ['the disclaimer must say why', message])
+            // The amount, so a reader can tell which document is wrong.
+            assert(message.includes('1234567'), ['expected the loss in cents', message])
+        },
+
+        /**
+         * Every one of the FIVE coded boxes refuses a non-zero amount by name,
+         * naming §652(b)/§662(b) rather than a partner's or shareholder's
+         * separate-statement rule. Hand-typed count beside the loop, so a box
+         * dropped from `estateTrustCodedBoxes` fails here even though the loop
+         * would happily iterate one fewer.
+         */
+        allFiveCodedBoxesRefuseByNameCitingSection652b: () => {
+            /** @type {readonly (readonly [keyof K1EstateTrust, string])[]} */
+            const codedBoxes = [
+                ['box9DirectlyApportionedDeductions', 'box 9'],
+                ['box11FinalYearDeductions', 'box 11'],
+                ['box12AlternativeMinimumTaxItems', 'box 12'],
+                ['box13CreditsAndCreditRecapture', 'box 13'],
+                ['box14OtherInformation', 'box 14'],
+            ]
+            assertEq(codedBoxes.length, 5, 'the printed Form 1041 K-1 has five coded boxes')
+            for (const [field, printedBox] of codedBoxes) {
+                const message = refusal(run({
+                    estateTrustK1Forms: [estateTrustDoc({ [field]: [{ code: 'A', amount: '500.00' }] })],
+                })).message
+                assert(message.includes(printedBox), ['a coded refusal must name its printed box', printedBox, message])
+                assert(message.includes('§652(b)/§662(b)'), ['expected the beneficiary statute', printedBox, message])
+                assert(message.includes('Schedule E Part III'), ['expected Part III named', printedBox, message])
+                assert(!message.includes('§702(a)'), ['a partner\'s statute must not appear', printedBox, message])
+                assert(!message.includes('§1366(a)(1)'), ['a shareholder\'s statute must not appear', printedBox, message])
+            }
+            // The CONTROL: a ZERO coded amount is not a refusal, so the sweep is
+            // not simply refusing every coded box that exists.
+            assertEq(
+                ok(run({
+                    estateTrustK1Forms: [estateTrustDoc({
+                        box14OtherInformation: [{ code: 'A', amount: '0.00' }],
+                    })],
+                })).parts.line33f.value,
+                8000000n,
+            )
+        },
+
+        /**
+         * **A beneficiary's share is NEVER self-employment income.** The
+         * structural zero, asserted through the figure `fjs/schedule/se` line 2
+         * actually reads — so mutating `beneficiaryRow`'s `0n` reddens here.
+         */
+        theBeneficiaryAddsNoSelfEmploymentEarnings: () => {
+            const alone = ok(run({ estateTrustK1Forms: [estateTrustDoc({})] }))
+            assertEq(alone.selfEmploymentEarningsCents, 0n, '§1402(a) does not reach a beneficiary')
+            assertEq(alone.selfEmployedRecipientTin, undefined)
+            // Beside a GENERAL PARTNER, whose $80,000.00 IS self-employment
+            // income: the total must be the partner's alone. A beneficiary that
+            // wrongly contributed would double it, and this is the pairing that
+            // tells "zero" apart from "not summed at all".
+            const beside = ok(run({
+                partnershipK1Forms: [partnershipDoc({})],
+                estateTrustK1Forms: [estateTrustDoc({})],
+            }))
+            assertEq(beside.selfEmploymentEarningsCents, 8000000n, 'the partner\'s share only')
+            assertEq(beside.parts.line41.value, 16000000n, 'line 32 $80,000.00 + line 37 $80,000.00')
+        },
+
+        /** Two Schedule K-1s from ONE estate refuse, naming PART III's printed
+         * line rather than Part II's — the message a reader acts on. */
+        twoK1sFromOneEstateRefuseNamingPartIIIsPrintedLine: () => {
+            const message = refusal(run({
+                estateTrustK1Forms: [estateTrustDoc({}), estateTrustDoc({})],
+            })).message
+            assert(message.includes('Schedule E Part III line 33'), ['expected Part III line 33', message])
+            assert(!message.includes('Part II line 28'), ['the wrong printed table was named', message])
+            assert(message.includes('66-6666666'), ['expected the shared identification number', message])
+        },
     },
 
     printedForm: {
