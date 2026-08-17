@@ -595,11 +595,37 @@ so they are scheduled rather than remembered. All are T3 — none blocks the v1 
       The note now widens the destructuring to `const [pr, pv]` first and compares
       `pv.protocolVersion`, with the broken version quoted so the correction is checkable.
 
-- [ ] **MAINT-06** *(T3)*: Take `functionalscript` 0.43.0. The project is pinned to `^0.41.0` while
-      `main` has moved two minor versions. Re-run the upstream-gap notes in `fjs/todo/` against the
-      new version — one such note has already been retired by an upstream fix once.
+- [x] **MAINT-06** *(T3)*: Take `functionalscript` 0.43.0. **Satisfied literally, and its intent is
+      blocked upstream — measured, not assumed.** `package.json` declares `^0.43.1`, so the version
+      this requirement names is taken and current within its own major line; the four
+      `fjs/todo/upstream-*.md` notes were re-checked against upstream `main` and one was **retired
+      and deleted** (`upstream-json-parse-split.md` — `parse` is tokenizer-backed and total at
+      0.43.1, and its own text mandated deletion once adopted).
 
-- [ ] **MAINT-07** *(T3)*: Share `executeRun`'s step sequence with `runExecuteRunViaFixture`.
+      The intent — *be on the newest release* — is not met and cannot be met from inside this
+      repository:
+
+      | version | release commit | `tsc --noEmit` |
+      |---|---|---|
+      | **0.43.1 (kept)** | `cc93a3ca` | **0 errors** |
+      | 0.44.0 | `37db36c0` | **1287 errors** |
+      | 0.45.0 (npm current) | `8804e783` | **1288 errors** |
+
+      Upstream migrated to `.f.mjs` and then **dropped the `.js` emit**, so every
+      `'functionalscript/.../module.f.js'` specifier is `TS2307`. Rewriting all **396 files / 1900
+      occurrences** was measured on a throwaway snapshot and **still leaves 288 errors across 60
+      files**, because the shipped `.d.mts` files `import type` the core vocabulary
+      (`Cas`, `Effect`, `Result`, `Unknown`, `OperationMap`, …) and never re-export it. Every
+      mechanical fix for that residue is a cast, an `any`, or a re-declared local type — **all three
+      forbidden by AGENTS.md**.
+
+      **Resolved by decision rather than left open:** stay on 0.43.1, and the upstream change that
+      unblocks the bump is specified in `fjs/todo/upstream-mjs-migration.md` (one
+      `export type { … }` per relocated type, beside the `import type` already there), with its
+      retirement condition. Half-doing the migration would have traded a working build for 288
+      errors and a forbidden construct at each one.
+
+- [x] **MAINT-07** *(T3)*: Share `executeRun`'s step sequence with `runExecuteRunViaFixture`.
       The rule duplication was removed in 09-05/09-06 (`classifyRunOutcome` now lives once, in
       `fjs/report/guard`), but the ORDER of `loadProgram` → `buildRunSnapshot` → `buildHostMap` →
       `interpret` is still written out twice. Reorder or insert a step in `executeRun` and the
@@ -607,7 +633,7 @@ so they are scheduled rather than remembered. All are T3 — none blocks the v1 
       is observable end to end. The helper itself must stay — `fjs/effects/node/virtual` genuinely
       cannot compose a write with an import in one session.
 
-- [ ] **MAINT-08** *(T3)*: Remove or share the two small duplications a dead-code audit found: the
+- [x] **MAINT-08** *(T3)*: Remove or share the two small duplications a dead-code audit found: the
       `formRevision must not be empty` check written out byte-identically in
       `fjs/document/1099int` and `fjs/document/w2` (conspicuous because its sibling money-box rule
       *is* correctly shared via `moneyFieldError`), and `artifactSubject` in
@@ -953,7 +979,7 @@ itemizing, which is complete apart from the eight open MAINT items.
       3922 alongside any reported sale REFUSES the return, naming the three facts that are
       missing (which sale, qualifying or disqualifying, and whether the ordinary-income element is
       already inside Form W-2 box 1).
-- [ ] **TAX-33** *(M2, T3)*: **Form 6251**, Alternative Minimum Tax → Schedule 2 line 2. The
+- [x] **TAX-33** *(M2, T3)*: **Form 6251**, Alternative Minimum Tax → Schedule 2 line 2. The
       hardest computation remaining in the project, and the reason an ISO exercise can generate
       tax on income never received.
 
@@ -963,18 +989,35 @@ itemizing, which is complete apart from the eight open MAINT items.
       tax. Attach Form 6251". It matters: Form 6251 line 10 READS Schedule 2 line 1z, so an engine
       putting the AMT on line 1 would have the form reading its own output.
 
-      **Phase 29 delivers Parts I and II and leaves this UNCHECKED for Part III.** What computes:
+      **Phase 29 delivered Parts I and II; TAX-33 CLOSES with Part III.** What computes:
       lines 1a/1b, line 2a's standard-deduction add-back, line 2i's ISO spread, line 4's
       married-filing-separately add-back, the exemption and its 25% phase-out, the 26/28% schedule
       with its halved MFS breakpoint, and line 11's EXCESS over the regular tax — end to end, on a
       real fixture, at $292,479.00 of tax on income never received.
 
-      What does not: **Part III**, the twenty-nine-line worksheet that reapplies the 0/15/20%
-      preferential rates inside the AMT. Returns are not blanket-refused for it — Part III's own
-      line 40 takes the SMALLER of its result and the flat 26/28% figure, so that figure is a
-      rigorous upper bound and the engine returns an exact `$0.00` whenever the bound already
-      loses to the regular tax. But a filer with a large ISO spread AND qualified dividends is
-      exactly who this requirement's persona is, and that filer is refused. Fifteen §56/§57
+      **Part III now computes too** (`fjs/form6251/part3`), all twenty-nine printed lines
+      12-40: the 0% band (line 23), 15% (line 31), 20% (line 34) and the 25% unrecaptured-§1250
+      band (line 37), over either the regular tax's Qualified Dividends and Capital Gain Tax
+      Worksheet or its Schedule D Tax Worksheet, threaded off the ONE `dispatchLine16` execution
+      that produced 1040 line 16 rather than a second one. **The persona's own return — a
+      $1,000,000.00 ISO spread beside $20,000.00 of qualified dividends — computes end to end
+      through `form1040Report`**: $55,023.00 of regular tax, $293,195.00 of AMT, $348,218.00
+      total. Part III is worth $2,600.00 on it, the qualified dividends taking §1(h)'s 15% rather
+      than the AMT's flat 28%.
+
+      **Phase 29's upper bound is unchanged and still runs first.** Part III's own line 40 takes
+      the SMALLER of its result and the flat 26/28% figure, so that figure is a rigorous upper
+      bound and the engine still returns an exact `$0.00` whenever the bound already loses to the
+      regular tax — on the same code path it took before Part III existed, with
+      `line7IsAnUpperBound` saying which path produced the answer. `fjs/form6251/part3` proves
+      the stronger statement it rests on: line 38 never exceeds line 39 at any input, because
+      every preferential rate the page charges is strictly below the AMT's own 26%.
+
+      What still refuses, by name: Part III required while the regular tax completed **neither**
+      preferential worksheet — reachable only when 1040 line 15 is zero or less — because lines
+      13, 15, 20 and 27's no-worksheet fallbacks are an untranscribed printed rule and a wrong
+      zero there would OVERSTATE the tax. Every Form 2555 clause on the page is structurally
+      unreachable (`foreignEarnedIncomeForm2555` refuses at dispatch level 0). Fifteen §56/§57
       adjustments on Part I are also refused, each by its own kind and each naming the document
       or election that would supply it.
 - [x] **TAX-34** *(M2, T2)*: **Form 8949 basis adjustment codes**, particularly code B for
@@ -1088,7 +1131,7 @@ itemizing, which is complete apart from the eight open MAINT items.
 | TAX-28, TAX-29 | T2 | 26 - Retiree Completion | Retiree — TAX-28 delivered; **TAX-29 stays open**, Form 8606 Part I only (Parts II/III, and so the backdoor Roth, refuse) |
 | DOC-20, DOC-21, TAX-30 | T3 | 27 - 1099-NEC and Schedule C | Startup founder — all three delivered |
 | TAX-31, TAX-32 | T3 | 28 - Schedule SE and QBI | **Startup founder** — TAX-31 delivered; TAX-32 delivers Form 8995 only and stays open for 8995-A |
-| DOC-22, DOC-23, TAX-33, TAX-34 | T3 | 29 - Equity Compensation and AMT | **FAANG employee** — DOC-22, DOC-23 and TAX-34 delivered; TAX-33 delivers Form 6251 Parts I and II and stays open for Part III |
+| DOC-22, DOC-23, TAX-33, TAX-34 | T3 | 29 - Equity Compensation and AMT | **FAANG employee** — all four delivered. TAX-33 closed with Form 6251 Part III: an ISO spread beside qualified dividends computes end to end |
 | DOC-24, TAX-35 | T3 | 30 - Pass-Through Income | **Startup founder** — DOC-24 delivered; TAX-35 delivers Schedule E Part II end to end and stays open for Part III and for routing the separately stated items |
 
 **25 requirements across 10 phases** — 120 in the document, 95 of them v1's. Each phase is a
@@ -1237,9 +1280,9 @@ them. Week 0 is research's addition in front of the plan's Week 1.
 | MAINT-03 | T3 | Phase 17 - Documentation Truth Pass | Backlog | Pending |
 | MAINT-04 | T3 | Phase 17 - Documentation Truth Pass | Backlog | Pending |
 | MAINT-05 | T3 | Phase 17 - Documentation Truth Pass | Backlog | Pending |
-| MAINT-06 | T3 | Phase 18 - Dependency and Duplication Debt | Backlog | Pending |
-| MAINT-07 | T3 | Phase 18 - Dependency and Duplication Debt | Backlog | Pending |
-| MAINT-08 | T3 | Phase 18 - Dependency and Duplication Debt | Backlog | Pending |
+| MAINT-06 | T3 | Phase 18 - Dependency and Duplication Debt | Blocked upstream | Pending |
+| MAINT-07 | T3 | Phase 18 - Dependency and Duplication Debt | Complete | Verified |
+| MAINT-08 | T3 | Phase 18 - Dependency and Duplication Debt | Complete | Verified |
 | EXEC-01 | T0 | Phase 3 - The Restricted Interpreter | Week 1 | Done |
 | EXEC-02 | T0 | Delivered upstream (fjs 0.41.0, functionalscript#1419) | Week 1 | Done |
 | EXEC-03 | T0 | Phase 3 - The Restricted Interpreter | Week 1 | Done |

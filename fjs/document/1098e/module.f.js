@@ -93,6 +93,7 @@ import { validate as rttiValidate } from 'functionalscript/fjs/types/rtti/valida
 import { error, ok } from 'functionalscript/fjs/types/result/module.f.js'
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
 import { base, mediaTypeOf } from '../base/module.f.js'
+import { formRevisionError } from '../form_revision/module.f.js'
 import { moneyFieldError } from '../money_field/module.f.js'
 import { formSubject } from '../subject/module.f.js'
 
@@ -171,8 +172,9 @@ const moneyBoxFields = /** @type {const} */ ([
  * @type {(r: OneZeroNineEightE) => Result<OneZeroNineEightE, OneZeroNineEightEError>}
  */
 export const checkReferences = r => {
-    if (r.formRevision.trim() === '') {
-        return error(`formRevision must not be empty or whitespace-only`)
+    const formRevisionMessage = formRevisionError(r.formRevision)
+    if (formRevisionMessage !== undefined) {
+        return error(formRevisionMessage)
     }
     for (const field of moneyBoxFields) {
         const printed = r[field]

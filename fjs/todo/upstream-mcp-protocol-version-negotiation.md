@@ -9,6 +9,16 @@ Target: `functionalscript` `fjs/protocol/mcp/module.f.js`, the `mcpStep` state-m
 (`functionalscript ^0.41.0`) — 0.41.0 changed `match`, not `mcpStep`, so this gap is
 unaffected by that release and remains open.
 
+**Re-checked 2026-08-17 against 0.45.0** (release commit `8804e783`, the current npm release),
+reading `fjs/protocol/mcp/module.f.mjs` at that SHA. **Still open, unchanged.** The `initialize`
+branch there still destructures `const [pr] = validate(initializeParams)(params)` and, on success,
+builds its `InitializeResult` from the server's own `protocolVersion` — the client's requested
+version is validated and then discarded, exactly as described below. The remedy in this file
+therefore still applies verbatim, including its widened `const [pr, pv]` destructuring. (The bump
+itself did not land: 0.44.0+ is not consumable here — see
+[upstream-mjs-migration.md](./upstream-mjs-migration.md) — so this gap is open at both the version
+we run and the version we cannot yet take.)
+
 ## The gap
 
 `mcpStep`'s `initialize` branch:

@@ -174,30 +174,43 @@ import { stringify as jsonText } from '../../json/module.f.js'
 // define it.
 
 /**
- * Runs a stored program (by CAS hash) against `input.args`, optionally
- * pinned to a concrete `subject`/`parents` snapshot. See the module header
- * for the five-step sequence this composes, unchanged, from Plan 05
- * (`materializeProgram`/`buildRunSnapshot`/`buildHostMap`), Phase 6
- * (`programPath`/`loadProgram`), and Phase 3 (`interpret`).
+ * `load -> snapshot -> interpret -> classify`: the tail of a run, and the
+ * ONLY definition of its order.
  *
- * ## `input.taxParams` (Phase 21, EXEC-14)
+ * MAINT-07 (Phase 18). `executeRun` and `runExecuteRunViaFixture` each used
+ * to write this sequence out, and the ROADMAP criterion named the
+ * consequence exactly: *"reorder or insert a step in `executeRun` and the
+ * fixture helper will not follow."* Two copies of an ORDER are two chances
+ * to disagree about it, and the rule inside the last step
+ * (`classifyRunOutcome`) had already been shared in 09-06 for the same
+ * reason — the orchestration around it was what was left.
  *
- * The ALREADY-RESOLVED parameter set the guest computes against. It is a
- * required field and it is **passed in, never looked up here** — this
- * function must not touch `taxParamsByYear`. `fjsRunTool` has already
- * resolved `args.taxYear` (refusing an unknown year before anything runs)
- * and has already hashed that exact object into the run record's
- * `paramSetHash`; a second lookup here could disagree with it, and a run
- * record that names parameters the guest did not use is precisely the lie
- * PROV-04 exists to prevent.
+ * **The heads genuinely diverge and deliberately still do.** `executeRun`
+ * reads the source from CAS and materializes it; the fixture performs a
+ * real `materializeProgram` write in one `virtual` session and then swaps a
+ * `JsModule` in, because `fjs/effects/node/virtual` cannot compose a write
+ * with an import at the same path in one session (see
+ * {@link runExecuteRunViaFixture}). That divergence is load-bearing. Only
+ * the tail is shared, which is why every value the tail needs — `path`,
+ * `source`, `literalCount`, `args`, `pin`, `taxParams` — arrives as a
+ * parameter rather than being recomputed here.
  *
- * The whole (wider) context goes to EVERY program, tax or not: a program
- * that does not read `ctx.form1040Report`/`ctx.taxParams` is unaffected by
- * their presence, which is why `fjs/report/payer`'s own stored program
- * still runs here unchanged.
+ * ## `taxParams` is THREADED, never re-resolved
+ *
+ * Moved here from `executeRun` by MAINT-07, because this is now the single
+ * place the parameter set reaches the guest, and the rule belongs where the
+ * code it constrains lives.
+ *
+ * The parameter set is the ALREADY-RESOLVED one. Nothing in this file may
+ * touch `taxParamsByYear`: `fjsRunTool` has already resolved
+ * `args.taxYear` (refusing an unknown year before anything runs) and has
+ * already hashed that exact object into the run record's `paramSetHash`; a
+ * second lookup here could disagree with it, and a run record that names
+ * parameters the guest did not use is precisely the lie PROV-04 exists to
+ * prevent.
  *
  * **The "never re-resolve" half of that rule is currently UNPROVEN, and
- * measured to be so.** Replacing `input.taxParams` below with a fresh
+ * measured to be so.** Replacing `taxParams` below with a fresh
  * `taxParamsByYear[2025]` lookup was run as a mutation gate on 2026-08-16
  * and **survived the entire suite** (6419/6419, exit 0). It cannot fail
  * today for a reason that has nothing to do with test quality:
@@ -210,6 +223,54 @@ import { stringify as jsonText } from '../../json/module.f.js'
  * standard deduction here reddens `tax-return-integration.test.js`), and
  * `tsc` refuses a bare `guestCtx` in its place (TS2739, `taxParams` and
  * `form1040Report` missing).
+ *
+ * The whole (wider) context goes to EVERY program, tax or not: a program
+ * that does not read `ctx.form1040Report`/`ctx.taxParams` is unaffected by
+ * their presence, which is why `fjs/report/payer`'s own stored program
+ * still runs here unchanged.
+ * @type {(cas: Cas<FileCasOperation>) => (evoApi: Evo<FileCasOperation>) => (taxParams: TaxParamSet) => (path: string) => (source: string) => (literalCount: number) => (args: readonly string[]) => (pin: { readonly subject: string, readonly parents: readonly string[] } | undefined) => Effect<FileCasOperation | Mkdir | WriteFile | Import | MemOp, RunOutcome<unknown>>}
+ */
+const runProgramTail = cas => evoApi => taxParams => path => source => literalCount => args => pin =>
+    step(loadProgram([])(path)(source), loadResult => {
+        if (loadResult[0] === 'error') {
+            return pure(/** @type {RunOutcome<unknown>} */ ({ kind: 'error', message: loadResult[1], reads: [] }))
+        }
+        return step(buildRunSnapshot(cas)(evoApi)(pin), snapshot => {
+            const hostMap = buildHostMap(snapshot)
+            const loaded = /** @type {{ readonly report: TaxReport<unknown> }} */ (loadResult[1])
+            const [t, v] = interpret(hostMap)(loaded.report(taxGuestCtx(taxParams))(args))
+            if (t === 'error') {
+                return pure(/** @type {RunOutcome<unknown>} */ ({ kind: 'error', message: v, reads: [] }))
+            }
+            const [value, reads] = v
+            // 09-06: classifyRunOutcome (imported from
+            // fjs/report/guard/module.f.js) is the zero-read kill
+            // condition's ONLY definition — this is the production call
+            // site, reached by BOTH run paths since MAINT-07.
+            return pure(classifyRunOutcome(literalCount)(value, reads))
+        })
+    })
+
+/**
+ * Runs a stored program (by CAS hash) against `input.args`, optionally
+ * pinned to a concrete `subject`/`parents` snapshot. See the module header
+ * for the five-step sequence this composes, unchanged, from Plan 05
+ * (`materializeProgram`/`buildRunSnapshot`/`buildHostMap`), Phase 6
+ * (`programPath`/`loadProgram`), and Phase 3 (`interpret`).
+ *
+ * ## `input.taxParams` (Phase 21, EXEC-14)
+ *
+ * The ALREADY-RESOLVED parameter set the guest computes against. It is a
+ * required field and it is **passed straight through to
+ * {@link runProgramTail}, never looked up here** — this function must not
+ * touch `taxParamsByYear`.
+ *
+ * **That rule, and the mutation gate that measured its "never re-resolve"
+ * half UNPROVEN, moved onto {@link runProgramTail} in Phase 18 (MAINT-07),
+ * because the tail is now the single place the parameter set reaches the
+ * guest.** It was not dropped; read it there. The short version, so nobody
+ * has to: re-resolving instead of threading survives the whole suite today,
+ * for the arithmetic reason that `taxParamsByYear` holds exactly one year.
  * @type {(materializeHomeRoot: string) => (cas: Cas<FileCasOperation>) => (evoApi: Evo<FileCasOperation>) => (input: { readonly hash: string, readonly args: readonly string[], readonly taxParams: TaxParamSet, readonly subject?: string, readonly parents?: readonly string[] }) => Effect<FileCasOperation | Mkdir | WriteFile | Import | MemOp, RunOutcome<unknown>>}
  */
 export const executeRun = materializeHomeRoot => cas => evoApi => input => {
@@ -230,28 +291,14 @@ export const executeRun = materializeHomeRoot => cas => evoApi => input => {
             if (materializeResult[0] === 'error') {
                 return pure(/** @type {RunOutcome<unknown>} */ ({ kind: 'error', message: materializeResult[1], reads: [] }))
             }
-            return step(loadProgram([])(programPath(materializeHome(materializeHomeRoot))(input.hash))(sourceText), loadResult => {
-                if (loadResult[0] === 'error') {
-                    return pure(/** @type {RunOutcome<unknown>} */ ({ kind: 'error', message: loadResult[1], reads: [] }))
-                }
-                const pin = input.subject !== undefined && input.parents !== undefined
-                    ? { subject: input.subject, parents: input.parents }
-                    : undefined
-                return step(buildRunSnapshot(cas)(evoApi)(pin), snapshot => {
-                    const hostMap = buildHostMap(snapshot)
-                    const loaded = /** @type {{ readonly report: TaxReport<unknown> }} */ (loadResult[1])
-                    const [t, v] = interpret(hostMap)(loaded.report(taxGuestCtx(input.taxParams))(input.args))
-                    if (t === 'error') {
-                        return pure(/** @type {RunOutcome<unknown>} */ ({ kind: 'error', message: v, reads: [] }))
-                    }
-                    const [value, reads] = v
-                    // 09-06: classifyRunOutcome (imported from
-                    // fjs/report/guard/module.f.js) is the zero-read kill
-                    // condition's ONLY definition — this is the production
-                    // call site.
-                    return pure(classifyRunOutcome(literalCount)(value, reads))
-                })
-            })
+            const pin = input.subject !== undefined && input.parents !== undefined
+                ? { subject: input.subject, parents: input.parents }
+                : undefined
+            // MAINT-07: the tail's ORDER lives once, in runProgramTail. This
+            // path and runExecuteRunViaFixture's replay are now the same
+            // definition, so inserting or reordering a step cannot reach one
+            // without reaching the other.
+            return runProgramTail(cas)(evoApi)(input.taxParams)(programPath(materializeHome(materializeHomeRoot))(input.hash))(sourceText)(literalCount)(input.args)(pin)
         })
     })
 }
@@ -645,25 +692,14 @@ const runExecuteRunViaFixture = home => taxParams => cas => evoApi => hash => so
     const path = programPath(materializeHome(home))(hash)
     const root = placeJsModuleFixture(state1.root)(path)(() => ({ report }))
     const state2 = { ...state1, root }
+    // MAINT-07: this is `executeRun`'s OWN tail, not a restatement of it —
+    // the SAME {@link runProgramTail} that production calls, replayed here in
+    // the second `virtual` session against the fixture. That is what makes
+    // the criterion's bar meetable: reorder or insert a step in the tail and
+    // BOTH this proof and `fjs-run-integration.test.js` must go red, because
+    // there is only one sequence left to change.
     return virtual(state2)(
-        step(loadProgram([])(path)(source), loadResult => {
-            if (loadResult[0] === 'error') {
-                return pure(/** @type {RunOutcome<unknown>} */ ({ kind: 'error', message: loadResult[1], reads: [] }))
-            }
-            return step(buildRunSnapshot(cas)(evoApi)(pin), snapshot => {
-                const hostMap = buildHostMap(snapshot)
-                const loaded = /** @type {{ readonly report: TaxReport<unknown> }} */ (loadResult[1])
-                const [t, v] = interpret(hostMap)(loaded.report(taxGuestCtx(taxParams))(args))
-                if (t === 'error') {
-                    return pure(/** @type {RunOutcome<unknown>} */ ({ kind: 'error', message: v, reads: [] }))
-                }
-                const [value, reads] = v
-                // 09-06: shares the SAME imported classifyRunOutcome
-                // executeRun calls above — no second copy of the zero-read
-                // rule.
-                return pure(classifyRunOutcome(literalCount)(value, reads))
-            })
-        }),
+        runProgramTail(cas)(evoApi)(taxParams)(path)(source)(literalCount)(args)(pin),
     )
 }
 

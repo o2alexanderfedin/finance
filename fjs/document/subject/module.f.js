@@ -9,8 +9,11 @@
  *
  * - The **artifact** chain — the original scanned/uploaded bytes (a PDF, an
  *   image) — is rooted at the cBase32 hash of that artifact itself
- *   ({@link artifactSubject}). Re-adding the identical bytes resolves to the
- *   identical subject, because the subject *is* the content hash.
+ *   the artifact's own cBase32 content hash. Re-adding the identical bytes
+ *   resolves to the identical subject, because the subject *is* the content
+ *   hash — there is no derivation, and therefore (MAINT-08, Phase 18) no
+ *   function here for it: an exported identity function with zero callers was
+ *   a named place to change that nothing read.
  * - Each **extracted form** — the structured data a dialect parses out of an
  *   artifact (e.g. a single 1099-INT) — gets its own subject, keyed on the
  *   business identity of that form: `(payerTin, recipientTin,
@@ -31,21 +34,6 @@
  */
 import { assertEq } from 'functionalscript/fjs/asserts/module.f.js'
 import { stringify as jsonText } from '../../json/module.f.js'
-
-/**
- * The subject for an artifact's own revision chain: the identity function on
- * the artifact's cBase32 content hash (DOC-01 — "the artifact chain ... is
- * rooted at the cBase32 hash of the original artifact"). The subject *is*
- * that hash, not a derived or prefixed value; re-adding identical bytes
- * therefore always resolves to the identical subject.
- *
- * Exported as a named function, not inlined as `x => x` at call sites, so
- * every caller reads its intent and there is a single place to change if a
- * namespacing convention (e.g. a `artifact:` prefix) is ever introduced.
- *
- * @type {(hash: string) => string}
- */
-export const artifactSubject = hash => hash
 
 /**
  * The five fields that key an extracted form's identity, per DOC-01. Not
@@ -101,13 +89,6 @@ const baseline = {
 }
 
 export const proof = {
-    // artifactSubject is the identity function on the hash string, and is
-    // `===`-stable across repeated calls with the identical argument.
-    artifactSubjectIsIdentity: () => {
-        assertEq(artifactSubject('abc'), 'abc')
-        const hash = 'SOME-CBASE32-HASH'
-        assertEq(artifactSubject(hash), artifactSubject(hash))
-    },
     // formSubject is deterministic across two DISTINCT object literals that
     // carry the identical five field values — proves it does not
     // accidentally key on object identity.

@@ -127,16 +127,16 @@
  * "without regard to this paragraph" — i.e. on line 4 BEFORE the add-back,
  * which {@link form6251} does by naming the two values separately.
  *
- * ## Capital gains: the Part III UPPER BOUND, and why this is not a refusal
+ * ## Capital gains: Part III, and the UPPER BOUND that still comes first
  *
  * Line 7 sends a return with qualified dividends or capital gains to **Part
- * III**, a twenty-nine-line worksheet that reapplies the 0/15/20% preferential
- * rates inside the AMT. This module does not model Part III.
+ * III**, a twenty-nine-line worksheet that reapplies the 0/15/20/25%
+ * preferential rates inside the AMT. `fjs/form6251/part3` models it (TAX-33),
+ * and this module reads its line 40 onto line 7.
  *
- * Refusing every such return was the obvious answer and it is the wrong one,
- * because it would refuse returns whose AMT is provably zero. The printed form
- * supplies a bound that settles most of them, on Part III's own last two
- * lines: **line 40 is the SMALLER of line 38 and line 39**, and line 39 is
+ * **The bound Phase 29 found is still computed, still checked first, and is
+ * still what makes the guarantee below a proof.** On Part III's own last two
+ * lines, **line 40 is the SMALLER of line 38 and line 39**, and line 39 is
  * exactly the flat 26/28% computation applied to line 12, which is line 6. So
  *
  * > Part III's answer ≤ the flat 26/28% figure, always, at every input.
@@ -144,17 +144,28 @@
  * Therefore if the flat figure, less the AMT foreign tax credit, is already no
  * greater than the regular tax on line 10, then line 9 ≤ line 10 whatever Part
  * III would have said, and **line 11 is exactly zero** — not approximately,
- * not probably. {@link form6251} computes that bound and returns a real,
- * exact `$0.00` for those returns, with `line7IsAnUpperBound` set so a reader
- * knows lines 7 and 9 are bounds rather than figures. Only when the bound does
- * NOT settle it does this module refuse, naming Part III.
+ * not probably. {@link form6251} computes that bound BEFORE Part III and
+ * returns a real, exact `$0.00` for those returns, with `line7IsAnUpperBound`
+ * set so a reader knows lines 7 and 9 are bounds rather than figures.
+ *
+ * Keeping the short circuit is not an optimisation. It is what lets this module
+ * answer *"is the AMT zero?"* for a whole class of returns **without depending
+ * on Part III being right**, and `fjs/form6251/part3`'s own
+ * `theFlatFigureIsAnUpperBoundAtEveryInput` proves the stronger statement the
+ * mechanism rests on: line 38 never exceeds line 39 either, because every
+ * preferential rate Part III charges is strictly below the AMT's own 26%. The
+ * flag therefore still says which path produced the answer, and the assert at
+ * Part III's call site below states the bound's claim where it can fail.
  *
  * **This is also what makes criterion 5 true.** A return with no preference
  * items has AMTI at or below the exemption, so line 6 is zero, Part III is
  * never reached, and nothing changes. A return above the exemption but with an
- * ordinary tax bill has its AMT settled at zero by the bound. Only a return
- * that genuinely might owe AMT and genuinely has preferential-rate income is
- * refused.
+ * ordinary tax bill has its AMT settled at zero by the bound, on the same code
+ * path it took before Part III existed.
+ *
+ * **What is still refused, by name:** Part III required while the regular tax
+ * completed NEITHER preferential worksheet. See
+ * {@link noRegularPreferentialWorksheetRefusal}.
  *
  * ## The same-year ISO disposition, refused
  *
@@ -185,9 +196,19 @@ import { centsFromString } from '../exact/module.f.js'
 import { of, multiply, halfUp } from '../types/rational/module.f.js'
 import { oneShare, sharesFromString } from '../document/share_count/module.f.js'
 import { taxParamsByYear } from '../tax/params/module.f.js'
+import { twentySixTwentyEightPercentTax } from './rate/module.f.js'
+import { partThree } from './part3/module.f.js'
 
 /** @import { FormThirtyNineTwentyOne } from '../document/form3921/module.f.js' */
 /** @import { IndividualFilingStatus, TaxParamSet } from '../tax/params/module.f.js' */
+/** @import { PartThree, RegularPreferentialWorksheet } from './part3/module.f.js' */
+
+/**
+ * The regular tax completed NEITHER preferential worksheet. Part III's lines 15,
+ * 20 and 27 each print a fallback for that case and none of them is modeled —
+ * see {@link noRegularPreferentialWorksheetRefusal}.
+ * @typedef {{ readonly kind: 'none' }} NoRegularPreferentialWorksheet
+ */
 
 /**
  * A stored document as this module sees it — mirrors every other consumer's
@@ -259,6 +280,9 @@ const min = a => b => a < b ? a : b
  *   readonly filingScheduleD: boolean,
  *   readonly scheduleD15Cents: bigint,
  *   readonly scheduleD16Cents: bigint,
+ *   readonly scheduleD19Cents: bigint,
+ *   readonly regularPreferentialWorksheet:
+ *     RegularPreferentialWorksheet | NoRegularPreferentialWorksheet,
  * }} Form6251Input
  */
 
@@ -269,10 +293,21 @@ const min = a => b => a < b ? a : b
  * line, one field), plus two facts about HOW the answer was reached.
  *
  * `line7IsAnUpperBound` is `true` exactly when Part III was required and the
- * upper bound settled the answer at zero. On such a return `line7` and `line9`
- * are UPPER BOUNDS rather than the figures the printed form would carry, and
- * `line11` is nonetheless exact — see this module's own docstring. On every
- * other return it is `false` and all three lines are the printed figures.
+ * upper bound settled the answer at zero WITHOUT running Part III. On such a
+ * return `line7` and `line9` are UPPER BOUNDS rather than the figures the
+ * printed form would carry, and `line11` is nonetheless exact — see this
+ * module's own docstring. On every other return it is `false` and all three
+ * lines are the printed figures. **It still tells a reader which path produced
+ * the answer**, which is the whole of what it ever claimed: `true` means the
+ * bound settled it, `false` means lines 7/9 are figures — now including a real
+ * Part III line 40 on line 7.
+ *
+ * `partThree` is the filled-in Part III worksheet when one was completed, and
+ * `undefined` otherwise — which is the case for every return that never reached
+ * Part III AND for a return the bound settled at zero without running it. A
+ * separate field rather than twenty-nine more lines on this record, following
+ * `fjs/tax/line16/qdcgt`'s sibling-module shape: Part III is a worksheet, not a
+ * continuation of this form's own numbering.
  *
  * `isoSpreadCents` is line 2i restated on its own field, because it is the
  * largest preference item this engine computes and a report that wants to say
@@ -297,6 +332,7 @@ const min = a => b => a < b ? a : b
  *   readonly line11: bigint,
  *   readonly line7IsAnUpperBound: boolean,
  *   readonly isoSpreadCents: bigint,
+ *   readonly partThree: PartThree | undefined,
  * }} Form6251Ok
  */
 
@@ -310,6 +346,51 @@ const min = a => b => a < b ? a : b
  */
 
 /** @typedef {Form6251Ok | Form6251Error} Form6251Outcome */
+
+// ── Part III's one remaining refusal ────────────────────────────────────────
+
+/**
+ * Part III is required, the upper bound does not settle the AMT at zero, and the
+ * regular tax completed **neither** the Qualified Dividends and Capital Gain Tax
+ * Worksheet **nor** the Schedule D Tax Worksheet.
+ *
+ * Part III's lines 15, 20 and 27 each print a fallback for that case — line 15's
+ * *"if you did not complete a Schedule D Tax Worksheet ... enter the amount from
+ * line 13"*, and lines 20 and 27's *"if you did not complete either worksheet
+ * for the regular tax, enter the amount from Form 1040 or 1040-SR, line 15; if
+ * zero or less, enter -0-"*. Line 13's own no-worksheet reading is not on the
+ * form's face at all; it is in `i6251.pdf`. So this corner needs an instruction
+ * this module has not transcribed, and it is refused rather than guessed.
+ *
+ * **When it happens, exactly.** `fjs/tax/line16`'s dispatch reaches neither
+ * preferential worksheet only through its LEVEL 1 gate, *"taxable income is zero
+ * or less"*, which precedes level 2's worksheet selection. Every other route
+ * into "neither worksheet" — Form 2555, Form 8615, Schedule J — already refuses
+ * one level up with its own scope kind. So this refusal names the one return
+ * shape that reaches it: 1040 line 15 at or below zero, alongside qualified
+ * dividends or capital gain, alongside enough of a preference item to put AMTI
+ * above the exemption. A large incentive stock option spread on a return whose
+ * deductions swallow its ordinary income is that shape.
+ *
+ * A CONSTANT rather than a function, unlike {@link isoDispositionRefusal}: there
+ * is no document to name. What the reader needs is the condition and the way
+ * out, and both are the same for every return that hits it.
+ * @type {Form6251Error}
+ */
+const noRegularPreferentialWorksheetRefusal = {
+    kind: 'error',
+    message: `Form 6251 Part III: this return reports qualified dividends or capital gain, so `
+        + `line 7 routes through Part III, and the flat 26%/28% figure does NOT already lose to `
+        + `the regular tax — so Part III genuinely decides the answer. But the regular tax `
+        + `completed NEITHER the Qualified Dividends and Capital Gain Tax Worksheet nor the `
+        + `Schedule D Tax Worksheet, which happens exactly when Form 1040 line 15 (taxable `
+        + `income) is zero or less. Part III lines 13, 15, 20 and 27 all read those worksheets, `
+        + `and their no-worksheet fallbacks are a separate printed rule this engine has not `
+        + `transcribed — line 13's is not on the form's face at all, only in the instructions. `
+        + `Refusing rather than substituting a zero: every one of those lines feeds a `
+        + `preferential band, so a wrong zero would tax capital gain at 26% or 28% inside the `
+        + `alternative minimum tax and OVERSTATE the tax, which is a confident wrong answer.`,
+}
 
 // ── Line 2i: the incentive stock option spread ──────────────────────────────
 
@@ -443,7 +524,8 @@ export const form6251 = taxParamSet => input => {
         specifiedPrivateActivityBondInterestCents,
         regularTaxCents, scheduleTwoLine1zCents, scheduleThreeLine1Cents,
         qualifiedDividendsCents, capitalGainDistributionsCents,
-        filingScheduleD, scheduleD15Cents, scheduleD16Cents,
+        filingScheduleD, scheduleD15Cents, scheduleD16Cents, scheduleD19Cents,
+        regularPreferentialWorksheet,
     } = input
     const { alternativeMinimumTax } = taxParamSet
 
@@ -610,6 +692,7 @@ export const form6251 = taxParamSet => input => {
             line7: 0n, line8: 0n, line9: 0n, line10, line11: 0n,
             line7IsAnUpperBound: false,
             isoSpreadCents: line2i,
+            partThree: undefined,
         }
     }
 
@@ -625,13 +708,12 @@ export const form6251 = taxParamSet => input => {
     //    `theTwentySixTwentyEightScheduleMatchesThePrintedShortcut` hand-types
     //    $4,782 and $2,391 and proves it. Rounded ONCE, on the combined exact
     //    rational, so the two forms agree to the cent rather than nearly.
-    const upperRateThresholdCents = centsFromString(
-        alternativeMinimumTax.upperRateThreshold[status].amount)
-    const atLowerRate = min(line6)(upperRateThresholdCents)
-    const atUpperRate = max(line6 - upperRateThresholdCents)(0n)
-    const flatTwentySixTwentyEight = halfUp(of(
-        BigInt(alternativeMinimumTax.lowerRatePercent) * atLowerRate
-        + BigInt(alternativeMinimumTax.upperRatePercent) * atUpperRate)(100n))
+    //
+    //    The schedule itself lives in `fjs/form6251/rate` since TAX-33,
+    //    because this form prints it THREE times -- here and at Part III's
+    //    lines 18 and 39 -- and three copies is "one rule, one place" with
+    //    three ways to rot.
+    const flatTwentySixTwentyEight = twentySixTwentyEightPercentTax(taxParamSet)(status)(line6)
 
     // 8. "Alternative minimum tax foreign tax credit." A documented zero:
     //    `foreignTaxCredit` (Schedule 3 line 1) is a refused kind, and the
@@ -672,20 +754,62 @@ export const form6251 = taxParamSet => input => {
                 line11: 0n,
                 line7IsAnUpperBound: true,
                 isoSpreadCents: line2i,
+                partThree: undefined,
             }
         }
+        // The bound did NOT settle it, so Part III has to be filled in for
+        // real. The one case it cannot be: the regular tax completed NEITHER
+        // preferential worksheet, which leaves lines 15, 20 and 27 reading
+        // printed fallbacks this engine does not model.
+        if (regularPreferentialWorksheet.kind === 'none') {
+            return noRegularPreferentialWorksheetRefusal
+        }
+        // Part III, lines 12-40. Line 12 is line 6 -- "Enter the amount from
+        // Form 6251, line 6" -- which is what makes line 39 identically
+        // `flatTwentySixTwentyEight` and the bound above exact.
+        const partThreeResult = partThree(taxParamSet)({
+            status,
+            line12Cents: line6,
+            scheduleD19Cents,
+            regularWorksheet: regularPreferentialWorksheet,
+        })
+        // THE BOUND, ASSERTED WHERE IT COULD FAIL. Everything above rests on
+        // Part III's answer never exceeding the flat figure; line 40's own
+        // printed `min` against line 39 makes that structural, and line 39 is
+        // this same computation on this same amount. Asserted rather than
+        // trusted, because if it ever failed, every `$0.00` this module returned
+        // on the short-circuit above would have been an understatement --
+        // `fjs/tax/line16/qdcgt`'s own argument for asserting instead of
+        // flooring, applied to the one invariant this form cannot get wrong.
+        assert(
+            partThreeResult.line39 === flatTwentySixTwentyEight,
+            ['Form 6251 line 39 must be line 7\'s own flat figure',
+                partThreeResult.line39, flatTwentySixTwentyEight])
+        assert(
+            partThreeResult.line40 <= flatTwentySixTwentyEight,
+            ['Form 6251 Part III must never exceed the flat 26/28% figure',
+                partThreeResult.line40, flatTwentySixTwentyEight])
+        // 7, via Part III: "Enter the smaller of line 38 or line 39 HERE AND ON
+        //    LINE 7."
+        const line7FromPartThree = partThreeResult.line40
+        const line9FromPartThree = line7FromPartThree - line8
         return {
-            kind: 'error',
-            message: `Form 6251 line 7: this return reports qualified dividends or capital `
-                + `gains, so the printed form routes line 7 through Part III — a twenty-nine-line `
-                + `worksheet that reapplies the 0%, 15% and 20% preferential rates inside the `
-                + `alternative minimum tax, over a Schedule D refigured for the AMT. This engine `
-                + `does not model Part III. It is refusing rather than taxing preferential-rate `
-                + `income at 26% or 28%, which is what the flat computation would do. Part III's `
-                + `own line 40 takes the SMALLER of its result and that flat figure, so this `
-                + `return's AMT is somewhere between $0.00 and the flat figure less the regular `
-                + `tax; the engine reports $0.00 without refusing only when that whole range is `
-                + `zero, and here it is not.`,
+            kind: 'ok',
+            line1a, line1b,
+            line2a, line2b, line2c, line2d, line2e, line2f, line2g, line2h, line2i,
+            line2j, line2k, line2l, line2m, line2n, line2o, line2p, line2q, line2r,
+            line2s, line2t,
+            line3, line4BeforeAddBack, line4, line5, line6,
+            line7: line7FromPartThree,
+            line8,
+            line9: line9FromPartThree,
+            line10,
+            line11: max(line9FromPartThree - line10)(0n),
+            // The figures ARE the printed figures now, so the flag is false --
+            // which is exactly what it has always meant.
+            line7IsAnUpperBound: false,
+            isoSpreadCents: line2i,
+            partThree: partThreeResult,
         }
     }
 
@@ -707,6 +831,7 @@ export const form6251 = taxParamSet => input => {
         line7, line8, line9, line10, line11,
         line7IsAnUpperBound: false,
         isoSpreadCents: line2i,
+        partThree: undefined,
     }
 }
 
@@ -770,7 +895,24 @@ const nothing = {
     filingScheduleD: false,
     scheduleD15Cents: 0n,
     scheduleD16Cents: 0n,
+    scheduleD19Cents: 0n,
+    // The base fixture reports no preferential income at all, so the regular tax
+    // completed no preferential worksheet -- which is the HONEST default here and
+    // not merely the empty one. Fixtures that DO reach Part III override it, and
+    // `partThreeRefusesWhenTheRegularTaxCompletedNeitherWorksheet` is the leaf
+    // that exercises this arm reaching Part III.
+    regularPreferentialWorksheet: { kind: 'none' },
 }
+
+/**
+ * The regular tax's QDCGT lines 4 and 5, as a fixture helper — `line4` is the
+ * preferential slice (qualified dividends plus net capital gain) and `line5` the
+ * ordinary remainder of taxable income.
+ * @type {(line4: bigint) => (line5: bigint) => RegularPreferentialWorksheet}
+ */
+const regularQdcgt = line4 => line5 => ({
+    kind: 'qdcgt', qdcgtLine4Cents: line4, qdcgtLine5Cents: line5,
+})
 
 /**
  * An ordinary wage return, expressed the way `fjs/form1040/core` would hand it
@@ -1576,54 +1718,160 @@ export const proof = {
                 result.line9 <= result.line10,
                 'the bound holds: even the flat figure loses to the regular tax')
         },
-        // THE REFUSAL, when the bound does not settle it. The same return with
-        // a $1,000,000.00 ISO spread: the flat figure is now far above the
-        // regular tax, so Part III could genuinely change the answer.
-        theSameReturnWithAPreferenceItemRefusesNamingPartThree: () => {
-            const outcome = run({
+        // ★ THE RETURN PHASE 29 HAD TO REFUSE, COMPUTING. The same return with a
+        // $1,000,000.00 ISO spread beside its qualified dividends: the flat
+        // figure is far above the regular tax, so the bound does not settle it
+        // and Part III genuinely decides the answer.
+        //
+        // MERGE NOTE / TAX-33. This leaf REPLACES a refusal proof
+        // (`theSameReturnWithAPreferenceItemRefusesNamingPartThree`) with a
+        // computing one, deliberately: the refusal it asserted is the thing
+        // TAX-33 removes. Do not restore it. Note also why it could not simply
+        // be left alone — the refusal that survives on this module
+        // (`noRegularPreferentialWorksheetRefusal`) contains the strings "Part
+        // III", "26%" and "preferential" too, so the old leaf would have stayed
+        // GREEN against a completely different refusal. That is AGENTS.md's
+        // "assert the effect, not the error message" in its most dangerous form.
+        //
+        //   AMTI       384,250.00 + 15,750.00 + 1,000,000.00   $1,400,000.00
+        //   line 5     fully phased out                                $0.00
+        //   line 6     = line 12                              $1,400,000.00
+        //   QDCGT 4    the qualified dividends                    $20,000.00
+        //   QDCGT 5    384,250.00 - 20,000.00                    $364,250.00
+        //   III 17     1,400,000.00 - 20,000.00                $1,380,000.00
+        //   III 18     26% x 239,100.00 = 62,166.00
+        //            + 28% x 1,140,900.00 = 319,452.00           $381,618.00
+        //   III 21     48,350.00 - 364,250.00 is negative              -0-
+        //   III 30     the $20,000.00, all of it at 15%           $20,000.00
+        //   III 31     15% x 20,000.00                             $3,000.00
+        //   III 38     381,618.00 + 3,000.00                     $384,618.00
+        //   III 39     62,166.00 + 28% x 1,160,900.00 = 325,052.00
+        //                                                        $387,218.00
+        //   III 40     the smaller                                $384,618.00
+        //   line 7     Part III line 40                           $384,618.00
+        //   line 10    the regular tax                            $100,000.00
+        //   line 11    384,618.00 - 100,000.00                    $284,618.00
+        theSameReturnWithAPreferenceItemNowComputesPartThree: () => {
+            const result = expectOk(run({
                 ...wageReturn(40000000n)(singleStandardDeduction)(10000000n),
                 qualifiedDividendsCents: 2000000n,
+                regularPreferentialWorksheet: regularQdcgt(2000000n)(36425000n),
                 isoExerciseForms: [isoForm('doc-iso-qd')('5.00')('105.00')('10000')],
+            }))
+            assertEq(result.line6, 140000000n, 'line 6 = $1,400,000.00')
+            const three = assertNotNullish(result.partThree, 'Part III must have been completed')
+            assertEq(three.line12, 140000000n, 'Part III line 12 IS Form 6251 line 6')
+            assertEq(three.line17, 138000000n, 'line 17 = $1,380,000.00 of ordinary AMT income')
+            assertEq(three.line18, 38161800n, 'line 18 = $381,618.00')
+            assertEq(three.line30, 2000000n, 'line 30 = the $20,000.00 of qualified dividends')
+            assertEq(three.line31, 300000n, 'line 31 = 15% of it = $3,000.00')
+            assertEq(three.line38, 38461800n, 'line 38 = $384,618.00')
+            assertEq(three.line39, 38721800n, 'line 39 = $387,218.00, the flat 26/28% figure')
+            assertEq(three.line40, 38461800n, 'line 40 = $384,618.00')
+            assertEq(result.line7, 38461800n, 'and line 40 lands on LINE 7')
+            assertEq(result.line9, 38461800n, 'line 9 = line 7, there being no AMT foreign tax credit')
+            assertEq(result.line11, 28461800n, 'line 11 = $384,618.00 - $100,000.00 = $284,618.00')
+            assertEq(
+                result.line7IsAnUpperBound, false,
+                'the flag is FALSE: line 7 is the printed figure, not a bound')
+            // WHAT PART III BUYS, as its own assertion and derived
+            // independently: 28% - 15% = 13%, and 13% of $20,000.00 is
+            // $2,600.00. Taxing the qualified dividends at the flat AMT rate --
+            // which is what Phase 29 refused rather than do -- would have
+            // overstated this return's AMT by exactly that.
+            assertEq(
+                three.line39 - result.line7, 260000n,
+                'the flat computation would charge 28% where Part III charges 15%')
+        },
+        // THE ONE REFUSAL LEFT ON THIS FORM, and it is not about Part III being
+        // unmodeled: it is Part III required while the regular tax completed
+        // NEITHER preferential worksheet, which happens exactly when 1040 line
+        // 15 is zero or less. A filer whose deductions swallow their ordinary
+        // income while a $1,000,000.00 ISO spread puts AMTI far above the
+        // exemption is that return.
+        partThreeRefusesWhenTheRegularTaxCompletedNeitherWorksheet: () => {
+            const outcome = run({
+                ...nothing,
+                // No taxable income at all, so `fjs/tax/line16`'s level-1 gate
+                // fires and neither preferential worksheet runs...
+                adjustedGrossIncomeCents: 0n,
+                regularTaxCents: 0n,
+                // ...but there ARE qualified dividends, so Part III is required,
+                // and a $1,000,000.00 spread puts AMTI above the exemption.
+                qualifiedDividendsCents: 2000000n,
+                isoExerciseForms: [isoForm('doc-iso-no-worksheet')('5.00')('105.00')('10000')],
             })
             assertEq(outcome.kind, 'error', ['expected a refusal', outcome])
             if (outcome.kind !== 'error') {
                 throw ['expected error', outcome]
             }
-            assert(outcome.message.includes('Part III'), ['name the part', outcome.message])
+            // The four things a reader can act on, each asserted separately --
+            // and none of them a string the OTHER refusals on this module share,
+            // so this leaf cannot pass against the wrong refusal.
             assert(
-                outcome.message.includes('26%'),
-                ['say what the wrong answer would have been', outcome.message])
+                outcome.message.includes('NEITHER'),
+                ['name the condition', outcome.message])
             assert(
-                outcome.message.includes('preferential'),
-                ['say WHY Part III exists', outcome.message])
+                outcome.message.includes('taxable income'),
+                ['say WHEN it happens', outcome.message])
+            assert(
+                outcome.message.includes('OVERSTATE'),
+                ['say which way the wrong answer would go', outcome.message])
+            assert(
+                outcome.message.includes('not on the form\'s face'),
+                ['say what is missing: an instruction, not a figure', outcome.message])
+            // THE CONTROL (AGENTS.md: "a gate needs a control"). The identical
+            // return with a completed regular-tax worksheet computes.
+            const computed = expectOk(run({
+                ...nothing,
+                adjustedGrossIncomeCents: 0n,
+                regularTaxCents: 0n,
+                qualifiedDividendsCents: 2000000n,
+                regularPreferentialWorksheet: regularQdcgt(2000000n)(0n),
+                isoExerciseForms: [isoForm('doc-iso-worksheet')('5.00')('105.00')('10000')],
+            }))
+            assertNotNullish(computed.partThree, 'the control completes Part III')
+            assert(computed.line11 > 0n, ['and owes a real AMT', computed.line11])
         },
         // Each of the THREE conditions the printed line 7 lists selects Part
         // III on its own, and each is exercised separately -- a predicate
         // written for qualified dividends alone would leave the other two
-        // silently taxed at 26/28%. The fixture is the refusing one, so a
-        // condition that stopped selecting Part III turns an error into an ok
-        // and reddens.
+        // silently taxed at 26/28%.
+        //
+        // Since TAX-33 the observable is `partThree` being FILLED IN rather than
+        // an error being returned, which is a stronger assertion than the
+        // refusal it replaces: a condition that stopped selecting Part III used
+        // to turn an error into an ok, and now turns a completed worksheet into
+        // an absent one while the return still computes. Both the presence and
+        // the resulting line 7 are checked, because a Part III that ran and was
+        // then ignored would leave `partThree` present and line 7 flat.
         eachOfTheThreePrintedConditionsSelectsPartThree: () => {
             const base = {
                 ...wageReturn(40000000n)(singleStandardDeduction)(10000000n),
+                regularPreferentialWorksheet: regularQdcgt(2000000n)(36425000n),
                 isoExerciseForms: [isoForm('doc-iso-three')('5.00')('105.00')('10000')],
             }
-            assertEq(
-                run({ ...base, qualifiedDividendsCents: 1n }).kind, 'error',
+            /** @type {(input: Form6251Input) => (label: string) => void} */
+            const expectPartThree = input => label => {
+                const result = expectOk(run(input))
+                const three = assertNotNullish(result.partThree, label)
+                assertEq(result.line7, three.line40, [label, 'line 7 must be Part III line 40'])
+                assert(
+                    result.line7 < three.line39,
+                    [label, 'and strictly below the flat figure on this fixture',
+                        result.line7, three.line39])
+            }
+            expectPartThree({ ...base, qualifiedDividendsCents: 1n })(
                 'condition 1: qualified dividends on 1040 line 3a')
-            assertEq(
-                run({ ...base, capitalGainDistributionsCents: 1n, filingScheduleD: false }).kind,
-                'error',
+            expectPartThree({ ...base, capitalGainDistributionsCents: 1n, filingScheduleD: false })(
                 'condition 2: capital gain distributions reported DIRECTLY on 1040 line 7')
-            assertEq(
-                run({
-                    ...base, filingScheduleD: true, scheduleD15Cents: 1n, scheduleD16Cents: 1n,
-                }).kind,
-                'error',
-                'condition 3: a gain on BOTH Schedule D lines 15 and 16')
-            // …and the control: the same return with none of the three
-            // computes a real AMT rather than refusing.
+            expectPartThree({
+                ...base, filingScheduleD: true, scheduleD15Cents: 1n, scheduleD16Cents: 1n,
+            })('condition 3: a gain on BOTH Schedule D lines 15 and 16')
+            // …and the control: the same return with none of the three does NOT
+            // complete Part III, and takes the flat 26/28% figure on line 7.
             const clean = expectOk(run(base))
+            assertEq(clean.partThree, undefined, 'no condition, no Part III')
             assertEq(clean.line7IsAnUpperBound, false)
             assert(clean.line11 > 0n, ['the control must owe real AMT', clean.line11])
         },
@@ -1635,15 +1883,21 @@ export const proof = {
         capitalGainDistributionsSelectPartThreeOnlyWithoutAScheduleD: () => {
             const base = {
                 ...wageReturn(40000000n)(singleStandardDeduction)(10000000n),
+                regularPreferentialWorksheet: regularQdcgt(500000n)(37850000n),
                 isoExerciseForms: [isoForm('doc-iso-cgd')('5.00')('105.00')('10000')],
                 capitalGainDistributionsCents: 500000n,
             }
-            assertEq(run({ ...base, filingScheduleD: false }).kind, 'error', 'reported directly')
+            assertNotNullish(
+                expectOk(run({ ...base, filingScheduleD: false })).partThree,
+                'reported directly: Part III is completed')
             // Schedule D filed, and line 16 a LOSS -- so neither condition 2
-            // nor condition 3 fires.
+            // nor condition 3 fires, and Part III is NOT completed.
             assertEq(
-                run({ ...base, filingScheduleD: true, scheduleD15Cents: 500000n, scheduleD16Cents: -100000n }).kind,
-                'ok',
+                expectOk(run({
+                    ...base, filingScheduleD: true,
+                    scheduleD15Cents: 500000n, scheduleD16Cents: -100000n,
+                })).partThree,
+                undefined,
                 'a Schedule D was filed, so box 2a did not reach line 7 directly')
         },
         // The bound is an UPPER bound on Part III, so a return it settles must
@@ -1661,14 +1915,71 @@ export const proof = {
             }
             // …and exactly ONE cent of regular tax less than the flat figure
             // is NOT settled, so the boundary of the bound is where it says it
-            // is rather than a cent either side.
+            // is rather than a cent either side. Since TAX-33 the unsettled side
+            // COMPUTES rather than refusing, and the observable is that it took
+            // the Part III path: `partThree` filled in and the flag false.
+            const oneCentShort = expectOk(run({
+                ...wageReturn(40000000n)(singleStandardDeduction)(8254999n),
+                qualifiedDividendsCents: 2000000n,
+                regularPreferentialWorksheet: regularQdcgt(2000000n)(36425000n),
+            }))
+            assertNotNullish(
+                oneCentShort.partThree,
+                'one cent short of the flat figure: the bound no longer settles it, so Part III runs')
             assertEq(
-                run({
-                    ...wageReturn(40000000n)(singleStandardDeduction)(8254999n),
-                    qualifiedDividendsCents: 2000000n,
-                }).kind,
-                'error',
-                'one cent short of the flat figure: the bound no longer settles it')
+                oneCentShort.line7IsAnUpperBound, false,
+                'and line 7 is a printed figure rather than a bound')
+            // …while exactly AT the flat figure the bound still settles it, on
+            // the OTHER code path -- so this pair pins the boundary from both
+            // sides and pins which path each side takes.
+            const exactly = expectOk(run({
+                ...wageReturn(40000000n)(singleStandardDeduction)(8255000n),
+                qualifiedDividendsCents: 2000000n,
+                regularPreferentialWorksheet: regularQdcgt(2000000n)(36425000n),
+            }))
+            assertEq(exactly.partThree, undefined, 'settled: Part III never ran')
+            assertEq(exactly.line7IsAnUpperBound, true, 'and the flag says the answer is a bound')
+            assertEq(exactly.line11, 0n, 'exactly $0.00, whatever Part III would have said')
+        },
+        // ★ CRITERION 2, and the FLAG'S MEANING after TAX-33, stated as a triple
+        // over ONE return varied only in its regular tax. The flag is not
+        // decoration: it is the difference between "lines 7 and 9 are bounds and
+        // line 11 is exactly zero" and "lines 7 and 9 are the printed figures".
+        //
+        // Both paths are exercised, and the SHORT CIRCUIT is shown to be a
+        // short circuit rather than an equivalent computation: on the settled
+        // return line 7 is the FLAT figure ($82,550.00) and on the computed one
+        // it is Part III's smaller line 40. A refactor that deleted the short
+        // circuit and always ran Part III would leave line 11 correct on both
+        // and change line 7 on the first -- which only this leaf notices.
+        theFlagSaysWhichPathProducedTheAnswer: () => {
+            const base = {
+                ...wageReturn(40000000n)(singleStandardDeduction)(0n),
+                qualifiedDividendsCents: 2000000n,
+                regularPreferentialWorksheet: regularQdcgt(2000000n)(36425000n),
+            }
+            // The flat figure on this AMTI: 26% of $239,100.00 = $62,166.00 plus
+            // 28% of $72,800.00 = $20,384.00, hand-typed.
+            const flat = 8255000n
+            const settled = expectOk(run({ ...base, regularTaxCents: flat }))
+            assertEq(settled.line7IsAnUpperBound, true, 'the bound settled it')
+            assertEq(settled.line7, flat, 'so line 7 is the FLAT figure, a bound')
+            assertEq(settled.partThree, undefined, 'and Part III was never run')
+            assertEq(settled.line11, 0n)
+            const computed = expectOk(run({ ...base, regularTaxCents: flat - 1n }))
+            assertEq(computed.line7IsAnUpperBound, false, 'one cent less, and the bound does not')
+            const three = assertNotNullish(computed.partThree, 'so Part III ran')
+            assertEq(computed.line7, three.line40, 'and line 7 is its line 40')
+            assert(
+                computed.line7 < flat,
+                ['which is STRICTLY below the flat figure, so the two paths are distinguishable',
+                    computed.line7, flat])
+            assertEq(
+                flat - computed.line7, 260000n,
+                '13% of the $20,000.00 of qualified dividends = $2,600.00, hand-computed')
+            // The bound's own claim, over the pair: whichever path ran, line 7
+            // never exceeds the flat figure.
+            assert(settled.line7 <= flat && computed.line7 <= flat, 'THE BOUND holds on both paths')
         },
     },
     // Line 10 is a SUM and a difference, not a pass-through of 1040 line 16.
@@ -1710,8 +2021,11 @@ export const proof = {
     everyPrintedLineIsNamed: () => {
         const result = expectOk(run(nothing))
         // 1a, 1b, 2a-2t (20), 3, 4BeforeAddBack, 4, 5, 6, 7, 8, 9, 10, 11,
-        // plus `kind`, `line7IsAnUpperBound` and `isoSpreadCents`.
-        const expectedFieldCount = 35
+        // plus `kind`, `line7IsAnUpperBound`, `isoSpreadCents` and `partThree`.
+        // (`partThree` is `undefined` on this fixture and STILL counted:
+        // `Object.keys` lists a property explicitly set to `undefined`, which is
+        // what makes this count catch the field disappearing.)
+        const expectedFieldCount = 36
         assertEq(
             Object.keys(result).length,
             expectedFieldCount,
