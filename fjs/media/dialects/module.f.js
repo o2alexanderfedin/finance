@@ -32,7 +32,7 @@
  * `dialectEntry`'s own documented default: no second argument, structural
  * (rtti) match alone.
  *
- * `financeDialects` carries TWENTY-SEVEN entries: the twenty-six local
+ * `financeDialects` carries TWENTY-EIGHT entries: the twenty-seven local
  * dialects below, plus `revisionDialect`, reused unchanged from upstream — not
  * reconstructed locally, since `fjs/media/revision` already IS one of this
  * repo's dialects (`vnd.fjs.revision` blobs are written directly into the
@@ -40,6 +40,10 @@
  *
  * Phase 30 (DOC-24) adds the twenty-second and twenty-third,
  * `vnd.fjs.k1_1065` and `vnd.fjs.k1_1120s`, and both gained a fixture below.
+ *
+ * TAX-35 adds the twenty-seventh, `vnd.fjs.k1_1041` — the THIRD Schedule K-1,
+ * whose box numbering is a third one again. Its fixture carries no
+ * `accountNumber`, because the printed Form 1041 face has no such box.
  *
  * ## This registry and `fjs/server/finance_schema`'s HAD diverged
  *
@@ -191,6 +195,11 @@ import {
     checkReferences as checkK1SCorporation,
 } from '../../document/k1_1120s/module.f.js'
 import {
+    dialect as k1EstateTrustDialect,
+    k1EstateTrustSchema,
+    checkReferences as checkK1EstateTrust,
+} from '../../document/k1_1041/module.f.js'
+import {
     dialect as formThirtyNineTwentyOneDialect,
     formThirtyNineTwentyOneSchema,
     checkReferences as checkFormThirtyNineTwentyOne,
@@ -245,6 +254,7 @@ export const financeDialects = [
     dialectEntry(businessExpensesSchema, v => checkBusinessExpenses(v)[0] === 'ok'),
     dialectEntry(k1PartnershipSchema, v => checkK1Partnership(v)[0] === 'ok'),
     dialectEntry(k1SCorporationSchema, v => checkK1SCorporation(v)[0] === 'ok'),
+    dialectEntry(k1EstateTrustSchema, v => checkK1EstateTrust(v)[0] === 'ok'),
     // Phase 29's three, registered with `finance_schema` in that phase and
     // with `detect` only here. Until this entry existed, `cas_refresh` filed a
     // stored Form 3921 blob as `text/plain`.
@@ -266,7 +276,7 @@ export const detectFinance = detect(financeDialects)
 
 /**
  * Independently hand-typed: the number of entries {@link financeDialects}
- * is expected to carry today — TWENTY-SIX local dialects plus
+ * is expected to carry today — TWENTY-SEVEN local dialects plus
  * {@link revisionDialect}, which is upstream's. Deliberately NOT derived from
  * `financeDialects.length` itself (AGENTS.md's hand-typed-count idiom,
  * mirroring `fjs/document/1099b`'s `expectedMoneyBoxFieldCount`): a dialect
@@ -277,7 +287,7 @@ export const detectFinance = detect(financeDialects)
  * collection shrinking").
  * @type {number}
  */
-const expectedDialectCount = 27
+const expectedDialectCount = 28
 
 /** A sample cbase32 hash — {@link revisionDialect}'s own `snapshot`/`parents` shape needs a decodable one; the value itself is arbitrary. */
 const revisionSampleHash = vecToCBase32(vec8(0x77n))
@@ -476,6 +486,17 @@ const fixtures = {
         payerTin: '44-4444444',
         recipientTin: '222-22-2222',
         accountNumber: 'SHR-0001',
+        taxYear: 2025,
+        formRevision: '2025',
+    },
+    // TAX-35's third Schedule K-1. It carries NO `accountNumber`, because the
+    // printed Form 1041 face has no such box — the one structural difference
+    // from its two siblings above, and the reason this fixture is not the
+    // S-corporation one with a dialect tag swapped.
+    [k1EstateTrustDialect]: {
+        dialect: k1EstateTrustDialect,
+        payerTin: '66-6666666',
+        recipientTin: '222-22-2222',
         taxYear: 2025,
         formRevision: '2025',
     },
