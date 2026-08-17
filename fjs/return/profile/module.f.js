@@ -462,7 +462,186 @@ const dependentEntrySchema = /** @type {const} */ ({
     ssnValidForEmployment: option(true),
     ageAtYearEnd: number,
     livedWithTaxpayer: option(true),
+    // ── TAX-27 (Phase 32): the five §32(c)(3) facts Schedule 8812's four
+    // above cannot express. See {@link earnedIncomeCreditVocabularies} for
+    // why every one of them is TWO OR MORE EXACT STRINGS rather than
+    // `option(true)`, and `fjs/todo/tax-27-earned-income-credit.md` for the
+    // fact-by-fact analysis that asked for them.
+    //
+    // `relationship` above is UNTOUCHED. It is Schedule 8812's, it is free
+    // text by design, and narrowing it would change a document already
+    // stored under a dialect whose readers depend on it. The §32 question is
+    // a DIFFERENT question with a different answer set -- §32(c)(3)(A) reaches
+    // §152(c)(2), which admits five relationships and no more -- so it gets
+    // its own field, exactly as `fjs/todo/tax-27-earned-income-credit.md`
+    // argues §32(c)(2) earned income must not share Schedule 8812's
+    // `earnedIncome`. Two questions with the same name and different
+    // definitions is the error, not the duplication.
+    earnedIncomeCreditRelationship: option(string),
+    earnedIncomeCreditFullTimeStudent: option(string),
+    earnedIncomeCreditPermanentAndTotalDisability: option(string),
+    earnedIncomeCreditUnitedStatesResidency: option(string),
+    earnedIncomeCreditJointReturn: option(string),
 })
+
+/**
+ * The FROZEN vocabularies for §32's ten asserted facts — five per dependent
+ * on {@link dependentEntrySchema} and five about the filer on
+ * {@link returnProfileSchema}.
+ *
+ * ## Why these are exact strings and NOT `option(true)`
+ *
+ * This dialect's own rule, stated in its header, is that a boolean-shaped
+ * fact is `option(true)` and ABSENCE means "not asserted true". That rule is
+ * right wherever absence is the SAFE reading, and it is wrong here, for
+ * exactly the reason `fjs/document/business_expenses` gives for its
+ * `specifiedServiceTradeOrBusiness` flag — the precedent this group follows
+ * rather than re-argues:
+ *
+ * - Under `option(true)`, absence and a denial are the same stored state. For
+ *   `earnedIncomeCreditPermanentAndTotalDisability` the two are opposite
+ *   answers to a question worth thousands of dollars: a disabled dependent has
+ *   NO age limit at all (§152(c)(3)(B)), so reading an absent field as "not
+ *   disabled" silently drops a 30-year-old qualifying child, and reading it as
+ *   "disabled" silently keeps one who is not.
+ * - **Here the wrong default GRANTS a credit.** That is the direction that
+ *   decides the shape. `earnedIncomeCreditJointReturn` is the sharpest case:
+ *   under `option(true)` the ABSENT state would have to mean "did not file a
+ *   joint return", which is the state that qualifies the child — so a
+ *   serializer that dropped the key, or a preparer who never asked, produces
+ *   a credit rather than a refusal. As one of two exact strings, absence is
+ *   *unstated* and `fjs/schedule/eic` refuses by name.
+ * - `option(boolean)` would express three states while making the dangerous
+ *   one cheap, as that same docstring records: *"a serializer that helpfully
+ *   materializes every key"* would write `false`, indistinguishable from a
+ *   taxpayer who answered no. A materialized `false` or `''` fails the
+ *   vocabulary check below and is refused, quoted.
+ *
+ * The names are the statute's own words rather than `yes`/`no`, following
+ * `fjs/document/k1_common`'s `materialParticipationValues`: a call site that
+ * forgot to check cannot mistake `'didNotShareTheTaxpayersUnitedStatesAbode\
+ * ForMoreThanHalfTheYear'` for a positive answer, and a bare `false` reads
+ * like one at a glance.
+ *
+ * ## The relationship vocabulary has a NEGATIVE member, and it is load-bearing
+ *
+ * `'notAnEarnedIncomeCreditRelationship'` is the fifth relationship's
+ * counterpart, and without it this array could not describe a real return.
+ * The `dependents` array serves Schedule 8812 too, and a dependent PARENT is
+ * a perfectly ordinary credit for other dependents (§24(h)(4)) while being no
+ * §32(c)(3) qualifying child at all — §152(c)(2) reaches a child, a
+ * descendant of a child, a sibling and a descendant of a sibling, and stops.
+ * Without an explicit denial, that parent's absent field would be *unstated*,
+ * `fjs/schedule/eic` would refuse, and a filer entitled to the CHILDLESS
+ * credit could not obtain it. So the denial is expressible and the absence
+ * still refuses.
+ *
+ * The five positive members are §152(c)(2) read through §152(f):
+ * `'child'` covers son, daughter and a legally adopted or lawfully placed
+ * child (§152(f)(1)(A)(i) and (B)); `'stepchild'` is that clause's stepson
+ * and stepdaughter; `'eligibleFosterChild'` is §152(f)(1)(C)'s;
+ * `'siblingOrStepOrHalfSibling'` is §152(c)(2)(B)'s brother, sister,
+ * stepbrother and stepsister, widened by §152(f)(4) to the half blood; and
+ * `'descendantOfAChildOrSibling'` is the *"or a descendant of"* in both
+ * subparagraphs, which is what makes a grandchild, a niece and a nephew
+ * qualify — the exact question the old free-text `relationship` field could
+ * not answer, as this repo's own TAX-27 note records with `'niece'` as its
+ * example.
+ *
+ * ## What is deliberately NOT here
+ *
+ * **§152(c)(4)'s tie-breaker**, where a child is the qualifying child of more
+ * than one person. Expressing it needs another person's return, which this
+ * engine has no way to hold, so it is an accepted TRUST BOUNDARY on the
+ * taxpayer's own declaration — mirroring exactly how this dialect's header
+ * records the citizenship boundary Schedule 8812 relies on, and how
+ * `fjs/schedule/b` records its own Form 8815 boundary. It is written down
+ * here rather than left silent, because a boundary nobody stated is a
+ * boundary nobody can review.
+ *
+ * **§152(c)(1)(D)'s support test** is absent for a stronger reason: it does
+ * not apply. §32(c)(3)(A) defines a qualifying child as §152(c)'s
+ * *"determined without regard to paragraph (1)(D) thereof"*, so a field for
+ * it would be a fact §32 does not ask for.
+ */
+export const earnedIncomeCreditVocabularies = /** @type {const} */ ({
+    // §32(c)(3)(A) -> §152(c)(2), read through §152(f)(1) and (f)(4).
+    earnedIncomeCreditRelationship: [
+        'child', 'stepchild', 'eligibleFosterChild',
+        'siblingOrStepOrHalfSibling', 'descendantOfAChildOrSibling',
+        'notAnEarnedIncomeCreditRelationship',
+    ],
+    // §152(c)(3)(A)(ii) and §152(f)(2) — five calendar months full time.
+    earnedIncomeCreditFullTimeStudent: ['wasAFullTimeStudent', 'wasNotAFullTimeStudent'],
+    // §152(c)(3)(B), which points at §22(e)(3)'s definition.
+    earnedIncomeCreditPermanentAndTotalDisability: [
+        'permanentlyAndTotallyDisabled', 'notPermanentlyAndTotallyDisabled',
+    ],
+    // §152(c)(1)(B), which §32(c)(3)(C) narrows to an abode IN THE UNITED
+    // STATES. The stored `livedWithTaxpayer` boolean says neither where nor
+    // for how long, which is why this is a separate field rather than a
+    // reading of that one.
+    earnedIncomeCreditUnitedStatesResidency: [
+        'sharedTheTaxpayersUnitedStatesAbodeForMoreThanHalfTheYear',
+        'didNotShareTheTaxpayersUnitedStatesAbodeForMoreThanHalfTheYear',
+    ],
+    // §152(c)(1)(E).
+    earnedIncomeCreditJointReturn: ['filedAJointReturn', 'didNotFileAJointReturn'],
+    // §32(c)(1)(E) and §32(m) — an SSN valid for employment, issued on or
+    // before the return's due date. One vocabulary, two fields, because the
+    // filer's and the spouse's are the same question about two people.
+    filerSocialSecurityNumber: ['validForEmployment', 'notValidForEmployment'],
+    spouseSocialSecurityNumber: ['validForEmployment', 'notValidForEmployment'],
+    // §32(c)(1)(B) — an individual who is themselves somebody's qualifying
+    // child is not an eligible individual, with or without children of their
+    // own.
+    filerQualifyingChildOfAnotherTaxpayer: [
+        'isAnotherTaxpayersQualifyingChild', 'isNotAnotherTaxpayersQualifyingChild',
+    ],
+    // §32(c)(1)(A)(ii)(II) — the CHILDLESS credit's age band. Stored as the
+    // assertion rather than as an age, because the statute's own test is
+    // "attained age 25 but not attained age 65 before the close of the taxable
+    // year" and on a joint return it is satisfied if EITHER spouse does; an
+    // age number for one person could not express that.
+    filerAttainedAgeTwentyFiveButNotSixtyFive: [
+        'attainedAgeTwentyFiveButNotSixtyFive', 'didNotAttainAgeTwentyFiveOrHasAttainedSixtyFive',
+    ],
+    // §32(c)(1)(A)(ii)(I) — the CHILDLESS credit's own abode test, about the
+    // filer rather than about a child.
+    filerPrincipalPlaceOfAbode: [
+        'inTheUnitedStatesForMoreThanHalfTheYear', 'notInTheUnitedStatesForMoreThanHalfTheYear',
+    ],
+})
+
+/** One key of {@link earnedIncomeCreditVocabularies}.
+ * @typedef {keyof typeof earnedIncomeCreditVocabularies} EarnedIncomeCreditFactField
+ */
+
+/**
+ * The vocabulary check, written ONCE for all ten fields (AGENTS.md, "one
+ * rule, one place") rather than ten times.
+ *
+ * Returns `undefined` for an ABSENT field: absence is a legitimate stored
+ * state and a `fjs/schedule/eic` refusal, never a storage error. That is the
+ * whole point of the three-state shape — this dialect stores what the
+ * taxpayer said, and the consumer decides whether the answer it needs is
+ * there.
+ * @type {(field: EarnedIncomeCreditFactField) => (stated: string | undefined) => string | undefined}
+ */
+export const earnedIncomeCreditFactError = field => stated => {
+    if (stated === undefined) {
+        return undefined
+    }
+    /** @type {readonly string[]} */
+    const permitted = earnedIncomeCreditVocabularies[field]
+    if (permitted.some(candidate => candidate === stated)) {
+        return undefined
+    }
+    return `${field} carries ${JSON.stringify(stated)}, which is not one of the `
+        + `${permitted.length} values §32 admits: ${permitted.join(', ')}. An unrecognized `
+        + 'answer cannot be read as either a yes or a no, and for the earned income credit '
+        + 'both readings are wrong for somebody'
+}
 
 /**
  * rtti schema for a `return_profile` BLOB. `dialect` is spread first (via
@@ -536,6 +715,21 @@ export const returnProfileSchema = /** @type {const} */ ({
     // module's own docstring, "schema decisions worth stating", for why
     // citizenship is deliberately NOT a fifth field here.
     dependents: option(array(dependentEntrySchema)),
+    // TAX-27 (Phase 32) — §32(c)(1)'s and §32(m)'s facts about the FILER,
+    // none of which any information return reports and none of which any
+    // existing field on this dialect carries. See
+    // {@link earnedIncomeCreditVocabularies}.
+    //
+    // §32(c)(1)(A)(ii)(III)'s third childless-credit condition -- "is not a
+    // dependent for whom a deduction is allowable ... to another taxpayer" --
+    // deliberately gets NO field here: `claimedAsDependent` (1040 line 12a,
+    // far above) already carries exactly that fact, and a second declaration
+    // of one fact is how the two come to disagree.
+    filerSocialSecurityNumber: option(string),
+    spouseSocialSecurityNumber: option(string),
+    filerQualifyingChildOfAnotherTaxpayer: option(string),
+    filerAttainedAgeTwentyFiveButNotSixtyFive: option(string),
+    filerPrincipalPlaceOfAbode: option(string),
 })
 
 /** @typedef {Ts<typeof returnProfileSchema>} ReturnProfile */
@@ -555,6 +749,29 @@ const moneyBoxFields = /** @type {const} */ ([
     'line26EstimatedTaxPayments',
     'line35aRefundRequested',
     'line36AppliedToNextYear',
+])
+
+/**
+ * The five {@link earnedIncomeCreditVocabularies} keys that name a field on
+ * the PROFILE, walked in a loop so the vocabulary check is written once.
+ * Typed `@type {const}` — not a wider annotation — so `r[field]` resolves to
+ * exactly `string | undefined`, the same device {@link moneyBoxFields} uses.
+ */
+const filerFactFields = /** @type {const} */ ([
+    'filerSocialSecurityNumber',
+    'spouseSocialSecurityNumber',
+    'filerQualifyingChildOfAnotherTaxpayer',
+    'filerAttainedAgeTwentyFiveButNotSixtyFive',
+    'filerPrincipalPlaceOfAbode',
+])
+
+/** The five that name a field on a {@link dependentEntrySchema} entry. */
+const dependentFactFields = /** @type {const} */ ([
+    'earnedIncomeCreditRelationship',
+    'earnedIncomeCreditFullTimeStudent',
+    'earnedIncomeCreditPermanentAndTotalDisability',
+    'earnedIncomeCreditUnitedStatesResidency',
+    'earnedIncomeCreditJointReturn',
 ])
 
 /**
@@ -721,6 +938,24 @@ export const checkReferences = r => {
             + `dependentCount (${r.dependentCount})`,
         )
     }
+    // 9 — TAX-27: every PRESENT §32 fact names a value that vocabulary
+    // admits. The five filer fields first, then the five per-dependent ones
+    // with the entry's index named, so a refusal on a five-dependent return
+    // says WHICH dependent.
+    for (const field of filerFactFields) {
+        const message = earnedIncomeCreditFactError(field)(r[field])
+        if (message !== undefined) {
+            return error(message)
+        }
+    }
+    for (const [index, entry] of (r.dependents ?? []).entries()) {
+        for (const field of dependentFactFields) {
+            const message = earnedIncomeCreditFactError(field)(entry[field])
+            if (message !== undefined) {
+                return error(`dependents[${index}]: ${message}`)
+            }
+        }
+    }
     return ok(r)
 }
 
@@ -793,6 +1028,87 @@ const generatedMoneyBoxExactnessProof = Object.fromEntries(
         },
     ]),
 )
+
+/**
+ * A profile stating ALL TEN §32 facts, each from its own vocabulary — the
+ * control for the ten generated refusals below, and the fixture
+ * `fjs/schedule/eic` is built to compute for.
+ * @type {ReturnProfile}
+ */
+const everyFactStated = {
+    ...minimal,
+    dependentCount: 1,
+    dependents: [{
+        relationship: 'daughter',
+        ssnValidForEmployment: true,
+        ageAtYearEnd: 9,
+        livedWithTaxpayer: true,
+        earnedIncomeCreditRelationship: 'child',
+        earnedIncomeCreditFullTimeStudent: 'wasNotAFullTimeStudent',
+        earnedIncomeCreditPermanentAndTotalDisability: 'notPermanentlyAndTotallyDisabled',
+        earnedIncomeCreditUnitedStatesResidency:
+            'sharedTheTaxpayersUnitedStatesAbodeForMoreThanHalfTheYear',
+        earnedIncomeCreditJointReturn: 'didNotFileAJointReturn',
+    }],
+    filerSocialSecurityNumber: 'validForEmployment',
+    spouseSocialSecurityNumber: 'validForEmployment',
+    filerQualifyingChildOfAnotherTaxpayer: 'isNotAnotherTaxpayersQualifyingChild',
+    filerAttainedAgeTwentyFiveButNotSixtyFive: 'attainedAgeTwentyFiveButNotSixtyFive',
+    filerPrincipalPlaceOfAbode: 'inTheUnitedStatesForMoreThanHalfTheYear',
+}
+
+/**
+ * One generated leaf per §32 fact field: the SAME rejected value
+ * (`'sortOf'`, a word no vocabulary contains) put in that field alone,
+ * asserting `validate` refuses AND that the refusal names the offending
+ * field. Naming matters here for the same reason it does in
+ * {@link generatedMoneyBoxExactnessProof}: without it a leaf could pass
+ * because some unrelated check fired first.
+ *
+ * A dependent-level field is exercised through a one-entry `dependents`
+ * array; a filer-level one directly. Which is which is decided by
+ * {@link dependentFactFields}, so a field that moved between the two loops in
+ * `checkReferences` without moving here would leave its leaf testing nothing
+ * — hence {@link expectedEarnedIncomeCreditFactFieldCount} and the two
+ * hand-typed halves beside it.
+ * @type {{ readonly [field: string]: () => void }}
+ */
+const generatedEarnedIncomeCreditVocabularyProof = Object.fromEntries(
+    Object.keys(earnedIncomeCreditVocabularies).map(field => [
+        field,
+        () => {
+            /** @type {readonly string[]} */
+            const perDependent = dependentFactFields
+            const [t, v] = validate(perDependent.includes(field)
+                ? {
+                    ...minimal,
+                    dependentCount: 1,
+                    dependents: [{ relationship: 'x', ageAtYearEnd: 5, [field]: 'sortOf' }],
+                }
+                : { ...minimal, [field]: 'sortOf' })
+            assertEq(t, 'error', ['expected an unrecognized §32 answer to be refused', field, t, v])
+            assert(typeof v === 'string', ['expected a semantic string refusal', field, v])
+            assert(v.includes(field), ['expected the refusal to name the offending field', field, v])
+            assert(v.includes('sortOf'), ['expected the refusal to quote the offending value', field, v])
+        },
+    ]),
+)
+
+/**
+ * Independently hand-typed: how many §32 fact fields
+ * {@link earnedIncomeCreditVocabularies} carries. Deliberately NOT
+ * `Object.keys(...).length` — that is the code under test, and a field
+ * dropped from it would take its own generated leaf with it, leaving the loop
+ * above iterating one fewer and green.
+ *
+ * Five per dependent (§32(c)(3)'s relationship, student status, disability,
+ * United States residency and joint-return facts) and five about the filer
+ * (§32(m)'s two social security numbers, §32(c)(1)(B)'s qualifying-child
+ * question, and §32(c)(1)(A)(ii)'s age band and abode). Counted off the
+ * statute, not off the object.
+ * @type {number}
+ */
+const expectedEarnedIncomeCreditFactFieldCount = 10
 
 /**
  * Independently hand-typed: the number of money boxes
@@ -1256,6 +1572,112 @@ export const proof = {
                 ],
             })
             assertEq(t2, 'error')
+        },
+    },
+    // ── TAX-27 (Phase 32): the ten §32 asserted facts ───────────────────────
+    //
+    // Every leaf here is structurally independent of every check above: none
+    // touches `checkReferences`'s first eight steps, `declaredKinds` or the
+    // money loop.
+    earnedIncomeCreditFacts: {
+        ...generatedEarnedIncomeCreditVocabularyProof,
+        // The count a generated leaf cannot supply: dropping a field from
+        // `earnedIncomeCreditVocabularies` deletes its own leaf in the same
+        // instant, so the loop above would happily iterate one fewer and stay
+        // green (AGENTS.md, Phase 10's `unknownDialectRefused` shape). Both
+        // numbers here are hand-typed off the statute, never read back off
+        // the object they describe.
+        everyFactFieldIsCovered: () => {
+            assertEq(
+                Object.keys(earnedIncomeCreditVocabularies).length,
+                expectedEarnedIncomeCreditFactFieldCount,
+                'ten §32 facts: five per dependent (§32(c)(3)) and five about the filer (§32(c)(1)/§32(m))',
+            )
+            assertEq(dependentFactFields.length, 5)
+            assertEq(filerFactFields.length, 5)
+            // The relationship vocabulary is the one with more than two
+            // members, and its size is the check that the negative arm has
+            // not been dropped -- see the vocabularies' own docstring, "The
+            // relationship vocabulary has a NEGATIVE member".
+            assertEq(earnedIncomeCreditVocabularies.earnedIncomeCreditRelationship.length, 6)
+            assert(
+                earnedIncomeCreditVocabularies.earnedIncomeCreditRelationship
+                    .some(v => v === 'notAnEarnedIncomeCreditRelationship'),
+                'a dependent parent must be expressible as NOT a §32(c)(3) qualifying child, '
+                + 'or the childless credit becomes unreachable for a filer who has one',
+            )
+        },
+        // The control the generated refusals need (AGENTS.md, "a gate needs a
+        // control"): all ten fields present, every value from its own
+        // vocabulary, and the profile validates. A vocabulary check that
+        // refused everything would pass every leaf above and fail this one.
+        allTenStatedValidate: () => {
+            const [t, v] = validate(everyFactStated)
+            assert(t === 'ok', ['expected the fully-stated profile to validate', t, v])
+            assertEq(v.filerSocialSecurityNumber, 'validForEmployment')
+            assertEq(v.filerPrincipalPlaceOfAbode, 'inTheUnitedStatesForMoreThanHalfTheYear')
+            const entry = v.dependents?.[0]
+            assert(entry !== undefined, ['expected a dependent entry', v])
+            assertEq(entry.earnedIncomeCreditRelationship, 'child')
+            assertEq(entry.earnedIncomeCreditUnitedStatesResidency,
+                'sharedTheTaxpayersUnitedStatesAbodeForMoreThanHalfTheYear')
+        },
+        // The three-state shape's own property: ABSENT is a legitimate stored
+        // state, distinguishable from every stated one, and it is NOT
+        // materialized as a key. This is the `specifiedServiceTradeOrBusiness`
+        // leaf one dialect over, applied to the field where the wrong default
+        // grants rather than denies.
+        absenceIsAStateOfItsOwnAndIsNotMaterialized: () => {
+            const [t, v] = validate(minimal)
+            assert(t === 'ok', ['expected the minimal profile to validate', t, v])
+            assertEq(v.filerSocialSecurityNumber, undefined)
+            assert(
+                !Object.keys(v).includes('filerSocialSecurityNumber'),
+                ['an unstated fact must be an ABSENT key, never a materialized undefined', v],
+            )
+            // ... and a DENIAL is a third state, stored and readable back, so
+            // "unstated" and "answered no" can never be confused downstream.
+            const [dt, dv] = validate({ ...minimal, filerSocialSecurityNumber: 'notValidForEmployment' })
+            assert(dt === 'ok', ['a denial is a legitimate stored state', dt, dv])
+            assertEq(dv.filerSocialSecurityNumber, 'notValidForEmployment')
+            assert(
+                dv.filerSocialSecurityNumber !== v.filerSocialSecurityNumber,
+                'a denial must be distinguishable from an absence',
+            )
+        },
+        // `option(true)` would have accepted a bare `false` nowhere, but
+        // `option(string)` must reject one explicitly -- and a materialized
+        // `false` is precisely the serializer hazard this dialect's header
+        // names. `''` is the other cheap way to write "nothing", and it is
+        // refused by the vocabulary rather than accepted as an absence.
+        booleanAndEmptyStringRefused: () => {
+            assertEq(validate({ ...minimal, filerSocialSecurityNumber: false })[0], 'error')
+            assertEq(validate({ ...minimal, filerPrincipalPlaceOfAbode: true })[0], 'error')
+            const [t, v] = validate({ ...minimal, filerSocialSecurityNumber: '' })
+            assertEq(t, 'error')
+            assert(typeof v === 'string', ['expected a semantic vocabulary refusal, not a structural one', v])
+            assert(v.includes('filerSocialSecurityNumber'), ['expected the offending field named', v])
+        },
+        // A per-dependent refusal names WHICH dependent, which is the only
+        // part of the message a filer with three children can act on --
+        // AGENTS.md's own "assert the part that carries the information".
+        perDependentRefusalNamesTheIndex: () => {
+            const [t, v] = validate({
+                ...minimal,
+                dependentCount: 2,
+                dependents: [
+                    { relationship: 'son', ageAtYearEnd: 8, earnedIncomeCreditRelationship: 'child' },
+                    { relationship: 'niece', ageAtYearEnd: 9, earnedIncomeCreditRelationship: 'niece' },
+                ],
+            })
+            assertEq(t, 'error')
+            assert(typeof v === 'string', ['expected a semantic string refusal', v])
+            assert(v.includes('dependents[1]'), ['expected the offending dependent named by index', v])
+            assert(v.includes('"niece"'), ['expected the offending value quoted', v])
+            assert(
+                v.includes('descendantOfAChildOrSibling'),
+                ['expected the admissible vocabulary named, so the filer can see a niece is a DESCENDANT', v],
+            )
         },
     },
     crossDialect: {
