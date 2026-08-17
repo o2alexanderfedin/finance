@@ -54,12 +54,14 @@
  * deduction**, so leaving it out would be an understatement of tax, and it is
  * the single most commonly missed step on this form.
  *
- * ## Above the threshold this form does not apply, and this engine REFUSES
+ * ## Above the threshold this form does not apply, and `fjs/form8995a` is where
+ * the return goes
  *
  * Form 8995 is the *simplified* computation, available only when taxable
  * income before the QBI deduction is at or below §199A(e)(2)'s threshold
  * ($197,300, or $394,600 on a joint return, for TY2025). Above it, Form
- * **8995-A** applies and brings two things this engine cannot supply:
+ * **8995-A** applies and brings two things no printed line on THIS page asks
+ * about:
  *
  * - **The W-2-wage and UBIA limitations** (§199A(b)(2)(B)): the deduction is
  *   capped at the greater of 50% of the business's W-2 wages, or 25% of those
@@ -70,31 +72,38 @@
  * - **The SSTB phase-in** (§199A(d)(3)): whether the business is a *specified
  *   service trade or business* — health, law, accounting, consulting,
  *   athletics, financial services, or one whose principal asset is the
- *   reputation or skill of its employees or owners. Nothing stored decides
- *   that.
+ *   reputation or skill of its employees or owners.
  *
- * Computing Form 8995 above the threshold would OVERSTATE the deduction and
- * understate the tax; computing 8995-A as though there were no W-2 wages and
- * no qualified property would UNDERSTATE it and overstate the tax. Both are
- * wrong, so {@link formEightNineNineFiveAIsUnmodeled} refuses by name — and
- * it refuses only when there is qualified business income to deduct against,
- * so a $500,000 wage earner with no business is untouched.
+ * **Both are modeled now** (Phase 31, TAX-32): `fjs/form8995a` transcribes Form
+ * 8995-A and its Schedule A, `vnd.fjs.business_expenses` carries the three
+ * facts they read as taxpayer assertions, and `fjs/form1040/core` routes 1040
+ * line 13a through that module for every return. Computing Form 8995 above the
+ * threshold would still OVERSTATE the deduction and understate the tax, so
+ * {@link formEightNineNineFiveAIsUnmodeled} stays as the guard that keeps THIS
+ * page from being used out of range — one rule in one place, checked from both
+ * sides. It is unreachable through the product path, because the router
+ * compares the same threshold before delegating here.
  *
- * ## Why no SSTB field is stored, which is a decision rather than an omission
+ * ## Why no SSTB field was stored in Phase 28, and why one is stored now
  *
- * The obvious move is to add an `isSpecifiedServiceTradeOrBusiness` assertion
- * to `vnd.fjs.business_expenses`, following the Phase 24/25/26 asserted-record
- * pattern. **It would be a stored field with no reader**, and that is exactly
- * the defect Phase 27 found in `vnd.fjs.w2`'s `box13StatutoryEmployee` — a box
- * modeled since the dialect was written and read by nothing, while the engine
- * silently produced a wrong answer for the filers it concerned.
+ * Phase 28 declined to add an `isSpecifiedServiceTradeOrBusiness` assertion to
+ * `vnd.fjs.business_expenses` on the grounds that **it would be a stored field
+ * with no reader** — exactly the defect Phase 27 found in `vnd.fjs.w2`'s
+ * `box13StatutoryEmployee`, a box modeled since its dialect was written and read
+ * by nothing while the engine silently produced a wrong answer for the filers it
+ * concerned.
  *
- * §199A(d)(3) is the reason: below the threshold an SSTB is a qualified trade
- * or business like any other, with no reduction at all. So the assertion could
- * only ever be READ above the threshold, which is where this engine refuses.
- * The day Form 8995-A is modeled is the day the field acquires a reader, and
- * the refusal below names the determination so a taxpayer above the threshold
- * is told which fact is missing rather than being asked for one nothing uses.
+ * §199A(d)(3) was the reason it could wait: below the threshold an SSTB is a
+ * qualified trade or business like any other, with no reduction at all, so the
+ * assertion could only ever be READ above the threshold — which is where that
+ * phase refused.
+ *
+ * **The day Form 8995-A is modeled is the day the field acquires a reader**, and
+ * Phase 31 is that day: `specifiedServiceTradeOrBusiness`, `w2Wages` and
+ * `unadjustedBasisOfQualifiedProperty` landed in the same commit as the reader
+ * that uses them, and `fjs/form8995a` refuses by name when one is unstated and
+ * the answer depends on it. Below the threshold none of the three is read, which
+ * is why a return stored before that phase still computes what it always did.
  *
  * ## The prior-year loss carryforward is ASSERTED, and its absence REFUSES
  *
@@ -279,20 +288,24 @@ export const formEightNineNineFiveAIsUnmodeled = taxParamSet => status => input 
             + `deduction is ${taxableIncomeBeforeQbiCents} cents, above §199A(e)(2)'s `
             + `${taxParamSet.qualifiedBusinessIncomeDeduction.thresholdAmount[status].amount} `
             + `threshold for a ${status} return, so the SIMPLIFIED computation on Form 8995 does `
-            + `not apply and Form 8995-A does. This engine does not model Form 8995-A, and two `
-            + `separate things on it are undecidable here. §199A(b)(2)(B) caps the deduction at `
+            + `not apply and Form 8995-A does. fjs/form8995a computes Form 8995-A (Phase 31), and `
+            + `fjs/form1040/core routes to it, so reaching THIS refusal means the simplified `
+            + `form was asked for directly at an income it does not cover. Two things on Form `
+            + `8995-A decide the answer there, and neither is on this page. §199A(b)(2)(B) caps `
+            + `the deduction at `
             + `the greater of 50% of the business's W-2 wages or 25% of those wages plus 2.5% of `
             + `the unadjusted basis immediately after acquisition of qualified property — a sole `
             + `proprietor with no employees has NO W-2 wages, so that cap bites hard, and UBIA is `
             + `the asset basis history Schedule C line 13 already refuses for. §199A(d)(3) then `
             + `phases the deduction out entirely for a SPECIFIED SERVICE trade or business `
             + `(health, law, accounting, consulting, athletics, financial services, or one whose `
-            + `principal asset is the reputation or skill of its owners), and nothing stored `
-            + `decides which this business is. Computing Form 8995 anyway would overstate the `
+            + `principal asset is the reputation or skill of its owners), and no printed line here `
+            + `asks which this business is. Computing Form 8995 anyway would overstate the `
             + `deduction and understate the tax; computing 8995-A as though there were no wages `
-            + `and no qualified property would overstate the tax. Refusing rather than choosing `
-            + `between two wrong answers (TAX-32 computes only the simplified case; Form 8995-A `
-            + `has no phase yet)`,
+            + `and no qualified property would overstate the tax. `
+            + `vnd.fjs.business_expenses carries all three facts as assertions `
+            + `(specifiedServiceTradeOrBusiness, w2Wages, `
+            + `unadjustedBasisOfQualifiedProperty) and fjs/form8995a reads them`,
     }
 }
 

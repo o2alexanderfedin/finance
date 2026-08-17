@@ -1701,10 +1701,58 @@ export const selfEmploymentTax = {
  * against the PDF itself. Naming a section that was not read would be the
  * precise sourcing error this module's header exists to prevent, and it is
  * strictly worse than citing the statute that governs the figure.
+ *
+ * ## `phaseInRange` — §199A's OTHER dollar figure, and it is NOT a ratio of
+ * the threshold (TAX-32, Phase 31, `fjs/form8995a`)
+ *
+ * Above the threshold the deduction does not stop; it phases. Form 8995-A's
+ * **printed line 23** (Part III, the W-2-wage/UBIA phase-in) and **Schedule A
+ * (Form 8995-A)'s printed line 8** (the specified-service phase-in) both read
+ * *"Enter $50,000 ($100,000 if married filing jointly)"*, and each is the
+ * DENOMINATOR of a phase-in percentage whose numerator is
+ * `taxable income − threshold`. Both pages were fetched and transcribed
+ * (2026-08-17) rather than recalled.
+ *
+ * **It is stored, never derived, and the arithmetic is what proves it must
+ * be.** 25% of $197,300 is $49,325, and 25.34...% would be a fraction nothing
+ * states — so the range is not a percentage of the threshold. The two figures
+ * are set by different provisions and move for different reasons:
+ *
+ * | Figure | Provision | Indexed? |
+ * |---|---|---|
+ * | threshold, $197,300 / $394,600 | §199A(e)(2)(A), adjusted by (e)(2)(B) | YES, annually |
+ * | phase-in range, $50,000 / $100,000 | §199A(b)(3)(B)(ii), §199A(d)(3)(B) | **NO adjustment clause exists** |
+ *
+ * §199A(e)(2)(B) inflation-adjusts "the $157,500 amount in subparagraph (A)"
+ * and nothing else. The range's own subparagraphs state their dollars flat,
+ * with no cost-of-living sentence anywhere near them — which is why a figure
+ * derived from the threshold would have drifted the moment the threshold was
+ * indexed and the range was not. **The printed page confirms the direction**:
+ * $247,300 − $197,300 = $50,000 exactly (line 23's own upper bound, printed in
+ * Part III's own "more than $197,300 but not $247,300"), and
+ * $494,600 − $394,600 = $100,000 exactly.
+ *
+ * `theRangeIsStoredRatherThanDerivedFromTheThreshold` is the leaf that states
+ * both halves: the range is the printed figure, and it is NOT 25% of the
+ * threshold. **If the second half ever reddens, a derivation has crept in.**
+ *
+ * The joint figure IS double here, unlike {@link thresholdAmount}'s, and for a
+ * reason worth separating: §199A(b)(3)(B)(ii) writes "$100,000 in the case of a
+ * joint return" as its own literal rather than as "200 percent of such
+ * amount". So a qualifying surviving spouse gets the $50,000 range for the same
+ * reason it gets the $197,300 threshold — it does not file a joint return —
+ * and each status is hand-typed rather than spread, exactly as above.
+ *
+ * Citation `kind: 'code'` at **§199A(b)(3)(B)** rather than at §199A(e)(2):
+ * (e)(2) defines the threshold and says nothing about a range. Schedule A's
+ * copy of the same figure governs under §199A(d)(3), named in the per-status
+ * comments — one figure, two provisions that happen to state it identically,
+ * which is a fact about the statute rather than a shortcut taken here.
  * @type {{
  *   readonly ratePercent: number,
  *   readonly rateCitation: Citation,
  *   readonly thresholdAmount: Record<IndividualFilingStatus, AmountWithCitation>,
+ *   readonly phaseInRange: Record<IndividualFilingStatus, AmountWithCitation>,
  * }}
  */
 export const qualifiedBusinessIncomeDeduction = {
@@ -1739,6 +1787,42 @@ export const qualifiedBusinessIncomeDeduction = {
         qualifyingSurvivingSpouse: {
             amount: '197300.00',
             citation: { kind: 'code', section: '§199A(e)(2)', effectiveDate: '2025-01-01' },
+        },
+    },
+    // Form 8995-A printed line 23, and Schedule A (Form 8995-A) printed line 8,
+    // both transcribed from the fetched pages: "Enter $50,000 ($100,000 if
+    // married filing jointly)". NEVER derived from the threshold above -- see
+    // this group's own docstring for why 25% of $197,300 = $49,325 is the
+    // arithmetic that settles it.
+    phaseInRange: {
+        single: {
+            amount: '50000.00',
+            citation: { kind: 'code', section: '§199A(b)(3)(B)(ii)', effectiveDate: '2025-01-01' },
+        },
+        // "$100,000 in the case of a joint return" -- its OWN literal in the
+        // statute, not "200 percent of such amount" as §199A(e)(2)(A) writes
+        // the threshold's doubling.
+        marriedFilingJointly: {
+            amount: '100000.00',
+            citation: { kind: 'code', section: '§199A(b)(3)(B)(ii)', effectiveDate: '2025-01-01' },
+        },
+        // Separately, jointly, and not at all are three different filings, and
+        // only the joint one gets $100,000. MFS takes the general figure at its
+        // FULL amount, mirroring the threshold row above it.
+        marriedFilingSeparately: {
+            amount: '50000.00',
+            citation: { kind: 'code', section: '§199A(b)(3)(B)(ii)', effectiveDate: '2025-01-01' },
+        },
+        headOfHousehold: {
+            amount: '50000.00',
+            citation: { kind: 'code', section: '§199A(b)(3)(B)(ii)', effectiveDate: '2025-01-01' },
+        },
+        // A surviving spouse does not FILE a joint return, so the $100,000
+        // literal does not reach it -- the same reading that gives this status
+        // the general $197,300 threshold one group up.
+        qualifyingSurvivingSpouse: {
+            amount: '50000.00',
+            citation: { kind: 'code', section: '§199A(b)(3)(B)(ii)', effectiveDate: '2025-01-01' },
         },
     },
 }
@@ -3494,6 +3578,77 @@ export const proof = {
                     !== twentyFourPercentCeiling('qualifyingSurvivingSpouse'),
                 'a qualifying surviving spouse\'s §199A threshold is NOT the joint bracket ceiling',
             )
+        },
+        // ── TAX-32 (Phase 31): the phase-in RANGE ───────────────────────────
+        // Hand-typed off Form 8995-A's printed line 23 and Schedule A's printed
+        // line 8, per status, both fetched 2026-08-17. $50,000 everywhere
+        // except a JOINT return's $100,000.
+        everyPhaseInRangeMatchesThePrintedPage: () => {
+            /** @type {Record<IndividualFilingStatus, string>} */
+            const expected = {
+                single: '50000.00',
+                marriedFilingJointly: '100000.00',
+                marriedFilingSeparately: '50000.00',
+                headOfHousehold: '50000.00',
+                qualifyingSurvivingSpouse: '50000.00',
+            }
+            for (const status of individualFilingStatuses) {
+                assertEq(
+                    qualifiedBusinessIncomeDeduction.phaseInRange[status].amount,
+                    expected[status],
+                    ['Form 8995-A line 23 phase-in range for this status', status],
+                )
+                assertEq(qualifiedBusinessIncomeDeduction.phaseInRange[status].citation.kind, 'code')
+                assert(
+                    qualifiedBusinessIncomeDeduction.phaseInRange[status].citation.section
+                        .startsWith('§199A(b)(3)(B)'),
+                    ['the range is §199A(b)(3)(B)(ii)\'s, NOT §199A(e)(2)\'s', status])
+            }
+        },
+        // **THE LEAF THAT KEEPS THE RANGE FROM BEING DERIVED.** 25% of the
+        // single threshold is $49,325.00, which is $675.00 short of the printed
+        // $50,000.00 — so no percentage of the threshold produces the range,
+        // and the two figures are indexed by different provisions (one of which
+        // has no indexing clause at all).
+        //
+        // The second half is the direction that matters: if a later edit
+        // replaces the stored figure with `threshold * 25 / 100`, THIS reddens.
+        theRangeIsStoredRatherThanDerivedFromTheThreshold: () => {
+            const threshold = centsFromString(
+                qualifiedBusinessIncomeDeduction.thresholdAmount.single.amount)
+            const range = centsFromString(
+                qualifiedBusinessIncomeDeduction.phaseInRange.single.amount)
+            assertEq(threshold, 19730000n, '$197,300.00')
+            assertEq(range, 5000000n, '$50,000.00')
+            // 19,730,000 * 25 / 100 = 4,932,500 cents = $49,325.00, hand-divided.
+            assertEq(threshold * 25n / 100n, 4932500n, '25% of the threshold is $49,325.00')
+            assert(
+                range !== threshold * 25n / 100n,
+                ['the range is NOT a quarter of the threshold', range, threshold * 25n / 100n])
+            assertEq(range - threshold * 25n / 100n, 67500n, 'and it is $675.00 more')
+        },
+        // The printed PART III upper bound is threshold + range, and the page
+        // states all four numbers independently: "more than $197,300 but not
+        // $247,300 ($394,600 and $494,600 if married filing jointly)". Adding
+        // the two stored figures must reproduce the two upper bounds, which is
+        // the cheapest check that a wrong range would fail.
+        //
+        //   19,730,000 + 5,000,000 = 24,730,000  -> $247,300.00
+        //   39,460,000 + 10,000,000 = 49,460,000 -> $494,600.00
+        theThresholdPlusTheRangeIsThePrintedUpperBound: () => {
+            const generalUpperBound = centsFromString(
+                qualifiedBusinessIncomeDeduction.thresholdAmount.single.amount)
+                + centsFromString(qualifiedBusinessIncomeDeduction.phaseInRange.single.amount)
+            assertEq(generalUpperBound, 24730000n, 'Form 8995-A Part III: "but not $247,300"')
+            const jointUpperBound = centsFromString(
+                qualifiedBusinessIncomeDeduction.thresholdAmount.marriedFilingJointly.amount)
+                + centsFromString(
+                    qualifiedBusinessIncomeDeduction.phaseInRange.marriedFilingJointly.amount)
+            assertEq(jointUpperBound, 49460000n, 'and "$494,600 if married filing jointly"')
+            // …and the joint upper bound is exactly double the general one,
+            // which is a consequence of both figures doubling rather than an
+            // input: it holds only if the range doubled too.
+            assertEq(jointUpperBound, generalUpperBound * 2n)
         },
     },
     // ── TAX-33 (Phase 29): §55's exemption, phase-out and two rates ─────────

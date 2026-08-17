@@ -85,9 +85,13 @@ import {
 import { scheduleTwo } from '../../schedule/2/module.f.js'
 import {
     netCapitalGainLine12,
-    qualifiedBusinessIncomeDeduction,
     taxableIncomeBeforeQualifiedBusinessIncomeDeduction,
 } from '../../form8995/module.f.js'
+// `fjs/form8995a` is the ROUTER over both §199A forms, not only the
+// above-threshold one: printed Form 8995-A line 3 skips every limitation line at
+// or below the threshold, which is exactly Form 8995, so that case is delegated
+// to `fjs/form8995` from inside there. One call site, either page.
+import { qualifiedBusinessIncomeDeduction } from '../../form8995a/module.f.js'
 import { scheduleThree } from '../../schedule/3/module.f.js'
 import { form8812 } from '../../form8812/module.f.js'
 import { iraTaxableAmount, rothDistributionCodeOf } from '../../form8606/module.f.js'
@@ -1226,6 +1230,21 @@ export const form1040IncomeLines = taxParamSet => inputs => {
         assertedPriorYearLossCarryforward: firstBusinessRecord === undefined
             ? undefined
             : firstBusinessRecord.value.priorYearQualifiedBusinessLossCarryforward,
+        // Form 8995-A's three facts (Phase 31, TAX-32). Read from the SAME
+        // business expenses record the carryforward comes from, and passed
+        // UNCONDITIONALLY: `fjs/form8995a` is what decides whether they are
+        // needed, and it needs them only above §199A(e)(2)'s threshold. A return
+        // with no business record at all passes three `undefined`s and is
+        // untouched, because there is no qualified business income to deduct.
+        assertedSpecifiedService: firstBusinessRecord === undefined
+            ? undefined
+            : firstBusinessRecord.value.specifiedServiceTradeOrBusiness,
+        assertedW2Wages: firstBusinessRecord === undefined
+            ? undefined
+            : firstBusinessRecord.value.w2Wages,
+        assertedUnadjustedBasis: firstBusinessRecord === undefined
+            ? undefined
+            : firstBusinessRecord.value.unadjustedBasisOfQualifiedProperty,
         taxableIncomeBeforeQbiCents: taxableIncomeBeforeQualifiedBusinessIncomeDeduction({
             adjustedGrossIncomeCents: line11b.value,
             deductionCents: line12e.value,
@@ -1244,10 +1263,15 @@ export const form1040IncomeLines = taxParamSet => inputs => {
             line7aCents: line7a.value,
         }),
     })
-    // An unstated prior-year carryforward, or a return above §199A(e)(2)'s
-    // threshold, stops the WHOLE report -- threaded exactly like the Schedule
-    // D, Schedule A and Schedule C guards above: `unmodeled: []`, since
-    // neither names an `fjs/return/scope` kind.
+    // An unstated prior-year carryforward, or an unstated one of Form 8995-A's
+    // three facts, stops the WHOLE report -- threaded exactly like the Schedule
+    // D, Schedule A and Schedule C guards above: `unmodeled: []`, since neither
+    // names an `fjs/return/scope` kind.
+    //
+    // **Being above §199A(e)(2)'s threshold is no longer among the reasons**
+    // (Phase 31, TAX-32). Phase 28 refused there because Form 8995-A was
+    // unmodeled; it is modeled now, so an above-threshold return computes, and
+    // what can still stop it is a missing FACT rather than a missing form.
     if (qbiOutcome.kind === 'error') {
         return { kind: 'error', message: qbiOutcome.message, unmodeled: [] }
     }
@@ -1257,7 +1281,10 @@ export const form1040IncomeLines = taxParamSet => inputs => {
     // this is the second reader it has ever had.
     const line13a = scheduleOnePartIResult.scheduleC.filed
         ? {
-            value: qbiOutcome.form.line15,
+            // Form 8995 line 15 or Form 8995-A line 39, whichever page the
+            // router filled -- `deductionCents` is the one figure line 13a
+            // receives either way, so this call site does not branch on it.
+            value: qbiOutcome.deductionCents,
             // Every fact the deduction reads: the business documents behind
             // the net profit and the deductible half, the AGI, and the
             // filing-status/12d-box/itemized sources behind line 12e and line
@@ -1266,7 +1293,8 @@ export const form1040IncomeLines = taxParamSet => inputs => {
                 scheduleOnePartIResult.scheduleC.partII.line31,
                 line11b, line12e, line13b, line3a, line7a,
             ]),
-            rule: '1040 line 13a (qualified business income deduction, Form 8995 line 15)',
+            rule: '1040 line 13a (qualified business income deduction, Form 8995 line 15 '
+                + 'or Form 8995-A line 39)',
         }
         : declaredZero('1040 line 13a')
     const line14 = totalLine('1040 line 14')([line12e, line13a, line13b])
@@ -2941,6 +2969,16 @@ const businessExpensesDocument = documentHash => advertisingAmount => ({
         // `aBusinessWithNoCarryforwardAssertionRefuses` is the leaf that
         // exercises the other side by overriding this field.
         priorYearQualifiedBusinessLossCarryforward: '0.00',
+        // Phase 31 (TAX-32): Form 8995-A's three facts, asserted as the ORDINARY
+        // sole proprietor's — a software consultant is a §199A(d)(2) specified
+        // service trade or business, and one with no employees and no qualified
+        // property has no W-2 wages and no UBIA. All three are read ONLY above
+        // §199A(e)(2)'s threshold, so every below-threshold leaf in this file is
+        // unaffected by their presence; `aBusinessWithNoFormEightNineNineFiveA\
+        // AssertionsRefuses` overrides them to exercise the other side.
+        specifiedServiceTradeOrBusiness: 'specifiedService',
+        w2Wages: '0.00',
+        unadjustedBasisOfQualifiedProperty: '0.00',
         entries: [{
             category: 'advertising',
             datePaid: '2025-03-14',
@@ -4382,41 +4420,178 @@ export const proof = {
                 'the Additional Medicare Tax on self-employment income, $28.53')
         },
         /**
-         * **THE §199A THRESHOLD, at the report.** The same fixture one step
-         * larger — a $300,000.00 net profit — puts taxable income before the
-         * deduction at $269,314.57, above §199A(e)(2)'s $197,300, so Form
-         * 8995-A applies and this engine refuses the WHOLE report rather than
-         * computing the simplified form anyway.
+         * **THE §199A THRESHOLD, at the report — and Phase 28's refusal is
+         * GONE (Phase 31, TAX-32).** The same fixture one step larger, a
+         * $300,000.00 net profit, puts taxable income before the deduction at
+         * $269,314.57. Phase 28 refused the whole report there because Form
+         * 8995-A was unmodeled. It is modeled now, so the report COMPUTES.
          *
-         * This is the leaf that says the threshold is measured against
-         * TAXABLE income rather than against the profit or the AGI: a
-         * $300,000 profit is nowhere near $197,300, but the figure the form
-         * compares is what is left after the standard deduction, and it is
-         * $269,314.57 rather than $300,000.00.
+         * This is still the leaf that says the threshold is measured against
+         * TAXABLE income rather than against the profit or the AGI: a $300,000
+         * profit is nowhere near $197,300, but the figure the form compares is
+         * what is left after the standard deduction, and it is $269,314.57.
+         *
+         * And the answer it computes is $0.00, which is the right answer and
+         * not a disguised refusal: `businessExpensesDocument` asserts
+         * `specifiedService` — the fixture's `principalBusiness` is *"software
+         * consulting"*, a §199A(d)(2) specified service trade or business — and
+         * Schedule A's own header says that above $247,300.00 such a business
+         * *"doesn't qualify for the deduction"*. $269,314.57 is $22,014.57 past
+         * that bound.
+         *
+         * `aNonSpecifiedServiceBusinessAboveTheThresholdReachesLineThirteenA`
+         * below is the leaf that carries a NONZERO deduction through the same
+         * wiring, so "computes" is not proven by a zero alone.
+         *
+         * Hand-derived, so every figure is checkable without running the
+         * engine: 92.35% of $300,000 is $277,050; 12.4% of the $176,100 base is
+         * $21,836.40 and 2.9% of $277,050 is $8,034.45, so Schedule SE line 12
+         * is $29,870.85 and line 13 is $14,935.43. AGI is
+         * $300,000.00 − $14,935.43 = $285,064.57, and taxable income before
+         * §199A is that less the $15,750.00 standard deduction: $269,314.57.
          */
-        aReturnAboveTheSectionOneNineNineAThresholdRefuses: () => {
+        aConsultantAboveThePhaseInRangeComputesAndIsAllowedNothing: () => {
+            const base = inputsOf(storedProfile(selfEmploymentProfile))([])([])([])([])([])([])([])([])([])
+            const { income } = computedLines(withBusiness(base)([
+                nonemployeeCompensationDocument('sha256-1099nec-01')('300000.00')('0.00'),
+            ])([businessExpensesDocument('sha256-business-01')('0.00')]))
+            assertEq(2987085n / 2n + 1n, 1493543n, 'the deductible half, half-up')
+            assertEq(30000000n - 1493543n - 1575000n, 26931457n, '$269,314.57')
+            // The engine agrees with the hand derivation about the figure the
+            // threshold is compared against…
+            assertEq(income.line11b.value - 1575000n, 26931457n, 'taxable income before §199A')
+            // …and it is past the printed $247,300.00 upper bound, hand-typed.
+            assert(26931457n > 24730000n, '$269,314.57 is above $247,300.00')
+            assertEq(26931457n - 24730000n, 2201457n, 'by $22,014.57')
+            // A specified service trade or business above the range is allowed
+            // nothing, and the report COMPUTES that rather than refusing.
+            assertEq(income.line13a.value, 0n, '1040 line 13a = $0.00, computed')
+        },
+        /**
+         * **A NONZERO Form 8995-A deduction reaching 1040 line 13a**, which is
+         * what "Phase 28's refusal is gone" has to mean to be worth anything.
+         *
+         * The identical $300,000.00 return, with two fields overridden on the
+         * business record: not a specified service trade or business, and
+         * $1,000,000.00 of unadjusted basis in qualified property. The wage limb
+         * is still zero — no employees — so the UBIA limb is the whole cap.
+         *
+         * Hand-derived from the same Schedule SE figures:
+         *
+         *   QBI      $300,000.00 − $14,935.43            $285,064.57
+         *   line 3   20% of 28,506,457 = 5,701,291.4      $57,012.91
+         *   line 5   50% of $0.00 of W-2 wages   WAGE LIMB     $0.00
+         *   line 8   2.5% of $1,000,000.00                $25,000.00
+         *   line 9   $0.00 + $25,000.00          UBIA LIMB $25,000.00
+         *   line 10  greater of the two limbs             $25,000.00
+         *   line 11  smaller of $57,012.91 and $25,000.00 $25,000.00
+         *   line 33  taxable income before §199A         $269,314.57
+         *   line 36  20% of 26,931,457 = 5,386,291.4      $53,862.91
+         *   line 39  smaller of $25,000.00 and $53,862.91 $25,000.00
+         *
+         * Part III is skipped — $269,314.57 is past the range — so the cap
+         * applies whole and the limitation costs $32,012.91 of deduction.
+         */
+        aNonSpecifiedServiceBusinessAboveTheThresholdReachesLineThirteenA: () => {
+            const record = businessExpensesDocument('sha256-business-01')('0.00')
+            /** @type {Stored<BusinessExpenses>} */
+            const plumber = {
+                documentHash: record.documentHash,
+                value: {
+                    ...record.value,
+                    specifiedServiceTradeOrBusiness: 'notSpecifiedService',
+                    unadjustedBasisOfQualifiedProperty: '1000000.00',
+                },
+            }
+            const base = inputsOf(storedProfile(selfEmploymentProfile))([])([])([])([])([])([])([])([])([])
+            const { income } = computedLines(withBusiness(base)([
+                nonemployeeCompensationDocument('sha256-1099nec-01')('300000.00')('0.00'),
+            ])([plumber]))
+            assertEq(income.line13a.value, 2500000n, '1040 line 13a = $25,000.00, from Form 8995-A')
+            // The unlimited 20%, hand-computed, and asserted to DIFFER — without
+            // this half a wiring that ignored the wage/UBIA cap entirely would
+            // pass on the line above.
+            assertEq(28506457n * 20n / 100n, 5701291n, '20% of the QBI would be $57,012.91')
+            assert(
+                income.line13a.value !== 5701291n,
+                ['§199A(b)(2)(B) caps it at the UBIA limb', income.line13a.value])
+            assertEq(5701291n - 2500000n, 3201291n, '$32,012.91 the limitation removed')
+            // …and it really flows into taxable income: line 14 adds line 12e,
+            // line 13a and line 13b, and line 15 subtracts it from AGI.
+            assertEq(
+                income.line14.value,
+                1575000n + 2500000n + income.line13b.value,
+                '1040 line 14 includes the deduction')
+            assertEq(income.line15.value, 28506457n - 1575000n - 2500000n, '1040 line 15 = $244,314.57')
+            // THE CONTROL: the same return WITHOUT the qualified property gets
+            // nothing, so the $25,000.00 above is the UBIA limb rather than an
+            // uncapped 20%.
+            /** @type {Stored<BusinessExpenses>} */
+            const noProperty = {
+                documentHash: record.documentHash,
+                value: { ...plumber.value, unadjustedBasisOfQualifiedProperty: '0.00' },
+            }
+            assertEq(
+                computedLines(withBusiness(base)([
+                    nonemployeeCompensationDocument('sha256-1099nec-01')('300000.00')('0.00'),
+                ])([noProperty])).income.line13a.value,
+                0n,
+                'no wages and no qualified property, no deduction at all')
+        },
+        /**
+         * **FORM 8995-A'S THREE FACTS, at the report.** The identical
+         * above-threshold fixture with the SSTB assertion removed refuses,
+         * naming the field — so the question cannot be answered silently in
+         * either direction for a return where it decides the deduction.
+         *
+         * The control is `aConsultantAboveThePhaseInRangeComputesAndIsAllowed\
+         * Nothing` above (same fixture, assertion present, computes) and every
+         * below-threshold leaf in this group, none of which needs the field at
+         * all.
+         */
+        aBusinessWithNoFormEightNineNineFiveAAssertionsRefuses: () => {
+            const record = businessExpensesDocument('sha256-business-01')('0.00')
+            /** @type {Stored<BusinessExpenses>} */
+            const withoutAssertion = {
+                documentHash: record.documentHash,
+                value: {
+                    ...record.value,
+                    specifiedServiceTradeOrBusiness: undefined,
+                },
+            }
             const base = inputsOf(storedProfile(selfEmploymentProfile))([])([])([])([])([])([])([])([])([])
             const outcome = form1040IncomeLines(taxParams2025)(withBusiness(base)([
                 nonemployeeCompensationDocument('sha256-1099nec-01')('300000.00')('0.00'),
-            ])([businessExpensesDocument('sha256-business-01')('0.00')]))
+            ])([withoutAssertion]))
             assert(outcome.kind === 'error', ['expected a refusal', outcome])
             if (outcome.kind !== 'error') {
                 return
             }
             assertEq(outcome.unmodeled.length, 0, 'a document-data-sufficiency refusal names no kind')
-            assert(outcome.message.includes('8995-A'), ['must name the form', outcome.message])
             assert(
-                outcome.message.includes('26931457'),
-                ['must quote the taxable income it compared', outcome.message])
-            // Hand-derived, so the figure above is checkable without running
-            // the engine: 92.35% of $300,000 is $277,050; 12.4% of the
-            // $176,100 base is $21,836.40 and 2.9% of $277,050 is $8,034.45,
-            // so Schedule SE line 12 is $29,870.85 and line 13 is $14,935.43.
-            // AGI is $300,000.00 - $14,935.43 = $285,064.57, and taxable
-            // income before §199A is that less the $15,750.00 standard
-            // deduction: $269,314.57.
-            assertEq(2987085n / 2n + 1n, 1493543n, 'the deductible half, half-up')
-            assertEq(30000000n - 1493543n - 1575000n, 26931457n, '$269,314.57')
+                outcome.message.includes('specifiedServiceTradeOrBusiness'),
+                ['must name the field that fixes it', outcome.message])
+            assert(outcome.message.includes('§199A(d)(3)'), ['must name the section', outcome.message])
+            // …and NOT the two that WERE asserted, so the message is the list of
+            // what is actually missing rather than a fixed paragraph.
+            assertEq(outcome.message.includes('w2Wages'), false)
+            // BELOW the threshold the same removal computes, which is what makes
+            // the refusal about the FACT being needed rather than stored.
+            //
+            // Hand-derived: 92.35% of $48,000.00 is $44,328.00; 15.3% of that is
+            // $6,782.18 (half-up from 6,782,18.4 cents) and half of it is
+            // $3,391.09, so QBI is $48,000.00 − $3,391.09 = $44,608.91 and 20%
+            // of it is $8,921.78. Taxable income before §199A is
+            // $44,608.91 − $15,750.00 = $28,858.91, and 20% of THAT is
+            // $5,771.78 — the income limitation, which is the smaller and binds.
+            assertEq(
+                computedLines(withBusiness(base)([
+                    nonemployeeCompensationDocument('sha256-1099nec-01')('48000.00')('0.00'),
+                ])([withoutAssertion])).income.line13a.value,
+                577178n,
+                'a $48,000.00 return needs no SSTB answer and gets $5,771.78')
+            assertEq(4460891n * 20n / 100n, 892178n, 'the QBI component would be $8,921.78')
+            assertEq(2885891n * 20n / 100n, 577178n, 'and the income limitation $5,771.78 binds')
         },
         /**
          * **THE CARRYFORWARD ASSERTION, at the report.** The identical
