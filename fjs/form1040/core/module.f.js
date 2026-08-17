@@ -8617,6 +8617,226 @@ export const proof = {
                 three.line40 - worksheet.line25, 29319500n,
                 'the AMT on 1040 line 17 = $348,218.00 - $55,023.00 = $293,195.00')
         },
+        /**
+         * ★ **Part III's OTHER arm, end to end — and the transposition it was
+         * the only thing that could catch.**
+         *
+         * FOUND BY MUTATION, NOT BY READING. Transposing
+         * `sdtwLine14Cents`/`sdtwLine21Cents` in `regularPreferentialWorksheetOf`
+         * above — a four-field money mapping, this codebase's own
+         * most-documented defect class — left the ENTIRE suite green. The part3
+         * proofs build their Schedule D inputs by hand and so bypass the
+         * adapter; the `fjs/tax/line16` leaf stops before it; and the FAANG
+         * fixture above takes the *other* arm. Nothing observed it.
+         *
+         * **Why the discriminating fixture is this specific and no simpler.**
+         * Part III reads SDTW line 14 at its line 20 and SDTW line 21 at its
+         * line 27, so a transposition is invisible unless BOTH readers are
+         * sensitive. That pins the fixture from three sides at once:
+         * - SDTW lines 14 and 21 must DIFFER, which forces SDTW line 18 above
+         *   the $197,300 breakpoint — line 21 is `max(line 18, min(line 14,
+         *   breakpoint))` and line 14 is never below line 18, so they can only
+         *   part when line 18 clears the breakpoint;
+         * - …which in turn forces Part III line 20 above the $48,350 zero-rate
+         *   ceiling, so line 21 is `-0-` and line 20 is **structurally
+         *   unobservable through it**. The transposition is therefore visible
+         *   ONLY through line 27, via line 28 → line 29;
+         * - …so line 29 must bind at line 30, i.e. `line 25 - line 28` must fall
+         *   strictly between zero and line 24. That needs a large capital gain
+         *   beside a middling ordinary income, which is what this fixture has.
+         *
+         * **And it cannot use an incentive stock option.** A Form 3921 beside any
+         * Form 1099-B reporting a sale REFUSES (§56(b)(3)'s same-year-disposition
+         * rule), and this fixture needs a 1099-B for its capital gain. So the
+         * preference item is Form 1099-INT **box 9** — §57(a)(5) private-activity
+         * bond interest, the engine's other computed preference — which reaches
+         * AMTI without touching adjusted gross income or Schedule D at all.
+         *
+         *   1040 line 1a   wages                              $215,750.00
+         *   Schedule D     405,000.00 - 5,000.00 of basis      $400,000.00
+         *   1099-DIV 2b    unrecaptured §1250 gain               $5,000.00
+         *   1099-DIV 2d    28%-rate collectibles gain            $3,000.00
+         *   1099-INT 8/9   private-activity muni interest    $1,000,000.00
+         *   1040 line 11b  215,750.00 + 400,000.00            $615,750.00
+         *   1040 line 15   615,750.00 - 15,750.00             $600,000.00
+         *
+         *   THE REGULAR TAX, by the Schedule D Tax Worksheet (Schedule D line
+         *   19 is non-zero, so dispatch bullet 2a):
+         *   SDTW 9/10      the whole preferential slice        $400,000.00
+         *   SDTW 11        Schedule D lines 18 + 19              $8,000.00
+         *   SDTW 12        min(400,000.00, 8,000.00)             $8,000.00
+         *   SDTW 13        400,000.00 - 8,000.00               $392,000.00
+         *   SDTW 14        600,000.00 - 392,000.00             $208,000.00
+         *   SDTW 18        600,000.00 - 400,000.00             $200,000.00
+         *   SDTW 20        min(208,000.00, 197,300.00)         $197,300.00
+         *   SDTW 21        max(200,000.00, 197,300.00)         $200,000.00
+         *                  -- and 208,000.00 != 200,000.00, which is the whole
+         *                  point of this fixture
+         *
+         *   THE AMT. Tax-exempt interest is outside gross income, so line 1b is
+         *   the same $600,000.00 of taxable income:
+         *   6251 line 2g   box 9, added straight back        $1,000,000.00
+         *   6251 line 4/6  600,000 + 15,750 + 1,000,000     $1,615,750.00
+         *
+         *   PART III:
+         *   III 13         SDTW line 13                        $392,000.00
+         *   III 14         Schedule D line 19                    $5,000.00
+         *   III 15         min(392,000 + 5,000, SDTW 10 =
+         *                  400,000)                            $397,000.00
+         *   III 16/17      1,615,750.00 - 397,000.00         $1,218,750.00
+         *   III 18         26% x 239,100.00 =  62,166.00
+         *                + 28% x 979,650.00 = 274,302.00      $336,468.00
+         *   III 20         SDTW line 14                        $208,000.00
+         *   III 21         48,350.00 - 208,000.00 is negative        -0-
+         *   III 22/24      min(1,615,750.00, 392,000.00)       $392,000.00
+         *   III 27         SDTW line 21 -- NOT line 14         $200,000.00
+         *   III 29         533,400.00 - 200,000.00             $333,400.00
+         *   III 30         min(392,000.00, 333,400.00)         $333,400.00
+         *   III 31         15% x 333,400.00                     $50,010.00
+         *   III 33         392,000.00 - 333,400.00              $58,600.00
+         *   III 34         20% x 58,600.00                      $11,720.00
+         *   III 35         1,218,750 + 333,400 + 58,600      $1,610,750.00
+         *   III 36         1,615,750.00 - 1,610,750.00           $5,000.00
+         *   III 37         25% x 5,000.00                        $1,250.00
+         *   III 38         336,468 + 50,010 + 11,720 + 1,250   $399,448.00
+         *   III 40         below line 39, so this               $399,448.00
+         *
+         * **The transposition would report $399,848.00** — $400.00 more, which
+         * is 5% of the $8,000.00 by which SDTW lines 14 and 21 differ, the 20%
+         * band taking what the 15% band gives up. That figure is asserted below
+         * as a counterfactual, hand-derived, so this leaf NAMES the defect it
+         * guards rather than merely repeating a right answer.
+         *
+         * Form 1040 line 16 is cross-checked against an INDEPENDENT `sdtw`
+         * execution rather than hand-typed: a 47-line worksheet's total is not
+         * something to assert from arithmetic done once, and
+         * `nonDegenerateSectionOneTwoFiftyGainComputesThroughFormOneZeroFourZeroReport`
+         * set this precedent one worksheet over. Part III's own figures ARE
+         * hand-derived, above.
+         */
+        theScheduleDArmOfPartThreeEndToEndAndTheTransposedMapping: () => {
+            const dividendForm = dividendDocument('sha256-33-sdtw-div')({
+                box2bUnrecapSec1250Gain: '5000.00',
+                box2dCollectibles28PercentGain: '3000.00',
+            })
+            const brokerageForm = brokerageDocument('sha256-33-sdtw-b')({
+                box1dProceeds: '405000.00',
+                box1eCostOrOtherBasis: '5000.00',
+                box2LongTermGainOrLoss: true,
+                box12BasisReportedToIrs: true,
+            })
+            const interestForm = interestDocument('sha256-33-sdtw-int')({
+                box8TaxExemptInterest: '1000000.00',
+                box9SpecifiedPrivateActivityBondInterest: '1000000.00',
+            })
+            /** @type {ReturnProfile} */
+            const profile = {
+                ...singleProfile,
+                declaredKinds: [
+                    'wages', 'taxableInterest', 'capitalGainsOrLosses',
+                    'unrecaptured1250Gain', 'collectibles28RateGain', 'alternativeMinimumTax',
+                ],
+            }
+            const outcome = form1040Report(taxParams2025)(
+                inputsOf(storedProfile(profile))([
+                    w2Document('sha256-33-sdtw-w2')('215750.00'),
+                ])([interestForm])([dividendForm])([brokerageForm])([])([])([])([])([]))
+            assert(
+                outcome.kind === 'ok',
+                ['the Schedule D arm of Part III must compute end to end', outcome])
+            if (outcome.kind !== 'ok') {
+                return
+            }
+            const at = lineRuled(outcome.lines)
+            assertEq(
+                outcome.line16Method, 'scheduleDTaxWorksheet',
+                'bullet 2a must select the SDTW, so Part III takes its OTHER arm')
+            assertEq(at('1040 line 11b').value, 61575000n, 'AGI = $615,750.00')
+            assertEq(at('1040 line 15').value, 60000000n, 'taxable income = $600,000.00')
+            assertEq(
+                at('1040 line 2a').value, 100000000n,
+                'the whole $1,000,000.00 of tax-exempt interest is REPORTED and taxed nowhere')
+            // The regular tax, against an independent `sdtw` execution on
+            // hand-typed inputs -- never against the report's own dispatch.
+            const worksheet = sdtw(taxParams2025)({
+                status: 'single',
+                line1Cents: 60000000n,
+                line2Cents: 0n,
+                form4952Line4gCents: 0n,
+                form4952Line4eCents: 0n,
+                scheduleD15Cents: 40000000n,
+                scheduleD16Cents: 40000000n,
+                scheduleD18Cents: 300000n,
+                scheduleD19Cents: 500000n,
+            })
+            // The four lines Part III reads, each hand-derived above.
+            assertEq(worksheet.line10, 40000000n, 'SDTW line 10 = $400,000.00')
+            assertEq(worksheet.line13, 39200000n, 'SDTW line 13 = $392,000.00')
+            assertEq(worksheet.line14, 20800000n, 'SDTW line 14 = $208,000.00')
+            assertEq(worksheet.line21, 20000000n, 'SDTW line 21 = $200,000.00')
+            assert(
+                worksheet.line14 !== worksheet.line21,
+                ['lines 14 and 21 MUST differ or the transposition is invisible',
+                    worksheet.line14, worksheet.line21])
+            assertEq(
+                at('1040 line 16').value, worksheet.line47,
+                'the regular tax is this independent worksheet\'s own line 47')
+            // Part III, off that same independent execution -- the mapping this
+            // leaf exists to pin, written out here in the CORRECT order so a
+            // transposed adapter disagrees with it.
+            const three = partThree(taxParams2025)({
+                status: 'single',
+                line12Cents: 161575000n,
+                scheduleD19Cents: 500000n,
+                regularWorksheet: {
+                    kind: 'scheduleDTaxWorksheet',
+                    sdtwLine10Cents: worksheet.line10,
+                    sdtwLine13Cents: worksheet.line13,
+                    sdtwLine14Cents: worksheet.line14,
+                    sdtwLine21Cents: worksheet.line21,
+                },
+            })
+            assertEq(three.line20, 20800000n, 'Part III line 20 = SDTW line 14 = $208,000.00')
+            assertEq(three.line27, 20000000n, 'Part III line 27 = SDTW line 21 = $200,000.00')
+            assertEq(three.line29, 33340000n, 'line 29 = $333,400.00 -- and it BINDS at line 30')
+            assertEq(three.line31, 5001000n, 'line 31 = $50,010.00 at 15%')
+            assertEq(three.line34, 1172000n, 'line 34 = $11,720.00 at 20%')
+            assertEq(three.line37, 125000n, 'line 37 = $1,250.00 at 25%')
+            assertEq(three.line38, 39944800n, 'line 38 = $399,448.00')
+            assertEq(three.line40, 39944800n, 'line 40 = $399,448.00')
+            // THE END-TO-END IDENTITY: the report's own AMT is that line 40 less
+            // the regular tax, and BOTH sides come from executions this leaf
+            // performed rather than from the report.
+            assertEq(
+                at('1040 line 17').value, three.line40 - worksheet.line47,
+                'the AMT is Part III line 40 less the regular tax')
+            assert(
+                at('1040 line 17').value > 0n,
+                ['and it is a real figure', at('1040 line 17').value])
+            // THE COUNTERFACTUAL, hand-derived: transposing SDTW lines 14 and 21
+            // in the adapter moves $8,000.00 from the 15% band to the 20% band,
+            // costing 5% of it -- $400.00 -- so line 38 would be $399,848.00.
+            const ifTransposed = partThree(taxParams2025)({
+                status: 'single',
+                line12Cents: 161575000n,
+                scheduleD19Cents: 500000n,
+                regularWorksheet: {
+                    kind: 'scheduleDTaxWorksheet',
+                    sdtwLine10Cents: worksheet.line10,
+                    sdtwLine13Cents: worksheet.line13,
+                    sdtwLine14Cents: worksheet.line21,
+                    sdtwLine21Cents: worksheet.line14,
+                },
+            })
+            assertEq(ifTransposed.line38, 39984800n, 'the transposed mapping reports $399,848.00')
+            assertEq(
+                ifTransposed.line38 - three.line38, 40000n,
+                '5% of the $8,000.00 by which SDTW lines 14 and 21 differ = $400.00')
+            assert(
+                at('1040 line 17').value !== ifTransposed.line40 - worksheet.line47,
+                ['the report must NOT be using the transposed mapping',
+                    at('1040 line 17').value])
+        },
         // THE MUTATION GUARD THIS FIXTURE EXISTS FOR, stated as its own
         // assertion rather than left implicit above.
         //
