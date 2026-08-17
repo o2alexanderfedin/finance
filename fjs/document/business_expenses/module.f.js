@@ -109,6 +109,59 @@
  * loss as a non-negative amount; Form 8995 line 3 prints it in parentheses and
  * is where it becomes a subtraction.
  *
+ * ## `specifiedServiceTradeOrBusiness`, `w2Wages` and
+ * `unadjustedBasisOfQualifiedProperty` — the THREE fields Form 8995-A needs,
+ * added in Phase 31 (TAX-32) at the same time as the reader that uses them
+ *
+ * Phase 28 deliberately did NOT add an SSTB field, and its reasoning was
+ * correct at the time: below §199A(e)(2)'s threshold a specified service trade
+ * or business is a qualified trade or business like any other, with no
+ * reduction at all, so the field could only ever be read above the threshold —
+ * which is exactly where that phase refused. **A stored field with no reader is
+ * the `box13StatutoryEmployee` defect**, modeled since its dialect was written
+ * and read by nothing while the engine quietly produced a wrong answer for the
+ * filers it concerned. This repo has now paid for that twice.
+ *
+ * `fjs/form8995a` is that reader, and it arrives in the same phase as these
+ * fields. Each is one printed input Form 8995-A cannot compute for itself:
+ *
+ * | Field | Printed line | Why nothing else can supply it |
+ * |---|---|---|
+ * | `specifiedServiceTradeOrBusiness` | Schedule A line 1a's own "check if specified service" | §199A(d)(2) is a question about what the business DOES |
+ * | `w2Wages` | Form 8995-A line 4 | this engine reads no Forms W-2 the taxpayer ISSUED, only ones they received |
+ * | `unadjustedBasisOfQualifiedProperty` | Form 8995-A line 7 | an asset basis history; Schedule C line 13 already refuses for the same absence |
+ *
+ * **Absence refuses; it never defaults** — and for the SSTB flag both defaults
+ * are wrong for somebody. Defaulting to "not a specified service business"
+ * would grant a consultant above the threshold a deduction §199A(d)(1) denies
+ * them, understating the tax. Defaulting the other way would deny a plumber the
+ * deduction they are owed, overstating it. Both are silent. So the field is
+ * three-state, and `fjs/form8995a` refuses BY NAME when it is unstated and the
+ * answer would depend on it.
+ *
+ * **A string, not `option(true)` and not `option(boolean)`**, which is a
+ * departure from DOC-12's checkbox convention worth stating precisely:
+ *
+ * - `option(true)` cannot express this field. Absence is that convention's way
+ *   of saying "no", and here "no" is a substantive assertion that RAISES the
+ *   deduction. The convention is right where absence is the safe reading —
+ *   `grossReceiptsFullyReportedOnForms1099Nec` above is exactly that — and
+ *   wrong here for the same reason `priorYearQualifiedBusinessLossCarryforward`
+ *   is not a checkbox either.
+ * - `option(boolean)` expresses three states but makes the dangerous one cheap.
+ *   The hazard this dialect already names — *"a serializer that helpfully
+ *   materializes every key"* — would write `false`, indistinguishable from a
+ *   taxpayer who answered no. As one of two exact strings, a materialized
+ *   `false` or `''` fails the vocabulary check and is refused, quoted.
+ *
+ * `w2Wages` and `unadjustedBasisOfQualifiedProperty` follow
+ * `priorYearQualifiedBusinessLossCarryforward` exactly instead: a money string,
+ * non-negative, where `'0.00'` is the assertion "none" and absence is
+ * *unstated*. **`'0.00'` is the ordinary case for wages**, not an edge case — a
+ * sole proprietor with no employees issues no Forms W-2 — and it is still an
+ * assertion the taxpayer has to make, because the engine cannot tell that
+ * proprietor apart from one who simply has not looked yet.
+ *
  * ## The date rule is `vnd.fjs.medical_expenses`', not `vnd.fjs.adjustments`'
  *
  * An HSA contribution may be made in the FOLLOWING calendar year and
@@ -192,8 +245,25 @@ export const businessExpensesSchema = /** @type {const} */ ({
     businessName: option(string),
     grossReceiptsFullyReportedOnForms1099Nec: option(true),
     priorYearQualifiedBusinessLossCarryforward: option(string),
+    specifiedServiceTradeOrBusiness: option(string),
+    w2Wages: option(string),
+    unadjustedBasisOfQualifiedProperty: option(string),
     entries: array(expenseEntry),
 })
+
+/**
+ * The two things a taxpayer can SAY about §199A(d)(2), and there is no third.
+ * Stored as one of these exact strings rather than as a boolean — see this
+ * module's docstring for why a materialized `false` would be a silent
+ * assertion, and why absence must be neither.
+ *
+ * A frozen two-element vocabulary in the `fjs/exec` `refusals` shape: a value
+ * outside it is refused by name and quoted, so a serializer's `''` or a
+ * hand-edited `'true'` cannot become an assertion by accident.
+ */
+export const specifiedServiceTradeOrBusinessValues = /** @type {const} */ ([
+    'specifiedService', 'notSpecifiedService',
+])
 
 /** @typedef {Ts<typeof businessExpensesSchema>} BusinessExpenses */
 
@@ -250,6 +320,44 @@ export const checkReferences = r => {
                 + `line 3 is where it becomes a subtraction. A negative value here would subtract `
                 + `it twice, INCREASING the §199A deduction that the carryforward exists to `
                 + `reduce`)
+        }
+    }
+    // ── TAX-32 (Phase 31): Form 8995-A's three per-business facts ───────────
+    // `specifiedServiceTradeOrBusiness` is checked against the frozen
+    // vocabulary above, never against a truthiness test: the whole point of the
+    // string form is that an unrecognised value is a REFUSAL rather than a
+    // silent "no".
+    const sstb = r.specifiedServiceTradeOrBusiness
+    if (sstb !== undefined
+        && !specifiedServiceTradeOrBusinessValues.some(candidate => candidate === sstb)) {
+        return error(
+            `specifiedServiceTradeOrBusiness ${JSON.stringify(sstb)} is not one of `
+            + `${specifiedServiceTradeOrBusinessValues.join(' or ')} — §199A(d)(2) admits exactly `
+            + `two answers, and this field is a string rather than a boolean precisely so that a `
+            + `serializer's empty string or a hand-edited "true" cannot become an assertion that `
+            + `this business is NOT a specified service trade or business. That assertion raises `
+            + `the deduction, so it has to be said deliberately or not at all`)
+    }
+    // Form 8995-A printed line 4 (W-2 wages) and line 7 (UBIA). Both are money
+    // magnitudes, both non-negative, and both are read ONLY above §199A(e)(2)'s
+    // threshold — `fjs/form8995a` refuses by name when one is missing there.
+    for (const [name, value] of /** @type {readonly (readonly [string, string | undefined])[]} */ ([
+        ['w2Wages', r.w2Wages],
+        ['unadjustedBasisOfQualifiedProperty', r.unadjustedBasisOfQualifiedProperty],
+    ])) {
+        if (value === undefined) {
+            continue
+        }
+        const message = moneyFieldError(name)(value)
+        if (message !== undefined) {
+            return error(message)
+        }
+        if (centsFromString(value) < 0n) {
+            return error(
+                `${name} ${value} is negative — Form 8995-A lines 4 and 7 hold a wage total and an `
+                + `asset basis, and neither can be less than nothing. A negative one would make the `
+                + `W-2/UBIA cap on line 10 negative and, through the "greater of" on line 13, `
+                + `hand the deduction back the limitation exists to remove`)
         }
     }
     if (r.principalBusiness.trim() === '') {
@@ -505,6 +613,151 @@ export const proof = {
                     priorYearQualifiedBusinessLossCarryforward: '18400.00',
                 })[0],
                 'ok')
+        },
+    },
+    // ── TAX-32 (Phase 31): Form 8995-A's three per-business facts ───────────
+    specifiedServiceTradeOrBusiness: {
+        // THREE states, and the third is the point. Both answers store, and
+        // absence is neither of them — `fjs/form8995a` is what turns absence
+        // into a refusal, and it can only do that if this dialect keeps the
+        // distinction instead of collapsing it into a boolean.
+        bothAnswersStoreAndAbsenceIsNeither: () => {
+            const [yesTag, yes] = validate({
+                ...minimal, specifiedServiceTradeOrBusiness: 'specifiedService',
+            })
+            assert(yesTag === 'ok', ['expected ok', yesTag, yes])
+            assertEq(yes.specifiedServiceTradeOrBusiness, 'specifiedService')
+            const [noTag, no] = validate({
+                ...minimal, specifiedServiceTradeOrBusiness: 'notSpecifiedService',
+            })
+            assert(noTag === 'ok', ['expected ok', noTag, no])
+            assertEq(no.specifiedServiceTradeOrBusiness, 'notSpecifiedService')
+            const [absentTag, absent] = validate(minimal)
+            assert(absentTag === 'ok', ['expected ok', absentTag, absent])
+            assertEq(absent.specifiedServiceTradeOrBusiness, undefined)
+            assertEq(
+                Object.keys(absent).includes('specifiedServiceTradeOrBusiness'),
+                false,
+                'absent is absent, never a materialized undefined')
+            // …and the two stored answers are DIFFERENT strings, which is what
+            // makes a reader that tests one of them observable at all.
+            assert(
+                yes.specifiedServiceTradeOrBusiness !== no.specifiedServiceTradeOrBusiness,
+                'the two answers must not be the same string')
+        },
+        // **THE REASON IT IS NOT A BOOLEAN.** A serializer that materializes
+        // every key writes `false`, which as a boolean would be
+        // indistinguishable from a taxpayer answering "no" — and "no" RAISES
+        // the deduction. Here it is refused, quoted, with the direction named.
+        aMaterializedFalseOrEmptyStringIsRefusedRatherThanReadAsNo: () => {
+            const [falseTag, falseValue] = validate({
+                ...minimal, specifiedServiceTradeOrBusiness: false,
+            })
+            assertEq(falseTag, 'error', 'a boolean is not one of the two strings')
+            assert(falseValue !== undefined, 'a refusal carries something to read')
+            const [emptyTag, empty] = validate({
+                ...minimal, specifiedServiceTradeOrBusiness: '',
+            })
+            assertEq(emptyTag, 'error')
+            assert(
+                typeof empty === 'string' && empty.includes('""'),
+                ['the refusal must quote the value it rejected', empty])
+            assert(
+                typeof empty === 'string' && empty.includes('specifiedService'),
+                ['the refusal must name what a valid answer looks like', empty])
+            assert(
+                typeof empty === 'string' && empty.includes('raises the deduction'),
+                ['the refusal must say which way the error would run', empty])
+            // A plausible hand edit, refused for the same reason.
+            assertEq(
+                validate({ ...minimal, specifiedServiceTradeOrBusiness: 'true' })[0], 'error')
+            // THE CONTROL: the vocabulary is not refusing everything.
+            assertEq(
+                validate({
+                    ...minimal, specifiedServiceTradeOrBusiness: 'notSpecifiedService',
+                })[0],
+                'ok')
+        },
+        // The vocabulary is FROZEN and hand-counted, AGENTS.md's
+        // `expectedMoneyBoxFieldCount` idiom: §199A(d)(2) admits two answers,
+        // so a third value silently added here fails this leaf even though
+        // every check above would happily iterate one element more.
+        theVocabularyHasExactlyTwoMembers: () => {
+            assertEq(specifiedServiceTradeOrBusinessValues.length, 2)
+            assertEq(specifiedServiceTradeOrBusinessValues[0], 'specifiedService')
+            assertEq(specifiedServiceTradeOrBusinessValues[1], 'notSpecifiedService')
+        },
+    },
+    w2WagesAndUnadjustedBasis: {
+        // `'0.00'` is an assertion and absence is not, exactly as for the
+        // carryforward above — and for wages `'0.00'` is the ORDINARY case: a
+        // proprietor with no employees issues no Forms W-2.
+        zeroIsAnAssertionAndAbsenceIsNot: () => {
+            const [t, v] = validate({
+                ...minimal, w2Wages: '0.00', unadjustedBasisOfQualifiedProperty: '120000.00',
+            })
+            assert(t === 'ok', ['expected ok', t, v])
+            assertEq(v.w2Wages, '0.00')
+            assertEq(v.unadjustedBasisOfQualifiedProperty, '120000.00')
+            const [absentTag, absent] = validate(minimal)
+            assert(absentTag === 'ok', ['expected ok', absentTag, absent])
+            assertEq(absent.w2Wages, undefined)
+            assertEq(absent.unadjustedBasisOfQualifiedProperty, undefined)
+            assertEq(Object.keys(absent).includes('w2Wages'), false)
+            assertEq(
+                Object.keys(absent).includes('unadjustedBasisOfQualifiedProperty'), false)
+        },
+        // Both are money magnitudes, so a negative is refused with the
+        // direction of the error named — a negative UBIA would make line 10's
+        // cap negative and line 13's "greater of" hand the deduction back.
+        //
+        // Asserted for EACH field separately: a loop that checked only the
+        // first would leave the second unguarded, which is this project's
+        // "one limb of the pair is never observed" failure in miniature.
+        aNegativeIsRefusedForEachFieldSeparately: () => {
+            const [wagesTag, wages] = validate({ ...minimal, w2Wages: '-1.00' })
+            assertEq(wagesTag, 'error')
+            assert(
+                typeof wages === 'string' && wages.includes('w2Wages'),
+                ['must name WHICH field', wages])
+            assert(
+                typeof wages === 'string' && wages.includes('-1.00'),
+                ['must quote the value', wages])
+            const [ubiaTag, ubia] = validate({
+                ...minimal, unadjustedBasisOfQualifiedProperty: '-120000.00',
+            })
+            assertEq(ubiaTag, 'error')
+            assert(
+                typeof ubia === 'string'
+                    && ubia.includes('unadjustedBasisOfQualifiedProperty'),
+                ['must name WHICH field, and it is the second one', ubia])
+            assert(
+                typeof ubia === 'string' && ubia.includes('-120000.00'),
+                ['must quote the value', ubia])
+            // THE CONTROL: the same magnitudes written positive are accepted,
+            // so the refusals above are about the sign rather than the field.
+            assertEq(
+                validate({
+                    ...minimal, w2Wages: '1.00',
+                    unadjustedBasisOfQualifiedProperty: '120000.00',
+                })[0],
+                'ok')
+        },
+        // Money-field exactness applies to both, `fjs/document/money_field`'s
+        // rule reaching two more fields.
+        commaGroupedAndOverPreciseAreRefusedForBoth: () => {
+            assertEq(validate({ ...minimal, w2Wages: '120,000.00' })[0], 'error')
+            assertEq(validate({ ...minimal, w2Wages: '120000.001' })[0], 'error')
+            assertEq(
+                validate({
+                    ...minimal, unadjustedBasisOfQualifiedProperty: '120,000.00',
+                })[0],
+                'error')
+            assertEq(
+                validate({
+                    ...minimal, unadjustedBasisOfQualifiedProperty: '120000.001',
+                })[0],
+                'error')
         },
     },
     datePaid: {
