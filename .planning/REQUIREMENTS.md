@@ -546,7 +546,7 @@ itemizing, which is complete apart from the eight open MAINT items.
 
 ### The Product Path (EXEC, PROV)
 
-- [ ] **EXEC-14** *(M2, T0)*: The 1040 engine reachable from a stored guest program — **via
+- [x] **EXEC-14** *(M2, T0)*: The 1040 engine reachable from a stored guest program — **via
       `guestCtx`, never via a server tool.** `guestCtx` already carries pure non-effect helpers
       (`step`, `pure`, `centsFromString`, `centsToString`) alongside the four frozen CAS
       commands, and `_CasOpIsExactlyTheFourCommands` pins the *effect* vocabulary, not the
@@ -554,15 +554,35 @@ itemizing, which is complete apart from the eight open MAINT items.
       authors the program; the program calls the engine and decides what to report. **This is
       the deliberate alternative to the forbidden `finance_compute_1040` tool** — see Out of
       Scope, where the distinction is recorded and the tool re-affirmed as forbidden.
-- [ ] **PROV-09** *(M2, T0)*: A real return produced through the product path end to end —
+
+      **Delivered by Phase 21 (PR #71, merge `75b6f5b`, 2026-08-16); ticked 2026-08-17 on
+      re-verification.** `fjs/guest/tax/module.f.js` exists, and `taxGuestCtx` is written as a
+      SPREAD of `guestCtx` plus `taxParams` and `form1040Report(taxParams)` rather than a
+      re-listing of the ABI — `taxGuestCtxCarriesTheWholeGuestAbiUnchanged` pins each of the eight
+      members by `Object.is` against `guestCtx`'s own, and `form1040Report` is asserted absent from
+      `casOpNames` so it is a pure value on the context, never a command. **`fjs/guest/module.f.js`
+      is byte-identical to its pre-Phase-21 state** (`git diff e085ced develop --
+      fjs/guest/module.f.js` is empty), which is what keeps the payer report's transitive gate
+      green. Measured against a live server on 2026-08-17: `tools/list` reports exactly **13**
+      tools, and not one of them names 1040 or "compute".
+- [x] **PROV-09** *(M2, T0)*: A real return produced through the product path end to end —
       documents stored via `evo_add`, a program stored in CAS and executed by `fjs_run`, the
       result written as a `vnd.fjs.run` record. This is what makes Phase 19's provenance header
       and PROV-05's pinned reproduction apply to an actual 1040 rather than to a fixture; today
       neither has ever run against one.
 
+      **Delivered by Phase 21 (PR #71, merge `75b6f5b`, 2026-08-16); ticked 2026-08-17 on
+      re-verification.** `tax-return-integration.test.js`'s `EXEC-14/PROV-09` leaf drives a real
+      1040 through a genuinely separate `fjs_run` process and passes in the full suite (~58s of its
+      runtime). Its pinned leg is a real reproduction rather than a tautology: an amendment is
+      landed and the UNPINNED rerun is first OBSERVED to move, then two pinned runs against the
+      same subject return the identical `resultHash` and byte-identical result bytes across a
+      second intervening amendment, and the reproduced bytes are asserted to be `kind: 'ok'` — a
+      real return, not a stored error value.
+
 ### The Safety Net (TAX)
 
-- [ ] **TAX-19** *(M2, T0)*: **Computable tripwires** — a table of (predicate over the stored
+- [x] **TAX-19** *(M2, T0)*: **Computable tripwires** — a table of (predicate over the stored
       documents) → (kind that MUST have been declared), asserted before any line is computed.
       Box 5 over the Additional Medicare Tax threshold implies `scheduleTwoTaxes`; any 1099-NEC
       implies self-employment; non-zero 1099-R box 3 implies capital-gain treatment. This is
@@ -571,20 +591,51 @@ itemizing, which is complete apart from the eight open MAINT items.
       records, but it rests on the taxpayer knowing what they owe — which is the thing they
       came to a tax engine not to have to know. Converts silent understatement into refusal.
 
+      **Delivered by Phase 22 (PR #72, merge `c449e0e`, 2026-08-16); ticked 2026-08-17 on
+      re-verification.** `fjs/return/tripwire/module.f.js` exists and carries the
+      predicate → required-kind table, and `form1040Report` calls `classifyTripwires` and returns
+      its refusal **strictly before `computeForm1040` runs** — so no printed line is computed for a
+      return the tripwires reject. The filing status is narrowed at that call site precisely because
+      the Additional Medicare Tax threshold is per-status and there is nothing earlier to thread it
+      from, which is the ordering stated as a comment at the site and true in the code.
+
 ### FAANG: Schedule 2 Populated (TAX)
 
-- [ ] **TAX-20** *(M2, T1)*: **Form 8959**, Additional Medicare Tax — 0.9% above $200,000
+- [x] **TAX-20** *(M2, T1)*: **Form 8959**, Additional Medicare Tax — 0.9% above $200,000
       single / $250,000 MFJ / $125,000 MFS, thresholds statutory and **not inflation-indexed**.
       Feeds Schedule 2 line 11 → 1040 line 23. Mandatory, not elective: this is what blocks
       every high-wage return today.
-- [ ] **TAX-21** *(M2, T1)*: **Form 8960**, Net Investment Income Tax — 3.8% on the lesser of
+
+      **Delivered by Phase 23 (PR #73, merge `1a3a80e`, 2026-08-16); ticked 2026-08-17 on
+      re-verification.** `fjs/form8959/module.f.js` exists, `additionalMedicareTax` is a member of
+      `modeledKinds` in `fjs/return/scope`, and the whole route is wired: Form 8959 line 18 becomes
+      Schedule 2 line 11, which enters Schedule 2's line 21 total, which IS 1040 line 23. Proven at
+      a real figure — Schedule 2's own `line11` proof asserts `$900.00` on `$100,000.00` of excess
+      and the same `$900.00` reaching line 21. Form 8959 line 24 additionally reaches **1040 line
+      25c**, without which the return would charge a high-wage filer $900 already withheld.
+- [x] **TAX-21** *(M2, T1)*: **Form 8960**, Net Investment Income Tax — 3.8% on the lesser of
       net investment income or MAGI over the same unindexed thresholds. Note AGENTS-relevant
       hazard: this MAGI has its own add-back list, so TAX-15's "no variable named `magi`" rule
       applies with full force.
-- [ ] **TAX-22** *(M2, T2)*: `scheduleTwoTaxes` splits from one coarse refused kind into
+
+      **Delivered by Phase 23 (PR #73, merge `1a3a80e`, 2026-08-16); ticked 2026-08-17 on
+      re-verification.** `fjs/form8960/module.f.js` exists and `netInvestmentIncomeTax` is a member
+      of `modeledKinds`; Form 8960 line 17 becomes Schedule 2 line 12 and reaches 1040 line 23
+      through the same line 21 total. The TAX-15 hazard held: the root-level acronym gate is green
+      across `fjs/**`, and it demonstrated on 2026-08-17 that it is still load-bearing by reddening
+      on a new docstring that merely *named the gate's own filename* in lowercase.
+- [x] **TAX-22** *(M2, T2)*: `scheduleTwoTaxes` splits from one coarse refused kind into
       per-line kinds, so what remains refused on Schedule 2 is nameable. Reclassify **only**
       the lines actually wired, in the same commit — the wire-before-reclassify discipline
       Phases 12.1, 13 and 20 all followed.
+
+      **Delivered by Phase 23 (PR #73, merge `1a3a80e`, 2026-08-16); ticked 2026-08-17 on
+      re-verification.** `grep -c "'scheduleTwoTaxes'" fjs/return/profile/module.f.js` returns
+      **0** — the coarse kind is gone from the declarable vocabulary, and every remaining mention of
+      the name anywhere under `fjs/` is prose recording that it was split. In its place are per-
+      printed-line kinds: four now modeled (`alternativeMinimumTax`, `selfEmploymentTax`,
+      `additionalMedicareTax`, `netInvestmentIncomeTax`) and the rest refused individually, each
+      naming its own printed line and the form or fact that would supply it.
 
 ### Non-Profit: Schedule 1 Part II and Schedule 3 (TAX, DOC)
 
@@ -940,13 +991,13 @@ itemizing, which is complete apart from the eight open MAINT items.
 
 | REQ-ID | Tier | Phase | Persona unblocked |
 |--------|------|-------|-------------------|
-| EXEC-14, PROV-09 | T0 | 21 - The Last Mile | *all four — nothing is reachable today* |
-| TAX-19 | T0 | 22 - Computable Tripwires | *all four — the safety net* |
-| TAX-20, TAX-21, TAX-22 | T1 | 23 - Schedule 2 Populated | **FAANG employee** |
-| TAX-23, TAX-24, DOC-19 | T2 | 24 - Schedule 1 Adjustments | **Non-profit worker** |
-| TAX-25, TAX-26, TAX-27 | T2 | 25 - Schedule 3 Credits | Non-profit worker |
-| TAX-28, TAX-29 | T2 | 26 - Retiree Completion | Retiree |
-| DOC-20, DOC-21, TAX-30 | T3 | 27 - 1099-NEC and Schedule C | Startup founder |
+| EXEC-14, PROV-09 | T0 | 21 - The Last Mile | *all four* — **both delivered** |
+| TAX-19 | T0 | 22 - Computable Tripwires | *all four — the safety net* — **delivered** |
+| TAX-20, TAX-21, TAX-22 | T1 | 23 - Schedule 2 Populated | **FAANG employee** — all three delivered |
+| TAX-23, TAX-24, DOC-19 | T2 | 24 - Schedule 1 Adjustments | **Non-profit worker** — all three delivered |
+| TAX-25, TAX-26, TAX-27 | T2 | 25 - Schedule 3 Credits | Non-profit worker — TAX-25 and TAX-26 delivered; **TAX-27 stays open**, a named EIC refusal plus a fact-by-fact spec, not the credit |
+| TAX-28, TAX-29 | T2 | 26 - Retiree Completion | Retiree — TAX-28 delivered; **TAX-29 stays open**, Form 8606 Part I only (Parts II/III, and so the backdoor Roth, refuse) |
+| DOC-20, DOC-21, TAX-30 | T3 | 27 - 1099-NEC and Schedule C | Startup founder — all three delivered |
 | TAX-31, TAX-32 | T3 | 28 - Schedule SE and QBI | **Startup founder** — TAX-31 delivered; TAX-32 delivers Form 8995 only and stays open for 8995-A |
 | DOC-22, DOC-23, TAX-33, TAX-34 | T3 | 29 - Equity Compensation and AMT | **FAANG employee** — DOC-22, DOC-23 and TAX-34 delivered; TAX-33 delivers Form 6251 Parts I and II and stays open for Part III |
 | DOC-24, TAX-35 | T3 | 30 - Pass-Through Income | **Startup founder** — DOC-24 delivered; TAX-35 delivers Schedule E Part II end to end and stays open for Part III and for routing the separately stated items |
