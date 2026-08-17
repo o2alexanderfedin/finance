@@ -1093,6 +1093,81 @@ export const proof = {
             assertEq(outcome.kind, 'ok', ['a declared kind must not trip its own tripwire', outcome])
         },
     },
+    // ── Entry 7: Form 1041 K-1 box 6 -> estateAndTrustIncome (TAX-35) ────
+    beneficiaryIncome: {
+        // A beneficiary holds a Schedule K-1 (Form 1041) and does not know
+        // Schedule E Part III exists. Sections 652(a)/662(a) tax the share for
+        // the year the fiduciary's income was required to be distributed,
+        // whether or not a dollar was paid over -- so undeclared, the engine
+        // would emit a confident 1040 short by $80,000.00 of income.
+        aStoredEstateTrustK1UndeclaredRefusesNamingScheduleEPartIII: () => {
+            const outcome = classify('single')(['wages'])({
+                ...noDocuments,
+                estateTrustK1Forms: [{ value: estateTrustK1 }],
+            })
+            assert(outcome.kind === 'error', ['a stored Form 1041 K-1 must refuse when undeclared', outcome])
+            if (outcome.kind !== 'error') {
+                return
+            }
+            assertEq(outcome.unmodeled.length, 1, ['expected exactly one required kind', outcome.unmodeled])
+            assertEq(
+                outcome.unmodeled[0],
+                'estateAndTrustIncome',
+                ['expected Schedule E Part III named', outcome.unmodeled])
+            assert(
+                outcome.message.includes('Schedule E Part III'),
+                ['the refusal must name the printed part', outcome.message])
+            assert(
+                outcome.message.includes('estateAndTrustIncome'),
+                ['the remedy must name the kind to declare', outcome.message])
+        },
+        // **THE DISCRIMINATING CASE, and the reason this is a SEVENTH tripwire
+        // rather than a widening of the sixth.** Declaring the PARTNERSHIP kind
+        // must NOT silence a beneficiary's document: they are different kinds
+        // reaching the same printed Schedule 1 line through different printed
+        // Schedule E parts. Folding box 6 into entry 6's predicate would make
+        // this outcome `ok` and hand the filer a 1040 short by the share.
+        aDeclaredPartnershipKindDoesNotSilenceTheBeneficiaryTripwire: () => {
+            const outcome = classify('single')(['wages', 'partnershipAndSCorporationIncome'])({
+                ...noDocuments,
+                estateTrustK1Forms: [{ value: estateTrustK1 }],
+            })
+            assert(outcome.kind === 'error', ['the partnership declaration must not cover a Form 1041 K-1', outcome])
+            if (outcome.kind !== 'error') {
+                return
+            }
+            assertEq(outcome.unmodeled[0], 'estateAndTrustIncome', [outcome.unmodeled])
+        },
+        // THE CONTROL: declared, it is silent -- otherwise a tripwire that
+        // refused every beneficiary would pass the two leaves above.
+        aDeclaredEstateAndTrustIncomeSilencesTheTripwire: () => {
+            const outcome = classify('single')(['wages', 'estateAndTrustIncome'])({
+                ...noDocuments,
+                estateTrustK1Forms: [{ value: estateTrustK1 }],
+            })
+            assertEq(outcome.kind, 'ok', ['a declared kind must not trip its own tripwire', outcome])
+        },
+        // A ZERO box 6 is not evidence: a dormant trust files a Schedule K-1
+        // with nothing on it, and refusing that filer would be an outage.
+        aZeroBoxSixIsNotEvidence: () => {
+            const outcome = classify('single')(['wages'])({
+                ...noDocuments,
+                estateTrustK1Forms: [{ value: { ...estateTrustK1, box6OrdinaryBusinessIncome: '0.00' } }],
+            })
+            assertEq(outcome.kind, 'ok', ['a zero box 6 must not trip the tripwire', outcome])
+        },
+        // A LOSS still requires the declaration -- `fjs/schedule/e`'s
+        // `beneficiaryLossRefusal` is where it then refuses by name under
+        // section 642(h), and it cannot be reached by a return that never
+        // declared the kind at all.
+        aNegativeBoxSixStillRequiresTheDeclaration: () => {
+            const outcome = classify('single')(['wages'])({
+                ...noDocuments,
+                estateTrustK1Forms: [{ value: { ...estateTrustK1, box6OrdinaryBusinessIncome: '-4000.00' } }],
+            })
+            assert(outcome.kind === 'error', ['a loss still requires the declaration', outcome])
+        },
+    },
     // ── Entry 6: Schedule K-1 box 1 -> partnershipAndSCorporationIncome ──
     passThroughIncome: {
         // PHASE 30'S MOTIVATING CASE. A founder holds a Schedule K-1 and does
