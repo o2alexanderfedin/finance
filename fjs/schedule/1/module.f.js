@@ -1833,7 +1833,7 @@ export const proof = {
             assertEq(partI.line5.value, 0n)
             assertEq(partI.line5.sources.length, 1)
             assertEq(partI.line5.sources[0].boxPath, 'declaredKinds')
-            assertEq(partI.scheduleE.filed, false)
+            assertEq(partI.scheduleE.partII.rows.length, 0)
             assertEq(partI.line10.value, 0n, 'and the Part I total is unmoved')
         },
         // **CRITERION 2**: box 1 reaches 1040 line 8 through Schedule E line
@@ -1858,7 +1858,7 @@ export const proof = {
             assertEq(withK1.scheduleE.parts.line41.value, 8000000n, 'Schedule E line 41')
             assertEq(withK1.line5.value, 8000000n, 'Schedule E line 41 IS Schedule 1 line 5')
             assertEq(withK1.line10.value, 8000000n, 'and it reaches the Part I total')
-            assertEq(withK1.scheduleE.filed, true)
+            assertEq(withK1.scheduleE.partII.rows.length, 1)
             // The hard zero is REPLACED: line 5 cites the Schedule K-1 box it
             // read, and its rule names where the figure came from.
             const paths = withK1.line5.sources.map(source => source.boxPath)

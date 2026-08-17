@@ -1084,11 +1084,18 @@ export const scheduleERemainingParts = profile => line32 => {
 /**
  * A computed Schedule E.
  *
- * `filed` distinguishes a return with a pass-through stake from one without —
- * `fjs/schedule/c`'s own field, for its own reason: a partnership that broke
- * exactly even and a taxpayer with no K-1 at all both produce a Schedule E of
- * zeros, and only the sources tell them apart. A caller reading `.value`
- * cannot.
+ * **There is deliberately no `filed` field here, and its absence is a
+ * decision rather than an omission.** `fjs/schedule/c` carries one, because a
+ * break-even business and no business at all produce the same Schedule C of
+ * zeros and NOTHING in that record tells them apart — `fjs/form1040/core`
+ * genuinely needs it, to keep 1040 line 13a a profile-cited zero. Here the
+ * same question is answered by `partII.rows.length`, which is carried out
+ * anyway because it IS printed line 28's own table, so a `filed` field would
+ * be derivable from a neighbour and read by nothing.
+ *
+ * A stored field with no reader is exactly the `box13StatutoryEmployee`
+ * defect Phase 27 found in `vnd.fjs.w2` and Phase 28 declined to repeat with
+ * an SSTB field. This one was written, found unread by mutation, and removed.
  *
  * `selfEmploymentEarningsCents` is carried OUT rather than left inside,
  * because `fjs/schedule/se` line 2 needs it and running this schedule a second
@@ -1097,7 +1104,6 @@ export const scheduleERemainingParts = profile => line32 => {
  * A, and it is zero for every S-corporation row by construction.
  * @typedef {{
  *   readonly kind: 'ok',
- *   readonly filed: boolean,
  *   readonly partII: ScheduleEPartII,
  *   readonly parts: ScheduleERemainingParts,
  *   readonly selfEmploymentEarningsCents: bigint,
@@ -1165,7 +1171,6 @@ export const scheduleE = input => {
     const selfEmployed = rows.find(row => row.selfEmploymentEarningsCents !== 0n)
     return {
         kind: 'ok',
-        filed: rows.length > 0,
         partII,
         parts,
         selfEmploymentEarningsCents,
@@ -1289,8 +1294,7 @@ export const proof = {
     // most of them.
     theReturnWithNoScheduleK1ComputesZerosCitingTheProfile: () => {
         const result = ok(run({}))
-        assertEq(result.filed, false)
-        assertEq(result.partII.rows.length, 0)
+        assertEq(result.partII.rows.length, 0, 'no rows, which is how a caller tells this from a break-even entity')
         assertEq(result.partII.line32.value, 0n, 'total partnership and S corporation income $0.00')
         assertEq(result.parts.line41.value, 0n, 'Schedule E line 41 $0.00')
         assertEq(result.selfEmploymentEarningsCents, 0n)
@@ -1646,9 +1650,10 @@ export const proof = {
             }))
             assertEq(result.parts.line41.value, 0n)
             assertEq(result.selfEmploymentEarningsCents, 0n)
-            // ...and it is FILED, unlike the no-document case: a dormant
-            // partnership is not the same as no partnership.
-            assertEq(result.filed, true)
+            // ...and it has a ROW, unlike the no-document case: a dormant
+            // partnership is not the same as no partnership, and the row is
+            // the only thing that says so.
+            assertEq(result.partII.rows.length, 1)
         },
 
         /** Code A disagreeing with box 1 refuses, naming both figures. */
@@ -1767,7 +1772,10 @@ export const proof = {
                 sCorporationK1Forms: [sCorporationDoc({ box1OrdinaryBusinessIncome: '0.00' })],
             }))
             assertEq(result.parts.line41.value, 0n)
-            assertEq(result.filed, true, 'a break-even entity is filed; only the sources tell it from none')
+            assertEq(
+                result.partII.rows.length,
+                1,
+                'a break-even entity still has a row; only that tells it from no entity at all')
         },
     },
 
