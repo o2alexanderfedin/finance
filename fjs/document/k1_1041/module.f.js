@@ -94,6 +94,7 @@ import { error, ok } from 'functionalscript/fjs/types/result/module.f.js'
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
 import { centsFromString } from '../../exact/module.f.js'
 import { base, mediaTypeOf } from '../base/module.f.js'
+import { formRevisionError } from '../form_revision/module.f.js'
 import { moneyFieldError } from '../money_field/module.f.js'
 import { codedEntry, codedBoxError, materialParticipationValues, materialParticipationError } from '../k1_common/module.f.js'
 
@@ -254,8 +255,15 @@ export const unmodeledMoneyBoxes = /** @type {const} */ ([
  * @type {(r: K1EstateTrust) => Result<K1EstateTrust, K1EstateTrustError>}
  */
 export const checkReferences = r => {
-    if (r.formRevision.trim() === '') {
-        return error(`formRevision must not be empty or whitespace-only`)
+    // MERGE NOTE: this dialect was written on a branch cut before Phase 18
+    // (MAINT-08) extracted `formRevisionError`, so the merge that brought
+    // Phase 18 in left the inline copy standing as copy FIFTEEN of a rule
+    // that had just been deduplicated down to one. git had no conflict to
+    // report — the two sides touched different files. Behaviour is
+    // unchanged; the point is "one rule, one place" (AGENTS.md).
+    const formRevisionMessage = formRevisionError(r.formRevision)
+    if (formRevisionMessage !== undefined) {
+        return error(formRevisionMessage)
     }
     const domestic = r.boxHDomesticBeneficiary === true
     const foreign = r.boxHForeignBeneficiary === true
