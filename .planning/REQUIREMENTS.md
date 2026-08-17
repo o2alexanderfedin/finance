@@ -963,10 +963,44 @@ itemizing, which is complete apart from the eight open MAINT items.
       is told. A **non-joint** return carrying a Form W-2 issued to a different `recipientTin`
       with Social Security wages on it also refuses, because the wage base is per person and the
       engine cannot tell which of the two records is wrong.
-- [ ] **TAX-32** *(M2, T3)*: **Form 8995 / 8995-A**, the QBI deduction → 1040 line 13a, with
+- [x] **TAX-32** *(M2, T3)*: **Form 8995 / 8995-A**, the QBI deduction → 1040 line 13a, with
       the SSTB phase-in and the W-2-wage/UBIA limitations. Depends on TAX-30.
 
-      **PARTIALLY delivered 2026-08-16, and the box stays unchecked because two of the three
+      **COMPLETE 2026-08-17 (Phase 31).** All three things this requirement names now compute.
+      Form **8995-A**'s forty printed lines and **Schedule A (Form 8995-A)**'s lines 2-13 are
+      transcribed in `fjs/form8995a`, from `f8995a.pdf` and `f8995aa.pdf` fetched that day, and
+      1040 line 13a is routed through that module for every return — Form 8995 below the
+      threshold, Form 8995-A above it. Phase 28's above-threshold refusal is gone.
+
+      - **The SSTB reduction is on SCHEDULE A, not Part II**, and it scales all three of
+        qualified business income (line 11 → form line 2), W-2 wages (line 12 → form line 4)
+        and UBIA (line 13 → form line 7). Above threshold+range the applicable percentage floors
+        at zero, which is the printed header's *"doesn't qualify for the deduction"*.
+      - **Part III phases in the W-2-wage/UBIA limitation**, gated on the printed second
+        condition *"and line 10 is less than line 3"*. The two limbs of §199A(b)(2)(B) — 50% of
+        wages, and 25% of wages plus 2.5% of UBIA — are separately named returned fields with a
+        fixture where each BINDS and a perturbation in each direction.
+      - **`fjs/tax/params` gains `phaseInRange`**, $50,000/$100,000 per §199A(b)(3)(B)(ii),
+        stored and never derived: 25% of $197,300 is $49,325, $675 short, and the threshold is
+        indexed while the range has no adjustment clause at all.
+      - **Below the threshold the two forms agree TO THE CENT**, asserted at four taxable
+        incomes including the boundary and one cent below it, and line-by-line where the two
+        pages carry the same quantity. Breaking the short-circuit by one cent reddens it.
+      - **`vnd.fjs.business_expenses` gains three assertions** —
+        `specifiedServiceTradeOrBusiness`, `w2Wages`, `unadjustedBasisOfQualifiedProperty` — in
+        the same commit as the reader that uses them. Absence REFUSES by name and never
+        defaults; below the threshold none of the three is read, so a Phase 28 return computes
+        exactly what it always did.
+
+      Still refused, and correctly: `qualifiedReitDividendsAndPtpIncome` (Form 8995 lines 6-9 /
+      Form 8995-A lines 28-30), the patron reduction (line 14, Schedule D), the §199A(g) DPAD
+      (line 38), a SECOND business (Schedule B aggregation), and Schedule A Part II's publicly
+      traded partnership SSTB income. Each needs a document this engine does not read.
+
+      *The Phase 28 record below is kept as history. Where it says Form 8995-A is unmodeled or
+      that no SSTB field is stored, read the note above.*
+
+      **PARTIALLY delivered 2026-08-16, and the box stayed unchecked because two of the three
       things this requirement names were not built.** Form **8995**, the simplified
       computation, is complete: all seventeen printed lines, reaching 1040 line 13a. Qualified
       business income is Schedule C net profit **reduced by the deductible half of
@@ -996,10 +1030,16 @@ itemizing, which is complete apart from the eight open MAINT items.
       the `box13StatutoryEmployee` defect Phase 27 found, avoided rather than repeated. It
       acquires a reader the day Form 8995-A is modeled.
 
-      **STILL OPEN after Phase 31. The reason is SESSION BUDGET and nothing else** — Form 8995-A is
-      a forty-line form plus four Schedules, and there was not enough of the session left to build it
-      to this repository's standard (transcribe, wire, reclassify the scope kind, separate every
-      `min`/`max` limb in a fixture, and watch each new proof fail). Nothing about it is undecidable.
+      *(Phase 31 is that day. `specifiedServiceTradeOrBusiness` now exists, as one of two exact
+      strings rather than a checkbox — absence must refuse, because DOC-12's convention reads
+      absence as "no" and "no" is the answer that RAISES the deduction.)*
+
+      **~~STILL OPEN after Phase 31~~ — CLOSED 2026-08-17.** The reason it stayed open was session
+      budget and nothing else: Form 8995-A is a forty-line form plus four Schedules. It is now built
+      to this repository's standard — transcribed from the fetched pages, wired, every `min`/`max`
+      limb separated with a fixture where it binds, and each new proof watched to fail. **No scope
+      kind needed reclassifying**: `qualifiedBusinessIncomeDeduction` was already moved to modeled in
+      Phase 28, and the kinds that remain refused are the document-shortage ones listed above.
 
       `[RECORD CORRECTED — read this before trusting any recorded reason, including this one]` The
       first version of this note gave a different reason: that `f8995a.pdf` **could not be fetched**.
@@ -1248,7 +1288,7 @@ itemizing, which is complete apart from the eight open MAINT items.
 | TAX-25, TAX-26, TAX-27 | T2 | 25 - Schedule 3 Credits | Non-profit worker — TAX-25 and TAX-26 delivered; **TAX-27 stays open**, a named EIC refusal plus a fact-by-fact spec, not the credit |
 | TAX-28, TAX-29 | T2 | 26 - Retiree Completion, 31 - Backdoor Roth | Retiree — TAX-28 delivered (Phase 26); **TAX-29 CLOSED in Phase 31**: Part II computed off Part I's own fraction, Part III's code `Q` computed and codes `J`/`T` refused by name, backdoor Roth computes end to end |
 | DOC-20, DOC-21, TAX-30 | T3 | 27 - 1099-NEC and Schedule C | Startup founder — all three delivered |
-| TAX-31, TAX-32 | T3 | 28 - Schedule SE and QBI | **Startup founder** — TAX-31 delivered; TAX-32 delivers Form 8995 only and stays open for 8995-A |
+| TAX-31, TAX-32 | T3 | 28 - Schedule SE and QBI; 31 - Form 8995-A | **Startup founder** — TAX-31 delivered in Phase 28; TAX-32 delivered Form 8995 there and Form 8995-A, Schedule A, the SSTB reduction and the W-2-wage/UBIA phase-in in Phase 31 |
 | DOC-22, DOC-23, TAX-33, TAX-34 | T3 | 29 - Equity Compensation and AMT | **FAANG employee** — all four delivered. TAX-33 closed with Form 6251 Part III: an ISO spread beside qualified dividends computes end to end |
 | DOC-24, TAX-35 | T3 | 30 - Pass-Through Income | **Startup founder** — DOC-24 delivered; TAX-35 delivers Schedule E Part II end to end and stays open for Part III and for routing the separately stated items |
 
