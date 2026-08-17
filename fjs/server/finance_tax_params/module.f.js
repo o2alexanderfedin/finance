@@ -140,7 +140,10 @@ export const knownYears = Object.keys(taxParamsResponses).map(Number)
  */
 export const financeTaxParamsTool = toolEntry(
     'finance_tax_params',
-    'Given a tax year, returns that year\'s TY parameter set — standard ' +
+    'Takes {"year": 2025} — the argument is `year`, NOT `taxYear`, which is ' +
+    'what `fjs_run` calls the same concept and what this tool names the field ' +
+    'in its own response; passing `taxYear` here returns "invalid arguments: ' +
+    'unexpected value". Returns that year\'s TY parameter set — standard ' +
     'deduction, aged/blind additional amounts, ordinary rate brackets, ' +
     'capital-gains breakpoints, and the Tax Table\'s band structure, each ' +
     'carrying its own Rev. Proc. citation — read this before authoring a ' +
