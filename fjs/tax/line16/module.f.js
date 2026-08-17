@@ -578,6 +578,116 @@ const refusingArms = [
 ]
 
 export const proof = {
+    // ── The preferential worksheet this dispatcher carries out (TAX-33) ──────
+    //
+    // WHY THIS BLOCK EXISTS. A mutation making the QDCGT arm report
+    // `{ kind: 'none' }` reddened exactly ONE leaf in the whole suite, and it
+    // was an end-to-end fixture two modules away in `fjs/form1040/core`. That
+    // is the shape AGENTS.md warns about — wiring observable only by accident,
+    // at a distance — so the field is pinned here, at the module that produces
+    // it. With this block the same mutation reddens two leaves, one of them
+    // local.
+    preferential: {
+        // Each arm reports ITSELF, and the worksheet it carries is the ONE that
+        // produced `cents`. Asserted as an identity against `cents` rather than
+        // against a second literal: that is what makes a second, divergent
+        // execution impossible to introduce silently.
+        eachArmCarriesTheWorksheetThatProducedTheCents: () => {
+            // The QDCGT arm: qualified dividends on 1040 line 3a (bullet 2c).
+            const qdcgtArm = dispatchLine16(taxParams2025)({
+                ...nothingSwitchedOn,
+                taxableIncomeCents: 25425000n,
+                qualifiedDividendsCents: 2000000n,
+            })
+            assert(qdcgtArm.kind === 'ok', ['expected a computed outcome', qdcgtArm])
+            assertEq(qdcgtArm.method, 'qdcgt')
+            assertEq(qdcgtArm.preferential.kind, 'qdcgt', 'and the worksheet says so too')
+            assert(qdcgtArm.preferential.kind === 'qdcgt', 'narrowing')
+            assertEq(
+                qdcgtArm.preferential.worksheet.line25, qdcgtArm.cents,
+                'the carried worksheet IS the one that produced line 16')
+            // Hand-typed from the FAANG return's own derivation in
+            // `fjs/form1040/core`: line 4 = $20,000.00, line 5 = $234,250.00.
+            assertEq(qdcgtArm.preferential.worksheet.line4, 2000000n, 'QDCGT line 4 = $20,000.00')
+            assertEq(
+                qdcgtArm.preferential.worksheet.line5, 23425000n, 'QDCGT line 5 = $234,250.00')
+            // The Schedule D Tax Worksheet arm: bullet 2a, Schedule D line 19
+            // non-zero.
+            const scheduleDArm = dispatchLine16(taxParams2025)({
+                ...nothingSwitchedOn,
+                taxableIncomeCents: 60000000n,
+                filingScheduleD: true,
+                scheduleD15Cents: 20000000n,
+                scheduleD16Cents: 20000000n,
+                scheduleD18Cents: 3000000n,
+                scheduleD19Cents: 5000000n,
+            })
+            assert(scheduleDArm.kind === 'ok', ['expected a computed outcome', scheduleDArm])
+            assertEq(scheduleDArm.method, 'scheduleDTaxWorksheet')
+            assertEq(scheduleDArm.preferential.kind, 'scheduleDTaxWorksheet')
+            assert(scheduleDArm.preferential.kind === 'scheduleDTaxWorksheet', 'narrowing')
+            assertEq(
+                scheduleDArm.preferential.worksheet.line47, scheduleDArm.cents,
+                'the carried worksheet IS the one that produced line 16')
+            // THE FOUR LINES Form 6251 Part III reads, and lines 14 and 21 are
+            // DIFFERENT figures on this return -- which is the whole reason both
+            // travel. Hand-derived: taxable income $600,000.00 with $200,000.00
+            // of net capital gain, of which $50,000.00 is unrecaptured §1250
+            // gain and $30,000.00 is 28%-rate gain.
+            //   line 10  the whole preferential slice          $200,000.00
+            //   line 13  200,000.00 - (30,000.00 + 50,000.00)  $120,000.00
+            //   line 14  600,000.00 - 120,000.00               $480,000.00
+            //   line 21  the larger of 400,000.00 and the
+            //            $197,300.00 breakpoint                $400,000.00
+            const { worksheet } = scheduleDArm.preferential
+            assertEq(worksheet.line10, 20000000n, 'SDTW line 10 = $200,000.00')
+            assertEq(worksheet.line13, 12000000n, 'SDTW line 13 = $120,000.00')
+            assertEq(worksheet.line14, 48000000n, 'SDTW line 14 = $480,000.00')
+            assertEq(worksheet.line21, 40000000n, 'SDTW line 21 = $400,000.00')
+            assert(
+                worksheet.line14 !== worksheet.line21,
+                ['Part III lines 20 and 27 read these two, and they differ',
+                    worksheet.line14, worksheet.line21])
+        },
+        // `'none'` IS REACHABLE, and by exactly one route: level 1's "taxable
+        // income is zero or less" gate, which returns before level 2 selects a
+        // worksheet. `fjs/form6251` refuses by name on it, so this leaf is what
+        // says that refusal is not dead code.
+        //
+        // The OTHER half is what a mutation found: a level-1 gate that reported
+        // a QDCGT worksheet it never ran passed the whole suite, because nothing
+        // asserted the NEGATIVE. So the kind is asserted here on a return whose
+        // qualified dividends are non-zero -- the only shape where "no worksheet
+        // ran" and "a worksheet could have run" come apart.
+        //
+        // Paired with its control in the same leaf: an ordinary return above the
+        // gate but below every preferential bullet ALSO reports `'none'`, and
+        // that one is the common case rather than the corner.
+        neitherWorksheetIsReportedAsSuchAndIsReachable: () => {
+            const noTaxableIncome = dispatchLine16(taxParams2025)({
+                ...nothingSwitchedOn,
+                taxableIncomeCents: 0n,
+                // Qualified dividends PRESENT, so this is not merely an empty
+                // return: the level-1 gate outranks bullet 2c, which is exactly
+                // the collision Form 6251 Part III has to refuse.
+                qualifiedDividendsCents: 2000000n,
+            })
+            assert(noTaxableIncome.kind === 'ok', ['expected ok', noTaxableIncome])
+            assertEq(noTaxableIncome.cents, 0n, 'no taxable income, no tax')
+            assertEq(
+                noTaxableIncome.preferential.kind, 'none',
+                'the level-1 gate returns before any worksheet is selected')
+            // The control: a plain wage return reports `'none'` too, and
+            // computes a real tax.
+            const ordinary = dispatchLine16(taxParams2025)({
+                ...nothingSwitchedOn,
+                taxableIncomeCents: 2530000n,
+            })
+            assert(ordinary.kind === 'ok', ['expected ok', ordinary])
+            assertEq(ordinary.preferential.kind, 'none', 'no preferential income, no worksheet')
+            assert(ordinary.cents > 0n, ['and a real tax', ordinary.cents])
+        },
+    },
     branches: {
         // The IRS's OWN printed Tax Table Example (i1040gi p68: "Mr. and
         // Mrs. Brown are filing a joint return. Their taxable income is
