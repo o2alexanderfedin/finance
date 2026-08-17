@@ -67,6 +67,9 @@ import { dialect as iraDialect, iraSchema } from '../../document/ira/module.f.js
 import { dialect as priorYearIraBasisDialect, priorYearIraBasisSchema } from '../../document/prior_year_ira_basis/module.f.js'
 import { dialect as oneZeroNineNineNecDialect, oneZeroNineNineNecSchema } from '../../document/1099nec/module.f.js'
 import { dialect as businessExpensesDialect, businessExpensesSchema } from '../../document/business_expenses/module.f.js'
+import { dialect as formThirtyNineTwentyOneDialect, formThirtyNineTwentyOneSchema } from '../../document/form3921/module.f.js'
+import { dialect as formThirtyNineTwentyTwoDialect, formThirtyNineTwentyTwoSchema } from '../../document/form3922/module.f.js'
+import { dialect as basisCorrectionDialect, basisCorrectionSchema } from '../../document/basis_correction/module.f.js'
 import { stringify as jsonText } from '../../json/module.f.js'
 
 /** @import { Type } from 'functionalscript/fjs/types/rtti/module.f.js' */
@@ -102,6 +105,9 @@ const dialectSchemas = {
     [priorYearIraBasisDialect]: priorYearIraBasisSchema,
     [oneZeroNineNineNecDialect]: oneZeroNineNineNecSchema,
     [businessExpensesDialect]: businessExpensesSchema,
+    [formThirtyNineTwentyOneDialect]: formThirtyNineTwentyOneSchema,
+    [formThirtyNineTwentyTwoDialect]: formThirtyNineTwentyTwoSchema,
+    [basisCorrectionDialect]: basisCorrectionSchema,
 }
 
 /** The known dialect tags, in declaration order — used in the refusal message. */
@@ -146,9 +152,16 @@ const knownDialects = /** @type {readonly string[]} */ (Object.keys(dialectSchem
  * Phase 27 (DOC-20/DOC-21/TAX-30) registers the SEVENTEENTH AND EIGHTEENTH
  * (`vnd.fjs.1099nec`, `vnd.fjs.business_expenses`), moving the count from 16
  * to 18 in one step, and both gained their own `*Resolves` leaf below.
+ *
+ * Phase 29 (DOC-22/DOC-23/TAX-34) registers the NINETEENTH, TWENTIETH AND
+ * TWENTY-FIRST (`vnd.fjs.form3921`, `vnd.fjs.form3922`,
+ * `vnd.fjs.basis_correction`), moving the count from 18 to 21 in one step, and
+ * all three gained their own `*Resolves` leaf below. It is the first phase to
+ * register THREE: two are the phase's own required dialects and the third is
+ * the taxpayer assertion TAX-34's basis adjustment cannot be derived without.
  * @type {number}
  */
-const expectedKnownDialectCount = 18
+const expectedKnownDialectCount = 21
 
 /**
  * `finance_schema(dialect)`: the MCP tool. Looks `dialect` up in
@@ -359,6 +372,33 @@ export const proof = {
         assertEq(
             JSON.stringify(JSON.parse(textOf(result))),
             JSON.stringify(toJsonSchema(oneZeroNineNineBSchema)),
+        )
+    },
+    // Phase 29 (DOC-22/DOC-23/TAX-34): the two equity-compensation forms
+    // neither of which is filed with the return, and the taxpayer's own basis
+    // correction. Each tag hand-typed, never read back off `dialectSchemas`.
+    formThirtyNineTwentyOneResolves: () => {
+        const result = call('vnd.fjs.form3921')
+        assertEq(result.isError, undefined)
+        assertEq(
+            JSON.stringify(JSON.parse(textOf(result))),
+            JSON.stringify(toJsonSchema(formThirtyNineTwentyOneSchema)),
+        )
+    },
+    formThirtyNineTwentyTwoResolves: () => {
+        const result = call('vnd.fjs.form3922')
+        assertEq(result.isError, undefined)
+        assertEq(
+            JSON.stringify(JSON.parse(textOf(result))),
+            JSON.stringify(toJsonSchema(formThirtyNineTwentyTwoSchema)),
+        )
+    },
+    basisCorrectionResolves: () => {
+        const result = call('vnd.fjs.basis_correction')
+        assertEq(result.isError, undefined)
+        assertEq(
+            JSON.stringify(JSON.parse(textOf(result))),
+            JSON.stringify(toJsonSchema(basisCorrectionSchema)),
         )
     },
     // An unknown dialect is a tool-level errorResult, never a throw — names
