@@ -104,6 +104,7 @@
  */
 import { assert, assertEq, assertNotNullish } from 'functionalscript/fjs/asserts/module.f.js'
 import { centsFromString, centsToString } from '../../exact/module.f.js'
+import { of, halfUp } from '../../types/rational/module.f.js'
 
 /**
  * A single parameter's own citation: the exact governing authority and the
@@ -697,6 +698,236 @@ export const childTaxCredit = {
     // Part II-A line 20's own 15% rate — same docstring, same citation
     // reasoning; a plain rate, not money.
     actcEarnedIncomeRatePercent: 15,
+}
+
+/**
+ * The FOUR qualifying-child tiers §32(b)(1)'s and §32(b)(2)(A)'s own printed
+ * tables are keyed by. Written in the order the STATUTE prints them rather
+ * than Rev. Proc. 2024-40 §2.06(1)'s (which puts "None" last), because the
+ * statute's order is ascending and an ascending list of counts is the one a
+ * reader can check against `qualifyingChildCount` without a mapping step.
+ *
+ * `'threeOrMore'` is not a count and is deliberately not spelled as one:
+ * §32(b)(1)'s own row reads *"3 or more qualifying children"*, so a fourth
+ * child changes nothing and a tier NAME that said `'three'` would invite a
+ * lookup by count that silently has no entry at four.
+ */
+export const earnedIncomeCreditChildTiers = /** @type {const} */ ([
+    'none', 'one', 'two', 'threeOrMore',
+])
+
+/** One member of {@link earnedIncomeCreditChildTiers}.
+ * @typedef {typeof earnedIncomeCreditChildTiers[number]} EarnedIncomeCreditChildTier
+ */
+
+/**
+ * One tier's five figures.
+ *
+ * **`phaseoutAmount` is keyed `marriedFilingJointly`/`other`, not by all five
+ * statuses**, and that is §32(b)(2)(B)'s own shape rather than a shortcut:
+ * the statute states ONE phaseout amount per tier and then says a joint
+ * return's is *"increased by $5,000"* (as indexed). Rev. Proc. 2024-40
+ * §2.06(1) prints exactly two rows for the same reason, and Worksheet A's
+ * line 5 asks exactly one question — *"married filing jointly"* or not. A
+ * five-status map here would be four copies of one figure, three of which
+ * nothing could ever notice drifting.
+ *
+ * This is the OPPOSITE decision from {@link additionalMedicareTaxThreshold},
+ * which hand-types a qualifying surviving spouse's own $200,000 precisely
+ * because that status does NOT share the joint figure. Here it does: Rev.
+ * Proc. 2024-40 §2.06(1)'s second row is captioned *"All other filing
+ * statuses"*, and the printed EIC Table's own column heading groups *"Single,
+ * head of household, or qualifying surviving spouse"* against *"Married
+ * filing jointly"*. The rule is the same in both places — read the printed
+ * grouping, never assume one — and it produces different answers.
+ * @typedef {{
+ *   readonly creditPercentBasisPoints: number,
+ *   readonly phaseoutPercentBasisPoints: number,
+ *   readonly earnedIncomeAmount: AmountWithCitation,
+ *   readonly maximumCredit: AmountWithCitation,
+ *   readonly phaseoutAmount: {
+ *     readonly marriedFilingJointly: AmountWithCitation,
+ *     readonly other: AmountWithCitation,
+ *   },
+ * }} EarnedIncomeCreditTier
+ */
+
+/**
+ * §32's own parameters — TAX-27, Phase 32. Read by `fjs/schedule/eic`.
+ *
+ * ## Two sources, and neither is guessed
+ *
+ * - **The percentages are STATUTORY and NOT indexed.** §32(b)(1) prints a
+ *   four-row table of credit and phaseout percentages — 34/15.98, 40/21.06,
+ *   45/21.06 and 7.65/7.65 — and §32(j) indexes *"each of the dollar amounts
+ *   in subsections (b)(2) and (i)(1)"*, which is the amounts and not the
+ *   percentages. So they cite `kind: 'code'` at §32(b)(1), for the same
+ *   reason {@link additionalMedicareTaxRates} does: there is no annual revenue
+ *   procedure to cite and inventing one would be the sourcing error this
+ *   module's own header exists to prevent.
+ * - **Every dollar figure IS indexed**, by §32(j), and comes from Rev. Proc.
+ *   2024-40 §2.06 — read off the published PDF, not recalled. §2.06(1)'s
+ *   table supplies the earned income amount, the maximum credit and both
+ *   phaseout amounts per tier; §2.06(2) supplies {@link investmentIncomeLimit}.
+ *
+ * ## BASIS POINTS, not `ratePercent`, for all eight percentages
+ *
+ * 15.98, 21.06 and 7.65 are not whole numbers of percent, and none of
+ * `0.1598`, `0.2106` or `0.0765` is exact as an IEEE 754 double — the same
+ * argument {@link additionalMedicareTaxRates} states in full. 34, 40 and 45
+ * ARE whole, and are stored in basis points anyway: a group where six fields
+ * are basis points and two are percent is a group where a reader has to check
+ * the units at every call site, and `fjs/schedule/eic` walks all four tiers
+ * through one expression.
+ *
+ * ## What is deliberately NOT stored: the completed phaseout amount
+ *
+ * Rev. Proc. 2024-40 §2.06(1) prints a *"Completed Phaseout Amount"* row —
+ * $19,104/$50,434/$57,310/$61,555 and $26,214/$57,554/$64,430/$68,675 — and
+ * every one of the eight is DERIVABLE from the three figures above it:
+ * `phaseoutAmount + maximumCredit / phaseoutPercent`, to the nearest dollar.
+ * Storing it would be a second source of truth able to disagree with the
+ * figures the computation actually reads — exactly the position
+ * {@link studentLoanInterestDeduction} takes on its own phase-out end point.
+ * `earnedIncomeCreditCompletedPhaseoutAmountsMatchTheRevenueProcedure`
+ * asserts the DERIVED eight against the eight hand-typed published figures
+ * instead, which is the check a ninth and tenth stored field would have made
+ * impossible.
+ *
+ * {@link maximumCredit} IS stored even though it too looks derivable, and the
+ * difference is that it is not: the printed EIC Table is built on the ROUNDED
+ * dollar figure. For the childless tier the exact product is
+ * $8,490 x 7.65% = $649.485 and the table's phase-out column is computed from
+ * $649 — a band whose entry the exact product would put one dollar higher.
+ * See `fjs/schedule/eic`'s own docstring, which reproduces the two rows that
+ * settle it. `earnedIncomeCreditMaximumCreditIsTheRoundedProduct` asserts the
+ * stored figure against the rounded product, so a transcription slip in
+ * either the percentage or the earned income amount still fails.
+ *
+ * ## `bandWidth` is a parameter, not a constant in the reader
+ *
+ * §32(f)(1) makes the credit *"determined under tables prescribed by the
+ * Secretary"* and §32(f)(2) fixes those tables' brackets at *"not greater
+ * than $50 each"*. The width is therefore a figure with a citation, like
+ * every other figure here, and `fjs/schedule/eic` reads it rather than
+ * spelling `5000n` inline.
+ * @type {{
+ *   readonly investmentIncomeLimit: AmountWithCitation,
+ *   readonly bandWidth: AmountWithCitation,
+ *   readonly percentagesCitation: Citation,
+ *   readonly tiers: Record<EarnedIncomeCreditChildTier, EarnedIncomeCreditTier>,
+ * }}
+ */
+export const earnedIncomeCredit = {
+    // §32(i)(1)'s $10,000, indexed by §32(j)(1) from calendar year 2020.
+    investmentIncomeLimit: {
+        amount: '11950.00',
+        citation: { kind: 'revProc', revProc: '2024-40', section: '§2.06(2)', effectiveDate: '2025-01-01' },
+    },
+    bandWidth: {
+        amount: '50.00',
+        citation: { kind: 'code', section: '§32(f)(2)', effectiveDate: '2025-01-01' },
+    },
+    // ONE citation for the eight percentages, because §32(b)(1) is one printed
+    // table with one row per tier — the same shape, for the same reason, as
+    // {@link additionalMedicareTaxRates}' shared §3101(b) citation.
+    percentagesCitation: { kind: 'code', section: '§32(b)(1)', effectiveDate: '2025-01-01' },
+    tiers: {
+        none: {
+            creditPercentBasisPoints: 765,
+            phaseoutPercentBasisPoints: 765,
+            earnedIncomeAmount: {
+                amount: '8490.00',
+                citation: { kind: 'revProc', revProc: '2024-40', section: '§2.06(1)', effectiveDate: '2025-01-01' },
+            },
+            maximumCredit: {
+                amount: '649.00',
+                citation: { kind: 'revProc', revProc: '2024-40', section: '§2.06(1)', effectiveDate: '2025-01-01' },
+            },
+            phaseoutAmount: {
+                marriedFilingJointly: {
+                    amount: '17730.00',
+                    citation: { kind: 'revProc', revProc: '2024-40', section: '§2.06(1)', effectiveDate: '2025-01-01' },
+                },
+                other: {
+                    amount: '10620.00',
+                    citation: { kind: 'revProc', revProc: '2024-40', section: '§2.06(1)', effectiveDate: '2025-01-01' },
+                },
+            },
+        },
+        one: {
+            creditPercentBasisPoints: 3400,
+            phaseoutPercentBasisPoints: 1598,
+            earnedIncomeAmount: {
+                amount: '12730.00',
+                citation: { kind: 'revProc', revProc: '2024-40', section: '§2.06(1)', effectiveDate: '2025-01-01' },
+            },
+            maximumCredit: {
+                amount: '4328.00',
+                citation: { kind: 'revProc', revProc: '2024-40', section: '§2.06(1)', effectiveDate: '2025-01-01' },
+            },
+            phaseoutAmount: {
+                marriedFilingJointly: {
+                    amount: '30470.00',
+                    citation: { kind: 'revProc', revProc: '2024-40', section: '§2.06(1)', effectiveDate: '2025-01-01' },
+                },
+                other: {
+                    amount: '23350.00',
+                    citation: { kind: 'revProc', revProc: '2024-40', section: '§2.06(1)', effectiveDate: '2025-01-01' },
+                },
+            },
+        },
+        two: {
+            creditPercentBasisPoints: 4000,
+            phaseoutPercentBasisPoints: 2106,
+            earnedIncomeAmount: {
+                amount: '17880.00',
+                citation: { kind: 'revProc', revProc: '2024-40', section: '§2.06(1)', effectiveDate: '2025-01-01' },
+            },
+            maximumCredit: {
+                amount: '7152.00',
+                citation: { kind: 'revProc', revProc: '2024-40', section: '§2.06(1)', effectiveDate: '2025-01-01' },
+            },
+            phaseoutAmount: {
+                marriedFilingJointly: {
+                    amount: '30470.00',
+                    citation: { kind: 'revProc', revProc: '2024-40', section: '§2.06(1)', effectiveDate: '2025-01-01' },
+                },
+                other: {
+                    amount: '23350.00',
+                    citation: { kind: 'revProc', revProc: '2024-40', section: '§2.06(1)', effectiveDate: '2025-01-01' },
+                },
+            },
+        },
+        // Hand-typed in full, deliberately never spread from `two` — §32(b)(1)
+        // gives the two tiers the SAME phaseout percentage and §32(b)(2)(A)
+        // the SAME earned income amount, which is exactly the coincidence
+        // {@link standardDeduction}'s own note says a spread makes impossible
+        // to observe drifting apart. The credit percentage and the maximum
+        // credit differ, and a future year could move any of them.
+        threeOrMore: {
+            creditPercentBasisPoints: 4500,
+            phaseoutPercentBasisPoints: 2106,
+            earnedIncomeAmount: {
+                amount: '17880.00',
+                citation: { kind: 'revProc', revProc: '2024-40', section: '§2.06(1)', effectiveDate: '2025-01-01' },
+            },
+            maximumCredit: {
+                amount: '8046.00',
+                citation: { kind: 'revProc', revProc: '2024-40', section: '§2.06(1)', effectiveDate: '2025-01-01' },
+            },
+            phaseoutAmount: {
+                marriedFilingJointly: {
+                    amount: '30470.00',
+                    citation: { kind: 'revProc', revProc: '2024-40', section: '§2.06(1)', effectiveDate: '2025-01-01' },
+                },
+                other: {
+                    amount: '23350.00',
+                    citation: { kind: 'revProc', revProc: '2024-40', section: '§2.06(1)', effectiveDate: '2025-01-01' },
+                },
+            },
+        },
+    },
 }
 
 /**
@@ -2097,6 +2328,7 @@ export const alternativeMinimumTax = {
  *   readonly saltCap: typeof saltCap,
  *   readonly medicalExpenseFloor: typeof medicalExpenseFloor,
  *   readonly childTaxCredit: typeof childTaxCredit,
+ *   readonly earnedIncomeCredit: typeof earnedIncomeCredit,
  *   readonly additionalMedicareTaxThreshold: typeof additionalMedicareTaxThreshold,
  *   readonly additionalMedicareTaxRates: typeof additionalMedicareTaxRates,
  *   readonly netInvestmentIncomeTaxThreshold: typeof netInvestmentIncomeTaxThreshold,
@@ -2135,6 +2367,7 @@ export const taxParamsByYear = {
         saltCap,
         medicalExpenseFloor,
         childTaxCredit,
+        earnedIncomeCredit,
         additionalMedicareTaxThreshold,
         additionalMedicareTaxRates,
         netInvestmentIncomeTaxThreshold,
@@ -2943,6 +3176,110 @@ export const proof = {
                 ['threshold + range must equal §221(b)(2)(B)\'s completely-phased-out figure', status],
             )
         }
+    },
+    // ── TAX-27, Phase 32: §32's own three independent checks ────────────────
+    //
+    // The Revenue Procedure prints SIX rows per tier and this module stores
+    // FOUR of them. The two it does not store are the two these leaves
+    // recompute — which is the whole point: a figure that is stored cannot
+    // check the figure it was transcribed beside, and a figure that is derived
+    // can. Every expected value below is hand-typed off Rev. Proc. 2024-40
+    // §2.06(1)'s printed table, never read back out of `earnedIncomeCredit`.
+    earnedIncomeCreditMaximumCreditIsTheRoundedProduct: () => {
+        /** @type {readonly (readonly [EarnedIncomeCreditChildTier, string])[]} */
+        const expected = [
+            // §32(b)(1) x §32(b)(2)(A), to the nearest dollar:
+            //   none        $8,490 x  7.65% =   $649.485 -> $649
+            //   one        $12,730 x 34%    = $4,328.20  -> $4,328
+            //   two        $17,880 x 40%    = $7,152.00  -> $7,152
+            //   threeOrMore $17,880 x 45%   = $8,046.00  -> $8,046
+            ['none', '649.00'],
+            ['one', '4328.00'],
+            ['two', '7152.00'],
+            ['threeOrMore', '8046.00'],
+        ]
+        assertEq(expected.length, 4, '§32(b)(1) prints exactly four tiers')
+        for (const [name, printed] of expected) {
+            const tier = earnedIncomeCredit.tiers[name]
+            // To the nearest DOLLAR, not the nearest cent: the divisor is
+            // 10,000 (basis points) x 100 (cents in a dollar), and the whole
+            // dollars are multiplied back up to cents. $649.485 is the case
+            // that distinguishes the two -- to the cent it is $649.49, and the
+            // printed maximum credit is $649.
+            const product = halfUp(of(
+                centsFromString(tier.earnedIncomeAmount.amount)
+                * BigInt(tier.creditPercentBasisPoints))(1000000n)) * 100n
+            assertEq(
+                centsToString(product), printed,
+                ['the credit percentage of the earned income amount, rounded, must be the printed maximum credit', name])
+            assertEq(
+                tier.maximumCredit.amount, printed,
+                ['the STORED maximum credit must be the same figure', name])
+        }
+    },
+    // Rev. Proc. 2024-40 §2.06(1)'s "Completed Phaseout Amount" rows, both of
+    // them, hand-typed and asserted against a figure DERIVED from the three
+    // stored ones -- see {@link earnedIncomeCredit}'s "What is deliberately
+    // NOT stored". Eight independent statements, and a slip in any of the
+    // twelve stored figures they are built from fails at least one.
+    earnedIncomeCreditCompletedPhaseoutAmountsMatchTheRevenueProcedure: () => {
+        /** @type {readonly (readonly [EarnedIncomeCreditChildTier, string, string])[]} */
+        const expected = [
+            // tier          married filing jointly   all other filing statuses
+            ['none', '26214.00', '19104.00'],
+            ['one', '57554.00', '50434.00'],
+            ['two', '64430.00', '57310.00'],
+            ['threeOrMore', '68675.00', '61555.00'],
+        ]
+        assertEq(expected.length, 4, '§2.06(1) prints exactly four tiers')
+        for (const [name, joint, other] of expected) {
+            const tier = earnedIncomeCredit.tiers[name]
+            // maximumCredit / phaseoutPercent, to the nearest CENT, then the
+            // phaseout amount added and the sum taken to the nearest DOLLAR --
+            // which is the rounding the printed figures carry (they are whole
+            // dollars, and $19,103.66 prints as $19,104).
+            const span = halfUp(of(
+                centsFromString(tier.maximumCredit.amount) * 10000n)(
+                BigInt(tier.phaseoutPercentBasisPoints)))
+            /** @type {readonly (readonly [string, AmountWithCitation])[]} */
+            const both = [
+                [joint, tier.phaseoutAmount.marriedFilingJointly],
+                [other, tier.phaseoutAmount.other],
+            ]
+            for (const [printed, start] of both) {
+                const wholeDollars = halfUp(of(centsFromString(start.amount) + span)(100n)) * 100n
+                assertEq(
+                    centsToString(wholeDollars), printed,
+                    ['phaseout amount + maximum credit / phaseout percentage must equal the printed completed phaseout amount', name, printed])
+            }
+        }
+    },
+    // The percentages are §32(b)(1)'s own and are NOT indexed -- the same
+    // check, for the same reason, as `studentLoanInterestFiguresCiteIrc221Only`
+    // one group down, and the opposite of the dollar figures beside them.
+    // Hand-typed basis points, never read back off the tier they describe.
+    earnedIncomeCreditPercentagesAreTheStatutoryOnes: () => {
+        /** @type {readonly (readonly [EarnedIncomeCreditChildTier, number, number])[]} */
+        const expected = [
+            ['none', 765, 765],
+            ['one', 3400, 1598],
+            ['two', 4000, 2106],
+            ['threeOrMore', 4500, 2106],
+        ]
+        assertEq(expected.length, 4)
+        for (const [name, credit, phaseout] of expected) {
+            const tier = earnedIncomeCredit.tiers[name]
+            assertEq(tier.creditPercentBasisPoints, credit, ['§32(b)(1) credit percentage', name])
+            assertEq(tier.phaseoutPercentBasisPoints, phaseout, ['§32(b)(1) phaseout percentage', name])
+        }
+        assertEq(earnedIncomeCredit.percentagesCitation.kind, 'code')
+        assertEq(earnedIncomeCredit.percentagesCitation.section, '§32(b)(1)')
+        // The two figures §32(j) DOES index, and §32(f)(2)'s bracket width,
+        // which it does not.
+        assertEq(earnedIncomeCredit.investmentIncomeLimit.amount, '11950.00')
+        assertEq(earnedIncomeCredit.bandWidth.amount, '50.00')
+        assertEq(earnedIncomeCredit.bandWidth.citation.section, '§32(f)(2)')
+        assertEq(earnedIncomeCreditChildTiers.length, 4)
     },
     // TAX-23: §221 is INDEXED (§221(f)), unlike §3101(b)(2) and §1411(b) one
     // parameter group up, whose own docstrings say at length that nothing
