@@ -288,6 +288,7 @@ const totalLine = rule => lines => ({
  *   readonly itemizing: boolean,
  *   readonly scheduleALine7Cents: bigint,
  *   readonly scheduleOneALine37Cents: bigint,
+ *   readonly specifiedPrivateActivityBondInterestCents: bigint,
  *   readonly standardDeductionCents: bigint,
  *   readonly isoExerciseForms: readonly Stored<FormThirtyNineTwentyOne>[],
  *   readonly aStoredNineteenNineBReportsASale: boolean,
@@ -363,6 +364,7 @@ export const scheduleTwo = taxParamSet => input => {
         selfEmployment,
         qualifiedDividends, totalDeductions, regularTax,
         itemizing, scheduleALine7Cents, scheduleOneALine37Cents, standardDeductionCents,
+        specifiedPrivateActivityBondInterestCents,
         isoExerciseForms, aStoredNineteenNineBReportsASale,
         filingScheduleD, scheduleD15Cents, scheduleD16Cents,
     } = input
@@ -397,6 +399,7 @@ export const scheduleTwo = taxParamSet => input => {
         adjustedGrossIncomeCents: adjustedGrossIncome.value,
         totalDeductionsCents: totalDeductions.value,
         scheduleOneALine37Cents,
+        specifiedPrivateActivityBondInterestCents,
         itemizing,
         scheduleALine7Cents,
         standardDeductionCents,
@@ -654,6 +657,7 @@ const noSelfEmployment = selfEmploymentInput(
 const noAmounts = {
     profile: profileNoDeclaredKinds,
     status: 'single',
+    specifiedPrivateActivityBondInterestCents: 0n,
     medicareWages: inputLine('box5MedicareWagesAndTips')(0n),
     medicareTaxWithheld: inputLine('box6MedicareTaxWithheld')(0n),
     taxableInterest: inputLine('line2b')(0n),

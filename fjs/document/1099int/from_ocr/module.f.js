@@ -45,10 +45,17 @@ import { dialect, validate } from '../module.f.js'
 /** @import { OneZeroNineNineInt } from '../module.f.js' */
 
 /**
- * The printed-label -> schema-field mapping for the six money boxes this
- * MVP models, written once and walked in a loop rather than as six
+ * The printed-label -> schema-field mapping for the seven money boxes this
+ * MVP models, written once and walked in a loop rather than as seven
  * near-identical branches. The labels are the strings a vision pass emits
  * for a US 1099-INT; the field names are `vnd.fjs.1099int`'s own.
+ *
+ * **Box 9 is here because a box no conversion reads is a box no return can
+ * ever carry.** `vnd.fjs.1099int` models box 9 and `fjs/form6251` reads it into
+ * line 2g, but every stored 1099-INT in this project arrives through this one
+ * function — so omitting the label would have left the §57(a)(5) preference
+ * modeled, wired, and permanently zero for every document the product path can
+ * produce.
  */
 const boxLabels = /** @type {const} */ ([
     ['Box 1 Interest income', 'box1InterestIncome'],
@@ -57,10 +64,11 @@ const boxLabels = /** @type {const} */ ([
     ['Box 4 Federal income tax withheld', 'box4FederalIncomeTaxWithheld'],
     ['Box 6 Foreign tax paid', 'box6ForeignTaxPaid'],
     ['Box 8 Tax-exempt interest', 'box8TaxExemptInterest'],
+    ['Box 9 Specified private activity bond interest', 'box9SpecifiedPrivateActivityBondInterest'],
 ])
 
 /**
- * The six schema field names {@link boxLabels} maps onto.
+ * The seven schema field names {@link boxLabels} maps onto.
  * @typedef {(typeof boxLabels)[number][1]} BoxKey
  */
 
@@ -167,11 +175,17 @@ export const proof = {
     // ── T-09-08-01: the most consequential coverage gap the mutation sweep
     // found. Every OTHER proof in this file uses only Box 1, Box 4 and Box 8
     // — no proof anywhere exercised Box 2 or Box 3, so swapping their
-    // `boxLabels` targets left the suite fully green. Every one of the six
+    // `boxLabels` targets left the suite fully green. Every one of the seven
     // boxes gets its own DISTINCT, non-round value here, and each field is
     // asserted separately (never one aggregate comparison), so a
     // transposition of any two boxes names both fields involved instead of
     // failing silently.
+    //
+    // Box 9's value is deliberately BELOW box 8's, because box 9 is a subset
+    // of box 8 and `vnd.fjs.1099int`'s own `checkReferences` refuses the
+    // reverse — `boxNineIsTransportedAndSatisfiesTheSubsetInvariant` below is
+    // where that invariant is exercised against a converted document, in both
+    // directions.
     everyBoxMapsToItsOwnDistinctField: () => {
         const result = convert(
             ocrOf({
@@ -181,6 +195,7 @@ export const proof = {
                 'Box 4 Federal income tax withheld': '444.44',
                 'Box 6 Foreign tax paid': '555.55',
                 'Box 8 Tax-exempt interest': '666.66',
+                'Box 9 Specified private activity bond interest': '123.45',
             }),
             meta)
         assertEq(result.box1InterestIncome, '111.11')
@@ -189,6 +204,38 @@ export const proof = {
         assertEq(result.box4FederalIncomeTaxWithheld, '444.44')
         assertEq(result.box6ForeignTaxPaid, '555.55')
         assertEq(result.box8TaxExemptInterest, '666.66')
+        assertEq(result.box9SpecifiedPrivateActivityBondInterest, '123.45')
+    },
+
+    // Box 9's own transported reading, end to end: a COMMA-GROUPED printed
+    // amount becomes the canonical string the schema stores, and the whole
+    // document then passes the dialect's own validator including the box 9 ≤
+    // box 8 invariant. Asserted separately from the transposition leaf above
+    // because that one proves box 9 lands in the right FIELD and this one
+    // proves the conversion chain and the invariant agree on it.
+    boxNineIsTransportedAndSatisfiesTheSubsetInvariant: () => {
+        const result = convert(
+            ocrOf({
+                'Box 8 Tax-exempt interest': '12,000.00',
+                'Box 9 Specified private activity bond interest': '4,500.00',
+            }),
+            meta)
+        assertEq(result.box8TaxExemptInterest, '12000.00')
+        assertEq(result.box9SpecifiedPrivateActivityBondInterest, '4500.00')
+        const [t, v] = validate(result)
+        assert(t === 'ok', ['a box 9 inside box 8 must validate', t, v])
+        // …and a transcription whose box 9 EXCEEDS box 8 converts perfectly
+        // well — the conversion's job is transport, not judgement — and is
+        // then refused by the dialect. That division of labour is the claim:
+        // one conversion path, one place the invariant lives.
+        const inconsistent = convert(
+            ocrOf({
+                'Box 8 Tax-exempt interest': '4,500.00',
+                'Box 9 Specified private activity bond interest': '12,000.00',
+            }),
+            meta)
+        assertEq(inconsistent.box9SpecifiedPrivateActivityBondInterest, '12000.00')
+        assertEq(validate(inconsistent)[0], 'error')
     },
 
     // ── Success Criterion 4, leaf 2 — DOC-11: blank is not zero ─────────

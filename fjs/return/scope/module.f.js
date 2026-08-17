@@ -507,6 +507,11 @@ export const modeledKinds = /** @type {const} */ ([
     'estimatedTaxPayments',        // declared on the return profile -> 1040 line 26
     'additionalChildTaxCredit',    // Schedule 8812 Part II-A       -> 1040 line 28
     'americanOpportunityCredit',   // Form 8863 line 8              -> 1040 line 29
+    // Reclassified the moment `vnd.fjs.1099int` gained box 9. Its refusal row
+    // had called itself "the SHARPEST gap on Form 6251 and the only one where
+    // the missing figure is a printed box on a dialect this engine already
+    // stores" -- and said adding box 9 "would close it outright". It did.
+    'amtPrivateActivityBondInterest', // 1099-INT box 9 -> Form 6251 line 2g -> 1040 line 17
 ])
 
 /** One member of {@link modeledKinds}.
@@ -756,7 +761,6 @@ export const unmodeledKindRefusals = /** @type {const} */ ([
     // names its Form 6251 line alongside the line it already named.
     { kind: 'amtDepletion', line: 'Form 6251 line 2d -> Schedule 2 line 2 -> 1040 line 17', label: 'the alternative minimum tax depletion adjustment', remedy: 'requires the depletion deduction refigured under §57(a)(1) with AMT income and deductions, and with the §611 deduction limited to the property\'s AMT-adjusted basis — a per-property computation for which this engine holds no document at all (no phase yet)' },
     { kind: 'amtNetOperatingLossDeduction', line: 'Form 6251 lines 2e and 2f -> Schedule 2 line 2 -> 1040 line 17', label: 'the net operating loss add-back and the alternative tax net operating loss deduction', remedy: 'requires the ATNOL: every prior year\'s loss refigured under the AMT rules, limited to 90% of alternative minimum taxable income figured without it. That is a multi-year history this engine does not hold, and Schedule 1 line 8a — the regular deduction line 2e adds back — is itself the refused `otherIncome` kind. ONE kind covers both printed lines because they are two halves of one fact: 2e removes the regular deduction and 2f allows the AMT one in its place (no phase yet)' },
-    { kind: 'amtPrivateActivityBondInterest', line: 'Form 6251 line 2g -> Schedule 2 line 2 -> 1040 line 17', label: 'interest from specified private activity bonds', remedy: 'requires Form 1099-INT box 9, "Specified private activity bond interest", which vnd.fjs.1099int does not model. This is the SHARPEST gap on Form 6251 and the only one where the missing figure is a printed box on a dialect this engine already stores: box 9 is a SUBSET of box 8, which this engine does read into 1040 line 2a, so a filer holding municipal bonds has tax-exempt interest computed correctly for the regular tax and a §57(a)(5) preference that cannot be seen at all. Adding box 9 to vnd.fjs.1099int would close it outright (no phase yet)' },
     { kind: 'amtEstatesAndTrusts', line: 'Form 6251 line 2j -> Schedule 2 line 2 -> 1040 line 17', label: 'the alternative minimum tax adjustment from an estate or trust', remedy: 'requires Schedule K-1 (Form 1041) box 12 code A, and this engine models no Form 1041 K-1 at all — DOC-24 (Phase 30) brings the partnership and S-corporation K-1s, not the fiduciary one (no phase yet)' },
     { kind: 'amtDispositionOfProperty', line: 'Form 6251 line 2k -> Schedule 2 line 2 -> 1040 line 17', label: 'the difference between the AMT and regular-tax gain or loss on a disposition', remedy: 'requires the taxpayer\'s AMT BASIS in the property disposed of, which differs from the regular-tax basis by every adjustment made in every prior year — most commonly the §56(b)(3) incentive stock option spread, which increases AMT basis in the year of exercise and reduces the AMT gain whenever the shares are later sold. This engine computes that spread (Form 6251 line 2i) but cannot carry it forward: it holds no prior-year AMT basis document, and Form 3921 is issued for the exercise year only (no phase yet)' },
     { kind: 'amtDepreciation', line: 'Form 6251 line 2l -> Schedule 2 line 2 -> 1040 line 17', label: 'the depreciation adjustment on assets placed in service after 1986', remedy: 'requires §56(a)(1)\'s alternative depreciation for every depreciable asset — a per-asset basis, method and placed-in-service date this engine holds for nothing, since vnd.fjs.business_expenses records Schedule C line totals rather than an asset register (no phase yet)' },
@@ -1302,7 +1306,7 @@ export const classifyScope = declaredKinds => {
  * and `fjs/form8995` wiring that makes all three computable.
  * @type {number}
  */
-const expectedModeledKindCount = 35
+const expectedModeledKindCount = 36
 
 /**
  * The modeled set, hand-typed a SECOND time and in {@link kindVocabulary}'s
@@ -1355,6 +1359,7 @@ const everyModeledKindHandTyped = [
     'estimatedTaxPayments',
     'additionalChildTaxCredit',
     'americanOpportunityCredit',
+    'amtPrivateActivityBondInterest',
 ]
 
 /**
@@ -1435,7 +1440,7 @@ const everyModeledKindHandTyped = [
  * that makes it computable.
  * @type {number}
  */
-const expectedUnmodeledKindCount = 79
+const expectedUnmodeledKindCount = 78
 
 /**
  * The complete refusal message for a return declaring exactly
@@ -1843,13 +1848,11 @@ export const proof = {
         // 2a and 2i COMPUTE, 2b is a computed zero (see the leaf below), and
         // 2c and 2h are named by `investmentInterestForm4952` and
         // `section1202Gain`, which already existed.
-        theFifteenFormSixTwoFiveOneKindsNameTheirOwnPrintedLine: () => {
+        theFourteenFormSixTwoFiveOneKindsStillRefusingNameTheirOwnPrintedLine: () => {
             /** @type {readonly (readonly [Kind, string])[]} */
             const expected = [
                 ['amtDepletion', 'Form 6251 line 2d'],
-                ['amtNetOperatingLossDeduction', 'Form 6251 lines 2e and 2f'],
-                ['amtPrivateActivityBondInterest', 'Form 6251 line 2g'],
-                ['amtEstatesAndTrusts', 'Form 6251 line 2j'],
+                ['amtNetOperatingLossDeduction', 'Form 6251 lines 2e and 2f'],                ['amtEstatesAndTrusts', 'Form 6251 line 2j'],
                 ['amtDispositionOfProperty', 'Form 6251 line 2k'],
                 ['amtDepreciation', 'Form 6251 line 2l'],
                 ['amtPassiveActivities', 'Form 6251 line 2m'],
@@ -1862,7 +1865,12 @@ export const proof = {
                 ['amtIntangibleDrillingCosts', 'Form 6251 line 2t'],
                 ['amtOtherAdjustments', 'Form 6251 line 3'],
             ]
-            assertEq(expected.length, 15, 'fifteen kinds, hand-counted off the printed Form 6251')
+            // FOURTEEN, not the fifteen Phase 29 wrote. `kindVocabulary` still
+            // carries fifteen `amt*` kinds -- the assertion further down still
+            // says so -- but one of them, `amtPrivateActivityBondInterest`, is
+            // now MODELED, so it has no refusal row for this table to name.
+            // The two counts measure different things and must not be unified.
+            assertEq(expected.length, 14, 'fourteen still-refusing kinds, hand-counted off the printed Form 6251')
             // Every one is in the vocabulary, in the order listed -- read from
             // `kindVocabulary`, which this module does not own.
             expected
@@ -1947,7 +1955,7 @@ export const proof = {
             // would have been the other way to handle it and would have
             // refused every return with a state tax refund. Counted rather
             // than named, so a kind added for ANY Part I line without a leaf
-            // in `theFifteenFormSixTwoFiveOneKindsNameTheirOwnPrintedLine`
+            // in `theFourteenFormSixTwoFiveOneKindsStillRefusingNameTheirOwnPrintedLine`
             // reddens here too.
             assertEq(
                 kindVocabulary.filter(kind => kind.startsWith('amt')).length,
@@ -2134,7 +2142,7 @@ export const proof = {
         // other, and a kind added to one of them alone reddens.
         everyModeledKindDeclaredTogetherIsInScope: () => {
             const outcome = classifyScope(everyModeledKindHandTyped)
-            assertEq(outcome.kind, 'ok', ['the thirty modeled kinds must be in scope', outcome])
+            assertEq(outcome.kind, 'ok', ['every modeled kind must be in scope when declared together', outcome])
         },
         theHandTypedListNamesEveryModeledKind: () => {
             assertEq(
@@ -2444,7 +2452,7 @@ export const proof = {
             //
             // The ten above are what still refuses on this schedule. The AMT's
             // own assertions move to `fjs/form6251` and to
-            // `theFifteenFormSixTwoFiveOneKindsNameTheirOwnPrintedLine`, where
+            // `theFourteenFormSixTwoFiveOneKindsStillRefusingNameTheirOwnPrintedLine`, where
             // fifteen NEW Schedule-2-line-2 kinds refuse by name — so this
             // schedule's refusal surface grew in the same phase its most
             // prominent refusal was computed away.

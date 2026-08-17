@@ -523,6 +523,7 @@ const storedFilingStatusNamed = status =>
  *   readonly scheduleD18Cents: bigint,
  *   readonly scheduleD19Cents: bigint,
  *   readonly selfEmployment: SelfEmploymentOutcome,
+ *   readonly specifiedPrivateActivityBondInterest: ReportLine,
  * }} Form1040IncomeLines
  */
 
@@ -679,6 +680,19 @@ export const form1040IncomeLines = taxParamSet => inputs => {
     const line2a = fromDocuments('1040 line 2a')(
         sumBoxOverDocuments(interestForms)('box8TaxExemptInterest')(
             form => form.box8TaxExemptInterest))
+    // Box 9, the §57(a)(5) private-activity slice of box 8, summed here and
+    // NOWHERE ELSE. It reaches Form 6251 line 2g through Schedule 2 and has no
+    // other reader in the engine.
+    //
+    // **It must never join a regular-tax line.** Box 9 is a SUBSET of box 8,
+    // which line 2a above already sums, so adding it anywhere in Parts I or II
+    // would count the same interest twice — and §103(a) excludes every cent of
+    // it from gross income regardless, which is why the AMT is the only place
+    // it can appear. `proof.privateActivityBonds.lineTwoAIsUnmovedByBoxNine`
+    // is the assertion that keeps this true rather than merely intended.
+    const specifiedPrivateActivityBondInterest = fromDocuments('Form 6251 line 2g')(
+        sumBoxOverDocuments(interestForms)('box9SpecifiedPrivateActivityBondInterest')(
+            form => form.box9SpecifiedPrivateActivityBondInterest))
     const line2b = fromDocuments('1040 line 2b')(addBoxSums(
         sumBoxOverDocuments(interestForms)('box1InterestIncome')(
             form => form.box1InterestIncome))(
@@ -1278,6 +1292,11 @@ export const form1040IncomeLines = taxParamSet => inputs => {
         // deducted half of. A dispatcher INPUT, never a printed line -- the
         // same category as the four `scheduleD*Cents` fields above it.
         selfEmployment: scheduleOneStageOne.selfEmployment,
+        // 1099-INT box 9, for Form 6251 line 2g. A dispatcher INPUT and NOT a
+        // printed 1040 line -- §103(a) keeps every cent of it out of gross
+        // income, so no line of Parts I or II may carry it. Same category as
+        // `selfEmployment` and the four `scheduleD*Cents` fields above.
+        specifiedPrivateActivityBondInterest,
     }
 }
 
@@ -1617,6 +1636,9 @@ const form1040TaxAndPaymentLines = taxParamSet => inputs => income => {
         // `income.line11b` above, so a second execution here would be pricing
         // a return the first one changed.
         selfEmployment: income.selfEmployment,
+        // Form 6251 line 2g. Summed once at line 2a's site off the SAME
+        // `form1040IncomeLines` execution, never re-read here.
+        specifiedPrivateActivityBondInterestCents: income.specifiedPrivateActivityBondInterest.value,
         // Phase 29 (TAX-33): everything Form 6251 reads. The AMT recomputes
         // taxable income from scratch, so it needs the deduction total, the
         // deduction's COMPOSITION (which of Schedule A line 7 and line 12e
@@ -2197,7 +2219,7 @@ const expectedIncomeLineCount = 31
  * so the `Exclude<>` below is what turns forgetting one of them into a
  * compile error rather than a crash on a missing `.sources` — which is
  * exactly what it did when this phase first added them.
- * @type {readonly Exclude<keyof Form1040IncomeLines, 'kind' | 'filingScheduleD' | 'scheduleD15Cents' | 'scheduleD16Cents' | 'scheduleD18Cents' | 'scheduleD19Cents' | 'selfEmployment' | 'itemizing' | 'scheduleALine7Cents' | 'scheduleOneALine37Cents'>[]}
+ * @type {readonly Exclude<keyof Form1040IncomeLines, 'kind' | 'filingScheduleD' | 'scheduleD15Cents' | 'scheduleD16Cents' | 'scheduleD18Cents' | 'scheduleD19Cents' | 'selfEmployment' | 'specifiedPrivateActivityBondInterest' | 'itemizing' | 'scheduleALine7Cents' | 'scheduleOneALine37Cents'>[]}
  */
 const incomeLineFieldNames = /** @type {const} */ ([
     'line1a', 'line1b', 'line1c', 'line1d', 'line1e', 'line1f', 'line1g', 'line1h', 'line1i', 'line1z',
@@ -2373,6 +2395,7 @@ const w2WithMedicareBoxes = documentHash => amount => box6MedicareTaxWithheld =>
  *   readonly box3UsSavingsBondsAndTreasuryInterest?: string,
  *   readonly box4FederalIncomeTaxWithheld?: string,
  *   readonly box8TaxExemptInterest?: string,
+ *   readonly box9SpecifiedPrivateActivityBondInterest?: string,
  * }} InterestBoxes
  */
 
@@ -4611,6 +4634,74 @@ export const proof = {
                     ['Form 8995 line 12 must equal QDCGT lines 2 + 3', filingScheduleD, d15, d16],
                 )
             }
+        },
+    },
+    // ── 1099-INT box 9: the §57(a)(5) preference, and the double count it
+    //    would be if any regular-tax line read it ────────────────────────────
+    privateActivityBonds: {
+        /**
+         * **The no-double-count guard.** Box 9 is a SUBSET of box 8: the
+         * private-activity slice of the same tax-exempt interest. 1040 line 2a
+         * already sums box 8, so a second summand anywhere in Parts I or II
+         * would tax the same interest twice — and §103(a) excludes every cent
+         * of it from gross income regardless, which is why the AMT is the only
+         * place it may appear at all.
+         *
+         * Two returns with the SAME box 8 and different box 9. Every 1040
+         * figure must be identical; only the AMT input moves. Asserting the
+         * equality of the whole printed return, rather than of line 2a alone,
+         * is deliberate — a future edit that reads box 9 into line 2b, or into
+         * the Social Security worksheet through line 2a, would slip past a
+         * line-2a-only assertion.
+         */
+        lineTwoAIsUnmovedByBoxNine: () => {
+            const withoutBoxNine = interestDocument('sha256-int-muni-a')({
+                box1InterestIncome: '500.00',
+                box8TaxExemptInterest: '60000.00',
+            })
+            const withBoxNine = interestDocument('sha256-int-muni-b')({
+                box1InterestIncome: '500.00',
+                box8TaxExemptInterest: '60000.00',
+                box9SpecifiedPrivateActivityBondInterest: '60000.00',
+            })
+            /** @type {(form: Stored<OneZeroNineNineInt>) => ReturnType<typeof computedLines>} */
+            const linesFor = form => computedLines(
+                inputsOf(storedProfile(singleProfile))([])([form])([])([])([])([])([])([])([]))
+            const plain = linesFor(withoutBoxNine)
+            const preference = linesFor(withBoxNine)
+            // $60,000.00 of tax-exempt interest is REPORTED on line 2a and
+            // taxed on no line at all, with or without box 9.
+            assertEq(plain.income.line2a.value, 6000000n, '1040 line 2a = box 8 = $60,000.00')
+            assertEq(preference.income.line2a.value, 6000000n, 'and box 9 does not add to it')
+            assertEq(plain.income.line2b.value, 50000n, 'line 2b = box 1 = $500.00')
+            assertEq(preference.income.line2b.value, 50000n, 'box 9 is not taxable interest either')
+            assertEq(plain.income.line9.value, preference.income.line9.value, 'total income unmoved')
+            assertEq(plain.income.line15.value, preference.income.line15.value, 'taxable income unmoved')
+            assertEq(plain.tax.line16.value, preference.tax.line16.value, 'the regular tax is unmoved')
+            // ...and box 9 IS read, exactly once, on its own carrier. Without
+            // this the leaf above would pass on a box 9 nothing reads at all,
+            // which is the shape that let `box13StatutoryEmployee` sit unread
+            // for eight phases.
+            assertEq(
+                plain.income.specifiedPrivateActivityBondInterest.value, 0n,
+                'no box 9 means no preference')
+            assertEq(
+                preference.income.specifiedPrivateActivityBondInterest.value, 6000000n,
+                'box 9 reaches Form 6251 line 2g as $60,000.00')
+        },
+
+        /** Box 9 short of box 8 — the ordinary muni holder, part private-activity. */
+        aPartialPrivateActivitySliceIsCarriedAsItself: () => {
+            const { income } = computedLines(inputsOf(storedProfile(singleProfile))([])([
+                interestDocument('sha256-int-muni-c')({
+                    box8TaxExemptInterest: '10000.00',
+                    box9SpecifiedPrivateActivityBondInterest: '2500.00',
+                }),
+            ])([])([])([])([])([])([])([]))
+            assertEq(income.line2a.value, 1000000n, 'all $10,000.00 is tax-exempt')
+            assertEq(
+                income.specifiedPrivateActivityBondInterest.value, 250000n,
+                'and $2,500.00 of it is the §57(a)(5) preference')
         },
     },
     withholding: {
