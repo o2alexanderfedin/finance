@@ -176,6 +176,8 @@ export const inputs = {
     businessExpenseForms: [],
     priorYearIraBasisForms: [],
     isoExerciseForms: [],
+    partnershipK1Forms: [],
+    sCorporationK1Forms: [],
     employeeStockPurchaseForms: [],
     basisCorrectionForms: [],
 }

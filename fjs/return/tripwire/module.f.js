@@ -209,6 +209,8 @@ import { dialect as oneZeroNineNineRDialect } from '../../document/1099r/module.
 import { dialect as oneZeroNineNineGDialect, validate as validate1099g } from '../../document/1099g/module.f.js'
 import { dialect as oneZeroNineNineNecDialect } from '../../document/1099nec/module.f.js'
 import { dialect as formThirtyNineTwentyOneDialect } from '../../document/form3921/module.f.js'
+import { dialect as k1PartnershipDialect } from '../../document/k1_1065/module.f.js'
+import { dialect as k1SCorporationDialect } from '../../document/k1_1120s/module.f.js'
 
 /** @import { IndividualFilingStatus, TaxParamSet } from '../../tax/params/module.f.js' */
 /** @import { Kind } from '../profile/module.f.js' */
@@ -217,6 +219,8 @@ import { dialect as formThirtyNineTwentyOneDialect } from '../../document/form39
 /** @import { OneZeroNineNineR } from '../../document/1099r/module.f.js' */
 /** @import { OneZeroNineNineNec } from '../../document/1099nec/module.f.js' */
 /** @import { FormThirtyNineTwentyOne } from '../../document/form3921/module.f.js' */
+/** @import { K1Partnership } from '../../document/k1_1065/module.f.js' */
+/** @import { K1SCorporation } from '../../document/k1_1120s/module.f.js' */
 
 // ── What a tripwire reads ────────────────────────────────────────────────────
 
@@ -242,6 +246,8 @@ import { dialect as formThirtyNineTwentyOneDialect } from '../../document/form39
  *   readonly retirementForms: readonly { readonly value: OneZeroNineNineR }[],
  *   readonly nonemployeeCompensationForms: readonly { readonly value: OneZeroNineNineNec }[],
  *   readonly isoExerciseForms: readonly { readonly value: FormThirtyNineTwentyOne }[],
+ *   readonly partnershipK1Forms: readonly { readonly value: K1Partnership }[],
+ *   readonly sCorporationK1Forms: readonly { readonly value: K1SCorporation }[],
  * }} SuppliedDocuments
  */
 
@@ -379,6 +385,31 @@ export const tripwires = [
             context.documents.nonemployeeCompensationForms.some(
                 form => boxIsNonZero(form.value.box1NonemployeeCompensation)),
     },
+    {
+        kind: 'partnershipAndSCorporationIncome',
+        evidence: 'a stored Schedule K-1 reports non-zero box 1 ordinary business income, which is '
+            + 'pass-through income from a partnership or an S corporation — the entity itself pays '
+            + 'no tax on it, so the whole of the owner\'s share is taxed on the owner\'s return '
+            + 'whether or not a single dollar was distributed — and it reaches 1040 line 8 through '
+            + 'Schedule E Part II and Schedule 1 line 5, neither of which is computed for a return '
+            + 'that does not declare it. For a GENERAL partner it also carries self-employment tax '
+            + 'to 1040 line 23 through Schedule SE line 2 and Schedule 2 line 4',
+        // BOTH dialects, and box 1 on each -- which is the one box the two
+        // printed faces agree on. The predicate asks the same question of two
+        // documents rather than one, because the tripwire's question is
+        // "does a document prove this obligation" and either dialect does.
+        //
+        // A ZERO box 1 does not trigger it: a dormant partnership issues a
+        // Schedule K-1 with nothing on it, and refusing that filer would be an
+        // outage rather than a guard. `boxIsNonZero` is also what keeps a
+        // negative box 1 IN scope -- a loss still requires the declaration,
+        // and `fjs/schedule/e` is where it then refuses by name.
+        triggered: context =>
+            context.documents.partnershipK1Forms.some(
+                form => boxIsNonZero(form.value.box1OrdinaryBusinessIncome))
+            || context.documents.sCorporationK1Forms.some(
+                form => boxIsNonZero(form.value.box1OrdinaryBusinessIncome)),
+    },
 ]
 
 // ── The rule ─────────────────────────────────────────────────────────────────
@@ -437,10 +468,13 @@ assert(taxParams2025 !== undefined, 'expected TY2025 parameters to be present in
  * own docstring for why the 1099-G box 2 entry is unreachable and omitted.
  * Phase 27 adds the fourth, and it is a different one — 1099-NEC box 1 ->
  * `businessIncomeOrLoss`. Phase 29 adds the fifth — a stored Form 3921 ->
- * `alternativeMinimumTax`, the first with no amount test at all.
+ * `alternativeMinimumTax`, the first with no amount test at all. Phase 30 adds
+ * the sixth — a stored Schedule K-1 of EITHER dialect with non-zero box 1 ->
+ * `partnershipAndSCorporationIncome`, the first whose predicate reads two
+ * document lists rather than one.
  * @type {number}
  */
-const expectedTripwireCount = 5
+const expectedTripwireCount = 6
 
 /** A W-2 carrying nothing but the fields its schema requires. @type {W2} */
 const bareW2 = {
@@ -475,6 +509,33 @@ const bare1099Nec = {
 /** No documents at all — the base every fixture below widens. @type {SuppliedDocuments} */
 const noDocuments = {
     w2s: [], retirementForms: [], nonemployeeCompensationForms: [], isoExerciseForms: [],
+    partnershipK1Forms: [], sCorporationK1Forms: [],
+}
+
+/** A partnership Schedule K-1 with a real box 1 share. @type {K1Partnership} */
+const partnershipK1 = {
+    dialect: k1PartnershipDialect,
+    payerTin: '33-3333333',
+    recipientTin: '222-22-2222',
+    accountNumber: 'PTR-0001',
+    taxYear: 2025,
+    formRevision: '2025',
+    boxGGeneralPartnerOrLlcMemberManager: true,
+    materialParticipation: 'materiallyParticipated',
+    box1OrdinaryBusinessIncome: '80000.00',
+    box14SelfEmploymentEarnings: [{ code: 'A', amount: '80000.00' }],
+}
+
+/** An S-corporation Schedule K-1 with the same box 1 share. @type {K1SCorporation} */
+const sCorporationK1 = {
+    dialect: k1SCorporationDialect,
+    payerTin: '44-4444444',
+    recipientTin: '222-22-2222',
+    accountNumber: 'SHR-0001',
+    taxYear: 2025,
+    formRevision: '2025',
+    materialParticipation: 'materiallyParticipated',
+    box1OrdinaryBusinessIncome: '80000.00',
 }
 
 /** A Form 3921 carrying the three boxes the §56(b)(3) spread reads.
@@ -974,6 +1035,111 @@ export const proof = {
             assertEq(outcome.kind, 'ok', ['a declared kind must not trip its own tripwire', outcome])
         },
     },
+    // ── Entry 6: Schedule K-1 box 1 -> partnershipAndSCorporationIncome ──
+    passThroughIncome: {
+        // PHASE 30'S MOTIVATING CASE. A founder holds a Schedule K-1 and does
+        // not know Schedule E exists; the entity paid no tax on the income and
+        // may have distributed none of it, and the whole share is taxable on
+        // this return. Undeclared, the engine would emit a confident 1040
+        // short by $80,000.00 of income.
+        //
+        // Each of the four things a reader can act on is asserted SEPARATELY.
+        aStoredPartnershipK1UndeclaredRefusesNamingScheduleE: () => {
+            const outcome = classify('single')(['wages'])({
+                ...noDocuments,
+                partnershipK1Forms: [{ value: partnershipK1 }],
+            })
+            assert(outcome.kind === 'error', ['a stored K-1 must refuse when undeclared', outcome])
+            if (outcome.kind !== 'error') {
+                return
+            }
+            assertEq(outcome.unmodeled.length, 1, ['expected exactly one required kind', outcome.unmodeled])
+            assertEq(
+                outcome.unmodeled[0],
+                'partnershipAndSCorporationIncome',
+                ['expected Schedule E Part II named', outcome.unmodeled])
+            assert(
+                outcome.message.includes('Schedule E Part II'),
+                ['the refusal must name the printed PART, not the whole schedule', outcome.message])
+            assert(
+                outcome.message.includes('Schedule 1 line 5'),
+                ['the refusal must name the Schedule 1 line it reaches', outcome.message])
+            assert(
+                outcome.message.includes('box 1'),
+                ['the refusal must name the box that proved it', outcome.message])
+            // The half a filer most needs to hear, and the reason this
+            // tripwire is worth more than most: the tax is owed on income
+            // that may never have been distributed.
+            assert(
+                outcome.message.includes('whether or not a single dollar was distributed'),
+                ['the evidence must state why the income is taxable at all', outcome.message])
+            // The remedy is a DECLARATION, because the kind is modeled.
+            assert(
+                outcome.message.includes('declare partnershipAndSCorporationIncome'),
+                ['the remedy must be the declaration, not a form hunt', outcome.message])
+        },
+        // **The SAME tripwire fires for the other dialect**, which is the half
+        // a predicate written against one document list would miss entirely —
+        // and it is the likelier omission, because the 1065 face is the one
+        // with the self-employment box and therefore the one a reader
+        // remembers.
+        aStoredSCorporationK1FiresTheSameTripwire: () => {
+            const outcome = classify('single')(['wages'])({
+                ...noDocuments,
+                sCorporationK1Forms: [{ value: sCorporationK1 }],
+            })
+            assert(outcome.kind === 'error', ['a stored 1120-S K-1 must refuse when undeclared', outcome])
+            if (outcome.kind !== 'error') {
+                return
+            }
+            assertEq(outcome.unmodeled[0], 'partnershipAndSCorporationIncome', [outcome.unmodeled])
+        },
+        // THE NEGATIVE CONTROL: absent, and a dormant entity's zero box 1.
+        // DOC-11 at the guard — a partnership that did nothing still issues a
+        // Schedule K-1, and refusing that filer would be an outage.
+        anAbsentOrZeroBoxOneNeverFires: () => {
+            const none = classify('single')(['wages'])(noDocuments)
+            assertEq(none.kind, 'ok', ['no K-1 must not fire', none])
+            const absent = classify('single')(['wages'])({
+                ...noDocuments,
+                partnershipK1Forms: [{
+                    value: { ...partnershipK1, box1OrdinaryBusinessIncome: undefined, box14SelfEmploymentEarnings: undefined },
+                }],
+            })
+            assertEq(absent.kind, 'ok', ['an absent box 1 must not fire', absent])
+            const zero = classify('single')(['wages'])({
+                ...noDocuments,
+                sCorporationK1Forms: [{ value: { ...sCorporationK1, box1OrdinaryBusinessIncome: '0.00' } }],
+            })
+            assertEq(zero.kind, 'ok', ['a zero box 1 must not fire', zero])
+        },
+        // A LOSS still fires it, which is deliberate and is the one place this
+        // predicate's `boxIsNonZero` is doing something a `> 0` would not: a
+        // filer with a pass-through LOSS must still declare the kind, and
+        // `fjs/schedule/e` is then where the loss refuses by name. Silently
+        // computing a return for them would be the same silence in the other
+        // direction.
+        aLossFiresItToo: () => {
+            const outcome = classify('single')(['wages'])({
+                ...noDocuments,
+                partnershipK1Forms: [{
+                    value: {
+                        ...partnershipK1,
+                        box1OrdinaryBusinessIncome: '-12000.00',
+                        box14SelfEmploymentEarnings: [{ code: 'A', amount: '-12000.00' }],
+                    },
+                }],
+            })
+            assert(outcome.kind === 'error', ['a pass-through LOSS must still require the declaration', outcome])
+        },
+        aDeclaredPassThroughSilencesTheTripwire: () => {
+            const outcome = classify('single')(['wages', 'partnershipAndSCorporationIncome'])({
+                ...noDocuments,
+                partnershipK1Forms: [{ value: partnershipK1 }],
+            })
+            assertEq(outcome.kind, 'ok', ['a declared kind must not trip its own tripwire', outcome])
+        },
+    },
     // ── The whole table's behaviour ──────────────────────────────────────
     //
     // Nothing supplied, nothing declared: compute. This is the strongest
@@ -1015,7 +1181,7 @@ export const proof = {
     // caller's evidence string came from, so this is the leaf that keeps the
     // convention honest: the taxpayer's OWN amounts, which are the only
     // taxpayer data a predicate here ever touches, must not appear in the
-    // refusal. Three distinctive amounts are supplied and each is searched for
+    // refusal. SEVEN distinctive amounts are supplied and each is searched for
     // separately, so a message that interpolated any one of them reddens here
     // and says which.
     noTaxpayerAmountRidesOutThroughATripwireRefusal: () => {
@@ -1025,6 +1191,10 @@ export const proof = {
             nonemployeeCompensationForms: [
                 { value: { ...bare1099Nec, box1NonemployeeCompensation: '9876.54' } },
             ],
+            partnershipK1Forms: [{
+                value: { ...partnershipK1, box1OrdinaryBusinessIncome: '5432.10' },
+            }],
+            sCorporationK1Forms: [],
             isoExerciseForms: [{
                 value: {
                     ...isoExercise,
@@ -1037,7 +1207,7 @@ export const proof = {
         if (outcome.kind !== 'error') {
             return
         }
-        for (const amount of ['387654.32', '1234.56', '7654.21', '9876.54', '3.21', '54.32']) {
+        for (const amount of ['387654.32', '1234.56', '7654.21', '9876.54', '3.21', '54.32', '5432.10']) {
             assert(
                 !outcome.message.includes(amount),
                 ['a taxpayer amount reached the refusal message', amount, outcome.message])
@@ -1045,7 +1215,7 @@ export const proof = {
         // The control: the message is not empty, and it really did describe
         // all three findings — otherwise "contains no amount" would be
         // satisfied by a message containing nothing.
-        assertEq(outcome.unmodeled.length, 5, ['expected all five tripwires to have fired', outcome.unmodeled])
+        assertEq(outcome.unmodeled.length, 6, ['expected all six tripwires to have fired', outcome.unmodeled])
     },
     // The rejected fourth entry, recorded as a CHECKED claim rather than as
     // prose (see this module's docstring). `fjs/document/1099g` refuses a

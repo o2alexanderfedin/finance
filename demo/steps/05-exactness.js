@@ -110,6 +110,8 @@ export const render = root => {
         isoExerciseForms: [],
         employeeStockPurchaseForms: [],
         basisCorrectionForms: [],
+        partnershipK1Forms: [],
+        sCorporationK1Forms: [],
     }
     const withoutElection = { ...withElection, profile: store(profileElecting(false)) }
 

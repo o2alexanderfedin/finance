@@ -72,6 +72,7 @@ import { scheduleD } from '../../schedule/d/module.f.js'
 import { scheduleOneA } from '../../schedule/1a/module.f.js'
 import { scheduleA } from '../../schedule/a/module.f.js'
 import {
+    passThroughOf,
     scheduleOnePartI,
     scheduleOnePartIIExceptStudentLoanInterest,
     scheduleOnePartII,
@@ -108,6 +109,8 @@ import { baseTaxForAmount } from '../../tax/table/module.f.js'
 /** @import { Ira } from '../../document/ira/module.f.js' */
 /** @import { PriorYearIraBasis } from '../../document/prior_year_ira_basis/module.f.js' */
 /** @import { FormThirtyNineTwentyOne } from '../../document/form3921/module.f.js' */
+/** @import { K1Partnership } from '../../document/k1_1065/module.f.js' */
+/** @import { K1SCorporation } from '../../document/k1_1120s/module.f.js' */
 /** @import { FormThirtyNineTwentyTwo } from '../../document/form3922/module.f.js' */
 /** @import { BasisCorrection } from '../../document/basis_correction/module.f.js' */
 /** @import { Kind, ReturnProfile } from '../../return/profile/module.f.js' */
@@ -214,6 +217,22 @@ import { baseTaxForAmount } from '../../tax/table/module.f.js'
  * Form 1099-B by CAS hash and REFUSES one that matches nothing, which is what
  * makes the list shape safe rather than merely convenient.
  *
+ * `partnershipK1Forms`/`sCorporationK1Forms` are Phase 30's own widening
+ * (DOC-24/TAX-35): Schedule 1 Part I line 5 reads them through
+ * `fjs/schedule/e`, and Schedule SE line 2 reads the partnership half's box 14
+ * code A. **Both are LISTS and both genuinely are** — printed Schedule E Part
+ * II line 28 is a FOUR-ROW table with a column (b) for "P for partnership, S
+ * for S corporation", so a founder with a partnership stake and an
+ * S-corporation holding fills two rows of one table. This is the OPPOSITE of
+ * `businessExpenseForms`, whose list shape exists so `fjs/schedule/c` can SEE
+ * a second business in order to refuse it: `fjs/schedule/e` combines its rows,
+ * which is what the printed form asks for, and it is safe to do so because
+ * every row that could carry a loss refuses before any total is formed.
+ *
+ * Two K-1s from the SAME entity refuse, which is the hazard the list shape
+ * genuinely introduces — a duplicate transcription, or an original beside its
+ * correction, would otherwise report the income twice.
+ *
  * `capitalLossCarryoverForms` is Plan 15-05's own widening (TAX-17): a LIST,
  * matching this typedef's own established "one running record per taxpayer
  * per year" convention (see `itemizedDeductionForms`/`medicalExpenseForms`
@@ -245,6 +264,8 @@ import { baseTaxForAmount } from '../../tax/table/module.f.js'
  *   readonly isoExerciseForms: readonly Stored<FormThirtyNineTwentyOne>[],
  *   readonly employeeStockPurchaseForms: readonly Stored<FormThirtyNineTwentyTwo>[],
  *   readonly basisCorrectionForms: readonly Stored<BasisCorrection>[],
+ *   readonly partnershipK1Forms: readonly Stored<K1Partnership>[],
+ *   readonly sCorporationK1Forms: readonly Stored<K1SCorporation>[],
  * }} Form1040Inputs
  */
 
@@ -544,6 +565,7 @@ export const form1040IncomeLines = taxParamSet => inputs => {
         adjustmentForms, studentLoanInterestForms,
         iraForms, priorYearIraBasisForms,
         employeeStockPurchaseForms, basisCorrectionForms,
+        partnershipK1Forms, sCorporationK1Forms,
     } = inputs
     const declaredZero = profileDeclaredZeroLine(profile)
     const fromDocuments = documentLine(profile)
@@ -808,6 +830,11 @@ export const form1040IncomeLines = taxParamSet => inputs => {
     const scheduleOnePartIResult = scheduleOnePartI({
         profile, unemploymentForms, nonemployeeCompensationForms, businessExpenseForms,
         w2Forms: w2s,
+        // **Line 5 is Phase 30's** (TAX-35): `fjs/schedule/e`'s own line 41,
+        // reaching 1040 line 8 THROUGH Schedule 1's own Part I total, never by
+        // a side channel -- the identical discipline line 3 already follows for
+        // Schedule C and line 10 for Part II's line 26.
+        partnershipK1Forms, sCorporationK1Forms,
     })
     if (scheduleOnePartIResult.kind === 'error') {
         return { kind: 'error', message: scheduleOnePartIResult.message, unmodeled: [] }
@@ -837,6 +864,12 @@ export const form1040IncomeLines = taxParamSet => inputs => {
         profile, status, adjustmentForms, w2Forms: w2s,
         businessNetProfit: scheduleOnePartIResult.scheduleC.partII.line31,
         businessExpenseForms,
+        // ...and printed Schedule SE line 2's OTHER named source, "Schedule
+        // K-1 (Form 1065), box 14, code A" -- read off the Schedule E
+        // execution Part I already performed, never a second one. It carries
+        // the recipient TIN with it, because §1402(b)(1)'s wage base is per
+        // PERSON and a partner's Forms W-2 must be told from a spouse's.
+        passThrough: passThroughOf(scheduleOnePartIResult.scheduleE),
     })
     // A document-data-sufficiency refusal from Part II — an unrecognized
     // `lineTag`, a following-year educator expense, a spouse entry on a
@@ -2530,6 +2563,8 @@ const inputsOf = profile => w2s => interestForms => dividendForms => brokerageFo
                 isoExerciseForms: [],
                 employeeStockPurchaseForms: [],
                 basisCorrectionForms: [],
+                partnershipK1Forms: [],
+                sCorporationK1Forms: [],
             })
 
 /**

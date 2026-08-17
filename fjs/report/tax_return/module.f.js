@@ -170,6 +170,8 @@ import { dialect as priorYearIraBasisDialect } from '../../document/prior_year_i
 import { dialect as formThirtyNineTwentyOneDialect } from '../../document/form3921/module.f.js'
 import { dialect as formThirtyNineTwentyTwoDialect } from '../../document/form3922/module.f.js'
 import { dialect as basisCorrectionDialect } from '../../document/basis_correction/module.f.js'
+import { dialect as k1PartnershipDialect } from '../../document/k1_1065/module.f.js'
+import { dialect as k1SCorporationDialect } from '../../document/k1_1120s/module.f.js'
 
 /** @import { Effect, OperationMap } from 'functionalscript/fjs/effects/module.f.js' */
 /** @import { CasOp } from '../../guest/module.f.js' */
@@ -198,6 +200,8 @@ import { dialect as basisCorrectionDialect } from '../../document/basis_correcti
 /** @import { FormThirtyNineTwentyOne } from '../../document/form3921/module.f.js' */
 /** @import { FormThirtyNineTwentyTwo } from '../../document/form3922/module.f.js' */
 /** @import { BasisCorrection } from '../../document/basis_correction/module.f.js' */
+/** @import { K1Partnership } from '../../document/k1_1065/module.f.js' */
+/** @import { K1SCorporation } from '../../document/k1_1120s/module.f.js' */
 
 // ── The rendered wire shape ──────────────────────────────────────────────────
 
@@ -239,7 +243,7 @@ import { dialect as basisCorrectionDialect } from '../../document/basis_correcti
  * `vnd.fjs.revision`, a future addition) falls straight through
  * {@link collectDocument} untouched — never coerced into a bucket, never
  * treated as a zero.
- * @typedef {ReturnProfile | W2 | OneZeroNineNineInt | OneZeroNineNineDiv | OneZeroNineNineB | OneZeroNineNineR | Ssa1099 | ItemizedDeductions | MedicalExpenses | PriorYearCapitalLoss | OneZeroNineNineG | Adjustments | OneZeroNineEightE | OneZeroNineEightT | Credits | Ira | PriorYearIraBasis | OneZeroNineNineNec | BusinessExpenses | FormThirtyNineTwentyOne | FormThirtyNineTwentyTwo | BasisCorrection} EngineDocument
+ * @typedef {ReturnProfile | W2 | OneZeroNineNineInt | OneZeroNineNineDiv | OneZeroNineNineB | OneZeroNineNineR | Ssa1099 | ItemizedDeductions | MedicalExpenses | PriorYearCapitalLoss | OneZeroNineNineG | Adjustments | OneZeroNineEightE | OneZeroNineEightT | Credits | Ira | PriorYearIraBasis | OneZeroNineNineNec | BusinessExpenses | FormThirtyNineTwentyOne | FormThirtyNineTwentyTwo | BasisCorrection | K1Partnership | K1SCorporation} EngineDocument
  */
 
 /**
@@ -279,6 +283,8 @@ import { dialect as basisCorrectionDialect } from '../../document/basis_correcti
  *   readonly isoExerciseForms: readonly Stored<FormThirtyNineTwentyOne>[],
  *   readonly employeeStockPurchaseForms: readonly Stored<FormThirtyNineTwentyTwo>[],
  *   readonly basisCorrectionForms: readonly Stored<BasisCorrection>[],
+ *   readonly partnershipK1Forms: readonly Stored<K1Partnership>[],
+ *   readonly sCorporationK1Forms: readonly Stored<K1SCorporation>[],
  * }} Collected
  */
 
@@ -352,6 +358,8 @@ export const taxReturnReportSource = [
     '        isoExerciseForms: [],',
     '        employeeStockPurchaseForms: [],',
     '        basisCorrectionForms: [],',
+    '        partnershipK1Forms: [],',
+    '        sCorporationK1Forms: [],',
     '    }',
     '    const runYear = ctx.taxParams.taxYear',
     '    const noteYearMismatch = documentHash => doc => acc => {',
@@ -391,6 +399,8 @@ export const taxReturnReportSource = [
     '        if (doc.dialect === \'vnd.fjs.form3921\') { return { ...acc, isoExerciseForms: [...acc.isoExerciseForms, stored] } }',
     '        if (doc.dialect === \'vnd.fjs.form3922\') { return { ...acc, employeeStockPurchaseForms: [...acc.employeeStockPurchaseForms, stored] } }',
     '        if (doc.dialect === \'vnd.fjs.basis_correction\') { return { ...acc, basisCorrectionForms: [...acc.basisCorrectionForms, stored] } }',
+    '        if (doc.dialect === \'vnd.fjs.k1_1065\') { return { ...acc, partnershipK1Forms: [...acc.partnershipK1Forms, stored] } }',
+    '        if (doc.dialect === \'vnd.fjs.k1_1120s\') { return { ...acc, sCorporationK1Forms: [...acc.sCorporationK1Forms, stored] } }',
     '        return undefined',
     '    }',
     '    const collect = documentHash => doc => acc => {',
@@ -450,6 +460,8 @@ export const taxReturnReportSource = [
     '            isoExerciseForms: acc.isoExerciseForms,',
     '            employeeStockPurchaseForms: acc.employeeStockPurchaseForms,',
     '            basisCorrectionForms: acc.basisCorrectionForms,',
+    '            partnershipK1Forms: acc.partnershipK1Forms,',
+    '            sCorporationK1Forms: acc.sCorporationK1Forms,',
     '        })',
     '        if (outcome.kind === \'error\') {',
     '            return { kind: \'error\', message: outcome.message, unmodeled: outcome.unmodeled }',
@@ -523,6 +535,8 @@ const emptyCollected = {
     isoExerciseForms: [],
     employeeStockPurchaseForms: [],
     basisCorrectionForms: [],
+    partnershipK1Forms: [],
+    sCorporationK1Forms: [],
 }
 
 /**
@@ -568,6 +582,8 @@ const routeDocument = documentHash => doc => acc => {
     if (doc.dialect === formThirtyNineTwentyOneDialect) { return { ...acc, isoExerciseForms: [...acc.isoExerciseForms, { documentHash, value: doc }] } }
     if (doc.dialect === formThirtyNineTwentyTwoDialect) { return { ...acc, employeeStockPurchaseForms: [...acc.employeeStockPurchaseForms, { documentHash, value: doc }] } }
     if (doc.dialect === basisCorrectionDialect) { return { ...acc, basisCorrectionForms: [...acc.basisCorrectionForms, { documentHash, value: doc }] } }
+    if (doc.dialect === k1PartnershipDialect) { return { ...acc, partnershipK1Forms: [...acc.partnershipK1Forms, { documentHash, value: doc }] } }
+    if (doc.dialect === k1SCorporationDialect) { return { ...acc, sCorporationK1Forms: [...acc.sCorporationK1Forms, { documentHash, value: doc }] } }
     return undefined
 }
 
@@ -687,6 +703,8 @@ const renderReturn = ctx => acc => {
         isoExerciseForms: acc.isoExerciseForms,
         employeeStockPurchaseForms: acc.employeeStockPurchaseForms,
         basisCorrectionForms: acc.basisCorrectionForms,
+        partnershipK1Forms: acc.partnershipK1Forms,
+        sCorporationK1Forms: acc.sCorporationK1Forms,
     })
     if (outcome.kind === 'error') {
         return { kind: 'error', message: outcome.message, unmodeled: outcome.unmodeled }
@@ -1215,7 +1233,8 @@ const renderedCents = result => rule => {
  *
  * The count is the point: a loop over this list alone could never notice the
  * list shrinking (AGENTS.md's fourth shipped defect), so seventeen is written
- * out here and asserted beside the loop.
+ * out here and asserted beside the loop. It has been short THREE times —
+ * Phase 24's two, found by Phase 25, and Phase 29's three, found by Phase 30.
  *
  * **Every prose count in this file's docstrings was stale before Phase 26**
  * — the module header said "eleven fields" and "twelve dialects" while the
@@ -1260,10 +1279,33 @@ const dispatchedDialects = [
     // to the twin, which is the discipline the paragraph above asks for.
     oneZeroNineNineNecDialect,
     businessExpensesDialect,
+    // **Phase 29's three were missing from this list until Phase 30 added
+    // them**, and that is the drift the paragraph above exists to warn about
+    // happening a THIRD time. `vnd.fjs.form3921`, `vnd.fjs.form3922` and
+    // `vnd.fjs.basis_correction` were added to the source text and to the twin
+    // in Phase 29 and not here, so the one mechanical check on the hand-sync
+    // silently stopped covering the three newest dialects — exactly as it did
+    // for Phase 24's two before Phase 25 noticed.
+    //
+    // Restored here rather than reported and left, because this list is the
+    // mechanism Phase 30's own two entries depend on: a check that is already
+    // three short is not a check the next entry can lean on.
+    formThirtyNineTwentyOneDialect,
+    formThirtyNineTwentyTwoDialect,
+    basisCorrectionDialect,
+    // Phase 30's own two (DOC-24), the TWENTY-THIRD and TWENTY-FOURTH: added
+    // here in the SAME commit that adds them to the source text and to the
+    // twin.
+    k1PartnershipDialect,
+    k1SCorporationDialect,
 ]
 
-/** @type {number} */
-const expectedDispatchedDialectCount = 19
+/**
+ * `19 -> 24` in Phase 30: three of the five are Phase 29's, restored, and two
+ * are this phase's own. See the list's own comments for both halves.
+ * @type {number}
+ */
+const expectedDispatchedDialectCount = 24
 
 export const proof = {
     // The phase's central number check, and the reason this module exists:
@@ -1767,7 +1809,7 @@ export const proof = {
     // the SOURCE text, against a hand-typed count. The twin imports these
     // constants; the source cannot, so it spells them out — this is what
     // stops a rename from quietly desynchronizing the two.
-    sourceAndTwinDispatchOnTheSameNineteenDialects: () => {
+    sourceAndTwinDispatchOnTheSameTwentyFourDialects: () => {
         assertEq(dispatchedDialects.length, expectedDispatchedDialectCount)
         for (const tag of dispatchedDialects) {
             assert(
