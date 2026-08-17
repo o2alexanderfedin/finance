@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v2
 milestone_name: The Product Path and Four Personas
-status: executing
-stopped_at: Everything is merged to develop (PR #68) and every local branch has ZERO unmerged commits. Next is Phase 21, The Last Mile - and read its ROADMAP entry first, because the obvious implementation is explicitly forbidden.
-last_updated: "2026-08-16T07:15:00.000Z"
-last_activity: 2026-08-16
+status: milestone_v2_complete
+stopped_at: ALL TEN v2 phases (21-30) are shipped and merged, PRs #71-#82. All four personas compute. 13 requirements remain open - 8 MAINT (Phases 16/17/18, the v1 documentation and dependency debt) and 5 tax, each stating in its own body why it is open rather than done. Nothing is in flight.
+last_updated: "2026-08-17T10:20:00.000Z"
+last_activity: 2026-08-17
 progress:
   total_phases: 30
-  completed_phases: 16
+  completed_phases: 26
   total_plans: 89
   completed_plans: 85
-  percent: 53
+  percent: 87
 ---
 
 # Project State
@@ -25,6 +25,34 @@ the server executes it as a pure function of `(documents, tax-year parameters) �
 **Current focus:** Between phases — Phase 15 shipped, Phase 16 awaiting an owner decision
 
 ## Current Position
+
+Phase: 30 (pass-through-income) — **COMPLETE AND MERGED. Milestone v2 is closed.**
+  All ten v2 phases shipped 2026-08-16/17 as PRs #71–#82. Suite went 6394 → **8533** tests and
+  953 → **~2010** proof leaves. **All four personas from `.planning/PERSONA-COVERAGE.md` now
+  compute**: retiree, non-profit worker, FAANG engineer, startup founder.
+  Requirements: **120 defined, 107 complete, 13 open** — derived, and the command is beside the
+  number in REQUIREMENTS.md.
+
+> **The five tax requirements left open are open ON PURPOSE and say so in their own bodies.**
+> TAX-27 (Earned Income Credit — the dependent model carries almost none of §32(c)(3), spec in
+> `fjs/todo/`), TAX-29 (Form 8606 Part I computes; Parts II/III refuse, so no backdoor Roth),
+> TAX-32 (Form 8995 computes; 8995-A, the SSTB phase-in and the wage/UBIA limits do not),
+> TAX-33 (Form 6251 Parts I/II compute; Part III refuses, so an ISO spread beside qualified
+> dividends is refused), TAX-35 (Schedule E Part II computes; Part III needs a THIRD K-1
+> numbering, and no separately stated item is routed).
+>
+> **A tick that needs a paragraph of caveats is a tick that should not be there.** Phase 25 once
+> checked TAX-27 while its own prose said the credit was not computed; that was corrected, and
+> every phase after it held the line.
+
+**The eight open MAINT requirements are v1's, not v2's** — Phase 16 (deferred, the orphan OCR
+island), Phase 17 (Documentation Truth Pass, never started) and Phase 18 (planned, four plans,
+**zero executed**; its plans state a proof floor of 916 and the real figure is now ~2010, so
+re-derive before trusting it). Phase 17 is the natural next move: this file was itself found four
+times carrying stale text under a newer heading, and the v2 roadmap rows sat reading "Not started"
+for shipped phases until the milestone-close sweep.
+
+### The previous position, kept because it is still the shape of the work
 
 Phase: 20 (unemployment-compensation) — **COMPLETE, VERIFIED AND MERGED**
   0 plans; none were written. The `vnd.fjs.1099g` dialect and the Schedule 1 line 7 wiring were
