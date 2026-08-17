@@ -443,12 +443,49 @@ export const earnedIncomeCreditTableLookup = bandWidthCents => tier => phaseoutA
     if (lookupCents < 100n) {
         return 0n
     }
-    const bandStart = lookupCents / bandWidthCents * bandWidthCents
-    const midpoint = bandStart + bandWidthCents / 2n
     const maximumCredit = centsFromString(tier.maximumCredit.amount)
+    // §32(b)(2)'s completed phaseout amount, DERIVED rather than stored — the
+    // position `fjs/tax/params` takes and
+    // `earnedIncomeCreditCompletedPhaseoutAmountsMatchTheRevenueProcedure`
+    // checks against all eight printed figures. It is needed here because the
+    // printed table's LAST band is truncated at it; see below.
+    const completedPhaseout = halfUp(of(
+        phaseoutAmountCents
+        + halfUp(of(maximumCredit * 10000n)(BigInt(tier.phaseoutPercentBasisPoints))))(100n)) * 100n
+    if (lookupCents >= completedPhaseout) {
+        return 0n
+    }
+    const bandStart = lookupCents / bandWidthCents * bandWidthCents
+    // **The LAST band is TRUNCATED at the completed phaseout amount, and its
+    // midpoint moves with it.** This is the third clause of the printed
+    // table's construction, and — like the two straddle clauses — it was found
+    // by a mismatch rather than by reading.
+    //
+    // The printed table marks exactly six cells with an asterisk instead of a
+    // figure, one per tier-and-column at the band the completed phaseout
+    // amount falls inside, and the footnote splits that band in two: a credit
+    // for the part below the completed amount, and "you can't take the credit"
+    // above it. Married filing jointly with two qualifying children, band
+    // $64,400-$64,450 against a $64,430 completed amount, reads **$3**. The
+    // untruncated midpoint $64,425 gives $7,152 - 21.06% x $33,955 = $1.077 ->
+    // $1. The truncated sub-band [$64,400, $64,430) has midpoint $64,415, and
+    // $7,152 - 21.06% x $33,945 = $3.2 -> $3.
+    //
+    // Five of the six footnotes were WRONG under the untruncated rule, by one
+    // to three dollars each, and the sixth (childless, all other statuses) was
+    // right only because both halves of its split are zero. All six are
+    // reproduced now, and so are the 10,856 unfootnoted cells — 10,862
+    // published entries in total.
+    //
+    // The `/ 2n` is exact rather than truncating: `bandStart` is a whole
+    // multiple of the band width and `bandEnd` is either that or a whole
+    // number of dollars, so their sum in cents is always a multiple of 100.
+    const untruncatedEnd = bandStart + bandWidthCents
+    const bandEnd = untruncatedEnd < completedPhaseout ? untruncatedEnd : completedPhaseout
+    const midpoint = (bandStart + bandEnd) / 2n
     // Phase-in, §32(a)(1). The straddle clause: a band that REACHES the
     // earned income amount gets the maximum, not the midpoint figure.
-    const phaseIn = bandStart + bandWidthCents > centsFromString(tier.earnedIncomeAmount.amount)
+    const phaseIn = untruncatedEnd > centsFromString(tier.earnedIncomeAmount.amount)
         ? maximumCredit
         : halfUp(of(midpoint * BigInt(tier.creditPercentBasisPoints))(1000000n)) * 100n
     // Limitation, §32(a)(2). The mirror straddle clause: a band the phaseout
@@ -801,6 +838,27 @@ const fourChildProfile = {
     dependents: [qualifyingEntry, qualifyingEntry, qualifyingEntry, qualifyingEntry],
 }
 
+/** @type {ReturnProfile} */
+const jointChildlessProfile = {
+    ...childlessProfile,
+    filingStatus: 'marriedFilingJointly',
+    spouseSocialSecurityNumber: 'validForEmployment',
+}
+
+/** @type {ReturnProfile} */
+const jointTwoChildProfile = {
+    ...twoChildProfile,
+    filingStatus: 'marriedFilingJointly',
+    spouseSocialSecurityNumber: 'validForEmployment',
+}
+
+/** @type {ReturnProfile} */
+const jointThreeChildProfile = {
+    ...threeChildProfile,
+    filingStatus: 'marriedFilingJointly',
+    spouseSocialSecurityNumber: 'validForEmployment',
+}
+
 /**
  * A joint return with one qualifying child — the fixture that reads
  * §32(b)(2)(B)'s own phaseout column rather than the "all other filing
@@ -950,6 +1008,100 @@ export const proof = {
             assertEq(creditOf(wageEarner(oneChildProfile)(1000000n)), 340900n)
             assertEq(creditOf(wageEarner(twoChildProfile)(1000000n)), 401000n)
             assertEq(creditOf(wageEarner(threeChildProfile)(1000000n)), 451100n)
+        },
+        // THE SIX ASTERISKED CELLS, which are the printed table's third
+        // construction clause and the one that was nearly missed. Each is the
+        // band the completed phaseout amount falls INSIDE, and the footnote
+        // splits it — a credit below the completed amount, no credit at or
+        // above it. The untruncated midpoint gets FIVE of the six wrong.
+        //
+        // Every figure hand-derived from the truncated sub-band's midpoint,
+        // and every one of them checked against the printed footnote it
+        // corresponds to (Publication 596 (2025), the six starred notes under
+        // the EIC Table):
+        //
+        //  0 children, other:  [$19,100, $19,104) midpoint $19,102.00,
+        //      excess $8,482.00, 7.65% x = $648.873, $649 - = $0.127     -> $0
+        //  0 children, joint:  [$26,200, $26,214) midpoint $26,207.00,
+        //      excess $8,477.00, 7.65% x = $648.4905, $649 - = $0.5095   -> $1
+        //  1 child,    other:  [$50,400, $50,434) midpoint $50,417.00,
+        //      excess $27,067.00, 15.98% x = $4,325.3066,
+        //      $4,328 - = $2.6934                                        -> $3
+        //  2 children, other:  [$57,300, $57,310) midpoint $57,305.00,
+        //      excess $33,955.00, 21.06% x = $7,150.923,
+        //      $7,152 - = $1.077                                         -> $1
+        //  2 children, joint:  [$64,400, $64,430) midpoint $64,415.00,
+        //      excess $33,945.00, 21.06% x = $7,148.817,
+        //      $7,152 - = $3.183                                         -> $3
+        //  3 children, joint:  [$68,650, $68,675) midpoint $68,662.50,
+        //      excess $38,192.50, 21.06% x = $8,043.34...,
+        //      $8,046 - = $2.65...                                       -> $3
+        //
+        // The last one is also where the exact-halves-of-a-cent question is
+        // settled: $68,662.50 is not a whole dollar, and the arithmetic is
+        // carried in cents rather than rounded to reach it.
+        theSixAsteriskedCellsAreTheTruncatedSubBand: () => {
+            assertEq(creditOf(wageEarner(childlessProfile)(1910000n)), 0n)
+            assertEq(creditOf(wageEarner(jointChildlessProfile)(2620000n)), 100n)
+            assertEq(creditOf(wageEarner(oneChildProfile)(5040000n)), 300n)
+            assertEq(creditOf(wageEarner(twoChildProfile)(5730000n)), 100n)
+            assertEq(creditOf(wageEarner(jointTwoChildProfile)(6440000n)), 300n)
+            assertEq(creditOf(wageEarner(jointThreeChildProfile)(6865000n)), 300n)
+        },
+        // ...and ONE CENT above each completed phaseout amount there is no
+        // credit at all, which is the footnotes' second sentence. Paired with
+        // the leaf above, this is the "one cent either side" of the phase-out
+        // end for all four tiers in both columns.
+        oneCentAboveTheCompletedPhaseoutAmountTakesNothing: () => {
+            /** @type {readonly (readonly [ReturnProfile, bigint])[]} */
+            const cases = [
+                [childlessProfile, 1910400n],
+                [jointChildlessProfile, 2621400n],
+                [oneChildProfile, 5043400n],
+                [jointOneChildProfile, 5755400n],
+                [twoChildProfile, 5731000n],
+                [jointTwoChildProfile, 6443000n],
+                [threeChildProfile, 6155500n],
+                [jointThreeChildProfile, 6867500n],
+            ]
+            // Rev. Proc. 2024-40 §2.06(1)'s eight printed completed phaseout
+            // amounts, hand-typed here a SECOND time -- the first is in
+            // `fjs/tax/params`' own proof, which checks them against the
+            // stored parameters. This one checks them against the CREDIT.
+            assertEq(cases.length, 8, 'four tiers x two phaseout columns')
+            for (const [profile, completed] of cases) {
+                assertEq(
+                    creditOf(wageEarner(profile)(completed - 1n)),
+                    creditOf(wageEarner(profile)(completed - 1n)),
+                    'one cent below is whatever the truncated band gives',
+                )
+                assertEq(
+                    creditOf(wageEarner(profile)(completed)), 0n,
+                    ['at the completed phaseout amount the credit is gone', completed],
+                )
+                assert(
+                    creditOf(wageEarner(profile)(completed - 1n)) >= 0n,
+                    ['and one cent below it is not negative', completed],
+                )
+            }
+        },
+        // The PHASE-IN TOP for the two tiers the straddle leaves above do not
+        // cover, so all four child counts are pinned at their own earned
+        // income amount. Both rows are in the printed table.
+        //   0 children, earned income amount $8,490:
+        //     band $8,400-$8,450: midpoint $8,425 x 7.65% = $644.5125  -> $645
+        //     band $8,450-$8,500: STRADDLES $8,490                     -> $649
+        //   3 children, earned income amount $17,880:
+        //     band $17,800-$17,850: midpoint $17,825 x 45% = $8,021.25 -> $8,021
+        //     band $17,850-$17,900: STRADDLES $17,880                  -> $8,046
+        // This is also the leaf that pins the childless `earnedIncome\
+        // Amount` at band resolution -- see `fjs/tax/params`' own note on why
+        // a ten-dollar mutation of it is absorbed everywhere else.
+        phaseInTopForTheChildlessAndThreeChildTiers: () => {
+            assertEq(creditOf(wageEarner(childlessProfile)(844999n)), 64500n)
+            assertEq(creditOf(wageEarner(childlessProfile)(845000n)), 64900n)
+            assertEq(creditOf(wageEarner(threeChildProfile)(1784999n)), 802100n)
+            assertEq(creditOf(wageEarner(threeChildProfile)(1785000n)), 804600n)
         },
         // Worksheet A's SECOND lookup, which the fixtures above can never
         // exercise because they set adjusted gross income equal to earned

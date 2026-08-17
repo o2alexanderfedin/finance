@@ -804,6 +804,26 @@ export const earnedIncomeCreditChildTiers = /** @type {const} */ ([
  * stored figure against the rounded product, so a transcription slip in
  * either the percentage or the earned income amount still fails.
  *
+ * ## A property of {@link earnedIncomeAmount} nobody had written down
+ *
+ * **A small mutation of the childless tier's `earnedIncomeAmount` is an
+ * EQUIVALENT MUTANT and no proof can bite on it.** Moving $8,490 to $8,480 was
+ * run against the whole suite and left it green. Two neighbouring operations
+ * absorb it, and both are the printed table's own (AGENTS.md, "the equivalent
+ * mutant: a mutation a neighbouring operation absorbs"):
+ *
+ * - the proof above rounds the product to whole DOLLARS, and 7.65% of $10 is
+ *   $0.765, so the rounded maximum credit stays $649;
+ * - `fjs/schedule/eic` reads this figure only to decide which $50 band reaches
+ *   it, so any change that does not cross a $50 boundary changes no credit at
+ *   any income.
+ *
+ * So the observable resolution of this parameter is the band, not the dollar.
+ * `phaseInTopForTheChildlessAndThreeChildTiers` pins it to exactly that
+ * resolution — $8,449.99 gives $645 and $8,450.00 gives $649 — and a mutation
+ * that crosses a $50 boundary does redden ($8,590 was run and fails the proof
+ * above). Written here rather than left to be rediscovered as a coverage gap.
+ *
  * ## `bandWidth` is a parameter, not a constant in the reader
  *
  * §32(f)(1) makes the credit *"determined under tables prescribed by the
