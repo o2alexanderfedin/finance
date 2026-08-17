@@ -454,6 +454,7 @@ export const modeledKinds = /** @type {const} */ ([
     'itemizedDeductions',          // Schedule A + deductionChoice   -> 1040 line 12e
     'qualifiedBusinessIncomeDeduction', // Form 8995 line 15         -> 1040 line 13a
     'seniorAndOtherScheduleOneADeductions', // Schedule 1-A Parts I/V/VI -> 1040 line 13b
+    'alternativeMinimumTax',       // Form 6251 line 11 -> Schedule 2 line 2 -> 1040 line 17
     'selfEmploymentTax',           // Schedule SE line 12 -> Schedule 2 line 4 -> 1040 line 23
     'additionalMedicareTax',       // Form 8959 -> Schedule 2 line 11 -> 1040 lines 23/25c
     'netInvestmentIncomeTax',      // Form 8960 -> Schedule 2 line 12 -> 1040 line 23
@@ -567,8 +568,8 @@ export const unmodeledKindRefusals = /** @type {const} */ ([
     { kind: 'form8919Wages', line: '1040 line 1g', label: 'Form 8919 wages', remedy: 'requires Form 8919 (no phase yet)' },
     { kind: 'otherEarnedIncome', line: '1040 line 1h', label: 'other earned income', remedy: 'no dialect models it (no phase yet)' },
     { kind: 'nontaxableCombatPayElection', line: '1040 line 1i', label: 'nontaxable combat pay election', remedy: 'no dialect models it (no phase yet)' },
-    { kind: 'section1202Gain', line: 'Form 1099-DIV box 2c', label: 'section 1202 gain', remedy: 'requires the §1202 exclusion percentage, which no 1099-DIV box carries (no phase yet)' },
-    { kind: 'investmentInterestForm4952', line: 'Form 4952 line 4g', label: 'investment interest expense election', remedy: 'requires Form 4952 and the Schedule D Tax Worksheet (TAX-11, Phase 12)' },
+    { kind: 'section1202Gain', line: 'Form 1099-DIV box 2c; Form 6251 line 2h -> Schedule 2 line 2 -> 1040 line 17', label: 'section 1202 gain', remedy: 'requires the §1202 exclusion percentage, which no 1099-DIV box carries. The SAME missing percentage blocks Form 6251 line 2h, which is 7% of the excluded gain as a positive AMT preference — so this one kind names both, rather than Phase 29 inventing a second declaration for one taxpayer fact (no phase yet)' },
+    { kind: 'investmentInterestForm4952', line: 'Form 4952 line 4g; Form 6251 line 2c -> Schedule 2 line 2 -> 1040 line 17', label: 'investment interest expense election', remedy: 'requires Form 4952 and the Schedule D Tax Worksheet (TAX-11, Phase 12). The SAME missing form blocks Form 6251 line 2c, which is the difference between the regular-tax and AMT investment interest deductions and needs a SECOND Form 4952 filled in with AMT amounts — so this one kind names both, rather than Phase 29 inventing a second declaration for one taxpayer fact' },
     // ── Schedule 1 Part I's seven per-line kinds (TAX-30, Phase 27) ─────────
     //
     // `scheduleOneAdditionalIncome` -- one coarse row covering this whole
@@ -674,7 +675,39 @@ export const unmodeledKindRefusals = /** @type {const} */ ([
     // taxes, one 1040 line each, above. See `fjs/return/profile`'s own
     // vocabulary comment.
     { kind: 'advancePremiumTaxCreditAndOtherRepayments', line: 'Schedule 2 line 1a-1z -> 1040 line 17', label: 'excess advance premium tax credit repayment and the other Part I repayments', remedy: 'requires Form 8962, and for the clean-vehicle-credit and elective-payment-election recapture sub-lines Forms 8936 and 3800 (no phase yet)' },
-    { kind: 'alternativeMinimumTax', line: 'Schedule 2 line 2 -> 1040 line 17', label: 'alternative minimum tax', remedy: 'requires Form 6251 (TAX-33, Phase 29)' },
+    // ── Form 6251 Part I's own lines, one kind each (TAX-33, Phase 29) ──────
+    //
+    // The fifteen §56/§57 adjustments and preferences this engine cannot
+    // compute. Every one of them is an ADD-BACK, which is what makes this
+    // block different from every other in this table: a blank line here does
+    // not merely omit an item, it UNDERSTATES alternative minimum taxable
+    // income and therefore the tax. Refusing each by name is the only honest
+    // alternative to a silent zero.
+    //
+    // `line` names the FORM 6251 line first and the Schedule 2 line it reaches
+    // second, mirroring the Schedule 2 block above: a reader holding a Form
+    // 6251 needs the former and a reader holding a 1040 needs the latter.
+    //
+    // Two of Part I's unmodeled lines are absent from this block on purpose,
+    // because a kind for either already exists: line 2c (investment interest)
+    // is `investmentInterestForm4952` and line 2h (qualified small business
+    // stock) is `section1202Gain`, both far above. Each of those two rows now
+    // names its Form 6251 line alongside the line it already named.
+    { kind: 'amtDepletion', line: 'Form 6251 line 2d -> Schedule 2 line 2 -> 1040 line 17', label: 'the alternative minimum tax depletion adjustment', remedy: 'requires the depletion deduction refigured under §57(a)(1) with AMT income and deductions, and with the §611 deduction limited to the property\'s AMT-adjusted basis — a per-property computation for which this engine holds no document at all (no phase yet)' },
+    { kind: 'amtNetOperatingLossDeduction', line: 'Form 6251 lines 2e and 2f -> Schedule 2 line 2 -> 1040 line 17', label: 'the net operating loss add-back and the alternative tax net operating loss deduction', remedy: 'requires the ATNOL: every prior year\'s loss refigured under the AMT rules, limited to 90% of alternative minimum taxable income figured without it. That is a multi-year history this engine does not hold, and Schedule 1 line 8a — the regular deduction line 2e adds back — is itself the refused `otherIncome` kind. ONE kind covers both printed lines because they are two halves of one fact: 2e removes the regular deduction and 2f allows the AMT one in its place (no phase yet)' },
+    { kind: 'amtPrivateActivityBondInterest', line: 'Form 6251 line 2g -> Schedule 2 line 2 -> 1040 line 17', label: 'interest from specified private activity bonds', remedy: 'requires Form 1099-INT box 9, "Specified private activity bond interest", which vnd.fjs.1099int does not model. This is the SHARPEST gap on Form 6251 and the only one where the missing figure is a printed box on a dialect this engine already stores: box 9 is a SUBSET of box 8, which this engine does read into 1040 line 2a, so a filer holding municipal bonds has tax-exempt interest computed correctly for the regular tax and a §57(a)(5) preference that cannot be seen at all. Adding box 9 to vnd.fjs.1099int would close it outright (no phase yet)' },
+    { kind: 'amtEstatesAndTrusts', line: 'Form 6251 line 2j -> Schedule 2 line 2 -> 1040 line 17', label: 'the alternative minimum tax adjustment from an estate or trust', remedy: 'requires Schedule K-1 (Form 1041) box 12 code A, and this engine models no Form 1041 K-1 at all — DOC-24 (Phase 30) brings the partnership and S-corporation K-1s, not the fiduciary one (no phase yet)' },
+    { kind: 'amtDispositionOfProperty', line: 'Form 6251 line 2k -> Schedule 2 line 2 -> 1040 line 17', label: 'the difference between the AMT and regular-tax gain or loss on a disposition', remedy: 'requires the taxpayer\'s AMT BASIS in the property disposed of, which differs from the regular-tax basis by every adjustment made in every prior year — most commonly the §56(b)(3) incentive stock option spread, which increases AMT basis in the year of exercise and reduces the AMT gain whenever the shares are later sold. This engine computes that spread (Form 6251 line 2i) but cannot carry it forward: it holds no prior-year AMT basis document, and Form 3921 is issued for the exercise year only (no phase yet)' },
+    { kind: 'amtDepreciation', line: 'Form 6251 line 2l -> Schedule 2 line 2 -> 1040 line 17', label: 'the depreciation adjustment on assets placed in service after 1986', remedy: 'requires §56(a)(1)\'s alternative depreciation for every depreciable asset — a per-asset basis, method and placed-in-service date this engine holds for nothing, since vnd.fjs.business_expenses records Schedule C line totals rather than an asset register (no phase yet)' },
+    { kind: 'amtPassiveActivities', line: 'Form 6251 line 2m -> Schedule 2 line 2 -> 1040 line 17', label: 'the passive activity adjustment', remedy: 'requires §469 passive activity losses refigured with AMT amounts, which needs Form 8582 and the Schedule E activities behind it (Phase 30 brings Schedule E Parts II and III; Form 8582 has no phase yet)' },
+    { kind: 'amtLossLimitations', line: 'Form 6251 line 2n -> Schedule 2 line 2 -> 1040 line 17', label: 'the loss-limitation adjustment', remedy: 'requires the §465 at-risk and §1366(d) basis limitations refigured with AMT amounts, both of which need a partner\'s or shareholder\'s basis history this engine does not hold (no phase yet)' },
+    { kind: 'amtCirculationCosts', line: 'Form 6251 line 2o -> Schedule 2 line 2 -> 1040 line 17', label: 'the circulation expenditures adjustment', remedy: 'requires §173 circulation expenditures amortized over three years for the AMT rather than deducted currently. No document this engine holds identifies an expenditure as circulation costs, and the §59(e) election that removes the adjustment entirely is an election nothing records (no phase yet)' },
+    { kind: 'amtLongTermContracts', line: 'Form 6251 line 2p -> Schedule 2 line 2 -> 1040 line 17', label: 'the long-term contract adjustment', remedy: 'requires §460\'s percentage-of-completion method applied for the AMT to contracts accounted for otherwise, which needs per-contract costs and completion percentages on no information return (no phase yet)' },
+    { kind: 'amtMiningCosts', line: 'Form 6251 line 2q -> Schedule 2 line 2 -> 1040 line 17', label: 'the mining exploration and development costs adjustment', remedy: 'requires §§616/617 costs amortized over ten years for the AMT. Same shape as the circulation-costs row: no document identifies the expenditure, and the §59(e) election that removes the adjustment is unrecorded (no phase yet)' },
+    { kind: 'amtResearchAndExperimentalCosts', line: 'Form 6251 line 2r -> Schedule 2 line 2 -> 1040 line 17', label: 'the research and experimental costs adjustment', remedy: 'requires §174A expenditures amortized over ten years for the AMT, and the §59(e) election that removes the adjustment. Neither the expenditure nor the election appears on any document this engine holds (no phase yet)' },
+    { kind: 'amtPre1987InstallmentSales', line: 'Form 6251 line 2s -> Schedule 2 line 2 -> 1040 line 17', label: 'income from certain installment sales before January 1, 1987', remedy: 'requires the installment method disallowed for the AMT on pre-1987 dispositions — a thirty-nine-year-old transaction history this engine has no document type for and could not verify if it had (no phase yet)' },
+    { kind: 'amtIntangibleDrillingCosts', line: 'Form 6251 line 2t -> Schedule 2 line 2 -> 1040 line 17', label: 'the intangible drilling costs preference', remedy: 'requires §57(a)(2)\'s excess intangible drilling costs over 65% of net income from oil, gas and geothermal properties, computed per property. No document this engine holds reports a drilling cost, and the §59(e) 60-month write-off election that removes the preference is unrecorded (no phase yet)' },
+    { kind: 'amtOtherAdjustments', line: 'Form 6251 line 3 -> Schedule 2 line 2 -> 1040 line 17', label: 'other alternative minimum tax adjustments, including income-based related adjustments', remedy: 'the printed line collapses every remaining §56/§57 item plus the "related adjustments" the instructions list — the §179 deduction, business use of a home, conservation expenses, taxable IRA distributions where prior-year IRA deductions differed for the AMT, the self-employed health insurance and retirement plan deductions, and the IRA deduction under §219(b)(1)(B)\'s earned income limitation. Each is a limit recomputed on an AMT income base, and this engine models no AMT income base for any of them (no phase yet)' },
     // ── Phase 28's own two new rows (TAX-31) ────────────────────────────────
     //
     // `selfEmploymentTax` stood HERE until Phase 28 and is now MODELED. The
@@ -729,7 +762,7 @@ export const unmodeledKindRefusals = /** @type {const} */ ([
     { kind: 'dependentCareCredit', line: 'Schedule 3 line 2 -> 1040 line 20', label: 'the credit for child and dependent care expenses', remedy: 'requires Form 2441 Part II (no phase yet)' },
     { kind: 'residentialCleanEnergyCredit', line: 'Schedule 3 line 5a -> 1040 line 20', label: 'the residential clean energy credit', remedy: 'requires Form 5695 Part I (no phase yet)' },
     { kind: 'energyEfficientHomeImprovementCredit', line: 'Schedule 3 line 5b -> 1040 line 20', label: 'the energy efficient home improvement credit', remedy: 'requires Form 5695 Part II (no phase yet)' },
-    { kind: 'otherNonrefundableCredits', line: 'Schedule 3 line 6a-6z -> 1040 line 20', label: 'other nonrefundable credits', remedy: 'the printed form itself collapses thirteen lettered sub-lines here — among them the general business credit, the prior-year minimum tax credit, the NONrefundable half of the adoption credit and the credit for the elderly or disabled on Schedule R — and this engine models none of them (no phase yet)' },
+    { kind: 'otherNonrefundableCredits', line: 'Schedule 3 line 6a-6z -> 1040 line 20', label: 'other nonrefundable credits', remedy: 'the printed form itself collapses thirteen lettered sub-lines here — among them the general business credit, the prior-year minimum tax credit on FORM 8801, the NONrefundable half of the adoption credit and the credit for the elderly or disabled on Schedule R — and this engine models none of them. Form 8801 is the one to read twice now that Phase 29 computes the alternative minimum tax: AMT paid on DEFERRAL items (most of all the §56(b)(3) incentive stock option spread) becomes a credit against the REGULAR tax in later years, so a filer who owes AMT this year is owed something next year that this engine will not compute for them, and a filer carrying one in from 2024 cannot claim it here. It is multi-year by construction and no document this engine holds records a prior year\'s minimum tax (no phase yet)' },
     { kind: 'federalTaxWithheldOnOtherForms', line: '1040 line 25c', label: 'federal income tax withheld on other forms', remedy: 'no dialect models it (no phase yet)' },
     { kind: 'earnedIncomeCredit', line: '1040 line 27a', label: 'earned income credit', remedy: '§32(c)(3)’s qualifying-child test needs four facts `vnd.fjs.return_profile`’s dependents array does not carry — a checked relationship vocabulary, full-time-student status, permanent and total disability, and residency in the United States for more than half the year — and §32(c)(1) needs three about the filer that it does not carry either: an age between 25 and 65 for the childless credit, a valid social security number, and not being another taxpayer’s qualifying child. This engine holds none of the seven, and a wrong earned income credit is the most audited figure on the return; see fjs/todo/tax-27-earned-income-credit.md (no phase yet)' },
     { kind: 'refundableAdoptionCredit', line: '1040 line 30', label: 'refundable adoption credit', remedy: 'requires Form 8839 (no phase yet)' },
@@ -828,6 +861,16 @@ export const unmodeledKindRefusals = /** @type {const} */ ([
  * see `fjs/return/tripwire`'s own docstring for why an over-approximation
  * would be worse than no entry. An unused row here would be a description of
  * a refusal nothing can raise.
+ *
+ * **`alternativeMinimumTax` is the THIRD entry** (Phase 29, TAX-33), and it
+ * is the one whose tripwire is the most nearly conclusive of the three. A
+ * stored Form 3921 does not merely suggest an alternative minimum tax — it is
+ * an exercise of an incentive stock option, which §56(b)(3) makes a preference
+ * item, full stop; the only question left is the size of it. Its remedy is
+ * unusually long on purpose: declaring the kind makes the tax compute, and it
+ * ALSO walks the filer into a form whose Part I this engine mostly refuses, so
+ * the remedy names both halves rather than promising more than Phase 29
+ * delivers.
  */
 export const modeledKindDeclarationRemedies = /** @type {const} */ ([
     {
@@ -836,6 +879,18 @@ export const modeledKindDeclarationRemedies = /** @type {const} */ ([
         label: 'Additional Medicare Tax',
         remedy: 'declare additionalMedicareTax on the return profile and this engine computes Form 8959 '
             + 'from Form W-2 boxes 5 and 6, including the withholding your employer already made (TAX-20, Phase 23)',
+    },
+    {
+        kind: 'alternativeMinimumTax',
+        line: 'Schedule 2 line 2 -> 1040 line 17',
+        label: 'alternative minimum tax',
+        remedy: 'declare alternativeMinimumTax on the return profile and this engine computes '
+            + 'Form 6251 from your Forms 3921, the standard-deduction add-back and the '
+            + 'senior deduction, and charges only the EXCESS over your regular tax (TAX-33, '
+            + 'Phase 29). Note where that computation still stops: Form 6251 Part I\'s other '
+            + 'fifteen §56/§57 adjustments each refuse by name, and a return with qualified '
+            + 'dividends or capital gains refuses unless the Part III upper bound already '
+            + 'settles the tax at $0.00',
     },
     {
         kind: 'businessIncomeOrLoss',
@@ -1174,7 +1229,7 @@ export const classifyScope = declaredKinds => {
  * and `fjs/form8995` wiring that makes all three computable.
  * @type {number}
  */
-const expectedModeledKindCount = 33
+const expectedModeledKindCount = 34
 
 /**
  * The modeled set, hand-typed a SECOND time and in {@link kindVocabulary}'s
@@ -1213,6 +1268,7 @@ const everyModeledKindHandTyped = [
     'itemizedDeductions',
     'qualifiedBusinessIncomeDeduction',
     'seniorAndOtherScheduleOneADeductions',
+    'alternativeMinimumTax',
     'selfEmploymentTax',
     'additionalMedicareTax',
     'netInvestmentIncomeTax',
@@ -1287,9 +1343,18 @@ const everyModeledKindHandTyped = [
  * exactly the case where a hand-typed constant proves nothing on its own —
  * `theHandTypedListNamesEveryModeledKind` and the vocabulary count in
  * `fjs/return/profile`, which DID move by three, are what catch it.
+ *
+ * `62 -> 77` is Phase 29's own first commit (TAX-33), and it is fifteen ADDED
+ * rather than a coarse kind split: Form 6251 Part I's §56/§57 adjustments and
+ * preferences, one kind per printed line, none of them nameable before that
+ * form existed. Nothing is reclassified in the same step —
+ * `77 -> 76` is that phase's own ONE-kind reclassification one commit later
+ * (`alternativeMinimumTax`), beside the `fjs/schedule/2` line 2 wiring that
+ * makes it computable. Wire before reclassify, as every slice since Phase 13
+ * has done.
  * @type {number}
  */
-const expectedUnmodeledKindCount = 62
+const expectedUnmodeledKindCount = 76
 
 /**
  * The complete refusal message for a return declaring exactly
@@ -1355,11 +1420,11 @@ export const proof = {
         // Plan 13-10's own two-kind move) targets: removing one entry from
         // `modeledKinds` without touching `expectedModeledKindCount` must
         // redden this leaf.
-        modeledKindsIsExactlyThirty: () => {
+        modeledKindsIsExactlyThirtyFour: () => {
             assertEq(modeledKinds.length, expectedModeledKindCount)
             assertEq(new Set(modeledKinds).size, expectedModeledKindCount)
         },
-        unmodeledRefusalsIsExactlySixtyTwo: () => {
+        unmodeledRefusalsIsExactlySeventySix: () => {
             assertEq(unmodeledKindRefusals.length, expectedUnmodeledKindCount)
             assertEq(
                 new Set(unmodeledKindRefusals.map(r => r.kind)).size,
@@ -1611,6 +1676,132 @@ export const proof = {
                     ],
                 )
             }
+        },
+        // TAX-33, Phase 29: the fifteen Form 6251 Part I kinds, in the FORM'S
+        // own printed order, each naming its own printed line. The same shape
+        // as the Schedule 2 leaf above, and it exists for a sharper reason:
+        // every one of these is an ADD-BACK, so a row that named the wrong
+        // line would send a taxpayer to look for the wrong understatement.
+        //
+        // Hand-typed off `f6251.pdf` (2025), in printed order, and NOT derived
+        // by filtering the refusal table for rows whose `line` starts with
+        // "Form 6251" -- a list computed from the table under test could never
+        // notice a row missing.
+        //
+        // Lines 2a, 2b, 2c, 2h and 2i are absent, each for its own reason:
+        // 2a and 2i COMPUTE, 2b is a computed zero (see the leaf below), and
+        // 2c and 2h are named by `investmentInterestForm4952` and
+        // `section1202Gain`, which already existed.
+        theFifteenFormSixTwoFiveOneKindsNameTheirOwnPrintedLine: () => {
+            /** @type {readonly (readonly [Kind, string])[]} */
+            const expected = [
+                ['amtDepletion', 'Form 6251 line 2d'],
+                ['amtNetOperatingLossDeduction', 'Form 6251 lines 2e and 2f'],
+                ['amtPrivateActivityBondInterest', 'Form 6251 line 2g'],
+                ['amtEstatesAndTrusts', 'Form 6251 line 2j'],
+                ['amtDispositionOfProperty', 'Form 6251 line 2k'],
+                ['amtDepreciation', 'Form 6251 line 2l'],
+                ['amtPassiveActivities', 'Form 6251 line 2m'],
+                ['amtLossLimitations', 'Form 6251 line 2n'],
+                ['amtCirculationCosts', 'Form 6251 line 2o'],
+                ['amtLongTermContracts', 'Form 6251 line 2p'],
+                ['amtMiningCosts', 'Form 6251 line 2q'],
+                ['amtResearchAndExperimentalCosts', 'Form 6251 line 2r'],
+                ['amtPre1987InstallmentSales', 'Form 6251 line 2s'],
+                ['amtIntangibleDrillingCosts', 'Form 6251 line 2t'],
+                ['amtOtherAdjustments', 'Form 6251 line 3'],
+            ]
+            assertEq(expected.length, 15, 'fifteen kinds, hand-counted off the printed Form 6251')
+            // Every one is in the vocabulary, in the order listed -- read from
+            // `kindVocabulary`, which this module does not own.
+            expected
+                .map(([kind]) => kindVocabulary.findIndex(candidate => candidate === kind))
+                .reduce((previous, position) => {
+                    assert(
+                        position > previous,
+                        ['a Form 6251 kind is missing from the vocabulary, or is out of printed order',
+                            position, previous],
+                    )
+                    return position
+                }, -1)
+            for (const [kind, line] of expected) {
+                const row = unmodeledKindRefusals.find(r => r.kind === kind)
+                assert(row !== undefined, ['a Form 6251 Part I kind must refuse', kind])
+                if (row === undefined) {
+                    continue
+                }
+                assert(
+                    row.line.startsWith(`${line} `),
+                    ['a Form 6251 refusal row names the wrong printed line', kind, line, row.line])
+                // Every one of them reaches 1040 line 17 through Schedule 2
+                // line 2 -- the destination is what a reader can act on, and
+                // Phase 20's own verification found that erasing a destination
+                // survived an entire suite.
+                assert(
+                    row.line.includes('Schedule 2 line 2 -> 1040 line 17'),
+                    ['a Form 6251 row must name where the understated tax would have landed',
+                        kind, row.line])
+                // …and each REFUSES on its own, which is the whole point of
+                // giving them names.
+                const outcome = classifyScope([kind])
+                assert(outcome.kind === 'error', ['this Form 6251 kind must refuse', kind, outcome])
+            }
+            // The two Part I lines that are named by a kind which already
+            // existed, rather than by one of the fifteen. Asserted here, in
+            // the same leaf, so a later phase cannot quietly add a sixteenth
+            // kind for one of them and give one taxpayer fact two
+            // declarations.
+            /** @type {readonly (readonly [Kind, string])[]} */
+            const namedByAPreExistingKind = [
+                ['investmentInterestForm4952', 'Form 6251 line 2c'],
+                ['section1202Gain', 'Form 6251 line 2h'],
+            ]
+            for (const [kind, formLine] of namedByAPreExistingKind) {
+                const row = unmodeledKindRefusals.find(r => r.kind === kind)
+                assert(row !== undefined, ['expected the pre-existing kind to still refuse', kind])
+                if (row === undefined) {
+                    continue
+                }
+                assert(
+                    row.line.includes(formLine),
+                    ['the pre-existing row must ALSO name its Form 6251 line', kind, row.line])
+            }
+        },
+        // Form 6251 line 2b is the ONE unmodeled-looking Part I line whose
+        // zero is COMPUTED rather than refused, and this is the leaf that
+        // keeps that claim from decaying into a convenient assumption. The
+        // line reads a state or local tax refund off Schedule 1 line 1 or line
+        // 8z, and BOTH are unreachable here for reasons that live in other
+        // modules:
+        //
+        // - `fjs/document/1099g` refuses a present, non-zero box 2 at
+        //   VALIDATION, so no stored document can put a figure on Schedule 1
+        //   line 1. `fjs/return/tripwire`'s own
+        //   `theRejectedFourthEntryIsUnreachableBecauseValidationRefusesIt`
+        //   pins that half against the dialect itself.
+        // - Schedule 1 line 8z is the `otherIncome` kind, refused here.
+        //
+        // The day either changes, this leaf reddens and `fjs/form6251`'s
+        // line 2b stops being a computed zero.
+        formSixTwoFiveOneLineTwoBIsAComputedZeroNotARefusedOne: () => {
+            /** @type {readonly Kind[]} */
+            const lineTwoBRestsOn = ['taxableStateLocalRefunds', 'otherIncome']
+            for (const kind of lineTwoBRestsOn) {
+                const outcome = classifyScope([kind])
+                assert(
+                    outcome.kind === 'error',
+                    ['Form 6251 line 2b rests on this kind still being refused', kind, outcome])
+            }
+            // …and no SIXTEENTH `amt*` kind was invented for line 2b, which
+            // would have been the other way to handle it and would have
+            // refused every return with a state tax refund. Counted rather
+            // than named, so a kind added for ANY Part I line without a leaf
+            // in `theFifteenFormSixTwoFiveOneKindsNameTheirOwnPrintedLine`
+            // reddens here too.
+            assertEq(
+                kindVocabulary.filter(kind => kind.startsWith('amt')).length,
+                15,
+                'exactly fifteen Form 6251 Part I kinds; line 2b is not one of them')
         },
         // TAX-23/TAX-24, Phase 24: the thirteen Schedule 1 Part II kinds, in
         // SCHEDULE 1's own printed order, each naming its own printed line.
@@ -2059,7 +2250,6 @@ export const proof = {
             /** @type {readonly Kind[]} */
             const stillRefused = [
                 'advancePremiumTaxCreditAndOtherRepayments',
-                'alternativeMinimumTax',
                 'additionalTaxOnTaxFavoredAccounts',
                 'householdEmploymentTaxes',
                 'uncollectedTaxOnTipsOrGroupTermLife',
@@ -2071,8 +2261,8 @@ export const proof = {
                 'section965NetTaxLiabilityInstallment',
             ]
             assertEq(
-                stillRefused.length, 11,
-                'fourteen Schedule 2 kinds, less Phase 23\'s two and Phase 28\'s one')
+                stillRefused.length, 10,
+                'fourteen Schedule 2 kinds, less Phase 23\'s two, Phase 28\'s one and Phase 29\'s one')
             for (const kind of stillRefused) {
                 const outcome = classifyScope([kind])
                 assert(
@@ -2081,20 +2271,37 @@ export const proof = {
                 )
             }
             // Phase 23's brief named AMT and self-employment tax
-            // specifically. AMT is still refused and still names Form 6251;
-            // self-employment tax is MODELED as of Phase 28, so the
-            // assertions that were paired here are re-pointed to the fact
-            // that replaced them rather than deleted.
-            const amt = classifyScope(['alternativeMinimumTax'])
-            assert(amt.kind === 'error', ['the alternative minimum tax must still refuse', amt])
-            assert(amt.message.includes('Form 6251'), ['the AMT refusal must still name Form 6251', amt.message])
-            assert(
-                amt.message.includes('Schedule 2 line 2'),
-                ['the AMT refusal must name its own Schedule 2 line', amt.message],
-            )
+            // specifically, as the two kinds whose continued refusal proved
+            // the split had named things rather than widened them. BOTH are
+            // MODELED now — self-employment tax as of Phase 28,
+            // `alternativeMinimumTax` as of Phase 29 — so the pair that once
+            // stood for "this guard still guards something" is gone, and what
+            // replaces it is stated rather than deleted.
+            //
+            // The ten above are what still refuses on this schedule. The AMT's
+            // own assertions move to `fjs/form6251` and to
+            // `theFifteenFormSixTwoFiveOneKindsNameTheirOwnPrintedLine`, where
+            // fifteen NEW Schedule-2-line-2 kinds refuse by name — so this
+            // schedule's refusal surface grew in the same phase its most
+            // prominent refusal was computed away.
             assertEq(
                 classifyScope(['selfEmploymentTax']).kind, 'ok',
                 'self-employment tax is Schedule 2 line 4, and Phase 28 computes it')
+            assertEq(
+                classifyScope(['alternativeMinimumTax']).kind, 'ok',
+                'the alternative minimum tax is Schedule 2 line 2, and Phase 29 computes it')
+            // …and declaring it names the DECLARATION as the remedy, not a
+            // form to go and find, because the engine computes it once told.
+            const amt = tripwireRefusal([{
+                kind: 'alternativeMinimumTax',
+                evidence: 'a stored Form 3921 proves an incentive stock option exercise',
+            }])
+            assert(
+                amt.message.includes('declare alternativeMinimumTax'),
+                ['the remedy must be the declaration, not a form hunt', amt.message])
+            assert(
+                amt.message.includes('Form 6251'),
+                ['and it must still name the form the tax is computed on', amt.message])
         },
         // TAX-23/TAX-24, Phase 24: the SAME property one schedule over. The
         // ten Schedule 1 Part II kinds this phase did NOT wire must still
@@ -2730,11 +2937,12 @@ export const proof = {
         everyDeclarationRequiredKindIsModeledAndDescribable: () => {
             // `1 -> 2` is Phase 27's own `businessIncomeOrLoss`, the second
             // and only other use of this table since Phase 23 built it.
-            const expectedDeclarationRequiredCount = 2
+            // `2 -> 3` is Phase 29's own `alternativeMinimumTax`.
+            const expectedDeclarationRequiredCount = 3
             assertEq(
                 modeledKindDeclarationRemedies.length,
                 expectedDeclarationRequiredCount,
-                ['exactly two modeled kinds are declaration-required today', modeledKindDeclarationRemedies],
+                ['exactly three modeled kinds are declaration-required today', modeledKindDeclarationRemedies],
             )
             for (const entry of modeledKindDeclarationRemedies) {
                 assert(

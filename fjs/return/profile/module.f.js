@@ -262,6 +262,56 @@ export const kindVocabulary = /** @type {const} */ ([
     // half without the tax half.
     'advancePremiumTaxCreditAndOtherRepayments', // Schedule 2 line 1a-1z -> 17
     'alternativeMinimumTax',                // Schedule 2 line 2  -> 17
+    // ── Phase 29 (TAX-33): Form 6251 Part I's own lines, one kind each ──────
+    //
+    // Not a coarse kind being split -- `alternativeMinimumTax` above stays,
+    // and it is the kind for the TAX ITSELF, which Phase 29 computes. These
+    // fifteen are the §56/§57 ADJUSTMENTS AND PREFERENCES that feed it and
+    // which this engine cannot compute, one per printed line of Form 6251
+    // Part I, in the form's own order.
+    //
+    // **The reason they exist as kinds at all is the direction the error
+    // runs.** A zero on a Form 6251 Part I line does not merely omit
+    // something: it UNDERSTATES alternative minimum taxable income, and
+    // therefore the tax. Every other unmodeled item in this vocabulary has a
+    // printed line a reader can see is blank; these are add-backs, and a
+    // blank add-back looks exactly like no add-back. So each is nameable and
+    // each refuses the whole return when declared.
+    //
+    // **Lines 2c and 2h deliberately get no kind here.** Line 2c is the
+    // investment interest expense difference, which needs Form 4952 --
+    // exactly what `investmentInterestForm4952` (above, at the Schedule D Tax
+    // Worksheet) already names, for the same missing form. Line 2h is 7% of a
+    // §1202 exclusion, which needs the exclusion percentage `section1202Gain`
+    // already refuses. A second kind for either would give one taxpayer fact
+    // two declarations.
+    //
+    // **Lines 2e and 2f share ONE kind**, against this vocabulary's usual
+    // one-per-printed-line rule. They are two halves of a single fact: 2e adds
+    // the regular net operating loss deduction back and 2f allows the
+    // alternative-tax one in its place. A taxpayer has an NOL or does not, and
+    // could never truthfully declare one half.
+    //
+    // Line 2b (a state or local tax refund) gets no kind either, and that is
+    // the one case where a zero is COMPUTED rather than unmodeled:
+    // `fjs/document/1099g` refuses a non-zero box 2 at validation, so
+    // Schedule 1 line 1 cannot be non-zero here, and line 8z is `otherIncome`,
+    // already above.
+    'amtDepletion',                         // Form 6251 line 2d -> Sch 2 line 2
+    'amtNetOperatingLossDeduction',         // Form 6251 lines 2e/2f -> Sch 2 line 2
+    'amtPrivateActivityBondInterest',       // Form 6251 line 2g -> Sch 2 line 2
+    'amtEstatesAndTrusts',                  // Form 6251 line 2j -> Sch 2 line 2
+    'amtDispositionOfProperty',             // Form 6251 line 2k -> Sch 2 line 2
+    'amtDepreciation',                      // Form 6251 line 2l -> Sch 2 line 2
+    'amtPassiveActivities',                 // Form 6251 line 2m -> Sch 2 line 2
+    'amtLossLimitations',                   // Form 6251 line 2n -> Sch 2 line 2
+    'amtCirculationCosts',                  // Form 6251 line 2o -> Sch 2 line 2
+    'amtLongTermContracts',                 // Form 6251 line 2p -> Sch 2 line 2
+    'amtMiningCosts',                       // Form 6251 line 2q -> Sch 2 line 2
+    'amtResearchAndExperimentalCosts',      // Form 6251 line 2r -> Sch 2 line 2
+    'amtPre1987InstallmentSales',           // Form 6251 line 2s -> Sch 2 line 2
+    'amtIntangibleDrillingCosts',           // Form 6251 line 2t -> Sch 2 line 2
+    'amtOtherAdjustments',                  // Form 6251 line 3  -> Sch 2 line 2
     'selfEmploymentTax',                    // Schedule 2 line 4  -> 23
     // ── Phase 28 (TAX-31): the two Schedule SE facts nothing stored can
     // reveal, each its own kind because they are separate taxpayer facts
@@ -771,16 +821,22 @@ const expectedMoneyBoxFieldCount = 4
  * grows when a form arrives that can name something it could not name
  * before, and this is the first phase since Phase 20 where it grew for that
  * reason rather than by taking a coarse kind apart.
+ *
+ * `95 -> 110` is Phase 29's own (TAX-33), and it grows for that same reason
+ * a second time: Form 6251 arrives and can name fifteen §56/§57 adjustments
+ * and preferences that had no printed line in this engine before. NOTHING was
+ * split — `alternativeMinimumTax` stays exactly where it was and is the kind
+ * for the tax itself, which that phase computes.
  * @type {number}
  */
-const expectedKindCount = 95
+const expectedKindCount = 110
 
 export const proof = {
     dialectAndMediaType: () => {
         assertEq(dialect, 'vnd.fjs.return_profile')
         assertEq(mediaType, 'application/vnd.fjs.return_profile+json')
     },
-    kindVocabularyIsExactlyNinetyFive: () => {
+    kindVocabularyIsExactlyOneHundredAndTen: () => {
         assertEq(kindVocabulary.length, expectedKindCount)
         assertEq(new Set(kindVocabulary).size, kindVocabulary.length)
     },

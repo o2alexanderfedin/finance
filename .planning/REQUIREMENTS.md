@@ -795,17 +795,61 @@ itemizing, which is complete apart from the eight open MAINT items.
 
 ### Equity Compensation and AMT (DOC, TAX)
 
-- [ ] **DOC-22** *(M2, T2)*: `vnd.fjs.form3921` — ISO exercise. Not filed with the return, but
+- [x] **DOC-22** *(M2, T2)*: `vnd.fjs.form3921` — ISO exercise. Not filed with the return, but
       it carries the exercise price and FMV that drive both the AMT preference and basis.
-- [ ] **DOC-23** *(M2, T2)*: `vnd.fjs.form3922` — ESPP transfer, carrying what a qualifying vs
+      **Delivered (Phase 29.)** Boxes 1-6, the two per-share prices exactness-checked and the
+      share count through the new `fjs/document/share_count`. The spread `(box 4 − box 3) × box 5`
+      reaches Form 6251 line 2i and thence 1040 line 17, following the printed instructions' own
+      order of operations (each product rounded, the subtraction last). The basis half of the
+      requirement is NOT delivered: the AMT basis increase this exercise creates is a multi-year
+      fact, refused by name at `amtDispositionOfProperty` (Form 6251 line 2k).
+- [x] **DOC-23** *(M2, T2)*: `vnd.fjs.form3922` — ESPP transfer, carrying what a qualifying vs
       disqualifying disposition needs.
-- [ ] **TAX-33** *(M2, T3)*: **Form 6251**, Alternative Minimum Tax → Schedule 2 line 1. The
+      **Delivered (Phase 29.)** All eight boxes, audited one by one against this requirement's own
+      standard in `everyBoxADispositionNeedsRoundTripsVerbatim` — both holding-period endpoints,
+      both fair market values (the qualifying and disqualifying rules read DIFFERENT ones), the
+      price paid, the lookback price in box 8 whose ABSENCE is a fact, and the share count.
+      **Nothing computes from it, and it is not a stored document with no reader**: a stored Form
+      3922 alongside any reported sale REFUSES the return, naming the three facts that are
+      missing (which sale, qualifying or disqualifying, and whether the ordinary-income element is
+      already inside Form W-2 box 1).
+- [ ] **TAX-33** *(M2, T3)*: **Form 6251**, Alternative Minimum Tax → Schedule 2 line 2. The
       hardest computation remaining in the project, and the reason an ISO exercise can generate
       tax on income never received.
-- [ ] **TAX-34** *(M2, T2)*: **Form 8949 basis adjustment codes**, particularly code B for
+
+      **The printed destination is line 2, not line 1, and this text has been corrected.** Every
+      AMT reference says line 1, and that was true through TY2024; the TY2025 Schedule 2 (fetched
+      2026-08-16) prints line 1 as "Additions to tax" (1a-1z) and line 2 as "Alternative minimum
+      tax. Attach Form 6251". It matters: Form 6251 line 10 READS Schedule 2 line 1z, so an engine
+      putting the AMT on line 1 would have the form reading its own output.
+
+      **Phase 29 delivers Parts I and II and leaves this UNCHECKED for Part III.** What computes:
+      lines 1a/1b, line 2a's standard-deduction add-back, line 2i's ISO spread, line 4's
+      married-filing-separately add-back, the exemption and its 25% phase-out, the 26/28% schedule
+      with its halved MFS breakpoint, and line 11's EXCESS over the regular tax — end to end, on a
+      real fixture, at $292,479.00 of tax on income never received.
+
+      What does not: **Part III**, the twenty-nine-line worksheet that reapplies the 0/15/20%
+      preferential rates inside the AMT. Returns are not blanket-refused for it — Part III's own
+      line 40 takes the SMALLER of its result and the flat 26/28% figure, so that figure is a
+      rigorous upper bound and the engine returns an exact `$0.00` whenever the bound already
+      loses to the regular tax. But a filer with a large ISO spread AND qualified dividends is
+      exactly who this requirement's persona is, and that filer is refused. Fifteen §56/§57
+      adjustments on Part I are also refused, each by its own kind and each naming the document
+      or election that would supply it.
+- [x] **TAX-34** *(M2, T2)*: **Form 8949 basis adjustment codes**, particularly code B for
       equity compensation. Brokers routinely report $0 or unadjusted basis on 1099-B for RSU
       and ESPP sales; without the adjustment the vested value is **taxed twice**. Form 8949
       already exists — this is the adjustment column and its codes, not a new form.
+      **Delivered (Phase 29.)** All eighteen printed column (f) codes, in the table's own order,
+      each with a TOTAL disposition — one emitted (B), two refused by name (D and W, each stating
+      what a later phase has to decide), fifteen structurally unreachable with the input shape
+      that would reach each one. Column (g) derives the printed worksheet's two presentations of
+      one correction from box 12. **Nothing is adjusted that the taxpayer did not assert**: the
+      correction is a stored `vnd.fjs.basis_correction` naming its Form 1099-B by CAS hash, and
+      an assertion the engine cannot use is refused rather than dropped, in four different ways.
+      The double taxation is PRICED end to end at **$49,467.75** of federal income tax on
+      $150,000.00 of already-taxed wages.
 
 ### Pass-Through Income (DOC, TAX)
 
@@ -826,7 +870,7 @@ itemizing, which is complete apart from the eight open MAINT items.
 | TAX-28, TAX-29 | T2 | 26 - Retiree Completion | Retiree |
 | DOC-20, DOC-21, TAX-30 | T3 | 27 - 1099-NEC and Schedule C | Startup founder |
 | TAX-31, TAX-32 | T3 | 28 - Schedule SE and QBI | **Startup founder** — TAX-31 delivered; TAX-32 delivers Form 8995 only and stays open for 8995-A |
-| DOC-22, DOC-23, TAX-33, TAX-34 | T3 | 29 - Equity Compensation and AMT | FAANG + founder |
+| DOC-22, DOC-23, TAX-33, TAX-34 | T3 | 29 - Equity Compensation and AMT | **FAANG employee** — DOC-22, DOC-23 and TAX-34 delivered; TAX-33 delivers Form 6251 Parts I and II and stays open for Part III |
 | DOC-24, TAX-35 | T3 | 30 - Pass-Through Income | Startup founder |
 
 **25 requirements across 10 phases** — 120 in the document, 95 of them v1's. Each phase is a

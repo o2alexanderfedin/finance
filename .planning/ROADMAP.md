@@ -978,6 +978,7 @@ All five are closed with fixtures that assert the wrong answer beside the right 
 ### Phase 29: Equity Compensation and AMT
 **Requirements**: DOC-22 (3921), DOC-23 (3922), TAX-33 (Form 6251), TAX-34 (Form 8949 basis codes) · **Tier**: T3
 **Note**: TAX-34 closes a **double-taxation** bug for anyone with RSUs — brokers report $0 or unadjusted basis and the filer must adjust. Form 8949 already exists; this is its adjustment column.
+**Status**: DOC-22, DOC-23 and TAX-34 delivered. TAX-34's double taxation is priced end to end at **$49,467.75** of federal income tax on $150,000.00 of already-taxed wages. TAX-33 delivers Form 6251 Parts I and II — a real $292,479.00 alternative minimum tax on an exercise-and-hold, on Schedule 2 **line 2** (not line 1; the TY2025 form moved it) — and **stays open for Part III**, the preferential-rate worksheet a filer with both an ISO spread and qualified dividends needs. Fifteen §56/§57 adjustments on Part I are refused by name, each with its own kind.
 
 ### Phase 30: Pass-Through Income
 **Requirements**: DOC-24 (K-1, two dialects — 1065 and 1120-S box numbering differs), TAX-35 (Schedule E) · **Tier**: T3
