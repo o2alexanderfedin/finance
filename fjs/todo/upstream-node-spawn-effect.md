@@ -7,6 +7,14 @@ small and does not block progress.
 Target: `functionalscript` `fjs/effects/node/module.f.ts` / `module.js`. Checked against
 the version pinned in this repo's `package.json` (`functionalscript ^0.43.1`).
 
+**Re-checked 2026-08-17 against 0.45.0** (release commit `8804e783`, the current npm release),
+reading `fjs/effects/node/types.ts` at that SHA. **Still open, unchanged.** There is no `Spawn`
+type and no `'spawn'` operation; `Exec` is still the only subprocess primitive, and the `Fs` union
+is still `Mkdir | ReadFile | ReadBytes | Readdir | WriteFile | Rm | Rename | Exec | Access |
+CreateExclusive | WriteBytes | Stat`. The workaround below stands. (The bump itself did not land:
+0.44.0+ is not consumable here — see
+[upstream-mjs-migration.md](./upstream-mjs-migration.md).)
+
 ## The gap, precisely
 
 `fjs/effects/node` already has one subprocess primitive — `Exec`:

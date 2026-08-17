@@ -6,6 +6,12 @@ FJS gap must never be silent.
 Target: `functionalscript` `fjs/effects/module.f.ts`, `match`. Present in the version pinned
 in this repo's `package.json`.
 
+**Re-checked 2026-08-17 against 0.45.0** (release commit `8804e783`, the current npm release),
+reading `fjs/effects/module.f.mjs` at that SHA. **Still open, unchanged.** `match` still ends its
+lookup with `assert(handler !== null, command)` — it refuses by throwing rather than widening
+`MatchResult`, so `fjs/exec`'s `try` is still load-bearing. (The bump itself did not land: 0.44.0+
+is not consumable here — see [upstream-mjs-migration.md](./upstream-mjs-migration.md).)
+
 ## The gap
 
 `match(map)(effect)` looks the effect's `command` up in `map` through `at` — an

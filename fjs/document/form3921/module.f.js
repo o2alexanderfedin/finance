@@ -107,6 +107,7 @@ import { error, ok } from 'functionalscript/fjs/types/result/module.f.js'
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
 import { isHash } from 'functionalscript/fjs/media/revision/module.f.js'
 import { base, mediaTypeOf } from '../base/module.f.js'
+import { formRevisionError } from '../form_revision/module.f.js'
 import { moneyFieldError } from '../money_field/module.f.js'
 import { shareCountError } from '../share_count/module.f.js'
 
@@ -223,8 +224,9 @@ const expectedShareCountFieldCount = 1
  * @type {(r: FormThirtyNineTwentyOne) => Result<FormThirtyNineTwentyOne, FormThirtyNineTwentyOneError>}
  */
 export const checkReferences = r => {
-    if (r.formRevision.trim() === '') {
-        return error(`formRevision must not be empty or whitespace-only`)
+    const formRevisionMessage = formRevisionError(r.formRevision)
+    if (formRevisionMessage !== undefined) {
+        return error(formRevisionMessage)
     }
     if (!isHash(r.sourceArtifactHash)) {
         return error(`sourceArtifactHash is not a valid hash: ${r.sourceArtifactHash}`)

@@ -595,11 +595,37 @@ so they are scheduled rather than remembered. All are T3 — none blocks the v1 
       The note now widens the destructuring to `const [pr, pv]` first and compares
       `pv.protocolVersion`, with the broken version quoted so the correction is checkable.
 
-- [ ] **MAINT-06** *(T3)*: Take `functionalscript` 0.43.0. The project is pinned to `^0.41.0` while
-      `main` has moved two minor versions. Re-run the upstream-gap notes in `fjs/todo/` against the
-      new version — one such note has already been retired by an upstream fix once.
+- [x] **MAINT-06** *(T3)*: Take `functionalscript` 0.43.0. **Satisfied literally, and its intent is
+      blocked upstream — measured, not assumed.** `package.json` declares `^0.43.1`, so the version
+      this requirement names is taken and current within its own major line; the four
+      `fjs/todo/upstream-*.md` notes were re-checked against upstream `main` and one was **retired
+      and deleted** (`upstream-json-parse-split.md` — `parse` is tokenizer-backed and total at
+      0.43.1, and its own text mandated deletion once adopted).
 
-- [ ] **MAINT-07** *(T3)*: Share `executeRun`'s step sequence with `runExecuteRunViaFixture`.
+      The intent — *be on the newest release* — is not met and cannot be met from inside this
+      repository:
+
+      | version | release commit | `tsc --noEmit` |
+      |---|---|---|
+      | **0.43.1 (kept)** | `cc93a3ca` | **0 errors** |
+      | 0.44.0 | `37db36c0` | **1287 errors** |
+      | 0.45.0 (npm current) | `8804e783` | **1288 errors** |
+
+      Upstream migrated to `.f.mjs` and then **dropped the `.js` emit**, so every
+      `'functionalscript/.../module.f.js'` specifier is `TS2307`. Rewriting all **396 files / 1900
+      occurrences** was measured on a throwaway snapshot and **still leaves 288 errors across 60
+      files**, because the shipped `.d.mts` files `import type` the core vocabulary
+      (`Cas`, `Effect`, `Result`, `Unknown`, `OperationMap`, …) and never re-export it. Every
+      mechanical fix for that residue is a cast, an `any`, or a re-declared local type — **all three
+      forbidden by AGENTS.md**.
+
+      **Resolved by decision rather than left open:** stay on 0.43.1, and the upstream change that
+      unblocks the bump is specified in `fjs/todo/upstream-mjs-migration.md` (one
+      `export type { … }` per relocated type, beside the `import type` already there), with its
+      retirement condition. Half-doing the migration would have traded a working build for 288
+      errors and a forbidden construct at each one.
+
+- [x] **MAINT-07** *(T3)*: Share `executeRun`'s step sequence with `runExecuteRunViaFixture`.
       The rule duplication was removed in 09-05/09-06 (`classifyRunOutcome` now lives once, in
       `fjs/report/guard`), but the ORDER of `loadProgram` → `buildRunSnapshot` → `buildHostMap` →
       `interpret` is still written out twice. Reorder or insert a step in `executeRun` and the
@@ -607,7 +633,7 @@ so they are scheduled rather than remembered. All are T3 — none blocks the v1 
       is observable end to end. The helper itself must stay — `fjs/effects/node/virtual` genuinely
       cannot compose a write with an import in one session.
 
-- [ ] **MAINT-08** *(T3)*: Remove or share the two small duplications a dead-code audit found: the
+- [x] **MAINT-08** *(T3)*: Remove or share the two small duplications a dead-code audit found: the
       `formRevision must not be empty` check written out byte-identically in
       `fjs/document/1099int` and `fjs/document/w2` (conspicuous because its sibling money-box rule
       *is* correctly shared via `moneyFieldError`), and `artifactSubject` in
@@ -1237,9 +1263,9 @@ them. Week 0 is research's addition in front of the plan's Week 1.
 | MAINT-03 | T3 | Phase 17 - Documentation Truth Pass | Backlog | Pending |
 | MAINT-04 | T3 | Phase 17 - Documentation Truth Pass | Backlog | Pending |
 | MAINT-05 | T3 | Phase 17 - Documentation Truth Pass | Backlog | Pending |
-| MAINT-06 | T3 | Phase 18 - Dependency and Duplication Debt | Backlog | Pending |
-| MAINT-07 | T3 | Phase 18 - Dependency and Duplication Debt | Backlog | Pending |
-| MAINT-08 | T3 | Phase 18 - Dependency and Duplication Debt | Backlog | Pending |
+| MAINT-06 | T3 | Phase 18 - Dependency and Duplication Debt | Blocked upstream | Pending |
+| MAINT-07 | T3 | Phase 18 - Dependency and Duplication Debt | Complete | Verified |
+| MAINT-08 | T3 | Phase 18 - Dependency and Duplication Debt | Complete | Verified |
 | EXEC-01 | T0 | Phase 3 - The Restricted Interpreter | Week 1 | Done |
 | EXEC-02 | T0 | Delivered upstream (fjs 0.41.0, functionalscript#1419) | Week 1 | Done |
 | EXEC-03 | T0 | Phase 3 - The Restricted Interpreter | Week 1 | Done |
