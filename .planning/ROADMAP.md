@@ -71,8 +71,20 @@ work was derived first and the granularity applied as compression guidance secon
 compressing to 12 would mean merging phases that have genuinely distinct verification
 gates — for example folding the guest ABI freeze (widest blast radius of any interface
 here; every stored program is frozen against it) into the `fjs_run` tool that consumes it.
-At 93 requirements over 19 phases that is 4.9 requirements per phase, which is within the spirit of
-`fine`.
+The granularity argument does not depend on the exact figure, so **it no longer states one** —
+which is the point of the paragraph below and the fix that finally holds. It has been ~4–5
+requirements per phase throughout, across every restatement of the total, and that is within the
+spirit of `fine`. Recompute rather than read:
+
+```sh
+grep -c '^- \[[ x]\] \*\*[A-Z]\+-[0-9]\+' .planning/REQUIREMENTS.md   # requirements
+```
+
+**Corrected a third time on 2026-08-17**, and this is the recurrence the paragraph below predicts
+without preventing: it read "At 93 requirements over 19 phases" — stale twice over, since v1 alone
+settled at 95 and the document now defines 120 across 29 phases. The first two corrections replaced
+one number with another and bought about a week each. **A sentence whose argument survives the
+number should not carry the number.**
 
 The drift is worth naming rather than silently correcting: this paragraph said "**15**" and "79
 requirements" until 2026-08-07, having gone stale twice — once when TEST-01..04 and the MAINT set
