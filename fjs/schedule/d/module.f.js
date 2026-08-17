@@ -99,6 +99,9 @@ import { form8949 } from '../../form8949/module.f.js'
 import { capitalLossCarryoverWorksheet } from '../../tax/carryover/module.f.js'
 
 /** @import { OneZeroNineNineB } from '../../document/1099b/module.f.js' */
+/** @import { BasisCorrection } from '../../document/basis_correction/module.f.js' */
+/** @import { FormThirtyNineTwentyTwo } from '../../document/form3922/module.f.js' */
+/** @import { Form8949Row } from '../../form8949/module.f.js' */
 /** @import { OneZeroNineNineDiv } from '../../document/1099div/module.f.js' */
 /** @import { PriorYearCapitalLoss } from '../../document/prior_year_capital_loss/module.f.js' */
 /** @import { Source } from '../../report/line/module.f.js' */
@@ -121,11 +124,23 @@ import { capitalLossCarryoverWorksheet } from '../../tax/carryover/module.f.js'
  * `priorYearCapitalLossCarryover` is OPTIONAL — its absence is a legitimate
  * `0n` on lines 6/14, never a refusal (module docstring, "Prior-year
  * carryover").
+ * `basisCorrections` and `employeeStockPurchaseForms` are Phase 29's own
+ * widening (TAX-34/DOC-23), passed straight through to `fjs/form8949` — this
+ * module reads neither itself. **Both are OPTIONAL**, unlike Form 8949's own
+ * required lists, and the asymmetry is deliberate: `fjs/form8949` is called by
+ * exactly one place and a forgotten list there would be a silent wiring bug,
+ * while `scheduleD` is called from a dozen proof fixtures whose subject is the
+ * loss cap or the 28% worksheet and which have no business restating that they
+ * hold no equity compensation. An absent list is an empty one, which is a
+ * legitimate "the broker got every basis right" — the same reasoning
+ * `priorYearCapitalLossCarryover` above already carries.
  * @typedef {{
  *   readonly status: IndividualFilingStatus,
  *   readonly brokerageForms: readonly Stored<OneZeroNineNineB>[],
  *   readonly dividendForms: readonly Stored<OneZeroNineNineDiv>[],
  *   readonly priorYearCapitalLossCarryover?: Stored<PriorYearCapitalLoss>,
+ *   readonly basisCorrections?: readonly Stored<BasisCorrection>[],
+ *   readonly employeeStockPurchaseForms?: readonly Stored<FormThirtyNineTwentyTwo>[],
  * }} ScheduleDInputs
  */
 
@@ -143,6 +158,9 @@ import { capitalLossCarryoverWorksheet } from '../../tax/carryover/module.f.js'
  *   readonly line16: bigint, readonly line18: bigint, readonly line19: bigint,
  *   readonly line21: bigint,
  *   readonly line7aCapitalGainOrLoss: bigint,
+ *   readonly line16Unadjusted: bigint,
+ *   readonly basisCorrectionOverstatement: bigint,
+ *   readonly form8949Rows: readonly Form8949Row[],
  *   readonly sources: readonly Source[],
  * }} ScheduleDOk
  */
@@ -193,7 +211,14 @@ const sumBoxOverDocuments = documents => boxPath => read => {
 export const scheduleD = inputs => {
     const { status, brokerageForms, dividendForms, priorYearCapitalLossCarryover } = inputs
 
-    const form8949Outcome = form8949(brokerageForms)
+    const form8949Outcome = form8949({
+        brokerageForms,
+        // An absent list is an empty one -- see `ScheduleDInputs`'s own
+        // docstring for why these two are optional here and required one
+        // module down.
+        basisCorrections: inputs.basisCorrections ?? [],
+        employeeStockPurchaseForms: inputs.employeeStockPurchaseForms ?? [],
+    })
     if (form8949Outcome.kind === 'error') {
         // Threaded VERBATIM — the SAME shaped refusal, no new
         // `fjs/return/scope` kind, no line below this point computed.
@@ -409,6 +434,28 @@ export const scheduleD = inputs => {
         ? line16
         : (line16 === 0n ? 0n : line21)
 
+    // ── TAX-34: the UNCORRECTED figure, carried out beside the corrected one
+    //
+    // Not a printed Schedule D line. `line16Unadjusted` is what line 16 would
+    // have been with no `vnd.fjs.basis_correction` at all, rebuilt from the
+    // four categories' own `unadjustedValue`s and the SAME lines 3-6 and 10-14
+    // the real line 16 used — never recomputed by a second traversal, which
+    // could disagree with the first. `basisCorrectionOverstatement` is the
+    // difference: the amount of already-taxed compensation this return would
+    // otherwise have taxed a second time.
+    //
+    // **It is the GAIN's overstatement, not the AGI's.** Where line 16 is a
+    // loss the $3,000/$1,500 cap on line 21 absorbs part or all of it, so the
+    // figure that actually reaches 1040 line 7a moves by less. Naming the
+    // field for what it measures is the honest option; a reader pricing the
+    // tax effect has to go through the cap themselves.
+    const unadjustedLine7 = line1a + categoryA.unadjustedValue + categoryB.unadjustedValue
+        + line3 + line4 + line5 + line6
+    const unadjustedLine15 = line8a + categoryD.unadjustedValue + categoryE.unadjustedValue
+        + line10 + line11 + line12 + line13 + line14
+    const line16Unadjusted = unadjustedLine7 + unadjustedLine15
+    const basisCorrectionOverstatement = line16Unadjusted - line16
+
     /** @type {readonly Source[]} */
     const sources = [
         ...categoryA.sources, ...categoryB.sources, ...categoryD.sources, ...categoryE.sources,
@@ -422,6 +469,9 @@ export const scheduleD = inputs => {
         line8a, line8b, line9, line10, line11, line12, line13, line14, line15,
         line16, line18, line19, line21,
         line7aCapitalGainOrLoss,
+        line16Unadjusted,
+        basisCorrectionOverstatement,
+        form8949Rows: form8949Outcome.rows,
         sources,
     }
 }
@@ -777,6 +827,182 @@ export const proof = {
             assertEq(source.documentHash, 'doc-carryover-worked-example-b')
             assertEq(source.boxPath, 'priorYearCapitalLossCarryoverWorksheet(shortTerm)')
             assertEq(source.value, '6000.00')
+        },
+    },
+    // TAX-34/Phase 29: the corrected figure and the uncorrected one, side by
+    // side on the schedule the 1040 actually reads.
+    basisCorrection: {
+        // THE DOUBLE-TAXATION FIGURE, PRICED, at the schedule.
+        //
+        // 1,000 RSUs vest at $150.00 and are sold the same day for
+        // $150,000.00. The broker reports basis $0.00 and checks box 12.
+        //
+        //   Schedule D line 1b   Form 8949 category A, column (h)      $0.00
+        //   Schedule D line 7    = line 1b                             $0.00
+        //   Schedule D line 16   = line 7 + line 15                    $0.00
+        //   1040 line 7a         a zero year routes exactly $0.00      $0.00
+        //
+        // and the uncorrected counterpart, hand-computed the same way:
+        //
+        //   line 1b uncorrected  $150,000.00 - $0.00            $150,000.00
+        //   line 16 uncorrected                                 $150,000.00
+        //
+        // so `basisCorrectionOverstatement` is $150,000.00 of already-taxed
+        // wages that would have been taxed a second time as a capital gain.
+        theRsuOverstatementIsPricedOnScheduleD: () => {
+            const sale = brokerageForm('doc-rsu-sched-d')({
+                box1dProceeds: '150000.00',
+                box1eCostOrOtherBasis: '0.00',
+                box2ShortTermGainOrLoss: true,
+                box12BasisReportedToIrs: true,
+            })
+            /** @type {Stored<BasisCorrection>} */
+            const correction = {
+                documentHash: 'doc-fix-sched-d',
+                value: {
+                    dialect: 'vnd.fjs.basis_correction',
+                    recipientTin: '222-22-2222',
+                    taxYear: 2025,
+                    brokerageDocumentHash: 'doc-rsu-sched-d',
+                    correctedCostOrOtherBasis: '150000.00',
+                    reason: 'RSU vesting value already included in Form W-2 box 1',
+                },
+            }
+            const result = expectOk(scheduleD({
+                status: 'single',
+                brokerageForms: [sale],
+                dividendForms: [],
+                basisCorrections: [correction],
+            }))
+            assertEq(result.line1b, 0n, 'line 1b = the CORRECTED category A total, $0.00')
+            assertEq(result.line7, 0n)
+            assertEq(result.line16, 0n)
+            assertEq(result.line7aCapitalGainOrLoss, 0n, 'nothing reaches 1040 line 7a')
+            assertEq(
+                result.line16Unadjusted, 15000000n,
+                'the UNCORRECTED line 16: $150,000.00 - $0.00')
+            assertEq(
+                result.basisCorrectionOverstatement, 15000000n,
+                'the double taxation this one document removes: $150,000.00')
+            // The Form 8949 row travels out with the schedule, so a report can
+            // print the column (f) code and the column (g) amount the totals
+            // were built from rather than reconstructing them.
+            assertEq(result.form8949Rows.length, 1)
+            const row = assertNotNullish(result.form8949Rows[0], 'one row')
+            assertEq(row.columnFCode, 'B')
+            assertEq(row.columnGAdjustment, -15000000n)
+        },
+        // THE CONTROL, and it is criterion 5 at this layer: a return with no
+        // corrections has `line16Unadjusted === line16` and an overstatement of
+        // exactly zero. Run against a fixture with REAL Part I and Part II
+        // activity, so the equality is a computed agreement rather than two
+        // untouched zeros.
+        aReturnWithNoCorrectionsPricesNoOverstatement: () => {
+            const stGainDoc = brokerageForm('doc-control-st')({
+                box1dProceeds: '5000.00',
+                box1eCostOrOtherBasis: '3000.00',
+                box2ShortTermGainOrLoss: true,
+                box12BasisReportedToIrs: true,
+            })
+            const ltGainDoc = brokerageForm('doc-control-lt')({
+                box1dProceeds: '9000.00',
+                box1eCostOrOtherBasis: '4000.00',
+                box2LongTermGainOrLoss: true,
+            })
+            const result = expectOk(scheduleD({
+                status: 'single',
+                brokerageForms: [stGainDoc, ltGainDoc],
+                dividendForms: [],
+            }))
+            assertEq(result.line16, 700000n, '$2,000.00 + $5,000.00 = $7,000.00')
+            assertEq(result.line16Unadjusted, 700000n, 'the same figure, nothing corrected')
+            assertEq(result.basisCorrectionOverstatement, 0n)
+            for (const row of result.form8949Rows) {
+                assertEq(row.columnFCode, '', 'no code on an uncorrected row')
+                assertEq(row.columnGAdjustment, 0n)
+            }
+        },
+        // The uncorrected figure is rebuilt from the SAME non-Form-8949 lines
+        // the real line 16 uses, not from the category totals alone. A
+        // prior-year carryover moves line 6 by -$6,000.00, and both figures
+        // must move with it -- otherwise `basisCorrectionOverstatement` would
+        // silently absorb every non-8949 line as though it were an
+        // overstatement. Reuses `fjs/tax/carryover`'s own independently
+        // verified Worked Example B.
+        theUncorrectedFigureCarriesEveryOtherLineToo: () => {
+            /** @type {Stored<PriorYearCapitalLoss>} */
+            const carryoverDoc = {
+                documentHash: 'doc-carryover-unadjusted',
+                value: {
+                    dialect: 'vnd.fjs.prior_year_capital_loss',
+                    recipientTin: '222-22-2222',
+                    taxYear: 2024,
+                    priorYearFormLine15: '20000.00',
+                    priorYearScheduleDLine7: '-10000.00',
+                    priorYearScheduleDLine15: '1000.00',
+                    priorYearScheduleDLine21: '-3000.00',
+                },
+            }
+            const sale = brokerageForm('doc-carryover-sale')({
+                box1dProceeds: '20000.00',
+                box1eCostOrOtherBasis: '0.00',
+                box2ShortTermGainOrLoss: true,
+                box12BasisReportedToIrs: true,
+            })
+            const result = expectOk(scheduleD({
+                status: 'single',
+                brokerageForms: [sale],
+                dividendForms: [],
+                priorYearCapitalLossCarryover: carryoverDoc,
+                basisCorrections: [{
+                    documentHash: 'doc-fix-carryover',
+                    value: {
+                        dialect: 'vnd.fjs.basis_correction',
+                        recipientTin: '222-22-2222',
+                        taxYear: 2025,
+                        brokerageDocumentHash: 'doc-carryover-sale',
+                        correctedCostOrOtherBasis: '20000.00',
+                        reason: 'RSU vesting value already included in Form W-2 box 1',
+                    },
+                }],
+            }))
+            assertEq(result.line6, -600000n, 'the $6,000.00 short-term carryover, as a negative')
+            // Corrected: $0.00 of gain, less the $6,000.00 carryover.
+            assertEq(result.line16, -600000n, 'corrected line 16 = -$6,000.00')
+            // Uncorrected: $20,000.00 of gain, less the SAME $6,000.00.
+            assertEq(result.line16Unadjusted, 1400000n, 'uncorrected line 16 = $14,000.00')
+            // …and the overstatement is the $20,000.00 correction alone, NOT
+            // the carryover, which appears identically in both.
+            assertEq(result.basisCorrectionOverstatement, 2000000n, '$20,000.00, the correction alone')
+            // The cap caveat the field's own docstring names, exercised: the
+            // corrected line 16 is a $6,000.00 loss, so 1040 line 7a is capped
+            // at -$3,000.00 and moves by far less than the gain did.
+            assertEq(result.line7aCapitalGainOrLoss, -300000n, 'capped at $3,000.00, single filer')
+        },
+        // Form 8949's refusals thread through unchanged: an unmatched
+        // correction stops the whole schedule, naming the document.
+        anUnmatchedCorrectionPropagatesVerbatim: () => {
+            const outcome = scheduleD({
+                status: 'single',
+                brokerageForms: [],
+                dividendForms: [],
+                basisCorrections: [{
+                    documentHash: 'doc-fix-orphan-sched-d',
+                    value: {
+                        dialect: 'vnd.fjs.basis_correction',
+                        recipientTin: '222-22-2222',
+                        taxYear: 2025,
+                        brokerageDocumentHash: 'doc-nowhere',
+                        correctedCostOrOtherBasis: '1.00',
+                        reason: 'names a document this return does not hold',
+                    },
+                }],
+            })
+            assertEq(outcome.kind, 'error', ['expected the refusal to propagate', outcome])
+            if (outcome.kind !== 'error') {
+                throw ['expected error', outcome]
+            }
+            assert(outcome.message.includes('doc-nowhere'), [outcome.message])
         },
     },
     // This module never carries a `dialect`/`mediaType` tag -- it computes
