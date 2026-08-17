@@ -172,6 +172,7 @@ import { dialect as formThirtyNineTwentyTwoDialect } from '../../document/form39
 import { dialect as basisCorrectionDialect } from '../../document/basis_correction/module.f.js'
 import { dialect as k1PartnershipDialect } from '../../document/k1_1065/module.f.js'
 import { dialect as k1SCorporationDialect } from '../../document/k1_1120s/module.f.js'
+import { dialect as k1EstateTrustDialect } from '../../document/k1_1041/module.f.js'
 
 /** @import { Effect, OperationMap } from 'functionalscript/fjs/effects/module.f.js' */
 /** @import { CasOp } from '../../guest/module.f.js' */
@@ -202,6 +203,7 @@ import { dialect as k1SCorporationDialect } from '../../document/k1_1120s/module
 /** @import { BasisCorrection } from '../../document/basis_correction/module.f.js' */
 /** @import { K1Partnership } from '../../document/k1_1065/module.f.js' */
 /** @import { K1SCorporation } from '../../document/k1_1120s/module.f.js' */
+/** @import { K1EstateTrust } from '../../document/k1_1041/module.f.js' */
 
 // ── The rendered wire shape ──────────────────────────────────────────────────
 
@@ -243,7 +245,7 @@ import { dialect as k1SCorporationDialect } from '../../document/k1_1120s/module
  * `vnd.fjs.revision`, a future addition) falls straight through
  * {@link collectDocument} untouched — never coerced into a bucket, never
  * treated as a zero.
- * @typedef {ReturnProfile | W2 | OneZeroNineNineInt | OneZeroNineNineDiv | OneZeroNineNineB | OneZeroNineNineR | Ssa1099 | ItemizedDeductions | MedicalExpenses | PriorYearCapitalLoss | OneZeroNineNineG | Adjustments | OneZeroNineEightE | OneZeroNineEightT | Credits | Ira | PriorYearIraBasis | OneZeroNineNineNec | BusinessExpenses | FormThirtyNineTwentyOne | FormThirtyNineTwentyTwo | BasisCorrection | K1Partnership | K1SCorporation} EngineDocument
+ * @typedef {ReturnProfile | W2 | OneZeroNineNineInt | OneZeroNineNineDiv | OneZeroNineNineB | OneZeroNineNineR | Ssa1099 | ItemizedDeductions | MedicalExpenses | PriorYearCapitalLoss | OneZeroNineNineG | Adjustments | OneZeroNineEightE | OneZeroNineEightT | Credits | Ira | PriorYearIraBasis | OneZeroNineNineNec | BusinessExpenses | FormThirtyNineTwentyOne | FormThirtyNineTwentyTwo | BasisCorrection | K1Partnership | K1SCorporation | K1EstateTrust} EngineDocument
  */
 
 /**
@@ -285,6 +287,7 @@ import { dialect as k1SCorporationDialect } from '../../document/k1_1120s/module
  *   readonly basisCorrectionForms: readonly Stored<BasisCorrection>[],
  *   readonly partnershipK1Forms: readonly Stored<K1Partnership>[],
  *   readonly sCorporationK1Forms: readonly Stored<K1SCorporation>[],
+ *   readonly estateTrustK1Forms: readonly Stored<K1EstateTrust>[],
  * }} Collected
  */
 
@@ -360,6 +363,7 @@ export const taxReturnReportSource = [
     '        basisCorrectionForms: [],',
     '        partnershipK1Forms: [],',
     '        sCorporationK1Forms: [],',
+    '        estateTrustK1Forms: [],',
     '    }',
     '    const runYear = ctx.taxParams.taxYear',
     '    const noteYearMismatch = documentHash => doc => acc => {',
@@ -401,6 +405,7 @@ export const taxReturnReportSource = [
     '        if (doc.dialect === \'vnd.fjs.basis_correction\') { return { ...acc, basisCorrectionForms: [...acc.basisCorrectionForms, stored] } }',
     '        if (doc.dialect === \'vnd.fjs.k1_1065\') { return { ...acc, partnershipK1Forms: [...acc.partnershipK1Forms, stored] } }',
     '        if (doc.dialect === \'vnd.fjs.k1_1120s\') { return { ...acc, sCorporationK1Forms: [...acc.sCorporationK1Forms, stored] } }',
+    '        if (doc.dialect === \'vnd.fjs.k1_1041\') { return { ...acc, estateTrustK1Forms: [...acc.estateTrustK1Forms, stored] } }',
     '        return undefined',
     '    }',
     '    const collect = documentHash => doc => acc => {',
@@ -462,6 +467,7 @@ export const taxReturnReportSource = [
     '            basisCorrectionForms: acc.basisCorrectionForms,',
     '            partnershipK1Forms: acc.partnershipK1Forms,',
     '            sCorporationK1Forms: acc.sCorporationK1Forms,',
+    '            estateTrustK1Forms: acc.estateTrustK1Forms,',
     '        })',
     '        if (outcome.kind === \'error\') {',
     '            return { kind: \'error\', message: outcome.message, unmodeled: outcome.unmodeled }',
@@ -537,6 +543,7 @@ const emptyCollected = {
     basisCorrectionForms: [],
     partnershipK1Forms: [],
     sCorporationK1Forms: [],
+    estateTrustK1Forms: [],
 }
 
 /**
@@ -587,6 +594,7 @@ const routeDocument = documentHash => doc => acc => {
     if (doc.dialect === basisCorrectionDialect) { return { ...acc, basisCorrectionForms: [...acc.basisCorrectionForms, { documentHash, value: doc }] } }
     if (doc.dialect === k1PartnershipDialect) { return { ...acc, partnershipK1Forms: [...acc.partnershipK1Forms, { documentHash, value: doc }] } }
     if (doc.dialect === k1SCorporationDialect) { return { ...acc, sCorporationK1Forms: [...acc.sCorporationK1Forms, { documentHash, value: doc }] } }
+    if (doc.dialect === k1EstateTrustDialect) { return { ...acc, estateTrustK1Forms: [...acc.estateTrustK1Forms, { documentHash, value: doc }] } }
     return undefined
 }
 
@@ -708,6 +716,7 @@ const renderReturn = ctx => acc => {
         basisCorrectionForms: acc.basisCorrectionForms,
         partnershipK1Forms: acc.partnershipK1Forms,
         sCorporationK1Forms: acc.sCorporationK1Forms,
+        estateTrustK1Forms: acc.estateTrustK1Forms,
     })
     if (outcome.kind === 'error') {
         return { kind: 'error', message: outcome.message, unmodeled: outcome.unmodeled }
@@ -1301,14 +1310,21 @@ const dispatchedDialects = [
     // twin.
     k1PartnershipDialect,
     k1SCorporationDialect,
+    // TAX-35's own, the TWENTY-FIFTH: `vnd.fjs.k1_1041`, added here in the SAME
+    // commit that adds it to the source text and to the twin. It was registered
+    // in both dialect registries by an earlier commit on this branch and read
+    // by NOTHING -- the `box13StatutoryEmployee` shape -- and this entry is
+    // half of what closes that; `fjs/schedule/e`'s `beneficiaryRow` is the
+    // other half.
+    k1EstateTrustDialect,
 ]
 
 /**
- * `19 -> 24` in Phase 30: three of the five are Phase 29's, restored, and two
+ * `24 -> 25` is TAX-35's own `vnd.fjs.k1_1041`. `19 -> 24` in Phase 30: three of the five are Phase 29's, restored, and two
  * are this phase's own. See the list's own comments for both halves.
  * @type {number}
  */
-const expectedDispatchedDialectCount = 24
+const expectedDispatchedDialectCount = 25
 
 export const proof = {
     // The phase's central number check, and the reason this module exists:
