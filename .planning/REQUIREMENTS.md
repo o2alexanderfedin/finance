@@ -853,10 +853,88 @@ itemizing, which is complete apart from the eight open MAINT items.
 
 ### Pass-Through Income (DOC, TAX)
 
-- [ ] **DOC-24** *(M2, T3)*: `vnd.fjs.k1_1065` and `vnd.fjs.k1_1120s` — partnership and S-corp
+- [x] **DOC-24** *(M2, T3)*: `vnd.fjs.k1_1065` and `vnd.fjs.k1_1120s` — partnership and S-corp
       Schedule K-1. Two dialects, not one: the box numbering differs.
+      **Delivered (Phase 30.)** Twenty-nine printed Part III fields on the 1065 face and
+      twenty-two on the 1120-S, each compared against a hand-typed printed table in both
+      directions. The "two dialects, not one" clause is *priced* rather than described: the two
+      faces collide on printed boxes 4, 5, 6, 7, 8, 9 and 14, so a shared schema would read an
+      S corporation's short-term capital gain as a partnership's royalty and would look for
+      self-employment earnings in a box that, on the 1120-S face, holds a checkbox.
+      `theBoxNumberingDiffersFromThePartnershipForm` and
+      `theTwoScheduleK1SchemasAreNotTheSameSchema` are the two leaves that would redden if either
+      dialect were ever "harmonised" onto the other's numbering.
+
+      **Box 1 computes on both. Every other fixed-caption money box refuses by name when
+      non-zero** — seventeen of eighteen on the 1065, twelve of thirteen on the 1120-S — each
+      naming the real line elsewhere on the return it would have reached, because §702(a) and
+      §1366(a)(1) require each separately stated item to be taken into account separately and a
+      dropped one is an understatement.
+
+      **1065 box G is a printed PAIR and exactly one tick is required.** §1402(a)(13) and
+      §469(h)(2) both turn on partner type, and neither a general nor a limited default is
+      available: the error is worth about 15.3% of 92.35% of the share in whichever direction it
+      was made. A blob ticking neither or both is refused at storage.
+
+      **The one field that is not a printed box** is the §469 material-participation
+      determination, in a vocabulary shared by both dialects. It rides on the K-1 because §469 is
+      applied activity by activity; absence is *unstated* and refuses at `fjs/schedule/e`; and
+      §469(h)(2) OVERRIDES it for a limited partner, so an assertion of material participation
+      beside a ticked "Limited partner" box is refused rather than honoured.
+
+      The eight (1065) and six (1120-S) CODED boxes are arrays of `(code, amount)` rows, and their
+      vocabulary belongs to `fjs/schedule/e` — the identical division `vnd.fjs.business_expenses`
+      makes with `fjs/schedule/c`. A row's amount is absent-able, because box 20 code Z prints
+      `STMT`.
 - [ ] **TAX-35** *(M2, T3)*: **Schedule E** Parts II and III → Schedule 1 line 5. A founder
       with a partnership stake or S-corp shares cannot file without it.
+
+      **Phase 30 delivers Part II and leaves this UNCHECKED for Part III.** The persona is
+      unblocked — a founder with a partnership stake or S-corporation shares can file — but the
+      requirement names two parts and one of them does not compute.
+
+      What computes: Part II lines 27-32 from both K-1 dialects, and Part V's line 41, which is
+      the destination the requirement names. Line 41 combines printed lines 26, 32, 37, 39 and 40,
+      four of them documented zeros, and reaches **Schedule 1 line 5 → 1040 line 8 through
+      Schedule 1's own Part I total** rather than by a side channel. The founder's
+      self-employment tax is charged or not charged according to the entity: a general partner's
+      1065 box 14 code A reaches printed Schedule SE line 2, which names that box in its own
+      caption, and an S-corporation shareholder's share never does (Rev. Rul. 59-221). The pair
+      is priced end to end at **$11,303.64 against $0.00** on the same $80,000.00, with the
+      Schedule E halves asserted EQUAL so that "the only difference is the entity type" is a
+      checked claim rather than a description.
+
+      What does not: **Part III**, estates and trusts, which needs a Schedule K-1 (Form 1041) —
+      a THIRD Schedule K-1 with its own box numbering again, where a beneficiary's box 5 is other
+      portfolio income and a partner's box 5 is interest. This phase built the two dialects
+      DOC-24 asked for and deliberately did not guess a third from them, because guessing a box
+      numbering is the exact failure DOC-24 exists to prevent. Part III's printed lines are
+      modeled here as documented zeros so line 41 adds them, and a beneficiary is refused by name.
+
+      Parts I (rental real estate and royalties), IV (REMICs) and Part V's own line 40 (Form
+      4835) are outside this requirement and each refuses by name through its own declared kind —
+      the coarse `rentalRealEstateRoyaltiesPartnershipsSCorps` is split into **five**
+      per-Schedule-E-part kinds, so a filer with rental property is told that Part I is what is
+      missing rather than being refused for "Schedule E".
+
+      **A LOSS refuses, per row**, consistently with Phase 27's Schedule C decision and for one
+      more reason than it had: §704(d)/§1366(d) basis is a multi-year history the K-1's own
+      §704(b) capital-account box is not, and §465 and §469 stand behind it exactly as they do on
+      Schedule C line 32. Per row rather than on the line-32 total, because netting one entity's
+      loss against another's profit before testing either is the arithmetic §704(d) exists to
+      stop.
+
+      **§199A is wired only in the direction that is honest.** A PRESENT 1065 box 20 code Z or
+      1120-S box 17 code V refuses, because the components live on an attached statement this
+      engine does not hold; an ABSENT one computes, under Reg. §1.199A-6(b)(3)(iii)'s presumption
+      that an unreported share of positive qualified business income is zero.
+
+      **Nothing is routed.** TAX-35 asks to route the separately stated items this engine already
+      models and refuse the rest by name; every one of them refuses by name instead, quoting box,
+      code and amount. Each routing — box 5 interest to 1040 line 2b, box 6b to line 3a, boxes
+      8/9a to Schedule D — is a separate wiring into a line that already computes from its own
+      document family, and a wrong one is a silent error in a figure that already looks right.
+      That is the half of this requirement still open besides Part III.
 
 ### v2 Traceability
 
@@ -871,7 +949,7 @@ itemizing, which is complete apart from the eight open MAINT items.
 | DOC-20, DOC-21, TAX-30 | T3 | 27 - 1099-NEC and Schedule C | Startup founder |
 | TAX-31, TAX-32 | T3 | 28 - Schedule SE and QBI | **Startup founder** — TAX-31 delivered; TAX-32 delivers Form 8995 only and stays open for 8995-A |
 | DOC-22, DOC-23, TAX-33, TAX-34 | T3 | 29 - Equity Compensation and AMT | **FAANG employee** — DOC-22, DOC-23 and TAX-34 delivered; TAX-33 delivers Form 6251 Parts I and II and stays open for Part III |
-| DOC-24, TAX-35 | T3 | 30 - Pass-Through Income | Startup founder |
+| DOC-24, TAX-35 | T3 | 30 - Pass-Through Income | **Startup founder** — DOC-24 delivered; TAX-35 delivers Schedule E Part II end to end and stays open for Part III and for routing the separately stated items |
 
 **25 requirements across 10 phases** — 120 in the document, 95 of them v1's. Each phase is a
 vertical slice that ends with something that works: a persona whose return computes, or a named
