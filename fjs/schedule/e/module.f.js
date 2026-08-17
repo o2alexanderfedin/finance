@@ -229,6 +229,7 @@ import { materialParticipationNamed } from '../../document/k1_common/module.f.js
 /** @import { ReturnProfile } from '../../return/profile/module.f.js' */
 /** @import { K1Partnership } from '../../document/k1_1065/module.f.js' */
 /** @import { K1SCorporation } from '../../document/k1_1120s/module.f.js' */
+/** @import { K1EstateTrust } from '../../document/k1_1041/module.f.js' */
 /** @import { CodedEntry } from '../../document/k1_common/module.f.js' */
 /** @import { ReportLine, Source } from '../../report/line/module.f.js' */
 
@@ -255,6 +256,20 @@ import { materialParticipationNamed } from '../../document/k1_common/module.f.js
  */
 
 /**
+ * The pass-through entity whose separate-statement rule a refusal must cite.
+ *
+ * **Deliberately NOT a widening of {@link EntityType}.** That type is printed
+ * line 28 column (b) and its vocabulary is the printed page's — there is no
+ * `E` to enter in that column, because an estate or trust is reported in
+ * printed Part III, whose own table has no such column at all. What the two
+ * share is only that a refusal message must name the right statute, and `'E'`
+ * names §652(b)/§662(b) where `'P'` names §702(a) and `'S'` §1366(a)(1).
+ * Keeping them separate is what stops a beneficiary row ever reaching printed
+ * line 28.
+ * @typedef {EntityType | 'E'} PassThroughType
+ */
+
+/**
  * ONE Schedule K-1, of either dialect, reduced to the facts printed Schedule E
  * Part II needs — so the two dialects meet at exactly one place and every rule
  * below is written once.
@@ -276,6 +291,36 @@ import { materialParticipationNamed } from '../../document/k1_common/module.f.js
  *   readonly selfEmploymentEarningsCents: bigint,
  *   readonly passive: boolean,
  * }} ScheduleERow
+ */
+
+/**
+ * ONE `vnd.fjs.k1_1041` reduced to the facts printed Schedule E **Part III**
+ * needs — the beneficiary counterpart of {@link ScheduleERow}, and a separate
+ * type rather than a widening of it.
+ *
+ * The printed tables genuinely differ. Part II's line 28 has a column (b)
+ * *"P or S"* and five income/loss columns split passive from nonpassive; Part
+ * III's line 33 has an *"Employer identification number"* column and exactly
+ * four — (c) passive deduction or loss allowed, (d) passive income, (e)
+ * deduction or loss, (f) other income. A row that cannot be entered on line 28
+ * should not have the type of one.
+ *
+ * **`selfEmploymentEarningsCents` is a STRUCTURAL zero and is carried out
+ * anyway**, for `sCorporationRow`'s reason: a reader should see the term exists
+ * and is zero because §1402(a) does not reach a beneficiary, rather than by
+ * oversight. `theBeneficiaryAddsNoSelfEmploymentEarnings` is what holds it to
+ * zero, and mutating the literal reddens it.
+ * @typedef {{
+ *   readonly documentHash: string,
+ *   readonly entityName: string,
+ *   readonly employerIdentificationNumber: string,
+ *   readonly recipientTin: string,
+ *   readonly ordinaryBusinessIncomeCents: bigint,
+ *   readonly ordinaryBusinessIncomePrinted: string | undefined,
+ *   readonly boxPath: string,
+ *   readonly selfEmploymentEarningsCents: bigint,
+ *   readonly passive: boolean,
+ * }} ScheduleEBeneficiaryRow
  */
 
 // ── Local helpers (reimplemented, not imported from `fjs/schedule/c`) ─────────
@@ -364,11 +409,16 @@ const codedRow = rows => code => (rows ?? []).find(row => row.code === code)
  * `corrected` is stored on both dialects and READ BY NOTHING, so this engine
  * genuinely cannot tell the two cases apart. It refuses rather than choosing,
  * naming the employer identification number both documents carry.
- * @type {(entityIdentificationNumber: string) => (entityName: string) => ScheduleERefusal}
+ * `printedLine` names the printed table the pair would have been entered on —
+ * line 28 for Part II's partnerships and S corporations, line 33 for Part
+ * III's estates and trusts. It is a parameter rather than a constant because
+ * the rule is now shared by two printed parts, and a message naming the wrong
+ * one sends a reader to the wrong table.
+ * @type {(printedLine: string) => (entityIdentificationNumber: string) => (entityName: string) => ScheduleERefusal}
  */
-export const duplicateEntityRefusal = entityIdentificationNumber => entityName => ({
+export const duplicateEntityRefusal = printedLine => entityIdentificationNumber => entityName => ({
     kind: 'error',
-    message: `Schedule E Part II line 28: this return carries TWO Schedule K-1s from the same `
+    message: `${printedLine}: this return carries TWO Schedule K-1s from the same `
         + `entity, ${entityName}, employer identification number ${entityIdentificationNumber}. `
         + `They are either one document transcribed twice or an original and its correction, and `
         + `this engine cannot tell those apart — the printed "corrected" box is stored on both `
@@ -388,13 +438,18 @@ export const duplicateEntityRefusal = entityIdentificationNumber => entityName =
  * assertion: reading an absent determination as either answer decides a
  * question only the taxpayer can answer, and the two answers move Form 8960
  * line 4a in opposite directions.
- * @type {(entityName: string) => (entityType: EntityType) => ScheduleERefusal}
+ * @type {(entityName: string) => (entityType: PassThroughType) => ScheduleERefusal}
  */
 export const materialParticipationUnstatedRefusal = entityName => entityType => ({
     kind: 'error',
-    message: `Schedule E Part II line 28 for ${entityName}: the Schedule K-1 does not state `
-        + `whether you materially participated in this ${entityType === 'P' ? 'partnership' : 'S corporation'}. `
-        + `The printed line has two column pairs — passive (f and g) and nonpassive (h, i and j) `
+    message: `${entityType === 'E' ? 'Schedule E Part III line 33' : 'Schedule E Part II line 28'} `
+        + `for ${entityName}: the Schedule K-1 does not state `
+        + `whether you materially participated in this ${entityType === 'P' ? 'partnership'
+            : entityType === 'S' ? 'S corporation'
+                : 'estate or trust'}. `
+        + `The printed line has ${entityType === 'E'
+            ? 'a passive column (d) and a nonpassive column (f), which is what page 2 of the Schedule K-1 (Form 1041) means by "column (d) or (f)"'
+            : 'two column pairs — passive (f and g) and nonpassive (h, i and j)'} `
         + `— and §469(h)(1)'s "regular, continuous, and substantial" test is a facts-and-`
         + `circumstances determination (Temp. Reg. §1.469-5T's seven tests) that no information `
         + `return reports. It decides, through §1411(c)(2)(A), whether this income is net `
@@ -426,6 +481,43 @@ export const lossLimitationsRefusal = entityName => entityType => lossCents => (
         + `itself, and letting it reach Schedule 1 line 5 would understate the tax while moving `
         + `adjusted gross income and every figure that depends on it. A PROFIT computes; a loss `
         + `refuses (the basis, at-risk and passive-loss limitations, no phase yet)`,
+})
+
+/**
+ * **A LOSS in box 6 of a Schedule K-1 (Form 1041)** — and the authority is
+ * NOT Part II's.
+ *
+ * `lossLimitationsRefusal` cites §704(d)/§1366(d), the basis limitations on a
+ * partner's or shareholder's loss. Neither reaches a beneficiary, and citing
+ * them here would be a plausible-looking wrong answer: a beneficiary is
+ * generally allocated **no loss at all**. §643(a) computes distributable net
+ * income without one, and §652(b)/§662(b) pass through only the character of
+ * what distributable net income contains. §642(h) is the one provision that
+ * passes a loss out, and it does so **only on termination** — in the estate's
+ * or trust's final taxable year — where the printed form reports it in **box
+ * 11** as a coded final-year deduction, not in box 6.
+ *
+ * So a negative box 6 is one of exactly two things, and both are refusals: a
+ * transcription of the fiduciary's own figure rather than the beneficiary's
+ * share, or a final-year item entered in the wrong box. Neither is a number to
+ * net against anything.
+ * @type {(entityName: string) => (lossCents: bigint) => ScheduleERefusal}
+ */
+export const beneficiaryLossRefusal = entityName => lossCents => ({
+    kind: 'error',
+    message: `Schedule E Part III line 33 for ${entityName}: box 6 of the Schedule K-1 (Form 1041) `
+        + `reports a LOSS of ${-lossCents} cents, and a beneficiary is generally allocated no loss `
+        + `at all. §643(a) computes distributable net income without one, and §652(b)/§662(b) pass `
+        + `through only the character of what distributable net income contains. §642(h) is the `
+        + `single provision that passes a loss out to a beneficiary, and it does so ONLY on `
+        + `termination — the estate's or trust's FINAL taxable year — where the printed form reports `
+        + `it in BOX 11 as a coded final-year deduction rather than in box 6. This is deliberately `
+        + `not §704(d)'s or §1366(d)'s basis limitation, which is what Part II refuses under: `
+        + `neither statute reaches a beneficiary, and citing one would name the wrong reason. So a `
+        + `negative box 6 is either the fiduciary's own figure transcribed in place of the `
+        + `beneficiary's share, or a final-year item entered in the wrong box, and both are `
+        + `corrections to the record rather than an amount to carry to Schedule 1 line 5. Refusing `
+        + `rather than netting a loss no provision allows this beneficiary`,
 })
 
 /**
@@ -545,15 +637,18 @@ export const section199AInformationRefusal = entityName => box => code => ({
  * coded box on both dialects, quoting the box, the code and the amount, and
  * naming §702(a)/§1366(a)(1)'s separate-statement rule as the reason it may
  * not simply be dropped.
- * @type {(entityName: string) => (entityType: EntityType) => (box: string) => (code: string) => (amount: string) => ScheduleERefusal}
+ * @type {(entityName: string) => (entityType: PassThroughType) => (box: string) => (code: string) => (amount: string) => ScheduleERefusal}
  */
 export const unroutedCodedItemRefusal = entityName => entityType => box => code => amount => ({
     kind: 'error',
     message: `Schedule K-1 for ${entityName}: ${box} code ${code} carries ${amount}, a separately `
         + `stated item this engine has no line for. `
-        + `${entityType === 'P' ? '§702(a)' : '§1366(a)(1)'} requires each such item to be taken `
+        + `${entityType === 'P' ? '§702(a)'
+            : entityType === 'S' ? '§1366(a)(1)'
+                : '§652(b)/§662(b)'} requires each such item to be taken `
         + `into account SEPARATELY on its own line elsewhere on the return, so it belongs neither `
-        + `on Schedule E Part II — which takes only box 1's ordinary business income — nor `
+        + `on ${entityType === 'E' ? 'Schedule E Part III — which takes only box 6\'s ordinary business income —'
+            : 'Schedule E Part II — which takes only box 1\'s ordinary business income —'} nor `
         + `nowhere. Dropping it would understate the tax where the item is income and overstate `
         + `it where the item is a deduction, and in both cases silently. Refusing rather than `
         + `computing a return that is short by a figure the entity did report (no phase yet)`,
@@ -589,36 +684,6 @@ export const partIRentalRealEstateAndRoyalties = () => ({
         + 'and $150,000 of modified adjusted gross income, would then decide how much of a loss '
         + 'is allowed at all. Refusing rather than computing a Schedule E missing a whole part '
         + '(no phase yet)',
-})
-
-/**
- * **Part III, Income or Loss From Estates and Trusts (lines 33-37).** Modeled
- * as printed lines that are documented zeros, and REFUSED by name for a
- * beneficiary who declares it.
- *
- * TAX-35 asks to *"model or refuse by name; state which"*. This is the
- * statement: the printed lines exist here and carry zeros that feed line 41,
- * so a reader sees Part III addressed rather than skipped; and the income
- * itself refuses, because it arrives on a **Schedule K-1 (Form 1041)** — a
- * THIRD Schedule K-1, with its own box numbering again. A beneficiary's box 5
- * is *other portfolio and nonbusiness income* where a partner's box 5 is
- * interest, which is precisely the collision DOC-24's two dialects exist to
- * prevent — so this phase built the two it was asked for and did not guess a
- * third from them.
- * @type {() => ScheduleERefusal}
- */
-export const partIIIEstatesAndTrusts = () => ({
-    kind: 'error',
-    message: 'Schedule E Part III (lines 33-37), estate and trust income: this engine does not '
-        + 'model it. The income arrives on a Schedule K-1 (Form 1041), which is a THIRD Schedule '
-        + 'K-1 with its own box numbering — a beneficiary\'s box 5 is other portfolio and '
-        + 'nonbusiness income where a partner\'s box 5 is interest, and box 11 carries the final-'
-        + 'year deductions and excess losses that pass through on termination. Phase 30 built the '
-        + 'Form 1065 and Form 1120-S faces and deliberately did not guess a third from them, '
-        + 'because guessing a box numbering is the exact failure DOC-24\'s "two dialects, not '
-        + 'one" exists to prevent. The printed Part III lines are modeled here as documented '
-        + 'zeros so line 41 adds them, and a beneficiary is refused by name rather than handed a '
-        + 'Schedule E silently missing their income (no phase yet)',
 })
 
 /**
@@ -725,7 +790,7 @@ const sCorporationCodedBoxes = /** @type {const} */ ([
  * Sweeps one document's coded boxes for a non-zero amount this engine does not
  * route. Written once over a `(field, printedBox, passThroughCodes)` table so
  * the two dialects share the rule and differ only in the table.
- * @type {(entityName: string) => (entityType: EntityType) => (boxes: readonly (readonly [string, string, readonly string[]])[]) => (rowsOf: (field: string) => readonly CodedEntry[] | undefined) => ScheduleERefusal | { readonly kind: 'ok' }}
+ * @type {(entityName: string) => (entityType: PassThroughType) => (boxes: readonly (readonly [string, string, readonly string[]])[]) => (rowsOf: (field: string) => readonly CodedEntry[] | undefined) => ScheduleERefusal | { readonly kind: 'ok' }}
  */
 const codedBoxSweep = entityName => entityType => boxes => rowsOf => {
     for (const [field, printedBox, passThroughCodes] of boxes) {
@@ -890,6 +955,104 @@ export const sCorporationRow = document => {
     }
 }
 
+/**
+ * The `vnd.fjs.k1_1041` coded boxes, and the codes let through: **none**.
+ *
+ * Box 9's codes A, B and C are directly apportioned deductions — depreciation,
+ * depletion and amortization — which page 2 routes to line 33 column (c) or
+ * (e), the *deduction* columns this engine holds at documented zeros. They are
+ * therefore swept like every other coded amount rather than passed through:
+ * letting one ride into column (d) or (f) would enter a deduction as income.
+ *
+ * Boxes 11, 12, 13 and 14 are the final-year deductions, the AMT items, the
+ * credits and *other information*; none has a destination on this schedule at
+ * all.
+ */
+const estateTrustCodedBoxes = /** @type {const} */ ([
+    ['box9DirectlyApportionedDeductions', 'box 9', /** @type {readonly string[]} */ ([])],
+    ['box11FinalYearDeductions', 'box 11', /** @type {readonly string[]} */ ([])],
+    ['box12AlternativeMinimumTaxItems', 'box 12', /** @type {readonly string[]} */ ([])],
+    ['box13CreditsAndCreditRecapture', 'box 13', /** @type {readonly string[]} */ ([])],
+    ['box14OtherInformation', 'box 14', /** @type {readonly string[]} */ ([])],
+])
+
+/**
+ * One `vnd.fjs.k1_1041` reduced to a {@link ScheduleEBeneficiaryRow}, or the
+ * refusal that stops the return. **This is the reader `vnd.fjs.k1_1041` did not
+ * have.**
+ *
+ * A registered dialect nothing reads is the `box13StatutoryEmployee` defect
+ * Phase 27 found in `vnd.fjs.w2`: a field, or here a whole face, transcribed
+ * and stored and consumed by no computation, so nothing can ever notice it
+ * being wrong. That is what this function closes.
+ *
+ * The check order is {@link sCorporationRow}'s, and the two differences are
+ * both structural rather than omissions:
+ * 1. **The coded sweep lets no code through.** There is no box 20 code Z and no
+ *    box 17 code V here — this face carries no §199A information at all,
+ *    because §199A(c)(3)(A) qualified business income is the *entity's* and an
+ *    estate or trust apportions it under §199A(f)(1)(B) through box 14, which
+ *    the sweep refuses by name.
+ * 2. **The loss refuses under §642(h)/§643, not §704(d)** — see
+ *    {@link beneficiaryLossRefusal}.
+ *
+ * `selfEmploymentEarningsCents` is a structural zero: §1402(a) reaches the
+ * trade or business *carried on* by the taxpayer, and a beneficiary of an
+ * estate or trust does not carry on the fiduciary's business. It is the same
+ * position an S-corporation shareholder is in under Rev. Rul. 59-221, reached
+ * by a different route.
+ *
+ * The existing §1411(c)(6) gate then handles the passive case unchanged, and
+ * for a beneficiary it always bites when the column is passive, because the
+ * self-employment term is zero by construction.
+ * @type {(document: Stored<K1EstateTrust>) => { readonly kind: 'ok', readonly row: ScheduleEBeneficiaryRow } | ScheduleERefusal}
+ */
+export const beneficiaryRow = document => {
+    const k1 = document.value
+    const entityName = k1.payerName ?? `estate or trust ${k1.payerTin}`
+    const swept = codedBoxSweep(entityName)('E')(estateTrustCodedBoxes)(
+        field => field === 'box9DirectlyApportionedDeductions' ? k1.box9DirectlyApportionedDeductions
+            : field === 'box11FinalYearDeductions' ? k1.box11FinalYearDeductions
+                : field === 'box12AlternativeMinimumTaxItems' ? k1.box12AlternativeMinimumTaxItems
+                    : field === 'box13CreditsAndCreditRecapture' ? k1.box13CreditsAndCreditRecapture
+                        : k1.box14OtherInformation)
+    if (swept.kind === 'error') {
+        return swept
+    }
+    const ordinaryBusinessIncomeCents = boxCents(k1.box6OrdinaryBusinessIncome)
+    if (ordinaryBusinessIncomeCents < 0n) {
+        return beneficiaryLossRefusal(entityName)(ordinaryBusinessIncomeCents)
+    }
+    // §1402(a) reaches a trade or business carried on BY the taxpayer. A
+    // beneficiary does not carry on the fiduciary's, so there is no box to read
+    // and no entity type to ask about -- the same structural zero
+    // `sCorporationRow` writes out under Rev. Rul. 59-221, reached by a
+    // different route.
+    const selfEmploymentEarningsCents = 0n
+    const stated = materialParticipationNamed(k1.materialParticipation)
+    if (stated === undefined) {
+        return materialParticipationUnstatedRefusal(entityName)('E')
+    }
+    const passive = stated === 'didNotMateriallyParticipate'
+    if (passive && ordinaryBusinessIncomeCents > selfEmploymentEarningsCents) {
+        return passiveIncomeOutsideSelfEmploymentRefusal(entityName)(ordinaryBusinessIncomeCents)(selfEmploymentEarningsCents)
+    }
+    return {
+        kind: 'ok',
+        row: {
+            documentHash: document.documentHash,
+            entityName,
+            employerIdentificationNumber: k1.payerTin,
+            recipientTin: k1.recipientTin,
+            ordinaryBusinessIncomeCents,
+            ordinaryBusinessIncomePrinted: k1.box6OrdinaryBusinessIncome,
+            boxPath: 'box6OrdinaryBusinessIncome',
+            selfEmploymentEarningsCents,
+            passive,
+        },
+    }
+}
+
 // ── Part II: lines 27 through 32 ─────────────────────────────────────────────
 
 /**
@@ -996,13 +1159,15 @@ export const scheduleEPartII = profile => rows => {
     }
 }
 
-// ── Parts III, IV and V's printed lines, as documented zeros ─────────────────
+// ── Part III's computed lines, and Parts IV and V's documented zeros ─────────
 
 /**
  * Part III's printed fields (lines 33-37), Part IV's (38-39) and Part V's
- * (40-43). Every one but line 41 is a documented zero; see this module's own
- * docstring for which part each refuses through.
+ * (40-43). Part III's columns (d) and (f) now carry real readings; every other
+ * line but 41 is a documented zero. See this module's own docstring for which
+ * part each refuses through.
  * @typedef {{
+ *   readonly beneficiaryRows: readonly ScheduleEBeneficiaryRow[],
  *   readonly line33c: ReportLine, readonly line33d: ReportLine,
  *   readonly line33e: ReportLine, readonly line33f: ReportLine,
  *   readonly line34aD: ReportLine, readonly line34aF: ReportLine,
@@ -1018,9 +1183,18 @@ export const scheduleEPartII = profile => rows => {
 /**
  * Parts III, IV and V, plus Part I's own line 26 — every printed line that
  * feeds line 41, and line 41 itself.
- * @type {(profile: Stored<ReturnProfile>) => (line32: ReportLine) => ScheduleERemainingParts}
+ *
+ * **`beneficiaryRows` is the second parameter and it is not optional.** Part
+ * III used to be four documented zeros, so this function needed nothing but
+ * line 32; now that columns (d) and (f) read real documents, a caller that
+ * cannot supply the rows is a caller that would silently produce a Schedule E
+ * missing a beneficiary's income. An empty array is the honest way to say
+ * "no Schedule K-1 (Form 1041)", and it reproduces the old behaviour exactly —
+ * `documentLine` falls back to the profile-cited zero when no row supplied a
+ * source.
+ * @type {(profile: Stored<ReturnProfile>) => (line32: ReportLine) => (beneficiaryRows: readonly ScheduleEBeneficiaryRow[]) => ScheduleERemainingParts}
  */
-export const scheduleERemainingParts = profile => line32 => {
+export const scheduleERemainingParts = profile => line32 => beneficiaryRows => {
     const zero = profileDeclaredZeroLine(profile)
     // 26. Part I's own total, "Total rental real estate and royalty income or
     //     (loss)". A documented zero: Part I refuses through
@@ -1029,10 +1203,38 @@ export const scheduleERemainingParts = profile => line32 => {
     const line26 = zero('Schedule E line 26 (total rental real estate and royalty income or loss)')
     // 33(c)-(f). The four Part III columns: passive deduction or loss allowed,
     //            passive income, nonpassive deduction or loss, other income.
+    //
+    //            Columns (d) and (f) are the two page 2 of the Schedule K-1
+    //            (Form 1041) names for box 6 -- "Schedule E, line 33, column
+    //            (d) or (f)" -- and which of the two is the §469
+    //            material-participation determination `beneficiaryRow` refuses
+    //            to make on the taxpayer's behalf.
+    /** @type {(predicate: (row: ScheduleEBeneficiaryRow) => boolean) => readonly Source[]} */
+    const beneficiarySourcesWhere = predicate => beneficiaryRows.filter(predicate).flatMap(row =>
+        row.ordinaryBusinessIncomePrinted === undefined
+            ? []
+            : [{
+                documentHash: row.documentHash,
+                boxPath: row.boxPath,
+                value: row.ordinaryBusinessIncomePrinted,
+            }])
+    /** @type {(predicate: (row: ScheduleEBeneficiaryRow) => boolean) => bigint} */
+    const beneficiaryTotalWhere = predicate => beneficiaryRows
+        .filter(predicate)
+        .reduce((total, row) => total + row.ordinaryBusinessIncomeCents, 0n)
+    // 33(c). "Passive deduction or loss allowed (attach Form 8582 if
+    //        required)." A structural zero: box 9's directly apportioned
+    //        deductions -- the only amounts that could reach this column -- are
+    //        swept by `estateTrustCodedBoxes`, and a negative box 6 refuses at
+    //        {@link beneficiaryLossRefusal} before this line is built.
     const line33c = zero('Schedule E line 33 column (c) (passive deduction or loss allowed)')
-    const line33d = zero('Schedule E line 33 column (d) (passive income from Schedule K-1)')
+    const line33d = documentLine(profile)('Schedule E line 33 column (d) (passive income from Schedule K-1)')(
+        beneficiaryTotalWhere(row => row.passive))(beneficiarySourcesWhere(row => row.passive))
+    // 33(e). "Deduction or loss from Schedule K-1." Structural zero, for
+    //        column (c)'s two reasons.
     const line33e = zero('Schedule E line 33 column (e) (deduction or loss from Schedule K-1)')
-    const line33f = zero('Schedule E line 33 column (f) (other income from Schedule K-1)')
+    const line33f = documentLine(profile)('Schedule E line 33 column (f) (other income from Schedule K-1)')(
+        beneficiaryTotalWhere(row => !row.passive))(beneficiarySourcesWhere(row => !row.passive))
     // 34a. "Totals" -- columns (d) and (f). 34b. "Totals" -- (c) and (e).
     const line34aD = { ...line33d, rule: 'Schedule E line 34a column (d) (totals)' }
     const line34aF = { ...line33f, rule: 'Schedule E line 34a column (f) (totals)' }
@@ -1073,6 +1275,7 @@ export const scheduleERemainingParts = profile => line32 => {
     const line42 = zero('Schedule E line 42 (reconciliation of farming and fishing income)')
     const line43 = zero('Schedule E line 43 (reconciliation for real estate professionals)')
     return {
+        beneficiaryRows,
         line26, line33c, line33d, line33e, line33f,
         line34aD, line34aF, line34bC, line34bE,
         line35, line36, line37, line38, line39, line40, line41, line42, line43,
@@ -1118,6 +1321,7 @@ export const scheduleERemainingParts = profile => line32 => {
  *   readonly profile: Stored<ReturnProfile>,
  *   readonly partnershipK1Forms: readonly Stored<K1Partnership>[],
  *   readonly sCorporationK1Forms: readonly Stored<K1SCorporation>[],
+ *   readonly estateTrustK1Forms: readonly Stored<K1EstateTrust>[],
  * }} ScheduleEInput
  */
 
@@ -1132,9 +1336,11 @@ export const scheduleERemainingParts = profile => line32 => {
  * @type {(input: ScheduleEInput) => ScheduleEOutcome}
  */
 export const scheduleE = input => {
-    const { profile, partnershipK1Forms, sCorporationK1Forms } = input
+    const { profile, partnershipK1Forms, sCorporationK1Forms, estateTrustK1Forms } = input
     /** @type {ScheduleERow[]} */
     const rows = []
+    /** @type {ScheduleEBeneficiaryRow[]} */
+    const beneficiaryRows = []
     for (const document of partnershipK1Forms) {
         const reduced = partnershipRow(document)
         if (reduced.kind === 'error') {
@@ -1149,20 +1355,46 @@ export const scheduleE = input => {
         }
         rows.push(reduced.row)
     }
+    for (const document of estateTrustK1Forms) {
+        const reduced = beneficiaryRow(document)
+        if (reduced.kind === 'error') {
+            return reduced
+        }
+        beneficiaryRows.push(reduced.row)
+    }
     // Two documents from ONE entity. Checked after the rows are built so the
     // message can name the entity rather than only its identification number,
     // and before any total is formed so the doubled income never exists.
+    //
+    // The two printed tables are scanned SEPARATELY, and that is a decision
+    // rather than convenience: an employer identification number is unique to
+    // one entity, but the printed line the pair would have been entered on
+    // differs, so the message must name the right table. Scanning them
+    // together would also make an estate and a partnership that somehow shared
+    // a number refuse under whichever part happened to sort first.
     for (const [index, row] of rows.entries()) {
         const duplicate = rows.findIndex(candidate =>
             candidate.employerIdentificationNumber === row.employerIdentificationNumber)
         if (duplicate !== index) {
-            return duplicateEntityRefusal(row.employerIdentificationNumber)(row.entityName)
+            return duplicateEntityRefusal('Schedule E Part II line 28')(row.employerIdentificationNumber)(row.entityName)
+        }
+    }
+    for (const [index, row] of beneficiaryRows.entries()) {
+        const duplicate = beneficiaryRows.findIndex(candidate =>
+            candidate.employerIdentificationNumber === row.employerIdentificationNumber)
+        if (duplicate !== index) {
+            return duplicateEntityRefusal('Schedule E Part III line 33')(row.employerIdentificationNumber)(row.entityName)
         }
     }
     const partII = scheduleEPartII(profile)(rows)
-    const parts = scheduleERemainingParts(profile)(partII.line32)
+    const parts = scheduleERemainingParts(profile)(partII.line32)(beneficiaryRows)
+    // Beneficiary rows are summed in too, and every one contributes its
+    // structural zero. Written as a second reduce rather than omitted so that
+    // mutating `beneficiaryRow`'s `selfEmploymentEarningsCents = 0n` reddens
+    // something -- an omitted term could not.
     const selfEmploymentEarningsCents = rows.reduce(
         (total, row) => total + row.selfEmploymentEarningsCents, 0n)
+        + beneficiaryRows.reduce((total, row) => total + row.selfEmploymentEarningsCents, 0n)
     // Whose self-employment earnings these are, for `fjs/schedule/se`'s
     // §1402(b)(1) wage-base attribution -- the base is PER PERSON, so a
     // partner's Forms W-2 must be told from a spouse's. `undefined` when no
@@ -1242,6 +1474,7 @@ const run = input => scheduleE({
     profile,
     partnershipK1Forms: [],
     sCorporationK1Forms: [],
+    estateTrustK1Forms: [],
     ...input,
 })
 
@@ -1274,15 +1507,19 @@ const refusal = outcome => {
 const printedPartTable = [
     ['I', 'lines 1-26 (rental real estate and royalties)', false],
     ['II', 'lines 27-32 (partnerships and S corporations)', true],
-    ['III', 'lines 33-37 (estates and trusts)', false],
+    ['III', 'lines 33-37 (estates and trusts)', true],
     ['IV', 'lines 38-39 (REMICs)', false],
     ['V', 'lines 40-43 (summary)', false],
 ]
 
 /** Hand-typed off the printed form: five parts. */
 const expectedPartCount = 5
-/** Hand-typed: one of the five computes. */
-const expectedComputedPartCount = 1
+/**
+ * Hand-typed: TWO of the five compute. Was `1` until TAX-35 gave
+ * `vnd.fjs.k1_1041` a reader — Part III's columns (d) and (f) now carry real
+ * box 6 readings, so Part III joined Part II.
+ */
+const expectedComputedPartCount = 2
 
 export const proof = {
     // ── THE REGRESSION CONTROL ───────────────────────────────────────────────
@@ -1309,21 +1546,26 @@ export const proof = {
     printedForm: {
         /**
          * THE COMPARISON: the hand-typed printed part table against what this
-         * module actually does. Four of the five parts have a named refusal
-         * function and the fifth does not — because it is the one that
-         * computes.
+         * module actually does. Three of the five parts have a named refusal
+         * function and the other two do not — because they are the two that
+         * compute.
+         *
+         * MERGE NOTE / TAX-35: Part III moved from the refusal side to the
+         * computing side, and `partIIIEstatesAndTrusts` was DELETED rather than
+         * left standing. A part refusal that no longer refuses is worse than
+         * none: it reads as this engine's stated position while the code has
+         * the opposite one.
          */
         theHandTypedPartTableAgreesWithTheCode: () => {
             assertEq(printedPartTable.length, expectedPartCount)
             assertEq(
                 printedPartTable.filter(([, , computes]) => computes).length,
                 expectedComputedPartCount,
-                'exactly one printed part computes',
+                'exactly two printed parts compute',
             )
             /** @type {Record<string, () => ScheduleERefusal>} */
             const refusalForPart = {
                 I: partIRentalRealEstateAndRoyalties,
-                III: partIIIEstatesAndTrusts,
                 IV: partIVRealEstateMortgageInvestmentConduits,
                 V: partVNetFarmRentalIncomeLine40,
             }
@@ -1355,22 +1597,15 @@ export const proof = {
             /** @type {readonly (readonly [() => ScheduleERefusal, string])[]} */
             const expected = [
                 [partIRentalRealEstateAndRoyalties, 'Form 4562'],
-                [partIIIEstatesAndTrusts, 'Form 1041'],
                 [partIVRealEstateMortgageInvestmentConduits, 'Form 1066'],
                 [partVNetFarmRentalIncomeLine40, 'Form 4835'],
             ]
-            assertEq(expected.length, 4, 'four printed parts refuse')
+            assertEq(expected.length, 3, 'three printed parts refuse')
             for (const [named, form] of expected) {
                 const message = named().message
                 assert(message.includes(form), ['a part refusal must name the form it needs', form, message])
                 assert(message.includes('no phase yet'), ['a part refusal must say it is not scheduled', message])
             }
-            // Part III must additionally name the SPECIFIC collision that
-            // stopped this phase guessing a third K-1 dialect, which is the
-            // whole reason it is a refusal rather than a third transcription.
-            assert(
-                partIIIEstatesAndTrusts().message.includes('box 5'),
-                ['Part III must name the box whose meaning differs', partIIIEstatesAndTrusts().message])
         },
 
         /**

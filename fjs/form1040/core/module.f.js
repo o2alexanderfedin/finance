@@ -115,6 +115,7 @@ import { baseTaxForAmount } from '../../tax/table/module.f.js'
 /** @import { FormThirtyNineTwentyOne } from '../../document/form3921/module.f.js' */
 /** @import { K1Partnership } from '../../document/k1_1065/module.f.js' */
 /** @import { K1SCorporation } from '../../document/k1_1120s/module.f.js' */
+/** @import { K1EstateTrust } from '../../document/k1_1041/module.f.js' */
 /** @import { FormThirtyNineTwentyTwo } from '../../document/form3922/module.f.js' */
 /** @import { BasisCorrection } from '../../document/basis_correction/module.f.js' */
 /** @import { Kind, ReturnProfile } from '../../return/profile/module.f.js' */
@@ -272,6 +273,7 @@ import { baseTaxForAmount } from '../../tax/table/module.f.js'
  *   readonly basisCorrectionForms: readonly Stored<BasisCorrection>[],
  *   readonly partnershipK1Forms: readonly Stored<K1Partnership>[],
  *   readonly sCorporationK1Forms: readonly Stored<K1SCorporation>[],
+ *   readonly estateTrustK1Forms: readonly Stored<K1EstateTrust>[],
  * }} Form1040Inputs
  */
 
@@ -572,7 +574,7 @@ export const form1040IncomeLines = taxParamSet => inputs => {
         adjustmentForms, studentLoanInterestForms,
         iraForms, priorYearIraBasisForms,
         employeeStockPurchaseForms, basisCorrectionForms,
-        partnershipK1Forms, sCorporationK1Forms,
+        partnershipK1Forms, sCorporationK1Forms, estateTrustK1Forms,
     } = inputs
     const declaredZero = profileDeclaredZeroLine(profile)
     const fromDocuments = documentLine(profile)
@@ -854,7 +856,7 @@ export const form1040IncomeLines = taxParamSet => inputs => {
         // reaching 1040 line 8 THROUGH Schedule 1's own Part I total, never by
         // a side channel -- the identical discipline line 3 already follows for
         // Schedule C and line 10 for Part II's line 26.
-        partnershipK1Forms, sCorporationK1Forms,
+        partnershipK1Forms, sCorporationK1Forms, estateTrustK1Forms,
     })
     if (scheduleOnePartIResult.kind === 'error') {
         return { kind: 'error', message: scheduleOnePartIResult.message, unmodeled: [] }
@@ -2647,6 +2649,7 @@ const inputsOf = profile => w2s => interestForms => dividendForms => brokerageFo
                 basisCorrectionForms: [],
                 partnershipK1Forms: [],
                 sCorporationK1Forms: [],
+                estateTrustK1Forms: [],
             })
 
 /**

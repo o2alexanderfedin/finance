@@ -112,6 +112,7 @@ export const render = root => {
         basisCorrectionForms: [],
         partnershipK1Forms: [],
         sCorporationK1Forms: [],
+        estateTrustK1Forms: [],
     }
     const withoutElection = { ...withElection, profile: store(profileElecting(false)) }
 

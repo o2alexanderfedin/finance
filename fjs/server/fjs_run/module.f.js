@@ -1004,7 +1004,7 @@ export const proof = {
                             nonemployeeCompensationForms: [], businessExpenseForms: [],
                             iraForms: [], priorYearIraBasisForms: [],
                             isoExerciseForms: [], employeeStockPurchaseForms: [],
-                            partnershipK1Forms: [], sCorporationK1Forms: [],
+                            partnershipK1Forms: [], sCorporationK1Forms: [], estateTrustK1Forms: [],
                             basisCorrectionForms: [],
                         })
                         assert(outcome.kind === 'ok', ['expected the engine to compute', outcome])

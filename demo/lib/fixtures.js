@@ -178,6 +178,7 @@ export const inputs = {
     isoExerciseForms: [],
     partnershipK1Forms: [],
     sCorporationK1Forms: [],
+    estateTrustK1Forms: [],
     employeeStockPurchaseForms: [],
     basisCorrectionForms: [],
 }

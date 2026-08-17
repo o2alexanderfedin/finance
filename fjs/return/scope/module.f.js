@@ -512,6 +512,16 @@ export const modeledKinds = /** @type {const} */ ([
     // the missing figure is a printed box on a dialect this engine already
     // stores" -- and said adding box 9 "would close it outright". It did.
     'amtPrivateActivityBondInterest', // 1099-INT box 9 -> Form 6251 line 2g -> 1040 line 17
+    // TAX-35's own, and reclassified in the SAME commit as the wiring that
+    // makes it computable -- `fjs/schedule/e`'s `beneficiaryRow` reading
+    // `vnd.fjs.k1_1041` box 6 into printed Part III columns (d) and (f), which
+    // reach line 41 through the addition that was already there.
+    //
+    // The dialect was registered in both registries by an earlier commit and
+    // read by NOTHING, which is the `box13StatutoryEmployee` shape this repo
+    // has already paid for once: a stored face no computation consumes cannot
+    // be noticed being wrong. Wiring first, reclassify beside it.
+    'estateAndTrustIncome',        // Schedule E Part III -> Schedule 1 line 5 -> 1040 line 8
 ])
 
 /** One member of {@link modeledKinds}.
@@ -660,7 +670,6 @@ export const unmodeledKindRefusals = /** @type {const} */ ([
     // 27 did. The split commit before it added all five as refusals and
     // reclassified nothing.
     { kind: 'rentalRealEstateAndRoyalties', line: 'Schedule E Part I lines 3-26 -> Schedule 1 line 5 -> 1040 line 8', label: 'rental real estate and royalty income or loss', remedy: 'requires Schedule E Part I, whose per-property columns need the rents received, the fair rental and personal-use days that §280A allocates by, and a depreciation figure from Form 4562 — the same asset basis history Schedule C line 13 already refuses for. A royalty additionally needs its own printed line 4, which is Part I’s and not Part II’s, so a Schedule K-1 royalty box cannot ride into line 41 on the partnership block (no phase yet)' },
-    { kind: 'estateAndTrustIncome', line: 'Schedule E Part III lines 33-37 -> Schedule 1 line 5 -> 1040 line 8', label: 'estate and trust income or loss', remedy: 'requires Schedule K-1 (Form 1041), which is a THIRD Schedule K-1 with its own box numbering — a beneficiary’s box 5 is other portfolio income where a partner’s is interest — and no dialect models it. Phase 30 built the 1065 and 1120-S faces and deliberately did not guess a third from them (no phase yet)' },
     { kind: 'remicResidualInterest', line: 'Schedule E Part IV lines 38-39 -> Schedule 1 line 5 -> 1040 line 8', label: 'real estate mortgage investment conduit (REMIC) residual interest', remedy: 'requires Schedule Q (Form 1066), and §860E(a) taxes the excess inclusion whether or not it was received and forbids offsetting it with any net operating loss — so a zero here is not merely an omission but a floor this engine cannot enforce (no phase yet)' },
     { kind: 'netFarmRentalIncomeForm4835', line: 'Schedule E Part V line 40 -> Schedule 1 line 5 -> 1040 line 8', label: 'net farm rental income or loss', remedy: 'requires Form 4835, which a landowner uses for crop-share rents received without materially participating — and materially participating instead moves the whole activity to Schedule F, which `farmIncomeOrLoss` already refuses. Neither form is modeled (no phase yet)' },
     { kind: 'farmIncomeOrLoss', line: 'Schedule 1 line 6 -> 1040 line 8', label: 'farm income or loss', remedy: 'requires Schedule F (no phase yet)' },
@@ -976,8 +985,24 @@ export const modeledKindDeclarationRemedies = /** @type {const} */ ([
             + 'the self-employment tax a GENERAL partner owes on box 14 code A and the '
             + 'self-employment tax an S-corporation shareholder does not. Note where it stops: a '
             + 'LOSS refuses, because §704(d)/§1366(d) basis is a multi-year history; a separately '
-            + 'stated item other than box 1 refuses by name; and Schedule E Parts I, III and IV '
-            + 'each have their own declared kind and each refuses',
+            + 'stated item other than box 1 refuses by name; and Schedule E Parts I and IV '
+            + 'each have their own declared kind and each refuses. Part III now COMPUTES and has '
+            + 'its own declared kind, estateAndTrustIncome',
+    },
+    {
+        kind: 'estateAndTrustIncome',
+        line: 'Schedule E Part III lines 33-37 -> Schedule 1 line 5 -> 1040 line 8',
+        label: 'estate and trust income or loss',
+        remedy: 'declare estateAndTrustIncome on the return profile and this engine computes '
+            + 'Schedule E Part III from your Schedule K-1s (Form 1041) (TAX-35). Box 6, the '
+            + 'beneficiary\'s share of ordinary business income, reaches printed line 33 column '
+            + '(d) or (f) on your material-participation determination, and NO self-employment tax '
+            + 'follows it: \u00a71402(a) reaches a trade or business you carry on, and a '
+            + 'beneficiary does not carry on the fiduciary\'s. Note where it stops: a LOSS refuses '
+            + 'under \u00a7642(h)/\u00a7643 rather than \u00a7704(d), because a beneficiary is '
+            + 'generally allocated no loss at all and \u00a7642(h) passes one out only on '
+            + 'termination, in box 11; and every other separately stated box on that face refuses '
+            + 'by name at storage, quoting the printed "Report on" destination',
     },
 ])
 
@@ -1306,7 +1331,7 @@ export const classifyScope = declaredKinds => {
  * and `fjs/form8995` wiring that makes all three computable.
  * @type {number}
  */
-const expectedModeledKindCount = 36
+const expectedModeledKindCount = 37
 
 /**
  * The modeled set, hand-typed a SECOND time and in {@link kindVocabulary}'s
@@ -1360,6 +1385,7 @@ const everyModeledKindHandTyped = [
     'additionalChildTaxCredit',
     'americanOpportunityCredit',
     'amtPrivateActivityBondInterest',
+    'estateAndTrustIncome',
 ]
 
 /**
@@ -1440,7 +1466,7 @@ const everyModeledKindHandTyped = [
  * that makes it computable.
  * @type {number}
  */
-const expectedUnmodeledKindCount = 78
+const expectedUnmodeledKindCount = 77
 
 /**
  * The complete refusal message for a return declaring exactly
@@ -1640,6 +1666,10 @@ export const proof = {
                 // all five rather than a stand-in for the block.
                 ['rentalRealEstateAndRoyalties', 'Schedule 1 line 5'],
                 ['partnershipAndSCorporationIncome', 'Schedule 1 line 5'],
+                // MODELED as of TAX-35, and still listed: this leaf states the
+                // printed ORDER of Schedule 1 Part I's kinds, which does not
+                // change when one of them starts computing. Dropping it here
+                // would have quietly reduced the ordering this leaf checks.
                 ['estateAndTrustIncome', 'Schedule 1 line 5'],
                 ['remicResidualInterest', 'Schedule 1 line 5'],
                 ['netFarmRentalIncomeForm4835', 'Schedule 1 line 5'],
@@ -2370,7 +2400,6 @@ export const proof = {
                 'alimonyReceived',
                 'otherGainsOrLosses',
                 'rentalRealEstateAndRoyalties',
-                'estateAndTrustIncome',
                 'remicResidualInterest',
                 'netFarmRentalIncomeForm4835',
                 'farmIncomeOrLoss',
@@ -2378,8 +2407,8 @@ export const proof = {
             ]
             assertEq(
                 stillRefused.length,
-                9,
-                'six printed Part I lines Phase 27 left refused, line 5 expanded into its five Schedule E parts, less the one Phase 30 wired')
+                8,
+                'six printed Part I lines Phase 27 left refused, line 5 expanded into its five Schedule E parts, less the one Phase 30 wired and the one TAX-35 wired')
             for (const kind of stillRefused) {
                 const outcome = classifyScope([kind])
                 assert(
@@ -3111,11 +3140,12 @@ export const proof = {
             // and only other use of this table since Phase 23 built it.
             // `2 -> 3` is Phase 29's own `alternativeMinimumTax`.
             // `3 -> 4` is Phase 30's own `partnershipAndSCorporationIncome`.
-            const expectedDeclarationRequiredCount = 4
+            // `4 -> 5` is TAX-35's own `estateAndTrustIncome`.
+            const expectedDeclarationRequiredCount = 5
             assertEq(
                 modeledKindDeclarationRemedies.length,
                 expectedDeclarationRequiredCount,
-                ['exactly four modeled kinds are declaration-required today', modeledKindDeclarationRemedies],
+                ['exactly five modeled kinds are declaration-required today', modeledKindDeclarationRemedies],
             )
             for (const entry of modeledKindDeclarationRemedies) {
                 assert(

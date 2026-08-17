@@ -206,6 +206,7 @@ import { taxParamsByYear } from '../../tax/params/module.f.js'
 /** @import { ScheduleE } from '../e/module.f.js' */
 /** @import { K1Partnership } from '../../document/k1_1065/module.f.js' */
 /** @import { K1SCorporation } from '../../document/k1_1120s/module.f.js' */
+/** @import { K1EstateTrust } from '../../document/k1_1041/module.f.js' */
 /** @import { SelfEmploymentOutcome } from '../se/module.f.js' */
 /** @import { W2 } from '../../document/w2/module.f.js' */
 /** @import { ReportLine, Source } from '../../report/line/module.f.js' */
@@ -368,6 +369,7 @@ const unemploymentCompensationLine = profile => forms => {
  *   readonly w2Forms: readonly Stored<W2>[],
  *   readonly partnershipK1Forms: readonly Stored<K1Partnership>[],
  *   readonly sCorporationK1Forms: readonly Stored<K1SCorporation>[],
+ *   readonly estateTrustK1Forms: readonly Stored<K1EstateTrust>[],
  * }} ScheduleOnePartIInput
  */
 
@@ -407,7 +409,7 @@ const unemploymentCompensationLine = profile => forms => {
 export const scheduleOnePartI = input => {
     const {
         profile, unemploymentForms, nonemployeeCompensationForms, businessExpenseForms, w2Forms,
-        partnershipK1Forms, sCorporationK1Forms,
+        partnershipK1Forms, sCorporationK1Forms, estateTrustK1Forms,
     } = input
     const zero = profileDeclaredZeroLine(profile)
     const scheduleCOutcome = scheduleC({
@@ -416,7 +418,7 @@ export const scheduleOnePartI = input => {
     if (scheduleCOutcome.kind === 'error') {
         return scheduleCOutcome
     }
-    const scheduleEOutcome = scheduleE({ profile, partnershipK1Forms, sCorporationK1Forms })
+    const scheduleEOutcome = scheduleE({ profile, partnershipK1Forms, sCorporationK1Forms, estateTrustK1Forms })
     if (scheduleEOutcome.kind === 'error') {
         return scheduleEOutcome
     }
@@ -1230,6 +1232,7 @@ export const scheduleOnePartII = taxParamSet => input => {
  *   readonly businessExpenseForms: readonly Stored<BusinessExpenses>[],
  *   readonly partnershipK1Forms: readonly Stored<K1Partnership>[],
  *   readonly sCorporationK1Forms: readonly Stored<K1SCorporation>[],
+ *   readonly estateTrustK1Forms: readonly Stored<K1EstateTrust>[],
  *   readonly adjustmentForms: readonly Stored<Adjustments>[],
  *   readonly studentLoanInterestForms: readonly Stored<OneZeroNineEightE>[],
  *   readonly w2Forms: readonly Stored<W2>[],
@@ -1248,12 +1251,12 @@ export const scheduleOnePartII = taxParamSet => input => {
 export const scheduleOne = taxParamSet => input => {
     const {
         profile, status, unemploymentForms, nonemployeeCompensationForms, businessExpenseForms,
-        partnershipK1Forms, sCorporationK1Forms,
+        partnershipK1Forms, sCorporationK1Forms, estateTrustK1Forms,
         adjustmentForms, studentLoanInterestForms, w2Forms, totalIncomeLine,
     } = input
     const partI = scheduleOnePartI({
         profile, unemploymentForms, nonemployeeCompensationForms, businessExpenseForms, w2Forms,
-        partnershipK1Forms, sCorporationK1Forms,
+        partnershipK1Forms, sCorporationK1Forms, estateTrustK1Forms,
     })
     if (partI.kind === 'error') {
         return partI
@@ -1488,6 +1491,7 @@ const partIOf = profile => unemploymentForms => nonemployeeCompensationForms => 
         w2Forms: [],
         partnershipK1Forms: [],
         sCorporationK1Forms: [],
+        estateTrustK1Forms: [],
     })
 
 /**
@@ -1626,6 +1630,7 @@ const stageOneWithBusiness = profile => status => nonemployeeCompensationForms =
             w2Forms,
             partnershipK1Forms: [],
             sCorporationK1Forms: [],
+            estateTrustK1Forms: [],
         }))
         return scheduleOnePartIIExceptStudentLoanInterest(taxParams2025)({
             profile, status, adjustmentForms: [], w2Forms,
@@ -1651,6 +1656,7 @@ const stageOneWithPassThrough = profile => status => partnershipK1Forms =>
             w2Forms,
             partnershipK1Forms,
             sCorporationK1Forms: [],
+            estateTrustK1Forms: [],
         }))
         return scheduleOnePartIIExceptStudentLoanInterest(taxParams2025)({
             profile, status, adjustmentForms: [], w2Forms,
@@ -1854,6 +1860,7 @@ export const proof = {
                 w2Forms: [],
                 partnershipK1Forms: [partnershipK1Doc('80000.00')],
                 sCorporationK1Forms: [],
+                estateTrustK1Forms: [],
             }))
             assertEq(withK1.scheduleE.parts.line41.value, 8000000n, 'Schedule E line 41')
             assertEq(withK1.line5.value, 8000000n, 'Schedule E line 41 IS Schedule 1 line 5')
@@ -1886,6 +1893,7 @@ export const proof = {
                 w2Forms: [],
                 partnershipK1Forms: [partnershipK1Doc('80000.00')],
                 sCorporationK1Forms: [],
+                estateTrustK1Forms: [],
             }))
             assertEq(partI.line3.value, 26000n, 'Schedule C: $350.00 - $90.00 = $260.00')
             assertEq(partI.line5.value, 8000000n, 'Schedule E: $80,000.00')
@@ -1903,6 +1911,7 @@ export const proof = {
                 w2Forms: [],
                 partnershipK1Forms: [partnershipK1Doc('-9000.00')],
                 sCorporationK1Forms: [],
+                estateTrustK1Forms: [],
             }))
             assert(
                 result.message.includes('§704(d)'),
@@ -2008,6 +2017,7 @@ export const proof = {
                 w2Forms: [],
                 partnershipK1Forms: [partnershipK1Doc('80000.00')],
                 sCorporationK1Forms: [],
+                estateTrustK1Forms: [],
             }))
             const stageOne = okStageOne(scheduleOnePartIIExceptStudentLoanInterest(taxParams2025)({
                 profile: profileNoDeclaredKinds,
@@ -2797,6 +2807,7 @@ export const proof = {
             businessExpenseForms: [],
             partnershipK1Forms: [],
             sCorporationK1Forms: [],
+            estateTrustK1Forms: [],
             adjustmentForms,
             studentLoanInterestForms,
             w2Forms: [],
@@ -2824,6 +2835,7 @@ export const proof = {
             businessExpenseForms: [],
             partnershipK1Forms: [],
             sCorporationK1Forms: [],
+            estateTrustK1Forms: [],
             adjustmentForms: [adjustmentsDoc([educatorEntry('250.00')('spouse')])([])],
             studentLoanInterestForms: [],
             w2Forms: [],
@@ -2893,6 +2905,7 @@ export const proof = {
             businessExpenseForms: [],
             partnershipK1Forms: [],
             sCorporationK1Forms: [],
+            estateTrustK1Forms: [],
             adjustmentForms: [],
             studentLoanInterestForms: [],
             w2Forms: [],
