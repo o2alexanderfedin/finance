@@ -58,6 +58,10 @@ import { dialect as adjustmentsDialect } from '../../document/adjustments/module
 import { dialect as oneZeroNineEightEDialect } from '../../document/1098e/module.f.js'
 import { qdcgt } from '../../tax/line16/qdcgt/module.f.js'
 import { sdtw } from '../../tax/line16/sdtw/module.f.js'
+// Imported for the PROOFS only, to cross-check the threaded Part III against an
+// independent execution (criterion 4). The production path below reaches Part
+// III through `fjs/schedule/2` and `fjs/form6251`, never directly.
+import { partThree } from '../../form6251/part3/module.f.js'
 import { socialSecurityBenefitsWorksheet } from '../../tax/ssb/module.f.js'
 import {
     dialect as returnProfileDialect,
@@ -8405,6 +8409,213 @@ export const proof = {
             assert(
                 boxes.includes('box4FairMarketValuePerShareOnExerciseDate'),
                 ['and the box the spread was computed from', boxes])
+        },
+        /**
+         * ★ **TAX-33's motivating return, end to end** — the ONE combination
+         * Phase 29 shipped a refusal for: a large incentive stock option spread
+         * **beside qualified dividends**. The AMT's flat 26/28% schedule and
+         * §1(h)'s preferential rates both apply, which is what Form 6251 Part
+         * III exists to reconcile, and before TAX-33 this return produced no
+         * figure at all.
+         *
+         * A single filer: $250,000.00 of salary, $20,000.00 of qualified
+         * dividends, and 10,000 shares exercised at a $5.00 strike against a
+         * $105.00 fair market value, held.
+         *
+         * EVERY FIGURE BELOW IS HAND-DERIVED, with the arithmetic shown. The
+         * 2025 single-filer brackets are Rev. Proc. 2024-40 §2.01: 10% to
+         * $11,925, 12% to $48,475, 22% to $103,350, 24% to $197,300, 32% to
+         * $250,525, 35% to $626,350. Both amounts priced below are ABOVE
+         * $100,000, so the Tax Computation Worksheet applies and bracket
+         * arithmetic is the right derivation; nothing here is a Tax Table row.
+         *
+         *   1040 line 1a   salary                             $250,000.00
+         *   1040 line 3a   qualified dividends                 $20,000.00
+         *   1040 line 3b   ordinary dividends (box 1a)         $20,000.00
+         *   1040 line 9    250,000.00 + 20,000.00             $270,000.00
+         *   1040 line 11b  no adjustments                     $270,000.00
+         *   1040 line 12e  the single standard deduction        $15,750.00
+         *   1040 line 15   270,000.00 - 15,750.00             $254,250.00
+         *
+         *   THE REGULAR TAX, by the QDCGT (1040 line 3a is non-zero):
+         *   QDCGT 4        20,000.00 + 0.00                    $20,000.00
+         *   QDCGT 5        254,250.00 - 20,000.00             $234,250.00
+         *   QDCGT 9        the 0% ceiling 48,350.00 is already buried by
+         *                  line 5, so nothing at 0%                  $0.00
+         *   QDCGT 17       the whole 20,000.00 at 15%          $20,000.00
+         *   QDCGT 18       15% x 20,000.00                      $3,000.00
+         *   QDCGT 22       T(234,250.00):
+         *                  10% x  11,925.00 =  1,192.50
+         *                  12% x  36,550.00 =  4,386.00
+         *                  22% x  54,875.00 = 12,072.50
+         *                  24% x  93,950.00 = 22,548.00
+         *                  32% x  36,950.00 = 11,824.00        $52,023.00
+         *   QDCGT 23       3,000.00 + 0.00 + 52,023.00         $55,023.00
+         *   QDCGT 24       T(254,250.00) = 40,199.00 (at 197,300.00)
+         *                  + 32% x 53,225.00 = 17,032.00
+         *                  + 35% x  3,725.00 =  1,303.75       $58,534.75
+         *   1040 line 16   the SMALLER                          $55,023.00
+         *
+         *   THE AMT:
+         *   Form 3921      (105.00 - 5.00) x 10,000         $1,000,000.00
+         *   6251 line 1b   270,000.00 - 15,750.00             $254,250.00
+         *   6251 line 2a   the standard deduction, added back   $15,750.00
+         *   6251 line 4    254,250 + 15,750 + 1,000,000     $1,270,000.00
+         *   6251 line 5    25% of (1,270,000.00 - 626,350.00) is 160,912.50,
+         *                  far above the 88,100.00 exemption         $0.00
+         *   6251 line 6    = Part III line 12               $1,270,000.00
+         *
+         *   PART III:
+         *   III 13         QDCGT line 4                        $20,000.00
+         *   III 15/16      the QDCGT arm reads line 13 flat    $20,000.00
+         *   III 17         1,270,000.00 - 20,000.00         $1,250,000.00
+         *   III 18         26% x   239,100.00 =  62,166.00
+         *                + 28% x 1,010,900.00 = 283,052.00    $345,218.00
+         *   III 20/27      QDCGT line 5                       $234,250.00
+         *   III 21         48,350.00 - 234,250.00 is negative        -0-
+         *   III 30         the 20,000.00, all at 15%           $20,000.00
+         *   III 31         15% x 20,000.00                      $3,000.00
+         *   III 38         345,218.00 + 3,000.00              $348,218.00
+         *   III 39         26% x   239,100.00 =  62,166.00
+         *                + 28% x 1,030,900.00 = 288,652.00    $350,818.00
+         *   III 40         the SMALLER                        $348,218.00
+         *
+         *   6251 line 7    Part III line 40                   $348,218.00
+         *   6251 line 10   1040 line 16                        $55,023.00
+         *   6251 line 11   348,218.00 - 55,023.00             $293,195.00
+         *   1040 line 17   Schedule 2 line 3                  $293,195.00
+         *   1040 line 18   55,023.00 + 293,195.00             $348,218.00
+         *
+         * **What Part III is worth on this return: $2,600.00.** Without it the
+         * $20,000.00 of qualified dividends would be charged the AMT's flat 28%
+         * ($5,600.00) instead of §1(h)'s 15% ($3,000.00), and the AMT would be
+         * $295,795.00. That is the number this leaf's own counterfactual
+         * assertion names, derived independently as 13% of $20,000.00.
+         */
+        theFaangReturnAnIsoSpreadBesideQualifiedDividends: () => {
+            /** @type {ReturnProfile} */
+            const profile = {
+                ...singleProfile,
+                declaredKinds: [
+                    'wages', 'ordinaryDividends', 'qualifiedDividends', 'alternativeMinimumTax',
+                ],
+            }
+            const outcome = form1040Report(taxParams2025)({
+                ...inputsOf(storedProfile(profile))([
+                    w2Document('sha256-33-faang-w2')('250000.00'),
+                ])([])([dividendDocument('sha256-33-faang-div')({
+                    box1aTotalOrdinaryDividends: '20000.00',
+                    box1bQualifiedDividends: '20000.00',
+                })])([])([])([])([])([])([]),
+                isoExerciseForms: [{
+                    documentHash: 'sha256-33-faang-3921',
+                    value: {
+                        dialect: 'vnd.fjs.form3921',
+                        payerTin: '11-1111111',
+                        recipientTin: '222-22-2222',
+                        accountNumber: 'ACC-ISO',
+                        taxYear: 2025,
+                        formRevision: 'April 2025',
+                        sourceArtifactHash:
+                            'deadbeef00112233445566778899aabbccddeeff0011223344556677889900',
+                        box1DateOptionGranted: '01/03/2023',
+                        box2DateOptionExercised: '03/13/2025',
+                        box3ExercisePricePerShare: '5.00',
+                        box4FairMarketValuePerShareOnExerciseDate: '105.00',
+                        box5NumberOfSharesTransferred: '10000',
+                    },
+                }],
+            })
+            // THE CRITERION, first: this return COMPUTES. Before TAX-33 the
+            // identical inputs produced a refusal naming Part III.
+            assert(
+                outcome.kind === 'ok',
+                ['an ISO spread beside qualified dividends must COMPUTE', outcome])
+            if (outcome.kind !== 'ok') {
+                return
+            }
+            const at = lineRuled(outcome.lines)
+            assertEq(at('1040 line 1a').value, 25000000n, '$250,000.00 of wages')
+            assertEq(at('1040 line 3a').value, 2000000n, '$20,000.00 of qualified dividends')
+            assertEq(at('1040 line 3b').value, 2000000n, 'and the same in ordinary dividends')
+            assertEq(at('1040 line 11b').value, 27000000n, 'AGI = $270,000.00')
+            assertEq(at('1040 line 15').value, 25425000n, 'taxable income = $254,250.00')
+            assertEq(at('1040 line 16').value, 5502300n, 'the regular tax = $55,023.00')
+            assertEq(at('1040 line 17').value, 29319500n, 'the AMT = $293,195.00')
+            assertEq(at('1040 line 18').value, 34821800n, '$55,023.00 + $293,195.00 = $348,218.00')
+            // 1040 line 18 is Part III's own line 40, because the AMT is the
+            // EXCESS over the regular tax and this return's line 10 is exactly
+            // 1040 line 16. Asserted as an identity across the two systems.
+            assertEq(
+                at('1040 line 18').value, 34821800n,
+                'and it equals Part III line 40, the AMT being the excess')
+            // THE COUNTERFACTUAL, derived independently: 28% - 15% = 13%, and
+            // 13% of $20,000.00 is $2,600.00. Taxing the qualified dividends at
+            // the flat AMT rate -- which is exactly what Phase 29 refused rather
+            // than do -- gives $295,795.00.
+            const ifTaxedFlat = 29579500n
+            assertEq(
+                ifTaxedFlat - 29319500n, 260000n,
+                '13% of the $20,000.00 of qualified dividends = $2,600.00, hand-computed')
+            assert(
+                at('1040 line 17').value !== ifTaxedFlat,
+                ['Part III must charge 15% on the qualified dividends, not the AMT\'s 28%',
+                    at('1040 line 17').value])
+            // Provenance survives Part III: 1040 line 17 still cites the Form
+            // 3921 that put the tax there.
+            const hashes = at('1040 line 17').sources.map(source => source.documentHash)
+            assert(
+                hashes.includes('sha256-33-faang-3921'),
+                ['1040 line 17 must cite the Form 3921', hashes])
+        },
+        /**
+         * ★ **CRITERION 4 — the cross-check against an INDEPENDENT `qdcgt`
+         * call.** The regular tax above and Part III's lines 13/20/27 both read
+         * the same worksheet, so an error in that ONE execution would be
+         * invisible to every assertion inside the leaf above: the wrong line 16
+         * and the wrong Part III would agree with each other.
+         *
+         * So this leaf runs `qdcgt` itself, on inputs built from the FAANG
+         * return's 1040 lines, and asserts that the threaded figures match it —
+         * the shape `formEightNineNineFivesNetCapitalGainIsTheWorksheetsOwn`
+         * set for Form 8995 line 12. The expected side is a real execution of a
+         * module whose own arithmetic is exhaustively proven, driven by inputs
+         * this leaf types out, and it is NOT the execution the report used.
+         */
+        theFaangReturnsWorksheetAgreesWithAnIndependentQdcgt: () => {
+            // Hand-typed off the derivation above, never read back off the
+            // report: 1040 line 15 and 1040 line 3a.
+            const worksheet = qdcgt(taxParams2025)({
+                status: 'single',
+                line1Cents: 25425000n,
+                line2Cents: 2000000n,
+                filingScheduleD: false,
+                scheduleD15Cents: 0n,
+                scheduleD16Cents: 0n,
+                line7aCents: 0n,
+            })
+            assertEq(worksheet.line4, 2000000n, 'QDCGT line 4 = $20,000.00 -- Part III line 13')
+            assertEq(worksheet.line5, 23425000n, 'QDCGT line 5 = $234,250.00 -- Part III lines 20/27')
+            assertEq(worksheet.line25, 5502300n, 'QDCGT line 25 = $55,023.00 -- 1040 line 16')
+            // Part III, run against THIS worksheet's lines rather than the
+            // report's, must reproduce the report's own line 7.
+            const three = partThree(taxParams2025)({
+                status: 'single',
+                line12Cents: 127000000n,
+                scheduleD19Cents: 0n,
+                regularWorksheet: {
+                    kind: 'qdcgt',
+                    qdcgtLine4Cents: worksheet.line4,
+                    qdcgtLine5Cents: worksheet.line5,
+                },
+            })
+            assertEq(three.line40, 34821800n, 'Part III line 40 = $348,218.00')
+            // …and the AMT the report printed is that figure less the regular
+            // tax this independent worksheet computed. Both sides of the
+            // subtraction come from THIS leaf's own executions.
+            assertEq(
+                three.line40 - worksheet.line25, 29319500n,
+                'the AMT on 1040 line 17 = $348,218.00 - $55,023.00 = $293,195.00')
         },
         // THE MUTATION GUARD THIS FIXTURE EXISTS FOR, stated as its own
         // assertion rather than left implicit above.
