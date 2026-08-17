@@ -96,6 +96,10 @@ import { scheduleThree } from '../../schedule/3/module.f.js'
 import { form8812 } from '../../form8812/module.f.js'
 import { iraTaxableAmount, rothDistributionCodeOf } from '../../form8606/module.f.js'
 import { baseTaxForAmount } from '../../tax/table/module.f.js'
+import {
+    earnedIncomeCredit,
+    disqualifiedPassiveIncomeCents as disqualifiedPassiveIncomeCents_,
+} from '../../schedule/eic/module.f.js'
 
 /** @import { ReportLine, Source } from '../../report/line/module.f.js' */
 /** @import { W2 } from '../../document/w2/module.f.js' */
@@ -536,6 +540,7 @@ const storedFilingStatusNamed = status =>
  *   readonly scheduleD19Cents: bigint,
  *   readonly selfEmployment: SelfEmploymentOutcome,
  *   readonly specifiedPrivateActivityBondInterest: ReportLine,
+ *   readonly disqualifiedPassiveIncomeCents: bigint,
  * }} Form1040IncomeLines
  */
 
@@ -1309,8 +1314,20 @@ export const form1040IncomeLines = taxParamSet => inputs => {
         rule: '1040 line 15',
     }
 
+    // §32(i)(2)(E), computed over the SAME Schedule E execution Schedule 1
+    // line 5 came from -- never a second one. It is here rather than at line
+    // 27a because this is the only function where those rows are in scope,
+    // and it is a `bigint` rather than a `ReportLine` because it is an input
+    // to a test, not a printed figure: no line of any form carries it. See
+    // `fjs/schedule/eic`'s own docstring for why it is COMPUTED rather than
+    // written as a zero.
+    const disqualifiedPassiveIncomeCents = disqualifiedPassiveIncomeCents_(
+        [...scheduleOnePartIResult.scheduleE.partII.rows,
+            ...scheduleOnePartIResult.scheduleE.parts.beneficiaryRows])
+
     return {
         kind: 'ok',
+        disqualifiedPassiveIncomeCents,
         line1a, line1b, line1c, line1d, line1e, line1f, line1g, line1h, line1i, line1z,
         line2a, line2b,
         line3a, line3b,
@@ -2003,7 +2020,52 @@ const form1040TaxAndPaymentLines = taxParamSet => inputs => income => {
     // see.
     const line26 = fromDocuments('1040 line 26')(
         profileMoneyBox(profile)('line26EstimatedTaxPayments'))
-    const line27a = declaredZero('1040 line 27a') // earned income credit
+    // 27a — §32, the earned income credit (TAX-27, Phase 32). FULLY
+    // REFUNDABLE, which is why it is here on line 27a among the payments
+    // rather than on Schedule 3 Part I among the nonrefundable credits: it is
+    // paid out whether or not there is any tax to offset, and line 32 adds it
+    // to the total payments.
+    //
+    // **A profile that does NOT declare `earnedIncomeCredit` keeps the
+    // `declaredZero` it has always had, byte for byte.** That is not a
+    // shortcut — it is what makes an ordinary return's report identical to
+    // what it was before this phase, `line27aIsAProfileDeclaredZeroWhenTheKind\
+    // IsNotDeclared` pins it, and the EXEC-14/PROV-09 pinned rerun (which
+    // computes a return declaring neither) is what proves it end to end.
+    // `fjs/schedule/eic` is not even called for such a return, so no §32 fact
+    // can be demanded of a filer who is not claiming the credit.
+    const earnedIncomeCreditOutcome = profile.value.declaredKinds.includes('earnedIncomeCredit')
+        ? earnedIncomeCredit(taxParamSet)({
+            profile: profile.value,
+            line1zCents: income.line1z.value,
+            scheduleSeLine3Cents: income.selfEmployment.lines.line3,
+            scheduleSeLine13Cents: income.selfEmployment.lines.line13,
+            adjustedGrossIncomeCents: income.line11b.value,
+            line2aCents: income.line2a.value,
+            line2bCents: income.line2b.value,
+            line3bCents: income.line3b.value,
+            line7aCents: income.line7a.value,
+            disqualifiedPassiveIncomeCents: income.disqualifiedPassiveIncomeCents,
+        })
+        : undefined
+    // A §32 refusal stops the WHOLE report, threaded exactly like the
+    // Schedule C and Schedule E refusals above: `unmodeled: []`, because it
+    // names no `fjs/return/scope` kind -- `earnedIncomeCredit` is MODELED as
+    // of this phase, and what is missing is a FACT rather than a form.
+    if (earnedIncomeCreditOutcome !== undefined && earnedIncomeCreditOutcome.kind === 'error') {
+        return { kind: 'error', message: earnedIncomeCreditOutcome.message, unmodeled: [] }
+    }
+    // Ruled just `'1040 line 27a'`, per this file's own convention that a 1040
+    // line is named by its 1040 line number -- the decision line 25c records
+    // at length. Its sources are the wage and dependent facts §32 read, which
+    // are what a reader can go and check.
+    const line27a = earnedIncomeCreditOutcome === undefined
+        ? declaredZero('1040 line 27a')
+        : {
+            value: earnedIncomeCreditOutcome.creditCents,
+            sources: unionSources([income.line1z, income.line11b]),
+            rule: '1040 line 27a',
+        }
     // 28 — additional child tax credit: Schedule 8812 Part II-A's line 27,
     // computed above alongside line 19 from the SAME `form8812Outcome`, per
     // Decision 4.3 — never independently re-derived here.
@@ -2334,7 +2396,7 @@ const expectedIncomeLineCount = 31
  * so the `Exclude<>` below is what turns forgetting one of them into a
  * compile error rather than a crash on a missing `.sources` — which is
  * exactly what it did when this phase first added them.
- * @type {readonly Exclude<keyof Form1040IncomeLines, 'kind' | 'filingScheduleD' | 'scheduleD15Cents' | 'scheduleD16Cents' | 'scheduleD18Cents' | 'scheduleD19Cents' | 'selfEmployment' | 'specifiedPrivateActivityBondInterest' | 'itemizing' | 'scheduleALine7Cents' | 'scheduleOneALine37Cents'>[]}
+ * @type {readonly Exclude<keyof Form1040IncomeLines, 'kind' | 'filingScheduleD' | 'scheduleD15Cents' | 'scheduleD16Cents' | 'scheduleD18Cents' | 'scheduleD19Cents' | 'selfEmployment' | 'specifiedPrivateActivityBondInterest' | 'itemizing' | 'scheduleALine7Cents' | 'scheduleOneALine37Cents' | 'disqualifiedPassiveIncomeCents'>[]}
  */
 const incomeLineFieldNames = /** @type {const} */ ([
     'line1a', 'line1b', 'line1c', 'line1d', 'line1e', 'line1f', 'line1g', 'line1h', 'line1i', 'line1z',
@@ -5376,6 +5438,182 @@ export const proof = {
         // `socialSecurityBenefits` itself now has its OWN "actually computes"
         // coverage: `retirementAndSocialSecurityBeforeTheScopeReclassificationLands`
         // above and `wave1RetirementAndSocialSecurity` below.
+        // ── TAX-27 (Phase 32): §32 through the FULL report entry point ──────
+        //
+        // ACCEPTANCE 1. A qualifying filer's earned income credit computed end
+        // to end, every figure hand-derived here and NONE of them read back
+        // out of the engine.
+        //
+        // A single filer, one qualifying nine-year-old daughter with every §32
+        // fact stated, and one Form W-2 for $25,000 with no withholding:
+        //
+        //   line 1a = 1z            $25,000.00   the one W-2's box 1
+        //   line 11b (AGI)          $25,000.00   no adjustments
+        //   line 12e                $15,750.00   single standard deduction
+        //   line 15                  $9,250.00   $25,000 - $15,750
+        //   line 16                    $928.00   Tax Table. Below $100,000 the
+        //                                        bands are $50 wide above
+        //                                        $3,000, so $9,250 sits in
+        //                                        [$9,250, $9,300) whose
+        //                                        midpoint is $9,275, and
+        //                                        10% x $9,275 = $927.50 -> $928
+        //                                        ($9,275 is inside single's 10%
+        //                                        bracket, which runs to $11,925)
+        //   line 19                    $928.00   Schedule 8812's child tax
+        //                                        credit, which runs off the
+        //                                        SAME `dependents` array and
+        //                                        is NONREFUNDABLE, so §24(a)
+        //                                        limits it to the tax
+        //   line 21                    $928.00   19 + 20, and 20 is zero
+        //   line 22                      $0.00   max(18 - 21, 0): the child
+        //                                        tax credit extinguishes the
+        //                                        tax exactly
+        //   line 24                      $0.00   no other taxes
+        //   line 27a                 $4,060.00   the EIC Table, one qualifying
+        //                                        child, all other filing
+        //                                        statuses: band [$25,000,
+        //                                        $25,050), midpoint $25,025,
+        //                                        which is above the $12,730
+        //                                        earned income amount so the
+        //                                        phase-in is the $4,328
+        //                                        maximum; the excess over the
+        //                                        $23,350 phaseout amount is
+        //                                        $1,675, and 15.98% x $1,675 =
+        //                                        $267.665, so $4,328 - $267.665
+        //                                        = $4,060.335 -> $4,060.
+        //                                        Printed 2025 EIC Table row
+        //                                        "25,000 25,050": 4,060
+        //   line 32                  $4,060.00   27a + 28 + 29 + 30 + 31, and
+        //                                        the last four are zero
+        //   line 33                  $4,060.00   25d + 26 + 32, both zero
+        //   line 34                  $4,060.00   $4,060.00 - $0.00
+        //
+        // **Line 34 is the whole point of the last figure**, and lines 19
+        // through 22 are why it is the strongest available statement of it.
+        // This return owes NO tax — Schedule 8812's nonrefundable child tax
+        // credit, computed off the same `dependents` array, already covers the
+        // whole $928 — so every cent of the earned income credit comes back as
+        // a refund. A nonrefundable §32 would have produced a $0.00 line 34
+        // here, which is exactly the difference between line 27a and Schedule 3
+        // Part I.
+        //
+        // **The first draft of this comment derived line 24 as $928.00 and
+        // line 34 as $3,132.00, and the leaf reddened.** Recorded rather than
+        // quietly corrected: the omission was line 19. The child tax credit
+        // does not wait to be declared — `childTaxCreditOrOtherDependents` is
+        // undeclared on this fixture and Schedule 8812 computes anyway, off the
+        // dependents array — so a hand-derivation of any §32 return with a
+        // qualifying child has to account for it. A figure adjusted until the
+        // suite went green would have hidden that.
+        theEarnedIncomeCreditComputesEndToEndAndIsRefunded: () => {
+            const outcome = form1040Report(taxParams2025)(inputsOf(storedProfile({
+                ...singleProfile,
+                declaredKinds: ['wages', 'earnedIncomeCredit'],
+                dependentCount: 1,
+                dependents: [{
+                    relationship: 'daughter',
+                    ssnValidForEmployment: true,
+                    ageAtYearEnd: 9,
+                    livedWithTaxpayer: true,
+                    earnedIncomeCreditRelationship: 'child',
+                    earnedIncomeCreditUnitedStatesResidency:
+                        'sharedTheTaxpayersUnitedStatesAbodeForMoreThanHalfTheYear',
+                    earnedIncomeCreditJointReturn: 'didNotFileAJointReturn',
+                }],
+                filerSocialSecurityNumber: 'validForEmployment',
+                filerQualifyingChildOfAnotherTaxpayer: 'isNotAnotherTaxpayersQualifyingChild',
+            }))([w2Document('sha256-w2-eic')('25000.00')])([])([])([])([])([])([])([])([]))
+            assert(outcome.kind === 'ok', ['a qualifying §32 filer must compute', outcome])
+            const at = lineRuled(outcome.lines)
+            assertEq(at('1040 line 15').value, 925000n, '$25,000.00 less the $15,750.00 standard deduction')
+            assertEq(at('1040 line 16').value, 92800n, '10% of the $9,275 Tax Table band midpoint')
+            assertEq(at('1040 line 19').value, 92800n, 'the NONREFUNDABLE child tax credit, limited to the tax')
+            assertEq(at('1040 line 24').value, 0n, 'the child tax credit extinguishes the tax exactly')
+            assertEq(at('1040 line 27a').value, 406000n, 'the 2025 EIC Table, one child, all other statuses')
+            assertEq(at('1040 line 32').value, 406000n, 'the credit is the whole of line 32')
+            assertEq(at('1040 line 33').value, 406000n, 'and the whole of the total payments')
+            assertEq(at('1040 line 34').value, 406000n, 'REFUNDED IN FULL: $4,060.00 of credit against $0.00 of tax')
+            // The credit's own line must cite documents, like every other
+            // line: an amount a reader cannot trace is a silently omitted one.
+            assert(
+                at('1040 line 27a').sources.length > 0,
+                ['the credit must cite what it was figured from', at('1040 line 27a').sources],
+            )
+        },
+        // ACCEPTANCE 2. A §32 fact the profile does not carry refuses the WHOLE
+        // report, naming the fact and the field — threaded exactly like the
+        // Schedule C and Schedule E refusals, with `unmodeled: []`, because
+        // `earnedIncomeCredit` is MODELED and what is missing is a fact rather
+        // than a form.
+        anUnstatedSectionThirtyTwoFactRefusesTheWholeReport: () => {
+            const outcome = form1040Report(taxParams2025)(inputsOf(storedProfile({
+                ...singleProfile,
+                declaredKinds: ['wages', 'earnedIncomeCredit'],
+                dependentCount: 1,
+                dependents: [{
+                    relationship: 'daughter',
+                    ssnValidForEmployment: true,
+                    ageAtYearEnd: 9,
+                    livedWithTaxpayer: true,
+                    // `earnedIncomeCreditUnitedStatesResidency` deliberately
+                    // absent: §32(c)(3)(C)'s United States abode test is the
+                    // fact the old `livedWithTaxpayer` boolean could not state.
+                    earnedIncomeCreditRelationship: 'child',
+                    earnedIncomeCreditJointReturn: 'didNotFileAJointReturn',
+                }],
+                filerSocialSecurityNumber: 'validForEmployment',
+                filerQualifyingChildOfAnotherTaxpayer: 'isNotAnotherTaxpayersQualifyingChild',
+            }))([w2Document('sha256-w2-eic')('25000.00')])([])([])([])([])([])([])([])([]))
+            assert(outcome.kind === 'error', ['an unstated §32 fact must stop the report', outcome])
+            assertEq(outcome.unmodeled.length, 0, 'a missing FACT names no unmodeled kind')
+            assert(
+                outcome.message.includes('earnedIncomeCreditUnitedStatesResidency'),
+                ['expected the profile field named', outcome.message],
+            )
+            assert(
+                outcome.message.includes('§32(c)(3)(C)'),
+                ['expected the statute named', outcome.message],
+            )
+            assert(
+                outcome.message.includes('dependents[0]'),
+                ['expected the dependent named by index', outcome.message],
+            )
+            // ...and NOT a single line comes back, per 10-CONTEXT.md Decision 2.
+            assert(
+                !Object.hasOwn(outcome, 'lines'),
+                ['a refusing report must carry no partial line list', outcome],
+            )
+        },
+        // ACCEPTANCE 3, and the leaf that keeps every pre-Phase-32 return
+        // BYTE-IDENTICAL. This is Phase 22's own
+        // `controlTheSameReturnBelowTheThresholdComputesSilently` pattern,
+        // applied to §32: a return that does not declare `earnedIncomeCredit`
+        // must reach line 27a as a profile-declared zero, and no rule string
+        // anywhere in the report may mention the credit at all. The EXEC-14/
+        // PROV-09 pinned rerun computes exactly such a return, so this leaf and
+        // that integration test are two witnesses to one property.
+        //
+        // The negative half is what makes it worth having: an implementation
+        // that ruled line 27a `'1040 line 27a (Earned Income Credit)'`, or that
+        // called `fjs/schedule/eic` unconditionally and thereby demanded a §32
+        // fact of a filer who is not claiming the credit, would pass the value
+        // assertion and fail this one.
+        line27aIsAProfileDeclaredZeroWhenTheKindIsNotDeclared: () => {
+            const outcome = form1040Report(taxParams2025)(
+                inputsOf(storedProfile(singleProfile))([
+                    w2Document('sha256-w2-01')('50000.00'),
+                ])([])([])([])([])([])([])([])([]))
+            assert(outcome.kind === 'ok', ['an ordinary return must still compute', outcome])
+            const line27a = lineRuled(outcome.lines)('1040 line 27a')
+            assertEq(line27a.value, 0n, 'declared zero, not computed and not refused')
+            assertEq(line27a.rule, '1040 line 27a', 'ruled by its line number, naming no form')
+            for (const line of outcome.lines) {
+                assert(
+                    !line.rule.includes('EIC') && !line.rule.toLowerCase().includes('earned income credit'),
+                    ['a return not claiming §32 must mention it in no rule string', line.rule],
+                )
+            }
+        },
         unreportedTipsRefuseTheWholeReportNamingTheLineAndTheRemedy: () => {
             const outcome = form1040Report(taxParams2025)(inputsOf(storedProfile({
                 ...singleProfile,
