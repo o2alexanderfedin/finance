@@ -8161,4 +8161,247 @@ export const proof = {
             assertEq(at('1040 line 18').value, 1913900n, 'line 18 is the regular tax alone')
         },
     },
+    // ── Phase 29 (TAX-34): the double taxation, PRICED end to end ──────────
+    basisCorrection: {
+        // THE FIGURE THIS REQUIREMENT EXISTS FOR, computed twice on one
+        // fixture: the SAME return with and without the taxpayer's basis
+        // correction, and the difference in federal income tax between them.
+        //
+        // The filer is an ordinary equity-compensated employee. $50,000.00 of
+        // salary and $150,000.00 of restricted stock units that vested during
+        // the year — all $200,000.00 of it inside Form W-2 box 1, all of it
+        // already withheld on. The shares were sold the day they vested, for
+        // the $150,000.00 they were worth, so there is no economic gain at
+        // all. The broker reports proceeds $150,000.00 and basis $0.00, which
+        // is CORRECT by §6045's rules — $0.00 is what the employee paid — and
+        // checks box 12, so this is Form 8949 category A.
+        //
+        // WITH the correction, hand-computed:
+        //   Form 8949 col (d)  proceeds                        $150,000.00
+        //             col (e)  basis as reported                     $0.00
+        //             col (f)  code                                       B
+        //             col (g)  0.00 - 150,000.00               ($150,000.00)
+        //             col (h)                                          $0.00
+        //   Sch D line 16 / 1040 line 7a                              $0.00
+        //   1040 line 11b   AGI                                 $200,000.00
+        //   1040 line 15    200,000.00 - 15,750.00              $184,250.00
+        //   1040 line 16    10% of 11,925.00                      $1,192.50
+        //                 + 12% of 36,550.00                      $4,386.00
+        //                 + 22% of 54,875.00                     $12,072.50
+        //                 + 24% of 80,900.00                     $19,416.00
+        //                                                        $37,067.00
+        //
+        // WITHOUT it, the identical return:
+        //   Sch D line 16 / 1040 line 7a                        $150,000.00
+        //   1040 line 11b   AGI                                 $350,000.00
+        //   1040 line 15    350,000.00 - 15,750.00              $334,250.00
+        //   1040 line 16    the four above, plus
+        //                   24% of 93,950.00 (to the ceiling)    $22,548.00
+        //                 + 32% of 53,225.00                     $17,032.00
+        //                 + 35% of 83,725.00                     $29,303.75
+        //                   i.e. 1,192.50 + 4,386.00 + 12,072.50
+        //                      + 22,548.00 + 17,032.00 + 29,303.75
+        //                                                        $86,534.75
+        //
+        // **$86,534.75 - $37,067.00 = $49,467.75** of federal income tax on
+        // $150,000.00 of wages that were already taxed as wages. Neither
+        // return refuses; neither looks wrong; every other line agrees. That
+        // is the whole of TAX-34.
+        theDoubleTaxationIsPricedAtFortyNineThousandFourHundredAndSixtySeven: () => {
+            /** @type {ReturnProfile} */
+            const profile = {
+                ...singleProfile,
+                declaredKinds: ['wages', 'capitalGainsOrLosses'],
+            }
+            /** @type {Stored<OneZeroNineNineB>} */
+            const sale = {
+                documentHash: 'sha256-29-rsu-1099b',
+                value: {
+                    dialect: 'vnd.fjs.1099b',
+                    payerTin: '77-7777777',
+                    recipientTin: '222-22-2222',
+                    accountNumber: 'ACC-BROKER',
+                    taxYear: 2025,
+                    formRevision: '2025',
+                    sourceArtifactHash:
+                        'deadbeef00112233445566778899aabbccddeeff0011223344556677889900',
+                    box1aDescriptionOfProperty: '1,000 sh MEGACORP',
+                    box1dProceeds: '150000.00',
+                    box1eCostOrOtherBasis: '0.00',
+                    box2ShortTermGainOrLoss: true,
+                    box12BasisReportedToIrs: true,
+                },
+            }
+            /** @type {(basisCorrectionForms: readonly Stored<BasisCorrection>[]) => Form1040Inputs} */
+            const returnWith = basisCorrectionForms => ({
+                ...inputsOf(storedProfile(profile))([
+                    w2Document('sha256-29-rsu-w2')('200000.00'),
+                ])([])([])([sale])([])([])([])([])([]),
+                basisCorrectionForms,
+            })
+            const uncorrected = form1040Report(taxParams2025)(returnWith([]))
+            assert(uncorrected.kind === 'ok', ['the uncorrected return must COMPUTE, not refuse', uncorrected])
+            if (uncorrected.kind !== 'ok') {
+                return
+            }
+            const corrected = form1040Report(taxParams2025)(returnWith([{
+                documentHash: 'sha256-29-rsu-fix',
+                value: {
+                    dialect: 'vnd.fjs.basis_correction',
+                    recipientTin: '222-22-2222',
+                    taxYear: 2025,
+                    brokerageDocumentHash: 'sha256-29-rsu-1099b',
+                    correctedCostOrOtherBasis: '150000.00',
+                    reason: '1,000 restricted stock units vested at $150.00 and the whole '
+                        + '$150,000.00 is inside Form W-2 box 1; the broker reported $0.00 basis '
+                        + 'because that is what the employee paid.',
+                },
+            }]))
+            assert(corrected.kind === 'ok', ['expected ok', corrected])
+            if (corrected.kind !== 'ok') {
+                return
+            }
+            const before = lineRuled(uncorrected.lines)
+            const after = lineRuled(corrected.lines)
+            // The wages are identical, which is the point: the $150,000.00 is
+            // taxed once here on BOTH returns.
+            assertEq(before('1040 line 1a').value, 20000000n, '$200,000.00 of wages')
+            assertEq(after('1040 line 1a').value, 20000000n, 'and the same on both')
+            // …and a second time, as a capital gain, only on the uncorrected
+            // one.
+            assertEq(before('1040 line 7a').value, 15000000n, 'a $150,000.00 phantom capital gain')
+            assertEq(after('1040 line 7a').value, 0n, 'and none at all, once corrected')
+            assertEq(before('1040 line 11b').value, 35000000n, 'AGI $350,000.00')
+            assertEq(after('1040 line 11b').value, 20000000n, 'AGI $200,000.00')
+            assertEq(before('1040 line 15').value, 33425000n, 'taxable income $334,250.00')
+            assertEq(after('1040 line 15').value, 18425000n, 'taxable income $184,250.00')
+            assertEq(before('1040 line 16').value, 8653475n, '$86,534.75 of tax')
+            assertEq(after('1040 line 16').value, 3706700n, '$37,067.00 of tax')
+            // THE PRICE, asserted as its own hand-typed figure rather than
+            // only as the two totals: a reader has to be able to see the
+            // number this requirement exists to remove.
+            const overstatement = before('1040 line 16').value - after('1040 line 16').value
+            assertEq(
+                overstatement, 4946775n,
+                '$49,467.75 of federal income tax on already-taxed wages')
+            // Neither return owes alternative minimum tax, so nothing here is
+            // an artefact of Phase 29's other half.
+            assertEq(before('1040 line 17').value, 0n)
+            assertEq(after('1040 line 17').value, 0n)
+            // And the corrected return CITES the taxpayer's own document, so
+            // the adjustment is attributable rather than anonymous.
+            const hashes = after('1040 line 7a').sources.map(source => source.documentHash)
+            assert(
+                hashes.includes('sha256-29-rsu-fix'),
+                ['1040 line 7a must cite the basis correction that moved it', hashes])
+        },
+        // DOC-23's only reader, at the entry point: a stored Form 3922 plus
+        // ANY reported sale refuses the whole return, naming all three gaps.
+        // The Form 3922 here is for an unrelated employee stock purchase plan
+        // — which is exactly the problem, since nothing establishes whether
+        // the shares sold were those shares.
+        aStoredFormThreeNineTwoTwoWithASaleRefusesTheWholeReturn: () => {
+            /** @type {ReturnProfile} */
+            const profile = { ...singleProfile, declaredKinds: ['wages', 'capitalGainsOrLosses'] }
+            /** @type {Stored<OneZeroNineNineB>} */
+            const sale = {
+                documentHash: 'sha256-29-espp-1099b',
+                value: {
+                    dialect: 'vnd.fjs.1099b',
+                    payerTin: '77-7777777',
+                    recipientTin: '222-22-2222',
+                    accountNumber: 'ACC-BROKER',
+                    taxYear: 2025,
+                    formRevision: '2025',
+                    sourceArtifactHash:
+                        'deadbeef00112233445566778899aabbccddeeff0011223344556677889900',
+                    box1dProceeds: '20000.00',
+                    box1eCostOrOtherBasis: '17000.00',
+                    box2LongTermGainOrLoss: true,
+                    box12BasisReportedToIrs: true,
+                },
+            }
+            /** @type {Stored<FormThirtyNineTwentyTwo>} */
+            const transfer = {
+                documentHash: 'sha256-29-espp-3922',
+                value: {
+                    dialect: 'vnd.fjs.form3922',
+                    payerTin: '11-1111111',
+                    recipientTin: '222-22-2222',
+                    accountNumber: 'ACC-ESPP',
+                    taxYear: 2025,
+                    formRevision: 'April 2025',
+                    sourceArtifactHash:
+                        'deadbeef00112233445566778899aabbccddeeff0011223344556677889900',
+                    box1DateOptionGranted: '01/01/2025',
+                    box2DateOptionExercised: '06/30/2025',
+                    box3FairMarketValuePerShareOnGrantDate: '100.00',
+                    box4FairMarketValuePerShareOnExerciseDate: '150.00',
+                    box5ExercisePricePaidPerShare: '85.00',
+                    box6NumberOfSharesTransferred: '117.647058',
+                    box7DateLegalTitleTransferred: '06/30/2025',
+                    box8ExercisePricePerShareAsIfExercisedOnGrantDate: '85.00',
+                },
+            }
+            const outcome = form1040Report(taxParams2025)({
+                ...inputsOf(storedProfile(profile))([
+                    w2Document('sha256-29-espp-w2')('90000.00'),
+                ])([])([])([sale])([])([])([])([])([]),
+                employeeStockPurchaseForms: [transfer],
+            })
+            assert(outcome.kind === 'error', ['an ESPP transfer plus a sale must refuse', outcome])
+            if (outcome.kind !== 'error') {
+                return
+            }
+            assert(outcome.message.includes('sha256-29-espp-3922'), [outcome.message])
+            assert(outcome.message.includes('§423(a)(1)'), ['gap 2', outcome.message])
+            assert(outcome.message.includes('Form W-2 box'), ['gap 3', outcome.message])
+            assertEq(outcome.unmodeled.length, 0, 'a data-sufficiency refusal names no kind')
+            // THE CONTROL, in the same leaf: the identical return WITHOUT the
+            // sale computes. A Form 3922 arrives in the year of purchase, and
+            // in that year there is nothing to report.
+            const control = form1040Report(taxParams2025)({
+                ...inputsOf(storedProfile(profile))([
+                    w2Document('sha256-29-espp-w2-control')('90000.00'),
+                ])([])([])([])([])([])([])([])([]),
+                employeeStockPurchaseForms: [transfer],
+            })
+            assertEq(control.kind, 'ok', ['an ESPP transfer with no sale must compute', control])
+        },
+        // A basis correction on a return that never runs Schedule D is an
+        // assertion the engine would DROP, and it refuses instead — the guard
+        // that lives in this file rather than in `fjs/form8949`, because only
+        // this layer knows whether Schedule D will run at all.
+        aCorrectionOnAReturnThatDoesNotFileScheduleDRefuses: () => {
+            /** @type {ReturnProfile} */
+            const profile = { ...singleProfile, declaredKinds: ['wages'] }
+            const outcome = form1040Report(taxParams2025)({
+                ...inputsOf(storedProfile(profile))([
+                    w2Document('sha256-29-no-sched-d-w2')('90000.00'),
+                ])([])([])([])([])([])([])([])([]),
+                basisCorrectionForms: [{
+                    documentHash: 'sha256-29-orphan-fix',
+                    value: {
+                        dialect: 'vnd.fjs.basis_correction',
+                        recipientTin: '222-22-2222',
+                        taxYear: 2025,
+                        brokerageDocumentHash: 'sha256-29-nowhere',
+                        correctedCostOrOtherBasis: '1000.00',
+                        reason: 'the return does not declare capitalGainsOrLosses',
+                    },
+                }],
+            })
+            assert(outcome.kind === 'error', ['expected a refusal', outcome])
+            if (outcome.kind !== 'error') {
+                return
+            }
+            assert(outcome.message.includes('sha256-29-orphan-fix'), [outcome.message])
+            assert(
+                outcome.message.includes('capitalGainsOrLosses'),
+                ['the refusal must name the declaration that fixes it', outcome.message])
+            assert(
+                outcome.message.includes('silently dropping'),
+                ['and say why it refuses rather than ignoring', outcome.message])
+        },
+    },
 }
