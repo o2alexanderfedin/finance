@@ -705,11 +705,40 @@ export const form1040IncomeLines = taxParamSet => inputs => {
     const specifiedPrivateActivityBondInterest = fromDocuments('Form 6251 line 2g')(
         sumBoxOverDocuments(interestForms)('box9SpecifiedPrivateActivityBondInterest')(
             form => form.box9SpecifiedPrivateActivityBondInterest))
-    const line2b = fromDocuments('1040 line 2b')(addBoxSums(
+    // **TAX-35 — the separately stated interest on all three Schedule K-1
+    // faces lands here too**, and each face numbers it DIFFERENTLY: the
+    // partner's is box 5 (§702(a)(8)), the shareholder's box 4
+    // (§1366(a)(1)(A)), the beneficiary's box 1. Read from each dialect's own
+    // field name, never from a shared "interest is box N" rule — on the 1065
+    // "box 5" IS interest, on the 1120-S it is ordinary/qualified dividends,
+    // and on the 1041 it is other portfolio and nonbusiness income bound for
+    // Schedule E line 33 column (f). One shared table would misroute two of
+    // the three, which is why `fjs/document/k1_1120s`'s own table docstring
+    // says the three are deliberately not shared.
+    //
+    // Read UNCONDITIONALLY, with no `declaredKinds` gate, for the reason
+    // lines 3a/3b below already state: `declaredKinds` gates REFUSALS for
+    // kinds this engine cannot compute, and this is now a computed line.
+    //
+    // **The K-1 box paths are dialect-qualified and the 1099-INT's are not.**
+    // `k1_1041`'s interest box is literally `box1InterestIncome`, the same
+    // name the 1099-INT uses, so an unqualified citation on this line could
+    // not tell a beneficiary's interest from a bank's — and a `boxPath`
+    // assertion, which is the only thing that catches a transposition a sum
+    // absorbs, would have nothing to bind to. `fjs/schedule/d`'s
+    // `priorYearCapitalLossCarryoverWorksheet(shortTerm)` is the same
+    // qualification for the same reason.
+    const line2b = fromDocuments('1040 line 2b')(addBoxSums(addBoxSums(addBoxSums(addBoxSums(
         sumBoxOverDocuments(interestForms)('box1InterestIncome')(
             form => form.box1InterestIncome))(
         sumBoxOverDocuments(interestForms)('box3UsSavingsBondsAndTreasuryInterest')(
-            form => form.box3UsSavingsBondsAndTreasuryInterest)))
+            form => form.box3UsSavingsBondsAndTreasuryInterest)))(
+        sumBoxOverDocuments(partnershipK1Forms)('k1_1065.box5InterestIncome')(
+            k1 => k1.box5InterestIncome)))(
+        sumBoxOverDocuments(sCorporationK1Forms)('k1_1120s.box4InterestIncome')(
+            k1 => k1.box4InterestIncome)))(
+        sumBoxOverDocuments(estateTrustK1Forms)('k1_1041.box1InterestIncome')(
+            k1 => k1.box1InterestIncome)))
 
     // 3a/3b — qualified/ordinary dividends, read UNCONDITIONALLY from stored
     // 1099-DIVs, exactly like 1a/2a/2b already read from documents with no
@@ -3082,6 +3111,107 @@ const withPassThrough = inputs => partnershipK1Forms => sCorporationK1Forms => (
 })
 
 /**
+ * Overrides `inputsOf`'s empty `estateTrustK1Forms` default — the third K-1
+ * dialect, which {@link withPassThrough} deliberately does not carry because
+ * its own leaves are about self-employment earnings and a beneficiary has
+ * none.
+ * @type {(inputs: Form1040Inputs) => (estateTrustK1Forms: readonly Stored<K1EstateTrust>[]) => Form1040Inputs}
+ */
+const withEstateTrust = inputs => estateTrustK1Forms => ({ ...inputs, estateTrustK1Forms })
+
+// ── TAX-35: the separately stated PORTFOLIO boxes, one fixture per face ──────
+//
+// Three separate box typedefs and three separate builders, never one shared
+// shape with a `dialect` parameter. The whole hazard TAX-35's routing exists
+// to survive is that the same portfolio item wears a different box NUMBER on
+// each face, so a fixture that could be pointed at any of the three by
+// changing one field would let a mis-numbered read pass by construction.
+
+/**
+ * The partner's portfolio boxes, numbered as the printed Schedule K-1 (Form
+ * 1065) numbers them.
+ * @typedef {{
+ *   readonly box5InterestIncome?: string,
+ * }} PartnershipPortfolioBoxes
+ */
+
+/**
+ * A partner's Schedule K-1 carrying portfolio items and NO box 1 — the shape
+ * a partner in an investment partnership receives, and the shape that makes
+ * these leaves about line 2b rather than about Schedule E.
+ * @type {(documentHash: string) => (boxes: PartnershipPortfolioBoxes) => Stored<K1Partnership>}
+ */
+const partnershipPortfolioK1 = documentHash => boxes => ({
+    documentHash,
+    value: {
+        dialect: 'vnd.fjs.k1_1065',
+        payerTin: '33-3333333',
+        recipientTin: '222-22-2222',
+        accountNumber: 'PTR-0002',
+        taxYear: 2025,
+        formRevision: '2025',
+        payerName: 'Northwind Portfolio Partners LP',
+        boxGGeneralPartnerOrLlcMemberManager: /** @type {const} */ (true),
+        materialParticipation: 'materiallyParticipated',
+        ...boxes,
+    },
+})
+
+/**
+ * The shareholder's portfolio boxes, numbered as the printed Schedule K-1
+ * (Form 1120-S) numbers them — **four**, where the partner's is five.
+ * @typedef {{
+ *   readonly box4InterestIncome?: string,
+ * }} SCorporationPortfolioBoxes
+ */
+
+/**
+ * @type {(documentHash: string) => (boxes: SCorporationPortfolioBoxes) => Stored<K1SCorporation>}
+ */
+const sCorporationPortfolioK1 = documentHash => boxes => ({
+    documentHash,
+    value: {
+        dialect: 'vnd.fjs.k1_1120s',
+        payerTin: '44-4444444',
+        recipientTin: '222-22-2222',
+        accountNumber: 'SHR-0002',
+        taxYear: 2025,
+        formRevision: '2025',
+        payerName: 'Northwind Holdings Inc.',
+        materialParticipation: 'materiallyParticipated',
+        ...boxes,
+    },
+})
+
+/**
+ * The beneficiary's portfolio boxes, numbered as the printed Schedule K-1
+ * (Form 1041) numbers them — **one**, which is the same literal field name the
+ * 1099-INT uses for a bank's interest and the reason line 2b's K-1 citations
+ * are dialect-qualified.
+ * @typedef {{
+ *   readonly box1InterestIncome?: string,
+ * }} EstateTrustPortfolioBoxes
+ */
+
+/**
+ * @type {(documentHash: string) => (boxes: EstateTrustPortfolioBoxes) => Stored<K1EstateTrust>}
+ */
+const estateTrustPortfolioK1 = documentHash => boxes => ({
+    documentHash,
+    value: {
+        dialect: 'vnd.fjs.k1_1041',
+        payerTin: '66-6666666',
+        recipientTin: '222-22-2222',
+        taxYear: 2025,
+        formRevision: '2025',
+        payerName: 'The Harrow Family Trust',
+        boxHDomesticBeneficiary: /** @type {const} */ (true),
+        materialParticipation: 'materiallyParticipated',
+        ...boxes,
+    },
+})
+
+/**
  * Runs the WHOLE line assembly — 1a-15 and then 16-37 — and hands back both
  * records plus the selected line-16 method, asserting that the return
  * computed.
@@ -3628,6 +3758,94 @@ export const proof = {
                 ])([])([])([])([])([])([])([])))
             assertEq(lines.line2a.value, 700n)
             assertEq(lines.line2b.value, 10000n)
+        },
+        // ── TAX-35: the three K-1 faces' interest, on this same line ─────
+        //
+        // **THREE DIFFERENT AMOUNTS on purpose.** Two boxes carrying the
+        // same figure make a transposition invisible even to a per-line
+        // total, so each face contributes a distinct one and the arithmetic
+        // below only balances if each landed from the face it was put on.
+        //
+        // $100.00 bank + $700.00 partner + $30.00 shareholder + $4.00
+        // beneficiary = $834.00. Hand-typed: 10000 + 70000 + 3000 + 400
+        // = 83400 cents.
+        allThreeKOneFacesReachLineTwoBAtTheirOwnBoxNumbers: () => {
+            const lines = expectIncomeOk(form1040IncomeLines(taxParams2025)(
+                withEstateTrust(withPassThrough(
+                    inputsOf(storedProfile(singleProfile))([])([
+                        interestDocument('sha256-int-01')({ box1InterestIncome: '100.00' }),
+                    ])([])([])([])([])([])([])([])
+                )([
+                    partnershipPortfolioK1('sha256-k1-1065-int')({ box5InterestIncome: '700.00' }),
+                ])([
+                    sCorporationPortfolioK1('sha256-k1-1120s-int')({ box4InterestIncome: '30.00' }),
+                ]))([
+                    estateTrustPortfolioK1('sha256-k1-1041-int')({ box1InterestIncome: '4.00' }),
+                ])))
+            assertEq(lines.line2b.value, 83400n, '$100 + $700 + $30 + $4 = $834.00')
+            // **Per-box `boxPath`, not just the total.** `addBoxSums`
+            // concatenates `sources`, so a swap of two reads leaves the sum
+            // untouched and only the citations can see it (AGENTS.md's
+            // 1099-INT box-mapping finding, in its K-1 form).
+            const paths = lines.line2b.sources.map(source => source.boxPath)
+            assertEq(paths.length, 4, 'one citation per PRESENT box, four boxes')
+            assert(paths.includes('box1InterestIncome'), ['the 1099-INT box 1', paths])
+            assert(paths.includes('k1_1065.box5InterestIncome'), ['the partner box 5', paths])
+            assert(paths.includes('k1_1120s.box4InterestIncome'), ['the shareholder box 4', paths])
+            assert(paths.includes('k1_1041.box1InterestIncome'), ['the beneficiary box 1', paths])
+            // The amount cited against each K-1 path is that face's OWN
+            // figure. This is the assertion a transposition reddens: swap
+            // any two reads above and the sum is still $834.00 while these
+            // three pairings are wrong.
+            const citedAt = /** @type {(path: string) => string | undefined} */ (
+                path => lines.line2b.sources.find(source => source.boxPath === path)?.value)
+            assertEq(citedAt('k1_1065.box5InterestIncome'), '700.00')
+            assertEq(citedAt('k1_1120s.box4InterestIncome'), '30.00')
+            assertEq(citedAt('k1_1041.box1InterestIncome'), '4.00')
+            // The document each citation names, so a read that hits the
+            // right box on the WRONG collection is visible too.
+            const hashAt = /** @type {(path: string) => string | undefined} */ (
+                path => lines.line2b.sources.find(source => source.boxPath === path)?.documentHash)
+            assertEq(hashAt('k1_1065.box5InterestIncome'), 'sha256-k1-1065-int')
+            assertEq(hashAt('k1_1120s.box4InterestIncome'), 'sha256-k1-1120s-int')
+            assertEq(hashAt('k1_1041.box1InterestIncome'), 'sha256-k1-1041-int')
+        },
+        // **THE CONTROL.** The same three K-1s with their interest boxes
+        // ABSENT — every other box on each face left as the builder leaves
+        // it — must not move line 2b off the bank's $100.00, and must not
+        // cite a K-1 at all. A gate needs a control (AGENTS.md): a routing
+        // that added a phantom zero, or that read some neighbouring box,
+        // passes the leaf above and fails this one.
+        kOneFacesWithNoInterestBoxDoNotMoveLineTwoB: () => {
+            const lines = expectIncomeOk(form1040IncomeLines(taxParams2025)(
+                withEstateTrust(withPassThrough(
+                    inputsOf(storedProfile(singleProfile))([])([
+                        interestDocument('sha256-int-01')({ box1InterestIncome: '100.00' }),
+                    ])([])([])([])([])([])([])([])
+                )([
+                    partnershipPortfolioK1('sha256-k1-1065-int')({}),
+                ])([
+                    sCorporationPortfolioK1('sha256-k1-1120s-int')({}),
+                ]))([
+                    estateTrustPortfolioK1('sha256-k1-1041-int')({}),
+                ])))
+            assertEq(lines.line2b.value, 10000n, 'the bank interest alone')
+            assertEq(lines.line2b.sources.length, 1, 'DOC-11: an absent box cites nothing')
+            const [only] = lines.line2b.sources
+            assertEq(only.boxPath, 'box1InterestIncome')
+            assertEq(only.documentHash, 'sha256-int-01')
+        },
+        // A beneficiary's interest is NOT tax-exempt interest, and the
+        // 1041's box 1 must not leak into line 2a the way box 8 of a
+        // 1099-INT legitimately does. The second control, for the one pair
+        // of lines this face could be mis-wired between.
+        beneficiaryInterestIsLineTwoBNotTwoA: () => {
+            const lines = expectIncomeOk(form1040IncomeLines(taxParams2025)(
+                withEstateTrust(inputsOf(storedProfile(singleProfile))([])([])([])([])([])([])([])([])([]))([
+                    estateTrustPortfolioK1('sha256-k1-1041-int')({ box1InterestIncome: '4.00' }),
+                ])))
+            assertEq(lines.line2b.value, 400n)
+            assertEq(lines.line2a.value, 0n, 'a beneficiary’s taxable interest is not §103 interest')
         },
     },
     line9: {

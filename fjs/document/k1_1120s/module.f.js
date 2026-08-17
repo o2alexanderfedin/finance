@@ -175,8 +175,15 @@ export const codedBoxFields = /** @type {const} */ ([
 
 /**
  * **The separately stated items this engine cannot place, each naming where
- * the amount would have gone.** Twelve of the thirteen fixed-caption money
- * boxes; box 1 is the one that computes.
+ * the amount would have gone.** Eleven of the thirteen fixed-caption money
+ * boxes. The boxes that are NOT here are the ones this engine computes, and
+ * they are LISTED rather than described, because there is now more than one of
+ * them and the list grows every time a destination is wired:
+ *
+ * - box 1 — ordinary business income, through `fjs/schedule/e` Part II.
+ * - box 4 — interest income, through `fjs/form1040/core`'s 1040 line 2b
+ *   (TAX-35, §1366(a)(1)(A)). This face numbers its interest FOUR where the
+ *   partnership numbers it five and the beneficiary numbers it one.
  *
  * §1366(a)(1) is the S-corporation counterpart of §702(a): each of these is
  * taken into account separately by the shareholder, on its own line elsewhere
@@ -191,7 +198,6 @@ export const codedBoxFields = /** @type {const} */ ([
 export const unmodeledMoneyBoxes = /** @type {const} */ ([
     ['box2NetRentalRealEstateIncome', 'Schedule E Part I (lines 3-26), rental real estate — which this engine does not model; `rentalRealEstateAndRoyalties` is an `fjs/return/scope` refusal'],
     ['box3OtherNetRentalIncome', 'Schedule E Part II column (g) or (j) as a SECOND activity separate from box 1, with its own §469 grouping and its own basis limitation'],
-    ['box4InterestIncome', '1040 line 2b (taxable interest), through §1366(a)(1)(A)'],
     ['box5aOrdinaryDividends', '1040 line 3b (ordinary dividends)'],
     ['box5bQualifiedDividends', '1040 line 3a (qualified dividends), and thence the Qualified Dividends and Capital Gain Tax Worksheet'],
     ['box6Royalties', 'Schedule E Part I line 4 (royalties received) — Part I, not Part II, which is why a royalty cannot ride into line 41 on this schedule’s S-corporation block'],
@@ -358,8 +364,45 @@ const perUnmodeledBoxZeroAccepted = Object.fromEntries(unmodeledMoneyBoxes.map((
 const expectedMoneyBoxCount = 13
 /** Hand-typed: six coded boxes — 10, 12, 13, 15, 16 and 17. */
 const expectedCodedBoxCount = 6
-/** Hand-typed: twelve of the thirteen refuse. `13 - 1` — box 1 computes. */
-const expectedUnmodeledBoxCount = 12
+/** Hand-typed: eleven of the thirteen refuse. `13 - 2` — box 1 computes
+ * (Schedule E Part II) and box 4 computes (1040 line 2b, TAX-35). */
+const expectedUnmodeledBoxCount = 11
+
+/**
+ * **The hand-typed inverse of {@link unmodeledMoneyBoxes}**: every
+ * fixed-caption money box this engine COMPUTES, and therefore accepts at
+ * storage with a non-zero amount.
+ *
+ * Deliberately not derived by subtracting one list from the other — both would
+ * be the code under test, and AGENTS.md records four shipped defects of
+ * exactly that shape. This is the independent side, and it is what makes a box
+ * that silently leaves `unmodeledMoneyBoxes` WITHOUT its destination being
+ * wired impossible to miss: the arithmetic below stops balancing.
+ * @type {readonly string[]}
+ */
+const computedMoneyBoxes = [
+    'box1OrdinaryBusinessIncome',
+    'box4InterestIncome',
+]
+
+/**
+ * One generated leaf per computed box: a present, NON-ZERO amount must now be
+ * ACCEPTED at storage. This is the exact inverse of the
+ * {@link perUnmodeledBoxRefusal} leaf that each of these boxes used to have,
+ * and deleting a row from {@link unmodeledMoneyBoxes} without adding it here
+ * leaves the box neither refused nor proven storable.
+ */
+const perComputedBoxAcceptedWhenNonZero = Object.fromEntries(computedMoneyBoxes.map(field => [
+    `${field}IsAcceptedWhenNonZero`,
+    () => {
+        const [t, v] = validate({ ...minimal, [field]: '1234.56' })
+        assertEq(t, 'ok', `${field} is computed, so a non-zero amount must be stored, not refused`)
+        assert(
+            !unmodeledMoneyBoxes.some(([refused]) => refused === field),
+            ['a computed box must not also be listed as unmodeled', field, v],
+        )
+    },
+]))
 
 /**
  * **The independent statement of the whole Part III box layout**, hand-typed
@@ -401,6 +444,7 @@ export const proof = {
     ...perCodedBoxRejection,
     ...perUnmodeledBoxRefusal,
     ...perUnmodeledBoxZeroAccepted,
+    ...perComputedBoxAcceptedWhenNonZero,
 
     dialectAndMediaType: () => {
         assertEq(dialect, 'vnd.fjs.k1_1120s')
@@ -412,9 +456,9 @@ export const proof = {
         assertEq(codedBoxFields.length, expectedCodedBoxCount)
         assertEq(unmodeledMoneyBoxes.length, expectedUnmodeledBoxCount)
         assertEq(
-            expectedMoneyBoxCount - 1,
+            expectedMoneyBoxCount - computedMoneyBoxes.length,
             expectedUnmodeledBoxCount,
-            'exactly one fixed-caption money box — box 1 — is computed rather than refused',
+            'every fixed-caption money box is either computed or refused, and none is both',
         )
     },
 
@@ -449,6 +493,29 @@ export const proof = {
         }
         for (const [field] of unmodeledMoneyBoxes) {
             assert(money.includes(field), ['an unmodeled box is not a fixed-caption money box', field])
+        }
+        // **The partition, asserted BY NAME in both directions** — added by
+        // TAX-35, and this face had no such assertion before it: the counts
+        // above could see a box LEAVE `unmodeledMoneyBoxes`, but nothing could
+        // see it leave without anything computing it. `fjs/document/k1_1041`
+        // already carried the by-name form; the two entity faces did not, so
+        // a row deleted here was a silently accepted, silently unread box.
+        // {@link computedMoneyBoxes} is the hand-typed side of the partition.
+        const refused = unmodeledMoneyBoxes.map(([field]) => field)
+        /** @type {readonly string[]} */
+        const refusedNames = refused
+        for (const field of computedMoneyBoxes) {
+            assert(
+                !refusedNames.includes(field),
+                ['a computed box must not also be refused', field, refused])
+            assert(
+                money.includes(field),
+                ['a computed box must be a fixed-caption money box on this face', field])
+        }
+        for (const field of money) {
+            assert(
+                computedMoneyBoxes.includes(field) || refusedNames.includes(field),
+                ['every money box is either computed or refused, and this one is neither', field])
         }
     },
 
