@@ -83,8 +83,34 @@ The fix belongs in `fjs/protocol/mcp/module.f.js`'s `initialize` branch itself, 
 - `McpConfig` grows a notion of the version(s) the server actually supports — either a single
   `protocolVersion` (current shape, reinterpreted as "the only version we support") or an
   explicit list/set of supported versions.
-- The `initialize` handler compares the now-already-validated `pr.protocolVersion` (the
-  client's request) against that supported set, and either:
+- **The handler must first BIND the validated params, which today it does not.** Corrected
+  2026-08-17 (MAINT-05); this bullet previously said *"compares the now-already-validated
+  `pr.protocolVersion`"*, and that comparison is **vacuous**. Upstream
+  `fjs/protocol/mcp/module.f.js:234` reads
+
+  ```js
+  const [pr] = validate(initializeParams)(params);
+  if (pr === 'error') { ... }
+  ```
+
+  `validate` returns a `Result` tuple `[tag, value]`, so `pr` is the **tag** — the very next line
+  compares it against the string `'error'`. `pr.protocolVersion` is therefore `undefined` on every
+  input, and `undefined !== config.protocolVersion` would be *unconditionally true*: a
+  "negotiation" that rejects every client, including a correct one. The fix has to widen the
+  destructuring first:
+
+  ```js
+  const [pr, pv] = validate(initializeParams)(params);
+  if (pr === 'error') { ... }
+  // pv is the validated params; pv.protocolVersion is the client's request
+  ```
+
+  **A note whose remedy is wrong is worse than no note**, because the next reader implements it and
+  the error looks like it came from upstream. This one had been sitting here proposing a
+  guaranteed-broken comparison.
+
+- The `initialize` handler then compares `pv.protocolVersion` (the client's request) against that
+  supported set, and either:
   - echoes back a mutually acceptable version (the client's requested version, if supported;
     otherwise the server's preferred/latest supported version, per the MCP spec's negotiation
     rule), or

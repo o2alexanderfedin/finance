@@ -244,9 +244,14 @@ structural (RTTI) and semantic passes.
       first-class artifact, not a transient step: it is the only record of what the model
       actually saw, and it lets reclassification branch without a second, nondeterministic
       vision pass.
-- [x] **DOC-04** *(T1)*: `vnd.fjs.1099int` — typed fields, integer cents, `Number.isSafeInteger`
-      guarded. The `"1,234.56" → 123456` conversion happens on exactly one revision
-      boundary.
+- [x] **DOC-04** *(T1)*: `vnd.fjs.1099int` — typed fields, money **stored as canonical decimal
+      strings** and parsed to `bigint` cents at the computation boundary by `fjs/exact`'s
+      `centsFromString`. A comma-grouped or otherwise unparseable amount is refused by name.
+      **Corrected 2026-08-17 (MAINT-03).** This read *"integer cents, `Number.isSafeInteger`
+      guarded"* and described a design the project moved away from: `Number.isSafeInteger` guards
+      a **`number`**, and this engine holds money in `bigint` precisely so that no safe-integer
+      ceiling exists to guard. The stored form is a decimal string, not an integer. Anyone reading
+      the old sentence would have gone looking for a guard that is deliberately absent.
 - [x] **DOC-05** *(T2 → pulled forward to Phase 5)*: `vnd.fjs.w2` — box 12 as a list of
       `(code, amount)` pairs (box-12 confusion is a documented model failure); boxes 15–20
       stored faithfully as a repeating array and never computed on.
@@ -329,10 +334,17 @@ structural (RTTI) and semantic passes.
 - [x] **TAX-01** *(T1)*: TY2025 parameters stored as **data**, keyed by year, each carrying
       a source citation (Rev. Proc. number and section) and an effective date. Sourced from
       Rev. Proc. 2024-40 **as modified by Rev. Proc. 2025-32**.
-- [x] **TAX-02** *(T1)*: The IRS Tax Table stored as data and diffed **row by row** against
-      the published Publication 1040 as a `proof`. Rows print tax on the interval midpoint,
-      so the table disagrees with bracket arithmetic — MFJ $18,000 taxable gives $1,803 by
-      table and $1,800 by brackets.
+- [x] **TAX-02** *(T1)*: The IRS Tax Table stored as data, with **ten rows hand-transcribed from
+      the printed Publication 1040 and the remaining ~2,000 checked against invariants**. Rows
+      print tax on the interval midpoint, so the table disagrees with bracket arithmetic — MFJ
+      $18,000 taxable gives $1,803 by table and $1,800 by brackets.
+      **Corrected 2026-08-17 (MAINT-03).** This read *"diffed **row by row** against the published
+      Publication 1040 as a `proof`"*, which claimed a per-row comparison against the source that
+      does not exist and could not be run without the PDF in the repository. The invariants that
+      check the other ~2,000 rows **share code with the generator**, so they cannot catch an error
+      in the shared part — they establish internal consistency, not agreement with the IRS. That is
+      a materially weaker guarantee than the original sentence advertised, and worth having written
+      down: a transcription error outside the ten hand-typed rows would survive this suite.
 - [x] **TAX-03** *(T1)*: Explicit line-16 method dispatch across all branches — Tax Table,
       Tax Computation Worksheet, QDCGT worksheet, Schedule D Tax Worksheet — with a proof
       per branch. Line 16 is not bracket arithmetic.
@@ -455,10 +467,33 @@ test the thing that breaks."* It was a one-off; this section makes it a practice
       real-process coverage for it in the same session harness. The standing rule: a phase is not
       complete when its virtual proofs are green — it is complete when the thing a client would
       actually call has been called.
-- [x] **TEST-04** *(T2)*: The integration suite is separable from the fast proof suite, so the
-      per-commit loop stays fast while the integration layer still runs before a phase is marked
-      complete. Real-process tests cost seconds each; the 133 virtual proofs cost milliseconds
-      in total, and conflating them would push developers to skip both.
+- [x] **TEST-04** *(T2)*: The integration suite is separable from the proof suite, so the
+      per-commit loop can skip the real-process tests while the integration layer still runs before
+      a phase is marked complete. **Amended 2026-08-17 by MAINT-03/MAINT-02 from measurement — the
+      original text's rationale was false in both of its numbers.** It read *"Real-process tests
+      cost seconds each; the 133 virtual proofs cost milliseconds in total, and conflating them
+      would push developers to skip both."* Measured on `279f247`:
+
+      | | tests | wall clock |
+      |---|---|---|
+      | `npm run test:proofs` (`node --test all.test.js`) | 4260 | **52.7s** |
+      | the seven root real-process and gate files | 13 | **7.0s** |
+      | `npm test` | **8533** | 25–140s, ~5× spread with load |
+
+      So the proofs are **the slow half, not the fast half** — 133 proofs became roughly 2,010 and
+      the suite that "cost milliseconds in total" now costs the better part of a minute, while every
+      real-process test and repo-wide gate together costs seven seconds. Splitting them out to keep
+      the per-commit loop fast would, today, skip the cheap half.
+
+      **And the parts do not sum.** 4260 + 13 = 4273 against `npm test`'s 8533 — a difference of
+      *exactly* 4260. **The proof suite executes twice under `npm test`.** STATE.md's anti-pattern
+      table already recorded a 2× inflation in the proof *metric* when the `functionalscript`
+      submodule is initialized; this shows the proofs are not merely double-*counted*, they are
+      double-*run*, at a real cost of about 53 seconds per invocation. The mechanism is **not
+      diagnosed** — no `*.test.js` exists under `functionalscript/` (a submodule with one tracked
+      gitlink), so simple double-discovery does not explain it. Stated as the measurement it is
+      rather than the guess it would otherwise be, and carried as its own open item.
+      `npm run test:proofs` exists now and is the separable path this requirement asked for.
 
 Scope note, deliberately: these requirements do **not** ask for the virtual proofs to be
 replaced. The virtual harness is fast, deterministic, and proves logic well. What it cannot do is
@@ -478,13 +513,22 @@ so they are scheduled rather than remembered. All are T3 — none blocks the v1 
       Track B (the agent reads by vision, emits the dialect, stores via the already-registered
       `evo_add`) supersedes them. Tested code that nothing can execute is worse than either outcome.
 
-- [ ] **MAINT-02** *(T3)*: Reconcile TEST-04 with reality — either meet it or amend it. It is
+- [x] **MAINT-02** *(T3)*: Reconcile TEST-04 with reality — either meet it or amend it. It is
       marked complete and claims the integration layer is separable "so the per-commit loop stays
       fast", but `npm test` is an unfiltered `tsc && node --test` that runs both real-process tests
       alongside the proofs, for ~15s. There is no proofs-only path. Either add one, or amend the
       requirement to say what the project actually decided.
 
-- [ ] **MAINT-03** *(T3)*: Correct the requirement and roadmap claims that overstate what shipped.
+      **Resolved 2026-08-17: BOTH options taken, because the measurement falsified the
+      requirement's own premise.** `npm run test:proofs` is the separable path; and TEST-04 is
+      amended, because measuring it showed the proofs are the SLOW half (4260 tests / 52.7s)
+      against every real-process test and gate combined (13 / 7.0s). Splitting them to keep the
+      per-commit loop fast would skip the cheap half. It also surfaced that **the proof suite runs
+      TWICE under `npm test`** — the parts sum to 4273 against 8533, a difference of exactly the
+      proof count — which is a ~53s cost per run and is carried as its own open item, mechanism
+      undiagnosed rather than guessed at. The `~15s` in the sentence above was itself stale.
+
+- [x] **MAINT-03** *(T3)*: Correct the requirement and roadmap claims that overstate what shipped.
       Known: TAX-02 says the Tax Table is "diffed row by row against Publication 1040" when ten rows
       are hand-transcribed and the remaining ~2,000 are checked against invariants that share code
       with the generator; DOC-04 describes `Number.isSafeInteger`-guarded integer cents when storage
@@ -493,18 +537,46 @@ so they are scheduled rather than remembered. All are T3 — none blocks the v1 
       already stale before the DOC-18/TAX-18 retrofit, not made stale by it. A pending item whose
       job is to fix wrong counts, carrying a wrong count, is the defect describing itself.)
 
-- [ ] **MAINT-04** *(T3)*: Fix the documentation that contradicts the code. DOCC-01 is checked and
+      **Resolved 2026-08-17.** TAX-02 and DOC-04 are corrected IN PLACE, each stating what it no
+      longer claims and why the old text would have misled — TAX-02's "diffed row by row" claimed a
+      per-row comparison against a source not in the repository, and its ~2,000 invariant-checked
+      rows share code with the generator, so they prove internal consistency and not agreement with
+      the IRS. DOC-04 described a `Number.isSafeInteger` guard on a design that deliberately holds
+      money in `bigint`, so no such ceiling exists to guard. The 79/83/95 count divergence is
+      handled the only way that lasts: ROADMAP.md and REQUIREMENTS.md now carry the derivation
+      COMMAND beside each figure, and the surviving 79/83 mentions are framed as history.
+
+- [x] **MAINT-04** *(T3)*: Fix the documentation that contradicts the code. DOCC-01 is checked and
       its own verification document asserts a grep is clean, but `fjs/todo/implement-mcp-server.md`
       still carries the `djs/parser` remedy verbatim along with the "sole user is trusted and local"
       rationale DOCC-05 was meant to remove. Separately, that file still reads "Status: spec, not
       implemented" and marks two questions "blocking, resolve before implementing" that are shipped
       and proven.
 
-- [ ] **MAINT-05** *(T3)*: Repair `fjs/todo/upstream-mcp-protocol-version-negotiation.md`'s proposed
+      **Resolved 2026-08-17, and it was worse than this entry said.** `fjs/todo/implement-mcp-server.md`
+      led with `Status: **spec, not implemented**` — through all ten phases of milestone v2, which
+      were built on top of it. Now records the shipped server (13 tools, protocol 2025-11-25) with
+      the command to verify it by starting it rather than by reading the file, and warns that the
+      rest of the document is a historical spec. Both DOCC-05 relics are gone: the "only user is
+      trusted and local" rationale (struck from the risk record — the risk is accepted and deferred,
+      not excused by who holds the keyboard) and the `djs/parser` remedy (a module this project does
+      not use; the recorded v2 item is a validator on `fjs/js/tokenizer` + `fjs/bnf`, and only "for
+      portability, not security"). Replaced with what is actually proven, which is narrower than
+      either reading.
+
+- [x] **MAINT-05** *(T3)*: Repair `fjs/todo/upstream-mcp-protocol-version-negotiation.md`'s proposed
       fix, which does not work as written. It compares "the now-already-validated
       `pr.protocolVersion`", but `mcpStep` destructures `const [pr] = validate(...)` — binding only
       the result tag, so `pr.protocolVersion` is `undefined` and the comparison is vacuous. A note
       whose remedy is wrong is worse than no note.
+
+      **Resolved 2026-08-17, claim verified against the upstream source first.**
+      `fjs/protocol/mcp/module.f.js:234` is `const [pr] = validate(initializeParams)(params)` and
+      line 235 compares `pr === 'error'` — so `pr` is the Result TAG and `pr.protocolVersion` is
+      `undefined` on every input. The proposed comparison was not merely vacuous but
+      unconditionally TRUE, i.e. a negotiation that rejects every client including a correct one.
+      The note now widens the destructuring to `const [pr, pv]` first and compares
+      `pv.protocolVersion`, with the broken version quoted so the correction is checkable.
 
 - [ ] **MAINT-06** *(T3)*: Take `functionalscript` 0.43.0. The project is pinned to `^0.41.0` while
       `main` has moved two minor versions. Re-run the upstream-gap notes in `fjs/todo/` against the
