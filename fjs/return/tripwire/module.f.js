@@ -72,13 +72,22 @@
  *    to treat this amount as a capital gain on Form 4972 (**not on Schedule
  *    D**)"* — the amount never reaches Schedule D or 1040 line 7a at all, so a
  *    refusal naming `capitalGainsOrLosses` would send the reader to the wrong
- *    form. It is also not expressible: `capitalGainsOrLosses` is a MODELED
- *    kind, so it has no entry in `unmodeledKindRefusals` and
- *    `tripwireRefusal` — which this phase's own criterion 3 requires every
- *    refusal here to go through — could not name a line, a label or a remedy
- *    for it. `form4972LumpSumDistribution` is the kind the form's own
+ *    form. `form4972LumpSumDistribution` is the kind the form's own
  *    instruction names, it is refused today at 1040 line 16, and its remedy
  *    already reads "requires Form 4972".
+ *
+ *    **The second half of this paragraph used to read "it is also not
+ *    expressible", and that clause is now false and deleted.** It said
+ *    `capitalGainsOrLosses` is a MODELED kind with no entry in
+ *    `unmodeledKindRefusals`, so `tripwireRefusal` could name no line, label
+ *    or remedy for it. Phase 23 then built `modeledKindDeclarationRemedies`
+ *    for exactly that case, entry 4 below uses it, and TAX-35's entry 8 now
+ *    names `capitalGainsOrLosses` itself. **The printed-form reason above is
+ *    what still keeps 1099-R box 3 out of it** — a reason about where THAT
+ *    amount goes, which no later phase can invalidate. A rule and the
+ *    scaffolding excuse for it were written in one breath here, and only the
+ *    rule survived; the excuse would have blocked a needed entry for three
+ *    phases had entry 8 gone looking for permission rather than checking.
  * 3. **W-2 box 8 (allocated tips) non-zero -> `unreportedTips`.** Allocated
  *    tips are NOT included in box 1, so the wages this engine reads are short
  *    by exactly that amount; i1040gi's line 1c instruction requires including
@@ -97,8 +106,9 @@
  *    Schedule C line 1 never runs, Schedule 1 line 3 stays a documented zero,
  *    and 1040 line 8 is short by the whole of their business income, silently.
  *
- *    **This is the SECOND entry to point at a MODELED kind**, and only the
- *    second since Phase 23 built the mechanism for it. `businessIncomeOrLoss`
+ *    **This was the SECOND entry to point at a MODELED kind**, and for three
+ *    phases the only one besides the first since Phase 23 built the mechanism.
+ *    TAX-35's entry 8 (`capitalGainsOrLosses`) is the third. `businessIncomeOrLoss`
  *    is computable as of the same phase, so its remedy in
  *    `fjs/return/scope`'s `modeledKindDeclarationRemedies` says "declare it
  *    and this engine computes it" rather than "go and get a form" — see that
@@ -450,6 +460,55 @@ export const tripwires = [
             context.documents.estateTrustK1Forms.some(
                 form => boxIsNonZero(form.value.box6OrdinaryBusinessIncome)),
     },
+    {
+        kind: 'capitalGainsOrLosses',
+        evidence: 'a stored Schedule K-1 reports a non-zero separately stated capital gain — the '
+            + 'partner\'s box 8 or 9a, the shareholder\'s box 7 or 8a, or the beneficiary\'s box 3 '
+            + 'or 4a — which \u00a7702(a)(1)-(2), \u00a71366(a)(1)(A) and \u00a7652(b)/\u00a7662(b) '
+            + 'require the owner to take into account SEPARATELY, retaining its short-term or '
+            + 'long-term character in the owner\'s hands, and it reaches 1040 line 7a through '
+            + 'printed Schedule D lines 5 and 12, which are not computed for a return that does '
+            + 'not declare it',
+        // **The entry TAX-35's routing half could not ship without.** Until
+        // that routing, these six boxes REFUSED at storage, so the amount
+        // could not reach a return at all and no tripwire was needed. Now
+        // they store and compute -- but `fjs/form1040/core`'s
+        // `filingScheduleD` is read VERBATIM off the declared kind and never
+        // off document presence (12.1-CONTEXT.md Decision 1.6), so an
+        // undeclared return would run no Schedule D and drop the gain
+        // SILENTLY. Trading a loud storage refusal for a silent
+        // understatement is precisely the failure TAX-16 exists to prevent,
+        // and this row is what keeps the trade from happening.
+        //
+        // Six boxes across three faces, each read by its OWN field name.
+        // "Box 3" is other net rental income on both entity faces and a
+        // short-term capital gain only on the beneficiary's, so a shared
+        // "box 3 is a capital gain" rule would fire on two rentals and miss
+        // nothing it should have caught -- the same collision DOC-24's
+        // separate dialects exist to prevent, in predicate form.
+        //
+        // The 28%-rate and unrecaptured-§1250 boxes are deliberately NOT
+        // in this predicate: they still refuse at storage, so they can never
+        // be non-zero on a stored document and a term for them would be
+        // unreachable rather than merely redundant.
+        //
+        // A ZERO box does not trigger it and a NEGATIVE one does, for the
+        // two reasons the entries above already give: a fund that closed the
+        // year flat issues a Schedule K-1 with nothing on it, and a capital
+        // LOSS still requires the declaration -- Schedule D line 21's
+        // $3,000 cap is exactly the computation a filer would lose by not
+        // declaring.
+        triggered: context =>
+            context.documents.partnershipK1Forms.some(
+                form => boxIsNonZero(form.value.box8NetShortTermCapitalGain)
+                    || boxIsNonZero(form.value.box9aNetLongTermCapitalGain))
+            || context.documents.sCorporationK1Forms.some(
+                form => boxIsNonZero(form.value.box7NetShortTermCapitalGain)
+                    || boxIsNonZero(form.value.box8aNetLongTermCapitalGain))
+            || context.documents.estateTrustK1Forms.some(
+                form => boxIsNonZero(form.value.box3NetShortTermCapitalGain)
+                    || boxIsNonZero(form.value.box4aNetLongTermCapitalGain)),
+    },
 ]
 
 // ── The rule ─────────────────────────────────────────────────────────────────
@@ -511,10 +570,13 @@ assert(taxParams2025 !== undefined, 'expected TY2025 parameters to be present in
  * `alternativeMinimumTax`, the first with no amount test at all. Phase 30 adds
  * the sixth — a stored Schedule K-1 of EITHER dialect with non-zero box 1 ->
  * `partnershipAndSCorporationIncome`, the first whose predicate reads two
- * document lists rather than one.
+ * document lists rather than one. TAX-35's routing half adds the eighth — a
+ * stored Schedule K-1 of ANY of the three dialects with a non-zero separately
+ * stated capital gain box -> `capitalGainsOrLosses`, the first whose predicate
+ * reads all three document lists and six different box numbers.
  * @type {number}
  */
-const expectedTripwireCount = 7
+const expectedTripwireCount = 8
 
 /** A W-2 carrying nothing but the fields its schema requires. @type {W2} */
 const bareW2 = {
@@ -594,6 +656,56 @@ const estateTrustK1 = {
     boxHDomesticBeneficiary: true,
     materialParticipation: 'materiallyParticipated',
     box6OrdinaryBusinessIncome: '80000.00',
+}
+
+/**
+ * The same three faces with **no ordinary-business-income box at all** — a
+ * partner or beneficiary in an investment vehicle whose whole share is
+ * portfolio and capital gain (TAX-35).
+ *
+ * Spelled out rather than spread with `box1OrdinaryBusinessIncome: undefined`,
+ * for the reason every K-1 fixture in this tree gives: a spread of `undefined`
+ * leaves the KEY present, and absent versus present-but-undefined are exactly
+ * the two states DOC-11 exists to keep apart.
+ *
+ * They exist because the capital-gain tripwire's CONTROLS cannot be built from
+ * the fixtures above: those carry a non-zero box 1 (box 6 on the 1041), so the
+ * `partnershipAndSCorporationIncome` and `estateAndTrustIncome` entries fire
+ * and a "declared, therefore silent" leaf can never observe silence. That is
+ * not a nuisance — it is the reason a control has to isolate ONE predicate.
+ * @type {K1Partnership}
+ */
+const partnershipK1NoBusinessIncome = {
+    dialect: k1PartnershipDialect,
+    payerTin: '33-3333333',
+    recipientTin: '222-22-2222',
+    accountNumber: 'PTR-0004',
+    taxYear: 2025,
+    formRevision: '2025',
+    boxGGeneralPartnerOrLlcMemberManager: true,
+    materialParticipation: 'materiallyParticipated',
+}
+
+/** @type {K1SCorporation} */
+const sCorporationK1NoBusinessIncome = {
+    dialect: k1SCorporationDialect,
+    payerTin: '44-4444444',
+    recipientTin: '222-22-2222',
+    accountNumber: 'SHR-0004',
+    taxYear: 2025,
+    formRevision: '2025',
+    materialParticipation: 'materiallyParticipated',
+}
+
+/** @type {K1EstateTrust} */
+const estateTrustK1NoBusinessIncome = {
+    dialect: 'vnd.fjs.k1_1041',
+    payerTin: '66-6666666',
+    recipientTin: '222-22-2222',
+    taxYear: 2025,
+    formRevision: '2025',
+    boxHDomesticBeneficiary: true,
+    materialParticipation: 'materiallyParticipated',
 }
 
 /** A Form 3921 carrying the three boxes the §56(b)(3) spread reads.
@@ -1166,6 +1278,150 @@ export const proof = {
                 estateTrustK1Forms: [{ value: { ...estateTrustK1, box6OrdinaryBusinessIncome: '-4000.00' } }],
             })
             assert(outcome.kind === 'error', ['a loss still requires the declaration', outcome])
+        },
+    },
+    // ── Entry 8: a Schedule K-1 capital gain -> capitalGainsOrLosses ────
+    //
+    // TAX-35's routing half could not ship without this group. Before it,
+    // these six boxes REFUSED at storage; after it they store and compute,
+    // but only if `capitalGainsOrLosses` is declared -- so without the
+    // tripwire the routing would have swapped a loud refusal for a silent
+    // understatement.
+    passThroughCapitalGains: {
+        // The partner's box 8, undeclared: the gain reaches nothing at all,
+        // because `fjs/form1040/core`'s `filingScheduleD` never runs.
+        // Each thing a reader can act on is asserted SEPARATELY.
+        aPartnerShortTermGainUndeclaredRefusesNamingScheduleD: () => {
+            const outcome = classify('single')(['wages'])({
+                ...noDocuments,
+                partnershipK1Forms: [{
+                    value: { ...partnershipK1NoBusinessIncome, box8NetShortTermCapitalGain: '12000.00' },
+                }],
+            })
+            assert(outcome.kind === 'error', ['a stored K-1 capital gain must refuse', outcome])
+            if (outcome.kind !== 'error') {
+                return
+            }
+            assertEq(outcome.unmodeled[0], 'capitalGainsOrLosses', [outcome.unmodeled])
+            assert(outcome.message.includes('Schedule D'), [outcome.message])
+            assert(outcome.message.includes('line 5'), ['the remedy must name the printed line', outcome.message])
+        },
+        // The partner's box 9a, the LONG-term half of the same face -- a
+        // separate leaf, because a predicate testing only one of the two
+        // boxes passes the leaf above while dropping every long-term gain.
+        aPartnerLongTermGainUndeclaredAlsoRefuses: () => {
+            const outcome = classify('single')(['wages'])({
+                ...noDocuments,
+                partnershipK1Forms: [{
+                    value: { ...partnershipK1NoBusinessIncome, box9aNetLongTermCapitalGain: '12000.00' },
+                }],
+            })
+            assert(outcome.kind === 'error', ['box 9a is evidence too', outcome])
+            if (outcome.kind !== 'error') {
+                return
+            }
+            assertEq(outcome.unmodeled[0], 'capitalGainsOrLosses', [outcome.unmodeled])
+            assert(outcome.message.includes('line 12'), ['the remedy must name the printed line', outcome.message])
+        },
+        // The shareholder's box 7 / box 8a -- DIFFERENT numbers for the same
+        // two printed lines, which is the whole reason the predicate reads
+        // each dialect's own field name.
+        aShareholderGainUndeclaredRefusesAtItsOwnBoxNumbers: () => {
+            const shortTerm = classify('single')(['wages'])({
+                ...noDocuments,
+                sCorporationK1Forms: [{
+                    value: { ...sCorporationK1NoBusinessIncome, box7NetShortTermCapitalGain: '3000.00' },
+                }],
+            })
+            assert(shortTerm.kind === 'error', ['box 7 is the shareholder short-term box', shortTerm])
+            const longTerm = classify('single')(['wages'])({
+                ...noDocuments,
+                sCorporationK1Forms: [{
+                    value: { ...sCorporationK1NoBusinessIncome, box8aNetLongTermCapitalGain: '3000.00' },
+                }],
+            })
+            assert(longTerm.kind === 'error', ['box 8a is the shareholder long-term box', longTerm])
+        },
+        // The beneficiary's box 3 / box 4a. **Box 3 is the sharpest of the
+        // six**: on both entity faces box 3 is OTHER NET RENTAL INCOME, so a
+        // shared "box 3 is a capital gain" rule would fire on two rentals.
+        aBeneficiaryGainUndeclaredRefusesAtItsOwnBoxNumbers: () => {
+            const shortTerm = classify('single')(['wages'])({
+                ...noDocuments,
+                estateTrustK1Forms: [{
+                    value: { ...estateTrustK1NoBusinessIncome, box3NetShortTermCapitalGain: '3000.00' },
+                }],
+            })
+            assert(shortTerm.kind === 'error', ['box 3 is the beneficiary short-term box', shortTerm])
+            const longTerm = classify('single')(['wages'])({
+                ...noDocuments,
+                estateTrustK1Forms: [{
+                    value: { ...estateTrustK1NoBusinessIncome, box4aNetLongTermCapitalGain: '3000.00' },
+                }],
+            })
+            assert(longTerm.kind === 'error', ['box 4a is the beneficiary long-term box', longTerm])
+        },
+        // THE CONTROL: declared, it is silent. Without this leaf a tripwire
+        // that refused every K-1 holder would pass all four above.
+        aDeclaredCapitalGainsOrLossesSilencesTheTripwire: () => {
+            const outcome = classify('single')(['wages', 'capitalGainsOrLosses'])({
+                ...noDocuments,
+                partnershipK1Forms: [{
+                    value: { ...partnershipK1NoBusinessIncome, box8NetShortTermCapitalGain: '12000.00' },
+                }],
+            })
+            assertEq(outcome.kind, 'ok', ['a declared kind must not trip its own tripwire', outcome])
+        },
+        // THE SECOND CONTROL: a ZERO box is not evidence. A fund that closed
+        // the year flat issues a Schedule K-1 with nothing on it, and
+        // refusing that filer would be an outage rather than a guard.
+        aZeroCapitalGainBoxIsNotEvidence: () => {
+            const outcome = classify('single')(['wages'])({
+                ...noDocuments,
+                partnershipK1Forms: [{
+                    value: {
+                        ...partnershipK1NoBusinessIncome,
+                        box8NetShortTermCapitalGain: '0.00',
+                        box9aNetLongTermCapitalGain: '0.00',
+                    },
+                }],
+            })
+            assertEq(outcome.kind, 'ok', ['a zero gain must not trip the tripwire', outcome])
+        },
+        // THE THIRD CONTROL, and the one that keeps this entry from
+        // swallowing its neighbour: a K-1 carrying ONLY box 1 business
+        // income must name `partnershipAndSCorporationIncome` and NOT
+        // `capitalGainsOrLosses`. A predicate that read any non-zero money
+        // box would pass every leaf above and refuse the wrong kind here.
+        aBoxOneOnlyKOneDoesNotTripTheCapitalGainEntry: () => {
+            const outcome = classify('single')(['wages'])({
+                ...noDocuments,
+                partnershipK1Forms: [{ value: partnershipK1 }],
+            })
+            assert(outcome.kind === 'error', ['box 1 still trips its own entry', outcome])
+            if (outcome.kind !== 'error') {
+                return
+            }
+            assert(
+                !outcome.unmodeled.includes('capitalGainsOrLosses'),
+                ['ordinary business income is not a capital gain', outcome.unmodeled])
+        },
+        // A LOSS still requires the declaration: Schedule D line 21's $3,000
+        // cap is exactly the computation an undeclared filer would lose, so
+        // a negative box is evidence in the OVERSTATING direction and the
+        // tripwire must still fire.
+        aNegativeCapitalGainStillRequiresTheDeclaration: () => {
+            const outcome = classify('single')(['wages'])({
+                ...noDocuments,
+                estateTrustK1Forms: [{
+                    value: { ...estateTrustK1NoBusinessIncome, box3NetShortTermCapitalGain: '-8000.00' },
+                }],
+            })
+            assert(outcome.kind === 'error', ['a loss still requires the declaration', outcome])
+            if (outcome.kind !== 'error') {
+                return
+            }
+            assertEq(outcome.unmodeled[0], 'capitalGainsOrLosses', [outcome.unmodeled])
         },
     },
     // ── Entry 6: Schedule K-1 box 1 -> partnershipAndSCorporationIncome ──
