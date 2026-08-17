@@ -222,6 +222,15 @@ export const codedBoxFields = /** @type {const} */ ([
  *   (TAX-35). Note that this face numbers its interest ONE where the
  *   partnership numbers it five and the S corporation four; the three tables
  *   are deliberately not shared for exactly this reason.
+ * - box 2a — ordinary dividends, 1040 line 3b (TAX-35).
+ * - box 2b — qualified dividends, 1040 line 3a (TAX-35). A SUBSET of 2a, on
+ *   its own line, never added to 3b a second time.
+ *
+ * **Box 5 stays refused and is the trap this list exists to keep visible.**
+ * `box5OtherPortfolioAndNonbusinessIncome` is not interest and not a
+ * dividend: it goes to Schedule E line 33 column (f) as PORTFOLIO income, and
+ * a shared "box 5 is interest" rule taken from the partnership's face would
+ * silently sweep it onto 1040 line 2b.
  *
  * **Every destination is quoted from the printed form's own page 2**, which
  * prints a *"Report on"* column against each box. That is what makes this table
@@ -229,8 +238,6 @@ export const codedBoxFields = /** @type {const} */ ([
  * where an item belongs.
  */
 export const unmodeledMoneyBoxes = /** @type {const} */ ([
-    ['box2aOrdinaryDividends', '1040 line 3b (ordinary dividends)'],
-    ['box2bQualifiedDividends', '1040 line 3a (qualified dividends), and thence the Qualified Dividends and Capital Gain Tax Worksheet'],
     ['box3NetShortTermCapitalGain', 'Schedule D line 5 (short-term gain or loss from partnerships, S corporations, estates and trusts)'],
     ['box4aNetLongTermCapitalGain', 'Schedule D line 12 (long-term gain or loss from partnerships, S corporations, estates and trusts)'],
     ['box4bTwentyEightPercentRateGain', 'the 28% Rate Gain Worksheet line 4 (Schedule D instructions)'],
@@ -439,9 +446,10 @@ const perUnmodeledBoxZeroAccepted = Object.fromEntries(unmodeledMoneyBoxes.map((
 const expectedMoneyBoxCount = 12
 /** Hand-typed: five coded boxes — 9, 11, 12, 13 and 14. */
 const expectedCodedBoxCount = 5
-/** Hand-typed: ten of the twelve refuse. `12 - 2` — box 6 computes (Schedule E
- * Part III) and box 1 computes (1040 line 2b, TAX-35). */
-const expectedUnmodeledBoxCount = 10
+/** Hand-typed: eight of the twelve refuse. `12 - 4` — box 6 computes
+ * (Schedule E Part III), box 1 computes (1040 line 2b) and boxes 2a/2b compute
+ * (1040 lines 3b/3a), the latter three all TAX-35. */
+const expectedUnmodeledBoxCount = 8
 
 /**
  * **The hand-typed inverse of {@link unmodeledMoneyBoxes}**: every
@@ -458,6 +466,8 @@ const expectedUnmodeledBoxCount = 10
 const computedMoneyBoxes = [
     'box6OrdinaryBusinessIncome',
     'box1InterestIncome',
+    'box2aOrdinaryDividends',
+    'box2bQualifiedDividends',
 ]
 
 /**

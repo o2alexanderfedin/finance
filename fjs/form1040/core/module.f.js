@@ -748,12 +748,41 @@ export const form1040IncomeLines = taxParamSet => inputs => {
     // individual already-computable line. A taxpayer who never declares
     // `qualifiedDividends` but holds a real 1099-DIV gets their REAL figure —
     // strictly more correct than the `declaredZero` this replaces, never less.
-    const line3a = fromDocuments('1040 line 3a')(
+    //
+    // **TAX-35 adds each K-1 face's own dividend pair**, at three more sets of
+    // box numbers: the partner's 6a/6b, the shareholder's 5a/5b, the
+    // beneficiary's 2a/2b. The qualified box is a SUBSET of the ordinary one
+    // on every face — exactly as the 1099-DIV's box 1b is a subset of box 1a —
+    // so it feeds line 3a ONLY and is never added into 3b a second time. That
+    // is the same double-count trap `specifiedPrivateActivityBondInterest`
+    // above is kept out of line 2a for, and the same one the partnership's
+    // `box4cTotalGuaranteedPayments` stays refused for.
+    const line3a = fromDocuments('1040 line 3a')(addBoxSums(addBoxSums(addBoxSums(
         sumBoxOverDocuments(dividendForms)('box1bQualifiedDividends')(
-            div => div.box1bQualifiedDividends))
-    const line3b = fromDocuments('1040 line 3b')(
+            div => div.box1bQualifiedDividends))(
+        sumBoxOverDocuments(partnershipK1Forms)('k1_1065.box6bQualifiedDividends')(
+            k1 => k1.box6bQualifiedDividends)))(
+        sumBoxOverDocuments(sCorporationK1Forms)('k1_1120s.box5bQualifiedDividends')(
+            k1 => k1.box5bQualifiedDividends)))(
+        sumBoxOverDocuments(estateTrustK1Forms)('k1_1041.box2bQualifiedDividends')(
+            k1 => k1.box2bQualifiedDividends)))
+    // Line 3b takes FOUR K-1 summands, not three: the partnership face alone
+    // carries `box6cDividendEquivalents`, a §871(m) payment TREATED as a
+    // dividend rather than a slice of box 6a, so it is a genuine second
+    // partnership summand here. The other two faces have no counterpart, which
+    // is why the 1065 routes six boxes across TAX-35's three slices where the
+    // 1120-S and the 1041 route five each.
+    const line3b = fromDocuments('1040 line 3b')(addBoxSums(addBoxSums(addBoxSums(addBoxSums(
         sumBoxOverDocuments(dividendForms)('box1aTotalOrdinaryDividends')(
-            div => div.box1aTotalOrdinaryDividends))
+            div => div.box1aTotalOrdinaryDividends))(
+        sumBoxOverDocuments(partnershipK1Forms)('k1_1065.box6aOrdinaryDividends')(
+            k1 => k1.box6aOrdinaryDividends)))(
+        sumBoxOverDocuments(partnershipK1Forms)('k1_1065.box6cDividendEquivalents')(
+            k1 => k1.box6cDividendEquivalents)))(
+        sumBoxOverDocuments(sCorporationK1Forms)('k1_1120s.box5aOrdinaryDividends')(
+            k1 => k1.box5aOrdinaryDividends)))(
+        sumBoxOverDocuments(estateTrustK1Forms)('k1_1041.box2aOrdinaryDividends')(
+            k1 => k1.box2aOrdinaryDividends)))
     // Decision 3.3/5.1 — the IRA-deduction circularity refusal, threaded
     // BEFORE line 4a is built, exactly like the Schedule D absent-basis
     // guard above: a document-data-sufficiency/interaction refusal
@@ -3132,6 +3161,9 @@ const withEstateTrust = inputs => estateTrustK1Forms => ({ ...inputs, estateTrus
  * 1065) numbers them.
  * @typedef {{
  *   readonly box5InterestIncome?: string,
+ *   readonly box6aOrdinaryDividends?: string,
+ *   readonly box6bQualifiedDividends?: string,
+ *   readonly box6cDividendEquivalents?: string,
  * }} PartnershipPortfolioBoxes
  */
 
@@ -3162,6 +3194,8 @@ const partnershipPortfolioK1 = documentHash => boxes => ({
  * (Form 1120-S) numbers them — **four**, where the partner's is five.
  * @typedef {{
  *   readonly box4InterestIncome?: string,
+ *   readonly box5aOrdinaryDividends?: string,
+ *   readonly box5bQualifiedDividends?: string,
  * }} SCorporationPortfolioBoxes
  */
 
@@ -3190,6 +3224,8 @@ const sCorporationPortfolioK1 = documentHash => boxes => ({
  * are dialect-qualified.
  * @typedef {{
  *   readonly box1InterestIncome?: string,
+ *   readonly box2aOrdinaryDividends?: string,
+ *   readonly box2bQualifiedDividends?: string,
  * }} EstateTrustPortfolioBoxes
  */
 
@@ -3846,6 +3882,117 @@ export const proof = {
                 ])))
             assertEq(lines.line2b.value, 400n)
             assertEq(lines.line2a.value, 0n, 'a beneficiary’s taxable interest is not §103 interest')
+        },
+    },
+    // ── TAX-35 slice 2: the three K-1 faces' dividend pairs ─────────────
+    line3aAnd3b: {
+        // **Every box a DIFFERENT amount**, so no transposition can hide
+        // inside an equal pair, and the two lines are asserted separately —
+        // a 3a/3b swap leaves neither total's neighbour able to see it.
+        //
+        // Ordinary (line 3b): $500.00 bank + $90.00 partner box 6a +
+        //   $7.00 partner box 6c + $60.00 shareholder box 5a +
+        //   $11.00 beneficiary box 2a = $668.00. Hand-typed:
+        //   50000 + 9000 + 700 + 6000 + 1100 = 66800 cents.
+        // Qualified (line 3a): $300.00 bank + $40.00 partner box 6b +
+        //   $20.00 shareholder box 5b + $5.00 beneficiary box 2b =
+        //   $365.00. Hand-typed: 30000 + 4000 + 2000 + 500 = 36500 cents.
+        allThreeKOneFacesReachLinesThreeAAndThreeBAtTheirOwnBoxNumbers: () => {
+            const lines = expectIncomeOk(form1040IncomeLines(taxParams2025)(
+                withEstateTrust(withPassThrough(
+                    inputsOf(storedProfile(singleProfile))([])([])([
+                        dividendDocument('sha256-div-01')({
+                            box1aTotalOrdinaryDividends: '500.00',
+                            box1bQualifiedDividends: '300.00',
+                        }),
+                    ])([])([])([])([])([])([])
+                )([
+                    partnershipPortfolioK1('sha256-k1-1065-div')({
+                        box6aOrdinaryDividends: '90.00',
+                        box6bQualifiedDividends: '40.00',
+                        box6cDividendEquivalents: '7.00',
+                    }),
+                ])([
+                    sCorporationPortfolioK1('sha256-k1-1120s-div')({
+                        box5aOrdinaryDividends: '60.00',
+                        box5bQualifiedDividends: '20.00',
+                    }),
+                ]))([
+                    estateTrustPortfolioK1('sha256-k1-1041-div')({
+                        box2aOrdinaryDividends: '11.00',
+                        box2bQualifiedDividends: '5.00',
+                    }),
+                ])))
+            assertEq(lines.line3b.value, 66800n, '$500 + $90 + $7 + $60 + $11 = $668.00')
+            assertEq(lines.line3a.value, 36500n, '$300 + $40 + $20 + $5 = $365.00')
+            // Per-box `boxPath` AND the amount cited against it, on BOTH
+            // lines — a sum cannot see a transposition, and neither can a
+            // path list on its own.
+            const citedOn = /** @type {(line: ReportLine) => (path: string) => string | undefined} */ (
+                line => path => line.sources.find(source => source.boxPath === path)?.value)
+            const onThreeB = citedOn(lines.line3b)
+            assertEq(onThreeB('box1aTotalOrdinaryDividends'), '500.00')
+            assertEq(onThreeB('k1_1065.box6aOrdinaryDividends'), '90.00')
+            assertEq(onThreeB('k1_1065.box6cDividendEquivalents'), '7.00')
+            assertEq(onThreeB('k1_1120s.box5aOrdinaryDividends'), '60.00')
+            assertEq(onThreeB('k1_1041.box2aOrdinaryDividends'), '11.00')
+            assertEq(lines.line3b.sources.length, 5, 'five ordinary-dividend boxes, five citations')
+            const onThreeA = citedOn(lines.line3a)
+            assertEq(onThreeA('box1bQualifiedDividends'), '300.00')
+            assertEq(onThreeA('k1_1065.box6bQualifiedDividends'), '40.00')
+            assertEq(onThreeA('k1_1120s.box5bQualifiedDividends'), '20.00')
+            assertEq(onThreeA('k1_1041.box2bQualifiedDividends'), '5.00')
+            assertEq(lines.line3a.sources.length, 4, 'four qualified-dividend boxes, four citations')
+            // **The qualified boxes are a SUBSET, so line 3b must not cite
+            // them.** This is the double count that would be invisible in
+            // 3b's total alone if the two K-1 dividend boxes were simply
+            // added together, and it is the K-1 form of the box-9/line-2a
+            // rule this file already states above.
+            const threeBPaths = lines.line3b.sources.map(source => source.boxPath)
+            assert(!threeBPaths.includes('k1_1065.box6bQualifiedDividends'), threeBPaths)
+            assert(!threeBPaths.includes('k1_1120s.box5bQualifiedDividends'), threeBPaths)
+            assert(!threeBPaths.includes('k1_1041.box2bQualifiedDividends'), threeBPaths)
+        },
+        // **THE CONTROL.** The same three K-1s with their dividend boxes
+        // absent leave both lines on the 1099-DIV's own figures and cite no
+        // K-1 at all.
+        kOneFacesWithNoDividendBoxesDoNotMoveEitherLine: () => {
+            const lines = expectIncomeOk(form1040IncomeLines(taxParams2025)(
+                withEstateTrust(withPassThrough(
+                    inputsOf(storedProfile(singleProfile))([])([])([
+                        dividendDocument('sha256-div-01')({
+                            box1aTotalOrdinaryDividends: '500.00',
+                            box1bQualifiedDividends: '300.00',
+                        }),
+                    ])([])([])([])([])([])([])
+                )([
+                    partnershipPortfolioK1('sha256-k1-1065-div')({}),
+                ])([
+                    sCorporationPortfolioK1('sha256-k1-1120s-div')({}),
+                ]))([
+                    estateTrustPortfolioK1('sha256-k1-1041-div')({}),
+                ])))
+            assertEq(lines.line3b.value, 50000n, 'the bank dividends alone')
+            assertEq(lines.line3a.value, 30000n)
+            assertEq(lines.line3b.sources.length, 1, 'DOC-11: an absent box cites nothing')
+            assertEq(lines.line3a.sources.length, 1)
+        },
+        // The 1041's box 2a is a DIVIDEND and its box 1 is INTEREST, and the
+        // engine must not let either become the other. The cross-line
+        // control for slices 1 and 2 together: one document carrying both,
+        // with each line moving by exactly its own box.
+        aBeneficiarysInterestAndDividendsDoNotCrossLines: () => {
+            const lines = expectIncomeOk(form1040IncomeLines(taxParams2025)(
+                withEstateTrust(inputsOf(storedProfile(singleProfile))([])([])([])([])([])([])([])([])([]))([
+                    estateTrustPortfolioK1('sha256-k1-1041-both')({
+                        box1InterestIncome: '4.00',
+                        box2aOrdinaryDividends: '11.00',
+                        box2bQualifiedDividends: '5.00',
+                    }),
+                ])))
+            assertEq(lines.line2b.value, 400n, 'box 1 alone reaches line 2b')
+            assertEq(lines.line3b.value, 1100n, 'box 2a alone reaches line 3b')
+            assertEq(lines.line3a.value, 500n, 'box 2b alone reaches line 3a')
         },
     },
     line9: {

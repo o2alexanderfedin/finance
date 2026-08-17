@@ -273,6 +273,15 @@ export const codedBoxFields = /** @type {const} */ ([
  *   (TAX-35, §702(a)(8)). Note that this face numbers its interest FIVE where
  *   the S corporation numbers it four and the beneficiary numbers it one; the
  *   three tables are deliberately not shared for exactly this reason.
+ * - box 6a — ordinary dividends, 1040 line 3b (TAX-35).
+ * - box 6b — qualified dividends, 1040 line 3a (TAX-35). A SUBSET of 6a, on
+ *   its own line exactly as a 1099-DIV's box 1b is a subset of box 1a, so it
+ *   is never added to 3b a second time.
+ * - box 6c — dividend equivalents, 1040 line 3b (TAX-35). **A sixth routed
+ *   box this face has and the other two do not**: a §871(m) dividend
+ *   equivalent is a payment treated as a dividend, not a slice of box 6a, so
+ *   it is a genuine second summand of line 3b rather than the double count
+ *   box 4c would be for boxes 4a and 4b.
  *
  * **Every destination below is a REAL line on a real form**, and that is the
  * point of the table rather than decoration: §702(a) requires each of these to
@@ -287,9 +296,6 @@ export const unmodeledMoneyBoxes = /** @type {const} */ ([
     ['box4aGuaranteedPaymentsForServices', 'Schedule E Part II line 28 column (j) AND Schedule SE line 2 — §707(c) payments for services are self-employment earnings even for a limited partner (§1402(a)(13)), so they are never merely box 1 by another name'],
     ['box4bGuaranteedPaymentsForCapital', 'Schedule E Part II line 28 column (j) — §707(c) payments for the use of capital, which are NOT self-employment earnings, so they part company with box 4a at Schedule SE'],
     ['box4cTotalGuaranteedPayments', 'the printed total of boxes 4a and 4b, which cannot be routed without routing its two components'],
-    ['box6aOrdinaryDividends', '1040 line 3b (ordinary dividends)'],
-    ['box6bQualifiedDividends', '1040 line 3a (qualified dividends), and thence the Qualified Dividends and Capital Gain Tax Worksheet'],
-    ['box6cDividendEquivalents', '1040 line 3b, as a §871(m) dividend equivalent'],
     ['box7Royalties', 'Schedule E Part I line 4 (royalties received) — Part I, not Part II, which is why a royalty cannot ride into line 41 on this schedule’s partnership block'],
     ['box8NetShortTermCapitalGain', 'Schedule D line 5 (short-term gain or loss from partnerships, S corporations, estates and trusts)'],
     ['box9aNetLongTermCapitalGain', 'Schedule D line 12 (long-term gain or loss from partnerships, S corporations, estates and trusts)'],
@@ -512,9 +518,10 @@ const perUnmodeledBoxZeroAccepted = Object.fromEntries(unmodeledMoneyBoxes.map((
 const expectedMoneyBoxCount = 18
 /** Hand-typed: eight coded boxes — 11, 13, 14, 15, 17, 18, 19 and 20. */
 const expectedCodedBoxCount = 8
-/** Hand-typed: sixteen of the eighteen refuse. `18 - 2` — box 1 computes
- * (Schedule E Part II) and box 5 computes (1040 line 2b, TAX-35). */
-const expectedUnmodeledBoxCount = 16
+/** Hand-typed: thirteen of the eighteen refuse. `18 - 5` — box 1 computes
+ * (Schedule E Part II), box 5 computes (1040 line 2b) and boxes 6a/6b/6c
+ * compute (1040 lines 3b/3a/3b), all four of the latter TAX-35. */
+const expectedUnmodeledBoxCount = 13
 
 /**
  * **The hand-typed inverse of {@link unmodeledMoneyBoxes}**: every
@@ -531,6 +538,9 @@ const expectedUnmodeledBoxCount = 16
 const computedMoneyBoxes = [
     'box1OrdinaryBusinessIncome',
     'box5InterestIncome',
+    'box6aOrdinaryDividends',
+    'box6bQualifiedDividends',
+    'box6cDividendEquivalents',
 ]
 
 /**

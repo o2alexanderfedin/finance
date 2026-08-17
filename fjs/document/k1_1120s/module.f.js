@@ -184,6 +184,15 @@ export const codedBoxFields = /** @type {const} */ ([
  * - box 4 — interest income, through `fjs/form1040/core`'s 1040 line 2b
  *   (TAX-35, §1366(a)(1)(A)). This face numbers its interest FOUR where the
  *   partnership numbers it five and the beneficiary numbers it one.
+ * - box 5a — ordinary dividends, 1040 line 3b (TAX-35).
+ * - box 5b — qualified dividends, 1040 line 3a (TAX-35). A SUBSET of 5a, on
+ *   its own line, never added to 3b a second time. **This face's box 5 is the
+ *   dividend pair where the partnership's box 5 is interest** — the single
+ *   sharpest reason the three tables are not shared.
+ *
+ * There is no counterpart here to the partnership's box 6c: an S corporation
+ * reports no §871(m) dividend equivalent on this face, so the partnership
+ * routes SIX boxes where this one routes five.
  *
  * §1366(a)(1) is the S-corporation counterpart of §702(a): each of these is
  * taken into account separately by the shareholder, on its own line elsewhere
@@ -198,8 +207,6 @@ export const codedBoxFields = /** @type {const} */ ([
 export const unmodeledMoneyBoxes = /** @type {const} */ ([
     ['box2NetRentalRealEstateIncome', 'Schedule E Part I (lines 3-26), rental real estate — which this engine does not model; `rentalRealEstateAndRoyalties` is an `fjs/return/scope` refusal'],
     ['box3OtherNetRentalIncome', 'Schedule E Part II column (g) or (j) as a SECOND activity separate from box 1, with its own §469 grouping and its own basis limitation'],
-    ['box5aOrdinaryDividends', '1040 line 3b (ordinary dividends)'],
-    ['box5bQualifiedDividends', '1040 line 3a (qualified dividends), and thence the Qualified Dividends and Capital Gain Tax Worksheet'],
     ['box6Royalties', 'Schedule E Part I line 4 (royalties received) — Part I, not Part II, which is why a royalty cannot ride into line 41 on this schedule’s S-corporation block'],
     ['box7NetShortTermCapitalGain', 'Schedule D line 5 (short-term gain or loss from partnerships, S corporations, estates and trusts)'],
     ['box8aNetLongTermCapitalGain', 'Schedule D line 12 (long-term gain or loss from partnerships, S corporations, estates and trusts)'],
@@ -364,9 +371,10 @@ const perUnmodeledBoxZeroAccepted = Object.fromEntries(unmodeledMoneyBoxes.map((
 const expectedMoneyBoxCount = 13
 /** Hand-typed: six coded boxes — 10, 12, 13, 15, 16 and 17. */
 const expectedCodedBoxCount = 6
-/** Hand-typed: eleven of the thirteen refuse. `13 - 2` — box 1 computes
- * (Schedule E Part II) and box 4 computes (1040 line 2b, TAX-35). */
-const expectedUnmodeledBoxCount = 11
+/** Hand-typed: nine of the thirteen refuse. `13 - 4` — box 1 computes
+ * (Schedule E Part II), box 4 computes (1040 line 2b) and boxes 5a/5b compute
+ * (1040 lines 3b/3a), the latter three all TAX-35. */
+const expectedUnmodeledBoxCount = 9
 
 /**
  * **The hand-typed inverse of {@link unmodeledMoneyBoxes}**: every
@@ -383,6 +391,8 @@ const expectedUnmodeledBoxCount = 11
 const computedMoneyBoxes = [
     'box1OrdinaryBusinessIncome',
     'box4InterestIncome',
+    'box5aOrdinaryDividends',
+    'box5bQualifiedDividends',
 ]
 
 /**
