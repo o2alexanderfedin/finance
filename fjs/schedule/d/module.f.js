@@ -103,6 +103,9 @@ import { capitalLossCarryoverWorksheet } from '../../tax/carryover/module.f.js'
 /** @import { FormThirtyNineTwentyTwo } from '../../document/form3922/module.f.js' */
 /** @import { Form8949Row } from '../../form8949/module.f.js' */
 /** @import { OneZeroNineNineDiv } from '../../document/1099div/module.f.js' */
+/** @import { K1Partnership } from '../../document/k1_1065/module.f.js' */
+/** @import { K1SCorporation } from '../../document/k1_1120s/module.f.js' */
+/** @import { K1EstateTrust } from '../../document/k1_1041/module.f.js' */
 /** @import { PriorYearCapitalLoss } from '../../document/prior_year_capital_loss/module.f.js' */
 /** @import { Source } from '../../report/line/module.f.js' */
 /** @import { IndividualFilingStatus } from '../../tax/params/module.f.js' */
@@ -134,6 +137,14 @@ import { capitalLossCarryoverWorksheet } from '../../tax/carryover/module.f.js'
  * hold no equity compensation. An absent list is an empty one, which is a
  * legitimate "the broker got every basis right" — the same reasoning
  * `priorYearCapitalLossCarryover` above already carries.
+ * The three Schedule K-1 collections are TAX-35's own widening, and they feed
+ * printed lines 5 and 12 — the two lines the form reserves for a
+ * partnership's, S corporation's or estate's/trust's separately stated capital
+ * gain. **All three are OPTIONAL**, for the reason `basisCorrections` above
+ * is: `scheduleD` is called from a dozen proof fixtures whose subject is the
+ * loss cap or the 28% worksheet and which have no business restating that the
+ * filer holds no Schedule K-1. An absent list is an empty one, which is a
+ * legitimate "this filer has no pass-through capital gain".
  * @typedef {{
  *   readonly status: IndividualFilingStatus,
  *   readonly brokerageForms: readonly Stored<OneZeroNineNineB>[],
@@ -141,6 +152,9 @@ import { capitalLossCarryoverWorksheet } from '../../tax/carryover/module.f.js'
  *   readonly priorYearCapitalLossCarryover?: Stored<PriorYearCapitalLoss>,
  *   readonly basisCorrections?: readonly Stored<BasisCorrection>[],
  *   readonly employeeStockPurchaseForms?: readonly Stored<FormThirtyNineTwentyTwo>[],
+ *   readonly partnershipK1Forms?: readonly Stored<K1Partnership>[],
+ *   readonly sCorporationK1Forms?: readonly Stored<K1SCorporation>[],
+ *   readonly estateTrustK1Forms?: readonly Stored<K1EstateTrust>[],
  * }} ScheduleDInputs
  */
 
@@ -199,6 +213,21 @@ const sumBoxOverDocuments = documents => boxPath => read => {
     }
 }
 
+/**
+ * Adds two {@link BoxSum}s — lines 5 and 12 each read the SAME printed line off
+ * three different K-1 faces, so each is three box sums added, not one box read
+ * three times. Mirrors `fjs/form1040/core`'s and `fjs/schedule/b`'s own.
+ *
+ * **It concatenates `sources`.** A transposition between two of the three
+ * faces therefore leaves `value` untouched and is visible ONLY in the citations
+ * — which is why the proofs below assert `boxPath` per box rather than a total.
+ * @type {(a: BoxSum) => (b: BoxSum) => BoxSum}
+ */
+const addBoxSums = a => b => ({
+    value: a.value + b.value,
+    sources: [...a.sources, ...b.sources],
+})
+
 // ── Schedule D ───────────────────────────────────────────────────────────────
 
 /**
@@ -210,6 +239,12 @@ const sumBoxOverDocuments = documents => boxPath => read => {
  */
 export const scheduleD = inputs => {
     const { status, brokerageForms, dividendForms, priorYearCapitalLossCarryover } = inputs
+    // An absent list is an empty one -- see `ScheduleDInputs`. Bound once
+    // here so lines 5 and 12 below read the same three collections and a
+    // future line cannot quietly acquire a fourth default.
+    const partnershipK1Forms = inputs.partnershipK1Forms ?? []
+    const sCorporationK1Forms = inputs.sCorporationK1Forms ?? []
+    const estateTrustK1Forms = inputs.estateTrustK1Forms ?? []
 
     const form8949Outcome = form8949({
         brokerageForms,
@@ -259,9 +294,22 @@ export const scheduleD = inputs => {
     // 4. ST gain from Form 6252 and Forms 4684/6781/8824 — no dialect for
     //    any of the four, documented 0.
     const line4 = 0n
-    // 5. Net ST gain/loss from partnerships/S-corps/estates/trusts via
-    //    Schedule K-1 — no K-1 dialect, documented 0.
-    const line5 = 0n
+    // 5. "Net short-term gain or (loss) from partnerships, S corporations,
+    //    estates, and trusts from Schedule(s) K-1" — TAX-35. THREE box
+    //    numbers for the one printed line: the partner's box 8, the
+    //    shareholder's box 7, the beneficiary's box 3. Read from each
+    //    dialect's own field name and never from a shared rule; the box
+    //    paths are dialect-qualified so a citation says WHICH face it came
+    //    off, which is the only thing that can see a transposition the sum
+    //    below absorbs.
+    const line5Sum = addBoxSums(addBoxSums(
+        sumBoxOverDocuments(partnershipK1Forms)('k1_1065.box8NetShortTermCapitalGain')(
+            k1 => k1.box8NetShortTermCapitalGain))(
+        sumBoxOverDocuments(sCorporationK1Forms)('k1_1120s.box7NetShortTermCapitalGain')(
+            k1 => k1.box7NetShortTermCapitalGain)))(
+        sumBoxOverDocuments(estateTrustK1Forms)('k1_1041.box3NetShortTermCapitalGain')(
+            k1 => k1.box3NetShortTermCapitalGain))
+    const line5 = line5Sum.value
     // 6. ST capital loss carryover — TAX-17/Phase 15 (see module docstring
     //    "Prior-year carryover"): the worksheet's short-term output,
     //    entered as a NEGATIVE (the printed line's entry box is
@@ -296,9 +344,26 @@ export const scheduleD = inputs => {
     //     gain/loss from Forms 4684/6781/8824 — no dialect for any,
     //     documented 0.
     const line11 = 0n
-    // 12. Net LT gain/loss from partnerships/S-corps/estates/trusts via
-    //     Schedule K-1 — no K-1 dialect, documented 0.
-    const line12 = 0n
+    // 12. "Net long-term gain or (loss) from partnerships, S corporations,
+    //     estates, and trusts from Schedule(s) K-1" — TAX-35, and again
+    //     three different box numbers: the partner's 9a, the shareholder's
+    //     8a, the beneficiary's 4a.
+    //
+    //     **The 28%-rate and unrecaptured-§1250 slices of those same boxes
+    //     stay REFUSED at storage** (1065 9b/9c, 1120-S 8b/8c, 1041 4b/4c).
+    //     They are components of the long-term figure bound for Schedule D
+    //     lines 18 and 19 through two worksheets this module computes only
+    //     from 1099-DIV boxes 2d and 2b, so routing 9a while accepting 9b
+    //     would put a collectibles gain into line 15 at the ordinary
+    //     long-term rate. Refusing the slice is what keeps line 12 honest.
+    const line12Sum = addBoxSums(addBoxSums(
+        sumBoxOverDocuments(partnershipK1Forms)('k1_1065.box9aNetLongTermCapitalGain')(
+            k1 => k1.box9aNetLongTermCapitalGain))(
+        sumBoxOverDocuments(sCorporationK1Forms)('k1_1120s.box8aNetLongTermCapitalGain')(
+            k1 => k1.box8aNetLongTermCapitalGain)))(
+        sumBoxOverDocuments(estateTrustK1Forms)('k1_1041.box4aNetLongTermCapitalGain')(
+            k1 => k1.box4aNetLongTermCapitalGain))
+    const line12 = line12Sum.value
     // 13. "Capital gain distributions." 1099-DIV box 2a is already
     //     inclusive of boxes 2b/2c/2d's sub-components (12.1-RESEARCH.md
     //     Finding 1) — box 2c is deliberately never read by this module at
@@ -461,6 +526,7 @@ export const scheduleD = inputs => {
         ...categoryA.sources, ...categoryB.sources, ...categoryD.sources, ...categoryE.sources,
         ...line13Sum.sources, ...twentyEightPercentLine4Sum.sources, ...unrecap1250Line11Sum.sources,
         ...line6Sources, ...line14Sources,
+        ...line5Sum.sources, ...line12Sum.sources,
     ]
 
     return {
@@ -547,6 +613,64 @@ const expectOk = outcome => {
     return outcome
 }
 
+/**
+ * The three K-1 faces' capital-gain boxes, one builder each — TAX-35. Three
+ * separate builders rather than one parameterised by dialect, for the reason
+ * `fjs/form1040/core`'s own portfolio fixtures give: the whole hazard is that
+ * the same printed line is a different box NUMBER on each face, so a fixture
+ * repointable by changing one field would let a mis-numbered read pass by
+ * construction.
+ * @type {(hash: string) => (boxes: { readonly box8NetShortTermCapitalGain?: string, readonly box9aNetLongTermCapitalGain?: string }) => Stored<K1Partnership>}
+ */
+const partnershipGainK1 = hash => boxes => ({
+    documentHash: hash,
+    value: {
+        dialect: 'vnd.fjs.k1_1065',
+        payerTin: '33-3333333',
+        recipientTin: '222-22-2222',
+        accountNumber: 'PTR-0003',
+        taxYear: 2025,
+        formRevision: '2025',
+        boxGGeneralPartnerOrLlcMemberManager: /** @type {const} */ (true),
+        materialParticipation: 'materiallyParticipated',
+        ...boxes,
+    },
+})
+
+/**
+ * @type {(hash: string) => (boxes: { readonly box7NetShortTermCapitalGain?: string, readonly box8aNetLongTermCapitalGain?: string }) => Stored<K1SCorporation>}
+ */
+const sCorporationGainK1 = hash => boxes => ({
+    documentHash: hash,
+    value: {
+        dialect: 'vnd.fjs.k1_1120s',
+        payerTin: '44-4444444',
+        recipientTin: '222-22-2222',
+        accountNumber: 'SHR-0003',
+        taxYear: 2025,
+        formRevision: '2025',
+        materialParticipation: 'materiallyParticipated',
+        ...boxes,
+    },
+})
+
+/**
+ * @type {(hash: string) => (boxes: { readonly box3NetShortTermCapitalGain?: string, readonly box4aNetLongTermCapitalGain?: string }) => Stored<K1EstateTrust>}
+ */
+const estateTrustGainK1 = hash => boxes => ({
+    documentHash: hash,
+    value: {
+        dialect: 'vnd.fjs.k1_1041',
+        payerTin: '66-6666666',
+        recipientTin: '222-22-2222',
+        taxYear: 2025,
+        formRevision: '2025',
+        boxHDomesticBeneficiary: /** @type {const} */ (true),
+        materialParticipation: 'materiallyParticipated',
+        ...boxes,
+    },
+})
+
 export const proof = {
     lossCap: {
         // $6,000.00 short-term loss, no long-term activity, single filer:
@@ -622,6 +746,130 @@ export const proof = {
     // LOSS of DIFFERENT sizes, netting to a gain that could hide a swapped
     // short/long-term categorization if only the total were checked. Lines
     // 7 and 15 are asserted SEPARATELY, never just line16.
+    // ── TAX-35: printed lines 5 and 12, the pass-through capital gain ───
+    passThroughCapitalGains: {
+        // **Six boxes, six DIFFERENT amounts, and both lines asserted
+        // separately.** Equal amounts would make a short/long transposition
+        // invisible even to the two line totals, and a single net figure
+        // would hide it completely -- which is why this module already keeps
+        // lines 7 and 15 independently observable.
+        //
+        // Short-term (line 5): $700.00 partner box 8 + $50.00 shareholder
+        //   box 7 + $9.00 beneficiary box 3 = $759.00.
+        //   Hand-typed: 70000 + 5000 + 900 = 75900 cents.
+        // Long-term (line 12): $6,000.00 partner box 9a + $400.00
+        //   shareholder box 8a + $30.00 beneficiary box 4a = $6,430.00.
+        //   Hand-typed: 600000 + 40000 + 3000 = 643000 cents.
+        allThreeFacesReachLinesFiveAndTwelveAtTheirOwnBoxNumbers: () => {
+            const result = expectOk(scheduleD({
+                status: 'single',
+                brokerageForms: [],
+                dividendForms: [],
+                partnershipK1Forms: [partnershipGainK1('doc-k1-1065-gain')({
+                    box8NetShortTermCapitalGain: '700.00',
+                    box9aNetLongTermCapitalGain: '6000.00',
+                })],
+                sCorporationK1Forms: [sCorporationGainK1('doc-k1-1120s-gain')({
+                    box7NetShortTermCapitalGain: '50.00',
+                    box8aNetLongTermCapitalGain: '400.00',
+                })],
+                estateTrustK1Forms: [estateTrustGainK1('doc-k1-1041-gain')({
+                    box3NetShortTermCapitalGain: '9.00',
+                    box4aNetLongTermCapitalGain: '30.00',
+                })],
+            }))
+            assertEq(result.line5, 75900n, 'ST: $700 + $50 + $9 = $759.00')
+            assertEq(result.line12, 643000n, 'LT: $6,000 + $400 + $30 = $6,430.00')
+            // Lines 7 and 15 must have TAKEN the two summands -- the whole
+            // point of routing them, and the thing a line-5 assertion alone
+            // cannot see if line 7 forgot to add it.
+            assertEq(result.line7, 75900n, 'line 7 combines 1a-6, and 5 is the only non-zero')
+            assertEq(result.line15, 643000n, 'line 15 combines 8a-14, and 12 is the only non-zero')
+            assertEq(result.line16, 718900n, '$759.00 + $6,430.00 = $7,189.00')
+            // **Per-box `boxPath` AND the amount cited against it.**
+            // `addBoxSums` concatenates `sources`, so a swap of any two of
+            // these six reads leaves BOTH totals untouched when the swap is
+            // within a line, and is visible only here.
+            const citedAt = /** @type {(path: string) => string | undefined} */ (
+                path => result.sources.find(source => source.boxPath === path)?.value)
+            assertEq(citedAt('k1_1065.box8NetShortTermCapitalGain'), '700.00')
+            assertEq(citedAt('k1_1120s.box7NetShortTermCapitalGain'), '50.00')
+            assertEq(citedAt('k1_1041.box3NetShortTermCapitalGain'), '9.00')
+            assertEq(citedAt('k1_1065.box9aNetLongTermCapitalGain'), '6000.00')
+            assertEq(citedAt('k1_1120s.box8aNetLongTermCapitalGain'), '400.00')
+            assertEq(citedAt('k1_1041.box4aNetLongTermCapitalGain'), '30.00')
+            // ...and the DOCUMENT each names, so a read that hits the right
+            // box on the wrong collection is visible too.
+            const hashAt = /** @type {(path: string) => string | undefined} */ (
+                path => result.sources.find(source => source.boxPath === path)?.documentHash)
+            assertEq(hashAt('k1_1065.box8NetShortTermCapitalGain'), 'doc-k1-1065-gain')
+            assertEq(hashAt('k1_1120s.box7NetShortTermCapitalGain'), 'doc-k1-1120s-gain')
+            assertEq(hashAt('k1_1041.box3NetShortTermCapitalGain'), 'doc-k1-1041-gain')
+        },
+        // **THE SHORT/LONG TRANSPOSITION GUARD.** One face, one box on each
+        // side, and the two amounts chosen so that swapping them changes
+        // NEITHER line 16 nor the sources' multiset -- only which line each
+        // lands on. A proof that checked line 16, or even the set of cited
+        // box paths, would pass a routing that put the partner's box 8 on
+        // line 12 and box 9a on line 5.
+        //
+        // $2,000.00 short-term and $5,000.00 long-term: line 5 = 200000,
+        // line 12 = 500000, line 16 = 700000 either way round.
+        aShortForLongSwapIsVisibleInTheLinesEvenThoughTheTotalIsNot: () => {
+            const result = expectOk(scheduleD({
+                status: 'single',
+                brokerageForms: [],
+                dividendForms: [],
+                partnershipK1Forms: [partnershipGainK1('doc-k1-swap')({
+                    box8NetShortTermCapitalGain: '2000.00',
+                    box9aNetLongTermCapitalGain: '5000.00',
+                })],
+            }))
+            assertEq(result.line16, 700000n, 'the total a swap cannot move')
+            assertEq(result.line5, 200000n, 'box 8 is SHORT-term and belongs on line 5')
+            assertEq(result.line12, 500000n, 'box 9a is LONG-term and belongs on line 12')
+            assertEq(result.line7, 200000n)
+            assertEq(result.line15, 500000n)
+        },
+        // **THE CONTROL.** K-1s present with their capital-gain boxes
+        // ABSENT leave both lines at zero and cite nothing -- DOC-11 at the
+        // Schedule D layer, and the pair for the leaf above (a gate that
+        // fires on every K-1 is not a gate).
+        kOnesWithNoGainBoxesLeaveBothLinesZeroAndCiteNothing: () => {
+            const result = expectOk(scheduleD({
+                status: 'single',
+                brokerageForms: [],
+                dividendForms: [],
+                partnershipK1Forms: [partnershipGainK1('doc-k1-1065-empty')({})],
+                sCorporationK1Forms: [sCorporationGainK1('doc-k1-1120s-empty')({})],
+                estateTrustK1Forms: [estateTrustGainK1('doc-k1-1041-empty')({})],
+            }))
+            assertEq(result.line5, 0n)
+            assertEq(result.line12, 0n)
+            assertEq(result.line16, 0n)
+            const fromK1 = result.sources.filter(source => source.boxPath.startsWith('k1_'))
+            assertEq(fromK1.length, 0, 'an absent box is ABSENT, never a zero citation')
+        },
+        // A pass-through LOSS reaches line 21's $3,000 cap exactly as a
+        // brokerage loss does -- the computation a filer would lose entirely
+        // by not declaring `capitalGainsOrLosses`, which is why
+        // `fjs/return/tripwire` treats a negative box as proof of the
+        // obligation rather than ignoring it.
+        aPassThroughLossReachesTheThreeThousandDollarCap: () => {
+            const result = expectOk(scheduleD({
+                status: 'single',
+                brokerageForms: [],
+                dividendForms: [],
+                estateTrustK1Forms: [estateTrustGainK1('doc-k1-1041-loss')({
+                    box3NetShortTermCapitalGain: '-8000.00',
+                })],
+            }))
+            assertEq(result.line5, -800000n)
+            assertEq(result.line16, -800000n)
+            assertEq(result.line21, -300000n, 'capped at $3,000.00 for a single filer')
+            assertEq(result.line7aCapitalGainOrLoss, -300000n)
+        },
+    },
     shortTermAndLongTermKeptIndependentlyObservable: {
         sixThousandShortTermGainAndTwoThousandLongTermLossNetFourThousand: () => {
             const stGainDoc = brokerageForm('doc-mixed-st')({
@@ -765,13 +1013,20 @@ export const proof = {
         assertEq(result.line1a, 0n)
         assertEq(result.line3, 0n)
         assertEq(result.line4, 0n)
-        assertEq(result.line5, 0n)
         assertEq(result.line6, 0n)
         assertEq(result.line8a, 0n)
         assertEq(result.line10, 0n)
         assertEq(result.line11, 0n)
-        assertEq(result.line12, 0n)
         assertEq(result.line14, 0n)
+        // **Lines 5 and 12 are NO LONGER documented zeros** (TAX-35): they
+        // read the separately stated capital gain off three Schedule K-1
+        // faces. They are still 0n HERE, and that is now a CONTROL rather
+        // than a structural fact -- this fixture holds no K-1, so a routing
+        // that manufactured a phantom summand out of an empty list would
+        // redden here. `passThroughCapitalGains` below is the paired
+        // positive case.
+        assertEq(result.line5, 0n, 'no Schedule K-1 supplied: a legitimate zero, not a constant')
+        assertEq(result.line12, 0n, 'no Schedule K-1 supplied: a legitimate zero, not a constant')
     },
     // TAX-17/Phase 15: the carryover boundary, both halves.
     priorYearCapitalLossCarryover: {

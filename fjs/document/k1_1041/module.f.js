@@ -33,17 +33,30 @@
  *
  * ## What this dialect COMPUTES versus what it merely STORES
  *
- * Exactly ONE figure is consumed by a computation:
+ * SIX figures are consumed by a computation, on three different forms. The
+ * list is the authority; a bare count would not say which:
  *
  * - **Box 6, ordinary business income** → Schedule E Part III line 33 column
  *   (d) or (f) → line 35 → line 37 → line 41 → Schedule 1 line 5 → 1040 line 8.
  *   The printed page 2 routes it to *"Schedule E, line 33, column (d) or (f)"*,
  *   and which of the two is a §469 determination — see below.
+ * - **Box 1, interest income** → 1040 line 2b (TAX-35). **One here, where both
+ *   entity faces number their ordinary business income one** — the costliest
+ *   collision on this form, and the reason for a third dialect.
+ * - **Box 2a, ordinary dividends** → 1040 line 3b (TAX-35).
+ * - **Box 2b, qualified dividends** → 1040 line 3a ONLY (TAX-35), a subset of
+ *   box 2a that never joins line 3b a second time.
+ * - **Box 3, net short-term capital gain (loss)** → Schedule D line 5 (TAX-35).
+ * - **Box 4a, net long-term capital gain (loss)** → Schedule D line 12
+ *   (TAX-35); its boxes 4b/4c slices stay REFUSED at their worksheets.
  *
  * Every other fixed-caption money box is stored and refused by name when
  * non-zero, quoting the printed *"Report on"* destination, exactly as
- * `vnd.fjs.k1_1065`'s own {@link unmodeledMoneyBoxes} does. **Eleven of the
- * twelve** are here; box 6 is the one that is not.
+ * `vnd.fjs.k1_1065`'s own {@link unmodeledMoneyBoxes} does. **Six of the
+ * twelve** are here; the six listed above are the ones that are not. Box 5 is
+ * emphatically among the refused: it is other portfolio and nonbusiness income
+ * bound for Schedule E line 33 column (f), NOT the interest a partner's box 5
+ * carries.
  *
  * Boxes 7 and 8 deserve their own note, because their destination is the very
  * part this dialect exists to feed. The printed page routes both to *"Schedule
@@ -226,6 +239,13 @@ export const codedBoxFields = /** @type {const} */ ([
  * - box 2b — qualified dividends, 1040 line 3a (TAX-35). A SUBSET of 2a, on
  *   its own line, never added to 3b a second time.
  *
+ * - box 3 — net short-term capital gain or loss, Schedule D line 5 (TAX-35).
+ * - box 4a — net long-term capital gain or loss, Schedule D line 12 (TAX-35).
+ *
+ * **Boxes 4b and 4c stay refused** — the collectibles 28% slice and the
+ * unrecaptured §1250 slice are components OF box 4a bound for two worksheets
+ * this engine does not compute.
+ *
  * **Box 5 stays refused and is the trap this list exists to keep visible.**
  * `box5OtherPortfolioAndNonbusinessIncome` is not interest and not a
  * dividend: it goes to Schedule E line 33 column (f) as PORTFOLIO income, and
@@ -238,8 +258,6 @@ export const codedBoxFields = /** @type {const} */ ([
  * where an item belongs.
  */
 export const unmodeledMoneyBoxes = /** @type {const} */ ([
-    ['box3NetShortTermCapitalGain', 'Schedule D line 5 (short-term gain or loss from partnerships, S corporations, estates and trusts)'],
-    ['box4aNetLongTermCapitalGain', 'Schedule D line 12 (long-term gain or loss from partnerships, S corporations, estates and trusts)'],
     ['box4bTwentyEightPercentRateGain', 'the 28% Rate Gain Worksheet line 4 (Schedule D instructions)'],
     ['box4cUnrecapturedSection1250Gain', 'the Unrecaptured Section 1250 Gain Worksheet line 11 (Schedule D instructions)'],
     ['box5OtherPortfolioAndNonbusinessIncome', 'Schedule E line 33 column (f) — but as PORTFOLIO income, which §469(e)(1) excludes from passive activity income and §1411(c)(1) makes net investment income on Form 8960, so it cannot ride into line 33 on box 6’s material-participation determination'],
@@ -446,10 +464,10 @@ const perUnmodeledBoxZeroAccepted = Object.fromEntries(unmodeledMoneyBoxes.map((
 const expectedMoneyBoxCount = 12
 /** Hand-typed: five coded boxes — 9, 11, 12, 13 and 14. */
 const expectedCodedBoxCount = 5
-/** Hand-typed: eight of the twelve refuse. `12 - 4` — box 6 computes
- * (Schedule E Part III), box 1 computes (1040 line 2b) and boxes 2a/2b compute
- * (1040 lines 3b/3a), the latter three all TAX-35. */
-const expectedUnmodeledBoxCount = 8
+/** Hand-typed: six of the twelve refuse. `12 - 6` — box 6 computes (Schedule
+ * E Part III); boxes 1, 2a, 2b, 3 and 4a compute (1040 line 2b, 1040 lines
+ * 3b/3a, Schedule D lines 5 and 12), all five TAX-35. */
+const expectedUnmodeledBoxCount = 6
 
 /**
  * **The hand-typed inverse of {@link unmodeledMoneyBoxes}**: every
@@ -468,6 +486,8 @@ const computedMoneyBoxes = [
     'box1InterestIncome',
     'box2aOrdinaryDividends',
     'box2bQualifiedDividends',
+    'box3NetShortTermCapitalGain',
+    'box4aNetLongTermCapitalGain',
 ]
 
 /**

@@ -644,6 +644,16 @@ export const form1040IncomeLines = taxParamSet => inputs => {
             status, brokerageForms, dividendForms,
             basisCorrections: basisCorrectionForms,
             employeeStockPurchaseForms,
+            // TAX-35: printed Schedule D lines 5 and 12 read the separately
+            // stated capital gain off all three K-1 faces. `filingScheduleD`
+            // above is still read VERBATIM off the declared kind rather than
+            // off document presence (Decision 1.6), so a filer holding such a
+            // K-1 and NOT declaring `capitalGainsOrLosses` would run no
+            // Schedule D at all -- which is why `fjs/return/tripwire` gained
+            // a `capitalGainsOrLosses` entry in the same commit as this
+            // wiring. Without it, routing these boxes would have traded a
+            // loud storage refusal for a silent understatement.
+            partnershipK1Forms, sCorporationK1Forms, estateTrustK1Forms,
             ...(priorYearCapitalLossCarryover === undefined ? {} : { priorYearCapitalLossCarryover }),
         })
         : undefined
@@ -3164,6 +3174,8 @@ const withEstateTrust = inputs => estateTrustK1Forms => ({ ...inputs, estateTrus
  *   readonly box6aOrdinaryDividends?: string,
  *   readonly box6bQualifiedDividends?: string,
  *   readonly box6cDividendEquivalents?: string,
+ *   readonly box8NetShortTermCapitalGain?: string,
+ *   readonly box9aNetLongTermCapitalGain?: string,
  * }} PartnershipPortfolioBoxes
  */
 
@@ -3196,6 +3208,8 @@ const partnershipPortfolioK1 = documentHash => boxes => ({
  *   readonly box4InterestIncome?: string,
  *   readonly box5aOrdinaryDividends?: string,
  *   readonly box5bQualifiedDividends?: string,
+ *   readonly box7NetShortTermCapitalGain?: string,
+ *   readonly box8aNetLongTermCapitalGain?: string,
  * }} SCorporationPortfolioBoxes
  */
 
@@ -3226,6 +3240,8 @@ const sCorporationPortfolioK1 = documentHash => boxes => ({
  *   readonly box1InterestIncome?: string,
  *   readonly box2aOrdinaryDividends?: string,
  *   readonly box2bQualifiedDividends?: string,
+ *   readonly box3NetShortTermCapitalGain?: string,
+ *   readonly box4aNetLongTermCapitalGain?: string,
  * }} EstateTrustPortfolioBoxes
  */
 

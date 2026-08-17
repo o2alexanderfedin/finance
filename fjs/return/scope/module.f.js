@@ -984,10 +984,30 @@ export const modeledKindDeclarationRemedies = /** @type {const} */ ([
             + 'computes Schedule E Part II from your Schedule K-1s (TAX-35, Phase 30), including '
             + 'the self-employment tax a GENERAL partner owes on box 14 code A and the '
             + 'self-employment tax an S-corporation shareholder does not. Note where it stops: a '
-            + 'LOSS refuses, because §704(d)/§1366(d) basis is a multi-year history; a separately '
-            + 'stated item other than box 1 refuses by name; and Schedule E Parts I and IV '
-            + 'each have their own declared kind and each refuses. Part III now COMPUTES and has '
-            + 'its own declared kind, estateAndTrustIncome',
+            + 'LOSS refuses, because §704(d)/§1366(d) basis is a multi-year history; and Schedule '
+            + 'E Parts I and IV each have their own declared kind and each refuses. Part III now '
+            + 'COMPUTES and has its own declared kind, estateAndTrustIncome. Six separately '
+            + 'stated boxes on the partnership face and five on the S-corporation face now '
+            + 'compute ELSEWHERE than Schedule E — interest on 1040 line 2b, dividends on lines '
+            + '3a/3b, and capital gains on Schedule D lines 5 and 12 (TAX-35) — so the ones that '
+            + 'still refuse by name are the rentals, the royalties, the guaranteed payments, the '
+            + '§1231 gain, the §179 deduction, the foreign taxes and the two capital-gain slices '
+            + 'bound for the 28%-rate and unrecaptured-§1250 worksheets',
+    },
+    {
+        kind: 'capitalGainsOrLosses',
+        line: 'Schedule D -> 1040 line 7a',
+        label: 'capital gains or losses',
+        remedy: 'declare capitalGainsOrLosses on the return profile and this engine computes '
+            + 'Schedule D and Form 8949 from your Forms 1099-B, your Forms 1099-DIV capital gain '
+            + 'distributions, and — since TAX-35 — the separately stated capital gain on your '
+            + 'Schedule K-1s: printed line 5 takes the short-term figure from box 8 of a Form '
+            + '1065 K-1, box 7 of a Form 1120-S K-1 or box 3 of a Form 1041 K-1, and printed '
+            + 'line 12 takes the long-term figure from box 9a, box 8a or box 4a of the same '
+            + 'three faces. Note where it stops: the 28%-rate and unrecaptured-\u00a71250 slices '
+            + 'of that long-term figure (boxes 9b/9c, 8b/8c and 4b/4c) still refuse by name at '
+            + 'storage, because this engine computes both worksheets from Form 1099-DIV boxes '
+            + '2d and 2b only',
     },
     {
         kind: 'estateAndTrustIncome',
@@ -1001,8 +1021,13 @@ export const modeledKindDeclarationRemedies = /** @type {const} */ ([
             + 'beneficiary does not carry on the fiduciary\'s. Note where it stops: a LOSS refuses '
             + 'under \u00a7642(h)/\u00a7643 rather than \u00a7704(d), because a beneficiary is '
             + 'generally allocated no loss at all and \u00a7642(h) passes one out only on '
-            + 'termination, in box 11; and every other separately stated box on that face refuses '
-            + 'by name at storage, quoting the printed "Report on" destination',
+            + 'termination, in box 11. Five other boxes on that face now compute ELSEWHERE than '
+            + 'Schedule E — box 1 interest on 1040 line 2b, boxes 2a/2b dividends on lines '
+            + '3b/3a, and boxes 3/4a capital gains on Schedule D lines 5 and 12 (TAX-35) — and '
+            + 'the rest still refuse by name at storage, quoting the printed "Report on" '
+            + 'destination. Box 5 is emphatically among them: it is other portfolio and '
+            + 'nonbusiness income for Schedule E line 33 column (f), not the interest a '
+            + 'partner\'s box 5 carries',
     },
 ])
 
@@ -3141,11 +3166,16 @@ export const proof = {
             // `2 -> 3` is Phase 29's own `alternativeMinimumTax`.
             // `3 -> 4` is Phase 30's own `partnershipAndSCorporationIncome`.
             // `4 -> 5` is TAX-35's own `estateAndTrustIncome`.
-            const expectedDeclarationRequiredCount = 5
+            // `5 -> 6` is TAX-35's own `capitalGainsOrLosses`, added by the
+            // passthrough-routing half: printed Schedule D lines 5 and 12
+            // now read six K-1 boxes that used to refuse at storage, and a
+            // filer who does not declare the kind would otherwise have those
+            // boxes accepted and never read.
+            const expectedDeclarationRequiredCount = 6
             assertEq(
                 modeledKindDeclarationRemedies.length,
                 expectedDeclarationRequiredCount,
-                ['exactly five modeled kinds are declaration-required today', modeledKindDeclarationRemedies],
+                ['exactly six modeled kinds are declaration-required today', modeledKindDeclarationRemedies],
             )
             for (const entry of modeledKindDeclarationRemedies) {
                 assert(

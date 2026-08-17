@@ -37,10 +37,20 @@
  *
  * ## What this dialect COMPUTES versus what it merely STORES
  *
- * Exactly ONE figure is consumed by a computation:
+ * SIX figures are consumed by a computation, on three different forms. The
+ * list is the authority; a bare count would not say which:
  *
  * - **Box 1, ordinary business income (loss)** → Schedule E Part II line 28
  *   column (g) or (j) → line 32 → line 41 → Schedule 1 line 5 → 1040 line 8.
+ * - **Box 4, interest income** → 1040 line 2b, through §1366(a)(1)(A)
+ *   (TAX-35). **Four here, where the partnership numbers its interest five
+ *   and this face's box 5 is the dividend pair.**
+ * - **Box 5a, ordinary dividends** → 1040 line 3b (TAX-35).
+ * - **Box 5b, qualified dividends** → 1040 line 3a ONLY (TAX-35), a subset of
+ *   box 5a that never joins line 3b a second time.
+ * - **Box 7, net short-term capital gain (loss)** → Schedule D line 5 (TAX-35).
+ * - **Box 8a, net long-term capital gain (loss)** → Schedule D line 12
+ *   (TAX-35); its boxes 8b/8c slices stay REFUSED at their worksheets.
  *
  * One asserted field is read and decides the return:
  *
@@ -190,9 +200,16 @@ export const codedBoxFields = /** @type {const} */ ([
  *   dividend pair where the partnership's box 5 is interest** — the single
  *   sharpest reason the three tables are not shared.
  *
+ * - box 7 — net short-term capital gain or loss, Schedule D line 5 (TAX-35).
+ * - box 8a — net long-term capital gain or loss, Schedule D line 12 (TAX-35).
+ *
  * There is no counterpart here to the partnership's box 6c: an S corporation
  * reports no §871(m) dividend equivalent on this face, so the partnership
  * routes SIX boxes where this one routes five.
+ *
+ * **Boxes 8b and 8c stay refused** — the collectibles 28% slice and the
+ * unrecaptured §1250 slice are components OF box 8a bound for two worksheets
+ * this engine does not compute.
  *
  * §1366(a)(1) is the S-corporation counterpart of §702(a): each of these is
  * taken into account separately by the shareholder, on its own line elsewhere
@@ -208,8 +225,6 @@ export const unmodeledMoneyBoxes = /** @type {const} */ ([
     ['box2NetRentalRealEstateIncome', 'Schedule E Part I (lines 3-26), rental real estate — which this engine does not model; `rentalRealEstateAndRoyalties` is an `fjs/return/scope` refusal'],
     ['box3OtherNetRentalIncome', 'Schedule E Part II column (g) or (j) as a SECOND activity separate from box 1, with its own §469 grouping and its own basis limitation'],
     ['box6Royalties', 'Schedule E Part I line 4 (royalties received) — Part I, not Part II, which is why a royalty cannot ride into line 41 on this schedule’s S-corporation block'],
-    ['box7NetShortTermCapitalGain', 'Schedule D line 5 (short-term gain or loss from partnerships, S corporations, estates and trusts)'],
-    ['box8aNetLongTermCapitalGain', 'Schedule D line 12 (long-term gain or loss from partnerships, S corporations, estates and trusts)'],
     ['box8bCollectiblesTwentyEightPercentGain', 'the 28% Rate Gain Worksheet and Schedule D line 18'],
     ['box8cUnrecapturedSection1250Gain', 'the Unrecaptured Section 1250 Gain Worksheet and Schedule D line 19'],
     ['box9NetSection1231Gain', 'Form 4797 Part I, and thence Schedule 1 line 4 (other gains or losses) — `otherGainsOrLosses` is an `fjs/return/scope` refusal'],
@@ -371,10 +386,10 @@ const perUnmodeledBoxZeroAccepted = Object.fromEntries(unmodeledMoneyBoxes.map((
 const expectedMoneyBoxCount = 13
 /** Hand-typed: six coded boxes — 10, 12, 13, 15, 16 and 17. */
 const expectedCodedBoxCount = 6
-/** Hand-typed: nine of the thirteen refuse. `13 - 4` — box 1 computes
- * (Schedule E Part II), box 4 computes (1040 line 2b) and boxes 5a/5b compute
- * (1040 lines 3b/3a), the latter three all TAX-35. */
-const expectedUnmodeledBoxCount = 9
+/** Hand-typed: seven of the thirteen refuse. `13 - 6` — box 1 computes
+ * (Schedule E Part II); boxes 4, 5a, 5b, 7 and 8a compute (1040 line 2b, 1040
+ * lines 3b/3a, Schedule D lines 5 and 12), all five TAX-35. */
+const expectedUnmodeledBoxCount = 7
 
 /**
  * **The hand-typed inverse of {@link unmodeledMoneyBoxes}**: every
@@ -393,6 +408,8 @@ const computedMoneyBoxes = [
     'box4InterestIncome',
     'box5aOrdinaryDividends',
     'box5bQualifiedDividends',
+    'box7NetShortTermCapitalGain',
+    'box8aNetLongTermCapitalGain',
 ]
 
 /**

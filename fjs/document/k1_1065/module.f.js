@@ -28,8 +28,8 @@
  *
  * ## What this dialect COMPUTES versus what it merely STORES
  *
- * Exactly TWO figures are consumed by a computation, and they are consumed by
- * different forms:
+ * EIGHT figures are consumed by a computation, and they are consumed by four
+ * different forms. The list is the authority; a bare count would not say which:
  *
  * - **Box 1, ordinary business income (loss)** → Schedule E Part II line 28
  *   column (g) or (j) → line 32 → line 41 → Schedule 1 line 5 → 1040 line 8.
@@ -37,6 +37,19 @@
  *   SE line 2, which names this box in its own printed caption: *"Net profit
  *   or (loss) from Schedule C, line 31; and Schedule K-1 (Form 1065), box 14,
  *   code A"*. `fjs/schedule/se` is where it lands.
+ * - **Box 5, interest income** → 1040 line 2b, through §702(a)(8) (TAX-35).
+ * - **Box 6a, ordinary dividends** → 1040 line 3b (TAX-35).
+ * - **Box 6b, qualified dividends** → 1040 line 3a ONLY (TAX-35). A subset of
+ *   box 6a, so it never joins line 3b a second time.
+ * - **Box 6c, dividend equivalents** → 1040 line 3b, as a §871(m) payment
+ *   treated as a dividend rather than a slice of box 6a (TAX-35). **No other
+ *   K-1 face has this box**, which is why this one routes six of TAX-35's
+ *   boxes where the 1120-S and the 1041 route five each.
+ * - **Box 8, net short-term capital gain (loss)** → Schedule D line 5 (TAX-35).
+ * - **Box 9a, net long-term capital gain (loss)** → Schedule D line 12
+ *   (TAX-35). Its 28%-rate and unrecaptured-§1250 slices — boxes 9b and 9c —
+ *   route to two worksheets this engine does not compute and stay REFUSED, so
+ *   a partner holding either is still told which line cannot be filled.
  *
  * Two checkbox facts are read and decide the return:
  *
@@ -282,6 +295,15 @@ export const codedBoxFields = /** @type {const} */ ([
  *   equivalent is a payment treated as a dividend, not a slice of box 6a, so
  *   it is a genuine second summand of line 3b rather than the double count
  *   box 4c would be for boxes 4a and 4b.
+ * - box 8 — net short-term capital gain or loss, Schedule D line 5 (TAX-35).
+ * - box 9a — net long-term capital gain or loss, Schedule D line 12 (TAX-35).
+ *
+ * **Boxes 9b and 9c stay refused, and they are the reason box 9a alone is not
+ * enough to call this face's capital gains modeled.** The collectibles 28%
+ * slice and the unrecaptured §1250 slice are components OF box 9a that the
+ * printed form routes to two worksheets this engine does not compute, so a
+ * partner holding either still gets told which line cannot be filled — even
+ * though the box that contains them now computes.
  *
  * **Every destination below is a REAL line on a real form**, and that is the
  * point of the table rather than decoration: §702(a) requires each of these to
@@ -297,8 +319,6 @@ export const unmodeledMoneyBoxes = /** @type {const} */ ([
     ['box4bGuaranteedPaymentsForCapital', 'Schedule E Part II line 28 column (j) — §707(c) payments for the use of capital, which are NOT self-employment earnings, so they part company with box 4a at Schedule SE'],
     ['box4cTotalGuaranteedPayments', 'the printed total of boxes 4a and 4b, which cannot be routed without routing its two components'],
     ['box7Royalties', 'Schedule E Part I line 4 (royalties received) — Part I, not Part II, which is why a royalty cannot ride into line 41 on this schedule’s partnership block'],
-    ['box8NetShortTermCapitalGain', 'Schedule D line 5 (short-term gain or loss from partnerships, S corporations, estates and trusts)'],
-    ['box9aNetLongTermCapitalGain', 'Schedule D line 12 (long-term gain or loss from partnerships, S corporations, estates and trusts)'],
     ['box9bCollectiblesTwentyEightPercentGain', 'the 28% Rate Gain Worksheet and Schedule D line 18'],
     ['box9cUnrecapturedSection1250Gain', 'the Unrecaptured Section 1250 Gain Worksheet and Schedule D line 19'],
     ['box10NetSection1231Gain', 'Form 4797 Part I, and thence Schedule 1 line 4 (other gains or losses) — `otherGainsOrLosses` is an `fjs/return/scope` refusal'],
@@ -518,10 +538,10 @@ const perUnmodeledBoxZeroAccepted = Object.fromEntries(unmodeledMoneyBoxes.map((
 const expectedMoneyBoxCount = 18
 /** Hand-typed: eight coded boxes — 11, 13, 14, 15, 17, 18, 19 and 20. */
 const expectedCodedBoxCount = 8
-/** Hand-typed: thirteen of the eighteen refuse. `18 - 5` — box 1 computes
- * (Schedule E Part II), box 5 computes (1040 line 2b) and boxes 6a/6b/6c
- * compute (1040 lines 3b/3a/3b), all four of the latter TAX-35. */
-const expectedUnmodeledBoxCount = 13
+/** Hand-typed: eleven of the eighteen refuse. `18 - 7` — box 1 computes
+ * (Schedule E Part II); boxes 5, 6a, 6b, 6c, 8 and 9a compute (1040 line 2b,
+ * 1040 lines 3b/3a/3b, Schedule D lines 5 and 12), all six TAX-35. */
+const expectedUnmodeledBoxCount = 11
 
 /**
  * **The hand-typed inverse of {@link unmodeledMoneyBoxes}**: every
@@ -541,6 +561,8 @@ const computedMoneyBoxes = [
     'box6aOrdinaryDividends',
     'box6bQualifiedDividends',
     'box6cDividendEquivalents',
+    'box8NetShortTermCapitalGain',
+    'box9aNetLongTermCapitalGain',
 ]
 
 /**
