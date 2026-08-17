@@ -595,11 +595,19 @@ so they are scheduled rather than remembered. All are T3 — none blocks the v1 
       The note now widens the destructuring to `const [pr, pv]` first and compares
       `pv.protocolVersion`, with the broken version quoted so the correction is checkable.
 
-- [ ] **MAINT-06** *(T3)*: Take `functionalscript` 0.43.0. The project is pinned to `^0.41.0` while
+- [ ] **MAINT-06** *(T3)*: **Left open deliberately, 2026-08-17 (Phase 18).** npm's current
+      release is **0.45.0**, and neither it nor 0.44.0 is consumable here: upstream migrated to
+      `.f.mjs` and `#1520` dropped the `.js` emit (1287/1288 `tsc` errors), and the mechanical
+      396-file specifier rename still leaves **288 errors across 60 files** because the shipped
+      declarations no longer re-export the core types. Measured, not guessed — see
+      `fjs/todo/upstream-mjs-migration.md`, which names the upstream fix and the retirement
+      condition. The literal text below is satisfiable by doing nothing (`^0.43.1` already
+      exceeds 0.43.0); its intent is not met, so this stays unchecked rather than ticked with a
+      paragraph of caveats. Take `functionalscript` 0.43.0. The project is pinned to `^0.41.0` while
       `main` has moved two minor versions. Re-run the upstream-gap notes in `fjs/todo/` against the
       new version — one such note has already been retired by an upstream fix once.
 
-- [ ] **MAINT-07** *(T3)*: Share `executeRun`'s step sequence with `runExecuteRunViaFixture`.
+- [x] **MAINT-07** *(T3)*: Share `executeRun`'s step sequence with `runExecuteRunViaFixture`.
       The rule duplication was removed in 09-05/09-06 (`classifyRunOutcome` now lives once, in
       `fjs/report/guard`), but the ORDER of `loadProgram` → `buildRunSnapshot` → `buildHostMap` →
       `interpret` is still written out twice. Reorder or insert a step in `executeRun` and the
@@ -607,7 +615,7 @@ so they are scheduled rather than remembered. All are T3 — none blocks the v1 
       is observable end to end. The helper itself must stay — `fjs/effects/node/virtual` genuinely
       cannot compose a write with an import in one session.
 
-- [ ] **MAINT-08** *(T3)*: Remove or share the two small duplications a dead-code audit found: the
+- [x] **MAINT-08** *(T3)*: Remove or share the two small duplications a dead-code audit found: the
       `formRevision must not be empty` check written out byte-identically in
       `fjs/document/1099int` and `fjs/document/w2` (conspicuous because its sibling money-box rule
       *is* correctly shared via `moneyFieldError`), and `artifactSubject` in
@@ -1237,9 +1245,9 @@ them. Week 0 is research's addition in front of the plan's Week 1.
 | MAINT-03 | T3 | Phase 17 - Documentation Truth Pass | Backlog | Pending |
 | MAINT-04 | T3 | Phase 17 - Documentation Truth Pass | Backlog | Pending |
 | MAINT-05 | T3 | Phase 17 - Documentation Truth Pass | Backlog | Pending |
-| MAINT-06 | T3 | Phase 18 - Dependency and Duplication Debt | Backlog | Pending |
-| MAINT-07 | T3 | Phase 18 - Dependency and Duplication Debt | Backlog | Pending |
-| MAINT-08 | T3 | Phase 18 - Dependency and Duplication Debt | Backlog | Pending |
+| MAINT-06 | T3 | Phase 18 - Dependency and Duplication Debt | Blocked upstream | Pending |
+| MAINT-07 | T3 | Phase 18 - Dependency and Duplication Debt | Complete | Verified |
+| MAINT-08 | T3 | Phase 18 - Dependency and Duplication Debt | Complete | Verified |
 | EXEC-01 | T0 | Phase 3 - The Restricted Interpreter | Week 1 | Done |
 | EXEC-02 | T0 | Delivered upstream (fjs 0.41.0, functionalscript#1419) | Week 1 | Done |
 | EXEC-03 | T0 | Phase 3 - The Restricted Interpreter | Week 1 | Done |

@@ -1,9 +1,9 @@
 ---
 phase: 18
 slug: dependency-and-duplication-debt
-status: draft
-nyquist_compliant: false
-wave_0_complete: false
+status: complete
+nyquist_compliant: true
+wave_0_complete: true
 created: 2026-08-14
 ---
 
@@ -106,14 +106,35 @@ form. Phase 19 achieved zero; Phases 10 and 13 did not, and their items remain u
 
 ---
 
-## Sign-Off
+## Sign-Off — executed 2026-08-17
 
-- [ ] `npm test` green; proof count **≥ 916**
-- [ ] **No expected literal was edited** — verified by reading the diff, not by the suite being green
-- [ ] M1, M2, M3, M4 all performed, watched failing, restored byte-identical, `git status` clean
-- [ ] The 0.44.0 bump is alone in its own commit
-- [ ] `grep -rn "formRevision must not be empty" fjs` returns exactly one definition
-- [ ] `grep -rn "artifactSubject" fjs` returns nothing
-- [ ] `nyquist_compliant: true` set
+> **Every number above this line was stale.** The floor was 916; it is **2024**. The population
+> of `formRevision` copies was "two", then "six"; it was **fourteen**. The target was 0.44.0;
+> npm's current release is **0.45.0** and neither it nor 0.44.0 is consumable. Re-derivation was
+> the phase's own instruction and it changed three of its four premises.
 
-**Approval:** pending
+- [x] `npm test` green — **4289/4289**, exit 0, `tsc` clean; proof leaves **2029**, floor
+      re-derived as 2024, raw == unique
+- [x] **No expected literal was edited** — read from the diff. `formRevisionError`'s wording is
+      byte-identical to the fourteen copies it replaced; no computed figure moved
+- [x] M1, M2, M3, M4 all performed, each watched failing with an `ℹ tests` line, each restored
+      byte-identical, `git status --short` after each showing only the untracked `type-level/`
+      orphan
+- [ ] **The bump did NOT land** — recorded in `fjs/todo/upstream-mjs-migration.md` with measured
+      error counts and release SHAs, rather than forced. `^0.43.1` and submodule `cc93a3ca`
+      still agree
+- [x] `grep -rn "formRevision must not be empty" fjs` → one definition site
+      (`fjs/document/form_revision/module.f.js`; its other three occurrences are hand-typed
+      proof expectations, which is the point)
+- [x] `grep -rn "artifactSubject" fjs` → nothing
+- [x] `nyquist_compliant: true` set
+
+**One proof leaf was intentionally lost** and is the single explained line of
+`comm -23 baseline result`: `fjs/document/subject/module.f.js").proof.artifactSubjectIsIdentity()`,
+deleted with the zero-caller identity function it asserted about.
+
+**M4's demonstration, which the gate table asked for and is the whole point of WR-03:** two
+assertions were broken *at the same time*, one in subtest 4 and one in subtest 11. Both were
+reported by name, and the seven subtests between them ran and passed.
+
+**Approval:** pending owner review of MAINT-06
