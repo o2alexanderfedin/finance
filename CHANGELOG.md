@@ -16,6 +16,51 @@ cannot yet be reached from the server.
 
 ## Unreleased
 
+### TAX-33 closed: Form 6251 Part III, the AMT's capital-gains worksheet
+
+Phase 29 shipped Form 6251 Parts I and II and **refused** every return with
+capital gains or qualified dividends, because Part III — the twenty-nine-line
+worksheet reconciling the AMT's 26/28% schedule with §1(h)'s preferential rates
+— was unbuilt. That refusal hit the FAANG persona's most likely combination: a
+large incentive stock option spread beside qualified dividends. It now computes.
+
+- **`fjs/form6251/part3`** — lines 12-40, transcribed from `f6251.pdf` page 2,
+  one named `const` per printed line. All four preferential bands: 0% (line 23),
+  15% (line 31), 20% (line 34) and the 25% unrecaptured-§1250 band (lines 35-37).
+  Both printed skips kept as skips; both printed floors floored; the four lines
+  with no printed floor asserted instead, per `fjs/tax/line16/qdcgt`'s stated
+  rule. Every dollar figure is a `fjs/tax/params` lookup — lines 19 and 25 read
+  the same `capitalGainsBreakpoints` rows the QDCGT's lines 6 and 13 read,
+  because §55(b)(3) applies §1(h) unchanged inside the AMT.
+- **`fjs/form6251/rate`** — §55(b)(1)(A)'s two-bracket schedule, which this form
+  prints THREE times (lines 7, 18 and 39), written once. The breakpoint's halving
+  for married filing separately is a stored parameter row, never arithmetic.
+- **The regular tax's own worksheet is threaded, never re-executed.** `Line16Ok`
+  now carries the QDCGT or Schedule D Tax Worksheet that produced 1040 line 16,
+  because Part III's lines 13/15/20/27 read four of its lines and lines 20 and 27
+  say *"as figured for the regular tax"* on the printed page.
+- **The FAANG return, end to end through `form1040Report`**: a single filer with
+  $250,000.00 of salary, $20,000.00 of qualified dividends and a $1,000,000.00
+  ISO spread pays **$55,023.00** of regular tax and **$293,195.00** of AMT,
+  **$348,218.00** in all. Part III is worth $2,600.00 of it — the qualified
+  dividends taking 15% rather than the AMT's flat 28%.
+- **Phase 29's upper bound is unchanged and still runs first.** A return whose
+  flat 26/28% figure already loses to the regular tax still gets an exact
+  `$0.00` without Part III running at all, and `line7IsAnUpperBound` still says
+  which path produced the answer. `fjs/form6251/part3` proves the stronger
+  statement the mechanism rests on: **line 38 never exceeds line 39 at any
+  input**, because every preferential rate the page charges is strictly below the
+  AMT's own 26% — so the printed `min` on line 40 is a clause that never binds.
+- **What still refuses, by name**: Part III required while the regular tax
+  completed *neither* preferential worksheet, reachable only when 1040 line 15 is
+  zero or less. Every Form 2555 clause on the page is structurally unreachable.
+  There is no 28% collectibles band on this page and its absence is the printed
+  form's own decision, not an omission — documented with a proof leaf.
+- Three proof leaves that asserted the removed refusal are **rewritten as
+  computing leaves** with hand-derived figures, not weakened to bare `throw:`
+  shapes. Two mutations found coverage gaps in the new wiring and both are now
+  pinned at the module that produces the value rather than two modules away.
+
 ### Phase 26: Retiree Completion — the retiree stops being overcharged
 
 Two new dialects, one new form module, and one figure worth stating up front: on a

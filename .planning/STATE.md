@@ -33,12 +33,11 @@ Phase: 30 (pass-through-income) — **COMPLETE AND MERGED. Milestone v2 is close
   Requirements: **120 defined, 107 complete, 13 open** — derived, and the command is beside the
   number in REQUIREMENTS.md.
 
-> **The five tax requirements left open are open ON PURPOSE and say so in their own bodies.**
+> **The four tax requirements left open are open ON PURPOSE and say so in their own bodies.**
 > TAX-27 (Earned Income Credit — the dependent model carries almost none of §32(c)(3), spec in
 > `fjs/todo/`), TAX-29 (Form 8606 Part I computes; Parts II/III refuse, so no backdoor Roth),
 > TAX-32 (Form 8995 computes; 8995-A, the SSTB phase-in and the wage/UBIA limits do not),
-> TAX-33 (Form 6251 Parts I/II compute; Part III refuses, so an ISO spread beside qualified
-> dividends is refused), TAX-35 (Schedule E Part II computes; Part III needs a THIRD K-1
+> TAX-35 (Schedule E Part II computes; Part III needs a THIRD K-1
 > numbering, and no separately stated item is routed).
 >
 > **A tick that needs a paragraph of caveats is a tick that should not be there.** Phase 25 once
