@@ -1417,6 +1417,17 @@ const businessDoc = entries => ({
     },
 })
 
+/**
+ * The SPOUSE's business record, on a joint return — the same dialect naming a
+ * DIFFERENT `recipientTin`. Schedule SE is filed per person, so this beside a
+ * partner's Schedule K-1 is two Schedules SE and refuses.
+ * @type {Stored<BusinessExpenses>}
+ */
+const spouseBusinessDoc = {
+    documentHash: 'sha256-business-spouse',
+    value: { ...businessDoc([]).value, recipientTin: '333-33-3333', accountNumber: 'BUS-0002' },
+}
+
 /** @type {(amount: string) => Stored<OneZeroNineEightE>} */
 const oneZeroNineEightEDoc = amount => ({
     documentHash: 'sha256-1098e-a',
@@ -1614,6 +1625,31 @@ const stageOneWithBusiness = profile => status => nonemployeeCompensationForms =
             businessExpenseForms,
             w2Forms,
             partnershipK1Forms: [],
+            sCorporationK1Forms: [],
+        }))
+        return scheduleOnePartIIExceptStudentLoanInterest(taxParams2025)({
+            profile, status, adjustmentForms: [], w2Forms,
+            businessNetProfit: partI.scheduleC.partII.line31,
+            businessExpenseForms,
+            passThrough: passThroughOf(partI.scheduleE),
+        })
+    }
+
+/**
+ * Stage 1 for a return whose self-employment income comes from a Schedule K-1
+ * rather than a Schedule C — Schedule E run first, exactly as `scheduleOne`
+ * and `fjs/form1040/core` run it.
+ * @type {(profile: Stored<ReturnProfile>) => (status: IndividualFilingStatus) => (partnershipK1Forms: readonly Stored<K1Partnership>[]) => (businessExpenseForms: readonly Stored<BusinessExpenses>[]) => (w2Forms: readonly Stored<W2>[]) => ScheduleOnePartIIStageOneOutcome}
+ */
+const stageOneWithPassThrough = profile => status => partnershipK1Forms =>
+    businessExpenseForms => w2Forms => {
+        const partI = okPartI(scheduleOnePartI({
+            profile,
+            unemploymentForms: [],
+            nonemployeeCompensationForms: [],
+            businessExpenseForms,
+            w2Forms,
+            partnershipK1Forms,
             sCorporationK1Forms: [],
         }))
         return scheduleOnePartIIExceptStudentLoanInterest(taxParams2025)({
@@ -1871,6 +1907,119 @@ export const proof = {
             assert(
                 result.message.includes('§704(d)'),
                 ['the Schedule E loss refusal must reach Schedule 1 unchanged', result.message])
+        },
+    },
+
+    // ── Line 15 for a PARTNER rather than a proprietor (Phase 30) ────────────
+    passThroughSelfEmployment: {
+        /**
+         * **THE WAGE-BASE COORDINATION FOR A PARTNER**, and the leaf that
+         * makes `selfEmployedRecipientTin` observable at all.
+         *
+         * Before Phase 30 the only source of a proprietor TIN was a
+         * `vnd.fjs.business_expenses` record. A partner has none — their
+         * self-employment income arrives on a Schedule K-1 — so without
+         * carrying the K-1's own `recipientTin` through, `socialSecurity\
+         * WagesAlreadyTaxed` would be handed `undefined`, no Forms W-2 would
+         * consume §1402(b)(1)'s base, and the tax would be OVERSTATED.
+         *
+         * A general partner with an $80,000.00 share and $150,000.00 of box 3
+         * wages from a day job. Every figure hand-derived:
+         *
+         *   Sch SE line 4a   92.35% of $80,000.00              $73,880.00
+         *   Sch SE line 8a   the day job's box 3              $150,000.00
+         *   Sch SE line 9    176,100.00 - 150,000.00           $26,100.00
+         *   Sch SE line 10   12.4% of the SMALLER, $26,100.00   $3,236.40
+         *   Sch SE line 11   2.9% of $73,880.00, uncapped       $2,142.52
+         *   Sch SE line 12   -> Schedule 2 line 4               $5,378.92
+         *   Sch SE line 13   50% of $5,378.92                   $2,689.46
+         *
+         * **The answer with no attribution is $11,303.64**, because 12.4% of
+         * the whole $73,880.00 is $9,161.12 rather than $3,236.40. Both are
+         * asserted, so a wiring that never carried the K-1's recipient lands
+         * on the second and says so — a $5,924.72 error.
+         */
+        aPartnersWagesConsumeTheWageBaseToo: () => {
+            const shared = okStageOne(stageOneWithPassThrough(profileNoDeclaredKinds)('single')(
+                [partnershipK1Doc('80000.00')])([])([
+                w2WithSocialSecurityWages('sha256-w2-day-job')('222-22-2222')('150000.00'),
+            ]))
+            assertEq(shared.selfEmployment.lines.line2, 8000000n, 'Sch SE line 2 = box 14 code A')
+            assertEq(shared.selfEmployment.lines.line4a, 7388000n, '$73,880.00')
+            assertEq(shared.selfEmployment.lines.line8a, 15000000n, '$150,000.00 of box 3')
+            assertEq(shared.selfEmployment.lines.line9, 2610000n, '$26,100.00 of base left')
+            assertEq(shared.selfEmployment.lines.line10, 323640n, '$3,236.40')
+            assertEq(shared.selfEmployment.lines.line11, 214252n, '$2,142.52, uncapped')
+            assertEq(shared.selfEmployment.lines.line12, 537892n, '$5,378.92 of tax')
+            assertEq(shared.line15.value, 268946n, 'line 15 = $2,689.46')
+            // THE ANSWER WITH NO ATTRIBUTION, hand-computed: 12.4% of the
+            // whole $73,880.00 is $9,161.12, which with the $2,142.52
+            // Medicare portion is $11,303.64 -- $5,924.72 more tax than is
+            // owed.
+            assertEq(7388000n * 1240n / 10000n, 916112n, 'no sharing: $9,161.12')
+            assertEq(916112n + 214252n, 1130364n, 'no sharing: $11,303.64 of tax')
+            // ...and line 15's sources include the W-2 box the sharing read.
+            const paths = shared.line15.sources.map(source => source.boxPath)
+            assert(
+                paths.includes('box3SocialSecurityWages'),
+                ['line 15 must cite the wages that consumed the base', paths])
+        },
+        /**
+         * **TWO different people with self-employment income on one return.**
+         * A Schedule K-1 is a SECOND source of it, so this case could not
+         * arise before Phase 30 — `fjs/schedule/c` refuses a second business
+         * record, and one record named one person.
+         *
+         * Schedule SE is filed per person and this engine computes one, so a
+         * spouse's Schedule C beside a partner's K-1 refuses by name rather
+         * than being merged into one line 6 that would shelter the second
+         * person's earnings behind the first's already-consumed base.
+         */
+        aSpousesScheduleCBesideAPartnersKOneRefuses: () => {
+            const outcome = stageOneWithPassThrough(profileJoint)('marriedFilingJointly')(
+                [partnershipK1Doc('80000.00')])([spouseBusinessDoc])([])
+            assert(outcome.kind === 'error', ['two self-employed people must refuse', outcome])
+            if (outcome.kind !== 'error') {
+                return
+            }
+            assert(outcome.message.includes('333-33-3333'), ['the proprietor', outcome.message])
+            assert(outcome.message.includes('222-22-2222'), ['the partner', outcome.message])
+            assert(outcome.message.includes('§1402(b)(1)'), [outcome.message])
+            assert(outcome.message.includes('$400'), [outcome.message])
+        },
+        /**
+         * THE CONTROL: the SAME two records naming the SAME person compute.
+         * A proprietor who also holds a partnership stake is ordinary, and
+         * their Schedule C profit and their box 14 code A are both on printed
+         * Schedule SE line 2.
+         *
+         *   Sch C line 31    $350.00 - $90.00                     $260.00
+         *   K-1 box 14 A                                       $80,000.00
+         *   Sch SE line 2    260.00 + 80,000.00                 $80,260.00
+         *   Sch SE line 4a   92.35% of $80,260.00               $74,120.11
+         *     8,026,000 x 9,235 = 74,120,110,000; / 10,000 = 7,412,011 exactly
+         */
+        oneProprietorWhoIsAlsoAPartnerAddsBothToLineTwo: () => {
+            const partI = okPartI(scheduleOnePartI({
+                profile: profileNoDeclaredKinds,
+                unemploymentForms: [],
+                nonemployeeCompensationForms: [nonemployeeCompensationDoc('350.00')],
+                businessExpenseForms: [businessDoc([advertisingEntry('90.00')])],
+                w2Forms: [],
+                partnershipK1Forms: [partnershipK1Doc('80000.00')],
+                sCorporationK1Forms: [],
+            }))
+            const stageOne = okStageOne(scheduleOnePartIIExceptStudentLoanInterest(taxParams2025)({
+                profile: profileNoDeclaredKinds,
+                status: 'single',
+                adjustmentForms: [],
+                w2Forms: [],
+                businessNetProfit: partI.scheduleC.partII.line31,
+                businessExpenseForms: [businessDoc([advertisingEntry('90.00')])],
+                passThrough: passThroughOf(partI.scheduleE),
+            }))
+            assertEq(stageOne.selfEmployment.lines.line2, 8026000n, '$260.00 + $80,000.00')
+            assertEq(stageOne.selfEmployment.lines.line4a, 7412011n, '$74,120.11')
         },
     },
 
