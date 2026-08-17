@@ -242,7 +242,7 @@ deliberately left untaken, so that discovering it did not become a reason to sto
 - [x] **Phase 26: Retiree Completion** - Qualified Charitable Distributions and Form 8606 (PR #76, 2026-08-16) — **TAX-29 stays open**: Form 8606 Part I only, so a backdoor Roth still refuses
 - [x] **Phase 27: 1099-NEC and Schedule C** - Reversed from Out of Scope on 2026-08-15 (PR #77, 2026-08-16)
 - [x] **Phase 28: Schedule SE and QBI** - **unblocks the startup founder**; TAX-31 complete, TAX-32 delivers Form 8995 and leaves 8995-A open (PR #78, 2026-08-16) — **TAX-32 stays open**
-- [x] **Phase 29: Equity Compensation and AMT** - Forms 3921/3922, Form 6251, Form 8949 basis adjustment codes (PR #79, 2026-08-16) — **TAX-33 stays open**: Form 6251 Parts I and II, not Part III
+- [x] **Phase 29: Equity Compensation and AMT** - Forms 3921/3922, Form 6251, Form 8949 basis adjustment codes (PR #79, 2026-08-16) — **TAX-33 CLOSED 2026-08-17**: Form 6251 Part III shipped, so an ISO spread beside qualified dividends computes
 - [x] **Phase 30: Pass-Through Income** - Schedule K-1 and Schedule E (PR #80, 2026-08-16) — **TAX-35 stays open**: Schedule E Part II only
 
 ---
@@ -995,7 +995,7 @@ All five are closed with fixtures that assert the wrong answer beside the right 
 ### Phase 29: Equity Compensation and AMT
 **Requirements**: DOC-22 (3921), DOC-23 (3922), TAX-33 (Form 6251), TAX-34 (Form 8949 basis codes) · **Tier**: T3
 **Note**: TAX-34 closes a **double-taxation** bug for anyone with RSUs — brokers report $0 or unadjusted basis and the filer must adjust. Form 8949 already exists; this is its adjustment column.
-**Status**: DOC-22, DOC-23 and TAX-34 delivered. TAX-34's double taxation is priced end to end at **$49,467.75** of federal income tax on $150,000.00 of already-taxed wages. TAX-33 delivers Form 6251 Parts I and II — a real $292,479.00 alternative minimum tax on an exercise-and-hold, on Schedule 2 **line 2** (not line 1; the TY2025 form moved it) — and **stays open for Part III**, the preferential-rate worksheet a filer with both an ISO spread and qualified dividends needs. Fifteen §56/§57 adjustments on Part I are refused by name, each with its own kind.
+**Status**: DOC-22, DOC-23 and TAX-34 delivered. TAX-34's double taxation is priced end to end at **$49,467.75** of federal income tax on $150,000.00 of already-taxed wages. TAX-33 delivers Form 6251 Parts I and II — a real $292,479.00 alternative minimum tax on an exercise-and-hold, on Schedule 2 **line 2** (not line 1; the TY2025 form moved it) — and **was CLOSED on 2026-08-17 with Part III** (`fjs/form6251/part3`, lines 12-40, all four preferential bands): the persona's own return, a $1,000,000.00 ISO spread beside $20,000.00 of qualified dividends, now computes end to end at $55,023.00 of regular tax and $293,195.00 of AMT. Phase 29's upper-bound short circuit is unchanged and still runs first. Fifteen §56/§57 adjustments on Part I are refused by name, each with its own kind.
 
 ### Phase 30: Pass-Through Income
 **Requirements**: DOC-24 (K-1, two dialects — 1065 and 1120-S box numbering differs), TAX-35 (Schedule E) · **Tier**: T3
@@ -1049,7 +1049,7 @@ is deferred, so three phases remain, and two reasons override the numeric defaul
 | 26. Retiree Completion | v2 | 0/0 — no plans were written | Shipped with one requirement OPEN (TAX-28 complete; **TAX-29 open** — Form 8606 Part I only; Parts II/III refuse, so no backdoor Roth) | 2026-08-16 · PR #76 `e672b46` |
 | 27. 1099-NEC and Schedule C | v2 | 0/0 — no plans were written | Complete (DOC-20, DOC-21, TAX-30) | 2026-08-16 · PR #77 `5ce3aa0` |
 | 28. Schedule SE and QBI | v2 | 0/0 — no plans were written | Shipped with one requirement OPEN (TAX-31 complete; **TAX-32 open** — Form 8995 only, no 8995-A) | 2026-08-16 · PR #78 `8d14463` |
-| 29. Equity Compensation and AMT | v2 | 0/0 — no plans were written | Shipped with one requirement OPEN (DOC-22, DOC-23, TAX-34 complete; **TAX-33 open** — Form 6251 Parts I and II, not Part III) | 2026-08-16 · PR #79 `106c17b` |
+| 29. Equity Compensation and AMT | v2 | 0/0 — no plans were written | Complete (DOC-22, DOC-23, TAX-34; **TAX-33 closed 2026-08-17** — Form 6251 Part III, lines 12-40) | 2026-08-16 · PR #79 `106c17b` |
 | 30. Pass-Through Income | v2 | 0/0 — no plans were written | Shipped with one requirement OPEN (DOC-24 complete; **TAX-35 open** — Schedule E Part II only) | 2026-08-16 · PR #80 `0df734d` |
 
 > **The nine stale milestone-v2 rows were retro-filled on 2026-08-17, from measurement.** They
