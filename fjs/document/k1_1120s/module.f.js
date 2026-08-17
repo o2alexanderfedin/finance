@@ -76,6 +76,7 @@ import { error, ok } from 'functionalscript/fjs/types/result/module.f.js'
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
 import { centsFromString } from '../../exact/module.f.js'
 import { base, mediaTypeOf } from '../base/module.f.js'
+import { formRevisionError } from '../form_revision/module.f.js'
 import { moneyFieldError } from '../money_field/module.f.js'
 import { codedEntry, codedBoxError, materialParticipationValues, materialParticipationError } from '../k1_common/module.f.js'
 
@@ -214,8 +215,9 @@ export const unmodeledMoneyBoxes = /** @type {const} */ ([
  * @type {(r: K1SCorporation) => Result<K1SCorporation, K1SCorporationError>}
  */
 export const checkReferences = r => {
-    if (r.formRevision.trim() === '') {
-        return error(`formRevision must not be empty or whitespace-only`)
+    const formRevisionMessage = formRevisionError(r.formRevision)
+    if (formRevisionMessage !== undefined) {
+        return error(formRevisionMessage)
     }
     const participationMessage = materialParticipationError(r.materialParticipation)
     if (participationMessage !== undefined) {
