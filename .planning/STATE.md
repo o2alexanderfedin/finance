@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v2
 milestone_name: The Product Path and Four Personas
 status: released
-stopped_at: v1.0.0 RELEASED. All 120 requirements complete, main and develop identical, tag pushed. Nothing in flight. Four fjs/todo/ notes remain, each with a tested reason and a recipe.
-last_updated: "2026-08-17T20:55:00.000Z"
+stopped_at: "v1.0.0 RELEASED, then a post-release truth pass on 2026-08-17: CAPABILITIES.md re-measured from a live server, this file's own Current Position corrected for the fifth time, and three real defects fixed — a comment in fjs/server contradicting its own import, two citations of a deleted todo note, and fjs/todo/tax-35-passthrough-routing.md reading NOT IMPLEMENTED after it shipped. 120/120 requirements. Six fjs/todo/ notes genuinely open, each with a tested reason and a recipe."
+last_updated: "2026-08-17T21:30:00.000Z"
 last_activity: 2026-08-17
 progress:
   total_phases: 30
@@ -26,35 +26,66 @@ the server executes it as a pure function of `(documents, tax-year parameters) �
 
 ## Current Position
 
-Phase: 30 (pass-through-income) — **COMPLETE AND MERGED. Milestone v2 is closed.**
-  All ten v2 phases shipped 2026-08-16/17 as PRs #71–#82. Suite went 6394 → **8533** tests and
-  953 → **~2010** proof leaves. **All four personas from `.planning/PERSONA-COVERAGE.md` now
-  compute**: retiree, non-profit worker, FAANG engineer, startup founder.
-  Requirements: **120 defined, 107 complete, 13 open** — derived, and the command is beside the
-  number in REQUIREMENTS.md.
+Phase: **none — milestone v2 is closed and v1.0.0 is released.**
 
-> **The tax requirements left open are open ON PURPOSE and say so in their own bodies.**
-> TAX-29 (Form 8606 Part I computes; Parts II/III refuse, so no backdoor Roth),
-> TAX-35 (Schedule E Part II computes; Part III needs a THIRD K-1
-> numbering, and no separately stated item is routed).
->
-> **TAX-27 and TAX-32 are CLOSED as of Phase 32 and Phase 31 respectively**, and this note is
-> corrected rather than deleted because the reason TAX-27 stayed open for seven phases is worth
-> keeping: the Schedule 8812 dependent model really did carry almost none of §32(c)(3), and the
-> spec in `fjs/todo/tax-27-earned-income-credit.md` really was the honest output until the facts
-> it asked for existed. Phase 32 added them — ten checked vocabularies on
+**Do not quote a number from this block.** Every figure below is stamped with what it was measured
+on; anything present-tense is a command, not a constant. This block has now been found stale
+**five** times, always the same way: correct frontmatter above, superseded prose below. The fifth
+was found on 2026-08-17 during a post-release resume — the frontmatter read `status: released` and
+`percent: 100` while this text six lines under it still read "107 complete, 13 open" and quoted a
+test total (8533) that a bug fix had already halved.
+
+**Measured on `fd6702c`, the v1.0.0 release point:**
+
+| | |
+|---|---|
+| Requirements | **120 defined, 120 complete, 0 open** |
+| Suite | 2242 tests, 0 fail, `tsc` clean, ~31s |
+| Project-local proofs | **2218** — the only stable count |
+| MCP surface | 13 tools, protocol `2025-11-25`, `finance-mcp 1.0.0`, 26 dialects |
+| Refusal partition | 114 kinds: 38 modeled, 76 refused, 8 tripwires |
+
+Re-derive instead of reading:
+
+```sh
+grep -cE '^- \[x\] \*\*[A-Z]+-[0-9]+' .planning/REQUIREMENTS.md   # complete
+grep -cE '^- \[ \] \*\*[A-Z]+-[0-9]+' .planning/REQUIREMENTS.md   # open
+npm test 2>&1 | grep -c '^✔ import("./fjs/'                    # proofs
+git log --oneline -1 -- .planning/STATE.md                     # who wrote this last
+```
+
+All ten v2 phases shipped 2026-08-16/17 as PRs #71–#82, plus post-milestone gap-closure work
+committed under `31-*` and `32-*` prefixes. **All four personas from
+`.planning/PERSONA-COVERAGE.md` compute**: retiree, non-profit worker, FAANG engineer, startup
+founder.
+
+> **ROADMAP.md stops at Phase 30, but commits exist with `31-` and `32-` prefixes** — the
+> gap-closure work that closed TAX-32 (Form 8995-A) and TAX-27 (the Earned Income Credit) ran
+> after the milestone was declared closed and never got ROADMAP rows. The `total_phases: 30` in
+> the frontmatter is therefore ROADMAP's count, not the commit history's. Recorded rather than
+> renumbered: renumbering would rewrite shipped commit prefixes to fix a bookkeeping mismatch.
+
+> **Every tax requirement is closed, including the ones that stayed open longest.** TAX-27 was
+> open for seven phases because the Schedule 8812 dependent model really did carry almost none of
+> §32(c)(3); the spec in `fjs/todo/tax-27-earned-income-credit.md` really was the honest output
+> until the facts it asked for existed. Phase 32 added them — ten checked vocabularies on
 > `vnd.fjs.return_profile` — and `fjs/schedule/eic` computes the credit to 1040 line 27a.
+> TAX-29's Form 8606 Part II computes, so a backdoor Roth works; Part III's nonqualified
+> distributions still refuse by name. TAX-35's routing shipped: sixteen K-1 boxes across three
+> faces, each with a fixture where the destination moves by exactly the K-1's contribution.
 >
 > **A tick that needs a paragraph of caveats is a tick that should not be there.** Phase 25 once
 > checked TAX-27 while its own prose said the credit was not computed; that was corrected, and
 > every phase after it held the line until the credit actually computed.
 
-**The eight open MAINT requirements are v1's, not v2's** — Phase 16 (deferred, the orphan OCR
-island), Phase 17 (Documentation Truth Pass, never started) and Phase 18 (planned, four plans,
-**zero executed**; its plans state a proof floor of 916 and the real figure is now ~2010, so
-re-derive before trusting it). Phase 17 is the natural next move: this file was itself found four
-times carrying stale text under a newer heading, and the v2 roadmap rows sat reading "Not started"
-for shipped phases until the milestone-close sweep.
+**The v1 maintenance debt is the honest remainder.** Phase 16 stays deferred by owner decision
+(an OCR conversion path nothing calls). Phase 17 (Documentation Truth Pass) **never started**, and
+that deferral has now cost something measurable: Phase 18 correctly deferred a stale comment in
+`fjs/server/module.f.js` to Phase 17, and because Phase 17 had no owner, the same defect was
+rediscovered independently on 2026-08-17 — by which point it also cited a deleted file and
+contradicted an import fourteen lines above it. Fixed then. Phase 18's four plans remain
+unexecuted apart from `18-01`; their stated proof floor of 916 is stale against ~2218, so
+re-derive before trusting any number in them.
 
 ### The previous position, kept because it is still the shape of the work
 
