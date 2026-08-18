@@ -115,10 +115,23 @@ const parseRequirements = () => {
     return { body, statusByRequirement, traced }
 }
 
-/** Every `.planning/*.md`, read once. */
-const planningDocuments = () => readdirSync(planningDir)
-    .filter(name => name.endsWith('.md'))
-    .map(name => ({ name, text: readFileSync(join(planningDir, name), 'utf8') }))
+/**
+ * Every `.planning/*.md` AND every root-level `*.md`, read once.
+ *
+ * The root files were added on the same day README.md gained "**13 tools**,
+ * **26 document dialects**" — a claim surface that had not existed an hour
+ * earlier. Scanning only `.planning/` would have left the front door as the
+ * one document free to go stale, which is the position every other document
+ * here was in before it drifted.
+ */
+const countedDocuments = () => [
+    ...readdirSync(planningDir)
+        .filter(name => name.endsWith('.md'))
+        .map(name => ({ name: `.planning/${name}`, text: readFileSync(join(planningDir, name), 'utf8') })),
+    ...readdirSync(repoRoot)
+        .filter(name => name.endsWith('.md'))
+        .map(name => ({ name, text: readFileSync(join(repoRoot, name), 'utf8') })),
+]
 
 /**
  * Finds `13 tools` / `**13 tools**`. The leading `(?<![\w-])` keeps it from
@@ -167,7 +180,7 @@ test('no requirement is unticked in its body while its table Status says done', 
 })
 
 test('every documented MCP tool count equals what the server actually serves', () => {
-    const wrong = planningDocuments().flatMap(({ name, text }) =>
+    const wrong = countedDocuments().flatMap(({ name, text }) =>
         claimsIn(text, toolCountPattern)
             .filter(claimed => claimed !== expectedServedToolCount)
             .map(claimed => `${name} claims ${claimed} tools, server serves ${expectedServedToolCount}`))
@@ -175,7 +188,7 @@ test('every documented MCP tool count equals what the server actually serves', (
 })
 
 test('every documented dialect count equals the schema registry', () => {
-    const wrong = planningDocuments().flatMap(({ name, text }) =>
+    const wrong = countedDocuments().flatMap(({ name, text }) =>
         claimsIn(text, dialectCountPattern)
             .filter(claimed => claimed !== knownDialects.length)
             .map(claimed => `${name} claims ${claimed} dialects, registry has ${knownDialects.length}`))

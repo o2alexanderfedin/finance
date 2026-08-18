@@ -7,8 +7,8 @@ stopped_at: "v1.0.0 RELEASED, then a post-release truth pass on 2026-08-17: CAPA
 last_updated: "2026-08-17T21:30:00.000Z"
 last_activity: 2026-08-17
 progress:
-  total_phases: 30
-  completed_phases: 30
+  total_phases: 33
+  completed_phases: 32
   total_plans: 89
   completed_plans: 85
   percent: 100
@@ -59,11 +59,13 @@ committed under `31-*` and `32-*` prefixes. **All four personas from
 `.planning/PERSONA-COVERAGE.md` compute**: retiree, non-profit worker, FAANG engineer, startup
 founder.
 
-> **ROADMAP.md stops at Phase 30, but commits exist with `31-` and `32-` prefixes** — the
-> gap-closure work that closed TAX-32 (Form 8995-A) and TAX-27 (the Earned Income Credit) ran
-> after the milestone was declared closed and never got ROADMAP rows. The `total_phases: 30` in
-> the frontmatter is therefore ROADMAP's count, not the commit history's. Recorded rather than
-> renumbered: renumbering would rewrite shipped commit prefixes to fix a bookkeeping mismatch.
+> **Phases 31 and 32 are now IN ROADMAP.md** — added 2026-08-17. They had been absent from it
+> entirely while being cited by name in REQUIREMENTS.md, CAPABILITIES.md and in code docstrings:
+> gap-closure work that closed TAX-32 (Form 8995-A), TAX-29 (Form 8606 Part II), MAINT-01 (the
+> OCR island) and TAX-27 (the Earned Income Credit), all run after the milestone was declared
+> closed, which is exactly when a phase is least likely to be written down. Derive the count
+> rather than reading one: `grep -cE '^- \[[ x]\] \*\*Phase ' .planning/ROADMAP.md` — 33 entries
+> (1-30, the inserted 12.1, and 31-32).
 
 > **Every tax requirement is closed, including the ones that stayed open longest.** TAX-27 was
 > open for seven phases because the Schedule 8812 dependent model really did carry almost none of
