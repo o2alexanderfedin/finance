@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v2
 milestone_name: The Product Path and Four Personas
-status: milestone_v2_complete
-stopped_at: ALL TEN v2 phases (21-30) are shipped and merged, PRs #71-#82. All four personas compute. 13 requirements remain open - 8 MAINT (Phases 16/17/18, the v1 documentation and dependency debt) and 5 tax, each stating in its own body why it is open rather than done. Nothing is in flight.
-last_updated: "2026-08-17T10:20:00.000Z"
+status: released
+stopped_at: v1.0.0 RELEASED. All 120 requirements complete, main and develop identical, tag pushed. Nothing in flight. Four fjs/todo/ notes remain, each with a tested reason and a recipe.
+last_updated: "2026-08-17T20:55:00.000Z"
 last_activity: 2026-08-17
 progress:
   total_phases: 30
-  completed_phases: 26
+  completed_phases: 30
   total_plans: 89
   completed_plans: 85
-  percent: 87
+  percent: 100
 ---
 
 # Project State
