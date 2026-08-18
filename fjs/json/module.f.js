@@ -20,7 +20,9 @@
  * `parse` is re-exported unchanged. It is total — `Result<Unknown, string>`,
  * not a throw — which is the other half of why the host's version had to go:
  * `JSON.parse` throws a `SyntaxError`, and a `.f.js` module has no `try`
- * (AGENTS.md §Testing, and `fjs/todo/upstream-json-parse-split.md`).
+ * (AGENTS.md §Testing). The note that used to be cited here,
+ * `fjs/todo/upstream-json-parse-split.md`, was retired and deleted in
+ * `c1441e1` once 0.43.1 shipped the total parser its own text asked for.
  *
  * **`parse` returns its keys sorted, `stringify` writes them in source
  * order.** So `stringify(unwrap(parse(text)))` canonicalizes rather than
