@@ -1,7 +1,7 @@
 # What This System Can Actually Do
 
-**Measured 2026-08-17 on `develop` @ `fd6702c`** — the v1.0.0 release point — by starting the
-server and asking it. Supersedes every earlier version, all of which predate the release.
+**Measured 2026-08-17 on `develop` @ `fd6702c`** (the v1.0.0 release point) for the server surface,
+**re-measured at `0ecec40`** for the suite figures, by starting the server and asking it. Supersedes every earlier version, all of which predate the release.
 
 > **Every number below came from a running server or a full suite run, not from reading source.**
 > That rule exists because the first version of this file got the tool count wrong three times,
@@ -120,10 +120,19 @@ surface. **Only 2025 exists** — `finance_tax_params` with any other year refus
 
 ## Health
 
-- `npm test`: **2242 / 2242**, exit 0, **~31 seconds** (`tsc` runs first and is clean)
-- **2218 project-local proof leaves** — the only stable count:
+- `npm test`: **2253 / 2253**, exit 0, **~31 seconds** (`tsc` runs first and is clean). Was 2242
+  before the two standing gates below were added.
+- **2220 project-local proof leaves** — the only stable count:
   `npm test 2>&1 | grep -c '^✔ import("./fjs/'`
 - Requirements: **120 defined, 120 complete, 0 open**
+
+**Two standing gates now compare the documents to the code**, because this file had been wrong
+about the version, the dialect count, the test total and four separate refusals at once:
+`planning-truth-gate.test.js` checks REQUIREMENTS.md's checkboxes against its traceability tables
+and every tool/dialect count claimed in `.planning/*.md` and the root `*.md`, and
+`fjs/server`'s `toolsListIsExactlyTheHandTypedToolSet` pins the served tool set by name in both
+directions — the invariant that forbids a `finance_compute_1040` tool had nothing behind it until
+2026-08-17.
 
 **Never gate on `npm test`'s total** (AGENTS.md line 127). It includes ~2,100 vendored
 `functionalscript` submodule proofs and moves with submodule state; the submodule is deliberately
@@ -135,8 +144,10 @@ pinned to `node --test *.test.js` and why earlier versions of this file reported
 
 ## Known gaps
 
-Nothing here is an open requirement. Four `fjs/todo/` notes remain, each carrying a **tested**
-reason and a recipe:
+Nothing here is an open requirement. **Six** `fjs/todo/` notes remain, each carrying a **tested**
+reason and a recipe. (`fjs/todo/` holds nine files; the other three are satisfied specs kept in
+their original present tense, each with a corrected status line at the top. An earlier version of
+this list said "four" by counting table rows rather than notes.)
 
 1. **`upstream-mjs-migration.md`** — `functionalscript` is pinned at 0.43.1 because 0.44/0.45
    dropped the `.js` emit. Migrating all 396 files was *measured* on a throwaway snapshot and still
@@ -147,4 +158,7 @@ reason and a recipe:
    Schedule B's $1,500 threshold while Schedule B's own line 4 stays below it.
 4. Three upstream `fjs` notes, re-verified still open against 0.45.0.
 
-Phase 16 (an OCR conversion path nothing calls) remains deferred by owner decision.
+**Phase 16 was RESOLVED BY REMOVAL** in Phase 31 (MAINT-01): `fjs/document/1099int/from_ocr` and
+`fjs/document/ocr_amount` are deleted, and the `vnd.fjs.ocr` dialect itself stays live. This line
+said the phase "remains deferred by owner decision" until 2026-08-17 — the deferral was real, and
+then the decision was taken.

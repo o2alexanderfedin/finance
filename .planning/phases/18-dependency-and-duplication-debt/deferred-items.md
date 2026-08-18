@@ -10,9 +10,13 @@ how it was found is worth more than the fix.
   2026-08-17 while re-checking `upstream-json-parse-split.md` (retired in this phase), correctly
   deferred to Phase 17 because Phase 18 must not change behaviour.
 
-  **Phase 17 never ran, so the deferral had no floor.** The comment was found again on
-  2026-08-17 during a post-release truth pass — the second independent discovery of the same
-  defect, which is what a deferral without an owner produces. It was worse than recorded here:
+  **The deferral pointed BACKWARDS, which is why nothing collected it.** This was first
+  written as "Phase 17 never ran"; that is wrong, and the timestamps say so. Phase 17 shipped as
+  PR #84 at 03:26 PDT on 2026-08-17 (`948a61b`), Phase 18 merged as PR #87 at 14:10 PDT, and
+  **this file was written at 21:10 PDT** — seven hours after the phase it defers to had already
+  completed. A deferral to a finished phase is not a deferral; it is a deletion with a
+  forwarding address. The comment was rediscovered later the same evening by a truth pass that
+  was not looking for it. It was worse than recorded here:
   the comment also cited `fjs/todo/upstream-json-parse-split.md`, deleted in `c1441e1`, and
   line 85 of the same file already imported the total `parse` — so the paragraph asserted the
   **opposite** of the import fourteen lines above it.
