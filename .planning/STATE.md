@@ -7,8 +7,8 @@ stopped_at: "v1.0.0 RELEASED, then a post-release truth pass on 2026-08-17: CAPA
 last_updated: "2026-08-17T21:30:00.000Z"
 last_activity: 2026-08-17
 progress:
-  total_phases: 30
-  completed_phases: 30
+  total_phases: 33
+  completed_phases: 32
   total_plans: 89
   completed_plans: 85
   percent: 100
@@ -59,11 +59,13 @@ committed under `31-*` and `32-*` prefixes. **All four personas from
 `.planning/PERSONA-COVERAGE.md` compute**: retiree, non-profit worker, FAANG engineer, startup
 founder.
 
-> **ROADMAP.md stops at Phase 30, but commits exist with `31-` and `32-` prefixes** — the
-> gap-closure work that closed TAX-32 (Form 8995-A) and TAX-27 (the Earned Income Credit) ran
-> after the milestone was declared closed and never got ROADMAP rows. The `total_phases: 30` in
-> the frontmatter is therefore ROADMAP's count, not the commit history's. Recorded rather than
-> renumbered: renumbering would rewrite shipped commit prefixes to fix a bookkeeping mismatch.
+> **Phases 31 and 32 are now IN ROADMAP.md** — added 2026-08-17. They had been absent from it
+> entirely while being cited by name in REQUIREMENTS.md, CAPABILITIES.md and in code docstrings:
+> gap-closure work that closed TAX-32 (Form 8995-A), TAX-29 (Form 8606 Part II), MAINT-01 (the
+> OCR island) and TAX-27 (the Earned Income Credit), all run after the milestone was declared
+> closed, which is exactly when a phase is least likely to be written down. Derive the count
+> rather than reading one: `grep -cE '^- \[[ x]\] \*\*Phase ' .planning/ROADMAP.md` — 33 entries
+> (1-30, the inserted 12.1, and 31-32).
 
 > **Every tax requirement is closed, including the ones that stayed open longest.** TAX-27 was
 > open for seven phases because the Schedule 8812 dependent model really did carry almost none of
@@ -78,14 +80,19 @@ founder.
 > checked TAX-27 while its own prose said the credit was not computed; that was corrected, and
 > every phase after it held the line until the credit actually computed.
 
-**The v1 maintenance debt is the honest remainder.** Phase 16 stays deferred by owner decision
-(an OCR conversion path nothing calls). Phase 17 (Documentation Truth Pass) **never started**, and
-that deferral has now cost something measurable: Phase 18 correctly deferred a stale comment in
-`fjs/server/module.f.js` to Phase 17, and because Phase 17 had no owner, the same defect was
-rediscovered independently on 2026-08-17 — by which point it also cited a deleted file and
-contradicted an import fourteen lines above it. Fixed then. Phase 18's four plans remain
-unexecuted apart from `18-01`; their stated proof floor of 916 is stale against ~2218, so
-re-derive before trusting any number in them.
+**The v1 maintenance debt is closed, and an earlier version of this paragraph got that wrong.**
+It read that Phase 17 "never started" and that Phase 18's plans were unexecuted. Both are false,
+and `git log` says so: **Phase 16** was resolved by REMOVAL (MAINT-01 — `from_ocr` and
+`ocr_amount` deleted, the `vnd.fjs.ocr` dialect kept); **Phase 17** shipped as PR #84 (`948a61b`,
+03:26 PDT 2026-08-17); **Phase 18** shipped as PR #87 (`0fecdfb`, 14:10 PDT), with MAINT-07 and
+MAINT-08 verified in code and only MAINT-06's *intent* blocked upstream. ROADMAP.md's checkboxes
+for 16, 17 and 18 were simply never ticked, which is the whole reason they read as outstanding.
+
+**One deferral did cost something, and its mechanism is worth keeping.** Phase 18 deferred a
+stale comment in `fjs/server/module.f.js` to Phase 17 — writing that note at 21:10 PDT, seven
+hours AFTER Phase 17 had already completed. A deferral aimed at a finished phase is collected by
+nobody. The comment survived until a truth pass found it independently that evening, by which
+point it also cited a deleted file and contradicted an import fourteen lines above it.
 
 ### The previous position, kept because it is still the shape of the work
 

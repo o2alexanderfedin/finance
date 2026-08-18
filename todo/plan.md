@@ -1,5 +1,20 @@
 # Plan
 
+> **HISTORICAL. This is the pre-v1 five-week plan, and it is DONE.** Status line added
+> 2026-08-17, following the convention `fjs/todo/implement-mcp-server.md` already uses: this file
+> carried none, so every week below — and all seven "open questions" — read as live planning long
+> after they were answered.
+>
+> All five weeks shipped, then a further ten-phase milestone (v2) shipped on top, and
+> `finance-mcp 1.0.0` is released: 13 tools, 26 document dialects, tax year 2025, 120 of 120
+> requirements complete. **The live tracker is `.planning/ROADMAP.md`**, and the answered
+> questions are recorded where the answers live — `fjs/guest/module.f.js` for the entry-point
+> convention, `fjs/server/fjs_run/module.f.js` for result disposition, `fjs/exact` and
+> `fjs/types/decimal` for exact arithmetic.
+>
+> **Read the rest as a record of what was decided and why, never as a description of the
+> present.** Where a line says a thing is open, unbuilt, or blocking, check the code first.
+
 ## Settled Decisions
 
 These constrain everything below.
@@ -86,7 +101,7 @@ Goal: **the full path works on the user's own documents.**
 ## Week 5 (Technical Debt)
 
 - Upstream whatever has stabilized into FunctionalScript (per AGENTS.md staging rule) — most likely the CAS effects, and `fjs_run` if its shape has settled.
-- **Work the `fjs/todo/upstream-*.md` queue.** Every FJS bug or gap worked around locally has a file there stating the gap, the workaround, and the intended upstream fix; this is where they get fixed upstream, released, and the local workarounds deleted. Open at the start of Week 1: [`upstream-media-dialect-registry.md`](../fjs/todo/upstream-media-dialect-registry.md) (blocks `fjs/media` detection of our document types; may be wanted as early as Week 3). Closed: [functionalscript#1419](https://github.com/functionalscript/functionalscript/pull/1419), `match` dispatching through the prototype chain — **fixed in 0.41.0**, which this repo now uses, so no local guard is needed.
+- **Work the `fjs/todo/upstream-*.md` queue.** Every FJS bug or gap worked around locally has a file there stating the gap, the workaround, and the intended upstream fix; this is where they get fixed upstream, released, and the local workarounds deleted. ~~Open at the start of Week 1: `upstream-media-dialect-registry.md` (blocks `fjs/media` detection of our document types; may be wanted as early as Week 3).~~ **Dead link, struck 2026-08-17:** that file no longer exists, and it blocks nothing — twenty-eight dialects are classifiable and twenty-six serve a readable schema. The surviving queue is `ls fjs/todo/upstream-*.md`, whose blocking member is now `upstream-mjs-migration.md`. Closed: [functionalscript#1419](https://github.com/functionalscript/functionalscript/pull/1419), `match` dispatching through the prototype chain — **fixed in 0.41.0**, which this repo now uses, so no local guard is needed.
 - Revisit execution safety: validating source as genuine FunctionalScript before `import()`, and/or Worker isolation with hard limits. Week 1 deliberately defers both.
 - Whatever the first four weeks accumulated.
 

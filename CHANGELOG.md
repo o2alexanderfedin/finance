@@ -5,16 +5,44 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-**While the project is pre-1.0, the minor position tracks the roadmap phase.**
-`0.10.0` is the release cut when Phase 10 completed. **`0.11.0` was never cut** —
-Phases 11 and 12 both landed before anyone tagged, so `0.12.0` covers the pair
-and the minor position continues to name the highest completed phase.
-`1.0.0` is reserved for the release in which Phase 14
-(Acceptance) lands and a real server path produces a Form 1040 end to end —
-until then the major position stays at zero deliberately, because the engine
-cannot yet be reached from the server.
+**Through `0.12.0` the minor position tracked the roadmap phase.** `0.10.0` was cut when Phase 10
+completed. **`0.11.0` was never cut** — Phases 11 and 12 both landed before anyone tagged, so
+`0.12.0` covers the pair. **From `1.0.0` the project follows plain SemVer.**
+
+`1.0.0` was reserved for "the release in which Phase 14 (Acceptance) lands and a real server path
+produces a Form 1040 end to end". **Phase 14 was skipped, and the condition was met anyway** —
+Phase 21 joined the engine to the server through `guestCtx`, and `fjs-run-integration.test.js`
+proves a stored guest program computing a real 1040 through a separate `fjs_run` process with a
+pinned rerun reproducing it byte for byte. That is what `1.0.0` names.
 
 ## Unreleased
+
+*Nothing yet.*
+
+## 1.0.0 — 2026-08-17
+
+**The two halves are joined, and all four reference taxpayers compute.** Milestone v2 — "The
+Product Path and Four Personas" — shipped as PRs #71–#82 plus the gap-closure work that followed,
+closing all 120 requirements.
+
+- **The product path.** A stored program, authored by the agent and executed by the server in a
+  sandbox, produces a complete Form 1040 with every figure citing the document box it came from,
+  and a pinned rerun reproduces it byte for byte. Reached through `guestCtx` rather than a
+  `finance_compute_1040` tool, which the architecture permanently forbids: **13 tools, unchanged
+  through twelve phases.**
+- **All four personas.** The retiree and non-profit worker compute correctly (the latter had been
+  overstating the tax); the FAANG engineer and startup founder no longer refuse. Forms 8959, 8960,
+  6251 including Part III, 8606 including Part II, 8880, 8889, 8995 and 8995-A, 3921, 3922, and
+  Schedules C, SE, E and EIC.
+- **Two silent wrong answers closed.** $49,467.75 of equity income was being taxed twice, because
+  brokers correctly report $0 basis on stock already taxed through payroll. And a $300,000 W-2
+  understated tax by ~$900 with no refusal, until eight computable tripwires began refusing when
+  the documents prove an obligation was never declared.
+- **The suite runs once.** The entire proof set had been executing twice under bare `node --test`
+  for months, recorded the whole time as a double-counted *metric*. It was double-*run*.
+
+**Everything below this line was released as part of `1.0.0`** — it sat under `## Unreleased`
+inside the `v1.0.0` tag itself, which is the defect this section fixes.
 
 ### TAX-33 closed: Form 6251 Part III, the AMT's capital-gains worksheet
 
