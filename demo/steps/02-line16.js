@@ -408,10 +408,10 @@ export const render = root => {
     root.append(tagPanel)
 
     root.append(sourceFooter([
-        { label: 'fjs/tax/line16 — the dispatch, in printed order', path: 'fjs/tax/line16/module.f.js', line: 167, proofLine: 536 },
+        { label: 'fjs/tax/line16 — the dispatch, in printed order', path: 'fjs/tax/line16/module.f.js', line: 197, proofLine: 580 },
         { label: 'fjs/tax/line16/qdcgt — the 25-line worksheet', path: 'fjs/tax/line16/qdcgt/module.f.js', line: 131, proofLine: 284 },
-        { label: 'fjs/tax/table — Tax Table and Tax Computation Worksheet', path: 'fjs/tax/table/module.f.js', line: 378, proofLine: 571 },
-        { label: 'fjs/return/scope — the one place a refusal is constructed', path: 'fjs/return/scope/module.f.js', line: 297, proofLine: 386 },
+        { label: 'fjs/tax/table — Tax Table and Tax Computation Worksheet', path: 'fjs/tax/table/module.f.js', line: 226, proofLine: 571 },
+        { label: 'fjs/return/scope — the one place a refusal is constructed', path: 'fjs/return/scope/module.f.js', line: 1226, proofLine: 1555 },
     ]))
 
     income.readout()

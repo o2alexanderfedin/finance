@@ -185,10 +185,10 @@ export const render = root => {
     root.append(closing)
 
     root.append(sourceFooter([
-        { label: 'fjs/return/scope — classification and the one place a refusal is built', path: 'fjs/return/scope/module.f.js', line: 326, proofLine: 386 },
-        { label: 'fjs/return/scope — the 63-entry refusal table', path: 'fjs/return/scope/module.f.js', line: 152 },
-        { label: 'fjs/form1040/core — the guard runs before any line is computed', path: 'fjs/form1040/core/module.f.js', line: 1130, proofLine: 1648 },
-        { label: 'fjs/return/profile — the frozen kind vocabulary', path: 'fjs/return/profile/module.f.js', line: 104, proofLine: 469 },
+        { label: 'fjs/return/scope — classification and the one place a refusal is built', path: 'fjs/return/scope/module.f.js', line: 474, proofLine: 1555 },
+        { label: `fjs/return/scope — the ${unmodeledKindRefusals.length}-entry refusal table`, path: 'fjs/return/scope/module.f.js', line: 623 },
+        { label: 'fjs/form1040/core — the guard runs before any line is computed', path: 'fjs/form1040/core/module.f.js', line: 2377, proofLine: 3758 },
+        { label: 'fjs/return/profile — the frozen kind vocabulary', path: 'fjs/return/profile/module.f.js', line: 126, proofLine: 1199 },
     ]))
 
     recompute()

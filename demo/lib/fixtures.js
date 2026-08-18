@@ -146,6 +146,21 @@ export const documents = [
 ]
 
 /**
+ * Which document a CAS address belongs to, for a friendlier citation than a
+ * bare hash.
+ *
+ * Lives here rather than in a step because two steps need it — the Return
+ * step's line detail and the Form 1040 step's amount detail — and a citation
+ * label that reads differently on two pages of one demo is a small lie about
+ * whether they are looking at the same document.
+ * @type {(hash: string) => string}
+ */
+export const documentLabel = hash => {
+    const found = documents.find(document => document.stored.documentHash === hash)
+    return found === undefined ? '(unknown document)' : found.label
+}
+
+/**
  * The engine's `Form1040Inputs` for the sample return. `dividendForms`/
  * `brokerageForms` are Plan 12.1-04's own widening of `Form1040Inputs`;
  * `retirementForms`/`socialSecurityForms` are Plan 13-02's own widening;

@@ -2,15 +2,17 @@
  * The one place this demo reaches into the engine.
  *
  * Everything below is imported from the SHIPPED modules under `fjs/` — the
- * same files `npm test` runs 629 proofs against. Nothing is re-implemented
+ * same files `npm test` runs its 2220 project-local proofs against. Nothing
+ * is re-implemented
  * here, nothing is mocked, and no number this demo displays is typed into a
  * fixture except the ones explicitly labelled as hand-transcribed expected
  * values.
  *
  * This works in a browser for one reason: every module under `fjs/` is pure
  * FunctionalScript and imports nothing from `node:`. The transitive closure
- * behind this file is 43 modules and contains no host API at all — no
- * filesystem, no network, no clock. A bundler is not merely unnecessary,
+ * behind this file is 108 modules and contains no host API at all — no
+ * filesystem, no network, no clock. (43 when this header was written;
+ * re-measured on 2026-08-18 by walking the import graph.) A bundler is not merely unnecessary,
  * there is nothing for it to do: the browser's own module loader resolves
  * `functionalscript/...` through the import map in `index.html`.
  *
@@ -27,6 +29,7 @@ import { standardDeductionCents, maxAgedOrBlindBoxes, expectedChartCombinationCo
 import { taxParamsByYear, individualFilingStatuses } from '../../fjs/tax/params/module.f.js'
 import { validate as validateProfile, kindVocabulary } from '../../fjs/return/profile/module.f.js'
 import { classifyScope, modeledKinds, unmodeledKindRefusals, scopeRefusal } from '../../fjs/return/scope/module.f.js'
+import { tripwires } from '../../fjs/return/tripwire/module.f.js'
 import { applyWholeDollarElection } from '../../fjs/report/line/module.f.js'
 import { validate as validateW2, w2Schema } from '../../fjs/document/w2/module.f.js'
 import { validate as validate1099Int, oneZeroNineNineIntSchema } from '../../fjs/document/1099int/module.f.js'
@@ -49,7 +52,7 @@ export {
     standardDeductionCents, maxAgedOrBlindBoxes, expectedChartCombinationCount,
     individualFilingStatuses,
     validateProfile, kindVocabulary,
-    classifyScope, modeledKinds, unmodeledKindRefusals, scopeRefusal,
+    classifyScope, modeledKinds, unmodeledKindRefusals, scopeRefusal, tripwires,
     applyWholeDollarElection,
     validateW2, w2Schema, validate1099Int, oneZeroNineNineIntSchema,
     centsFromString, centsToString, tryCentsFromString,
@@ -108,16 +111,22 @@ export const store = value => ({
 // ── Presentation ─────────────────────────────────────────────────────────────
 
 /**
- * Formats exact cents as dollars with thousands separators.
+ * Exact cents split into the three pieces a printed form prints separately:
+ * the sign, the grouped dollars, and the two-digit cents that live in the
+ * form's own narrow right-hand column.
  *
- * The grouping is done on the DIGITS, after `centsToString` has produced the
- * exact decimal text — never by handing the value to `Intl.NumberFormat`,
- * which takes a `number` and would round a large return's total through a
- * double on the way to the screen. The whole point of the engine is that this
- * never happens; the display must not undo it on the last hop.
- * @type {(cents: bigint) => string}
+ * The grouping is done on the DIGITS — never by handing the value to
+ * `Intl.NumberFormat`, which takes a `number` and would round a large
+ * return's total through a double on the way to the screen. The whole point
+ * of the engine is that this never happens; the display must not undo it on
+ * the last hop.
+ *
+ * This exists as its own function because the Form 1040 step needs the two
+ * halves in two different cells and {@link money} needs them joined. One
+ * split, two renderings — rather than a second, subtly different, splitter.
+ * @type {(cents: bigint) => { readonly sign: string, readonly dollars: string, readonly cents: string }}
  */
-export const money = cents => {
+export const moneyParts = cents => {
     const magnitude = cents < 0n ? -cents : cents
     // Split on the cents scale ARITHMETICALLY rather than by slicing the
     // formatted string at a `.`: `noUncheckedIndexedAccess` makes a `split`
@@ -125,9 +134,20 @@ export const money = cents => {
     // and a `!` over that. Dividing is also simply what the value means.
     const dollars = magnitude / 100n
     const remainder = magnitude % 100n
-    const grouped = String(dollars).replace(/\B(?=(\d{3})+(?!\d))/g, ',')
-    const fraction = String(remainder).padStart(2, '0')
-    return `${cents < 0n ? '-' : ''}$${grouped}.${fraction}`
+    return {
+        sign: cents < 0n ? '-' : '',
+        dollars: String(dollars).replace(/\B(?=(\d{3})+(?!\d))/g, ','),
+        cents: String(remainder).padStart(2, '0'),
+    }
+}
+
+/**
+ * Formats exact cents as dollars with thousands separators.
+ * @type {(cents: bigint) => string}
+ */
+export const money = cents => {
+    const parts = moneyParts(cents)
+    return `${parts.sign}$${parts.dollars}.${parts.cents}`
 }
 
 /**

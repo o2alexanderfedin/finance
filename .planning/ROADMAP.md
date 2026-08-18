@@ -201,7 +201,7 @@ harmless one. Phase 12 wires the dialect into the worksheet that is already ther
 
 ### Week 4 — The Full Path Works on the User's Own Documents
 
-- [ ] **Phase 14: Acceptance — Reproducible, Cited, End-to-End** - Line-by-line match against the filed return, adversarially verified
+- [→] **Phase 14: Acceptance — Reproducible, Cited, End-to-End** — **MOVED to milestone v3 on 2026-08-17 and REFRAMED.** It is not skipped and not cancelled; its old form was circular and could never be satisfied. See "Milestone v3" below.
       **⚠ NOT AUTONOMOUS-EXECUTABLE.** This phase requires the taxpayer's real filed return and real
       source documents to compare against. No agent can produce them. Explicitly skipped by the phase
       owner on 2026-08-07 for the autonomous run; it needs a working session with the documents present.
@@ -246,6 +246,40 @@ deliberately left untaken, so that discovering it did not become a reason to sto
 - [x] **Phase 30: Pass-Through Income** - Schedule K-1 and Schedule E (PR #80, 2026-08-16) — **TAX-35 CLOSED 2026-08-17**: Schedule E Part II shipped here, Part III with the `vnd.fjs.k1_1041` dialect, and sixteen K-1 boxes across three faces routed to 1040 lines 2b/3a/3b and Schedule D lines 5/12
 - [x] **Phase 31: Gap Closure — Form 8995-A, Form 8606 Part II, and the OCR island** - closes TAX-32 (Form 8995-A with Schedule A's SSTB percentage and Part III's wage/UBIA phase-in), TAX-29 (Form 8606 Part II computed, Part III decided by code), and MAINT-01 (the orphan OCR modules deleted) (2026-08-17)
 - [x] **Phase 32: Gap Closure — the Earned Income Credit** - closes TAX-27: `fjs/schedule/eic` computes §32 to 1040 line 27a, on ten checked §32 vocabularies added to `vnd.fjs.return_profile` (2026-08-17)
+
+
+**── Milestone v3: File a Real Return ──**
+
+**Why this milestone exists.** Phase 14's acceptance criterion read *"feed it a year already
+filed; every 1040 line matches"*. **That is circular for this project's actual user.** The owner
+does not have a filed TY2025 return — the entire system exists so that they can file one. An
+acceptance test that requires the artifact it is meant to help produce can never be run, which is
+why the phase sat blocked from 2026-08-11 to 2026-08-17 with nobody able to move it.
+
+v3 replaces "diff against your own filed return" with **external ground truth that does not
+require it**, and adds the thing nobody had noticed was missing: **there is no output you can
+actually file.** The engine returns `{ value, rule, sources }` — numbers with citations. There is
+no filled 1040, no PDF, no e-file.
+
+- [ ] **Phase 33: External Validation Without a Filed Return** - Run TaxCalcBench's 51 public
+      cases, which ship expected outputs. Record per case: matched, refused (and by which named
+      refusal), or diverged. **A divergence is a bug; a refusal is not.** This is the only
+      substitute for criterion 1 that needs nothing from the taxpayer.
+- [ ] **Phase 34: Second-Implementation Cross-Check** - Run the owner's own documents through a
+      free commercial filer (FreeTaxUSA / IRS Free File) and through this engine, and diff line by
+      line. Two independent implementations agreeing is what a prior-year return was standing in
+      for.
+- [ ] **Phase 35: A Filable Artifact** - Render the computed return onto the printed Form 1040
+      layout, faithful enough to transcribe from or to hand to a preparer. **E-file is out of
+      scope**: IRS MeF requires provider authorization no personal project obtains.
+- [ ] **Phase 36: The Conversational Path** - Documents into chat, "what do I owe for 2025?",
+      answer end to end with citing hashes, no code touched. This is Phase 14's criterion 2,
+      unchanged and still wanted.
+
+> **Phase 14 is retired into this milestone, not deleted.** Its criteria 3, 4 and 5 were already
+> moved to Phase 19 on 2026-08-12 because they were pure engineering and did not need the
+> taxpayer. What remained was criteria 1 and 2; criterion 2 becomes Phase 36 unchanged, and
+> criterion 1 is replaced by Phases 33-35, which reach the same confidence by a route that exists.
 
 > **Phases 31 and 32 were absent from this file entirely until 2026-08-17**, while being cited by
 > name in REQUIREMENTS.md, CAPABILITIES.md and in code docstrings (`fjs/schedule/eic` says "TAX-27,
@@ -1070,6 +1104,10 @@ is deferred, so three phases remain, and two reasons override the numeric defaul
 | 30. Pass-Through Income | v2 | 0/0 — no plans were written | Complete (DOC-24 and Schedule E Part II here; **TAX-35 closed 2026-08-17** — Part III via `vnd.fjs.k1_1041`, and sixteen K-1 boxes routed across three faces) | 2026-08-16 · PR #80 `0df734d` |
 | 31. Gap Closure — 8995-A, 8606 Part II, OCR island | v2 | 0/0 — no plans were written | Complete (TAX-32, TAX-29, MAINT-01) | 2026-08-17 |
 | 32. Gap Closure — Earned Income Credit | v2 | 0/0 — no plans were written | Complete (TAX-27) | 2026-08-17 |
+| 33. External Validation Without a Filed Return | v3 | 0/TBD | Not started | - |
+| 34. Second-Implementation Cross-Check | v3 | 0/TBD | Not started | - |
+| 35. A Filable Artifact | v3 | 0/TBD | Not started | - |
+| 36. The Conversational Path | v3 | 0/TBD | Not started | - |
 
 > **The nine stale milestone-v2 rows were retro-filled on 2026-08-17, from measurement.** They
 > had read `0/TBD | Not started` for work that was in `develop`: phases 21 through 29 all

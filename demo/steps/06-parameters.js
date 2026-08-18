@@ -184,8 +184,8 @@ export const render = root => {
     root.append(worked)
 
     root.append(sourceFooter([
-        { label: 'fjs/tax/params — every stored figure and its citation', path: 'fjs/tax/params/module.f.js', line: 153, proofLine: 418 },
-        { label: 'fjs/tax/deduction — the chart and its exceptions', path: 'fjs/tax/deduction/module.f.js', line: 215, proofLine: 387 },
-        { label: 'fjs/tax/table — where the brackets become a tax', path: 'fjs/tax/table/module.f.js', line: 131, proofLine: 571 },
+        { label: 'fjs/tax/params — every stored figure and its citation', path: 'fjs/tax/params/module.f.js', line: 2377, proofLine: 2537 },
+        { label: 'fjs/tax/deduction — the chart and its exceptions', path: 'fjs/tax/deduction/module.f.js', line: 215, proofLine: 648 },
+        { label: 'fjs/tax/table — where the brackets become a tax', path: 'fjs/tax/table/module.f.js', line: 283, proofLine: 571 },
     ]))
 }
