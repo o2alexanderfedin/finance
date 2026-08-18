@@ -299,6 +299,51 @@ const toolsCallRequest = {
 }
 
 /**
+ * **The served tool set, hand-typed — the independent side of a comparison,
+ * not documentation.**
+ *
+ * `financeMcpHandlers` composes this set from two upstream registries plus six
+ * individual tools, so no single line of this file states what the server
+ * actually serves. This list does, and
+ * {@link toolsListIsExactlyTheHandTypedToolSet} compares the two.
+ *
+ * ## Why a set and not a count
+ *
+ * The tool count is the project's most load-bearing invariant.
+ * `.planning/REQUIREMENTS.md` permanently forbids a `finance_compute_1040`
+ * tool — the whole architecture exists so the agent AUTHORS a program rather
+ * than calling one — and `.planning/CAPABILITIES.md` states the count has not
+ * moved through twelve phases. **Nothing enforced either claim.**
+ * `toolsListEnumeratesComposedRegistry` below asserts `tools.length > 0` and
+ * names six of the thirteen, so adding a fourteenth tool — including the
+ * forbidden one — left the whole suite green.
+ *
+ * A hand-typed COUNT would not have been enough either, and this repo has the
+ * receipts: `fjs/server/dialect_parity`'s own header records two
+ * twenty-three-entry registries that were not the same twenty-three, each
+ * carrying a count that could only see its own list. **A total cannot see a
+ * swap.** So the leaf below checks containment in BOTH directions and the
+ * length against {@link expectedServedToolCount}, which is a second
+ * hand-typed statement rather than `everyServedToolHandTyped.length` — two
+ * independent claims that have to agree.
+ */
+/** @type {readonly string[]} */
+export const everyServedToolHandTyped = ([
+    'cas_add', 'cas_get', 'cas_list', 'cas_refresh',
+    'evo_add', 'evo_list', 'evo_head', 'evo_revision',
+    'finance_schema', 'finance_tax_params', 'finance_documents_list',
+    'fjs_run', 'fjs_check',
+])
+
+/**
+ * Hand-typed independently of {@link everyServedToolHandTyped}'s contents, so
+ * a name added to that list alone reddens rather than passing quietly.
+ * Thirteen since Phase 21; **a change here needs a reason in REQUIREMENTS.md,
+ * not just a passing suite.**
+ */
+export const expectedServedToolCount = 13
+
+/**
  * Drives the full `initialize` -> `notifications/initialized` -> `tools/list`
  * -> `tools/call` session against the real assembled `financeMcpServer` over
  * the virtual Node interpreter — no real process, no real filesystem, no
@@ -461,6 +506,46 @@ export const proof = {
             assert(tools.some(t => t.name === 'finance_tax_params'))
             assert(tools.some(t => t.name === 'finance_documents_list'))
             assert(tools.some(t => t.name === 'fjs_run'))
+        },
+        // **The comparison the leaf above is not.** It asserts `length > 0`
+        // and names six of thirteen, so a FOURTEENTH tool — including the
+        // `finance_compute_1040` that REQUIREMENTS.md permanently forbids,
+        // and whose absence CAPABILITIES.md advertises as an architectural
+        // guarantee — was invisible to it. Containment is checked in both
+        // directions because one direction only catches a removal and the
+        // other only catches an addition; a swap needs both.
+        toolsListIsExactlyTheHandTypedToolSet: () => {
+            const [, listResponse] = responsesOf(runSession())
+            const served = asToolsListResult(listResponse).result.tools.map(t => t.name)
+            assertEq(
+                served.length,
+                expectedServedToolCount,
+                ['the served tool count moved -- REQUIREMENTS.md must say why', served],
+            )
+            const missing = everyServedToolHandTyped.filter(name => !served.includes(name))
+            assertEq(missing.length, 0, ['a hand-typed tool is no longer served', missing])
+            const unexpected = served.filter(name => !everyServedToolHandTyped.includes(name))
+            assertEq(
+                unexpected.length,
+                0,
+                ['a tool is served that the hand-typed set does not name', unexpected],
+            )
+        },
+        theHandTypedListNamesEveryServedTool: () => {
+            assertEq(
+                everyServedToolHandTyped.length,
+                expectedServedToolCount,
+                [
+                    'the hand-typed tool list and the hand-typed count disagree',
+                    everyServedToolHandTyped.length,
+                    expectedServedToolCount,
+                ],
+            )
+            assertEq(
+                new Set(everyServedToolHandTyped).size,
+                expectedServedToolCount,
+                'and it names each tool once',
+            )
         },
         // A real registered handler answers tools/call — a green tools/call,
         // not merely a green tools/list (the documented silent-failure mode

@@ -552,10 +552,18 @@ so they are scheduled rather than remembered. All are T3 — none blocks the v1 
       requirement's own premise.** `npm run test:proofs` is the separable path; and TEST-04 is
       amended, because measuring it showed the proofs are the SLOW half (4260 tests / 52.7s)
       against every real-process test and gate combined (13 / 7.0s). Splitting them to keep the
-      per-commit loop fast would skip the cheap half. It also surfaced that **the proof suite runs
-      TWICE under `npm test`** — the parts sum to 4273 against 8533, a difference of exactly the
-      proof count — which is a ~53s cost per run and is carried as its own open item, mechanism
-      undiagnosed rather than guessed at. The `~15s` in the sentence above was itself stale.
+      per-commit loop fast would skip the cheap half. It also surfaced that **the proof suite ran
+      TWICE under `npm test`** — the parts summed to 4273 against 8533, a difference of exactly the
+      proof count — a ~53s cost per run. The `~15s` in the sentence above was itself stale.
+
+      **The double-run was DIAGNOSED and fixed on 2026-08-17**, after this entry was written
+      recording it as an open item with the mechanism unknown: bare `node --test` was discovering
+      the vendored `functionalscript` submodule's own `.ts` entry point, which re-scans the same
+      working directory, so every finance proof was executed and printed twice. `npm test` is now
+      pinned to `node --test *.test.js` and the suite runs 2242 tests in ~31s. **The defect had
+      been recorded for months as a "double-counted *metric*, advisory, remedy: de-duplicate"** —
+      it was double-*run*. A workaround that works removes all pressure to look at why it was
+      needed, which is what made this the most expensive bug in the project.
 
 - [x] **MAINT-03** *(T3)*: Correct the requirement and roadmap claims that overstate what shipped.
       Known: TAX-02 says the Tax Table is "diffed row by row against Publication 1040" when ten rows
@@ -1456,9 +1464,16 @@ them. Week 0 is research's addition in front of the plan's Week 1.
 >   { [ "$cb" = '[x]' ] && [ "$tb" != Complete ] && [ "$tb" != Done ]; } && echo "MISMATCH $r $cb $tb"
 > done
 > ```
-> **A second source of truth is safe only when something watches it drift.** Nothing watches
-> this one — the command above is not run by any gate. **Phase 17 (Documentation Truth Pass)
-> owns making it an actual check** rather than a snippet someone has to remember.
+> **A second source of truth is safe only when something watches it drift.** Something now does:
+> `planning-truth-gate.test.js` at the repository root runs the comparison above on every
+> `npm test`, in both directions, plus the reverse (unticked body against a done Status) and the
+> tool- and dialect-count claims in every `.planning/*.md` against the code.
+>
+> **It found five rows on its first run** — MAINT-02 through MAINT-06, ticked `[x]` with dated
+> resolution notes while this table still read `Pending`. The snippet that would have caught them
+> was sitting in this file the whole time. *That* is the argument for a gate over a documented
+> command, and it is why the snippet is kept below: it is now the gate's specification, not its
+> substitute.
 
 | REQ-ID | Tier | Phase | Milestone | Status |
 |--------|------|-------|-----------|--------|
@@ -1483,11 +1498,11 @@ them. Week 0 is research's addition in front of the plan's Week 1.
 | TEST-03 | T2 | Phases 8-15 - standing, per phase | Weeks 2-5 | Complete |
 | TEST-04 | T2 | Phase 7 - `fjs_run` and Run Records | Week 1 | Complete |
 | MAINT-01 | T3 | Phase 16 - Orphan Ingestion Island | Phase 31 | **Closed — REMOVED.** `from_ocr` + `ocr_amount` deleted (imported by nothing / only by it); the live `vnd.fjs.ocr` dialect and every `dialect_parity` leaf stay green |
-| MAINT-02 | T3 | Phase 17 - Documentation Truth Pass | Backlog | Pending |
-| MAINT-03 | T3 | Phase 17 - Documentation Truth Pass | Backlog | Pending |
-| MAINT-04 | T3 | Phase 17 - Documentation Truth Pass | Backlog | Pending |
-| MAINT-05 | T3 | Phase 17 - Documentation Truth Pass | Backlog | Pending |
-| MAINT-06 | T3 | Phase 18 - Dependency and Duplication Debt | Blocked upstream | Pending |
+| MAINT-02 | T3 | Phase 17 - Documentation Truth Pass | Phase 17 | **Complete.** `npm run test:proofs` is the separable path, and TEST-04 was amended because measuring it falsified the premise — the proofs are the SLOW half |
+| MAINT-03 | T3 | Phase 17 - Documentation Truth Pass | Phase 17 | **Complete.** TAX-02 and DOC-04 corrected in place; the 79/83/95 divergence fixed by putting the derivation COMMAND beside every figure |
+| MAINT-04 | T3 | Phase 17 - Documentation Truth Pass | Phase 17 | **Complete.** `implement-mcp-server.md` led with "spec, not implemented" through all ten v2 phases built on it; both DOCC-05 relics gone |
+| MAINT-05 | T3 | Phase 17 - Documentation Truth Pass | Phase 17 | **Complete.** The note's proposed fix was not merely vacuous but unconditionally TRUE — a negotiation rejecting every client; corrected with the broken version quoted |
+| MAINT-06 | T3 | Phase 18 - Dependency and Duplication Debt | Blocked upstream | **Complete as written**, intent blocked upstream and MEASURED: `^0.43.1` is taken; 0.44/0.45 leave 288 `tsc` errors, each fixable only by a forbidden construct (`fjs/todo/upstream-mjs-migration.md`) |
 | MAINT-07 | T3 | Phase 18 - Dependency and Duplication Debt | Complete | Verified |
 | MAINT-08 | T3 | Phase 18 - Dependency and Duplication Debt | Complete | Verified |
 | EXEC-01 | T0 | Phase 3 - The Restricted Interpreter | Week 1 | Done |
