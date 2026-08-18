@@ -416,6 +416,22 @@ export const capitalGainsBreakpoints = {
  * time — is not a third base amount at all; it is a structural skip
  * straight to line 16, so it is modeled as a branch inside `fjs/tax/ssb`
  * itself, never as a parameter here.
+ *
+ * **`§86(c)` is the governing PROVISION for all four figures, and the literal
+ * source of only two of them.** Re-verified 2026-08-17 against the printed
+ * pages, discharging `13-VERIFICATION.md`'s manual-only item. `firstThreshold`
+ * ($25,000 / $32,000) is §86(c)(1) verbatim. `secondThreshold` ($9,000 /
+ * $12,000) is **not written in §86(c) at all** — that section states the
+ * *adjusted base amounts* $34,000 and $44,000, and the worksheet prints their
+ * DIFFERENCES from the base amounts instead (34,000 − 25,000 = 9,000;
+ * 44,000 − 32,000 = 12,000). A reader who opens §86(c) looking for `$9,000`
+ * will not find it, exactly as this module's `childTaxCredit` docstring
+ * already records for `§24(h)` and `$1,700`. `kind: 'code'` stays for the same
+ * reason it stays there: the governing provision is the honest, verifiable
+ * half of the citation, and the DOLLAR VALUES are backed by the printed
+ * worksheet face. Neither figure is inflation-indexed — §86's amounts have
+ * been unchanged since 1993 — so neither can go stale between tax years, which
+ * is why they are `kind: 'code'` and not an annual Rev. Proc.
  * @type {{
  *   readonly firstThreshold: { readonly marriedFilingJointly: AmountWithCitation, readonly other: AmountWithCitation },
  *   readonly secondThreshold: { readonly marriedFilingJointly: AmountWithCitation, readonly other: AmountWithCitation },

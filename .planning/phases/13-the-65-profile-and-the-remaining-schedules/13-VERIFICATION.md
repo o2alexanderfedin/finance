@@ -2,8 +2,9 @@
 phase: 13
 slug: the-65-profile-and-the-remaining-schedules
 verified: 2026-08-11T00:00:00Z
-status: human_needed
-score: 5/5 must-haves verified (code-level); 1 manual-only item outstanding
+reverified: 2026-08-17T00:00:00Z
+status: passed
+score: 5/5 must-haves verified (code-level); the manual-only item DISCHARGED 2026-08-17 against the printed pages
 overrides_applied: 0
 must_haves:
   truths:
@@ -16,6 +17,16 @@ human_verification:
   - test: "Spot-check each new TY2025 parameter (senior deduction $6,000/6%/$75k-$150k; SSB base amounts $25k/$32k/$9k/$12k; SALT cap $40,000/30%/$500k-$250k/$10,000 floor; CTC $2,200/ODC $500/ACTC cap $1,700/phase-out $400k-$200k at 5% per $1,000; medical floor 7.5%) against the cited 2025 IRS PDF page"
     expected: "Each figure and its line label match the printed page cited in 13-RESEARCH.md's [VERIFIED: ...] annotations"
     why_human: "No local copy of the cited IRS PDFs (f1040s1a.pdf, i1040gi.pdf, f1040sa.pdf, f1040s8.pdf, rp-25-32.pdf) exists in this repository or was reachable to this verifier. A green suite proves the engine agrees with the constants it was given, never that a constant was transcribed correctly from the source PDF -- this is 13-VALIDATION.md's own named 'Manual-Only Verification' row, and it is the fooled-but-passing failure mode for the whole phase."
+    result: passed
+    resolved: 2026-08-17
+    resolved_by: "The blocker was tool access, not judgment. The pages were fetched from irs.gov and read directly. EVERY figure matches its printed line; no constant was mistranscribed and no code change was needed. Evidence below."
+    evidence:
+      - "Sch 1-A (2025) Part V line 32: '$75,000 ($150,000 if married filing jointly)'; line 33: 'enter $6,000'; line 34: 'Multiply line 33 by 6% (0.06)' -- senior deduction confirmed, and line 32 lists ONLY the MFJ split, so MFS and HoH correctly share the $75,000 figure the repo gives them."
+      - "Sch A (2025) line 3: 'Multiply line 2 by 7.5% (0.075)' -- medical floor confirmed."
+      - "Sch A instructions p7, State and Local Tax Deduction Worksheet: line 1 'Enter $40,000'; line 5 '$500,000 ($250,000 if married filing separately)'; line 7 'Multiply line 6 by 30% (0.30)'; line 9 'larger of line 8 or $10,000'; line 10 'smaller of line 9 (half the amount on line 9 if married filing separately)'. This is an exact match to fjs/schedule/a's w1/w5/w7/w9/w10, INCLUDING the flat-then-halved quirk its docstring calls Pitfall 2 -- the $40,000 cap and $10,000 floor are stored unhalved on purpose, and only w10 halves, which reproduces the form's own '$20,000 if MFS' cap and the statutory $5,000 MFS floor."
+      - "Sch 8812 (2025) p1 line 5 'Multiply line 4 by $2,200'; line 7 'Multiply line 6 by $500'; line 9 'Married filing jointly-$400,000 / All other filing statuses-$200,000'; line 10 'next multiple of $1,000'; line 11 'Multiply line 10 by 5% (0.05)'. p2 line 16b 'x $1,700'; line 19 'more than $2,500?'; line 20 'Multiply the amount on line 19 by 15% (0.15)'. All confirmed."
+      - "SSB base amounts: $25,000/$32,000 are IRC 86(c)(1) verbatim. $9,000/$12,000 are the WORKSHEET's pre-computed differences (86(c)(2)'s $34,000/$44,000 adjusted base amounts less the base amounts), confirmed against the printed Social Security Benefits Worksheet and Pub. 915. Values correct; the citation was imprecise and is now annotated in fjs/tax/params -- see below."
+    finding: "One real defect, documentation-only: socialSecurityBenefitsWorksheetBaseAmounts cited section 86(c) for ALL FOUR figures, but a reader opening 86(c) looking for $9,000 or $12,000 will not find them -- that section states $34,000/$44,000. Annotated following the module's own established precedent for the identical situation at section 24(h). No value changed, so no proof moved."
 ---
 
 # Phase 13: The 65+ Profile and the Remaining Schedules — Verification Report
