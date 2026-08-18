@@ -282,7 +282,7 @@ structural (RTTI) and semantic passes.
       (which described an older `fjs/media` recognizing only `vnd.fjs.revision`) is itself
       part of DOC-16's own scope, per 15-RESEARCH.md's "State of the Art" finding. This repo
       adopts that already-shipped machinery LOCALLY (`fjs/media/dialects/module.f.js`,
-      Plan 15-06) for every one of its own thirteen dialects, wired into `cas_refresh`'s real
+      Plan 15-06) for every one of its own **twenty-eight** classifiable dialects (`expectedDialectCount` in `fjs/media/dialects`; twenty-six also serve a readable schema through `finance_schema`) — this read *thirteen* until 2026-08-17, last true around Phase 20 — wired into `cas_refresh`'s real
       running path — no upstream contribution is needed or was made.
 - [x] **DOC-17** *(T2, added Phase 5)*: `vnd.fjs.medical_expenses` — the substantiation record
       behind Schedule A's medical and dental deduction. Unlike every other dialect it is
@@ -504,9 +504,9 @@ test the thing that breaks."* It was a one-off; this section makes it a practice
 
       | | before | after |
       |---|---|---|
-      | `npm test` | 8533 tests | **4273** |
-      | wall clock | ~60s (25–140 under load) | **~30s** |
-      | raw proof lines vs unique | 4048 vs 2024 | **2024 vs 2024** |
+      | `npm test` | 8533 tests | **2242** (was recorded here as 4273 until 2026-08-17) |
+      | wall clock | ~60s (25–140 under load) | **~31s** |
+      | project-local proof leaves | 4048 raw vs 2024 unique | **2218, each printed once** |
 
       **Nothing is skipped** — every proof and every root test still runs, once. `sort -u` in the
       leaf-count command is no longer load-bearing and is kept as a cheap assertion that it stays
@@ -514,7 +514,7 @@ test the thing that breaks."* It was a one-off; this section makes it a practice
 
 Scope note, deliberately: these requirements do **not** ask for the virtual proofs to be
 replaced. The virtual harness is fast, deterministic, and proves logic well. What it cannot do is
-prove that two real subsystems meet. Both layers are wanted; only one of them currently exists.
+prove that two real subsystems meet. Both layers are wanted, **and both exist** — this sentence said only one did, until 2026-08-17. TEST-01/02 delivered the real-process harness in Phase 7 and TEST-03 has kept it growing; the root `*.test.js` files are that layer, and `npm test` runs them alongside the proofs.
 
 ### Deferred Judgments (MAINT)
 
@@ -536,7 +536,9 @@ so they are scheduled rather than remembered. All are T3 — none blocks the v1 
       `fjs/document/1099int` and `fjs/form1040/core`. AGENTS.md's layering rule cited `ocr_amount`
       as its example and was repointed at `fjs/exact` in the same commit.
       `fjs/document/1099int/from_ocr`, `fjs/document/ocr_amount` and `fjs/document/subject` are
-      **unreachable from the running server** — an import graph from `index.js` never touches them,
+      **unreachable from the running server** *(pre-Phase-31 finding, kept as history: the
+      `from_ocr` and `ocr_amount` modules named here are the ones MAINT-01's resolution note above
+      deleted, and they no longer exist. Marked 2026-08-17.)* — an import graph from `index.js` never touches them,
       and a guest program cannot reach them either, since EXEC-07 forbids imports inside a stored
       program. Either an ingest tool is still planned and they are pre-built, or `todo/plan.md`'s
       Track B (the agent reads by vision, emits the dialect, stores via the already-registered
@@ -608,7 +610,7 @@ so they are scheduled rather than remembered. All are T3 — none blocks the v1 
       whose remedy is wrong is worse than no note.
 
       **Resolved 2026-08-17, claim verified against the upstream source first.**
-      `fjs/protocol/mcp/module.f.js:234` is `const [pr] = validate(initializeParams)(params)` and
+      `node_modules/functionalscript/fjs/protocol/mcp/module.f.js:234` is `const [pr] = validate(initializeParams)(params)` (an upstream file — there is no `fjs/protocol/` in this repository, and the path was written without the prefix until 2026-08-17) and
       line 235 compares `pr === 'error'` — so `pr` is the Result TAG and `pr.protocolVersion` is
       `undefined` on every input. The proposed comparison was not merely vacuous but
       unconditionally TRUE, i.e. a negotiation that rejects every client including a correct one.
@@ -653,11 +655,22 @@ so they are scheduled rather than remembered. All are T3 — none blocks the v1 
       is observable end to end. The helper itself must stay — `fjs/effects/node/virtual` genuinely
       cannot compose a write with an import in one session.
 
+      **Resolved (Phase 18).** The order now lives once, in `fjs/server/fjs_run/module.f.js`'s
+      shared `load → snapshot → interpret → classify` tail, documented there as "the ONLY
+      definition of its order". Only the *heads* diverge, deliberately and for the reason above.
+      This entry was ticked with no resolution note until 2026-08-17, so the stale description was
+      the only text under the tick — the same defect the requirement itself is about.
+
 - [x] **MAINT-08** *(T3)*: Remove or share the two small duplications a dead-code audit found: the
       `formRevision must not be empty` check written out byte-identically in
       `fjs/document/1099int` and `fjs/document/w2` (conspicuous because its sibling money-box rule
       *is* correctly shared via `moneyFieldError`), and `artifactSubject` in
       `fjs/document/subject`, which is the identity function with zero callers.
+
+      **Resolved (Phase 18).** The check is shared as `fjs/document/form_revision` — `grep -rn
+      'formRevision must not be empty' fjs/` hits that module and nothing else — and
+      `artifactSubject` is deleted, with `grep -rn artifactSubject fjs/` returning nothing.
+      Ticked with no resolution note until 2026-08-17.
 
 ---
 
@@ -665,18 +678,18 @@ so they are scheduled rather than remembered. All are T3 — none blocks the v1 
 
 **Opened 2026-08-15 by owner decision**, triggered by `.planning/PERSONA-COVERAGE.md`, which
 measured the engine against four taxpayers: a retiree, a non-profit employee, a FAANG engineer
-and a startup founder. One of the four is supported. One computes a *wrong* return. Two refuse.
+and a startup founder. At the time of that survey, one of the four was supported, one computed a *wrong* return, and two refused. **All four now compute** — see the v2 traceability table below. The present-tense sentence stood here until 2026-08-17, after every phase that fixed it had shipped.
 
 **These 25 requirements are counted separately from v1's 95** and do not move v1's completion
 figure. v1 remains what it always was: a 65+ TY2025 return with brokerage, dependents and
-itemizing, which is complete apart from the eight open MAINT items.
+itemizing, which is complete, the eight MAINT items included — MAINT-01 through MAINT-06 closed on 2026-08-17 and MAINT-07/08 in Phase 18. (This read "apart from the eight open MAINT items" until they were all closed.)
 
 > **Read the ordering constraint before planning any of this.** TAX-19 (computable tripwires)
 > comes first and is not negotiable. Every requirement below adds a form the engine will
 > compute, and each one that lands *without* TAX-19 widens the window in which the engine
 > answers confidently and wrongly. The survey's central finding is that declaration-driven
 > scoping cannot see a tax that triggers on a threshold from data the engine already holds —
-> so a $300k W-2 silently understates by ~$900 today. Adding forms before closing that is
+> so a $300k W-2 silently understated by ~$900 when this was written — TAX-19 and TAX-20 closed it, and the same ~$900 is now the asserted figure on Schedule 2 line 11. Adding forms before closing that is
 > building faster on the one foundation known to be cracked.
 
 ### The Product Path (EXEC, PROV)
@@ -776,8 +789,16 @@ itemizing, which is complete apart from the eight open MAINT items.
 
 - [x] **TAX-23** *(M2, T2)*: **Schedule 1 line 21**, student loan interest deduction, with its
       phase-out. Today a hard zero — the single largest silent overstatement for this persona.
+
+      **Delivered (Phase 24).** `fjs/schedule/1` line 21 computes from the `vnd.fjs.1098e`
+      dialect, with §221(b)(2)'s phase-out in `fjs/tax/params`. No longer a hard zero; this entry
+      carried no delivery note until 2026-08-17.
 - [x] **TAX-24** *(M2, T2)*: **Schedule 1 line 11**, educator expenses; **line 13**, HSA
       deduction (Form 8889). Both hard zeros today.
+
+      **Delivered (Phase 24).** `fjs/schedule/1` lines 11 and 13 both compute, line 13 through
+      `fjs/form8889`, both fed by `vnd.fjs.adjustments` (DOC-19). Neither is a hard zero; this
+      entry carried no delivery note until 2026-08-17.
 - [x] **TAX-25** *(M2, T2)*: **Form 8880**, the Saver's Credit → Schedule 3 line 4.
 - [x] **TAX-26** *(M2, T2)*: **Form 8863**, American Opportunity and Lifetime Learning credits
       → Schedule 3 line 3 and 1040 line 29.
@@ -869,6 +890,8 @@ itemizing, which is complete apart from the eight open MAINT items.
       sits over the documents and Forms 1099-R partition three ways, not two.
       Without it, after-tax IRA money is taxed twice. Also the piece that makes a backdoor Roth
       computable, which is why it serves the FAANG persona as much as the retiree.
+
+      *(**Phase 26 record, kept as history.** Where the text below says the box is unticked, Part II is refused, or a backdoor Roth is not computable, read the Phase 31 note above instead: Part II computes, Part III is decided by code, and a backdoor Roth computes end to end. Marked 2026-08-17, because a bolded "UNTICKED DELIBERATELY" against a `[x]` gives a reader no way to tell which wins.)*
 
       **UNTICKED DELIBERATELY: the first sentence ships and the second does not.** Phase 26
       built Form 8606 **Part I** in full — §408(d)(2)'s pro-rata rule over the **aggregated**
@@ -1190,7 +1213,7 @@ itemizing, which is complete apart from the eight open MAINT items.
       preferential worksheet — reachable only when 1040 line 15 is zero or less — because lines
       13, 15, 20 and 27's no-worksheet fallbacks are an untranscribed printed rule and a wrong
       zero there would OVERSTATE the tax. Every Form 2555 clause on the page is structurally
-      unreachable (`foreignEarnedIncomeForm2555` refuses at dispatch level 0). Fifteen §56/§57
+      unreachable (`foreignEarnedIncomeForm2555` refuses at dispatch level 0). **Fourteen** — this said *fifteen* until 2026-08-17, before line 2g's `amtPrivateActivityBondInterest` moved into `modeledKinds` when Form 1099-INT box 9 arrived — §56/§57
       adjustments on Part I are also refused, each by its own kind and each naming the document
       or election that would supply it.
 - [x] **TAX-34** *(M2, T2)*: **Form 8949 basis adjustment codes**, particularly code B for
@@ -1301,7 +1324,12 @@ itemizing, which is complete apart from the eight open MAINT items.
       Schedule E halves asserted EQUAL so that "the only difference is the entity type" is a
       checked claim rather than a description.
 
-      What does not: **Part III**, estates and trusts, which needs a Schedule K-1 (Form 1041) —
+      *(**Phase 30 record, kept as history.** Where the paragraph below says Part III is a
+      documented zero and no third K-1 was built, read this entry's own header instead: the
+      `vnd.fjs.k1_1041` dialect and Schedule E Part III shipped afterwards, and columns (d) and (f)
+      carry real readings. Marked 2026-08-17.)*
+
+      What did not, at the time: **Part III**, estates and trusts, which needs a Schedule K-1 (Form 1041) —
       a THIRD Schedule K-1 with its own box numbering again, where a beneficiary's box 5 is other
       portfolio income and a partner's box 5 is interest. This phase built the two dialects
       DOC-24 asked for and deliberately did not guess a third from them, because guessing a box
