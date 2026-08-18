@@ -601,11 +601,14 @@ export const proof = {
     // "over $501,050 but not over $751,600", 35% x 700,000.00 -
     // 60,905.50 (p80).
     //
-    // That $184,094.50 is the one value in this phase sensitive to
+    // That $184,094.50 was the one value in this phase sensitive to
     // 10-RESEARCH.md's assumption A2 — whether the Tax Computation
-    // Worksheet rounds to whole dollars. Plan 10-03 decided cent-exact
-    // and `fjs/tax/table` pins the same figure; if Phase 14's acceptance
-    // against a real filed return disagrees, this is the leaf that moves.
+    // Worksheet rounds to whole dollars. Plan 10-03 decided cent-exact.
+    // **A2 was RESOLVED on 2026-08-17 and the decision was right**: the
+    // worksheet's own printed subtraction amounts carry cents, so the form
+    // has no whole-dollar reading to offer. It did not need a filed return,
+    // only the page it was already citing. See `fjs/tax/table`'s
+    // `taxComputationWorksheet` docstring for the full evidence.
     allThreePreferentialRatesWithBothBaseLookupsInOneExecution: () => {
         /** @type {QdcgtInput} */
         const allRates = {

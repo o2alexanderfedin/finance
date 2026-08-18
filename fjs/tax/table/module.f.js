@@ -272,12 +272,25 @@ export const lookupTaxTable = taxParamSet => incomeCents => {
  * once over the whole report by `applyWholeDollarElection` — a property
  * of the return, not of this worksheet.
  *
- * Residual uncertainty, recorded honestly: 10-RESEARCH.md's assumption A2
- * notes the IRS states no TCW-specific rounding rule, so the above
- * follows the general p23 rule. Phase 14's acceptance against the user's
- * own filed return is what resolves it. The leaf that would move if A2
- * turns out wrong is the MFJ $700,000.00 one in this module's `proof`,
- * whose exact answer ends in `.50`.
+ * **Assumption A2 is RESOLVED — 2026-08-17, from the printed page, and it
+ * never needed a filed return.** 10-RESEARCH.md recorded a residual
+ * uncertainty here on the grounds that "the IRS states no TCW-specific
+ * rounding rule", routing the question to Phase 14's acceptance against the
+ * user's own return. That was the wrong place to look. The worksheet settles
+ * it structurally: **its own printed subtraction amounts carry cents.**
+ * Pub. 1040 (2025) p14-15 prints `$60,905.50` for the MFJ 35% row,
+ * `$75,937.50` for MFJ 37%, and `$30,452.75`, `$42,979.75` and `$37,968.75`
+ * for three more. A worksheet that rounded to whole dollars could not print
+ * a quarter of a dollar in the constant a filer subtracts, so cent
+ * precision is a property of the form's own design, not an inference from
+ * the general p23 rule.
+ *
+ * The pinned figure follows directly: 35% x $700,000.00 - $60,905.50 =
+ * **$184,094.50**, the exact value this module's `proof` asserts. All twenty
+ * rows in {@link taxComputationWorksheetRows} were re-verified against that
+ * printed page the same day, with zero mismatches, and Section B's own
+ * heading -- "Married filing jointly **or Qualifying surviving spouse**" --
+ * is what `taxTableColumnFor.qualifyingSurvivingSpouse` mirrors.
  * @type {(brackets: readonly Bracket[]) => (incomeCents: bigint) => bigint}
  */
 export const taxComputationWorksheet = brackets => incomeCents => {
@@ -749,8 +762,15 @@ export const proof = {
     //   HoH  $626,350.00: 37% x 626,350.00 - 44,718.00 = $187,031.50
     // Both end in a half dollar, which is the point: rounding this
     // worksheet to whole dollars the way the printed TABLE rounds its
-    // rows would move both by fifty cents. This is the leaf that would
-    // move if 10-RESEARCH.md's assumption A2 turns out wrong.
+    // rows would move both by fifty cents.
+    //
+    // This was recorded for months as "the leaf that would move if
+    // 10-RESEARCH.md's assumption A2 turns out wrong". A2 was RESOLVED on
+    // 2026-08-17 against Pub. 1040 (2025) p14-15, and this leaf does not
+    // move: the worksheet's own printed SUBTRACTION AMOUNTS carry cents
+    // ($60,905.50 here, and $30,452.75 / $42,979.75 / $37,968.75 elsewhere
+    // in the same table), so a whole-dollar reading is not available to the
+    // form. See this module's `taxComputationWorksheet` docstring.
     taxComputationWorksheetKeepsCentsAndNeverRoundsToWholeDollars: () => {
         const mfjAtSevenHundredThousand =
             taxComputationWorksheet(taxParams2025.ordinaryBrackets.marriedFilingJointly.brackets)(70000000n)
