@@ -1,7 +1,7 @@
 ---
 phase: 10-form-1040-core-line-16-dispatch-and-the-scope-guard
 verified: 2026-08-07T01:03:21Z
-status: human_needed
+status: passed
 score: 5/5 must-haves verified
 verdict: PASS — with one coverage WARNING and one open human-verification item (F-01 and F-02 closed 2026-08-09)
 overrides_applied: 0
@@ -54,6 +54,15 @@ human_verification:
   - test: "Confirm 10-RESEARCH.md assumption A2 — that the Tax Computation Worksheet is cent-exact rather than whole-dollar — against a real filed return."
     expected: "$184,094.50 for MFJ at $700,000.00 of taxable income (the one figure in the phase sensitive to A2)."
     why_human: "The IRS states no TCW-specific rounding rule. Both fjs/tax/table and fjs/tax/line16/qdcgt pin this figure; Phase 14's acceptance is what resolves it. Recorded honestly at both sites."
+    result: passed
+    resolved: 2026-08-17
+    resolved_by: "RESOLVED FROM THE PRINTED PAGE, and it never needed a filed return -- the question was routed to Phase 14 because 'the IRS states no TCW-specific rounding rule', but the worksheet settles it structurally rather than by rule."
+    evidence:
+      - "Pub. 1040 (2025) p14-15, 2025 Tax Computation Worksheet -- Line 16, Section B (Married filing jointly or Qualifying surviving spouse), row 'Over $501,050 but not over $751,600': column (b) 'x 35% (0.35)', column (d) subtraction amount '$ 60,905.50'. The SUBTRACTION AMOUNT THE FILER IS TOLD TO SUBTRACT CARRIES CENTS."
+      - "Four more printed subtraction amounts carry non-zero cents, three of them a QUARTER of a dollar: Single 35% $30,452.75 and 37% $42,979.75; MFJ 37% $75,937.50; MFS 37% $37,968.75. A worksheet designed to produce whole dollars cannot print $.75 in its own constant, so cent precision is a property of the form, not an inference from the Form 1040 p23 general rounding rule."
+      - "The pinned figure follows directly: 35% x $700,000.00 - $60,905.50 = $184,094.50 exactly, which is what fjs/tax/table and fjs/tax/line16/qdcgt both assert."
+      - "Bonus check, same page: all TWENTY stored taxComputationWorksheetRows (4 filing statuses x 5 brackets) were compared against the printed Sections A-D -- income bounds, multiplication amounts and subtraction amounts -- with ZERO mismatches. Section B's printed heading covers 'Married filing jointly or Qualifying surviving spouse', which is exactly what taxTableColumnFor.qualifyingSurvivingSpouse mirrors, so the absence of QSS rows is correct and not a gap."
+    note: "10-RESEARCH.md's A2 asked whether the worksheet rounds. The answer was on the page it already cited. Phase 14 remains genuinely required for line-by-line acceptance against a real return -- this item simply was not one of the things that needed it."
 deferred:
   - truth: "The Schedule D Tax Worksheet branch computes rather than refuses"
     addressed_in: "Phase 12"
