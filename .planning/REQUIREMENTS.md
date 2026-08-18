@@ -505,7 +505,7 @@ test the thing that breaks."* It was a one-off; this section makes it a practice
       | | before | after |
       |---|---|---|
       | `npm test` | 8533 tests | **2242** (was recorded here as 4273 until 2026-08-17) |
-      | wall clock | ~60s (25–140 under load) | **~31s** |
+      | wall clock | ~60s (25–140 under load) | **5–31s, load-dependent** (four runs on 2026-08-17 with no code change between them gave 31s, 4.9s, 12.5s, 11.9s — the spread is three real-process tests, not the proofs) |
       | project-local proof leaves | 4048 raw vs 2024 unique | **2218, each printed once** |
 
       **Nothing is skipped** — every proof and every root test still runs, once. `sort -u` in the
@@ -562,7 +562,7 @@ so they are scheduled rather than remembered. All are T3 — none blocks the v1 
       recording it as an open item with the mechanism unknown: bare `node --test` was discovering
       the vendored `functionalscript` submodule's own `.ts` entry point, which re-scans the same
       working directory, so every finance proof was executed and printed twice. `npm test` is now
-      pinned to `node --test *.test.js` and the suite runs 2242 tests in ~31s. **The defect had
+      pinned to `node --test *.test.js` and the suite runs 2253 tests. **The defect had
       been recorded for months as a "double-counted *metric*, advisory, remedy: de-duplicate"** —
       it was double-*run*. A workaround that works removes all pressure to look at why it was
       needed, which is what made this the most expensive bug in the project.
