@@ -9,7 +9,12 @@
 // something a `.f.js` module's purity rule permits. `@ts-nocheck` disables
 // TYPE checking of this one file only.
 //
-// ── What this gate is (MAINT-02..MAINT-05, Phase 17) ──────────────────────
+// ── What this gate is ─────────────────────────────────────────────────────
+//
+// NOT a MAINT requirement. Phase 17 (PR #84) and Phase 18 (PR #87) both shipped
+// on 2026-08-17 and closed MAINT-02..MAINT-08 between them. This file is the
+// piece REQUIREMENTS.md asked for by name and that neither phase delivered:
+// a standing check rather than a one-time correction.
 //
 // `.planning/REQUIREMENTS.md` states every requirement TWICE: once as a
 // checkbox in its body (`- [x] **MAINT-07** ...`) and once as a row in a

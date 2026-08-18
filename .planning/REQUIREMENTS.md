@@ -1455,25 +1455,24 @@ them. Week 0 is research's addition in front of the plan's Week 1.
 > accumulated across Phases 3 through 12.1. Both were reconciled on that date (72 complete,
 > 21 pending, 93 total).
 >
-> Recompute rather than trusting either figure:
-> ```sh
-> # every row whose checkbox and Status disagree — must print nothing
-> for r in $(grep -oE '^- \[[ x]\] \*\*[A-Z]+-[0-9]+\*\*' .planning/REQUIREMENTS.md | grep -oE '[A-Z]+-[0-9]+'); do
->   cb=$(grep -oE "^- \[[ x]\] \*\*${r}\*\*" .planning/REQUIREMENTS.md | grep -oE '\[[ x]\]' | head -1)
->   tb=$(grep -E "^\| ${r} " .planning/REQUIREMENTS.md | awk -F'|' '{print $6}' | tr -d ' ')
->   { [ "$cb" = '[x]' ] && [ "$tb" != Complete ] && [ "$tb" != Done ]; } && echo "MISMATCH $r $cb $tb"
-> done
-> ```
-> **A second source of truth is safe only when something watches it drift.** Something now does:
-> `planning-truth-gate.test.js` at the repository root runs the comparison above on every
-> `npm test`, in both directions, plus the reverse (unticked body against a done Status) and the
-> tool- and dialect-count claims in every `.planning/*.md` against the code.
+> **Do not run the shell snippet that used to live here — it was wrong.** It compared every
+> requirement ID against the v1 table below and accepted only the two exact words `Complete` and
+> `Done`, so it printed **33 false mismatches**: 25 for the v2 requirements, which are traced in
+> their own differently-shaped table and have no row here at all, and 8 more for rows whose Status
+> is a sentence rather than a single word. A check that cries wolf 33 times gets ignored, which is
+> what happened — the five rows that were genuinely wrong sat inside that noise.
 >
-> **It found five rows on its first run** — MAINT-02 through MAINT-06, ticked `[x]` with dated
-> resolution notes while this table still read `Pending`. The snippet that would have caught them
-> was sitting in this file the whole time. *That* is the argument for a gate over a documented
-> command, and it is why the snippet is kept below: it is now the gate's specification, not its
-> substitute.
+> **The check is now a test, and the test is the specification:**
+>
+> ```sh
+> node --test planning-truth-gate.test.js     # 9 leaves; part of `npm test`
+> ```
+>
+> It compares the body checkboxes against BOTH traceability tables, in both directions, and
+> accepts the real Status vocabulary instead of two hard-coded words. It also compares the tool
+> and dialect counts claimed anywhere in `.planning/*.md` against the code. It found the five real
+> rows on its first run — MAINT-02 through MAINT-06, ticked `[x]` with dated resolution notes
+> while this table still read `Pending`.
 
 | REQ-ID | Tier | Phase | Milestone | Status |
 |--------|------|-------|-----------|--------|

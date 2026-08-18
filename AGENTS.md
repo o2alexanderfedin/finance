@@ -8,7 +8,12 @@
 
 - All source files live under [./fjs/](./fjs/) and are [FunctionalScript](https://github.com/functionalscript/functionalscript) files with an extension `.f.js`. The only exceptions are root-level entry points that are plain (impure) JS by necessity — keep this set as small as possible, currently:
   - [./index.js](./index.js), used to start the app,
-  - [./all.test.js](./all.test.js), used to initialize FunctionalScript Emergent Testing Framework.
+  - [./all.test.js](./all.test.js), used to initialize FunctionalScript Emergent Testing Framework,
+  - the root-level `*.test.js` gate and integration suites, which `npm test`'s `node --test *.test.js`
+    glob is what discovers. `ls *.js` is the live list; it is **ten** files today, not two, and this
+    bullet named only the first two until 2026-08-17 — long enough for an audit to read the set as
+    stray impure JS. Each states in its own header why it cannot be a `.f.js` proof: it reads the
+    filesystem, or spawns a real process, neither of which a pure module may do.
 - The files can be used as normal ESM files.
 - JSDoc comments are used for strong typing.
 - TypeScript is used to validate the typing without emitting.
@@ -53,7 +58,7 @@ facilitate Emergent Design sessions
 - `all.test.js` (root) registers every discovered `proof` with Node's test runner, so `node --test` (and thus `npm test`) picks it up automatically via Node's default `*.test.js` convention — no manual test registration or explicit path needed.
 - Add tests by adding/extending a `proof` export in the relevant `.f.js` file (see `node_modules/functionalscript/fjs/dev/proof.f.js` or `.../emergent_testing/example.f.js` for the pattern).
 - **Only run proofs through root discovery — `npm test`, or `node --test all.test.js`.** Emergent Testing registration happens when `all.test.js` is imported; it walks the project via `loadModuleMap` and registers every discovered `proof`. Any invocation that bypasses that reports a *fake pass*, not a failure, which is the dangerous direction:
-  - `node --test fjs` — Node resolves the bare directory to `fjs/index.js` and runs the whole app as one fake "test".
+  - `node --test fjs` — errors with `Cannot find module`, because there is no `fjs/index.js` (the entry point is `fjs/index.f.js`). A hard failure is the safe direction; this bullet described a fake pass that the layout no longer permits.
   - `node --test fjs/some/module.f.js` — targeting a source file by explicit path is **also** a fake pass. Node executes it as a plain script; no `proof` leaf runs. Verified by injecting a leaf that throws unconditionally: `npm test` reported `tests 8, pass 7, fail 1`, while `node --test fjs/server/module.f.js` reported `tests 1, pass 1, fail 0` on the identical file.
 
 ## Hard rules
@@ -124,12 +129,20 @@ fails the count even when the loop happily iterates one item fewer.
   only observing the side effect distinguishes them (Phase 6 learned this).
 - **A gate needs a control.** A proof that something is refused must be paired with one showing the
   legitimate case is not — otherwise a gate that refuses everything passes.
-- **Never gate a phase on `npm test`'s total.** It includes ~2,100 vendored submodule proofs and
-  moves with submodule state. Use `node --test 2>&1 | grep -c '^✔ import("./fjs/'`. A Phase 7 gate
-  of "total > 134" was already satisfied before that phase's first line was written.
+- **Never gate a phase on `npm test`'s total.** The rule stands; the reason given here was itself
+  stale. The total counts everything discovered outside `fjs/` — today ~30 root gate and
+  integration leaves — and historically moved with submodule state, which is where the "~2,100
+  vendored submodule proofs" figure came from. That figure was the pre-2026-08-17 double-run
+  inflation this file diagnoses below; the submodule is de-initialised and contributes zero now.
+  A Phase 7 gate of "total > 134" was already satisfied before that phase's first line was written.
+  Use **`npm test`**, never bare `node --test`, and count project-local leaves:
+  `npm test 2>&1 | grep -c '^✔ import("./fjs/'`. This line recommended the bare form until
+  2026-08-17, contradicting this file's own warning below and skipping the `tsc` gate `npm test`
+  runs first — so a count could be taken over a tree that does not typecheck.
 
-**Sweep for untested code rather than guessing at it.** Copy the repo (`cp -a . /tmp/sweep` — the
-`node_modules` symlink is absolute, so it still resolves), then mutate values, comparisons and
+**Sweep for untested code rather than guessing at it.** Copy the repo (`cp -a . /tmp/sweep` — `node_modules`
+is a real directory here, not a symlink, so the copy includes the whole dependency tree and is
+heavier than it looks), then mutate values, comparisons and
 returned shapes one at a time, reverting each. Every mutation that leaves the suite green is
 uncovered code. Two cautions learned by doing it: a copy shares the real repo's git directory, so
 never run a *writing* git command from inside one (`git checkout --` to revert is safe and operates
@@ -374,6 +387,8 @@ instead: a rule nobody reads while editing code prevents nothing.
 
 ## Commands
 
-- `npm test` — `tsc` (typecheck) then `node --test` (runs all FunctionalScript proofs via root `all.test.js`).
+- `npm test` — `tsc` (typecheck) then `node --test *.test.js`. **The glob is the pin, not a detail:** bare `node --test` also discovers the vendored submodule's own entry point and runs every proof twice (see the warning above).
+- `npm run test:proofs` — `tsc` then `node --test all.test.js`: the proof leaves alone.
+- `npm run test:integration` — the real-process subset (`fjs-run-integration.test.js`), also included in `npm test`.
 - `npm start` — runs the app via plain Node (`node index.js`).
 - `npm run fjs-start` — runs the app via the `fjs` CLI directly (`fjs r ./fjs/index.f.js`).

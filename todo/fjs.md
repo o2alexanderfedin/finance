@@ -115,7 +115,7 @@ Work items to land in FunctionalScript itself, driven by what `finance` needs.
    > construction, so whatever the heads happened to be is what gets recorded. Fine for a
    > local single user; worth naming as a limitation rather than discovering it.
 
-3. Big file uploader. The problem is that if we use MCP `cas_upload`, we burn tokens, also it has a limit for file size. We also need to provide big CAS files as MCP resources. Solutions:
+3. Big file uploader. The problem is that if we use MCP `cas_add`, we burn tokens, also it has a limit for file size. *(Named `cas_upload` here until 2026-08-17; no such tool has ever existed. Half of this item is already resolved: `cas_add` caps inline content at 128 KiB and its own description directs the caller to `npx functionalscript cas add <path>` for anything larger. Only the MCP-resources half is outstanding.)* We also need to provide big CAS files as MCP resources. Solutions:
    - CLI. Actually, we can just use `fjs cas add ...`
    - Local Web Server.
 
@@ -160,6 +160,14 @@ Work items to land in FunctionalScript itself, driven by what `finance` needs.
    Where a form needs finer precision than the default scale, fall back to a string:
    `{"interest": "3.45%"}`.
 
+   > **NOT ADOPTED — do not act on the paragraph below.** Corrected 2026-08-17. It was written
+   > as a live instruction ("**Both documents must be updated in the same change as this**") for
+   > a proposal that was never built: there is no type-aware JSON parser, and money in a stored
+   > JSON document is still a **string**, which AGENTS.md carries as a Hard Rule and every one of
+   > the twenty-six shipped dialects obeys. An agent following the instruction would have edited
+   > AGENTS.md and PROJECT.md to contradict the entire document layer. Kept, in its original
+   > tense, as the upstream proposal it is.
+   >
    > **This supersedes a settled decision.** `todo/plan.md` Week 1 step 5 and the PROJECT.md
    > requirement both say money fields must be JSON **strings**, "never JSON numbers",
    > because `fjs/media/json`'s value model types a number as rtti `Number` — a JS double —
