@@ -120,7 +120,11 @@ surface. **Only 2025 exists** — `finance_tax_params` with any other year refus
 
 ## Health
 
-- `npm test`: **2253 / 2253**, exit 0, **~31 seconds** (`tsc` runs first and is clean). Was 2242
+- `npm test`: **2253 / 2253**, exit 0 (`tsc` runs first and is clean). **Wall clock is 5-31s and
+  is not a stable figure** — measured 31s, 4.9s, 12.5s and 11.9s across four runs on 2026-08-17
+  with no code change between them. It is dominated by three tests that spawn real `node`
+  subprocesses (`EXEC-14/PROV-09` alone ranged 3.5s-29.3s), so it tracks machine load, not the
+  suite. The 2220 proof leaves are milliseconds each. Was 2242
   before the two standing gates below were added.
 - **2220 project-local proof leaves** — the only stable count:
   `npm test 2>&1 | grep -c '^✔ import("./fjs/'`
