@@ -1,9 +1,49 @@
 # Spec: the stakeholder showcase demo
 
-**Status:** BUILT — all eight steps plus the All view, 2026-08-06
-**Re-pinned:** `v0.12.0` @ `cfc4a12`, 629 proofs, 2026-08-08
+**Status:** BUILT — **ten** steps plus the All view; steps 8 (Personas) and 9
+(the Form 1040 face) added 2026-08-18
+**Re-pinned:** `v1.0.0` @ `66c0873`, **2220** project-local proofs, 2026-08-18
 **Written:** 2026-08-06
 **Concerns:** `demo/` (this directory's parent)
+
+> **EVERY FIGURE BELOW THIS LINE PREDATES THE v1.0.0 RE-PIN, and is left
+> standing rather than rewritten.** The document is a dated record of two
+> re-pinning exercises and of what each one caught; editing the numbers in
+> place would destroy the record while leaving the reasoning — which is the
+> part still worth reading — indistinguishable from a fresh measurement.
+>
+> What moved on 2026-08-18: the release is `v1.0.0` at `66c0873`, the proof
+> count is 2220 project-local (2253 total, which is not the same figure and
+> never goes on the badge), the served tool count is **13**, and **every link
+> now points at `github.com/o2alexanderfedin/finance`** — the public copy the
+> Pages workflow publishes from — rather than the private `fjs-dev/finance`.
+> That last one is the change the workflow's own warning demanded: a published
+> page whose `source ↗` links 404 has broken its central claim.
+>
+> Two boundaries this document tells the presenter to state out loud, under
+> "Three things to say out loud", are **no longer true** and must not be said:
+> `form1040Report` gained a production caller in Phase 21
+> (`tax-return-integration.test.js` drives a real 1040 through a real
+> `fjs_run` process), and the Schedule D Tax Worksheet branch computes as of
+> Plan 12.1-04. The sandbox boundary — the third — still stands exactly as
+> written.
+>
+> **The re-pinning procedure itself is unchanged and still the thing to run**,
+> including step 3's anchor check, which caught six silently-slid anchors last
+> time. On 2026-08-18 every `line`/`proofLine` anchor in every step footer was
+> re-resolved by hand against the pinned tree — **most had slid, several by
+> more than a thousand lines** — with one caution worth carrying forward:
+> `fjs/tax/{table,params}` and `fjs/tax/line16/qdcgt` have moved since `v1.0.0`
+> was cut, so their anchors were resolved with `git show 66c0873:<path>` and
+> **not** from the working tree. Resolving an anchor against the checkout you
+> happen to be sitting in is the way to write a wrong number while doing the
+> check.
+>
+> What was NOT re-run is the network half of step 3: no href was fetched from
+> this machine. Every cited path was confirmed to exist at `66c0873` with
+> `git cat-file -e`, and the tag was confirmed to exist on the public remote
+> with `git ls-remote --tags`, but a wrong `#L` anchor returns HTTP 200 and
+> only a human eye catches it.
 
 > **Re-pin, 2026-08-08 — and the anchor check earned its place.** Moving from
 > `v0.10.0` (492 proofs) to `v0.12.0` (629), after Phases 11 and 12 shipped.

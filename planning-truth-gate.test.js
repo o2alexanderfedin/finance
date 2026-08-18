@@ -131,6 +131,18 @@ const countedDocuments = () => [
     ...readdirSync(repoRoot)
         .filter(name => name.endsWith('.md'))
         .map(name => ({ name, text: readFileSync(join(repoRoot, name), 'utf8') })),
+    // `demo/` states the same counts to an AUDIENCE, which is the worst place
+    // for them to be wrong. It was not scanned until 2026-08-18, and that is
+    // precisely why "twelve tools" and "629 proofs" rotted there unnoticed
+    // while every .planning/ copy stayed current. Prose and code both: the
+    // step modules carry these numbers in comments and in rendered strings.
+    ...['demo', join('demo', 'steps'), join('demo', 'lib')].flatMap(dir =>
+        readdirSync(join(repoRoot, dir))
+            .filter(name => name.endsWith('.md') || name.endsWith('.js') || name.endsWith('.html'))
+            .map(name => ({
+                name: `${dir}/${name}`,
+                text: readFileSync(join(repoRoot, dir, name), 'utf8'),
+            }))),
 ]
 
 /**

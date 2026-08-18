@@ -279,7 +279,7 @@ export const render = root => {
 
     root.append(sourceFooter([
         { label: 'fjs/exec — interpret, the refusal message, and the step budget', path: 'fjs/exec/module.f.js', line: 158, proofLine: 183 },
-        { label: 'fjs/guest — the four-command vocabulary and its type assertion', path: 'fjs/guest/module.f.js', line: 120, proofLine: 207 },
+        { label: 'fjs/guest — the four-command vocabulary and its type assertion', path: 'fjs/guest/module.f.js', line: 139, proofLine: 207 },
         { label: 'fjs/guest/materialize — the import gate, and why it must run first', path: 'fjs/guest/materialize/module.f.js', line: 203, proofLine: 369 },
     ]))
 }

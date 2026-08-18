@@ -20,6 +20,8 @@ import * as refusal from './steps/04-refusal.js'
 import * as exactness from './steps/05-exactness.js'
 import * as parameters from './steps/06-parameters.js'
 import * as sandbox from './steps/07-sandbox.js'
+import * as personas from './steps/08-personas.js'
+import * as form1040 from './steps/09-form1040.js'
 
 /**
  * A step module's contract, in full. The shell knows this and nothing else
@@ -38,7 +40,10 @@ import * as sandbox from './steps/07-sandbox.js'
 /** Ship order. Every prefix of this list is a complete demo.
  * @type {readonly Step[]}
  */
-const steps = [about, documents, line16, theReturn, refusal, exactness, parameters, sandbox]
+const steps = [
+    about, documents, line16, theReturn, refusal, exactness, parameters, sandbox,
+    personas, form1040,
+]
 
 /** The "All" view is a step for routing purposes, with no module of its own. */
 const allId = 'all'
