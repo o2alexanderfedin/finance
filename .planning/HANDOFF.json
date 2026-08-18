@@ -20,9 +20,9 @@
       "git fetch -q origin",
       "test \"$(git rev-parse develop)\" = \"$(git rev-parse origin/develop)\"   # develop is pushed",
       "test \"$(git rev-parse main)\"    = \"$(git rev-parse origin/main)\"      # main is pushed",
-      "git merge-base --is-ancestor main develop                            # main is not ahead",
-      "test -z \"$(git diff main develop)\"                                    # same tree",
-      "git rev-parse -q --verify v1.0.0                                      # tag exists"
+      "git merge-base --is-ancestor develop main   # everything on develop is in main. NOT the reverse: main carries a --no-ff merge commit per release, so --is-ancestor main develop is false on a healthy repo.",
+      "test -z \"$(git diff main develop)\"          # identical trees -- this is the real equivalence check",
+      "git rev-parse -q --verify v1.0.0            # tag exists"
     ]
   },
   "suite": {
