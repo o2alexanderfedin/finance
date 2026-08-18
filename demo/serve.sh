@@ -25,7 +25,7 @@ port="${1:-8000}"
 repo="$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)"
 site="${TMPDIR:-/tmp}/finance-showcase-site"
 
-# `functionalscript` resolves from node_modules, which is where the 629 proofs
+# `functionalscript` resolves from node_modules, which is where the 2220 proofs
 # resolve it from too — the submodule at the repository root is deliberately
 # left alone, because entering it is a documented foot-gun in this project.
 if [ ! -d "$repo/node_modules/functionalscript" ]; then

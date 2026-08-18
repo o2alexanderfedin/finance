@@ -120,9 +120,9 @@ export const render = root => {
     }
 
     root.append(sourceFooter([
-        { label: 'fjs/document/w2 — the W-2 dialect and its validator', path: 'fjs/document/w2/module.f.js', line: 93, proofLine: 308 },
-        { label: 'fjs/document/1099int — the 1099-INT dialect and its validator', path: 'fjs/document/1099int/module.f.js', line: 69, proofLine: 220 },
-        { label: 'fjs/return/profile — the return profile dialect', path: 'fjs/return/profile/module.f.js', line: 167, proofLine: 469 },
+        { label: 'fjs/document/w2 — the W-2 dialect and its validator', path: 'fjs/document/w2/module.f.js', line: 111, proofLine: 327 },
+        { label: 'fjs/document/1099int — the 1099-INT dialect and its validator', path: 'fjs/document/1099int/module.f.js', line: 98, proofLine: 309 },
+        { label: 'fjs/return/profile — the return profile dialect', path: 'fjs/return/profile/module.f.js', line: 652, proofLine: 1199 },
         { label: 'fjs/exact — exact decimal parsing at the cents scale', path: 'fjs/exact/module.f.js', line: 34, proofLine: 70 },
     ]))
 }

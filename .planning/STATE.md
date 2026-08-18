@@ -1,17 +1,17 @@
 ---
 gsd_state_version: 1.0
-milestone: v2
-milestone_name: The Product Path and Four Personas
-status: released
-stopped_at: "v1.0.0 RELEASED, then a post-release truth pass on 2026-08-17: CAPABILITIES.md re-measured from a live server, this file's own Current Position corrected for the fifth time, and three real defects fixed — a comment in fjs/server contradicting its own import, two citations of a deleted todo note, and fjs/todo/tax-35-passthrough-routing.md reading NOT IMPLEMENTED after it shipped. 120/120 requirements. Six fjs/todo/ notes genuinely open, each with a tested reason and a recipe."
+milestone: v3
+milestone_name: File a Real Return
+status: in_progress
+stopped_at: "Milestone v3 opened 2026-08-17. Phase 14 was MOVED into it and REFRAMED: its acceptance criterion required a filed return, which is the artifact this system exists to produce -- circular, and unsatisfiable for its own owner. v3 replaces it with external ground truth that needs nothing from the taxpayer (TaxCalcBench 51 cases, a second-implementation cross-check) plus the thing nobody had noticed was missing -- there is no filable output at all; the engine returns cited numbers, not a form. Public copy published at o2alexanderfedin/finance by owner decision."
 last_updated: "2026-08-17T21:30:00.000Z"
 last_activity: 2026-08-17
 progress:
-  total_phases: 33
+  total_phases: 37
   completed_phases: 32
   total_plans: 89
   completed_plans: 85
-  percent: 100
+  percent: 86
 ---
 
 # Project State

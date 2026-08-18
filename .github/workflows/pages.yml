@@ -1,31 +1,46 @@
 # Publishes demo/ to GitHub Pages.
 #
 # ┌──────────────────────────────────────────────────────────────────────────┐
-# │ DO NOT RUN THIS WITHOUT A DELIBERATE DECISION TO PUBLISH THE ENGINE.      │
+# │ DECISION TAKEN BY THE OWNER, 2026-08-17: PUBLISH.                        │
 # │                                                                          │
+# │ The deferred decision recorded below was made. The published copy is     │
+# │ https://github.com/o2alexanderfedin/finance — a PUBLIC repository        │
+# │ holding the same history. `fjs-dev/finance` stays private, and the job   │
+# │ guard below means it can never publish by accident: both jobs run only   │
+# │ when `github.repository_owner` is `o2alexanderfedin`.                    │
+# │                                                                          │
+# │ The owner was shown, and accepted, both material facts before deciding:  │
+# │   - the history carries real dollar figures from their own IRS Wage and  │
+# │     Income Transcript ($4,554.00 and $454.00, the 1099-G that drove      │
+# │     Phase 20). No SSN, no scan and no binary was ever committed — that   │
+# │     was verified across the whole history, not assumed.                  │
+# │   - the repository carries 63 commits by a second author and has no      │
+# │     LICENSE file, so the default is all-rights-reserved. No license was  │
+# │     added unilaterally; that is the co-author's call to share.           │
+# └──────────────────────────────────────────────────────────────────────────┘
+#
+# ── The original warning, kept because its REASONING is still correct ──────
+#
+# ┌──────────────────────────────────────────────────────────────────────────┐
 # │ This repository is PRIVATE. The demo executes the engine IN THE BROWSER,  │
-# │ so the browser must download it: staging copies ~950 KB of `fjs/**` — 37  │
-# │ `.f.js` files — into a world-readable site. That is the engine source     │
-# │ verbatim, including its design-rationale comments (SEC-* identifiers,     │
-# │ REQUIREMENTS references, phase context, and the recorded accepted-risk    │
-# │ notes in `fjs/guest/materialize`).                                        │
+# │ so the browser must download it: staging copies `fjs/**` into a           │
+# │ world-readable site. That is the engine source verbatim, including its    │
+# │ design-rationale comments.                                                │
 # │                                                                          │
 # │ There is no configuration of this workflow that avoids that. A demo that  │
 # │ runs the real engine in a public page publishes the real engine. The only │
 # │ question is whether it happens on purpose.                               │
 # │                                                                          │
 # │ Related: every `source ↗` / `proof ↗` link the demo renders points at     │
-# │ github.com/fjs-dev/finance, which is private — those links 404 for any    │
-# │ viewer outside the org. Publishing the site without also resolving repo   │
-# │ visibility produces a public page whose central claim is broken.          │
+# │ github.com — publishing the site without also resolving repo visibility   │
+# │ produces a public page whose central claim is broken. RESOLVED: the demo  │
+# │ now links at the PUBLIC copy, so those links work for any viewer.         │
 # │                                                                          │
-# │ Status 2026-08-06: DEFERRED. The first showcase is being presented from   │
-# │ a laptop; whether any of this becomes public is an open decision.         │
+# │ Status 2026-08-06: DEFERRED.  →  Status 2026-08-17: TAKEN, see above.     │
 # └──────────────────────────────────────────────────────────────────────────┘
 #
-# MANUAL TRIGGER ONLY, deliberately, and it should stay that way until the
-# above is settled. Publishing is a decision for a person rather than a side
-# effect of a push.
+# Publishing now runs on every push to `main` in the PUBLIC repository, plus a
+# manual trigger. It was manual-only until the decision above was taken.
 #
 # GitHub Pages must also be enabled for the repository with "Source: GitHub
 # Actions" (Settings → Pages). Until it is, the deploy step fails and nothing
@@ -47,6 +62,8 @@
 name: Demo (GitHub Pages)
 
 on:
+  push:
+    branches: [ main ]
   workflow_dispatch:
 
 permissions:
@@ -61,6 +78,10 @@ concurrency:
 
 jobs:
   build:
+    # THE GUARD. Only the public copy publishes. `fjs-dev/finance` runs this
+    # file too -- it is the same commit -- and this is what stops it, rather
+    # than relying on its Pages simply never having been enabled.
+    if: github.repository_owner == 'o2alexanderfedin'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -101,6 +122,7 @@ jobs:
 
   deploy:
     needs: build
+    if: github.repository_owner == 'o2alexanderfedin'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
