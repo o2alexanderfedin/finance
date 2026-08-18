@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "timestamp": "2026-08-17T20:55:00.000Z",
+  "timestamp": "2026-08-17T21:30:00.000Z",
   "phase": "none",
   "phase_name": "milestone-v2-complete-v1.0.0-released",
   "phase_dir": null,
@@ -11,21 +11,28 @@
   "position_note": "All 120 requirements complete, v1.0.0 tagged and pushed. Nothing in flight, no open PRs, no stashes, one worktree, two branches.",
   "git": {
     "branch": "develop",
-    "head": "5f75fcd",
-    "main": "66c0873",
+    "note": "NO SHAs ARE RECORDED HERE ON PURPOSE. The previous version pinned develop=5f75fcd main=66c0873 and both were stale within the hour, because the commit that wrote them moved develop past them. Present-tense git claims are comparisons; run the verify commands.",
     "tag": "v1.0.0",
     "working_tree": "clean apart from the untracked type-level/ orphan from another session",
     "open_prs": 0,
     "worktrees": 1,
-    "verify": "git rev-parse --short develop origin/develop main origin/main   # 5f75fcd 5f75fcd 66c0873 66c0873"
+    "verify": [
+      "git fetch -q origin",
+      "test \"$(git rev-parse develop)\" = \"$(git rev-parse origin/develop)\"   # develop is pushed",
+      "test \"$(git rev-parse main)\"    = \"$(git rev-parse origin/main)\"      # main is pushed",
+      "git merge-base --is-ancestor main develop                            # main is not ahead",
+      "test -z \"$(git diff main develop)\"                                    # same tree",
+      "git rev-parse -q --verify v1.0.0                                      # tag exists"
+    ]
   },
   "suite": {
     "command": "npm test",
     "exit": 0,
+    "measured_on": "fd6702c, the v1.0.0 release point",
     "tests": "2242/2242",
     "project_local_proof_leaves": 2218,
     "tsc": "clean",
-    "gate_command": "npm test 2>&1 | grep -c '^\u2714 import(\"./fjs/'",
+    "gate_command": "npm test 2>&1 | grep -c '^✔ import(\"./fjs/'",
     "warning": "NEVER gate on npm test's total (AGENTS.md line 127) -- it includes ~2100 vendored submodule proofs and moves with submodule state. The submodule is deliberately de-initialised."
   },
   "remaining_tasks": [
@@ -46,7 +53,7 @@
     },
     {
       "id": 4,
-      "name": "Three upstream fjs notes re-verified still open against 0.45.0",
+      "name": "Three upstream fjs notes re-verified still open against 0.45.0: upstream-mcp-protocol-version-negotiation, upstream-node-spawn-effect, upstream-total-match-dispatch",
       "status": "open"
     }
   ],
@@ -75,6 +82,6 @@
     }
   ],
   "uncommitted_files": [],
-  "next_action": "Nothing required. The milestone is closed and released. If work resumes, the four fjs/todo/ notes are the candidate list; each carries its own recipe and retirement condition.",
+  "next_action": "Nothing required. The milestone is closed and released. If work resumes, the SIX open fjs/todo/ notes are the candidate list (fjs/todo/ holds nine files; three are satisfied specs kept in their original present tense, each with a corrected status line). Phase 17, the Documentation Truth Pass, is the one piece of v1 debt with a demonstrated cost: it never ran, and a defect Phase 18 deferred to it was rediscovered independently months later.",
   "context_notes": "Two failures in this session are worth more than the features. FIRST: `git push` reported success while doing nothing, three times, because an agent run un-isolated in the main checkout left HEAD on its own branch -- caught only because main's TEST COUNT came back 2185 instead of 2242, not by checking a ref. SECOND: the proof suite had been running TWICE for months, recorded as a 'double-counted metric, severity advisory, remedy: de-duplicate'; it was double-RUN, ~53s per invocation, and the documented workaround is exactly why nobody looked again. A workaround that works is the most expensive kind of bug. The through-line across eleven occurrences this session: only a COMPARISON stops a count from drifting -- naming the hazard in a comment failed three separate times, while the two gates added (theHandTypedListNamesEveryModeledKind, dialect_parity) each caught a real omission within a day."
 }

@@ -1,9 +1,21 @@
 # TAX-35, routing half — verified scout, not yet implemented
 
-Status: **NOT IMPLEMENTED.** This file records what was *verified against the code* by a session
-that ran out of context before writing the routing. Everything below was checked by reading the
-named line, not carried over from a handoff. Where something was only read and not executed, it
-says so.
+Status: **IMPLEMENTED.** Corrected 2026-08-17; this line read *"NOT IMPLEMENTED"* after the
+routing had already shipped. TAX-35 is closed in `.planning/REQUIREMENTS.md`, and the sixteen
+boxes this file mapped are routed in `fjs/form1040/core` — `k1_1065.box5InterestIncome` to 1040
+line 2b, `box6a`/`box6b`/`box6c` to lines 3b/3a, and the 1120-S and 1041 faces at their own box
+numbers. Verify by grepping `k1_1065.box` in `fjs/form1040/core/module.f.js`, not by trusting
+this line.
+
+**The body below is kept in the present tense it was written in**, exactly as
+`tax-27-earned-income-credit.md` is. It was a scout's map, every entry checked by reading the
+named line; the implementation followed it rather than correcting it. A spec rewritten into the
+past tense once it is satisfied stops being checkable against the thing that satisfied it.
+
+The original status line, for the record: *"This file records what was verified against the code
+by a session that ran out of context before writing the routing. Everything below was checked by
+reading the named line, not carried over from a handoff. Where something was only read and not
+executed, it says so."*
 
 The point of the file is that the next session does not have to re-derive the box map or the leaf
 arithmetic, which is where most of the budget went.

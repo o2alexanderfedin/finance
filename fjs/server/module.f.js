@@ -321,13 +321,20 @@ const runSession = () => {
  * about their shape until a schema says so. `decode` below is how a leaf
  * says so.
  *
- * `JSON.parse` is used directly rather than `fjs/media/json`'s `parse`
- * because at fjs 0.41.0 the latter is literally `export const parse =
- * JSON.parse` — the same function under another name, so importing it would
- * be a rename dressed as a fix. Upstream is splitting that export into a
- * total, tokenizer-backed `parse` returning a `Result` and a deprecated
- * `parseNative` (functionalscript#1430); when that lands, this is the one
- * line to revisit. Recorded in `fjs/todo/upstream-json-parse-split.md`.
+ * **Parsing goes through `fjs/json`'s total `parse`** (imported above as
+ * `jsonParse`), not the host's `JSON.parse`. It returns
+ * `Result<Unknown, string>` rather than throwing a `SyntaxError`, which is
+ * what makes it usable here at all: a `.f.js` module has no `try`
+ * (AGENTS.md §Testing).
+ *
+ * This paragraph read the opposite until 2026-08-17 — it said `JSON.parse`
+ * was used directly because upstream's `parse` was an alias for it at fjs
+ * 0.41.0, and named functionalscript#1430 as the fix to wait for. **The fix
+ * landed in 0.43.1, the import above was migrated, and the comment was
+ * not.** It also cited `fjs/todo/upstream-json-parse-split.md`, retired and
+ * deleted in `c1441e1` for the same reason. A comment stating the opposite
+ * of the line beneath it survives every test in the suite; only reading the
+ * import catches it.
  * @type {(state: State) => readonly Unknown[]}
  */
 const responsesOf = state => state.stdout
