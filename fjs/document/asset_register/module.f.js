@@ -739,6 +739,35 @@ export const priorYearServer = /** @type {RegisteredAsset} */ ({
     specialDepreciationAllowanceClaimed: '16000.00',
 })
 
+
+/**
+ * The disposal block every leaf below varies one field of: acquired 14
+ * February 2023, sold 3 November 2025 for $4,250.75 with $125.00 of selling
+ * expense. **Every field is distinctive** — a different month on each side of
+ * the sale, a price whose cents are non-zero, and an expense that is not a
+ * round hundred — so a helper reading one field for another produces a visibly
+ * wrong number rather than a plausible one.
+ */
+const soldDisposal = /** @type {const} */ ({
+    dateAcquired: '2023-02-14',
+    dateSold: '2025-11-03',
+    grossSalesPrice: '4250.75',
+    expenseOfSale: '125.00',
+})
+
+/** {@link priorYearServer} without its §168(k) allowance, sold during the year. @type {RegisteredAsset} */
+const soldServer = {
+    description: 'rack server',
+    datePlacedInService: '2023-03',
+    costOrOtherBasis: '20000.00',
+    businessUsePercentage: '100.00',
+    classification: 'fiveYear',
+    method: '200DB',
+    convention: 'HY',
+    section168kStatus: 'electedOut',
+    disposal: soldDisposal,
+}
+
 /** Rebuilds `minimalAssetRegister` around one asset. @type {(asset: RegisteredAsset) => AssetRegister} */
 const withAsset = asset => ({ ...minimalAssetRegister, assets: [asset] })
 
@@ -921,6 +950,166 @@ export const proof = {
         overPreciseBusinessUseIsRefused: () => {
             assert(expectRefusal(validate(withAsset({ ...officeFurniture, businessUsePercentage: '33.333' })))
                 .includes('two decimal places'), 'three decimals')
+        },
+    },
+    disposal: {
+        // THE CONTROL FIRST, because every refusal below is a departure from
+        // it: an ordinary sale of an asset the register already holds
+        // validates, and the four facts travel out of the dialect as the
+        // `bigint`s and `number`s `fjs/form4797` takes.
+        anOrdinaryDisposalValidatesAndTravels: () => {
+            const [t, v] = validate(withAsset(soldServer))
+            assert(t === 'ok', ['expected ok', t, v])
+            const [asset] = depreciableAssets(v)
+            assert(asset !== undefined, 'expected one extracted asset')
+            if (asset === undefined) { return }
+            const disposal = asset.disposal
+            assert(disposal !== undefined, ['the disposal must travel out of the dialect', asset])
+            if (disposal === undefined) { return }
+            assertEq(disposal.acquiredDate, '2023-02-14')
+            assertEq(disposal.soldDate, '2025-11-03')
+            // The month and the year are split out because Step 3's disposal
+            // decimal reads the MONTH and the recovery year reads the YEAR;
+            // both are asserted, because a helper that read one for the other
+            // would still produce plausible numbers.
+            assertEq(disposal.soldYear, 2025)
+            assertEq(disposal.soldMonth, 11)
+            assertEq(disposal.grossSalesPriceCents, 425075n, '$4,250.75')
+            assertEq(disposal.expenseOfSaleCents, 12500n, '$125.00')
+        },
+        // An asset with no disposal carries `undefined` rather than a
+        // zero-valued block — the distinction printed Form 4797 turns on.
+        anAssetStillHeldCarriesNoDisposal: () => {
+            const [t, v] = validate(withAsset(priorYearServer))
+            assert(t === 'ok', ['expected ok', t, v])
+            const [asset] = depreciableAssets(v)
+            assert(asset !== undefined, 'expected one extracted asset')
+            if (asset === undefined) { return }
+            assertEq(asset.disposal, undefined)
+        },
+        // The register asserts nothing was disposed of AND records a disposal.
+        // Nothing in the document says which is the mistake.
+        aDisposalBesideTheCertificationIsRefused: () => {
+            const message = expectRefusal(validate({
+                ...withAsset(soldServer),
+                noDepreciablePropertyDisposedOfDuringTheYear: true,
+            }))
+            assert(message.includes('contradict'),
+                ['the refusal must say the two disagree', message])
+            assert(message.includes('noDepreciablePropertyDisposedOfDuringTheYear'),
+                ['and name the certification', message])
+        },
+        // Form 4797 lines 2 and 19 print columns (b) and (c) as "(mo., day,
+        // yr.)" and the DAY decides which printed Part the disposal lands in,
+        // so a `YYYY-MM` here is refused rather than read as the first of the
+        // month.
+        aMonthAndYearWithNoDayIsRefused: () => {
+            const message = expectRefusal(validate(withAsset({
+                ...soldServer, disposal: { ...soldDisposal, dateSold: '2025-11' },
+            })))
+            assert(message.includes('YYYY-MM-DD'), ['the refusal must name the shape', message])
+            assert(message.includes('holding period'),
+                ['and say what the day decides', message])
+        },
+        // A day the month does not have. Only the ORDER of these dates is ever
+        // used, so `2025-02-30` would sort correctly and produce a plausible
+        // answer — which is exactly why it is checked.
+        aDayTheMonthDoesNotHaveIsRefused: () => {
+            const message = expectRefusal(validate(withAsset({
+                ...soldServer, disposal: { ...soldDisposal, dateSold: '2025-02-30' },
+            })))
+            assert(message.includes('28 days'),
+                ['the refusal must say how many days the month has', message])
+        },
+        // THE CONTROL FOR THE LEAP RULE, in both directions: 2024 has a 29th
+        // of February and 2025 does not. A `daysInMonth` that returned 28 or
+        // 29 unconditionally would pass one of these two and fail the other.
+        theLeapDayIsAcceptedInALeapYearAndRefusedOtherwise: () => {
+            assertEq(validate(withAsset({
+                ...soldServer,
+                datePlacedInService: '2023-02',
+                disposal: { ...soldDisposal, dateAcquired: '2024-02-29' },
+            }))[0], 'error', 'acquired after placed in service')
+            assertEq(validate({
+                ...minimalAssetRegister,
+                taxYear: 2024,
+                assets: [{
+                    ...soldServer,
+                    // Placed in service in March 2024 rather than March 2023,
+                    // because the acquisition cannot precede the service date
+                    // and the leaf above already checks that rule.
+                    datePlacedInService: '2024-03',
+                    disposal: { ...soldDisposal, dateAcquired: '2024-02-29', dateSold: '2024-12-01' },
+                }],
+            })[0], 'ok', '2024 HAS a 29th of February')
+            assert(expectRefusal(validate(withAsset({
+                ...soldServer,
+                disposal: { ...soldDisposal, dateSold: '2025-02-29' },
+            }))).includes('28 days'), '2025 does not')
+        },
+        // One register is one business for ONE year, and Form 4797 reports
+        // that year's dispositions: a sale in another year belongs on that
+        // year's return, where its §1231 character is decided against that
+        // year's other dispositions.
+        aSaleOutsideTheRegistersTaxYearIsRefused: () => {
+            const message = expectRefusal(validate(withAsset({
+                ...soldServer, disposal: { ...soldDisposal, dateSold: '2024-11-03' },
+            })))
+            assert(message.includes('2025'), ['the refusal must quote the register’s year', message])
+            assert(message.includes('§1231'),
+                ['and say why the year matters', message])
+        },
+        // Acquiring an asset AFTER placing it in service is not a thing that
+        // can happen. The reverse — bought in December, put to work in
+        // January — is the ORDINARY case and must not be refused, which is
+        // the second half of this leaf.
+        acquisitionAfterPlacingInServiceIsRefusedAndBeforeIsNot: () => {
+            const message = expectRefusal(validate(withAsset({
+                ...soldServer, disposal: { ...soldDisposal, dateAcquired: '2023-04-01' },
+            })))
+            assert(message.includes('Date acquired'),
+                ['the refusal must name the printed column', message])
+            // THE CONTROL: acquired in the month BEFORE, and in the same
+            // month, both validate.
+            assertEq(validate(withAsset({
+                ...soldServer, disposal: { ...soldDisposal, dateAcquired: '2023-02-28' },
+            }))[0], 'ok', 'the same month is fine')
+            assertEq(validate(withAsset({
+                ...soldServer, disposal: { ...soldDisposal, dateAcquired: '2022-12-30' },
+            }))[0], 'ok', 'and an earlier one is the ordinary case')
+        },
+        // Selling in a month before the one it was placed in service in would
+        // take a fraction of a recovery year that had not begun.
+        aSaleBeforeThePlacedInServiceMonthIsRefused: () => {
+            const message = expectRefusal(validate(withAsset({
+                ...soldServer,
+                datePlacedInService: '2025-06',
+                disposal: {
+                    ...soldDisposal, dateAcquired: '2025-05-01', dateSold: '2025-04-30',
+                },
+            })))
+            assert(message.includes('Step 3'),
+                ['the refusal must name the decimal it would take', message])
+        },
+        // A negative expense of sale would INCREASE the gain line 25a
+        // recaptures as ordinary income; a negative price is not a price.
+        negativeDisposalMoneyIsRefused: () => {
+            assert(expectRefusal(validate(withAsset({
+                ...soldServer, disposal: { ...soldDisposal, grossSalesPrice: '-1.00' },
+            }))).includes('negative'), 'a negative price')
+            assert(expectRefusal(validate(withAsset({
+                ...soldServer, disposal: { ...soldDisposal, expenseOfSale: '-1.00' },
+            }))).includes('INCREASE'),
+                'a negative expense, and the refusal must name the direction')
+        },
+        // THE CONTROL: a sale that realized NOTHING is 0.00 and is accepted —
+        // an abandoned machine is a real disposal, and refusing it would send
+        // the taxpayer looking for a price that does not exist.
+        aSaleForNothingIsAccepted: () => {
+            assertEq(validate(withAsset({
+                ...soldServer,
+                disposal: { ...soldDisposal, grossSalesPrice: '0.00', expenseOfSale: '0.00' },
+            }))[0], 'ok')
         },
     },
     sectionOneSixtyEightK: {

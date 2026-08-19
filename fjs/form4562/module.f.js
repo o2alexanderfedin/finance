@@ -1079,6 +1079,117 @@ export const proof = {
             ])))
             assertEq(lines.line22, 714500n, '14.29% of $50,000.00')
         },
+        /**
+         * **The disposal certification is NARROWED, and this leaf is the
+         * narrowing.** A register that RECORDS a disposal computes without it
+         * — that is what `fjs/form4797` is for — and the same register with
+         * neither the block nor the certification still refuses.
+         *
+         * ```
+         *   $5,000.00 of 5-year property placed in service March 2022, sold
+         *   in September 2025. Table A-1: 20.00 32.00 19.20 11.52
+         *   recovery year 4, sold, half-year: 11.52% x 500,000 x 0.5 = 28,800
+         * ```
+         *
+         * The deduction is HALF what an asset still held would take, which is
+         * the second half of the claim: printed line 17 is $288.00 rather
+         * than $576.00.
+         */
+        aRecordedDisposalReplacesTheCertification: () => {
+            /** @type {DepreciableAsset} */
+            const sold = {
+                ...bareAsset,
+                description: 'sold machine',
+                placedInServiceYear: 2022,
+                placedInServiceMonth: 3,
+                classification: 'fiveYear',
+                costOrOtherBasisCents: 500000n,
+                disposal: {
+                    acquiredDate: '2022-02-20',
+                    soldDate: '2025-09-15',
+                    soldYear: 2025,
+                    soldMonth: 9,
+                    grossSalesPriceCents: 100000n,
+                    expenseOfSaleCents: 0n,
+                },
+            }
+            const lines = expectLines(formFortyFiveSixtyTwo({
+                ...registerOf([sold]),
+                noDepreciablePropertyDisposedOfDuringTheYear: false,
+            }))
+            assertEq(lines.line17, 28800n, 'HALF of 11.52% of $5,000.00 — i4562 Step 3')
+            // THE CONTROL, in both directions. The same asset still held
+            // takes the WHOLE year, and the same register with neither the
+            // disposal nor the certification refuses.
+            const stillHeld = expectLines(formFortyFiveSixtyTwo({
+                ...registerOf([{ ...sold, disposal: undefined }]),
+                noDepreciablePropertyDisposedOfDuringTheYear: true,
+            }))
+            assertEq(stillHeld.line17, 57600n, 'the whole 11.52%')
+            const neither = expectRefusal(formFortyFiveSixtyTwo({
+                ...registerOf([{ ...sold, disposal: undefined }]),
+                noDepreciablePropertyDisposedOfDuringTheYear: false,
+            }))
+            assert(neither.includes('records no disposal'),
+                ['the refusal must say what is missing', neither])
+        },
+        /**
+         * **An asset placed in service AND disposed of in the same tax year
+         * refuses**, and this leaf exists because a mutation disabling it
+         * survived the whole suite: no fixture anywhere held such an asset.
+         *
+         * i4562 p11 says two things about it and this engine will not guess at
+         * either across the conventions the page does not cover — the property
+         * is struck from the mid-quarter aggregate, and *"no depreciation is
+         * allowed under this convention"*, a sentence printed for the
+         * mid-quarter convention and for no other.
+         */
+        anAssetBoughtAndSoldInsideOneYearRefuses: () => {
+            /** @type {DepreciableAsset} */
+            const sameYear = {
+                ...bareAsset,
+                description: 'short-lived machine',
+                placedInServiceYear: 2025,
+                placedInServiceMonth: 3,
+                classification: 'fiveYear',
+                costOrOtherBasisCents: 500000n,
+                disposal: {
+                    acquiredDate: '2025-02-20',
+                    soldDate: '2025-11-15',
+                    soldYear: 2025,
+                    soldMonth: 11,
+                    grossSalesPriceCents: 100000n,
+                    expenseOfSaleCents: 0n,
+                },
+            }
+            const message = expectRefusal(formFortyFiveSixtyTwo(registerOf([sameYear])))
+            assert(message.includes('short-lived machine'),
+                ['the refusal must name the asset', message])
+            assert(message.includes('mid-quarter'),
+                ['and the aggregate it would distort', message])
+            assert(message.includes('no depreciation is allowed'),
+                ['and quote the printed rule it will not extend', message])
+            assert(message.includes('OVERSTATES'),
+                ['and name the direction of the error', message])
+            // THE CONTROL, one year either side: the same asset placed in
+            // service a year earlier computes, and so does the same asset
+            // sold a year later. A check that refused every disposal would
+            // pass the assertions above.
+            assertEq(
+                expectLines(formFortyFiveSixtyTwo(registerOf([
+                    { ...sameYear, placedInServiceYear: 2024 },
+                ]))).line17,
+                80000n,
+                'placed in service in 2024, sold in November: HALF of 32.00% of $5,000.00')
+            const soldNextYear = { ...sameYear, disposal: undefined }
+            assertEq(
+                expectLines(formFortyFiveSixtyTwo({
+                    ...registerOf([soldNextYear]),
+                    noDepreciablePropertyDisposedOfDuringTheYear: true,
+                })).line19.b,
+                100000n,
+                'and still held: the whole 20.00% of $5,000.00')
+        },
         theThreeCertificationsEachRefuseByName: () => {
             const carryover = expectRefusal(formFortyFiveSixtyTwo(
                 { ...emptyRegister, priorYearSection179CarryoverIsZero: false }))
