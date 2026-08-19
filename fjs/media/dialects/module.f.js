@@ -229,12 +229,17 @@ import {
     rentalPropertySchema,
     checkReferences as checkRentalProperty,
 } from '../../document/rental_property/module.f.js'
+import {
+    dialect as farmDialect,
+    farmSchema,
+    checkReferences as checkFarm,
+} from '../../document/farm/module.f.js'
 
 /** @import { DialectEntry } from 'functionalscript/fjs/media/types.js' */
 
 /**
  * Every one of this repo's own dialects, registered for {@link detect}: the
- * thirty local finance document/return/run dialects wrapped via
+ * thirty-one local finance document/return/run dialects wrapped via
  * {@link dialectEntry}, plus upstream's own {@link revisionDialect} reused
  * unchanged. See this module's own docstring for why `ocr` is the one entry
  * with no `extraValidate` second argument.
@@ -291,6 +296,11 @@ export const financeDialects = [
     // Part I into printed line 26 -- `fjs/server/dialect_parity` is what would
     // otherwise catch one of the two being forgotten.
     dialectEntry(rentalPropertySchema, v => checkRentalProperty(v)[0] === 'ok'),
+    // `vnd.fjs.farm`, registered here and in `fjs/server/finance_schema` in the
+    // SAME commit that wires Schedule F line 34 into Schedule 1 line 6 --
+    // `fjs/server/dialect_parity` is what would otherwise catch one of the two
+    // being forgotten.
+    dialectEntry(farmSchema, v => checkFarm(v)[0] === 'ok'),
     revisionDialect,
 ]
 
@@ -306,7 +316,7 @@ export const detectFinance = detect(financeDialects)
 
 /**
  * Independently hand-typed: the number of entries {@link financeDialects}
- * is expected to carry today — THIRTY local dialects plus
+ * is expected to carry today — THIRTY-ONE local dialects plus
  * {@link revisionDialect}, which is upstream's. Deliberately NOT derived from
  * `financeDialects.length` itself (AGENTS.md's hand-typed-count idiom,
  * mirroring `fjs/document/1099b`'s `expectedMoneyBoxFieldCount`): a dialect
@@ -317,7 +327,7 @@ export const detectFinance = detect(financeDialects)
  * collection shrinking").
  * @type {number}
  */
-const expectedDialectCount = 31
+const expectedDialectCount = 32
 
 /** A sample cbase32 hash — {@link revisionDialect}'s own `snapshot`/`parents` shape needs a decodable one; the value itself is arbitrary. */
 const revisionSampleHash = vecToCBase32(vec8(0x77n))
@@ -606,6 +616,21 @@ const fixtures = {
         fairRentalDays: 365,
         personalUseDays: 0,
         rentsReceived: '24000.00',
+        entries: [],
+    },
+    // `vnd.fjs.farm`. Printed lines A, C, E and 36 are REQUIRED, and printed
+    // line 6d is not — the absence that `fjs/schedule/f` refuses on is a
+    // SCHEDULE refusal, not a document one, so this fixture omits it and still
+    // DETECTs.
+    [farmDialect]: {
+        dialect: farmDialect,
+        recipientTin: '222-22-2222',
+        accountNumber: 'FARM-0001',
+        taxYear: 2025,
+        principalCropOrActivity: 'corn and soybeans',
+        accountingMethod: 'cash',
+        materiallyParticipated: 'yes',
+        investmentAtRisk: 'allAtRisk',
         entries: [],
     },
     [revisionDialectTag]: {

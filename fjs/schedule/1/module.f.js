@@ -213,6 +213,7 @@ import { movingExpenses, movingExpensesLine4W2Box12Codes } from '../../form3903/
 import { scheduleC } from '../c/module.f.js'
 import { form7206, longTermCareCapCents } from '../../form7206/module.f.js'
 import { scheduleE } from '../e/module.f.js'
+import { scheduleF } from '../f/module.f.js'
 import {
     scheduleSelfEmploymentPartI,
     socialSecurityWagesAlreadyTaxed,
@@ -230,9 +231,11 @@ import { taxParamsByYear } from '../../tax/params/module.f.js'
 /** @import { BusinessExpenses } from '../../document/business_expenses/module.f.js' */
 /** @import { AssetRegister } from '../../document/asset_register/module.f.js' */
 /** @import { RentalProperty } from '../../document/rental_property/module.f.js' */
+/** @import { Farm } from '../../document/farm/module.f.js' */
 /** @import { OneZeroNineNineNec } from '../../document/1099nec/module.f.js' */
 /** @import { ScheduleC } from '../c/module.f.js' */
 /** @import { ScheduleE } from '../e/module.f.js' */
+/** @import { ScheduleF } from '../f/module.f.js' */
 /** @import { K1Partnership } from '../../document/k1_1065/module.f.js' */
 /** @import { K1SCorporation } from '../../document/k1_1120s/module.f.js' */
 /** @import { K1EstateTrust } from '../../document/k1_1041/module.f.js' */
@@ -612,6 +615,7 @@ const earlyWithdrawalPenaltyLine = profile => forms => {
  *   readonly line10: ReportLine,
  *   readonly scheduleC: ScheduleC,
  *   readonly scheduleE: ScheduleE,
+ *   readonly scheduleF: ScheduleF,
  * }} ScheduleOnePartI
  */
 
@@ -626,6 +630,7 @@ const earlyWithdrawalPenaltyLine = profile => forms => {
  *   readonly w2Forms: readonly Stored<W2>[],
  *   readonly assetRegisters: readonly Stored<AssetRegister>[],
  *   readonly rentalProperties: readonly Stored<RentalProperty>[],
+ *   readonly farmForms: readonly Stored<Farm>[],
  *   readonly partnershipK1Forms: readonly Stored<K1Partnership>[],
  *   readonly sCorporationK1Forms: readonly Stored<K1SCorporation>[],
  *   readonly estateTrustK1Forms: readonly Stored<K1EstateTrust>[],
@@ -668,7 +673,7 @@ const earlyWithdrawalPenaltyLine = profile => forms => {
 export const scheduleOnePartI = input => {
     const {
         profile, unemploymentForms, nonemployeeCompensationForms, businessExpenseForms, w2Forms,
-        assetRegisters, rentalProperties,
+        assetRegisters, rentalProperties, farmForms,
         partnershipK1Forms, sCorporationK1Forms, estateTrustK1Forms,
     } = input
     const zero = profileDeclaredZeroLine(profile)
@@ -689,6 +694,18 @@ export const scheduleOnePartI = input => {
     })
     if (scheduleEOutcome.kind === 'error') {
         return scheduleEOutcome
+    }
+    // `businessExpenseForms` and `unemploymentForms` both reach Schedule F, and
+    // neither is a leak. The first is what `fjs/schedule/f` refuses a farm
+    // BESIDE a Schedule C business on -- §199A and §461(l) both aggregate
+    // across trades or businesses and this engine carries one business's facts.
+    // The second is where printed Schedule F line 4a comes from: Form 1099-G
+    // box 7 and box 9, which `vnd.fjs.1099g` refused by name until this phase.
+    const scheduleFOutcome = scheduleF({
+        profile, farmForms, businessExpenseForms, unemploymentForms, assetRegisters,
+    })
+    if (scheduleFOutcome.kind === 'error') {
+        return scheduleFOutcome
     }
     const line1 = zero('Schedule 1 line 1 (taxable state/local income tax refunds)')
     const line2a = zero('Schedule 1 line 2a (alimony received)')
@@ -711,7 +728,17 @@ export const scheduleOnePartI = input => {
         ...scheduleEOutcome.parts.line41,
         rule: 'Schedule 1 line 5 (rental real estate, royalties, partnerships, S corporations, Schedule E line 41)',
     }
-    const line6 = zero('Schedule 1 line 6 (farm income/loss, Schedule F)')
+    // 6. "Farm income or (loss). Attach Schedule F." -- Schedule F's own line
+    //    34, restated under this schedule's printed number and never recomputed
+    //    here, exactly as line 3 restates Schedule C line 31 and line 5
+    //    Schedule E line 41. i1040sf p9: "Enter your net profit or loss on line
+    //    34 and on Schedule 1 (Form 1040), line 6 and; Schedule SE (Form 1040),
+    //    line 1a" -- BOTH printed destinations, and the second is
+    //    `fjs/schedule/se` line 1a, wired in this same phase.
+    const line6 = {
+        ...scheduleFOutcome.line34,
+        rule: 'Schedule 1 line 6 (farm income/loss, Schedule F line 34)',
+    }
     const line7 = unemploymentCompensationLine(profile)(unemploymentForms)
     // 8. "Other income" -- a collapsed stand-in for 8a-8z (23 printed
     //    sub-lines, 8a through 8v and 8z; the "26" this comment carried until
@@ -730,6 +757,7 @@ export const scheduleOnePartI = input => {
         line1, line2a, line3, line4, line5, line6, line7, line8, line9, line10,
         scheduleC: scheduleCOutcome,
         scheduleE: scheduleEOutcome,
+        scheduleF: scheduleFOutcome,
     }
 }
 
@@ -766,12 +794,18 @@ export const scheduleOnePartI = input => {
  * field, the proprietor's `recipientTin`, which decides whose Forms W-2
  * consume the §1402(b)(1) wage base; `fjs/schedule/se`'s own docstring
  * carries that argument.
+ *
+ * `farmNetProfit` is **Schedule F's own line 34**, which printed Schedule SE
+ * line 1a asks for by that name — passed in the same way and for the same
+ * reason. i1040sf p9 gives line 34 two printed destinations and this is the
+ * second of them; the first is printed Schedule 1 line 6, up in Part I.
  * @typedef {{
  *   readonly profile: Stored<ReturnProfile>,
  *   readonly status: IndividualFilingStatus,
  *   readonly adjustmentForms: readonly Stored<Adjustments>[],
  *   readonly w2Forms: readonly Stored<W2>[],
  *   readonly businessNetProfit: ReportLine,
+ *   readonly farmNetProfit: ReportLine,
  *   readonly businessExpenseForms: readonly Stored<BusinessExpenses>[],
  *   readonly passThrough: PassThroughSelfEmployment,
  *   readonly interestForms: readonly Stored<OneZeroNineNineInt>[],
@@ -1252,7 +1286,8 @@ export const iraDeductionWorksheet = taxParamSet => input => {
  */
 export const scheduleOnePartIIExceptStudentLoanInterest = taxParamSet => input => {
     const {
-        profile, status, adjustmentForms, w2Forms, businessNetProfit, businessExpenseForms,
+        profile, status, adjustmentForms, w2Forms, businessNetProfit, farmNetProfit,
+        businessExpenseForms,
         passThrough, interestForms, marketplaceCoverageStored, totalIncomeExceptTaxableSocialSecurityLine,
         socialSecurityBenefitsCents, taxExemptInterestCents, mfsLivedWithSpouseAtAnyTimeInYear,
         iraDistributionReceived,
@@ -1538,6 +1573,7 @@ export const scheduleOnePartIIExceptStudentLoanInterest = taxParamSet => input =
         wages.cents)(wages.sources)
     const selfEmploymentLines = scheduleSelfEmploymentPartI(taxParamSet)({
         netProfitCents: businessNetProfit.value,
+        farmNetProfitCents: farmNetProfit.value,
         partnershipSelfEmploymentEarningsCents: passThrough.earningsCents,
         socialSecurityWagesCents: wages.cents,
     })
@@ -1554,7 +1590,7 @@ export const scheduleOnePartIIExceptStudentLoanInterest = taxParamSet => input =
     //     is the leaf that pins it rather than leaving it to be noticed.
     const line15 = {
         value: selfEmploymentLines.line13,
-        sources: unionSources([businessNetProfit, socialSecurityWages]),
+        sources: unionSources([businessNetProfit, farmNetProfit, socialSecurityWages]),
         rule: 'Schedule 1 line 15 (deductible part of self-employment tax, Schedule SE line 13)',
     }
     const line16 = zero('Schedule 1 line 16 (SEP/SIMPLE/qualified plans)')
@@ -2350,6 +2386,7 @@ export const scheduleOnePartII = taxParamSet => input => {
  *   readonly businessExpenseForms: readonly Stored<BusinessExpenses>[],
  *   readonly assetRegisters: readonly Stored<AssetRegister>[],
  *   readonly rentalProperties: readonly Stored<RentalProperty>[],
+ *   readonly farmForms: readonly Stored<Farm>[],
  *   readonly partnershipK1Forms: readonly Stored<K1Partnership>[],
  *   readonly sCorporationK1Forms: readonly Stored<K1SCorporation>[],
  *   readonly estateTrustK1Forms: readonly Stored<K1EstateTrust>[],
@@ -2378,7 +2415,7 @@ export const scheduleOnePartII = taxParamSet => input => {
 export const scheduleOne = taxParamSet => input => {
     const {
         profile, status, unemploymentForms, nonemployeeCompensationForms, businessExpenseForms,
-        assetRegisters, rentalProperties,
+        assetRegisters, rentalProperties, farmForms,
         partnershipK1Forms, sCorporationK1Forms, estateTrustK1Forms,
         adjustmentForms, studentLoanInterestForms, w2Forms, interestForms, totalIncomeLine,
         totalIncomeExceptTaxableSocialSecurityLine, socialSecurityBenefitsCents,
@@ -2387,7 +2424,7 @@ export const scheduleOne = taxParamSet => input => {
     } = input
     const partI = scheduleOnePartI({
         profile, unemploymentForms, nonemployeeCompensationForms, businessExpenseForms, w2Forms,
-        assetRegisters, rentalProperties,
+        assetRegisters, rentalProperties, farmForms,
         partnershipK1Forms, sCorporationK1Forms, estateTrustK1Forms,
     })
     if (partI.kind === 'error') {
@@ -2406,6 +2443,7 @@ export const scheduleOne = taxParamSet => input => {
         // so that is the line handed over -- never Part I's line 3, which is
         // the same figure under a different printed number.
         businessNetProfit: partI.scheduleC.partII.line31,
+        farmNetProfit: partI.scheduleF.line34,
         businessExpenseForms,
         // ...and the SAME printed line names "Schedule K-1 (Form 1065), box
         // 14, code A" beside it. Read off the Schedule E execution Part I
@@ -2766,6 +2804,7 @@ const stageOneForMovingAndIra = entries =>
         taxExemptInterestCents: 0n,
         mfsLivedWithSpouseAtAnyTimeInYear: false,
         iraDistributionReceived: false,
+        farmNetProfit: noBusinessNetProfit(profileCertifiedForMoving),
         businessNetProfit: noBusinessNetProfit(profileCertifiedForMoving),
         businessExpenseForms: [],
         passThrough: noPassThrough,
@@ -2792,6 +2831,7 @@ const partIOf = profile => unemploymentForms => nonemployeeCompensationForms => 
     scheduleOnePartI({
         assetRegisters: [],
         rentalProperties: [],
+        farmForms: [],
         profile, unemploymentForms, nonemployeeCompensationForms, businessExpenseForms,
         w2Forms: [],
         partnershipK1Forms: [],
@@ -2931,6 +2971,7 @@ const partIIOf = profile => status => adjustmentForms => studentLoanInterestForm
         profile, status, adjustmentForms, w2Forms, interestForms: [],
         ...noSocialSecurityInteraction,
         totalIncomeExceptTaxableSocialSecurityLine: totalIncomeOf(totalIncomeCents),
+        farmNetProfit: noBusinessNetProfit(profile),
         businessNetProfit: noBusinessNetProfit(profile),
         businessExpenseForms: [],
         passThrough: noPassThrough,
@@ -2967,6 +3008,7 @@ const stageOneWithInterest = interestForms =>
         interestForms,
         ...noSocialSecurityInteraction,
         totalIncomeExceptTaxableSocialSecurityLine: noOtherIncomeLine,
+        farmNetProfit: noBusinessNetProfit(profileNoDeclaredKinds),
         businessNetProfit: noBusinessNetProfit(profileNoDeclaredKinds),
         businessExpenseForms: [],
         passThrough: noPassThrough,
@@ -3069,6 +3111,7 @@ const stageOneForIra = fixture => {
         taxExemptInterestCents: 0n,
         mfsLivedWithSpouseAtAnyTimeInYear,
         iraDistributionReceived,
+        farmNetProfit: noBusinessNetProfit(profileNoDeclaredKinds),
         businessNetProfit: noBusinessNetProfit(profileNoDeclaredKinds),
         businessExpenseForms: [],
         passThrough: noPassThrough,
@@ -3110,6 +3153,7 @@ const stageOneWithBusiness = profile => status => nonemployeeCompensationForms =
         const partI = okPartI(scheduleOnePartI({
             assetRegisters: [],
             rentalProperties: [],
+            farmForms: [],
             profile,
             unemploymentForms: [],
             nonemployeeCompensationForms,
@@ -3124,6 +3168,7 @@ const stageOneWithBusiness = profile => status => nonemployeeCompensationForms =
             ...noSocialSecurityInteraction,
             totalIncomeExceptTaxableSocialSecurityLine: noOtherIncomeLine,
             businessNetProfit: partI.scheduleC.partII.line31,
+            farmNetProfit: partI.scheduleF.line34,
             businessExpenseForms,
             passThrough: passThroughOf(partI.scheduleE),
         })
@@ -3140,6 +3185,7 @@ const stageOneWithPassThrough = profile => status => partnershipK1Forms =>
         const partI = okPartI(scheduleOnePartI({
             assetRegisters: [],
             rentalProperties: [],
+            farmForms: [],
             profile,
             unemploymentForms: [],
             nonemployeeCompensationForms: [],
@@ -3154,6 +3200,7 @@ const stageOneWithPassThrough = profile => status => partnershipK1Forms =>
             ...noSocialSecurityInteraction,
             totalIncomeExceptTaxableSocialSecurityLine: noOtherIncomeLine,
             businessNetProfit: partI.scheduleC.partII.line31,
+            farmNetProfit: partI.scheduleF.line34,
             businessExpenseForms,
             passThrough: passThroughOf(partI.scheduleE),
         })
@@ -3247,6 +3294,7 @@ const stageOneForHealthInsurance =
             const partI = okPartI(scheduleOnePartI({
                 assetRegisters: [],
                 rentalProperties: [],
+                farmForms: [],
                 profile,
                 unemploymentForms: [],
                 nonemployeeCompensationForms,
@@ -3273,6 +3321,7 @@ const stageOneForHealthInsurance =
                 marketplaceCoverageStored,
                 totalIncomeExceptTaxableSocialSecurityLine: noOtherIncomeLine,
                 businessNetProfit: partI.scheduleC.partII.line31,
+                farmNetProfit: partI.scheduleF.line34,
                 businessExpenseForms,
                 passThrough: passThroughOf(partI.scheduleE),
             })
@@ -3861,6 +3910,7 @@ export const proof = {
             const withK1 = okPartI(scheduleOnePartI({
                 assetRegisters: [],
                 rentalProperties: [],
+                farmForms: [],
                 profile: profileNoDeclaredKinds,
                 unemploymentForms: [],
                 nonemployeeCompensationForms: [],
@@ -3896,6 +3946,7 @@ export const proof = {
             const partI = okPartI(scheduleOnePartI({
                 assetRegisters: [],
                 rentalProperties: [],
+                farmForms: [],
                 profile: profileNoDeclaredKinds,
                 unemploymentForms: [],
                 nonemployeeCompensationForms: [nonemployeeCompensationDoc('350.00')],
@@ -3916,6 +3967,7 @@ export const proof = {
             const result = refusal(scheduleOnePartI({
                 assetRegisters: [],
                 rentalProperties: [],
+                farmForms: [],
                 profile: profileNoDeclaredKinds,
                 unemploymentForms: [],
                 nonemployeeCompensationForms: [],
@@ -4024,6 +4076,7 @@ export const proof = {
             const partI = okPartI(scheduleOnePartI({
                 assetRegisters: [],
                 rentalProperties: [],
+                farmForms: [],
                 profile: profileNoDeclaredKinds,
                 unemploymentForms: [],
                 nonemployeeCompensationForms: [nonemployeeCompensationDoc('350.00')],
@@ -4042,6 +4095,7 @@ export const proof = {
                 adjustmentForms: [],
                 w2Forms: [],
                 businessNetProfit: partI.scheduleC.partII.line31,
+                farmNetProfit: partI.scheduleF.line34,
                 businessExpenseForms: [businessDoc([advertisingEntry('90.00')])],
                 passThrough: passThroughOf(partI.scheduleE),
             }))
@@ -5092,6 +5146,7 @@ export const proof = {
             const partI = okPartI(scheduleOnePartI({
                 assetRegisters: [],
                 rentalProperties: [],
+                farmForms: [],
                 profile: profileNoDeclaredKinds,
                 unemploymentForms: [],
                 nonemployeeCompensationForms: [nonemployeeCompensationDoc('40000.00')],
@@ -5111,6 +5166,7 @@ export const proof = {
                 ...noSocialSecurityInteraction,
                 totalIncomeExceptTaxableSocialSecurityLine: noOtherIncomeLine,
                 businessNetProfit: partI.scheduleC.partII.line31,
+                farmNetProfit: partI.scheduleF.line34,
                 businessExpenseForms: [businessDoc([advertisingEntry('1000.00')])],
                 passThrough: noPassThrough,
             }))
@@ -5374,7 +5430,8 @@ export const proof = {
                 hsaEntry('700.00')('taxpayer'),
             ])([fullYearCoverage('taxpayer')('selfOnly')])],
             w2Forms: [],
-            businessNetProfit: noBusinessNetProfit(profileNoDeclaredKinds),
+            farmNetProfit: noBusinessNetProfit(profileNoDeclaredKinds),
+        businessNetProfit: noBusinessNetProfit(profileNoDeclaredKinds),
             businessExpenseForms: [],
         }))
         assertEq(socialSecurityWorksheetAdjustmentsTotal(stageOne), 100000n, 'lines 11-20, 23, 25')
@@ -5875,6 +5932,7 @@ export const proof = {
         const composed = scheduleOne(taxParams2025)({
             assetRegisters: [],
             rentalProperties: [],
+            farmForms: [],
             profile: profileNoDeclaredKinds,
             interestForms: [],
             ...noSocialSecurityInteraction,
@@ -5908,6 +5966,7 @@ export const proof = {
         const composed = scheduleOne(taxParams2025)({
             assetRegisters: [],
             rentalProperties: [],
+            farmForms: [],
             profile: profileNoDeclaredKinds,
             interestForms: [],
             ...noSocialSecurityInteraction,
@@ -5983,6 +6042,7 @@ export const proof = {
         const composed = scheduleOne(taxParams2025)({
             assetRegisters: [],
             rentalProperties: [],
+            farmForms: [],
             profile: profileNoDeclaredKinds,
             interestForms: [],
             ...noSocialSecurityInteraction,

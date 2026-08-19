@@ -237,6 +237,7 @@ import { dialect as k1SCorporationDialect } from '../../document/k1_1120s/module
 /** @import { K1SCorporation } from '../../document/k1_1120s/module.f.js' */
 /** @import { K1EstateTrust } from '../../document/k1_1041/module.f.js' */
 /** @import { RentalProperty } from '../../document/rental_property/module.f.js' */
+/** @import { Farm } from '../../document/farm/module.f.js' */
 
 // ── What a tripwire reads ────────────────────────────────────────────────────
 
@@ -269,6 +270,7 @@ import { dialect as k1SCorporationDialect } from '../../document/k1_1120s/module
  *   readonly sCorporationK1Forms: readonly { readonly value: K1SCorporation }[],
  *   readonly estateTrustK1Forms: readonly { readonly value: K1EstateTrust }[],
  *   readonly rentalProperties: readonly { readonly value: RentalProperty }[],
+ *   readonly farmForms: readonly { readonly value: Farm }[],
  * }} SuppliedDocuments
  */
 
@@ -436,6 +438,52 @@ export const tripwires = [
             context.documents.rentalProperties.some(property =>
                 boxIsNonZero(property.value.rentsReceived)
                 || boxIsNonZero(property.value.royaltiesReceived)),
+    },
+    {
+        kind: 'farmIncomeOrLoss',
+        evidence: 'a stored vnd.fjs.farm reports non-zero income on one of printed Schedule F Part '
+            + 'I\'s printed lines 1a through 8, which is gross income under \u00a761(a)(2), and it '
+            + 'reaches 1040 line 8 through printed Schedule F lines 9 and 34 and Schedule 1 line '
+            + '6 — and printed Schedule SE line 1a besides, which is self-employment tax at '
+            + '15.3% of 92.35% of it — none of which is computed for a return that does not '
+            + 'declare it',
+        // **The entry `vnd.fjs.farm` could not ship without**, and it is the
+        // rule the tenth entry's own docstring states: a dialect a filer can
+        // store before anything checks that the return declares it is a dialect
+        // that can go unread. `fjs/schedule/f` runs off the stored documents,
+        // but the engine's schedules are dispatched on the DECLARED kind
+        // (12.1-CONTEXT Decision 1.6), so an undeclared return would carry a
+        // stored farm that no printed line ever reads.
+        //
+        // **This one understates TWO taxes rather than one**, which is why its
+        // evidence names both: the income tax on 1040 line 8, and the
+        // self-employment tax printed Schedule SE line 1a charges on the same
+        // line 34.
+        //
+        // The predicate reads the SIX income fields that can stand alone, and
+        // it deliberately does NOT read the three "Taxable amount" halves
+        // (printed lines 3b, 5c and 6b) — each is bounded by its own gross,
+        // which is already in the list, so reading both would be reading one
+        // fact twice. Printed line 1b is a COST and printed line 4a is not
+        // stored at all (it is computed from Forms 1099-G), so neither is here.
+        //
+        // A farm with every income line at ZERO does not trigger it: a farm
+        // bought in December with nothing sold yet is a real record with no
+        // income, and `fjs/schedule/f` would refuse it as a LOSS one layer in
+        // with a message naming §461(l) — which is a better message than this
+        // one.
+        triggered: context =>
+            context.documents.farmForms.some(farm =>
+                boxIsNonZero(farm.value.salesOfPurchasedLivestockAndOtherResaleItems)
+                || boxIsNonZero(farm.value.salesOfRaisedProductsAndLivestock)
+                || boxIsNonZero(farm.value.cooperativeDistributions)
+                || boxIsNonZero(farm.value.agriculturalProgramPaymentsNotReportedOnForm1099G)
+                || boxIsNonZero(farm.value.commodityCreditCorporationLoansReportedUnderElection)
+                || boxIsNonZero(farm.value.commodityCreditCorporationLoansForfeited)
+                || boxIsNonZero(farm.value.cropInsuranceProceedsReceived)
+                || boxIsNonZero(farm.value.cropInsuranceProceedsDeferredFromPriorYear)
+                || boxIsNonZero(farm.value.customHireIncome)
+                || boxIsNonZero(farm.value.otherIncome)),
     },
     {
         kind: 'businessIncomeOrLoss',
@@ -625,9 +673,15 @@ assert(taxParams2025 !== undefined, 'expected TY2025 parameters to be present in
  * in the same commit as its tripwire, which is the order the rule asks for: a
  * dialect a filer can store before anything checks that the return declares it
  * is a dialect that can go unread.
+ *
+ * The Schedule F wiring adds the ELEVENTH under the same rule — a stored
+ * `vnd.fjs.farm` with income on any of printed Part I's stand-alone lines ->
+ * `farmIncomeOrLoss`. It is the first whose omission would understate TWO
+ * taxes: the income tax on 1040 line 8 and the self-employment tax printed
+ * Schedule SE line 1a charges on the same Schedule F line 34.
  * @type {number}
  */
-const expectedTripwireCount = 10
+const expectedTripwireCount = 11
 
 /** A W-2 carrying nothing but the fields its schema requires. @type {W2} */
 const bareW2 = {
@@ -663,7 +717,22 @@ const bare1099Nec = {
 const noDocuments = {
     w2s: [], retirementForms: [], nonemployeeCompensationForms: [], isoExerciseForms: [],
     partnershipK1Forms: [], sCorporationK1Forms: [], estateTrustK1Forms: [],
-    rentalProperties: [],
+    rentalProperties: [], farmForms: [],
+}
+
+/** A cash-method farm with a real printed line 2. @type {Farm} */
+const farm = {
+    dialect: 'vnd.fjs.farm',
+    recipientTin: '222-22-2222',
+    accountNumber: 'FARM-0001',
+    taxYear: 2025,
+    principalCropOrActivity: 'corn and soybeans',
+    accountingMethod: 'cash',
+    materiallyParticipated: 'yes',
+    investmentAtRisk: 'allAtRisk',
+    salesOfRaisedProductsAndLivestock: '142600.00',
+    cropInsuranceProceedsDeferredFromPriorYear: '0.00',
+    entries: [],
 }
 
 /** A rental property with a real printed line 3. @type {RentalProperty} */
@@ -1365,6 +1434,120 @@ export const proof = {
             assertEq(outcome.kind, 'ok', ['a declared kind must not trip its own tripwire', outcome])
         },
     },
+    // ── Entry 11: vnd.fjs.farm -> farmIncomeOrLoss ─────────────────────────
+    //
+    // A farmer stores a farm record and does not know printed Schedule F has to
+    // be declared. Undeclared, the engine would emit a confident 1040 short by
+    // the whole of the farm profit AND by the self-employment tax on it, with
+    // the document sitting in the store unread.
+    farm: {
+        aStoredFarmWithIncomeRefusesWhenUndeclared: () => {
+            const outcome = classify('single')(['wages'])({
+                ...noDocuments,
+                farmForms: [{ value: farm }],
+            })
+            assert(outcome.kind === 'error', ['a stored farm must refuse when undeclared', outcome])
+            if (outcome.kind !== 'error') {
+                return
+            }
+            assertEq(outcome.unmodeled.length, 1, ['expected exactly one required kind', outcome.unmodeled])
+            assertEq(
+                outcome.unmodeled[0],
+                'farmIncomeOrLoss',
+                ['expected Schedule F named', outcome.unmodeled])
+            assert(
+                outcome.message.includes('Schedule F'),
+                ['the refusal must name the schedule the income belongs on', outcome.message])
+            assert(
+                outcome.message.includes('Schedule 1 line 6'),
+                ['the refusal must name the Schedule 1 line it reaches', outcome.message])
+            // ★ **THE SECOND TAX.** This entry is the only one whose omission
+            // understates TWO taxes, and the evidence has to say so or a filer
+            // reads the refusal as being about income tax alone.
+            assert(
+                outcome.message.includes('Schedule SE line 1a'),
+                ['the refusal must name the self-employment tax too', outcome.message])
+            assert(
+                outcome.message.includes('15.3%'),
+                ['and the rate, which is the part a filer can price', outcome.message])
+            // The REMEDY: the kind is MODELED, so the fix is a declaration
+            // rather than a form the taxpayer has to go and find.
+            assert(
+                outcome.message.includes('declare farmIncomeOrLoss'),
+                ['the remedy must be the declaration, not a form hunt', outcome.message])
+            // And the remedy must say where Schedule F STOPS, or a filer reads
+            // it as a promise it does not make.
+            assert(
+                outcome.message.includes('§461(l)'),
+                ['the remedy must name the loss limitation it cannot compute', outcome.message])
+            assert(
+                outcome.message.includes('line 45'),
+                ['and the printed line the accrual method refuses at', outcome.message])
+        },
+        /**
+         * ★ **EVERY ONE OF THE TEN INCOME FIELDS FIRES IT, ONE AT A TIME.**
+         * A predicate written against printed line 2 alone would miss a farm
+         * whose whole income is a crop insurance payment, and nothing else here
+         * would notice. The count is hand-typed beside the list for the reason
+         * AGENTS.md gives: a field silently dropped from the disjunction would
+         * otherwise just make this loop one iteration shorter.
+         */
+        everyPrintedIncomeFieldFiresItOnItsOwn: () => {
+            /** @type {readonly string[]} */
+            const fields = [
+                'salesOfPurchasedLivestockAndOtherResaleItems',
+                'salesOfRaisedProductsAndLivestock',
+                'cooperativeDistributions',
+                'agriculturalProgramPaymentsNotReportedOnForm1099G',
+                'commodityCreditCorporationLoansReportedUnderElection',
+                'commodityCreditCorporationLoansForfeited',
+                'cropInsuranceProceedsReceived',
+                'cropInsuranceProceedsDeferredFromPriorYear',
+                'customHireIncome',
+                'otherIncome',
+            ]
+            assertEq(fields.length, 10, 'hand-counted off the predicate')
+            for (const field of fields) {
+                const outcome = classify('single')(['wages'])({
+                    ...noDocuments,
+                    farmForms: [{
+                        value: {
+                            ...farm,
+                            salesOfRaisedProductsAndLivestock: undefined,
+                            cropInsuranceProceedsDeferredFromPriorYear: '0.00',
+                            [field]: '1000.00',
+                        },
+                    }],
+                })
+                assert(outcome.kind === 'error', ['this printed line must fire the tripwire', field, outcome])
+            }
+            // THE CONTROL, and it is the one that makes the loop mean
+            // something: a farm with EVERY one of those fields absent or zero
+            // does NOT fire. A predicate that returned `true` unconditionally
+            // would pass the loop above and fail here.
+            const quiet = classify('single')(['wages'])({
+                ...noDocuments,
+                farmForms: [{
+                    value: {
+                        ...farm,
+                        salesOfRaisedProductsAndLivestock: '0.00',
+                        cropInsuranceProceedsDeferredFromPriorYear: '0.00',
+                    },
+                }],
+            })
+            assertEq(quiet.kind, 'ok', ['a farm with no income yet must not fire', quiet])
+        },
+        // THE NEGATIVE CONTROLS: no farm at all, and the declared case.
+        anAbsentFarmNeverFiresAndADeclaredOneIsSilent: () => {
+            const none = classify('single')(['wages'])(noDocuments)
+            assertEq(none.kind, 'ok', ['no farm must not fire', none])
+            const declared = classify('single')(['wages', 'farmIncomeOrLoss'])({
+                ...noDocuments,
+                farmForms: [{ value: farm }],
+            })
+            assertEq(declared.kind, 'ok', ['a declared kind must not trip its own tripwire', declared])
+        },
+    },
     // ── Entry 7: Form 1041 K-1 box 6 -> estateAndTrustIncome (TAX-35) ────
     beneficiaryIncome: {
         // A beneficiary holds a Schedule K-1 (Form 1041) and does not know
@@ -1730,9 +1913,10 @@ export const proof = {
     // caller's evidence string came from, so this is the leaf that keeps the
     // convention honest: the taxpayer's OWN amounts, which are the only
     // taxpayer data a predicate here ever touches, must not appear in the
-    // refusal. NINE distinctive amounts are supplied and each is searched for
+    // refusal. TEN distinctive amounts are supplied and each is searched for
     // separately, so a message that interpolated any one of them reddens here
-    // and says which. A stored rental property's rent is the ninth.
+    // and says which. A stored rental property's rent is the ninth and a
+    // stored farm's printed line 2 is the tenth.
     noTaxpayerAmountRidesOutThroughATripwireRefusal: () => {
         const outcome = classify('single')(['wages'])({
             w2s: [{ value: { ...bareW2, box5MedicareWagesAndTips: '387654.32', box8AllocatedTips: '1234.56' } }],
@@ -1755,12 +1939,15 @@ export const proof = {
                 },
             }],
             rentalProperties: [{ value: { ...rentalProperty, rentsReceived: '8765.43' } }],
+            farmForms: [{
+                value: { ...farm, salesOfRaisedProductsAndLivestock: '2109.87' },
+            }],
         })
         assert(outcome.kind === 'error', ['expected a refusal', outcome])
         if (outcome.kind !== 'error') {
             return
         }
-        for (const amount of ['387654.32', '1234.56', '7654.21', '9876.54', '3.21', '54.32', '5432.10', '6543.21', '8765.43']) {
+        for (const amount of ['387654.32', '1234.56', '7654.21', '9876.54', '3.21', '54.32', '5432.10', '6543.21', '8765.43', '2109.87']) {
             assert(
                 !outcome.message.includes(amount),
                 ['a taxpayer amount reached the refusal message', amount, outcome.message])
@@ -1768,7 +1955,7 @@ export const proof = {
         // The control: the message is not empty, and it really did describe
         // all three findings — otherwise "contains no amount" would be
         // satisfied by a message containing nothing.
-        assertEq(outcome.unmodeled.length, 8, ['expected all eight tripwires to have fired', outcome.unmodeled])
+        assertEq(outcome.unmodeled.length, 9, ['expected all nine tripwires to have fired', outcome.unmodeled])
     },
     // The rejected fourth entry, recorded as a CHECKED claim rather than as
     // prose (see this module's docstring). `fjs/document/1099g` refuses a

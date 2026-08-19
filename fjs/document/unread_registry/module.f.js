@@ -238,8 +238,8 @@ export const moneyFieldDisposition = [
     [oneZeroNineNineGDialect, 'box4FederalIncomeTaxWithheld', 'read', '1040 line 25b'],
     [oneZeroNineNineGDialect, 'box5RtaaPayments', 'refused', 'refused by name, naming Schedule 1 line 8z'],
     [oneZeroNineNineGDialect, 'box6TaxableGrants', 'refused', 'refused by name, naming Schedule 1 line 8z'],
-    [oneZeroNineNineGDialect, 'box7AgriculturePayments', 'refused', 'refused by name, naming Schedule F line 4b'],
-    [oneZeroNineNineGDialect, 'box9MarketGain', 'refused', 'refused by name, naming the Schedule F reporting of a CCC loan market gain'],
+    [oneZeroNineNineGDialect, 'box7AgriculturePayments', 'read', 'Schedule F line 4a -> line 4b -> line 9 -> line 34 -> Schedule 1 line 6 (i1040sf p3\'s own routing table). An orphan box with no vnd.fjs.farm stored still REFUSES, at fjs/schedule/f rather than at the dialect'],
+    [oneZeroNineNineGDialect, 'box9MarketGain', 'read', 'Schedule F line 4a, and OUT again at line 4b under the §77 election (i1040sf p4). An orphan box with no vnd.fjs.farm stored still REFUSES, at fjs/schedule/f rather than at the dialect'],
     [oneZeroNineNineGDialect, 'stateIncomeTaxWithheld', 'dropped', 'STATE: out of scope, and this dialect\'s own header says so'],
     // ── vnd.fjs.1099int ─────────────────────────────────────────────────
     [oneZeroNineNineIntDialect, 'box1InterestIncome', 'read', '1040 line 2b'],

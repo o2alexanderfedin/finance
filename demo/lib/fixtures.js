@@ -191,6 +191,7 @@ export const inputs = {
     businessExpenseForms: [],
     assetRegisters: [],
     rentalProperties: [],
+    farmForms: [],
     priorYearIraBasisForms: [],
     isoExerciseForms: [],
     partnershipK1Forms: [],
