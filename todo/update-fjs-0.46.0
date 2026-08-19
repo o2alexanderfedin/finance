@@ -1,0 +1,11 @@
+# Update to FunctionalScript 0.46.0
+
+## Main Changes
+
+- The new Effect system. The main change is that each Effect can have an error, so each Effect returns `Result<T, E>`. The new Effect signature: `Effect<O, T, E>`.
+- FunctionalScript now uses `.f.mjs` as the main source file and `types.ts` to describe types. 
+  The migration is quite successful, and I would suggest also adapting the idea to use `types.ts` for TypeScript type definitions.
+
+There are also many other changes, and I may have missed something important. 
+I would like to see an extensive, structured report on the migration to 0.46.0 once it's done. 
+In particular, I'm interested in whether you learned anything new and how you adapted to the project, as well as what the main challenges were.
