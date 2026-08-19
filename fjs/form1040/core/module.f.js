@@ -6836,6 +6836,78 @@ export const proof = {
                 ['the carryforward must cite the farm behind it', carryforwardHashes])
         },
         /**
+         * ★ **THE TAXPAYER §461(l) WAS WRITTEN FOR: WAGES BESIDE A BUSINESS
+         * LOSS.** $80,000.00 of Form W-2 box 1 and a $50,000.00 farm loss.
+         *
+         * This is the case the whole limitation exists to reach, and it is the
+         * one where getting printed Form 461 line 1 wrong would show. Wages are
+         * NOT trade-or-business income for §461(l) — i461's *Definitions*
+         * excludes *"any trade or business of performing services of an
+         * employee"*, §461(l)(6), which is why the printed line 1 that carried
+         * Form 1040 line 1 in the 2018-2020 revisions now reads "Reserved for
+         * future use". Read the other way, this filer's line 14 would be
+         * $30,000.00 rather than -$50,000.00 and no wage earner with a side
+         * business could ever reach the threshold.
+         *
+         * It does not change the outcome HERE — $50,000.00 is far under
+         * $313,000.00 either way — and that is the point of asserting the
+         * arithmetic rather than only the verdict:
+         *
+         * ```
+         *  1040         1a Form W-2 box 1                       80,000.00
+         *  Schedule 1   6 Schedule F line 34                   -50,000.00
+         *  Form 461    14 the trade-or-business net            -50,000.00   (NOT +30,000.00)
+         *  Form 461    16 = 14 + 15                            263,000.00
+         *  1040         8 Schedule 1 line 10                   -50,000.00
+         *              9 = 1a + 8                               30,000.00
+         *             11a adjusted gross income                 30,000.00
+         *             12e the single standard deduction         15,750.00
+         *             13a a loss earns no §199A deduction            0.00
+         *             15 = 11a - 14                             14,250.00
+         *  Form 8995   16 carried to 2026                      -50,000.00
+         * ```
+         *
+         * The counterfactual below — the same W-2 with the farm withheld — is
+         * what makes the $50,000.00 a statement about the LOSS rather than four
+         * unrelated figures.
+         */
+        wagesBesideAFarmLossAreNotTradeOrBusinessIncomeForSectionFourSixtyOneL: () => {
+            const base = inputsOf(storedProfile({
+                ...farmProfile,
+                declaredKinds: /** @type {readonly Kind[]} */ (['wages', 'farmIncomeOrLoss']),
+            }))([w2Document('sha256-w2-farm-wages')('80000.00')])([])([])([])([])([])([])([])([])
+            const lossFarm = {
+                documentHash: 'sha256-farm-loss-wages',
+                value: {
+                    ...farmDocument('x').value,
+                    entries: [{
+                        category: 'feed',
+                        datePaid: '2025-04-15',
+                        description: 'winter hay',
+                        amount: '90000.00',
+                    }],
+                },
+            }
+            const { income } = computedLines({ ...base, farmForms: [lossFarm] })
+            assertEq(income.line1a.value, 8000000n, '$80,000.00 of wages')
+            assertEq(income.line8.value, -5000000n, 'and a $50,000.00 farm loss on line 8')
+            assertEq(income.line9.value, 3000000n, 'total income $30,000.00')
+            assertEq(income.line11a.value, 3000000n, 'adjusted gross income $30,000.00')
+            assertEq(income.line12e.value, 1575000n, 'the single standard deduction')
+            assertEq(income.line13a.value, 0n, 'a qualified business LOSS earns no deduction')
+            assertEq(income.line15.value, 1425000n, '$30,000.00 - $15,750.00 = $14,250.00')
+            assertEq(income.qualifiedBusinessLossCarryforward.value, -5000000n,
+                'and the whole loss goes to 2026 on Form 8995 line 16')
+            // **THE COUNTERFACTUAL**: the same W-2 with no farm at all. AGI is
+            // $80,000.00, so the farm moved it by exactly $50,000.00 — and
+            // nothing goes to 2026.
+            const { income: withoutTheFarm } = computedLines(base)
+            assertEq(withoutTheFarm.line11a.value, 8000000n, 'wages alone')
+            assertEq(withoutTheFarm.line11a.value - income.line11a.value, 5000000n,
+                'the farm loss moved adjusted gross income by exactly $50,000.00')
+            assertEq(withoutTheFarm.qualifiedBusinessLossCarryforward.value, 0n)
+        },
+        /**
          * ★ **AND ONE CENT PAST §461(l)'s THRESHOLD, THE WHOLE REPORT STOPS.**
          * The same farm with $353,000.01 of feed against $40,000.00 of raised
          * products is a $313,000.01 loss — one cent more than the printed line
