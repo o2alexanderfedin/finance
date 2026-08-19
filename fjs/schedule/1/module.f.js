@@ -775,6 +775,19 @@ export const scheduleOnePartI = taxParamSet => input => {
     // itself, and citing them a second time would put a brokerage statement
     // under a Schedule 1 line that is zero.
     //
+    // **It is arithmetically INERT today, and that is a property of the printed
+    // form rather than of this wiring.** Discovered by mutating it to `0n` and
+    // watching the whole suite stay green: printed line 3 adds it to line 9, and
+    // printed lines 10/11 remove exactly it again, so printed line 14 —
+    // `line9 + line13` — cancels it to the cent at every input. `fjs/form461`'s
+    // Part II arm for it is unconditional (`attributableToATradeOrBusiness:
+    // false`) precisely because every capital transaction this engine holds is
+    // an investment transaction. The day Form 4797 exists and a §1231 gain can
+    // be a trade-or-business gain, that arm becomes conditional and this term
+    // stops cancelling — which is why it is threaded now rather than written as
+    // a zero with a comment. `theCapitalGainOrLossReachesPrintedFormFourSixtyOne\
+    // LineThree` is what keeps the pass-through observable in the meantime.
+    //
     // **The value is always zero on a return that computes**, and that is not a
     // structural zero: `fjs/form461` REFUSES a binding limitation (its own
     // docstring says why), so reaching this line at all means printed Form 461
@@ -6109,6 +6122,79 @@ export const proof = {
                 [adjustmentsDoc([{ ...hsaEntry('2000.00')('taxpayer'), datePaid: '2026-03-04' }])(
                     [fullYearCoverage('taxpayer')('selfOnly')])])([])([])(0n))
             assertEq(result.line13.value, 200000n)
+        },
+    },
+
+    // ── Printed line 8p, and printed Form 461 behind it ────────────────────
+    formFourSixtyOne: {
+        /**
+         * ★ **PRINTED LINE 8p IS ZERO BECAUSE FORM 461 SAID SO**, not because
+         * no sub-line of line 8 is modeled. The empty return computes a whole
+         * Form 461 whose line 16 is the bare threshold, and line 8p cites the
+         * three Schedule 1 lines the aggregate was formed from.
+         */
+        anEmptyReturnComputesFormFourSixtyOneAndLineEightPIsZero: () => {
+            const partI = partIWithoutBusiness(profileNoDeclaredKinds)([])
+            assertEq(partI.line8p.value, 0n, 'no excess business loss')
+            assert(partI.line8p.rule.includes('Form 461 line 16'),
+                ['line 8p must name the form it came from', partI.line8p.rule])
+            assertEq(partI.form461.line14, 0n, 'nothing on lines 1-8')
+            assertEq(partI.form461.line15, 31300000n, 'the single threshold')
+            assertEq(partI.form461.line16, 31300000n)
+            assertEq(partI.form461.filed, false, 'and the form is not filed')
+            assertEq(partI.line9.value, 0n, 'line 9 = the 8a-8z collapse plus 8p')
+        },
+        /**
+         * ★ **1040 LINE 7a REACHES PRINTED FORM 461 LINE 3.** This is the one
+         * wiring on this schedule that nothing else can observe: printed line 3
+         * is added on printed line 9 and removed again on printed lines 10 and
+         * 11, so it cancels to the cent in printed line 14 at every input —
+         * mutating the argument to `0n` leaves the whole suite green. See the
+         * comment at the call site for why it is threaded anyway.
+         *
+         * A $3,000.00 capital LOSS, i461: *"Losses from sales or exchanges of
+         * capital assets are not included in the calculation of the total
+         * deductions from your trades or businesses."*
+         */
+        theCapitalGainOrLossReachesPrintedFormFourSixtyOneLineThree: () => {
+            const partI = okPartI(scheduleOnePartI(taxParams2025)({
+                status: 'single',
+                form1040Line7aCents: -300000n,
+                assetRegisters: [],
+                rentalProperties: [],
+                farmForms: [],
+                profile: profileNoDeclaredKinds,
+                unemploymentForms: [],
+                nonemployeeCompensationForms: [],
+                businessExpenseForms: [],
+                w2Forms: [],
+                partnershipK1Forms: [],
+                sCorporationK1Forms: [],
+                estateTrustK1Forms: [],
+            }))
+            assertEq(partI.form461.line3, -300000n, '1040 line 7a, on printed line 3')
+            assertEq(partI.form461.line9, -300000n, 'and into printed line 9')
+            assertEq(partI.form461.line11, 300000n, 'removed on printed line 11, POSITIVE')
+            assertEq(partI.form461.line14, 0n, 'so the trade-or-business net is untouched')
+            // The joint threshold reaches printed line 15 from the STATUS this
+            // schedule hands over, which is the second wiring here.
+            const joint = okPartI(scheduleOnePartI(taxParams2025)({
+                status: 'marriedFilingJointly',
+                form1040Line7aCents: 0n,
+                assetRegisters: [],
+                rentalProperties: [],
+                farmForms: [],
+                profile: profileNoDeclaredKinds,
+                unemploymentForms: [],
+                nonemployeeCompensationForms: [],
+                businessExpenseForms: [],
+                w2Forms: [],
+                partnershipK1Forms: [],
+                sCorporationK1Forms: [],
+                estateTrustK1Forms: [],
+            }))
+            assertEq(joint.form461.line15, 62600000n,
+                'a JOINT return reaches printed line 15 with $626,000.00')
         },
     },
 
