@@ -118,12 +118,17 @@ silently typechecks the PARENT's 0.43.1 and reports **0 errors** on a tree whose
   re-exported by `parse/types.d.ts`; we import it from `parse/types.js`, beside the function
   whose error channel it is.
 
-**One semantic difference, deliberately accepted.** Old `validate` returned the value it was
-given; `parse` returns a freshly constructed value carrying only the fields the schema declares.
-Structs and tuples stay open on the way IN — an extra field is still accepted — so no document
-that validated before is refused now. What changes is the way OUT: undeclared fields are absent
-from the result. Every call site here reads only declared fields, so nothing observable moves;
-recorded because a future call site that forwards a validated value wholesale would.
+**One semantic difference, and it is NOT benign — see
+[`upstream-rtti-parse-materializes-absent-members.md`](./upstream-rtti-parse-materializes-absent-members.md).**
+Old `validate` returned the value it was given; `parse` returns a freshly constructed value that
+has **every declared key present**, an absent optional filled with `undefined`, and every
+undeclared key dropped. This project's documents distinguish absent from present-and-undefined by
+hard rule, so **54 proof leaves across 13 typecheck-clean modules go red** — a behavioural
+regression under a green `tsc`, which is the dangerous direction. Every workaround available here
+needs a cast or a hand-asserted type predicate, so the fix is upstream: re-expose the 0.43.1
+validator beside `parse`. It was predicted as a risk when `parse` was chosen and then found by the
+suite, not by reading — which is the whole argument for running the suite even when the typecheck
+is still red.
 
 ### The `types.ts` convention, consumed but not adopted
 
@@ -172,3 +177,22 @@ had nothing to complain about. Fixing the imports is what made the Effect mismat
 
 `fjs/exec`'s `try` is untouched — removing it is the Effect-refusal change, and it belongs to the
 same stage as the rest of `fjs/exec`.
+
+### The runtime suite, with the `tsc` gate bypassed
+
+`npm test` is `tsc && node --test *.test.js`, so it stops at 513 errors and runs nothing. Run the
+second half alone — `node --test '*.test.js'`, the pinned glob, never bare `node --test` — and it
+reports **2500 tests, 2375 pass, 123 fail, 2 cancelled**, with **2355** project-local proof leaves
+discovered. The failures split cleanly in two, and the split is the useful part:
+
+- **54 leaves in 13 modules that typecheck cleanly** — the `parse` reconstruction above. These are
+  not Effect work and stage 3 will not fix them.
+- **the rest** — modules that also carry `tsc` errors, i.e. the Effect system, plus the
+  real-process integration suites that drive `fjs_run`. One of those surfaces as a runtime
+  `TypeError: Cannot mix BigInt and other types` inside upstream's `types/bigint`'s `log2`,
+  reached from `fjs/server/fjs_run`'s `utf8ToString(readResult[1])` — the value a `step`
+  continuation receives is no longer what that line assumes, which is precisely the Effect
+  migration.
+
+Do not read the 123 as a stage-3 estimate: fixing the Effect system leaves the 54 exactly where
+they are.
