@@ -371,6 +371,22 @@ export const form6781 = taxParamSet => inputs => {
             return aggregateDisagreementRefusal(
                 document.documentHash)(stored)(computed)(absentBoxes)
         }
+        // **`stored`, and the guard above makes that an EQUIVALENT MUTANT** —
+        // recorded here because it is a property of this code nobody had
+        // written down until a mutation went looking. Replacing `stored` with
+        // `computed` on this line changes the source and cannot turn red at
+        // any input, because the two are equal by the three lines above it.
+        // Measured: the whole suite stayed green at 2,938 leaves.
+        //
+        // That does NOT make the choice arbitrary, and the mutation that
+        // bites says why: weaken the guard AND take `computed`, and four
+        // leaves redden. What the pair encodes is that this engine takes the
+        // BROKER'S reported aggregate and refuses when its own arithmetic
+        // disagrees — it never reconstructs the figure and quietly files it,
+        // which is exactly what {@link missingAggregateRefusal}'s message
+        // promises a reader. `stored` is the honest token even where it is
+        // an unobservable one, and a later edit that removes the guard must
+        // not find `computed` already sitting here.
         line1Rows.push({ identification: document.documentHash, aggregateCents: stored })
         // The citation is box 11 — the box the printed line actually takes.
         // The three components are cited nowhere, because nothing they touch

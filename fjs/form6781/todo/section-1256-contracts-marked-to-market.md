@@ -348,3 +348,92 @@ belongs in one place. The count stays 10; the evidence string grows to name both
 
 `expectedDroppedCount` 36 -> 32. `expectedMoneyFieldCount` stays 142 — no field was added or
 removed, four changed disposition.
+
+---
+
+## The mutation log
+
+Baseline before this work: **2,902 pass / 0 fail**, `tsc` clean. After: **2,938 pass / 0 fail**.
+Every mutation below compiled, was applied by line number with `git diff --numstat` confirming one
+insertion and one deletion per edited line, and was reverted with `git checkout --` before the
+next. The work was committed before the first mutation, per AGENTS.md.
+
+| # | mutation | compiled | red leaves |
+|---|---|---|---|
+| M1 | box 9's sign `-1n` -> `1n` (the identity becomes `8 + 9 + 10`) | yes | **12** — 7 in `fjs/form6781`, 3 in `fjs/form1040/core`, 2 in `fjs/report/tax_return` |
+| M2 | swap the 40/60 rates between Form 6781 lines 8 and 9 | yes | **11** — 8 in `fjs/form6781`, 3 in `fjs/form1040/core` |
+| M3 | Schedule D takes the LONG half on line 4 and the SHORT half on line 11 | yes | **6** — 3 in `fjs/schedule/d`, 3 in `fjs/form1040/core` |
+| M4 | the R2 cross-check never fires (`&& computed > 10n ** 12n`) | yes | **4** |
+| M5 | truncate toward zero instead of `halfUp`, in a form that keeps `of`/`halfUp` live | yes | **3** |
+| M6 | box 11 flipped back to `'dropped'` in the registry | yes | **2** — the count gate and the pin |
+| M6b | the FULL silencing: flipped AND `expectedDroppedCount` lowered to match | yes | **1** — `theKnownDefectsKeepTheirDisposition` alone |
+| M7 | the box 11 tripwire disjunct never fires (`&& false` inside `.some`) | yes | **4** |
+| M8 | the core computes Form 6781 and never hands it to Schedule D | yes | **6** |
+| M9 | line 1 takes `computed` instead of the stored box 11 | yes | **0 — EQUIVALENT MUTANT** |
+| M9b | the same intent in a form that bites: `computed` **and** the guard disabled | yes | **4** |
+| M10 | erase `${destination}` from both refusal messages | yes | **3** |
+| M11 | the short-term rate parameter `40 -> 41` | yes | **14** |
+| M13 | R1 never fires (`presentBoxes.length >= 0`) | yes | **1** |
+| M13b | R1 fires on every box-11-less document (`presentBoxes.length > 0`) | yes | **17** |
+| M14 | the straddle row's printed line degraded to a vague `'Schedule D'` | yes | **2** |
+| M15 | line 2 columns (b) and (c) swapped | yes | **3** |
+| M16 | line 3 SUBTRACTS the loss column instead of combining it | yes | **4** |
+| M17 | the citation names box 8 instead of box 11 (the VALUE is untouched) | yes | **2** |
+| M19 | Schedule D drops the Form 6781 citations while keeping its figures | yes | **5** |
+| M20 | the core never threads Form 6781's refusal | yes | **1** |
+
+### The one survivor, and what it taught
+
+**M9 is an equivalent mutant, and it is recorded at the site in `fjs/form6781/module.f.js`.**
+Replacing `aggregateCents: stored` with `aggregateCents: computed` cannot turn red at any input,
+because the `computed !== stored` guard three lines above makes the two equal. This is the shape
+AGENTS.md names — *"a mutation a neighbouring operation absorbs"* — and the instruction it gives
+was followed: M9b re-ran the same intent in a form that bites (disable the guard as well) and four
+leaves reddened. The choice of token is still not arbitrary, and the site now says why: the pair
+encodes that this engine files the BROKER'S reported aggregate and refuses when its own arithmetic
+disagrees, never the reverse, which is what R1's own message promises a reader.
+
+### Predictions that were wrong, and what the surprise was worth
+
+- **M2 was predicted to redden the two `fjs/report/tax_return` leaves. It did not.** Those leaves
+  assert 1040 line 7a, which is the SUM of the two halves — and `17,200 + 25,800` equals
+  `25,800 + 17,200`. This is exactly the transposition trap `fjs/schedule/d`'s Mutation Gate M2
+  exists for, reproduced one form up. It confirms that the load-bearing assertion for the split is
+  `income.scheduleD15Cents` inside `fjs/form1040/core`, not the line 7a total anywhere; a
+  return-level proof asserting only line 7a would have been decoration.
+- **M13b was predicted to redden three or four leaves. It reddened 17**, ten of them **pre-existing**
+  proofs in `fjs/form1040/core` and `fjs/report/tax_return` that have nothing to do with §1256 —
+  the basis-correction group, the Form 3922 refusal, the §1250 end-to-end chain. That is the
+  strongest available evidence for Q6's claim that this work neither widened nor narrowed the
+  existing 1099-B path: the moment Form 6781 starts refusing an ordinary brokerage document, a
+  third of the capital-gains suite says so.
+- **M19 was predicted to redden one citation assertion. It reddened five**, because
+  `fjs/report/line`'s `ReportLine.sources` is a NON-EMPTY tuple: a 1040 line 7a whose only
+  contributor lost its citation cannot be constructed at all. A property of the report layer this
+  work did not know it was relying on.
+- **M1 left four `fjs/form6781` leaves green, and each is explainable**: the two rounding leaves
+  and `aFirstYearTradersGenuinelyEmptyBoxNineComputes` all have box 9 at zero or absent, where
+  `-0 === +0`; and `componentsWithoutTheirAggregateAreRefused` hits R1 before the identity is ever
+  evaluated.
+
+### What M6b proves about the registry gate
+
+Flipping box 11 back to `'dropped'` alone reddens two leaves — but **both are mechanical**, and an
+agent trying to quiet a Form 6781 regression would fix them by lowering `expectedDroppedCount`,
+which M6b does. With the count lowered to match, the whole suite passes **except**
+`theKnownDefectsKeepTheirDisposition`. That leaf is the only thing standing between a future
+regression and a silent reclassification, which is why the four §1256 boxes were added to its
+pinned set in the same commit as the wiring.
+
+## One caveat about the `TAX-38` tag
+
+`TAX-38` is used throughout this work as a stable handle, following the precedent of `TAX-37`
+(Form 8962) and `TAX-39` (Form 7206). **Neither of those two has an entry in
+`.planning/REQUIREMENTS.md` either** — checked, not assumed: a grep for `TAX-36` through `TAX-39`
+across every markdown file in the repo finds exactly one hit, a prose mention in
+`fjs/schedule/1/todo/self-employed-health-insurance.md`. The highest TAX identifier that document
+actually traces is `TAX-35`. So three code-cited requirement IDs now have no requirement behind
+them. Recorded rather than quietly extended: `planning-truth-gate.test.js` checks that every
+requirement in REQUIREMENTS.md is traced and that every traced ID has a body, but nothing checks
+the reverse direction — that an ID cited in `fjs/**` exists at all — and this is the gap that lets
+it happen.
