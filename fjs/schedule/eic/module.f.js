@@ -40,7 +40,7 @@
  * | Printed input | This engine |
  * |---|---|
  * | Step 5 line 1 — 1040 line 1z | LIVE. Equals line 1a, since `householdEmployeeWages` through `nontaxableCombatPayElection` (lines 1b-1i) are all `fjs/return/scope` refusals |
- * | Step 5 line 2 — Medicaid waiver payments on Schedule 1 line 8s | zero: `otherIncome` refuses, and so does `medicaidWaiverPayments` |
+ * | Step 5 line 2 — Medicaid waiver payments on Schedule 1 line 8s | zero: `medicaidWaiverPayments` refuses, and as of the 2026-08-18 split its refusal row names Schedule 1 line 8s outright rather than a coarse `otherIncome` naming the whole block |
  * | Step 5 line 4 — nontaxable combat pay elected in | zero: `nontaxableCombatPayElection` refuses |
  * | Worksheet B line 1a — Schedule SE Part I line 3 | LIVE |
  * | Worksheet B line 1b — Schedule SE lines 4b and 5a | zero: `selfEmploymentOptionalMethods` and `churchEmployeeIncome` refuse |
@@ -122,7 +122,7 @@
  * | 1 — 1040 line 2b | (A) interest includible in gross income | COMPUTED, 1099-INT boxes 1 and 3 |
  * | 2 — 1040 line 2a, plus Form 8814 line 1b | (B) tax-exempt interest | COMPUTED, 1099-INT box 8. Form 8814 is `form8814ChildInterestAndDividends`, a scope refusal |
  * | 3 — 1040 line 3b | (A) dividends includible in gross income | COMPUTED, 1099-DIV box 1a |
- * | 4 — Schedule 1 line 8z from Form 8814 | (A) | zero: `otherIncome` refuses, and so does Form 8814 |
+ * | 4 — Schedule 1 line 8z from Form 8814 | (A) | zero: `otherIncomeNotListed` (line 8z's residual kind, 2026-08-18) refuses, and so does Form 8814 |
  * | 5-7 — 1040 line 7a floored at zero, less Form 4797 line 7 | (D) capital gain net income, §1222(9) | COMPUTED, floored. Form 4797 is `otherGainsOrLosses`, a scope refusal |
  * | 8-10 — Schedule E line 23b royalties, less line 20 | (C) net rent and royalty | see {@link rentAndRoyaltyRefusal} |
  * | 11-13 — passive income less passive losses | (E) net passive income | COMPUTED, see {@link disqualifiedPassiveIncomeCents} |

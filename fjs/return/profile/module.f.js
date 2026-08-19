@@ -170,7 +170,9 @@ export const kindVocabulary = /** @type {const} */ ([
     // whole of Part I -- taxable state and local refunds, alimony received,
     // business income on Schedule C, other gains on Form 4797, rental and
     // pass-through income on Schedule E, farm income on Schedule F, and the
-    // twenty-six lettered sub-lines at 8a-8z. A single kind covering that
+    // twenty-three lettered sub-lines at 8a-8z (8a through 8v and 8z; the
+    // remedy that said twenty-six was counting letters the form does not
+    // print). A single kind covering that
     // many distinct income items could only ever refuse them together, so
     // nothing on Part I was nameable and nothing on it could be reclassified
     // one line at a time. It is split here into one kind per printed line, in
@@ -194,7 +196,8 @@ export const kindVocabulary = /** @type {const} */ ([
     // order in this list, and that is history rather than design.
     //
     // Lines 9 and 10 get no kind either: line 9 is the TOTAL of the 8a-8z
-    // block `otherIncome` already covers, and line 10 is Part I's own total.
+    // block, which is now twenty-eight kinds of its own below, and line 10
+    // is Part I's own total.
     // A kind for either would be a declaration a taxpayer could never
     // truthfully make -- the identical reasoning Schedule 3's lines 7/8/14/15
     // already carry.
@@ -243,7 +246,65 @@ export const kindVocabulary = /** @type {const} */ ([
     'remicResidualInterest',                // Schedule E Part IV (38-39) -> Schedule 1 line 5 -> 8
     'netFarmRentalIncomeForm4835',          // Schedule E Part V line 40  -> Schedule 1 line 5 -> 8
     'farmIncomeOrLoss',                     // Schedule 1 line 6   -> 8
-    'otherIncome',                          // Schedule 1 line 8a-8z -> 8
+    // ── Schedule 1 line 8's own twenty-eight kinds (2026-08-18) ────────────
+    //
+    // `otherIncome` stood here as ONE kind for the whole of printed line 8 --
+    // twenty-three lettered sub-lines, from a net operating loss carried in
+    // from a year this engine does not hold, through gambling winnings,
+    // Alaska Permanent Fund dividends, jury duty pay, prizes, hobby income
+    // and stock options, to a write-in line the instructions leave open. A
+    // single kind covering that many unrelated facts could only refuse them
+    // together: a taxpayer with a Form 1099-C and a taxpayer with an
+    // Alaska dividend read the SAME sentence, naming neither document.
+    //
+    // Split off `f1040s1.pdf` (2025) and `i1040gi.pdf` (2025) pp. 90-93, one
+    // kind per printed sub-line, in the form's own order. The old remedy
+    // said "twenty-six lettered sub-lines"; the printed form has
+    // twenty-three -- 8a through 8v and 8z, with no 8w, 8x or 8y.
+    //
+    // **Two sub-lines get no kind here, because a kind for each already
+    // exists.** Line 8d is the Form 2555 foreign earned income exclusion,
+    // which `foreignEarnedIncomeForm2555` names; line 8s is the nontaxable
+    // Medicaid waiver payment, which `medicaidWaiverPayments` names at 1040
+    // line 1d. Both rows in `fjs/return/scope` are extended to name their
+    // Schedule 1 line as well, the way `section1202Gain` names both a
+    // 1099-DIV box and a Form 6251 line -- rather than a second declaration
+    // being invented for one taxpayer fact.
+    //
+    // **Line 8z is a WRITE-IN and is EIGHT kinds, not one.** Its
+    // instructions name seven examples and then leave the line open ("any
+    // taxable income not reported elsewhere"), so the seven are kinds and an
+    // eighth, `otherIncomeNotListed`, is the residual. Seven alone would
+    // assert a closed list the form refuses to close; the residual alone
+    // would be the coarse kind under a new name.
+    'netOperatingLossDeduction',                       // Schedule 1 line 8a  -> 8
+    'gamblingWinnings',                                // Schedule 1 line 8b  -> 8
+    'cancellationOfDebt',                              // Schedule 1 line 8c  -> 8
+    'form8853MsaAndLongTermCareIncome',                // Schedule 1 line 8e  -> 8
+    'healthSavingsAccountIncome',                      // Schedule 1 line 8f  -> 8
+    'alaskaPermanentFundDividends',                    // Schedule 1 line 8g  -> 8
+    'juryDutyPay',                                     // Schedule 1 line 8h  -> 8
+    'prizesAndAwards',                                 // Schedule 1 line 8i  -> 8
+    'notForProfitActivityIncome',                      // Schedule 1 line 8j  -> 8
+    'stockOptionIncome',                               // Schedule 1 line 8k  -> 8
+    'personalPropertyRentalIncome',                    // Schedule 1 line 8l  -> 8
+    'olympicAndParalympicMedals',                      // Schedule 1 line 8m  -> 8
+    'section951Inclusion',                             // Schedule 1 line 8n  -> 8
+    'section951AInclusion',                            // Schedule 1 line 8o  -> 8
+    'excessBusinessLossAdjustment',                    // Schedule 1 line 8p  -> 8
+    'ableAccountDistributions',                        // Schedule 1 line 8q  -> 8
+    'scholarshipAndFellowshipGrants',                  // Schedule 1 line 8r  -> 8
+    'nonqualifiedDeferredCompensationPension',         // Schedule 1 line 8t  -> 8
+    'wagesEarnedWhileIncarcerated',                    // Schedule 1 line 8u  -> 8
+    'digitalAssetOrdinaryIncome',                      // Schedule 1 line 8v  -> 8
+    'recoveriesOfAmountsDeductedInAnEarlierYear',      // Schedule 1 line 8z  -> 8
+    'reemploymentTradeAdjustmentAssistance',           // Schedule 1 line 8z  -> 8
+    'lossOnCorrectiveDistributionsOfExcessDeferrals',  // Schedule 1 line 8z  -> 8
+    'insurancePolicyDividendsExceedingPremiums',       // Schedule 1 line 8z  -> 8
+    'charitableContributionDeductionRecapture',        // Schedule 1 line 8z  -> 8
+    'disasterReliefPayments',                          // Schedule 1 line 8z  -> 8
+    'educationSavingsAccountDistributions',            // Schedule 1 line 8z  -> 8
+    'otherIncomeNotListed',                            // Schedule 1 line 8z  -> 8
     // ── Schedule 1 Part II's own lines, one kind each (TAX-23/24, Phase 24) ─
     //
     // `scheduleOneAdjustments` stood here as ONE coarse kind for the whole of
@@ -282,7 +343,33 @@ export const kindVocabulary = /** @type {const} */ ([
     'iraDeduction',                         // Schedule 1 line 20  -> 10
     'studentLoanInterestDeduction',         // Schedule 1 line 21  -> 10
     'archerMsaDeduction',                   // Schedule 1 line 23  -> 10
-    'otherAdjustments',                     // Schedule 1 line 24a-24z -> 10
+    // ── Schedule 1 line 24's own ten kinds (2026-08-18) ────────────────────
+    //
+    // `otherAdjustments` stood here as ONE kind for the whole of printed line
+    // 24, and the same argument applies as at line 8 above. Split off
+    // `f1040s1.pdf` (2025) page 2 and `i1040gi.pdf` (2025) pp. 99-100, one
+    // kind per printed sub-line. The old remedy said "eleven lettered
+    // sub-lines"; the printed form has twelve, 24a through 24k and 24z.
+    //
+    // **Line 24j gets no kind here**: the Form 2555 housing deduction is the
+    // same taxpayer fact as line 8d's exclusion, and
+    // `foreignEarnedIncomeForm2555` names it.
+    //
+    // **Line 24z gets no kind at all**, and this is the one place in this
+    // vocabulary where a write-in line does not. Its whole 2025 instruction
+    // reads "Leave line 24z blank" (i1040gi p100), so there is nothing a
+    // taxpayer could truthfully declare -- the same reasoning that gives a
+    // reserved line and a total line no kind.
+    'juryDutyPayGivenToEmployer',                 // Schedule 1 line 24a -> 10
+    'personalPropertyRentalExpenses',             // Schedule 1 line 24b -> 10
+    'olympicAndParalympicMedalsExclusion',        // Schedule 1 line 24c -> 10
+    'reforestationAmortizationAndExpenses',       // Schedule 1 line 24d -> 10
+    'tradeActSupplementalUnemploymentRepayment',  // Schedule 1 line 24e -> 10
+    'section501c18DPensionContributions',         // Schedule 1 line 24f -> 10
+    'chaplainSection403bContributions',           // Schedule 1 line 24g -> 10
+    'unlawfulDiscriminationClaimAttorneyFees',    // Schedule 1 line 24h -> 10
+    'irsWhistleblowerAwardAttorneyFees',          // Schedule 1 line 24i -> 10
+    'excessDeductionsOfSection67eExpenses',       // Schedule 1 line 24k -> 10
     'itemizedDeductions',                   // 12e
     'netQualifiedDisasterLoss',             // 12e exception 5
     'qualifiedBusinessIncomeDeduction',     // 13a
@@ -376,8 +463,8 @@ export const kindVocabulary = /** @type {const} */ ([
     // Line 2b (a state or local tax refund) gets no kind either, and that is
     // the one case where a zero is COMPUTED rather than unmodeled:
     // `fjs/document/1099g` refuses a non-zero box 2 at validation, so
-    // Schedule 1 line 1 cannot be non-zero here, and line 8z is `otherIncome`,
-    // already above.
+    // Schedule 1 line 1 cannot be non-zero here, and line 8z's recovery is
+    // `recoveriesOfAmountsDeductedInAnEarlierYear`, already above.
     'amtDepletion',                         // Form 6251 line 2d -> Sch 2 line 2
     'amtNetOperatingLossDeduction',         // Form 6251 lines 2e/2f -> Sch 2 line 2
     'amtPrivateActivityBondInterest',       // Form 6251 line 2g -> Sch 2 line 2
@@ -392,7 +479,32 @@ export const kindVocabulary = /** @type {const} */ ([
     'amtResearchAndExperimentalCosts',      // Form 6251 line 2r -> Sch 2 line 2
     'amtPre1987InstallmentSales',           // Form 6251 line 2s -> Sch 2 line 2
     'amtIntangibleDrillingCosts',           // Form 6251 line 2t -> Sch 2 line 2
-    'amtOtherAdjustments',                  // Form 6251 line 3  -> Sch 2 line 2
+    // ── Form 6251 line 3's own seven kinds (2026-08-18) ────────────────────
+    //
+    // `amtOtherAdjustments` stood here as ONE kind for printed line 3. Split
+    // off `i6251.pdf` (2025) pp. 8-9, which gives line 3 seven named
+    // headings plus a "Related Adjustments" group.
+    //
+    // Six headings become kinds. The SEVENTH, "Net Qualified Disaster Loss",
+    // gets none: it is the same increased standard deduction
+    // `netQualifiedDisasterLoss` already names at 1040 line 12e, added back
+    // for the AMT, and that row is extended to name this line too.
+    //
+    // **"Related Adjustments" is ONE kind, `amtRelatedAdjustments`, and that
+    // is the one deliberate departure from one-kind-per-printed-fact in this
+    // whole split.** Its seven affected items share a single blocker exactly
+    // -- each is a limit recomputed on an AMT income base this engine does
+    // not compute -- the printed form takes them COMBINED into one line 3
+    // entry, and the instructions say "include the following", so the list is
+    // not closed. Seven kinds would be seven copies of one remedy asserting a
+    // closed set.
+    'amtPre1987Depreciation',                       // Form 6251 line 3   -> 17
+    'amtPollutionControlFacilities',                // Form 6251 line 3   -> 17
+    'amtTaxShelterFarmActivities',                  // Form 6251 line 3   -> 17
+    'amtCharitableContributionsOfCertainProperty',  // Form 6251 line 3   -> 17
+    'amtBusinessInterestLimitation',                // Form 6251 line 3   -> 17
+    'amtNonPrincipalResidenceMortgageInterest',     // Form 6251 line 3   -> 17
+    'amtRelatedAdjustments',                        // Form 6251 line 3   -> 17
     'selfEmploymentTax',                    // Schedule 2 line 4  -> 23
     // ── Phase 28 (TAX-31): the two Schedule SE facts nothing stored can
     // reveal, each its own kind because they are separate taxpayer facts
@@ -411,7 +523,46 @@ export const kindVocabulary = /** @type {const} */ ([
     'interestOnResidentialLotAndTimeshareInstallments', // Schedule 2 line 14 -> 23
     'interestOnDeferredInstallmentSaleTax', // Schedule 2 line 15 -> 23
     'lowIncomeHousingCreditRecapture',      // Schedule 2 line 16 -> 23
-    'otherAdditionalTaxes',                 // Schedule 2 line 17a-17z -> 23
+    // ── Schedule 2 line 17's own twenty kinds (2026-08-18) ─────────────────
+    //
+    // `otherAdditionalTaxes` stood here as ONE kind for the whole of printed
+    // line 17. Split off `f1040s2.pdf` (2025) page 2 and `i1040gi.pdf` (2025)
+    // pp. 113-114. The old remedy said "more than twenty lettered sub-lines";
+    // the printed form has eighteen, 17a through 17q and 17z.
+    //
+    // **Line 17a is FOUR kinds, not one.** Its instruction lists five
+    // numbered recaptures reaching four different forms, and the first two
+    // are both the Form 3468 investment credit recaptured through Form 4255,
+    // so they share one kind.
+    //
+    // **Lines 17p and 17q get no kind here**: both are interest from Form
+    // 8621, the same PFIC holding `form8621` already names at 1040 line 16.
+    //
+    // **Line 17z is a WRITE-IN and is TWO kinds plus an extension.** Its
+    // instructions name the prevailing wage and apprenticeship penalties
+    // (its own kind) and a negative Form 8978 adjustment (`form8978`, whose
+    // row is extended), and leave the line open -- so
+    // `otherAdditionalTaxesNotListed` is the residual.
+    'investmentCreditRecapture',                                // Schedule 2 line 17a -> 23
+    'newMarketsCreditRecapture',                                // Schedule 2 line 17a -> 23
+    'employerProvidedChildcareCreditRecapture',                 // Schedule 2 line 17a -> 23
+    'section6418TransferRecapture',                             // Schedule 2 line 17a -> 23
+    'federalMortgageSubsidyRecapture',                          // Schedule 2 line 17b -> 23
+    'hsaDistributionAdditionalTax',                             // Schedule 2 line 17c -> 23
+    'hsaIneligibleIndividualAdditionalTax',                     // Schedule 2 line 17d -> 23
+    'archerMsaDistributionAdditionalTax',                       // Schedule 2 line 17e -> 23
+    'medicareAdvantageMsaDistributionAdditionalTax',            // Schedule 2 line 17f -> 23
+    'charitableFractionalInterestRecaptureTax',                 // Schedule 2 line 17g -> 23
+    'section409ANonqualifiedPlanTax',                           // Schedule 2 line 17h -> 23
+    'section457ANonqualifiedPlanTax',                           // Schedule 2 line 17i -> 23
+    'section72m5ExcessBenefitsTax',                             // Schedule 2 line 17j -> 23
+    'goldenParachutePaymentsTax',                               // Schedule 2 line 17k -> 23
+    'accumulationDistributionOfTrustsTax',                      // Schedule 2 line 17l -> 23
+    'expatriatedCorporationInsiderStockCompensationExciseTax',  // Schedule 2 line 17m -> 23
+    'lookBackInterest',                                         // Schedule 2 line 17n -> 23
+    'nonresidentAlienNonEffectivelyConnectedIncomeTax',         // Schedule 2 line 17o -> 23
+    'prevailingWageAndApprenticeshipPenalties',                 // Schedule 2 line 17z -> 23
+    'otherAdditionalTaxesNotListed',                            // Schedule 2 line 17z -> 23
     // MISNAMED, and knowingly so. Printed Schedule 2 (Form 1040) 2025 line 19
     // is "Recapture of net EPE from Form 4255, line 1d, column (l)" -- an
     // elective payment election recapture with no connection to Form 8962.
@@ -437,24 +588,47 @@ export const kindVocabulary = /** @type {const} */ ([
     // the block as a whole, since every one of these feeds line 8 and thence
     // 1040 line 20.
     //
-    // **6a-6z stays ONE collapsed kind**, exactly as Schedule 1's
-    // `otherAdjustments` (24a-24z) and Schedule 2's `otherAdditionalTaxes`
-    // (17a-17z) do: the printed line 6 is a header over lettered sub-lines
-    // with no dollar box of its own, this engine models none of them, and
-    // inventing a kind per sub-line would put names in this frozen vocabulary
-    // that no work here read off the printed page.
+    // **6a-6z stayed ONE collapsed kind until 2026-08-18**, on the argument
+    // that "inventing a kind per sub-line would put names in this frozen
+    // vocabulary that no work here read off the printed page". That was a
+    // statement about the work, not about the form, and it is answered by
+    // doing the work: the eleven kinds in the block below are read off
+    // `f1040s3.pdf` (2025) and `i1040gi.pdf` (2025) p116.
     //
-    // Line 7 deliberately gets no kind: it is the TOTAL of the 6a-6z block
-    // `otherNonrefundableCredits` already covers, and line 8 is Part I's own
-    // total. A kind for either would be a declaration a taxpayer could never
-    // truthfully make.
+    // Line 7 deliberately gets no kind: it is the TOTAL of the 6a-6z block,
+    // and line 8 is Part I's own total. A kind for either would be a
+    // declaration a taxpayer could never truthfully make.
     'foreignTaxCredit',                     // Schedule 3 line 1  -> 20
     'dependentCareCredit',                  // Schedule 3 line 2  -> 20
     'educationCredits',                     // Schedule 3 line 3  -> 20
     'retirementSavingsContributionsCredit', // Schedule 3 line 4  -> 20
     'residentialCleanEnergyCredit',         // Schedule 3 line 5a -> 20
     'energyEfficientHomeImprovementCredit', // Schedule 3 line 5b -> 20
-    'otherNonrefundableCredits',            // Schedule 3 line 6a-6z -> 20
+    // ── Schedule 3 line 6's own eleven kinds (2026-08-18) ──────────────────
+    //
+    // `otherNonrefundableCredits` stood here as ONE kind for the whole of
+    // printed line 6, and the comment above -- written when this block was
+    // split and arguing that "inventing a kind per sub-line would put names
+    // in this frozen vocabulary that no work here read off the printed page"
+    // -- is what this split answers: the names below ARE read off the printed
+    // page, `f1040s3.pdf` (2025), and off `i1040gi.pdf` (2025) p116.
+    //
+    // **Line 6e gets no kind**: the printed form reserves it for future use.
+    // **Line 6l gets none either**: it is Form 8978's negative adjustment
+    // arriving as a credit, the same audit `form8978` already names.
+    // **Line 6z gets none at all**: its whole instruction reads "Leave
+    // line 6z blank" (i1040gi p116).
+    'generalBusinessCredit',                          // Schedule 3 line 6a  -> 20
+    'priorYearMinimumTaxCredit',                      // Schedule 3 line 6b  -> 20
+    'adoptionCredit',                                 // Schedule 3 line 6c  -> 20
+    'creditForTheElderlyOrDisabled',                  // Schedule 3 line 6d  -> 20
+    'newCleanVehicleCredit',                          // Schedule 3 line 6f  -> 20
+    'mortgageInterestCredit',                         // Schedule 3 line 6g  -> 20
+    'districtOfColumbiaFirstTimeHomebuyerCredit',     // Schedule 3 line 6h  -> 20
+    'qualifiedElectricVehicleCredit',                 // Schedule 3 line 6i  -> 20
+    'alternativeFuelVehicleRefuelingPropertyCredit',  // Schedule 3 line 6j  -> 20
+    'creditToHoldersOfTaxCreditBonds',                // Schedule 3 line 6k  -> 20
+    'previouslyOwnedCleanVehicleCredit',              // Schedule 3 line 6m  -> 20
     'federalTaxWithheldOnW2',               // 25a
     'federalTaxWithheldOn1099Int',          // 25b
     'federalTaxWithheldOnOther1099',        // 25b
@@ -469,8 +643,8 @@ export const kindVocabulary = /** @type {const} */ ([
     // `scheduleThreeRefundableCredits` stood here as ONE coarse kind for the
     // whole of Part II, and is split for the identical reason as Part I's
     // above. Every one of these feeds Schedule 3 line 15 and thence 1040 line
-    // 31; 13a-13z stays one collapsed kind, and lines 14 and 15 get none
-    // because they are totals.
+    // 31; 13a-13z is its own eight kinds as of 2026-08-18, and lines 14 and
+    // 15 get none because they are totals.
     //
     // **None of the five is MODELED after this phase.** TAX-25 and TAX-26
     // reach Part I's lines 3 and 4 only; Part II is untouched. `excessSocial\
@@ -483,7 +657,25 @@ export const kindVocabulary = /** @type {const} */ ([
     'amountPaidWithExtensionRequest',       // Schedule 3 line 10 -> 31
     'excessSocialSecurityWithheld',         // Schedule 3 line 11 -> 31
     'federalFuelTaxCredit',                 // Schedule 3 line 12 -> 31
-    'otherPaymentsAndRefundableCredits',    // Schedule 3 line 13a-13z -> 31
+    // ── Schedule 3 line 13's own eight kinds (2026-08-18) ──────────────────
+    //
+    // `otherPaymentsAndRefundableCredits` stood here as ONE kind for the
+    // whole of printed line 13. Split off `f1040s3.pdf` (2025) and
+    // `i1040gi.pdf` (2025) p117. The old remedy's "five lettered sub-lines"
+    // was right -- 13a, 13b, 13c, 13d and 13z.
+    //
+    // **Line 13z is a WRITE-IN and is FOUR kinds**: its instructions name
+    // three credits outright -- §960(c)'s excess limitation account, Form
+    // 8689's Virgin Islands allocation and Form 1062's farmland deferral --
+    // and leave the line open, so a residual stands beside them.
+    'form2439UndistributedCapitalGains',  // Schedule 3 line 13a -> 31
+    'section1341CreditForRepayment',      // Schedule 3 line 13b -> 31
+    'netElectivePaymentElectionAmount',   // Schedule 3 line 13c -> 31
+    'deferredNet965TaxLiability',         // Schedule 3 line 13d -> 31
+    'section960cExcessLimitationCredit',  // Schedule 3 line 13z -> 31
+    'usVirginIslandsTaxAllocation',       // Schedule 3 line 13z -> 31
+    'qualifiedFarmlandGainDeferral',      // Schedule 3 line 13z -> 31
+    'otherRefundableCreditsNotListed',    // Schedule 3 line 13z -> 31
     'foreignEarnedIncomeForm2555',          // line 16 wrapper
     'childsUnearnedIncomeForm8615',         // line 16 wrapper
     'farmIncomeAveragingScheduleJ',         // line 16 wrapper
@@ -1412,14 +1604,14 @@ const expectedMoneyBoxFieldCount = 5
  * one and no to the others.
  * @type {number}
  */
-const expectedKindCount = 117
+const expectedKindCount = 195
 
 export const proof = {
     dialectAndMediaType: () => {
         assertEq(dialect, 'vnd.fjs.return_profile')
         assertEq(mediaType, 'application/vnd.fjs.return_profile+json')
     },
-    kindVocabularyIsExactlyOneHundredAndSeventeen: () => {
+    kindVocabularyIsExactlyOneHundredAndNinetyFive: () => {
         assertEq(kindVocabulary.length, expectedKindCount)
         assertEq(new Set(kindVocabulary).size, kindVocabulary.length)
     },

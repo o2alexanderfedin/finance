@@ -561,7 +561,9 @@ export const scheduleOnePartI = input => {
     }
     const line6 = zero('Schedule 1 line 6 (farm income/loss, Schedule F)')
     const line7 = unemploymentCompensationLine(profile)(unemploymentForms)
-    // 8. "Other income" -- a collapsed stand-in for 8a-8z (26 sub-lines);
+    // 8. "Other income" -- a collapsed stand-in for 8a-8z (23 printed
+    //    sub-lines, 8a through 8v and 8z; the "26" this comment carried until
+    //    2026-08-18 counted letters the form does not print);
     //    see this module's own docstring, "The 26/11 sub-line collapses".
     const line8 = zero('Schedule 1 line 8 (other income, 8a-8z collapsed -- none separately reachable)')
     // 9. "Total other income. Add lines 8a through 8z" -- the SAME total,
@@ -1409,8 +1411,10 @@ export const scheduleOnePartIIExceptStudentLoanInterest = taxParamSet => input =
     // 22. "Reserved for future use" -- the form's own inert line.
     const line22 = zero('Schedule 1 line 22 (reserved for future use)')
     const line23 = zero('Schedule 1 line 23 (Archer MSA deduction)')
-    // 24. "Other adjustments" -- a collapsed stand-in for 24a-24z (11
-    //     sub-lines); see this module's own docstring.
+    // 24. "Other adjustments" -- a collapsed stand-in for 24a-24z (12 printed
+    //     sub-lines, 24a through 24k and 24z, of which the instructions say to
+    //     leave 24z blank; this comment said 11 until 2026-08-18); see this
+    //     module's own docstring.
     const line24 = zero('Schedule 1 line 24 (other adjustments, 24a-24z collapsed -- none separately reachable)')
     // 25. "Total other adjustments. Add lines 24a through 24z" -- the SAME
     //     total, restated as its own printed line.

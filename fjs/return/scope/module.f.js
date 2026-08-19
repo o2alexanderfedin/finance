@@ -63,7 +63,7 @@
  *
  * ## The partition, and why `tsc` owns it
  *
- * Every one of the one hundred and fourteen kinds is either in {@link modeledKinds} or carries an
+ * Every one of the one hundred and ninety-five kinds is either in {@link modeledKinds} or carries an
  * entry in {@link unmodeledKindRefusals}. There is deliberately no third
  * option: {@link _EveryKindIsEitherModeledOrRefused} states the partition as a
  * conditional type, so a kind added to the vocabulary and classified nowhere
@@ -434,6 +434,60 @@
  * because this phase MODELS that kind,
  * {@link modeledKindDeclarationRemedies} gains its third entry.
  *
+ * ## The last six coarse kinds, split on 2026-08-18
+ *
+ * Six rows in {@link unmodeledKindRefusals} still named a printed line that
+ * collapses many unrelated facts — `otherIncome` (Schedule 1 line 8a-8z),
+ * `otherAdjustments` (24a-24z), `otherAdditionalTaxes` (Schedule 2 line
+ * 17a-17z), `otherNonrefundableCredits` (Schedule 3 line 6a-6z),
+ * `otherPaymentsAndRefundableCredits` (13a-13z) and `amtOtherAdjustments`
+ * (Form 6251 line 3). They are eighty-four rows now, and **nothing is
+ * reclassified**: {@link expectedModeledKindCount} does not move, and
+ * `theSplitReclassifiedNothing` is the leaf that says so by set equality
+ * rather than by the length comparison a swap would survive.
+ *
+ * The spec, the fact lists and the instruction pages every one was read off
+ * are in `fjs/return/scope/todo/split-the-six-coarse-kinds.md`. Three things
+ * from it belong here, because they are properties of this table rather than
+ * of that phase:
+ *
+ * 1. **The rule is one kind per fact a taxpayer can truthfully declare
+ *    having** — Phase 30's own words, and the default reading is one kind per
+ *    printed lettered sub-line. It has three riders. A printed line with no
+ *    fact behind it gets no kind: Schedule 3 line 6e is *Reserved for future
+ *    use*, and the whole 2025 instruction for Schedule 1 line 24z and
+ *    Schedule 3 line 6z is "Leave line 24z blank" / "Leave line 6z blank".
+ *    A WRITE-IN line gets one kind per example the instructions name PLUS a
+ *    residual, because the line is defined as open and a closed list would be
+ *    a lie in the other direction. And where one form this engine does not
+ *    have feeds two printed lines that nobody can declare separately, ONE
+ *    kind names both — `section1202Gain`'s precedent, which is why five
+ *    existing rows absorbed seven of the sub-lines instead of seven new kinds
+ *    being invented for facts already declarable.
+ * 2. **The one deliberate departure** is Form 6251 line 3's *Related
+ *    Adjustments*, which is one kind rather than the seven its bullet list
+ *    would give. All seven share one blocker exactly — a limit recomputed on
+ *    an AMT income base this engine does not compute — the printed form takes
+ *    them combined into one entry, and the instructions say "include the
+ *    following", so seven kinds would assert a closed set. The reason is
+ *    written into `amtRelatedAdjustments`' own remedy, at the site.
+ * 3. **Three of the six remedies were wrong about their own printed form**,
+ *    which is what reading it rather than the remedy turns up first: line 8
+ *    prints twenty-three lettered sub-lines and the remedy said twenty-six,
+ *    line 24 prints twelve and the remedy said eleven, line 17 prints
+ *    eighteen and the remedy said "more than twenty". A count nothing
+ *    compares to anything is the shape this file already knows.
+ *
+ * **What the split found is worth more than the split.** `vnd.fjs.w2` stores
+ * `box11NonqualifiedPlans`, validates it for exactness, and no computation
+ * reads it — the fourth ingest-and-drop after `box2EarlyWithdrawalPenalty`,
+ * `box6ForeignTaxPaid` and `box10DependentCareBenefits`, and the box Schedule
+ * 1 line 8t's instructions point at. It is REPORTED rather than wired, and the
+ * reason is in `nonqualifiedDeferredCompensationPension`'s remedy: unlike the
+ * other three, the figure alone is not enough, because box 11 amounts are
+ * already inside box 1 and moving one without removing it there double-counts
+ * it while removing it changes earned income.
+ *
  * @module
  */
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
@@ -642,7 +696,7 @@ const modeledKindNames = modeledKinds
 // ── The refusal table ────────────────────────────────────────────────────────
 
 /**
- * The sixty-eight declared kinds this engine does not model, each naming the
+ * The one hundred and forty-three declared kinds this engine does not model, each naming the
  * form line that cannot be computed, a human label, and the remedy — the form
  * or schedule required and, where one exists, the requirement ID and phase
  * that will supply it. `10-RESEARCH.md`'s "Form 1040 Lines 1a-37" table is the
@@ -716,7 +770,7 @@ const modeledKindNames = modeledKinds
 export const unmodeledKindRefusals = /** @type {const} */ ([
     { kind: 'householdEmployeeWages', line: '1040 line 1b', label: 'household employee wages', remedy: 'no dialect models it (no phase yet)' },
     { kind: 'unreportedTips', line: '1040 line 1c', label: 'unreported tips', remedy: 'requires Form 4137 (no phase yet)' },
-    { kind: 'medicaidWaiverPayments', line: '1040 line 1d', label: 'nontaxable Medicaid waiver payments', remedy: 'no dialect models it (no phase yet)' },
+    { kind: 'medicaidWaiverPayments', line: '1040 line 1d, and Schedule 1 line 8s -> 1040 line 8', label: 'nontaxable Medicaid waiver payments', remedy: 'no dialect models it. ONE kind names both printed lines because they are one fact seen twice: the payment goes on 1040 line 1a or 1d and the SAME amount comes back out on Schedule 1 line 8s as a negative, so a taxpayer could not truthfully declare one half (no phase yet)' },
     { kind: 'adoptionBenefits', line: '1040 line 1f', label: 'employer-provided adoption benefits', remedy: 'requires Form 8839 (no phase yet)' },
     { kind: 'form8919Wages', line: '1040 line 1g', label: 'Form 8919 wages', remedy: 'requires Form 8919 (no phase yet)' },
     { kind: 'otherEarnedIncome', line: '1040 line 1h', label: 'other earned income', remedy: 'no dialect models it (no phase yet)' },
@@ -771,7 +825,62 @@ export const unmodeledKindRefusals = /** @type {const} */ ([
     { kind: 'remicResidualInterest', line: 'Schedule E Part IV lines 38-39 -> Schedule 1 line 5 -> 1040 line 8', label: 'real estate mortgage investment conduit (REMIC) residual interest', remedy: 'requires Schedule Q (Form 1066), and §860E(a) taxes the excess inclusion whether or not it was received and forbids offsetting it with any net operating loss — so a zero here is not merely an omission but a floor this engine cannot enforce (no phase yet)' },
     { kind: 'netFarmRentalIncomeForm4835', line: 'Schedule E Part V line 40 -> Schedule 1 line 5 -> 1040 line 8', label: 'net farm rental income or loss', remedy: 'requires Form 4835, which a landowner uses for crop-share rents received without materially participating — and materially participating instead moves the whole activity to Schedule F, which `farmIncomeOrLoss` already refuses. Neither form is modeled (no phase yet)' },
     { kind: 'farmIncomeOrLoss', line: 'Schedule 1 line 6 -> 1040 line 8', label: 'farm income or loss', remedy: 'requires Schedule F (no phase yet)' },
-    { kind: 'otherIncome', line: 'Schedule 1 line 8a-8z -> 1040 line 8', label: 'other income', remedy: 'the printed form itself collapses twenty-six lettered sub-lines here — among them net operating loss, gambling winnings, jury duty pay, cancellation of debt and the taxable Olympic-medal exclusion — and this engine models none of them (no phase yet)' },
+    // ── Schedule 1 line 8's twenty-eight kinds (2026-08-18) ────────────────
+    //
+    // `otherIncome` stood here as ONE row for the whole of printed line 8. Its
+    // remedy read "the printed form itself collapses twenty-six lettered
+    // sub-lines here — among them net operating loss, gambling winnings, jury
+    // duty pay, cancellation of debt and the taxable Olympic-medal exclusion —
+    // and this engine models none of them (no phase yet)", which is a sentence
+    // a taxpayer can do nothing with: it names a form, a count and a sample,
+    // and never the document THEY are missing. It was also wrong about the
+    // count — `f1040s1.pdf` (2025) prints twenty-THREE lettered sub-lines,
+    // 8a through 8v and 8z, with no 8w, 8x or 8y.
+    //
+    // Each row below names one printed sub-line and the document, form or
+    // determination that would supply it, read off `f1040s1.pdf` (2025) and
+    // `i1040gi.pdf` (2025) pp. 90-93. Nothing is reclassified: all
+    // twenty-eight refuse, and `expectedModeledKindCount` does not move.
+    //
+    // Two of the twenty-three sub-lines have no row here, because a row for
+    // each already existed and was EXTENDED rather than duplicated — 8d
+    // (`foreignEarnedIncomeForm2555`) and 8s (`medicaidWaiverPayments`). That
+    // is `section1202Gain`'s precedent, five rows below: one kind naming both
+    // printed lines rather than a second declaration for one taxpayer fact.
+    //
+    // Line 8z is EIGHT rows. Its instructions name seven examples and then
+    // leave the line open ("any taxable income not reported elsewhere on your
+    // return or other schedules"), so seven rows name the examples and
+    // `otherIncomeNotListed` is the residual that says, in its own remedy,
+    // that no single form closes it.
+    { kind: 'netOperatingLossDeduction', line: 'Schedule 1 line 8a -> 1040 line 8', label: 'a net operating loss deduction from an earlier year', remedy: 'requires Form 172 and the earlier year’s loss: an NOL is carried forward from a return this engine does not hold, since it models one tax year (no phase yet)' },
+    { kind: 'gamblingWinnings', line: 'Schedule 1 line 8b -> 1040 line 8', label: 'gambling winnings not attributable to a trade or business', remedy: 'requires a Form W-2G dialect, which does not exist here. The losses that offset them are Schedule A line 16 and are capped at the winnings, so a winnings figure without a losses figure would overstate tax for anyone who itemizes (no phase yet)' },
+    { kind: 'cancellationOfDebt', line: 'Schedule 1 line 8c -> 1040 line 8', label: 'cancellation of debt', remedy: 'requires a Form 1099-C dialect and the Pub. 4681 exclusion determination — insolvency, bankruptcy or qualified principal residence indebtedness — without which a box 2 amount that is not taxable at all would be taxed in full (no phase yet)' },
+    { kind: 'form8853MsaAndLongTermCareIncome', line: 'Schedule 1 line 8e -> 1040 line 8', label: 'taxable Archer MSA, Medicare Advantage MSA and long-term care insurance income', remedy: 'requires Form 8853 lines 8, 12 and 26, which this engine does not compute and no dialect reports (no phase yet)' },
+    { kind: 'healthSavingsAccountIncome', line: 'Schedule 1 line 8f -> 1040 line 8', label: 'taxable health savings account income', remedy: 'requires Form 8889 lines 16 and 20. `fjs/schedule/1` reads Form W-2 box 12 code W for the line 13 DEDUCTION, but nothing stored reports a DISTRIBUTION, and the income half cannot be inferred from the contribution half (no phase yet)' },
+    { kind: 'alaskaPermanentFundDividends', line: 'Schedule 1 line 8g -> 1040 line 8', label: 'Alaska Permanent Fund dividends', remedy: 'no dialect models the Alaska Department of Revenue’s annual dividend statement, and the amount reaches no federal information return this engine reads (no phase yet)' },
+    { kind: 'juryDutyPay', line: 'Schedule 1 line 8h -> 1040 line 8', label: 'jury duty pay', remedy: 'no dialect models it — a court pays it on no federal information return this engine reads. The matching deduction for pay turned over to an employer is Schedule 1 line 24a and is its own kind (no phase yet)' },
+    { kind: 'prizesAndAwards', line: 'Schedule 1 line 8i -> 1040 line 8', label: 'prizes and awards', remedy: 'requires a Form 1099-MISC dialect (box 3), which does not exist here (no phase yet)' },
+    { kind: 'notForProfitActivityIncome', line: 'Schedule 1 line 8j -> 1040 line 8', label: 'income from an activity not engaged in for profit', remedy: 'requires the §183 hobby-versus-business determination that decides whether the income belongs here or on Schedule C, and no dialect records it (no phase yet)' },
+    { kind: 'stockOptionIncome', line: 'Schedule 1 line 8k -> 1040 line 8', label: 'income from the exercise of stock options not reported on 1040 line 1h', remedy: 'requires the exercise price and the fair market value at exercise for a NONSTATUTORY option that never went through payroll. `vnd.fjs.form3921` records an INCENTIVE stock option exercise under §422, which is not this line — its spread is a Form 6251 preference, not ordinary income (no phase yet)' },
+    { kind: 'personalPropertyRentalIncome', line: 'Schedule 1 line 8l -> 1040 line 8', label: 'income from the rental of personal property engaged in for profit but not as a business', remedy: 'no dialect models it, and the for-profit-but-not-a-business determination that keeps it off Schedule C is the taxpayer’s. The matching expenses are Schedule 1 line 24b and are their own kind (no phase yet)' },
+    { kind: 'olympicAndParalympicMedals', line: 'Schedule 1 line 8m -> 1040 line 8', label: 'the value of Olympic and Paralympic medals and USOC prize money', remedy: 'requires a Form 1099-MISC dialect (box 3). The §74(d) nontaxable offset is Schedule 1 line 24c and is its own kind, and it needs adjusted gross income figured INCLUDING this amount (no phase yet)' },
+    { kind: 'section951Inclusion', line: 'Schedule 1 line 8n -> 1040 line 8', label: 'a section 951(a) subpart F inclusion', remedy: 'requires Forms 5471, Schedule I lines 1a through 1h and line 2, and no dialect models a controlled foreign corporation return (no phase yet)' },
+    { kind: 'section951AInclusion', line: 'Schedule 1 line 8o -> 1040 line 8', label: 'a section 951A(a) global intangible low-taxed income inclusion', remedy: 'requires Form 8992 Part II line 5, and no dialect models it (no phase yet)' },
+    { kind: 'excessBusinessLossAdjustment', line: 'Schedule 1 line 8p -> 1040 line 8', label: 'the section 461(l) excess business loss adjustment', remedy: 'requires Form 461 line 16, which limits an aggregate trade-or-business loss across every business the taxpayer has — this engine models one Schedule C and does not aggregate (no phase yet)' },
+    { kind: 'ableAccountDistributions', line: 'Schedule 1 line 8q -> 1040 line 8', label: 'taxable distributions from an ABLE account', remedy: 'requires Form 1099-QA and the designated beneficiary’s qualified disability expenses for the year, neither of which any dialect models (no phase yet)' },
+    { kind: 'scholarshipAndFellowshipGrants', line: 'Schedule 1 line 8r -> 1040 line 8', label: 'scholarship and fellowship grants not reported on Form W-2', remedy: '`vnd.fjs.1098t` box 5 records scholarships or grants and `fjs/schedule/3` already reads it, but the TAXABLE part is what was not spent on tuition and course-related expenses — room, board and travel — and no document reports what the money was spent on, nor whether the taxpayer was a degree candidate (no phase yet)' },
+    { kind: 'nonqualifiedDeferredCompensationPension', line: 'Schedule 1 line 8t -> 1040 line 8', label: 'a pension or annuity from a nonqualified deferred compensation plan or a nongovernmental section 457 plan', remedy: 'the amount is Form W-2 box 11, which `vnd.fjs.w2` STORES as `box11NonqualifiedPlans` and no computation reads. What is missing is not the figure but a decision: box 11 amounts are already inside box 1, which `fjs/form1040/core` puts on 1040 line 1a in full, so carrying one here without removing it there double-counts it — and removing it changes earned income, and with it the earned income credit (no phase yet)' },
+    { kind: 'wagesEarnedWhileIncarcerated', line: 'Schedule 1 line 8u -> 1040 line 8', label: 'wages earned while incarcerated', remedy: 'the amount arrives on a Form W-2 or a Form 1099 that does not distinguish it, and no dialect records the penal-institution fact that moves it off 1040 line 1a (no phase yet)' },
+    { kind: 'digitalAssetOrdinaryIncome', line: 'Schedule 1 line 8v -> 1040 line 8', label: 'ordinary income received in digital assets and not reported elsewhere', remedy: 'requires a Form 1099-DA dialect, which does not exist here — and forks, staking and mining income often arrives on no information return at all (no phase yet)' },
+    { kind: 'recoveriesOfAmountsDeductedInAnEarlierYear', line: 'Schedule 1 line 8z -> 1040 line 8', label: 'recoveries of amounts deducted in an earlier year', remedy: 'requires the Pub. 525 tax-benefit rule, whose input is the PRIOR year’s return — this engine models one tax year. It is the same blocker `taxableStateLocalRefunds` carries on printed line 1, and the two of them together are what keep Form 6251 line 2b a computed zero (no phase yet)' },
+    { kind: 'reemploymentTradeAdjustmentAssistance', line: 'Schedule 1 line 8z -> 1040 line 8', label: 'reemployment trade adjustment assistance (RTAA) payments', remedy: 'the amount is Form 1099-G box 5, which `vnd.fjs.1099g` REFUSES at storage when non-zero rather than dropping it. Nothing else is missing: what this line needs is a computation to carry the box here (no phase yet)' },
+    { kind: 'lossOnCorrectiveDistributionsOfExcessDeferrals', line: 'Schedule 1 line 8z -> 1040 line 8', label: 'a loss on a corrective distribution of excess deferrals', remedy: 'requires the §402(g) excess deferral and the loss allocable to it; `vnd.fjs.1099r` carries the distribution but no field records which part is the corrective distribution or its allocable loss (no phase yet)' },
+    { kind: 'insurancePolicyDividendsExceedingPremiums', line: 'Schedule 1 line 8z -> 1040 line 8', label: 'dividends on an insurance policy that exceed the net premiums paid', remedy: 'requires the total of every net premium paid on the contract over its whole life, which no annual information return reports (no phase yet)' },
+    { kind: 'charitableContributionDeductionRecapture', line: 'Schedule 1 line 8z -> 1040 line 8', label: 'recapture of a charitable contribution deduction', remedy: 'requires the earlier year’s deduction — for a fractional interest in tangible personal property under Pub. 526, or for property the charity disposed of within three years — and this engine holds no prior-year return. The 10% ADDITIONAL TAX that travels with the fractional-interest case is Schedule 2 line 17g and is its own kind (no phase yet)' },
+    { kind: 'disasterReliefPayments', line: 'Schedule 1 line 8z -> 1040 line 8', label: 'the taxable part of disaster relief payments', remedy: 'requires the §139 determination of which payments reimbursed which expenses, and no dialect models a disaster relief payment (no phase yet)' },
+    { kind: 'educationSavingsAccountDistributions', line: 'Schedule 1 line 8z -> 1040 line 8', label: 'taxable distributions from a Coverdell education savings account or a qualified tuition program', remedy: 'requires Form 1099-Q and the beneficiary’s qualified education expenses for the year. `vnd.fjs.1098t` box 1 records tuition BILLED, which is neither the same figure nor enough — it excludes room and board and says nothing about a rollover (no phase yet)' },
+    { kind: 'otherIncomeNotListed', line: 'Schedule 1 line 8z -> 1040 line 8', label: 'other taxable income the printed line does not name', remedy: 'line 8z is a WRITE-IN. Its instructions define it as “any taxable income not reported elsewhere on your return or other schedules” and then give examples rather than a closed list — the seven they name are each their own kind above. This one is the residual, and no single form closes it: a taxpayer declaring it has to say what it is (no phase yet)' },
     // ── Schedule 1 Part II's thirteen per-line kinds (TAX-23/24, Phase 24) ──
     //
     // `scheduleOneAdjustments` -- one coarse row covering this whole block --
@@ -830,8 +939,29 @@ export const unmodeledKindRefusals = /** @type {const} */ ([
     { kind: 'selfEmployedHealthInsuranceDeduction', line: 'Schedule 1 line 17 -> 1040 line 10', label: 'the self-employed health insurance deduction', remedy: 'requires the Pub. 535 self-employed health insurance deduction worksheet. Both figures it once lacked now exist — Schedule C as of Phase 27 and §162(l)(2)(A)\u2019s net-earnings cap as of Phase 28 — and what remains missing is the premiums: no dialect here records what was paid for medical, dental or long-term-care coverage, nor whether the taxpayer was eligible for an employer plan in any month, which §162(l)(2)(B) disqualifies (no phase yet)' },
     { kind: 'alimonyPaid', line: 'Schedule 1 line 19a -> 1040 line 10', label: 'alimony paid', remedy: 'requires the recipient\u2019s SSN and the divorce-decree date, since only a pre-2019 decree makes alimony deductible, and no dialect models either (no phase yet)' },
     { kind: 'archerMsaDeduction', line: 'Schedule 1 line 23 -> 1040 line 10', label: 'the Archer MSA deduction', remedy: 'requires Form 8853 (no phase yet)' },
-    { kind: 'otherAdjustments', line: 'Schedule 1 line 24a-24z -> 1040 line 10', label: 'other adjustments to income', remedy: 'the printed form itself collapses eleven lettered sub-lines here and this engine models none of them (no phase yet)' },
-    { kind: 'netQualifiedDisasterLoss', line: '1040 line 12e', label: 'net qualified disaster loss', remedy: 'requires Form 4684 (no phase yet)' },
+    // ── Schedule 1 line 24's ten kinds (2026-08-18) ────────────────────────
+    //
+    // `otherAdjustments` stood here as ONE row reading "the printed form
+    // itself collapses eleven lettered sub-lines here and this engine models
+    // none of them (no phase yet)" — which named no sub-line, no form and no
+    // document, and miscounted: `f1040s1.pdf` (2025) page 2 prints twelve,
+    // 24a through 24k and 24z.
+    //
+    // Read off that page and `i1040gi.pdf` (2025) pp. 99-100. Line 24j has no
+    // row here because `foreignEarnedIncomeForm2555` names it, and line 24z
+    // has none because its entire 2025 instruction reads "Leave line 24z
+    // blank" — the one write-in line in this table with nothing behind it.
+    { kind: 'juryDutyPayGivenToEmployer', line: 'Schedule 1 line 24a -> 1040 line 10', label: 'the deduction for jury duty pay turned over to an employer', remedy: 'requires the Schedule 1 line 8h jury duty pay AND the fact that the employer kept paying salary and was repaid out of it, and no dialect models either (no phase yet)' },
+    { kind: 'personalPropertyRentalExpenses', line: 'Schedule 1 line 24b -> 1040 line 10', label: 'deductible expenses of a personal property rental engaged in for profit', remedy: 'requires the expenses of the Schedule 1 line 8l rental. `vnd.fjs.business_expenses` records SCHEDULE C expenses, and this rental is by definition not a business, so its expenses have no dialect (no phase yet)' },
+    { kind: 'olympicAndParalympicMedalsExclusion', line: 'Schedule 1 line 24c -> 1040 line 10', label: 'the nontaxable amount of Olympic and Paralympic medals and USOC prize money', remedy: 'requires the Schedule 1 line 8m amount, which has no dialect, and the §74(d) test against adjusted gross income figured INCLUDING it — $1,000,000, or $500,000 if married filing separately (no phase yet)' },
+    { kind: 'reforestationAmortizationAndExpenses', line: 'Schedule 1 line 24d -> 1040 line 10', label: 'reforestation amortization and expenses', remedy: 'requires the §194 election and the qualified timber property’s basis, amortized over 84 months through Form 4562 Part VI. `fjs/form4562` computes depreciation from `vnd.fjs.asset_register`, which models no timber property and carries no §194 election (no phase yet)' },
+    { kind: 'tradeActSupplementalUnemploymentRepayment', line: 'Schedule 1 line 24e -> 1040 line 10', label: 'repayment of supplemental unemployment benefits under the Trade Act of 1974', remedy: 'requires the repayment and the earlier year in which the benefit was included in income, and no dialect models either (no phase yet)' },
+    { kind: 'section501c18DPensionContributions', line: 'Schedule 1 line 24f -> 1040 line 10', label: 'contributions to a section 501(c)(18)(D) pension plan', remedy: 'requires the contribution and the Pub. 525 determination that the plan is a §501(c)(18)(D) plan created before 25 June 1959; no stored document states a plan’s type (no phase yet)' },
+    { kind: 'chaplainSection403bContributions', line: 'Schedule 1 line 24g -> 1040 line 10', label: 'contributions by a chaplain to a section 403(b) plan', remedy: 'requires the Pub. 517 determination that the chaplain is self-employed for this purpose, and the contribution; no dialect records either (no phase yet)' },
+    { kind: 'unlawfulDiscriminationClaimAttorneyFees', line: 'Schedule 1 line 24h -> 1040 line 10', label: 'attorney fees and court costs for an action involving an unlawful discrimination claim', remedy: 'the deduction is capped at the gross income from the action, so it needs BOTH the fees and the award — and no dialect models a settlement or how it was allocated (no phase yet)' },
+    { kind: 'irsWhistleblowerAwardAttorneyFees', line: 'Schedule 1 line 24i -> 1040 line 10', label: 'attorney fees and court costs paid in connection with an IRS whistleblower award', remedy: 'capped at the award includible in gross income, so it needs both figures, and no dialect models either (no phase yet)' },
+    { kind: 'excessDeductionsOfSection67eExpenses', line: 'Schedule 1 line 24k -> 1040 line 10', label: 'excess deductions of section 67(e) expenses from a terminating estate or trust', remedy: 'the amount is Schedule K-1 (Form 1041) box 11 code A, which `vnd.fjs.k1_1041` stores and `fjs/schedule/e`’s coded-box sweep REFUSES by name rather than dropping. What is missing is a computation that reads code A and carries it here — the same box also carries codes B, C and D, which belong elsewhere (no phase yet)' },
+    { kind: 'netQualifiedDisasterLoss', line: '1040 line 12e, and Form 6251 line 3 -> Schedule 2 line 2 -> 1040 line 17', label: 'net qualified disaster loss', remedy: 'requires Form 4684. The SAME increased standard deduction is added back for the alternative minimum tax on Form 6251 line 3 — one of that line\u2019s seven printed headings — so this one kind names both, rather than the line 3 split inventing a second declaration for one taxpayer fact (no phase yet)' },
     // ── Phase 28's own new row (TAX-32) ─────────────────────────────────────
     //
     // `qualifiedBusinessIncomeDeduction` stood HERE until Phase 28 and is now
@@ -888,7 +1018,7 @@ export const unmodeledKindRefusals = /** @type {const} */ ([
     // stock) is `section1202Gain`, both far above. Each of those two rows now
     // names its Form 6251 line alongside the line it already named.
     { kind: 'amtDepletion', line: 'Form 6251 line 2d -> Schedule 2 line 2 -> 1040 line 17', label: 'the alternative minimum tax depletion adjustment', remedy: 'requires the depletion deduction refigured under §57(a)(1) with AMT income and deductions, and with the §611 deduction limited to the property\'s AMT-adjusted basis — a per-property computation for which this engine holds no document at all (no phase yet)' },
-    { kind: 'amtNetOperatingLossDeduction', line: 'Form 6251 lines 2e and 2f -> Schedule 2 line 2 -> 1040 line 17', label: 'the net operating loss add-back and the alternative tax net operating loss deduction', remedy: 'requires the ATNOL: every prior year\'s loss refigured under the AMT rules, limited to 90% of alternative minimum taxable income figured without it. That is a multi-year history this engine does not hold, and Schedule 1 line 8a — the regular deduction line 2e adds back — is itself the refused `otherIncome` kind. ONE kind covers both printed lines because they are two halves of one fact: 2e removes the regular deduction and 2f allows the AMT one in its place (no phase yet)' },
+    { kind: 'amtNetOperatingLossDeduction', line: 'Form 6251 lines 2e and 2f -> Schedule 2 line 2 -> 1040 line 17', label: 'the net operating loss add-back and the alternative tax net operating loss deduction', remedy: 'requires the ATNOL: every prior year\'s loss refigured under the AMT rules, limited to 90% of alternative minimum taxable income figured without it. That is a multi-year history this engine does not hold, and Schedule 1 line 8a — the regular deduction line 2e adds back — is itself the refused `netOperatingLossDeduction` kind. ONE kind covers both printed lines because they are two halves of one fact: 2e removes the regular deduction and 2f allows the AMT one in its place (no phase yet)' },
     { kind: 'amtDispositionOfProperty', line: 'Form 6251 line 2k -> Schedule 2 line 2 -> 1040 line 17', label: 'the difference between the AMT and regular-tax gain or loss on a disposition', remedy: 'requires the taxpayer\'s AMT BASIS in the property disposed of, which differs from the regular-tax basis by every adjustment made in every prior year — most commonly the §56(b)(3) incentive stock option spread, which increases AMT basis in the year of exercise and reduces the AMT gain whenever the shares are later sold. This engine computes that spread (Form 6251 line 2i) but cannot carry it forward: it holds no prior-year AMT basis document, and Form 3921 is issued for the exercise year only (no phase yet)' },
     { kind: 'amtPassiveActivities', line: 'Form 6251 line 2m -> Schedule 2 line 2 -> 1040 line 17', label: 'the passive activity adjustment', remedy: 'requires §469 passive activity losses refigured with AMT amounts, which needs Form 8582 and the Schedule E activities behind it (Phase 30 brings Schedule E Parts II and III; Form 8582 has no phase yet)' },
     { kind: 'amtLossLimitations', line: 'Form 6251 line 2n -> Schedule 2 line 2 -> 1040 line 17', label: 'the loss-limitation adjustment', remedy: 'requires the §465 at-risk and §1366(d) basis limitations refigured with AMT amounts, both of which need a partner\'s or shareholder\'s basis history this engine does not hold (no phase yet)' },
@@ -898,7 +1028,32 @@ export const unmodeledKindRefusals = /** @type {const} */ ([
     { kind: 'amtResearchAndExperimentalCosts', line: 'Form 6251 line 2r -> Schedule 2 line 2 -> 1040 line 17', label: 'the research and experimental costs adjustment', remedy: 'requires §174A expenditures amortized over ten years for the AMT, and the §59(e) election that removes the adjustment. Neither the expenditure nor the election appears on any document this engine holds (no phase yet)' },
     { kind: 'amtPre1987InstallmentSales', line: 'Form 6251 line 2s -> Schedule 2 line 2 -> 1040 line 17', label: 'income from certain installment sales before January 1, 1987', remedy: 'requires the installment method disallowed for the AMT on pre-1987 dispositions — a thirty-nine-year-old transaction history this engine has no document type for and could not verify if it had (no phase yet)' },
     { kind: 'amtIntangibleDrillingCosts', line: 'Form 6251 line 2t -> Schedule 2 line 2 -> 1040 line 17', label: 'the intangible drilling costs preference', remedy: 'requires §57(a)(2)\'s excess intangible drilling costs over 65% of net income from oil, gas and geothermal properties, computed per property. No document this engine holds reports a drilling cost, and the §59(e) 60-month write-off election that removes the preference is unrecorded (no phase yet)' },
-    { kind: 'amtOtherAdjustments', line: 'Form 6251 line 3 -> Schedule 2 line 2 -> 1040 line 17', label: 'other alternative minimum tax adjustments, including income-based related adjustments', remedy: 'the printed line collapses every remaining §56/§57 item plus the "related adjustments" the instructions list — the §179 deduction, business use of a home, conservation expenses, taxable IRA distributions where prior-year IRA deductions differed for the AMT, the self-employed health insurance and retirement plan deductions, and the IRA deduction under §219(b)(1)(B)\'s earned income limitation. Each is a limit recomputed on an AMT income base, and this engine models no AMT income base for any of them (no phase yet)' },
+    // ── Form 6251 line 3's seven kinds (2026-08-18) ────────────────────────
+    //
+    // `amtOtherAdjustments` stood here as ONE row, and unlike the five other
+    // coarse rows this one's remedy DID name its contents — the §179
+    // deduction, business use of a home, conservation expenses and the rest.
+    // It was still coarse in the way that matters: one row means one refusal,
+    // so a taxpayer with a pre-1987 depreciation schedule and a taxpayer with
+    // an AMT Form 8990 were told the same thing, and neither could be
+    // reclassified without the other.
+    //
+    // Read off `i6251.pdf` (2025) pp. 8-9, which gives line 3 seven named
+    // headings and a "Related Adjustments" group. SIX of the headings are
+    // rows below. The seventh, "Net Qualified Disaster Loss", has none:
+    // `netQualifiedDisasterLoss` already names that standard deduction at
+    // 1040 line 12e and its row is extended to name this line too.
+    //
+    // "Related Adjustments" is ONE row, `amtRelatedAdjustments`, and it is
+    // the single deliberate departure from one-kind-per-printed-fact in this
+    // whole split — see its remedy, which states the reason at the site.
+    { kind: 'amtPre1987Depreciation', line: 'Form 6251 line 3 -> Schedule 2 line 2 -> 1040 line 17', label: 'the pre-1987-rules depreciation adjustment', remedy: 'requires every property depreciated under the Tax Reform Act of 1986 transitional rules refigured straight line — 19 years for 19-year real property, 15 for low-income housing — and `vnd.fjs.asset_register` records nothing placed in service before 1987 (no phase yet)' },
+    { kind: 'amtPollutionControlFacilities', line: 'Form 6251 line 3 -> Schedule 2 line 2 -> 1040 line 17', label: 'the pollution control facility amortization adjustment', remedy: 'requires the §169 election and the facility refigured under ADS or straight-line MACRS. `fjs/form4562` computes MACRS from `vnd.fjs.asset_register`, which has no §169 certified facility and no §169 election (no phase yet)' },
+    { kind: 'amtTaxShelterFarmActivities', line: 'Form 6251 line 3 -> Schedule 2 line 2 -> 1040 line 17', label: 'the tax shelter farm activity adjustment', remedy: 'requires every gain and loss of a §58(a)(2) NON-passive tax shelter farm activity refigured under the AMT, with each refigured loss suspended and carried forward indefinitely — a multi-year suspension this engine does not hold, and Schedule F is unmodeled besides (no phase yet)' },
+    { kind: 'amtCharitableContributionsOfCertainProperty', line: 'Form 6251 line 3 -> Schedule 2 line 2 -> 1040 line 17', label: 'the adjustment for a charitable contribution of property with a different AMT basis', remedy: 'requires the §170(e) property’s AMT basis, which differs from its regular-tax basis only where an earlier year’s AMT adjustment moved it — a carried basis this engine does not hold (no phase yet)' },
+    { kind: 'amtBusinessInterestLimitation', line: 'Form 6251 line 3 -> Schedule 2 line 2 -> 1040 line 17', label: 'the business interest limitation adjustment', remedy: 'requires a SECOND Form 8990 filled in with AMT amounts and the difference at its line 30; this engine computes no Form 8990 at all (no phase yet)' },
+    { kind: 'amtNonPrincipalResidenceMortgageInterest', line: 'Form 6251 line 3 -> Schedule 2 line 2 -> 1040 line 17', label: 'the adjustment for mortgage interest on a dwelling that is not a qualified dwelling for the AMT', remedy: 'requires which dwelling each Schedule A interest amount was paid on, and whether it is a qualified dwelling for the AMT — a houseboat and a recreational vehicle are not. `vnd.fjs.itemized_deductions` records the interest without the property it was paid on (no phase yet)' },
+    { kind: 'amtRelatedAdjustments', line: 'Form 6251 line 3 -> Schedule 2 line 2 -> 1040 line 17', label: 'the related adjustments — every item whose limit rests on an income base other than adjusted gross income', remedy: 'ONE kind rather than one per affected item, because all of them share a single blocker and the printed form takes them COMBINED into one line 3 entry: each is a limit recomputed on an AMT income base this engine does not compute. The instructions name the §179 deduction, business or rental use of a home, conservation expenses, taxable IRA distributions where prior-year IRA deductions differed for the AMT, the self-employed health insurance deduction, the self-employed SEP/SIMPLE/qualified plans deduction and the IRA deduction under §219(b)(1)(B)’s earned income limitation — and says “include the following”, so the list is not closed either (no phase yet)' },
     // ── Phase 28's own two new rows (TAX-31) ────────────────────────────────
     //
     // `selfEmploymentTax` stood HERE until Phase 28 and is now MODELED. The
@@ -914,7 +1069,42 @@ export const unmodeledKindRefusals = /** @type {const} */ ([
     { kind: 'interestOnResidentialLotAndTimeshareInstallments', line: 'Schedule 2 line 14 -> 1040 line 23', label: 'interest on the tax due on installment income from residential lots and timeshares', remedy: 'requires the §453(l)(3) computation, which no document this engine models supplies (no phase yet)' },
     { kind: 'interestOnDeferredInstallmentSaleTax', line: 'Schedule 2 line 15 -> 1040 line 23', label: 'interest on the deferred tax on installment sales over $150,000', remedy: 'requires the §453A(c) computation, which no document this engine models supplies (no phase yet)' },
     { kind: 'lowIncomeHousingCreditRecapture', line: 'Schedule 2 line 16 -> 1040 line 23', label: 'recapture of the low-income housing credit', remedy: 'requires Form 8611 (no phase yet)' },
-    { kind: 'otherAdditionalTaxes', line: 'Schedule 2 line 17a-17z -> 1040 line 23', label: 'other additional taxes', remedy: 'the printed form itself collapses more than twenty lettered sub-lines here and this engine models none of them (no phase yet)' },
+    // ── Schedule 2 line 17's twenty kinds (2026-08-18) ─────────────────────
+    //
+    // `otherAdditionalTaxes` stood here as ONE row reading "the printed form
+    // itself collapses more than twenty lettered sub-lines here and this
+    // engine models none of them (no phase yet)". "More than twenty" was a
+    // guess: `f1040s2.pdf` (2025) page 2 prints eighteen, 17a through 17q and
+    // 17z. Read off that page and `i1040gi.pdf` (2025) pp. 113-114.
+    //
+    // Line 17a is FOUR rows rather than one: its instruction lists five
+    // numbered recaptures reaching four different forms, and the first two
+    // are the same Form 3468 investment credit recaptured through Form 4255.
+    //
+    // Lines 17p and 17q have no row here — both are interest from Form 8621,
+    // and `form8621`'s row is extended to name them. Line 17z is two rows
+    // plus an extension: the prevailing wage and apprenticeship penalties,
+    // the residual, and `form8978`, whose negative adjustment lands here.
+    { kind: 'investmentCreditRecapture', line: 'Schedule 2 line 17a -> 1040 line 23', label: 'recapture of the investment credit', remedy: 'requires Form 4255 column (j) lines 1b, 1j, 1l and 1m together with the Form 3468 Part IV non-EPE recapture, and behind them the earlier year’s credit and the property’s remaining recapture period — this engine holds no prior-year return (no phase yet)' },
+    { kind: 'newMarketsCreditRecapture', line: 'Schedule 2 line 17a -> 1040 line 23', label: 'recapture of the new markets credit', remedy: 'requires Form 8874 and the earlier year’s credit, which this engine does not hold (no phase yet)' },
+    { kind: 'employerProvidedChildcareCreditRecapture', line: 'Schedule 2 line 17a -> 1040 line 23', label: 'recapture of the credit for employer-provided childcare facilities', remedy: 'requires Form 8882 and the earlier year’s credit, which this engine does not hold (no phase yet)' },
+    { kind: 'section6418TransferRecapture', line: 'Schedule 2 line 17a -> 1040 line 23', label: 'recapture attributable to a section 6418 credit transfer', remedy: 'requires Form 4255 column (m)(3), which records a credit BOUGHT from another taxpayer; nothing stored here records a transfer election (no phase yet)' },
+    { kind: 'federalMortgageSubsidyRecapture', line: 'Schedule 2 line 17b -> 1040 line 23', label: 'recapture of a federal mortgage subsidy', remedy: 'requires Form 8828 and the bond-financed loan behind it: the sale price, the holding period and the modified adjusted gross income at sale, none of which any dialect models (no phase yet)' },
+    { kind: 'hsaDistributionAdditionalTax', line: 'Schedule 2 line 17c -> 1040 line 23', label: 'the additional tax on health savings account distributions', remedy: 'requires Form 8889 line 17b — 20% of a distribution not used for qualified medical expenses. `vnd.fjs.w2` box 12 code W gives the CONTRIBUTION side only, and nothing stored reports a distribution or what it paid for (no phase yet)' },
+    { kind: 'hsaIneligibleIndividualAdditionalTax', line: 'Schedule 2 line 17d -> 1040 line 23', label: 'the additional tax for failing to remain an HSA-eligible individual', remedy: 'requires Form 8889 line 21 and the last-month rule’s testing period — a fact about the FOLLOWING year’s coverage, which a one-year engine cannot hold (no phase yet)' },
+    { kind: 'archerMsaDistributionAdditionalTax', line: 'Schedule 2 line 17e -> 1040 line 23', label: 'the additional tax on Archer MSA distributions', remedy: 'requires Form 8853 line 9b, and no dialect reports an Archer MSA distribution (no phase yet)' },
+    { kind: 'medicareAdvantageMsaDistributionAdditionalTax', line: 'Schedule 2 line 17f -> 1040 line 23', label: 'the additional tax on Medicare Advantage MSA distributions', remedy: 'requires Form 8853 line 13b, and no dialect reports a Medicare Advantage MSA distribution (no phase yet)' },
+    { kind: 'charitableFractionalInterestRecaptureTax', line: 'Schedule 2 line 17g -> 1040 line 23', label: 'the additional tax on recapture of a charitable deduction for a fractional interest in tangible personal property', remedy: '10% of the recaptured amount, so it needs the earlier year’s deduction — the same missing prior-year return that blocks the INCOME half on Schedule 1 line 8z (no phase yet)' },
+    { kind: 'section409ANonqualifiedPlanTax', line: 'Schedule 2 line 17h -> 1040 line 23', label: 'the 20% tax on income from a nonqualified deferred compensation plan that fails section 409A', remedy: 'the income is Form W-2 box 12 code Z or Form 1099-MISC box 15. `vnd.fjs.w2` stores box 12 entries and no computation reads a code Z; the §409A(a)(1)(B)(ii) interest added to the 20% also needs the year each amount was deferred (no phase yet)' },
+    { kind: 'section457ANonqualifiedPlanTax', line: 'Schedule 2 line 17i -> 1040 line 23', label: 'the 20% tax on compensation from a section 457A nonqualified deferred compensation plan', remedy: 'requires the amount that first became determinable this year and the §457A(c)(2) interest, which needs the earlier year in which it would otherwise have been includible (no phase yet)' },
+    { kind: 'section72m5ExcessBenefitsTax', line: 'Schedule 2 line 17j -> 1040 line 23', label: 'the section 72(m)(5) excess benefits tax', remedy: 'requires the Pub. 560 computation of a 5% owner’s excess benefit from a qualified plan, and no dialect records plan ownership (no phase yet)' },
+    { kind: 'goldenParachutePaymentsTax', line: 'Schedule 2 line 17k -> 1040 line 23', label: 'the 20% tax on excess golden parachute payments', remedy: 'the amount is Form W-2 box 12 code K; `vnd.fjs.w2` stores box 12 entries and no computation reads a code K. The instructions also send a payee to Form 1099-NEC box 3, which the 2025 form face labels “Reserved for future use” (no phase yet)' },
+    { kind: 'accumulationDistributionOfTrustsTax', line: 'Schedule 2 line 17l -> 1040 line 23', label: 'the tax on an accumulation distribution of a trust', remedy: 'requires Form 4970 and the trust’s throwback years — a multi-year history this engine does not hold (no phase yet)' },
+    { kind: 'expatriatedCorporationInsiderStockCompensationExciseTax', line: 'Schedule 2 line 17m -> 1040 line 23', label: 'the excise tax on insider stock compensation from an expatriated corporation', remedy: 'requires the §4985 determination that the taxpayer is a disqualified individual of a corporation that expatriated, and no dialect records it (no phase yet)' },
+    { kind: 'lookBackInterest', line: 'Schedule 2 line 17n -> 1040 line 23', label: 'look-back interest under section 167(g) or 460(b)', remedy: 'requires Form 8697 or Form 8866 and the earlier years’ income from the long-term contract or the income-forecast property, which this engine does not hold (no phase yet)' },
+    { kind: 'nonresidentAlienNonEffectivelyConnectedIncomeTax', line: 'Schedule 2 line 17o -> 1040 line 23', label: 'tax on non-effectively-connected income for the part of the year the taxpayer was a nonresident alien', remedy: 'requires Form 1040-NR. This engine computes a Form 1040 for a full-year resident and `vnd.fjs.return_profile` has no field in which to declare a dual-status year (no phase yet)' },
+    { kind: 'prevailingWageAndApprenticeshipPenalties', line: 'Schedule 2 line 17z -> 1040 line 23', label: 'the prevailing wage and apprenticeship penalties', remedy: 'requires Form 4255 columns (o) and (p), reached through Form 7210, Form 8933 or Form 4255 itself, and no dialect models an energy credit claim (no phase yet)' },
+    { kind: 'otherAdditionalTaxesNotListed', line: 'Schedule 2 line 17z -> 1040 line 23', label: 'other additional taxes the printed line does not name', remedy: 'line 17z is a WRITE-IN. Its instructions define it as “any taxes not reported elsewhere on your return or other schedules” and then list examples — the prevailing-wage penalties and a negative Form 8978 adjustment, each its own kind. This one is the residual, and no single form closes it (no phase yet)' },
     // ── TAX-37's finding: THIS ROW DESCRIBED THE WRONG FORM, and it is
     // corrected rather than reclassified.
     //
@@ -988,7 +1178,30 @@ export const unmodeledKindRefusals = /** @type {const} */ ([
     // execution.
     { kind: 'residentialCleanEnergyCredit', line: 'Schedule 3 line 5a -> 1040 line 20', label: 'the residential clean energy credit', remedy: 'requires Form 5695 Part I (no phase yet)' },
     { kind: 'energyEfficientHomeImprovementCredit', line: 'Schedule 3 line 5b -> 1040 line 20', label: 'the energy efficient home improvement credit', remedy: 'requires Form 5695 Part II (no phase yet)' },
-    { kind: 'otherNonrefundableCredits', line: 'Schedule 3 line 6a-6z -> 1040 line 20', label: 'other nonrefundable credits', remedy: 'the printed form itself collapses thirteen lettered sub-lines here — among them the general business credit, the prior-year minimum tax credit on FORM 8801, the NONrefundable half of the adoption credit and the credit for the elderly or disabled on Schedule R — and this engine models none of them. Form 8801 is the one to read twice now that Phase 29 computes the alternative minimum tax: AMT paid on DEFERRAL items (most of all the §56(b)(3) incentive stock option spread) becomes a credit against the REGULAR tax in later years, so a filer who owes AMT this year is owed something next year that this engine will not compute for them, and a filer carrying one in from 2024 cannot claim it here. It is multi-year by construction and no document this engine holds records a prior year\'s minimum tax (no phase yet)' },
+    // ── Schedule 3 line 6's eleven kinds (2026-08-18) ──────────────────────
+    //
+    // `otherNonrefundableCredits` stood here as ONE row. Its remedy was the
+    // most informative of the six — it named the general business credit,
+    // Form 8801, the nonrefundable half of the adoption credit and Schedule R,
+    // and spent a paragraph on why Form 8801 matters now that Phase 29
+    // computes the AMT. That paragraph survives, moved onto
+    // `priorYearMinimumTaxCredit`, which is the row it was always about.
+    //
+    // Read off `f1040s3.pdf` (2025) and `i1040gi.pdf` (2025) p116. Line 6e has
+    // no row because the printed form reserves it; line 6l has none because
+    // `form8978` names it; line 6z has none because its entire instruction
+    // reads "Leave line 6z blank".
+    { kind: 'generalBusinessCredit', line: 'Schedule 3 line 6a -> 1040 line 20', label: 'the general business credit', remedy: 'requires Form 3800, which aggregates some three dozen component credits and applies §38(c)’s tax-liability limitation with a one-year carryback and a twenty-year carryforward — a multi-year history this engine does not hold (no phase yet)' },
+    { kind: 'priorYearMinimumTaxCredit', line: 'Schedule 3 line 6b -> 1040 line 20', label: 'the credit for prior year minimum tax', remedy: 'requires Form 8801 and the alternative minimum tax PAID in an earlier year on DEFERRAL items. `fjs/form6251` computes this year’s AMT, which is what creates the credit for NEXT year, but no document this engine holds records a prior year’s minimum tax — so a filer carrying one in from 2024 cannot claim it here (no phase yet)' },
+    { kind: 'adoptionCredit', line: 'Schedule 3 line 6c -> 1040 line 20', label: 'the nonrefundable adoption credit', remedy: 'requires Form 8839, the qualified adoption expenses, the child’s special-needs determination and the year the adoption became final. The REFUNDABLE half on 1040 line 30 and the employer-provided benefits exclusion on 1040 line 1f are their own kinds, and all three come off the same unbuilt form (no phase yet)' },
+    { kind: 'creditForTheElderlyOrDisabled', line: 'Schedule 3 line 6d -> 1040 line 20', label: 'the credit for the elderly or the disabled', remedy: 'requires Schedule R and the §22(e)(3) determination of permanent and total disability, certified by a physician — which no stored document carries (no phase yet)' },
+    { kind: 'newCleanVehicleCredit', line: 'Schedule 3 line 6f -> 1040 line 20', label: 'the new clean vehicle credit', remedy: 'requires Form 8936 Part III and the seller’s report behind it: the vehicle identification number, the battery and critical-mineral sourcing tests and the modified adjusted gross income cap. The REPAYMENT of one transferred to a dealer is Schedule 2 lines 1b and 1c and is its own kind (no phase yet)' },
+    { kind: 'mortgageInterestCredit', line: 'Schedule 3 line 6g -> 1040 line 20', label: 'the mortgage interest credit', remedy: 'requires Form 8396 and a state or local mortgage credit certificate. `vnd.fjs.itemized_deductions` records mortgage interest PAID, which is the deduction rather than the credit, and no dialect models a certificate (no phase yet)' },
+    { kind: 'districtOfColumbiaFirstTimeHomebuyerCredit', line: 'Schedule 3 line 6h -> 1040 line 20', label: 'the District of Columbia first-time homebuyer credit', remedy: 'claimable only as a carryforward from 2024 — no home bought after 2011 qualifies — and this engine holds no prior-year return to carry anything forward from (no phase yet)' },
+    { kind: 'qualifiedElectricVehicleCredit', line: 'Schedule 3 line 6i -> 1040 line 20', label: 'the qualified electric vehicle credit', remedy: 'claimable only as a passive activity credit carried forward from an earlier year — no vehicle placed in service after 2006 qualifies — and this engine holds no prior-year return (no phase yet)' },
+    { kind: 'alternativeFuelVehicleRefuelingPropertyCredit', line: 'Schedule 3 line 6j -> 1040 line 20', label: 'the alternative fuel vehicle refueling property credit', remedy: 'requires Form 8911 and the census-tract eligibility of the property’s location, which no dialect models (no phase yet)' },
+    { kind: 'creditToHoldersOfTaxCreditBonds', line: 'Schedule 3 line 6k -> 1040 line 20', label: 'the credit to holders of tax credit bonds', remedy: 'requires Form 8912 and the issuer’s credit rate and allowance dates, which no dialect models (no phase yet)' },
+    { kind: 'previouslyOwnedCleanVehicleCredit', line: 'Schedule 3 line 6m -> 1040 line 20', label: 'the credit for previously owned clean vehicles', remedy: 'requires Form 8936 Part IV, the seller’s report, and the $25,000 sale-price and modified-adjusted-gross-income caps. The REPAYMENT of one transferred to a dealer is Schedule 2 line 1c and is its own kind (no phase yet)' },
     { kind: 'federalTaxWithheldOnOtherForms', line: '1040 line 25c', label: 'federal income tax withheld on other forms', remedy: 'no dialect models it (no phase yet)' },
     { kind: 'refundableAdoptionCredit', line: '1040 line 30', label: 'refundable adoption credit', remedy: 'requires Form 8839 (no phase yet)' },
     // ── Schedule 3 Part II's five per-line kinds (Phase 25) ─────────────────
@@ -1020,7 +1233,26 @@ export const unmodeledKindRefusals = /** @type {const} */ ([
     // say it (`federalTaxWithheldOnOtherForms` above, and Schedule 1's own
     // two) are where to look next.
     { kind: 'federalFuelTaxCredit', line: 'Schedule 3 line 12 -> 1040 line 31', label: 'the credit for federal tax paid on fuels', remedy: 'requires Form 4136 (no phase yet)' },
-    { kind: 'otherPaymentsAndRefundableCredits', line: 'Schedule 3 line 13a-13z -> 1040 line 31', label: 'other payments or refundable credits', remedy: 'the printed form itself collapses five lettered sub-lines here and this engine models none of them (no phase yet)' },
+    // ── Schedule 3 line 13's eight kinds (2026-08-18) ──────────────────────
+    //
+    // `otherPaymentsAndRefundableCredits` stood here as ONE row reading "the
+    // printed form itself collapses five lettered sub-lines here and this
+    // engine models none of them (no phase yet)". The count was right and the
+    // sentence was still unusable. Read off `f1040s3.pdf` (2025) and
+    // `i1040gi.pdf` (2025) p117.
+    //
+    // Line 13z is FOUR rows: its instructions name three credits outright —
+    // §960(c)'s excess limitation account, Form 8689's Virgin Islands
+    // allocation and Form 1062's farmland deferral — and leave the line open,
+    // so a residual stands beside them.
+    { kind: 'form2439UndistributedCapitalGains', line: 'Schedule 3 line 13a -> 1040 line 31', label: 'the credit for tax paid by a regulated investment company or REIT on undistributed long-term capital gains', remedy: 'requires Form 2439, which no dialect models — and its box 1a gain has to reach Schedule D as well, so crediting the tax without the gain would understate income while overstating payments (no phase yet)' },
+    { kind: 'section1341CreditForRepayment', line: 'Schedule 3 line 13b -> 1040 line 31', label: 'the section 1341 credit for repayment of amounts included in income in an earlier year', remedy: 'requires the earlier year’s tax recomputed without the repaid amount, and this engine models one tax year and holds no prior-year return (no phase yet)' },
+    { kind: 'netElectivePaymentElectionAmount', line: 'Schedule 3 line 13c -> 1040 line 31', label: 'the net elective payment election amount', remedy: 'requires Form 3800 Part III line 6 column (j) — §6417’s elective payment of an energy credit — and no dialect models a credit claim (no phase yet)' },
+    { kind: 'deferredNet965TaxLiability', line: 'Schedule 3 line 13d -> 1040 line 31', label: 'the deferred amount of net section 965 tax liability', remedy: 'requires Form 965-A and the installment election made in an earlier year, which this engine does not hold. The installment PAYABLE this year is Schedule 2 line 20 and is its own kind (no phase yet)' },
+    { kind: 'section960cExcessLimitationCredit', line: 'Schedule 3 line 13z -> 1040 line 31', label: 'the section 960(c) credit for an excess limitation account', remedy: 'requires Form 1116 Part III and the excess limitation account carried between years, and this engine holds no prior-year return (no phase yet)' },
+    { kind: 'usVirginIslandsTaxAllocation', line: 'Schedule 3 line 13z -> 1040 line 31', label: 'U.S. tax allocable to the U.S. Virgin Islands', remedy: 'requires Form 8689 and a Virgin Islands residence or source determination, for which `vnd.fjs.return_profile` has no field (no phase yet)' },
+    { kind: 'qualifiedFarmlandGainDeferral', line: 'Schedule 3 line 13z -> 1040 line 31', label: 'the deferral of net income tax on gain from a sale of qualified farmland', remedy: 'requires Form 1062 line 14 and the election to defer, of which 75% is entered here; no dialect models a farmland sale or the election (no phase yet)' },
+    { kind: 'otherRefundableCreditsNotListed', line: 'Schedule 3 line 13z -> 1040 line 31', label: 'other refundable credits the printed line does not name', remedy: 'line 13z is a WRITE-IN. Its instructions name three credits — §960(c), Form 8689 and Form 1062 — each its own kind above, and leave the line open for others. This one is the residual, and no single form closes it (no phase yet)' },
     // ── The nine line-16 entries below matter more than they look ────────────
     //
     // `[VERIFIED: i1040gi.pdf p34, "Line 16 Tax"]` — line 16 is a SUM, not just
@@ -1035,15 +1267,15 @@ export const unmodeledKindRefusals = /** @type {const} */ ([
     // the add-ons is exactly TAX-16's failure mode: every line above 16 agrees
     // with the taxpayer's own return, line 16 is quietly short, and nothing in
     // the report says why. They are refusals precisely so that cannot happen.
-    { kind: 'foreignEarnedIncomeForm2555', line: '1040 line 16', label: 'foreign earned income exclusion', remedy: 'requires Form 2555 and the Foreign Earned Income Tax Worksheet (no phase yet)' },
+    { kind: 'foreignEarnedIncomeForm2555', line: '1040 line 16; Schedule 1 line 8d -> 1040 line 8; Schedule 1 line 24j -> 1040 line 10', label: 'foreign earned income exclusion, and the housing deduction beside it', remedy: 'requires Form 2555 and the Foreign Earned Income Tax Worksheet. ONE kind names all three printed lines because one form produces them: line 45 is the exclusion on Schedule 1 line 8d, line 50 the housing deduction on Schedule 1 line 24j, and the worksheet reprices 1040 line 16 (no phase yet)' },
     { kind: 'childsUnearnedIncomeForm8615', line: '1040 line 16', label: "a child's unearned income", remedy: 'requires Form 8615 (no phase yet)' },
     { kind: 'farmIncomeAveragingScheduleJ', line: '1040 line 16', label: 'farm and fishing income averaging', remedy: 'requires Schedule J (no phase yet)' },
     { kind: 'form8814ChildInterestAndDividends', line: '1040 line 16', label: 'tax from Form 8814', remedy: 'requires Form 8814 (no phase yet)' },
     { kind: 'form4972LumpSumDistribution', line: '1040 line 16', label: 'tax from Form 4972', remedy: 'requires Form 4972 (no phase yet)' },
     { kind: 'section962Election', line: '1040 line 16', label: 'tax with respect to a section 962 election', remedy: 'no phase yet' },
     { kind: 'educationCreditRecapture', line: '1040 line 16', label: 'recapture of an education credit', remedy: 'no phase yet' },
-    { kind: 'form8621', line: '1040 line 16', label: 'tax from Form 8621 line 16e', remedy: 'no phase yet' },
-    { kind: 'form8978', line: '1040 line 16', label: 'tax from Form 8978 line 14', remedy: 'no phase yet' },
+    { kind: 'form8621', line: '1040 line 16; Schedule 2 lines 17p and 17q -> 1040 line 23', label: 'tax from Form 8621 line 16e, and the interest that travels with it', remedy: 'requires Form 8621, which no dialect models. ONE kind names all three printed lines because one PFIC holding produces them: line 16e is the \u00a71291 deferred tax, line 16f the interest on it, and line 24 the interest on a \u00a71294 election — nobody can hold the interest without holding the form (no phase yet)' },
+    { kind: 'form8978', line: '1040 line 16; Schedule 3 line 6l -> 1040 line 20; Schedule 2 line 17z -> 1040 line 23', label: 'the Form 8978 partner audit adjustment, positive or negative', remedy: 'requires Form 8978, which no dialect models. ONE kind names all three printed lines because one partnership audit produces them and the SIGN of line 14 decides where it lands: positive to 1040 line 16, negative to Schedule 3 line 6l and, once that line is exhausted, to Schedule 2 line 17z as a negative write-in (no phase yet)' },
 ])
 
 /** One entry of {@link unmodeledKindRefusals}.
@@ -1749,9 +1981,27 @@ const everyModeledKindHandTyped = [
  * (`dependentCareBenefits` at 1040 line 1e and `dependentCareCredit` at
  * Schedule 3 line 2) and none arrives, because Form 2441 has no coarse kind to
  * split. `68 - 2`.
+ *
+ * **`65 -> 143` is the last six coarse kinds being split at once**, on
+ * 2026-08-18: `65 - 6 + 84`. `otherIncome` becomes twenty-eight rows,
+ * `otherAdjustments` ten, `otherAdditionalTaxes` twenty,
+ * `otherNonrefundableCredits` eleven, `otherPaymentsAndRefundableCredits`
+ * eight and `amtOtherAdjustments` seven. **Nothing is reclassified**, which is
+ * what makes this the largest move this constant has ever made while
+ * {@link expectedModeledKindCount} does not move at all — and the pair of
+ * facts together is the whole claim: the vocabulary grew, the engine did not.
+ *
+ * Seven further printed sub-lines are covered WITHOUT a new kind, by
+ * extending a row that already existed (`foreignEarnedIncomeForm2555`,
+ * `medicaidWaiverPayments`, `form8621`, `form8978`, `netQualifiedDisasterLoss`).
+ * A count of 91 would have been the number reached by giving each printed
+ * sub-line a kind of its own regardless — and it would have let one taxpayer
+ * fact be declared twice, which is the failure `section1202Gain`'s own row
+ * has guarded against since Phase 12.1. See
+ * `fjs/return/scope/todo/split-the-six-coarse-kinds.md`.
  * @type {number}
  */
-const expectedUnmodeledKindCount = 65
+const expectedUnmodeledKindCount = 143
 
 /**
  * The complete refusal message for a return declaring exactly
@@ -1821,7 +2071,7 @@ export const proof = {
             assertEq(modeledKinds.length, expectedModeledKindCount)
             assertEq(new Set(modeledKinds).size, expectedModeledKindCount)
         },
-        unmodeledRefusalsIsExactlySixtyFive: () => {
+        unmodeledRefusalsIsExactlyOneHundredAndFortyThree: () => {
             assertEq(unmodeledKindRefusals.length, expectedUnmodeledKindCount)
             assertEq(
                 new Set(unmodeledKindRefusals.map(r => r.kind)).size,
@@ -1938,7 +2188,7 @@ export const proof = {
         // totals; a kind for a total would let a taxpayer declare a sum
         // without declaring anything it is a sum of, the same reasoning
         // Schedule 3's lines 7/8/14/15 already carry.
-        theElevenScheduleOnePartOneKindsNameTheirOwnPrintedLine: () => {
+        theThirtyEightScheduleOnePartOneKindsNameTheirOwnPrintedLine: () => {
             /** @type {readonly (readonly [string, string])[]} */
             const expected = [
                 ['taxableStateLocalRefunds', 'Schedule 1 line 1'],
@@ -1959,9 +2209,38 @@ export const proof = {
                 ['remicResidualInterest', 'Schedule 1 line 5'],
                 ['netFarmRentalIncomeForm4835', 'Schedule 1 line 5'],
                 ['farmIncomeOrLoss', 'Schedule 1 line 6'],
-                ['otherIncome', 'Schedule 1 line 8a-8z'],
+                ['netOperatingLossDeduction', 'Schedule 1 line 8a'],
+                ['gamblingWinnings', 'Schedule 1 line 8b'],
+                ['cancellationOfDebt', 'Schedule 1 line 8c'],
+                ['form8853MsaAndLongTermCareIncome', 'Schedule 1 line 8e'],
+                ['healthSavingsAccountIncome', 'Schedule 1 line 8f'],
+                ['alaskaPermanentFundDividends', 'Schedule 1 line 8g'],
+                ['juryDutyPay', 'Schedule 1 line 8h'],
+                ['prizesAndAwards', 'Schedule 1 line 8i'],
+                ['notForProfitActivityIncome', 'Schedule 1 line 8j'],
+                ['stockOptionIncome', 'Schedule 1 line 8k'],
+                ['personalPropertyRentalIncome', 'Schedule 1 line 8l'],
+                ['olympicAndParalympicMedals', 'Schedule 1 line 8m'],
+                ['section951Inclusion', 'Schedule 1 line 8n'],
+                ['section951AInclusion', 'Schedule 1 line 8o'],
+                ['excessBusinessLossAdjustment', 'Schedule 1 line 8p'],
+                ['ableAccountDistributions', 'Schedule 1 line 8q'],
+                ['scholarshipAndFellowshipGrants', 'Schedule 1 line 8r'],
+                ['nonqualifiedDeferredCompensationPension', 'Schedule 1 line 8t'],
+                ['wagesEarnedWhileIncarcerated', 'Schedule 1 line 8u'],
+                ['digitalAssetOrdinaryIncome', 'Schedule 1 line 8v'],
+                ['recoveriesOfAmountsDeductedInAnEarlierYear', 'Schedule 1 line 8z'],
+                ['reemploymentTradeAdjustmentAssistance', 'Schedule 1 line 8z'],
+                ['lossOnCorrectiveDistributionsOfExcessDeferrals', 'Schedule 1 line 8z'],
+                ['insurancePolicyDividendsExceedingPremiums', 'Schedule 1 line 8z'],
+                ['charitableContributionDeductionRecapture', 'Schedule 1 line 8z'],
+                ['disasterReliefPayments', 'Schedule 1 line 8z'],
+                ['educationSavingsAccountDistributions', 'Schedule 1 line 8z'],
+                ['otherIncomeNotListed', 'Schedule 1 line 8z'],
             ]
-            assertEq(expected.length, 11, 'Phase 27 produced seven kinds and Phase 30 expanded line 5 into five, 7 - 1 + 5')
+            assertEq(expected.length, 38,
+                'Phase 27 produced seven, Phase 30 expanded line 5 into five, and the '
+                + '2026-08-18 split replaced the coarse line-8 kind with twenty-eight: 7 - 1 + 5 - 1 + 28')
             expected
                 .map(([kind]) => kindVocabulary.findIndex(candidate => candidate === kind))
                 .reduce((previous, position) => {
@@ -2080,7 +2359,7 @@ export const proof = {
         // "Reserved for future use" on the printed face, and 5 and 6 are
         // already named by `unreportedTips` (Form 4137) and `form8919Wages`
         // (Form 8919) — see `fjs/return/profile`'s own vocabulary comment.
-        theSixteenScheduleTwoKindsNameTheirOwnPrintedLine: () => {
+        theThirtyFiveScheduleTwoKindsNameTheirOwnPrintedLine: () => {
             /** @type {readonly (readonly [string, string])[]} */
             const expected = [
                 ['excessAdvancePremiumTaxCreditRepayment', 'Schedule 2 line 1a'],
@@ -2099,13 +2378,34 @@ export const proof = {
                 ['interestOnResidentialLotAndTimeshareInstallments', 'Schedule 2 line 14'],
                 ['interestOnDeferredInstallmentSaleTax', 'Schedule 2 line 15'],
                 ['lowIncomeHousingCreditRecapture', 'Schedule 2 line 16'],
-                ['otherAdditionalTaxes', 'Schedule 2 line 17a-17z'],
+                ['investmentCreditRecapture', 'Schedule 2 line 17a'],
+                ['newMarketsCreditRecapture', 'Schedule 2 line 17a'],
+                ['employerProvidedChildcareCreditRecapture', 'Schedule 2 line 17a'],
+                ['section6418TransferRecapture', 'Schedule 2 line 17a'],
+                ['federalMortgageSubsidyRecapture', 'Schedule 2 line 17b'],
+                ['hsaDistributionAdditionalTax', 'Schedule 2 line 17c'],
+                ['hsaIneligibleIndividualAdditionalTax', 'Schedule 2 line 17d'],
+                ['archerMsaDistributionAdditionalTax', 'Schedule 2 line 17e'],
+                ['medicareAdvantageMsaDistributionAdditionalTax', 'Schedule 2 line 17f'],
+                ['charitableFractionalInterestRecaptureTax', 'Schedule 2 line 17g'],
+                ['section409ANonqualifiedPlanTax', 'Schedule 2 line 17h'],
+                ['section457ANonqualifiedPlanTax', 'Schedule 2 line 17i'],
+                ['section72m5ExcessBenefitsTax', 'Schedule 2 line 17j'],
+                ['goldenParachutePaymentsTax', 'Schedule 2 line 17k'],
+                ['accumulationDistributionOfTrustsTax', 'Schedule 2 line 17l'],
+                ['expatriatedCorporationInsiderStockCompensationExciseTax', 'Schedule 2 line 17m'],
+                ['lookBackInterest', 'Schedule 2 line 17n'],
+                ['nonresidentAlienNonEffectivelyConnectedIncomeTax', 'Schedule 2 line 17o'],
+                ['prevailingWageAndApprenticeshipPenalties', 'Schedule 2 line 17z'],
+                ['otherAdditionalTaxesNotListed', 'Schedule 2 line 17z'],
                 ['premiumTaxCreditReconciliation', 'Schedule 2 line 19'],
                 ['section965NetTaxLiabilityInstallment', 'Schedule 2 line 20'],
             ]
             assertEq(
-                expected.length, 16,
-                'Phase 23\u2019s split produced fourteen, and TAX-37 replaced the coarse line-1 kind with three')
+                expected.length, 35,
+                'Phase 23\u2019s split produced fourteen, TAX-37 replaced the coarse line-1 kind with '
+                + 'three, and the 2026-08-18 split replaced the coarse line-17 kind with twenty: '
+                + '14 - 1 + 3 - 1 + 20')
             // Every one is a kind the vocabulary carries, and every one is in
             // the vocabulary in the order listed above -- read from
             // `kindVocabulary`, which this module does not own.
@@ -2172,7 +2472,7 @@ export const proof = {
         // `investmentInterestForm4952` and `section1202Gain`, which already
         // existed. 2j joined the computing set with `amtEstatesAndTrusts`'s
         // reclassification, and 2l with the Form 4562 wiring.
-        theTwelveFormSixTwoFiveOneKindsStillRefusingNameTheirOwnPrintedLine: () => {
+        theEighteenFormSixTwoFiveOneKindsStillRefusingNameTheirOwnPrintedLine: () => {
             /** @type {readonly (readonly [Kind, string])[]} */
             const expected = [
                 ['amtDepletion', 'Form 6251 line 2d'],
@@ -2186,15 +2486,22 @@ export const proof = {
                 ['amtResearchAndExperimentalCosts', 'Form 6251 line 2r'],
                 ['amtPre1987InstallmentSales', 'Form 6251 line 2s'],
                 ['amtIntangibleDrillingCosts', 'Form 6251 line 2t'],
-                ['amtOtherAdjustments', 'Form 6251 line 3'],
+                ['amtPre1987Depreciation', 'Form 6251 line 3'],
+                ['amtPollutionControlFacilities', 'Form 6251 line 3'],
+                ['amtTaxShelterFarmActivities', 'Form 6251 line 3'],
+                ['amtCharitableContributionsOfCertainProperty', 'Form 6251 line 3'],
+                ['amtBusinessInterestLimitation', 'Form 6251 line 3'],
+                ['amtNonPrincipalResidenceMortgageInterest', 'Form 6251 line 3'],
+                ['amtRelatedAdjustments', 'Form 6251 line 3'],
             ]
             // FOURTEEN, not the fifteen Phase 29 wrote. `kindVocabulary` still
             // carries fifteen `amt*` kinds -- the assertion further down still
             // says so -- but one of them, `amtPrivateActivityBondInterest`, is
             // now MODELED, so it has no refusal row for this table to name.
             // The two counts measure different things and must not be unified.
-            assertEq(expected.length, 12,
-                'twelve still-refusing kinds, hand-counted off the printed Form 6251')
+            assertEq(expected.length, 18,
+                'eighteen still-refusing kinds: twelve, less the coarse line-3 kind, plus the '
+                + 'seven the 2026-08-18 split read off i6251.pdf pp. 8-9')
             // Every one is in the vocabulary, in the order listed -- read from
             // `kindVocabulary`, which this module does not own.
             expected
@@ -2238,6 +2545,13 @@ export const proof = {
             const namedByAPreExistingKind = [
                 ['investmentInterestForm4952', 'Form 6251 line 2c'],
                 ['section1202Gain', 'Form 6251 line 2h'],
+                // Line 3's SEVENTH printed heading, "Net Qualified Disaster
+                // Loss" (i6251 p8). The 2026-08-18 split gave the other six
+                // headings a kind each and this one none, because the standard
+                // deduction it adds back is the one `netQualifiedDisasterLoss`
+                // already names at 1040 line 12e. Listed here so a later phase
+                // cannot quietly add a nineteenth kind for it.
+                ['netQualifiedDisasterLoss', 'Form 6251 line 3'],
             ]
             for (const [kind, formLine] of namedByAPreExistingKind) {
                 const row = unmodeledKindRefusals.find(r => r.kind === kind)
@@ -2262,13 +2576,26 @@ export const proof = {
         //   line 1. `fjs/return/tripwire`'s own
         //   `theRejectedFourthEntryIsUnreachableBecauseValidationRefusesIt`
         //   pins that half against the dialect itself.
-        // - Schedule 1 line 8z is the `otherIncome` kind, refused here.
+        // - Schedule 1 line 8z's recovery is the
+        //   `recoveriesOfAmountsDeductedInAnEarlierYear` kind, refused here.
+        //   It was the coarse `otherIncome` until the 2026-08-18 split.
         //
         // The day either changes, this leaf reddens and `fjs/form6251`'s
         // line 2b stops being a computed zero.
         formSixTwoFiveOneLineTwoBIsAComputedZeroNotARefusedOne: () => {
             /** @type {readonly Kind[]} */
-            const lineTwoBRestsOn = ['taxableStateLocalRefunds', 'otherIncome']
+            const lineTwoBRestsOn = [
+                'taxableStateLocalRefunds',
+                // Was `otherIncome`, the coarse kind for the whole of printed
+                // line 8, until the 2026-08-18 split. Printed Form 6251 line
+                // 2b reads "Tax refund from Schedule 1 (Form 1040), line 1 or
+                // line 8z" — and the line 8z half is specifically a RECOVERY
+                // of an amount deducted in an earlier year, which is now its
+                // own kind. Naming the coarse kind here was true and vague;
+                // naming this one says which of line 8z's eight kinds the
+                // computed zero actually rests on.
+                'recoveriesOfAmountsDeductedInAnEarlierYear',
+            ]
             for (const kind of lineTwoBRestsOn) {
                 const outcome = classifyScope([kind])
                 assert(
@@ -2283,8 +2610,8 @@ export const proof = {
             // reddens here too.
             assertEq(
                 kindVocabulary.filter(kind => kind.startsWith('amt')).length,
-                15,
-                'exactly fifteen Form 6251 Part I kinds; line 2b is not one of them')
+                21,
+                'exactly twenty-one Form 6251 Part I kinds; line 2b is not one of them')
         },
         // TAX-23/TAX-24, Phase 24: the thirteen Schedule 1 Part II kinds, in
         // SCHEDULE 1's own printed order, each naming its own printed line.
@@ -2295,10 +2622,10 @@ export const proof = {
         //
         // Printed lines 21 through 26 are NOT all here. Line 22 is "Reserved
         // for future use" with no box to fill, line 25 is the TOTAL of the
-        // 24a-24z block `otherAdjustments` already covers, and line 26 is the
-        // Part II total itself -- a kind for any of the three would be a
-        // declaration a taxpayer could never truthfully make.
-        theThirteenScheduleOneKindsNameTheirOwnPrintedLine: () => {
+        // 24a-24z block -- ten kinds of its own since the 2026-08-18 split --
+        // and line 26 is the Part II total itself. A kind for any of the three
+        // would be a declaration a taxpayer could never truthfully make.
+        theTwentyTwoScheduleOneKindsNameTheirOwnPrintedLine: () => {
             /** @type {readonly (readonly [string, string])[]} */
             const expected = [
                 ['educatorExpenses', 'Schedule 1 line 11'],
@@ -2313,9 +2640,20 @@ export const proof = {
                 ['iraDeduction', 'Schedule 1 line 20'],
                 ['studentLoanInterestDeduction', 'Schedule 1 line 21'],
                 ['archerMsaDeduction', 'Schedule 1 line 23'],
-                ['otherAdjustments', 'Schedule 1 line 24a-24z'],
+                ['juryDutyPayGivenToEmployer', 'Schedule 1 line 24a'],
+                ['personalPropertyRentalExpenses', 'Schedule 1 line 24b'],
+                ['olympicAndParalympicMedalsExclusion', 'Schedule 1 line 24c'],
+                ['reforestationAmortizationAndExpenses', 'Schedule 1 line 24d'],
+                ['tradeActSupplementalUnemploymentRepayment', 'Schedule 1 line 24e'],
+                ['section501c18DPensionContributions', 'Schedule 1 line 24f'],
+                ['chaplainSection403bContributions', 'Schedule 1 line 24g'],
+                ['unlawfulDiscriminationClaimAttorneyFees', 'Schedule 1 line 24h'],
+                ['irsWhistleblowerAwardAttorneyFees', 'Schedule 1 line 24i'],
+                ['excessDeductionsOfSection67eExpenses', 'Schedule 1 line 24k'],
             ]
-            assertEq(expected.length, 13, 'the split produced thirteen kinds, hand-counted off the printed form')
+            assertEq(expected.length, 22,
+                'Phase 24 produced thirteen and the 2026-08-18 split replaced the coarse '
+                + 'line-24 kind with ten: 13 - 1 + 10')
             expected
                 .map(([kind]) => kindVocabulary.findIndex(candidate => candidate === kind))
                 .reduce((previous, position) => {
@@ -2363,7 +2701,7 @@ export const proof = {
         // TOTALS (7 of the 6a-6z block, 8 of Part I, 14 of the 13a-13z block,
         // 15 of Part II), and a kind for a total would let a taxpayer declare
         // a sum without declaring anything it is a sum of.
-        theTwelveScheduleThreeKindsNameTheirOwnPrintedLine: () => {
+        theTwentyNineScheduleThreeKindsNameTheirOwnPrintedLine: () => {
             /** @type {readonly (readonly [string, string, string])[]} */
             const expected = [
                 ['foreignTaxCredit', 'Schedule 3 line 1', '1040 line 20'],
@@ -2372,23 +2710,42 @@ export const proof = {
                 ['retirementSavingsContributionsCredit', 'Schedule 3 line 4', '1040 line 20'],
                 ['residentialCleanEnergyCredit', 'Schedule 3 line 5a', '1040 line 20'],
                 ['energyEfficientHomeImprovementCredit', 'Schedule 3 line 5b', '1040 line 20'],
-                ['otherNonrefundableCredits', 'Schedule 3 line 6a-6z', '1040 line 20'],
+                ['generalBusinessCredit', 'Schedule 3 line 6a', '1040 line 20'],
+                ['priorYearMinimumTaxCredit', 'Schedule 3 line 6b', '1040 line 20'],
+                ['adoptionCredit', 'Schedule 3 line 6c', '1040 line 20'],
+                ['creditForTheElderlyOrDisabled', 'Schedule 3 line 6d', '1040 line 20'],
+                ['newCleanVehicleCredit', 'Schedule 3 line 6f', '1040 line 20'],
+                ['mortgageInterestCredit', 'Schedule 3 line 6g', '1040 line 20'],
+                ['districtOfColumbiaFirstTimeHomebuyerCredit', 'Schedule 3 line 6h', '1040 line 20'],
+                ['qualifiedElectricVehicleCredit', 'Schedule 3 line 6i', '1040 line 20'],
+                ['alternativeFuelVehicleRefuelingPropertyCredit', 'Schedule 3 line 6j', '1040 line 20'],
+                ['creditToHoldersOfTaxCreditBonds', 'Schedule 3 line 6k', '1040 line 20'],
+                ['previouslyOwnedCleanVehicleCredit', 'Schedule 3 line 6m', '1040 line 20'],
                 ['netPremiumTaxCredit', 'Schedule 3 line 9', '1040 line 31'],
                 ['amountPaidWithExtensionRequest', 'Schedule 3 line 10', '1040 line 31'],
                 ['excessSocialSecurityWithheld', 'Schedule 3 line 11', '1040 line 31'],
                 ['federalFuelTaxCredit', 'Schedule 3 line 12', '1040 line 31'],
-                ['otherPaymentsAndRefundableCredits', 'Schedule 3 line 13a-13z', '1040 line 31'],
+                ['form2439UndistributedCapitalGains', 'Schedule 3 line 13a', '1040 line 31'],
+                ['section1341CreditForRepayment', 'Schedule 3 line 13b', '1040 line 31'],
+                ['netElectivePaymentElectionAmount', 'Schedule 3 line 13c', '1040 line 31'],
+                ['deferredNet965TaxLiability', 'Schedule 3 line 13d', '1040 line 31'],
+                ['section960cExcessLimitationCredit', 'Schedule 3 line 13z', '1040 line 31'],
+                ['usVirginIslandsTaxAllocation', 'Schedule 3 line 13z', '1040 line 31'],
+                ['qualifiedFarmlandGainDeferral', 'Schedule 3 line 13z', '1040 line 31'],
+                ['otherRefundableCreditsNotListed', 'Schedule 3 line 13z', '1040 line 31'],
             ]
-            assertEq(expected.length, 12, 'the split produced twelve kinds, hand-counted off the printed form')
+            assertEq(expected.length, 29,
+                'Phase 25 produced twelve and the 2026-08-18 split replaced both coarse '
+                + 'collapsed kinds with nineteen: 12 - 2 + 11 + 8')
             assertEq(
                 expected.filter(([, , destination]) => destination === '1040 line 20').length,
-                7,
-                'Part I has seven, hand-counted: lines 1, 2, 3, 4, 5a, 5b and the collapsed 6a-6z',
+                17,
+                'Part I has seventeen, hand-counted: lines 1, 2, 3, 4, 5a, 5b and line 6\u2019s eleven',
             )
             assertEq(
                 expected.filter(([, , destination]) => destination === '1040 line 31').length,
-                5,
-                'Part II has five, hand-counted: lines 9, 10, 11, 12 and the collapsed 13a-13z',
+                12,
+                'Part II has twelve, hand-counted: lines 9, 10, 11, 12 and line 13\u2019s eight',
             )
             expected
                 .map(([kind]) => kindVocabulary.findIndex(candidate => candidate === kind))
@@ -2425,6 +2782,226 @@ export const proof = {
                     ['a Schedule 3 row names the wrong 1040 destination', kind, destination, row.line],
                 )
             }
+        },
+        // ── The 2026-08-18 split, stated INDEPENDENTLY of the table it split ──
+        //
+        // Eighty-four kinds replaced six, and the six were coarse in one
+        // specific way: a taxpayer with a Form 1099-C and a taxpayer with an
+        // Alaska Permanent Fund dividend read the IDENTICAL sentence, which
+        // named neither of their documents. So the property worth proving is
+        // not that each new kind refuses — the four `stillRefuse` leaves above
+        // already say that — but that each refuses **differently**, naming its
+        // own printed line, its own label and its own remedy.
+        //
+        // The eighty-four names are hand-typed here, in the printed order of
+        // the six blocks, and deliberately NOT derived by filtering
+        // {@link unmodeledKindRefusals} for rows added on a date or matching a
+        // line prefix: a list computed from the table under test could never
+        // notice a row missing, which is AGENTS.md's fourth shipped defect.
+        everyKindThisSplitAddedRefusesWithItsOwnSentence: () => {
+            /** @type {readonly Kind[]} */
+            const added = [
+                'netOperatingLossDeduction',
+                'gamblingWinnings',
+                'cancellationOfDebt',
+                'form8853MsaAndLongTermCareIncome',
+                'healthSavingsAccountIncome',
+                'alaskaPermanentFundDividends',
+                'juryDutyPay',
+                'prizesAndAwards',
+                'notForProfitActivityIncome',
+                'stockOptionIncome',
+                'personalPropertyRentalIncome',
+                'olympicAndParalympicMedals',
+                'section951Inclusion',
+                'section951AInclusion',
+                'excessBusinessLossAdjustment',
+                'ableAccountDistributions',
+                'scholarshipAndFellowshipGrants',
+                'nonqualifiedDeferredCompensationPension',
+                'wagesEarnedWhileIncarcerated',
+                'digitalAssetOrdinaryIncome',
+                'recoveriesOfAmountsDeductedInAnEarlierYear',
+                'reemploymentTradeAdjustmentAssistance',
+                'lossOnCorrectiveDistributionsOfExcessDeferrals',
+                'insurancePolicyDividendsExceedingPremiums',
+                'charitableContributionDeductionRecapture',
+                'disasterReliefPayments',
+                'educationSavingsAccountDistributions',
+                'otherIncomeNotListed',
+                'juryDutyPayGivenToEmployer',
+                'personalPropertyRentalExpenses',
+                'olympicAndParalympicMedalsExclusion',
+                'reforestationAmortizationAndExpenses',
+                'tradeActSupplementalUnemploymentRepayment',
+                'section501c18DPensionContributions',
+                'chaplainSection403bContributions',
+                'unlawfulDiscriminationClaimAttorneyFees',
+                'irsWhistleblowerAwardAttorneyFees',
+                'excessDeductionsOfSection67eExpenses',
+                'investmentCreditRecapture',
+                'newMarketsCreditRecapture',
+                'employerProvidedChildcareCreditRecapture',
+                'section6418TransferRecapture',
+                'federalMortgageSubsidyRecapture',
+                'hsaDistributionAdditionalTax',
+                'hsaIneligibleIndividualAdditionalTax',
+                'archerMsaDistributionAdditionalTax',
+                'medicareAdvantageMsaDistributionAdditionalTax',
+                'charitableFractionalInterestRecaptureTax',
+                'section409ANonqualifiedPlanTax',
+                'section457ANonqualifiedPlanTax',
+                'section72m5ExcessBenefitsTax',
+                'goldenParachutePaymentsTax',
+                'accumulationDistributionOfTrustsTax',
+                'expatriatedCorporationInsiderStockCompensationExciseTax',
+                'lookBackInterest',
+                'nonresidentAlienNonEffectivelyConnectedIncomeTax',
+                'prevailingWageAndApprenticeshipPenalties',
+                'otherAdditionalTaxesNotListed',
+                'generalBusinessCredit',
+                'priorYearMinimumTaxCredit',
+                'adoptionCredit',
+                'creditForTheElderlyOrDisabled',
+                'newCleanVehicleCredit',
+                'mortgageInterestCredit',
+                'districtOfColumbiaFirstTimeHomebuyerCredit',
+                'qualifiedElectricVehicleCredit',
+                'alternativeFuelVehicleRefuelingPropertyCredit',
+                'creditToHoldersOfTaxCreditBonds',
+                'previouslyOwnedCleanVehicleCredit',
+                'form2439UndistributedCapitalGains',
+                'section1341CreditForRepayment',
+                'netElectivePaymentElectionAmount',
+                'deferredNet965TaxLiability',
+                'section960cExcessLimitationCredit',
+                'usVirginIslandsTaxAllocation',
+                'qualifiedFarmlandGainDeferral',
+                'otherRefundableCreditsNotListed',
+                'amtPre1987Depreciation',
+                'amtPollutionControlFacilities',
+                'amtTaxShelterFarmActivities',
+                'amtCharitableContributionsOfCertainProperty',
+                'amtBusinessInterestLimitation',
+                'amtNonPrincipalResidenceMortgageInterest',
+                'amtRelatedAdjustments',
+            ]
+            assertEq(added.length, 84,
+                'eighty-four kinds, hand-counted off the six printed blocks: 28 + 10 + 20 + 11 + 8 + 7')
+            assertEq(new Set(added).size, 84, 'and each is named once')
+            const sentences = added.map(kind => {
+                const outcome = classifyScope([kind])
+                assert(
+                    outcome.kind === 'error',
+                    ['a kind this split added must refuse on its own', kind, outcome])
+                const row = unmodeledKindRefusals.find(r => r.kind === kind)
+                if (row === undefined) {
+                    throw ['a kind this split added must carry a refusal row', kind]
+                }
+                // The three fields a reader can act on. AGENTS.md's own
+                // Phase 20 finding is why the LINE is asserted and not only
+                // the label: erasing a destination survived an entire suite
+                // once, because five proofs asserted the box name and none
+                // asserted where the amount would have gone.
+                assert(
+                    outcome.message.includes(row.line),
+                    ['the refusal must name the printed line', kind, outcome.message])
+                assert(
+                    outcome.message.includes(row.label),
+                    ['the refusal must name the label', kind, outcome.message])
+                assert(
+                    outcome.message.includes(row.remedy),
+                    ['the refusal must name the remedy', kind, outcome.message])
+                // The INFORMATIONAL part of the sentence, without the kind
+                // name. **Not `outcome.message`, and the difference is the
+                // whole leaf**: `scopeRefusal` interpolates `r.kind` into
+                // every message, so eighty-four whole messages are distinct
+                // the moment eighty-four names are — which the assertion two
+                // lines above already checked. A distinctness test over the
+                // messages would have been decoration that could never redden,
+                // and it was written that way first (AGENTS.md, \u201ca proof is not
+                // known to work until you have watched it fail\u201d).
+                return `${row.line} | ${row.label} | ${row.remedy}`
+            })
+            // THE POINT OF THE SPLIT, in one assertion: eighty-four rows that
+            // each say something different about where the money goes and what
+            // would supply it. Two rows copied from one coarse row would fail
+            // here even with two distinct kind names in front of them, which
+            // is exactly the state the six rows this split removed were in.
+            assertEq(
+                new Set(sentences).size, 84,
+                'no two of the eighty-four refusals may name the same line, label and remedy')
+        },
+        // THE CONTROL FOR THE LEAF ABOVE. A split that quietly reclassified
+        // something would pass every assertion up to here: the eighty-four new
+        // rows would still refuse distinctly while a SIXTY-FIFTH kind had
+        // slipped into `modeledKinds`. This is the leaf that says the engine's
+        // claims did not move at all.
+        //
+        // It asserts set EQUALITY between the two independent statements of the
+        // modeled set rather than only the lengths
+        // `theHandTypedListNamesEveryModeledKind` compares — a swap (one kind
+        // out, one in) keeps every length identical.
+        theSplitReclassifiedNothing: () => {
+            /** @type {readonly string[]} */
+            const modeledNames = modeledKinds
+            assertEq(
+                modeledNames.length, 52,
+                'the modeled set is the same fifty-two it was before the split')
+            for (const kind of everyModeledKindHandTyped) {
+                assert(
+                    modeledNames.includes(kind),
+                    ['a kind that was modeled before the split is no longer in modeledKinds', kind])
+            }
+            for (const kind of modeledNames) {
+                assert(
+                    everyModeledKindHandTyped.some(candidate => candidate === kind),
+                    ['a kind became modeled in a split that was supposed to reclassify nothing', kind])
+            }
+            // …and none of the fifty-two acquired a refusal row beside its
+            // membership, which is the other way the partition could have
+            // broken while every count stayed put.
+            /** @type {readonly string[]} */
+            const refusedNames = unmodeledKindRefusals.map(entry => entry.kind)
+            for (const kind of everyModeledKindHandTyped) {
+                assert(
+                    !refusedNames.includes(kind),
+                    ['a modeled kind also carries a refusal row', kind])
+            }
+            // The six coarse names are GONE from the vocabulary, not merely
+            // unused. `tsc` enforces this through `Kind` — which is why the
+            // list is widened to `string` before the comparison, the same
+            // device `modeledKindNames` uses — and this states it for a reader
+            // who is not running the compiler.
+            /** @type {readonly string[]} */
+            const vocabularyNames = kindVocabulary
+            const split = [
+                'otherIncome',
+                'otherAdjustments',
+                'otherAdditionalTaxes',
+                'otherNonrefundableCredits',
+                'otherPaymentsAndRefundableCredits',
+                'amtOtherAdjustments',
+            ]
+            assertEq(split.length, 6, 'six coarse kinds were split, hand-counted')
+            for (const gone of split) {
+                assert(
+                    !vocabularyNames.includes(gone),
+                    ['a coarse kind this split removed is still in the vocabulary', gone])
+                assert(
+                    !refusedNames.includes(gone),
+                    ['a coarse kind this split removed still carries a refusal row', gone])
+            }
+            // The gate is still a gate in the other direction too: declaring
+            // nothing computes, and so does declaring all fifty-two at once.
+            // Without these two a split that made `classifyScope` refuse
+            // EVERYTHING would pass every assertion above.
+            assertEq(
+                classifyScope([]).kind, 'ok',
+                'declaring nothing must still be in scope after the split')
+            assertEq(
+                classifyScope(everyModeledKindHandTyped).kind, 'ok',
+                'every modeled kind together must still be in scope after the split')
         },
     },
     scope: {
@@ -2777,12 +3354,41 @@ export const proof = {
                 'remicResidualInterest',
                 'netFarmRentalIncomeForm4835',
                 'farmIncomeOrLoss',
-                'otherIncome',
+                'netOperatingLossDeduction',
+                'gamblingWinnings',
+                'cancellationOfDebt',
+                'form8853MsaAndLongTermCareIncome',
+                'healthSavingsAccountIncome',
+                'alaskaPermanentFundDividends',
+                'juryDutyPay',
+                'prizesAndAwards',
+                'notForProfitActivityIncome',
+                'stockOptionIncome',
+                'personalPropertyRentalIncome',
+                'olympicAndParalympicMedals',
+                'section951Inclusion',
+                'section951AInclusion',
+                'excessBusinessLossAdjustment',
+                'ableAccountDistributions',
+                'scholarshipAndFellowshipGrants',
+                'nonqualifiedDeferredCompensationPension',
+                'wagesEarnedWhileIncarcerated',
+                'digitalAssetOrdinaryIncome',
+                'recoveriesOfAmountsDeductedInAnEarlierYear',
+                'reemploymentTradeAdjustmentAssistance',
+                'lossOnCorrectiveDistributionsOfExcessDeferrals',
+                'insurancePolicyDividendsExceedingPremiums',
+                'charitableContributionDeductionRecapture',
+                'disasterReliefPayments',
+                'educationSavingsAccountDistributions',
+                'otherIncomeNotListed',
             ]
             assertEq(
                 stillRefused.length,
-                8,
-                'six printed Part I lines Phase 27 left refused, line 5 expanded into its five Schedule E parts, less the one Phase 30 wired and the one TAX-35 wired')
+                35,
+                'six printed Part I lines Phase 27 left refused, line 5 expanded into its five '
+                + 'Schedule E parts, less the one Phase 30 wired and the one TAX-35 wired, and '
+                + 'the coarse line-8 kind replaced by twenty-eight: 8 - 1 + 28')
             for (const kind of stillRefused) {
                 const outcome = classifyScope([kind])
                 assert(
@@ -2831,15 +3437,34 @@ export const proof = {
                 'interestOnResidentialLotAndTimeshareInstallments',
                 'interestOnDeferredInstallmentSaleTax',
                 'lowIncomeHousingCreditRecapture',
-                'otherAdditionalTaxes',
+                'investmentCreditRecapture',
+                'newMarketsCreditRecapture',
+                'employerProvidedChildcareCreditRecapture',
+                'section6418TransferRecapture',
+                'federalMortgageSubsidyRecapture',
+                'hsaDistributionAdditionalTax',
+                'hsaIneligibleIndividualAdditionalTax',
+                'archerMsaDistributionAdditionalTax',
+                'medicareAdvantageMsaDistributionAdditionalTax',
+                'charitableFractionalInterestRecaptureTax',
+                'section409ANonqualifiedPlanTax',
+                'section457ANonqualifiedPlanTax',
+                'section72m5ExcessBenefitsTax',
+                'goldenParachutePaymentsTax',
+                'accumulationDistributionOfTrustsTax',
+                'expatriatedCorporationInsiderStockCompensationExciseTax',
+                'lookBackInterest',
+                'nonresidentAlienNonEffectivelyConnectedIncomeTax',
+                'prevailingWageAndApprenticeshipPenalties',
+                'otherAdditionalTaxesNotListed',
                 'premiumTaxCreditReconciliation',
                 'section965NetTaxLiabilityInstallment',
             ]
             assertEq(
-                stillRefused.length, 10,
+                stillRefused.length, 29,
                 'sixteen Schedule 2 kinds -- fourteen, less the coarse line-1 kind TAX-37 split, plus its '
                 + 'three sub-line kinds -- less Phase 23\'s two, Phase 28\'s one, Phase 29\'s one, TAX-37\'s '
-                + 'own line 1a and line 13')
+                + 'own line 1a and line 13, and the coarse line-17 kind replaced by twenty: 10 - 1 + 20')
             for (const kind of stillRefused) {
                 const outcome = classifyScope([kind])
                 assert(
@@ -2902,12 +3527,22 @@ export const proof = {
                 'selfEmployedHealthInsuranceDeduction',
                 'alimonyPaid',
                 'archerMsaDeduction',
-                'otherAdjustments',
+                'juryDutyPayGivenToEmployer',
+                'personalPropertyRentalExpenses',
+                'olympicAndParalympicMedalsExclusion',
+                'reforestationAmortizationAndExpenses',
+                'tradeActSupplementalUnemploymentRepayment',
+                'section501c18DPensionContributions',
+                'chaplainSection403bContributions',
+                'unlawfulDiscriminationClaimAttorneyFees',
+                'irsWhistleblowerAwardAttorneyFees',
+                'excessDeductionsOfSection67eExpenses',
             ]
             assertEq(
-                stillRefused.length, 6,
+                stillRefused.length, 15,
                 'thirteen Schedule 1 Part II kinds, less Phase 24\'s three, Phase 28\'s one, '
-                + 'lines 18 and 20, and line 14\'s own Form 3903 wiring')
+                + 'lines 18 and 20, and line 14\'s own Form 3903 wiring, and the coarse line-24 '
+                + 'kind replaced by ten: 6 - 1 + 10')
             for (const kind of stillRefused) {
                 const outcome = classifyScope([kind])
                 assert(
@@ -3025,18 +3660,36 @@ export const proof = {
         // subtracting the two wired kinds from the twelve — a list computed
         // from the tables under test could never notice a tenth kind silently
         // becoming modeled.
-        theSevenScheduleThreeKindsStillWithoutAFormStillRefuse: () => {
+        theTwentyTwoScheduleThreeKindsStillWithoutAFormStillRefuse: () => {
             /** @type {readonly Kind[]} */
             const stillRefused = [
                 'residentialCleanEnergyCredit',
                 'energyEfficientHomeImprovementCredit',
-                'otherNonrefundableCredits',
+                'generalBusinessCredit',
+                'priorYearMinimumTaxCredit',
+                'adoptionCredit',
+                'creditForTheElderlyOrDisabled',
+                'newCleanVehicleCredit',
+                'mortgageInterestCredit',
+                'districtOfColumbiaFirstTimeHomebuyerCredit',
+                'qualifiedElectricVehicleCredit',
+                'alternativeFuelVehicleRefuelingPropertyCredit',
+                'creditToHoldersOfTaxCreditBonds',
+                'previouslyOwnedCleanVehicleCredit',
                 'federalFuelTaxCredit',
-                'otherPaymentsAndRefundableCredits',
+                'form2439UndistributedCapitalGains',
+                'section1341CreditForRepayment',
+                'netElectivePaymentElectionAmount',
+                'deferredNet965TaxLiability',
+                'section960cExcessLimitationCredit',
+                'usVirginIslandsTaxAllocation',
+                'qualifiedFarmlandGainDeferral',
+                'otherRefundableCreditsNotListed',
             ]
-            assertEq(stillRefused.length, 5,
+            assertEq(stillRefused.length, 22,
                 'twelve Schedule 3 kinds minus lines 1, 2, 3, 4, 9, 10 and 11, all seven now '
-                + 'modeled — line 2 left this list at TAX-38 with Form 2441')
+                + 'modeled — line 2 left this list at TAX-38 with Form 2441 — and both '
+                + 'coarse collapsed kinds replaced by nineteen: 5 - 2 + 19')
             for (const kind of stillRefused) {
                 const outcome = classifyScope([kind])
                 assert(

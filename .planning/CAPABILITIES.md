@@ -66,11 +66,17 @@ Two figures worth knowing, both computed by the engine on real fixtures:
 The engine **refuses rather than guessing** wherever it cannot compute honestly. Each refusal names
 the form or the facts that would supply it.
 
-**The refusal surface is a partition, checked at `tsc`:** every one of **117 income, deduction,
+**The refusal surface is a partition, checked at `tsc`:** every one of **195 income, deduction,
 credit and payment kinds** is either modeled or carries a refusal naming what is missing —
-**52 modeled, 65 refused**, and `_EveryKindIsEitherModeledOrRefused` fails the build if a kind
+**52 modeled, 143 refused**, and `_EveryKindIsEitherModeledOrRefused` fails the build if a kind
 falls in neither. Re-derive with `modeledKinds.length` / `unmodeledKindRefusals.length` in
 `fjs/return/scope`.
+
+The refused half jumped 65 → 143 on 2026-08-18, when the last six coarse kinds — each naming a
+printed line that collapsed many unrelated facts — became 84 per-fact kinds read off the 2025
+printed forms and instructions. **Nothing was reclassified in that change**: the modeled count
+did not move, and a taxpayer who is refused now gets told which document, form or determination
+is missing rather than that a whole lettered block is unmodeled.
 
 The conditional refusals — the ones that fire on a taxpayer whose kinds are all modeled:
 

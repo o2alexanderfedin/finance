@@ -86,8 +86,10 @@
  *   entered as a negative. A **computed** zero rather than a refused one, and
  *   this is the one Part I line where that is honest: `fjs/document/1099g`
  *   REFUSES a present, non-zero box 2 at validation, so Schedule 1 line 1
- *   cannot be non-zero for any document that reaches this engine, and line 8z
- *   is `otherIncome`, a refused scope kind. `fjs/return/scope`'s own
+ *   cannot be non-zero for any document that reaches this engine, and line 8z's
+ *   recovery is `recoveriesOfAmountsDeductedInAnEarlierYear`, a refused scope
+ *   kind (`otherIncome`, the coarse kind for the whole of printed line 8, until
+ *   the 2026-08-18 split named the recovery specifically). `fjs/return/scope`'s own
  *   `theFormSixTwoFiveOneLinesAreNameableByKind` leaf is where those two
  *   claims are checked rather than asserted here.
  * - **Line 2g** — *"Interest from specified private activity bonds exempt from
@@ -602,7 +604,8 @@ export const form6251 = taxParamSet => input => {
     // 2b. State/local tax refund from Schedule 1 line 1 or 8z, as a negative.
     //     A COMPUTED zero: `fjs/document/1099g` refuses a non-zero box 2 at
     //     validation, so Schedule 1 line 1 cannot be non-zero here, and line
-    //     8z is the refused `otherIncome` kind.
+    //     8z's recovery is the refused
+    //     `recoveriesOfAmountsDeductedInAnEarlierYear` kind.
     const line2b = 0n
     // 2c. Investment interest expense (Form 4952) -- `investmentInterestForm4952`.
     const line2c = 0n
@@ -693,7 +696,13 @@ export const form6251 = taxParamSet => input => {
     // 2t. Intangible drilling costs preference -- `amtIntangibleDrillingCosts`.
     const line2t = 0n
     // 3. "Other adjustments, including income-based related adjustments" --
-    //    `amtOtherAdjustments`.
+    //    SEVEN kinds as of the 2026-08-18 split, one per printed heading in
+    //    i6251 pp. 8-9 (`amtPre1987Depreciation`,
+    //    `amtPollutionControlFacilities`, `amtTaxShelterFarmActivities`,
+    //    `amtCharitableContributionsOfCertainProperty`,
+    //    `amtBusinessInterestLimitation`,
+    //    `amtNonPrincipalResidenceMortgageInterest`, `amtRelatedAdjustments`),
+    //    plus `netQualifiedDisasterLoss`, which already named the eighth.
     const line3 = 0n
 
     // 4. "Alternative minimum taxable income. Combine lines 1b through 3."
