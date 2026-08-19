@@ -881,6 +881,47 @@ export const proof = {
             assertEq(result.line42Cents, 40660n, '$406.60')
         },
         /**
+         * ★ **THE LEAF A SURVIVING MUTATION BOUGHT.** Every other fixture in
+         * this module divides evenly — $20,000.00 x 2.564% is $512.80 to the
+         * cent — so replacing line 42's `halfUp` with truncation left the
+         * WHOLE suite green. A rate line whose rounding nobody exercises is a
+         * rate line with no rounding rule.
+         *
+         * $1,000.25 of business basis at 2.564% is 2,564.641 hundredths of a
+         * cent. Half-up is **$25.65**; truncation is $25.64. Hand-typed:
+         * 100,025 x 2,564 = 256,464,100, and 256,464,100 / 100,000 = 2,564.641.
+         */
+        lineFortyTwoRoundsHalfUpRatherThanTruncating: () => {
+            const result = expectOk(form8829(inputOf({
+                ...tenPercentHome,
+                areaUsedForBusiness: 900,
+                totalAreaOfHome: 900,
+                homeAdjustedBasisOrFairMarketValue: '1000.25',
+                landIncludedInThatBasis: '0.00',
+            })(10000000n)))
+            assertEq(result.line40Cents, 100025n, '$1,000.25 of business basis')
+            assertEq(result.line42Cents, 2565n, '$25.65 — half-up, not the $25.64 of truncation')
+        },
+        /**
+         * The same gap on the OTHER rounding, and it was there for the same
+         * reason: every allocation fixture divided evenly. $100.00 of an
+         * indirect expense in a home two-thirds of which is used for business
+         * is 6,666.67 cents — **$66.67** half-up, $66.66 truncated.
+         */
+        theAllocationRoundsHalfUpRatherThanTruncating: () => {
+            const result = expectOk(form8829(inputOf({
+                ...tenPercentHome,
+                areaUsedForBusiness: 2,
+                totalAreaOfHome: 3,
+                homeAdjustedBasisOrFairMarketValue: '0.00',
+                landIncludedInThatBasis: '0.00',
+                expenses: [
+                    { line: '21', column: 'indirect', description: 'utilities', amount: '100.00' },
+                ],
+            })(10000000n)))
+            assertEq(result.line24Cents, 6667n, '$66.67 — half-up, not the $66.66 of truncation')
+        },
+        /**
          * **The hand-typed rows are Table A-7a's, NOT the column
          * `fjs/form4562/macrs` derives.** Both rows are hand-typed here, from
          * i8829 and from that module's own proof, so the two cannot drift into
