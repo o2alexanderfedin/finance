@@ -126,7 +126,22 @@
  * `priorYearQualifiedBusinessLossCarryforward` (Phase 28), `'0.00'` is the
  * assertion "none", and absence is *unstated* rather than none:
  * {@link priorYearCarryforwardIsUnstated} refuses by name whenever a deduction
- * would otherwise be computed. That dialect's own header carries the argument
+ * would otherwise be computed.
+ *
+ * **The OUTBOUND half is printed line 16, and it acquired a reader in the Form
+ * 461 phase.** *"Total qualified business (loss) carryforward. Add lines 2 and
+ * 3. If greater than zero, enter -0-."* This module has computed it since Phase
+ * 28 and nothing read it, which is the `box13StatutoryEmployee` shape this
+ * repository has paid for twice — and `fjs/schedule/f`'s own loss refusal named
+ * the gap out loud, saying the outbound direction *"has no home at all"*. Two
+ * things were actually missing. The zero floor sat inside
+ * {@link qualifiedBusinessIncome}, i.e. on printed line 2, where the paper
+ * floors line 4 — so the first real business loss to arrive would have been
+ * clamped to zero before line 16 ever saw it. And line 16 reached no report
+ * field. Both are fixed: the floor is on line 4 where it is printed,
+ * `fjs/form1040/core` carries line 16 out as a `ReportLine`, and
+ * `fjs/report/tax_return` prints it — so a farmer whose Schedule F line 34 is a
+ * loss can transcribe it into next year's assertion. That dialect's own header carries the argument
  * for why absence cannot mean zero here when it does mean zero for
  * `vnd.fjs.prior_year_capital_loss`.
  *

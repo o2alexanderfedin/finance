@@ -28,44 +28,62 @@
  * | 23 pension and profit-sharing | REFUSES by name | nothing distinguishes an employee's from the proprietor's |
  * | 11, 13, 15-22, 24a-32 | ✔ | `vnd.fjs.farm` entries, one category per printed line |
  * | 33 total expenses | ✔ | a plain sum; printed line 32f cannot go negative here |
- * | 34 net farm profit | ✔ **any profit, and a break-even zero**; REFUSES a loss | see below |
+ * | 34 net farm profit | ✔ **any profit, any break-even zero, and a LOSS at printed box 36a**; REFUSES a loss at box 36b | see below |
  * | 35 | reserved | the printed face says *"Reserved for future use"* |
- * | 36a/36b at risk | never reached | it exists only for a loss, which refuses |
+ * | 36a/36b at risk | ✔ **read**, and it decides whether a loss computes | 36a computes, 36b refuses on §465 |
  * | Part III (37-50) | REFUSES by name | beginning and ending INVENTORY, and a valuation method |
  *
- * ## The net-loss decision
+ * ## The net-loss decision, and where it stands after the Form 461 phase
  *
- * **A net loss on line 34 is REFUSED by name. A profit, and a break-even zero,
- * compute.** This is `fjs/schedule/c` line 31's decision and
- * `fjs/schedule/e/part_i`'s, reached from a printed page that says the same
- * thing — i1040sf p9, *"If line 33 is more than line 9, don't enter your loss on
+ * **A net loss on line 34 COMPUTES at printed box 36a. It REFUSES at printed box
+ * 36b, on §465 alone.** A profit and a break-even zero compute as they always
+ * did. i1040sf p9: *"If line 33 is more than line 9, don't enter your loss on
  * line 34 until you have applied the at-risk rules and the passive activity loss
  * rules […] You may also be required to file Form 461, which limits the
- * allowable loss."*
+ * allowable loss."* Three things stood in the way of that sentence and two of
+ * them are gone.
  *
- * **The binding statute is §461(l), and NOT §461(j).** §461(j)'s excess FARM
- * loss is the provision a farm-shaped reading reaches for, and §461(l)(1)'s
- * flush text disapplies it for any noncorporate taxpayer in a year §461(l)
- * applies — which 2025 is (i1040sf p1, Reminders). The two have different
- * thresholds and different carryover consequences, so naming the wrong one
- * would send a filer to the wrong form.
+ * **§465 and §469 are disposed of by i1040sf p10, in one sentence, on the
+ * taxpayer's own two answers**: *"If all your investment amounts are at risk in
+ * this activity, check box 36a. If you also checked the 'Yes' box on line E,
+ * your remaining loss is your loss. The at-risk rules and the passive activity
+ * loss rules don't apply."* `vnd.fjs.farm` stores both answers, which is exactly
+ * what `vnd.fjs.business_expenses` does not — it carries no field for Schedule
+ * C's printed line 32 at-risk box and none for material participation, so
+ * `fjs/schedule/c`'s loss still refuses and this one does not. That difference
+ * between two dialects is the whole reason one schedule moved and the other
+ * could not. At box 36b, {@link netFarmLossRefusal} still refuses, and its
+ * ground is §465 and Form 6198 alone.
  *
- * **§469 never appears in the loss refusal, and that is because of a refusal
- * that fires earlier.** {@link noMaterialParticipationRefusal} turns away every
- * farm that answered "No" on printed line E, so a farm that reaches printed line
- * 34 at all is non-passive by the taxpayer's own assertion. What is left is
- * §465 — named only when printed box 36b is checked, which is what i1040sf p10
- * says: *"If all your investment amounts are at risk in this activity, check box
- * 36a. If you also checked the 'Yes' box on line E, your remaining loss is your
- * loss. The at-risk rules and the passive activity loss rules don't apply."*
+ * **§461(l) is computed now**, by `fjs/form461`, called from `fjs/schedule/1`
+ * Part I after every schedule has produced its own printed line — which is
+ * exactly i461's *Ordering Rules*: *"First, apply the at-risk rules; next, apply
+ * the passive activity loss rules; and then apply the excess business loss
+ * rules."* This schedule does not ask it, and could not: §461(l)(3)(A) measures
+ * the AGGREGATE of every trade or business on the return, which one Schedule F
+ * cannot see. A loss the limitation actually BINDS on still refuses, from
+ * `fjs/form461`, because the disallowed amount is a §172 net operating loss
+ * carryover this engine cannot hand to next year.
  *
- * A THIRD blocker holds even at 36a, and it is not a limitation on the loss but
- * a consequence of it: §199A(c)(2) makes a negative qualified business income
- * amount *"a loss from a qualified trade or business in the succeeding taxable
- * year"*, which is next year's Form 8995 line 3. This engine holds one tax year.
- * `vnd.fjs.business_expenses` carries
- * `priorYearQualifiedBusinessLossCarryforward` because of the INBOUND direction
- * of that rule; the outbound direction has no home at all.
+ * **The binding statute is §461(l), and NOT §461(j)**, and that reading is what
+ * made the aggregate the right question to ask. §461(j)'s excess FARM loss is
+ * the provision a farm-shaped reading reaches for, and §461(l)(1)'s flush text
+ * disapplies it for any noncorporate taxpayer in a year §461(l) applies — which
+ * 2025 is (i1040sf p1, Reminders). The two have different thresholds and
+ * different carryover consequences.
+ *
+ * **§199A(c)(2) was the third blocker, and it is gone for a reason worth
+ * recording, because this docstring got it wrong.** It said the outbound
+ * direction of that rule *"has no home at all"*. It has one: Form 8995 printed
+ * line 16, *"Total qualified business (loss) carryforward"*, which
+ * `fjs/form8995` has computed since Phase 28 and nothing read. Two things were
+ * genuinely missing and the Form 461 phase supplied both — the zero-floor sat on
+ * printed line 2 where the paper floors line 4, so a loss would have been
+ * swallowed before reaching line 16; and line 16 reached no report field, so the
+ * farmer could not transcribe it into next year's
+ * `priorYearQualifiedBusinessLossCarryforward`. Above §199A(e)(2)'s threshold
+ * `fjs/form8995a` refuses instead, because Form 8995-A has no such printed line
+ * here.
  *
  * ## Printed line E answering "No" refuses, and the ground is §1411
  *
