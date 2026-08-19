@@ -54,6 +54,40 @@ Three distinct causes, in rising order of effort:
    semantic migration, not a mechanical one** — the interpreter and the run spine have to decide
    what an error channel means where they previously had none.
 
+## The new Effect system is LLM tool-calling, and upstream says so in those words
+
+Observed by the owner on 2026-08-18 and then checked against `fjs/effects/types.d.ts` rather than
+agreed with. The type is `Operation = readonly [string, (..._) => Result<unknown, unknown>]` — a
+command NAME paired with the signature a runner implements it at — and upstream's own docstring
+describes the missing-handler path as: *"A runner may decline any command it was not given a
+handler for — `partialMatch` answers `error(notImplemented(command))`"*, after which *"the program
+receives control back and decides what an incompatible runner means for it."* That is a tool call,
+a tool that the client does not have, and a caller deciding what to do about it. Even the reason
+the refusal carries only the NAME is the same: the payload may hold functions, so carrying it
+would break serializability.
+
+**This retires `upstream-total-match-dispatch.md`.** At 0.43.1 `match` refuses by throwing, which
+is why `fjs/exec` carries a `try` that AGENTS.md's no-`try` rule otherwise forbids; that note was
+re-checked against 0.45.0 on 2026-08-17 and found still open. At 0.46.0 the refusal is
+`error(notImplemented)` and `throw` is reserved for panics. **The migration therefore DELETES a
+workaround rather than adding a version** — check `fjs/exec`'s `try` for removal as part of this
+work, and delete that note when it goes.
+
+**And it sharpens this project's own thesis.** REQUIREMENTS.md permanently forbids a
+`finance_compute_1040` tool so that the agent AUTHORS a program instead of calling one. If effects
+are isomorphic to tool calls, the difference was never *what executes* — it is **who decides, and
+when**:
+
+| | an LLM's tool calls | this engine's effects |
+|---|---|---|
+| who picks the next call | the model, at every step | the program, written once in advance |
+| reproducibility | none | byte-identical, from the same program hash |
+| a failed call | the model improvises | `Result<T, E>`, discharged by type |
+
+The same mechanism, with the decision made once and stored in CAS instead of re-made on every
+step. That is the clearest statement of the thesis this project has produced, and it belongs in
+the report the upstream author asked for.
+
 ## Retirement condition
 
 This note is deleted when `package.json` declares `^0.46.0`, `npm test` is green on it, and the
