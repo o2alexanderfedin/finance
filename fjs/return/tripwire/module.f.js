@@ -849,10 +849,16 @@ const everyStatus = [
 ]
 
 export const proof = {
-    // The hand-typed count, and the structural facts a loop cannot see: five
-    // rows, five DISTINCT kinds, and no empty evidence string. A tripwire
+    // The hand-typed count, and the structural facts a loop cannot see: ten
+    // rows, ten DISTINCT kinds, and no empty evidence string. A tripwire
     // whose evidence were blank would refuse without saying what proved it,
     // which is the silence this whole module replaces.
+    //
+    // This sentence said "five" while the table held eight, and the leaf was
+    // named `theTableIsExactlyFiveDistinctTripwires` at the same time. Both
+    // were prose about a number, and neither is what `expectedTripwireCount`
+    // asserts — which is precisely why the count stayed right while its own
+    // description went wrong. Corrected with the name.
     theTableIsExactlyTenDistinctTripwires: () => {
         assertEq(tripwires.length, expectedTripwireCount)
         assertEq(new Set(tripwires.map(t => t.kind)).size, expectedTripwireCount)
