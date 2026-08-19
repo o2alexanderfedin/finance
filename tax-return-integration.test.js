@@ -71,6 +71,15 @@ import { centsFromString } from './fjs/exact/module.f.js'
 import { dialect as returnProfileDialect, validate as validateReturnProfile } from './fjs/return/profile/module.f.js'
 import { dialect as w2Dialect, validate as validateW2 } from './fjs/document/w2/module.f.js'
 import { dialect as oneZeroNineNineGDialect, validate as validateOneZeroNineNineG } from './fjs/document/1099g/module.f.js'
+// The three Schedule K-1 faces, a 1099-INT and a 1099-DIV, imported for the
+// SAME reason the three above are: the seeds must be proven well-formed
+// documents before the store is asked to compute from them. See the route-line
+// leg below for why they are here at all.
+import { dialect as k1PartnershipDialect, validate as validateK1Partnership } from './fjs/document/k1_1065/module.f.js'
+import { dialect as k1SCorporationDialect, validate as validateK1SCorporation } from './fjs/document/k1_1120s/module.f.js'
+import { dialect as k1EstateTrustDialect, validate as validateK1EstateTrust } from './fjs/document/k1_1041/module.f.js'
+import { dialect as oneZeroNineNineIntDialect, validate as validateOneZeroNineNineInt } from './fjs/document/1099int/module.f.js'
+import { dialect as oneZeroNineNineDivDialect, validate as validateOneZeroNineNineDiv } from './fjs/document/1099div/module.f.js'
 import { paramSetHash, reviewedEstimateFraming, countsTowardReproducibilityAcceptance } from './fjs/report/provenance/module.f.js'
 import { taxParamsByYear } from './fjs/tax/params/module.f.js'
 import { taxReturnReportSource } from './fjs/report/tax_return/module.f.js'
@@ -501,6 +510,196 @@ test(
                 assert.deepEqual(record.parents, [w2ARevision1])
                 assert.equal(countsTowardReproducibilityAcceptance(record), true)
             }
+
+            // ── Five more of the stored text's route lines, EXECUTED ──────
+            //
+            // `fjs/todo/tax-return-report-source-route-lines-unexercised.md`
+            // sized this and left it open. The stored program's own text
+            // carries a route line per dialect, and the text is executed ONLY
+            // here — the twin's routing sweep in
+            // `fjs/report/tax_return` interprets the FUNCTION, not these
+            // bytes. Until this leg the fixture above was two W-2s and a
+            // 1099-G, so twenty-five of the twenty-eight route lines were
+            // covered by a `String.includes` of the dialect tag and nothing
+            // else — which cannot see a line that is present and WRONG.
+            // This leg takes it to eight; the todo sizes the twenty left.
+            //
+            // **Why a zero-box K-1 would have been a fake pass**, and this
+            // leg is not one: the reducer's fallthrough returns `acc`
+            // unchanged for an unrouted document — deliberately, so a stored
+            // blob of a dialect this report does not consume cannot fail the
+            // run — so presence is unobservable and only an AMOUNT THAT MOVES
+            // proves the line executed. Each of the four carries interest,
+            // which reaches 1040 line 2b through no declaration gate, and the
+            // four amounts are chosen so that **every subset sums to a
+            // different figure**: $700.00 + $30.00 + $400.00 + $9.00 =
+            // $1,139.00, and dropping any one line leaves $439.00,
+            // $1,109.00, $739.00 or $1,130.00 — so a failure names which
+            // route line broke rather than only that one did.
+            //
+            // A `vnd.fjs.1099int` and a `vnd.fjs.1099div` ride along because
+            // their own route lines were equally unexecuted, and the 1099-INT
+            // in particular because it makes the `boxPath` assertions below
+            // LOAD BEARING rather than belt-and-braces: `k1_1041`'s interest box is
+            // literally `box1InterestIncome`, the same name the 1099-INT uses,
+            // so a beneficiary's K-1 misrouted into `interestForms` would
+            // still contribute its $400.00 to the total and only the
+            // dialect-qualified `boxPath` would say so. The interest box wears
+            // a DIFFERENT NUMBER on each of the three K-1 faces — 5 on the
+            // partner's, 4 on the shareholder's, 1 on the beneficiary's —
+            // which is the collision DOC-24's separate dialects exist to
+            // prevent.
+            //
+            // The ordinary-business-income boxes are deliberately absent: box
+            // 1 on the first two faces and box 6 on the third trip
+            // `fjs/return/tripwire`'s undeclared-kind refusals, which would
+            // make this a leg about a declaration rather than about routing.
+            //
+            // Run HERE — after every assertion above, before the mixed-year
+            // leg — because it permanently adds five subjects to the store,
+            // and the figures above are hand-typed against a four-subject
+            // one.
+            const partnershipK1 = {
+                dialect: k1PartnershipDialect,
+                payerTin: '77-7777777',
+                recipientTin,
+                accountNumber: 'PTR-INTEG',
+                taxYear: 2025,
+                formRevision: '2025',
+                boxGGeneralPartnerOrLlcMemberManager: true,
+                materialParticipation: 'materiallyParticipated',
+                box5InterestIncome: '700.00',
+            }
+            const sCorporationK1 = {
+                dialect: k1SCorporationDialect,
+                payerTin: '88-8888888',
+                recipientTin,
+                accountNumber: 'SHR-INTEG',
+                taxYear: 2025,
+                formRevision: '2025',
+                materialParticipation: 'materiallyParticipated',
+                box4InterestIncome: '30.00',
+            }
+            // No `accountNumber`: the Schedule K-1 (Form 1041) face has no
+            // such box.
+            const estateTrustK1 = {
+                dialect: k1EstateTrustDialect,
+                payerTin: '99-9999999',
+                recipientTin,
+                taxYear: 2025,
+                formRevision: '2025',
+                boxHDomesticBeneficiary: true,
+                materialParticipation: 'materiallyParticipated',
+                box1InterestIncome: '400.00',
+            }
+            const bankInterest = {
+                dialect: oneZeroNineNineIntDialect,
+                payerTin: '10-1010101',
+                recipientTin,
+                accountNumber: 'ACC-1099INT',
+                taxYear: 2025,
+                formRevision: '2025',
+                box1InterestIncome: '9.00',
+            }
+            assert.equal(validateK1Partnership(partnershipK1)[0], 'ok', 'expected the seeded K-1 (1065) to validate')
+            assert.equal(validateK1SCorporation(sCorporationK1)[0], 'ok', 'expected the seeded K-1 (1120-S) to validate')
+            assert.equal(validateK1EstateTrust(estateTrustK1)[0], 'ok', 'expected the seeded K-1 (1041) to validate')
+            // The FIFTH route line, and it is deliberately not a sixth
+            // contributor to line 2b: it lands on printed lines 3a and 3b, so
+            // the leg says the recipe generalizes past one printed line.
+            // Box 1b is the QUALIFIED SUBSET of box 1a, never an addend
+            // beside it — a transposition of the two is exactly what the
+            // separate assertions below catch.
+            const bankDividend = {
+                dialect: oneZeroNineNineDivDialect,
+                payerTin: '12-1212121',
+                recipientTin,
+                accountNumber: 'ACC-1099DIV',
+                taxYear: 2025,
+                formRevision: '2025',
+                sourceArtifactHash: 'deadbeef00112233445566778899aabbccddeeff0011223344556677889900',
+                box1aTotalOrdinaryDividends: '250.00',
+                box1bQualifiedDividends: '100.00',
+            }
+            assert.equal(validateOneZeroNineNineInt(bankInterest)[0], 'ok', 'expected the seeded 1099-INT to validate')
+            assert.equal(validateOneZeroNineNineDiv(bankDividend)[0], 'ok', 'expected the seeded 1099-DIV to validate')
+
+            const partnershipK1Hash = await casAdd(JSON.stringify(partnershipK1))
+            const sCorporationK1Hash = await casAdd(JSON.stringify(sCorporationK1))
+            const estateTrustK1Hash = await casAdd(JSON.stringify(estateTrustK1))
+            const bankInterestHash = await casAdd(JSON.stringify(bankInterest))
+            const bankDividendHash = await casAdd(JSON.stringify(bankDividend))
+            await evoAdd({ parents: [], subject: 'tax-return-integration-k1-1065', snapshot: partnershipK1Hash })
+            await evoAdd({ parents: [], subject: 'tax-return-integration-k1-1120s', snapshot: sCorporationK1Hash })
+            await evoAdd({ parents: [], subject: 'tax-return-integration-k1-1041', snapshot: estateTrustK1Hash })
+            await evoAdd({ parents: [], subject: 'tax-return-integration-1099int', snapshot: bankInterestHash })
+            await evoAdd({ parents: [], subject: 'tax-return-integration-1099div', snapshot: bankDividendHash })
+
+            const k1RunResponse = await call('fjs_run', { hash: programHash, taxYear: 2025 })
+            assert.equal(
+                k1RunResponse.result.isError, undefined,
+                `K-1 routing fjs_run failed: ${JSON.stringify(k1RunResponse)}`)
+            const k1Run = JSON.parse(k1RunResponse.result.content[0].text)
+            // `1 + 3 × 9`: nine subjects now, the original four plus these
+            // five. Hand-typed, like the thirteen above.
+            assert.equal(k1Run.readCount, 28)
+            const k1Bytes = await casGetText(k1Run.resultHash)
+            const k1Result = JSON.parse(k1Bytes)
+            assert.equal(k1Result.kind, 'ok', `expected a computed return: ${k1Bytes.slice(0, 400)}`)
+            const k1CentsAt = rule => {
+                const line = k1Result.lines.find(candidate => candidate.rule === rule)
+                assert.ok(line !== undefined, `expected the return to carry ${rule}`)
+                return centsFromString(line.value)
+            }
+            // The arithmetic, checkable by a reader without running anything.
+            // The live W-2A is the SECOND amendment ($77,777.00) by this point
+            // — the two PROV-05 legs above landed it — so wages are
+            // $77,777.00 + $9,568.00 = $87,345.00. Interest is the three K-1
+            // boxes plus the bank's, $700.00 + $30.00 + $400.00 + $9.00 =
+            // $1,139.00. Ordinary dividends are $250.00, of which $100.00 is
+            // the qualified SUBSET and is therefore NOT added again.
+            // Unemployment is unchanged at $4,554.00, so total income is
+            // $87,345.00 + $1,139.00 + $250.00 + $4,554.00 = $93,288.00, less
+            // TY2025's $15,750.00 single standard deduction = $77,538.00 of
+            // taxable income.
+            assert.equal(k1CentsAt('1040 line 1a'), 8734500n)
+            assert.equal(k1CentsAt('1040 line 2b'), 113900n)
+            assert.equal(k1CentsAt('1040 line 3a'), 10000n)
+            assert.equal(k1CentsAt('1040 line 3b'), 25000n)
+            assert.equal(k1CentsAt('1040 line 8'), 455400n)
+            assert.equal(k1CentsAt('1040 line 9'), 9328800n)
+            assert.equal(k1CentsAt('1040 line 15'), 7753800n)
+            // Line 16 is deliberately NOT asserted here. It is a Tax Table
+            // band lookup — a step function whose expected value would have to
+            // be hand-derived from Publication 1040's own rows, and never
+            // recomputed with the engine — and this leg is about three route
+            // lines, not about the tax table. The main run above pins line 16.
+            //
+            // ── Each route line SEPARATELY, by dialect-qualified boxPath ──
+            //
+            // The total alone cannot tell a document routed into the wrong
+            // bucket from one routed into the right one, because all three
+            // buckets reach the same printed line. These three assertions can:
+            // each names the document the server itself hashed and the box
+            // path `fjs/form1040/core` cites for that face.
+            const k1LineTwoB = k1Result.lines.find(candidate => candidate.rule === '1040 line 2b')
+            const citedBox = (documentHash, boxPath) => k1LineTwoB.sources.some(
+                s => s.documentHash === documentHash && s.boxPath === boxPath)
+            assert.ok(
+                citedBox(partnershipK1Hash, 'k1_1065.box5InterestIncome'),
+                `line 2b must cite the partner's box 5: ${JSON.stringify(k1LineTwoB.sources)}`)
+            assert.ok(
+                citedBox(sCorporationK1Hash, 'k1_1120s.box4InterestIncome'),
+                `line 2b must cite the shareholder's box 4: ${JSON.stringify(k1LineTwoB.sources)}`)
+            assert.ok(
+                citedBox(estateTrustK1Hash, 'k1_1041.box1InterestIncome'),
+                `line 2b must cite the beneficiary's box 1: ${JSON.stringify(k1LineTwoB.sources)}`)
+            // Unqualified, and that is the point of the pair: the bank's box 1
+            // and the beneficiary's box 1 are the same NAME on two faces, and
+            // only the qualification tells them apart.
+            assert.ok(
+                citedBox(bankInterestHash, 'box1InterestIncome'),
+                `line 2b must cite the bank's box 1: ${JSON.stringify(k1LineTwoB.sources)}`)
 
             // ── The mixed-year refusal, through the REAL stored bytes ─────
             //

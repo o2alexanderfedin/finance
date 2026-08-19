@@ -2569,11 +2569,19 @@ export const proof = {
     // leaf here too, and they do not close it.** `runTwin` interprets
     // {@link taxReturnReport} — the function TWIN. The literal
     // {@link taxReturnReportSource} is executed only by
-    // `tax-return-integration.test.js`, whose fixture is two W-2s and a
-    // 1099-G, so the SOURCE text's own twenty-six route lines remain covered
-    // by a `String.includes` and nothing else.
-    // `fjs/todo/tax-return-report-source-k1-routes-unexercised.md` sizes that
-    // separate gap for three of them and is still OPEN.
+    // `tax-return-integration.test.js`, in a real `fjs_run` process.
+    //
+    // That harness's fixture WAS two W-2s and a 1099-G, so all but three of
+    // the SOURCE text's route lines were covered by a `String.includes` and
+    // nothing else. It now seeds five more subjects — three Schedule K-1
+    // faces, a 1099-INT and a 1099-DIV — with amounts chosen so that every
+    // subset sums differently and with per-source `boxPath` assertions, so
+    // **eight** of the twenty-eight route lines are genuinely executed.
+    // Moving any one of the five to a neighbouring bucket reddens that
+    // harness and nothing else in this suite.
+    // `fjs/todo/tax-return-report-source-route-lines-unexercised.md` sizes
+    // the twenty that remain, and separates the ones that cost a subject from
+    // the ones that cost a hand-derived schedule.
     routingSweep: {
         // THE CONTROL for the six portfolio leaves. The same profile with
         // every document withheld: each line they move is zero, and the
