@@ -6908,6 +6908,73 @@ export const proof = {
             assertEq(withoutTheFarm.qualifiedBusinessLossCarryforward.value, 0n)
         },
         /**
+         * ★ **THE FIXTURE THAT MAKES THE WAGES QUESTION LOAD-BEARING**, and
+         * without it nothing in this repository could tell the two readings
+         * apart. $400,000.00 of Form W-2 box 1 and a $350,000.00 farm loss:
+         *
+         * ```
+         *                              wages EXCLUDED      wages INCLUDED
+         *  Form 461  14                   -350,000.00          +50,000.00
+         *  Form 461  15                    313,000.00          313,000.00
+         *  Form 461  16                    -37,000.00         363,000.00
+         *  verdict                            REFUSES            computes
+         * ```
+         *
+         * `fjs/form461` has no wage input at all, so this cannot be mutated
+         * directly — which is exactly why the guard has to be an OUTCOME. The
+         * day anyone threads Form 1040 line 1 into printed Form 461 line 1
+         * (where the 2018-2020 revisions had it), this leaf reddens.
+         *
+         * The taxpayer is real, not contrived: i461's *Who Must File* threshold
+         * and §461(l)'s legislative purpose are both about a high wage earner
+         * sheltering salary with a business loss.
+         */
+        aLargeWageEarnerWithALargeFarmLossIsRefusedByFormFourSixtyOne: () => {
+            const base = inputsOf(storedProfile({
+                ...farmProfile,
+                declaredKinds: /** @type {readonly Kind[]} */ (['wages', 'farmIncomeOrLoss']),
+            }))([w2Document('sha256-w2-big-wages')('400000.00')])([])([])([])([])([])([])([])([])
+            /** @type {(amount: string) => Form1040IncomeLines | Form1040Error} */
+            const withFeed = amount => form1040IncomeLines(taxParams2025)({
+                ...base,
+                farmForms: [{
+                    documentHash: 'sha256-farm-loss-big',
+                    value: {
+                        ...farmDocument('x').value,
+                        entries: [{
+                            category: 'feed',
+                            datePaid: '2025-04-15',
+                            description: 'winter hay',
+                            amount,
+                        }],
+                    },
+                }],
+            })
+            const outcome = withFeed('390000.00')
+            assert(outcome.kind === 'error',
+                ['a $350,000.00 business loss is over §461(l)\'s threshold', outcome])
+            if (outcome.kind !== 'error') {
+                return
+            }
+            assert(outcome.message.includes('Form 461 line 16 is -37000.00'),
+                ['line 16, with the wages EXCLUDED from line 14', outcome.message])
+            assert(outcome.message.includes('-350000.00'),
+                ['printed line 14 is the farm loss alone, not the loss net of wages',
+                    outcome.message])
+            // **THE CONTROL**: the same $400,000.00 wage earner with a
+            // $313,000.00 loss — exactly the threshold — computes, and the
+            // whole loss reaches 1040 line 8. So the refusal above is about the
+            // SIZE of the loss and not about the wages being there.
+            const exactly = withFeed('353000.00')
+            assert(exactly.kind === 'ok', ['exactly at the threshold computes', exactly])
+            if (exactly.kind !== 'ok') {
+                return
+            }
+            assertEq(exactly.line1a.value, 40000000n, '$400,000.00 of wages')
+            assertEq(exactly.line8.value, -31300000n, 'and the whole $313,000.00 loss')
+            assertEq(exactly.line11a.value, 8700000n, 'adjusted gross income $87,000.00')
+        },
+        /**
          * ★ **AND ONE CENT PAST §461(l)'s THRESHOLD, THE WHOLE REPORT STOPS.**
          * The same farm with $353,000.01 of feed against $40,000.00 of raised
          * products is a $313,000.01 loss — one cent more than the printed line
