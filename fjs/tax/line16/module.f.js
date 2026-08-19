@@ -499,11 +499,41 @@ export const dispatchLine16 = taxParamSet => inputs => {
         const worksheetLine5 = baseTaxForAmount(taxParamSet)(status)(worksheetLine2c).cents
         // 6. "Subtract line 5 from line 4. Enter the result. If zero or less,
         //    enter -0-."
-        const worksheetLine6BeforeFloor = lineFourOutcome.cents - worksheetLine5
+        //
+        //    **Written as an ASSERTION rather than a floor, and a surviving
+        //    mutation is why.** Replacing `> 0n ? … : 0n` with the bare
+        //    difference left the entire suite green — the equivalent-mutant
+        //    shape AGENTS.md describes, where a neighbouring operation already
+        //    enforces what the mutated token enforced. Here the neighbour is
+        //    the capital-gain-excess guard six lines up, and the argument is
+        //    worth writing down because nobody had:
+        //
+        //    - line 3 = line 1 + line 2c, so line 3 >= line 2c;
+        //    - the guard has just refused every return whose preferential
+        //      slice exceeds line 1, so on this path the QDCGT's line 5 (its
+        //      ordinary remainder, line 1 less line 4) is at least line 2c,
+        //      and the same holds of the Schedule D Tax Worksheet's line 14;
+        //    - both preferential worksheets end in a `min` against the
+        //      ORDINARY tax on their own line 1, and both of their arms are
+        //      monotone in it;
+        //    - `baseTaxForAmount` is monotone non-decreasing, band midpoints
+        //      included.
+        //
+        //    So line 4 >= line 5 identically, and the printed "-0-" clause is
+        //    unreachable. A floor would then be a silent mask: the one way
+        //    line 6 could go negative is a defect above it, and masking that
+        //    to zero would understate the tax without a word. `fjs/tax/line16/qdcgt`'s
+        //    own no-floor assertion and `fjs/form8812`'s line 16a are the
+        //    precedent — `assert` throws a BARE value, never an `Error`.
+        const worksheetLine6 = lineFourOutcome.cents - worksheetLine5
+        assert(
+            worksheetLine6 >= 0n,
+            ['the Foreign Earned Income Tax Worksheet\'s line 4 can never be below its line 5',
+                lineFourOutcome.cents, worksheetLine5])
         return {
             kind: 'ok',
             method: 'foreignEarnedIncomeTaxWorksheet',
-            cents: worksheetLine6BeforeFloor > 0n ? worksheetLine6BeforeFloor : 0n,
+            cents: worksheetLine6,
             // The worksheet that priced line 4, carried out unchanged. Form
             // 6251 Part III reads its lines "as figured for the regular tax",
             // and with Form 2555 in play the regular tax's worksheet IS the
