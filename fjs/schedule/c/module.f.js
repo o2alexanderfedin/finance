@@ -2214,6 +2214,89 @@ export const proof = {
             assert(message.includes('TWICE'), ['must say why an entry is refused now', message])
             assert(message.includes('vnd.fjs.asset_register'), ['and what to store instead', message])
         },
+        /**
+         * ★ **THE LEAF A MUTATION DEMANDED.** Forcing
+         * `businessUseHundredthsOfPercent` to a flat 100% in
+         * {@link depreciableAssets} left the ENTIRE suite green: every fixture
+         * in this repository used 100.00% business use, a June
+         * placed-in-service month and the current tax year, so three of the
+         * five facts that function extracts were unobservable. This leaf makes
+         * all three bite at once.
+         *
+         * Two assets, every figure hand-computed off Publication 946:
+         *
+         * - A **60%-business** $10,000.00 seven-year asset placed in service in
+         *   **November**. Its basis for depreciation is
+         *   $10,000.00 × 60% = $6,000.00 (i4562 p10, column (c)), and because
+         *   it is the whole of this year's additions and all of it falls in the
+         *   last three months, the **mid-quarter** convention applies — which
+         *   the engine derives and the register's own `convention` field only
+         *   confirms. Table A-5 (fourth quarter), 7-year, year 1: **3.57%** of
+         *   $6,000.00 = **$214.20**.
+         * - A $5,000.00 five-year asset placed in service in **March 2022**,
+         *   half-year, whose convention is TRANSCRIBED rather than derived
+         *   because a register of assets still held cannot reconstruct 2022's
+         *   own aggregate. 2025 is its fourth recovery year, and Table A-1's
+         *   5-year column gives **11.52%** of $5,000.00 = **$576.00**, which
+         *   lands on Form 4562 line 17 rather than line 19.
+         *
+         * Line 13 is $214.20 + $576.00 = **$790.20**, and line 31 is
+         * $6,000.00 - $790.20 = **$5,209.80**.
+         */
+        aPartialBusinessUseAndAPriorYearAssetBothTravel: () => {
+            const result = ok(run({
+                nonemployeeCompensationForms: [necDoc('6000.00')('sha256-nec-1')],
+                businessExpenseForms: [businessDoc([])],
+                assetRegisters: [{
+                    documentHash: 'sha256-register-mixed',
+                    value: {
+                        ...registerDoc('BUS-0001').value,
+                        assets: [{
+                            description: 'shared workstation',
+                            datePlacedInService: '2025-11',
+                            costOrOtherBasis: '10000.00',
+                            businessUsePercentage: '60.00',
+                            classification: 'sevenYear',
+                            method: '200DB',
+                            convention: 'MQ',
+                            section168kStatus: 'electedOut',
+                        }, {
+                            description: 'older server',
+                            datePlacedInService: '2022-03',
+                            costOrOtherBasis: '5000.00',
+                            businessUsePercentage: '100.00',
+                            classification: 'fiveYear',
+                            method: '200DB',
+                            convention: 'HY',
+                            section168kStatus: 'electedOut',
+                        }],
+                    },
+                }],
+            }))
+            const form4562 = result.form4562
+            assert(form4562 !== undefined, 'a register must produce a Form 4562')
+            assertEq(form4562?.midQuarterConventionApplies, true,
+                'all of this year\'s additions fell in the last three months')
+            assertEq(form4562?.line19.c, 21420n, 'Table A-5, 7-year, year 1, on a 60% basis')
+            assertEq(form4562?.line17, 57600n, 'Table A-1, 5-year, year 4, on the 2022 asset')
+            assertEq(result.partII.line13.value, 79020n, '$214.20 + $576.00')
+            assertEq(result.partII.line31.value, 520980n, '$6,000.00 - $790.20')
+        },
+        /**
+         * THE CONTROL for the month and the percentage, one at a time: the
+         * SAME seven-year asset at 100% business use in June is Table A-1's
+         * 14.29% of the WHOLE $10,000.00 — $1,429.00 rather than $214.20. Two
+         * facts changed and the figure moved by a factor of nearly seven, so
+         * neither is being read as a constant.
+         */
+        theSameAssetInJuneAtFullBusinessUseIsADifferentFigure: () => {
+            const result = ok(run({
+                nonemployeeCompensationForms: [necDoc('6000.00')('sha256-nec-1')],
+                businessExpenseForms: [businessDoc([])],
+                assetRegisters: [registerDoc('BUS-0001')],
+            }))
+            assertEq(result.partII.line13.value, 142900n)
+        },
     },
     businessCardinality: {
         // Schedule C is filed PER BUSINESS, and a second record is two
