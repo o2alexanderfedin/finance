@@ -496,6 +496,19 @@ const dependentCareCommonFacts
         return {
             status,
             qualifyingPersonCount: persons.length,
+            // Form 2441 line 2 column (c), read for the first time here.
+            // §21(b)(1) has exactly two populations — a dependent under 13
+            // (subparagraph (A)) and a disabled spouse or dependent who shared
+            // the taxpayer's abode (subparagraphs (B) and (C)) — and i2441's
+            // own line 2 CAUTION forbids anyone else from appearing on the
+            // printed grid. `vnd.fjs.credits` is not a transcribed form, so a
+            // record can and did carry an entry in neither population, and
+            // `persons.length` counted it. Named rather than counted, so
+            // `fjs/form2441`'s R6 can say which row to fix.
+            qualifyingPersonsWithNoAgeAssertion: persons.filter(person =>
+                person.overAgeTwelveAndDisabled !== true
+                && person.underAgeThirteenWhenTheCareWasProvided !== true)
+                .map(person => person.name),
             careProviderCount: providers.length,
             // Form 2441 line 2 column (d), summed across every qualifying
             // person — and across every stored record, because
@@ -4815,9 +4828,32 @@ const dependentCareCredits = {
             identifyingNumber: '11-1111111',
             amountPaid: '8000.00',
         }],
+        // **The two entries assert DIFFERENT §21(b)(1) populations**, and that
+        // is deliberate rather than decorative. Every dependent-care fixture
+        // in this repository asserted the same one until R6 existed, which is
+        // the monoculture AGENTS.md warns about: the over-12-and-disabled
+        // branch of `qualifyingPersonsWithNoAgeAssertion` would have been
+        // unexercised end to end, and deleting its term from the filter would
+        // have left the whole suite green.
+        //
+        // Neither child is a 1040 dependent (`dependentCount: 0` above), which
+        // is also why the profile's own `dependents[].ageAtYearEnd` could not
+        // have supplied this fact: i2441's special rule for children of
+        // divorced or separated parents puts a qualifying person on line 2 who
+        // is on nobody's dependent list here.
         dependentCareQualifyingPersons: [
-            { name: 'A. Child', tin: '444-44-4444', qualifiedExpensesIncurredAndPaid: '4000.00' },
-            { name: 'B. Child', tin: '555-55-5555', qualifiedExpensesIncurredAndPaid: '4000.00' },
+            {
+                name: 'A. Child',
+                tin: '444-44-4444',
+                underAgeThirteenWhenTheCareWasProvided: true,
+                qualifiedExpensesIncurredAndPaid: '4000.00',
+            },
+            {
+                name: 'B. Child',
+                tin: '555-55-5555',
+                overAgeTwelveAndDisabled: true,
+                qualifiedExpensesIncurredAndPaid: '4000.00',
+            },
         ],
         dependentCareQualifiedExpensesIncurred: '8000.00',
         dependentCareFilerWasNeitherAStudentNorDisabled: true,
@@ -4958,6 +4994,7 @@ const dependentCareWithAChildInputs = {
             dependentCareQualifyingPersons: [{
                 name: 'A. Child',
                 tin: '444-44-4444',
+                underAgeThirteenWhenTheCareWasProvided: true,
                 qualifiedExpensesIncurredAndPaid: '3000.00',
             }],
             dependentCareQualifiedExpensesIncurred: '3000.00',
@@ -15366,6 +15403,126 @@ export const proof = {
                 ['the printed checkbox and the deemed monthly amount for two qualifying persons',
                     outcome.message])
         },
+        // ── R6's wiring: f2441 line 2 column (c), end to end ────────────────
+        //
+        // A FORM-LEVEL PROOF CANNOT PROVE THIS. `fjs/form2441`'s own R6 leaves
+        // build `qualifyingPersonsWithNoAgeAssertion` by hand and would all
+        // stay green if `dependentCareCommonFacts` passed a constant `[]`,
+        // which is exactly the state this repository shipped in until now: the
+        // stored `overAgeTwelveAndDisabled` was read by nothing at all
+        // (`fjs/todo/stored-but-unread-field-sweep.md`).
+        //
+        // Built by DROPPING the assertion from the shipped fixture, the same
+        // idiom `aBindingLimitationWithoutTheCertificationRefusesTheWholeReturn`
+        // uses above, so the fixture and the negative case cannot drift.
+        aQualifyingPersonWithNoAgeAssertionRefusesTheWholeReturn: () => {
+            const credits = dependentCareInputs.creditForms[0]
+            assert(credits !== undefined, 'the fixture carries a credits record')
+            if (credits === undefined) {
+                throw 'expected a credits record'
+            }
+            const persons = credits.value.dependentCareQualifyingPersons
+            assert(persons !== undefined, 'the fixture carries qualifying persons')
+            if (persons === undefined) {
+                throw 'expected qualifying persons'
+            }
+            assertEq(persons.length, 2, 'two of them, hand-typed against the fixture above')
+            const outcome = form1040Report(taxParams2025)({
+                ...dependentCareInputs,
+                creditForms: [{
+                    ...credits,
+                    value: {
+                        ...credits.value,
+                        dependentCareQualifyingPersons: persons.map(person => {
+                            const {
+                                overAgeTwelveAndDisabled: _over,
+                                underAgeThirteenWhenTheCareWasProvided: _under,
+                                ...stripped
+                            } = person
+                            return stripped
+                        }),
+                    },
+                }],
+            })
+            assert(outcome.kind === 'error', ['expected the line 2 column (c) refusal', outcome])
+            if (outcome.kind !== 'error') {
+                throw ['expected error', outcome]
+            }
+            // BOTH names, so a filter that stopped at the first person fails
+            // here, and the field that unlocks it.
+            assert(
+                outcome.message.includes('A. Child, B. Child')
+                && outcome.message.includes('underAgeThirteenWhenTheCareWasProvided'),
+                ['the refusal must name every unstated person and the field that settles them',
+                    outcome.message])
+        },
+        // **Both §21(b)(1) populations are admitted, and each is proven by
+        // removing the OTHER's assertion.** This is the leaf that pins the two
+        // terms of the filter in `dependentCareCommonFacts`: dropping either
+        // term leaves one population refusing, and the shipped fixture — which
+        // deliberately carries one person of each kind — cannot see that on
+        // its own, because it has one person in each and refuses either way.
+        //
+        // Each case strips one person's assertion and asserts that the OTHER
+        // person is not named. `continue`-past-a-miss is impossible here: the
+        // lookup is asserted, per AGENTS.md.
+        bothQualifyingPersonPopulationsAreAdmitted: () => {
+            const credits = dependentCareInputs.creditForms[0]
+            assert(credits !== undefined, 'the fixture carries a credits record')
+            if (credits === undefined) {
+                throw 'expected a credits record'
+            }
+            const persons = credits.value.dependentCareQualifyingPersons
+            assert(persons !== undefined, 'the fixture carries qualifying persons')
+            if (persons === undefined) {
+                throw 'expected qualifying persons'
+            }
+            // Hand-typed: which fixture person asserts which population, and
+            // which name must therefore survive when the other is stripped.
+            /** @type {readonly (readonly [string, string])[]} */
+            const cases = [
+                ['A. Child', 'B. Child'],
+                ['B. Child', 'A. Child'],
+            ]
+            assertEq(cases.length, 2, '§21(b)(1) has exactly two populations')
+            for (const one of cases) {
+                const [stripped, survivor] = one
+                const target = persons.find(person => person.name === stripped)
+                assert(target !== undefined, ['fixture person missing', stripped])
+                if (target === undefined) {
+                    throw ['fixture person missing', stripped]
+                }
+                const {
+                    overAgeTwelveAndDisabled: _over,
+                    underAgeThirteenWhenTheCareWasProvided: _under,
+                    ...bare
+                } = target
+                const outcome = form1040Report(taxParams2025)({
+                    ...dependentCareInputs,
+                    creditForms: [{
+                        ...credits,
+                        value: {
+                            ...credits.value,
+                            dependentCareQualifyingPersons: persons.map(
+                                person => person.name === stripped ? bare : person),
+                        },
+                    }],
+                })
+                assert(outcome.kind === 'error', ['expected a refusal', stripped, outcome])
+                if (outcome.kind !== 'error') {
+                    throw ['expected error', stripped]
+                }
+                assert(
+                    outcome.message.includes(stripped),
+                    ['the stripped person must be named', stripped, outcome.message])
+                // The load-bearing half: the person who KEPT their assertion is
+                // admitted. Drop either term of the filter and this fails.
+                assert(
+                    !outcome.message.includes(survivor),
+                    ['the person whose population IS asserted must be admitted',
+                        survivor, outcome.message])
+            }
+        },
         // **The second leaf a survived mutation bought**, and it is Schedule
         // 8812's rather than Schedule 3's — see
         // {@link dependentCareWithAChildInputs}. The figures are printed in
@@ -15446,6 +15603,11 @@ export const proof = {
             const common = {
                 status: 'single',
                 qualifyingPersonCount: 2,
+                // Both fixture children certify §21(b)(1)(A), so no name is
+                // unstated and R6 does not fire. Hand-typed as EMPTY rather
+                // than derived from the fixture, which is what makes it a
+                // check on the fixture rather than a restatement of it.
+                qualifyingPersonsWithNoAgeAssertion: [],
                 careProviderCount: 1,
                 qualifiedExpensesIncurredAndPaidCents: 800000n,
                 filerWasNeitherAStudentNorDisabled: true,

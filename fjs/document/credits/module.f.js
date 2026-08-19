@@ -297,16 +297,74 @@ const dependentCareProviderEntry = /** @type {const} */ ({
  * exist for. Storing one figure and using it for both would erase the
  * distinction the form is built around.
  *
+ * ## The two age assertions, and why ONE checkbox was not enough
+ *
  * `overAgeTwelveAndDisabled` is column (c). It is a taxpayer ASSERTION about a
  * person, in the shape `educationStudentEntry`'s four Form 8863 boxes already
  * are, and this dialect does not police it: §21(b)(1)(B)'s "physically or
  * mentally incapable of caring for themselves" is not a fact any document
  * reports and not one arithmetic can check.
+ *
+ * `underAgeThirteenWhenTheCareWasProvided` is §21(b)(1)(A)'s age test, and it
+ * has NO printed column of its own. It is here because **this dialect is not a
+ * transcribed IRS form** — the first sentence of this module — and the printed
+ * page's own device for settling the age is a CAUTION addressed to whoever
+ * fills the paper in, which nobody here has read. i2441 (2025), Part II, Line
+ * 2, Column (c), third sentence:
+ *
+ * > *"A person over age 12 at the time the care was provided must be
+ * > physically or mentally incapable of caring for themselves to be listed on
+ * > line 2."*
+ *
+ * and the CAUTION printed immediately above it:
+ *
+ * > *"Don't list a person on line 2 unless they are listed as an eligible
+ * > person under Qualifying Person(s), earlier."*
+ *
+ * On the PAPER those two sentences do close the ambiguity: an unchecked column
+ * (c) on a correctly prepared Form 2441 can only mean "under age 13", because
+ * the over-12-and-not-disabled person may not appear on line 2 at all. That is
+ * why the sweep's report of this field
+ * (`fjs/todo/stored-but-unread-field-sweep.md`) is wrong where it says absence
+ * is ambiguous *on the form*.
+ *
+ * It is right about the RECORD, which is a different object. Here the engine
+ * is the preparer: nothing between the taxpayer's own care receipts and
+ * `fjs/form2441` applies that caution, so an absent `overAgeTwelveAndDisabled`
+ * carries all three of "under 13", "over 12 and not disabled" and "nobody
+ * asked" at once — and the engine granted a qualifying person in every one of
+ * them. That is this dialect's own recorded rule about `option(true)` being
+ * violated in the direction it names as decisive
+ * ({@link earnedIncomeCreditVocabularies}, in `fjs/return/profile`): *"Here the
+ * wrong default GRANTS a credit."* A person wrongly counted moves §21(c)'s cap
+ * from $3,000 to $6,000 and is worth up to $1,050 of credit the taxpayer will
+ * owe back.
+ *
+ * So each of the printed page's two eligible populations gets its own
+ * `option(true)`, absence of BOTH is *unstated* rather than a silent grant, and
+ * `fjs/form2441` refuses by name — exactly as `fjs/form8863` refuses without
+ * `filerAttainedAgeTwentyFourBeforeTheEndOfTheYear` and `fjs/form8880`
+ * without a `saversCreditEligibility` record. A DATE OF BIRTH was the other
+ * candidate and is not what the printed structure asks for: column (c)'s test
+ * is *"at the time the care was provided"*, and neither line 2 nor line 1
+ * prints a care date to compare a birthday against, so a stored date of birth
+ * would still not settle the child who turns 13 in June (i2441, Qualifying
+ * Person(s), item 1: *"If the child turned 13 during the year, the child is a
+ * qualifying person for the part of the year they were under age 13."*). The
+ * taxpayer knows; the arithmetic cannot.
+ *
+ * **Both present is a CONTRADICTION and is refused by {@link checkReferences}.**
+ * "Over age 12 at the time the care was provided" and "under age 13 when the
+ * care was provided" cannot both hold of the same care, so a record asserting
+ * both has answered the same printed question twice, differently. That refusal
+ * belongs here rather than in `fjs/form2441` because it is a property of the
+ * stored record and not of any computation.
  */
 const dependentCareQualifyingPersonEntry = /** @type {const} */ ({
     name: string,
     tin: string,
     overAgeTwelveAndDisabled: option(true),
+    underAgeThirteenWhenTheCareWasProvided: option(true),
     qualifiedExpensesIncurredAndPaid: string,
 })
 
@@ -609,6 +667,27 @@ export const checkReferences = r => {
                 + `expense cap from $3,000 to $6,000`)
         }
         seenQualifyingPersonTins.push(person.tin)
+        // §21(b)(1)'s two populations are DISJOINT, in the printed page's own
+        // words. i2441 (2025) line 2 column (c) asks whether the person "was
+        // over age 12 at the time the care was provided and was disabled";
+        // `underAgeThirteenWhenTheCareWasProvided` asserts the opposite of the
+        // first conjunct about the same care. A record asserting both has
+        // answered one question twice, differently, and neither answer can be
+        // preferred — so it is refused here rather than resolved. Absence of
+        // BOTH is a different thing entirely: it is *unstated*, which is
+        // `fjs/form2441`'s refusal to make, because only the form knows what
+        // the missing answer would have been worth.
+        if (
+            person.overAgeTwelveAndDisabled === true
+            && person.underAgeThirteenWhenTheCareWasProvided === true
+        ) {
+            return error(
+                `qualifying person ${person.name} asserts BOTH overAgeTwelveAndDisabled and `
+                + `underAgeThirteenWhenTheCareWasProvided — i2441 line 2 column (c) asks whether `
+                + `the person "was over age 12 at the time the care was provided and was `
+                + `disabled", and the same care cannot have been provided both over age 12 and `
+                + `under age 13; drop whichever assertion is not true of this person`)
+        }
     }
     return ok(r)
 }
@@ -1221,6 +1300,57 @@ export const proof = {
                 ],
             })
             assert(t === 'ok', ['two children is an ordinary return', v])
+        },
+        // ── The two §21(b)(1) populations are DISJOINT ─────────────────────
+        //
+        // A record asserting both has answered i2441 line 2 column (c) twice,
+        // differently, and neither answer can be preferred. Refused HERE
+        // rather than in `fjs/form2441`, because it is a property of the
+        // stored record: no computation is needed to see it.
+        aPersonInBothPopulationsAtOnceIsRefused: () => {
+            const [t, v] = validate({
+                ...minimal,
+                dependentCareQualifyingPersons: [{
+                    name: 'A. Child',
+                    tin: '444-44-4444',
+                    overAgeTwelveAndDisabled: true,
+                    underAgeThirteenWhenTheCareWasProvided: true,
+                    qualifiedExpensesIncurredAndPaid: '3000.00',
+                }],
+            })
+            assertEq(t, 'error')
+            assert(
+                typeof v === 'string'
+                && v.includes('A. Child')
+                && v.includes('over age 12 at the time the care was provided'),
+                ['the refusal must name the person and quote the printed sentence', v])
+        },
+        // THREE controls, because the refusal has to fire on exactly one of
+        // the four states of a pair of `option(true)`s. Hand-typed as four
+        // rows rather than generated, so a state that stops being tested
+        // fails the count rather than disappearing from a loop.
+        theOtherThreeAgeAssertionStatesAreNotRefusedHere: () => {
+            /** @type {readonly (readonly [string, boolean, boolean])[]} */
+            const states = [
+                ['neither — unstated, which is fjs/form2441 R6’s to refuse', false, false],
+                ['§21(b)(1)(A), the under-13 dependent', false, true],
+                ['§21(b)(1)(B)/(C), the disabled spouse or dependent', true, false],
+            ]
+            assertEq(states.length, 3, 'three of the four states of the pair are accepted here')
+            for (const state of states) {
+                const [why, over, under] = state
+                const [t, v] = validate({
+                    ...minimal,
+                    dependentCareQualifyingPersons: [{
+                        name: 'A. Child',
+                        tin: '444-44-4444',
+                        ...(over ? { overAgeTwelveAndDisabled: true } : {}),
+                        ...(under ? { underAgeThirteenWhenTheCareWasProvided: true } : {}),
+                        qualifiedExpensesIncurredAndPaid: '3000.00',
+                    }],
+                })
+                assert(t === 'ok', [why, v])
+            }
         },
         // DOC-12 in both directions: an absent certification stays absent
         // rather than reading back as `false`, and `false` is REFUSED rather

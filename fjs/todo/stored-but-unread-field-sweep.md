@@ -137,13 +137,46 @@ invisible — the line was never zero, so nothing looked wrong.
   `box10AmountAllocableToIrrWithin5Years`, `box11FirstYearOfDesigRothContrib` — each needs a rule
   the engine does not have (NUA deferral, §402(g) corrective distributions, the five-year Roth
   clock).
-- `vnd.fjs.credits` `overAgeTwelveAndDisabled` — Form 2441 line 2 column (c). **The blocker is
-  not this field, it is the qualifying person's AGE**, which `vnd.fjs.credits` does not store.
-  Absence of the checkbox is ambiguous: it means either "under 13" (qualifying) or "over 12 and
-  not disabled" (NOT qualifying), and only a date of birth separates them. Today
-  `dependentCareCommonFacts` counts every listed person as qualifying.
-  **Direction: understatement of tax** — an over-12, non-disabled person inflates both the
-  §21 credit and the §129 exclusion. Flagged first among the (b) rows for that reason.
+- ~~`vnd.fjs.credits` `overAgeTwelveAndDisabled`~~ — **CLOSED. Wired, and the row above it was
+  wrong twice.** Retained in full because a report that was half right is more useful to the next
+  reader than a deleted one. What it said:
+
+  > The blocker is not this field, it is the qualifying person's AGE, which `vnd.fjs.credits` does
+  > not store. Absence of the checkbox is ambiguous: it means either "under 13" (qualifying) or
+  > "over 12 and not disabled" (NOT qualifying), and only a date of birth separates them. Today
+  > `dependentCareCommonFacts` counts every listed person as qualifying. Direction: understatement
+  > of tax — an over-12, non-disabled person inflates both the §21 credit and the §129 exclusion.
+
+  Both italicised claims are false against the printed page, and each was refuted by a sentence
+  the sweep did not fetch:
+
+  1. **Absence is NOT ambiguous on the form.** i2441 (2025), Part II, Line 2, Column (c), third
+     sentence: *"A person over age 12 at the time the care was provided must be physically or
+     mentally incapable of caring for themselves to be listed on line 2."* Under the CAUTION
+     printed directly above it — *"Don't list a person on line 2 unless they are listed as an
+     eligible person under Qualifying Person(s), earlier."* — the over-12, non-disabled person may
+     not appear on line 2 at all, so an unchecked box on a correctly prepared **paper** Form 2441
+     can only mean "under 13". A date of birth is not what settles it and would not have settled
+     it: column (c)'s test is *"at the time the care was provided"*, and the printed form carries
+     no care date to compare a birthday against — i2441's own *"If the child turned 13 during the
+     year, the child is a qualifying person for the part of the year they were under age 13"* is
+     exactly the case a stored date of birth still cannot answer.
+  2. **The §129 exclusion is not affected at all, let alone independently.** f2441 prints
+     *"To claim the child and dependent care credit, complete lines 27 through 31 below."*
+     between line 26 and line 27. Line 26 — the taxable benefits reaching 1040 line 1e — is built
+     from lines 20-25, whose only ceiling is line 21's flat $5,000/$2,500. The qualifying person
+     count first appears at line 27, on the credit's side of that caption.
+
+  **The understatement was real anyway, for the reason the report reached past.** The ambiguity is
+  a property of the RECORD, not of the form: `vnd.fjs.credits` *"is not a transcribed IRS form"*
+  (its own header's first sentence), so nothing between the taxpayer's care receipts and
+  `fjs/form2441` had ever applied that caution, and an absent `overAgeTwelveAndDisabled` carried
+  "under 13", "over 12 and not disabled" and "nobody asked" at once. `dependentCareCommonFacts`
+  granted a qualifying person in all three. The fix is the shape this dialect already uses for
+  `filerAttainedAgeTwentyFourBeforeTheEndOfTheYear` and `saversCreditEligibility`: a second
+  `option(true)`, `underAgeThirteenWhenTheCareWasProvided`, so each of §21(b)(1)'s two populations
+  is assertable, absence of both is *unstated*, and `fjs/form2441`'s R6 refuses by name. Both
+  present is a contradiction and `fjs/document/credits`' `checkReferences` refuses it.
 - `vnd.fjs.1099g` `box3RefundTaxYear` — the year of the refund in box 2, which is already refused
   by name (the §111 tax-benefit rule needs the prior-year return).
 - `vnd.fjs.1098t` `box9GraduateStudent` — an AOTC eligibility signal; the engine reads the

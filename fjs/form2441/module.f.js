@@ -72,8 +72,8 @@
  *
  * ## What this module refuses, and why each refusal is the designed outcome
  *
- * Seven conditions, each transcribed beside the printed sentence that
- * requires it. The two a reader will assume away:
+ * Eight conditions, each transcribed beside the printed sentence that
+ * requires it. The three a reader will assume away:
  *
  * - **Married filing JOINTLY.** Lines 5 and 19 want the SPOUSE's earned
  *   income separately, and nothing in this engine attributes an earned dollar
@@ -86,6 +86,26 @@
  *   disability status. The deemed amount is a FLOOR, so where the limitation
  *   does not bind it provably cannot move any printed line and the return
  *   computes — which is why the refusal is conditional rather than blanket.
+ * - **A line 2 person in neither §21(b)(1) population.** i2441's line 2
+ *   CAUTION and its column (c) paragraph together forbid an over-12,
+ *   non-disabled person from appearing on line 2 at all, which is what makes
+ *   an unchecked column (c) on the PAPER unambiguous — it can only be a child
+ *   under 13. `vnd.fjs.credits` is not a transcribed IRS form, so nothing
+ *   before this module has applied that caution and the record's silence
+ *   carries "nobody asked" alongside "under 13". Absence therefore GRANTED a
+ *   qualifying person, which is the direction that decides the shape.
+ *
+ * ## What this module does NOT refuse for, and the printed reason
+ *
+ * The §129 exclusion is **not** touched by the qualifying person count, so
+ * that count going wrong could never have inflated it independently of the
+ * credit. The caption f2441 prints between lines 26 and 27 is the whole
+ * argument: *"To claim the child and dependent care credit, complete lines 27
+ * through 31 below."* Line 26 — the taxable benefits that reach 1040 line 1e —
+ * is built from lines 20 through 25, whose only ceiling is line 21's flat
+ * $5,000/$2,500. The count first appears at line 27, on the credit's side of
+ * that caption, and reaches Part II through line 31 -> line 3. R6 refuses in
+ * BOTH parts anyway, for {@link destination}'s own stated reason.
  *
  * @module
  */
@@ -116,15 +136,22 @@ const destination = '1040 line 1e (the taxable dependent care benefits, Form 244
     + 'and Schedule 3 line 2 (the credit, Form 2441 line 11 -> 1040 line 20)'
 
 /**
- * The facts BOTH parts read, so the five shared refusals are written once and
+ * The facts BOTH parts read, so the six shared refusals are written once and
  * cannot drift between the two entry points (AGENTS.md, "one rule, one
  * place").
  *
  * `selfEmploymentEarningsPresent` is a fact about the RETURN rather than about
  * Form 2441: see {@link sharedRefusal} for why a return carrying it refuses.
+ *
+ * `qualifyingPersonsWithNoAgeAssertion` names — rather than counts — the
+ * people whose §21(b)(1) population the stored record never stated, because
+ * R6's refusal has to say WHICH row of line 2 to go and fix. A count would be
+ * a message a reader cannot act on, which is the defect AGENTS.md records the
+ * erased `${destination}` interpolation as.
  * @typedef {{
  *   readonly status: IndividualFilingStatus,
  *   readonly qualifyingPersonCount: number,
+ *   readonly qualifyingPersonsWithNoAgeAssertion: readonly string[],
  *   readonly careProviderCount: number,
  *   readonly qualifiedExpensesIncurredAndPaidCents: bigint,
  *   readonly filerWasNeitherAStudentNorDisabled: boolean,
@@ -311,7 +338,7 @@ export const dependentCareExclusionLimitCents = taxParamSet => status => planMax
 }
 
 /**
- * The five refusals BOTH parts make, in printed order, or `undefined` when
+ * The six refusals BOTH parts make, in printed order, or `undefined` when
  * none applies.
  *
  * Written once and called from both entry points, so an engine that refused a
@@ -323,6 +350,7 @@ const sharedRefusal = taxParamSet => input => {
     const {
         status, careProviderCount, qualifiedExpensesIncurredAndPaidCents,
         priorYearExpensesPaidThisYearCents, selfEmploymentEarningsPresent,
+        qualifyingPersonsWithNoAgeAssertion,
     } = input
     // R1 — a joint return needs TWO earned incomes and this engine holds one.
     // f2441 line 5: "If married filing jointly, enter your spouse's earned
@@ -422,6 +450,48 @@ const sharedRefusal = taxParamSet => input => {
                 + `disallowed. Record them on vnd.fjs.credits’ dependentCareProviders. `
                 + `Refusing rather than claiming a credit the return could not substantiate. `
                 + `Nothing reaches ${destination}`,
+        }
+    }
+    // R6 — f2441 line 2 column (c), and the §21(b)(1) population every listed
+    // person has to be in. i2441 (2025), Column (c): "A person over age 12 at
+    // the time the care was provided must be physically or mentally incapable
+    // of caring for themselves to be listed on line 2", under a CAUTION
+    // reading "Don't list a person on line 2 unless they are listed as an
+    // eligible person under Qualifying Person(s), earlier."
+    //
+    // **Those two sentences settle the paper and NOT the record.** On a
+    // correctly prepared Form 2441 an unchecked column (c) can only mean
+    // "under age 13", because the over-12-and-not-disabled person is not
+    // allowed onto line 2 at all. `vnd.fjs.credits` is not a transcribed IRS
+    // form — its own header's first sentence — so nothing upstream of here has
+    // applied that caution, and this engine is the preparer that must. Before
+    // TAX-38's correction an entry with no age assertion was counted as
+    // qualifying, which moved §21(c)'s cap from $3,000 to $6,000 on the second
+    // such person and was worth up to $1,050 of credit the taxpayer would owe
+    // back.
+    //
+    // Gated on the NAMES rather than on `qualifyingPersonCount`, because the
+    // count cannot say which row to fix and because a return with no
+    // qualifying persons at all — i2441 p2's Part-III-only filer — must still
+    // compute a taxable line 26.
+    if (qualifyingPersonsWithNoAgeAssertion.length !== 0) {
+        return {
+            kind: 'error',
+            message: `Form 2441 line 2 column (c): `
+                + `${qualifyingPersonsWithNoAgeAssertion.join(', ')} `
+                + `${qualifyingPersonsWithNoAgeAssertion.length === 1 ? 'is' : 'are'} listed as a `
+                + `qualifying person with neither age assertion. §21(b)(1) admits exactly two `
+                + `populations and i2441 keeps them apart in one sentence — "A person over age 12 `
+                + `at the time the care was provided must be physically or mentally incapable of `
+                + `caring for themselves to be listed on line 2" — so a listed person is either `
+                + `under age 13 when the care was provided or over age 12 and disabled, and this `
+                + `record says neither. Set underAgeThirteenWhenTheCareWasProvided or `
+                + `overAgeTwelveAndDisabled on that vnd.fjs.credits entry. Refusing rather than `
+                + `assuming the qualifying one: a person wrongly counted raises §21(c)'s expense `
+                + `cap from `
+                + `${centsToString(dependentCareExpenseLimitCents(taxParamSet)(1))} to `
+                + `${centsToString(dependentCareExpenseLimitCents(taxParamSet)(2))} and inflates `
+                + `a credit the taxpayer would owe back. Nothing reaches ${destination}`,
         }
     }
     // Present only so the deemed-income refusals below can quote the two
@@ -737,6 +807,10 @@ if (taxParams2025 === undefined) {
 const oneChildBase = {
     status: 'headOfHousehold',
     qualifyingPersonCount: 1,
+    // The ordinary return: the one child's §21(b)(1)(A) population IS stated,
+    // so R6 is silent. Every leaf below that varies this varies ONE fact, and
+    // the R6 leaves vary this one.
+    qualifyingPersonsWithNoAgeAssertion: [],
     careProviderCount: 1,
     qualifiedExpensesIncurredAndPaidCents: 0n,
     filerWasNeitherAStudentNorDisabled: true,
@@ -1271,7 +1345,7 @@ export const proof = {
                 '$259.26 — $259.2597 rounded UP, never truncated to $259.25')
         },
     },
-    // ── The seven refusals, each with its own control ───────────────────────
+    // ── The eight refusals, each with its own control ───────────────────────
     refusals: {
         aJointReturnIsRefusedBecauseTheSpouseSplitIsUnavailable: () => {
             const message = expectRefusal(form2441Credit(taxParams2025)({
@@ -1389,6 +1463,103 @@ export const proof = {
                 earnedIncomeExcludingBenefitsCents: 4000000n,
             }))
             assertEq(result.line26TaxableBenefitsCents, 500000n)
+        },
+        // ── R6, f2441 line 2 column (c) ────────────────────────────────────
+        //
+        // The understatement `fjs/todo/stored-but-unread-field-sweep.md`
+        // flagged: an entry in neither §21(b)(1) population used to be counted
+        // as qualifying. Asserted in BOTH parts, because the count reaches
+        // Part III at line 27 and Part II at line 3.
+        aQualifyingPersonWithNoAgeAssertionIsRefusedNamingThePersonAndTheCap: () => {
+            const message = expectRefusal(form2441Credit(taxParams2025)({
+                ...creditOf({
+                    ...oneChildBase,
+                    qualifyingPersonsWithNoAgeAssertion: ['A. Child'],
+                }),
+                line3Cents: 300000n,
+                earnedIncomeCents: 4000000n,
+                adjustedGrossIncomeCents: 4000000n,
+                taxLiabilityLimitCents: 500000n,
+            }))
+            // WHICH row of line 2 to fix, and WHICH field unlocks it: the two
+            // halves of a message a reader can act on.
+            assert(
+                message.includes('A. Child')
+                && message.includes('underAgeThirteenWhenTheCareWasProvided')
+                && message.includes('overAgeTwelveAndDisabled'),
+                ['the refusal must name the person and both fields that settle them', message])
+            // The printed sentence the whole refusal rests on, and the two
+            // caps whose difference is what the wrong answer was worth.
+            assert(
+                message.includes('over age 12 at the time the care was provided')
+                && message.includes('3000.00') && message.includes('6000.00'),
+                ['and quote the printed rule and the cap it moves', message])
+            assertNamesBothDestinations(message)
+        },
+        aQualifyingPersonWithNoAgeAssertionIsRefusedInPartThreeToo: () => {
+            const message = expectRefusal(form2441DependentCareBenefits(taxParams2025)({
+                ...benefitsOf({
+                    ...oneChildBase,
+                    qualifyingPersonsWithNoAgeAssertion: ['A. Child'],
+                }),
+                dependentCareBenefitsCents: 500000n,
+                earnedIncomeExcludingBenefitsCents: 4000000n,
+            }))
+            assert(message.includes('line 2 column (c)'), ['the same printed column', message])
+        },
+        // Every unstated person is named, not just the first — a refusal that
+        // fixed one row and refused again on the next would be a worse
+        // refusal than one that lists them all.
+        everyUnstatedPersonIsNamedRatherThanTheFirst: () => {
+            const message = expectRefusal(form2441Credit(taxParams2025)({
+                ...creditOf({
+                    ...oneChildBase,
+                    qualifyingPersonCount: 2,
+                    qualifyingPersonsWithNoAgeAssertion: ['A. Child', 'B. Child'],
+                }),
+                line3Cents: 600000n,
+                earnedIncomeCents: 4000000n,
+                adjustedGrossIncomeCents: 4000000n,
+                taxLiabilityLimitCents: 500000n,
+            }))
+            assert(
+                message.includes('A. Child, B. Child') && message.includes('are listed'),
+                ['both names, and the plural verb', message])
+        },
+        // The CONTROL: a return whose every listed person IS in one of the two
+        // populations computes, and the credit is the whole $660.00 rather
+        // than a quietly reduced one. Without it, a gate that refused every
+        // Form 2441 would pass all three leaves above.
+        //
+        // WHICH population each person is in is not visible here — this
+        // function receives the names already filtered — so the proof that the
+        // filter admits BOTH lives where the filter does, in
+        // `fjs/form1040/core`'s `bothQualifyingPersonPopulationsAreAdmitted`.
+        aReturnWhoseEveryPersonIsInAPopulationComputes: () => {
+            const result = expectCreditOk(form2441Credit(taxParams2025)({
+                ...creditOf({ ...oneChildBase, qualifyingPersonsWithNoAgeAssertion: [] }),
+                line3Cents: 300000n,
+                earnedIncomeCents: 4000000n,
+                adjustedGrossIncomeCents: 4000000n,
+                taxLiabilityLimitCents: 500000n,
+            }))
+            assertEq(result.line11CreditCents, 66000n, '$660.00 — 22% of $3,000.00')
+        },
+        // The SECOND control, and the one i2441 p2 names: a return with no
+        // qualifying person at all is not "a person in neither population",
+        // it is the Part-III-only filer, and it must still report its taxable
+        // benefits. A gate keyed on `qualifyingPersonCount === 0` rather than
+        // on the names would refuse this return.
+        aReturnWithNoQualifyingPersonAtAllStillComputesItsTaxableBenefits: () => {
+            const result = expectBenefitsOk(form2441DependentCareBenefits(taxParams2025)({
+                ...benefitsOf({
+                    ...oneChildBase, qualifyingPersonCount: 0, careProviderCount: 0,
+                    qualifyingPersonsWithNoAgeAssertion: [],
+                }),
+                dependentCareBenefitsCents: 500000n,
+                earnedIncomeExcludingBenefitsCents: 4000000n,
+            }))
+            assertEq(result.line26TaxableBenefitsCents, 500000n, 'the whole $5,000.00 is wages')
         },
         soleProprietorshipBenefitsAreRefusedNamingTheThreeBusinessSchedules: () => {
             const message = expectRefusal(form2441DependentCareBenefits(taxParams2025)({
