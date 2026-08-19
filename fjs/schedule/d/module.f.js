@@ -1427,6 +1427,172 @@ export const proof = {
         },
     },
     // ── TAX-38: Form 6781 lines 8 and 9 reach printed lines 4 and 11 ────
+    /**
+     * TAX-41: the three figures Form 4797 hands this schedule. **A schedule
+     * that only ever sees one shape of input is a schedule whose contract is
+     * untested**, and these three leaves exist because two mutations survived:
+     * removing the Unrecaptured Section 1250 Gain Worksheet's line 7 CAP, and
+     * ignoring its line 8. Both were unobservable through `fjs/form1040/core`,
+     * where Form 4797 line 8 is a structural zero and no fixture made the
+     * unrecaptured gain exceed the §1231 gain.
+     *
+     * This schedule takes NUMBERS, so a proof of its contract may supply any
+     * numbers the printed worksheet admits — including the ones no Form 4797
+     * this engine computes can produce yet.
+     */
+    formFortySevenNinetySeven: {
+        /*
+         * Printed line 11 is "Gain from Form 4797, Part I; long-term gain
+         * from Forms 2439 and 6252; and long-term gain or (loss) from Forms
+         * 4684, 6781, and 8824" — TWO of this engine's sources on one line, so
+         * both are supplied at once and neither total could stand in for the
+         * other.
+         *
+         *   4797 Part I gain                                  $12,000.00
+         *   6781 line 9 (the 60% long half)                     $2,500.00
+         *   line 11  12,000.00 + 2,500.00                      $14,500.00
+         *   line 15  = line 11 alone                           $14,500.00
+         *   line 16  = line 15 alone                           $14,500.00
+         */
+        thePartOneGainReachesLineElevenBesideFormSixtySevenEightyOne: () => {
+            const result = expectOk(scheduleD({
+                status: 'single',
+                brokerageForms: [],
+                dividendForms: [],
+                sectionTwelveFiftySix: {
+                    shortTermCents: 0n, longTermCents: 250000n, sources: [],
+                },
+                formFortySevenNinetySeven: {
+                    partOneGainCents: 1200000n,
+                    unrecapturedSectionTwelveFiftyGainCents: 0n,
+                    lineEightCents: 0n,
+                    sources: [],
+                },
+            }))
+            assertEq(result.line11, 1450000n, '$14,500.00 — both sources, added')
+            assertEq(result.line4, 0n, 'and the SHORT half is a different printed line')
+            assertEq(result.line16, 1450000n)
+            assertEq(result.line19, 0n, 'no unrecaptured §1250 gain was supplied')
+        },
+        /*
+         * ★ **THE CAP ON WORKSHEET LINE 7 BINDS**, and no return this engine
+         * computes can reach the case yet: it needs an unrecaptured §1250 gain
+         * LARGER than the net §1231 gain, which happens when a §1231 loss
+         * elsewhere on Form 4797 nets the gain down without touching the
+         * depreciation inside it.
+         *
+         * i1040sd p.12, worksheet line 7: "Enter the smaller of line 6 or the
+         * gain from Form 4797, line 7."
+         *
+         *   worksheet line 3  = Form 4797's per-property total     $40,000.00
+         *   worksheet line 6  = 3 + 4 + 5                          $40,000.00
+         *   Form 4797 line 7                                       $11,000.00
+         *   worksheet line 7  min(40,000.00, 11,000.00)            $11,000.00
+         *   worksheet line 8  Form 4797 line 8                          $0.00
+         *   worksheet line 9  11,000.00 - 0.00                     $11,000.00
+         *   Schedule D line 19                                     $11,000.00
+         *
+         * Without the cap line 19 would be $40,000.00 — 25%-rate income the
+         * taxpayer never had, on a return whose whole §1231 gain was
+         * $11,000.00.
+         */
+        theWorksheetCapsTheUnrecapturedGainAtTheSectionTwelveThirtyOneGain: () => {
+            const result = expectOk(scheduleD({
+                status: 'single',
+                brokerageForms: [],
+                dividendForms: [],
+                formFortySevenNinetySeven: {
+                    partOneGainCents: 1100000n,
+                    unrecapturedSectionTwelveFiftyGainCents: 4000000n,
+                    lineEightCents: 0n,
+                    sources: [],
+                },
+            }))
+            assertEq(result.line19, 1100000n, 'capped at the §1231 gain, not $40,000.00')
+            assertEq(result.line11, 1100000n, 'and line 11 is the gain itself')
+        },
+        /*
+         * ★ **WORKSHEET LINE 8 IS SUBTRACTED**, and it is the half §1231(c)
+         * makes necessary: the part of the gain printed Form 4797 line 8 has
+         * already turned into ORDINARY income must not also be taxed at 25%.
+         *
+         *   worksheet line 6                                       $18,000.00
+         *   Form 4797 line 7                                       $30,000.00
+         *   worksheet line 7  min(18,000.00, 30,000.00)            $18,000.00
+         *   worksheet line 8  Form 4797 line 8                      $7,000.00
+         *   worksheet line 9  18,000.00 - 7,000.00                 $11,000.00
+         *
+         * **Form 4797 line 8 is zero in every return this engine computes
+         * today** — a §1231 gain reaches Schedule D only on the return
+         * profile's certification that the five-year lookback is empty — so
+         * this leaf is the ONLY place the subtraction is observable, and a
+         * mutation erasing it was green across the whole suite before it
+         * existed.
+         */
+        theWorksheetSubtractsTheNonrecapturedSectionTwelveThirtyOneLosses: () => {
+            const result = expectOk(scheduleD({
+                status: 'single',
+                brokerageForms: [],
+                dividendForms: [],
+                formFortySevenNinetySeven: {
+                    partOneGainCents: 3000000n,
+                    unrecapturedSectionTwelveFiftyGainCents: 1800000n,
+                    lineEightCents: 700000n,
+                    sources: [],
+                },
+            }))
+            assertEq(result.line19, 1100000n, '$18,000.00 less $7,000.00')
+            // THE CONTROL: the same figures with line 8 at zero leave the
+            // whole $18,000.00 at the 25% rate, so this pair is about the
+            // SUBTRACTION rather than about either number.
+            const withoutLineEight = expectOk(scheduleD({
+                status: 'single',
+                brokerageForms: [],
+                dividendForms: [],
+                formFortySevenNinetySeven: {
+                    partOneGainCents: 3000000n,
+                    unrecapturedSectionTwelveFiftyGainCents: 1800000n,
+                    lineEightCents: 0n,
+                    sources: [],
+                },
+            }))
+            assertEq(withoutLineEight.line19, 1800000n)
+        },
+        /*
+         * "Subtract line 8 from line 7. If zero or less, enter -0-." A line 8
+         * larger than line 7 floors at zero rather than producing a negative
+         * 25%-rate amount, which would UNDERSTATE the tax by reducing the
+         * Schedule D Tax Worksheet's preferential slice below what it is.
+         */
+        theWorksheetFloorsAtZero: () => {
+            const result = expectOk(scheduleD({
+                status: 'single',
+                brokerageForms: [],
+                dividendForms: [],
+                formFortySevenNinetySeven: {
+                    partOneGainCents: 3000000n,
+                    unrecapturedSectionTwelveFiftyGainCents: 500000n,
+                    lineEightCents: 900000n,
+                    sources: [],
+                },
+            }))
+            assertEq(result.line19, 0n, '$5,000.00 less $9,000.00, floored')
+        },
+        /*
+         * THE CONTROL FOR THE WHOLE GROUP: an absent `formFortySevenNinetySeven`
+         * is a filer with no Form 4797, and both printed lines stay at the
+         * zeros every other fixture in this module expects.
+         */
+        anAbsentFormFortySevenNinetySevenLeavesBothLinesAtZero: () => {
+            const result = expectOk(scheduleD({
+                status: 'single',
+                brokerageForms: [],
+                dividendForms: [],
+            }))
+            assertEq(result.line11, 0n)
+            assertEq(result.line19, 0n)
+        },
+    },
     sectionTwelveFiftySixContracts: {
         /*
          * ★ THE ASSIGNMENT, and it is the only thing this group exists to
