@@ -46,7 +46,7 @@
  * @module
  */
 import { string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
-import { pure } from 'functionalscript/fjs/effects/module.f.mjs'
+import { pureOk } from 'functionalscript/fjs/effects/module.f.mjs'
 import { runPure } from 'functionalscript/fjs/effects/module.f.mjs'
 import { toolEntry, okResult, errorResult } from 'functionalscript/fjs/protocol/mcp/module.f.mjs'
 import { toJsonSchema } from 'functionalscript/fjs/media/json/schema/module.f.mjs'
@@ -233,14 +233,14 @@ export const financeSchemaTool = toolEntry(
     args => {
         const schema = dialectSchemas[args.dialect]
         if (schema === undefined) {
-            return pure(errorResult(
+            return pureOk(errorResult(
                 `unknown dialect: ${args.dialect}; known: ${knownDialects.join(', ')}`,
             ))
         }
         // `toJsonSchema` returns rtti's `UnknownConst`, which differs from
         // `json`'s `Unknown` only by admitting `undefined` — and a JSON Schema
         // never holds one, since `toJsonSchema` builds every field it emits.
-        return pure(okResult(jsonText(/** @type {JsonUnknown} */ (toJsonSchema(schema)))))
+        return pureOk(okResult(jsonText(/** @type {JsonUnknown} */ (toJsonSchema(schema)))))
     },
 )
 

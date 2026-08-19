@@ -48,7 +48,7 @@
  * @module
  */
 import { number } from 'functionalscript/fjs/types/rtti/module.f.mjs'
-import { pure, runPure } from 'functionalscript/fjs/effects/module.f.mjs'
+import { pureOk, runPure } from 'functionalscript/fjs/effects/module.f.mjs'
 import { toolEntry, okResult, errorResult } from 'functionalscript/fjs/protocol/mcp/module.f.mjs'
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { taxParamsByYear } from '../../tax/params/module.f.js'
@@ -153,11 +153,11 @@ export const financeTaxParamsTool = toolEntry(
     args => {
         const response = taxParamsResponses[args.year]
         if (response === undefined) {
-            return pure(errorResult(
+            return pureOk(errorResult(
                 `unknown tax year: ${args.year}; known: ${knownYears.join(', ')}`,
             ))
         }
-        return pure(okResult(jsonText(response)))
+        return pureOk(okResult(jsonText(response)))
     },
 )
 

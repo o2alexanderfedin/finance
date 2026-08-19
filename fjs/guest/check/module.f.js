@@ -33,7 +33,7 @@
  *
  * @module
  */
-import { step, pure, mapStep } from 'functionalscript/fjs/effects/module.f.mjs'
+import { step, pure, pureOk, mapStep } from 'functionalscript/fjs/effects/module.f.mjs'
 import { error, ok } from 'functionalscript/fjs/types/result/module.f.mjs'
 import { cBase32ToVec, vecToCBase32 } from 'functionalscript/fjs/basen/cbase32/module.f.mjs'
 import { collectRead, fileCas } from 'functionalscript/fjs/cas/module.f.mjs'
@@ -83,13 +83,13 @@ export const fjsCheck = materializeHomeRoot => cas => hash => {
                 loadProgram([])(programPath(materializeHome(materializeHomeRoot))(hash))(sourceText),
                 loadResult => {
                     if (loadResult[0] === 'error') {
-                        return pure(/** @type {Result<{ readonly exportsReport: boolean }, string>} */ (error(loadResult[1])))
+                        return pureOk(/** @type {Result<{ readonly exportsReport: boolean }, string>} */ (error(loadResult[1])))
                     }
                     // The whole point of this module: read the presence/type
                     // of `report` and stop. Nothing below this line reads or
                     // calls `loaded.report(...)`.
                     const loaded = /** @type {{ readonly report?: unknown }} */ (loadResult[1])
-                    return pure(/** @type {Result<{ readonly exportsReport: boolean }, string>} */ (
+                    return pureOk(/** @type {Result<{ readonly exportsReport: boolean }, string>} */ (
                         ok({ exportsReport: typeof loaded.report === 'function' })))
                 },
             )
@@ -107,7 +107,7 @@ export const fjsCheck = materializeHomeRoot => cas => hash => {
 const seedText = cas => text => {
     const bytes = tryUtf8(text)
     assert(bytes !== null, ['expected sample text to encode as UTF-8', text])
-    return mapStep(cas.write(pure({ first: ok(bytes), tail: pure(undefined) })), w => {
+    return mapStep(cas.write(pureOk({ first: ok(bytes), tail: pureOk(undefined) })), w => {
         assert(w[0] === 'ok', ['expected the seed write to succeed', w])
         return vecToCBase32(w[1])
     })
@@ -186,10 +186,10 @@ const runFjsCheckViaFixture = home => hash => source => fixture => state => {
     return virtual(state2)(
         step(loadProgram([])(path)(source), loadResult => {
             if (loadResult[0] === 'error') {
-                return pure(/** @type {Result<{ readonly exportsReport: boolean }, string>} */ (error(loadResult[1])))
+                return pureOk(/** @type {Result<{ readonly exportsReport: boolean }, string>} */ (error(loadResult[1])))
             }
             const loaded = /** @type {{ readonly report?: unknown }} */ (loadResult[1])
-            return pure(/** @type {Result<{ readonly exportsReport: boolean }, string>} */ (
+            return pureOk(/** @type {Result<{ readonly exportsReport: boolean }, string>} */ (
                 ok({ exportsReport: typeof loaded.report === 'function' })))
         }),
     )

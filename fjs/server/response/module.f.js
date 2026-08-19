@@ -65,7 +65,7 @@ import { length as bitLength, maxLengthBytes, msb, u8List, u8ListToVec } from 'f
 import { take } from 'functionalscript/fjs/types/list/module.f.mjs'
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { fromVec } from 'functionalscript/fjs/types/uint8array/module.f.mjs'
-import { pure } from 'functionalscript/fjs/effects/module.f.mjs'
+import { pureOk } from 'functionalscript/fjs/effects/module.f.mjs'
 import { create } from 'functionalscript/fjs/effects/memory/module.f.mjs'
 import { emptyState, virtual } from 'functionalscript/fjs/effects/node/virtual/module.f.mjs'
 import { fromRegistry, mcpStep, okResult, toolEntry, uninitializedState } from 'functionalscript/fjs/protocol/mcp/module.f.mjs'
@@ -230,7 +230,7 @@ const orderingProofTool = toolEntry(
     'size_guard_ordering_probe',
     'Test-only: applies sizeGuard to oversized content before returning it.',
     {},
-    () => pure(okResult(sizeGuard(8)(4)(orderingProofRawContent, orderingProofHash).preview)),
+    () => pureOk(okResult(sizeGuard(8)(4)(orderingProofRawContent, orderingProofHash).preview)),
 )
 
 /** The oversized content the contrast leaf returns WITHOUT `sizeGuard` — a real payload over the transport's own 128 KiB line cap, reproducing `writeResponse`'s own generic fallback (see that module's `proof.f.js`, which uses the identical technique to prove the fallback exists). */
@@ -246,7 +246,7 @@ const contrastTool = toolEntry(
     'size_guard_contrast_probe',
     'Test-only: returns an oversized result WITHOUT sizeGuard.',
     {},
-    () => pure(okResult(contrastRawContent)),
+    () => pureOk(okResult(contrastRawContent)),
 )
 
 // ── Tests ────────────────────────────────────────────────────────────────────

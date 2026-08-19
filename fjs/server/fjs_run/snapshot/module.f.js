@@ -112,14 +112,14 @@
  *
  * @module
  */
-import { step, mapStep, foldStep, pure } from 'functionalscript/fjs/effects/module.f.mjs'
+import { step, mapStep, foldStep, pureOk } from 'functionalscript/fjs/effects/module.f.mjs'
 import { collectRead, fileCas } from 'functionalscript/fjs/cas/module.f.mjs'
 import { vecToCBase32 } from 'functionalscript/fjs/basen/cbase32/module.f.mjs'
 import { utf8ToString, tryUtf8 } from 'functionalscript/fjs/text/module.f.mjs'
 import { initEvo, evo, syncRevision } from 'functionalscript/fjs/cas/evo/module.f.mjs'
 import { sha256 } from 'functionalscript/fjs/crypto/sha2/module.f.mjs'
 import { emptyState, virtual } from 'functionalscript/fjs/effects/node/virtual/module.f.mjs'
-import { ok } from 'functionalscript/fjs/types/result/module.f.mjs'
+import { ok, error } from 'functionalscript/fjs/types/result/module.f.mjs'
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { dialect as revisionDialect } from 'functionalscript/fjs/media/revision/module.f.mjs'
 import { interpret } from '../../../exec/module.f.js'
@@ -127,6 +127,7 @@ import { guestCtx } from '../../../guest/module.f.js'
 import { stringify as jsonText } from '../../../json/module.f.js'
 
 /** @import { Effect, Operation, OperationMap } from 'functionalscript/fjs/effects/types.js' */
+/** @import { Result } from 'functionalscript/fjs/types/result/types.js' */
 /** @import { MemOp } from 'functionalscript/fjs/effects/memory/types.js' */
 /** @import { Cas } from 'functionalscript/fjs/cas/types.js' */
 /** @import { Evo } from 'functionalscript/fjs/cas/evo/types.js' */
@@ -202,7 +203,7 @@ export const buildRunSnapshot = cas => evoApi => pin => {
     const withBlobsAndRevisions = step(
         cas.list(),
         hashes => foldStep(
-            pure(hashes),
+            pureOk(hashes),
             emptyFoldState,
             hash => state => step(
                 collectRead(cas.read(hash)),
@@ -212,7 +213,7 @@ export const buildRunSnapshot = cas => evoApi => pin => {
                         // read: skip it, mirroring buildCache's own "ignore
                         // what does not decode" precedent rather than
                         // failing the whole snapshot over one bad blob.
-                        return pure(state)
+                        return pureOk(state)
                     }
                     const hashStr = vecToCBase32(hash)
                     const blobs = { ...state.blobs, [hashStr]: utf8ToString(blobResult[1]) }
@@ -253,7 +254,7 @@ export const buildRunSnapshot = cas => evoApi => pin => {
                                     ? { ...state.archivedHashes, [hashStr]: true }
                                     : state.archivedHashes,
                             }
-                            return pure(nextState)
+                            return pureOk(nextState)
                         },
                     )
                 },
@@ -266,14 +267,14 @@ export const buildRunSnapshot = cas => evoApi => pin => {
             evoApi.list(),
             activeSubjects => step(
                 evoApi.list(true),
-                archivedSubjects => pure({ ...state, activeSubjects, archivedSubjects }),
+                archivedSubjects => pureOk({ ...state, activeSubjects, archivedSubjects }),
             ),
         ),
     )
     const withHeads = step(
         withSubjects,
         state => foldStep(
-            pure([...state.activeSubjects, ...state.archivedSubjects]),
+            pureOk([...state.activeSubjects, ...state.archivedSubjects]),
             state,
             subject => s => step(
                 evoApi.head(subject),
@@ -293,7 +294,7 @@ export const buildRunSnapshot = cas => evoApi => pin => {
                     // is then `[]` — indistinguishable from an unknown
                     // subject, to a report program.
                     const activeHeadHashes = headHashes.filter(h => state.archivedHashes[h] !== true)
-                    return pure({ ...s, heads: { ...s.heads, [subject]: activeHeadHashes } })
+                    return pureOk({ ...s, heads: { ...s.heads, [subject]: activeHeadHashes } })
                 },
             ),
         ),
@@ -322,39 +323,46 @@ export const buildRunSnapshot = cas => evoApi => pin => {
 // ── buildHostMap: the plain synchronous OperationMap<CasOp, string> ──────────
 
 /**
- * The synchronous `OperationMap<CasOp, string>` `interpret` dispatches
- * through. Every handler reads ONLY from `snapshot` — never performs I/O,
- * never returns an `Effect`.
+ * The synchronous `OperationMap<CasOp, Result<string, string>>` `interpret`
+ * dispatches through. Every handler reads ONLY from `snapshot` — never
+ * performs I/O, never returns an `Effect`.
  *
- * `casRead`/`evoRevision` throw a plain string (never an `Error`) when the
- * hash is absent from the snapshot — consistent with this codebase's
- * bare-throw discipline; `interpret`'s own `assert(typeof thrown ===
- * 'string')` catch-and-report path already converts it into an actionable
- * refusal message.
+ * `casRead`/`evoRevision` answer `error('… not found: <hash>')` when the hash
+ * is absent from the snapshot. **They used to THROW that string**, and the
+ * change is a correction rather than a translation: the throw crossed
+ * `interpret`'s `try` and came back out as
+ * `operation not permitted: blob not found: <hash>; permitted: …` — a
+ * data-availability failure reported as a POLICY refusal. Nothing asserted
+ * the label, so nothing caught it. Now the failure travels the guest's own
+ * error channel, `step` short-circuits the chain on it, and it reaches the
+ * run record under its own name.
+ *
+ * The guest can also now RECOVER from it (`catchStep`), which the throw made
+ * impossible. Nothing here does yet; the capability is the point of the
+ * channel, not an obligation.
+ *
+ * `evoList`/`evoHead` cannot fail: an unknown subject has an empty head list,
+ * which is an answer. They return `ok` unconditionally, and the shared
+ * `Result<string, string>` return type is `CasOp`'s, not each handler's —
+ * an operation set declares one channel for all four.
  *
  * `evoList`'s argument selects active vs. archived: `'true'` (the literal
- * string, since `CasOp` carries only `string -> string`) answers with the
- * archived subjects, anything else with the active ones — mirroring
- * `Evo.list(archived?: true)`'s own default-is-active convention.
- * @type {(snapshot: RunSnapshot) => OperationMap<CasOp, string>}
+ * string, since `CasOp` carries only `string -> Result<string, string>`)
+ * answers with the archived subjects, anything else with the active ones —
+ * mirroring `Evo.list(archived?: true)`'s own default-is-active convention.
+ * @type {(snapshot: RunSnapshot) => OperationMap<CasOp, Result<string, string>>}
  */
 export const buildHostMap = snapshot => ({
     casRead: hash => {
         const blob = snapshot.blobs[hash]
-        if (blob === undefined) {
-            throw `blob not found: ${hash}`
-        }
-        return blob
+        return blob === undefined ? error(`blob not found: ${hash}`) : ok(blob)
     },
-    evoList: archivedFlag => jsonText(
-        archivedFlag === 'true' ? snapshot.archivedSubjects : snapshot.activeSubjects),
-    evoHead: subject => jsonText(snapshot.heads[subject] ?? []),
+    evoList: archivedFlag => ok(jsonText(
+        archivedFlag === 'true' ? snapshot.archivedSubjects : snapshot.activeSubjects)),
+    evoHead: subject => ok(jsonText(snapshot.heads[subject] ?? [])),
     evoRevision: hash => {
         const revision = snapshot.revisions[hash]
-        if (revision === undefined) {
-            throw `revision not found: ${hash}`
-        }
-        return revision
+        return revision === undefined ? error(`revision not found: ${hash}`) : ok(revision)
     },
 })
 
@@ -453,7 +461,7 @@ export const proof = {
             const docBytes = tryUtf8(docText)
             assert(docBytes !== null, 'expected the sample document to encode as UTF-8')
             const [state1, docWrite] = virtual(state0)(
-                cas.write(pure({ first: ok(docBytes), tail: pure(undefined) })))
+                cas.write(pureOk({ first: ok(docBytes), tail: pureOk(undefined) })))
             assert(docWrite[0] === 'ok', ['expected the document write to succeed', docWrite])
             const docHash = vecToCBase32(docWrite[1])
             // A revision naming that document as its snapshot, for a fresh
@@ -491,7 +499,7 @@ export const proof = {
             const docBytes = tryUtf8('{}')
             assert(docBytes !== null, 'expected "{}" to encode as UTF-8')
             const [state1, docWrite] = virtual(state0)(
-                cas.write(pure({ first: ok(docBytes), tail: pure(undefined) })))
+                cas.write(pureOk({ first: ok(docBytes), tail: pureOk(undefined) })))
             assert(docWrite[0] === 'ok', ['expected the document write to succeed', docWrite])
             const docHash = vecToCBase32(docWrite[1])
             const e = evo(cas)(cacheKey)
@@ -534,7 +542,7 @@ export const proof = {
             const docBytes = tryUtf8('{"dialect":"vnd.fjs.w2"}')
             assert(docBytes !== null, 'expected the sample document to encode as UTF-8')
             const [state1, docWrite] = virtual(state0)(
-                cas.write(pure({ first: ok(docBytes), tail: pure(undefined) })))
+                cas.write(pureOk({ first: ok(docBytes), tail: pureOk(undefined) })))
             assert(docWrite[0] === 'ok', ['expected the document write to succeed', docWrite])
             const docHash = vecToCBase32(docWrite[1])
             const [state2, activeAddResult] = virtual(state1)(
@@ -550,7 +558,7 @@ export const proof = {
             // a gate needs a control (AGENTS.md), proving the filter is
             // selective, not a blanket break.
             const [state4, controlDocWrite] = virtual(state3)(
-                cas.write(pure({ first: ok(docBytes), tail: pure(undefined) })))
+                cas.write(pureOk({ first: ok(docBytes), tail: pureOk(undefined) })))
             assert(controlDocWrite[0] === 'ok', ['expected the control document write to succeed', controlDocWrite])
             const [state5, controlAddResult] = virtual(state4)(
                 e.add({ parents: [], subject: 'subjectActive', snapshot: docHash }))
@@ -640,7 +648,7 @@ export const proof = {
             const garbageBytes = tryUtf8('not a revision at all {{{')
             assert(garbageBytes !== null, 'expected the garbage bytes to encode as UTF-8')
             const [state1, garbageWrite] = virtual(state0)(
-                cas.write(pure({ first: ok(garbageBytes), tail: pure(undefined) })))
+                cas.write(pureOk({ first: ok(garbageBytes), tail: pureOk(undefined) })))
             assert(garbageWrite[0] === 'ok', ['expected the garbage write to succeed', garbageWrite])
             const garbageHashVec = garbageWrite[1]
             const garbageHashStr = vecToCBase32(garbageHashVec)
@@ -670,7 +678,7 @@ export const proof = {
             const controlDocBytes = tryUtf8('{"dialect":"vnd.fjs.w2"}')
             assert(controlDocBytes !== null, 'expected the control document to encode as UTF-8')
             const [state3, controlDocWrite] = virtual(state2)(
-                cas.write(pure({ first: ok(controlDocBytes), tail: pure(undefined) })))
+                cas.write(pureOk({ first: ok(controlDocBytes), tail: pureOk(undefined) })))
             assert(controlDocWrite[0] === 'ok', ['expected the control document write to succeed', controlDocWrite])
             const controlDocHash = vecToCBase32(controlDocWrite[1])
             const [state4, controlAddResult] = virtual(state3)(

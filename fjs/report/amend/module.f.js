@@ -44,7 +44,7 @@
 import { cBase32ToVec, vecToCBase32 } from 'functionalscript/fjs/basen/cbase32/module.f.mjs'
 import { collectRead, fileCas } from 'functionalscript/fjs/cas/module.f.mjs'
 import { utf8ToString, tryUtf8 } from 'functionalscript/fjs/text/module.f.mjs'
-import { step, pure, mapStep } from 'functionalscript/fjs/effects/module.f.mjs'
+import { step, pure, pureOk, mapStep } from 'functionalscript/fjs/effects/module.f.mjs'
 import { emptyState, virtual } from 'functionalscript/fjs/effects/node/virtual/module.f.mjs'
 import { sha256 } from 'functionalscript/fjs/crypto/sha2/module.f.mjs'
 import { error, ok } from 'functionalscript/fjs/types/result/module.f.mjs'
@@ -296,12 +296,12 @@ const readResultsAndDiff = cas => elected => runHashA => runHashB => resultHashA
     step(readResultRecord(cas)(resultHashA), wireA =>
         step(readResultRecord(cas)(resultHashB), wireB => {
             if (wireA[0] === 'error') {
-                return pure(/** @type {Result<AmendmentDiffResult, string>} */ (error(`run A's (${runHashA}) stored result is invalid: ${wireA[1]}`)))
+                return pureOk(/** @type {Result<AmendmentDiffResult, string>} */ (error(`run A's (${runHashA}) stored result is invalid: ${wireA[1]}`)))
             }
             if (wireB[0] === 'error') {
-                return pure(/** @type {Result<AmendmentDiffResult, string>} */ (error(`run B's (${runHashB}) stored result is invalid: ${wireB[1]}`)))
+                return pureOk(/** @type {Result<AmendmentDiffResult, string>} */ (error(`run B's (${runHashB}) stored result is invalid: ${wireB[1]}`)))
             }
-            return pure(diffWireRecords(elected)(wireA[1])(wireB[1]))
+            return pureOk(diffWireRecords(elected)(wireA[1])(wireB[1]))
         }))
 
 /**
@@ -361,14 +361,14 @@ export const amendmentDiff = cas => elected => runHashA => runHashB =>
 
 /**
  * TEST-FIXTURE ONLY. Writes `text`'s UTF-8 bytes to CAS as a single chunk —
- * the same `cas.write(pure({first: ok(bytes), tail: pure(undefined)}))`
+ * the same `cas.write(pureOk({first: ok(bytes), tail: pureOk(undefined)}))`
  * pattern `fjs/server/fjs_run/module.f.js`'s own test helpers use.
  * @type {(cas: Cas<FileCasOperation>) => (text: string) => Effect<FileCasOperation, string>}
  */
 const seedText = cas => text => {
     const bytes = tryUtf8(text)
     assert(bytes !== null, ['expected fixture text to encode as UTF-8', text])
-    return mapStep(cas.write(pure({ first: ok(bytes), tail: pure(undefined) })), w => {
+    return mapStep(cas.write(pureOk({ first: ok(bytes), tail: pureOk(undefined) })), w => {
         assert(w[0] === 'ok', ['expected fixture write to succeed', w])
         return vecToCBase32(w[1])
     })

@@ -38,32 +38,57 @@
  *
  * @module
  */
-import { do_, step, pure } from 'functionalscript/fjs/effects/module.f.mjs'
+import { do_, step, pureOk } from 'functionalscript/fjs/effects/module.f.mjs'
+import { ok } from 'functionalscript/fjs/types/result/module.f.mjs'
 import { assert, assertEq, assertNotNullish } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { interpret } from '../exec/module.f.js'
 import { centsFromString, centsToString } from '../exact/module.f.js'
 
 /** @import { Effect, OperationMap } from 'functionalscript/fjs/effects/types.js' */
+/** @import { Result } from 'functionalscript/fjs/types/result/types.js' */
 /** @import { Assert } from 'functionalscript/fjs/asserts/types.js' */
 /** @import { Equal } from 'functionalscript/fjs/types/ts/types.js' */
 
 // ── The frozen vocabulary ────────────────────────────────────────────────────
 
 /**
- * Reads a stored blob by cBase32 hash; yields its content as text.
- * @typedef {readonly ['casRead', (a: string) => string]} CasRead
+ * ## The error channel these four carry, and why it is `string`
+ *
+ * 0.46.0 requires an operation's handler to return a `Result`, and for these
+ * four that is not a formality: `buildHostMap`'s `casRead` and `evoRevision`
+ * genuinely fail on a hash the snapshot does not hold. Before 0.46.0 they
+ * said so by **throwing a bare string**, which crossed `interpret`'s `try`
+ * and came back out relabelled — a missing blob was reported to the guest as
+ * `operation not permitted: blob not found: …`, i.e. as a POLICY refusal for
+ * something that was never a policy question. Nothing asserted the label, so
+ * nothing caught it.
+ *
+ * With the channel typed, a missing blob is `error('blob not found: …')`,
+ * `step` short-circuits the guest's chain on it, and `interpret` passes it
+ * through its own `E | string` channel to the run record under its own name.
+ * The refusal vocabulary is now reserved for actual refusals.
+ *
+ * `string` rather than a richer type because that is what the run record's
+ * `message` field holds, and inventing a tagged error here would be widening
+ * the guest vocabulary — a frozen thing — to carry a distinction no consumer
+ * makes yet.
+ */
+/**
+ * Reads a stored blob by cBase32 hash; yields its content as text, or fails
+ * if the snapshot does not hold that hash.
+ * @typedef {readonly ['casRead', (a: string) => Result<string, string>]} CasRead
  */
 /**
  * Lists subjects; the argument selects active or archived. Yields JSON.
- * @typedef {readonly ['evoList', (a: string) => string]} EvoList
+ * @typedef {readonly ['evoList', (a: string) => Result<string, string>]} EvoList
  */
 /**
  * Yields a subject's head hashes, as JSON.
- * @typedef {readonly ['evoHead', (a: string) => string]} EvoHead
+ * @typedef {readonly ['evoHead', (a: string) => Result<string, string>]} EvoHead
  */
 /**
  * Yields one revision by hash, decoded, as JSON.
- * @typedef {readonly ['evoRevision', (a: string) => string]} EvoRevision
+ * @typedef {readonly ['evoRevision', (a: string) => Result<string, string>]} EvoRevision
  */
 
 /**
@@ -78,17 +103,17 @@ import { centsFromString, centsToString } from '../exact/module.f.js'
  * `do_` narrowed per command. `do_('casRead')` alone under-constrains `O` to
  * bare `Operation` rather than `CasRead`; the annotation is what pins it —
  * the same reason `fjs/exec` annotates its fixture constructors.
- * @type {(a: string) => Effect<CasRead, string>}
+ * @type {(a: string) => Effect<CasRead, string, string>}
  */
 const casRead = do_('casRead')
 
-/** @type {(a: string) => Effect<EvoList, string>} */
+/** @type {(a: string) => Effect<EvoList, string, string>} */
 const evoList = do_('evoList')
 
-/** @type {(a: string) => Effect<EvoHead, string>} */
+/** @type {(a: string) => Effect<EvoHead, string, string>} */
 const evoHead = do_('evoHead')
 
-/** @type {(a: string) => Effect<EvoRevision, string>} */
+/** @type {(a: string) => Effect<EvoRevision, string, string>} */
 const evoRevision = do_('evoRevision')
 
 /**
@@ -123,7 +148,18 @@ export const guestCtx = {
     evoHead,
     evoRevision,
     step,
-    pure,
+    // `pure` is upstream's `pureOk` since 0.46.0, and the KEY deliberately
+    // keeps the old name. A guest writes `ctx.pure("ok")` — a bare value —
+    // and 0.46.0 split that constructor in two: `pure` now takes a whole
+    // `Result`, `pureOk` takes the value. The value-taking one is what every
+    // stored program means. Renaming the key to match upstream would edit the
+    // SOURCE TEXT of programs that are content-addressed: every stored
+    // program's hash would change, every pinned run record would stop
+    // resolving, and PROV-09's byte-for-byte rerun would be comparing against
+    // a program that no longer exists. The vocabulary a guest sees is this
+    // project's to keep stable; upstream's spelling of the same constructor
+    // is not part of it.
+    pure: pureOk,
     centsFromString,
     centsToString,
 }
@@ -144,7 +180,7 @@ export const casOpNames = ['casRead', 'evoList', 'evoHead', 'evoRevision']
  * T>`, which is EXEC-07's stated signature; `ctx` precedes it because a CAS
  * blob has nowhere to import a vocabulary from.
  * @template T
- * @typedef {(ctx: GuestCtx) => (args: readonly string[]) => Effect<CasOp, T>} Report
+ * @typedef {(ctx: GuestCtx) => (args: readonly string[]) => Effect<CasOp, T, string>} Report
  */
 
 // ── The whitelist, in the type system (Success Criterion 1) ──────────────────
@@ -181,13 +217,13 @@ export const casOpNames = ['casRead', 'evoList', 'evoHead', 'evoRevision']
  * is required, not decorative: without it the map's inferred object type
  * does not satisfy `interpret`'s parameter and `tsc` reports the whole
  * literal as unassignable.
- * @type {OperationMap<CasOp, string>}
+ * @type {OperationMap<CasOp, Result<string, string>>}
  */
 const hostMap = {
-    casRead: (/** @type {string} */ a) => `casRead:${a}`,
-    evoList: (/** @type {string} */ a) => `evoList:${a}`,
-    evoHead: (/** @type {string} */ a) => `evoHead:${a}`,
-    evoRevision: (/** @type {string} */ a) => `evoRevision:${a}`,
+    casRead: (/** @type {string} */ a) => ok(`casRead:${a}`),
+    evoList: (/** @type {string} */ a) => ok(`evoList:${a}`),
+    evoHead: (/** @type {string} */ a) => ok(`evoHead:${a}`),
+    evoRevision: (/** @type {string} */ a) => ok(`evoRevision:${a}`),
 }
 
 /**
@@ -200,7 +236,7 @@ const hostMap = {
  * value type does not have a single unary `string -> Effect` signature).
  * This record exists only to give the lookup a single, uniform call shape
  * to type against.
- * @type {Readonly<Record<string, (a: string) => Effect<CasOp, string>>>}
+ * @type {Readonly<Record<string, (a: string) => Effect<CasOp, string, string>>>}
  */
 const commandConstructorsByName = { casRead, evoList, evoHead, evoRevision }
 
@@ -211,9 +247,17 @@ export const proof = {
     // re-implementation or re-rounding. `Object.is` is the direct check for
     // "same function object"; `typeof ... === 'function'` alone would also
     // pass for a wrapper, which is exactly what this must rule out.
+    //
+    // `ctx.pure` is checked against `pureOk`, not `pure`: 0.46.0 split the
+    // one constructor into a value-taking and a Result-taking half, and the
+    // value-taking half is what `ctx.pure` always was. The KEY keeps its name
+    // because stored programs are content-addressed — see `guestCtx`. This
+    // assertion is what stops the key being quietly repointed at the
+    // Result-taking `pure`, which would typecheck at the ctx and fail only
+    // inside guest source nobody typechecks.
     guestCtxReExportsCombinatorsAndMoneyHelpers: () => {
         assert(Object.is(guestCtx.step, step), ['guestCtx.step must be the same function object as step'])
-        assert(Object.is(guestCtx.pure, pure), ['guestCtx.pure must be the same function object as pure'])
+        assert(Object.is(guestCtx.pure, pureOk), ['guestCtx.pure must be the same function object as pureOk'])
         assert(
             Object.is(guestCtx.centsFromString, centsFromString),
             ['guestCtx.centsFromString must be the same function object as fjs/exact\'s centsFromString'])

@@ -51,7 +51,7 @@
  *
  * @module
  */
-import { mapStep, pure, step, foldStep } from 'functionalscript/fjs/effects/module.f.mjs'
+import { mapStep, pureOk, step, foldStep } from 'functionalscript/fjs/effects/module.f.mjs'
 import { create, write } from 'functionalscript/fjs/effects/memory/module.f.mjs'
 import { stdioTransport } from 'functionalscript/fjs/protocol/mcp/stdio/module.f.mjs'
 import { mcpStep, uninitializedState, fromRegistry, toolEntry, okResult, errorResult } from 'functionalscript/fjs/protocol/mcp/module.f.mjs'
@@ -154,7 +154,7 @@ export const casRefreshTool = cas => cacheKey => toolEntry(
             () => step(
                 cas.list(),
                 hashes => foldStep(
-                    pure(hashes),
+                    pureOk(hashes),
                     /** @type {{ [mimeType: string]: number }} */ ({}),
                     hash => acc => mapStep(
                         collectRead(cas.read(hash)),
@@ -591,7 +591,7 @@ export const proof = {
             // fixes its effect parameter at `never`, side-stepping the
             // inference gap while building the identical `{first, tail}` cons
             // cell shape `nonEmpty`/`empty` themselves construct.
-            const [state1, w] = virtual(state0)(cas.write(pure({ first: ok(bytes), tail: pure(undefined) })))
+            const [state1, w] = virtual(state0)(cas.write(pureOk({ first: ok(bytes), tail: pureOk(undefined) })))
             assert(w[0] === 'ok', ['expected seed write ok', w])
             const seededHash = vecToCBase32(w[1])
             // 3. The session-state slot, exactly as financeMcpServer allocates it.
@@ -660,7 +660,7 @@ export const proof = {
             const seedBlob = state => text => {
                 const bytes = tryUtf8(text)
                 assert(bytes !== null, ['expected the seed text to encode as UTF-8', text])
-                const [nextState, w] = virtual(state)(cas.write(pure({ first: ok(bytes), tail: pure(undefined) })))
+                const [nextState, w] = virtual(state)(cas.write(pureOk({ first: ok(bytes), tail: pureOk(undefined) })))
                 assert(w[0] === 'ok', ['expected the seed write to succeed', w])
                 return /** @type {const} */ ([nextState, vecToCBase32(w[1])])
             }
@@ -755,8 +755,8 @@ export const proof = {
 
             /**
              * Single-chunk UTF-8 CAS write, returning the resulting content
-             * hash — the same `cas.write(pure({first: ok(bytes), tail:
-             * pure(undefined)}))` pattern `casRefresh.seedInvisibleUntilRefreshed`
+             * hash — the same `cas.write(pureOk({first: ok(bytes), tail:
+             * pureOk(undefined)}))` pattern `casRefresh.seedInvisibleUntilRefreshed`
              * (above) uses, factored here so the seven sequential writes below
              * (three documents, three revisions, one program) don't repeat it
              * seven times.
@@ -765,7 +765,7 @@ export const proof = {
             const seedText = state => text => {
                 const bytes = tryUtf8(text)
                 assert(bytes !== null, ['expected seed text to encode as UTF-8', text])
-                const [nextState, w] = virtual(state)(cas.write(pure({ first: ok(bytes), tail: pure(undefined) })))
+                const [nextState, w] = virtual(state)(cas.write(pureOk({ first: ok(bytes), tail: pureOk(undefined) })))
                 assert(w[0] === 'ok', ['expected the seed write to succeed', w])
                 return [nextState, vecToCBase32(w[1])]
             }

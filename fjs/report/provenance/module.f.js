@@ -44,7 +44,7 @@ import { cBase32ToVec, vecToCBase32 } from 'functionalscript/fjs/basen/cbase32/m
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { stringify as jsonText } from '../../json/module.f.js'
 import { fileCas } from 'functionalscript/fjs/cas/module.f.mjs'
-import { pure } from 'functionalscript/fjs/effects/module.f.mjs'
+import { pureOk } from 'functionalscript/fjs/effects/module.f.mjs'
 import { emptyState, virtual } from 'functionalscript/fjs/effects/node/virtual/module.f.mjs'
 import { ok } from 'functionalscript/fjs/types/result/module.f.mjs'
 import { dialect as runDialect } from '../../run/module.f.js'
@@ -191,7 +191,7 @@ export const proof = {
             const cas = fileCas(sha256)(home)
             const bytes = tryUtf8(jsonText(taxParams2025))
             assert(bytes !== null, ['expected the parameter-set text to encode as UTF-8', taxParams2025])
-            const [, write] = virtual(emptyState)(cas.write(pure({ first: ok(bytes), tail: pure(undefined) })))
+            const [, write] = virtual(emptyState)(cas.write(pureOk({ first: ok(bytes), tail: pureOk(undefined) })))
             assert(write[0] === 'ok', ['expected the CAS write to succeed', write])
             assertEq(vecToCBase32(write[1]), paramSetHash(taxParams2025))
         },

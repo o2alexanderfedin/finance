@@ -104,7 +104,7 @@
  *
  * The zero-read kill condition ({@link classifyRunOutcome}, imported from
  * `fjs/report/guard/module.f.js`) is the mechanism that defeats
- * `() => pure({ line16: 9137 })` — a program that recites an answer instead
+ * `() => pureOk({ line16: 9137 })` — a program that recites an answer instead
  * of computing one from a stored document. This file no longer defines that
  * rule; it CONSUMES it, at the two call sites below ({@link executeRun} and
  * {@link runExecuteRunViaFixture}). The full plain-words account of all
@@ -115,7 +115,7 @@
  *
  * @module
  */
-import { step, pure, mapStep, do_ } from 'functionalscript/fjs/effects/module.f.mjs'
+import { step, pureOk, mapStep, do_ } from 'functionalscript/fjs/effects/module.f.mjs'
 import { collectRead, fileCas } from 'functionalscript/fjs/cas/module.f.mjs'
 import { cBase32ToVec, vecToCBase32 } from 'functionalscript/fjs/basen/cbase32/module.f.mjs'
 import { utf8ToString, tryUtf8 } from 'functionalscript/fjs/text/module.f.mjs'
@@ -234,21 +234,21 @@ import { stringify as jsonText } from '../../json/module.f.js'
 const runProgramTail = cas => evoApi => taxParams => path => source => literalCount => args => pin =>
     step(loadProgram([])(path)(source), loadResult => {
         if (loadResult[0] === 'error') {
-            return pure(/** @type {RunOutcome<unknown>} */ ({ kind: 'error', message: loadResult[1], reads: [] }))
+            return pureOk(/** @type {RunOutcome<unknown>} */ ({ kind: 'error', message: loadResult[1], reads: [] }))
         }
         return step(buildRunSnapshot(cas)(evoApi)(pin), snapshot => {
             const hostMap = buildHostMap(snapshot)
             const loaded = /** @type {{ readonly report: TaxReport<unknown> }} */ (loadResult[1])
             const [t, v] = interpret(hostMap)(loaded.report(taxGuestCtx(taxParams))(args))
             if (t === 'error') {
-                return pure(/** @type {RunOutcome<unknown>} */ ({ kind: 'error', message: v, reads: [] }))
+                return pureOk(/** @type {RunOutcome<unknown>} */ ({ kind: 'error', message: v, reads: [] }))
             }
             const [value, reads] = v
             // 09-06: classifyRunOutcome (imported from
             // fjs/report/guard/module.f.js) is the zero-read kill
             // condition's ONLY definition — this is the production call
             // site, reached by BOTH run paths since MAINT-07.
-            return pure(classifyRunOutcome(literalCount)(value, reads))
+            return pureOk(classifyRunOutcome(literalCount)(value, reads))
         })
     })
 
@@ -277,11 +277,11 @@ const runProgramTail = cas => evoApi => taxParams => path => source => literalCo
 export const executeRun = materializeHomeRoot => cas => evoApi => input => {
     const hashVec = cBase32ToVec(input.hash)
     if (hashVec === null) {
-        return pure(/** @type {RunOutcome<unknown>} */ ({ kind: 'error', message: `program not found: ${input.hash}`, reads: [] }))
+        return pureOk(/** @type {RunOutcome<unknown>} */ ({ kind: 'error', message: `program not found: ${input.hash}`, reads: [] }))
     }
     return step(collectRead(cas.read(hashVec)), readResult => {
         if (readResult[0] === 'error') {
-            return pure(/** @type {RunOutcome<unknown>} */ ({ kind: 'error', message: `program not found: ${input.hash}`, reads: [] }))
+            return pureOk(/** @type {RunOutcome<unknown>} */ ({ kind: 'error', message: `program not found: ${input.hash}`, reads: [] }))
         }
         const sourceText = utf8ToString(readResult[1])
         // PROV-07 (the reported half): computed HERE, at the exact point
@@ -290,7 +290,7 @@ export const executeRun = materializeHomeRoot => cas => evoApi => input => {
         const literalCount = countNumericLiterals(sourceText)
         return step(materializeProgram(materializeHomeRoot)(input.hash)(sourceText), materializeResult => {
             if (materializeResult[0] === 'error') {
-                return pure(/** @type {RunOutcome<unknown>} */ ({ kind: 'error', message: materializeResult[1], reads: [] }))
+                return pureOk(/** @type {RunOutcome<unknown>} */ ({ kind: 'error', message: materializeResult[1], reads: [] }))
             }
             const pin = input.subject !== undefined && input.parents !== undefined
                 ? { subject: input.subject, parents: input.parents }
@@ -308,7 +308,7 @@ export const executeRun = materializeHomeRoot => cas => evoApi => input => {
 
 /**
  * Writes `text`'s UTF-8 bytes to CAS as a single chunk — the same
- * `cas.write(pure({first: ok(bytes), tail: pure(undefined)}))` pattern
+ * `cas.write(pureOk({first: ok(bytes), tail: pureOk(undefined)}))` pattern
  * `fjs/server/module.f.js`'s `casRefresh` proof and
  * `fjs/server/fjs_run/snapshot/module.f.js`'s own store-seeding proofs use —
  * and returns the resulting content hash. A write failure here is asserted,
@@ -322,7 +322,7 @@ const writeTextToCas = cas => text => {
     const bytes = tryUtf8(text)
     assert(bytes !== null, ['expected text destined for CAS to encode as UTF-8', text])
     return mapStep(
-        cas.write(pure({ first: ok(bytes), tail: pure(undefined) })),
+        cas.write(pureOk({ first: ok(bytes), tail: pureOk(undefined) })),
         writeResult => {
             assert(writeResult[0] === 'ok', ['expected a CAS write to succeed', writeResult])
             return vecToCBase32(writeResult[1])
@@ -464,7 +464,7 @@ const handleRunOutcome = cas => programHash => programArgs => pinned => pinField
                 // counter (09-CONTEXT.md). literalCount is outcome's own
                 // count, computed once in executeRun/runExecuteRunViaFixture
                 // at the point the source text was already in hand.
-                return pure(okResult(jsonText({
+                return pureOk(okResult(jsonText({
                     resultHash,
                     runHash,
                     preview,
@@ -495,7 +495,7 @@ const handleRunOutcome = cas => programHash => programArgs => pinned => pinField
     const [vt, vv] = validateRun(record)
     assert(vt === 'ok', ['fjs_run assembled an invalid error run record - executor bug', vv])
     return step(writeTextToCas(cas)(jsonText(vv)), runHash =>
-        pure(errorResult(`fjs_run failed: ${outcome.message} (run record: ${runHash})`)))
+        pureOk(errorResult(`fjs_run failed: ${outcome.message} (run record: ${runHash})`)))
 }
 
 /**
@@ -550,7 +550,7 @@ export const fjsRunTool = materializeHomeRoot => cas => evoApi => toolEntry(
         // noUncheckedIndexedAccess produces.
         const taxParamSet = taxParamsByYear[args.taxYear]
         if (taxParamSet === undefined) {
-            return pure(errorResult(
+            return pureOk(errorResult(
                 `unknown tax year: ${args.taxYear}; known: ${Object.keys(taxParamsByYear).map(Number).join(', ')}`,
             ))
         }
@@ -603,7 +603,7 @@ assert(taxParamsFixture !== undefined, 'expected TY2025 parameters to be present
 const seedText = cas => text => {
     const bytes = tryUtf8(text)
     assert(bytes !== null, ['expected sample text to encode as UTF-8', text])
-    return mapStep(cas.write(pure({ first: ok(bytes), tail: pure(undefined) })), w => {
+    return mapStep(cas.write(pureOk({ first: ok(bytes), tail: pureOk(undefined) })), w => {
         assert(w[0] === 'ok', ['expected the seed write to succeed', w])
         return vecToCBase32(w[1])
     })
@@ -1724,7 +1724,7 @@ export const proof = {
     // ── PROV-07's decisive proof: zero observed reads becomes an error ───
     zeroReadGate: {
         // A purpose-built zero-read report — distinct from Plan 09-04's own
-        // verbatim `() => pure({ line16: 9137 })` adversary fixture — proves
+        // verbatim `() => pureOk({ line16: 9137 })` adversary fixture — proves
         // the gate itself: a report that dispatches NO CAS/Evo read is
         // refused as an error result, never returned as a silent 'ok'.
         zeroReadOutcomeBecomesAnErrorResult: () => {
@@ -1789,7 +1789,7 @@ export const proof = {
     // claim, not a proof (09-CONTEXT.md). This section runs the decisive
     // comparison both ways: a real, minimal ReportLine-shaped program whose
     // output MOVES when a stored document changes (the leaf above), and the
-    // exact adversary `() => pure({ line16: 9137 })`, written verbatim, whose
+    // exact adversary `() => pureOk({ line16: 9137 })`, written verbatim, whose
     // failure does NOT move under the identical perturbation (the leaf
     // below, `hardcodedAdversaryFailsAndIsInvariantToInputChange`) — the
     // control that makes the assertion about the gate itself rather than

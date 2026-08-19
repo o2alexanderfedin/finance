@@ -79,7 +79,7 @@
  */
 import { number, option, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
 import { parse as rttiValidate } from 'functionalscript/fjs/types/rtti/parse/module.f.mjs'
-import { step, mapStep, foldStep, pure } from 'functionalscript/fjs/effects/module.f.mjs'
+import { step, mapStep, foldStep, pureOk } from 'functionalscript/fjs/effects/module.f.mjs'
 import { collectRead, fileCas } from 'functionalscript/fjs/cas/module.f.mjs'
 import { cBase32ToVec, vecToCBase32 } from 'functionalscript/fjs/basen/cbase32/module.f.mjs'
 import { utf8ToString, tryUtf8 } from 'functionalscript/fjs/text/module.f.mjs'
@@ -148,7 +148,7 @@ export const financeDocumentsListTool = evo => cas => {
                 // Should not happen: headHash was itself just returned by
                 // evo.head, but code defensively per this project's
                 // noUncheckedIndexedAccess discipline.
-                return pure(undefined)
+                return pureOk(undefined)
             }
             const snapshotRef = revResult[1].snapshot
             if (snapshotRef === undefined) {
@@ -156,24 +156,24 @@ export const financeDocumentsListTool = evo => cas => {
                 // says `snapshot` is "always present" on output, but the
                 // field is typed optional (RevisionData's input/output
                 // vocabulary is shared) -- narrow rather than assume.
-                return pure(undefined)
+                return pureOk(undefined)
             }
             const snapshotHash = cBase32ToVec(snapshotRef)
             if (snapshotHash === null) {
-                return pure(undefined)
+                return pureOk(undefined)
             }
             return step(
                 collectRead(cas.read(snapshotHash)),
                 blobResult => {
                     if (blobResult[0] === 'error') {
                         // A genuinely broken/missing snapshot blob -- skip.
-                        return pure(undefined)
+                        return pureOk(undefined)
                     }
                     const [parseTag, parsed] = parse(utf8ToString(blobResult[1]))
                     if (parseTag === 'error') {
                         // The "non-JSON snapshot blob" skip case -- see the
                         // module header's "Failure modes" section.
-                        return pure(undefined)
+                        return pureOk(undefined)
                     }
                     const [t, identity] = rttiValidate(documentIdentitySchema)(parsed)
                     const dialect = t === 'ok' && identity.dialect !== undefined
@@ -182,7 +182,7 @@ export const financeDocumentsListTool = evo => cas => {
                     const taxYear = t === 'ok' ? identity.taxYear : undefined
                     /** @type {DocumentListEntry} */
                     const entry = { subject, dialect, ...(taxYear === undefined ? {} : { taxYear }), hash: headHash }
-                    return pure(entry)
+                    return pureOk(entry)
                 },
             )
         },
@@ -199,12 +199,12 @@ export const financeDocumentsListTool = evo => cas => {
             step(
                 evo.list(archived),
                 subjects => foldStep(
-                    pure(subjects),
+                    pureOk(subjects),
                     /** @type {readonly DocumentListEntry[]} */ ([]),
                     subject => acc => step(
                         evo.head(subject),
                         heads => foldStep(
-                            pure(heads),
+                            pureOk(heads),
                             acc,
                             headHash => innerAcc => mapStep(
                                 entryFor(subject)(headHash),
@@ -283,7 +283,7 @@ const buildFixture = () => {
         const bytes = tryUtf8(text)
         assert(bytes !== null, ['expected the sample document to encode as UTF-8', text])
         const [nextState, writeResult] = virtual(state)(
-            cas.write(pure({ first: ok(bytes), tail: pure(undefined) })))
+            cas.write(pureOk({ first: ok(bytes), tail: pureOk(undefined) })))
         assert(writeResult[0] === 'ok', ['expected the document write to succeed', writeResult])
         return /** @type {const} */ ([nextState, vecToCBase32(writeResult[1])])
     }
@@ -331,7 +331,7 @@ const buildFixture = () => {
     const brokenBytes = tryUtf8('not valid json at all {{{')
     assert(brokenBytes !== null, 'expected the broken sample to encode as UTF-8')
     const [state11, brokenWrite] = virtual(state10)(
-        cas.write(pure({ first: ok(brokenBytes), tail: pure(undefined) })))
+        cas.write(pureOk({ first: ok(brokenBytes), tail: pureOk(undefined) })))
     assert(brokenWrite[0] === 'ok', ['expected the broken-blob write to succeed', brokenWrite])
     const brokenHash = vecToCBase32(brokenWrite[1])
     const [state12, brokenAdd] = virtual(state11)(

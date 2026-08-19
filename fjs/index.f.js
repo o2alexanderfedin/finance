@@ -1,4 +1,4 @@
-import { pure, step } from 'functionalscript/fjs/effects/module.f.mjs'
+import { pureOk, step } from 'functionalscript/fjs/effects/module.f.mjs'
 import { financeMcpServer } from './server/module.f.js'
 
 /** @import { NodeProgram } from 'functionalscript/fjs/effects/node/types.js' */
@@ -12,4 +12,4 @@ import { financeMcpServer } from './server/module.f.js'
  * a project path — see `fjs/server/module.f.js` for detail.
  * @type {NodeProgram}
  */
-export const main = options => step(financeMcpServer(options.args[0] ?? '.'), () => pure(0))
+export const main = options => step(financeMcpServer(options.args[0] ?? '.'), () => pureOk(0))

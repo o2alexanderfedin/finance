@@ -56,7 +56,7 @@
  *
  * @module
  */
-import { step, pure } from 'functionalscript/fjs/effects/module.f.mjs'
+import { step, pure, pureOk } from 'functionalscript/fjs/effects/module.f.mjs'
 import { import_, mkdir, writeUtf8File, readUtf8File } from 'functionalscript/fjs/effects/node/module.f.mjs'
 import { error, ok } from 'functionalscript/fjs/types/result/module.f.mjs'
 import { join } from 'functionalscript/fjs/path/module.f.mjs'
@@ -312,7 +312,7 @@ export const materializeProgram = home => hash => source => step(
         }
         return step(
             writeUtf8File(programPath(materializeHome(home))(hash), source),
-            writeResult => pure(writeResult[0] === 'error' ? error(String(writeResult[1])) : ok(undefined)),
+            writeResult => pureOk(writeResult[0] === 'error' ? error(String(writeResult[1])) : ok(undefined)),
         )
     },
 )
@@ -340,7 +340,7 @@ export const loadProgram = allowed => path => source => {
     }
     return step(import_(path), imported => {
         const [it, iv] = imported
-        return pure(it === 'error' ? error(`import failed: ${String(iv)}`) : ok(iv))
+        return pureOk(it === 'error' ? error(`import failed: ${String(iv)}`) : ok(iv))
     })
 }
 
