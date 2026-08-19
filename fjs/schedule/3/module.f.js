@@ -130,13 +130,23 @@
  * vocabulary expresses it" — stood here until Phase 25 and is corrected
  * rather than deleted, because a docstring that quotes a finding inherits its
  * expiry (`fjs/schedule/1`'s own header records the same kind of correction).
- * What has NOT changed is the boundary itself: `line11` below is a
- * `profileDeclaredZeroLine` exactly
- * like every other line on this module, not a document-derived
- * computation — a documented boundary, not a silent omission, mirroring
- * `fjs/schedule/b`'s Form 8815 treatment (money the underlying documents
- * could support, deliberately not computed this phase, with the reason
- * recorded here for whichever future phase reaches it).
+ *
+ * **The boundary itself is now gone too, and this paragraph is its third
+ * correction.** `line11` is a document-derived computation over Form W-2 box 4
+ * — see {@link excessSocialSecurityWithheldLine}. Everything above stands as
+ * the record of why it took three phases: the figure was always in reach, the
+ * missing pieces were the wage base (Phase 28) and §3101(a)'s rate, and each
+ * intervening phase said so rather than omitting it silently. `fjs/schedule/b`'s
+ * Form 8815 treatment is the remaining example of the shape this line used to
+ * be.
+ *
+ * What line 11 still does NOT compute is the **tier-1 RRTA** half of its own
+ * printed title. `vnd.fjs.w2` has no box 14, which is where a railroad
+ * employer reports tier-1 tax, and railroad employment sits outside FICA
+ * entirely — so no stored figure is dropped, but no railroad return is served
+ * either. `fjs/schedule/3/todo/excess-social-security.md` records it as a
+ * scope question for whoever reclassifies the kind, whose own label names
+ * tier-1 RRTA.
  *
  * The `totalLine`/`unionSources`/`profileDeclaredZeroLine` helpers below
  * are reimplemented locally, private and NOT imported from
@@ -147,6 +157,7 @@
  */
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
 import { centsFromString } from '../../exact/module.f.js'
+import { of, halfUp } from '../../types/rational/module.f.js'
 import { form8863 } from '../../form8863/module.f.js'
 import { form8880 } from '../../form8880/module.f.js'
 import { taxParamsByYear } from '../../tax/params/module.f.js'
@@ -339,6 +350,167 @@ const educationCreditElectionNamed = credit =>
     credit === 'americanOpportunity' ? 'americanOpportunity'
         : credit === 'lifetimeLearning' ? 'lifetimeLearning'
             : undefined
+
+// ── Line 11: excess Social Security tax withheld ────────────────────────────
+
+/**
+ * The values of `values`, first-seen order, each once.
+ * @type {(values: readonly string[]) => readonly string[]}
+ */
+const distinct = values => values.filter((value, index) => values.indexOf(value) === index)
+
+/**
+ * The maximum §3101(a) tax any ONE employer may withhold from any ONE
+ * employee in the year: the Social Security wage base times 6.2%. For TY2025
+ * that is $176,100.00 x 6.2% = **$10,918.20**, which is the figure the printed
+ * Schedule 3 line 11 instructions state outright.
+ *
+ * Both operands come off `taxParamSet` rather than out of a literal here, so a
+ * second tax year computes its own maximum — `fjs/tax/params` pins the TY2025
+ * product against the instructions' own $10,918.20.
+ *
+ * **The wage base is `selfEmploymentTax`'s, and that is not a borrow.**
+ * §1402(b)(1) (chapter 2) and §3121(a)(1) (chapter 21) do not each state a
+ * dollar amount; both defer to *"the contribution and benefit base (as
+ * determined under section 230 of the Social Security Act)"*. One number, read
+ * by two statutes — so a second stored copy could only ever disagree with a
+ * base the Social Security Administration sets once. The RATE is the opposite
+ * case and is stored separately for that reason; `fjs/tax/params`'
+ * {@link socialSecurityTaxWithholding} argues both halves.
+ *
+ * Cent-exact and half-up through `fjs/types/rational`, never through a float —
+ * the arithmetic `fjs/form8959` performs on the neighbouring §3101(b) rates.
+ * @type {(taxParamSet: TaxParamSet) => bigint}
+ */
+const socialSecurityWithholdingMaximum = taxParamSet => halfUp(of(
+    centsFromString(taxParamSet.selfEmploymentTax.socialSecurityWageBase.amount)
+    * BigInt(taxParamSet.socialSecurityTaxWithholding.employeeRateBasisPoints))(10000n))
+
+/**
+ * One stored Form W-2 that actually REPORTED box 4, paired with the printed
+ * string it reported.
+ *
+ * The pair exists because line 11 needs the box AND the form: the amount is
+ * summed, while `recipientTin` and `payerTin` decide which sums are allowed to
+ * happen at all. Building it with `flatMap` over an `undefined` check keeps
+ * the narrowing the compiler already did — no second lookup, so no
+ * `T | undefined` to cast away.
+ * @typedef {{ readonly form: Stored<W2>, readonly withheld: string }} BoxFourReading
+ */
+
+/**
+ * Every W-2 that reported box 4, in document order.
+ *
+ * **Presence, never value.** A W-2 reporting `'0.00'` withholding is kept: it
+ * said something, and line 11 cites it. A W-2 with no box 4 at all is dropped
+ * entirely — it is not cited, and it does not count towards §6413(c)(1)'s
+ * employer count either, because an employer that withheld no Social Security
+ * tax cannot have contributed to an excess of it. This is the same
+ * presence-not-value rule `fjs/schedule/1`'s `earlyWithdrawalPenaltyLine`
+ * follows for 1099-INT box 2.
+ * @type {(forms: readonly Stored<W2>[]) => readonly BoxFourReading[]}
+ */
+const boxFourReadings = forms => forms.flatMap(form => {
+    const withheld = form.value.box4SocialSecurityTaxWithheld
+    return withheld === undefined ? [] : [{ form, withheld }]
+})
+
+/**
+ * The EMPLOYEE a reading belongs to — box a, the employee's own SSN. Each one
+ * gets a wage base of their own, so this is the key the excess is computed
+ * per. Named once and read twice (to enumerate the employees and to select
+ * each one's forms), so the two cannot drift apart: AGENTS.md's "one rule, one
+ * place".
+ * @type {(reading: BoxFourReading) => string}
+ */
+const employeeOf = reading => reading.form.value.recipientTin
+
+/**
+ * The EMPLOYER a reading belongs to — box b, the employer's EIN. §6413(c)(1)
+ * counts these, never documents.
+ * @type {(reading: BoxFourReading) => string}
+ */
+const employerOf = reading => reading.form.value.payerTin
+
+/**
+ * Line 11, excess Social Security tax withheld: what §31(b) allows as a
+ * payment because §6413(c)(1) allows it as a special refund.
+ *
+ * Each employer withholds §3101(a)'s 6.2% up to the wage base **independently**
+ * — no employer knows what another paid — so an employee who changed jobs or
+ * held two at once can have more than the annual maximum taken out of wages
+ * that were never above the base in total. §6413(c)(1) gives that surplus
+ * back, and §31(b) delivers it as a credit against the income tax rather than
+ * as a separate claim, which is why it lands on Schedule 3 Part II beside the
+ * withholding and not among the credits in Part I.
+ *
+ * Three things here are statute rather than arithmetic, and each one is a way
+ * "sum the boxes and subtract the cap" gets a real refund wrong:
+ *
+ * **1. More than one employer, or nothing.** §6413(c)(1) opens *"if by reason
+ * of an employee receiving wages from more than one employer during a calendar
+ * year…"*. The instructions say the same thing the other way round: *"If any
+ * one employer withheld too much social security or tier 1 RRTA tax, you can't
+ * claim the excess as a credit against your income tax. Your employer should
+ * adjust the excess for you."* A single employer's over-withholding is the
+ * employer's to refund under Reg. §31.6413(a)-1, and paying it here as well
+ * would pay it twice. So a lone employer's box 4 can be any figure at all and
+ * this line stays zero.
+ *
+ * **2. Employers are counted by `payerTin`, never by document.** A corrected
+ * form, a successor filing, or simply two W-2s from one EIN do not create a
+ * second wage base.
+ *
+ * **3. The base is per EMPLOYEE, so a joint return gets two of them.**
+ * §6413(c)(1) is written about "an employee", and a married couple filing
+ * jointly are two. One shared cap would understate the refund by up to the
+ * whole maximum. The grouping key is the W-2's own `recipientTin` — box a, the
+ * employee's SSN — and NOT the return profile, which carries no TIN at all.
+ * That is also why this line needs no answer to "which spouse does this W-2
+ * belong to", the question `fjs/form8880` refuses a joint return for being
+ * unable to answer: the form itself says whose it is.
+ *
+ * **Every W-2 carrying box 4 is cited, including one whose employee did not
+ * clear the two-employer gate.** The cited set is the set that was READ, and a
+ * reader told the line is zero is owed the boxes that produced the zero.
+ * @type {(taxParamSet: TaxParamSet) => (profile: Stored<ReturnProfile>) => (w2Forms: readonly Stored<W2>[]) => ReportLine}
+ */
+const excessSocialSecurityWithheldLine = taxParamSet => profile => w2Forms => {
+    const rule = 'Schedule 3 line 11 (excess Social Security tax withheld -> 1040 line 31)'
+    const readings = boxFourReadings(w2Forms)
+    /** @type {readonly Source[]} */
+    const sources = readings.map(reading => ({
+        documentHash: reading.form.documentHash,
+        boxPath: 'box4SocialSecurityTaxWithheld',
+        value: reading.withheld,
+    }))
+    const maximum = socialSecurityWithholdingMaximum(taxParamSet)
+    const employees = distinct(readings.map(employeeOf))
+    const value = employees.reduce((total, employee) => {
+        const theirs = readings.filter(reading => employeeOf(reading) === employee)
+        const employers = distinct(theirs.map(employerOf))
+        if (employers.length < 2) {
+            return total
+        }
+        const withheld = theirs.reduce(
+            (sum, reading) => sum + centsFromString(reading.withheld), 0n)
+        // The `>` below is an EQUIVALENT MUTANT under `>=`, and that is
+        // recorded here rather than left for the next reader to rediscover
+        // (AGENTS.md, "the equivalent mutant"). The two operators differ at
+        // exactly one input, `withheld === maximum`, and at that input the
+        // subtraction in the other arm yields `0n` — the same value the `0n`
+        // arm yields. The neighbouring arithmetic absorbs the whole
+        // comparison, so `>=` cannot turn any leaf red at any input.
+        //
+        // What the comparison DOES carry is the floor, and that is not
+        // absorbed: dropping the ternary entirely reddens
+        // `twoEmployersUnderTheMaximumIsZero`, which would otherwise return a
+        // NEGATIVE payment. The two boundary leaves pin the maximum itself —
+        // `maximum + 1n` and `maximum - 1n` each redden six and seven leaves.
+        return total + (withheld > maximum ? withheld - maximum : 0n)
+    }, 0n)
+    return documentLine(profile)(rule)(value)(sources)
+}
 
 // ── Schedule 3 itself ───────────────────────────────────────────────────────
 
@@ -641,9 +813,11 @@ export const scheduleThree = taxParamSet => input => {
     // ── Part II: Other Payments and Refundable Credits ──────────────────
     const line9 = zero('Schedule 3 line 9 (net premium tax credit, Form 8962)')
     const line10 = zero('Schedule 3 line 10 (amount paid with request for extension to file)')
-    // 11. Excess Social Security/tier-1 RRTA tax withheld -- see this
-    //     module's own docstring, "Line 11 ... a DIFFERENT boundary".
-    const line11 = zero('Schedule 3 line 11 (excess Social Security/tier-1 RRTA tax withheld -- theoretically W-2-derivable, out of this phase\'s scope)')
+    // 11. Excess Social Security tax withheld -- §31(b) via §6413(c)(1), read
+    //     off Form W-2 box 4. The hard zero is REPLACED, not supplemented:
+    //     there is no `zero(...)` call here, and on a return carrying box 4
+    //     this line does not cite `declaredKinds` at all.
+    const line11 = excessSocialSecurityWithheldLine(taxParamSet)(profile)(w2Forms)
     const line12 = zero('Schedule 3 line 12 (federal fuel tax credit, Form 4136)')
     // 13a-13z. "Other payments or refundable credits" -- a collapsed
     // stand-in for five sub-lines.
@@ -758,6 +932,57 @@ const w2WithBox12 = code => amount => ({
     },
 })
 
+/**
+ * A stored Form W-2 carrying box 3 wages and, usually, box 4 Social Security
+ * tax — the line 11 fixture.
+ *
+ * Every parameter is a parameter for a reason line 11 can get wrong:
+ *
+ * - `hash`, because the citation contract is ONE source per contributing
+ *   document, and a fixture reusing one hash could not tell "two documents
+ *   summed" from "one document counted twice".
+ * - `payerTin`, because §6413(c)(1) counts EMPLOYERS, and two forms from one
+ *   EIN are one employer.
+ * - `recipientTin`, because the wage base is per EMPLOYEE, and a joint return
+ *   has two.
+ * - `wages` (box 3) is always present and always equals `tax / 6.2%` to the
+ *   cent, so that a mutation transposing the box READ produces a wrong number
+ *   rather than the same one. A fixture that left box 3 out would make that
+ *   whole class of defect invisible.
+ * - `tax` is `undefined` for the "this employer reported no box 4" case,
+ *   which is a different fact from a reported `'0.00'` and is cited
+ *   differently.
+ * @type {(hash: string) => (payerTin: string) => (recipientTin: string) => (wages: string) => (tax: string | undefined) => Stored<W2>}
+ */
+const w2WithSocialSecurity = hash => payerTin => recipientTin => wages => tax => ({
+    documentHash: hash,
+    value: {
+        dialect: 'vnd.fjs.w2',
+        payerTin,
+        recipientTin,
+        accountNumber: '',
+        taxYear: 2025,
+        formRevision: '2025',
+        box3SocialSecurityWages: wages,
+        ...(tax === undefined ? {} : { box4SocialSecurityTaxWithheld: tax }),
+    },
+})
+
+/** The taxpayer's own SSN in every line 11 fixture. @type {string} */
+const taxpayerSsn = '222-22-2222'
+
+/** The spouse's, used only by the joint-return leaf. @type {string} */
+const spouseSsn = '333-33-3333'
+
+/**
+ * Schedule 3 line 11 over a set of Forms W-2 and nothing else.
+ *
+ * Every other input is `baseInput`'s empty case, so a non-zero line 11 can
+ * only have come from the box under test.
+ * @type {(w2Forms: readonly Stored<W2>[]) => ReportLine}
+ */
+const lineEleven = w2Forms => okResult(compute(baseInput({ w2Forms }))).line11
+
 /** Hand-typed: the number of box-12 codes Form 8880 line 2 reads. NOT
  * `electiveDeferralBox12Codes.length` — a code silently dropped would take
  * its own generated coverage with it (AGENTS.md's hand-typed-count idiom).
@@ -829,11 +1054,16 @@ export const proof = {
                 assertEq(line.sources[0]?.boxPath, 'declaredKinds', field)
             }
         },
-        // Line 11's own boundary, unchanged by this phase: a documented zero,
-        // never a computation over the stored W-2 box 4 figures that could
-        // support one. Asserted with a W-2 actually present, which is the
-        // only input at which the claim can be observed at all.
-        lineElevenIsStillADocumentedZeroEvenWithAW2Present: () => {
+        // CORRECTED, not deleted. This leaf used to be called
+        // `lineElevenIsStillADocumentedZeroEvenWithAW2Present` and asserted
+        // line 11's old boundary: "this module now reads W-2s, and line 11
+        // still does not." It does now. What survives is the half that is
+        // still true and still worth pinning — a W-2 carrying box 12 and NO
+        // box 4 leaves line 11 a profile-cited zero, because the filter is on
+        // the BOX, not on the dialect. Renamed so the name states what it
+        // proves; the value assertions are unchanged and the line-4 contrast
+        // is kept, since it is what makes the W-2 demonstrably in scope.
+        lineElevenIgnoresAW2ThatNeverReportedBoxFour: () => {
             const result = okResult(compute(baseInput({
                 w2Forms: [w2WithBox12('D')('1000.00')],
                 creditForms: [creditsDocument({
@@ -848,8 +1078,241 @@ export const proof = {
             assertEq(result.line11.sources.length, 1, 'line 11 cites exactly the profile, never a W-2 box')
             assertEq(result.line11.sources[0]?.boxPath, 'declaredKinds')
             // …while line 4, on the SAME W-2, is real. The contrast is the
-            // point: this module now reads W-2s, and line 11 still does not.
+            // point: the W-2 is unquestionably in scope, and line 11 still
+            // declines to cite it, because it reported no box 4.
             assert(result.line4.value > 0n, ['line 4 must be real', result.line4])
+        },
+    },
+
+    // ── Line 11: excess Social Security tax withheld (§31(b)/§6413(c)(1)) ──
+    //
+    // Every expected value below is a hand-typed cent literal with its dollar
+    // figure in the assertion message, never derived from the sum under test.
+    // The maximum those figures straddle — $176,100.00 x 6.2% = $10,918.20 —
+    // is likewise never computed here: the two boundary leaves pin it to the
+    // cent from outside, one at exactly the maximum and one a penny over.
+    //
+    // Value and citation are asserted by SEPARATE leaves. A line that summed
+    // correctly while citing nothing and a line that cited correctly while
+    // summing zero are different defects, and one leaf could not tell them
+    // apart.
+    lineEleven: {
+        // §6413(c)(1)'s gate, first, because every other leaf depends on it
+        // being open. ONE employer, under the maximum: nothing to refund, and
+        // the document still cited because the box was read.
+        oneEmployerUnderTheMaximumIsZeroAndStillCitesItsW2: () => {
+            const line = lineEleven([
+                w2WithSocialSecurity('sha256-w2-a')('11-1111111')(taxpayerSsn)('100000.00')('6200.00'),
+            ])
+            assertEq(line.value, 0n, '$6,200.00 withheld, well under $10,918.20')
+            assertEq(line.sources.length, 1, 'the document, not the profile')
+            assertEq(
+                line.sources[0]?.boxPath, 'box4SocialSecurityTaxWithheld',
+                'the box that was read')
+        },
+        // The control the gate needs: a single employer who withheld MORE
+        // than the annual maximum. Reg. §31.6413(a)-1 makes that the
+        // employer's to refund, so claiming it here would claim it twice.
+        // Without this leaf, dropping the two-employer test entirely would go
+        // unnoticed on every fixture in this block.
+        oneEmployerOverTheMaximumIsStillZeroBecauseSixFourOneThreeCNeedsTwo: () => {
+            const line = lineEleven([
+                w2WithSocialSecurity('sha256-w2-a')('11-1111111')(taxpayerSsn)('193548.39')('12000.00'),
+            ])
+            assertEq(
+                line.value, 0n,
+                '$12,000.00 from ONE employer is that employer\'s to refund, never Schedule 3\'s')
+            assertEq(line.sources.length, 1, 'and the box is still cited, so the zero is explicable')
+        },
+        // Two employers, combined UNDER the maximum. The floor at zero is
+        // what makes this leaf zero rather than -$5,958.20, and it is the
+        // only fixture in the block where a missing floor would leak.
+        twoEmployersUnderTheMaximumIsZero: () => {
+            const line = lineEleven([
+                w2WithSocialSecurity('sha256-w2-a')('11-1111111')(taxpayerSsn)('48000.00')('2976.00'),
+                w2WithSocialSecurity('sha256-w2-b')('22-2222222')(taxpayerSsn)('32000.00')('1984.00'),
+            ])
+            assertEq(line.value, 0n, '$2,976.00 + $1,984.00 = $4,960.00, under $10,918.20')
+            assertEq(line.sources.length, 2, 'both documents cited even though the answer is zero')
+        },
+        // The main case: two employers, combined over the maximum.
+        twoEmployersOverTheMaximumRefundTheExcess: () => {
+            const line = lineEleven([
+                w2WithSocialSecurity('sha256-w2-a')('11-1111111')(taxpayerSsn)('100000.00')('6200.00'),
+                w2WithSocialSecurity('sha256-w2-b')('22-2222222')(taxpayerSsn)('96000.00')('5952.00'),
+            ])
+            assertEq(
+                line.value, 123380n,
+                '$6,200.00 + $5,952.00 = $12,152.00, less $10,918.20, is $1,233.80')
+        },
+        // The SAME fixture, citations only — the separate-leaf rule.
+        theSameTwoEmployersAreCitedOncePerDocumentAtTheBoxThatWasRead: () => {
+            const line = lineEleven([
+                w2WithSocialSecurity('sha256-w2-a')('11-1111111')(taxpayerSsn)('100000.00')('6200.00'),
+                w2WithSocialSecurity('sha256-w2-b')('22-2222222')(taxpayerSsn)('96000.00')('5952.00'),
+            ])
+            assertEq(line.sources.length, 2, 'one source per contributing document')
+            assertEq(
+                line.sources.map(source => source.documentHash).join(','),
+                'sha256-w2-a,sha256-w2-b',
+                'both documents cited, in document order')
+            for (const source of line.sources) {
+                assertEq(
+                    source.boxPath, 'box4SocialSecurityTaxWithheld',
+                    'box 4, never box 3 and never the profile')
+            }
+            assertEq(
+                line.sources.map(source => source.value).join(','), '6200.00,5952.00',
+                'each source carries the printed string its own form reported')
+        },
+        // Boundary, exactly at the maximum. $100,000.00 + $76,100.00 is the
+        // wage base to the dollar, so this is the largest correctly withheld
+        // pair that exists.
+        exactlyAtTheMaximumIsZero: () => {
+            const line = lineEleven([
+                w2WithSocialSecurity('sha256-w2-a')('11-1111111')(taxpayerSsn)('100000.00')('6200.00'),
+                w2WithSocialSecurity('sha256-w2-b')('22-2222222')(taxpayerSsn)('76100.00')('4718.20'),
+            ])
+            assertEq(line.value, 0n, '$6,200.00 + $4,718.20 = $10,918.20 exactly — nothing is excess')
+        },
+        // Boundary, one cent over. The pair above with seventeen more cents
+        // of wages at the second employer.
+        oneCentOverTheMaximumRefundsOneCent: () => {
+            const line = lineEleven([
+                w2WithSocialSecurity('sha256-w2-a')('11-1111111')(taxpayerSsn)('100000.00')('6200.00'),
+                w2WithSocialSecurity('sha256-w2-b')('22-2222222')(taxpayerSsn)('76100.17')('4718.21'),
+            ])
+            assertEq(line.value, 1n, '$10,918.21 less $10,918.20 is $0.01')
+        },
+        // A W-2 with NO box 4 neither contributes nor is cited — and, just as
+        // importantly, does not count as an employer. Three forms, three
+        // EINs, and the answer is the two-employer answer.
+        aW2WithNoBoxFourIsNeitherSummedNorCitedNorCountedAsAnEmployer: () => {
+            const line = lineEleven([
+                w2WithSocialSecurity('sha256-w2-a')('11-1111111')(taxpayerSsn)('100000.00')('6200.00'),
+                w2WithSocialSecurity('sha256-w2-b')('22-2222222')(taxpayerSsn)('96000.00')('5952.00'),
+                w2WithSocialSecurity('sha256-w2-c')('33-3333333')(taxpayerSsn)('5000.00')(undefined),
+            ])
+            assertEq(line.value, 123380n, 'the same $1,233.80 the two box-4 forms produce alone')
+            assertEq(line.sources.length, 2, 'the third form is not cited')
+            assertEq(
+                line.sources.map(source => source.documentHash).join(','),
+                'sha256-w2-a,sha256-w2-b',
+                'and it is the third form specifically that is absent')
+        },
+        // The presence-not-value rule, as two leaves. A box that is absent
+        // and a box present and zero are the same NUMBER and different FACTS;
+        // only the citation tells them apart.
+        aZeroBoxFourStillCitesItsDocument: () => {
+            const line = lineEleven([
+                w2WithSocialSecurity('sha256-w2-a')('11-1111111')(taxpayerSsn)('0.00')('0.00'),
+            ])
+            assertEq(line.value, 0n, 'a reported zero withholding')
+            assertEq(line.sources.length, 1, 'the document, not the profile')
+            assertEq(
+                line.sources[0]?.boxPath, 'box4SocialSecurityTaxWithheld',
+                'the form reported the box, so the form is what is cited')
+        },
+        noW2AtAllIsAProfileCitedZero: () => {
+            const line = lineEleven([])
+            assertEq(line.value, 0n, 'no Form W-2 at all')
+            assertEq(line.sources.length, 1, 'the profile citation only')
+            assertEq(
+                line.sources[0]?.boxPath, 'declaredKinds',
+                'a computed zero cites the profile, never a document the taxpayer lacks')
+        },
+        // Two W-2s from ONE employer are one employer. Same EIN, same
+        // employee, combined well over the maximum — and no refund, because
+        // §6413(c)(1) needs "more than one employer" and this is not two.
+        twoW2sFromOneEmployerAreOneEmployer: () => {
+            const line = lineEleven([
+                w2WithSocialSecurity('sha256-w2-a')('11-1111111')(taxpayerSsn)('100000.00')('6200.00'),
+                w2WithSocialSecurity('sha256-w2-b')('11-1111111')(taxpayerSsn)('96000.00')('5952.00'),
+            ])
+            assertEq(
+                line.value, 0n,
+                '$12,152.00 through one EIN — a corrected or successor form, not a second job')
+            assertEq(line.sources.length, 2, 'both documents are still cited')
+        },
+        // The wage base is per EMPLOYEE. Two spouses, two employers each, and
+        // the answer is the SUM OF TWO SEPARATE excesses — not one excess
+        // over one shared maximum, which for this fixture would be
+        // $23,312.00 - $10,918.20 = $12,393.80, ten times too much.
+        aJointReturnGetsOneWageBasePerSpouse: () => {
+            const line = okResult(compute(baseInput({
+                status: 'marriedFilingJointly',
+                w2Forms: [
+                    w2WithSocialSecurity('sha256-w2-a')('11-1111111')(taxpayerSsn)('100000.00')('6200.00'),
+                    w2WithSocialSecurity('sha256-w2-b')('22-2222222')(taxpayerSsn)('96000.00')('5952.00'),
+                    w2WithSocialSecurity('sha256-w2-c')('33-3333333')(spouseSsn)('90000.00')('5580.00'),
+                    w2WithSocialSecurity('sha256-w2-d')('44-4444444')(spouseSsn)('90000.00')('5580.00'),
+                ],
+            }))).line11
+            assertEq(
+                line.value, 147560n,
+                'the taxpayer\'s $1,233.80 plus the spouse\'s $241.80 is $1,475.60')
+            assertEq(line.sources.length, 4, 'all four documents cited')
+        },
+        // The other half of "per employee", and the case a real couple hits:
+        // two spouses with ONE employer each, whose combined withholding is
+        // over the maximum. Nothing is refundable — neither of them received
+        // wages from more than one employer, so §6413(c)(1) never opens. A
+        // return that pooled the two would hand back $1,481.80 that is not
+        // owed, which is why this leaf exists beside the joint one below.
+        twoSpousesWithOneEmployerEachRefundNothing: () => {
+            const line = okResult(compute(baseInput({
+                status: 'marriedFilingJointly',
+                w2Forms: [
+                    w2WithSocialSecurity('sha256-w2-a')('11-1111111')(taxpayerSsn)('100000.00')('6200.00'),
+                    w2WithSocialSecurity('sha256-w2-b')('22-2222222')(spouseSsn)('100000.00')('6200.00'),
+                ],
+            }))).line11
+            assertEq(
+                line.value, 0n,
+                '$12,400.00 between two people, one employer each — $0.00, not $1,481.80')
+            assertEq(line.sources.length, 2, 'and both documents are still cited')
+        },
+        // The spouse's half of that sum on its own, so the joint figure above
+        // is checkable by hand rather than only as a total.
+        theSpousesOwnExcessIsComputedFromTheSpousesOwnTwoEmployers: () => {
+            const line = lineEleven([
+                w2WithSocialSecurity('sha256-w2-c')('33-3333333')(spouseSsn)('90000.00')('5580.00'),
+                w2WithSocialSecurity('sha256-w2-d')('44-4444444')(spouseSsn)('90000.00')('5580.00'),
+            ])
+            assertEq(
+                line.value, 24180n,
+                '$5,580.00 + $5,580.00 = $11,160.00, less $10,918.20, is $241.80')
+        },
+        // Line 11 reaches Part II's total. Without this the line could be
+        // computed correctly and dropped on the way to 1040 line 31.
+        lineElevenReachesLineFifteen: () => {
+            const result = okResult(compute(baseInput({
+                w2Forms: [
+                    w2WithSocialSecurity('sha256-w2-a')('11-1111111')(taxpayerSsn)('100000.00')('6200.00'),
+                    w2WithSocialSecurity('sha256-w2-b')('22-2222222')(taxpayerSsn)('96000.00')('5952.00'),
+                ],
+            })))
+            assertEq(
+                result.line15.value, 123380n,
+                'lines 9, 10, 11, 12 and 14 with only line 11 non-zero -> 1040 line 31')
+            assert(
+                result.line15.sources.some(source => source.documentHash === 'sha256-w2-a'),
+                ['the total must carry line 11\'s own citations', result.line15.sources])
+        },
+        // The hard zero is REPLACED, not supplemented: on a return carrying
+        // box 4, line 11 does not mention `declaredKinds` at all. The control
+        // for `noW2AtAllIsAProfileCitedZero` above.
+        aRealLineElevenNeverCitesTheProfile: () => {
+            const line = lineEleven([
+                w2WithSocialSecurity('sha256-w2-a')('11-1111111')(taxpayerSsn)('100000.00')('6200.00'),
+                w2WithSocialSecurity('sha256-w2-b')('22-2222222')(taxpayerSsn)('96000.00')('5952.00'),
+            ])
+            assertEq(
+                line.sources.filter(source => source.boxPath === 'declaredKinds').length, 0,
+                'no `declaredKinds` source survives beside real document readings')
+            assertEq(
+                line.rule, 'Schedule 3 line 11 (excess Social Security tax withheld -> 1040 line 31)',
+                'and the rule names the printed line and where it goes')
         },
     },
 

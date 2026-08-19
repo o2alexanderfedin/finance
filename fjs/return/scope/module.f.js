@@ -503,6 +503,7 @@ export const modeledKinds = /** @type {const} */ ([
     'childTaxCreditOrOtherDependents', // Schedule 8812 Part I       -> 1040 line 19
     'educationCredits',            // Form 8863 line 19 -> Schedule 3 line 3 -> 1040 line 20
     'retirementSavingsContributionsCredit', // Form 8880 -> Schedule 3 line 4 -> 1040 line 20
+    'excessSocialSecurityWithheld', // W-2 box 4 -> Schedule 3 line 11 -> 1040 line 31
     'federalTaxWithheldOnW2',      // W-2 box 2                     -> 1040 line 25a
     'federalTaxWithheldOn1099Int', // 1099-INT box 4                -> 1040 line 25b
     'federalTaxWithheldOnOther1099', // 1099-R/1099-DIV/1099-B box 4 -> 1040 line 25b
@@ -852,18 +853,17 @@ export const unmodeledKindRefusals = /** @type {const} */ ([
     // as Part I's above. NONE of the five is reclassified by this phase or
     // any commit in it: TAX-25 and TAX-26 reach Part I's lines 3 and 4 only.
     //
-    // `excessSocialSecurityWithheld` is the row worth reading. Every other
-    // refusal in this whole table is unmodeled because no document this
-    // engine holds carries the figure. That one is different: `vnd.fjs.w2`
-    // box 4 already carries it, on every W-2 this engine stores, and the
-    // computation is a comparison against one indexed maximum. It is refused
-    // because it is not modeled, not because it is unmodelable -- a
-    // distinction the remedy says out loud, so a reader is not told to go and
-    // find a form that does not exist. `fjs/schedule/3`'s own docstring has
-    // recorded this boundary since Phase 13.
+    // `excessSocialSecurityWithheld` used to sit here and was the row worth
+    // reading: alone in this table, it was refused because it was not
+    // modeled rather than because it was unmodelable -- `vnd.fjs.w2` box 4
+    // already carried the figure on every W-2 this engine stores. It is
+    // MODELED now (Schedule 3 line 11), so the row is gone and no refusal in
+    // this table says "no form is missing" any more. What the row taught
+    // survives as a rule: a remedy must distinguish a missing FORM from a
+    // missing COMPUTATION, because only one of the two is something a
+    // taxpayer can act on.
     { kind: 'netPremiumTaxCredit', line: 'Schedule 3 line 9 -> 1040 line 31', label: 'the net premium tax credit', remedy: 'requires Form 8962 (no phase yet)' },
     { kind: 'amountPaidWithExtensionRequest', line: 'Schedule 3 line 10 -> 1040 line 31', label: 'the amount paid with a request for an extension to file', remedy: 'no dialect models it — there is no information return for a payment made with Form 4868 (no phase yet)' },
-    { kind: 'excessSocialSecurityWithheld', line: 'Schedule 3 line 11 -> 1040 line 31', label: 'excess Social Security and tier-1 RRTA tax withheld', remedy: 'no form is missing: this is computable from the Form W-2 box 4 figures this engine already stores, by comparing their sum against the annual Social Security wage-base maximum, and it is unmodeled only because no phase has yet stored that maximum or written the comparison (no phase yet)' },
     { kind: 'federalFuelTaxCredit', line: 'Schedule 3 line 12 -> 1040 line 31', label: 'the credit for federal tax paid on fuels', remedy: 'requires Form 4136 (no phase yet)' },
     { kind: 'otherPaymentsAndRefundableCredits', line: 'Schedule 3 line 13a-13z -> 1040 line 31', label: 'other payments or refundable credits', remedy: 'the printed form itself collapses five lettered sub-lines here and this engine models none of them (no phase yet)' },
     // ── The nine line-16 entries below matter more than they look ────────────
@@ -1361,7 +1361,7 @@ export const classifyScope = declaredKinds => {
  * and `fjs/form8995` wiring that makes all three computable.
  * @type {number}
  */
-const expectedModeledKindCount = 40
+const expectedModeledKindCount = 41
 
 /**
  * The modeled set, hand-typed a SECOND time and in {@link kindVocabulary}'s
@@ -1410,6 +1410,7 @@ const everyModeledKindHandTyped = [
     'childTaxCreditOrOtherDependents',
     'educationCredits',
     'retirementSavingsContributionsCredit',
+    'excessSocialSecurityWithheld',
     'federalTaxWithheldOnW2',
     'federalTaxWithheldOn1099Int',
     'federalTaxWithheldOnOther1099',
@@ -1499,7 +1500,7 @@ const everyModeledKindHandTyped = [
  * that makes it computable.
  * @type {number}
  */
-const expectedUnmodeledKindCount = 74
+const expectedUnmodeledKindCount = 73
 
 /**
  * The complete refusal message for a return declaring exactly
@@ -2409,6 +2410,12 @@ export const proof = {
                 outcome.kind, 'ok',
                 ['Schedule 2 line 13\'s kind alone must be in scope', outcome])
         },
+        excessSocialSecurityWithheldIsInScopeAlone: () => {
+            const outcome = classifyScope(['excessSocialSecurityWithheld'])
+            assertEq(
+                outcome.kind, 'ok',
+                ['Schedule 3 line 11\'s kind alone must be in scope', outcome])
+        },
         // TAX-30, Phase 27: the SIX Schedule 1 Part I kinds this phase did NOT
         // wire must still refuse on their own, or the split quietly widened
         // the engine's claims rather than named them. The SAME property the
@@ -2701,11 +2708,11 @@ export const proof = {
                 'otherNonrefundableCredits',
                 'netPremiumTaxCredit',
                 'amountPaidWithExtensionRequest',
-                'excessSocialSecurityWithheld',
                 'federalFuelTaxCredit',
                 'otherPaymentsAndRefundableCredits',
             ]
-            assertEq(stillRefused.length, 10, 'twelve Schedule 3 kinds minus the two this phase wired')
+            assertEq(stillRefused.length, 9,
+                'twelve Schedule 3 kinds minus the two this phase wired and line 11')
             for (const kind of stillRefused) {
                 const outcome = classifyScope([kind])
                 assert(
@@ -2734,19 +2741,6 @@ export const proof = {
             assert(
                 premium.message.includes('1040 line 31'),
                 ['it must name the REFUNDABLE 1040 line it reaches', premium.message],
-            )
-            // And the one whose remedy says NO FORM IS MISSING — the only row
-            // in this whole table that can. A remedy rewritten to "requires
-            // Form NNNN" would be a lie a reader would act on.
-            const excess = classifyScope(['excessSocialSecurityWithheld'])
-            assert(excess.kind === 'error', ['excess Social Security must still refuse', excess])
-            assert(
-                excess.message.includes('no form is missing'),
-                ['this refusal must say that no form is missing', excess.message],
-            )
-            assert(
-                excess.message.includes('box 4'),
-                ['and must name the box it could already read', excess.message],
             )
         },
         // The gate. Its control is the leaf immediately below, which is this

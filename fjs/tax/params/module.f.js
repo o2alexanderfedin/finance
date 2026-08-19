@@ -1080,6 +1080,53 @@ export const additionalMedicareTaxRates = {
 }
 
 /**
+ * The employee's Social Security tax rate — IRC **§3101(a)**, 6.2%, in BASIS
+ * POINTS. Schedule 3 line 11 multiplies {@link selfEmploymentTax}'s
+ * `socialSecurityWageBase` by it to obtain the maximum any ONE employer may
+ * withhold, $10,918.20 for TY2025.
+ *
+ * Placed beside {@link additionalMedicareTaxRates} because the two are
+ * subsections of ONE section: §3101(a) is the Social Security half of FICA
+ * and §3101(b) the Medicare half. Nothing else in this module reads chapter
+ * 21 at all.
+ *
+ * **This is NOT half of {@link selfEmploymentTax}'s 12.4%, and storing it
+ * separately is the point.** §1401(a) imposes 12.4% on a self-employed
+ * person's net earnings (chapter 2, SECA); §3101(a) imposes 6.2% on an
+ * employee's wages (chapter 21, FICA), with §3111(a) imposing the matching
+ * 6.2% on the employer. Each statute writes its own number outright. That the
+ * three are related 1:2 today is arithmetic, not law, and a derived 620 would
+ * be a second copy of a rule no statute states — the
+ * {@link additionalMedicareTaxThreshold}-versus-{@link netInvestmentIncomeTaxThreshold}
+ * position this module already takes three times, for the same reason. The
+ * contrast worth holding beside it is §1402(a)(12), which this module cites as
+ * the reason 92.35% is DERIVED rather than stored: there the statute performs
+ * the derivation itself, and here no statute does.
+ *
+ * **NOT indexed.** §3101(a) has read "6.2 percent" since 1990. The figure that
+ * moves with inflation is the wage base it multiplies, which lives in
+ * {@link selfEmploymentTax} and carries that warning in its own docstring.
+ *
+ * Basis points rather than `ratePercent` for the exactness reason
+ * {@link additionalMedicareTaxRates} states in full: 6.2 is not a whole number
+ * of percent, and `0.062` is not exact as an IEEE 754 double. The consumer
+ * multiplies by `basisPoints / 10000` through `fjs/types/rational`, cent-exact
+ * and half-up — never through a float. `kind: 'code'` for the same reason
+ * §3101(b)'s citation is: the statute states the rate, and no Revenue
+ * Procedure adjusts it.
+ * @type {{
+ *   readonly employeeRateBasisPoints: number,
+ *   readonly citation: Citation,
+ * }}
+ */
+export const socialSecurityTaxWithholding = {
+    // 6.2% — IRC §3101(a), the tax an employer withholds from box 3 wages and
+    // reports in Form W-2 box 4.
+    employeeRateBasisPoints: 620,
+    citation: { kind: 'code', section: '§3101(a)', effectiveDate: '2025-01-01' },
+}
+
+/**
  * Form 8960's Net Investment Income Tax thresholds — IRC **§1411(b)**,
  * TAX-21, Phase 23. The 3.8% tax applies to the LESSER of net investment
  * income and the excess of §1411's own modified adjusted gross income over
@@ -2367,6 +2414,7 @@ export const alternativeMinimumTax = {
  *   readonly earnedIncomeCredit: typeof earnedIncomeCredit,
  *   readonly additionalMedicareTaxThreshold: typeof additionalMedicareTaxThreshold,
  *   readonly additionalMedicareTaxRates: typeof additionalMedicareTaxRates,
+ *   readonly socialSecurityTaxWithholding: typeof socialSecurityTaxWithholding,
  *   readonly netInvestmentIncomeTaxThreshold: typeof netInvestmentIncomeTaxThreshold,
  *   readonly netInvestmentIncomeTaxRateBasisPoints: typeof netInvestmentIncomeTaxRateBasisPoints,
  *   readonly studentLoanInterestDeduction: typeof studentLoanInterestDeduction,
@@ -2406,6 +2454,7 @@ export const taxParamsByYear = {
         earnedIncomeCredit,
         additionalMedicareTaxThreshold,
         additionalMedicareTaxRates,
+        socialSecurityTaxWithholding,
         netInvestmentIncomeTaxThreshold,
         netInvestmentIncomeTaxRateBasisPoints,
         studentLoanInterestDeduction,
@@ -2779,6 +2828,45 @@ export const proof = {
                 ],
             )
         }
+    },
+    // §3101(a)'s 6.2%, in the statute's own words, with its citation asserted
+    // SEPARATELY from its value — a rate that is right while citing the wrong
+    // section and a rate that is wrong while citing the right one are
+    // different defects.
+    theEmployeeSocialSecurityRateIsSectionThirtyOneOhOnesOwnSixPointTwo: () => {
+        assertEq(
+            socialSecurityTaxWithholding.employeeRateBasisPoints, 620,
+            '6.2% — IRC §3101(a), the rate an employer withholds into Form W-2 box 4')
+        assertEq(socialSecurityTaxWithholding.citation.kind, 'code')
+        assertEq(socialSecurityTaxWithholding.citation.section, '§3101(a)')
+        assertEq(socialSecurityTaxWithholding.citation.effectiveDate, '2025-01-01')
+        // The unit test this module applies to every other rate: 6.2 is not a
+        // whole number of percent, so basis points are what make it exact.
+        assert(
+            socialSecurityTaxWithholding.employeeRateBasisPoints % 100 !== 0,
+            ['§3101(a)\'s rate IS a whole number of percent — revisit the unit',
+                socialSecurityTaxWithholding.employeeRateBasisPoints])
+    },
+    // The product, checked against a figure NEITHER stored parameter
+    // produced: the 2025 Schedule 3 instructions for line 11 print the
+    // maximum outright as **$10,918.20**, and that is what is hand-typed
+    // here. Two stored parameters multiplied together are not evidence about
+    // either one until something outside this module says what the answer
+    // should be — the idiom `fjs/schedule/se`'s 0.9235 leaf uses, applied to
+    // the pair §3121(a)(1) actually needs.
+    //
+    // It is also the leaf that notices the SHARED wage base moving. §1402(b)(1)
+    // and §3121(a)(1) both defer to one Social Security Act §230 base, so
+    // `selfEmploymentTax.socialSecurityWageBase` is read by chapter 2 AND
+    // chapter 21; a TY2026 figure dropped in without revisiting this line
+    // would silently change a refund on Schedule 3 line 11.
+    theSocialSecurityWithholdingMaximumIsTheInstructionsOwnFigure: () => {
+        const maximum = halfUp(of(
+            centsFromString(selfEmploymentTax.socialSecurityWageBase.amount)
+            * BigInt(socialSecurityTaxWithholding.employeeRateBasisPoints))(10000n))
+        assertEq(
+            centsToString(maximum), '10918.20',
+            '$176,100.00 x 6.2% — the 2025 Schedule 3 line 11 instructions print $10,918.20')
     },
     // T-08-02: every stored dollar amount is a `string`, never a JSON
     // number, and round-trips exactly through
