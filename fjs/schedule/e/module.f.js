@@ -225,6 +225,9 @@
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
 import { centsFromString } from '../../exact/module.f.js'
 import { materialParticipationNamed } from '../../document/k1_common/module.f.js'
+// The ONE code this schedule's coded sweep lets through on the 1041 face, read
+// from the module that computes it. See {@link estateTrustCodedBoxes}.
+import { line2jCodes } from '../../form6251/estate_trust/module.f.js'
 
 /** @import { ReturnProfile } from '../../return/profile/module.f.js' */
 /** @import { K1Partnership } from '../../document/k1_1065/module.f.js' */
@@ -956,7 +959,8 @@ export const sCorporationRow = document => {
 }
 
 /**
- * The `vnd.fjs.k1_1041` coded boxes, and the codes let through: **none**.
+ * The `vnd.fjs.k1_1041` coded boxes, and the codes let through: **box 12's code
+ * A, and nothing else.**
  *
  * Box 9's codes A, B and C are directly apportioned deductions — depreciation,
  * depletion and amortization — which page 2 routes to line 33 column (c) or
@@ -964,14 +968,32 @@ export const sCorporationRow = document => {
  * therefore swept like every other coded amount rather than passed through:
  * letting one ride into column (d) or (f) would enter a deduction as income.
  *
- * Boxes 11, 12, 13 and 14 are the final-year deductions, the AMT items, the
- * credits and *other information*; none has a destination on this schedule at
- * all.
+ * **Box 12 code A is the one code this table lets through, and it is not read
+ * on this schedule at all** — it is Form 6251 line 2j, whose printed caption
+ * names the box and the code outright: *"Estates and trusts (amount from
+ * Schedule K-1 (Form 1041), box 12, code A)"*. The pass-through list is
+ * {@link line2jCodes}, **imported rather than restated**, so the gate cannot
+ * open wider than the computation that reads it — the sweep's job here is to
+ * refuse an item nothing routes, and one list is what makes "nothing routes it"
+ * a checkable claim rather than two opinions (AGENTS.md, "one rule, one
+ * place").
+ *
+ * Box 12's other NINE codes still refuse, and for two different reasons worth
+ * keeping apart: codes B-F are *"the portion, if any, of the amount included in
+ * code A"* (`i1041sk1.pdf`) bound for Part III's AMT capital-gain worksheets,
+ * which `fjs/form6251/part3` does not refigure per K-1; codes G, H and I are
+ * accelerated depreciation, depletion and amortization, which belong on Form
+ * 6251 lines 2l, 2d and their neighbours — every one a documented zero with its
+ * own live `fjs/return/scope` kind. Code J is not a Form 6251 item at all: it
+ * feeds the following year's Form 8801.
+ *
+ * Boxes 11, 13 and 14 are the final-year deductions, the credits and *other
+ * information*; none has a destination this engine computes.
  */
 const estateTrustCodedBoxes = /** @type {const} */ ([
     ['box9DirectlyApportionedDeductions', 'box 9', /** @type {readonly string[]} */ ([])],
     ['box11FinalYearDeductions', 'box 11', /** @type {readonly string[]} */ ([])],
-    ['box12AlternativeMinimumTaxItems', 'box 12', /** @type {readonly string[]} */ ([])],
+    ['box12AlternativeMinimumTaxItems', 'box 12', line2jCodes],
     ['box13CreditsAndCreditRecapture', 'box 13', /** @type {readonly string[]} */ ([])],
     ['box14OtherInformation', 'box 14', /** @type {readonly string[]} */ ([])],
 ])
@@ -1683,20 +1705,29 @@ export const proof = {
          * separate-statement rule. Hand-typed count beside the loop, so a box
          * dropped from `estateTrustCodedBoxes` fails here even though the loop
          * would happily iterate one fewer.
+         *
+         * **The CODE is per box, and box 12's is `G` rather than `A`.** Box 12
+         * code A is Form 6251 line 2j and is now routed, so driving this box
+         * with `A` would be driving it with the one code the sweep is supposed
+         * to let past — the leaf would then be asserting the opposite of the
+         * rule. `G` is accelerated depreciation, a Form 6251 line 2l item this
+         * engine holds at a documented zero, and it still refuses. The pair
+         * below (`boxTwelveCodeAIsRoutedAndEveryOtherCodeRefuses`) is where the
+         * routed code is proved separately.
          */
         allFiveCodedBoxesRefuseByNameCitingSection652b: () => {
-            /** @type {readonly (readonly [keyof K1EstateTrust, string])[]} */
+            /** @type {readonly (readonly [keyof K1EstateTrust, string, string])[]} */
             const codedBoxes = [
-                ['box9DirectlyApportionedDeductions', 'box 9'],
-                ['box11FinalYearDeductions', 'box 11'],
-                ['box12AlternativeMinimumTaxItems', 'box 12'],
-                ['box13CreditsAndCreditRecapture', 'box 13'],
-                ['box14OtherInformation', 'box 14'],
+                ['box9DirectlyApportionedDeductions', 'box 9', 'A'],
+                ['box11FinalYearDeductions', 'box 11', 'A'],
+                ['box12AlternativeMinimumTaxItems', 'box 12', 'G'],
+                ['box13CreditsAndCreditRecapture', 'box 13', 'A'],
+                ['box14OtherInformation', 'box 14', 'A'],
             ]
             assertEq(codedBoxes.length, 5, 'the printed Form 1041 K-1 has five coded boxes')
-            for (const [field, printedBox] of codedBoxes) {
+            for (const [field, printedBox, code] of codedBoxes) {
                 const message = refusal(run({
-                    estateTrustK1Forms: [estateTrustDoc({ [field]: [{ code: 'A', amount: '500.00' }] })],
+                    estateTrustK1Forms: [estateTrustDoc({ [field]: [{ code, amount: '500.00' }] })],
                 })).message
                 assert(message.includes(printedBox), ['a coded refusal must name its printed box', printedBox, message])
                 assert(message.includes('§652(b)/§662(b)'), ['expected the beneficiary statute', printedBox, message])
@@ -1714,6 +1745,80 @@ export const proof = {
                 })).parts.line33f.value,
                 8000000n,
             )
+        },
+
+        /**
+         * **The gate this schedule opened for Form 6251 line 2j, and its
+         * control.** Box 12 code A is routed — the beneficiary's row still
+         * computes, and the $80,000.00 share still reaches line 33 column (f)
+         * beside it — while box 12's other NINE codes still refuse by name.
+         *
+         * The nine codes are HAND-TYPED here and NOT read from `line2jCodes`,
+         * per AGENTS.md: a list derived from the code under test cannot notice
+         * itself growing. Adding any of them to the routed list reddens this
+         * leaf and `fjs/form6251/estate_trust`'s own arithmetic leaf together.
+         *
+         * A gate that let EVERY code through would pass the first half of this
+         * leaf and fail the second; a gate that let NONE through — the state
+         * before this work — fails the first.
+         */
+        boxTwelveCodeAIsRoutedAndEveryOtherCodeRefuses: () => {
+            // Routed: no refusal, and the rest of the row is untouched.
+            const routed = ok(run({
+                estateTrustK1Forms: [estateTrustDoc({
+                    box12AlternativeMinimumTaxItems: [{ code: 'A', amount: '75000.00' }],
+                })],
+            }))
+            assertEq(routed.parts.beneficiaryRows.length, 1, 'the beneficiary row still computes')
+            assertEq(
+                routed.parts.line33f.value, 8000000n,
+                'and box 6\'s $80,000.00 still reaches column (f) beside the AMT item')
+            /** @type {readonly string[]} */
+            const stillRefused = ['B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J']
+            assertEq(stillRefused.length, 9, 'box 12 prints ten codes and exactly one of them is line 2j')
+            for (const code of stillRefused) {
+                const message = refusal(run({
+                    estateTrustK1Forms: [estateTrustDoc({
+                        box12AlternativeMinimumTaxItems: [{ code, amount: '500.00' }],
+                    })],
+                })).message
+                assert(message.includes('box 12'), ['name the printed box', code, message])
+                assert(message.includes(code), ['name the code that refused', code, message])
+            }
+        },
+
+        /**
+         * **The gate is the STRICTER of the two code matchers, deliberately.**
+         * `codedBoxSweep` compares the RAW string and is shared by all three
+         * K-1 faces, so a lower-cased `' a '` does not match `line2jCodes` here
+         * and the whole return refuses — before Form 6251, whose own matcher
+         * trims and upper-cases, ever sums it.
+         *
+         * The asymmetry is safe in exactly one direction and this leaf is what
+         * pins the direction: every code the sweep passes the reader also sums,
+         * so nothing is silently dropped; and a spelling the sweep does not
+         * recognise cannot reach a computed line at all. Loosening the sweep
+         * instead would loosen the 1065 box 14 code A read, where a `'a'` would
+         * pass the sweep and then be MISSED by
+         * {@link selfEmploymentEarningsForRow} — self-employment earnings
+         * silently zero, an understatement.
+         */
+        aLowerCaseCodeStillRefusesAtTheGate: () => {
+            const message = refusal(run({
+                estateTrustK1Forms: [estateTrustDoc({
+                    box12AlternativeMinimumTaxItems: [{ code: ' a ', amount: '75000.00' }],
+                })],
+            })).message
+            assert(message.includes('box 12'), ['name the printed box', message])
+            // The CONTROL: the same document with the code as PRINTED is
+            // routed, so this is not a sweep that refuses box 12 outright.
+            assertEq(
+                ok(run({
+                    estateTrustK1Forms: [estateTrustDoc({
+                        box12AlternativeMinimumTaxItems: [{ code: 'A', amount: '75000.00' }],
+                    })],
+                })).parts.beneficiaryRows.length,
+                1)
         },
 
         /**

@@ -101,11 +101,22 @@
  *   with qualified business income to deduct. Below the threshold printed line 3
  *   skips every line that reads them, so a Phase 28 return computes exactly what
  *   it computed before, and a return with no business is untouched entirely.
- * - **Lines 28-30 (REIT dividends and PTP income)** are the documented zeros
- *   Form 8995's lines 6-9 already are, for the identical reason:
- *   `qualifiedReitDividendsAndPtpIncome` is an `fjs/return/scope` refusal, so a
- *   taxpayer with either is told. Line 32 still ADDS line 31, so the day Form
- *   1099-DIV box 5 acquires a reader it reaches the deduction with no edit here.
+ * - **Lines 28-31 (REIT dividends and PTP income)** carry the REIT half and
+ *   only the REIT half, exactly as Form 8995's lines 6-9 do and for the
+ *   identical reasons — see that module's docstring. Line 28 is Form 1099-DIV
+ *   box 5 (§199A dividends); the PTP half is refused by `fjs/schedule/e`'s
+ *   `section199AInformationRefusal` on Schedule K-1 box 20 code Z / box 17
+ *   code V, and line 29 is a structural zero because a PTP LOSS is the only
+ *   thing that could carry into it.
+ *
+ *   **This component bypasses everything above it on this page**, which is the
+ *   whole reason it must be wired on BOTH forms rather than only on the
+ *   simplified one: §199A(b)(2)(B)'s wage/UBIA cap and §199A(d)(3)'s
+ *   specified-service phase-out reduce lines 2-16 and never touch line 28. A
+ *   consultant above the phase-in range is allowed NOTHING for their business
+ *   and still gets 20% of their REIT dividends. A deduction that appeared on
+ *   Form 8995 and vanished on Form 8995-A would be a defect the taxpayer could
+ *   only discover by crossing the threshold.
  * - **Line 14 (patron reduction, from Schedule D) and line 38 (the §199A(g)
  *   DPAD)** are structural zeros. Both belong to patrons of agricultural or
  *   horticultural cooperatives, and this engine reads no Form 1099-PATR.
@@ -446,6 +457,7 @@ export const formEightNineNineFiveAInputsAreUnstated = input => {
  *   readonly isSpecifiedServiceTradeOrBusiness: boolean,
  *   readonly w2WagesCents: bigint,
  *   readonly unadjustedBasisCents: bigint,
+ *   readonly qualifiedReitDividendsCents: bigint,
  * }} Form8995AInput
  */
 
@@ -465,6 +477,7 @@ export const form8995a = taxParamSet => status => input => {
         qualifiedBusinessIncomeCents, priorYearLossCarryforwardCents,
         taxableIncomeBeforeQbiCents, netCapitalGainCents,
         isSpecifiedServiceTradeOrBusiness, w2WagesCents, unadjustedBasisCents,
+        qualifiedReitDividendsCents,
     } = input
     const rate = BigInt(taxParamSet.qualifiedBusinessIncomeDeduction.ratePercent)
     const position = phaseInPosition(taxParamSet)(status)(taxableIncomeBeforeQbiCents)
@@ -599,11 +612,14 @@ export const form8995a = taxParamSet => status => input => {
     //     businesses, or aggregations. Enter the amount from line 16."
     const line27 = line16
     // 28. "Qualified REIT dividends and publicly traded partnership (PTP)
-    //     income or (loss)." A documented zero, exactly as Form 8995 line 6 is.
-    const line28 = 0n
+    //     income or (loss)." Form 1099-DIV box 5, exactly as Form 8995 line 6
+    //     is -- and it arrives here UNREDUCED by anything Parts I through III
+    //     computed, because §199A(b)(1)(B) is a component of its own.
+    const line28 = qualifiedReitDividendsCents
     // 29. "Qualified REIT dividends and PTP (loss) carryforward from prior
-    //     years." Zero for the one-tax-year reason, and structurally so because
-    //     line 28 is zero.
+    //     years." A structural zero, for `fjs/form8995` line 7's reason: only a
+    //     qualified PTP loss could carry into it, and the K-1 that would report
+    //     one is refused by name.
     const line29 = 0n
     // 30. "Total qualified REIT dividends and PTP income. Combine lines 28 and
     //     29. If less than zero, enter -0-."
@@ -683,6 +699,7 @@ export const form8995a = taxParamSet => status => input => {
  *   readonly assertedUnadjustedBasis: string | undefined,
  *   readonly taxableIncomeBeforeQbiCents: bigint,
  *   readonly netCapitalGainCents: bigint,
+ *   readonly qualifiedReitDividendsCents: bigint,
  * }} QualifiedBusinessIncomeDeductionInput
  */
 
@@ -716,7 +733,7 @@ export const qualifiedBusinessIncomeDeduction = taxParamSet => input => {
         status, netProfitCents, deductibleHalfOfSelfEmploymentTaxCents,
         assertedPriorYearLossCarryforward, assertedSpecifiedService,
         assertedW2Wages, assertedUnadjustedBasis,
-        taxableIncomeBeforeQbiCents, netCapitalGainCents,
+        taxableIncomeBeforeQbiCents, netCapitalGainCents, qualifiedReitDividendsCents,
     } = input
     const qualifiedBusinessIncomeCents = qualifiedBusinessIncome({
         netProfitCents, deductibleHalfOfSelfEmploymentTaxCents,
@@ -743,6 +760,7 @@ export const qualifiedBusinessIncomeDeduction = taxParamSet => input => {
         const outcome = simplifiedComputation(taxParamSet)({
             status, netProfitCents, deductibleHalfOfSelfEmploymentTaxCents,
             assertedPriorYearLossCarryforward, taxableIncomeBeforeQbiCents, netCapitalGainCents,
+            qualifiedReitDividendsCents,
         })
         if (outcome.kind === 'error') {
             return outcome
@@ -775,6 +793,7 @@ export const qualifiedBusinessIncomeDeduction = taxParamSet => input => {
         unadjustedBasisCents: assertedUnadjustedBasis === undefined
             ? 0n
             : centsFromString(assertedUnadjustedBasis),
+        qualifiedReitDividendsCents,
     })
     return {
         kind: 'ok',
@@ -826,6 +845,7 @@ const soleProprietor = {
     assertedUnadjustedBasis: '0.00',
     taxableIncomeBeforeQbiCents: 0n,
     netCapitalGainCents: 0n,
+    qualifiedReitDividendsCents: 0n,
 }
 
 /** Narrows an outcome to its OK arm, throwing (never casting).
@@ -868,7 +888,7 @@ const refusal = outcome => {
  * Form 8995-A computed DIRECTLY, bypassing the router — the only way to reach
  * this module's own short-circuit path below the threshold, which is what
  * `belowTheThresholdBothFormsAgree` compares against Form 8995.
- * @type {(input: { readonly qualifiedBusinessIncomeCents: bigint, readonly taxableIncomeBeforeQbiCents: bigint, readonly netCapitalGainCents?: bigint }) => Form8995A}
+ * @type {(input: { readonly qualifiedBusinessIncomeCents: bigint, readonly taxableIncomeBeforeQbiCents: bigint, readonly netCapitalGainCents?: bigint, readonly qualifiedReitDividendsCents?: bigint }) => Form8995A}
  */
 const directly = input => form8995a(taxParams2025)('single')({
     qualifiedBusinessIncomeCents: input.qualifiedBusinessIncomeCents,
@@ -878,6 +898,7 @@ const directly = input => form8995a(taxParams2025)('single')({
     isSpecifiedServiceTradeOrBusiness: false,
     w2WagesCents: 0n,
     unadjustedBasisCents: 0n,
+    qualifiedReitDividendsCents: input.qualifiedReitDividendsCents ?? 0n,
 })
 
 export const proof = {
@@ -1647,6 +1668,102 @@ export const proof = {
         },
     },
 
+    // ── §199A(b)(1)(B)'s second component, on the COMPREHENSIVE page ────────
+    reitDividends: {
+        // **THE COMPONENT THAT BYPASSES EVERYTHING ABOVE IT.** The consultant
+        // of `aSpecifiedServiceBusinessAboveTheRangeGetsNothing` — a specified
+        // service trade or business past the top of the phase-in range, whose
+        // business is allowed $0.00 — still gets 20% of their REIT dividends,
+        // because §199A(d)(3) reduces lines 2-16 and never touches line 28.
+        //
+        //   line 16/27  the SSTB, phased out entirely            $0.00
+        //   line 28     box 5, §199A dividends              $1,000.00
+        //   line 30     28 + 29, floored                    $1,000.00
+        //   line 31     20% of 100,000                         $200.00
+        //   line 32     27 + 31                                $200.00
+        //   line 36     20% of 30,000,000                   $60,000.00
+        //   line 39     the SMALLER of 32 and 36               $200.00
+        aSpecifiedServiceBusinessAllowedNothingStillGetsTheReitComponent: () => {
+            const form = comprehensive(run({
+                ...soleProprietor,
+                netProfitCents: 30000000n,
+                assertedSpecifiedService: 'specifiedService',
+                qualifiedReitDividendsCents: 100000n,
+                taxableIncomeBeforeQbiCents: 30000000n,
+            }))
+            assertEq(form.line16, 0n, 'the SSTB is allowed nothing at all')
+            assertEq(form.line27, 0n, 'so line 27 is $0.00')
+            assertEq(form.line28, 100000n, 'line 28 = $1,000.00 of qualified REIT dividends')
+            assertEq(form.line30, 100000n, 'line 30 = $1,000.00')
+            assertEq(form.line31, 20000n, 'line 31 = $200.00 = 20% of $1,000.00')
+            assertEq(form.line32, 20000n, 'line 32 = $200.00')
+            assertEq(form.line39, 20000n, 'line 39 = $200.00 -> 1040 line 13a')
+            // THE CONTROL: the identical return without the box gets nothing,
+            // so the $200.00 above is the REIT component rather than something
+            // Part II failed to phase out.
+            assertEq(
+                deduction(run({
+                    ...soleProprietor,
+                    netProfitCents: 30000000n,
+                    assertedSpecifiedService: 'specifiedService',
+                    taxableIncomeBeforeQbiCents: 30000000n,
+                })),
+                0n,
+                'without box 5, nothing at all')
+        },
+        // **THE WAGE/UBIA CAP DOES NOT TOUCH IT EITHER.** A non-specified-service
+        // business with no employees and no qualified property: §199A(b)(2)(B)
+        // caps its component at $0.00, and the REIT component is unmoved.
+        theWageAndUbiaCapDoesNotReachLineTwentyEight: () => {
+            const form = comprehensive(run({
+                ...soleProprietor,
+                netProfitCents: 30000000n,
+                assertedSpecifiedService: 'notSpecifiedService',
+                qualifiedReitDividendsCents: 100000n,
+                taxableIncomeBeforeQbiCents: 30000000n,
+            }))
+            assertEq(form.line10, 0n, 'both limbs of the cap are zero')
+            assertEq(form.line11, 0n, 'so the business component is capped to nothing')
+            assertEq(form.line31, 20000n, 'and the REIT component is still $200.00')
+            assertEq(form.line39, 20000n, 'line 39 = $200.00')
+        },
+        // **THE TWO FORMS MUST NOT DISAGREE ABOUT THIS COMPONENT.** The same
+        // $1,000.00 of box 5 with no business at all: below the threshold the
+        // router fills Form 8995 and above it Form 8995-A, and both must
+        // produce $200.00 to the cent. A page-specific transcription error is
+        // invisible from either side alone — this is the only leaf that can see
+        // it, and it is the reason line 28 had to be wired in the same commit
+        // as line 6.
+        bothFormsProduceTheSameReitComponent: () => {
+            /** @type {(taxableIncomeBeforeQbiCents: bigint) => QualifiedBusinessIncomeDeductionOutcome} */
+            const withDividend = taxableIncomeBeforeQbiCents => run({
+                ...soleProprietor,
+                qualifiedReitDividendsCents: 100000n,
+                taxableIncomeBeforeQbiCents,
+            })
+            // Below the threshold: Form 8995 line 15.
+            const below = withDividend(4925000n)
+            assertEq(simplified(below).line9, 20000n, 'Form 8995 line 9 = $200.00')
+            assertEq(deduction(below), 20000n, '$200.00 through the simplified page')
+            // Above it: Form 8995-A line 39, at $250,000.00 of taxable income
+            // before §199A -- past the printed $247,300.00 upper bound, so no
+            // phase-in applies and the comparison is of the component alone.
+            const above = withDividend(25000000n)
+            assert(25000000n > printedUpperBoundCents, 'the fixture really is past the range')
+            assertEq(comprehensive(above).line31, 20000n, 'Form 8995-A line 31 = $200.00')
+            assertEq(deduction(above), 20000n, '$200.00 through the comprehensive page')
+            assertEq(deduction(below), deduction(above), 'the two pages must agree to the cent')
+            // …and the AT-THE-BOUNDARY pair, one cent apart, where the router
+            // switches pages: the deduction must not jump.
+            assertEq(deduction(withDividend(printedThresholdCents)), 20000n)
+            assertEq(deduction(withDividend(printedThresholdCents + 1n)), 20000n)
+            assertEq(
+                simplified(withDividend(printedThresholdCents)).line15,
+                comprehensive(withDividend(printedThresholdCents + 1n)).line39,
+                'one cent of taxable income must not change the REIT deduction')
+        },
+    },
+
     // ── The structural zeros and the shape of the record ────────────────────
     theReitPtpAndPatronLinesAreStructuralZeros: () => {
         const form = comprehensive(run({
@@ -1655,8 +1772,8 @@ export const proof = {
             assertedUnadjustedBasis: '1000000.00',
             taxableIncomeBeforeQbiCents: 30000000n,
         }))
-        assertEq(form.line28, 0n, 'line 28 = $0.00 -- 1099-DIV box 5 has no reader')
-        assertEq(form.line29, 0n, 'line 29 = $0.00')
+        assertEq(form.line28, 0n, 'line 28 = $0.00 -- no 1099-DIV reported box 5')
+        assertEq(form.line29, 0n, 'line 29 = $0.00, and it is structural: only a PTP LOSS could carry in')
         assertEq(form.line30, 0n, 'line 30 = $0.00')
         assertEq(form.line31, 0n, 'line 31 = $0.00')
         assertEq(form.line40, 0n, 'line 40 = $0.00, the opposite floor from line 30\'s')

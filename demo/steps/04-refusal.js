@@ -45,7 +45,12 @@ const offered = [
     // (TAX-32) — swapped for the §199A component that is STILL refused, so
     // this toggle keeps demonstrating the same deduction and the same 1040
     // line while naming something the engine genuinely cannot compute.
-    'qualifiedReitDividendsAndPtpIncome',
+    //
+    // Re-pointed again when the coarse REIT/PTP kind was SPLIT: its REIT
+    // half now computes off 1099-DIV box 5, and only the PTP half is still
+    // refused. Naming the half that is genuinely unreachable is the whole
+    // point of this toggle — the pair would now be half a lie.
+    'qualifiedPubliclyTradedPartnershipIncome',
     // `itemizedDeductions` moved to `modeledKinds` in Plan 13-07 (Phase 13
     // Wave 3, TAX-13) — swapped for `netQualifiedDisasterLoss`, its former
     // neighbor in the refusal table, which stays refused per Decision 1.4.

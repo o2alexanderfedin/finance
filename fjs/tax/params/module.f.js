@@ -120,12 +120,20 @@ import { of, halfUp } from '../../types/rational/module.f.js'
  *   figure with no annual Rev. Proc. and no recent Public Law of its own
  *   (e.g. the Social Security Benefits Worksheet's IRC §86(c) base amounts,
  *   unchanged since 1993).
+ * - `'federalRegister'` — an agency notice published in the Federal Register,
+ *   for a figure a department OTHER than Treasury sets and the tax law then
+ *   incorporates by reference. Added for {@link federalPovertyLine}: the HHS
+ *   poverty guidelines are §36B(d)(3)'s input and no IRS document originates
+ *   them, so filing them under `'code'` would have named an authority that
+ *   does not publish the numbers.
  * @typedef {{
  *   readonly kind: 'revProc', readonly revProc: string, readonly section: string, readonly effectiveDate: string
  * } | {
  *   readonly kind: 'publicLaw', readonly publicLaw: string, readonly section: string, readonly effectiveDate: string
  * } | {
  *   readonly kind: 'code', readonly section: string, readonly effectiveDate: string
+ * } | {
+ *   readonly kind: 'federalRegister', readonly federalRegister: string, readonly section: string, readonly effectiveDate: string
  * }} Citation
  */
 
@@ -1080,6 +1088,121 @@ export const additionalMedicareTaxRates = {
 }
 
 /**
+ * The employee's Social Security tax rate — IRC **§3101(a)**, 6.2%, in BASIS
+ * POINTS. Schedule 3 line 11 multiplies {@link selfEmploymentTax}'s
+ * `socialSecurityWageBase` by it to obtain the maximum any ONE employer may
+ * withhold, $10,918.20 for TY2025.
+ *
+ * Placed beside {@link additionalMedicareTaxRates} because the two are
+ * subsections of ONE section: §3101(a) is the Social Security half of FICA
+ * and §3101(b) the Medicare half. Nothing else in this module reads chapter
+ * 21 at all.
+ *
+ * **This is NOT half of {@link selfEmploymentTax}'s 12.4%, and storing it
+ * separately is the point.** §1401(a) imposes 12.4% on a self-employed
+ * person's net earnings (chapter 2, SECA); §3101(a) imposes 6.2% on an
+ * employee's wages (chapter 21, FICA), with §3111(a) imposing the matching
+ * 6.2% on the employer. Each statute writes its own number outright. That the
+ * three are related 1:2 today is arithmetic, not law, and a derived 620 would
+ * be a second copy of a rule no statute states — the
+ * {@link additionalMedicareTaxThreshold}-versus-{@link netInvestmentIncomeTaxThreshold}
+ * position this module already takes three times, for the same reason. The
+ * contrast worth holding beside it is §1402(a)(12), which this module cites as
+ * the reason 92.35% is DERIVED rather than stored: there the statute performs
+ * the derivation itself, and here no statute does.
+ *
+ * **NOT indexed.** §3101(a) has read "6.2 percent" since 1990. The figure that
+ * moves with inflation is the wage base it multiplies, which lives in
+ * {@link selfEmploymentTax} and carries that warning in its own docstring.
+ *
+ * Basis points rather than `ratePercent` for the exactness reason
+ * {@link additionalMedicareTaxRates} states in full: 6.2 is not a whole number
+ * of percent, and `0.062` is not exact as an IEEE 754 double. The consumer
+ * multiplies by `basisPoints / 10000` through `fjs/types/rational`, cent-exact
+ * and half-up — never through a float. `kind: 'code'` for the same reason
+ * §3101(b)'s citation is: the statute states the rate, and no Revenue
+ * Procedure adjusts it.
+ * @type {{
+ *   readonly employeeRateBasisPoints: number,
+ *   readonly citation: Citation,
+ * }}
+ */
+export const socialSecurityTaxWithholding = {
+    // 6.2% — IRC §3101(a), the tax an employer withholds from box 3 wages and
+    // reports in Form W-2 box 4.
+    employeeRateBasisPoints: 620,
+    citation: { kind: 'code', section: '§3101(a)', effectiveDate: '2025-01-01' },
+}
+
+/**
+ * The §904(j)(2)(B) de-minimis ceiling on creditable foreign taxes — the
+ * figure below which an individual may ELECT out of the §904(a) limitation
+ * and take the foreign tax credit straight onto Schedule 3 line 1, with no
+ * Form 1116 at all. TAX-36, and see
+ * `fjs/schedule/3/todo/foreign-tax-credit.md` for the whole of what the
+ * election does and does not assert.
+ *
+ * §904(j)(2)(B): *"the amount of the creditable foreign taxes paid or accrued
+ * by the individual during the taxable year does not exceed **$300 ($600 in
+ * the case of a joint return)**"*.
+ *
+ * **The ceiling is on the TAXES, not on the income.** It is the one of
+ * §904(j)(2)'s three conditions this engine can check for itself; (A)'s
+ * all-passive, all-on-a-payee-statement test and (C)'s election are taxpayer
+ * assertions carried on `vnd.fjs.return_profile`. A small figure here is not
+ * evidence that (A) holds.
+ *
+ * **`qualifyingSurvivingSpouse` is $300, NOT $600 — the trap in this group**,
+ * and the same one {@link additionalMedicareTaxThreshold} carries one
+ * parameter over. The statute's larger figure is *"in the case of a joint
+ * return"*, and a qualifying surviving spouse does not file one: that status
+ * borrows the joint rate schedule and the joint standard deduction, and
+ * nothing else. Head of household and married-filing-separately are $300 for
+ * the identical reading. Only `marriedFilingJointly` is a joint return.
+ *
+ * Hand-typed per status, deliberately never spread from another status's
+ * entry, for the reason {@link standardDeduction} states: a spread makes two
+ * statuses impossible to observe drifting apart.
+ *
+ * **NOT indexed.** §904(j)(2)(B) has read $300/$600 since the Taxpayer Relief
+ * Act of 1997 §1105 added the subsection, and no Revenue Procedure adjusts
+ * it — so `kind: 'code'`, for the same reason
+ * {@link additionalMedicareTaxThreshold}'s citations are, and inventing a Rev.
+ * Proc. number would be the sourcing error this module's own header exists to
+ * prevent. `effectiveDate` reads `'2025-01-01'` per that header: every
+ * citation here states the year the figure is being APPLIED for.
+ *
+ * No `estatesAndTrusts` entry: §904(j)(1) opens *"In the case of an
+ * individual"*, and this map is keyed by {@link IndividualFilingStatus} to
+ * say so at the type level.
+ * @type {Record<IndividualFilingStatus, AmountWithCitation>}
+ */
+export const foreignTaxCreditDeMinimisElection = {
+    single: {
+        amount: '300.00',
+        citation: { kind: 'code', section: '§904(j)(2)(B)', effectiveDate: '2025-01-01' },
+    },
+    // The ONE joint return, and therefore the one $600.
+    marriedFilingJointly: {
+        amount: '600.00',
+        citation: { kind: 'code', section: '§904(j)(2)(B)', effectiveDate: '2025-01-01' },
+    },
+    marriedFilingSeparately: {
+        amount: '300.00',
+        citation: { kind: 'code', section: '§904(j)(2)(B)', effectiveDate: '2025-01-01' },
+    },
+    headOfHousehold: {
+        amount: '300.00',
+        citation: { kind: 'code', section: '§904(j)(2)(B)', effectiveDate: '2025-01-01' },
+    },
+    // See this group's own docstring: NOT a joint return, so NOT $600.
+    qualifyingSurvivingSpouse: {
+        amount: '300.00',
+        citation: { kind: 'code', section: '§904(j)(2)(B)', effectiveDate: '2025-01-01' },
+    },
+}
+
+/**
  * Form 8960's Net Investment Income Tax thresholds — IRC **§1411(b)**,
  * TAX-21, Phase 23. The 3.8% tax applies to the LESSER of net investment
  * income and the excess of §1411's own modified adjusted gross income over
@@ -1179,6 +1302,204 @@ export const netInvestmentIncomeTaxThreshold = {
  * @type {number}
  */
 export const netInvestmentIncomeTaxRateBasisPoints = 380
+
+/**
+ * Schedule 1 line 20's traditional IRA deduction — IRC §219, Publication
+ * 590-A Worksheet 1-2 and Appendix B Worksheet 2.
+ *
+ * ## Two indexed figures, two statutory constants, and one that is neither
+ *
+ * {@link studentLoanInterestDeduction}'s own docstring warns that copying
+ * "no Revenue Procedure adjusts these" onto an indexed group is a silent
+ * error one tax year later. This group is the sharpest case of that yet,
+ * because it holds THREE kinds of figure at once:
+ *
+ * - `deductibleAmount` and every `phaseoutThreshold` are **inflation-indexed**
+ *   (§219(b)(5)(C) and §219(g)(3)(B)'s own flush language), and IRS Notice
+ *   2024-80 is what published the TY2025 values. They moved for 2025:
+ *   $77,000 -> $79,000 (single/HoH) and $123,000 -> $126,000 (joint/QSS).
+ * - `catchUpContribution` is indexed by §219(b)(5)(C)(iii) in $500
+ *   increments and has therefore sat at **$1,000 since 2006** — the
+ *   {@link healthSavingsAccount} trap exactly: a figure that looks constant
+ *   and is not. Notice 2024-80 says "remains $1,000", not "is $1,000".
+ * - `phaseoutRange`, `minimumPhasedOutLimit` and `roundingIncrement` are
+ *   written into §219(g)(2) itself and nothing indexes them.
+ *
+ * ## `marriedFilingJointly` has NO entry, and neither does a covered spouse
+ *
+ * `fjs/schedule/1` REFUSES a joint return carrying a traditional IRA
+ * contribution — §219(f)(2) computes the limit "separately for each
+ * individual", coverage is a Form W-2 box 13 checkbox, and nothing this
+ * engine models says which spouse a Form W-2 belongs to. So the status has
+ * no dollar threshold here, exactly as {@link studentLoanInterestDeduction}
+ * omits `marriedFilingSeparately` and {@link seniorDeduction} omits it too:
+ * there is no threshold for a status whose amount never depends on one.
+ *
+ * Two published TY2025 figures are therefore recorded HERE, in prose, rather
+ * than stored — the phase that models joint returns needs both and neither is
+ * derivable from what is below:
+ *
+ * - §219(g)(3)(B)(i), a joint return where the CONTRIBUTOR is the active
+ *   participant: **$126,000**, over a **$20,000** range. (That pair IS
+ *   stored, under `qualifyingSurvivingSpouse` — see below.)
+ * - §219(g)(7)(A), a joint return where the contributor is NOT an active
+ *   participant but their spouse is: **$236,000** — over a **$10,000**
+ *   range, NOT $20,000, because §219(g)(7)(B) overrides §219(g)(2)(A)(ii)'s
+ *   joint divisor. Publication 590-A Worksheet 1-2 puts that taxpayer in its
+ *   "All others … 70% (80%)" row rather than its joint "35% (40%)" row for
+ *   exactly this reason, and getting it wrong is the classic §219
+ *   implementation bug.
+ *
+ * ## `qualifyingSurvivingSpouse` carries the JOINT figures — the opposite of
+ * {@link additionalMedicareTaxThreshold}
+ *
+ * That group gives QSS §3101(b)(2)(C)'s "any other case" amount, on the
+ * ground that a QSS return is not a JOINT return. **Here the authority says
+ * the opposite in so many words.** IRS Notice 2024-80: *"The applicable
+ * amount under section 219(g)(3)(B)(i) for determining the deductible amount
+ * of an IRA contribution for taxpayers who are active participants filing a
+ * joint return **or as a qualifying widow(er)** is increased from $123,000 to
+ * $126,000."* Publication 590-A's Table 1-2 groups "married filing jointly or
+ * qualifying surviving spouse" on one row, and Worksheet 1-2's own lines 3
+ * and 4 name that status in the $20,000/35%/40% branch.
+ *
+ * So the range is $20,000 for a QSS as well, and the two groups disagree
+ * about QSS on purpose. Both docstrings say so, so that a reader who finds
+ * one cannot copy it onto the other.
+ *
+ * ## `marriedFilingSeparately`'s `$0.00` is a real threshold, not a sentinel
+ *
+ * §219(g)(3)(B)(iii) sets the applicable dollar amount for a married
+ * individual filing separately to zero, and Notice 2024-80 states it "is not
+ * subject to an annual cost-of-living adjustment and remains $0". So the
+ * phase-out runs from the first dollar of modified AGI to $10,000 — a
+ * genuine `$0.00` threshold with a genuine range beside it, and NOT the
+ * "this status is short-circuited" absence that
+ * {@link studentLoanInterestDeduction} uses for the same status. §219(g)(4)
+ * is what makes it survivable: a couple who lived apart for the whole year
+ * are "not … treated as married individuals for purposes of this
+ * subsection", and `fjs/schedule/1` routes such a filer to `single`.
+ *
+ * ## Two figures per status, never three — and no stored percentage
+ *
+ * Publication 590-A Worksheet 1-2 line 4 prints percentages (35%/40% for a
+ * joint or QSS filer, 70%/80% for everyone else). **They are not stored**,
+ * because they are `deductibleAmount / phaseoutRange` and
+ * `(deductibleAmount + catchUpContribution) / phaseoutRange` exactly — a
+ * stored percentage would be a fourth figure able to disagree with the three
+ * the computation actually reads. The completely-phased-out end points
+ * ($89,000, $146,000, $10,000) are likewise DERIVED, per the "two figures,
+ * not three" position {@link studentLoanInterestDeduction} records;
+ * `iraDeductionPhaseoutEndPointsAndPercentagesMatchPublication590A` asserts
+ * the derived values against hand-typed ones.
+ *
+ * ## Citation kind
+ *
+ * `kind: 'code'`, §219's own subsections — the same "governing provision, not
+ * the literal source" position {@link studentLoanInterestDeduction} takes.
+ * §219(b)(5) and §219(g)(2)/(g)(3) genuinely are where these limits, this
+ * mechanism and these applicable dollar amounts live; what §219 does not
+ * contain is the TY2025 indexed figures, which come from IRS Notice 2024-80
+ * and are reprinted in Publication 590-A Tables 1-2/1-3.
+ * @type {{
+ *   readonly deductibleAmount: AmountWithCitation,
+ *   readonly catchUpContribution: AmountWithCitation,
+ *   readonly minimumPhasedOutLimit: AmountWithCitation,
+ *   readonly roundingIncrement: AmountWithCitation,
+ *   readonly phaseoutThreshold: {
+ *     readonly single: AmountWithCitation,
+ *     readonly marriedFilingSeparately: AmountWithCitation,
+ *     readonly headOfHousehold: AmountWithCitation,
+ *     readonly qualifyingSurvivingSpouse: AmountWithCitation,
+ *   },
+ *   readonly phaseoutRange: {
+ *     readonly single: AmountWithCitation,
+ *     readonly marriedFilingSeparately: AmountWithCitation,
+ *     readonly headOfHousehold: AmountWithCitation,
+ *     readonly qualifyingSurvivingSpouse: AmountWithCitation,
+ *   },
+ * }}
+ */
+export const iraDeduction = {
+    deductibleAmount: {
+        amount: '7000.00',
+        citation: { kind: 'code', section: '§219(b)(5)(A)', effectiveDate: '2025-01-01' },
+    },
+    // §219(b)(5)(B)(ii)'s "applicable amount" for an individual who attains
+    // age 50 before the close of the taxable year. **No document in this
+    // repository carries a birth date**, so `fjs/schedule/1` never assumes
+    // either answer: it computes the deduction against BOTH limits and
+    // refuses only when the two disagree.
+    catchUpContribution: {
+        amount: '1000.00',
+        citation: { kind: 'code', section: '§219(b)(5)(B)(ii)', effectiveDate: '2025-01-01' },
+    },
+    // §219(g)(2)(B), "No reduction below $200 until complete phase-out": a
+    // partially phased-out limit is never between $1 and $199. It is either
+    // at least $200 or exactly zero, and zero only when the un-floored
+    // computation was already zero.
+    minimumPhasedOutLimit: {
+        amount: '200.00',
+        citation: { kind: 'code', section: '§219(g)(2)(B)', effectiveDate: '2025-01-01' },
+    },
+    // §219(g)(2)(C) rounds "any amount determined under this paragraph" — the
+    // REDUCTION — to the next LOWEST $10. Subtracting a reduction rounded
+    // down rounds the surviving limit UP, which is the direction Publication
+    // 590-A Worksheet 1-2 line 4 states ("round it to the next highest
+    // multiple of $10. (For example, $611.40 is rounded to $620.)").
+    // `fjs/schedule/1` implements the worksheet's direction on the surviving
+    // limit; both are the same rule read from opposite ends.
+    roundingIncrement: {
+        amount: '10.00',
+        citation: { kind: 'code', section: '§219(g)(2)(C)', effectiveDate: '2025-01-01' },
+    },
+    phaseoutThreshold: {
+        single: {
+            amount: '79000.00',
+            citation: { kind: 'code', section: '§219(g)(3)(B)(ii)', effectiveDate: '2025-01-01' },
+        },
+        marriedFilingSeparately: {
+            amount: '0.00',
+            citation: { kind: 'code', section: '§219(g)(3)(B)(iii)', effectiveDate: '2025-01-01' },
+        },
+        // Publication 590-A Table 1-2 groups "single or head of household" on
+        // one row, so this carries the same figure as `single`. Hand-typed
+        // per status anyway, never spread from it, for the reason
+        // `standardDeduction` states: a spread makes two statuses impossible
+        // to observe drifting apart.
+        headOfHousehold: {
+            amount: '79000.00',
+            citation: { kind: 'code', section: '§219(g)(3)(B)(ii)', effectiveDate: '2025-01-01' },
+        },
+        qualifyingSurvivingSpouse: {
+            amount: '126000.00',
+            citation: { kind: 'code', section: '§219(g)(3)(B)(i)', effectiveDate: '2025-01-01' },
+        },
+    },
+    // §219(g)(2)(A)(ii)'s divisor: "$10,000 ($20,000 in the case of a joint
+    // return)". A qualifying surviving spouse takes the $20,000 figure on
+    // Publication 590-A Worksheet 1-2's own authority — see this group's
+    // docstring, which is also where §219(g)(7)(B)'s $10,000 override for a
+    // non-covered spouse ON a joint return is recorded.
+    phaseoutRange: {
+        single: {
+            amount: '10000.00',
+            citation: { kind: 'code', section: '§219(g)(2)(A)(ii)', effectiveDate: '2025-01-01' },
+        },
+        marriedFilingSeparately: {
+            amount: '10000.00',
+            citation: { kind: 'code', section: '§219(g)(2)(A)(ii)', effectiveDate: '2025-01-01' },
+        },
+        headOfHousehold: {
+            amount: '10000.00',
+            citation: { kind: 'code', section: '§219(g)(2)(A)(ii)', effectiveDate: '2025-01-01' },
+        },
+        qualifyingSurvivingSpouse: {
+            amount: '20000.00',
+            citation: { kind: 'code', section: '§219(g)(2)(A)(ii)', effectiveDate: '2025-01-01' },
+        },
+    },
+}
 
 /**
  * Schedule 1 line 21's student loan interest deduction — IRC §221, TAX-23,
@@ -2330,6 +2651,274 @@ export const alternativeMinimumTax = {
 }
 
 /**
+ * Which of Form 8962 line 4's three printed federal-poverty-line tables
+ * applies — the line's own checkbox, transcribed as a vocabulary rather than
+ * as a state name.
+ *
+ * A STATE would be the wrong shape. i8962 p8, Line 4: *"If you moved during
+ * 2025 and you lived in Alaska and/or Hawaii, or you are filing jointly and
+ * you and your spouse lived in different states, use the table with the
+ * higher dollar amounts for your family size."* So the taxpayer declares
+ * which TABLE governs, which is a fact a state name does not determine.
+ * @typedef {'contiguous48AndDistrictOfColumbia' | 'alaska' | 'hawaii'} FederalPovertyLineTable
+ */
+
+/**
+ * The three tables {@link federalPovertyLine} carries, exported so consumers
+ * iterate this list rather than hand-typing the same three names repeatedly —
+ * {@link individualFilingStatuses}' own precedent.
+ * @type {readonly FederalPovertyLineTable[]}
+ */
+export const federalPovertyLineTables = [
+    'contiguous48AndDistrictOfColumbia',
+    'alaska',
+    'hawaii',
+]
+
+/**
+ * Form 8962 line 4 — the federal poverty line, by tax family size and by
+ * table. TAX-37.
+ *
+ * ## The year is the trap, and it is a PRIOR one
+ *
+ * **The 2025 Form 8962 uses the 2024 poverty guidelines.** Not a
+ * simplification and not a lag this module is papering over — it is what the
+ * printed instructions say, verbatim (i8962 p8, Line 4): *"(For 2025, the
+ * 2024 federal poverty lines are used for this purpose and are shown
+ * below.)"* §36B(d)(3)(B) is why: the poverty line is the one *"in effect on
+ * the first day of the regular enrollment period"* for coverage in the tax
+ * year, and open enrollment for 2025 coverage began in November 2024, when
+ * the 2024 guidelines were the ones in effect.
+ *
+ * Reaching for 2025's figures instead would be silently wrong in the
+ * direction that costs money: they are higher, so every household's line 5
+ * percentage would come out LOWER, the applicable figure would fall, and the
+ * credit would be overstated — which the taxpayer then repays with the
+ * return. The figures below are checked digit-by-digit against the printed
+ * Tables 1-1, 1-2 and 1-3, whose eight rows each are reproduced in this
+ * module's own proof from the printed page rather than from this data.
+ *
+ * ## Shape: a first person and an increment, not eight rows
+ *
+ * The printed tables list family sizes 1 through 8 and then a footnote —
+ * *"If your family size was more than 8 people, add $5,380 for each
+ * additional person"* — which is the same arithmetic the eight printed rows
+ * already are. Storing base-plus-increment stores the rule; storing eight
+ * rows and a ninth number would store it twice and let the two disagree. The
+ * proof below is what pins the pair against all eight printed rows of all
+ * three tables, so the compression is verified rather than assumed.
+ *
+ * ## Citation kind: `'federalRegister'`, a FOURTH kind
+ *
+ * These figures are not an IRS Revenue Procedure's, not an Act of Congress's,
+ * and not a bare Code section's. They are the Department of Health and Human
+ * Services' annual poverty guidelines, published in the Federal Register —
+ * 89 FR 2961, "Annual Update of the HHS Poverty Guidelines", HHS Office of
+ * the Secretary, published 2024-01-17 (verified live against
+ * federalregister.gov's own API, not recalled). §36B(d)(3)(A) is what makes
+ * them a tax figure at all, by defining "poverty line" as the one in
+ * §2110(c)(5) of the Social Security Act.
+ *
+ * Filing them under `kind: 'code'` would have avoided widening {@link Citation}
+ * and would have named an authority that does not publish these numbers.
+ * 13-CONTEXT.md Decision 5.2 widened the union twice before for exactly this
+ * reason; this is the third time, and `effectiveDate` reads `'2025-01-01'` per
+ * this module's header — the year the figure is APPLIED for, which is what
+ * makes the prior-year sourcing visible in the data rather than only in prose.
+ * @type {Record<FederalPovertyLineTable, {
+ *   readonly firstPerson: AmountWithCitation,
+ *   readonly eachAdditionalPerson: AmountWithCitation,
+ * }>}
+ */
+export const federalPovertyLine = {
+    contiguous48AndDistrictOfColumbia: {
+        firstPerson: {
+            amount: '15060.00',
+            citation: { kind: 'federalRegister', federalRegister: '89 FR 2961', section: 'HHS Poverty Guidelines for 2024, 48 contiguous states and DC', effectiveDate: '2025-01-01' },
+        },
+        eachAdditionalPerson: {
+            amount: '5380.00',
+            citation: { kind: 'federalRegister', federalRegister: '89 FR 2961', section: 'HHS Poverty Guidelines for 2024, 48 contiguous states and DC', effectiveDate: '2025-01-01' },
+        },
+    },
+    // Alaska and Hawaii are NOT the contiguous figure scaled — HHS publishes
+    // them as separate schedules, and both the base and the increment differ.
+    // Hand-typed per table for the reason `standardDeduction` states about
+    // spreading one status's entry onto another.
+    alaska: {
+        firstPerson: {
+            amount: '18810.00',
+            citation: { kind: 'federalRegister', federalRegister: '89 FR 2961', section: 'HHS Poverty Guidelines for 2024, Alaska', effectiveDate: '2025-01-01' },
+        },
+        eachAdditionalPerson: {
+            amount: '6730.00',
+            citation: { kind: 'federalRegister', federalRegister: '89 FR 2961', section: 'HHS Poverty Guidelines for 2024, Alaska', effectiveDate: '2025-01-01' },
+        },
+    },
+    hawaii: {
+        firstPerson: {
+            amount: '17310.00',
+            citation: { kind: 'federalRegister', federalRegister: '89 FR 2961', section: 'HHS Poverty Guidelines for 2024, Hawaii', effectiveDate: '2025-01-01' },
+        },
+        eachAdditionalPerson: {
+            amount: '6190.00',
+            citation: { kind: 'federalRegister', federalRegister: '89 FR 2961', section: 'HHS Poverty Guidelines for 2024, Hawaii', effectiveDate: '2025-01-01' },
+        },
+    },
+}
+
+/**
+ * One tier of §36B(b)(3)(A)'s applicable percentage table: the household
+ * income band, as a whole percent of the federal poverty line, and the
+ * percentage at each end of it, in HUNDREDTHS OF A PERCENTAGE POINT.
+ *
+ * Hundredths rather than a decimal, for {@link additionalMedicareTaxRates}'
+ * own reason: 8.5 is not exact as an IEEE 754 double and 850 hundredths is.
+ * `ceilingPercent` is `undefined` on the open-topped last tier — no sentinel,
+ * matching {@link Bracket}'s own convention.
+ * @typedef {{
+ *   readonly floorPercent: number,
+ *   readonly ceilingPercent: number | undefined,
+ *   readonly initialHundredthsOfPercent: number,
+ *   readonly finalHundredthsOfPercent: number,
+ * }} ApplicablePercentageTier
+ */
+
+/**
+ * Form 8962 line 7's *applicable figure* — IRC §36B(b)(3)(A), TAX-37.
+ *
+ * ## Six tiers reproduce all 252 printed rows of Table 2, exactly
+ *
+ * The instructions print a lookup table with a row for every whole percent
+ * from "less than 150" to "400 or more". The statute prints six tiers and an
+ * interpolation rule: §36B(b)(3)(A)(i) says the applicable percentage
+ * *"increases on a sliding scale in a linear manner"* from the initial to the
+ * final percentage across each income tier.
+ *
+ * The tiers below, interpolated linearly and rounded HALF-UP to four decimal
+ * places, were checked against every one of the 252 printed rows extracted
+ * from i8962 Table 2: **zero mismatches, and no printed row unaccounted
+ * for.** That check is what makes six stored tiers legitimate in place of 252
+ * transcribed rows, and this module's own proof re-runs a hand-typed sample of
+ * those printed rows — including every tier boundary — against the
+ * interpolation, so the equivalence is proven here rather than asserted here.
+ *
+ * ## These are ARPA's tiers, and they are the reason there is still a credit
+ * above 400%
+ *
+ * §36B(b)(3)(A)(iii), as added by ARPA §9661 and extended by IRA §12001,
+ * replaces the ordinary table *"in the case of a taxable year beginning after
+ * December 31, 2020, and before January 1, 2026"* — which includes TY2025 and
+ * excludes TY2026. Two consequences a reader must not carry forward:
+ *
+ * - **The subsidy cliff is gone for 2025.** The top tier has a floor of 400
+ *   and no ceiling, so a household above 400% of the poverty line still has an
+ *   applicable figure (8.5%) and can still take a credit. The pre-ARPA table
+ *   simply stopped, and above 400% the credit was zero.
+ * - **§36B(b)(3)(A)(ii)'s inflation indexing does not apply for these years**,
+ *   which is why no Revenue Procedure adjusts these figures and the citation
+ *   below is `kind: 'code'`.
+ *
+ * **Form 8962's REPAYMENT limitation table disagrees with this one about what
+ * 400% means, and both are transcribed as printed.** Here, 400 and above is a
+ * tier with a percentage; in {@link premiumTaxCreditRepaymentLimitation}, 400
+ * and above is where the limitation stops existing. The two tables are not
+ * two views of one boundary and must never be merged.
+ * @type {{
+ *   readonly tiers: readonly ApplicablePercentageTier[],
+ *   readonly citation: Citation,
+ * }}
+ */
+export const premiumTaxCreditApplicablePercentage = {
+    tiers: [
+        // "Up to 150.0 percent — initial 0.0, final 0.0". Table 2 prints this
+        // as the single row "less than 150" plus the row "150".
+        { floorPercent: 0, ceilingPercent: 150, initialHundredthsOfPercent: 0, finalHundredthsOfPercent: 0 },
+        { floorPercent: 150, ceilingPercent: 200, initialHundredthsOfPercent: 0, finalHundredthsOfPercent: 200 },
+        { floorPercent: 200, ceilingPercent: 250, initialHundredthsOfPercent: 200, finalHundredthsOfPercent: 400 },
+        { floorPercent: 250, ceilingPercent: 300, initialHundredthsOfPercent: 400, finalHundredthsOfPercent: 600 },
+        { floorPercent: 300, ceilingPercent: 400, initialHundredthsOfPercent: 600, finalHundredthsOfPercent: 850 },
+        // Open-topped: `ceilingPercent` is `undefined`, never a large
+        // sentinel. Worksheet 2 caps line 5 at 401 anyway, but the tier is
+        // written as the statute writes it.
+        { floorPercent: 400, ceilingPercent: undefined, initialHundredthsOfPercent: 850, finalHundredthsOfPercent: 850 },
+    ],
+    citation: { kind: 'code', section: '§36B(b)(3)(A)(iii)', effectiveDate: '2025-01-01' },
+}
+
+/**
+ * One band of Form 8962 Table 5: the household-income ceiling (as a whole
+ * percent of the federal poverty line, EXCLUSIVE) and the two limitation
+ * amounts.
+ *
+ * `single` and `other` rather than a full {@link IndividualFilingStatus} map,
+ * because the printed table has exactly two columns and Rev. Proc. 2024-40
+ * §2.07 spells the first as *"unmarried individuals (other than surviving
+ * spouses and heads of household)"*. Modelling it as five statuses would
+ * invent four figures the source does not print.
+ * @typedef {{
+ *   readonly povertyLinePercentCeiling: number,
+ *   readonly single: string,
+ *   readonly other: string,
+ * }} RepaymentLimitationBand
+ */
+
+/**
+ * Form 8962 line 28 — the limitation on the tax imposed for excess advance
+ * payments. IRC §36B(f)(2)(B), Rev. Proc. 2024-40 §2.07, TAX-37.
+ *
+ * ## At and above 400% there is NO limitation, and that is the whole risk
+ *
+ * There are THREE bands, not four, and the missing fourth is deliberate.
+ * i8962 p17, Line 28: *"If your entry on Form 8962, line 5, is 400 or more,
+ * there is no repayment limitation. You must repay the amount shown on line
+ * 27. Leave line 28 blank and enter the amount from line 27 on line 29."*
+ *
+ * A fourth band carrying a large sentinel would look harmless and would be a
+ * silent UNDERSTATEMENT of tax for exactly the population with the largest
+ * excess advance payments — a household that reported a low income at
+ * enrollment and finished the year above 400% of the poverty line can owe the
+ * entire year's advance back, with no cap at all. `fjs/form8962` therefore
+ * treats "no band matched" as "no limitation", never as "zero".
+ *
+ * ## Only `single` reads the left column
+ *
+ * Form 8962 Table 5 heads its two columns "for a filing status of Single" and
+ * "for any other filing status", and Rev. Proc. 2024-40 §2.07 makes the
+ * exclusion explicit: *"unmarried individuals (other than surviving spouses
+ * and heads of household)"*. So head of household and qualifying surviving
+ * spouse take the LARGER figure.
+ *
+ * **This is the opposite direction from
+ * {@link additionalMedicareTaxThreshold}, where a qualifying surviving spouse
+ * takes the smaller amount because §3101(b)(2)(A) speaks only of a joint
+ * return.** Two statutes, two answers for the same status, and copying either
+ * one onto the other is a silent wrong number. Read the printed table.
+ *
+ * Married filing separately reads the right column too — and the limitation
+ * *"appl[ies] to you and your spouse separately based on the household income
+ * reported on each return"* (i8962 p17). That is only reachable for a filer
+ * who qualifies for one of §36B(c)(1)(C)'s exceptions, which `fjs/form8962`
+ * refuses on; the row is stored as printed anyway rather than omitted,
+ * because a parameter table is a transcription of a page.
+ *
+ * `kind: 'revProc'`: §36B(f)(2)(B)(ii) inflation-adjusts these amounts, and
+ * Rev. Proc. 2024-40 §2.07 is where TY2025's come from.
+ * @type {{
+ *   readonly bands: readonly RepaymentLimitationBand[],
+ *   readonly citation: Citation,
+ * }}
+ */
+export const premiumTaxCreditRepaymentLimitation = {
+    bands: [
+        { povertyLinePercentCeiling: 200, single: '375.00', other: '750.00' },
+        { povertyLinePercentCeiling: 300, single: '975.00', other: '1950.00' },
+        { povertyLinePercentCeiling: 400, single: '1625.00', other: '3250.00' },
+    ],
+    citation: { kind: 'revProc', revProc: '2024-40', section: '§2.07', effectiveDate: '2025-01-01' },
+}
+
+/**
  * A full tax-year parameter set: every TY2025 parameter this phase
  * requires, together.
  *
@@ -2367,8 +2956,11 @@ export const alternativeMinimumTax = {
  *   readonly earnedIncomeCredit: typeof earnedIncomeCredit,
  *   readonly additionalMedicareTaxThreshold: typeof additionalMedicareTaxThreshold,
  *   readonly additionalMedicareTaxRates: typeof additionalMedicareTaxRates,
+ *   readonly socialSecurityTaxWithholding: typeof socialSecurityTaxWithholding,
+ *   readonly foreignTaxCreditDeMinimisElection: typeof foreignTaxCreditDeMinimisElection,
  *   readonly netInvestmentIncomeTaxThreshold: typeof netInvestmentIncomeTaxThreshold,
  *   readonly netInvestmentIncomeTaxRateBasisPoints: typeof netInvestmentIncomeTaxRateBasisPoints,
+ *   readonly iraDeduction: typeof iraDeduction,
  *   readonly studentLoanInterestDeduction: typeof studentLoanInterestDeduction,
  *   readonly educatorExpenses: typeof educatorExpenses,
  *   readonly healthSavingsAccount: typeof healthSavingsAccount,
@@ -2378,6 +2970,9 @@ export const alternativeMinimumTax = {
  *   readonly selfEmploymentTax: typeof selfEmploymentTax,
  *   readonly qualifiedBusinessIncomeDeduction: typeof qualifiedBusinessIncomeDeduction,
  *   readonly alternativeMinimumTax: typeof alternativeMinimumTax,
+ *   readonly federalPovertyLine: typeof federalPovertyLine,
+ *   readonly premiumTaxCreditApplicablePercentage: typeof premiumTaxCreditApplicablePercentage,
+ *   readonly premiumTaxCreditRepaymentLimitation: typeof premiumTaxCreditRepaymentLimitation,
  * }} TaxParamSet
  */
 
@@ -2406,8 +3001,11 @@ export const taxParamsByYear = {
         earnedIncomeCredit,
         additionalMedicareTaxThreshold,
         additionalMedicareTaxRates,
+        socialSecurityTaxWithholding,
+        foreignTaxCreditDeMinimisElection,
         netInvestmentIncomeTaxThreshold,
         netInvestmentIncomeTaxRateBasisPoints,
+        iraDeduction,
         studentLoanInterestDeduction,
         educatorExpenses,
         healthSavingsAccount,
@@ -2417,6 +3015,9 @@ export const taxParamsByYear = {
         selfEmploymentTax,
         qualifiedBusinessIncomeDeduction,
         alternativeMinimumTax,
+        federalPovertyLine,
+        premiumTaxCreditApplicablePercentage,
+        premiumTaxCreditRepaymentLimitation,
     },
 }
 
@@ -2467,6 +3068,7 @@ const assertPublicLawCitation = citation => {
  * @type {readonly string[]}
  */
 const everyDollarStringField = [
+    ...individualFilingStatuses.map(status => foreignTaxCreditDeMinimisElection[status].amount),
     ...individualFilingStatuses.map(status => standardDeduction[status].amount),
     agedOrBlindAdditional.married.amount,
     agedOrBlindAdditional.unmarried.amount,
@@ -2505,6 +3107,18 @@ const everyDollarStringField = [
     childTaxCredit.actcEarnedIncomeThreshold.amount,
     ...individualFilingStatuses.map(status => additionalMedicareTaxThreshold[status].amount),
     ...individualFilingStatuses.map(status => netInvestmentIncomeTaxThreshold[status].amount),
+    iraDeduction.deductibleAmount.amount,
+    iraDeduction.catchUpContribution.amount,
+    iraDeduction.minimumPhasedOutLimit.amount,
+    iraDeduction.roundingIncrement.amount,
+    iraDeduction.phaseoutThreshold.single.amount,
+    iraDeduction.phaseoutThreshold.marriedFilingSeparately.amount,
+    iraDeduction.phaseoutThreshold.headOfHousehold.amount,
+    iraDeduction.phaseoutThreshold.qualifyingSurvivingSpouse.amount,
+    iraDeduction.phaseoutRange.single.amount,
+    iraDeduction.phaseoutRange.marriedFilingSeparately.amount,
+    iraDeduction.phaseoutRange.headOfHousehold.amount,
+    iraDeduction.phaseoutRange.qualifyingSurvivingSpouse.amount,
     studentLoanInterestDeduction.maximumDeduction.amount,
     studentLoanInterestDeduction.phaseoutThreshold.single.amount,
     studentLoanInterestDeduction.phaseoutThreshold.marriedFilingJointly.amount,
@@ -2548,6 +3162,11 @@ const everyDollarStringField = [
         alternativeMinimumTax.exemptionCompletePhaseout[status].amount,
         alternativeMinimumTax.upperRateThreshold[status].amount,
     ]),
+    ...federalPovertyLineTables.flatMap(table => [
+        federalPovertyLine[table].firstPerson.amount,
+        federalPovertyLine[table].eachAdditionalPerson.amount,
+    ]),
+    ...premiumTaxCreditRepaymentLimitation.bands.flatMap(band => [band.single, band.other]),
 ]
 
 export const proof = {
@@ -2778,6 +3397,89 @@ export const proof = {
                     basisPoints,
                 ],
             )
+        }
+    },
+    // §3101(a)'s 6.2%, in the statute's own words, with its citation asserted
+    // SEPARATELY from its value — a rate that is right while citing the wrong
+    // section and a rate that is wrong while citing the right one are
+    // different defects.
+    theEmployeeSocialSecurityRateIsSectionThirtyOneOhOnesOwnSixPointTwo: () => {
+        assertEq(
+            socialSecurityTaxWithholding.employeeRateBasisPoints, 620,
+            '6.2% — IRC §3101(a), the rate an employer withholds into Form W-2 box 4')
+        assertEq(socialSecurityTaxWithholding.citation.kind, 'code')
+        assertEq(socialSecurityTaxWithholding.citation.section, '§3101(a)')
+        assertEq(socialSecurityTaxWithholding.citation.effectiveDate, '2025-01-01')
+        // The unit test this module applies to every other rate: 6.2 is not a
+        // whole number of percent, so basis points are what make it exact.
+        assert(
+            socialSecurityTaxWithholding.employeeRateBasisPoints % 100 !== 0,
+            ['§3101(a)\'s rate IS a whole number of percent — revisit the unit',
+                socialSecurityTaxWithholding.employeeRateBasisPoints])
+    },
+    // The product, checked against a figure NEITHER stored parameter
+    // produced: the 2025 Schedule 3 instructions for line 11 print the
+    // maximum outright as **$10,918.20**, and that is what is hand-typed
+    // here. Two stored parameters multiplied together are not evidence about
+    // either one until something outside this module says what the answer
+    // should be — the idiom `fjs/schedule/se`'s 0.9235 leaf uses, applied to
+    // the pair §3121(a)(1) actually needs.
+    //
+    // It is also the leaf that notices the SHARED wage base moving. §1402(b)(1)
+    // and §3121(a)(1) both defer to one Social Security Act §230 base, so
+    // `selfEmploymentTax.socialSecurityWageBase` is read by chapter 2 AND
+    // chapter 21; a TY2026 figure dropped in without revisiting this line
+    // would silently change a refund on Schedule 3 line 11.
+    theSocialSecurityWithholdingMaximumIsTheInstructionsOwnFigure: () => {
+        const maximum = halfUp(of(
+            centsFromString(selfEmploymentTax.socialSecurityWageBase.amount)
+            * BigInt(socialSecurityTaxWithholding.employeeRateBasisPoints))(10000n))
+        assertEq(
+            centsToString(maximum), '10918.20',
+            '$176,100.00 x 6.2% — the 2025 Schedule 3 line 11 instructions print $10,918.20')
+    },
+    // §904(j)(2)(B)'s two figures, in the statute's own words, with the
+    // citation asserted SEPARATELY from the value — a threshold that is right
+    // while citing the wrong subsection and one that is wrong while citing
+    // the right one are different defects.
+    //
+    // Asserted PER STATUS and hand-typed five times, never as one loop over
+    // an expected map, so a single wrong figure names its own status. The
+    // three $300 rows are the interesting ones: each is a status the statute
+    // does NOT call a joint return, and a copy-paste of the joint figure into
+    // any of them would hand that filer twice the ceiling.
+    theDeMinimisCeilingIsThreeHundredExceptOnAJointReturn: () => {
+        assertEq(
+            foreignTaxCreditDeMinimisElection.single.amount, '300.00',
+            '$300 — §904(j)(2)(B), a single filer is not a joint return')
+        assertEq(
+            foreignTaxCreditDeMinimisElection.marriedFilingJointly.amount, '600.00',
+            '$600 — §904(j)(2)(B), "in the case of a joint return"')
+        assertEq(
+            foreignTaxCreditDeMinimisElection.marriedFilingSeparately.amount, '300.00',
+            '$300 — a separate return is not a joint return')
+        assertEq(
+            foreignTaxCreditDeMinimisElection.headOfHousehold.amount, '300.00',
+            '$300 — head of household is not a joint return')
+        assertEq(
+            foreignTaxCreditDeMinimisElection.qualifyingSurvivingSpouse.amount, '300.00',
+            '$300 — a qualifying surviving spouse does not file a JOINT return, '
+            + 'whatever rate schedule the status borrows')
+        // Exactly ONE status may carry the larger figure. Stated as a count
+        // rather than as five equalities, so a sixth status added later
+        // cannot quietly take $600 by default.
+        assertEq(
+            individualFilingStatuses.filter(
+                status => foreignTaxCreditDeMinimisElection[status].amount === '600.00').length,
+            1,
+            'exactly one filing status is a joint return')
+    },
+    everyDeMinimisCeilingCitesSubsectionJ: () => {
+        for (const status of individualFilingStatuses) {
+            const { citation } = foreignTaxCreditDeMinimisElection[status]
+            assertEq(citation.kind, 'code', status)
+            assertEq(citation.section, '§904(j)(2)(B)', status)
+            assertEq(citation.effectiveDate, '2025-01-01', status)
         }
     },
     // T-08-02: every stored dollar amount is a `string`, never a JSON
@@ -3211,6 +3913,116 @@ export const proof = {
                 completelyPhasedOut,
                 ['threshold + range must equal §221(b)(2)(B)\'s completely-phased-out figure', status],
             )
+        }
+    },
+    // ── IRC §219, Schedule 1 line 20: the traditional IRA deduction ─────────
+    //
+    // Every expected value below is hand-typed from IRS Notice 2024-80 and
+    // Publication 590-A Table 1-2, never read back out of `iraDeduction`.
+    // The subsection letter is asserted beside each amount so the two cannot
+    // drift: a $126,000 figure sitting under `single` would have to arrive
+    // with a `(g)(3)(B)(i)` citation to pass, and it would still fail on the
+    // amount.
+    iraDeductionLimitsAreNoticeTwentyFourEightyFigures: () => {
+        assertEq(iraDeduction.deductibleAmount.amount, '7000.00', '§219(b)(5)(A), Notice 2024-80')
+        assertEq(iraDeduction.deductibleAmount.citation.section, '§219(b)(5)(A)')
+        assertEq(iraDeduction.deductibleAmount.citation.kind, 'code')
+        assertEq(iraDeduction.deductibleAmount.citation.effectiveDate, '2025-01-01')
+        assertEq(iraDeduction.catchUpContribution.amount, '1000.00', '§219(b)(5)(B)(ii), "remains $1,000"')
+        assertEq(iraDeduction.catchUpContribution.citation.section, '§219(b)(5)(B)(ii)')
+        // §219(g)(2)(B) and (C), the two figures written into the statute
+        // itself. Publication 590-A Worksheet 1-2 line 4 prints both in one
+        // sentence: "round it to the next highest multiple of $10 … However,
+        // if the result is less than $200, enter $200."
+        assertEq(iraDeduction.minimumPhasedOutLimit.amount, '200.00', '§219(g)(2)(B)')
+        assertEq(iraDeduction.minimumPhasedOutLimit.citation.section, '§219(g)(2)(B)')
+        assertEq(iraDeduction.roundingIncrement.amount, '10.00', '§219(g)(2)(C)')
+        assertEq(iraDeduction.roundingIncrement.citation.section, '§219(g)(2)(C)')
+    },
+    // The four statuses that can compute this deduction, each with its own
+    // threshold, its own range and its own subsection. Hand-typed as four
+    // separate rows rather than looped with a shared expectation, for the
+    // reason `additionalMedicareTaxThresholdsAreTheUnindexedStatutoryFigures`
+    // states about ITS QSS row -- except that here QSS goes the OTHER way and
+    // takes the joint figures, on Notice 2024-80's own words ("filing a joint
+    // return or as a qualifying widow(er)").
+    //
+    // `marriedFilingJointly` is deliberately absent and there is no fifth
+    // row: `fjs/schedule/1` refuses a joint return carrying a contribution,
+    // so the status has no threshold here at all.
+    iraDeductionPhaseoutThresholdsArePublication590ATableOneTwo: () => {
+        /** @type {readonly (readonly [string, string, string, string])[]} */
+        const expected = [
+            ['single', '79000.00', '10000.00', '§219(g)(3)(B)(ii)'],
+            ['headOfHousehold', '79000.00', '10000.00', '§219(g)(3)(B)(ii)'],
+            ['qualifyingSurvivingSpouse', '126000.00', '20000.00', '§219(g)(3)(B)(i)'],
+            ['marriedFilingSeparately', '0.00', '10000.00', '§219(g)(3)(B)(iii)'],
+        ]
+        assertEq(
+            expected.length, 4,
+            'four statuses compute; a joint return refuses and so stores nothing')
+        for (const [status, threshold, range, section] of expected) {
+            const storedThreshold = status === 'single' ? iraDeduction.phaseoutThreshold.single
+                : status === 'headOfHousehold' ? iraDeduction.phaseoutThreshold.headOfHousehold
+                    : status === 'qualifyingSurvivingSpouse'
+                        ? iraDeduction.phaseoutThreshold.qualifyingSurvivingSpouse
+                        : iraDeduction.phaseoutThreshold.marriedFilingSeparately
+            const storedRange = status === 'single' ? iraDeduction.phaseoutRange.single
+                : status === 'headOfHousehold' ? iraDeduction.phaseoutRange.headOfHousehold
+                    : status === 'qualifyingSurvivingSpouse'
+                        ? iraDeduction.phaseoutRange.qualifyingSurvivingSpouse
+                        : iraDeduction.phaseoutRange.marriedFilingSeparately
+            assertEq(storedThreshold.amount, threshold, ['wrong §219(g)(3)(B) applicable dollar amount', status])
+            assertEq(storedThreshold.citation.section, section, ['wrong subsection', status])
+            assertEq(storedRange.amount, range, ['wrong §219(g)(2)(A)(ii) divisor', status])
+            assertEq(storedRange.citation.section, '§219(g)(2)(A)(ii)', ['wrong divisor citation', status])
+        }
+    },
+    // The check a THIRD and FOURTH stored figure would have made impossible.
+    // Publication 590-A Worksheet 1-2's own table prints a completely-
+    // phased-out end point per status, and its line 4 prints a PERCENTAGE per
+    // status; this module stores neither, because both are derivable from the
+    // three figures the computation actually reads. Derived here and compared
+    // against hand-typed values off the printed worksheet.
+    //
+    // The percentages are `deductibleAmount / range` and
+    // `(deductibleAmount + catchUp) / range` -- 70%/80% for single, head of
+    // household and married-filing-separately, and 35%/40% for a qualifying
+    // surviving spouse, which is the pair Worksheet 1-2 prints in its
+    // "Married filing jointly or qualifying surviving spouse" row.
+    iraDeductionPhaseoutEndPointsAndPercentagesMatchPublication590A: () => {
+        /** @type {readonly (readonly [string, string, number, number])[]} */
+        const expected = [
+            ['single', '89000.00', 70, 80],
+            ['headOfHousehold', '89000.00', 70, 80],
+            ['qualifyingSurvivingSpouse', '146000.00', 35, 40],
+            ['marriedFilingSeparately', '10000.00', 70, 80],
+        ]
+        assertEq(expected.length, 4, 'one row per computable status')
+        const baseCents = centsFromString(iraDeduction.deductibleAmount.amount)
+        const catchUpCents = centsFromString(iraDeduction.catchUpContribution.amount)
+        for (const [status, endPoint, basePercent, catchUpPercent] of expected) {
+            const storedThreshold = status === 'single' ? iraDeduction.phaseoutThreshold.single
+                : status === 'headOfHousehold' ? iraDeduction.phaseoutThreshold.headOfHousehold
+                    : status === 'qualifyingSurvivingSpouse'
+                        ? iraDeduction.phaseoutThreshold.qualifyingSurvivingSpouse
+                        : iraDeduction.phaseoutThreshold.marriedFilingSeparately
+            const storedRange = status === 'single' ? iraDeduction.phaseoutRange.single
+                : status === 'headOfHousehold' ? iraDeduction.phaseoutRange.headOfHousehold
+                    : status === 'qualifyingSurvivingSpouse'
+                        ? iraDeduction.phaseoutRange.qualifyingSurvivingSpouse
+                        : iraDeduction.phaseoutRange.marriedFilingSeparately
+            const rangeCents = centsFromString(storedRange.amount)
+            assertEq(
+                centsToString(centsFromString(storedThreshold.amount) + rangeCents),
+                endPoint,
+                ['threshold + range must equal Publication 590-A’s end point', status])
+            assertEq(
+                Number(baseCents * 100n / rangeCents), basePercent,
+                ['wrong Worksheet 1-2 line 4 percentage, under age 50', status])
+            assertEq(
+                Number((baseCents + catchUpCents) * 100n / rangeCents), catchUpPercent,
+                ['wrong Worksheet 1-2 line 4 percentage, age 50 or over', status])
         }
     },
     // ── TAX-27, Phase 32: §32's own three independent checks ────────────────
@@ -4159,4 +4971,274 @@ export const proof = {
             }
         },
     },
+    // ── Form 8962's three parameter groups (TAX-37) ─────────────────────────
+    federalPovertyLine: {
+        // Every one of the twenty-four printed rows of i8962 Tables 1-1, 1-2
+        // and 1-3, hand-typed from the printed page and NOT derived from the
+        // stored base-and-increment pair — which is the whole point, since
+        // that pair is the thing under test. Family sizes 1 through 8, three
+        // tables.
+        allTwentyFourPrintedRowsAgreeWithTheStoredBaseAndIncrement: () => {
+            /** @type {Record<FederalPovertyLineTable, readonly bigint[]>} */
+            const printed = {
+                contiguous48AndDistrictOfColumbia: [
+                    1506000n, 2044000n, 2582000n, 3120000n, 3658000n, 4196000n, 4734000n, 5272000n,
+                ],
+                alaska: [
+                    1881000n, 2554000n, 3227000n, 3900000n, 4573000n, 5246000n, 5919000n, 6592000n,
+                ],
+                hawaii: [
+                    1731000n, 2350000n, 2969000n, 3588000n, 4207000n, 4826000n, 5445000n, 6064000n,
+                ],
+            }
+            for (const table of federalPovertyLineTables) {
+                const rows = printed[table]
+                assertEq(rows.length, 8, ['each printed table has eight rows', table])
+                const first = centsFromString(federalPovertyLine[table].firstPerson.amount)
+                const each = centsFromString(federalPovertyLine[table].eachAdditionalPerson.amount)
+                for (let size = 1; size <= 8; ++size) {
+                    const expected = assertNotNullish(rows[size - 1], ['row', table, size])
+                    assertEq(
+                        first + each * BigInt(size - 1),
+                        expected,
+                        [
+                            'the stored base-and-increment must reproduce this printed row exactly',
+                            table,
+                            size,
+                            centsToString(expected),
+                        ],
+                    )
+                }
+            }
+        },
+        // The footnote under each printed table works one example, and all
+        // three are worked here: "if your family size is 11 ... Enter the
+        // result of $68,860" (contiguous), $86,110 (Alaska), $79,210
+        // (Hawaii). This is what proves the increment is the increment rather
+        // than a number that merely happens to fit eight rows.
+        theOverEightFootnoteExamplesAreReproduced: () => {
+            /** @type {Record<FederalPovertyLineTable, bigint>} */
+            const familyOfEleven = {
+                contiguous48AndDistrictOfColumbia: 6886000n,
+                alaska: 8611000n,
+                hawaii: 7921000n,
+            }
+            for (const table of federalPovertyLineTables) {
+                const expected = familyOfEleven[table]
+                assertEq(
+                    centsFromString(federalPovertyLine[table].firstPerson.amount)
+                        + centsFromString(federalPovertyLine[table].eachAdditionalPerson.amount) * 10n,
+                    expected,
+                    ['i8962’s own worked example for a family of eleven', table, centsToString(expected)],
+                )
+            }
+        },
+        // The three tables are genuinely DIFFERENT figures, not one table
+        // referenced three times. A spread would make this leaf impossible to
+        // fail and the Alaska/Hawaii uplift impossible to observe going
+        // missing.
+        theThreeTablesAreThreeDistinctSchedules: () => {
+            const amounts = federalPovertyLineTables.map(
+                table => federalPovertyLine[table].firstPerson.amount)
+            assertEq(new Set(amounts).size, 3, ['three tables, three first-person amounts', amounts])
+            const increments = federalPovertyLineTables.map(
+                table => federalPovertyLine[table].eachAdditionalPerson.amount)
+            assertEq(new Set(increments).size, 3, ['three tables, three increments', increments])
+            // Alaska is the highest of the three at every family size, and
+            // Hawaii sits between it and the mainland. Asserted because a
+            // transposition of the two would keep all three distinct.
+            assert(
+                centsFromString(federalPovertyLine.alaska.firstPerson.amount)
+                    > centsFromString(federalPovertyLine.hawaii.firstPerson.amount),
+                'Alaska’s poverty line is above Hawaii’s')
+            assert(
+                centsFromString(federalPovertyLine.hawaii.firstPerson.amount)
+                    > centsFromString(
+                        federalPovertyLine.contiguous48AndDistrictOfColumbia.firstPerson.amount),
+                'Hawaii’s poverty line is above the contiguous 48’s')
+        },
+        // The PRIOR-year sourcing, made assertable. The 2025 contiguous
+        // first-person guideline is $15,650; this parameter must be $15,060,
+        // the 2024 one, because that is what the 2025 Form 8962 uses. The
+        // wrong-year figure is hand-typed here so the check is a comparison
+        // against a real alternative rather than against nothing.
+        theFiguresAreTheTwentyTwentyFourGuidelinesNotTheTwentyTwentyFiveOnes: () => {
+            const twentyTwentyFiveContiguousFirstPerson = 1565000n
+            assertEq(
+                centsFromString(
+                    federalPovertyLine.contiguous48AndDistrictOfColumbia.firstPerson.amount),
+                1506000n,
+                'i8962 Table 1-1 prints $15,060 — the 2024 guideline')
+            assert(
+                centsFromString(
+                    federalPovertyLine.contiguous48AndDistrictOfColumbia.firstPerson.amount)
+                    !== twentyTwentyFiveContiguousFirstPerson,
+                'the 2025 guideline ($15,650) is NOT what the 2025 Form 8962 uses — see this group’s docstring')
+        },
+        everyFigureCitesTheFederalRegisterNoticeThatPublishedIt: () => {
+            for (const table of federalPovertyLineTables) {
+                for (const entry of [
+                    federalPovertyLine[table].firstPerson,
+                    federalPovertyLine[table].eachAdditionalPerson,
+                ]) {
+                    assertEq(entry.citation.kind, 'federalRegister', table)
+                    const citation = entry.citation
+                    assert(
+                        citation.kind === 'federalRegister',
+                        ['expected a federalRegister-kind citation', table, citation])
+                    assertEq(citation.federalRegister, '89 FR 2961', table)
+                    assertEq(citation.effectiveDate, '2025-01-01', table)
+                    assert(
+                        citation.section.includes('2024'),
+                        [
+                            'the citation must say which YEAR of guidelines these are, since that is the trap',
+                            table,
+                            citation.section,
+                        ])
+                }
+            }
+        },
+    },
+    premiumTaxCreditApplicablePercentage: {
+        // The six tiers of §36B(b)(3)(A)(iii), hand-typed from the statute
+        // rather than read back off the stored list, and compared entry by
+        // entry. The hand-typed COUNT is what a dropped tier fails.
+        theSixStatutoryTiers: () => {
+            /** @type {readonly (readonly [number, number | undefined, number, number])[]} */
+            const statutory = [
+                [0, 150, 0, 0],
+                [150, 200, 0, 200],
+                [200, 250, 200, 400],
+                [250, 300, 400, 600],
+                [300, 400, 600, 850],
+                [400, undefined, 850, 850],
+            ]
+            assertEq(
+                premiumTaxCreditApplicablePercentage.tiers.length,
+                6,
+                '§36B(b)(3)(A)(iii) prints six income tiers')
+            assertEq(statutory.length, 6, 'and the hand-typed statement of them has six too')
+            for (let i = 0; i < statutory.length; ++i) {
+                const expected = assertNotNullish(statutory[i], ['hand-typed tier', i])
+                const stored = assertNotNullish(premiumTaxCreditApplicablePercentage.tiers[i], ['stored tier', i])
+                assertEq(stored.floorPercent, expected[0], ['tier floor', i])
+                assertEq(stored.ceilingPercent, expected[1], ['tier ceiling', i])
+                assertEq(stored.initialHundredthsOfPercent, expected[2], ['tier initial percentage', i])
+                assertEq(stored.finalHundredthsOfPercent, expected[3], ['tier final percentage', i])
+            }
+        },
+        // The tiers are CONTIGUOUS and cover every percentage from zero
+        // upwards with no gap and no overlap. A gap would make one household
+        // income have no applicable figure at all, which the printed table
+        // never does.
+        theTiersCoverEveryPercentageWithoutAGapOrAnOverlap: () => {
+            const tiers = premiumTaxCreditApplicablePercentage.tiers
+            const first = assertNotNullish(tiers[0], 'the tier list is not empty')
+            assertEq(first.floorPercent, 0, 'the first tier starts at zero')
+            for (let i = 1; i < tiers.length; ++i) {
+                const previous = assertNotNullish(tiers[i - 1], ['previous tier', i])
+                const current = assertNotNullish(tiers[i], ['current tier', i])
+                assertEq(
+                    previous.ceilingPercent,
+                    current.floorPercent,
+                    ['each tier begins exactly where the last one ended', i])
+                assertEq(
+                    previous.finalHundredthsOfPercent,
+                    current.initialHundredthsOfPercent,
+                    ['and the percentage is continuous across the join', i])
+            }
+            const last = assertNotNullish(tiers[tiers.length - 1], 'the tier list is not empty')
+            assertEq(last.ceilingPercent, undefined, 'the last tier is open-topped, with no sentinel')
+        },
+        // The top tier exists AT ALL, which is the ARPA/IRA change: before it,
+        // a household above 400% of the poverty line had no applicable figure
+        // and therefore no credit.
+        thereIsStillAnApplicableFigureAboveFourHundredPercent: () => {
+            const top = assertNotNullish(
+                premiumTaxCreditApplicablePercentage.tiers[
+                    premiumTaxCreditApplicablePercentage.tiers.length - 1],
+                'the tier list is not empty')
+            assertEq(top.floorPercent, 400)
+            assertEq(top.initialHundredthsOfPercent, 850, '8.50% — i8962 Table 2’s "400 or more" row')
+            assertEq(top.finalHundredthsOfPercent, 850, 'flat, not sliding')
+        },
+        theCitationIsTheStatuteAndNotARevenueProcedure: () => {
+            // §36B(b)(3)(A)(ii)'s indexing is switched off for tax years
+            // beginning before 2026, so no Rev. Proc. adjusts this table and
+            // naming one would be an invented source.
+            assertEq(premiumTaxCreditApplicablePercentage.citation.kind, 'code')
+            assertEq(premiumTaxCreditApplicablePercentage.citation.section, '§36B(b)(3)(A)(iii)')
+            assertEq(premiumTaxCreditApplicablePercentage.citation.effectiveDate, '2025-01-01')
+        },
+    },
+    premiumTaxCreditRepaymentLimitation: {
+        // The three printed rows of i8962 Table 5, hand-typed from the page.
+        theThreePrintedBands: () => {
+            /** @type {readonly (readonly [number, bigint, bigint])[]} */
+            const printed = [
+                [200, 37500n, 75000n],
+                [300, 97500n, 195000n],
+                [400, 162500n, 325000n],
+            ]
+            assertEq(
+                premiumTaxCreditRepaymentLimitation.bands.length,
+                3,
+                'i8962 Table 5 has THREE capped rows; the fourth row is "leave line 28 blank"')
+            assertEq(printed.length, 3)
+            for (let i = 0; i < printed.length; ++i) {
+                const expected = assertNotNullish(printed[i], ['hand-typed band', i])
+                const stored = assertNotNullish(premiumTaxCreditRepaymentLimitation.bands[i], ['stored band', i])
+                assertEq(stored.povertyLinePercentCeiling, expected[0], ['band ceiling', i])
+                assertEq(centsFromString(stored.single), expected[1], ['single column', i])
+                assertEq(centsFromString(stored.other), expected[2], ['any-other-status column', i])
+            }
+        },
+        // There is NO band at or above 400, and the absence is asserted
+        // rather than left to the reader: a fourth band would be a silent cap
+        // on an uncapped repayment.
+        thereIsNoBandAtOrAboveFourHundredPercent: () => {
+            for (const band of premiumTaxCreditRepaymentLimitation.bands) {
+                assert(
+                    band.povertyLinePercentCeiling <= 400,
+                    ['no Table 5 band caps a household at or above 400% of the poverty line', band])
+            }
+            assert(
+                !premiumTaxCreditRepaymentLimitation.bands.some(
+                    band => band.povertyLinePercentCeiling > 400),
+                'i8962 line 28: "If your entry on Form 8962, line 5, is 400 or more, there is no repayment limitation"')
+        },
+        // The "any other filing status" column is exactly twice the Single
+        // one in all three bands — which is a property of the printed table
+        // and NOT how either column is stored. Asserted as a cross-check on
+        // the transcription, in the direction a single transposed digit would
+        // break.
+        theOtherColumnIsTwiceTheSingleColumnInEveryBand: () => {
+            for (const band of premiumTaxCreditRepaymentLimitation.bands) {
+                assertEq(
+                    centsFromString(band.other),
+                    centsFromString(band.single) * 2n,
+                    ['Rev. Proc. 2024-40 §2.07 prints the second column at twice the first', band])
+            }
+        },
+        theBandsAreOrderedAndStrictlyIncreasing: () => {
+            const bands = premiumTaxCreditRepaymentLimitation.bands
+            for (let i = 1; i < bands.length; ++i) {
+                const previous = assertNotNullish(bands[i - 1], ['previous band', i])
+                const current = assertNotNullish(bands[i], ['current band', i])
+                assert(
+                    previous.povertyLinePercentCeiling < current.povertyLinePercentCeiling,
+                    ['Table 5 reads downwards in increasing income order', i])
+                assert(
+                    centsFromString(previous.single) < centsFromString(current.single),
+                    ['and the limitation rises with income', i])
+            }
+        },
+        theCitationIsTheRevenueProcedureThatIndexedTheAmounts: () => {
+            const citation = assertRevProcCitation(premiumTaxCreditRepaymentLimitation.citation)
+            assertEq(citation.revProc, '2024-40')
+            assertEq(citation.section, '§2.07')
+            assertEq(citation.effectiveDate, '2025-01-01')
+        },
+    },
 }
+

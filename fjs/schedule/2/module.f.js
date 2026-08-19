@@ -138,15 +138,21 @@
  * @module
  */
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
+import { centsFromString } from '../../exact/module.f.js'
 import { form8959 } from '../../form8959/module.f.js'
 import { form8960 } from '../../form8960/module.f.js'
 import { form6251 } from '../../form6251/module.f.js'
-// PROOF-ONLY at run time, and deliberately the ONLY thing this module reads
-// from `fjs/return/scope`: `theForeignTaxCreditCycleIsResolvedByARefusal`
-// needs to check that the foreign tax credit is still refused, because Form
-// 6251 line 10 is handed a $0.00 for it. Production code below reads nothing
-// from the scope guard, exactly as this module's own docstring says.
-import { modeledKinds } from '../../return/scope/module.f.js'
+import { estateTrustAmtAdjustmentSources } from '../../form6251/estate_trust/module.f.js'
+// REMOVED at TAX-36: `import { modeledKinds } from '../../return/scope/...'`
+// stood here, proof-only, so `theForeignTaxCreditCycleIsResolvedByARefusal`
+// could assert that `foreignTaxCredit` was still a refused kind — the one
+// thing this module ever read from the scope guard. That kind is modeled now
+// and Form 6251 is handed the real Schedule 3 line 1, so the check has
+// nothing left to assert and the leaf is repointed (see
+// `theForeignTaxCreditIsForwardedToFormSixTwoFiftyOnesBothSides`). This
+// module now reads nothing at all from `fjs/return/scope`, in proofs or in
+// production, which is what its own docstring always claimed of the
+// production half.
 import { scheduleSelfEmploymentPartI } from '../se/module.f.js'
 import { taxParamsByYear } from '../../tax/params/module.f.js'
 
@@ -158,6 +164,9 @@ import { taxParamsByYear } from '../../tax/params/module.f.js'
 /** @import { Form6251Ok, NoRegularPreferentialWorksheet } from '../../form6251/module.f.js' */
 /** @import { RegularPreferentialWorksheet } from '../../form6251/part3/module.f.js' */
 /** @import { FormThirtyNineTwentyOne } from '../../document/form3921/module.f.js' */
+/** @import { W2 } from '../../document/w2/module.f.js' */
+/** @import { K1EstateTrust } from '../../document/k1_1041/module.f.js' */
+/** @import { CodedEntry } from '../../document/k1_common/module.f.js' */
 /** @import { SelfEmploymentOutcome } from '../se/module.f.js' */
 
 // ── Inputs ───────────────────────────────────────────────────────────────────
@@ -223,6 +232,79 @@ const totalLine = rule => lines => ({
     rule,
 })
 
+/**
+ * A line built from real document readings, falling back to
+ * {@link profileDeclaredZeroLine} when NO document supplied one — mirrors
+ * `fjs/schedule/1`'s own private `documentLine`, under this module's
+ * established "reimplement an idiom you cannot import" rule.
+ *
+ * This is what makes "the hard zero is replaced, not supplemented" true for
+ * line 13: on a return whose W-2s carry none of the four codes, the line is
+ * byte-identical to the `zero(...)` it was before — same value, same single
+ * `declaredKinds` citation — and on a return that does carry them, its
+ * sources do not mention the profile at all.
+ * @type {(profile: Stored<ReturnProfile>) => (rule: string) => (value: bigint) => (sources: readonly Source[]) => ReportLine}
+ */
+const documentLine = profile => rule => value => sources => {
+    const [first, ...rest] = sources
+    return first === undefined
+        ? profileDeclaredZeroLine(profile)(rule)
+        : { value, sources: [first, ...rest], rule }
+}
+
+/**
+ * The four Form W-2 box 12 codes that report tax an employer could NOT
+ * collect, and which the employee therefore owes on Schedule 2 line 13:
+ *
+ * - `A` — uncollected social security or RRTA tax on tips
+ * - `B` — uncollected Medicare tax on tips
+ * - `M` — uncollected social security or RRTA tax on group-term life
+ *   insurance over $50,000 (former employees only)
+ * - `N` — uncollected Medicare tax on group-term life insurance over $50,000
+ *   (former employees only)
+ *
+ * **Hand-typed here, and nowhere derived**, per AGENTS.md's fourth shipped
+ * defect: a match set computed from anything the proofs also read could not
+ * notice one of the four quietly disappearing. `theFourUncollectedTaxCodes`
+ * below hand-types the same four a SECOND time, so dropping one reddens a
+ * leaf even if every fixture happened to use the other three.
+ */
+const uncollectedTaxCodes = /** @type {const} */ (['A', 'B', 'M', 'N'])
+
+/**
+ * Schedule 2 line 13's whole computation: one {@link Source} per box-12
+ * entry, on every stored Form W-2, whose code is one of
+ * {@link uncollectedTaxCodes}.
+ *
+ * **One source per ENTRY, never per document.** A single W-2 can carry all
+ * four codes, and an auditor reading line 13 has to be able to see which of
+ * the four the money came from — the Medicare half and the social security
+ * half of an uncollected tip tax are different statutes.
+ *
+ * The code is matched case-insensitively after trimming, because
+ * `fjs/document/w2` stores box 12's code "as printed" and never interprets
+ * it. A code that arrives as `'a'` or `' A '` is the same box; a code that
+ * arrives as `'AA'` — a designated Roth contribution — is NOT, so the
+ * comparison is on the whole trimmed string rather than a prefix. This is
+ * `fjs/schedule/1`'s `employerHsaContributionSources` verbatim in shape, for
+ * the identical reason.
+ *
+ * The NORMALIZED code reaches the `boxPath`, so a citation reads
+ * `box12[code=A]` whatever spelling the employer printed.
+ * @type {(w2s: readonly Stored<W2>[]) => readonly Source[]}
+ */
+const uncollectedTaxSources = w2s => w2s.flatMap(form =>
+    (form.value.box12 ?? []).flatMap(entry => {
+        const code = entry.code.trim().toUpperCase()
+        return uncollectedTaxCodes.some(candidate => candidate === code)
+            ? [{
+                documentHash: form.documentHash,
+                boxPath: `box12[code=${code}]`,
+                value: entry.amount,
+            }]
+            : []
+    }))
+
 // ── Schedule 2 itself ───────────────────────────────────────────────────────
 
 /**
@@ -262,22 +344,34 @@ const totalLine = rule => lines => ({
  * the same-year ISO disposition rule makes the spread unknowable, and whether
  * capital gain distributions reached 1040 line 7 directly.
  *
- * **`scheduleThreeLine1Cents` is deliberately NOT among them, and there is a
- * cycle behind that.** Form 6251 line 10 subtracts Schedule 3 line 1, the
- * foreign tax credit; `fjs/schedule/3` runs AFTER this module in
- * `fjs/form1040/core`, because its own Credit Limit Worksheet reads 1040 line
- * 18, which is line 16 plus THIS schedule's line 3. The printed forms are
- * genuinely circular there. It is resolvable today only because
- * `foreignTaxCredit` is a refused `fjs/return/scope` kind, so Schedule 3 line
- * 1 is a documented zero for every return this engine computes — and
- * `theForeignTaxCreditCycleIsResolvedByARefusal` is the leaf that says so as a
- * checked claim rather than a comment, so the day that kind is modeled this
- * module fails and somebody has to break the cycle properly.
+ * **`scheduleThreeLine1Cents` IS among them as of TAX-36, and the paragraph
+ * that said it never could be is rewritten rather than deleted, because the
+ * correction is the finding.** It read: Form 6251 line 10 subtracts Schedule
+ * 3 line 1, the foreign tax credit; `fjs/schedule/3` runs AFTER this module
+ * in `fjs/form1040/core`, because its own Credit Limit Worksheet reads 1040
+ * line 18, which is line 16 plus THIS schedule's line 3 — so the printed
+ * forms are *genuinely circular there*, and passing `0n` was correct only
+ * while `foreignTaxCredit` was a refused kind.
+ *
+ * **The cycle was never real.** Schedule 3 line 1 has no tax figure on its
+ * input side at all: under §904(j) the credit is the creditable foreign taxes
+ * off two 1099 boxes, with no limitation and no worksheet. Only Schedule 3's
+ * lines 3 and 4 need 1040 line 18. So `fjs/schedule/3` exports
+ * `foreignTaxCreditLine`, `fjs/form1040/core` runs it ONCE before this
+ * module, and both schedules are handed the finished line. What looked like a
+ * cycle was one module's lines sharing an input the other line did not need.
+ *
+ * `theForeignTaxCreditCycleIsResolvedByARefusal` — the leaf written to fail
+ * on this exact day — is repointed to the property that replaces it, rather
+ * than deleted: line 10 moves by exactly the credit it is handed, and Form
+ * 6251 line 8 moves with it, so a §904(j) credit's net effect on the AMT is
+ * zero.
  * @typedef {{
  *   readonly profile: Stored<ReturnProfile>,
  *   readonly status: IndividualFilingStatus,
  *   readonly medicareWages: ReportLine,
  *   readonly medicareTaxWithheld: ReportLine,
+ *   readonly w2Forms: readonly Stored<W2>[],
  *   readonly taxableInterest: ReportLine,
  *   readonly ordinaryDividends: ReportLine,
  *   readonly netCapitalGainOrLoss: ReportLine,
@@ -292,11 +386,13 @@ const totalLine = rule => lines => ({
  *   readonly specifiedPrivateActivityBondInterestCents: bigint,
  *   readonly standardDeductionCents: bigint,
  *   readonly isoExerciseForms: readonly Stored<FormThirtyNineTwentyOne>[],
+ *   readonly estateTrustK1Forms: readonly Stored<K1EstateTrust>[],
  *   readonly aStoredNineteenNineBReportsASale: boolean,
  *   readonly filingScheduleD: boolean,
  *   readonly scheduleD15Cents: bigint,
  *   readonly scheduleD16Cents: bigint,
  *   readonly scheduleD19Cents: bigint,
+ *   readonly scheduleThreeLine1Cents: bigint,
  *   readonly regularPreferentialWorksheet:
  *     RegularPreferentialWorksheet | NoRegularPreferentialWorksheet,
  * }} ScheduleTwoInput
@@ -363,13 +459,13 @@ const totalLine = rule => lines => ({
 export const scheduleTwo = taxParamSet => input => {
     const {
         profile, status,
-        medicareWages, medicareTaxWithheld,
+        medicareWages, medicareTaxWithheld, w2Forms,
         taxableInterest, ordinaryDividends, netCapitalGainOrLoss, adjustedGrossIncome,
         selfEmployment,
         qualifiedDividends, totalDeductions, regularTax,
         itemizing, scheduleALine7Cents, scheduleOneALine37Cents, standardDeductionCents,
         specifiedPrivateActivityBondInterestCents,
-        isoExerciseForms, aStoredNineteenNineBReportsASale,
+        isoExerciseForms, estateTrustK1Forms, aStoredNineteenNineBReportsASale,
         filingScheduleD, scheduleD15Cents, scheduleD16Cents, scheduleD19Cents,
         regularPreferentialWorksheet,
     } = input
@@ -409,15 +505,20 @@ export const scheduleTwo = taxParamSet => input => {
         scheduleALine7Cents,
         standardDeductionCents,
         isoExerciseForms,
+        // Form 6251 line 2j -- box 12 code A off every stored Schedule K-1
+        // (Form 1041). The DOCUMENTS travel, not a summed figure: the rows
+        // need per-code filtering and the citations below are per ENTRY.
+        estateTrustK1Forms,
         aStoredNineteenNineBReportsASale,
         regularTaxCents: regularTax.value,
         scheduleTwoLine1zCents: line1z.value,
-        // The foreign tax credit, and the cycle this module's own
-        // `ScheduleTwoInput` docstring argues: `fjs/schedule/3` runs after
-        // this module because its Credit Limit Worksheet reads 1040 line 18,
-        // which is line 16 plus this schedule's line 3. A documented zero,
-        // correct only because `foreignTaxCredit` is a refused kind.
-        scheduleThreeLine1Cents: 0n,
+        // Schedule 3 line 1, the foreign tax credit, computed ONCE by
+        // `fjs/schedule/3`'s exported `foreignTaxCreditLine` before this
+        // module ran and threaded straight through -- see this module's own
+        // `ScheduleTwoInput` docstring for why the cycle recorded there was
+        // not a real one. Form 6251 subtracts it on BOTH sides (line 8 and
+        // line 10), so a §904(j) credit's net effect on the AMT is zero.
+        scheduleThreeLine1Cents: input.scheduleThreeLine1Cents,
         qualifiedDividendsCents: qualifiedDividends.value,
         // 1040 line 7a, which IS the capital gain distributions when no
         // Schedule D was filed -- the same field `fjs/tax/line16`'s dispatcher
@@ -451,13 +552,19 @@ export const scheduleTwo = taxParamSet => input => {
                 value: fairMarketValue,
             }]
     })
+    // One citation per Schedule K-1 (Form 1041) box 12 entry that reached line
+    // 2j, built by the module that decided which entries those were -- never a
+    // second code match here, which is how a citation comes to name a row that
+    // did not contribute (or miss one that did).
+    const estateTrustSources = estateTrustAmtAdjustmentSources(estateTrustK1Forms)
     // Every fact the comparison actually reads: the profile (so a return with
     // no AMT still names the declaration the way every other zero line on this
     // schedule does), the adjusted gross income and deduction total that make
     // up alternative minimum taxable income, the regular tax it is measured
-    // against, and one citation per Form 3921 whose spread reached line 2i.
+    // against, one citation per Form 3921 whose spread reached line 2i, and one
+    // per K-1 box 12 code A row that reached line 2j.
     //
-    // The Form 3921 citations are APPENDED rather than unioned, because
+    // The document citations are APPENDED rather than unioned, because
     // `unionSources` takes `ReportLine`s and a Form 3921 box is not a report
     // line -- and no deduplication is lost: a `(documentHash, boxPath)` pair
     // naming a Form 3921 cannot collide with one naming a 1040 line.
@@ -466,7 +573,9 @@ export const scheduleTwo = taxParamSet => input => {
         adjustedGrossIncome, totalDeductions, regularTax,
     ])
     /** @type {readonly [Source, ...(readonly Source[])]} */
-    const line2Sources = [line2LineSources[0], ...line2LineSources.slice(1), ...isoSources]
+    const line2Sources = [
+        line2LineSources[0], ...line2LineSources.slice(1), ...isoSources, ...estateTrustSources,
+    ]
     const line2 = {
         value: form6251Result.line11,
         sources: line2Sources,
@@ -551,7 +660,20 @@ export const scheduleTwo = taxParamSet => input => {
         sources: unionSources([taxableInterest, ordinaryDividends, netCapitalGainOrLoss, adjustedGrossIncome]),
         rule: 'Schedule 2 line 12 (net investment income tax, Form 8960 line 17)',
     }
-    const line13 = zero('Schedule 2 line 13 (uncollected Social Security/Medicare/RRTA tax on tips or group-term life insurance)')
+    // 13. "Uncollected social security and Medicare or RRTA tax on tips or
+    //     group-term life insurance from Form W-2, box 12." The printed line
+    //     names its own source, and the four codes ARE the computation: no
+    //     floor, no threshold, no phase-out, no worksheet and no form to
+    //     attach. Read UNCONDITIONALLY, exactly as lines 2, 4, 11 and 12 are
+    //     -- an employer's inability to collect is not elective, and gating
+    //     this on a declaration would let a truthful filer who never read
+    //     box 12's code table receive a return that understates the tax by
+    //     the whole of it.
+    const line13Sources = uncollectedTaxSources(w2Forms)
+    const line13 = documentLine(profile)(
+        'Schedule 2 line 13 (uncollected Social Security/Medicare/RRTA tax on tips or group-term life insurance, Form W-2 box 12 codes A, B, M and N)')(
+        line13Sources.reduce((total, source) => total + centsFromString(source.value), 0n))(
+        line13Sources)
     const line14 = zero('Schedule 2 line 14 (interest on tax due on installment income from certain residential lots and timeshares)')
     const line15 = zero('Schedule 2 line 15 (interest on the deferred tax on certain installment sales over $150,000)')
     const line16 = zero('Schedule 2 line 16 (recapture of low-income housing credit)')
@@ -670,9 +792,15 @@ const noSelfEmployment = selfEmploymentInput(
 const noAmounts = {
     profile: profileNoDeclaredKinds,
     status: 'single',
+    // Schedule 3 line 1 as `fjs/form1040/core` hands it in: zero for a return
+    // with no foreign tax anywhere. The leaves below that care about it
+    // override it, and `theForeignTaxCreditReachesFormSixTwoFiftyOnesBothSides`
+    // is what proves it is not being ignored.
+    scheduleThreeLine1Cents: 0n,
     specifiedPrivateActivityBondInterestCents: 0n,
     medicareWages: inputLine('box5MedicareWagesAndTips')(0n),
     medicareTaxWithheld: inputLine('box6MedicareTaxWithheld')(0n),
+    w2Forms: [],
     taxableInterest: inputLine('line2b')(0n),
     ordinaryDividends: inputLine('line3b')(0n),
     netCapitalGainOrLoss: inputLine('line7a')(0n),
@@ -686,12 +814,53 @@ const noAmounts = {
     scheduleOneALine37Cents: 0n,
     standardDeductionCents: 0n,
     isoExerciseForms: [],
+    estateTrustK1Forms: [],
     aStoredNineteenNineBReportsASale: false,
     filingScheduleD: false,
     scheduleD15Cents: 0n,
     scheduleD16Cents: 0n,
     scheduleD19Cents: 0n,
     regularPreferentialWorksheet: { kind: 'none' },
+}
+
+/**
+ * A stored Form W-2 carrying a box 12 array verbatim, for the line 13 leaves.
+ *
+ * `documentHash` is a PARAMETER rather than a constant because line 13's
+ * citation contract is one source per contributing ENTRY, on the document
+ * that carried it — a fixture that reused a single hash could not tell "two
+ * W-2s summed" from "one W-2 counted twice", which is the only interesting
+ * way that line can be wrong.
+ *
+ * The `code` strings are passed through untouched, spacing and case included:
+ * `fjs/document/w2` stores box 12's code as printed, so a fixture that
+ * pre-normalized them would be proving the normalization it was supposed to
+ * be testing. Test-only: builds an INPUT.
+ * @type {(documentHash: string) => (box12: NonNullable<W2['box12']>) => Stored<W2>}
+ */
+const w2WithBox12 = documentHash => box12 => ({
+    documentHash,
+    value: {
+        dialect: 'vnd.fjs.w2',
+        payerTin: '11-1111111', recipientTin: '222-22-2222', accountNumber: 'ACC-W2',
+        taxYear: 2025, formRevision: '2025',
+        box12,
+    },
+})
+
+/**
+ * A stored Form W-2 with no box 12 key AT ALL — the ordinary case, and a
+ * different fact from a box 12 that exists and holds no uncollected-tax code.
+ * @type {Stored<W2>}
+ */
+const w2WithNoBoxTwelve = {
+    documentHash: 'sha256-w2-nobox12',
+    value: {
+        dialect: 'vnd.fjs.w2',
+        payerTin: '11-1111111', recipientTin: '222-22-2222', accountNumber: 'ACC-W2',
+        taxYear: 2025, formRevision: '2025',
+        box1WagesTipsOtherCompensation: '52000.00',
+    },
 }
 
 /**
@@ -711,6 +880,26 @@ const isoForm = hash => exercisePrice => fairMarketValue => shares => ({
         box3ExercisePricePerShare: exercisePrice,
         box4FairMarketValuePerShareOnExerciseDate: fairMarketValue,
         box5NumberOfSharesTransferred: shares,
+    },
+})
+
+/**
+ * A stored beneficiary's Schedule K-1 (Form 1041) carrying exactly the box 12
+ * rows given — the document Form 6251 line 2j reads.
+ * @type {(hash: string) => (box12: readonly CodedEntry[]) => Stored<K1EstateTrust>}
+ */
+const beneficiaryK1 = hash => box12 => ({
+    documentHash: hash,
+    value: {
+        dialect: 'vnd.fjs.k1_1041',
+        payerTin: '66-6666666',
+        recipientTin: '222-22-2222',
+        taxYear: 2025,
+        formRevision: '2025',
+        payerName: 'The Harrow Family Trust',
+        boxHDomesticBeneficiary: /** @type {const} */ (true),
+        materialParticipation: 'materiallyParticipated',
+        box12AlternativeMinimumTaxItems: box12,
     },
 })
 
@@ -762,6 +951,15 @@ export const proof = {
     // includes theirs — it is asserted separately too, because "still $0.00"
     // and "still cites only the profile" have come apart for it and only the
     // first is still true.
+    //
+    // **Line 13 STAYS on this list, and it is the only member that is no
+    // longer a `zero(...)` at its construction site.** It reads Form W-2 box
+    // 12 now, and `noAmounts` passes no W-2 at all, so `documentLine`'s
+    // fallback rebuilds the identical `profileDeclaredZeroLine` — same value,
+    // same single `declaredKinds` citation, same box path. That equality is
+    // the regression property the wiring rests on, which is why it is pinned
+    // here rather than quietly relied on; `lineThirteen`'s own leaves below
+    // pin the other direction.
     sixteenLinesAreStillDeclaredZerosCitingOnlyTheProfile: () => {
         const result = run(noAmounts)
         /** @type {readonly ReportLine[]} */
@@ -963,6 +1161,72 @@ export const proof = {
             const hashes = result.line2.sources.map(source => source.documentHash)
             assert(hashes.includes('doc-iso-sched-2'), ['by hash, too', hashes])
         },
+        /**
+         * The same slice for **Form 6251 line 2j**: a stored Schedule K-1 (Form
+         * 1041) box 12 code A reaches line 2, line 3 and thence 1040 line 17,
+         * and line 2 CITES the box 12 entry that put it there.
+         *
+         * $250,000.00 of salary, a $52,000.00 regular tax and a $75,000.00 code
+         * A adjustment; every figure is hand-computed in `fjs/form6251`'s
+         * `theBeneficiaryWhoOwesAlternativeMinimumTax`, and the claim here is
+         * the routing and the citation.
+         */
+        aStoredScheduleKOneBoxTwelveCodeAReachesLineTwoAndThenceLineThree: () => {
+            const result = run({
+                ...noAmounts,
+                adjustedGrossIncome: inputLine('line11b')(25000000n),
+                totalDeductions: inputLine('line14')(1575000n),
+                standardDeductionCents: 1575000n,
+                regularTax: inputLine('line16')(5200000n),
+                estateTrustK1Forms: [beneficiaryK1('doc-k1-sched-2')([
+                    { code: 'A', amount: '75000.00' },
+                ])],
+            })
+            assertEq(result.form6251.line2j, 7500000n, 'the adjustment reached Form 6251 line 2j')
+            assertEq(result.line2.value, 959400n, 'line 2 = $9,594.00')
+            assertEq(result.line3.value, 959400n, 'line 3 = $9,594.00 -> 1040 line 17')
+            assertEq(result.line21.value, 0n, 'line 21 = $0.00 -- the AMT is not an "other tax"')
+        },
+        /** The citation, in its own leaf: no amount is asserted here. */
+        lineTwoCitesTheBoxTwelveEntryItTaxed: () => {
+            const result = run({
+                ...noAmounts,
+                adjustedGrossIncome: inputLine('line11b')(25000000n),
+                totalDeductions: inputLine('line14')(1575000n),
+                standardDeductionCents: 1575000n,
+                regularTax: inputLine('line16')(5200000n),
+                estateTrustK1Forms: [beneficiaryK1('doc-k1-sched-2')([
+                    { code: 'A', amount: '75000.00' },
+                ])],
+            })
+            const boxes = result.line2.sources.map(source => source.boxPath)
+            assert(
+                boxes.includes('k1_1041.box12[code=A]'),
+                ['line 2 must cite the box 12 entry it taxed, dialect-qualified', boxes])
+            const hashes = result.line2.sources.map(source => source.documentHash)
+            assert(hashes.includes('doc-k1-sched-2'), ['by hash, too', hashes])
+            const cited = result.line2.sources.filter(
+                source => source.boxPath === 'k1_1041.box12[code=A]')
+            assertEq(cited.length, 1, 'one contributing entry, one source')
+            const [source] = cited
+            assert(source !== undefined, 'expected the source')
+            if (source === undefined) {
+                return
+            }
+            assertEq(source.value, '75000.00', 'the RAW printed amount, not the computed tax')
+            // The CONTROL: a return with no K-1 cites no such box, so the
+            // citation is not appearing unconditionally.
+            const without = run({
+                ...noAmounts,
+                adjustedGrossIncome: inputLine('line11b')(25000000n),
+                totalDeductions: inputLine('line14')(1575000n),
+                standardDeductionCents: 1575000n,
+                regularTax: inputLine('line16')(5200000n),
+            })
+            assert(
+                !without.line2.sources.some(candidate => candidate.boxPath === 'k1_1041.box12[code=A]'),
+                without.line2.sources.map(candidate => candidate.boxPath))
+        },
         // Line 2 is Form 6251 line 11, asserted as an identity against the
         // record that produced it -- so a wiring that read line 7 (the
         // tentative minimum tax) or line 9 instead would name itself. Each of
@@ -1043,28 +1307,57 @@ export const proof = {
                 outcome.message.includes('Form 6251 line 2i'),
                 ['and still name the line it could not compute', outcome.message])
         },
-        // THE CYCLE, as a checked claim rather than a comment. Form 6251 line
-        // 10 subtracts Schedule 3 line 1, and `fjs/schedule/3` runs AFTER this
-        // module because its Credit Limit Worksheet reads 1040 line 18 = line
-        // 16 + this schedule's line 3. Passing $0.00 is correct only because
-        // `foreignTaxCredit` is a refused scope kind; the day it is modeled,
-        // this leaf reddens and the cycle has to be broken properly.
-        theForeignTaxCreditCycleIsResolvedByARefusal: () => {
-            const result = run({ ...noAmounts, regularTax: inputLine('line16')(5500000n) })
+        // **REPOINTED at TAX-36, not deleted.** This leaf was
+        // `theForeignTaxCreditCycleIsResolvedByARefusal`, and it existed to
+        // FAIL on the day `foreignTaxCredit` became modeled — it asserted
+        // that Form 6251 line 10 was the regular tax alone and that
+        // `modeledKinds` did not contain the kind. It did its job: that
+        // assertion is what forced the cycle to be looked at instead of
+        // patched, and the cycle turned out not to exist (Schedule 3 line 1
+        // needs no tax figure, so `fjs/form1040/core` computes it before this
+        // module and hands it in). What replaces it is the property that
+        // makes the new wiring safe.
+        //
+        // Both sides of Form 6251's comparison move, and the hand-typed
+        // arithmetic is: line 10 = $55,000.00 - $1,000.00 = $54,000.00, line
+        // 8 = $1,000.00, so line 9 falls by $1,000.00 and line 11 — the AMT
+        // — does not move. `fjs/form6251`'s own `theThreeTermsEachMoveLineTen`
+        // pins the same property one layer down; this leaf pins that THIS
+        // MODULE actually forwards the input rather than passing its own
+        // zero, which that one cannot see.
+        theForeignTaxCreditIsForwardedToFormSixTwoFiftyOnesBothSides: () => {
+            // An AMT-BEARING fixture, and it has to be: on Form 6251's
+            // zero-line-6 short circuit (every return with no preference
+            // item) lines 7 through 9 are all a printed -0- and line 8 could
+            // not be observed at all. The ISO spread is the same
+            // $5.00/$105.00/10,000-share Form 3921 the neighbouring leaves
+            // use, so the AMT arithmetic here is already pinned elsewhere and
+            // the only new claim is the forwarding.
+            const base = {
+                ...noAmounts,
+                adjustedGrossIncome: inputLine('line11b')(25000000n),
+                totalDeductions: inputLine('line14')(1575000n),
+                standardDeductionCents: 1575000n,
+                regularTax: inputLine('line16')(5500000n),
+                isoExerciseForms: [isoForm('doc-iso-ftc')('5.00')('105.00')('10000')],
+            }
+            const withoutCredit = run(base)
             assertEq(
-                result.form6251.line10, 5500000n,
-                'line 10 is the regular tax alone: nothing was subtracted for a foreign tax credit')
-            // Widened to `readonly string[]` by an ordinary ASSIGNMENT, not a
-            // cast: `modeledKinds` is a literal tuple, so asking it directly
-            // whether it contains 'foreignTaxCredit' is a question `tsc`
-            // answers at compile time (TS2367, "no overlap") rather than one
-            // this leaf can ask at run time. Same device, same reason, as
-            // `fjs/return/scope`'s own `modeledKindNames`.
-            /** @type {readonly string[]} */
-            const modeledKindNames = modeledKinds
-            assert(
-                !modeledKindNames.includes('foreignTaxCredit'),
-                'Schedule 3 line 1 may be passed as zero only while the foreign tax credit is refused')
+                withoutCredit.form6251.line10, 5500000n,
+                'line 10 is the regular tax alone when no foreign tax credit is passed')
+            assertEq(withoutCredit.form6251.line8, 0n, 'and the AMT foreign tax credit is zero')
+            const withCredit = run({ ...base, scheduleThreeLine1Cents: 100000n })
+            assertEq(
+                withCredit.form6251.line10, 5400000n,
+                '$55,000.00 - $1,000.00: the credit reached line 10 through this module')
+            assertEq(
+                withCredit.form6251.line8, 100000n,
+                'and line 8, so the AMT does not rise by the credit')
+            // The consequence, at THIS module's own printed line: Schedule 2
+            // line 2 is the AMT, and it must be identical either way.
+            assertEq(
+                withCredit.line2.value, withoutCredit.line2.value,
+                'a §904(j) credit nets to zero on the AMT, so Schedule 2 line 2 is unmoved')
         },
     },
     line11: {
@@ -1251,6 +1544,250 @@ export const proof = {
                 assert(boxes.includes(box), ['line 12 must cite this fact', box, boxes])
             }
             assert(!boxes.includes('line2a'), ['tax-exempt interest must not be cited by line 12', boxes])
+        },
+    },
+    // ── Line 13: uncollected tax on tips or group-term life insurance ──────
+    //
+    // Form W-2 box 12 codes A, B, M and N. Every expected value below is a
+    // hand-typed cent literal with its dollar figure in the assertion
+    // message, added on paper and never derived from the sum under test.
+    // **Value and citation are asserted by SEPARATE leaves**: a line that
+    // summed correctly while citing nothing, and one that cited correctly
+    // while summing zero, are different defects and one leaf could not tell
+    // them apart.
+    line13: {
+        // The match set, hand-typed a SECOND time here in the proof, so
+        // dropping a code from `uncollectedTaxCodes` reddens by NAME and not
+        // only by arithmetic. AGENTS.md's fourth shipped defect is exactly
+        // the shape this guards: a set derived from the code under test
+        // shrinks silently in the same instant the code does.
+        theFourCodesAreHandTypedASecondTime: () => {
+            assertEq(uncollectedTaxCodes.length, 4, 'box 12 codes A, B, M and N')
+            for (const code of ['A', 'B', 'M', 'N']) {
+                assert(
+                    uncollectedTaxCodes.some(candidate => candidate === code),
+                    ['an uncollected-tax box 12 code left the match set', code],
+                )
+            }
+        },
+        // One W-2, one code. The simplest possible reading, and the one an
+        // implementation that read nothing at all still fails.
+        oneWTwoWithCodeAOnly: () => {
+            const result = run({
+                ...noAmounts,
+                w2Forms: [w2WithBox12('sha256-w2-a')([{ code: 'A', amount: '125.40' }])],
+            })
+            assertEq(result.line13.value, 12540n, 'line 13 = $125.40 uncollected social security tax on tips')
+        },
+        oneWTwoWithCodeAOnlyCitesThatEntryAndNotTheProfile: () => {
+            const result = run({
+                ...noAmounts,
+                w2Forms: [w2WithBox12('sha256-w2-a')([{ code: 'A', amount: '125.40' }])],
+            })
+            assertEq(result.line13.sources.length, 1, 'one source per contributing entry')
+            assertEq(result.line13.sources[0].documentHash, 'sha256-w2-a', 'the W-2 that carried it')
+            assertEq(result.line13.sources[0].boxPath, 'box12[code=A]', 'the box that was read')
+            assertEq(result.line13.sources[0].value, '125.40', 'the amount as stored')
+        },
+        // Each of the four on its own, so dropping ONE from the match set
+        // reddens even though the other three still add up. The pairs are
+        // hand-typed off the printed box 12 code table.
+        eachOfTheFourCodesIsTaxedOnItsOwn: () => {
+            /** @type {readonly (readonly [string, string, bigint])[]} */
+            const cases = [
+                ['A', '125.40', 12540n],
+                ['B', '29.33', 2933n],
+                ['M', '48.10', 4810n],
+                ['N', '11.25', 1125n],
+            ]
+            assertEq(cases.length, 4, 'codes A ($125.40), B ($29.33), M ($48.10) and N ($11.25)')
+            for (const [code, amount, expected] of cases) {
+                const result = run({
+                    ...noAmounts,
+                    w2Forms: [w2WithBox12('sha256-w2-a')([{ code, amount }])],
+                })
+                assertEq(result.line13.value, expected, ['box 12 code is an uncollected tax', code, `$${amount}`])
+            }
+        },
+        eachOfTheFourCodesCitesItsOwnBoxPath: () => {
+            for (const code of ['A', 'B', 'M', 'N']) {
+                const result = run({
+                    ...noAmounts,
+                    w2Forms: [w2WithBox12('sha256-w2-a')([{ code, amount: '10.00' }])],
+                })
+                assertEq(result.line13.sources.length, 1, ['$10.00 under one code', code])
+                assertEq(result.line13.sources[0].boxPath, `box12[code=${code}]`, code)
+            }
+        },
+        // All four on ONE W-2 -- a tipped employee who also carried
+        // group-term life cover after leaving. $125.40 + $29.33 + $48.10 +
+        // $11.25 = $214.08, added on paper.
+        allFourCodesOnOneWTwoAreSummed: () => {
+            const result = run({
+                ...noAmounts,
+                w2Forms: [w2WithBox12('sha256-w2-a')([
+                    { code: 'A', amount: '125.40' },
+                    { code: 'B', amount: '29.33' },
+                    { code: 'M', amount: '48.10' },
+                    { code: 'N', amount: '11.25' },
+                ])],
+            })
+            assertEq(result.line13.value, 21408n, 'line 13 = $214.08 = $125.40 + $29.33 + $48.10 + $11.25')
+        },
+        // ...cited ONCE PER ENTRY, never once per document: the social
+        // security half and the Medicare half of an uncollected tip tax are
+        // different statutes, and an auditor reading line 13 has to see
+        // which of the four the money came from.
+        allFourCodesOnOneWTwoAreCitedOncePerEntry: () => {
+            const result = run({
+                ...noAmounts,
+                w2Forms: [w2WithBox12('sha256-w2-a')([
+                    { code: 'A', amount: '125.40' },
+                    { code: 'B', amount: '29.33' },
+                    { code: 'M', amount: '48.10' },
+                    { code: 'N', amount: '11.25' },
+                ])],
+            })
+            assertEq(result.line13.sources.length, 4, 'four entries, four citations')
+            assertEq(
+                result.line13.sources.map(source => source.boxPath).join(','),
+                'box12[code=A],box12[code=B],box12[code=M],box12[code=N]',
+                'one citation per entry, in printed box 12 order')
+            for (const source of result.line13.sources) {
+                assertEq(source.documentHash, 'sha256-w2-a', 'all four came off the same W-2')
+            }
+        },
+        // Two employers, and the citations must stay apart. $125.40 +
+        // $11.25 + $29.33 = $165.98, added on paper.
+        twoWTwosEachCarryingCodesAreSummed: () => {
+            const result = run({
+                ...noAmounts,
+                w2Forms: [
+                    w2WithBox12('sha256-w2-a')([{ code: 'A', amount: '125.40' }]),
+                    w2WithBox12('sha256-w2-b')([
+                        { code: 'N', amount: '11.25' },
+                        { code: 'B', amount: '29.33' },
+                    ]),
+                ],
+            })
+            assertEq(result.line13.value, 16598n, 'line 13 = $165.98 = $125.40 + $11.25 + $29.33')
+        },
+        twoWTwosEachCarryingCodesAreCitedSeparately: () => {
+            const result = run({
+                ...noAmounts,
+                w2Forms: [
+                    w2WithBox12('sha256-w2-a')([{ code: 'A', amount: '125.40' }]),
+                    w2WithBox12('sha256-w2-b')([
+                        { code: 'N', amount: '11.25' },
+                        { code: 'B', amount: '29.33' },
+                    ]),
+                ],
+            })
+            assertEq(result.line13.sources.length, 3, 'three entries across two documents')
+            assertEq(
+                result.line13.sources.map(source => `${source.documentHash} ${source.boxPath}`).join(','),
+                'sha256-w2-a box12[code=A],sha256-w2-b box12[code=N],sha256-w2-b box12[code=B]',
+                'each entry cited under the document that carried it, in document then box order')
+        },
+        // A W-2 whose box 12 holds only codes this line does NOT tax --
+        // `D` (elective deferrals) and `W` (employer HSA contributions,
+        // which `fjs/schedule/1` reads for an entirely different line).
+        unrelatedBoxTwelveCodesContributeNothing: () => {
+            const result = run({
+                ...noAmounts,
+                w2Forms: [w2WithBox12('sha256-w2-a')([
+                    { code: 'D', amount: '5000.00' },
+                    { code: 'W', amount: '1000.00' },
+                ])],
+            })
+            assertEq(result.line13.value, 0n, 'line 13 = $0.00 -- neither $5,000.00 nor $1,000.00 is an uncollected tax')
+        },
+        unrelatedBoxTwelveCodesAreNotCited: () => {
+            const result = run({
+                ...noAmounts,
+                w2Forms: [w2WithBox12('sha256-w2-a')([
+                    { code: 'D', amount: '5000.00' },
+                    { code: 'W', amount: '1000.00' },
+                ])],
+            })
+            assertEq(result.line13.sources.length, 1, 'the profile citation only')
+            assertEq(result.line13.sources[0].documentHash, profileNoDeclaredKinds.documentHash,
+                'a W-2 this line did not read must not be cited by it')
+            assertEq(result.line13.sources[0].boxPath, 'declaredKinds')
+        },
+        // Case and whitespace. `fjs/document/w2` stores the code AS PRINTED,
+        // so `'a'` and `' A '` are the same box as `'A'` -- and `'AA'`, a
+        // designated Roth contribution under a §401(k) plan, is a DIFFERENT
+        // code that a prefix match would silently tax. $10.00 + $20.00 +
+        // $5.00 = $35.00, and the $9,999.00 under `'AA'` is not in it.
+        caseAndWhitespaceAreTheSameCodeButAADoubleIsNot: () => {
+            const result = run({
+                ...noAmounts,
+                w2Forms: [w2WithBox12('sha256-w2-a')([
+                    { code: 'a', amount: '10.00' },
+                    { code: ' A ', amount: '20.00' },
+                    { code: 'AA', amount: '9999.00' },
+                    { code: 'm', amount: '5.00' },
+                ])],
+            })
+            assertEq(result.line13.value, 3500n, 'line 13 = $35.00 = $10.00 + $20.00 + $5.00, and NOT the $9,999.00 under AA')
+        },
+        caseAndWhitespaceNormalizeTheCitedBoxPath: () => {
+            const result = run({
+                ...noAmounts,
+                w2Forms: [w2WithBox12('sha256-w2-a')([
+                    { code: 'a', amount: '10.00' },
+                    { code: ' A ', amount: '20.00' },
+                    { code: 'AA', amount: '9999.00' },
+                    { code: 'm', amount: '5.00' },
+                ])],
+            })
+            assertEq(result.line13.sources.length, 3, 'three matching entries; AA is not one of them')
+            assertEq(
+                result.line13.sources.map(source => source.boxPath).join(','),
+                'box12[code=A],box12[code=A],box12[code=M]',
+                'the NORMALIZED code reaches the citation, whatever the employer printed')
+        },
+        // No box 12 key at all -- the ordinary W-2, and the case that keeps
+        // every pre-existing Schedule 2 fixture byte-identical.
+        aWTwoWithNoBoxTwelveIsAProfileCitedZero: () => {
+            const result = run({ ...noAmounts, w2Forms: [w2WithNoBoxTwelve] })
+            assertEq(result.line13.value, 0n, 'line 13 = $0.00')
+        },
+        aWTwoWithNoBoxTwelveCitesTheProfileAndNotTheDocument: () => {
+            const result = run({ ...noAmounts, w2Forms: [w2WithNoBoxTwelve] })
+            assertEq(result.line13.sources.length, 1, 'the profile citation only')
+            assertEq(result.line13.sources[0].documentHash, profileNoDeclaredKinds.documentHash,
+                'a computed zero cites the profile, never a document this line did not read')
+            assertEq(result.line13.sources[0].boxPath, 'declaredKinds')
+        },
+        // The tax has to REACH 1040 line 23. Without this the line could be
+        // computed and cited perfectly and then dropped on the way out --
+        // and it must reach line 21, not line 3: this is a Part II tax.
+        lineThirteenReachesLineTwentyOneAndNotLineThree: () => {
+            const result = run({
+                ...noAmounts,
+                w2Forms: [w2WithBox12('sha256-w2-a')([{ code: 'A', amount: '125.40' }])],
+            })
+            assertEq(result.line21.value, 12540n, 'line 21 = $125.40 -> 1040 line 23')
+            assertEq(result.line3.value, 0n, 'line 3 = $0.00 -- 1040 line 17 is untouched')
+            const boxes = result.line21.sources.map(source => source.boxPath)
+            assert(
+                boxes.includes('box12[code=A]'),
+                ['the Part II total must cite the box line 13 read', boxes])
+        },
+        // The tax is read UNCONDITIONALLY, exactly as lines 2, 4, 11 and 12
+        // are. The profile below declares NOTHING -- an employer's inability
+        // to collect is not elective, and a declaration gate here would let a
+        // truthful filer who never read box 12's code table receive a return
+        // understated by the whole of it.
+        theTaxIsNotGatedOnADeclaration: () => {
+            const result = run({
+                ...noAmounts,
+                profile: { documentHash: 'profile-hash-0013', value: { ...minimalProfileValue, declaredKinds: [] } },
+                w2Forms: [w2WithBox12('sha256-w2-a')([{ code: 'B', amount: '29.33' }])],
+            })
+            assertEq(result.line13.value, 2933n, 'line 13 = $29.33 with an empty `declaredKinds`')
         },
     },
     // BOTH taxes on ONE return, added into line 21 rather than one silently

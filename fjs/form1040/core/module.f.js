@@ -92,7 +92,7 @@ import {
 // or below the threshold, which is exactly Form 8995, so that case is delegated
 // to `fjs/form8995` from inside there. One call site, either page.
 import { qualifiedBusinessIncomeDeduction } from '../../form8995a/module.f.js'
-import { scheduleThree } from '../../schedule/3/module.f.js'
+import { scheduleThree, foreignTaxCreditLine } from '../../schedule/3/module.f.js'
 import { form8812 } from '../../form8812/module.f.js'
 import { iraTaxableAmount, rothDistributionCodeOf } from '../../form8606/module.f.js'
 import { baseTaxForAmount } from '../../tax/table/module.f.js'
@@ -124,6 +124,7 @@ import {
 /** @import { K1Partnership } from '../../document/k1_1065/module.f.js' */
 /** @import { K1SCorporation } from '../../document/k1_1120s/module.f.js' */
 /** @import { K1EstateTrust } from '../../document/k1_1041/module.f.js' */
+/** @import { CodedEntry } from '../../document/k1_common/module.f.js' */
 /** @import { FormThirtyNineTwentyTwo } from '../../document/form3922/module.f.js' */
 /** @import { BasisCorrection } from '../../document/basis_correction/module.f.js' */
 /** @import { Kind, ReturnProfile } from '../../return/profile/module.f.js' */
@@ -974,6 +975,43 @@ export const form1040IncomeLines = taxParamSet => inputs => {
         rule: '1040 line 8',
     }   // additional income, Schedule 1 Part I total (line10)
 
+    // 6a — total Social Security/Railroad Retirement benefits (SSA-1099/
+    // RRB-1099 box 5), read UNCONDITIONALLY from stored documents, exactly
+    // like 3a/3b already read from `dividendForms` with no declaration gate.
+    //
+    // **This line, the MFS gate below it and `totalIncomeExceptTaxableSocialSecurity`
+    // were computed AFTER stage 1 until Schedule 1 line 20 landed**, and the
+    // move is the whole ordering of Publication 590-A Appendix B: §219(g)(3)(A)
+    // determines adjusted gross income "after application of section 86", so
+    // stage 1 has to be able to run the Social Security worksheet itself
+    // before it can price the IRA deduction. Nothing here depends on Schedule
+    // 1 at all — they read stored documents and the profile — so the move is a
+    // pure reordering.
+    const line6a = fromDocuments('1040 line 6a')(
+        sumBoxOverDocuments(socialSecurityForms)('box5NetBenefits')(
+            form => form.box5NetBenefits))
+    // `mfsLivedWithSpouseAtAnyTimeInYear` is gated on the filing STATUS here,
+    // never passed through unconditionally — `fjs/tax/ssb`'s own `assert`
+    // refuses a `true` value paired with any other status, and gating here
+    // means a profile that declares the flag inconsistently (e.g. without MFS)
+    // is read as `false` rather than crashing the whole computation on an
+    // internal invariant (Rule 2 — input validation at the boundary, not an
+    // unhandled throw one module in). Gated ONCE, here, and handed to both the
+    // Social Security worksheet below and Schedule 1 stage 1: §219(g)(4)
+    // ("live apart at all times") reads the same fact, and two gates would be
+    // two rules able to disagree.
+    const mfsLivedWithSpouseAtAnyTimeInYear = status === 'marriedFilingSeparately'
+        && profile.value.mfsLivedWithSpouseAtAnyTimeInYear === true
+    // 1040 line 9 LESS line 6b — every income line whose value does not
+    // depend on any Schedule 1 adjustment. It is the Social Security
+    // worksheet's own line 3, and it is also Publication 590-A Appendix B
+    // Worksheet 1 line 1's starting point before the adjustments come off.
+    // Built as a `ReportLine` rather than a bare sum so Schedule 1 line 20 can
+    // cite what its phase-out actually ran against (PROV-02).
+    const totalIncomeExceptTaxableSocialSecurity = totalLine(
+        '1040 line 9 less line 6b (total income except taxable Social Security benefits)')([
+        line1z, line2b, line3b, line4b, line5b, line7a, line8,
+    ])
     // Schedule 1 Part II, STAGE 1 (Phase 24, TAX-23/TAX-24): every adjustment
     // that does not depend on income — lines 11 (educator expenses) and 13
     // (the HSA deduction) compute here from real documents. Line 21's
@@ -991,6 +1029,29 @@ export const form1040IncomeLines = taxParamSet => inputs => {
     // wage base.
     const scheduleOneStageOne = scheduleOnePartIIExceptStudentLoanInterest(taxParamSet)({
         profile, status, adjustmentForms, w2Forms: w2s,
+        // Schedule 1 line 20's own inputs (§219). The Publication 590-A
+        // Appendix B ordering in three passes, of which stage 1 runs the
+        // first two: Worksheet 1 computes taxable Social Security benefits
+        // AS THOUGH THERE WERE NO IRA DEDUCTION, Worksheet 2 prices the
+        // deduction against that income, and Worksheet 3 — the `ssbResult`
+        // call below, unchanged — recomputes taxable benefits WITH the
+        // deduction subtracted. The two §86 figures legitimately differ; the
+        // second is the one that lands on line 6b.
+        totalIncomeExceptTaxableSocialSecurityLine: totalIncomeExceptTaxableSocialSecurity,
+        socialSecurityBenefitsCents: line6a.value,
+        taxExemptInterestCents: line2a.value,
+        mfsLivedWithSpouseAtAnyTimeInYear,
+        // Publication 590-A: a contribution AND a distribution in the same
+        // year makes modified adjusted gross income depend on a basis
+        // recovery that itself depends on this deduction. That one IS a fixed
+        // point, and `fjs/schedule/1` refuses it. Presence of the document,
+        // never its amount: a $0 distribution is still a distribution.
+        iraDistributionReceived: iraRetirementForms.length !== 0,
+        // Line 18's whole computation: §62(a)(9) deducts the forfeited
+        // interest a bank charges for breaking a term deposit, reported in
+        // box 2 and subject to no floor or phase-out. The SAME documents
+        // already feeding lines 2a and 2b above.
+        interestForms,
         businessNetProfit: scheduleOnePartIResult.scheduleC.partII.line31,
         businessExpenseForms,
         // ...and printed Schedule SE line 2's OTHER named source, "Schedule
@@ -1010,22 +1071,21 @@ export const form1040IncomeLines = taxParamSet => inputs => {
         return { kind: 'error', message: scheduleOneStageOne.message, unmodeled: [] }
     }
 
-    // 6a — total Social Security/Railroad Retirement benefits (SSA-1099/
-    // RRB-1099 box 5), read UNCONDITIONALLY from stored documents, exactly
-    // like 3a/3b already read from `dividendForms` with no declaration gate.
-    const line6a = fromDocuments('1040 line 6a')(
-        sumBoxOverDocuments(socialSecurityForms)('box5NetBenefits')(
-            form => form.box5NetBenefits))
     // 6b — taxable Social Security benefits: the 18-line worksheet
     // (`fjs/tax/ssb`), fed every other income line its own line 3 sums
     // (1z, 2b, 3b, 4b, 5b, 7a, 8) plus tax-exempt interest (line 2a, the
     // add-back). `mfsLivedWithSpouseAtAnyTimeInYear` is gated on the filing
-    // STATUS here, never passed through unconditionally — the worksheet's
-    // own `assert` refuses a `true` value paired with any other status, and
-    // gating here means a profile that declares the flag inconsistently
-    // (e.g. without MFS) is read as `false` rather than crashing the whole
-    // computation on an internal invariant (Rule 2 — input validation at the
-    // boundary, not an unhandled throw one module in).
+    // STATUS above rather than here, because Schedule 1 stage 1 now reads the
+    // same fact for §219(g)(4) and one gate is one rule; the paragraph that
+    // stood here explaining the gate has moved with it.
+    //
+    // **This is Publication 590-A Appendix B WORKSHEET 3** on a return that
+    // carries both benefits and an IRA contribution: the same eighteen lines
+    // stage 1 already ran as Worksheet 1, differing only in that line 20 is
+    // now filled in and therefore inside `socialSecurityWorksheetAdjustmentsTotal`'s
+    // "lines 11 through 20" range. Nothing about this call changed when line
+    // 20 landed, which is the point — Worksheet 3 IS the return's own
+    // worksheet, and Worksheet 1 is the extra one.
     //
     // **`scheduleOneAdjustmentsTotalCents` is a REAL figure as of Phase 24**,
     // where it was a hardcoded `0n` before. `fjs/tax/ssb`'s own header
@@ -1038,15 +1098,15 @@ export const form1040IncomeLines = taxParamSet => inputs => {
     // that owns those lines. **Line 21 is outside that printed range**, which
     // is precisely what lets this call happen before line 21 is computed —
     // see `fjs/schedule/1`'s own header.
-    const mfsLivedWithSpouseAtAnyTimeInYear = status === 'marriedFilingSeparately'
-        && profile.value.mfsLivedWithSpouseAtAnyTimeInYear === true
     const ssbResult = socialSecurityBenefitsWorksheet(taxParamSet)({
         status,
         mfsLivedWithSpouseAtAnyTimeInYear,
         totalSsaAndRrbBox5Cents: line6a.value,
-        otherIncomeLine3Cents:
-            line1z.value + line2b.value + line3b.value + line4b.value
-            + line5b.value + line7a.value + line8.value,
+        // The worksheet's own line 3, which is the same seven summands
+        // `totalIncomeExceptTaxableSocialSecurity` names above — stated once
+        // so Schedule 1 line 20's phase-out income and this worksheet's line
+        // 3 cannot drift apart into two different sums of the same lines.
+        otherIncomeLine3Cents: totalIncomeExceptTaxableSocialSecurity.value,
         taxExemptInterestCents: line2a.value,
         scheduleOneAdjustmentsTotalCents:
             socialSecurityWorksheetAdjustmentsTotal(scheduleOneStageOne),
@@ -1292,6 +1352,12 @@ export const form1040IncomeLines = taxParamSet => inputs => {
     // There is no circularity here, only that order: line 11 of Form 8995
     // excludes the very deduction being computed, by its own wording.
     const [firstBusinessRecord] = businessExpenseForms
+    // Form 1099-DIV box 5, §199A dividends -- Form 8995 line 6's REIT half.
+    // Bound here rather than inline because line 13a below needs BOTH halves
+    // of it: the value, to decide whether the deduction is computed at all,
+    // and the sources, to cite the box it deducted.
+    const reitDividendSum = sumBoxOverDocuments(dividendForms)('box5Section199ADividends')(
+        div => div.box5Section199ADividends)
     const qbiOutcome = qualifiedBusinessIncomeDeduction(taxParamSet)({
         status,
         // Schedule C line 31, and the SAME Schedule SE execution line 10
@@ -1323,6 +1389,17 @@ export const form1040IncomeLines = taxParamSet => inputs => {
             deductionCents: line12e.value,
             additionalDeductionsCents: line13b.value,
         }),
+        // Form 8995 line 6 / Form 8995-A line 28: §199A(b)(1)(B)'s SECOND
+        // component, 20% of qualified REIT dividends, which needs no trade or
+        // business at all. Form 1099-DIV box 5, summed over the SAME documents
+        // lines 3a, 3b, 7a and 25b already read, with one Source per
+        // contributing form -- `vnd.fjs.1099div` has validated this box to the
+        // cent since the dialect shipped and nothing read it.
+        //
+        // The PTP half of that printed line stays zero: it arrives on a
+        // Schedule K-1 as box 20 code Z or box 17 code V, and `fjs/schedule/e`
+        // refuses the whole return for either.
+        qualifiedReitDividendsCents: reitDividendSum.value,
         // Form 8995 line 12's own definition, which is the Qualified
         // Dividends and Capital Gain Tax Worksheet's lines 2 and 3 written a
         // second time -- `formEightNineNineFivesNetCapitalGainIsTheWorksheets\
@@ -1348,23 +1425,43 @@ export const form1040IncomeLines = taxParamSet => inputs => {
     if (qbiOutcome.kind === 'error') {
         return { kind: 'error', message: qbiOutcome.message, unmodeled: [] }
     }
-    // A return with no business filed keeps the documented zero it has always
-    // carried, citing the profile alone -- `scheduleC.filed` is the field
-    // that tells a break-even business apart from no business at all, and
-    // this is the second reader it has ever had.
-    const line13a = scheduleOnePartIResult.scheduleC.filed
+    // **THE GATE, and it is not `scheduleC.filed` alone.** §199A has TWO
+    // components and only the first needs a trade or business: §199A(b)(1)(B)
+    // gives 20% of qualified REIT dividends to a filer with no business at
+    // all, which is the retiree holding a REIT index fund. Gating line 13a on
+    // `scheduleC.filed` would have computed that deduction and then thrown it
+    // away one line later — the shape a form-level proof structurally cannot
+    // see, and the reason this module carries end-to-end leaves for it.
+    //
+    // A return with NEITHER a filed Schedule C nor a reported box 5 keeps the
+    // documented zero it has always carried, citing the profile alone.
+    const [firstReitSource, ...restReitSources] = reitDividendSum.sources
+    // The REIT half as a line of its own, present ONLY when a document
+    // supplied it -- an empty tuple would be untypable and a `documentLine`
+    // fallback would drag the profile's `declaredKinds` box into line 13a's
+    // citation for every business return that has no 1099-DIV.
+    /** @type {readonly ReportLine[]} */
+    const reitDividendLines = firstReitSource === undefined
+        ? []
+        : [{
+            value: reitDividendSum.value,
+            sources: [firstReitSource, ...restReitSources],
+            rule: 'Form 8995 line 6 (qualified REIT dividends, Form 1099-DIV box 5)',
+        }]
+    const line13a = scheduleOnePartIResult.scheduleC.filed || firstReitSource !== undefined
         ? {
             // Form 8995 line 15 or Form 8995-A line 39, whichever page the
             // router filled -- `deductionCents` is the one figure line 13a
             // receives either way, so this call site does not branch on it.
             value: qbiOutcome.deductionCents,
             // Every fact the deduction reads: the business documents behind
-            // the net profit and the deductible half, the AGI, and the
+            // the net profit and the deductible half, the §199A dividends
+            // behind the REIT component, the AGI, and the
             // filing-status/12d-box/itemized sources behind line 12e and line
             // 13b that decide the limitation base.
             sources: unionSources([
                 scheduleOnePartIResult.scheduleC.partII.line31,
-                line11b, line12e, line13b, line3a, line7a,
+                line11b, line12e, line13b, line3a, line7a, ...reitDividendLines,
             ]),
             rule: '1040 line 13a (qualified business income deduction, Form 8995 line 15 '
                 + 'or Form 8995-A line 39)',
@@ -1662,7 +1759,7 @@ const profileMoneyBox = profile => boxPath => {
 const form1040TaxAndPaymentLines = taxParamSet => inputs => income => {
     const {
         profile, w2s, interestForms, dividendForms, brokerageForms, retirementForms,
-        unemploymentForms, nonemployeeCompensationForms, isoExerciseForms,
+        unemploymentForms, nonemployeeCompensationForms, isoExerciseForms, estateTrustK1Forms,
     } = inputs
     const declaredZero = profileDeclaredZeroLine(profile)
     const fromDocuments = documentLine(profile)
@@ -1802,11 +1899,42 @@ const form1040TaxAndPaymentLines = taxParamSet => inputs => income => {
     const medicareTaxWithheld = fromDocuments('Form 8959 line 19 (Form W-2 box 6)')(
         sumBoxOverDocuments(w2s)('box6MedicareTaxWithheld')(
             w2 => w2.box6MedicareTaxWithheld))
+    // Schedule 3 line 1 -- the §904(j) foreign tax credit (TAX-36) -- is
+    // computed HERE, once, and BEFORE Schedule 2, because Form 6251 lines 8
+    // and 10 both need it and Schedule 2 is where Form 6251 runs. Schedule 3
+    // itself takes the finished line as an input rather than recomputing it,
+    // so this figure has exactly one execution and cannot go stale against a
+    // second one.
+    //
+    // `fjs/schedule/2`'s own docstring recorded this as an unbreakable cycle
+    // (Schedule 3 runs after Schedule 2 because lines 3 and 4 read 1040 line
+    // 18). It was not one: line 1 needs no tax figure at all. See
+    // `fjs/schedule/3`'s `foreignTaxCreditLine`.
+    //
+    // It can REFUSE -- a stored foreign tax with no §904(j) election, or one
+    // above §904(j)(2)(B)'s ceiling -- and the refusal is the whole return's,
+    // threaded through the same `unmodeled: []` arm every other
+    // document-data-sufficiency guard in this file uses.
+    const foreignTaxCreditOutcome
+        = foreignTaxCreditLine(taxParamSet)(status)(profile)(dividendForms)(interestForms)
+    if (foreignTaxCreditOutcome.kind === 'error') {
+        return { kind: 'error', message: foreignTaxCreditOutcome.message, unmodeled: [] }
+    }
+    const scheduleThreeLine1 = foreignTaxCreditOutcome.line
     const scheduleTwoOutcome = scheduleTwo(taxParamSet)({
         profile,
         status,
+        scheduleThreeLine1Cents: scheduleThreeLine1.value,
         medicareWages,
         medicareTaxWithheld,
+        // Schedule 2 line 13's whole computation: Form W-2 box 12 codes A,
+        // B, M and N -- tax the employer could NOT collect, which the
+        // employee therefore owes. Unlike boxes 5 and 6 above these are NOT
+        // pre-summed here, because line 13's citation contract is one source
+        // per contributing box-12 ENTRY, and a pre-summed `ReportLine` would
+        // have to carry those per-entry sources anyway. The SAME documents
+        // lines 1a, 25a and Form 8959 already read.
+        w2Forms: w2s,
         // Form 8960's three investment incomes, read off the 1040 lines that
         // already carry them -- line 2b and NOT line 2a, because §103(a)
         // keeps tax-exempt interest out of gross income and so out of
@@ -1840,6 +1968,11 @@ const form1040TaxAndPaymentLines = taxParamSet => inputs => income => {
         scheduleOneALine37Cents: income.scheduleOneALine37Cents,
         standardDeductionCents: income.line12e.value,
         isoExerciseForms,
+        // Form 6251 line 2j -- Schedule K-1 (Form 1041) box 12 code A, the
+        // beneficiary's share of the estate's or trust's alternative minimum
+        // tax adjustment. The SAME documents lines 2b, 3a and 3b and Schedule
+        // E Part III already read; box 12 has no other reader in the engine.
+        estateTrustK1Forms,
         // §56(b)(3)'s same-year-disposition rule: `fjs/form6251` cannot tell
         // whether the shares sold were the shares exercised, so a stored Form
         // 3921 alongside ANY reported sale refuses. Asked of `box1dProceeds`
@@ -1924,6 +2057,9 @@ const form1040TaxAndPaymentLines = taxParamSet => inputs => income => {
         // refuses on the taxpayer's own assertion instead — see its docstring.
         aStored1099RProvesADistribution: retirementForms.some(
             form => form.value.box1GrossDistribution !== undefined),
+        // Printed line 1, off the ONE execution above -- never a second,
+        // independently stale `foreignTaxCreditLine(...)` call.
+        foreignTaxCreditLine1: scheduleThreeLine1,
     })
     if (scheduleThreeOutcome.kind === 'error') {
         return { kind: 'error', message: scheduleThreeOutcome.message, unmodeled: [] }
@@ -1938,12 +2074,15 @@ const form1040TaxAndPaymentLines = taxParamSet => inputs => income => {
             livedWithTaxpayer: d.livedWithTaxpayer === true,
         })),
         line18Cents: line18.value,
-        // Credit Limit Worksheet A line 2: Schedule 3 lines 3 and 4, off the
-        // SAME execution that produced them. The other ten summands the
-        // printed worksheet lists are refused `fjs/return/scope` kinds and
-        // therefore documented zeros.
-        scheduleThreeCreditsCents:
-            scheduleThreeOutcome.line3.value + scheduleThreeOutcome.line4.value,
+        // Credit Limit Worksheet A line 2: Schedule 3 lines 1, 3 and 4, off
+        // the SAME execution that produced them. **Line 1 joined them at
+        // TAX-36** -- §26 orders the foreign tax credit ahead of the child
+        // tax credit, so omitting it here would let a §904(j) filer claim a
+        // child tax credit against tax the foreign credit had already
+        // absorbed. The other nine summands the printed worksheet lists are
+        // refused `fjs/return/scope` kinds and therefore documented zeros.
+        scheduleThreeCreditsCents: scheduleThreeOutcome.line1.value
+            + scheduleThreeOutcome.line3.value + scheduleThreeOutcome.line4.value,
         earnedIncomeCents: profile.value.earnedIncome === undefined
             ? 0n
             : centsFromString(profile.value.earnedIncome),
@@ -2681,6 +2820,8 @@ const dividendAndBrokerageSourceArtifactHash
  *   readonly box2bUnrecapSec1250Gain?: string,
  *   readonly box2dCollectibles28PercentGain?: string,
  *   readonly box4FederalIncomeTaxWithheld?: string,
+ *   readonly box5Section199ADividends?: string,
+ *   readonly box7ForeignTaxPaid?: string,
  * }} DividendBoxes
  */
 
@@ -3067,6 +3208,28 @@ const unemploymentDocument = documentHash => box1 => box4 => ({
 const selfEmploymentProfile = {
     ...singleProfile,
     declaredKinds: ['businessIncomeOrLoss', 'federalTaxWithheldOnOther1099'],
+}
+
+/**
+ * **A SINGLE WAGE EARNER WHO HOLDS A REIT INDEX FUND** — the §199A(b)(1)(B)
+ * persona, and the one this engine dropped a deduction for until Form 8995
+ * line 6 acquired a reader.
+ *
+ * It declares NO business kind, which is the whole point: the REIT component
+ * needs no trade or business, so `scheduleC.filed` is `false` on every return
+ * built from this profile and 1040 line 13a is nonzero anyway.
+ *
+ * It also does NOT declare `qualifiedReitDividendsAndPtpIncome`. That kind
+ * covers the publicly traded partnership half as well, which this engine still
+ * cannot compute, so it stays an `fjs/return/scope` refusal and declaring it
+ * would refuse the whole return — while Form 1099-DIV box 5 is read
+ * unconditionally, exactly as boxes 1a and 1b already are. See
+ * `fjs/form8995/todo/reit-dividends.md`.
+ * @type {ReturnProfile}
+ */
+const reitInvestorProfile = {
+    ...singleProfile,
+    declaredKinds: ['wages', 'ordinaryDividends'],
 }
 
 /** @type {(documentHash: string) => (box1: string) => (box4: string) => Stored<OneZeroNineNineNec>} */
@@ -3579,6 +3742,99 @@ const phaseTwentyFourInputs = {
 }
 
 
+// ── Form 3903's own fixture (TAX-34): a service member's PCS move ──────────
+//
+// The persona Schedule 1 line 14 exists for and nothing in this file reached
+// until Form 3903 was wired: a staff sergeant moved by military order, who
+// shipped a household, drove to the new duty station, and was reimbursed for
+// part of it in Form W-2 box 12 code P.
+//
+// **A form-level proof cannot prove a wiring.** `fjs/form3903`'s own twelve
+// leaves prove the arithmetic against three `bigint`s and would not notice
+// this engine handing it an empty document list, an empty adjustments list,
+// or nothing at all. These leaves drive the real entry point over real
+// stored documents, which is the only place that shows.
+
+/** @type {ReturnProfile} */
+const formThreeNineZeroThreeProfile = {
+    dialect: returnProfileDialect,
+    taxYear: 2025,
+    filingStatus: 'single',
+    dependentCount: 0,
+    declaredKinds: ['wages', 'movingExpensesArmedForces', 'federalTaxWithheldOnW2'],
+    // Form 3903's pre-line checkbox — §217(g), the one case TCJA §11049 left
+    // standing. Without it this return REFUSES, which
+    // `withoutTheCertificationTheWholeReturnRefuses` asserts through this
+    // same entry point.
+    movingExpensesArmedForcesPermanentChangeOfStation: true,
+}
+
+/**
+ * The service member's Form W-2. Box 12 carries code P beside `DD` and `PP` —
+ * both LARGER than the code P amount, so a match loosened to a prefix or to
+ * "any box 12 row" produces a Form 3903 line 4 that is unmistakably wrong
+ * rather than nearly right, end to end and not only in `fjs/schedule/1`'s
+ * unit proofs.
+ * @type {(codePAmount: string) => Stored<W2>}
+ */
+const formThreeNineZeroThreeW2 = codePAmount => ({
+    documentHash: 'sha256-p3903-w2',
+    value: {
+        ...w2Document('sha256-p3903-w2')('52000.00').value,
+        box2FederalIncomeTaxWithheld: '4200.00',
+        box12: [
+            { code: 'DD', amount: '14500.00' },
+            { code: 'P', amount: codePAmount },
+            { code: 'PP', amount: '9999.00' },
+        ],
+    },
+})
+
+/** The SAME Form W-2 with no code P row at all — the differential control.
+ * @type {Stored<W2>}
+ */
+const formThreeNineZeroThreeW2WithoutReimbursement = {
+    documentHash: 'sha256-p3903-w2',
+    value: {
+        ...w2Document('sha256-p3903-w2')('52000.00').value,
+        box2FederalIncomeTaxWithheld: '4200.00',
+        box12: [{ code: 'DD', amount: '14500.00' }, { code: 'PP', amount: '9999.00' }],
+    },
+}
+
+/** @type {Stored<Adjustments>} */
+const formThreeNineZeroThreeAdjustments = {
+    documentHash: 'sha256-p3903-adjustments',
+    value: {
+        dialect: adjustmentsDialect,
+        recipientTin: '222-22-2222',
+        taxYear: 2025,
+        entries: [
+            {
+                lineTag: 'movingExpensesTransportationAndStorage',
+                datePaid: '2025-07-14',
+                description: 'household goods shipped on PCS orders',
+                amount: '4837.50',
+                individual: 'taxpayer',
+            },
+            {
+                lineTag: 'movingExpensesTravelAndLodgingExcludingMeals',
+                datePaid: '2025-07-16',
+                description: 'mileage, tolls and one night of lodging en route',
+                amount: '1299.40',
+                individual: 'taxpayer',
+            },
+        ],
+    },
+}
+
+/** @type {(codePAmount: string) => Form1040Inputs} */
+const formThreeNineZeroThreeInputs = codePAmount => ({
+    ...inputsOf(storedProfile(formThreeNineZeroThreeProfile))(
+        [formThreeNineZeroThreeW2(codePAmount)])([])([])([])([])([])([])([])([]),
+    adjustmentForms: [formThreeNineZeroThreeAdjustments],
+})
+
 // ── Phase 25's own fixture (TAX-25/TAX-26): a student with a 401(k) ────────
 //
 // The persona both credits exist for and neither reached before this phase:
@@ -3734,6 +3990,49 @@ const socialSecurityWithHsaInputs = {
 }
 
 /**
+ * The SAME interaction for Schedule 1 line 14, and it exists for the same
+ * reason: **a mutation found the gap.** Dropping `partII.line14.value` from
+ * `socialSecurityWorksheetAdjustmentsTotal` left the entire suite green,
+ * because not one fixture anywhere carried BOTH Social Security benefits and
+ * a moving expense — precisely the shape AGENTS.md records this repository
+ * shipping four times.
+ *
+ * Deliberately the same $30,000.00/$30,000.00/$2,000.00 return as
+ * {@link socialSecurityWithHsaInputs}, with the adjustment moved from line 13
+ * to line 14, so the two worksheets are arithmetically identical and any
+ * difference between the leaves can only be the line under test.
+ * @type {Form1040Inputs}
+ */
+const socialSecurityWithMovingExpenseInputs = {
+    ...inputsOf(storedProfile({
+        ...formThreeNineZeroThreeProfile,
+        declaredKinds: [
+            'socialSecurityBenefits', 'pensionsAndAnnuities', 'movingExpensesArmedForces',
+        ],
+    }))([])([])([])([])([
+        retirementDocument('sha256-p3903-pension')({
+            box1GrossDistribution: '30000.00',
+            box2aTaxableAmount: '30000.00',
+        }),
+    ])([socialSecurityDocument('sha256-p3903-ssa')('30000.00')])([])([])([]),
+    adjustmentForms: [{
+        documentHash: 'sha256-p3903-move-only',
+        value: {
+            dialect: adjustmentsDialect,
+            recipientTin: '222-22-2222',
+            taxYear: 2025,
+            entries: [{
+                lineTag: 'movingExpensesTransportationAndStorage',
+                datePaid: '2025-07-14',
+                description: 'household goods shipped on PCS orders',
+                amount: '2000.00',
+                individual: 'taxpayer',
+            }],
+        },
+    }],
+}
+
+/**
  * A return whose income sits INSIDE §221(b)(2)(B)'s phase-out range, so the
  * worksheet's own line 7 ratio actually bites. The persona fixture above
  * cannot do this job: at $52,000.00 the deduction is unreduced, and a
@@ -3754,6 +4053,338 @@ const phaseOutInputs = {
     }],
 }
 
+// ── Schedule 1 line 20's own fixtures (§219) through the 1040 ───────────────
+//
+// A schedule-level proof CANNOT prove a wiring. `fjs/schedule/1` proves the
+// worksheet against facts; only this file can prove that the figure reaches
+// the return through the ordinary path — line 10, AGI, and everything AGI
+// drives — and that the FIVE inputs stage 1 grew for this line are really
+// supplied from this module's own already-computed figures rather than from a
+// zero somebody typed at the call site.
+
+/**
+ * A Form W-2 with box 13's "Retirement plan" checkbox set, built ON TOP of
+ * {@link w2Document} so the identity fields cannot drift.
+ *
+ * **No fixture in this repository set box 13 before Schedule 1 line 20** — the
+ * box was stored by `vnd.fjs.w2` and read by no computation, the
+ * `box13StatutoryEmployee` shape this repository has already paid for twice.
+ * @type {(documentHash: string) => (amount: string) => Stored<W2>}
+ */
+const w2CoveredByRetirementPlan = documentHash => amount => {
+    const base = w2Document(documentHash)(amount)
+    return {
+        ...base,
+        value: { ...base.value, box13RetirementPlan: /** @type {true} */ (true) },
+    }
+}
+
+/**
+ * A `vnd.fjs.adjustments` document carrying one traditional IRA contribution.
+ *
+ * `datePaid` is in **April 2026**, deliberately: §219(f)(3) deems a
+ * contribution made up to the return due date to have been made on the last
+ * day of the preceding year, and that is how a large share of real IRA
+ * contributions are made. A `fjs/schedule/1` gate that forgot this tag would
+ * refuse the whole return here rather than merely mis-price a line.
+ * @type {(documentHash: string) => (lineTag: string) => (amount: string) => Stored<Adjustments>}
+ */
+const iraAdjustmentsDocument = documentHash => lineTag => amount => ({
+    documentHash,
+    value: {
+        dialect: adjustmentsDialect,
+        recipientTin: '222-22-2222',
+        taxYear: 2025,
+        entries: [{
+            lineTag,
+            datePaid: '2026-04-10',
+            description: 'traditional IRA contribution',
+            amount,
+            individual: 'taxpayer',
+        }],
+        hsaCoverage: [],
+    },
+})
+
+/**
+ * **The phase-out persona.** A single filer with $82,000.00 of wages, covered
+ * by a workplace plan, who contributed $7,000.00 to a traditional IRA and
+ * asserted §219(b)(5)(B)(ii)'s age. $82,000.00 sits inside
+ * §219(g)(3)(B)(ii)'s $79,000.00–$89,000.00 range, so the deduction is
+ * genuinely reduced — a fixture below the threshold would produce the same
+ * answer as a worksheet fed no income at all, which is exactly the gap Phase
+ * 24's own verification found on line 21.
+ * @type {Form1040Inputs}
+ */
+const iraPhaseOutInputs = {
+    ...inputsOf(storedProfile({ ...singleProfile, declaredKinds: ['wages'] }))(
+        [w2CoveredByRetirementPlan('sha256-p33-w2')('82000.00')])([])([])([])([])([])([])([])([]),
+    adjustmentForms: [
+        iraAdjustmentsDocument('sha256-p33-ira')('traditionalIraContributionAgeFiftyOrOver')('7000.00'),
+    ],
+}
+
+/**
+ * **The Appendix B persona.** A single filer with $28,000.00 of wages, NOT
+ * covered by a workplace plan, $12,000.00 of Social Security benefits and a
+ * $3,000.00 traditional IRA contribution.
+ *
+ * Not covered on purpose: §219(g) never applies, so the deduction is the
+ * whole $3,000.00 at any income, and the ONLY thing this fixture can show is
+ * the other direction — Schedule 1 line 20 flowing INTO the Social Security
+ * Benefits Worksheet's own line 6 (Publication 590-A Appendix B Worksheet 3)
+ * and moving 1040 line 6b. Income low enough that the 50% tier, not the 85%
+ * cap, is what binds — otherwise the two passes would coincide and the leaf
+ * would prove nothing.
+ * @type {Form1040Inputs}
+ */
+const iraWithSocialSecurityInputs = {
+    ...inputsOf(storedProfile({
+        ...singleProfile,
+        declaredKinds: ['wages', 'socialSecurityBenefits'],
+    }))([w2Document('sha256-p33-ssb-w2')('28000.00')])([])([])([])([])(
+        [socialSecurityDocument('sha256-p33-ssa')('12000.00')])([])([])([]),
+    adjustmentForms: [
+        iraAdjustmentsDocument('sha256-p33-ira-ssb')('traditionalIraContribution')('3000.00'),
+    ],
+}
+
+/**
+ * **Added after a mutation.** Replacing `taxExemptInterestCents: line2a.value`
+ * with `0n` at the stage 1 call site left the WHOLE SUITE GREEN: not one
+ * fixture anywhere carried tax-exempt interest, Social Security benefits and
+ * a traditional IRA contribution at once, so §219 modified AGI's own
+ * tax-exempt add-back — which arrives through Publication 590-A Appendix B
+ * Worksheet 1's line 5, not through §219(g)(3)(A) directly — was observed by
+ * nothing. This fixture is that combination.
+ *
+ * Single filer, covered by a workplace plan: $30,000.00 of wages,
+ * $60,000.00 of Social Security benefits, $28,000.00 of tax-exempt municipal
+ * interest, and an $8,000.00 contribution with the age asserted.
+ *
+ * The income is deliberately in the **50% tier rather than against the
+ * 85%-of-gross cap**: above the cap the add-back is invisible, because line
+ * 17 binds no matter how large the combined income is, and the fixture would
+ * prove nothing.
+ * @type {Form1040Inputs}
+ */
+const iraWithTaxExemptInterestInputs = {
+    ...inputsOf(storedProfile({
+        ...singleProfile,
+        declaredKinds: ['wages', 'taxableInterest', 'socialSecurityBenefits'],
+    }))([w2CoveredByRetirementPlan('sha256-p33-tei-w2')('30000.00')])(
+        [interestDocument('sha256-p33-tei-int')({ box8TaxExemptInterest: '28000.00' })])([])([])([])(
+        [socialSecurityDocument('sha256-p33-tei-ssa')('60000.00')])([])([])([]),
+    adjustmentForms: [
+        iraAdjustmentsDocument('sha256-p33-tei-ira')('traditionalIraContributionAgeFiftyOrOver')('8000.00'),
+    ],
+}
+
+/**
+ * **Also added after a mutation.** `iraDistributionReceived:
+ * iraRetirementForms.length !== 0` could be disconnected entirely with the
+ * suite green — no fixture held both a Form 1099-R IRA distribution and a
+ * contribution. Publication 590-A's own named special case, end to end.
+ * @type {Form1040Inputs}
+ */
+const iraContributionAndDistributionInputs = {
+    ...iraPhaseOutInputs,
+    retirementForms: [
+        retirementDocument('sha256-p33-dist')({
+            box1GrossDistribution: '5000.00',
+            box2aTaxableAmount: '5000.00',
+            box7bIraSepSimple: true,
+        }),
+    ],
+}
+
+/**
+ * **Also added after a mutation.** Hardcoding `mfsLivedWithSpouseAtAnyTimeInYear`
+ * to `false` at the stage 1 call site left the suite green: every end-to-end
+ * IRA fixture was a single filer, so §219(g)(4) — the rule that turns a $0
+ * applicable dollar amount into a $79,000.00 one — was wired but unobserved.
+ *
+ * Married filing separately, living with the spouse, covered by a workplace
+ * plan: $6,500.00 of wages and a $3,000.00 contribution with the age
+ * asserted. $10,000.00 - $6,500.00 = $3,500.00 of range, times 80%, is
+ * $2,800.00; the same return that lived APART all year reads the single row
+ * and deducts the whole $3,000.00.
+ * @type {Form1040Inputs}
+ */
+const iraMarriedFilingSeparatelyInputs = {
+    ...inputsOf(storedProfile({
+        ...singleProfile,
+        filingStatus: 'marriedFilingSeparately',
+        mfsLivedWithSpouseAtAnyTimeInYear: true,
+        declaredKinds: ['wages'],
+    }))([w2CoveredByRetirementPlan('sha256-p33-mfs-w2')('6500.00')])([])([])([])([])([])([])([])([]),
+    adjustmentForms: [
+        iraAdjustmentsDocument('sha256-p33-mfs-ira')('traditionalIraContributionAgeFiftyOrOver')('3000.00'),
+    ],
+}
+
+/**
+ * **The other direction of the same interaction**, and the fixture that pins
+ * Publication 590-A Appendix B **Worksheet 1**: a single filer with
+ * $60,000.00 of wages, covered by a workplace plan, $30,000.00 of Social
+ * Security benefits and an $8,000.00 contribution with the age asserted.
+ *
+ * $60,000.00 alone is below §219(g)(3)(B)(ii)'s $79,000.00 threshold, so
+ * without the SSA-1099 the deduction is the whole $8,000.00. Adding the
+ * benefits puts $25,500.00 of taxable Social Security into the phase-out
+ * income and the deduction collapses to $2,800.00. Nothing else in this
+ * repository can observe that read.
+ * @type {Form1040Inputs}
+ */
+const iraCoveredWithSocialSecurityInputs = {
+    ...inputsOf(storedProfile({
+        ...singleProfile,
+        declaredKinds: ['wages', 'socialSecurityBenefits'],
+    }))([w2CoveredByRetirementPlan('sha256-p33-cov-w2')('60000.00')])([])([])([])([])(
+        [socialSecurityDocument('sha256-p33-cov-ssa')('30000.00')])([])([])([]),
+    adjustmentForms: [
+        iraAdjustmentsDocument('sha256-p33-cov-ira')('traditionalIraContributionAgeFiftyOrOver')('8000.00'),
+    ],
+}
+
+
+/**
+ * A beneficiary's Schedule K-1 (Form 1041) carrying **box 12 rows and no income
+ * box at all** — the document Form 6251 line 2j reads, and a separate builder
+ * from {@link estateTrustPortfolioK1} for the reason the three portfolio
+ * builders are separate: a fixture that could be pointed at any box by changing
+ * one field lets a mis-numbered read pass by construction.
+ * @type {(documentHash: string) => (box12: readonly CodedEntry[]) => Stored<K1EstateTrust>}
+ */
+const estateTrustAmtK1 = documentHash => box12 => ({
+    documentHash,
+    value: {
+        dialect: 'vnd.fjs.k1_1041',
+        payerTin: '66-6666666',
+        recipientTin: '222-22-2222',
+        taxYear: 2025,
+        formRevision: '2025',
+        payerName: 'The Harrow Family Trust',
+        boxHDomesticBeneficiary: /** @type {const} */ (true),
+        materialParticipation: 'materiallyParticipated',
+        box12AlternativeMinimumTaxItems: box12,
+    },
+})
+
+/**
+ * The EXACT exercise-and-hold return `anExerciseAndHoldReachesNineteenFortyLineSeventeen`
+ * computes — a 65-year-old single filer, $130,000.00 of wages, 10,000 shares
+ * exercised at a $5.00 strike against a $105.00 fair market value — optionally
+ * carrying beneficiary Schedule K-1s.
+ *
+ * Shared so the line 2j leaves below are DIFFERENTIALS against a return whose
+ * every figure is already hand-derived one leaf above, rather than against a
+ * second fixture that could drift from it.
+ * @type {(estateTrustK1Forms: readonly Stored<K1EstateTrust>[]) => Form1040Outcome}
+ */
+const exerciseAndHoldWith = estateTrustK1Forms => {
+    /** @type {ReturnProfile} */
+    const profile = {
+        ...singleProfile,
+        taxpayerBornBeforeJan2_1961: true,
+        declaredKinds: ['wages', 'seniorAndOtherScheduleOneADeductions', 'alternativeMinimumTax'],
+    }
+    return form1040Report(taxParams2025)({
+        ...inputsOf(storedProfile(profile))([
+            w2Document('sha256-2j-amt-w2')('130000.00'),
+        ])([])([])([])([])([])([])([])([]),
+        isoExerciseForms: [{
+            documentHash: 'sha256-2j-amt-3921',
+            value: {
+                dialect: 'vnd.fjs.form3921',
+                payerTin: '11-1111111',
+                recipientTin: '222-22-2222',
+                accountNumber: 'ACC-ISO',
+                taxYear: 2025,
+                formRevision: 'April 2025',
+                sourceArtifactHash:
+                    'deadbeef00112233445566778899aabbccddeeff0011223344556677889900',
+                box1DateOptionGranted: '01/03/2023',
+                box2DateOptionExercised: '03/13/2025',
+                box3ExercisePricePerShare: '5.00',
+                box4FairMarketValuePerShareOnExerciseDate: '105.00',
+                box5NumberOfSharesTransferred: '10000',
+            },
+        }],
+        estateTrustK1Forms,
+    })
+}
+
+/**
+ * The §904(j) persona's return profile: a single filer with wages, the
+ * withholding on them, and the foreign tax credit declared AND elected.
+ * @type {ReturnProfile}
+ */
+const singleProfileElectingSection904j = {
+    ...singleProfile,
+    declaredKinds: ['wages', 'federalTaxWithheldOnW2', 'foreignTaxCredit'],
+    section904jElectionAllForeignIncomeIsQualifiedPassiveIncome: true,
+}
+
+/** The SAME profile declaring the kind and NOT electing — the §904(j)(2)(C)
+ * control, and the only difference between it and the one above.
+ * @type {ReturnProfile}
+ */
+const singleProfileDeclaringForeignTaxCredit = {
+    ...singleProfile,
+    declaredKinds: ['wages', 'federalTaxWithheldOnW2', 'foreignTaxCredit'],
+}
+
+/**
+ * The persona's return: $52,000.00 of wages, $4,200.00 withheld, and one
+ * 1099-DIV whose box 7 carries the foreign tax given (or none at all, which
+ * is the differential control every leaf below is read against).
+ * @type {(profile: ReturnProfile) => (foreignTax: string | undefined) => Form1040Inputs}
+ */
+const foreignTaxInputsFor = profile => foreignTax => inputsOf(storedProfile(profile))([{
+    documentHash: 'sha256-ftc-w2',
+    value: {
+        ...w2Document('sha256-ftc-w2')('52000.00').value,
+        box2FederalIncomeTaxWithheld: '4200.00',
+    },
+}])([])(foreignTax === undefined ? [] : [
+    dividendDocument('sha256-ftc-div')({ box7ForeignTaxPaid: foreignTax }),
+])([])([])([])([])([])([])
+
+/** The electing persona's own return.
+ * @type {(foreignTax: string | undefined) => Form1040Inputs}
+ */
+const foreignTaxInputs = foreignTaxInputsFor(singleProfileElectingSection904j)
+
+/**
+ * The SAME persona with one qualifying child and a much smaller wage, chosen
+ * so the child tax credit is limited by the tax rather than by income:
+ * $25,750.00 - $15,750.00 = $10,000.00 of taxable income, against a
+ * $2,200.00 credit. See `theCreditIsSubtractedBeforeTheChildTaxCredit`.
+ * @type {(foreignTax: string | undefined) => Form1040Inputs}
+ */
+const childInputs = foreignTax => inputsOf(storedProfile({
+    ...singleProfileElectingSection904j,
+    declaredKinds: [
+        'wages', 'federalTaxWithheldOnW2', 'foreignTaxCredit',
+        'childTaxCreditOrOtherDependents', 'additionalChildTaxCredit',
+    ],
+    dependentCount: 1,
+    dependents: [{
+        relationship: 'daughter',
+        ssnValidForEmployment: true,
+        ageAtYearEnd: 9,
+        livedWithTaxpayer: true,
+    }],
+}))([{
+    documentHash: 'sha256-ftc-child-w2',
+    value: {
+        ...w2Document('sha256-ftc-child-w2')('25750.00').value,
+        box2FederalIncomeTaxWithheld: '900.00',
+    },
+}])([])(foreignTax === undefined ? [] : [
+    dividendDocument('sha256-ftc-div')({ box7ForeignTaxPaid: foreignTax }),
+])([])([])([])([])([])([])
 
 export const proof = {
     unionSources: {
@@ -5298,6 +5929,166 @@ export const proof = {
             assertEq(815505n - 575505n, 240000n, '$2,400.00 = 20% of the qualified dividends')
         },
         /**
+         * **THE WIRING LEAF, and it exists because a mutation demanded it.**
+         *
+         * `fjs/form8995`'s own leaves prove lines 6-10's arithmetic and
+         * `fjs/form8995a`'s prove lines 28-32's. **Not one of them can notice
+         * this module handing the deduction an empty dividend list, or
+         * throwing the computed figure away one line later.** Replacing
+         * `qualifiedReitDividendsCents: reitDividendSum.value` with `0n` at the
+         * call site above, or narrowing line 13a's gate back to
+         * `scheduleC.filed` alone, left the whole suite green until these
+         * leaves existed — and a retiree holding a REIT index fund would have
+         * received a return understating their deduction by the whole of it.
+         *
+         * **The gate is the load-bearing half.** §199A(b)(1)(B) needs no trade
+         * or business, so this fixture deliberately has none: no Schedule C is
+         * filed, `scheduleC.filed` is `false`, and the deduction is real
+         * anyway.
+         *
+         *   1040 line 1a   W-2 box 1                        $60,000.00
+         *   1040 line 3b   1099-DIV box 1a                   $5,000.00
+         *   1040 line 11a  AGI, no adjustments              $65,000.00
+         *   1040 line 12e  the single standard deduction    $15,750.00
+         *   Form 8995 6    1099-DIV box 5, §199A dividends   $1,000.00
+         *   Form 8995 9    20% of 100,000                      $200.00
+         *   Form 8995 11   65,000.00 - 15,750.00            $49,250.00
+         *   Form 8995 14   20% of 4,925,000                  $9,850.00
+         *   Form 8995 15   the LESSER of 10 and 14             $200.00
+         *   1040 line 13a  = Form 8995 line 15                 $200.00
+         *   1040 line 14   15,750.00 + 200.00 + 0.00        $15,950.00
+         *   1040 line 15   65,000.00 - 15,950.00            $49,050.00
+         *
+         * Stated as a DIFFERENTIAL as well as an absolute: the identical
+         * return with box 5 removed must deduct exactly $200.00 less and fall
+         * back to the documented zero, so the leaf cannot be satisfied by
+         * anything that merely happens to total $200.00 for another reason.
+         *
+         * `qualifiedReitDividendsAndPtpIncome` is deliberately NOT declared:
+         * it is still a refused `fjs/return/scope` kind — the PTP half of it
+         * genuinely cannot be computed — and box 5 is read unconditionally
+         * anyway, exactly as lines 3a and 3b read boxes 1b and 1a off the same
+         * document. See `fjs/form8995/todo/reit-dividends.md`.
+         */
+        aReitDividendWithNoBusinessAtAllReachesLineThirteenA: () => {
+            /** @type {(boxes: DividendBoxes) => Form1040IncomeLines} */
+            const investorReturn = boxes => computedLines(
+                inputsOf(storedProfile(reitInvestorProfile))([
+                    w2Document('sha256-w2-reit-investor')('60000.00'),
+                ])([])([dividendDocument('sha256-1099div-reit')(boxes)])([])([])([])([])([])([])
+            ).income
+            const withBoxFive = investorReturn({
+                box1aTotalOrdinaryDividends: '5000.00',
+                box5Section199ADividends: '1000.00',
+            })
+            const withoutBoxFive = investorReturn({ box1aTotalOrdinaryDividends: '5000.00' })
+            assertEq(withBoxFive.line1a.value, 6000000n, '$60,000.00 of wages')
+            assertEq(withBoxFive.line3b.value, 500000n, '$5,000.00 of ordinary dividends')
+            assertEq(withBoxFive.line11a.value, 6500000n, 'AGI = $65,000.00')
+            assertEq(withBoxFive.line12e.value, 1575000n, 'the single standard deduction')
+            assertEq(withBoxFive.line13a.value, 20000n, '1040 line 13a = $200.00 = 20% of $1,000.00')
+            assertEq(withBoxFive.line14.value, 1595000n, '1040 line 14 = $15,950.00')
+            assertEq(withBoxFive.line15.value, 4905000n, '1040 line 15 = $49,050.00 of taxable income')
+            // The income limitation is nowhere near binding, hand-computed —
+            // so the $200.00 is the REIT component itself rather than a
+            // limitation that coincidentally landed there.
+            assertEq(4925000n * 20n / 100n, 985000n, 'Form 8995 line 14 would allow $9,850.00')
+            // THE CONTROL, and the differential.
+            assertEq(withoutBoxFive.line13a.value, 0n, 'without box 5, no deduction at all')
+            assertEq(
+                withBoxFive.line13a.value - withoutBoxFive.line13a.value,
+                20000n,
+                'the SAME return deducts exactly $200.00 more for carrying the box')
+            // …and without it the line is the DOCUMENTED ZERO it has always
+            // been, citing the profile alone: no Schedule C was filed on
+            // either return, which is what makes the gate observable.
+            assertEq(withoutBoxFive.line13a.sources.length, 1, 'one citation, the profile')
+            assertEq(withoutBoxFive.line13a.sources[0]?.boxPath, 'declaredKinds')
+            // The whole $5,000.00 of ordinary dividends is still ordinary
+            // income on line 3b: box 5 is a SUBSET of box 1a on the printed
+            // form, and reading it for the deduction must not remove it from
+            // income. A wiring that subtracted it would show $4,000.00 here.
+            assertEq(withoutBoxFive.line3b.value, withBoxFive.line3b.value, 'box 5 is not income of its own')
+        },
+        /**
+         * …and it arrives citing the box an auditor has to look at. A separate
+         * leaf from the value, because a citation that is right for the wrong
+         * amount and an amount that is right with no citation are different
+         * defects, and one leaf asserting both would report either as the
+         * other.
+         *
+         * Two 1099-DIVs, one of which reports box 5 and one of which does not:
+         * the cited set must name the first document and only the first, and
+         * the boxPath must be the stored field name rather than a prose
+         * description of it.
+         */
+        lineThirteenACitesTheBoxFiveItDeducted: () => {
+            const { income } = computedLines(
+                inputsOf(storedProfile(reitInvestorProfile))([
+                    w2Document('sha256-w2-reit-investor')('60000.00'),
+                ])([])([
+                    dividendDocument('sha256-1099div-reit')({
+                        box1aTotalOrdinaryDividends: '5000.00',
+                        box5Section199ADividends: '1000.00',
+                    }),
+                    dividendDocument('sha256-1099div-plain')({
+                        box1aTotalOrdinaryDividends: '250.00',
+                    }),
+                ])([])([])([])([])([])([]))
+            assertEq(income.line13a.value, 20000n, '$200.00, from the one form that reported box 5')
+            const cited = income.line13a.sources.filter(
+                source => source.boxPath === 'box5Section199ADividends')
+            assertEq(cited.length, 1, ['line 13a must cite the box it deducted', income.line13a.sources])
+            assertEq(cited[0]?.documentHash, 'sha256-1099div-reit', 'the 1099-DIV that carried it')
+            assertEq(cited[0]?.value, '1000.00', 'quoted verbatim, never re-formatted')
+        },
+        /**
+         * **THE SAME DIVIDEND, ABOVE §199A(e)(2)'s THRESHOLD**, where the
+         * return is filled on Form 8995-A instead. §199A(b)(1)(B)'s component
+         * is untouched by everything that page adds — the wage/UBIA cap and
+         * the specified-service phase-out reduce lines 2-16 and never reach
+         * line 28 — so the deduction must be the SAME $200.00. A deduction
+         * that appeared on one form and vanished on the other would be a
+         * defect a taxpayer could discover only by crossing the threshold.
+         *
+         *   1040 line 1a   W-2 box 1                       $210,000.00
+         *   1040 line 3b   1099-DIV box 1a                    $5,000.00
+         *   1040 line 11a  AGI                              $215,000.00
+         *   line 11 - 12e  taxable income before §199A      $199,250.00   <- above $197,300.00
+         *   8995-A 28      1099-DIV box 5                     $1,000.00
+         *   8995-A 31/32   20% of 100,000                       $200.00
+         *   8995-A 39      the smaller of 32 and 36 ($39,850)   $200.00
+         */
+        theSameReitDividendReachesLineThirteenAAboveTheThreshold: () => {
+            /** @type {(box1: string) => Form1040IncomeLines} */
+            const investorReturn = box1 => computedLines(
+                inputsOf(storedProfile(reitInvestorProfile))([
+                    w2Document('sha256-w2-reit-investor')(box1),
+                ])([])([
+                    dividendDocument('sha256-1099div-reit')({
+                        box1aTotalOrdinaryDividends: '5000.00',
+                        box5Section199ADividends: '1000.00',
+                    }),
+                ])([])([])([])([])([])([])
+            ).income
+            const above = investorReturn('210000.00')
+            assertEq(above.line11a.value, 21500000n, 'AGI = $215,000.00')
+            assertEq(above.line11b.value - above.line12e.value, 19925000n, '$199,250.00 before §199A')
+            // …and that really is above §199A(e)(2)'s single threshold,
+            // hand-typed from the statute rather than read from the params.
+            assert(19925000n > 19730000n, '$199,250.00 is above $197,300.00')
+            assertEq(19925000n - 19730000n, 195000n, 'by $1,950.00, so Form 8995-A is the page')
+            assertEq(above.line13a.value, 20000n, '1040 line 13a = $200.00, from Form 8995-A')
+            // THE COMPARISON that makes it worth asserting: the identical
+            // return below the threshold gets the identical figure, so the two
+            // pages cannot disagree about this component without reddening
+            // here.
+            assertEq(investorReturn('60000.00').line13a.value, 20000n, 'and $200.00 below it too')
+            // The income limitation on the comprehensive page is nowhere near
+            // binding either, hand-computed: 20% of $199,250.00 is $39,850.00.
+            assertEq(19925000n * 20n / 100n, 3985000n, 'Form 8995-A line 36 would allow $39,850.00')
+        },
+        /**
          * **ONE RULE, ONE PLACE, checked**: Form 8995 line 12's "net capital
          * gain" and the Qualified Dividends and Capital Gain Tax Worksheet's
          * lines 2 + 3 are the same quantity, transcribed twice — once in
@@ -6374,6 +7165,77 @@ export const proof = {
             assert(
                 boxes.includes('declaredKinds'),
                 ['1040 line 23 must still cite the twelve declared zeros it also sums', boxes])
+        },
+        // ── Schedule 2 line 13, END TO END ────────────────────────────────
+        //
+        // THE WIRING LEAF, and it exists because a mutation demanded it.
+        // `fjs/schedule/2`'s own leaves prove the arithmetic and the
+        // citations; NONE of them can notice this module handing that
+        // schedule an empty `w2Forms`. Replacing `w2Forms: w2s` with
+        // `w2Forms: []` at the call site above left the whole suite green
+        // until these two leaves existed — a taxpayer holding a W-2 with box
+        // 12 code A would have received a return understating the tax by the
+        // whole of it, with 2,276 proofs passing.
+        //
+        // Stated as a DIFFERENTIAL as well as an absolute: the identical
+        // return without the box 12 entry must owe exactly $125.40 less, so
+        // the leaf cannot be satisfied by anything that merely happens to
+        // total $125.40 for another reason.
+        //
+        // `uncollectedTaxOnTipsOrGroupTermLife` is deliberately NOT declared:
+        // it is still a refused `fjs/return/scope` kind, and the tax is read
+        // unconditionally anyway — an employer's inability to collect is not
+        // elective.
+        aBoxTwelveCodeAReachesLineTwentyThree: () => {
+            /** @type {(box12: NonNullable<W2['box12']>) => Form1040Outcome} */
+            const wagesReturn = box12 => {
+                const bare = w2Document('sha256-w2-box12-uncollected')('52000.00')
+                return form1040Report(taxParams2025)(
+                    inputsOf(storedProfile({ ...singleProfile, declaredKinds: ['wages'] }))(
+                        [{ ...bare, value: { ...bare.value, box12 } }])([])([])([])([])([])([])([])([]))
+            }
+            const withCodeA = wagesReturn([{ code: 'A', amount: '125.40' }])
+            const withoutCodeA = wagesReturn([{ code: 'D', amount: '1000.00' }])
+            assert(withCodeA.kind === 'ok', ['expected the return to compute', withCodeA])
+            assert(withoutCodeA.kind === 'ok', ['expected the control to compute', withoutCodeA])
+            if (withCodeA.kind !== 'ok' || withoutCodeA.kind !== 'ok') {
+                return
+            }
+            assertEq(lineRuled(withCodeA.lines)('1040 line 23').value, 12540n,
+                '$125.40 of uncollected social security tax on tips, Schedule 2 line 13')
+            assertEq(lineRuled(withoutCodeA.lines)('1040 line 23').value, 0n,
+                'the control: box 12 code D is an elective deferral, not a tax')
+            assertEq(
+                lineRuled(withCodeA.lines)('1040 line 23').value
+                - lineRuled(withoutCodeA.lines)('1040 line 23').value,
+                12540n,
+                'the SAME return owes exactly $125.40 more for carrying the code')
+        },
+        // …and it arrives THROUGH Schedule 2's own Part II total, citable
+        // back to the box 12 entry an auditor has to look at.
+        lineTwentyThreeCitesTheBoxTwelveEntryItTaxed: () => {
+            const bare = w2Document('sha256-w2-box12-cited')('52000.00')
+            const outcome = form1040Report(taxParams2025)(
+                inputsOf(storedProfile({ ...singleProfile, declaredKinds: ['wages'] }))([{
+                    ...bare,
+                    value: {
+                        ...bare.value,
+                        box12: [{ code: 'D', amount: '1000.00' }, { code: 'N', amount: '11.25' }],
+                    },
+                }])([])([])([])([])([])([])([])([]))
+            assert(outcome.kind === 'ok', ['expected the return to compute', outcome])
+            if (outcome.kind !== 'ok') {
+                return
+            }
+            const line23 = lineRuled(outcome.lines)('1040 line 23')
+            assertEq(line23.value, 1125n, '$11.25 of uncollected Medicare tax on group-term life insurance')
+            const cited = line23.sources.filter(source => source.boxPath === 'box12[code=N]')
+            assertEq(cited.length, 1, ['1040 line 23 must cite the box 12 entry it taxed', line23.sources])
+            assertEq(cited[0]?.documentHash, 'sha256-w2-box12-cited', 'the W-2 that carried it')
+            const boxes = line23.sources.map(source => source.boxPath)
+            assert(
+                !boxes.includes('box12[code=D]'),
+                ['the elective deferral must not be cited by a tax line', boxes])
         },
         // **THE CASE WHERE THE FILER ACTUALLY OWES.** A joint couple with two
         // $150,000 employers: NEITHER employer paid anyone above $200,000, so
@@ -8422,6 +9284,21 @@ export const proof = {
                 creditForms: [phaseTwentyFiveCredits],
                 tuitionForms: [phaseTwentyFiveOneZeroNineEightT],
                 aStored1099RProvesADistribution: false,
+                // This return holds no 1099 with a foreign tax box, so
+                // Schedule 3 line 1 is the profile-declared zero
+                // `foreignTaxCreditLine` returns for that case. Written out
+                // rather than obtained by calling that function, so the
+                // cross-check's expected side is not produced by code under
+                // test.
+                foreignTaxCreditLine1: {
+                    value: 0n,
+                    sources: [{
+                        documentHash: profileHash,
+                        boxPath: 'declaredKinds',
+                        value: JSON.stringify(phaseTwentyFiveProfile.declaredKinds),
+                    }],
+                    rule: 'Schedule 3 line 1 (foreign tax credit, §904(j) election -> 1040 line 20)',
+                },
             })
             assert(crossCheck.kind === 'ok', ['expected the cross-check to compute', crossCheck])
             if (crossCheck.kind !== 'ok') {
@@ -8520,6 +9397,272 @@ export const proof = {
             assertEq(cents('1040 line 37'), 255500n, 'and the whole of it owed')
         },
     },
+    // ── Schedule 3 line 10: the Form 4868 extension payment, END TO END ────
+    //
+    // **A schedule-level proof CANNOT prove a wiring.** `fjs/schedule/3`'s own
+    // five line-10 leaves read the profile this file hands it, and every one
+    // of them stays green while `form1040Report` passes a profile whose field
+    // was never populated, or while Schedule 3 line 15 drops line 10 from its
+    // summand list, or while 1040 line 31 stops reading line 15. These leaves
+    // drive the real entry point.
+    //
+    // Hand-computed from the printed forms, independently of the code:
+    //
+    //   Schedule 3 line 10  paid with Form 4868                   $1,250.00
+    //   Schedule 3 line 15  add lines 9, 10, 11, 12 and 14        $1,250.00
+    //   1040 line 31        from Schedule 3 line 15               $1,250.00
+    //   1040 line 32        add lines 27a through 31              $1,250.00
+    //   1040 line 33        add lines 25d, 26 and 32              $1,250.00
+    //   1040 line 24 (no income, no tax)                              $0.00
+    //   1040 line 34        overpaid                              $1,250.00
+    extensionPaymentReachesTheReturn: {
+        theWholePaymentIsAnOverpaymentOnAReturnWithNoIncome: () => {
+            const outcome = form1040Report(taxParams2025)(inputsOf(storedProfile({
+                ...singleProfile,
+                declaredKinds: ['amountPaidWithExtensionRequest'],
+                scheduleThreeLine10AmountPaidWithExtensionRequest: '1250.00',
+            }))([])([])([])([])([])([])([])([])([]))
+            assert(outcome.kind === 'ok', ['expected the extension return to compute', outcome])
+            if (outcome.kind !== 'ok') {
+                throw ['expected ok', outcome]
+            }
+            /** @type {(rule: string) => bigint} */
+            const cents = rule => lineRuled(outcome.lines)(rule).value
+            assertEq(cents('1040 line 24'), 0n, 'no income, no tax')
+            assertEq(cents('1040 line 31'), 125000n, '$1,250.00 — Schedule 3 line 15')
+            assertEq(cents('1040 line 32'), 125000n, 'total other payments and refundable credits')
+            assertEq(cents('1040 line 33'), 125000n, 'total payments')
+            assertEq(cents('1040 line 34'), 125000n, 'the whole payment is an overpayment')
+            assertEq(cents('1040 line 37'), 0n, 'and nothing is owed')
+        },
+        // The CITATION, through the full report. 1040 line 31 carries
+        // Schedule 3 line 15's unioned sources, and the profile field must be
+        // among them by name with the raw stored string — a figure that
+        // arrives with no provenance is the defect this engine exists to
+        // prevent.
+        lineThirtyOneCitesTheProfileFieldTheAmountCameFrom: () => {
+            const outcome = form1040Report(taxParams2025)(inputsOf(storedProfile({
+                ...singleProfile,
+                declaredKinds: ['amountPaidWithExtensionRequest'],
+                scheduleThreeLine10AmountPaidWithExtensionRequest: '1250.00',
+            }))([])([])([])([])([])([])([])([])([]))
+            assert(outcome.kind === 'ok', ['expected the extension return to compute', outcome])
+            if (outcome.kind !== 'ok') {
+                throw ['expected ok', outcome]
+            }
+            const cited = lineRuled(outcome.lines)('1040 line 31').sources.find(
+                source => source.boxPath === 'scheduleThreeLine10AmountPaidWithExtensionRequest')
+            assert(
+                cited !== undefined,
+                'line 31 must cite the profile box the extension payment was read from')
+            if (cited === undefined) {
+                throw ['unreachable', outcome]
+            }
+            assertEq(cited.documentHash, profileHash)
+            assertEq(cited.value, '1250.00', 'the raw stored string, never re-formatted')
+        },
+        // The DIFFERENTIAL, on a return that actually owes tax: the same wage
+        // return with and without the field, and the only permitted
+        // difference is $1,250.00 on the payment side. This is the leaf that
+        // survives every arithmetic change to the wage return around it, and
+        // the one that reddens when the field is ignored, when line 10 leaves
+        // line 15's summands, or when line 31 stops reading line 15.
+        theSameWageReturnMovesByExactlyThePaymentAndOnlyOnThePaymentSide: () => {
+            /** @type {(extension: string | undefined) => Form1040Inputs} */
+            const wageReturn = extension => inputsOf(storedProfile({
+                ...singleProfile,
+                declaredKinds: extension === undefined
+                    ? ['wages', 'federalTaxWithheldOnW2']
+                    : ['wages', 'federalTaxWithheldOnW2', 'amountPaidWithExtensionRequest'],
+                ...(extension === undefined
+                    ? {}
+                    : { scheduleThreeLine10AmountPaidWithExtensionRequest: extension }),
+            }))([{
+                documentHash: 'sha256-4868-w2',
+                value: {
+                    ...w2Document('sha256-4868-w2')('52000.00').value,
+                    box2FederalIncomeTaxWithheld: '4200.00',
+                },
+            }])([])([])([])([])([])([])([])([])
+            const without = form1040Report(taxParams2025)(wageReturn(undefined))
+            const with4868 = form1040Report(taxParams2025)(wageReturn('1250.00'))
+            assert(without.kind === 'ok', ['expected the plain wage return to compute', without])
+            assert(with4868.kind === 'ok', ['expected the extension return to compute', with4868])
+            if (without.kind !== 'ok' || with4868.kind !== 'ok') {
+                throw ['expected ok', without, with4868]
+            }
+            /** @type {(outcome: { readonly lines: readonly ReportLine[] }) => (rule: string) => bigint} */
+            const cents = report => rule => lineRuled(report.lines)(rule).value
+            // Unmoved: the payment is not income, not a deduction and not a
+            // credit against the tax.
+            for (const rule of ['1040 line 9', '1040 line 11', '1040 line 15', '1040 line 24']) {
+                assertEq(
+                    cents(with4868)(rule), cents(without)(rule),
+                    ['an extension PAYMENT must not move the tax side', rule])
+            }
+            assert(cents(without)('1040 line 24') > 0n, ['the control return must owe tax'])
+            // Moved, by exactly the payment.
+            assertEq(cents(without)('1040 line 31'), 0n, 'no Schedule 3 Part II figure without it')
+            assertEq(cents(with4868)('1040 line 31'), 125000n, '$1,250.00')
+            assertEq(
+                cents(with4868)('1040 line 33') - cents(without)('1040 line 33'), 125000n,
+                'total payments rise by exactly $1,250.00')
+        },
+    },
+
+    // ── Schedule 3 line 1: the §904(j) foreign tax credit, END TO END ──────
+    //
+    // **A schedule-level proof CANNOT prove a wiring**, and this file has paid
+    // for that repeatedly. `fjs/schedule/3`'s eleven `lineOneForeignTaxCredit`
+    // leaves prove the §904(j) arithmetic against document lists handed
+    // straight to them; every one stays green while THIS file passes
+    // `foreignTaxCreditLine` an empty `dividendForms`, or drops line 1 from
+    // Schedule 8812's Credit Limit Worksheet, or never propagates its
+    // refusal. The leaves below drive `form1040Report` over stored documents.
+    //
+    // The persona: an ordinary index-fund holder. $52,000.00 of wages,
+    // $4,200.00 withheld, and one 1099-DIV whose box 7 reports $250.00 of
+    // foreign tax an international fund paid on their behalf — under
+    // §904(j)(2)(B)'s $300.00 single-filer ceiling, so the election is
+    // available and Form 1116 is not needed. That $250.00 was dropped in
+    // silence by every version of this engine before TAX-36.
+    foreignTaxCreditReachesTheReturn: {
+        // The credit reaches 1040 line 20 and reduces the tax by exactly
+        // itself. The tax figures are read DIFFERENTIALLY against the same
+        // return without the 1099-DIV, so this leaf pins the wiring without
+        // re-deriving the Tax Table — and the differential is hand-typed.
+        theCreditReachesLineTwentyAndReducesTheTaxByItself: () => {
+            const withCredit = form1040Report(taxParams2025)(foreignTaxInputs('250.00'))
+            const without = form1040Report(taxParams2025)(foreignTaxInputs(undefined))
+            assert(withCredit.kind === 'ok', ['expected the §904(j) return to compute', withCredit])
+            assert(without.kind === 'ok', ['expected the control return to compute', without])
+            if (withCredit.kind !== 'ok' || without.kind !== 'ok') {
+                throw ['expected ok', withCredit, without]
+            }
+            /** @type {(report: { readonly lines: readonly ReportLine[] }) => (rule: string) => bigint} */
+            const cents = report => rule => lineRuled(report.lines)(rule).value
+            assertEq(cents(without)('1040 line 20'), 0n, 'no credit without the 1099-DIV')
+            assertEq(cents(withCredit)('1040 line 20'), 25000n, '$250.00 — Schedule 3 line 8')
+            assertEq(cents(withCredit)('1040 line 21'), 25000n, 'line 19 ($0.00) + line 20')
+            // The tax before credits is UNMOVED — a foreign tax credit is a
+            // credit, never an adjustment to income — and the tax after
+            // credits falls by exactly the credit.
+            assertEq(
+                cents(withCredit)('1040 line 18'), cents(without)('1040 line 18'),
+                'a credit does not move the tax before credits')
+            assertEq(
+                cents(without)('1040 line 22') - cents(withCredit)('1040 line 22'), 25000n,
+                'line 22 falls by exactly $250.00')
+            assert(
+                cents(withCredit)('1040 line 22') > 0n,
+                ['the fixture must still owe tax, or the credit would be capped and '
+                    + 'the differential would prove nothing',
+                cents(withCredit)('1040 line 22')])
+        },
+        // The CITATION, end to end: 1040 line 20 carries Schedule 3 line 8's
+        // unioned sources, and the 1099-DIV's box 7 must be among them by
+        // name with the raw stored string.
+        lineTwentyCitesTheNineteenNinetyNineDivBoxSeven: () => {
+            const outcome = form1040Report(taxParams2025)(foreignTaxInputs('250.00'))
+            assert(outcome.kind === 'ok', ['expected the §904(j) return to compute', outcome])
+            if (outcome.kind !== 'ok') {
+                throw ['expected ok', outcome]
+            }
+            const cited = lineRuled(outcome.lines)('1040 line 20').sources.find(
+                source => source.boxPath === 'box7ForeignTaxPaid')
+            assert(cited !== undefined, 'line 20 must cite the box the foreign tax came from')
+            if (cited === undefined) {
+                throw ['unreachable', outcome]
+            }
+            assertEq(cited.documentHash, 'sha256-ftc-div')
+            assertEq(cited.value, '250.00', 'the raw stored string, never re-formatted')
+        },
+        // §904(j)(2)(C), through the FULL entry point: the same 1099-DIV
+        // without the election refuses the whole return rather than silently
+        // dropping $250.00 the taxpayer is owed.
+        withoutTheElectionTheWholeReturnRefuses: () => {
+            const outcome = form1040Report(taxParams2025)(
+                foreignTaxInputsFor(singleProfileDeclaringForeignTaxCredit)('250.00'))
+            assert(outcome.kind === 'error', ['expected a refusal', outcome])
+            if (outcome.kind !== 'error') {
+                throw ['expected error', outcome]
+            }
+            assert(outcome.message.includes('250.00'), ['naming the amount', outcome.message])
+            assert(
+                outcome.message.includes('sha256-ftc-div'),
+                ['and the document it is stored on', outcome.message])
+            assert(
+                outcome.message.includes('Schedule 3 line 1'),
+                ['and where the amount would have gone', outcome.message])
+            assert(
+                outcome.message.includes(
+                    'section904jElectionAllForeignIncomeIsQualifiedPassiveIncome'),
+                ['and the profile field that would make it computable', outcome.message])
+            assertEq(outcome.unmodeled.length, 0, 'this is not a scope refusal')
+        },
+        // §904(j)(2)(B), through the FULL entry point: $300.01 on a single
+        // return is one cent over the ceiling, so the election is unavailable
+        // and Form 1116 — which this engine does not compute — is required.
+        aboveTheCeilingTheWholeReturnRefuses: () => {
+            const outcome = form1040Report(taxParams2025)(foreignTaxInputs('300.01'))
+            assert(outcome.kind === 'error', ['expected a refusal', outcome])
+            if (outcome.kind !== 'error') {
+                throw ['expected error', outcome]
+            }
+            assert(outcome.message.includes('300.01'), ['naming the total', outcome.message])
+            assert(outcome.message.includes('300.00'), ['and the ceiling', outcome.message])
+            assert(outcome.message.includes('Form 1116'), [outcome.message])
+        },
+        // …and the CONTROL for both refusals: $300.00 exactly, one cent less,
+        // computes end to end. Without it, a gate that refused every return
+        // carrying a 1099-DIV would pass the two leaves above.
+        threeHundredExactlyStillComputesEndToEnd: () => {
+            const outcome = form1040Report(taxParams2025)(foreignTaxInputs('300.00'))
+            assert(outcome.kind === 'ok', ['$300.00 exactly must still compute', outcome])
+            if (outcome.kind !== 'ok') {
+                throw ['expected ok', outcome]
+            }
+            assertEq(lineRuled(outcome.lines)('1040 line 20').value, 30000n, '$300.00')
+        },
+        // **Schedule 8812's Credit Limit Worksheet A**, which subtracts
+        // Schedule 3 lines 1 through 4 before the child tax credit sees the
+        // tax. This is the downstream total a form-level proof cannot see,
+        // and the one the Form 3903 slice lost three mutations to.
+        //
+        // The fixture is built so the CTC is TAX-limited: $25,750.00 of
+        // wages against the $15,750.00 single standard deduction leaves
+        // $10,000.00 of taxable income and a tax far below the $2,200.00
+        // credit one qualifying child earns. So 1040 line 19 IS the room left
+        // after Schedule 3, and it must fall by exactly the foreign tax
+        // credit — hand-typed as $100.00, never derived from the tax table.
+        theCreditIsSubtractedBeforeTheChildTaxCredit: () => {
+            const withCredit = form1040Report(taxParams2025)(childInputs('100.00'))
+            const without = form1040Report(taxParams2025)(childInputs(undefined))
+            assert(withCredit.kind === 'ok', ['expected the child return to compute', withCredit])
+            assert(without.kind === 'ok', ['expected the control to compute', without])
+            if (withCredit.kind !== 'ok' || without.kind !== 'ok') {
+                throw ['expected ok', withCredit, without]
+            }
+            /** @type {(report: { readonly lines: readonly ReportLine[] }) => (rule: string) => bigint} */
+            const cents = report => rule => lineRuled(report.lines)(rule).value
+            // The premise, asserted rather than assumed: the child tax credit
+            // is limited by the tax, so there is room for line 1 to take.
+            assertEq(
+                cents(without)('1040 line 19'), cents(without)('1040 line 18'),
+                'the CTC must be TAX-limited, or this leaf proves nothing')
+            assert(cents(without)('1040 line 19') > 10000n, ['and by more than $100.00'])
+            assertEq(
+                cents(without)('1040 line 19') - cents(withCredit)('1040 line 19'), 10000n,
+                'the child tax credit falls by exactly the $100.00 foreign tax credit')
+            // …and the total of the two nonrefundable credits is unmoved,
+            // because the foreign credit took exactly what the child credit
+            // gave up. That is §26's ordering, observed rather than asserted.
+            assertEq(
+                cents(withCredit)('1040 line 21'), cents(without)('1040 line 21'),
+                'line 21 is the same tax either way — the ordering moved it, not the total')
+        },
+    },
+
     scheduleOneAdjustments: {
         theNonProfitEmployeeReturnDeductsAllThreeAdjustmentsThroughLineTen: () => {
             const outcome = form1040Report(taxParams2025)(phaseTwentyFourInputs)
@@ -8754,6 +9897,608 @@ export const proof = {
             // A document-data-sufficiency refusal, never a scope one: it
             // names no `fjs/return/scope` kind.
             assertEq(outcome.unmodeled.length, 0)
+        },
+    },
+    // ── Form 3903: Schedule 1 line 14 through the FULL entry point ──────────
+    //
+    // **A form-level proof CANNOT prove a wiring**, and this repo has paid
+    // for that four times (AGENTS.md, "A proof is not known to work until you
+    // have watched it fail"). `fjs/form3903` takes three `bigint`s and
+    // returns five lines; every one of its twelve leaves stays green while
+    // this file hands it an empty W-2 list, an empty adjustments list, or a
+    // zero. The leaves below drive `form1040Report` over stored documents,
+    // which is the only layer where the assembly is observable.
+    //
+    // Hand-computed from the printed forms, independently of the code under
+    // test:
+    //
+    //   Form 3903 line 1  household goods shipped               $4,837.50
+    //   Form 3903 line 2  travel and lodging, net of meals       $1,299.40
+    //   Form 3903 line 3  add lines 1 and 2                      $6,136.90
+    //   Form 3903 line 4  W-2 box 12 code P                      $2,000.00
+    //   Form 3903 line 5  subtract line 4 from line 3            $4,136.90
+    //   Schedule 1 line 14 = line 26 (no other adjustment)       $4,136.90
+    //   1040 line 1a/1z = W-2 box 1                             $52,000.00
+    //   1040 line 9  (total income)                             $52,000.00
+    //   1040 line 10 (adjustments)                               $4,136.90
+    //   1040 line 11a/11b (AGI) $52,000.00 - $4,136.90          $47,863.10
+    //   1040 line 12e single standard deduction                 $15,750.00
+    //   1040 line 15 $47,863.10 - $15,750.00                    $32,113.10
+    formThreeNineZeroThreeMovingExpenses: {
+        movingExpensesReachTheReturnThroughTheFullEntryPoint: () => {
+            const outcome = form1040Report(taxParams2025)(formThreeNineZeroThreeInputs('2000.00'))
+            assert(outcome.kind === 'ok', ['expected the PCS return to compute', outcome])
+            if (outcome.kind !== 'ok') {
+                throw ['expected ok', outcome]
+            }
+            assertEq(lineRuled(outcome.lines)('1040 line 1a').value, 5200000n, '$52,000.00 of wages')
+            assertEq(lineRuled(outcome.lines)('1040 line 9').value, 5200000n, '$52,000.00 total income')
+            assertEq(lineRuled(outcome.lines)('1040 line 10').value, 413690n,
+                '$6,136.90 of moving expenses less $2,000.00 reimbursed = $4,136.90')
+            assertEq(lineRuled(outcome.lines)('1040 line 11a').value, 4786310n, '$47,863.10 AGI')
+            assertEq(lineRuled(outcome.lines)('1040 line 11b').value, 4786310n, 'restated on page 2')
+            assertEq(lineRuled(outcome.lines)('1040 line 12e').value, 1575000n, '$15,750.00')
+            assertEq(lineRuled(outcome.lines)('1040 line 15').value, 3211310n, '$32,113.10 taxable income')
+            assert(
+                lineRuled(outcome.lines)('1040 line 10').value > 0n,
+                ['line 10 must be a REAL figure, not the hard zero this wiring replaced',
+                    lineRuled(outcome.lines)('1040 line 10').value],
+            )
+        },
+        // THE DIFFERENTIAL, and the strongest single statement here: the
+        // identical return with no adjustments document and no code P box has
+        // a taxable income exactly $4,136.90 HIGHER. A difference rather than
+        // two absolutes, so it cannot fail for a reason unrelated to this
+        // line — not the Tax Table, not the standard deduction.
+        theSameReturnWithoutTheMoveIsExactlyThatMuchMoreTaxable: () => {
+            const withMove = form1040Report(taxParams2025)(formThreeNineZeroThreeInputs('2000.00'))
+            const without = form1040Report(taxParams2025)({
+                ...formThreeNineZeroThreeInputs('2000.00'),
+                adjustmentForms: [],
+                w2s: [formThreeNineZeroThreeW2WithoutReimbursement],
+            })
+            assert(withMove.kind === 'ok', ['expected ok', withMove])
+            assert(without.kind === 'ok', ['expected ok', without])
+            if (withMove.kind !== 'ok' || without.kind !== 'ok') {
+                throw ['expected two computed returns', withMove, without]
+            }
+            assertEq(
+                lineRuled(without.lines)('1040 line 15').value
+                    - lineRuled(withMove.lines)('1040 line 15').value,
+                413690n,
+                'the move must reduce taxable income by exactly Form 3903 line 5')
+            assertEq(lineRuled(without.lines)('1040 line 10').value, 0n,
+                'and the same return with no moving documents is still a legitimate zero')
+        },
+        // **Form 3903 line 4 must actually be SUBTRACTED, end to end.** The
+        // identical return whose Form W-2 carries no code P row deducts the
+        // whole of line 3 — $2,000.00 more. A wiring that never assembled
+        // line 4, or assembled it from the wrong box, produces the same
+        // number in both halves and this leaf goes red.
+        theBoxTwelveCodePReimbursementIsSubtractedEndToEnd: () => {
+            const reimbursed = form1040Report(taxParams2025)(
+                formThreeNineZeroThreeInputs('2000.00'))
+            const unreimbursed = form1040Report(taxParams2025)({
+                ...formThreeNineZeroThreeInputs('2000.00'),
+                w2s: [formThreeNineZeroThreeW2WithoutReimbursement],
+            })
+            assert(reimbursed.kind === 'ok', ['expected ok', reimbursed])
+            assert(unreimbursed.kind === 'ok', ['expected ok', unreimbursed])
+            if (reimbursed.kind !== 'ok' || unreimbursed.kind !== 'ok') {
+                throw ['expected two computed returns', reimbursed, unreimbursed]
+            }
+            assertEq(lineRuled(unreimbursed.lines)('1040 line 10').value, 613690n,
+                '$6,136.90 deducted in full when nothing was reimbursed')
+            assertEq(
+                lineRuled(unreimbursed.lines)('1040 line 10').value
+                    - lineRuled(reimbursed.lines)('1040 line 10').value,
+                200000n,
+                'exactly the $2,000.00 in box 12 code P, and the decoys DD and PP contribute none of it')
+        },
+        // PROV-02, end to end: 1040 line 10 must cite the documents the
+        // deduction actually came from, by the CAS hash a reader can look up
+        // and by the BOX inside each one.
+        lineTenCitesTheMovingEntriesAndTheCodePBox: () => {
+            const outcome = form1040Report(taxParams2025)(formThreeNineZeroThreeInputs('2000.00'))
+            assert(outcome.kind === 'ok', ['expected ok', outcome])
+            if (outcome.kind !== 'ok') {
+                throw ['expected ok', outcome]
+            }
+            const sources = lineRuled(outcome.lines)('1040 line 10').sources
+            const hashes = sources.map(source => source.documentHash)
+            assert(hashes.includes('sha256-p3903-adjustments'),
+                ['line 10 must cite the adjustments document', sources])
+            assert(hashes.includes('sha256-p3903-w2'),
+                ['line 10 must cite the W-2 whose box 12 code P reduced the deduction', sources])
+            const boxPaths = sources.map(source => source.boxPath)
+            assert(
+                boxPaths.includes(
+                    'entries[lineTag=movingExpensesTransportationAndStorage,individual=taxpayer]'),
+                ['line 10 must cite Form 3903 line 1', boxPaths])
+            assert(
+                boxPaths.includes(
+                    'entries[lineTag=movingExpensesTravelAndLodgingExcludingMeals,individual=taxpayer]'),
+                ['line 10 must cite Form 3903 line 2', boxPaths])
+            assert(boxPaths.includes('box12[code=P]'),
+                ['line 10 must cite the W-2 BOX, not merely the document', boxPaths])
+            assert(!boxPaths.includes('box12[code=PP]') && !boxPaths.includes('box12[code=DD]'),
+                ['and no box that did not contribute', boxPaths])
+        },
+        // **THE §217(g) GATE, through the entry point.** The same documents
+        // on a profile that does NOT certify Form 3903's pre-line
+        // requirement refuse the WHOLE return, never a partial 1040 with a
+        // civilian's moving deduction quietly taken.
+        //
+        // A document-data-sufficiency refusal, not a scope one: the kind is
+        // MODELED as of this wiring, so `unmodeled` is empty and the message
+        // names the profile field instead.
+        withoutTheCertificationTheWholeReturnRefuses: () => {
+            const outcome = form1040Report(taxParams2025)({
+                ...formThreeNineZeroThreeInputs('2000.00'),
+                profile: storedProfile({
+                    ...formThreeNineZeroThreeProfile,
+                    movingExpensesArmedForcesPermanentChangeOfStation: undefined,
+                }),
+            })
+            assert(outcome.kind === 'error', ['an uncertified move must refuse', outcome])
+            if (outcome.kind !== 'error') {
+                throw ['expected a refusal', outcome]
+            }
+            assert(
+                outcome.message.includes('movingExpensesArmedForcesPermanentChangeOfStation'),
+                ['name the field that would fix it', outcome.message])
+            assert(outcome.message.includes('permanent change of station'),
+                ['and the printed requirement it stands for', outcome.message])
+            assertEq(outcome.unmodeled.length, 0,
+                'a data-sufficiency refusal, not a scope one — the kind is modeled')
+            // THE CONTROL: the identical inputs WITH the certification
+            // compute, so this gate is not simply refusing everything.
+            assertEq(
+                form1040Report(taxParams2025)(formThreeNineZeroThreeInputs('2000.00')).kind,
+                'ok',
+                'the same return, certified, computes')
+        },
+        // **THE TRAP, end to end.** The service reimbursed $9,000.00 against
+        // a $6,136.90 move, so $2,863.10 is gross income on 1040 **line 1h**
+        // — a line this engine refuses (`otherEarnedIncome`) and sets to a
+        // declared zero. Returning a zero deduction here would emit a
+        // complete-looking Form 1040 that omits real income and UNDERSTATES
+        // the tax, which is the whole reason `fjs/form3903` refuses. The
+        // message must reach the caller VERBATIM.
+        //
+        // $9,000.00 - $6,136.90 = $2,863.10, subtracted by hand.
+        anOverReimbursedMoveRefusesTheWholeReturnNamingLineOneH: () => {
+            const outcome = form1040Report(taxParams2025)(formThreeNineZeroThreeInputs('9000.00'))
+            assert(outcome.kind === 'error', ['an over-reimbursed move must refuse', outcome])
+            if (outcome.kind !== 'error') {
+                throw ['expected a refusal', outcome]
+            }
+            assert(outcome.message.includes('$2863.10'),
+                ['name the excess amount', outcome.message])
+            assert(outcome.message.includes('line 1h'),
+                ['name WHERE it would have gone', outcome.message])
+            assert(outcome.message.includes('earned income'),
+                ['and what that line is', outcome.message])
+            assert(outcome.message.includes('8z'),
+                ['and rule out the line it is not', outcome.message])
+            assert(outcome.message.includes('UNDERSTATE'),
+                ['and which way the error runs', outcome.message])
+            assertEq(outcome.unmodeled.length, 0)
+            // THE CONTROL at the printed boundary: reimbursed to the cent is
+            // a ZERO deduction and a COMPUTED return, not a refusal —
+            // i3903.pdf reports the excess only "if the result is more than
+            // zero".
+            const exactly = form1040Report(taxParams2025)(
+                formThreeNineZeroThreeInputs('6136.90'))
+            assert(exactly.kind === 'ok', ['a perfectly reimbursed move computes', exactly])
+            if (exactly.kind !== 'ok') {
+                throw ['expected ok', exactly]
+            }
+            assertEq(lineRuled(exactly.lines)('1040 line 10').value, 0n,
+                'a zero deduction, and the return is complete')
+            assertEq(lineRuled(exactly.lines)('1040 line 15').value, 3625000n,
+                '$52,000.00 - $0.00 - $15,750.00 = $36,250.00 taxable income')
+        },
+        // **THE SOCIAL SECURITY INTERACTION — added after a mutation, exactly
+        // as Phase 24's own line-13 leaf was.**
+        //
+        // `fjs/tax/ssb`'s line 6 subtracts Schedule 1 "lines 11 through 20,
+        // and 23 and 25", and line 14 is inside that printed range. Dropping
+        // `partII.line14.value` from `socialSecurityWorksheetAdjustmentsTotal`
+        // left the whole suite green: no fixture anywhere carried BOTH Social
+        // Security benefits and a moving expense, so the newly-real summand
+        // was observed by nothing. This leaf is that fixture.
+        //
+        // Single filer, $30,000.00 of SSA-1099 box 5, a $30,000.00 taxable
+        // pension, $2,000.00 of unreimbursed moving expenses. Hand-computed
+        // from the printed worksheet:
+        //
+        //   line 1  $30,000.00   line 2  $15,000.00 (half)
+        //   line 3  $30,000.00 (the pension, 1040 line 5b)
+        //   line 4  $0.00        line 5  $45,000.00
+        //   line 6  $2,000.00 <- Schedule 1 line 14, the figure at issue
+        //   line 7  $43,000.00   line 8  $25,000.00 (single base)
+        //   line 9  $18,000.00   line 10 $9,000.00 (single second threshold)
+        //   line 11 $9,000.00    line 12 $9,000.00 (smaller of 9 and 10)
+        //   line 13 $4,500.00    line 14 $4,500.00 (smaller of 2 and 13)
+        //   line 15 $7,650.00 (85% of line 11)
+        //   line 16 $12,150.00   line 17 $25,500.00 (85% of line 1)
+        //   line 18 $12,150.00 -> 1040 line 6b
+        //
+        // With line 6 at $0.00 the same worksheet gives line 9 $20,000.00,
+        // line 11 $11,000.00, line 15 $9,350.00 and line 18 $13,850.00 —
+        // exactly $1,700.00 more, which is 85% of the $2,000.00 deduction.
+        // That 85% relationship can only hold if line 14 genuinely reaches
+        // worksheet line 6.
+        theMovingDeductionReducesTaxableSocialSecurityThroughWorksheetLineSix: () => {
+            const withMove = form1040Report(taxParams2025)(socialSecurityWithMovingExpenseInputs)
+            const without = form1040Report(taxParams2025)({
+                ...socialSecurityWithMovingExpenseInputs,
+                adjustmentForms: [],
+            })
+            assert(withMove.kind === 'ok', ['expected ok', withMove])
+            assert(without.kind === 'ok', ['expected ok', without])
+            if (withMove.kind !== 'ok' || without.kind !== 'ok') {
+                throw ['expected two computed returns', withMove, without]
+            }
+            const sixBWith = lineRuled(withMove.lines)('1040 line 6b').value
+            const sixBWithout = lineRuled(without.lines)('1040 line 6b').value
+            assertEq(sixBWith, 1215000n,
+                '$12,150.00, hand-computed from the worksheet with line 6 = $2,000.00')
+            assertEq(sixBWithout, 1385000n,
+                '$13,850.00, the SAME worksheet with line 6 = $0.00')
+            assertEq(sixBWithout - sixBWith, 170000n,
+                '$1,700.00 — exactly 85% of the $2,000.00 moving deduction, this return\'s tier')
+            // …and the deduction ALSO reduces AGI directly through line 10,
+            // so the total effect is larger than either half alone.
+            assertEq(lineRuled(withMove.lines)('1040 line 10').value, 200000n,
+                '$2,000.00 of moving expenses, nothing reimbursed')
+            assertEq(
+                lineRuled(without.lines)('1040 line 11a').value
+                    - lineRuled(withMove.lines)('1040 line 11a').value,
+                370000n,
+                '$1,700.00 of taxable benefits plus the $2,000.00 deduction itself',
+            )
+        },
+        // The kind is MODELED as of this wiring, so DECLARING it is in scope
+        // — the reclassification exercised through the entry point rather
+        // than only against `classifyScope`. Before it, this identical
+        // declaration refused the whole return.
+        decliningToDeclareIsNotRequiredAndDeclaringIsInScope: () => {
+            const outcome = form1040Report(taxParams2025)(formThreeNineZeroThreeInputs('2000.00'))
+            assertEq(outcome.kind, 'ok', 'the reclassified kind must not refuse')
+            assertEq(
+                JSON.stringify(formThreeNineZeroThreeProfile.declaredKinds),
+                JSON.stringify(['wages', 'movingExpensesArmedForces', 'federalTaxWithheldOnW2']),
+                'the fixture really does declare it, or the leaf above proves nothing',
+            )
+        },
+    },
+    // ── §219: Schedule 1 line 20 through the FULL entry point ───────────────
+    //
+    // `fjs/schedule/1` proves the IRA Deduction Worksheet against Publication
+    // 590-A's printed lines. What only THIS file can prove is that the figure
+    // reaches the return through the ordinary path, and that the five inputs
+    // stage 1 grew for this line are supplied from real figures rather than
+    // from a zero typed at the call site. Every expected value is hand-typed
+    // with its dollar figure in the message.
+    iraDeduction: {
+        // Hand-computed from the printed forms, independently of the code
+        // under test:
+        //
+        //   1040 line 1a/1z = W-2 box 1                       $82,000.00
+        //   1040 line 9  (total income)                       $82,000.00
+        //   §219(g)(3)(A) modified AGI: no other adjustment,
+        //       no Social Security benefits                   $82,000.00
+        //   Worksheet 1-2 line 1 $79,000.00 + $10,000.00      $89,000.00
+        //   line 3  $89,000.00 - $82,000.00                    $7,000.00
+        //   line 4  $7,000.00 x 80% ($8,000.00 / $10,000.00)   $5,600.00
+        //   line 5  compensation, Form W-2 box 1              $82,000.00
+        //   line 6  min($7,000.00 contributed, $8,000.00)      $7,000.00
+        //   line 7  smallest of 4, 5 and 6 -> Sch 1 line 20    $5,600.00
+        //   Sch 1 line 26 -> 1040 line 10                      $5,600.00
+        //   1040 line 11a (AGI) = $82,000.00 - $5,600.00      $76,400.00
+        //   1040 line 12e = single standard deduction         $15,750.00
+        //   1040 line 15 = $76,400.00 - $15,750.00            $60,650.00
+        theCoveredContributorsDeductionReachesLineTenAndAgi: () => {
+            const outcome = form1040Report(taxParams2025)(iraPhaseOutInputs)
+            assert(outcome.kind === 'ok', ['expected the IRA contributor’s return to compute', outcome])
+            if (outcome.kind !== 'ok') {
+                throw ['expected ok', outcome]
+            }
+            /** @type {(rule: string) => bigint} */
+            const cents = rule => lineRuled(outcome.lines)(rule).value
+            assertEq(cents('1040 line 1a'), 8200000n, '$82,000.00 of wages')
+            assertEq(cents('1040 line 9'), 8200000n, '$82,000.00 total income')
+            assertEq(cents('1040 line 10'), 560000n, '$5,600.00 — the phased-out IRA deduction')
+            assertEq(cents('1040 line 11a'), 7640000n, '$76,400.00 AGI')
+            assertEq(cents('1040 line 12e'), 1575000n, '$15,750.00')
+            assertEq(cents('1040 line 15'), 6065000n, '$60,650.00 taxable income')
+            // The three figures a wrong wiring would produce instead, named
+            // so the leaf says what it refuses. $7,000.00 is a worksheet fed
+            // no income at all (the phase-out never ran); $8,000.00 is the
+            // §219(b)(5) limit with no contribution cap; $0.00 is line 20
+            // never reaching line 26 — or a stage 1 handed an empty W-2 list,
+            // which would zero the compensation on Worksheet 1-2 line 5.
+            assert(cents('1040 line 10') !== 700000n,
+                'a worksheet fed a zero modified AGI would deduct the whole $7,000.00')
+            assert(cents('1040 line 10') !== 800000n,
+                'and one that ignored the contribution would deduct $8,000.00')
+            assert(cents('1040 line 10') !== 0n,
+                'and a line 20 that never reached line 26 would deduct nothing')
+        },
+        // The DIFFERENTIAL: the identical return with no adjustments document
+        // has a taxable income exactly $5,600.00 higher. Deliberately a
+        // difference rather than two absolute figures, so it cannot fail for
+        // an unrelated reason — the shape
+        // `theSameReturnWithoutTheDocumentsIsExactlyThatMuchMoreTaxable`
+        // already uses one phase over.
+        theSameReturnWithNoAdjustmentsDocumentIsThatMuchMoreTaxable: () => {
+            const withContribution = form1040Report(taxParams2025)(iraPhaseOutInputs)
+            const without = form1040Report(taxParams2025)({
+                ...iraPhaseOutInputs,
+                adjustmentForms: [],
+            })
+            assert(withContribution.kind === 'ok', ['expected ok', withContribution])
+            assert(without.kind === 'ok', ['expected ok', without])
+            if (withContribution.kind !== 'ok' || without.kind !== 'ok') {
+                throw ['expected two computed returns', withContribution, without]
+            }
+            assertEq(
+                lineRuled(without.lines)('1040 line 15').value
+                    - lineRuled(withContribution.lines)('1040 line 15').value,
+                560000n,
+                'the IRA deduction must reduce taxable income by exactly $5,600.00')
+            assertEq(lineRuled(without.lines)('1040 line 10').value, 0n,
+                'and the same return with no contribution is still a legitimate zero')
+        },
+        // **Publication 590-A Appendix B Worksheet 1, end to end.** Removing
+        // the SSA-1099 from a COVERED contributor's return moves the
+        // deduction from $2,800.00 to the whole $8,000.00, because
+        // §219(g)(3)(A)(i) determines adjusted gross income "after
+        // application of section 86" and $25,500.00 of taxable benefits are
+        // what push the modified AGI from $60,000.00 to $85,500.00.
+        //
+        //   Worksheet 1: line 1 $30,000.00, line 2 $15,000.00,
+        //     line 3 $60,000.00, line 5 $75,000.00, line 6 $0.00,
+        //     line 7 $75,000.00, line 8 $25,000.00, line 9 $50,000.00,
+        //     line 10 $9,000.00, line 11 $41,000.00, line 12 $9,000.00,
+        //     line 13 $4,500.00, line 14 $4,500.00, line 15 $34,850.00,
+        //     line 16 $39,350.00, line 17 $25,500.00, line 18 $25,500.00
+        //   modified AGI $60,000.00 + $25,500.00 =              $85,500.00
+        //   Worksheet 1-2 line 3 $89,000.00 - $85,500.00 =       $3,500.00
+        //   line 4 $3,500.00 x 80% =                             $2,800.00
+        taxableSocialSecurityBenefitsMoveTheDeductionThroughTheFullEntryPoint: () => {
+            const withBenefits = form1040Report(taxParams2025)(iraCoveredWithSocialSecurityInputs)
+            const without = form1040Report(taxParams2025)({
+                ...iraCoveredWithSocialSecurityInputs,
+                socialSecurityForms: [],
+            })
+            assert(withBenefits.kind === 'ok', ['expected ok', withBenefits])
+            assert(without.kind === 'ok', ['expected ok', without])
+            if (withBenefits.kind !== 'ok' || without.kind !== 'ok') {
+                throw ['expected two computed returns', withBenefits, without]
+            }
+            assertEq(lineRuled(withBenefits.lines)('1040 line 6a').value, 3000000n, '$30,000.00 of benefits')
+            assertEq(lineRuled(withBenefits.lines)('1040 line 6b').value, 2550000n,
+                '$25,500.00 taxable — the 85%-of-gross cap')
+            assertEq(lineRuled(withBenefits.lines)('1040 line 9').value, 8550000n, '$85,500.00 total income')
+            assertEq(lineRuled(withBenefits.lines)('1040 line 10').value, 280000n,
+                '$2,800.00 — $3,500.00 of range left, times 80%')
+            assertEq(lineRuled(without.lines)('1040 line 10').value, 800000n,
+                'the SAME return without the SSA-1099 deducts the whole $8,000.00, at $60,000.00')
+        },
+        // **Publication 590-A Appendix B Worksheet 3, end to end** — the OTHER
+        // direction, and the one that shows the two §86 figures genuinely
+        // differ. Schedule 1 line 20 is inside the Social Security Benefits
+        // Worksheet's own "lines 11 through 20" range, so a $3,000.00
+        // deduction moves 1040 line 6b from $4,500.00 to $3,000.00.
+        //
+        //   Worksheet 1 (line 6 = $0.00):  line 5 $34,000.00, line 7
+        //     $34,000.00, line 9 $9,000.00, line 12 $9,000.00, line 13
+        //     $4,500.00, line 14 $4,500.00, line 18 $4,500.00
+        //   Worksheet 3 (line 6 = $3,000.00): line 7 $31,000.00, line 9
+        //     $6,000.00, line 12 $6,000.00, line 13 $3,000.00, line 14
+        //     $3,000.00, line 18 $3,000.00
+        //
+        // $1,500.00 apart — exactly 50% of the deduction, which is the tier
+        // this return sits in and a relationship that can only hold if line
+        // 20 genuinely reaches worksheet line 6.
+        theDeductionReducesTaxableSocialSecurityThroughWorksheetLineSix: () => {
+            const withContribution = form1040Report(taxParams2025)(iraWithSocialSecurityInputs)
+            const without = form1040Report(taxParams2025)({
+                ...iraWithSocialSecurityInputs,
+                adjustmentForms: [],
+            })
+            assert(withContribution.kind === 'ok', ['expected ok', withContribution])
+            assert(without.kind === 'ok', ['expected ok', without])
+            if (withContribution.kind !== 'ok' || without.kind !== 'ok') {
+                throw ['expected two computed returns', withContribution, without]
+            }
+            const sixBWith = lineRuled(withContribution.lines)('1040 line 6b').value
+            const sixBWithout = lineRuled(without.lines)('1040 line 6b').value
+            assertEq(sixBWith, 300000n, '$3,000.00, hand-computed with worksheet line 6 = $3,000.00')
+            assertEq(sixBWithout, 450000n, '$4,500.00, the SAME worksheet with line 6 = $0.00')
+            assertEq(sixBWithout - sixBWith, 150000n,
+                '$1,500.00 — exactly 50% of the $3,000.00 deduction, the tier this return sits in')
+            assertEq(lineRuled(withContribution.lines)('1040 line 10').value, 300000n,
+                'the whole contribution: §219(g) never applies to a filer with no workplace plan')
+            // …and the deduction reduces AGI twice over: directly through
+            // line 10 and again through the benefits it took out of line 6b.
+            assertEq(
+                lineRuled(without.lines)('1040 line 11a').value
+                    - lineRuled(withContribution.lines)('1040 line 11a').value,
+                450000n,
+                '$3,000.00 of deduction plus $1,500.00 of taxable benefits')
+        },
+        // **Added after a mutation.** Publication 590-A Appendix B Worksheet
+        // 1 line 5 adds tax-exempt interest into the §86 sub-computation, and
+        // zeroing `taxExemptInterestCents` at the stage 1 call site left the
+        // whole suite green until this leaf existed.
+        //
+        //   Worksheet 1 with $28,000.00 of tax-exempt interest:
+        //     line 2 $30,000.00 (half of benefits), line 3 $30,000.00,
+        //     line 4 $28,000.00, line 5 $88,000.00, line 7 $88,000.00,
+        //     line 8 $25,000.00, line 9 $63,000.00, line 10 $9,000.00,
+        //     line 11 $54,000.00, line 12 $9,000.00, line 13 $4,500.00,
+        //     line 14 $4,500.00, line 15 $45,900.00, line 16 $50,400.00,
+        //     line 17 $51,000.00 (85% cap, NOT binding), line 18 $50,400.00
+        //   modified AGI $30,000.00 + $50,400.00 =              $80,400.00
+        //   $89,000.00 - $80,400.00 = $8,600.00, x 80% =         $6,880.00
+        //
+        // …and without the 1099-INT, line 18 is $26,600.00, modified AGI is
+        // $56,600.00, and the whole $8,000.00 is deductible.
+        taxExemptInterestReachesThePhaseOutIncomeThroughWorksheetOne: () => {
+            const withInterest = form1040Report(taxParams2025)(iraWithTaxExemptInterestInputs)
+            const without = form1040Report(taxParams2025)({
+                ...iraWithTaxExemptInterestInputs,
+                interestForms: [],
+            })
+            assert(withInterest.kind === 'ok', ['expected ok', withInterest])
+            assert(without.kind === 'ok', ['expected ok', without])
+            if (withInterest.kind !== 'ok' || without.kind !== 'ok') {
+                throw ['expected two computed returns', withInterest, without]
+            }
+            assertEq(lineRuled(withInterest.lines)('1040 line 2a').value, 2800000n,
+                '$28,000.00 of tax-exempt interest, which is NOT in taxable income')
+            assertEq(lineRuled(withInterest.lines)('1040 line 10').value, 688000n,
+                '$6,880.00 — the deduction after the add-back pushed modified AGI to $80,400.00')
+            assertEq(lineRuled(without.lines)('1040 line 10').value, 800000n,
+                'and the whole $8,000.00 without it, at $56,600.00')
+        },
+        // **Added after a mutation.** `iraDistributionReceived` could be
+        // disconnected entirely with the suite green. Publication 590-A's own
+        // named special case, through the full entry point.
+        aContributionBesideAnIraDistributionStopsTheWholeReturn: () => {
+            const outcome = form1040Report(taxParams2025)(iraContributionAndDistributionInputs)
+            assertEq(outcome.kind, 'error')
+            if (outcome.kind !== 'error') {
+                throw ['expected a refusal', outcome]
+            }
+            assert(outcome.message.includes('590-B'),
+                ['the refusal must name the worksheet it would need', outcome.message])
+            assertEq(outcome.unmodeled.length, 0, 'a document-data-sufficiency refusal, not a scope one')
+            // The control: the SAME distribution with no contribution
+            // computes. A retiree taking a distribution is the modal
+            // retirement return.
+            const control = form1040Report(taxParams2025)({
+                ...iraContributionAndDistributionInputs,
+                adjustmentForms: [],
+            })
+            assertEq(control.kind, 'ok', 'a distribution alone must still compute')
+        },
+        // **Added after a mutation.** Hardcoding the MFS-lived-with-spouse
+        // flag to `false` at the stage 1 call site left the suite green:
+        // §219(g)(4) was wired and unobserved end to end.
+        theMarriedFilingSeparatelyFlagReachesTheApplicableDollarAmount: () => {
+            const livedTogether = form1040Report(taxParams2025)(iraMarriedFilingSeparatelyInputs)
+            const livedApart = form1040Report(taxParams2025)({
+                ...iraMarriedFilingSeparatelyInputs,
+                profile: storedProfile({
+                    ...singleProfile,
+                    filingStatus: 'marriedFilingSeparately',
+                    declaredKinds: ['wages'],
+                }),
+            })
+            assert(livedTogether.kind === 'ok', ['expected ok', livedTogether])
+            assert(livedApart.kind === 'ok', ['expected ok', livedApart])
+            if (livedTogether.kind !== 'ok' || livedApart.kind !== 'ok') {
+                throw ['expected two computed returns', livedTogether, livedApart]
+            }
+            assertEq(lineRuled(livedTogether.lines)('1040 line 10').value, 280000n,
+                '$2,800.00 — §219(g)(3)(B)(iii)’s $0.00 applicable dollar amount')
+            assertEq(lineRuled(livedApart.lines)('1040 line 10').value, 300000n,
+                'and the whole $3,000.00 once §219(g)(4) unmarries them')
+        },
+        // PROV-02 end to end: 1040 line 10 must cite the documents and the
+        // BOXES the deduction actually came from, by the CAS hash a reader can
+        // look up — including Form W-2 box 13, which no computation in this
+        // repository read before this line.
+        lineTenCitesTheContributionTheCoverageBoxAndTheCompensationBox: () => {
+            const outcome = form1040Report(taxParams2025)(iraPhaseOutInputs)
+            assert(outcome.kind === 'ok', ['expected ok', outcome])
+            if (outcome.kind !== 'ok') {
+                throw ['expected ok', outcome]
+            }
+            const sources = lineRuled(outcome.lines)('1040 line 10').sources
+            const hashes = sources.map(source => source.documentHash)
+            assert(hashes.includes('sha256-p33-ira'),
+                ['line 10 must cite the adjustments document', sources])
+            assert(hashes.includes('sha256-p33-w2'),
+                ['and the Form W-2 behind the coverage and the compensation', sources])
+            const boxPaths = sources.map(source => source.boxPath)
+            assert(
+                boxPaths.includes(
+                    'entries[lineTag=traditionalIraContributionAgeFiftyOrOver,individual=taxpayer]'),
+                ['line 10 must cite the tagged ENTRY, not merely the document', boxPaths])
+            assert(boxPaths.includes('box13RetirementPlan'),
+                ['and the box that made §219(g) apply at all', boxPaths])
+            assert(boxPaths.includes('box1WagesTipsOtherCompensation'),
+                ['and the box that caps the deduction under §219(b)(1)(B)', boxPaths])
+        },
+        // A line 20 refusal must stop the WHOLE return, threaded through the
+        // same error arm every other stage 1 refusal uses — never a partial
+        // 1040 with a guessed deduction. The same contribution WITHOUT the
+        // age assertion is the case: $7,000.00 x 70% and x 80% are $700.00
+        // apart, and nothing here stores a birth date.
+        theAgeRefusalStopsTheWholeReturnAndNamesNoScopeKind: () => {
+            const outcome = form1040Report(taxParams2025)({
+                ...iraPhaseOutInputs,
+                adjustmentForms: [
+                    iraAdjustmentsDocument('sha256-p33-ira')('traditionalIraContribution')('7000.00'),
+                ],
+            })
+            assertEq(outcome.kind, 'error')
+            if (outcome.kind !== 'error') {
+                throw ['expected a refusal', outcome]
+            }
+            assert(outcome.message.includes('$4900.00'),
+                ['the refusal must name the under-50 figure, $4,900.00', outcome.message])
+            assert(outcome.message.includes('$5600.00'),
+                ['and the age-50 figure, $5,600.00', outcome.message])
+            // A document-data-sufficiency refusal, never a scope one.
+            assertEq(outcome.unmodeled.length, 0)
+        },
+        // **The control the reclassification report depends on.** `iraDeduction`
+        // is STILL an `fjs/return/scope` refusal — this work deliberately does
+        // not move it, because `fjs/return/scope` and `fjs/return/profile` are
+        // being edited by another author. So the line computes for a return
+        // that does not DECLARE the kind (the `educatorExpenses`/line 18
+        // shape: a modeled line reports what the documents say, and
+        // `declaredKinds` gates only refusals), and declaring it still refuses
+        // the whole return by name.
+        //
+        // The kind HAS moved, in the commit after the one that wired the
+        // line, and this leaf changed with it exactly as its predecessor said
+        // it would. What it asserts now is the other half of the same
+        // property: declaring a MODELED kind must not refuse, and the line
+        // must compute the same figure whether or not it was declared.
+        declaringTheKindNoLongerRefuses: () => {
+            const outcome = form1040Report(taxParams2025)({
+                ...iraPhaseOutInputs,
+                profile: storedProfile({
+                    ...singleProfile,
+                    declaredKinds: ['wages', 'iraDeduction'],
+                }),
+            })
+            assertEq(outcome.kind, 'ok', 'the kind is in `modeledKinds` now')
+            if (outcome.kind !== 'ok') {
+                throw ['expected a computed return', outcome]
+            }
+            // ...and declaring it changed nothing about the number, which is
+            // what `declaredKinds` gating refusals rather than computation
+            // means. Compared against the SAME return without the
+            // declaration, not against a hand-typed figure, because the
+            // property under test is the equality itself.
+            const undeclared = form1040Report(taxParams2025)(iraPhaseOutInputs)
+            assertEq(undeclared.kind, 'ok', 'the control must compute too')
+            if (undeclared.kind !== 'ok') {
+                throw ['expected a computed control', undeclared]
+            }
+            assertEq(
+                JSON.stringify(outcome.lines.map(line => line.value.toString())),
+                JSON.stringify(undeclared.lines.map(line => line.value.toString())),
+                'declaring a modeled kind moves no printed line at all')
         },
     },
     // ── Phase 26 (TAX-28/TAX-29): the QCD and Form 8606 through the FULL
@@ -9423,6 +11168,134 @@ export const proof = {
             assert(
                 boxes.includes('box4FairMarketValuePerShareOnExerciseDate'),
                 ['and the box the spread was computed from', boxes])
+        },
+        /**
+         * ★ **THE WIRING LEAF FOR FORM 6251 LINE 2J.** A stored Schedule K-1
+         * (Form 1041) box 12 code A reaches Form 6251 line 2j, Schedule 2 line
+         * 2, Schedule 2 line 3 and **1040 line 17**.
+         *
+         * It exists because a form-level proof structurally cannot see the
+         * wiring: `fjs/form6251`'s own leaves all hand the form a document list
+         * directly, and every one of them stays green while
+         * `fjs/form1040/core` hands `fjs/schedule/2` an EMPTY one — the exact
+         * defect `15c30af` shipped a fix for and this project has now paid for
+         * twice.
+         *
+         * The base return is the one hand-derived in the leaf above, so only
+         * the DELTA has to be computed here. AMTI was $1,130,000.00, the
+         * exemption is already fully phased out, and line 6 is above the
+         * $239,100.00 breakpoint — so every extra dollar of AMTI is taxed at
+         * 28% and nothing else on the return moves:
+         *
+         *   K-1 box 12 code A                                    $10,000.00
+         *   6251 line 4    1,130,000.00 + 10,000.00           $1,140,000.00
+         *   6251 line 6    the exemption is $0.00              $1,140,000.00
+         *   6251 line 7    26% of 239,100.00                      $62,166.00
+         *                + 28% of 900,900.00                     $252,252.00
+         *                                                        $314,418.00
+         *   6251 line 10   1040 line 16, unchanged                $19,139.00
+         *   6251 line 11   314,418.00 - 19,139.00                $295,279.00
+         *   1040 line 17                                         $295,279.00
+         */
+        aBoxTwelveCodeAReachesNineteenFortyLineSeventeen: () => {
+            const outcome = exerciseAndHoldWith([
+                estateTrustAmtK1('sha256-2j-k1')([{ code: 'A', amount: '10000.00' }]),
+            ])
+            assert(outcome.kind === 'ok', ['expected the beneficiary return to compute', outcome])
+            if (outcome.kind !== 'ok') {
+                return
+            }
+            const at = lineRuled(outcome.lines)
+            assertEq(at('1040 line 16').value, 1913900n, '$19,139.00 of regular tax, unchanged')
+            assertEq(at('1040 line 17').value, 29527900n, '$295,279.00 of alternative minimum tax')
+            assertEq(at('1040 line 18').value, 31441800n, '$314,418.00 = $19,139.00 + $295,279.00')
+            // THE DIFFERENTIAL: the identical return without the K-1 owes
+            // $292,479.00, so the whole $2,800.00 difference is 28% of the
+            // $10,000.00 adjustment and nothing else. An absolute assertion
+            // alone would be satisfied by a coincidence; this pair cannot be.
+            const without = exerciseAndHoldWith([])
+            assert(without.kind === 'ok', ['expected the control return to compute', without])
+            if (without.kind !== 'ok') {
+                return
+            }
+            const controlAt = lineRuled(without.lines)
+            assertEq(controlAt('1040 line 17').value, 29247900n, '$292,479.00 without the K-1')
+            assertEq(
+                at('1040 line 17').value - controlAt('1040 line 17').value, 280000n,
+                '$2,800.00 = 28% of the $10,000.00 adjustment')
+        },
+        /**
+         * **A NEGATIVE box 12 code A LOWERS 1040 line 17**, end to end. The
+         * leaf a floor at zero fails, at the entry point rather than at the
+         * form: 28% of minus $10,000.00 is minus $2,800.00 of tax.
+         *
+         *   6251 line 4    1,130,000.00 - 10,000.00           $1,120,000.00
+         *   6251 line 7    26% of 239,100.00                      $62,166.00
+         *                + 28% of 880,900.00                     $246,652.00
+         *                                                        $308,818.00
+         *   6251 line 11   308,818.00 - 19,139.00                $289,679.00
+         */
+        aNegativeBoxTwelveCodeALowersNineteenFortyLineSeventeen: () => {
+            const outcome = exerciseAndHoldWith([
+                estateTrustAmtK1('sha256-2j-k1-neg')([{ code: 'A', amount: '-10000.00' }]),
+            ])
+            assert(outcome.kind === 'ok', ['expected the negative-adjustment return to compute', outcome])
+            if (outcome.kind !== 'ok') {
+                return
+            }
+            assertEq(
+                lineRuled(outcome.lines)('1040 line 17').value, 28967900n,
+                '$289,679.00 -- BELOW the $292,479.00 the same return owes with no K-1')
+        },
+        /**
+         * Provenance, in its own leaf: 1040 line 17 cites the box 12 entry it
+         * taxed, by hash and by dialect-qualified box path — `box12` exists on
+         * a Form W-2 too, and that box also has a code A.
+         */
+        nineteenFortyLineSeventeenCitesTheBoxTwelveEntry: () => {
+            const outcome = exerciseAndHoldWith([
+                estateTrustAmtK1('sha256-2j-k1')([{ code: 'A', amount: '10000.00' }]),
+            ])
+            assert(outcome.kind === 'ok', ['expected the beneficiary return to compute', outcome])
+            if (outcome.kind !== 'ok') {
+                return
+            }
+            const seventeen = lineRuled(outcome.lines)('1040 line 17')
+            const hashes = seventeen.sources.map(source => source.documentHash)
+            assert(hashes.includes('sha256-2j-k1'), ['1040 line 17 must cite the Schedule K-1', hashes])
+            const boxes = seventeen.sources.map(source => source.boxPath)
+            assert(
+                boxes.includes('k1_1041.box12[code=A]'),
+                ['and the box AND CODE the adjustment came from', boxes])
+        },
+        /**
+         * ★ **THE CONTROL.** The same return whose box 12 carries code **J**
+         * — exclusion items, which belong on the FOLLOWING year's Form 8801
+         * and on no line of this return — **refuses**, naming the box and the
+         * code.
+         *
+         * Without it, a gate that let every box 12 code through would pass
+         * every leaf above: the three that assert a figure would still see
+         * code A summed correctly, and nothing would notice that a code
+         * belonging to another year's return had been let in beside it.
+         */
+        aBoxTwelveCodeThisEngineDoesNotRouteStillRefuses: () => {
+            const outcome = exerciseAndHoldWith([
+                estateTrustAmtK1('sha256-2j-k1-j')([{ code: 'J', amount: '10000.00' }]),
+            ])
+            assert(outcome.kind === 'error', ['expected the return to refuse', outcome])
+            if (outcome.kind !== 'error') {
+                return
+            }
+            assert(outcome.message.includes('box 12'), ['name the printed box', outcome.message])
+            assert(outcome.message.includes('J'), ['name the code', outcome.message])
+            // And the refusal is not the whole story: the SAME return with
+            // code A computes, which is what makes this a gate rather than a
+            // wall.
+            const routed = exerciseAndHoldWith([
+                estateTrustAmtK1('sha256-2j-k1')([{ code: 'A', amount: '10000.00' }]),
+            ])
+            assert(routed.kind === 'ok', ['code A must still compute', routed])
         },
         /**
          * ★ **TAX-33's motivating return, end to end** — the ONE combination

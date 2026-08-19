@@ -121,13 +121,41 @@
  * for why absence cannot mean zero here when it does mean zero for
  * `vnd.fjs.prior_year_capital_loss`.
  *
+ * ## Lines 6-9: the REIT half is COMPUTED, the PTP half is not
+ *
+ * §199A(b)(1)(B)'s second component is 20% of qualified REIT dividends plus
+ * qualified publicly traded partnership income, and it is independent of the
+ * qualified-business-income component in the strong sense: **it needs no trade
+ * or business at all**, it is not reduced by §199A(b)(2)(B)'s wage/UBIA cap,
+ * and §199A(d)(3)'s specified-service phase-out does not touch it. A retiree
+ * whose only holding is a REIT index fund is entitled to it.
+ *
+ * Line 6 now carries the REIT half: `vnd.fjs.1099div` box 5 (§199A dividends),
+ * which that dialect has stored inside its own money-exactness loop since it
+ * shipped and no computation read — the `box13StatutoryEmployee` shape this
+ * repository has already paid for twice. `fjs/form1040/core` sums the box over
+ * every stored 1099-DIV and cites one `Source` per contributing document.
+ *
+ * **The PTP half is still zero, and it is zero because it is REFUSED.**
+ * Qualified publicly traded partnership income reaches a return on a Schedule
+ * K-1, as box 20 code Z or box 17 code V, and `fjs/schedule/e`'s
+ * `section199AInformationRefusal` stops the WHOLE return for either — a
+ * document-data refusal, so it fires whatever the profile declared.
+ * `qualifiedReitDividendsAndPtpIncome` also remains an `fjs/return/scope`
+ * refusal, and `fjs/form8995/todo/reit-dividends.md` argues why that row must
+ * be SPLIT before either half is reclassified: moving it whole would tell a
+ * taxpayer holding a pipeline K-1 that this engine computes their deduction.
+ *
+ * **Line 7 is therefore a structural zero rather than an unstated assertion.**
+ * §199A(c)(2)'s one-tax-year argument, which makes
+ * {@link priorYearCarryforwardIsUnstated} refuse for line 3, would apply here
+ * too if line 6 could ever be negative — and it cannot: a qualified REIT
+ * dividend is a dividend, and a qualified PTP LOSS is the only other way in.
+ * That argument is load-bearing on the PTP half staying refused, which is the
+ * second reason the kind must not be reclassified whole.
+ *
  * ## What else is a documented zero here
  *
- * - **Lines 6-9, qualified REIT dividends and PTP income.** Form 1099-DIV box
- *   5 carries §199A dividends and `vnd.fjs.1099div` stores them, but nothing
- *   in this engine reads that box, and publicly traded partnership income
- *   needs Schedule K-1 (DOC-24, Phase 30). `qualifiedReitDividendsAndPtpIncome`
- *   is an `fjs/return/scope` refusal so a taxpayer with either is told.
  * - **Lines 1(ii) through 1(v).** This engine computes ONE Schedule C and
  *   `fjs/schedule/c` refuses a second business by name, so exactly one row of
  *   the printed table can ever be filled.
@@ -367,6 +395,7 @@ export const priorYearCarryforwardIsUnstated = input => {
  *   readonly priorYearLossCarryforwardCents: bigint,
  *   readonly taxableIncomeBeforeQbiCents: bigint,
  *   readonly netCapitalGainCents: bigint,
+ *   readonly qualifiedReitDividendsCents: bigint,
  * }} Form8995Input
  */
 
@@ -378,7 +407,7 @@ export const priorYearCarryforwardIsUnstated = input => {
 export const form8995 = taxParamSet => input => {
     const {
         qualifiedBusinessIncomeCents, priorYearLossCarryforwardCents,
-        taxableIncomeBeforeQbiCents, netCapitalGainCents,
+        taxableIncomeBeforeQbiCents, netCapitalGainCents, qualifiedReitDividendsCents,
     } = input
     const rate = BigInt(taxParamSet.qualifiedBusinessIncomeDeduction.ratePercent)
     // 1(i)(c). "Qualified business income or (loss)" for the first trade or
@@ -401,15 +430,26 @@ export const form8995 = taxParamSet => input => {
     // 5. "Qualified business income component. Multiply line 4 by 20% (0.20)."
     const line5 = percentOfCents(line4)(rate)
     // 6. "Qualified REIT dividends and publicly traded partnership (PTP)
-    //    income or (loss)." A documented zero: nothing reads Form 1099-DIV
-    //    box 5, and PTP income needs Schedule K-1 (DOC-24, Phase 30).
-    //    `qualifiedReitDividendsAndPtpIncome` is an `fjs/return/scope`
-    //    refusal, so a taxpayer with either is told.
-    const line6 = 0n
+    //    income or (loss)." The REIT half is Form 1099-DIV box 5 (§199A
+    //    dividends), summed over every stored 1099-DIV by `fjs/form1040/core`
+    //    and cited one Source per contributing document. The PTP half is a
+    //    documented zero because it is REFUSED: PTP income arrives as
+    //    Schedule K-1 box 20 code Z or box 17 code V, and `fjs/schedule/e`'s
+    //    `section199AInformationRefusal` stops the whole return for either.
+    //    A PTP LOSS -- the only thing that could make this line negative --
+    //    is refused by the same guard, which is why line 7 below is a
+    //    structural zero rather than an assertion.
+    const qualifiedPubliclyTradedPartnershipIncomeCents = 0n
+    const line6 = qualifiedReitDividendsCents + qualifiedPubliclyTradedPartnershipIncomeCents
     // 7. "Qualified REIT dividends and PTP (loss) carryforward from prior
-    //    years." Zero for the same one-tax-year reason line 3 would be,
-    //    except that line 6 is structurally zero so nothing could carry
-    //    forward into it.
+    //    years." Zero, and NOT for the reason it was before line 6 acquired a
+    //    reader. §199A(c)(2)'s one-tax-year argument would apply here exactly
+    //    as it does to line 3, if line 6 could go negative. It cannot: box 5
+    //    is a dividend and `vnd.fjs.1099div`'s money check rejects anything
+    //    that is not an exact decimal amount, and the only other summand -- a
+    //    qualified PTP loss -- is refused by name one module over. See this
+    //    module's docstring; the day PTP income is wired is the day this line
+    //    must become an assertion.
     const line7 = 0n
     // 8. "Total qualified REIT dividends and PTP income. Combine lines 6 and
     //    7. If zero or less, enter -0-."
@@ -469,6 +509,7 @@ export const form8995 = taxParamSet => input => {
  *   readonly assertedPriorYearLossCarryforward: string | undefined,
  *   readonly taxableIncomeBeforeQbiCents: bigint,
  *   readonly netCapitalGainCents: bigint,
+ *   readonly qualifiedReitDividendsCents: bigint,
  * }} QualifiedBusinessIncomeDeductionInput
  */
 
@@ -487,6 +528,7 @@ export const qualifiedBusinessIncomeDeduction = taxParamSet => input => {
     const {
         status, netProfitCents, deductibleHalfOfSelfEmploymentTaxCents,
         assertedPriorYearLossCarryforward, taxableIncomeBeforeQbiCents, netCapitalGainCents,
+        qualifiedReitDividendsCents,
     } = input
     const qualifiedBusinessIncomeCents = qualifiedBusinessIncome({
         netProfitCents, deductibleHalfOfSelfEmploymentTaxCents,
@@ -513,6 +555,7 @@ export const qualifiedBusinessIncomeDeduction = taxParamSet => input => {
                 : centsFromString(assertedPriorYearLossCarryforward),
             taxableIncomeBeforeQbiCents,
             netCapitalGainCents,
+            qualifiedReitDividendsCents,
         }),
     }
 }
@@ -549,6 +592,7 @@ const soleProprietor = {
     assertedPriorYearLossCarryforward: '0.00',
     taxableIncomeBeforeQbiCents: 0n,
     netCapitalGainCents: 0n,
+    qualifiedReitDividendsCents: 0n,
 }
 
 /** Narrows an outcome to its OK arm, throwing (never casting).
@@ -1015,19 +1059,116 @@ export const proof = {
     },
 
     reitAndPtp: {
-        // Lines 6 through 9 are structurally zero, asserted at a realistic
-        // input rather than at zero — where "zero because the input was zero"
-        // and "zero because the lines are unreachable" are indistinguishable.
-        // Line 10 still ADDS line 9, so the day Form 1099-DIV box 5 acquires
-        // a reader it reaches the deduction without another edit here.
-        theReitAndPtpComponentIsStructurallyZero: () => {
+        // **THE RETIREE WITH A REIT INDEX FUND AND NO BUSINESS.** §199A(b)(1)(B)
+        // is a component of its own: $1,000.00 of Form 1099-DIV box 5 gives
+        // $200.00 of deduction on a return whose line 1(i) is empty. Every
+        // figure hand-typed.
+        //
+        //   line 6   box 5, §199A dividends                   $1,000.00
+        //   line 8   6 + 7, floored                           $1,000.00
+        //   line 9   20% of 100,000                             $200.00
+        //   line 10  line 5 ($0.00) + line 9                    $200.00
+        //   line 11  taxable income before §199A              $49,250.00
+        //   line 14  20% of 4,925,000                         $9,850.00
+        //   line 15  the LESSER                                 $200.00
+        aReitDividendWithNoBusinessAtAllProducesADeduction: () => {
+            const form = ok(run({
+                ...soleProprietor,
+                qualifiedReitDividendsCents: 100000n,
+                taxableIncomeBeforeQbiCents: 4925000n,
+            }))
+            assertEq(form.line1i, 0n, 'no trade or business at all')
+            assertEq(form.line5, 0n, 'and therefore no qualified business income component')
+            assertEq(form.line6, 100000n, 'line 6 = $1,000.00 of qualified REIT dividends')
+            assertEq(form.line8, 100000n, 'line 8 = $1,000.00')
+            assertEq(form.line9, 20000n, 'line 9 = $200.00 = 20% of $1,000.00')
+            assertEq(form.line10, 20000n, 'line 10 = $200.00, the REIT component alone')
+            assertEq(form.line14, 985000n, 'line 14 = $9,850.00 = 20% of $49,250.00')
+            assertEq(form.line15, 20000n, 'line 15 = $200.00 -> 1040 line 13a')
+            // …and THE CONTROL: the identical return without the box.
+            assertEq(
+                ok(run({ ...soleProprietor, taxableIncomeBeforeQbiCents: 4925000n })).line15,
+                0n,
+                'without box 5 there is no deduction at all')
+        },
+        // **BOTH COMPONENTS, ADDED ON LINE 10.** The founder of
+        // `theIncomeLimitationBindsForAnOrdinarySoleProprietor` who also holds
+        // a REIT fund: $9,293.52 from line 5 and $200.00 from line 9. Each
+        // half asserted separately, so a wiring that dropped either one is
+        // visible rather than absorbed by the sum.
+        theTwoComponentsAreAddedOnLineTen: () => {
+            const form = ok(run({
+                ...soleProprietor,
+                netProfitCents: 5000000n,
+                deductibleHalfOfSelfEmploymentTaxCents: 353239n,
+                qualifiedReitDividendsCents: 100000n,
+                taxableIncomeBeforeQbiCents: 12000000n,
+            }))
+            assertEq(form.line5, 929352n, 'line 5 = $9,293.52, the QBI component')
+            assertEq(form.line9, 20000n, 'line 9 = $200.00, the REIT component')
+            assertEq(form.line10, 949352n, 'line 10 = $9,493.52 = $9,293.52 + $200.00')
+            assertEq(form.line14, 2400000n, 'line 14 = $24,000.00, and it does not bind')
+            assertEq(form.line15, 949352n, 'line 15 = $9,493.52')
+            // …and the same return WITHOUT the dividend, so the $200.00 is
+            // observable rather than merely present.
+            const none = ok(run({
+                ...soleProprietor,
+                netProfitCents: 5000000n,
+                deductibleHalfOfSelfEmploymentTaxCents: 353239n,
+                taxableIncomeBeforeQbiCents: 12000000n,
+            }))
+            assertEq(none.line15, 929352n, 'without it, $9,293.52')
+            assertEq(form.line15 - none.line15, 20000n, 'exactly 20% of the $1,000.00 dividend')
+        },
+        // §199A(a)(1)(B)'s income limitation caps the COMBINED figure, so a
+        // REIT dividend does not escape line 14 — it escapes the wage/UBIA
+        // limitation, which is a different thing and lives on Form 8995-A.
+        // $500.00 of taxable income before §199A allows $100.00 of deduction
+        // against a $200.00 REIT component.
+        theIncomeLimitationStillCapsTheReitComponent: () => {
+            const form = ok(run({
+                ...soleProprietor,
+                qualifiedReitDividendsCents: 100000n,
+                taxableIncomeBeforeQbiCents: 50000n,
+            }))
+            assertEq(form.line10, 20000n, 'line 10 = $200.00')
+            assertEq(form.line14, 10000n, 'line 14 = $100.00 = 20% of $500.00')
+            assertEq(form.line15, 10000n, 'line 15 = $100.00, the LESSER')
+            assert(form.line10 > form.line14, ['the limitation must bind here', form.line10, form.line14])
+        },
+        // **THE PTP HALF IS STILL ZERO**, and line 6 says so arithmetically:
+        // it equals the REIT input exactly, with nothing added. Line 7 and
+        // line 17 stay zero for the reason the module docstring gives — a
+        // qualified PTP LOSS is the only thing that could make either
+        // nonzero, and `fjs/schedule/e` refuses the K-1 that would carry it.
+        thePtpHalfContributesNothingAndNothingCarriesForward: () => {
+            const form = ok(run({
+                ...soleProprietor,
+                qualifiedReitDividendsCents: 314159n,
+                taxableIncomeBeforeQbiCents: 12000000n,
+            }))
+            assertEq(form.line6, 314159n, 'line 6 is the REIT dividend and NOTHING else')
+            assertEq(form.line7, 0n, 'line 7 = $0.00, a structural zero')
+            assertEq(form.line8, 314159n, 'line 8 = $3,141.59')
+            assertEq(form.line17, 0n, 'line 17 = $0.00 -- nothing carries into next year')
+            // The printed rule on line 17 is "if greater than zero, enter
+            // -0-", the OPPOSITE floor from line 8's, and the one a
+            // transcription is likeliest to invert. Line 8 is positive here,
+            // so a transcription that shared line 8's floor would print
+            // $3,141.59 on line 17.
+            assert(form.line8 > 0n, 'the control: line 8 is a real positive amount')
+        },
+        // A return with no 1099-DIV box 5 at all keeps the zeros it always
+        // had, asserted at a REALISTIC business input rather than at zero —
+        // where "zero because the input was zero" and "zero because the lines
+        // were unreachable" would be indistinguishable.
+        withoutBoxFiveTheComponentIsZeroAndLineTenStillAdds: () => {
             const form = ok(run({
                 ...soleProprietor,
                 netProfitCents: 5000000n,
                 taxableIncomeBeforeQbiCents: 12000000n,
             }))
-            assertEq(form.line6, 0n, 'line 6 = $0.00 -- 1099-DIV box 5 has no reader')
-            assertEq(form.line7, 0n, 'line 7 = $0.00')
+            assertEq(form.line6, 0n, 'line 6 = $0.00 -- no 1099-DIV reported box 5')
             assertEq(form.line8, 0n, 'line 8 = $0.00')
             assertEq(form.line9, 0n, 'line 9 = $0.00')
             assertEq(form.line10, form.line5 + form.line9, 'line 10 adds BOTH components')
