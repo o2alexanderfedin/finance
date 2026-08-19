@@ -659,6 +659,17 @@ export const formFortySevenNinetySeven = inputs => {
     //     (§1254 mineral property) and 29b (§1255 cost-sharing property) are
     //     structural zeros: no dialect can spell any of the three, and a
     //     register bound to a farm refuses above.
+    //
+    //     **`p.line26gCents` here is an EQUIVALENT MUTANT, and that is
+    //     recorded rather than hidden.** Deleting the term changes the source
+    //     and cannot turn red at any input, because line 26g is a structural
+    //     zero for every property this engine can hold — the register's two
+    //     §1250 classes are straight-line only and post-1986, which is i4797
+    //     p10's own exclusion, and §291 is corporations. Measured: the whole
+    //     suite stayed green at 3,106 leaves. It is written anyway because it
+    //     is the printed sum, and because the day a §1250 class with
+    //     accelerated depreciation becomes representable the term must already
+    //     be here rather than being remembered.
     const line31Cents = partIIIProperties.reduce(
         (sum, p) => sum + p.line25bCents + p.line26gCents, 0n)
     // 32. "Subtract line 31 from line 30. Enter the portion from casualty or
@@ -1431,6 +1442,52 @@ export const proof = {
         assertEq(f.longTermCapitalGainCents, 9113768n)
         assertEq(f.unrecapturedSectionTwelveFiftyGainCents, 4740018n)
         assertEq(f.sources.length, 5, 'one citation per disposal, across both registers')
+    },
+    /**
+     * ★ **THE CITATIONS**, added because a mutation erasing the asset's name
+     * from `boxPath` survived the whole suite. A `sources.length` assertion
+     * counts citations; it does not check that any of them points anywhere a
+     * reader could go.
+     *
+     * Each row cites the REGISTER it came off — the two registers are
+     * distinguishable — and names the asset inside it, because a register
+     * holding four disposals would otherwise carry four citations a reader
+     * could not tell apart.
+     */
+    everyCitationNamesItsRegisterAndItsAsset: () => {
+        const f = expectOk(formFortySevenNinetySeven({
+            profile: fullyDeclaredProfile,
+            assetRegisters: [
+                registerDocument('BUS-0001')([lathe, trailer, desk, forklift]),
+                registerDocument('RENT-0002')([duplex]),
+            ],
+            farmForms: [],
+        }))
+        /** @type {readonly (readonly [string, string, string])[]} */
+        const expected = [
+            ['sha256-register-BUS-0001', 'assets -> "lathe" -> disposal', '9000.00'],
+            ['sha256-register-BUS-0001', 'assets -> "delivery trailer" -> disposal', '9500.00'],
+            ['sha256-register-BUS-0001', 'assets -> "office desk" -> disposal', '500.00'],
+            ['sha256-register-BUS-0001', 'assets -> "forklift" -> disposal', '9000.00'],
+            ['sha256-register-RENT-0002', 'assets -> "rental duplex" -> disposal', '250000.00'],
+        ]
+        // Hand-typed count beside the walk: a citation silently dropped would
+        // otherwise just make this loop one iteration shorter.
+        assertEq(expected.length, 5, 'five disposals, five citations')
+        assertEq(f.sources.length, 5)
+        for (const [index, [documentHash, boxPath, value]] of expected.entries()) {
+            const source = f.sources[index]
+            assert(source !== undefined, ['expected a citation at', index])
+            if (source === undefined) { return }
+            assertEq(source.documentHash, documentHash, `citation ${index} document`)
+            assertEq(source.boxPath, boxPath, `citation ${index} path`)
+            assertEq(source.value, value, `citation ${index} value`)
+        }
+        // The lathe and the forklift both sold for $9,000.00, on purpose: a
+        // reader handed two identical amounts can tell them apart ONLY by the
+        // path, which is exactly what the mutation erased.
+        assertEq(expected[0]?.[2], expected[3]?.[2],
+            'two disposals share an amount, so the path is the only discriminator')
     },
     /**
      * A return with registers but no disposals is not a Form 4797 at all.
