@@ -490,6 +490,7 @@ export const modeledKinds = /** @type {const} */ ([
     'educatorExpenses',            // vnd.fjs.adjustments -> Schedule 1 line 11 -> 1040 line 10
     'healthSavingsAccountDeduction', // Form 8889 Part I  -> Schedule 1 line 13 -> 1040 line 10
     'deductiblePartOfSelfEmploymentTax', // Schedule SE line 13 -> Schedule 1 line 15 -> 1040 line 10
+    'penaltyOnEarlyWithdrawalOfSavings', // 1099-INT box 2 -> Schedule 1 line 18 -> 1040 line 10
     'studentLoanInterestDeduction', // 1098-E + worksheet -> Schedule 1 line 21 -> 1040 line 10
     'itemizedDeductions',          // Schedule A + deductionChoice   -> 1040 line 12e
     'qualifiedBusinessIncomeDeduction', // Form 8995 line 15         -> 1040 line 13a
@@ -725,7 +726,6 @@ export const unmodeledKindRefusals = /** @type {const} */ ([
     // a phase that then shipped. What is left is the part no phase has
     // promised: the premiums themselves appear on no information return.
     { kind: 'selfEmployedHealthInsuranceDeduction', line: 'Schedule 1 line 17 -> 1040 line 10', label: 'the self-employed health insurance deduction', remedy: 'requires the Pub. 535 self-employed health insurance deduction worksheet. Both figures it once lacked now exist — Schedule C as of Phase 27 and §162(l)(2)(A)\u2019s net-earnings cap as of Phase 28 — and what remains missing is the premiums: no dialect here records what was paid for medical, dental or long-term-care coverage, nor whether the taxpayer was eligible for an employer plan in any month, which §162(l)(2)(B) disqualifies (no phase yet)' },
-    { kind: 'penaltyOnEarlyWithdrawalOfSavings', line: 'Schedule 1 line 18 -> 1040 line 10', label: 'the penalty on early withdrawal of savings', remedy: 'requires Form 1099-INT box 2, which `vnd.fjs.1099int` stores but no computation reads (no phase yet)' },
     { kind: 'alimonyPaid', line: 'Schedule 1 line 19a -> 1040 line 10', label: 'alimony paid', remedy: 'requires the recipient\u2019s SSN and the divorce-decree date, since only a pre-2019 decree makes alimony deductible, and no dialect models either (no phase yet)' },
     { kind: 'iraDeduction', line: 'Schedule 1 line 20 -> 1040 line 10', label: 'the IRA deduction', remedy: 'requires Pub. 590-A Worksheet 1-1, whose own modified adjusted gross income depends on 1040 line 6b while line 6b depends on this deduction \u2014 a fixed point this engine does not model (no phase yet)' },
     { kind: 'archerMsaDeduction', line: 'Schedule 1 line 23 -> 1040 line 10', label: 'the Archer MSA deduction', remedy: 'requires Form 8853 (no phase yet)' },
@@ -1361,7 +1361,7 @@ export const classifyScope = declaredKinds => {
  * and `fjs/form8995` wiring that makes all three computable.
  * @type {number}
  */
-const expectedModeledKindCount = 38
+const expectedModeledKindCount = 39
 
 /**
  * The modeled set, hand-typed a SECOND time and in {@link kindVocabulary}'s
@@ -1397,6 +1397,7 @@ const everyModeledKindHandTyped = [
     'educatorExpenses',
     'healthSavingsAccountDeduction',
     'deductiblePartOfSelfEmploymentTax',
+    'penaltyOnEarlyWithdrawalOfSavings',
     'studentLoanInterestDeduction',
     'itemizedDeductions',
     'qualifiedBusinessIncomeDeduction',
@@ -1497,7 +1498,7 @@ const everyModeledKindHandTyped = [
  * that makes it computable.
  * @type {number}
  */
-const expectedUnmodeledKindCount = 76
+const expectedUnmodeledKindCount = 75
 
 /**
  * The complete refusal message for a return declaring exactly
@@ -2555,15 +2556,14 @@ export const proof = {
                 'movingExpensesArmedForces',
                 'selfEmployedRetirementPlans',
                 'selfEmployedHealthInsuranceDeduction',
-                'penaltyOnEarlyWithdrawalOfSavings',
                 'alimonyPaid',
                 'iraDeduction',
                 'archerMsaDeduction',
                 'otherAdjustments',
             ]
             assertEq(
-                stillRefused.length, 9,
-                'thirteen Schedule 1 Part II kinds, less Phase 24\'s three and Phase 28\'s one')
+                stillRefused.length, 8,
+                'thirteen Schedule 1 Part II kinds, less Phase 24\'s three, Phase 28\'s one and line 18')
             for (const kind of stillRefused) {
                 const outcome = classifyScope([kind])
                 assert(

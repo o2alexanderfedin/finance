@@ -991,6 +991,11 @@ export const form1040IncomeLines = taxParamSet => inputs => {
     // wage base.
     const scheduleOneStageOne = scheduleOnePartIIExceptStudentLoanInterest(taxParamSet)({
         profile, status, adjustmentForms, w2Forms: w2s,
+        // Line 18's whole computation: §62(a)(9) deducts the forfeited
+        // interest a bank charges for breaking a term deposit, reported in
+        // box 2 and subject to no floor or phase-out. The SAME documents
+        // already feeding lines 2a and 2b above.
+        interestForms,
         businessNetProfit: scheduleOnePartIResult.scheduleC.partII.line31,
         businessExpenseForms,
         // ...and printed Schedule SE line 2's OTHER named source, "Schedule

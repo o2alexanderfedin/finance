@@ -198,6 +198,7 @@ import { taxParamsByYear } from '../../tax/params/module.f.js'
 
 /** @import { ReturnProfile } from '../../return/profile/module.f.js' */
 /** @import { OneZeroNineNineG } from '../../document/1099g/module.f.js' */
+/** @import { OneZeroNineNineInt } from '../../document/1099int/module.f.js' */
 /** @import { OneZeroNineEightE } from '../../document/1098e/module.f.js' */
 /** @import { Adjustments } from '../../document/adjustments/module.f.js' */
 /** @import { BusinessExpenses } from '../../document/business_expenses/module.f.js' */
@@ -332,6 +333,37 @@ const unemploymentCompensationLine = profile => forms => {
         const printed = form.value.box1UnemploymentCompensation
         assert(printed !== undefined, ['filtered to present box 1', form.documentHash])
         return { documentHash: form.documentHash, boxPath: 'box1UnemploymentCompensation', value: printed }
+    })
+    const value = sources.reduce((total, source) => total + centsFromString(source.value), 0n)
+    return documentLine(profile)(rule)(value)(sources)
+}
+
+/**
+ * Line 18, penalty on early withdrawal of savings: the sum of box 2 across
+ * every stored `vnd.fjs.1099int`, citing ONE source per document.
+ *
+ * **§62(a)(9) has no floor, no threshold and no phase-out**, which is why
+ * this line is a sum and not a form. A bank that charges forfeited interest
+ * for breaking a term deposit reports the whole charge in box 2, and the
+ * whole of it is an above-the-line deduction. There is no worksheet and no
+ * form to attach — the box IS the computation, which is what separates this
+ * line from every other still-refused adjustment on this schedule.
+ *
+ * **A box that is present and `'0.00'` still cites its document.** The
+ * filter is on presence, never on value: a Form 1099-INT that reported a
+ * zero penalty said something, and a return that never received one said
+ * nothing. Collapsing the two would make the citation claim a document the
+ * taxpayer does not hold. This is the same presence-not-value rule
+ * {@link unemploymentCompensationLine} follows one line above.
+ * @type {(profile: Stored<ReturnProfile>) => (forms: readonly Stored<OneZeroNineNineInt>[]) => ReportLine}
+ */
+const earlyWithdrawalPenaltyLine = profile => forms => {
+    const rule = 'Schedule 1 line 18 (penalty on early withdrawal of savings)'
+    const withBox2 = forms.filter(form => form.value.box2EarlyWithdrawalPenalty !== undefined)
+    const sources = withBox2.map(form => {
+        const printed = form.value.box2EarlyWithdrawalPenalty
+        assert(printed !== undefined, ['filtered to present box 2', form.documentHash])
+        return { documentHash: form.documentHash, boxPath: 'box2EarlyWithdrawalPenalty', value: printed }
     })
     const value = sources.reduce((total, source) => total + centsFromString(source.value), 0n)
     return documentLine(profile)(rule)(value)(sources)
@@ -504,6 +536,7 @@ export const scheduleOnePartI = input => {
  *   readonly businessNetProfit: ReportLine,
  *   readonly businessExpenseForms: readonly Stored<BusinessExpenses>[],
  *   readonly passThrough: PassThroughSelfEmployment,
+ *   readonly interestForms: readonly Stored<OneZeroNineNineInt>[],
  * }} ScheduleOnePartIIStageOneInput
  */
 
@@ -600,7 +633,7 @@ const employerHsaContributionSources = w2s => w2s.flatMap(form =>
 export const scheduleOnePartIIExceptStudentLoanInterest = taxParamSet => input => {
     const {
         profile, status, adjustmentForms, w2Forms, businessNetProfit, businessExpenseForms,
-        passThrough,
+        passThrough, interestForms,
     } = input
     const zero = profileDeclaredZeroLine(profile)
     /** @type {readonly StoredEntry[]} */
@@ -841,7 +874,7 @@ export const scheduleOnePartIIExceptStudentLoanInterest = taxParamSet => input =
     }
     const line16 = zero('Schedule 1 line 16 (SEP/SIMPLE/qualified plans)')
     const line17 = zero('Schedule 1 line 17 (self-employed health insurance deduction)')
-    const line18 = zero('Schedule 1 line 18 (penalty on early withdrawal of savings)')
+    const line18 = earlyWithdrawalPenaltyLine(profile)(interestForms)
     const line19a = zero('Schedule 1 line 19a (alimony paid)')
     const line20 = zero('Schedule 1 line 20 (IRA deduction)')
     // 22. "Reserved for future use" -- the form's own inert line.
@@ -1236,6 +1269,7 @@ export const scheduleOnePartII = taxParamSet => input => {
  *   readonly adjustmentForms: readonly Stored<Adjustments>[],
  *   readonly studentLoanInterestForms: readonly Stored<OneZeroNineEightE>[],
  *   readonly w2Forms: readonly Stored<W2>[],
+ *   readonly interestForms: readonly Stored<OneZeroNineNineInt>[],
  *   readonly totalIncomeLine: ReportLine,
  * }} ScheduleOneInput
  */
@@ -1252,7 +1286,7 @@ export const scheduleOne = taxParamSet => input => {
     const {
         profile, status, unemploymentForms, nonemployeeCompensationForms, businessExpenseForms,
         partnershipK1Forms, sCorporationK1Forms, estateTrustK1Forms,
-        adjustmentForms, studentLoanInterestForms, w2Forms, totalIncomeLine,
+        adjustmentForms, studentLoanInterestForms, w2Forms, interestForms, totalIncomeLine,
     } = input
     const partI = scheduleOnePartI({
         profile, unemploymentForms, nonemployeeCompensationForms, businessExpenseForms, w2Forms,
@@ -1262,7 +1296,7 @@ export const scheduleOne = taxParamSet => input => {
         return partI
     }
     const stageOne = scheduleOnePartIIExceptStudentLoanInterest(taxParamSet)({
-        profile, status, adjustmentForms, w2Forms,
+        profile, status, adjustmentForms, w2Forms, interestForms,
         // Printed Schedule SE line 2 asks for "Schedule C, line 31" by name,
         // so that is the line handed over -- never Part I's line 3, which is
         // the same figure under a different printed number.
@@ -1443,6 +1477,33 @@ const oneZeroNineEightEDoc = amount => ({
 })
 
 /**
+ * A stored Form 1099-INT carrying an early-withdrawal penalty in box 2, for
+ * Schedule 1 line 18.
+ *
+ * `hash` is a parameter rather than a constant because line 18's whole
+ * citation contract is ONE source per contributing document — a fixture that
+ * reused a single hash could not tell "two documents summed" from "one
+ * document counted twice", which is the only interesting way that line can be
+ * wrong.
+ *
+ * `box2EarlyWithdrawalPenalty` is `undefined` for the absence case rather
+ * than `'0.00'`: the two are different facts and line 18 cites them
+ * differently, which {@link earlyWithdrawalPenaltyLine}'s own docstring
+ * argues and the two leaves below pin.
+ * @type {(hash: string) => (penalty: string | undefined) => Stored<OneZeroNineNineInt>}
+ */
+const oneZeroNineNineIntPenaltyDoc = hash => penalty => ({
+    documentHash: hash,
+    value: {
+        dialect: 'vnd.fjs.1099int',
+        payerTin: '66-6666666', recipientTin: '222-22-2222', accountNumber: 'CD-0001',
+        taxYear: 2025, formRevision: '2025',
+        box1InterestIncome: '100.00',
+        ...(penalty === undefined ? {} : { box2EarlyWithdrawalPenalty: penalty }),
+    },
+})
+
+/**
  * A Form 1040 line 9 (total income) as this schedule receives it, citing the
  * W-2 box a real return's total income would trace back to.
  *
@@ -1594,7 +1655,7 @@ const refusal = outcome => {
  */
 const partIIOf = profile => status => adjustmentForms => studentLoanInterestForms => w2Forms => totalIncomeCents => {
     const stageOne = scheduleOnePartIIExceptStudentLoanInterest(taxParams2025)({
-        profile, status, adjustmentForms, w2Forms,
+        profile, status, adjustmentForms, w2Forms, interestForms: [],
         businessNetProfit: noBusinessNetProfit(profile),
         businessExpenseForms: [],
         passThrough: noPassThrough,
@@ -1612,6 +1673,27 @@ const partIIOf = profile => status => adjustmentForms => studentLoanInterestForm
 /** The empty case, reused by every regression control below. */
 /** @type {() => ScheduleOnePartIIOutcome} */
 const emptyPartII = () => partIIOf(profileNoDeclaredKinds)('single')([])([])([])(0n)
+
+/**
+ * Part II stage one over a set of Forms 1099-INT and nothing else, for the
+ * line 18 leaves.
+ *
+ * Everything other than `interestForms` is the empty/no-business case, so a
+ * non-zero line 18 can only have come from the box under test — the same
+ * isolation {@link emptyPartII} gives the other adjustment leaves.
+ * @type {(interestForms: readonly Stored<OneZeroNineNineInt>[]) => ScheduleOnePartIIStageOneOutcome}
+ */
+const stageOneWithInterest = interestForms =>
+    scheduleOnePartIIExceptStudentLoanInterest(taxParams2025)({
+        profile: profileNoDeclaredKinds,
+        status: 'single',
+        adjustmentForms: [],
+        w2Forms: [],
+        interestForms,
+        businessNetProfit: noBusinessNetProfit(profileNoDeclaredKinds),
+        businessExpenseForms: [],
+        passThrough: noPassThrough,
+    })
 
 /**
  * Stage 1 for a return WITH a business — Schedule C run first, exactly as
@@ -1633,7 +1715,7 @@ const stageOneWithBusiness = profile => status => nonemployeeCompensationForms =
             estateTrustK1Forms: [],
         }))
         return scheduleOnePartIIExceptStudentLoanInterest(taxParams2025)({
-            profile, status, adjustmentForms: [], w2Forms,
+            profile, status, adjustmentForms: [], w2Forms, interestForms: [],
             businessNetProfit: partI.scheduleC.partII.line31,
             businessExpenseForms,
             passThrough: passThroughOf(partI.scheduleE),
@@ -1659,7 +1741,7 @@ const stageOneWithPassThrough = profile => status => partnershipK1Forms =>
             estateTrustK1Forms: [],
         }))
         return scheduleOnePartIIExceptStudentLoanInterest(taxParams2025)({
-            profile, status, adjustmentForms: [], w2Forms,
+            profile, status, adjustmentForms: [], w2Forms, interestForms: [],
             businessNetProfit: partI.scheduleC.partII.line31,
             businessExpenseForms,
             passThrough: passThroughOf(partI.scheduleE),
@@ -2021,6 +2103,7 @@ export const proof = {
             }))
             const stageOne = okStageOne(scheduleOnePartIIExceptStudentLoanInterest(taxParams2025)({
                 profile: profileNoDeclaredKinds,
+                interestForms: [],
                 status: 'single',
                 adjustmentForms: [],
                 w2Forms: [],
@@ -2705,9 +2788,81 @@ export const proof = {
     // documented zero. Stated as a leaf so the coincidence is recorded rather
     // than relied on: line 23 (Archer MSA) is in the Social Security
     // worksheet's range and not in the student loan worksheet's.
+    // ── Line 18: penalty on early withdrawal of savings (§62(a)(9)) ─────────
+    //
+    // Every expected value below is a hand-typed cent literal with its dollar
+    // figure in the assertion message, never derived from the sum under test.
+    // Value and citation are asserted by SEPARATE leaves: a line that summed
+    // correctly while citing nothing, and one that cited correctly while
+    // summing zero, are different defects and a single leaf could not tell
+    // them apart.
+    lineEighteenSumsOneFormsEarlyWithdrawalPenalty: () => {
+        const stageOne = okStageOne(stageOneWithInterest(
+            [oneZeroNineNineIntPenaltyDoc('sha256-1099int-a')('250.00')]))
+        assertEq(stageOne.line18.value, 25000n, '$250.00 forfeited interest')
+    },
+    lineEighteenSumsTwoFormsAndCitesEachOnce: () => {
+        const stageOne = okStageOne(stageOneWithInterest([
+            oneZeroNineNineIntPenaltyDoc('sha256-1099int-a')('250.00'),
+            oneZeroNineNineIntPenaltyDoc('sha256-1099int-b')('75.50'),
+        ]))
+        assertEq(stageOne.line18.value, 32550n, '$250.00 + $75.50')
+        assertEq(stageOne.line18.sources.length, 2, 'one source per contributing document')
+        assertEq(
+            stageOne.line18.sources.map(source => source.documentHash).join(','),
+            'sha256-1099int-a,sha256-1099int-b',
+            'both documents cited, in document order')
+        for (const source of stageOne.line18.sources) {
+            assertEq(source.boxPath, 'box2EarlyWithdrawalPenalty', 'the box that was read')
+        }
+    },
+    // The presence-not-value rule, as two leaves. A box that is absent and a
+    // box that is present and zero are the same NUMBER and different FACTS,
+    // and only the citation tells them apart.
+    lineEighteenWithNoFormIsAProfileCitedZero: () => {
+        const stageOne = okStageOne(stageOneWithInterest([]))
+        assertEq(stageOne.line18.value, 0n, 'no Form 1099-INT at all')
+        assertEq(stageOne.line18.sources.length, 1, 'the profile citation only')
+        assertEq(
+            stageOne.line18.sources[0]?.boxPath, 'declaredKinds',
+            'a computed zero cites the profile, never a document the taxpayer lacks')
+    },
+    lineEighteenWithAZeroBoxStillCitesTheDocument: () => {
+        const stageOne = okStageOne(stageOneWithInterest(
+            [oneZeroNineNineIntPenaltyDoc('sha256-1099int-a')('0.00')]))
+        assertEq(stageOne.line18.value, 0n, 'a reported zero penalty')
+        assertEq(stageOne.line18.sources.length, 1, 'the document, not the profile')
+        assertEq(
+            stageOne.line18.sources[0]?.boxPath, 'box2EarlyWithdrawalPenalty',
+            'the form reported the box, so the form is what is cited')
+    },
+    // A Form 1099-INT that reports interest but no penalty must not be cited
+    // by line 18 -- the filter is on box 2, not on the dialect.
+    lineEighteenIgnoresAnInterestFormWithNoPenaltyBox: () => {
+        const stageOne = okStageOne(stageOneWithInterest([
+            oneZeroNineNineIntPenaltyDoc('sha256-1099int-a')(undefined),
+            oneZeroNineNineIntPenaltyDoc('sha256-1099int-b')('40.00'),
+        ]))
+        assertEq(stageOne.line18.value, 4000n, 'only the form carrying box 2')
+        assertEq(stageOne.line18.sources.length, 1, 'the other form is not cited')
+        assertEq(
+            stageOne.line18.sources[0]?.documentHash, 'sha256-1099int-b',
+            'the form that reported a penalty')
+    },
+    // Line 18 reaches the adjustment totals. Without this the line could be
+    // computed correctly and dropped on the way to line 26.
+    lineEighteenReachesTheAdjustmentTotals: () => {
+        const stageOne = okStageOne(stageOneWithInterest(
+            [oneZeroNineNineIntPenaltyDoc('sha256-1099int-a')('250.00')]))
+        assertEq(socialSecurityWorksheetAdjustmentsTotal(stageOne), 25000n,
+            'lines 11-20, 23, 25 with only line 18 non-zero')
+        assertEq(studentLoanInterestWorksheetOtherAdjustments(stageOne), 25000n,
+            'lines 11-20 plus write-ins on 24z, same single summand')
+    },
     theTwoAdjustmentTotalsAreSeparateRulesThatHappenToAgree: () => {
         const stageOne = okStageOne(scheduleOnePartIIExceptStudentLoanInterest(taxParams2025)({
             profile: profileNoDeclaredKinds,
+            interestForms: [],
             status: 'single',
             passThrough: noPassThrough,
             adjustmentForms: [adjustmentsDoc([
@@ -2801,6 +2956,7 @@ export const proof = {
             studentLoanInterestForms)([])(9250000n))
         const composed = scheduleOne(taxParams2025)({
             profile: profileNoDeclaredKinds,
+            interestForms: [],
             status: 'single',
             unemploymentForms: [unemploymentA],
             nonemployeeCompensationForms: [],
@@ -2829,6 +2985,7 @@ export const proof = {
     aStageOneRefusalPropagatesThroughTheComposedForm: () => {
         const composed = scheduleOne(taxParams2025)({
             profile: profileNoDeclaredKinds,
+            interestForms: [],
             status: 'single',
             unemploymentForms: [],
             nonemployeeCompensationForms: [],
@@ -2899,6 +3056,7 @@ export const proof = {
     everyPrintedLineIsNamed: () => {
         const composed = scheduleOne(taxParams2025)({
             profile: profileNoDeclaredKinds,
+            interestForms: [],
             status: 'single',
             unemploymentForms: [],
             nonemployeeCompensationForms: [],
