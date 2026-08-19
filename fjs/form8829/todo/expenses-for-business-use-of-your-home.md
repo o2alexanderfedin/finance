@@ -247,3 +247,54 @@ addition or improvement; a second home.
   it stays a category — reclassified from refused to computed.
 - **No second depreciation path.** See §3: the register is not used, and Part III does not
   reach `fjs/form4562` at all.
+
+## The mutation log
+
+Gate before: **2,902 pass / 0 fail** (`feature/tier-b-forms` @ `73e9832`). After the Form 2441
+fix: 2,911. After this form: **2,962 pass / 0 fail**, 2,923 project-local leaves. Every
+mutation below compiles, was applied to the tracked file, and `git diff --numstat` was checked.
+
+| # | Mutation | Red |
+|---|---|---|
+| M8 | line 24 does not multiply column (b) by line 7 | **8** — all four layers |
+| M9 | the January row becomes `fjs/form4562/macrs`' derived `2.457` | **1** — the divergence leaf |
+| M10 | the line 43 (operating) limitation refusal never fires | **4** |
+| M11 | the line 44 (depreciation) limitation refusal never fires | **1** |
+| M12 | the wiring hands Form 8829 Schedule C line **7** instead of line 29 | **2** |
+| M13 | the itemizer refusal never fires | **1** |
+| M14 | the direct and indirect columns are transposed | **10** |
+| M15 | line 42 truncates instead of rounding half-up | **0 — SURVIVED** |
+| M16 | `allocate` truncates instead of rounding half-up | 1, after M15's fix |
+| M17 | line 27 takes the LARGER of lines 15 and 26 | **22** |
+| M18 | line 25's carryover IN is dropped | **1** |
+| M19 | line 31's carryover IN is dropped | **1** |
+| M20 | line 38's land is not subtracted from line 37 | **11** |
+| M21 | printed line 22 falls out of the tuple and the caption map | **3** |
+| M22 | a `simplified` election is computed as `actualExpenses` | **1** |
+| M23 | `landIncludedInThatBasis` falls out of the dialect's exactness loop | **1** |
+| M24 | `${destination}` is erased from every refusal | **15** |
+| M25 | line 34 stops adding line 33 | **6** |
+
+**M15 is the finding.** Every fixture in this module divided evenly — $20,000.00 at 2.564% is
+$512.80 to the cent, $4,000.00 is $102.56 — so replacing line 42's `halfUp` with truncation left
+the entire suite green. Both rate lines now have a leaf whose expected value is the half-up
+answer with the truncated one named beside it ($25.65 against $25.64; $66.67 against $66.66),
+and M15 and M16 each redden exactly one.
+
+**M11 is the second finding, and it was predicted at the site.** The depreciation tier binds
+SECOND — i8829 allows operating expenses first — so a return can have line 27 fully allowed and
+still be limited at line 33. No fixture built for the first tier can reach the second, and
+without `aBindingDepreciationLimitationIsRefusedNamingLineFortyFour` the whole line 44 refusal
+would have been deletable with the suite green.
+
+**M9 measures a real, accepted narrowness.** Only one leaf reddens, because no fixture is a home
+first used for business in January. That leaf pins all twelve rows against both the printed and
+the derived table, which is the coverage that matters; a per-month fixture would add eleven
+leaves that assert the same multiplication.
+
+Counts recomputed and each mutated to watch it redden: `expectedModeledKindCount` 54,
+`expectedUnmodeledKindCount` 141, `expectedTripwireCount` 10, `unread_registry`'s
+`expectedDialectCount` 16. **None of them moves.** No new scope kind (business use of the home
+is inside Schedule C, whose kinds already exist), no new tripwire, and no new dialect — so
+`fjs/media/dialects`' own count and the dispatch table are untouched too, which is the
+`vnd.fjs.business_expenses` decision paying for itself.

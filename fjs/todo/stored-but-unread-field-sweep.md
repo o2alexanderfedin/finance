@@ -270,3 +270,34 @@ one nobody was doing — making a money field's status a thing somebody had to w
 
 It covers MONEY fields only. Dates, checkboxes, identity labels and free text are outside it: all
 seven known defects were money, and a partition including `payerName` would be mostly noise.
+
+## The Form 2441 fix's own mutation log
+
+Gate before: **2,902 pass / 0 fail** (`feature/tier-b-forms` @ `73e9832`). After: **2,911**.
+
+Before any leaf was written, the fix itself was the first observation: adding the refusal with
+the shipped fixtures untouched turned **eight** `fjs/form1040/core` leaves red — every
+end-to-end Form 2441 leaf in the repository — which is the direct measurement that the wrong
+behaviour was live and that those fixtures were in it.
+
+| # | Mutation | Red |
+|---|---|---|
+| M1 | R6 never fires (`length !== 0` -> `length > 1000`) | **5** — 3 form-level, 2 wiring |
+| M2a | `under !== true` -> `under !== true \|\| name.length > 1000` | **0 — a no-op by construction**, recorded rather than re-run silently: `false \|\| false` is `false` and `true \|\| false` is `true`, so the term is unchanged at every input |
+| M2b | the under-13 term is really dropped | **9** |
+| M3 | the over-12-and-disabled term is dropped | **8** |
+| M4 | only the FIRST unstated person is named | **2** |
+| M5 | the both-asserted contradiction refusal never fires | **1** |
+| M6 | `underAgeThirteenWhenTheCareWasProvided` is deleted from the schema | **does not compile** — 5 `tsc` errors across three modules, which is the strongest form of "it is wired" |
+| M7 | the `$6,000` cap interpolation is erased from R6's message | **1** |
+
+**M3 reddens one fewer than M2b, and the arithmetic is why.**
+`theDependentCareCreditIsOrderedAheadOfTheChildTaxCredit` runs on
+`dependentCareWithAChildInputs`, whose single qualifying person asserts §21(b)(1)(A) — so
+dropping the *over-12* term cannot touch it, while dropping the *under-13* term refuses it. The
+prediction was "the same set both ways" and it was wrong, which is the useful direction.
+
+**M2a is the equivalent-mutant case AGENTS.md names**, and it is recorded rather than quietly
+replaced: the written mutation compiled, applied, changed the source, and could not turn red at
+any input. M2b is the semantically-intended edit in a form that keeps the binding live
+(`String(x).length < 1000`), and it bites.
