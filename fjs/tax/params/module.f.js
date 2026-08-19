@@ -120,12 +120,20 @@ import { of, halfUp } from '../../types/rational/module.f.js'
  *   figure with no annual Rev. Proc. and no recent Public Law of its own
  *   (e.g. the Social Security Benefits Worksheet's IRC §86(c) base amounts,
  *   unchanged since 1993).
+ * - `'federalRegister'` — an agency notice published in the Federal Register,
+ *   for a figure a department OTHER than Treasury sets and the tax law then
+ *   incorporates by reference. Added for {@link federalPovertyLine}: the HHS
+ *   poverty guidelines are §36B(d)(3)'s input and no IRS document originates
+ *   them, so filing them under `'code'` would have named an authority that
+ *   does not publish the numbers.
  * @typedef {{
  *   readonly kind: 'revProc', readonly revProc: string, readonly section: string, readonly effectiveDate: string
  * } | {
  *   readonly kind: 'publicLaw', readonly publicLaw: string, readonly section: string, readonly effectiveDate: string
  * } | {
  *   readonly kind: 'code', readonly section: string, readonly effectiveDate: string
+ * } | {
+ *   readonly kind: 'federalRegister', readonly federalRegister: string, readonly section: string, readonly effectiveDate: string
  * }} Citation
  */
 
@@ -2643,6 +2651,274 @@ export const alternativeMinimumTax = {
 }
 
 /**
+ * Which of Form 8962 line 4's three printed federal-poverty-line tables
+ * applies — the line's own checkbox, transcribed as a vocabulary rather than
+ * as a state name.
+ *
+ * A STATE would be the wrong shape. i8962 p8, Line 4: *"If you moved during
+ * 2025 and you lived in Alaska and/or Hawaii, or you are filing jointly and
+ * you and your spouse lived in different states, use the table with the
+ * higher dollar amounts for your family size."* So the taxpayer declares
+ * which TABLE governs, which is a fact a state name does not determine.
+ * @typedef {'contiguous48AndDistrictOfColumbia' | 'alaska' | 'hawaii'} FederalPovertyLineTable
+ */
+
+/**
+ * The three tables {@link federalPovertyLine} carries, exported so consumers
+ * iterate this list rather than hand-typing the same three names repeatedly —
+ * {@link individualFilingStatuses}' own precedent.
+ * @type {readonly FederalPovertyLineTable[]}
+ */
+export const federalPovertyLineTables = [
+    'contiguous48AndDistrictOfColumbia',
+    'alaska',
+    'hawaii',
+]
+
+/**
+ * Form 8962 line 4 — the federal poverty line, by tax family size and by
+ * table. TAX-37.
+ *
+ * ## The year is the trap, and it is a PRIOR one
+ *
+ * **The 2025 Form 8962 uses the 2024 poverty guidelines.** Not a
+ * simplification and not a lag this module is papering over — it is what the
+ * printed instructions say, verbatim (i8962 p8, Line 4): *"(For 2025, the
+ * 2024 federal poverty lines are used for this purpose and are shown
+ * below.)"* §36B(d)(3)(B) is why: the poverty line is the one *"in effect on
+ * the first day of the regular enrollment period"* for coverage in the tax
+ * year, and open enrollment for 2025 coverage began in November 2024, when
+ * the 2024 guidelines were the ones in effect.
+ *
+ * Reaching for 2025's figures instead would be silently wrong in the
+ * direction that costs money: they are higher, so every household's line 5
+ * percentage would come out LOWER, the applicable figure would fall, and the
+ * credit would be overstated — which the taxpayer then repays with the
+ * return. The figures below are checked digit-by-digit against the printed
+ * Tables 1-1, 1-2 and 1-3, whose eight rows each are reproduced in this
+ * module's own proof from the printed page rather than from this data.
+ *
+ * ## Shape: a first person and an increment, not eight rows
+ *
+ * The printed tables list family sizes 1 through 8 and then a footnote —
+ * *"If your family size was more than 8 people, add $5,380 for each
+ * additional person"* — which is the same arithmetic the eight printed rows
+ * already are. Storing base-plus-increment stores the rule; storing eight
+ * rows and a ninth number would store it twice and let the two disagree. The
+ * proof below is what pins the pair against all eight printed rows of all
+ * three tables, so the compression is verified rather than assumed.
+ *
+ * ## Citation kind: `'federalRegister'`, a FOURTH kind
+ *
+ * These figures are not an IRS Revenue Procedure's, not an Act of Congress's,
+ * and not a bare Code section's. They are the Department of Health and Human
+ * Services' annual poverty guidelines, published in the Federal Register —
+ * 89 FR 2961, "Annual Update of the HHS Poverty Guidelines", HHS Office of
+ * the Secretary, published 2024-01-17 (verified live against
+ * federalregister.gov's own API, not recalled). §36B(d)(3)(A) is what makes
+ * them a tax figure at all, by defining "poverty line" as the one in
+ * §2110(c)(5) of the Social Security Act.
+ *
+ * Filing them under `kind: 'code'` would have avoided widening {@link Citation}
+ * and would have named an authority that does not publish these numbers.
+ * 13-CONTEXT.md Decision 5.2 widened the union twice before for exactly this
+ * reason; this is the third time, and `effectiveDate` reads `'2025-01-01'` per
+ * this module's header — the year the figure is APPLIED for, which is what
+ * makes the prior-year sourcing visible in the data rather than only in prose.
+ * @type {Record<FederalPovertyLineTable, {
+ *   readonly firstPerson: AmountWithCitation,
+ *   readonly eachAdditionalPerson: AmountWithCitation,
+ * }>}
+ */
+export const federalPovertyLine = {
+    contiguous48AndDistrictOfColumbia: {
+        firstPerson: {
+            amount: '15060.00',
+            citation: { kind: 'federalRegister', federalRegister: '89 FR 2961', section: 'HHS Poverty Guidelines for 2024, 48 contiguous states and DC', effectiveDate: '2025-01-01' },
+        },
+        eachAdditionalPerson: {
+            amount: '5380.00',
+            citation: { kind: 'federalRegister', federalRegister: '89 FR 2961', section: 'HHS Poverty Guidelines for 2024, 48 contiguous states and DC', effectiveDate: '2025-01-01' },
+        },
+    },
+    // Alaska and Hawaii are NOT the contiguous figure scaled — HHS publishes
+    // them as separate schedules, and both the base and the increment differ.
+    // Hand-typed per table for the reason `standardDeduction` states about
+    // spreading one status's entry onto another.
+    alaska: {
+        firstPerson: {
+            amount: '18810.00',
+            citation: { kind: 'federalRegister', federalRegister: '89 FR 2961', section: 'HHS Poverty Guidelines for 2024, Alaska', effectiveDate: '2025-01-01' },
+        },
+        eachAdditionalPerson: {
+            amount: '6730.00',
+            citation: { kind: 'federalRegister', federalRegister: '89 FR 2961', section: 'HHS Poverty Guidelines for 2024, Alaska', effectiveDate: '2025-01-01' },
+        },
+    },
+    hawaii: {
+        firstPerson: {
+            amount: '17310.00',
+            citation: { kind: 'federalRegister', federalRegister: '89 FR 2961', section: 'HHS Poverty Guidelines for 2024, Hawaii', effectiveDate: '2025-01-01' },
+        },
+        eachAdditionalPerson: {
+            amount: '6190.00',
+            citation: { kind: 'federalRegister', federalRegister: '89 FR 2961', section: 'HHS Poverty Guidelines for 2024, Hawaii', effectiveDate: '2025-01-01' },
+        },
+    },
+}
+
+/**
+ * One tier of §36B(b)(3)(A)'s applicable percentage table: the household
+ * income band, as a whole percent of the federal poverty line, and the
+ * percentage at each end of it, in HUNDREDTHS OF A PERCENTAGE POINT.
+ *
+ * Hundredths rather than a decimal, for {@link additionalMedicareTaxRates}'
+ * own reason: 8.5 is not exact as an IEEE 754 double and 850 hundredths is.
+ * `ceilingPercent` is `undefined` on the open-topped last tier — no sentinel,
+ * matching {@link Bracket}'s own convention.
+ * @typedef {{
+ *   readonly floorPercent: number,
+ *   readonly ceilingPercent: number | undefined,
+ *   readonly initialHundredthsOfPercent: number,
+ *   readonly finalHundredthsOfPercent: number,
+ * }} ApplicablePercentageTier
+ */
+
+/**
+ * Form 8962 line 7's *applicable figure* — IRC §36B(b)(3)(A), TAX-37.
+ *
+ * ## Six tiers reproduce all 252 printed rows of Table 2, exactly
+ *
+ * The instructions print a lookup table with a row for every whole percent
+ * from "less than 150" to "400 or more". The statute prints six tiers and an
+ * interpolation rule: §36B(b)(3)(A)(i) says the applicable percentage
+ * *"increases on a sliding scale in a linear manner"* from the initial to the
+ * final percentage across each income tier.
+ *
+ * The tiers below, interpolated linearly and rounded HALF-UP to four decimal
+ * places, were checked against every one of the 252 printed rows extracted
+ * from i8962 Table 2: **zero mismatches, and no printed row unaccounted
+ * for.** That check is what makes six stored tiers legitimate in place of 252
+ * transcribed rows, and this module's own proof re-runs a hand-typed sample of
+ * those printed rows — including every tier boundary — against the
+ * interpolation, so the equivalence is proven here rather than asserted here.
+ *
+ * ## These are ARPA's tiers, and they are the reason there is still a credit
+ * above 400%
+ *
+ * §36B(b)(3)(A)(iii), as added by ARPA §9661 and extended by IRA §12001,
+ * replaces the ordinary table *"in the case of a taxable year beginning after
+ * December 31, 2020, and before January 1, 2026"* — which includes TY2025 and
+ * excludes TY2026. Two consequences a reader must not carry forward:
+ *
+ * - **The subsidy cliff is gone for 2025.** The top tier has a floor of 400
+ *   and no ceiling, so a household above 400% of the poverty line still has an
+ *   applicable figure (8.5%) and can still take a credit. The pre-ARPA table
+ *   simply stopped, and above 400% the credit was zero.
+ * - **§36B(b)(3)(A)(ii)'s inflation indexing does not apply for these years**,
+ *   which is why no Revenue Procedure adjusts these figures and the citation
+ *   below is `kind: 'code'`.
+ *
+ * **Form 8962's REPAYMENT limitation table disagrees with this one about what
+ * 400% means, and both are transcribed as printed.** Here, 400 and above is a
+ * tier with a percentage; in {@link premiumTaxCreditRepaymentLimitation}, 400
+ * and above is where the limitation stops existing. The two tables are not
+ * two views of one boundary and must never be merged.
+ * @type {{
+ *   readonly tiers: readonly ApplicablePercentageTier[],
+ *   readonly citation: Citation,
+ * }}
+ */
+export const premiumTaxCreditApplicablePercentage = {
+    tiers: [
+        // "Up to 150.0 percent — initial 0.0, final 0.0". Table 2 prints this
+        // as the single row "less than 150" plus the row "150".
+        { floorPercent: 0, ceilingPercent: 150, initialHundredthsOfPercent: 0, finalHundredthsOfPercent: 0 },
+        { floorPercent: 150, ceilingPercent: 200, initialHundredthsOfPercent: 0, finalHundredthsOfPercent: 200 },
+        { floorPercent: 200, ceilingPercent: 250, initialHundredthsOfPercent: 200, finalHundredthsOfPercent: 400 },
+        { floorPercent: 250, ceilingPercent: 300, initialHundredthsOfPercent: 400, finalHundredthsOfPercent: 600 },
+        { floorPercent: 300, ceilingPercent: 400, initialHundredthsOfPercent: 600, finalHundredthsOfPercent: 850 },
+        // Open-topped: `ceilingPercent` is `undefined`, never a large
+        // sentinel. Worksheet 2 caps line 5 at 401 anyway, but the tier is
+        // written as the statute writes it.
+        { floorPercent: 400, ceilingPercent: undefined, initialHundredthsOfPercent: 850, finalHundredthsOfPercent: 850 },
+    ],
+    citation: { kind: 'code', section: '§36B(b)(3)(A)(iii)', effectiveDate: '2025-01-01' },
+}
+
+/**
+ * One band of Form 8962 Table 5: the household-income ceiling (as a whole
+ * percent of the federal poverty line, EXCLUSIVE) and the two limitation
+ * amounts.
+ *
+ * `single` and `other` rather than a full {@link IndividualFilingStatus} map,
+ * because the printed table has exactly two columns and Rev. Proc. 2024-40
+ * §2.07 spells the first as *"unmarried individuals (other than surviving
+ * spouses and heads of household)"*. Modelling it as five statuses would
+ * invent four figures the source does not print.
+ * @typedef {{
+ *   readonly povertyLinePercentCeiling: number,
+ *   readonly single: string,
+ *   readonly other: string,
+ * }} RepaymentLimitationBand
+ */
+
+/**
+ * Form 8962 line 28 — the limitation on the tax imposed for excess advance
+ * payments. IRC §36B(f)(2)(B), Rev. Proc. 2024-40 §2.07, TAX-37.
+ *
+ * ## At and above 400% there is NO limitation, and that is the whole risk
+ *
+ * There are THREE bands, not four, and the missing fourth is deliberate.
+ * i8962 p17, Line 28: *"If your entry on Form 8962, line 5, is 400 or more,
+ * there is no repayment limitation. You must repay the amount shown on line
+ * 27. Leave line 28 blank and enter the amount from line 27 on line 29."*
+ *
+ * A fourth band carrying a large sentinel would look harmless and would be a
+ * silent UNDERSTATEMENT of tax for exactly the population with the largest
+ * excess advance payments — a household that reported a low income at
+ * enrollment and finished the year above 400% of the poverty line can owe the
+ * entire year's advance back, with no cap at all. `fjs/form8962` therefore
+ * treats "no band matched" as "no limitation", never as "zero".
+ *
+ * ## Only `single` reads the left column
+ *
+ * Form 8962 Table 5 heads its two columns "for a filing status of Single" and
+ * "for any other filing status", and Rev. Proc. 2024-40 §2.07 makes the
+ * exclusion explicit: *"unmarried individuals (other than surviving spouses
+ * and heads of household)"*. So head of household and qualifying surviving
+ * spouse take the LARGER figure.
+ *
+ * **This is the opposite direction from
+ * {@link additionalMedicareTaxThreshold}, where a qualifying surviving spouse
+ * takes the smaller amount because §3101(b)(2)(A) speaks only of a joint
+ * return.** Two statutes, two answers for the same status, and copying either
+ * one onto the other is a silent wrong number. Read the printed table.
+ *
+ * Married filing separately reads the right column too — and the limitation
+ * *"appl[ies] to you and your spouse separately based on the household income
+ * reported on each return"* (i8962 p17). That is only reachable for a filer
+ * who qualifies for one of §36B(c)(1)(C)'s exceptions, which `fjs/form8962`
+ * refuses on; the row is stored as printed anyway rather than omitted,
+ * because a parameter table is a transcription of a page.
+ *
+ * `kind: 'revProc'`: §36B(f)(2)(B)(ii) inflation-adjusts these amounts, and
+ * Rev. Proc. 2024-40 §2.07 is where TY2025's come from.
+ * @type {{
+ *   readonly bands: readonly RepaymentLimitationBand[],
+ *   readonly citation: Citation,
+ * }}
+ */
+export const premiumTaxCreditRepaymentLimitation = {
+    bands: [
+        { povertyLinePercentCeiling: 200, single: '375.00', other: '750.00' },
+        { povertyLinePercentCeiling: 300, single: '975.00', other: '1950.00' },
+        { povertyLinePercentCeiling: 400, single: '1625.00', other: '3250.00' },
+    ],
+    citation: { kind: 'revProc', revProc: '2024-40', section: '§2.07', effectiveDate: '2025-01-01' },
+}
+
+/**
  * A full tax-year parameter set: every TY2025 parameter this phase
  * requires, together.
  *
@@ -2694,6 +2970,9 @@ export const alternativeMinimumTax = {
  *   readonly selfEmploymentTax: typeof selfEmploymentTax,
  *   readonly qualifiedBusinessIncomeDeduction: typeof qualifiedBusinessIncomeDeduction,
  *   readonly alternativeMinimumTax: typeof alternativeMinimumTax,
+ *   readonly federalPovertyLine: typeof federalPovertyLine,
+ *   readonly premiumTaxCreditApplicablePercentage: typeof premiumTaxCreditApplicablePercentage,
+ *   readonly premiumTaxCreditRepaymentLimitation: typeof premiumTaxCreditRepaymentLimitation,
  * }} TaxParamSet
  */
 
@@ -2736,6 +3015,9 @@ export const taxParamsByYear = {
         selfEmploymentTax,
         qualifiedBusinessIncomeDeduction,
         alternativeMinimumTax,
+        federalPovertyLine,
+        premiumTaxCreditApplicablePercentage,
+        premiumTaxCreditRepaymentLimitation,
     },
 }
 
@@ -2880,6 +3162,11 @@ const everyDollarStringField = [
         alternativeMinimumTax.exemptionCompletePhaseout[status].amount,
         alternativeMinimumTax.upperRateThreshold[status].amount,
     ]),
+    ...federalPovertyLineTables.flatMap(table => [
+        federalPovertyLine[table].firstPerson.amount,
+        federalPovertyLine[table].eachAdditionalPerson.amount,
+    ]),
+    ...premiumTaxCreditRepaymentLimitation.bands.flatMap(band => [band.single, band.other]),
 ]
 
 export const proof = {
@@ -4684,4 +4971,274 @@ export const proof = {
             }
         },
     },
+    // ── Form 8962's three parameter groups (TAX-37) ─────────────────────────
+    federalPovertyLine: {
+        // Every one of the twenty-four printed rows of i8962 Tables 1-1, 1-2
+        // and 1-3, hand-typed from the printed page and NOT derived from the
+        // stored base-and-increment pair — which is the whole point, since
+        // that pair is the thing under test. Family sizes 1 through 8, three
+        // tables.
+        allTwentyFourPrintedRowsAgreeWithTheStoredBaseAndIncrement: () => {
+            /** @type {Record<FederalPovertyLineTable, readonly bigint[]>} */
+            const printed = {
+                contiguous48AndDistrictOfColumbia: [
+                    1506000n, 2044000n, 2582000n, 3120000n, 3658000n, 4196000n, 4734000n, 5272000n,
+                ],
+                alaska: [
+                    1881000n, 2554000n, 3227000n, 3900000n, 4573000n, 5246000n, 5919000n, 6592000n,
+                ],
+                hawaii: [
+                    1731000n, 2350000n, 2969000n, 3588000n, 4207000n, 4826000n, 5445000n, 6064000n,
+                ],
+            }
+            for (const table of federalPovertyLineTables) {
+                const rows = printed[table]
+                assertEq(rows.length, 8, ['each printed table has eight rows', table])
+                const first = centsFromString(federalPovertyLine[table].firstPerson.amount)
+                const each = centsFromString(federalPovertyLine[table].eachAdditionalPerson.amount)
+                for (let size = 1; size <= 8; ++size) {
+                    const expected = assertNotNullish(rows[size - 1], ['row', table, size])
+                    assertEq(
+                        first + each * BigInt(size - 1),
+                        expected,
+                        [
+                            'the stored base-and-increment must reproduce this printed row exactly',
+                            table,
+                            size,
+                            centsToString(expected),
+                        ],
+                    )
+                }
+            }
+        },
+        // The footnote under each printed table works one example, and all
+        // three are worked here: "if your family size is 11 ... Enter the
+        // result of $68,860" (contiguous), $86,110 (Alaska), $79,210
+        // (Hawaii). This is what proves the increment is the increment rather
+        // than a number that merely happens to fit eight rows.
+        theOverEightFootnoteExamplesAreReproduced: () => {
+            /** @type {Record<FederalPovertyLineTable, bigint>} */
+            const familyOfEleven = {
+                contiguous48AndDistrictOfColumbia: 6886000n,
+                alaska: 8611000n,
+                hawaii: 7921000n,
+            }
+            for (const table of federalPovertyLineTables) {
+                const expected = familyOfEleven[table]
+                assertEq(
+                    centsFromString(federalPovertyLine[table].firstPerson.amount)
+                        + centsFromString(federalPovertyLine[table].eachAdditionalPerson.amount) * 10n,
+                    expected,
+                    ['i8962’s own worked example for a family of eleven', table, centsToString(expected)],
+                )
+            }
+        },
+        // The three tables are genuinely DIFFERENT figures, not one table
+        // referenced three times. A spread would make this leaf impossible to
+        // fail and the Alaska/Hawaii uplift impossible to observe going
+        // missing.
+        theThreeTablesAreThreeDistinctSchedules: () => {
+            const amounts = federalPovertyLineTables.map(
+                table => federalPovertyLine[table].firstPerson.amount)
+            assertEq(new Set(amounts).size, 3, ['three tables, three first-person amounts', amounts])
+            const increments = federalPovertyLineTables.map(
+                table => federalPovertyLine[table].eachAdditionalPerson.amount)
+            assertEq(new Set(increments).size, 3, ['three tables, three increments', increments])
+            // Alaska is the highest of the three at every family size, and
+            // Hawaii sits between it and the mainland. Asserted because a
+            // transposition of the two would keep all three distinct.
+            assert(
+                centsFromString(federalPovertyLine.alaska.firstPerson.amount)
+                    > centsFromString(federalPovertyLine.hawaii.firstPerson.amount),
+                'Alaska’s poverty line is above Hawaii’s')
+            assert(
+                centsFromString(federalPovertyLine.hawaii.firstPerson.amount)
+                    > centsFromString(
+                        federalPovertyLine.contiguous48AndDistrictOfColumbia.firstPerson.amount),
+                'Hawaii’s poverty line is above the contiguous 48’s')
+        },
+        // The PRIOR-year sourcing, made assertable. The 2025 contiguous
+        // first-person guideline is $15,650; this parameter must be $15,060,
+        // the 2024 one, because that is what the 2025 Form 8962 uses. The
+        // wrong-year figure is hand-typed here so the check is a comparison
+        // against a real alternative rather than against nothing.
+        theFiguresAreTheTwentyTwentyFourGuidelinesNotTheTwentyTwentyFiveOnes: () => {
+            const twentyTwentyFiveContiguousFirstPerson = 1565000n
+            assertEq(
+                centsFromString(
+                    federalPovertyLine.contiguous48AndDistrictOfColumbia.firstPerson.amount),
+                1506000n,
+                'i8962 Table 1-1 prints $15,060 — the 2024 guideline')
+            assert(
+                centsFromString(
+                    federalPovertyLine.contiguous48AndDistrictOfColumbia.firstPerson.amount)
+                    !== twentyTwentyFiveContiguousFirstPerson,
+                'the 2025 guideline ($15,650) is NOT what the 2025 Form 8962 uses — see this group’s docstring')
+        },
+        everyFigureCitesTheFederalRegisterNoticeThatPublishedIt: () => {
+            for (const table of federalPovertyLineTables) {
+                for (const entry of [
+                    federalPovertyLine[table].firstPerson,
+                    federalPovertyLine[table].eachAdditionalPerson,
+                ]) {
+                    assertEq(entry.citation.kind, 'federalRegister', table)
+                    const citation = entry.citation
+                    assert(
+                        citation.kind === 'federalRegister',
+                        ['expected a federalRegister-kind citation', table, citation])
+                    assertEq(citation.federalRegister, '89 FR 2961', table)
+                    assertEq(citation.effectiveDate, '2025-01-01', table)
+                    assert(
+                        citation.section.includes('2024'),
+                        [
+                            'the citation must say which YEAR of guidelines these are, since that is the trap',
+                            table,
+                            citation.section,
+                        ])
+                }
+            }
+        },
+    },
+    premiumTaxCreditApplicablePercentage: {
+        // The six tiers of §36B(b)(3)(A)(iii), hand-typed from the statute
+        // rather than read back off the stored list, and compared entry by
+        // entry. The hand-typed COUNT is what a dropped tier fails.
+        theSixStatutoryTiers: () => {
+            /** @type {readonly (readonly [number, number | undefined, number, number])[]} */
+            const statutory = [
+                [0, 150, 0, 0],
+                [150, 200, 0, 200],
+                [200, 250, 200, 400],
+                [250, 300, 400, 600],
+                [300, 400, 600, 850],
+                [400, undefined, 850, 850],
+            ]
+            assertEq(
+                premiumTaxCreditApplicablePercentage.tiers.length,
+                6,
+                '§36B(b)(3)(A)(iii) prints six income tiers')
+            assertEq(statutory.length, 6, 'and the hand-typed statement of them has six too')
+            for (let i = 0; i < statutory.length; ++i) {
+                const expected = assertNotNullish(statutory[i], ['hand-typed tier', i])
+                const stored = assertNotNullish(premiumTaxCreditApplicablePercentage.tiers[i], ['stored tier', i])
+                assertEq(stored.floorPercent, expected[0], ['tier floor', i])
+                assertEq(stored.ceilingPercent, expected[1], ['tier ceiling', i])
+                assertEq(stored.initialHundredthsOfPercent, expected[2], ['tier initial percentage', i])
+                assertEq(stored.finalHundredthsOfPercent, expected[3], ['tier final percentage', i])
+            }
+        },
+        // The tiers are CONTIGUOUS and cover every percentage from zero
+        // upwards with no gap and no overlap. A gap would make one household
+        // income have no applicable figure at all, which the printed table
+        // never does.
+        theTiersCoverEveryPercentageWithoutAGapOrAnOverlap: () => {
+            const tiers = premiumTaxCreditApplicablePercentage.tiers
+            const first = assertNotNullish(tiers[0], 'the tier list is not empty')
+            assertEq(first.floorPercent, 0, 'the first tier starts at zero')
+            for (let i = 1; i < tiers.length; ++i) {
+                const previous = assertNotNullish(tiers[i - 1], ['previous tier', i])
+                const current = assertNotNullish(tiers[i], ['current tier', i])
+                assertEq(
+                    previous.ceilingPercent,
+                    current.floorPercent,
+                    ['each tier begins exactly where the last one ended', i])
+                assertEq(
+                    previous.finalHundredthsOfPercent,
+                    current.initialHundredthsOfPercent,
+                    ['and the percentage is continuous across the join', i])
+            }
+            const last = assertNotNullish(tiers[tiers.length - 1], 'the tier list is not empty')
+            assertEq(last.ceilingPercent, undefined, 'the last tier is open-topped, with no sentinel')
+        },
+        // The top tier exists AT ALL, which is the ARPA/IRA change: before it,
+        // a household above 400% of the poverty line had no applicable figure
+        // and therefore no credit.
+        thereIsStillAnApplicableFigureAboveFourHundredPercent: () => {
+            const top = assertNotNullish(
+                premiumTaxCreditApplicablePercentage.tiers[
+                    premiumTaxCreditApplicablePercentage.tiers.length - 1],
+                'the tier list is not empty')
+            assertEq(top.floorPercent, 400)
+            assertEq(top.initialHundredthsOfPercent, 850, '8.50% — i8962 Table 2’s "400 or more" row')
+            assertEq(top.finalHundredthsOfPercent, 850, 'flat, not sliding')
+        },
+        theCitationIsTheStatuteAndNotARevenueProcedure: () => {
+            // §36B(b)(3)(A)(ii)'s indexing is switched off for tax years
+            // beginning before 2026, so no Rev. Proc. adjusts this table and
+            // naming one would be an invented source.
+            assertEq(premiumTaxCreditApplicablePercentage.citation.kind, 'code')
+            assertEq(premiumTaxCreditApplicablePercentage.citation.section, '§36B(b)(3)(A)(iii)')
+            assertEq(premiumTaxCreditApplicablePercentage.citation.effectiveDate, '2025-01-01')
+        },
+    },
+    premiumTaxCreditRepaymentLimitation: {
+        // The three printed rows of i8962 Table 5, hand-typed from the page.
+        theThreePrintedBands: () => {
+            /** @type {readonly (readonly [number, bigint, bigint])[]} */
+            const printed = [
+                [200, 37500n, 75000n],
+                [300, 97500n, 195000n],
+                [400, 162500n, 325000n],
+            ]
+            assertEq(
+                premiumTaxCreditRepaymentLimitation.bands.length,
+                3,
+                'i8962 Table 5 has THREE capped rows; the fourth row is "leave line 28 blank"')
+            assertEq(printed.length, 3)
+            for (let i = 0; i < printed.length; ++i) {
+                const expected = assertNotNullish(printed[i], ['hand-typed band', i])
+                const stored = assertNotNullish(premiumTaxCreditRepaymentLimitation.bands[i], ['stored band', i])
+                assertEq(stored.povertyLinePercentCeiling, expected[0], ['band ceiling', i])
+                assertEq(centsFromString(stored.single), expected[1], ['single column', i])
+                assertEq(centsFromString(stored.other), expected[2], ['any-other-status column', i])
+            }
+        },
+        // There is NO band at or above 400, and the absence is asserted
+        // rather than left to the reader: a fourth band would be a silent cap
+        // on an uncapped repayment.
+        thereIsNoBandAtOrAboveFourHundredPercent: () => {
+            for (const band of premiumTaxCreditRepaymentLimitation.bands) {
+                assert(
+                    band.povertyLinePercentCeiling <= 400,
+                    ['no Table 5 band caps a household at or above 400% of the poverty line', band])
+            }
+            assert(
+                !premiumTaxCreditRepaymentLimitation.bands.some(
+                    band => band.povertyLinePercentCeiling > 400),
+                'i8962 line 28: "If your entry on Form 8962, line 5, is 400 or more, there is no repayment limitation"')
+        },
+        // The "any other filing status" column is exactly twice the Single
+        // one in all three bands — which is a property of the printed table
+        // and NOT how either column is stored. Asserted as a cross-check on
+        // the transcription, in the direction a single transposed digit would
+        // break.
+        theOtherColumnIsTwiceTheSingleColumnInEveryBand: () => {
+            for (const band of premiumTaxCreditRepaymentLimitation.bands) {
+                assertEq(
+                    centsFromString(band.other),
+                    centsFromString(band.single) * 2n,
+                    ['Rev. Proc. 2024-40 §2.07 prints the second column at twice the first', band])
+            }
+        },
+        theBandsAreOrderedAndStrictlyIncreasing: () => {
+            const bands = premiumTaxCreditRepaymentLimitation.bands
+            for (let i = 1; i < bands.length; ++i) {
+                const previous = assertNotNullish(bands[i - 1], ['previous band', i])
+                const current = assertNotNullish(bands[i], ['current band', i])
+                assert(
+                    previous.povertyLinePercentCeiling < current.povertyLinePercentCeiling,
+                    ['Table 5 reads downwards in increasing income order', i])
+                assert(
+                    centsFromString(previous.single) < centsFromString(current.single),
+                    ['and the limitation rises with income', i])
+            }
+        },
+        theCitationIsTheRevenueProcedureThatIndexedTheAmounts: () => {
+            const citation = assertRevProcCitation(premiumTaxCreditRepaymentLimitation.citation)
+            assertEq(citation.revProc, '2024-40')
+            assertEq(citation.section, '§2.07')
+            assertEq(citation.effectiveDate, '2025-01-01')
+        },
+    },
 }
+

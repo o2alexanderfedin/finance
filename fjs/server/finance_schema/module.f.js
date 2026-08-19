@@ -72,6 +72,7 @@ import { dialect as businessExpensesDialect, businessExpensesSchema } from '../.
 import { dialect as formThirtyNineTwentyOneDialect, formThirtyNineTwentyOneSchema } from '../../document/form3921/module.f.js'
 import { dialect as formThirtyNineTwentyTwoDialect, formThirtyNineTwentyTwoSchema } from '../../document/form3922/module.f.js'
 import { dialect as basisCorrectionDialect, basisCorrectionSchema } from '../../document/basis_correction/module.f.js'
+import { dialect as oneZeroNineFiveADialect, oneZeroNineFiveASchema } from '../../document/1095a/module.f.js'
 import { dialect as k1PartnershipDialect, k1PartnershipSchema } from '../../document/k1_1065/module.f.js'
 import { dialect as k1SCorporationDialect, k1SCorporationSchema } from '../../document/k1_1120s/module.f.js'
 import { dialect as k1EstateTrustDialect, k1EstateTrustSchema } from '../../document/k1_1041/module.f.js'
@@ -127,6 +128,11 @@ const dialectSchemas = {
     // `fjs/server/dialect_parity` is what now stops it recurring.
     [itemizedDeductionsDialect]: itemizedDeductionsSchema,
     [priorYearCapitalLossDialect]: priorYearCapitalLossSchema,
+    // Form 1095-A. An agent filing for anyone who bought Marketplace
+    // coverage has to author Part III's twelve rows, and guessing whether
+    // the column is `columnB` or `slcsp` is exactly the guess this tool
+    // exists to make unnecessary.
+    [oneZeroNineFiveADialect]: oneZeroNineFiveASchema,
 }
 
 /**
@@ -209,7 +215,7 @@ export const knownDialects = /** @type {readonly string[]} */ (Object.keys(diale
  * which is the check the two paragraphs of prose above turned out not to be.
  * @type {number}
  */
-const expectedKnownDialectCount = 26
+const expectedKnownDialectCount = 27
 
 /**
  * `finance_schema(dialect)`: the MCP tool. Looks `dialect` up in
@@ -439,6 +445,19 @@ export const proof = {
         assertEq(
             JSON.stringify(JSON.parse(textOf(result))),
             JSON.stringify(toJsonSchema(formThirtyNineTwentyTwoSchema)),
+        )
+    },
+    // Form 1095-A, the Health Insurance Marketplace Statement -- the
+    // TWENTY-SEVENTH, registered in the same commit as the Form 8962 wiring
+    // that reads it. The tag is hand-typed here, never read back off
+    // `dialectSchemas`, for the reason `expectedKnownDialectCount`'s own
+    // docstring gives at length.
+    oneZeroNineFiveAResolves: () => {
+        const result = call('vnd.fjs.1095a')
+        assertEq(result.isError, undefined)
+        assertEq(
+            JSON.stringify(JSON.parse(textOf(result))),
+            JSON.stringify(toJsonSchema(oneZeroNineFiveASchema)),
         )
     },
     basisCorrectionResolves: () => {

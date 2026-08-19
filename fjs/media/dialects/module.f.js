@@ -210,6 +210,11 @@ import {
     checkReferences as checkFormThirtyNineTwentyTwo,
 } from '../../document/form3922/module.f.js'
 import {
+    dialect as oneZeroNineFiveADialect,
+    oneZeroNineFiveASchema,
+    checkReferences as checkOneZeroNineFiveA,
+} from '../../document/1095a/module.f.js'
+import {
     dialect as basisCorrectionDialect,
     basisCorrectionSchema,
     checkReferences as checkBasisCorrection,
@@ -261,6 +266,11 @@ export const financeDialects = [
     dialectEntry(formThirtyNineTwentyOneSchema, v => checkFormThirtyNineTwentyOne(v)[0] === 'ok'),
     dialectEntry(formThirtyNineTwentyTwoSchema, v => checkFormThirtyNineTwentyTwo(v)[0] === 'ok'),
     dialectEntry(basisCorrectionSchema, v => checkBasisCorrection(v)[0] === 'ok'),
+    // Form 1095-A, the Health Insurance Marketplace Statement, registered
+    // here and in `fjs/server/finance_schema` in the SAME commit that wires
+    // Form 8962 -- `fjs/server/dialect_parity` is what would otherwise catch
+    // one of the two being forgotten.
+    dialectEntry(oneZeroNineFiveASchema, v => checkOneZeroNineFiveA(v)[0] === 'ok'),
     revisionDialect,
 ]
 
@@ -276,7 +286,7 @@ export const detectFinance = detect(financeDialects)
 
 /**
  * Independently hand-typed: the number of entries {@link financeDialects}
- * is expected to carry today — TWENTY-SEVEN local dialects plus
+ * is expected to carry today — TWENTY-EIGHT local dialects plus
  * {@link revisionDialect}, which is upstream's. Deliberately NOT derived from
  * `financeDialects.length` itself (AGENTS.md's hand-typed-count idiom,
  * mirroring `fjs/document/1099b`'s `expectedMoneyBoxFieldCount`): a dialect
@@ -287,7 +297,7 @@ export const detectFinance = detect(financeDialects)
  * collection shrinking").
  * @type {number}
  */
-const expectedDialectCount = 28
+const expectedDialectCount = 29
 
 /** A sample cbase32 hash — {@link revisionDialect}'s own `snapshot`/`parents` shape needs a decodable one; the value itself is arbitrary. */
 const revisionSampleHash = vecToCBase32(vec8(0x77n))
@@ -532,6 +542,22 @@ const fixtures = {
         correctedCostOrOtherBasis: '150000.00',
         reason: 'RSU vesting: the shares were included in Form W-2 box 1 as compensation, '
             + 'and the broker reported $0.00 basis because that is what the employee paid.',
+    },
+    // Form 1095-A. Non-empty `coveredIndividuals` is a REQUIRED semantic
+    // refinement, not merely a stored field: `checkOneZeroNineFiveA` refuses
+    // a blob whose Part II is empty, so the fixture that must DETECT has to
+    // carry a row. Same shape as `k1PartnershipDialect`'s box G above.
+    [oneZeroNineFiveADialect]: {
+        dialect: oneZeroNineFiveADialect,
+        marketplaceIdentifier: '99',
+        marketplaceAssignedPolicyNumber: 'POLICY-0001',
+        policyIssuerName: 'Some Health Plan, Inc.',
+        recipientTin: '222-22-2222',
+        taxYear: 2025,
+        formRevision: '2025',
+        sourceArtifactHash: 'deadbeef00112233445566778899aabbccddeeff0011223344556677889900',
+        coveredIndividuals: [{ name: 'Some Person' }],
+        monthlyCoverage: [],
     },
     [revisionDialectTag]: {
         dialect: revisionDialectTag,
