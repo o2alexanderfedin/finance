@@ -345,3 +345,79 @@ Each has a control leaf showing the legitimate neighbouring case computes.
 - **The optional methods** (Form 7206's first footnote sends an optional-method
   filer to Schedule SE line 4b). `selfEmploymentOptionalMethods` is a refused
   `fjs/return/scope` kind, so such a return never reaches this line.
+
+---
+
+## 8. Mutation log
+
+*A proof is not known to work until you have watched it fail.* Nineteen
+mutations, each applied alone against the committed tree, each verified as
+exactly one insertion and one deletion with `git diff --numstat` unless noted.
+Gate before: **2752 pass / 0 fail**. Gate after: **2805 / 0**.
+
+| # | File | Intent | Compiled | Leaves reddened |
+|---|---|---|---|---|
+| M1 | `fjs/form7206` | line 2: cap the running SUM instead of each covered person | yes | **3** — and see the surprise below |
+| M2 | `fjs/form7206` | line 14: take line 13 always, never `min(line 3, line 13)` | yes | **17**, across all four layers |
+| M3 | `fjs/form7206` | line 7: subtract the WHOLE Schedule 1 line 15 (what the 3-line 1040 worksheet does) | yes | 2 |
+| M4 | `fjs/form7206` | line 13: read line 10 always, never line 11's S-corporation path | yes | 1 |
+| M5 | `fjs/schedule/1` | route every line 17 tag into Form 7206's UNCAPPED line 1 | yes | 7 |
+| M6 | `fjs/schedule/1` | feed Form 7206 line 7 a zero §164(f) half | yes | 2 |
+| M7 | `fjs/form8995` | drop §162(l) from §199A(c)(1)'s reduction to QBI | yes | 2 |
+| M8 | `fjs/form1040/core` | hand §199A a zero while line 17 itself is untouched — **the wiring mutation** | yes | 2 |
+| M9 | `fjs/schedule/1` | drop line 17 from the Social Security worksheet's "lines 11 through 20" | yes | 1 |
+| M10 | `fjs/schedule/1` | drop line 17 from the printed line 26 total | yes | 5 → **6 after a leaf was added**; see below |
+| M11 | `fjs/schedule/1` | erase `${line17Destination}` — AGENTS.md's own recipe | **no**, then yes | 0 (TS1005), then **3** |
+| M12 | `fjs/schedule/1` | read an ABSENT §162(l)(2)(B) certification as "eligible in no month" | yes | **22** |
+| M13 | `fjs/form1040/core` | disconnect the Form 1095-A detection (`length !== 0` → `> 1000`) | yes | 1 |
+| M14 | `fjs/tax/params` | transpose the $4,810 and $6,020 caps | yes | 5 |
+| M15 | `fjs/schedule/1` | point the age-51-to-60 tag at the 61-to-70 band | yes | 8 |
+| M16 | `fjs/schedule/1` | disable the whole `premiumsCouldMatter` gate | yes | 6 |
+| M17 | `fjs/schedule/1` | R3 fires on ANY Schedule C, not only on two sources | yes | 16 |
+| M18 | `fjs/return/scope` | un-reclassify: remove the kind from `modeledKinds` | **no** — TS2344 | see below |
+| M19 | `fjs/return/scope` | remove it from the INDEPENDENT hand-typed second list | yes | 1 |
+
+**No survivors.** Three results are worth more than the counts.
+
+### M1: a predicted red set that was wrong, and the property it revealed
+
+`twoPeopleInDifferentBandsAreCappedSeparately` was predicted to redden and
+**stayed green**. Capping the running sum gives, for that fixture,
+`min(3,000, 1,800) = 1,800` then `min(1,800 + 3,000, 4,810) = 4,800` — which is
+the *right* answer. The accumulated total happens to fall under the second,
+larger cap, so the wrong rule and the right rule agree at that input. This is
+AGENTS.md's *equivalent mutant* shape, absorbed by the ordering of the bands
+rather than by a neighbouring operation.
+
+Only **two people in the SAME band** separate the two rules, and
+`twoPeopleInTheSameBandEachGetTheirOwnCap` is the leaf that did redden. Both
+leaves exist for this reason, and it is now written at the site.
+
+### M10: a leaf whose NAME claimed more than its assertions
+
+`lineSeventeenReachesLineTwentySixAndBothWorksheetTotals` never touched line 26
+— stage 1 has no line 26, and the two worksheet totals are computed by
+different functions. Dropping line 17 from `scheduleOnePartII`'s summands
+reddened only the `fjs/form1040/core` and `fjs/report/tax_return` leaves;
+nothing at the schedule layer noticed.
+
+**A leaf whose name overpromises is the same defect as a stale docstring**, and
+it was caught the same way. The leaf now stages Part II and asserts printed line
+26, and M10 re-run reddens **6**.
+
+### M18: the mutation the compiler catches, which is stronger
+
+Removing the kind from `modeledKinds` does not compile:
+`fjs/return/scope/module.f.js(1323,21): error TS2344: Type 'false' does not
+satisfy the constraint 'true'` — `_EveryKindIsEitherModeledOrRefused`. The
+partition is enforced at `tsc`, so a kind cannot silently fall out of both
+tables. Recorded as a **stronger** result than a red test, not as a failed
+mutation; M19 exercises the same reclassification through the one path that does
+compile, and reddens the hand-typed-list comparison.
+
+### Where the destination assertion lives
+
+`${line17Destination}` is one shared constant interpolated into all five
+refusals, and two leaves assert it (R1's and R2's, at both the schedule and the
+report layer). M11 confirms that is sufficient: erasing the constant reddens
+three leaves. R3, R4 and R5 do not repeat the assertion — one rule, one place.

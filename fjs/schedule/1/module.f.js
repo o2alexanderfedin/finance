@@ -3394,6 +3394,15 @@ export const proof = {
         },
         // The band tag decides which cap, and a different band is a different
         // answer. Without this leaf every band tag could route to the same cap.
+        // **A recorded property of this code, found by a mutation that did NOT
+        // bite where it was predicted to.** Rewriting Form 7206 line 2 to cap
+        // the running SUM rather than each covered person leaves the
+        // two-DIFFERENT-bands fixtures green: the accumulated $1,800.00 plus a
+        // second $3,000.00 is $4,800.00, which is still under the 61-70 band's
+        // $4,810.00 cap, so the wrong rule returns the right answer. Only two
+        // people in the SAME band separate the two rules
+        // (`twoPeopleInTheSameBandEachGetTheirOwnCap`, in `fjs/form7206`), and
+        // that is why both leaves exist rather than one.
         adifferentBandTagSelectsADifferentCap: () => {
             const younger = okStageOne(soleProprietorWithPremiums('50000.00')([
                 premiumEntry('selfEmployedLongTermCareAgeFortyOrYounger')('2400.00')('taxpayer'),
@@ -3428,6 +3437,15 @@ export const proof = {
         // Security worksheet's printed "lines 11 through 20" range and inside
         // line 26's total, and a line that computed correctly but reached
         // neither would leave every leaf above green and the return wrong.
+        //
+        // **The line 26 half of this leaf was added after a mutation exposed
+        // the name as a promise the body did not keep.** Dropping line 17 from
+        // `scheduleOnePartII`'s line 26 summands reddened only the
+        // `fjs/form1040/core` and `fjs/report/tax_return` leaves — nothing at
+        // THIS layer noticed, because stage 1 has no line 26 and the two
+        // worksheet totals are computed by different functions. A leaf whose
+        // name claims more than its assertions is the same defect as a stale
+        // docstring, and it is caught the same way: by mutating.
         lineSeventeenReachesLineTwentySixAndBothWorksheetTotals: () => {
             const withPremium = okStageOne(soleProprietorWithPremiums('50000.00')([
                 premiumEntry('selfEmployedHealthInsuranceMedicalDentalVision')('9600.00')(
@@ -3444,6 +3462,23 @@ export const proof = {
                     - studentLoanInterestWorksheetOtherAdjustments(without),
                 960000n,
                 'and so must the student loan interest worksheet\u2019s other-adjustments total')
+            // …and printed line 26 itself, through stage 2, which is the line
+            // 1040 line 10 actually reads.
+            /** @type {(stageOne: ScheduleOnePartIIExceptStudentLoanInterest) => bigint} */
+            const lineTwentySixOf = stageOne => {
+                const partII = scheduleOnePartII(taxParams2025)({
+                    profile: profileCertifiedForHealthInsurance,
+                    status: 'single',
+                    exceptStudentLoanInterest: stageOne,
+                    adjustmentForms: [],
+                    studentLoanInterestForms: [],
+                    totalIncomeLine: totalIncomeOf(5000000n),
+                })
+                return okPartII(partII).line26.value
+            }
+            assertEq(
+                lineTwentySixOf(withPremium) - lineTwentySixOf(without), 960000n,
+                'and printed line 26, the figure 1040 line 10 restates')
         },
         // The tag vocabulary and the stored parameter table must name the same
         // five bands. Two independent lists, compared — a band added to

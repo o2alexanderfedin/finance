@@ -1539,9 +1539,12 @@ const documentByHash = {
             'businessIncomeOrLoss', 'selfEmploymentTax', 'deductiblePartOfSelfEmploymentTax',
             'qualifiedBusinessIncomeDeduction', 'selfEmployedHealthInsuranceDeduction',
         ],
-        // §162(l)(2)(B). Without it `fjs/schedule/1` refuses the whole return,
-        // and `theHealthInsurancePersonaRefusesWithoutTheCertification` is the
-        // leaf that drives that side through this same rendering path.
+        // §162(l)(2)(B). Without it `fjs/schedule/1` refuses the whole return;
+        // that side is driven by `fjs/form1040/core`'s
+        // `theUncertifiedSelfEmployedReturnRefusesTheWholeReport`, which reaches
+        // the same refusal through the same schedule. Named here rather than
+        // duplicated, because a second profile document on this fixture would
+        // be a second copy of the same assertion.
         notEligibleForAnySubsidizedEmployerHealthPlanInAnyMonth: true,
     },
     [fixtureHealthNecHash]: {
