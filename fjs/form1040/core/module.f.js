@@ -9675,9 +9675,12 @@ export const proof = {
         // `declaredKinds` gates only refusals), and declaring it still refuses
         // the whole return by name.
         //
-        // When the kind moves, THIS leaf is the one that has to change, and it
-        // says so out loud so the change is deliberate rather than a surprise.
-        declaringTheKindStillRefusesUntilTheReclassificationLands: () => {
+        // The kind HAS moved, in the commit after the one that wired the
+        // line, and this leaf changed with it exactly as its predecessor said
+        // it would. What it asserts now is the other half of the same
+        // property: declaring a MODELED kind must not refuse, and the line
+        // must compute the same figure whether or not it was declared.
+        declaringTheKindNoLongerRefuses: () => {
             const outcome = form1040Report(taxParams2025)({
                 ...iraPhaseOutInputs,
                 profile: storedProfile({
@@ -9685,14 +9688,24 @@ export const proof = {
                     declaredKinds: ['wages', 'iraDeduction'],
                 }),
             })
-            assertEq(outcome.kind, 'error', 'the kind is not yet in `modeledKinds`')
-            if (outcome.kind !== 'error') {
-                throw ['expected a refusal', outcome]
+            assertEq(outcome.kind, 'ok', 'the kind is in `modeledKinds` now')
+            if (outcome.kind !== 'ok') {
+                throw ['expected a computed return', outcome]
+            }
+            // ...and declaring it changed nothing about the number, which is
+            // what `declaredKinds` gating refusals rather than computation
+            // means. Compared against the SAME return without the
+            // declaration, not against a hand-typed figure, because the
+            // property under test is the equality itself.
+            const undeclared = form1040Report(taxParams2025)(iraPhaseOutInputs)
+            assertEq(undeclared.kind, 'ok', 'the control must compute too')
+            if (undeclared.kind !== 'ok') {
+                throw ['expected a computed control', undeclared]
             }
             assertEq(
-                JSON.stringify(outcome.unmodeled),
-                JSON.stringify(['iraDeduction']),
-                'and it refuses as a SCOPE kind, which is what the reclassification removes')
+                JSON.stringify(outcome.lines.map(line => line.value.toString())),
+                JSON.stringify(undeclared.lines.map(line => line.value.toString())),
+                'declaring a modeled kind moves no printed line at all')
         },
     },
     // ── Phase 26 (TAX-28/TAX-29): the QCD and Form 8606 through the FULL

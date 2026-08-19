@@ -491,6 +491,7 @@ export const modeledKinds = /** @type {const} */ ([
     'healthSavingsAccountDeduction', // Form 8889 Part I  -> Schedule 1 line 13 -> 1040 line 10
     'deductiblePartOfSelfEmploymentTax', // Schedule SE line 13 -> Schedule 1 line 15 -> 1040 line 10
     'penaltyOnEarlyWithdrawalOfSavings', // 1099-INT box 2 -> Schedule 1 line 18 -> 1040 line 10
+    'iraDeduction',               // vnd.fjs.adjustments + W-2 box 13 -> Schedule 1 line 20 -> 1040 line 10
     'studentLoanInterestDeduction', // 1098-E + worksheet -> Schedule 1 line 21 -> 1040 line 10
     'itemizedDeductions',          // Schedule A + deductionChoice   -> 1040 line 12e
     'qualifiedBusinessIncomeDeduction', // Form 8995 line 15         -> 1040 line 13a
@@ -731,7 +732,6 @@ export const unmodeledKindRefusals = /** @type {const} */ ([
     // promised: the premiums themselves appear on no information return.
     { kind: 'selfEmployedHealthInsuranceDeduction', line: 'Schedule 1 line 17 -> 1040 line 10', label: 'the self-employed health insurance deduction', remedy: 'requires the Pub. 535 self-employed health insurance deduction worksheet. Both figures it once lacked now exist — Schedule C as of Phase 27 and §162(l)(2)(A)\u2019s net-earnings cap as of Phase 28 — and what remains missing is the premiums: no dialect here records what was paid for medical, dental or long-term-care coverage, nor whether the taxpayer was eligible for an employer plan in any month, which §162(l)(2)(B) disqualifies (no phase yet)' },
     { kind: 'alimonyPaid', line: 'Schedule 1 line 19a -> 1040 line 10', label: 'alimony paid', remedy: 'requires the recipient\u2019s SSN and the divorce-decree date, since only a pre-2019 decree makes alimony deductible, and no dialect models either (no phase yet)' },
-    { kind: 'iraDeduction', line: 'Schedule 1 line 20 -> 1040 line 10', label: 'the IRA deduction', remedy: 'requires Pub. 590-A Worksheet 1-1, whose own modified adjusted gross income depends on 1040 line 6b while line 6b depends on this deduction \u2014 a fixed point this engine does not model (no phase yet)' },
     { kind: 'archerMsaDeduction', line: 'Schedule 1 line 23 -> 1040 line 10', label: 'the Archer MSA deduction', remedy: 'requires Form 8853 (no phase yet)' },
     { kind: 'otherAdjustments', line: 'Schedule 1 line 24a-24z -> 1040 line 10', label: 'other adjustments to income', remedy: 'the printed form itself collapses eleven lettered sub-lines here and this engine models none of them (no phase yet)' },
     { kind: 'netQualifiedDisasterLoss', line: '1040 line 12e', label: 'net qualified disaster loss', remedy: 'requires Form 4684 (no phase yet)' },
@@ -1362,7 +1362,7 @@ export const classifyScope = declaredKinds => {
  * and `fjs/form8995` wiring that makes all three computable.
  * @type {number}
  */
-const expectedModeledKindCount = 43
+const expectedModeledKindCount = 44
 
 /**
  * The modeled set, hand-typed a SECOND time and in {@link kindVocabulary}'s
@@ -1399,6 +1399,7 @@ const everyModeledKindHandTyped = [
     'healthSavingsAccountDeduction',
     'deductiblePartOfSelfEmploymentTax',
     'penaltyOnEarlyWithdrawalOfSavings',
+    'iraDeduction',
     'studentLoanInterestDeduction',
     'itemizedDeductions',
     'qualifiedBusinessIncomeDeduction',
@@ -1511,7 +1512,7 @@ const everyModeledKindHandTyped = [
  * that makes it computable.
  * @type {number}
  */
-const expectedUnmodeledKindCount = 72
+const expectedUnmodeledKindCount = 71
 
 /**
  * The complete refusal message for a return declaring exactly
@@ -2608,12 +2609,11 @@ export const proof = {
                 'selfEmployedRetirementPlans',
                 'selfEmployedHealthInsuranceDeduction',
                 'alimonyPaid',
-                'iraDeduction',
                 'archerMsaDeduction',
                 'otherAdjustments',
             ]
             assertEq(
-                stillRefused.length, 8,
+                stillRefused.length, 7,
                 'thirteen Schedule 1 Part II kinds, less Phase 24\'s three, Phase 28\'s one and line 18')
             for (const kind of stillRefused) {
                 const outcome = classifyScope([kind])
@@ -2622,20 +2622,16 @@ export const proof = {
                     ['this Schedule 1 Part II kind must still refuse after the split', kind, outcome],
                 )
             }
-            // The two the phase's brief names specifically, each with the
-            // reason it still cannot be computed -- so a refusal that stopped
-            // naming the fixed point, or Schedule SE, reddens here rather
-            // than only in the table loop.
-            const ira = classifyScope(['iraDeduction'])
-            assert(ira.kind === 'error', ['the IRA deduction must still refuse', ira])
-            assert(
-                ira.message.includes('590-A'),
-                ['the IRA refusal must still name the worksheet it needs', ira.message],
-            )
-            assert(
-                ira.message.includes('Schedule 1 line 20'),
-                ['the IRA refusal must name its own Schedule 1 line', ira.message],
-            )
+            // `iraDeduction` stood here with two assertions demanding its
+            // refusal name Pub. 590-A's worksheet and its own printed line.
+            // It COMPUTES now: the worksheet turned out to be three ordered
+            // passes rather than the fixed point this file called it, and
+            // Appendix B Worksheet 1 is `fjs/tax/ssb` run with line 20 taken
+            // as zero. The kind is modeled, so the assertions are replaced by
+            // the one that is still true.
+            assertEq(
+                classifyScope(['iraDeduction']).kind, 'ok',
+                'the IRA deduction computes as of Schedule 1 line 20\'s wiring')
             // Phase 24's brief named the IRA deduction and the deductible
             // half of self-employment tax specifically. The first still
             // refuses; the second is MODELED as of Phase 28, and the
