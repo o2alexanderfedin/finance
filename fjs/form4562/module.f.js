@@ -119,7 +119,9 @@
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { of, multiply, ofInt, halfUp } from '../types/rational/module.f.js'
 import { centsToString } from '../exact/module.f.js'
-import { macrsClassifications, macrsDeductionCents } from './macrs/module.f.js'
+import {
+    macrsClassifications, macrsDeductionCents, macrsDisposalDeductionCents,
+} from './macrs/module.f.js'
 
 /** @import { MacrsConvention, MacrsMethod } from './macrs/module.f.js' */
 
@@ -140,7 +142,32 @@ import { macrsClassifications, macrsDeductionCents } from './macrs/module.f.js'
  *   readonly specialDepreciationAllowanceClaimedCents: bigint,
  *   readonly section179ElectedCostCents: bigint,
  *   readonly listedProperty: boolean,
+ *   readonly disposal: AssetDisposal | undefined,
  * }} DepreciableAsset
+ */
+
+/**
+ * The end of one asset's history, as extracted `bigint` and `number` facts.
+ * `vnd.fjs.asset_register`'s `assetDisposal` is where each field's printed
+ * citation lives.
+ *
+ * The two full dates stay STRINGS because the only thing anything does with
+ * them is compare them, and a zero-padded `YYYY-MM-DD` compares correctly as
+ * text — see `fjs/form4797`'s `heldMoreThanOneYear`, which is one string
+ * comparison and no calendar.
+ *
+ * **Required, not optional (`| undefined` rather than `?:`)**, so that every
+ * construction site has to say what it does about a disposal. The alternative
+ * lets a fixture omit the key and read as "not disposed of" by accident, which
+ * is the shape of absence this repository refuses everywhere else.
+ * @typedef {{
+ *   readonly acquiredDate: string,
+ *   readonly soldDate: string,
+ *   readonly soldYear: number,
+ *   readonly soldMonth: number,
+ *   readonly grossSalesPriceCents: bigint,
+ *   readonly expenseOfSaleCents: bigint,
+ * }} AssetDisposal
  */
 
 /**
@@ -288,6 +315,13 @@ export const applicableConvention = classification => midQuarter => {
  * @type {(taxYear: number) => (assets: readonly DepreciableAsset[]) => boolean}
  */
 export const midQuarterConventionApplies = taxYear => assets => {
+    // The exclusion list has a third bullet this function does NOT implement —
+    // *"Property that is placed in service and disposed of within the same tax
+    // year"* — because {@link formFortyFiveSixtyTwo} refuses such an asset
+    // outright, so no computable return can reach here holding one. Writing
+    // the filter anyway would be a branch no proof could redden, which is
+    // AGENTS.md's "a rule illustrated by an unreachable module is a rule
+    // nobody can check". The refusal names the bullet.
     const counted = assets.filter(asset => {
         const spec = macrsClassifications[asset.classification]
         return asset.placedInServiceYear === taxYear && spec !== undefined && !spec.midMonth
@@ -313,16 +347,75 @@ export const midQuarterConventionApplies = taxYear => assets => {
 export const assetDeductionCents = taxYear => asset => {
     const basis = basisForDepreciationCents(asset)
     const recoveryYear = taxYear - asset.placedInServiceYear + 1
-    const regularCents = macrsDeductionCents(basis)(asset.classification)(asset.method)(
-        asset.placedInServiceMonth)(asset.convention)(recoveryYear)
+    // i4562 p11, column (g): *"If you disposed of the property during the
+    // current tax year, multiply the result by the applicable decimal amount
+    // from the tables in Step 3."* The AMT column takes the same fraction —
+    // §56(a)(1) changes the METHOD, never the convention — so both arms read
+    // the one `deduct` below and a disposal cannot make them diverge.
+    const disposal = asset.disposal
+    const soldThisYear = disposal !== undefined && disposal.soldYear === taxYear
+    /** @type {(method: MacrsMethod) => bigint} */
+    const deduct = method => soldThisYear && disposal !== undefined
+        ? macrsDisposalDeductionCents(basis)(asset.classification)(method)(
+            asset.placedInServiceMonth)(asset.convention)(recoveryYear)(disposal.soldMonth)
+        : macrsDeductionCents(basis)(asset.classification)(method)(
+            asset.placedInServiceMonth)(asset.convention)(recoveryYear)
+    const regularCents = deduct(asset.method)
     const adjusted = asset.method === '200DB' && asset.section168kStatus === 'notQualifiedProperty'
     return {
         regularCents,
-        alternativeCents: adjusted
-            ? macrsDeductionCents(basis)(asset.classification)('150DB')(
-                asset.placedInServiceMonth)(asset.convention)(recoveryYear)
-            : regularCents,
+        alternativeCents: adjusted ? deduct('150DB') : regularCents,
     }
+}
+
+/**
+ * **Depreciation allowed OR ALLOWABLE**, cumulatively, from recovery year 1
+ * through the year of sale — Form 4797 line 22, and the figure §1245(a)(2)
+ * recaptures.
+ *
+ * i4797 p9's line 22 Step 1: *"Deductions allowed **or allowable** for
+ * depreciation (including any special depreciation allowance …)"*, plus *"The
+ * section 179 expense deduction"*. A taxpayer who under-claimed still
+ * recaptures, so this is never a transcribed "what I actually deducted".
+ *
+ * It is derivable here for the same reason `vnd.fjs.asset_register` carries no
+ * accumulated depreciation at all: Publication 946 Table A-1's own header is
+ * *"Multiply your property's unadjusted basis each year by the percentage"*,
+ * so year `n`'s deduction is a function of the unadjusted basis and the
+ * elapsed years and never of what was deducted — which is the definition of
+ * *allowable*. `fjs/form4562/macrs`'s `macrsColumn` already derives the whole
+ * column; this walks it.
+ *
+ * **Each year is rounded at its own line, and the rounded years are summed.**
+ * That is the cumulative amount that was allowable, year by year, on the Forms
+ * 4562 those years would have carried. Applying a cumulative percentage and
+ * rounding once would produce a figure no year's form ever showed.
+ *
+ * The §179 term is always `0n` in a computable return, because a non-zero
+ * `section179ElectedCost` refuses the whole Form 4562 — it is written anyway,
+ * with this note, so that lifting that refusal cannot silently drop §179 from
+ * the recapture base.
+ * The computed tax year is NOT a parameter: the disposal carries its own
+ * `soldYear`, and the register refuses a `dateSold` outside its own `taxYear`,
+ * so a second copy of the year here could only ever disagree with the one the
+ * document already carries.
+ * @type {(asset: DepreciableAsset) => bigint}
+ */
+export const depreciationAllowedOrAllowableCents = asset => {
+    const disposal = asset.disposal
+    assert(disposal !== undefined, ['only a disposed asset has a cumulative figure', asset.description])
+    if (disposal === undefined) {
+        throw ['only a disposed asset has a cumulative figure', asset.description]
+    }
+    const basis = basisForDepreciationCents(asset)
+    const finalRecoveryYear = disposal.soldYear - asset.placedInServiceYear + 1
+    let total = asset.specialDepreciationAllowanceClaimedCents + asset.section179ElectedCostCents
+    for (let recoveryYear = 1; recoveryYear < finalRecoveryYear; recoveryYear += 1) {
+        total += macrsDeductionCents(basis)(asset.classification)(asset.method)(
+            asset.placedInServiceMonth)(asset.convention)(recoveryYear)
+    }
+    return total + macrsDisposalDeductionCents(basis)(asset.classification)(asset.method)(
+        asset.placedInServiceMonth)(asset.convention)(finalRecoveryYear)(disposal.soldMonth)
 }
 
 /**
@@ -397,18 +490,63 @@ export const formFortyFiveSixtyTwo = input => {
         }
     }
 
-    // 4. A disposal during the year. i4562 p11 Step 3 has a whole disposal
-    //    column, and a disposal is also §1245/§1250 recapture on Form 4797.
-    if (!input.noDepreciablePropertyDisposedOfDuringTheYear) {
+    // 4. Disposals. **NARROWED**, from a blanket precondition to the shape
+    //    `everyDepreciableAssetIsListed` already has: the certification is
+    //    required exactly when nothing in the register makes it unnecessary.
+    //    Step 3's disposal decimal is `fjs/form4562/macrs`'s
+    //    `disposalTwentyFourths` and the recapture is `fjs/form4797`, so a
+    //    register that RECORDS its disposals now computes. One that records
+    //    none and certifies nothing still refuses: a register lists what is
+    //    held, so silence about a sale is indistinguishable from there having
+    //    been none, and the part-year deduction and the recapture income would
+    //    both vanish without a trace.
+    const disposed = assets.filter(asset => asset.disposal !== undefined)
+    if (disposed.length === 0 && !input.noDepreciablePropertyDisposedOfDuringTheYear) {
         return {
             kind: 'error',
-            message: `${where}: the register does not certify `
+            message: `${where}: the register records no disposal and does not certify `
                 + `noDepreciablePropertyDisposedOfDuringTheYear. A disposal takes a PART-year `
                 + `deduction — i4562's Step 3 gives a second decimal column for exactly that — `
-                + `and it also triggers §1245 or §1250 recapture on Form 4797, which this engine `
-                + `does not compute. A register lists what is still held, so a disposed asset `
-                + `leaves no trace in it at all: the deduction it was owed would silently `
-                + `vanish and the recapture income with it`,
+                + `and it also triggers §1245 or §1250 recapture on Form 4797. A register lists `
+                + `what is still held, so a disposed asset that is neither recorded in a `
+                + `disposal block nor certified away leaves no trace at all: the deduction it `
+                + `was owed would silently vanish and the recapture income with it. Add the `
+                + `certification, or record the disposal`,
+        }
+    }
+
+    // 4b. An asset placed in service AND disposed of in the same tax year.
+    //     i4562 p11 says two things about it, and this engine will not guess
+    //     at either across the conventions the page does not cover: it is
+    //     struck from the mid-quarter aggregate (*"In determining whether the
+    //     mid-quarter convention applies, do not take into account … Property
+    //     that is placed in service and disposed of within the same tax
+    //     year"*), and under that convention *"no depreciation is allowed"* —
+    //     a sentence the printed page states for the MID-QUARTER convention
+    //     and for no other. Publication 946 chapter 4 gives the disposal-year
+    //     fraction for all three conventions and never repeats the same-year
+    //     rule, so whether a half-year or mid-month asset bought and sold in
+    //     one year gets half a year or nothing is not settled by anything this
+    //     engine has read. Refusing rather than picking one.
+    const sameYear = disposed.find(
+        asset => asset.placedInServiceYear === taxYear
+            && asset.disposal !== undefined && asset.disposal.soldYear === taxYear)
+    if (sameYear !== undefined) {
+        return {
+            kind: 'error',
+            message: `${where}: ${JSON.stringify(sameYear.description)} was placed in service in `
+                + `${taxYear} and disposed of in ${taxYear}. i4562 excludes such property from `
+                + `the mid-quarter test — "In determining whether the mid-quarter convention `
+                + `applies, do not take into account … Property that is placed in service and `
+                + `disposed of within the same tax year" — and says that under that convention `
+                + `"no depreciation is allowed" for it. The printed page states the second rule `
+                + `for the mid-quarter convention ONLY, and Publication 946 chapter 4 gives the `
+                + `year-of-disposition fraction for all three conventions without repeating it, `
+                + `so whether a half-year or mid-month asset bought and sold inside one year `
+                + `takes half a year of depreciation or none is not settled by the paper this `
+                + `engine reads. Refusing rather than choosing: the wrong choice OVERSTATES the `
+                + `deduction and UNDERSTATES the §1245 recapture at the same time, in the one `
+                + `year both are decided (no phase yet)`,
         }
     }
 
@@ -625,6 +763,7 @@ const bareAsset = {
     specialDepreciationAllowanceClaimedCents: 0n,
     section179ElectedCostCents: 0n,
     listedProperty: false,
+    disposal: undefined,
 }
 
 /** @type {(assets: readonly DepreciableAsset[]) => Form4562Input} */

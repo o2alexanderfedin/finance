@@ -205,6 +205,38 @@ export const conventionTwentyFourths = convention => month => {
     return BigInt(27 - 6 * quarter)
 }
 
+/**
+ * Step 3's OTHER decimal column — the one for the year the property is
+ * **disposed of**, in the same twenty-fourths {@link conventionTwentyFourths}
+ * returns for the year it is placed in service.
+ *
+ * i4562 p11, column (g): *"If you disposed of the property during the current
+ * tax year, multiply the result by the applicable decimal amount from the
+ * tables in Step 3"*, and Step 3's tables print TWO columns, headed *"Placed
+ * in service"* and *"Disposed of"*:
+ *
+ * | Convention | Placed in service | Disposed of |
+ * |---|---|---|
+ * | HY | 0.5 | 0.5 |
+ * | MQ 1st … 4th quarter | 0.875, 0.625, 0.375, 0.125 | 0.125, 0.375, 0.625, 0.875 |
+ * | MM 1st … 12th month | 0.9583 … 0.0417 | 0.0417 … 0.9583 |
+ *
+ * **The two columns sum to 1 in every one of the seventeen printed rows**, so
+ * this is `24 − placed` rather than a second hand-typed table — one table
+ * cannot disagree with itself, and two could. The proof hand-types all
+ * seventeen printed pairs anyway, from the page rather than from this
+ * identity.
+ *
+ * `month` here is the month of DISPOSAL. For HY the two are indistinguishable
+ * (0.5 either way) and for MM they are symmetric about the year; MQ is the
+ * convention where feeding the placed-in-service month instead produces a
+ * plausible wrong answer, which is why no fixture in this repository shares a
+ * month between the two.
+ * @type {(convention: MacrsConvention) => (month: number) => bigint}
+ */
+export const disposalTwentyFourths = convention => month =>
+    24n - conventionTwentyFourths(convention)(month)
+
 /** `10n ** BigInt(n)`, written once so the two call sites cannot disagree. @type {(n: number) => bigint} */
 const tenTo = n => 10n ** BigInt(n)
 
@@ -303,6 +335,30 @@ export const macrsRate = classification => method => month => convention => reco
 export const macrsDeductionCents = basisCents => classification => method => month => convention => recoveryYear =>
     halfUp(multiply(ofInt(basisCents))(
         macrsRate(classification)(method)(month)(convention)(recoveryYear)))
+
+/**
+ * The deduction for a year in which the property was **disposed of**: the same
+ * rate as {@link macrsDeductionCents}, reduced by
+ * {@link disposalTwentyFourths}.
+ *
+ * The disposal decimal is folded into the exact rational BEFORE the single
+ * `halfUp`, so the rounding still happens exactly once at the printed line.
+ * Rounding the full year first and then halving it would round twice and would
+ * differ by a cent whenever the full year's deduction is odd.
+ *
+ * `month` is the month placed in service (which decides the RATE column);
+ * `disposalMonth` is the month sold (which decides Step 3's second decimal).
+ * They are separate parameters because for the mid-quarter convention they
+ * pick different fractions, and a caller that passed one for the other would
+ * still typecheck.
+ * @type {(basisCents: bigint) => (classification: string) => (method: MacrsMethod) => (month: number) => (convention: MacrsConvention) => (recoveryYear: number) => (disposalMonth: number) => bigint}
+ */
+export const macrsDisposalDeductionCents
+    = basisCents => classification => method => month => convention => recoveryYear => disposalMonth =>
+        halfUp(multiply(
+            multiply(ofInt(basisCents))(
+                macrsRate(classification)(method)(month)(convention)(recoveryYear)))(
+            of(disposalTwentyFourths(convention)(disposalMonth))(24n)))
 
 // ── Tests ────────────────────────────────────────────────────────────────────
 
@@ -513,6 +569,106 @@ export const proof = {
             for (const [month, twentyFourths] of expected) {
                 assertEq(conventionTwentyFourths('MM')(month), twentyFourths, `month ${month}`)
             }
+        },
+    },
+    disposalTwentyFourths: {
+        // i4562 p12's Step 3 tables again, but the OTHER printed column --
+        // "Disposed of" -- hand-typed from the page rather than derived from
+        // the "Placed in service" column beside it. Seventeen printed rows:
+        // one for HY, four for MQ, twelve for MM. Counted, so a row silently
+        // dropped from this fixture fails here rather than losing coverage.
+        allSeventeenPrintedRows: () => {
+            /** @type {readonly (readonly [MacrsConvention, number, bigint])[]} */
+            const printed = [
+                // "Half-year (HY) convention . . . 0.5" -- one printed row,
+                // and the disposal column is the same 0.5.
+                ['HY', 6, 12n],
+                // "1st quarter 0.125, 2nd 0.375, 3rd 0.625, 4th 0.875" --
+                // one month from each quarter, and DIFFERENT months from the
+                // ones the placed-in-service leaf above uses.
+                ['MQ', 2, 3n], ['MQ', 5, 9n], ['MQ', 8, 15n], ['MQ', 11, 21n],
+                // "1st month .0417 … 12th month .9583".
+                ['MM', 1, 1n], ['MM', 2, 3n], ['MM', 3, 5n], ['MM', 4, 7n],
+                ['MM', 5, 9n], ['MM', 6, 11n], ['MM', 7, 13n], ['MM', 8, 15n],
+                ['MM', 9, 17n], ['MM', 10, 19n], ['MM', 11, 21n], ['MM', 12, 23n],
+            ]
+            assertEq(printed.length, 17, 'seventeen printed Step 3 rows')
+            for (const [convention, month, twentyFourths] of printed) {
+                assertEq(disposalTwentyFourths(convention)(month), twentyFourths,
+                    `${convention} month ${month}`)
+            }
+        },
+        // The printed pairs sum to a whole year in every row. This is the
+        // identity the implementation is written as, asserted against the
+        // hand-typed table above rather than against itself: the leaf above
+        // supplies the disposal side from the PAGE, and this one checks the
+        // page's own arithmetic.
+        theTwoPrintedColumnsSumToAWholeYear: () => {
+            /** @type {readonly MacrsConvention[]} */
+            const conventions = ['HY', 'MQ', 'MM']
+            for (const convention of conventions) {
+                for (let month = 1; month <= 12; month += 1) {
+                    assertEq(
+                        conventionTwentyFourths(convention)(month)
+                        + disposalTwentyFourths(convention)(month),
+                        24n,
+                        `${convention} month ${month}`)
+                }
+            }
+        },
+        // The mid-quarter transposition, called out because it is the one a
+        // fixture sharing a month cannot see: an asset placed in service in
+        // the FIRST quarter and sold in the FOURTH takes 0.875 of a year in
+        // its first year and 0.875 of a year in its last, and swapping the
+        // two arguments gives 0.125 for both.
+        theQuarterOfDisposalIsNotTheQuarterPlacedInService: () => {
+            assertEq(conventionTwentyFourths('MQ')(2), 21n, 'placed in Q1: 0.875')
+            assertEq(disposalTwentyFourths('MQ')(11), 21n, 'sold in Q4: 0.875')
+            assertEq(disposalTwentyFourths('MQ')(2), 3n, 'sold in Q1: 0.125')
+        },
+        // A worked disposal-year deduction, hand-computed in cents: $10,000.00
+        // of seven-year property, 200 DB, half-year, in recovery year 3.
+        // Publication 946 Table A-1 prints 17.49% for that cell, so the full
+        // year is $1,749.00 and half of it is $874.50 -- an ODD number of
+        // cents, chosen so that rounding the year first and halving second
+        // (which would give $874.50 too, from 174900/2) is distinguished from
+        // the honest single rounding by the SECOND case below.
+        aWorkedDisposalYearDeduction: () => {
+            assertEq(
+                macrsDeductionCents(1000000n)('sevenYear')('200DB')(6)('HY')(3),
+                174900n,
+                'Table A-1 year 3 of 7-year property: 17.49% of $10,000.00')
+            assertEq(
+                macrsDisposalDeductionCents(1000000n)('sevenYear')('200DB')(6)('HY')(3)(6),
+                87450n,
+                'half of it, because the asset was sold during the year')
+            // The CONTROL, where the two orders agree: $3,333.00 of the same
+            // property in the same year is 17.49% = 58,294.17 cents ->
+            // $582.94, an EVEN number of cents, so rounding the year first and
+            // halving gives 58294/2 = 29147 and the exact half
+            // (29,147.085 -> 29147) gives the same. A fixture set containing
+            // only cases like this one is exactly the monoculture AGENTS.md
+            // records a rounding mutation surviving inside.
+            assertEq(
+                macrsDeductionCents(333300n)('sevenYear')('200DB')(6)('HY')(3),
+                58294n)
+            assertEq(
+                macrsDisposalDeductionCents(333300n)('sevenYear')('200DB')(6)('HY')(3)(6),
+                29147n)
+            // And the case where they DIVERGE, which is why the disposal
+            // decimal is folded in before the single `halfUp`. $3,335.00:
+            // 333500 x 0.1749 = 58,329.15 cents, so the full year is $583.29
+            // -- an ODD number of cents. Rounding first and halving in bigint
+            // gives 58329n / 2n = 29164n. The exact half is 29,164.575 ->
+            // 29165n. One cent apart, and 29165 is the honest one.
+            assertEq(
+                macrsDeductionCents(333500n)('sevenYear')('200DB')(6)('HY')(3),
+                58329n,
+                'an odd number of cents, on purpose')
+            assertEq(
+                macrsDisposalDeductionCents(333500n)('sevenYear')('200DB')(6)('HY')(3)(6),
+                29165n,
+                'the single rounding, not 29164')
         },
     },
     publication946: {
