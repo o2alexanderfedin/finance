@@ -27,6 +27,7 @@ form and corrects the remedy.
 | 3 | Where does the disallowed amount go? | Schedule 1 line 8p this year, and an **NOL carryover** to next year on Form 172. The carryover OUT is why a BINDING limitation refuses. | f461 line 16; i461 *Purpose of Form*, *Line 16* |
 | 4 | Which schedule's loss becomes computable? | **Schedule F's, at box 36a with line E "Yes", and no other.** Schedule C's and Schedule E Part I's blockers are untouched. | §4 below |
 | 5 | Does Form 461 change §199A(c)(2)? | **No — they are independent.** But §199A(c)(2) turns out to be removable on its own terms, and this phase removes it. | §6 below |
+| 6 | Does any KIND reclassify? | **No.** `excessBusinessLossAdjustment` stays refused, because an excess business loss still cannot be produced. | §7 below |
 
 ---
 
@@ -317,18 +318,37 @@ replaces.
 
 ---
 
-## 7. Kinds
+## 7. Kinds — and NO kind is reclassified
 
-- `excessBusinessLossAdjustment` moves from `unmodeledKindRefusals` to
-  `modeledKindDeclarationRemedies`. Declaring it makes Form 461 compute; the
-  remedy states where it stops (a BINDING limitation refuses, on the §172
-  carryover).
-- `farmIncomeOrLoss`'s remedy is corrected: it says today that *"a net LOSS on
-  printed line 34 refuses under §461(l) and Form 461"*, and after this phase a net
-  loss at box 36a computes.
-- `netOperatingLossDeduction` stays refused, and it is now load-bearing on §5.
+This section said, while it was being written, that
+`excessBusinessLossAdjustment` would move from `unmodeledKindRefusals` to
+`modeledKindDeclarationRemedies` and that the counts would go 55 -> 56 and
+142 -> 141. **That was wrong, and §5 is what makes it wrong.**
 
-Counts move: modeled 55 -> 56, refused 142 -> 141, `kindVocabulary` stays 197.
+The kind names the *adjustment on printed line 8p*, which exists only when there
+IS an excess business loss — and §5 refuses exactly that case. A taxpayer who
+declares the kind is a taxpayer with a binding §461(l), and this engine still
+cannot finish their return. Reclassifying it would tell them the opposite. *Only
+reclassify a kind whose every blocker is gone*, and this one's blocker is the
+§172 carryover, which is untouched.
+
+So:
+
+- `excessBusinessLossAdjustment` **stays refused**, with a corrected remedy. The
+  old one was stale on both halves — it said Form 461 was required (it is
+  modeled) and that *"this engine models one Schedule C and does not
+  aggregate"* (Schedule F had been modeled for a phase, and Part I forms the
+  aggregate). The new one states what is actually missing: Form 172.
+- `farmIncomeOrLoss`'s remedy is corrected. It said a net LOSS on printed line 34
+  *"refuses under §461(l) and Form 461"*; a loss at printed box 36a computes now,
+  and box 36b is what still refuses.
+- `netOperatingLossDeduction` stays refused, and its remedy now records that it
+  is load-bearing on §5 — the outbound carryforward whose inbound counterpart
+  this engine alone does not model.
+
+**Every count is unchanged: modeled 55, refused 142, `kindVocabulary` 197,
+tripwires 11, dialects 30 known / 32 dropped.** Each was read live and mutated to
+confirm the assertion behind it is alive.
 
 ---
 
