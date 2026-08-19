@@ -43,8 +43,10 @@
  */
 import { cBase32ToVec, vecToCBase32 } from 'functionalscript/fjs/basen/cbase32/module.f.mjs'
 import { collectRead, fileCas } from 'functionalscript/fjs/cas/module.f.mjs'
+import { empty, nonEmpty } from 'functionalscript/fjs/effects/list/module.f.mjs'
 import { utf8ToString, tryUtf8 } from 'functionalscript/fjs/text/module.f.mjs'
-import { step, pure, pureOk, mapStep } from 'functionalscript/fjs/effects/module.f.mjs'
+import { step, catchStep, pure, pureError, mapStep, history, historyStep, unwrapStep } from 'functionalscript/fjs/effects/module.f.mjs'
+import { errorSummary } from 'functionalscript/fjs/effects/node/module.f.mjs'
 import { emptyState, virtual } from 'functionalscript/fjs/effects/node/virtual/module.f.mjs'
 import { sha256 } from 'functionalscript/fjs/crypto/sha2/module.f.mjs'
 import { error, ok } from 'functionalscript/fjs/types/result/module.f.mjs'
@@ -56,6 +58,9 @@ import { applyWholeDollarElection } from '../line/module.f.js'
 import { centsFromString, centsToString, tryCentsFromString } from '../../exact/module.f.js'
 
 /** @import { Effect } from 'functionalscript/fjs/effects/types.js' */
+/** @import { List } from 'functionalscript/fjs/effects/list/types.js' */
+/** @import { Vec } from 'functionalscript/fjs/types/bit_vec/types.js' */
+/** @import { IoChannel } from 'functionalscript/fjs/effects/node/types.js' */
 /** @import { Cas, FileCasOperation } from 'functionalscript/fjs/cas/types.js' */
 /** @import { Result } from 'functionalscript/fjs/types/result/types.js' */
 /** @import { Run, RunError } from '../../run/module.f.js' */
@@ -113,15 +118,20 @@ const validateResultRecord = rttiValidate(resultRecordSchema)
  * `fjs/server/fjs_run/module.f.js`'s own `assertPersistedErrorRunRecord` test
  * helper already establishes and proves against real CAS content. Reused
  * verbatim, not re-derived.
- * @type {(cas: Cas<FileCasOperation>) => (runHash: string) => Effect<FileCasOperation, Result<Run, string>>}
+ *
+ * **Its failure is in the CHANNEL, not the payload** (0.46.0). The read's own
+ * `IoChannel` is re-tagged to this module's `string` channel by `catchStep`
+ * at the one place that knows what a missing blob means, so every caller
+ * composes with a plain `step` and never discharges a `Result` by hand.
+ * @type {(cas: Cas<FileCasOperation>) => (runHash: string) => Effect<FileCasOperation, Run, string>}
  */
 const readRunRecord = cas => runHash => {
     const vec = cBase32ToVec(runHash)
-    if (vec === null) { return pure(error(`not a decodable run hash: ${runHash}`)) }
-    return mapStep(collectRead(cas.read(vec)), readResult => {
-        if (readResult[0] === 'error') { return error(`run record not found: ${runHash}`) }
-        const [t, v] = validateRun(/** @type {RttiUnknown} */ (JSON.parse(utf8ToString(readResult[1]))))
-        return t === 'error' ? error(runErrorMessage(v)) : ok(v)
+    if (vec === null) { return pureError(`not a decodable run hash: ${runHash}`) }
+    const bytes = catchStep(collectRead(cas.read(vec)), () => pureError(`run record not found: ${runHash}`))
+    return step(bytes, read => {
+        const [t, v] = validateRun(/** @type {RttiUnknown} */ (JSON.parse(utf8ToString(read))))
+        return pure(t === 'error' ? error(runErrorMessage(v)) : ok(v))
     })
 }
 
@@ -138,19 +148,18 @@ const runErrorMessage = e => typeof e === 'string' ? e : `${e.message} (at ${e.p
  * Reads the JSON blob a run's `resultHash` points at and validates it as a
  * record of wire-projected `ReportLine`s. Same read sequence as
  * {@link readRunRecord} — reused, not re-derived.
- * @type {(cas: Cas<FileCasOperation>) => (resultHash: string) => Effect<FileCasOperation, Result<WireResultRecord, string>>}
+ * @type {(cas: Cas<FileCasOperation>) => (resultHash: string) => Effect<FileCasOperation, WireResultRecord, string>}
  */
 const readResultRecord = cas => resultHash => {
     const vec = cBase32ToVec(resultHash)
-    if (vec === null) { return pure(error(`not a decodable result hash: ${resultHash}`)) }
-    return mapStep(collectRead(cas.read(vec)), readResult => {
-        if (readResult[0] === 'error') { return error(`result blob not found: ${resultHash}`) }
-        const parsed = /** @type {RttiUnknown} */ (JSON.parse(utf8ToString(readResult[1])))
+    if (vec === null) { return pureError(`not a decodable result hash: ${resultHash}`) }
+    const bytes = catchStep(collectRead(cas.read(vec)), () => pureError(`result blob not found: ${resultHash}`))
+    return step(bytes, read => {
+        const parsed = /** @type {RttiUnknown} */ (JSON.parse(utf8ToString(read)))
         const [t, v] = validateResultRecord(parsed)
-        if (t === 'error') {
-            return error(`stored result at ${resultHash} is not a ReportLine-shaped record: ${v.message} (at ${v.path.join('.')})`)
-        }
-        return ok(v)
+        return pure(t === 'error'
+            ? error(`stored result at ${resultHash} is not a ReportLine-shaped record: ${v.message} (at ${v.path.join('.')})`)
+            : ok(v))
     })
 }
 
@@ -284,7 +293,7 @@ const diffWireRecords = elected => wireA => wireB => {
  * the type and annotating each helper explicitly is the fix, not a
  * work-around: each helper's own JSDoc `@type` is the single place its
  * return type is asserted, and `tsc` checks the function body against it.
- * @typedef {Effect<FileCasOperation, Result<AmendmentDiffResult, string>>} DiffEffect
+ * @typedef {Effect<FileCasOperation, AmendmentDiffResult, string>} DiffEffect
  */
 
 /**
@@ -292,47 +301,42 @@ const diffWireRecords = elected => wireA => wireB => {
  * already known comparable and `ok`), reads each result blob and diffs them.
  * @type {(cas: Cas<FileCasOperation>) => (elected: boolean) => (runHashA: string) => (runHashB: string) => (resultHashA: string) => (resultHashB: string) => DiffEffect}
  */
-const readResultsAndDiff = cas => elected => runHashA => runHashB => resultHashA => resultHashB =>
-    step(readResultRecord(cas)(resultHashA), wireA =>
-        step(readResultRecord(cas)(resultHashB), wireB => {
-            if (wireA[0] === 'error') {
-                return pureOk(/** @type {Result<AmendmentDiffResult, string>} */ (error(`run A's (${runHashA}) stored result is invalid: ${wireA[1]}`)))
-            }
-            if (wireB[0] === 'error') {
-                return pureOk(/** @type {Result<AmendmentDiffResult, string>} */ (error(`run B's (${runHashB}) stored result is invalid: ${wireB[1]}`)))
-            }
-            return pure(diffWireRecords(elected)(wireA[1])(wireB[1]))
-        }))
+const readResultsAndDiff = cas => elected => runHashA => runHashB => resultHashA => resultHashB => {
+    const wireA = catchStep(
+        readResultRecord(cas)(resultHashA),
+        e => pureError(`run A's (${runHashA}) stored result is invalid: ${e}`))
+    const wireB = catchStep(
+        readResultRecord(cas)(resultHashB),
+        e => pureError(`run B's (${runHashB}) stored result is invalid: ${e}`))
+    const both = historyStep(history(wireA), () => wireB)
+    return step(both, ([b, a]) => pure(diffWireRecords(elected)(a)(b)))
+}
 
 /**
  * The comparability guards and dispatch to {@link readResultsAndDiff}, given
  * both run records already read back out of CAS.
- * @type {(cas: Cas<FileCasOperation>) => (elected: boolean) => (runHashA: string) => (runHashB: string) => (resultA: Result<Run, string>) => (resultB: Result<Run, string>) => DiffEffect}
+ *
+ * Both records arrive as plain `Run`s: a read that failed short-circuited in
+ * {@link amendmentDiff}'s `step`, so the two `if (result[0] === 'error')`
+ * arms this function used to open with are now the error channel's job.
+ * @type {(cas: Cas<FileCasOperation>) => (elected: boolean) => (runHashA: string) => (runHashB: string) => (runA: Run) => (runB: Run) => DiffEffect}
  */
-const compareRunsAndDiff = cas => elected => runHashA => runHashB => resultA => resultB => {
-    if (resultA[0] === 'error') {
-        return pure(error(`could not read run A (${runHashA}): ${resultA[1]}`))
-    }
-    if (resultB[0] === 'error') {
-        return pure(error(`could not read run B (${runHashB}): ${resultB[1]}`))
-    }
-    const runA = resultA[1]
-    const runB = resultB[1]
+const compareRunsAndDiff = cas => elected => runHashA => runHashB => runA => runB => {
     if (runA.programHash !== runB.programHash) {
-        return pure(error(
+        return pureError(
             `not comparable: run A (${runHashA}) has programHash "${runA.programHash}", ` +
-            `run B (${runHashB}) has programHash "${runB.programHash}" — refusing to diff two different programs`))
+            `run B (${runHashB}) has programHash "${runB.programHash}" — refusing to diff two different programs`)
     }
     if (JSON.stringify(runA.args) !== JSON.stringify(runB.args)) {
-        return pure(error(
+        return pureError(
             `not comparable: run A (${runHashA}) has args ${JSON.stringify(runA.args)}, ` +
-            `run B (${runHashB}) has args ${JSON.stringify(runB.args)} — refusing to diff two different invocations`))
+            `run B (${runHashB}) has args ${JSON.stringify(runB.args)} — refusing to diff two different invocations`)
     }
     if (runA.status !== 'ok') {
-        return pure(error(`run A (${runHashA}) did not succeed, nothing to diff: ${runA.error}`))
+        return pureError(`run A (${runHashA}) did not succeed, nothing to diff: ${runA.error}`)
     }
     if (runB.status !== 'ok') {
-        return pure(error(`run B (${runHashB}) did not succeed, nothing to diff: ${runB.error}`))
+        return pureError(`run B (${runHashB}) did not succeed, nothing to diff: ${runB.error}`)
     }
     const resultHashA = assertNotNullish(runA.resultHash, 'an ok run record must have a resultHash')
     const resultHashB = assertNotNullish(runB.resultHash, 'an ok run record must have a resultHash')
@@ -346,10 +350,16 @@ const compareRunsAndDiff = cas => elected => runHashA => runHashB => resultA => 
  * them into Form 1040-X's Columns A/B/C per 1040 line.
  * @type {(cas: Cas<FileCasOperation>) => (elected: boolean) => (runHashA: string) => (runHashB: string) => DiffEffect}
  */
-export const amendmentDiff = cas => elected => runHashA => runHashB =>
-    step(readRunRecord(cas)(runHashA), resultA =>
-        step(readRunRecord(cas)(runHashB), resultB =>
-            compareRunsAndDiff(cas)(elected)(runHashA)(runHashB)(resultA)(resultB)))
+export const amendmentDiff = cas => elected => runHashA => runHashB => {
+    const runA = catchStep(
+        readRunRecord(cas)(runHashA),
+        e => pureError(`could not read run A (${runHashA}): ${e}`))
+    const runB = catchStep(
+        readRunRecord(cas)(runHashB),
+        e => pureError(`could not read run B (${runHashB}): ${e}`))
+    const both = historyStep(history(runA), () => runB)
+    return step(both, ([b, a]) => compareRunsAndDiff(cas)(elected)(runHashA)(runHashB)(a)(b))
+}
 
 // ── Tests ────────────────────────────────────────────────────────────────────
 //
@@ -363,15 +373,20 @@ export const amendmentDiff = cas => elected => runHashA => runHashB =>
  * TEST-FIXTURE ONLY. Writes `text`'s UTF-8 bytes to CAS as a single chunk —
  * the same `cas.write(pureOk({first: ok(bytes), tail: pureOk(undefined)}))`
  * pattern `fjs/server/fjs_run/module.f.js`'s own test helpers use.
- * @type {(cas: Cas<FileCasOperation>) => (text: string) => Effect<FileCasOperation, string>}
+ * @type {(cas: Cas<FileCasOperation>) => (text: string) => Effect<FileCasOperation, string, never>}
  */
 const seedText = cas => text => {
     const bytes = tryUtf8(text)
     assert(bytes !== null, ['expected fixture text to encode as UTF-8', text])
-    return mapStep(cas.write(pureOk({ first: ok(bytes), tail: pureOk(undefined) })), w => {
-        assert(w[0] === 'ok', ['expected fixture write to succeed', w])
-        return vecToCBase32(w[1])
-    })
+    // The payload is annotated rather than inferred: `nonEmpty`/`empty` are
+    // generic in `O`, and without a contextual type the write's op-set widens
+    // to the whole `Operation` universe.
+    /** @type {List<FileCasOperation, Vec, IoChannel>} */
+    const payload = nonEmpty(bytes, empty())
+    // A failed fixture write has no answer here, so the panic is written down
+    // with `unwrapStep` rather than hand-asserted off a payload `Result`.
+    const written = unwrapStep(cas.write(payload), errorSummary)
+    return mapStep(written, vecToCBase32)
 }
 
 /** TEST-FIXTURE ONLY. @type {(programHash: string) => (args: readonly string[]) => (resultHash: string) => Run} */
@@ -404,7 +419,7 @@ const errorRun = programHash => args => message => ({
  * TEST-FIXTURE ONLY. Seeds two wire-shaped result blobs, two `ok` run
  * records pointing at them, then calls {@link amendmentDiff} and returns its
  * `Result`.
- * @type {(cas: Cas<FileCasOperation>) => (programHashA: string) => (argsA: readonly string[]) => (wireA: Readonly<Record<string, unknown>>) => (programHashB: string) => (argsB: readonly string[]) => (wireB: Readonly<Record<string, unknown>>) => (elected: boolean) => Effect<FileCasOperation, Result<AmendmentDiffResult, string>>}
+ * @type {(cas: Cas<FileCasOperation>) => (programHashA: string) => (argsA: readonly string[]) => (wireA: Readonly<Record<string, unknown>>) => (programHashB: string) => (argsB: readonly string[]) => (wireB: Readonly<Record<string, unknown>>) => (elected: boolean) => DiffEffect}
  */
 const runOkDiffFixture = cas => programHashA => argsA => wireA => programHashB => argsB => wireB => elected =>
     step(seedText(cas)(JSON.stringify(wireA)), resultHashA =>
@@ -418,7 +433,7 @@ const runOkDiffFixture = cas => programHashA => argsA => wireA => programHashB =
  * `error` run (no result blob at all — an error run never has one), then
  * calls `amendmentDiff`, returning its `Result`. `errorSide` selects which
  * of the two positions is the failing one.
- * @type {(cas: Cas<FileCasOperation>) => (errorSide: 'a' | 'b') => (programHash: string) => (args: readonly string[]) => (wire: Readonly<Record<string, unknown>>) => (message: string) => Effect<FileCasOperation, Result<AmendmentDiffResult, string>>}
+ * @type {(cas: Cas<FileCasOperation>) => (errorSide: 'a' | 'b') => (programHash: string) => (args: readonly string[]) => (wire: Readonly<Record<string, unknown>>) => (message: string) => DiffEffect}
  */
 const statusErrorDiffFixture = cas => errorSide => programHash => args => wire => message =>
     step(seedText(cas)(JSON.stringify(wire)), resultHash =>
