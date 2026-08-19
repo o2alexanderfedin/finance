@@ -89,6 +89,14 @@ across the same partition**, on the same terms and for the same reason: the wiri
 and the reclassification rode with it. The vocabulary is still the 195 the split left — neither
 reclassification invented or retired a kind — and 54 + 141 = 195.
 
+It fell a third time, 141 → 140, and the modeled half rose 54 → 55, when Schedule F made
+`farmIncomeOrLoss` computable at Schedule 1 line 6 — and at Schedule SE line 1a, which is the
+half a reclassification could have skipped while looking complete. **A third single kind moved
+across the same partition**, on the same terms, and 55 + 140 = 195. Its two farm neighbours did
+NOT move: `netFarmRentalIncomeForm4835` is Form 4835, a different printed form for a landowner
+who did not materially participate, and `farmIncomeAveragingScheduleJ` is Schedule J, which
+averages farm income over three preceding years this engine does not hold.
+
 The conditional refusals — the ones that fire on a taxpayer whose kinds are all modeled:
 
 | Refused | Because |
@@ -96,6 +104,10 @@ The conditional refusals — the ones that fire on a taxpayer whose kinds are al
 | A nonqualified Roth distribution (1099-R box 7a code `J` or `T`) | Form 8606 Part III is unbuilt. Part I and **Part II compute**, so a backdoor Roth works. |
 | Qualified disaster distributions (Form 8606 line 15b) | Form 8915-F is unbuilt |
 | A business **loss** | the at-risk determination (Form 6198) needs a multi-year basis history |
+| A farm **loss** | §461(l)'s excess business loss aggregates every trade or business including Form 4797 gains, and §199A(c)(2) carries a negative QBI amount into next year |
+| A farm on the **accrual** method | printed Schedule F line 45's beginning-of-year inventory, and the valuation method the printed footnote to line 49 makes the sign of lines 47-50 depend on |
+| A farm the taxpayer did not **materially participate** in | it is a passive activity, so §1411(c)(1)(A)(ii) makes its income net investment income and Form 8960 line 4b is unbuilt |
+| A farm beside a Schedule C business | Form 8995-A figures its limitations per business and this engine carries one business's W-2 wages and unadjusted basis |
 | A mixed-tax-year document store | 2024 and 2025 W-2s together would silently mis-total |
 | Two businesses, or two K-1s from one entity | netting them is the arithmetic §704(d) exists to stop |
 | Two Schedules SE (both spouses self-employed) | one Schedule SE is computed; two are a phase of their own |
