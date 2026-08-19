@@ -473,6 +473,17 @@ import { kindVocabulary } from '../profile/module.f.js'
  */
 export const modeledKinds = /** @type {const} */ ([
     'wages',                       // W-2 box 1                     -> 1040 line 1a
+    // TAX-38's INCOME half, reclassified in the SAME commit as the
+    // `fjs/form1040/core` wiring that reads Form W-2 box 10 -- a box this
+    // dialect had STORED and no computation had ever read, so the zero on
+    // 1040 line 1e was a silent understatement of tax for every taxpayer with
+    // a dependent care FSA. The third stored-but-unread box this project has
+    // found, after `box2EarlyWithdrawalPenalty` on `vnd.fjs.1099int`.
+    //
+    // Modeled does NOT mean always computed: `fjs/form2441` refuses seven
+    // printed conditions AT THE FORM, each naming the taxpayer's own figures
+    // -- which a scope refusal could never have said.
+    'dependentCareBenefits',       // W-2 box 10 -> Form 2441 line 26 -> 1040 line 1e
     'taxExemptInterest',           // 1099-INT box 8                -> 1040 line 2a
     'taxableInterest',             // 1099-INT boxes 1 and 3        -> 1040 line 2b
     'qualifiedDividends',          // 1099-DIV box 1b                -> 1040 line 3a
@@ -548,6 +559,13 @@ export const modeledKinds = /** @type {const} */ ([
     // exactly as `foreignTaxCredit` below records.
     'excessAdvancePremiumTaxCreditRepayment', // Form 1095-A -> Form 8962 line 29 -> Schedule 2 line 1a -> 1040 line 17
     'foreignTaxCredit',            // 1099-DIV box 7 + 1099-INT box 6 -> Schedule 3 line 1 -> 1040 line 20
+    // TAX-38's CREDIT half, and the other product of the same Form 2441
+    // execution `dependentCareBenefits` above is one product of. NOT
+    // refundable for 2025: f2441 line 11 sends it to Schedule 3 line 2, which
+    // the printed page files under Part I, Nonrefundable Credits. ARPA's 2021
+    // refundability is gone and the slot its Part II line 10 occupied now
+    // holds a tax-liability limit.
+    'dependentCareCredit',         // Form 2441 line 11 -> Schedule 3 line 2 -> 1040 line 20
     'educationCredits',            // Form 8863 line 19 -> Schedule 3 line 3 -> 1040 line 20
     'retirementSavingsContributionsCredit', // Form 8880 -> Schedule 3 line 4 -> 1040 line 20
     'excessSocialSecurityWithheld', // W-2 box 4 -> Schedule 3 line 11 -> 1040 line 31
@@ -688,7 +706,6 @@ export const unmodeledKindRefusals = /** @type {const} */ ([
     { kind: 'householdEmployeeWages', line: '1040 line 1b', label: 'household employee wages', remedy: 'no dialect models it (no phase yet)' },
     { kind: 'unreportedTips', line: '1040 line 1c', label: 'unreported tips', remedy: 'requires Form 4137 (no phase yet)' },
     { kind: 'medicaidWaiverPayments', line: '1040 line 1d', label: 'nontaxable Medicaid waiver payments', remedy: 'no dialect models it (no phase yet)' },
-    { kind: 'dependentCareBenefits', line: '1040 line 1e', label: 'dependent care benefits', remedy: 'requires Form 2441 (no phase yet)' },
     { kind: 'adoptionBenefits', line: '1040 line 1f', label: 'employer-provided adoption benefits', remedy: 'requires Form 8839 (no phase yet)' },
     { kind: 'form8919Wages', line: '1040 line 1g', label: 'Form 8919 wages', remedy: 'requires Form 8919 (no phase yet)' },
     { kind: 'otherEarnedIncome', line: '1040 line 1h', label: 'other earned income', remedy: 'no dialect models it (no phase yet)' },
@@ -951,14 +968,14 @@ export const unmodeledKindRefusals = /** @type {const} */ ([
     // Part II block far below, because Form 8863's ONE execution produces
     // both it and line 3 -- see this module's own docstring.
     //
-    // `dependentCareCredit` and `dependentCareBenefits` (1040 line 1e) are
-    // BOTH kinds, and that is deliberate, unlike the Schedule 2 block above
-    // where `unreportedTips` deliberately got no second kind for its own tax.
-    // The two halves of Form 2441 are separable facts a taxpayer can have one
-    // of without the other: Part III's employer-provided benefits are
-    // INCLUDIBLE INCOME, and Part II's credit is a credit. Declaring one
-    // would not be declaring the other.
-    { kind: 'dependentCareCredit', line: 'Schedule 3 line 2 -> 1040 line 20', label: 'the credit for child and dependent care expenses', remedy: 'requires Form 2441 Part II (no phase yet)' },
+    // `dependentCareCredit` and `dependentCareBenefits` (1040 line 1e) BOTH
+    // left this table at TAX-38, and their separateness -- deliberate, unlike
+    // the Schedule 2 block above where `unreportedTips` got no second kind for
+    // its own tax -- is what let them move together honestly: Part III's
+    // employer-provided benefits are INCLUDIBLE INCOME and Part II's credit is
+    // a credit, so a taxpayer can have either without the other, and
+    // `fjs/form1040/core` computes each from its own half of one Form 2441
+    // execution.
     { kind: 'residentialCleanEnergyCredit', line: 'Schedule 3 line 5a -> 1040 line 20', label: 'the residential clean energy credit', remedy: 'requires Form 5695 Part I (no phase yet)' },
     { kind: 'energyEfficientHomeImprovementCredit', line: 'Schedule 3 line 5b -> 1040 line 20', label: 'the energy efficient home improvement credit', remedy: 'requires Form 5695 Part II (no phase yet)' },
     { kind: 'otherNonrefundableCredits', line: 'Schedule 3 line 6a-6z -> 1040 line 20', label: 'other nonrefundable credits', remedy: 'the printed form itself collapses thirteen lettered sub-lines here — among them the general business credit, the prior-year minimum tax credit on FORM 8801, the NONrefundable half of the adoption credit and the credit for the elderly or disabled on Schedule R — and this engine models none of them. Form 8801 is the one to read twice now that Phase 29 computes the alternative minimum tax: AMT paid on DEFERRAL items (most of all the §56(b)(3) incentive stock option spread) becomes a credit against the REGULAR tax in later years, so a filer who owes AMT this year is owed something next year that this engine will not compute for them, and a filer carrying one in from 2024 cannot claim it here. It is multi-year by construction and no document this engine holds records a prior year\'s minimum tax (no phase yet)' },
@@ -1141,6 +1158,20 @@ export const modeledKindDeclarationRemedies = /** @type {const} */ ([
             + 'of that long-term figure (boxes 9b/9c, 8b/8c and 4b/4c) still refuse by name at '
             + 'storage, because this engine computes both worksheets from Form 1099-DIV boxes '
             + '2d and 2b only',
+    },
+    {
+        kind: 'dependentCareBenefits',
+        line: 'Form 2441 line 26 -> 1040 line 1e',
+        label: 'dependent care benefits',
+        remedy: 'declare dependentCareBenefits on the return profile and this engine computes '
+            + 'Form 2441 Part III from Form W-2 box 10 (TAX-38), excluding what §129 allows '
+            + 'and taxing the rest on 1040 line 1e. **Box 10 was stored and read by nothing '
+            + 'before TAX-38**, so this line was $0.00 for everyone with a dependent care '
+            + 'flexible spending account, which understates tax. Note that the exclusion needs '
+            + 'facts no information return carries: without a vnd.fjs.credits record stating the '
+            + 'qualified expenses INCURRED in the year (Form 2441 line 16), nothing can be '
+            + 'excluded and the whole of box 10 is taxable — which is correct, because an '
+            + 'expense you cannot substantiate is one you cannot exclude a benefit against',
     },
     {
         kind: 'estateAndTrustIncome',
@@ -1508,9 +1539,19 @@ export const classifyScope = declaredKinds => {
  * Form 8962's own line 24 / line 25 comparison, so reclassifying either alone
  * would leave the engine silently wrong for the half of the population on the
  * other arm.
+ *
+ * `49 -> 51` is TAX-38's Form 2441 pair — `dependentCareBenefits` and
+ * `dependentCareCredit` — landed beside the `fjs/form1040/core` wiring that
+ * runs Part III before 1040 line 1z and Part II after the tax. **Two, and
+ * unlike Form 8962's pair these are NOT two arms of one comparison**: a
+ * taxpayer can have employer-provided benefits without any credit and a credit
+ * without any benefits. They moved together because ONE execution produces
+ * both, and because the §129 exclusion on the income half reduces the §21(c)
+ * cap on the credit half dollar for dollar — reclassifying either alone would
+ * have left the other reading a cap the exclusion had already eaten.
  * @type {number}
  */
-const expectedModeledKindCount = 49
+const expectedModeledKindCount = 51
 
 /**
  * The modeled set, hand-typed a SECOND time and in {@link kindVocabulary}'s
@@ -1529,6 +1570,7 @@ const expectedModeledKindCount = 49
  */
 const everyModeledKindHandTyped = [
     'wages',
+    'dependentCareBenefits',
     'taxExemptInterest',
     'taxableInterest',
     'qualifiedDividends',
@@ -1562,6 +1604,7 @@ const everyModeledKindHandTyped = [
     'excessAdvancePremiumTaxCreditRepayment',
     'childTaxCreditOrOtherDependents',
     'foreignTaxCredit',
+    'dependentCareCredit',
     'educationCredits',
     'retirementSavingsContributionsCredit',
     'excessSocialSecurityWithheld',
@@ -1690,9 +1733,14 @@ const everyModeledKindHandTyped = [
  * glance, from a commit that changed nothing — which is why the hand-typed
  * SET (`everyModeledKindHandTyped`) and the per-schedule `stillRefused`
  * lists, not this number, are what actually pin this phase.
+ *
+ * **`68 -> 66` is TAX-38's**, and here the count DOES move: two rows leave
+ * (`dependentCareBenefits` at 1040 line 1e and `dependentCareCredit` at
+ * Schedule 3 line 2) and none arrives, because Form 2441 has no coarse kind to
+ * split. `68 - 2`.
  * @type {number}
  */
-const expectedUnmodeledKindCount = 68
+const expectedUnmodeledKindCount = 66
 
 /**
  * The complete refusal message for a return declaring exactly
@@ -2957,15 +3005,15 @@ export const proof = {
         theSevenScheduleThreeKindsStillWithoutAFormStillRefuse: () => {
             /** @type {readonly Kind[]} */
             const stillRefused = [
-                'dependentCareCredit',
                 'residentialCleanEnergyCredit',
                 'energyEfficientHomeImprovementCredit',
                 'otherNonrefundableCredits',
                 'federalFuelTaxCredit',
                 'otherPaymentsAndRefundableCredits',
             ]
-            assertEq(stillRefused.length, 6,
-                'twelve Schedule 3 kinds minus lines 1, 3, 4, 9, 10 and 11, all six now modeled')
+            assertEq(stillRefused.length, 5,
+                'twelve Schedule 3 kinds minus lines 1, 2, 3, 4, 9, 10 and 11, all seven now '
+                + 'modeled — line 2 left this list at TAX-38 with Form 2441')
             for (const kind of stillRefused) {
                 const outcome = classifyScope([kind])
                 assert(
@@ -3002,6 +3050,39 @@ export const proof = {
         },
         excessAdvancePremiumTaxCreditRepaymentIsInScopeAlone: () => {
             assertEq(classifyScope(['excessAdvancePremiumTaxCreditRepayment']).kind, 'ok')
+        },
+        // ── TAX-38, Form 2441 ───────────────────────────────────────────
+        //
+        // Each half of Form 2441 is in scope on its own, which is the whole
+        // reason they are two kinds: employer-provided benefits with no
+        // credit is an ordinary return, and so is a credit with no benefits.
+        dependentCareBenefitsIsInScopeAlone: () => {
+            assertEq(classifyScope(['dependentCareBenefits']).kind, 'ok')
+        },
+        dependentCareCreditIsInScopeAlone: () => {
+            assertEq(classifyScope(['dependentCareCredit']).kind, 'ok')
+        },
+        bothFormTwentyFourFortyOneHalvesTogetherAreInScope: () => {
+            assertEq(
+                classifyScope(['dependentCareBenefits', 'dependentCareCredit']).kind,
+                'ok')
+        },
+        // The CONTROL: the neighbouring 1040 line 1 sub-lines and the
+        // neighbouring Schedule 3 Part I credits still refuse. Without this,
+        // "Form 2441 is modeled" could not be told from "1040 line 1 and
+        // Schedule 3 Part I are modeled".
+        theNeighbouringLineOneAndScheduleThreeKindsStillRefuse: () => {
+            for (const kind of /** @type {readonly Kind[]} */ ([
+                'adoptionBenefits',
+                'form8919Wages',
+                'otherEarnedIncome',
+                'residentialCleanEnergyCredit',
+            ])) {
+                const outcome = classifyScope([kind])
+                assert(
+                    outcome.kind === 'error',
+                    ['Form 2441 does not make this kind computable', kind, outcome])
+            }
         },
         // ...and both together, which is what a taxpayer who does not yet
         // know which arm they are on would truthfully declare.
@@ -3497,7 +3578,7 @@ export const proof = {
             // now read six K-1 boxes that used to refuse at storage, and a
             // filer who does not declare the kind would otherwise have those
             // boxes accepted and never read.
-            const expectedDeclarationRequiredCount = 6
+            const expectedDeclarationRequiredCount = 7
             assertEq(
                 modeledKindDeclarationRemedies.length,
                 expectedDeclarationRequiredCount,

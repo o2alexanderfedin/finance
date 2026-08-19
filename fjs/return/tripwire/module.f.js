@@ -354,6 +354,20 @@ export const tripwires = [
             context.documents.w2s.some(w2 => boxIsNonZero(w2.value.box8AllocatedTips)),
     },
     {
+        kind: 'dependentCareBenefits',
+        evidence: 'Form W-2 box 10 (dependent care benefits) is non-zero, so §129 requires the excludable '
+            + 'part to be figured on Form 2441 Part III and the REST to be reported as wages on 1040 line 1e; '
+            + 'how much is excludable turns on the qualified expenses you incurred, which no information '
+            + 'return reports',
+        // The box that was STORED and read by nothing until TAX-38. This
+        // tripwire is what keeps it from going quiet again: a taxpayer whose
+        // employer funded a dependent care FSA has taxable income unless they
+        // substantiate expenses against it, and the engine cannot see those
+        // expenses without a `vnd.fjs.credits` record.
+        triggered: context =>
+            context.documents.w2s.some(w2 => boxIsNonZero(w2.value.box10DependentCareBenefits)),
+    },
+    {
         kind: 'form4972LumpSumDistribution',
         evidence: 'Form 1099-R box 3 (capital gain, included in box 2a) is non-zero, so this is a lump-sum '
             + 'distribution eligible for capital-gain treatment on Form 4972 (not on Schedule D), which this '
@@ -576,7 +590,7 @@ assert(taxParams2025 !== undefined, 'expected TY2025 parameters to be present in
  * reads all three document lists and six different box numbers.
  * @type {number}
  */
-const expectedTripwireCount = 8
+const expectedTripwireCount = 9
 
 /** A W-2 carrying nothing but the fields its schema requires. @type {W2} */
 const bareW2 = {
