@@ -816,8 +816,30 @@ export const scheduleEPartI = input => {
     // 25. "Losses. Add royalty losses from line 21 and rental real estate
     //     losses from line 22." A STRUCTURAL zero: every loss refuses at
     //     {@link rentalLossRefusal} or {@link royaltyLossRefusal} before this
-    //     line is built, so nothing can reach it. Not a silent zero — a zero
+    //     line is built, so nothing can reach it. Not a silent zero -- a zero
     //     with a refusal standing in front of it.
+    //
+    //     **EQUIVALENT MUTANT, recorded rather than worked around.** Deleting
+    //     `line25` from line 26's sum below cannot turn red at ANY input,
+    //     because the two refusals above make its value permanently zero --
+    //     AGENTS.md's "a mutation a neighbouring operation absorbs", where the
+    //     neighbour is a refusal rather than a `min`. It was written, run, and
+    //     left the whole suite green.
+    //
+    //     **The provenance does not rescue it either, and the first attempt to
+    //     make it bite was wrong.** A source assertion looked like the
+    //     observable -- line 25 is the only summand that CITES the profile --
+    //     but every column leaves one of printed lines 3 and 4 empty (a rental
+    //     has no royalties and a royalty has no rents), so `documentLine`'s
+    //     fallback has already put the profile's `declaredKinds` citation into
+    //     line 24's own union. Measured: the mutation stayed green with the
+    //     assertion in place.
+    //
+    //     So the sum is proven through its MIRROR IMAGE instead: dropping line
+    //     24 reddens seven leaves, which is what says `totalLine` over these
+    //     two is load-bearing. Line 25 stays a summand because the printed
+    //     instruction says "combine lines 24 and 25" and the day the loss
+    //     refusal is lifted this line already carries it.
     const line25 = zero('Schedule E line 25 (losses: royalty losses from line 21 and rental losses from line 22)')
     // 26. "Total rental real estate and royalty income or (loss). Combine
     //     lines 24 and 25." THE DESTINATION: Schedule E line 41 -> Schedule 1
@@ -1056,6 +1078,16 @@ export const proof = {
         assertEq(result.line24.value, 1000450n, 'line 24 $10,004.50')
         assertEq(result.line25.value, 0n, 'line 25 is a structural zero')
         assertEq(result.line26.value, 1000450n, 'line 26 -> Schedule 1 line 5')
+        // Printed line 26 cites BOTH a document and the profile: the rent it
+        // is made of, and the `declaredKinds` box that says the taxpayer
+        // asked for this part at all. See line 25's own comment for why this
+        // is NOT the assertion that catches line 25 being dropped from the
+        // sum -- it was tried, and it does not.
+        const line26Boxes = result.line26.sources.map(source => source.boxPath)
+        assert(line26Boxes.includes('declaredKinds'),
+            ['line 26 must carry the profile citation', line26Boxes])
+        assert(line26Boxes.includes('rentsReceived'),
+            ['and the document the rent came from', line26Boxes])
         // Provenance: line 3 cites the document, not the profile.
         assertEq(column.line3.sources.length, 1)
         assertEq(column.line3.sources[0]?.documentHash, 'sha256-rental-a')
@@ -1257,6 +1289,7 @@ export const proof = {
             assert(allocation.includes('did NOT use the unit as a home'), ['which side of the test', allocation])
             assert(allocation.includes('Schedule A'), ['where the disallowed share goes', allocation])
             assert(allocation.includes('Bolton'), ['why the day count is contested', allocation])
+            assert(allocation.includes('RENT-0001'), ['and WHICH property the filer must look at', allocation])
             // §280A(c)(5): 30 personal days against 100 fair rental days.
             // 30 > 14 and 300 > 100, so a home; 100 >= 15, so the CAP.
             const cap = refusal(run({
@@ -1276,6 +1309,24 @@ export const proof = {
             }))
             assert(excluded.includes('§280A(g)'), ['the exclusion regime', excluded])
             assert(excluded.includes('do not report the rental income'), ['the printed instruction', excluded])
+            // ★ **THE BOUNDARY A MUTATION DEMANDED.** Moving
+            // `deMinimisRentalDayThreshold` from 15 to 14 reddened only the
+            // predicate table above, because every fixture here sat far from
+            // the boundary: 10 fair rental days is below both. These two sit
+            // ON it. i1040se p5 says "fewer than 15 days", so 14 is §280A(g)
+            // and 15 is §280A(c)(5), with 30 personal days making both a home.
+            const fourteenDays = refusal(run({
+                rentalProperties: [propertyDocument({
+                    fairRentalDays: 14, personalUseDays: 30,
+                })('sha256-rental-a')],
+            }))
+            assert(fourteenDays.includes('§280A(g)'), ['14 fair rental days is FEWER than 15', fourteenDays])
+            const fifteenDays = refusal(run({
+                rentalProperties: [propertyDocument({
+                    fairRentalDays: 15, personalUseDays: 30,
+                })('sha256-rental-a')],
+            }))
+            assert(fifteenDays.includes('§280A(c)(5)'), ['15 is not fewer than 15', fifteenDays])
             // The three messages must be DIFFERENT, which is the property a
             // per-regime assertion alone cannot check.
             assertEq(new Set([allocation, cap, excluded]).size, 3)
@@ -1310,6 +1361,7 @@ export const proof = {
             assert(message.includes('\u00a71.469-2(f)(6)'), ['the \u00a7469 recharacterization', message])
             assert(message.includes('\u00a71.1411-4(g)(6)'), ['the \u00a71411 exclusion', message])
             assert(message.includes('Form 8960 line 4b'), ['the printed line that cannot be computed', message])
+            assert(message.includes('RENT-0001'), ['and which property', message])
             // THE CONTROL: the other SEVEN printed codes all compute. A
             // refusal that fired on every type would pass the assertions above.
             const otherCodes = [
@@ -1369,6 +1421,7 @@ export const proof = {
             }))
             assert(message.includes('line 6'), ['the printed line', message])
             assert(message.includes('Part V of Form 4562'), ['the printed instruction', message])
+            assert(message.includes('RENT-0001'), ['and which property', message])
             assert(message.includes('340.00'), ['the amount', message])
             assert(message.includes('§274(d)'), ['the substantiation rule', message])
         },
@@ -1382,6 +1435,7 @@ export const proof = {
             assert(message.includes('TWICE'), ['why an entry cannot stand', message])
             assert(message.includes('vnd.fjs.asset_register'), ['what to store instead', message])
             assert(message.includes('DEPLETION'), ['the other half of the printed line', message])
+            assert(message.includes('RENT-0001'), ['and which property', message])
         },
         twoDocumentsForOnePropertyRefuse: () => {
             const message = refusal(run({

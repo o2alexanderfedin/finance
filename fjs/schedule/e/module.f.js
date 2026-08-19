@@ -1524,6 +1524,28 @@ const estateTrustDoc = overrides => ({
     },
 })
 
+/**
+ * ONE `vnd.fjs.rental_property`: a residence let all year with no personal
+ * use and $24,000.00 of rent, varied by the overrides.
+ * @type {(overrides: Partial<RentalProperty>) => Stored<RentalProperty>}
+ */
+const rentalPropertyDoc = overrides => ({
+    documentHash: 'sha256-rental-a',
+    value: {
+        dialect: 'vnd.fjs.rental_property',
+        recipientTin: '222-22-2222',
+        accountNumber: 'RENT-0001',
+        taxYear: 2025,
+        propertyType: 'singleFamilyResidence',
+        physicalAddress: '18 Alder Street, Wells, ME 04090',
+        fairRentalDays: 365,
+        personalUseDays: 0,
+        rentsReceived: '24000.00',
+        entries: [],
+        ...overrides,
+    },
+})
+
 /** @type {(input: Partial<ScheduleEInput>) => ScheduleEOutcome} */
 const run = input => scheduleE({
     profile,
@@ -1602,6 +1624,91 @@ export const proof = {
             assertEq(line.sources[0].documentHash, profile.documentHash)
             assertEq(line.sources[0].boxPath, 'declaredKinds')
         }
+    },
+
+    // ── PART I: rental real estate and royalties ─────────────────────────────
+    //
+    // The arithmetic lives in `fjs/schedule/e/part_i` and is proven there.
+    // What is proven HERE is the seam, which that module structurally cannot
+    // see: printed line 26 reaching printed line 41, and a Part I refusal
+    // reaching a caller of `scheduleE` with its content intact.
+    partI: {
+        /**
+         * ★ **THE LEAF A SURVIVING MUTATION DEMANDED.** Replacing this
+         * module's Part I error arm with `{ ...partI, message: '' }` — a
+         * refusal that fires, propagates, and says NOTHING — left the entire
+         * suite green. `fjs/schedule/e/part_i`'s own refusal leaves call that
+         * module directly and never travel through this one, so nothing
+         * asserted that a Part I refusal survives the trip.
+         *
+         * Two refusals with two different subjects are checked, so a seam that
+         * happened to carry one message correctly cannot pass.
+         */
+        aPartIRefusalReachesAScheduleECallerWithItsContentIntact: () => {
+            const loss = run({
+                rentalProperties: [rentalPropertyDoc({
+                    rentsReceived: '1000.00',
+                    entries: [{
+                        category: 'repairs',
+                        datePaid: '2025-05-02',
+                        description: 'boiler repair',
+                        amount: '1500.00',
+                    }],
+                })],
+            })
+            assert(loss.kind === 'error', ['a rental loss must refuse through Schedule E', loss])
+            if (loss.kind !== 'error') {
+                return
+            }
+            assert(loss.message.includes('Form 8582'),
+                ['the form the filer needs must survive the seam', loss.message])
+            assert(loss.message.includes('RENT-0001'),
+                ['and the property it is about', loss.message])
+            const personalUse = run({
+                rentalProperties: [rentalPropertyDoc({ fairRentalDays: 100, personalUseDays: 30 })],
+            })
+            assert(personalUse.kind === 'error', ['a §280A property must refuse through Schedule E', personalUse])
+            if (personalUse.kind !== 'error') {
+                return
+            }
+            assert(personalUse.message.includes('\u00a7280A(c)(5)'),
+                ['a DIFFERENT Part I refusal must survive the seam too', personalUse.message])
+            assert(!personalUse.message.includes('Form 8582'),
+                ['and it must not be the loss refusal wearing another name', personalUse.message])
+        },
+        /**
+         * ★ **THE SEAM ITSELF**: printed line 26 IS a summand of printed line
+         * 41, and line 41 is what `fjs/schedule/1` reads into line 5. A
+         * profitable property beside a partnership K-1 proves both halves are
+         * carried rather than one replacing the other.
+         *
+         * Hand-typed: rents $24,000.00 less $1,500.00 of repairs is printed
+         * line 26 = **$22,500.00**; the partnership's box 1 is $80,000.00 on
+         * printed line 32; line 41 combines them at **$102,500.00**.
+         */
+        printedLineTwentySixIsASummandOfPrintedLineFortyOne: () => {
+            const result = ok(run({
+                rentalProperties: [rentalPropertyDoc({
+                    entries: [{
+                        category: 'repairs',
+                        datePaid: '2025-05-02',
+                        description: 'boiler repair',
+                        amount: '1500.00',
+                    }],
+                })],
+                partnershipK1Forms: [partnershipDoc({})],
+            }))
+            assertEq(result.partI.line26.value, 2250000n, 'Schedule E line 26 $22,500.00')
+            assertEq(result.parts.line26.value, 2250000n, 'and the summary carries the SAME line 26')
+            assertEq(result.partII.line32.value, 8000000n, 'Schedule E line 32 $80,000.00')
+            assertEq(result.parts.line41.value, 10250000n, 'line 41 = 26 + 32 + 37 + 39 + 40')
+            // THE CONTROL: the same partnership with no property. Line 41 is
+            // the partnership share alone, so the leaf above is evidence about
+            // line 26 rather than about line 32.
+            const withoutProperty = ok(run({ partnershipK1Forms: [partnershipDoc({})] }))
+            assertEq(withoutProperty.partI.line26.value, 0n)
+            assertEq(withoutProperty.parts.line41.value, 8000000n)
+        },
     },
 
     // ── PART III: the reader `vnd.fjs.k1_1041` did not have (TAX-35) ─────────
