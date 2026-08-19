@@ -465,7 +465,14 @@ of this table is untouched by that, because Form 6781 moved no dialect and no tr
 leaves that spell a count in their names had to be renamed with the constants:
 `modeledKindsIsExactlyFiftyFive`, `unmodeledRefusalsIsExactlyOneHundredAndFortyTwo`,
 `theTableIsExactlyElevenDistinctTripwires` and
-`sourceAndTwinDispatchOnTheSameTwentyNineDialects`.
+`sourceAndTwinDispatchOnTheSameTwentyNineDialects`. (The first two were renamed TWICE more —
+by Form 4797 (TAX-41) to `…FiftySix`/`…OneHundredAndFortyOne`, and by Form 2555 (TAX-42), which
+had independently reached `…FiftySix`/`…OneHundredAndFortyFive` from the same starting point, so
+the integration of the two composed them to `modeledKindsIsExactlyFiftySeven` and
+`unmodeledRefusalsIsExactlyOneHundredAndFortyFour`. The names above are what this phase left
+behind, and grepping for them today finds nothing but this line. **A leaf whose name spells a
+count is a name that goes stale every time the count moves** — which is now the fifth rename in
+four phases, and the third caused by nothing but two branches meeting.)
 
 ---
 
