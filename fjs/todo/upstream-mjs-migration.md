@@ -202,3 +202,75 @@ Of the 123: **112 are project-local proof leaves** and 11 are root gate/integrat
 
 Do not read the 123 as a stage-3 estimate: fixing the Effect system leaves the 54 exactly where
 they are.
+
+## Stage 3 — the Effect system: what landed, and the map for what is left
+
+`tsc` **513 -> 282**. Failing proof leaves **112 -> 113**, of which **27 are the `parse`
+regression** (unchanged set, verified byte-identical) and **86 are Effect work still open**.
+`fjs/exec`'s `try` is gone and `upstream-total-match-dispatch.md` with it.
+
+**Order taken was `exec` -> `guest` -> `fjs_run`, not `exec` -> `fjs_run`.** `CasOp` — the
+operation vocabulary the whole run spine is typed against — is declared in `fjs/guest`, and until
+its handlers returned a `Result` nothing downstream could satisfy 0.46.0's `Operation`
+constraint. Doing `guest` second turned 472 into 288 across seven modules at once; doing
+`fjs_run` first would have meant fixing the same constraint error 150 times.
+
+### The four rules that did the work, in the order they pay off
+
+1. **An operation's handler returns a `Result`.** Fixing the vocabulary at its declaration
+   (`TestOp` in `exec`, `CasOp` in `guest`) collapses the `TS2344 does not satisfy the constraint
+   'Operation'` cascade everywhere else. Declare the channel the operation actually has — `never`
+   where it cannot fail, so the caller's channel collapses too.
+2. **`pure(v)` -> `pureOk(v)`** for a bare value; `pure(ok(…))` / `pure(error(…))` are already
+   right. 85 sites. Anchor on not-`.` so `ctx.pure(` in stored program source is never touched.
+3. **`runPure` yields `Option<Result<T, E>>`.** Two questions, asked separately: the `Option` for
+   "reached a value vs stopped at a command", the `Result` for success vs failure.
+4. **`step` -> `resultStep`, `mapStep` -> `resultMapStep`, wherever the continuation inspects
+   `r[0]`.** Those lines were written against 0.43.1's Result-BLIND `step`, and `resultStep` *is*
+   that function. Getting this wrong is the worst failure mode in the whole migration: it
+   typechecks as a *bit-vector* complaint (`Property '1' does not exist on type 'Symbol & {
+   bit_vec … }'`) and fails at runtime three frames inside `types/bigint`.
+
+### What is left, and the one decision it turns on
+
+| Module | `tsc` | failing leaves |
+|---|---|---|
+| `fjs/server/fjs_run` | 149 | 25 |
+| `fjs/server/fjs_run/snapshot` | 40 | 5 |
+| `fjs/report/amend` | 19 | 13 |
+| `demo/steps` | 19 | 0 (not proof-covered) |
+| `fjs/server` | 16 | 3 |
+| `fjs/server/finance_documents_list` | 10 | 8 |
+| `fjs/guest/materialize` | 10 | 4 |
+| `fjs/guest/check` | 9 | 3 |
+| `fjs/report/payer` / `tax_return` / `provenance` | 8 | 23 |
+| `fjs/server/response`, `fjs/index.f.js` | 2 | 2 |
+
+**The decision: this project's OWN fallible helpers still carry their `Result` in the PAYLOAD.**
+`readRunRecord`, `readResultRecord`, `materializeProgram`, `loadProgram` are all declared
+`Effect<O, Result<T, string>, …>` — the pre-0.46.0 spelling, because there was no channel to put
+it in. Every remaining cluster above is downstream of that one choice, and it is a design
+decision rather than a mechanical edit:
+
+- **Move them to the channel** (`Effect<O, T, string>`). Then `resultMapStep` is the natural
+  combinator at the definition, every caller's hand-written `if (r[0] === 'error')` disappears
+  into a plain `step`, and short-circuiting is the layer's job rather than each call site's. This
+  is what the error channel is FOR, and it is what upstream did to `collectRead`.
+- **Keep the payload spelling.** Cheaper per file, but it leaves two conventions in one codebase
+  and every caller keeps discharging by hand — which is exactly the shape that hid the BigInt bug.
+
+The first is right, and it should be taken deliberately in one pass per helper rather than
+drifted into: changing a helper's channel changes its callers' types, so a half-converted spine
+type-checks in neither spelling.
+
+Two smaller items, both recorded rather than done:
+
+- **`foldStep`/`forEachStep` now short-circuit on the first `error`;** the Result-blind ones ran
+  every item. `snapshot` folds over revisions and has a proof
+  (`subjectUndecodableHead`) that depends on skipping an undecodable one. If that fold's items
+  become fallible, the skip must be written as a per-item `catchStep`, not recovered by reverting.
+- **`fjs/exec`'s `unsafeDo` is still `/** @type {any} *\/ (do_)`** — pre-existing, confined to the
+  test-fixture section, and the only `any` under `fjs/`. It exists to build a `Do` node whose
+  command string bypassed `tsc`, which is the exact thing `interpret` is the backstop for. Left
+  as found; removing it needs `interpret`'s signature to admit an effect whose op-set is WIDER
+  than its map's, which is true and currently unsayable.
