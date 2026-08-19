@@ -6,19 +6,19 @@
  * delivered upstream in fjs 0.41.0's `match`/`at` and is not reimplemented
  * here — this module only catches `match`'s bare-string refusal throw and
  * reports it with the permitted set. The module imports only
- * `functionalscript/fjs/effects/module.f.js`,
- * `functionalscript/fjs/types/result/module.f.js`, and
- * `functionalscript/fjs/asserts/module.f.js` (no CAS, no Evo, no MCP, no
+ * `functionalscript/fjs/effects/module.f.mjs`,
+ * `functionalscript/fjs/types/result/module.f.mjs`, and
+ * `functionalscript/fjs/asserts/module.f.mjs` (no CAS, no Evo, no MCP, no
  * filesystem).
  *
  * @module
  */
-import { match, do_, pure, step } from 'functionalscript/fjs/effects/module.f.js'
-import { ok, error } from 'functionalscript/fjs/types/result/module.f.js'
-import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
+import { match, do_, pure, step } from 'functionalscript/fjs/effects/module.f.mjs'
+import { ok, error } from 'functionalscript/fjs/types/result/module.f.mjs'
+import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
 
-/** @import { Effect, Operation, OperationMap, Return } from 'functionalscript/fjs/effects/module.f.js' */
-/** @import { Result } from 'functionalscript/fjs/types/result/module.f.js' */
+/** @import { Effect, Operation, OperationMap, Return } from 'functionalscript/fjs/effects/module.f.mjs' */
+/** @import { Result } from 'functionalscript/fjs/types/result/module.f.mjs' */
 
 // ── Test fixtures ───────────────────────────────────────────────────────────────
 

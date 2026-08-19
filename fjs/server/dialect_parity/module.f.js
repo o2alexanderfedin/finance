@@ -74,7 +74,7 @@
  *
  * @module
  */
-import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
+import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { financeDialects } from '../../media/dialects/module.f.js'
 import { knownDialects } from '../finance_schema/module.f.js'
 

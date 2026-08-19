@@ -59,11 +59,11 @@
  *
  * @module
  */
-import { assert, assertEq, assertNotNullish } from 'functionalscript/fjs/asserts/module.f.js'
+import { assert, assertEq, assertNotNullish } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { guestCtx } from '../../guest/module.f.js'
 import { interpret } from '../../exec/module.f.js'
 
-/** @import { OperationMap } from 'functionalscript/fjs/effects/module.f.js' */
+/** @import { OperationMap } from 'functionalscript/fjs/effects/module.f.mjs' */
 /** @import { CasOp, Report } from '../../guest/module.f.js' */
 
 /**
@@ -226,7 +226,7 @@ export const payerReportSource = [
  */
 export const payerReport = ctx => () => ctx.step(ctx.evoList('false'), activeJson => {
     /**
-     * @type {(subjects: readonly string[]) => (byPayer: ByPayer) => import('functionalscript/fjs/effects/module.f.js').Effect<CasOp, ByPayer>}
+     * @type {(subjects: readonly string[]) => (byPayer: ByPayer) => import('functionalscript/fjs/effects/module.f.mjs').Effect<CasOp, ByPayer>}
      */
     const walk = subjects => byPayer => {
         const subject = subjects[0]

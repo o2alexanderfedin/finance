@@ -46,7 +46,7 @@ facilitate Emergent Design sessions
 - Import types with `@import { Name } from '...'` (a top-level JSDoc comment), not inline `@type {import('...').Name}`. Example:
 
   ```js
-  /** @import { NodeProgram } from 'functionalscript/fjs/effects/node/module.f.js' */
+  /** @import { NodeProgram } from 'functionalscript/fjs/effects/node/module.f.mjs' */
 
   /** @type {NodeProgram} */
   export const main = () => /* ... */;
@@ -56,7 +56,7 @@ facilitate Emergent Design sessions
 
 - Any `.f.js` module may export a `proof` object: a tree of zero-argument functions (nested via plain objects/arrays). A leaf passes if it doesn't throw; leaves nested under a `throw` key must throw to pass.
 - `all.test.js` (root) registers every discovered `proof` with Node's test runner, so `node --test` (and thus `npm test`) picks it up automatically via Node's default `*.test.js` convention — no manual test registration or explicit path needed.
-- Add tests by adding/extending a `proof` export in the relevant `.f.js` file (see `node_modules/functionalscript/fjs/dev/proof.f.js` or `.../emergent_testing/example.f.js` for the pattern).
+- Add tests by adding/extending a `proof` export in the relevant `.f.js` file (see `node_modules/functionalscript/fjs/dev/proof.f.mjs` or `.../emergent_testing/example.f.mjs` for the pattern).
 - **Only run proofs through root discovery — `npm test`, or `node --test all.test.js`.** Emergent Testing registration happens when `all.test.js` is imported; it walks the project via `loadModuleMap` and registers every discovered `proof`. Any invocation that bypasses that reports a *fake pass*, not a failure, which is the dangerous direction:
   - `node --test fjs` — errors with `Cannot find module`, because there is no `fjs/index.js` (the entry point is `fjs/index.f.js`). A hard failure is the safe direction; this bullet described a fake pass that the layout no longer permits.
   - `node --test fjs/some/module.f.js` — targeting a source file by explicit path is **also** a fake pass. Node executes it as a plain script; no `proof` leaf runs. Verified by injecting a leaf that throws unconditionally: `npm test` reported `tests 8, pass 7, fail 1`, while `node --test fjs/server/module.f.js` reported `tests 1, pass 1, fail 0` on the identical file.
@@ -257,6 +257,32 @@ node -p "require('./package-lock.json').packages['node_modules/functionalscript'
 cheapest place to catch it. Note also that the vendored-proof total differs between checkouts for
 the same reason (2717 in one, 494 in another, both correct) — a second reason the project-local
 `grep -c` count is the only comparable number.
+
+### A worktree nested inside the checkout makes `tsc` typecheck the PARENT's dependency
+
+Worse than drift, because it reports **zero errors** rather than sixteen. Worktrees live at
+`<repo>/.claude/worktrees/agent-*/`, i.e. *inside* the parent checkout. TypeScript resolves a bare
+specifier by walking every ancestor `node_modules` in a first pass that prefers TypeScript and
+Declaration extensions. FunctionalScript 0.46.0 ships only `.d.mts`, so a legacy
+`functionalscript/**.f.js` specifier finds no `.d.ts` in the worktree's own `node_modules`, keeps
+walking up, and binds to `<repo>/node_modules/functionalscript` — a different, older version.
+
+Measured 2026-08-18 during the 0.46.0 migration: `npx tsc --noEmit` in the worktree reported **0
+errors** against 0.46.0-with-old-specifiers, a state whose true count is **1526**. `--traceResolution`
+names the culprit in one line (`... was successfully resolved to <repo>/node_modules/... @0.43.1`).
+Node's own runtime resolution is *not* affected — it takes the nearest `node_modules` — so only the
+typecheck lies, and it lies green.
+
+Measure from outside the parent checkout, which has no ancestor `node_modules` to find:
+
+```sh
+rsync -a --delete --exclude .git --exclude .planning "$PWD/" /tmp/measure/
+( cd /tmp/measure && npx tsc --noEmit ) | grep -cE 'error TS'
+```
+
+Sanity-check any surprisingly clean `tsc` with
+`npx tsc --noEmit --traceResolution | grep -c "$PWD/node_modules"` — a zero there means nothing
+resolved to your own dependencies.
 
 ### The mutation that deletes the last use of a binding does not compile
 

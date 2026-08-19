@@ -123,7 +123,7 @@
  *
  * @module
  */
-import { assertEq, assert } from 'functionalscript/fjs/asserts/module.f.js'
+import { assertEq, assert } from 'functionalscript/fjs/asserts/module.f.mjs'
 
 /** @import { Read } from '../../exec/module.f.js' */
 

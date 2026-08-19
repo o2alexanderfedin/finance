@@ -41,12 +41,12 @@
  *
  * @module
  */
-import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
+import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { centsFromString } from '../../exact/module.f.js'
 import { taxParamsByYear } from '../params/module.f.js'
 
 /** @import { IndividualFilingStatus, TaxParamSet } from '../params/module.f.js' */
-/** @import { StringMap } from 'functionalscript/fjs/types/object/module.f.js' */
+/** @import { StringMap } from 'functionalscript/fjs/types/object/module.f.mjs' */
 
 /**
  * Which of `fjs/tax/params`' two aged/blind additional amounts a filing

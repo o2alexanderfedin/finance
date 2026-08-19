@@ -47,7 +47,7 @@
  *
  * @module
  */
-import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
+import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { parse, tryParse, format } from '../../types/decimal/module.f.js'
 import { maxSafeCents } from '../money_field/module.f.js'
 

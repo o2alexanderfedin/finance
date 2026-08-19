@@ -1,6 +1,6 @@
 /**
  * The `finance` MCP server: our own composition root, mirroring fjs's own
- * `casMcpServer` (`functionalscript/fjs/mcp/module.f.js`) but with our own
+ * `casMcpServer` (`functionalscript/fjs/mcp/module.f.mjs`) but with our own
  * identity and store path.
  *
  * ## Why our own `McpConfig`, not `casConfig`
@@ -16,7 +16,7 @@
  * `mcpStep`'s `initialize` handler validates the client's params and then
  * unconditionally returns the configured `protocolVersion` — it does not
  * negotiate against, or even inspect, what the client asked for
- * (`functionalscript/fjs/protocol/mcp/module.f.js`). Whatever string we pin
+ * (`functionalscript/fjs/protocol/mcp/module.f.mjs`). Whatever string we pin
  * here is what every client is told, regardless of its own request. That gap
  * belongs in fjs's `initialize` handler (a generic protocol capability, not
  * app-specific glue — see AGENTS.md), and is recorded in
@@ -51,27 +51,27 @@
  *
  * @module
  */
-import { mapStep, pure, step, foldStep } from 'functionalscript/fjs/effects/module.f.js'
-import { create, write } from 'functionalscript/fjs/effects/memory/module.f.js'
-import { stdioTransport } from 'functionalscript/fjs/protocol/mcp/stdio/module.f.js'
-import { mcpStep, uninitializedState, fromRegistry, toolEntry, okResult, errorResult } from 'functionalscript/fjs/protocol/mcp/module.f.js'
-import { fileCas } from 'functionalscript/fjs/cas/module.f.js'
-import { initEvo, evo, buildCache } from 'functionalscript/fjs/cas/evo/module.f.js'
-import { sha256 } from 'functionalscript/fjs/crypto/sha2/module.f.js'
-import { casToolRegistry } from 'functionalscript/fjs/mcp/cas/module.f.js'
-import { evoToolRegistry } from 'functionalscript/fjs/mcp/evo/module.f.js'
-import { emptyState, virtual } from 'functionalscript/fjs/effects/node/virtual/module.f.js'
-import { fromVec } from 'functionalscript/fjs/types/uint8array/module.f.js'
-import { utf8 } from 'functionalscript/fjs/text/module.f.js'
-import { array, option, string } from 'functionalscript/fjs/types/rtti/module.f.js'
-import { validate as rttiValidate } from 'functionalscript/fjs/types/rtti/validate/module.f.js'
-import { assert, assertEq, assertNotNullish } from 'functionalscript/fjs/asserts/module.f.js'
-import { dialect as revisionDialect } from 'functionalscript/fjs/media/revision/module.f.js'
-import { cBase32ToVec, vecToCBase32 } from 'functionalscript/fjs/basen/cbase32/module.f.js'
-import { vec8 } from 'functionalscript/fjs/types/bit_vec/module.f.js'
-import { ok } from 'functionalscript/fjs/types/result/module.f.js'
-import { tryUtf8, utf8ToString } from 'functionalscript/fjs/text/module.f.js'
-import { collectRead } from 'functionalscript/fjs/cas/module.f.js'
+import { mapStep, pure, step, foldStep } from 'functionalscript/fjs/effects/module.f.mjs'
+import { create, write } from 'functionalscript/fjs/effects/memory/module.f.mjs'
+import { stdioTransport } from 'functionalscript/fjs/protocol/mcp/stdio/module.f.mjs'
+import { mcpStep, uninitializedState, fromRegistry, toolEntry, okResult, errorResult } from 'functionalscript/fjs/protocol/mcp/module.f.mjs'
+import { fileCas } from 'functionalscript/fjs/cas/module.f.mjs'
+import { initEvo, evo, buildCache } from 'functionalscript/fjs/cas/evo/module.f.mjs'
+import { sha256 } from 'functionalscript/fjs/crypto/sha2/module.f.mjs'
+import { casToolRegistry } from 'functionalscript/fjs/mcp/cas/module.f.mjs'
+import { evoToolRegistry } from 'functionalscript/fjs/mcp/evo/module.f.mjs'
+import { emptyState, virtual } from 'functionalscript/fjs/effects/node/virtual/module.f.mjs'
+import { fromVec } from 'functionalscript/fjs/types/uint8array/module.f.mjs'
+import { utf8 } from 'functionalscript/fjs/text/module.f.mjs'
+import { array, option, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
+import { validate as rttiValidate } from 'functionalscript/fjs/types/rtti/validate/module.f.mjs'
+import { assert, assertEq, assertNotNullish } from 'functionalscript/fjs/asserts/module.f.mjs'
+import { dialect as revisionDialect } from 'functionalscript/fjs/media/revision/module.f.mjs'
+import { cBase32ToVec, vecToCBase32 } from 'functionalscript/fjs/basen/cbase32/module.f.mjs'
+import { vec8 } from 'functionalscript/fjs/types/bit_vec/module.f.mjs'
+import { ok } from 'functionalscript/fjs/types/result/module.f.mjs'
+import { tryUtf8, utf8ToString } from 'functionalscript/fjs/text/module.f.mjs'
+import { collectRead } from 'functionalscript/fjs/cas/module.f.mjs'
 import { financeSchemaTool } from './finance_schema/module.f.js'
 import { financeTaxParamsTool } from './finance_tax_params/module.f.js'
 import { financeDocumentsListTool } from './finance_documents_list/module.f.js'
@@ -83,21 +83,21 @@ import { programPath, materializeHome } from '../guest/materialize/module.f.js'
 import { validate as validateRun } from '../run/module.f.js'
 import { dialect as oneZeroNineNineIntDialect, validate as validateOneZeroNineNineInt } from '../document/1099int/module.f.js'
 import { parse as jsonParse, stringify as jsonText } from '../json/module.f.js'
-import { unwrap } from 'functionalscript/fjs/types/result/module.f.js'
+import { unwrap } from 'functionalscript/fjs/types/result/module.f.mjs'
 
-/** @import { McpConfig, McpHandlers, ToolEntry } from 'functionalscript/fjs/protocol/mcp/module.f.js' */
-/** @import { Effect, Operation } from 'functionalscript/fjs/effects/module.f.js' */
-/** @import { MemOp, Key } from 'functionalscript/fjs/effects/memory/module.f.js' */
-/** @import { Read, Write, Mkdir, WriteFile, Import } from 'functionalscript/fjs/effects/node/module.f.js' */
-/** @import { FileCasOperation } from 'functionalscript/fjs/cas/module.f.js' */
-/** @import { Cache } from 'functionalscript/fjs/cas/evo/module.f.js' */
-/** @import { Cas } from 'functionalscript/fjs/cas/module.f.js' */
-/** @import { Unknown } from 'functionalscript/fjs/media/json/module.f.js' */
-/** @import { Result } from 'functionalscript/fjs/types/result/module.f.js' */
-/** @import { ValidationError } from 'functionalscript/fjs/types/rtti/validate/module.f.js' */
-/** @import { Vec } from 'functionalscript/fjs/types/bit_vec/module.f.js' */
+/** @import { McpConfig, McpHandlers, ToolEntry } from 'functionalscript/fjs/protocol/mcp/module.f.mjs' */
+/** @import { Effect, Operation } from 'functionalscript/fjs/effects/module.f.mjs' */
+/** @import { MemOp, Key } from 'functionalscript/fjs/effects/memory/module.f.mjs' */
+/** @import { Read, Write, Mkdir, WriteFile, Import } from 'functionalscript/fjs/effects/node/module.f.mjs' */
+/** @import { FileCasOperation } from 'functionalscript/fjs/cas/module.f.mjs' */
+/** @import { Cache } from 'functionalscript/fjs/cas/evo/module.f.mjs' */
+/** @import { Cas } from 'functionalscript/fjs/cas/module.f.mjs' */
+/** @import { Unknown } from 'functionalscript/fjs/media/json/module.f.mjs' */
+/** @import { Result } from 'functionalscript/fjs/types/result/module.f.mjs' */
+/** @import { ValidationError } from 'functionalscript/fjs/types/rtti/validate/module.f.mjs' */
+/** @import { Vec } from 'functionalscript/fjs/types/bit_vec/module.f.mjs' */
 /** @import { Report, CasOp } from '../guest/module.f.js' */
-/** @import { State } from 'functionalscript/fjs/effects/node/virtual/module.f.js' */
+/** @import { State } from 'functionalscript/fjs/effects/node/virtual/module.f.mjs' */
 
 // ── cas_refresh (DOC-14) ────────────────────────────────────────────────────────
 /**
@@ -560,7 +560,7 @@ export const proof = {
     },
     // DOC-14 (Success Criterion 5's mechanism, proven in-process): a
     // `vnd.fjs.revision` blob seeded directly into the store — bypassing
-    // `evo.add`, exactly as `node_modules/functionalscript/fjs/cas/evo/proof.f.js`'s
+    // `evo.add`, exactly as `node_modules/functionalscript/fjs/cas/evo/proof.f.mjs`'s
     // `buildCacheIncludesScannedRevision` leaf does — simulates content
     // written by another process. The cache built once at `initEvo` time,
     // strictly before the seed write below, cannot know about it, so
@@ -584,7 +584,7 @@ export const proof = {
             // A single-chunk `List<never, IoResult<Vec>>`, built directly via
             // `pure` rather than `fjs/effects/list`'s `nonEmpty`/`empty`: those
             // are declared `<O extends Operation, T>`, and calling them with no
-            // usable inference context (as `node_modules/functionalscript/fjs/cas/evo/proof.f.js`
+            // usable inference context (as `node_modules/functionalscript/fjs/cas/evo/proof.f.mjs`
             // does — a file this project's `tsconfig.json` excludes from
             // checking) widens `O` to the bare `Operation` constraint here,
             // which then fails to unify with `virtual`'s `NodeOp`. `pure`

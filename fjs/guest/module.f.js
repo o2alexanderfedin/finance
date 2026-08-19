@@ -38,14 +38,14 @@
  *
  * @module
  */
-import { do_, step, pure } from 'functionalscript/fjs/effects/module.f.js'
-import { assert, assertEq, assertNotNullish } from 'functionalscript/fjs/asserts/module.f.js'
+import { do_, step, pure } from 'functionalscript/fjs/effects/module.f.mjs'
+import { assert, assertEq, assertNotNullish } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { interpret } from '../exec/module.f.js'
 import { centsFromString, centsToString } from '../exact/module.f.js'
 
-/** @import { Effect, OperationMap } from 'functionalscript/fjs/effects/module.f.js' */
-/** @import { Assert } from 'functionalscript/fjs/asserts/module.f.js' */
-/** @import { Equal } from 'functionalscript/fjs/types/ts/module.f.js' */
+/** @import { Effect, OperationMap } from 'functionalscript/fjs/effects/module.f.mjs' */
+/** @import { Assert } from 'functionalscript/fjs/asserts/module.f.mjs' */
+/** @import { Equal } from 'functionalscript/fjs/types/ts/module.f.mjs' */
 
 // ── The frozen vocabulary ────────────────────────────────────────────────────
 
@@ -110,7 +110,7 @@ const evoRevision = do_('evoRevision')
  * `centsFromString`/`centsToString` (money helpers) are added here to
  * deliver the rest of that sentence. This is a widening of `ctx`, **not** of
  * the operation vocabulary: `step` and `pure` are re-exported directly from
- * `functionalscript/fjs/effects/module.f.js` and are pure data composition —
+ * `functionalscript/fjs/effects/module.f.mjs` and are pure data composition —
  * they build an `Effect` value, they never themselves become a `command`,
  * and they never reach `match`. `CasOp` (four commands) and `casOpNames`
  * are untouched below; `proof.vocabularyIsFrozenAtFour` and

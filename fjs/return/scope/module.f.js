@@ -436,11 +436,11 @@
  *
  * @module
  */
-import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
+import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { kindVocabulary } from '../profile/module.f.js'
 
-/** @import { Assert } from 'functionalscript/fjs/asserts/module.f.js' */
-/** @import { Equal } from 'functionalscript/fjs/types/ts/module.f.js' */
+/** @import { Assert } from 'functionalscript/fjs/asserts/module.f.mjs' */
+/** @import { Equal } from 'functionalscript/fjs/types/ts/module.f.mjs' */
 /** @import { Kind } from '../profile/module.f.js' */
 
 // ── The frozen modeled set ───────────────────────────────────────────────────

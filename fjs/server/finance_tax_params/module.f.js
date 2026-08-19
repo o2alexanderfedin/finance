@@ -47,18 +47,18 @@
  *
  * @module
  */
-import { number } from 'functionalscript/fjs/types/rtti/module.f.js'
-import { pure, runPure } from 'functionalscript/fjs/effects/module.f.js'
-import { toolEntry, okResult, errorResult } from 'functionalscript/fjs/protocol/mcp/module.f.js'
-import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
+import { number } from 'functionalscript/fjs/types/rtti/module.f.mjs'
+import { pure, runPure } from 'functionalscript/fjs/effects/module.f.mjs'
+import { toolEntry, okResult, errorResult } from 'functionalscript/fjs/protocol/mcp/module.f.mjs'
+import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { taxParamsByYear } from '../../tax/params/module.f.js'
 import { taxTableBandStructure } from '../../tax/table/module.f.js'
 import { stringify as jsonText } from '../../json/module.f.js'
 
-/** @import { ToolEntry, ToolsCallResult } from 'functionalscript/fjs/protocol/mcp/module.f.js' */
+/** @import { ToolEntry, ToolsCallResult } from 'functionalscript/fjs/protocol/mcp/module.f.mjs' */
 /** @import { TaxParamSet } from '../../tax/params/module.f.js' */
 /** @import { BandRegion } from '../../tax/table/module.f.js' */
-/** @import { StringMap } from 'functionalscript/fjs/types/object/module.f.js' */
+/** @import { StringMap } from 'functionalscript/fjs/types/object/module.f.mjs' */
 
 /**
  * The shape `finance_tax_params` actually returns: every Plan 08-01

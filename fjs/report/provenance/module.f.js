@@ -38,15 +38,15 @@
  *
  * @module
  */
-import { tryUtf8 } from 'functionalscript/fjs/text/module.f.js'
-import { computeSync, sha256 } from 'functionalscript/fjs/crypto/sha2/module.f.js'
-import { cBase32ToVec, vecToCBase32 } from 'functionalscript/fjs/basen/cbase32/module.f.js'
-import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
+import { tryUtf8 } from 'functionalscript/fjs/text/module.f.mjs'
+import { computeSync, sha256 } from 'functionalscript/fjs/crypto/sha2/module.f.mjs'
+import { cBase32ToVec, vecToCBase32 } from 'functionalscript/fjs/basen/cbase32/module.f.mjs'
+import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { stringify as jsonText } from '../../json/module.f.js'
-import { fileCas } from 'functionalscript/fjs/cas/module.f.js'
-import { pure } from 'functionalscript/fjs/effects/module.f.js'
-import { emptyState, virtual } from 'functionalscript/fjs/effects/node/virtual/module.f.js'
-import { ok } from 'functionalscript/fjs/types/result/module.f.js'
+import { fileCas } from 'functionalscript/fjs/cas/module.f.mjs'
+import { pure } from 'functionalscript/fjs/effects/module.f.mjs'
+import { emptyState, virtual } from 'functionalscript/fjs/effects/node/virtual/module.f.mjs'
+import { ok } from 'functionalscript/fjs/types/result/module.f.mjs'
 import { dialect as runDialect } from '../../run/module.f.js'
 
 /** @import { TaxParamSet } from '../../tax/params/module.f.js' */

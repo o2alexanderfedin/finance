@@ -19,7 +19,7 @@ import {
 } from '../lib/engine.js'
 
 /** @import { Step } from '../demo.js' */
-/** @import { Effect, OperationMap } from 'functionalscript/fjs/effects/module.f.js' */
+/** @import { Effect, OperationMap } from 'functionalscript/fjs/effects/module.f.mjs' */
 
 // ── The operation types this panel runs against ──────────────────────────────
 //

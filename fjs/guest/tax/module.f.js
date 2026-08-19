@@ -69,13 +69,13 @@
  *
  * @module
  */
-import { assert, assertEq, assertNotNullish } from 'functionalscript/fjs/asserts/module.f.js'
+import { assert, assertEq, assertNotNullish } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { guestCtx, casOpNames } from '../module.f.js'
 import { form1040Report } from '../../form1040/core/module.f.js'
 import { taxParamsByYear } from '../../tax/params/module.f.js'
 import { dialect as returnProfileDialect } from '../../return/profile/module.f.js'
 
-/** @import { Effect } from 'functionalscript/fjs/effects/module.f.js' */
+/** @import { Effect } from 'functionalscript/fjs/effects/module.f.mjs' */
 /** @import { CasOp } from '../module.f.js' */
 /** @import { TaxParamSet } from '../../tax/params/module.f.js' */
 /** @import { Form1040Inputs } from '../../form1040/core/module.f.js' */

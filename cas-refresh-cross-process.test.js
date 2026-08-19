@@ -87,7 +87,7 @@ const fjsCliPath = join(repoRoot, 'node_modules', 'functionalscript', 'fjs', 'mo
  * `home` — a genuinely separate OS process, awaited here (it does not need
  * to overlap with the server) but otherwise the same real `spawn` this file
  * uses for the server itself. Verified end-to-end against this repo:
- * `os.homedir()` (`node_modules/functionalscript/fjs/effects/node/module.js:279`)
+ * `os.homedir()` (`node_modules/functionalscript/fjs/effects/node/module.mjs:279`)
  * reads the `HOME` environment variable on POSIX, so this is the same store
  * the real server below is pointed at via its own `<home>` CLI argument
  * (`fjs/index.f.js`'s `options.args[0]`).

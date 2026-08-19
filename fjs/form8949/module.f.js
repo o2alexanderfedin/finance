@@ -199,7 +199,7 @@
  *
  * @module
  */
-import { assert, assertEq, assertNotNullish } from 'functionalscript/fjs/asserts/module.f.js'
+import { assert, assertEq, assertNotNullish } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { centsFromString } from '../exact/module.f.js'
 
 /** @import { OneZeroNineNineB } from '../document/1099b/module.f.js' */

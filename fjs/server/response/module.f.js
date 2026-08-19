@@ -5,7 +5,7 @@
  *
  * ## Two thresholds, not one, and why
  *
- * `functionalscript/fjs/protocol/mcp/stdio/module.f.js`'s `writeResponse`
+ * `functionalscript/fjs/protocol/mcp/stdio/module.f.mjs`'s `writeResponse`
  * enforces exactly one limit: `fjs/types/bigint`'s `maxLength` (`0x100000n`
  * bits = 131,072 bytes = 128 KiB), the size of one encoded JSON-RPC line.
  * Overflowing it is not reported to the caller as a size problem — it
@@ -60,23 +60,23 @@
  *
  * @module
  */
-import { tryUtf8, utf8, utf8ToString } from 'functionalscript/fjs/text/module.f.js'
-import { length as bitLength, maxLengthBytes, msb, u8List, u8ListToVec } from 'functionalscript/fjs/types/bit_vec/module.f.js'
-import { take } from 'functionalscript/fjs/types/list/module.f.js'
-import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
-import { fromVec } from 'functionalscript/fjs/types/uint8array/module.f.js'
-import { pure } from 'functionalscript/fjs/effects/module.f.js'
-import { create } from 'functionalscript/fjs/effects/memory/module.f.js'
-import { emptyState, virtual } from 'functionalscript/fjs/effects/node/virtual/module.f.js'
-import { fromRegistry, mcpStep, okResult, toolEntry, uninitializedState } from 'functionalscript/fjs/protocol/mcp/module.f.js'
-import { stdioTransport } from 'functionalscript/fjs/protocol/mcp/stdio/module.f.js'
-import { internalError, jsonrpc } from 'functionalscript/fjs/protocol/json_rpc/module.f.js'
+import { tryUtf8, utf8, utf8ToString } from 'functionalscript/fjs/text/module.f.mjs'
+import { length as bitLength, maxLengthBytes, msb, u8List, u8ListToVec } from 'functionalscript/fjs/types/bit_vec/module.f.mjs'
+import { take } from 'functionalscript/fjs/types/list/module.f.mjs'
+import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
+import { fromVec } from 'functionalscript/fjs/types/uint8array/module.f.mjs'
+import { pure } from 'functionalscript/fjs/effects/module.f.mjs'
+import { create } from 'functionalscript/fjs/effects/memory/module.f.mjs'
+import { emptyState, virtual } from 'functionalscript/fjs/effects/node/virtual/module.f.mjs'
+import { fromRegistry, mcpStep, okResult, toolEntry, uninitializedState } from 'functionalscript/fjs/protocol/mcp/module.f.mjs'
+import { stdioTransport } from 'functionalscript/fjs/protocol/mcp/stdio/module.f.mjs'
+import { internalError, jsonrpc } from 'functionalscript/fjs/protocol/json_rpc/module.f.mjs'
 import { parse as jsonParse } from '../../json/module.f.js'
-import { unwrap } from 'functionalscript/fjs/types/result/module.f.js'
+import { unwrap } from 'functionalscript/fjs/types/result/module.f.mjs'
 
-/** @import { Vec } from 'functionalscript/fjs/types/bit_vec/module.f.js' */
-/** @import { McpConfig, ToolEntry } from 'functionalscript/fjs/protocol/mcp/module.f.js' */
-/** @import { State } from 'functionalscript/fjs/effects/node/virtual/module.f.js' */
+/** @import { Vec } from 'functionalscript/fjs/types/bit_vec/module.f.mjs' */
+/** @import { McpConfig, ToolEntry } from 'functionalscript/fjs/protocol/mcp/module.f.mjs' */
+/** @import { State } from 'functionalscript/fjs/effects/node/virtual/module.f.mjs' */
 
 /**
  * The inline-preview threshold (8 KiB, in bytes): a result whose UTF-8

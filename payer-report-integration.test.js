@@ -50,7 +50,7 @@ import { fileURLToPath } from 'node:url'
 import { centsFromString, centsToString } from './fjs/exact/module.f.js'
 import { dialect as oneZeroNineNineIntDialect, validate as validateOneZeroNineNineInt } from './fjs/document/1099int/module.f.js'
 import { dialect as oneZeroNineNineDivDialect, validate as validateOneZeroNineNineDiv } from './fjs/document/1099div/module.f.js'
-import { dialect as revisionDialect } from 'functionalscript/fjs/media/revision/module.f.js'
+import { dialect as revisionDialect } from 'functionalscript/fjs/media/revision/module.f.mjs'
 import { payerReportSource } from './fjs/report/payer/module.f.js'
 
 const repoRoot = fileURLToPath(new URL('.', import.meta.url))

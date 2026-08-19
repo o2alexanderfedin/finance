@@ -26,7 +26,7 @@ import { store } from './engine.js'
 /** @import { W2 } from '../../fjs/document/w2/module.f.js' */
 /** @import { OneZeroNineNineInt } from '../../fjs/document/1099int/module.f.js' */
 /** @import { ReturnProfile } from '../../fjs/return/profile/module.f.js' */
-/** @import { Unknown } from 'functionalscript/fjs/media/json/module.f.js' */
+/** @import { Unknown } from 'functionalscript/fjs/media/json/module.f.mjs' */
 
 /** The household. Names are fictional; TINs are IRS-reserved test ranges.
  * @type {ReturnProfile}

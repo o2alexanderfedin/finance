@@ -31,7 +31,7 @@
  *
  * @module
  */
-import { assertEq } from 'functionalscript/fjs/asserts/module.f.js'
+import { assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
 
 /**
  * Returns `{ dialect }`, with `dialect`'s literal string type preserved in

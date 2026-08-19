@@ -37,7 +37,7 @@
  *   `fjs/effects/node/virtual`'s `writeFile` stores a file as an array of
  *   `Vec` chunks, while `import_` requires the entry at its path to be a
  *   `JsModule` (a plain function) — verified by reading
- *   `node_modules/functionalscript/fjs/effects/node/virtual/module.f.js`
+ *   `node_modules/functionalscript/fjs/effects/node/virtual/module.f.mjs`
  *   directly. `virtual` has no JS parser and cannot execute freshly-written
  *   bytes as a module, so write-then-import cannot be composed in one
  *   virtual session; this module's own proof therefore verifies the write
@@ -56,18 +56,18 @@
  *
  * @module
  */
-import { step, pure } from 'functionalscript/fjs/effects/module.f.js'
-import { import_, mkdir, writeUtf8File, readUtf8File } from 'functionalscript/fjs/effects/node/module.f.js'
-import { error, ok } from 'functionalscript/fjs/types/result/module.f.js'
-import { join } from 'functionalscript/fjs/path/module.f.js'
-import { emptyState, virtual } from 'functionalscript/fjs/effects/node/virtual/module.f.js'
-import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
+import { step, pure } from 'functionalscript/fjs/effects/module.f.mjs'
+import { import_, mkdir, writeUtf8File, readUtf8File } from 'functionalscript/fjs/effects/node/module.f.mjs'
+import { error, ok } from 'functionalscript/fjs/types/result/module.f.mjs'
+import { join } from 'functionalscript/fjs/path/module.f.mjs'
+import { emptyState, virtual } from 'functionalscript/fjs/effects/node/virtual/module.f.mjs'
+import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { guestCtx } from '../module.f.js'
 import { interpret } from '../../exec/module.f.js'
 
-/** @import { Effect, OperationMap } from 'functionalscript/fjs/effects/module.f.js' */
-/** @import { Import, Module, Mkdir, WriteFile } from 'functionalscript/fjs/effects/node/module.f.js' */
-/** @import { Result } from 'functionalscript/fjs/types/result/module.f.js' */
+/** @import { Effect, OperationMap } from 'functionalscript/fjs/effects/module.f.mjs' */
+/** @import { Import, Module, Mkdir, WriteFile } from 'functionalscript/fjs/effects/node/module.f.mjs' */
+/** @import { Result } from 'functionalscript/fjs/types/result/module.f.mjs' */
 /** @import { CasOp, Report } from '../module.f.js' */
 
 // ── SEC-02: the specifier allow-list ─────────────────────────────────────────

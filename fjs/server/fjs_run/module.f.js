@@ -34,7 +34,7 @@
  *    revision passed the bare hash-derived filename here instead, which
  *    real Node's `import_` effect resolves against `process.cwd()`, not
  *    `materializeHomeRoot` — see
- *    `node_modules/functionalscript/fjs/effects/node/module.js`'s
+ *    `node_modules/functionalscript/fjs/effects/node/module.mjs`'s
  *    `asyncImport`. Every proof below existed at the time and none caught
  *    it, because each one placed its `JsModule` fixture at that SAME bare
  *    name — see `fjs/todo/upstream-node-spawn-effect.md`-adjacent 07-10 fix
@@ -115,20 +115,20 @@
  *
  * @module
  */
-import { step, pure, mapStep, do_ } from 'functionalscript/fjs/effects/module.f.js'
-import { collectRead, fileCas } from 'functionalscript/fjs/cas/module.f.js'
-import { cBase32ToVec, vecToCBase32 } from 'functionalscript/fjs/basen/cbase32/module.f.js'
-import { utf8ToString, tryUtf8 } from 'functionalscript/fjs/text/module.f.js'
-import { ok } from 'functionalscript/fjs/types/result/module.f.js'
-import { option, array, number, string } from 'functionalscript/fjs/types/rtti/module.f.js'
-import { toolEntry, okResult, errorResult } from 'functionalscript/fjs/protocol/mcp/module.f.js'
-import { sha256 } from 'functionalscript/fjs/crypto/sha2/module.f.js'
-import { initEvo, evo } from 'functionalscript/fjs/cas/evo/module.f.js'
-import { emptyState, virtual } from 'functionalscript/fjs/effects/node/virtual/module.f.js'
-import { assert, assertEq, assertNotNullish } from 'functionalscript/fjs/asserts/module.f.js'
-import { validate as rttiValidate } from 'functionalscript/fjs/types/rtti/validate/module.f.js'
-import { unknown as jsonUnknown, stringify as jsonStringify } from 'functionalscript/fjs/media/json/module.f.js'
-import { identity } from 'functionalscript/fjs/types/function/module.f.js'
+import { step, pure, mapStep, do_ } from 'functionalscript/fjs/effects/module.f.mjs'
+import { collectRead, fileCas } from 'functionalscript/fjs/cas/module.f.mjs'
+import { cBase32ToVec, vecToCBase32 } from 'functionalscript/fjs/basen/cbase32/module.f.mjs'
+import { utf8ToString, tryUtf8 } from 'functionalscript/fjs/text/module.f.mjs'
+import { ok } from 'functionalscript/fjs/types/result/module.f.mjs'
+import { option, array, number, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
+import { toolEntry, okResult, errorResult } from 'functionalscript/fjs/protocol/mcp/module.f.mjs'
+import { sha256 } from 'functionalscript/fjs/crypto/sha2/module.f.mjs'
+import { initEvo, evo } from 'functionalscript/fjs/cas/evo/module.f.mjs'
+import { emptyState, virtual } from 'functionalscript/fjs/effects/node/virtual/module.f.mjs'
+import { assert, assertEq, assertNotNullish } from 'functionalscript/fjs/asserts/module.f.mjs'
+import { validate as rttiValidate } from 'functionalscript/fjs/types/rtti/validate/module.f.mjs'
+import { unknown as jsonUnknown, stringify as jsonStringify } from 'functionalscript/fjs/media/json/module.f.mjs'
+import { identity } from 'functionalscript/fjs/types/function/module.f.mjs'
 import { interpret } from '../../exec/module.f.js'
 import { countNumericLiterals } from '../../report/audit/module.f.js'
 import { classifyRunOutcome } from '../../report/guard/module.f.js'
@@ -141,28 +141,28 @@ import { taxParamsByYear } from '../../tax/params/module.f.js'
 import { dialect as returnProfileDialect } from '../../return/profile/module.f.js'
 import { paramSetHash, reviewedEstimateFraming } from '../../report/provenance/module.f.js'
 import { sizeGuard, previewBytes, guardBytes } from '../response/module.f.js'
-import { readUtf8File } from 'functionalscript/fjs/effects/node/module.f.js'
-import { vec8, length as bitLength } from 'functionalscript/fjs/types/bit_vec/module.f.js'
-import { parse } from 'functionalscript/fjs/path/module.f.js'
+import { readUtf8File } from 'functionalscript/fjs/effects/node/module.f.mjs'
+import { vec8, length as bitLength } from 'functionalscript/fjs/types/bit_vec/module.f.mjs'
+import { parse } from 'functionalscript/fjs/path/module.f.mjs'
 import { stringify as jsonText } from '../../json/module.f.js'
 
-/** @import { Effect, Operation } from 'functionalscript/fjs/effects/module.f.js' */
-/** @import { MemOp } from 'functionalscript/fjs/effects/memory/module.f.js' */
-/** @import { Mkdir, WriteFile, Import } from 'functionalscript/fjs/effects/node/module.f.js' */
-/** @import { Cas, FileCasOperation } from 'functionalscript/fjs/cas/module.f.js' */
-/** @import { Evo } from 'functionalscript/fjs/cas/evo/module.f.js' */
-/** @import { ToolEntry, ToolsCallResult } from 'functionalscript/fjs/protocol/mcp/module.f.js' */
-/** @import { Vec } from 'functionalscript/fjs/types/bit_vec/module.f.js' */
+/** @import { Effect, Operation } from 'functionalscript/fjs/effects/module.f.mjs' */
+/** @import { MemOp } from 'functionalscript/fjs/effects/memory/module.f.mjs' */
+/** @import { Mkdir, WriteFile, Import } from 'functionalscript/fjs/effects/node/module.f.mjs' */
+/** @import { Cas, FileCasOperation } from 'functionalscript/fjs/cas/module.f.mjs' */
+/** @import { Evo } from 'functionalscript/fjs/cas/evo/module.f.mjs' */
+/** @import { ToolEntry, ToolsCallResult } from 'functionalscript/fjs/protocol/mcp/module.f.mjs' */
+/** @import { Vec } from 'functionalscript/fjs/types/bit_vec/module.f.mjs' */
 /** @import { CasOp, Report } from '../../guest/module.f.js' */
 /** @import { TaxReport } from '../../guest/tax/module.f.js' */
 /** @import { TaxParamSet } from '../../tax/params/module.f.js' */
 /** @import { ReturnProfile } from '../../return/profile/module.f.js' */
-/** @import { State, Dir, JsModule } from 'functionalscript/fjs/effects/node/virtual/module.f.js' */
+/** @import { State, Dir, JsModule } from 'functionalscript/fjs/effects/node/virtual/module.f.mjs' */
 /** @import { Run } from '../../run/module.f.js' */
 /** @import { RunOutcome } from '../../report/guard/module.f.js' */
 /** @import { ReportLine } from '../../report/line/module.f.js' */
-/** @import { Unknown as JsonUnknown } from 'functionalscript/fjs/media/json/module.f.js' */
-/** @import { Ts, Unknown as RttiUnknown } from 'functionalscript/fjs/types/rtti/ts/module.f.js' */
+/** @import { Unknown as JsonUnknown } from 'functionalscript/fjs/media/json/module.f.mjs' */
+/** @import { Ts, Unknown as RttiUnknown } from 'functionalscript/fjs/types/rtti/ts/module.f.mjs' */
 
 // ── executeRun ────────────────────────────────────────────────────────────────
 //

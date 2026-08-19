@@ -79,7 +79,7 @@
  *
  * @module
  */
-import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
+import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { baseTaxForAmount } from '../table/module.f.js'
 import { taxParamsByYear } from '../params/module.f.js'
 import { qdcgt } from './qdcgt/module.f.js'

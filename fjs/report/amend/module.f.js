@@ -41,26 +41,26 @@
  *
  * @module
  */
-import { cBase32ToVec, vecToCBase32 } from 'functionalscript/fjs/basen/cbase32/module.f.js'
-import { collectRead, fileCas } from 'functionalscript/fjs/cas/module.f.js'
-import { utf8ToString, tryUtf8 } from 'functionalscript/fjs/text/module.f.js'
-import { step, pure, mapStep } from 'functionalscript/fjs/effects/module.f.js'
-import { emptyState, virtual } from 'functionalscript/fjs/effects/node/virtual/module.f.js'
-import { sha256 } from 'functionalscript/fjs/crypto/sha2/module.f.js'
-import { error, ok } from 'functionalscript/fjs/types/result/module.f.js'
-import { array, record, string } from 'functionalscript/fjs/types/rtti/module.f.js'
-import { validate as rttiValidate } from 'functionalscript/fjs/types/rtti/validate/module.f.js'
-import { assert, assertEq, assertNotNullish } from 'functionalscript/fjs/asserts/module.f.js'
+import { cBase32ToVec, vecToCBase32 } from 'functionalscript/fjs/basen/cbase32/module.f.mjs'
+import { collectRead, fileCas } from 'functionalscript/fjs/cas/module.f.mjs'
+import { utf8ToString, tryUtf8 } from 'functionalscript/fjs/text/module.f.mjs'
+import { step, pure, mapStep } from 'functionalscript/fjs/effects/module.f.mjs'
+import { emptyState, virtual } from 'functionalscript/fjs/effects/node/virtual/module.f.mjs'
+import { sha256 } from 'functionalscript/fjs/crypto/sha2/module.f.mjs'
+import { error, ok } from 'functionalscript/fjs/types/result/module.f.mjs'
+import { array, record, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
+import { validate as rttiValidate } from 'functionalscript/fjs/types/rtti/validate/module.f.mjs'
+import { assert, assertEq, assertNotNullish } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { dialect as runDialect, validate as validateRun } from '../../run/module.f.js'
 import { applyWholeDollarElection } from '../line/module.f.js'
 import { centsFromString, centsToString, tryCentsFromString } from '../../exact/module.f.js'
 
-/** @import { Effect } from 'functionalscript/fjs/effects/module.f.js' */
-/** @import { Cas, FileCasOperation } from 'functionalscript/fjs/cas/module.f.js' */
-/** @import { Result } from 'functionalscript/fjs/types/result/module.f.js' */
+/** @import { Effect } from 'functionalscript/fjs/effects/module.f.mjs' */
+/** @import { Cas, FileCasOperation } from 'functionalscript/fjs/cas/module.f.mjs' */
+/** @import { Result } from 'functionalscript/fjs/types/result/module.f.mjs' */
 /** @import { Run, RunError } from '../../run/module.f.js' */
 /** @import { ReportLine, Source } from '../line/module.f.js' */
-/** @import { Ts, Unknown as RttiUnknown } from 'functionalscript/fjs/types/rtti/ts/module.f.js' */
+/** @import { Ts, Unknown as RttiUnknown } from 'functionalscript/fjs/types/rtti/ts/module.f.mjs' */
 
 // ── The stored result's wire shape ──────────────────────────────────────────
 //

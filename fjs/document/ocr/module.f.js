@@ -21,12 +21,12 @@
  *
  * @module
  */
-import { array, record, string } from 'functionalscript/fjs/types/rtti/module.f.js'
-import { validate as rttiValidate } from 'functionalscript/fjs/types/rtti/validate/module.f.js'
-import { assertEq } from 'functionalscript/fjs/asserts/module.f.js'
+import { array, record, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
+import { validate as rttiValidate } from 'functionalscript/fjs/types/rtti/validate/module.f.mjs'
+import { assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { base, mediaTypeOf } from '../base/module.f.js'
 
-/** @import { Ts } from 'functionalscript/fjs/types/rtti/ts/module.f.js' */
+/** @import { Ts } from 'functionalscript/fjs/types/rtti/ts/module.f.mjs' */
 
 /**
  * Format tag: names the dialect of this BLOB. The media type it is served

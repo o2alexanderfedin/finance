@@ -112,24 +112,24 @@
  *
  * @module
  */
-import { step, mapStep, foldStep, pure } from 'functionalscript/fjs/effects/module.f.js'
-import { collectRead, fileCas } from 'functionalscript/fjs/cas/module.f.js'
-import { vecToCBase32 } from 'functionalscript/fjs/basen/cbase32/module.f.js'
-import { utf8ToString, tryUtf8 } from 'functionalscript/fjs/text/module.f.js'
-import { initEvo, evo, syncRevision } from 'functionalscript/fjs/cas/evo/module.f.js'
-import { sha256 } from 'functionalscript/fjs/crypto/sha2/module.f.js'
-import { emptyState, virtual } from 'functionalscript/fjs/effects/node/virtual/module.f.js'
-import { ok } from 'functionalscript/fjs/types/result/module.f.js'
-import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
-import { dialect as revisionDialect } from 'functionalscript/fjs/media/revision/module.f.js'
+import { step, mapStep, foldStep, pure } from 'functionalscript/fjs/effects/module.f.mjs'
+import { collectRead, fileCas } from 'functionalscript/fjs/cas/module.f.mjs'
+import { vecToCBase32 } from 'functionalscript/fjs/basen/cbase32/module.f.mjs'
+import { utf8ToString, tryUtf8 } from 'functionalscript/fjs/text/module.f.mjs'
+import { initEvo, evo, syncRevision } from 'functionalscript/fjs/cas/evo/module.f.mjs'
+import { sha256 } from 'functionalscript/fjs/crypto/sha2/module.f.mjs'
+import { emptyState, virtual } from 'functionalscript/fjs/effects/node/virtual/module.f.mjs'
+import { ok } from 'functionalscript/fjs/types/result/module.f.mjs'
+import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
+import { dialect as revisionDialect } from 'functionalscript/fjs/media/revision/module.f.mjs'
 import { interpret } from '../../../exec/module.f.js'
 import { guestCtx } from '../../../guest/module.f.js'
 import { stringify as jsonText } from '../../../json/module.f.js'
 
-/** @import { Effect, Operation, OperationMap } from 'functionalscript/fjs/effects/module.f.js' */
-/** @import { MemOp } from 'functionalscript/fjs/effects/memory/module.f.js' */
-/** @import { Cas } from 'functionalscript/fjs/cas/module.f.js' */
-/** @import { Evo } from 'functionalscript/fjs/cas/evo/module.f.js' */
+/** @import { Effect, Operation, OperationMap } from 'functionalscript/fjs/effects/module.f.mjs' */
+/** @import { MemOp } from 'functionalscript/fjs/effects/memory/module.f.mjs' */
+/** @import { Cas } from 'functionalscript/fjs/cas/module.f.mjs' */
+/** @import { Evo } from 'functionalscript/fjs/cas/evo/module.f.mjs' */
 /** @import { CasOp } from '../../../guest/module.f.js' */
 
 // ── RunSnapshot: the whole reachable store, resolved before interpret runs ───

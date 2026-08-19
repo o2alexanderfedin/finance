@@ -45,12 +45,12 @@
  *
  * @module
  */
-import { string } from 'functionalscript/fjs/types/rtti/module.f.js'
-import { pure } from 'functionalscript/fjs/effects/module.f.js'
-import { runPure } from 'functionalscript/fjs/effects/module.f.js'
-import { toolEntry, okResult, errorResult } from 'functionalscript/fjs/protocol/mcp/module.f.js'
-import { toJsonSchema } from 'functionalscript/fjs/media/json/schema/module.f.js'
-import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
+import { string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
+import { pure } from 'functionalscript/fjs/effects/module.f.mjs'
+import { runPure } from 'functionalscript/fjs/effects/module.f.mjs'
+import { toolEntry, okResult, errorResult } from 'functionalscript/fjs/protocol/mcp/module.f.mjs'
+import { toJsonSchema } from 'functionalscript/fjs/media/json/schema/module.f.mjs'
+import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { dialect as oneZeroNineNineIntDialect, oneZeroNineNineIntSchema } from '../../document/1099int/module.f.js'
 import { dialect as ocrDialect, ocrSchema } from '../../document/ocr/module.f.js'
 import { dialect as w2Dialect, w2Schema } from '../../document/w2/module.f.js'
@@ -80,10 +80,10 @@ import { dialect as itemizedDeductionsDialect, itemizedDeductionsSchema } from '
 import { dialect as priorYearCapitalLossDialect, priorYearCapitalLossSchema } from '../../document/prior_year_capital_loss/module.f.js'
 import { stringify as jsonText } from '../../json/module.f.js'
 
-/** @import { Type } from 'functionalscript/fjs/types/rtti/module.f.js' */
-/** @import { ToolEntry, ToolsCallResult } from 'functionalscript/fjs/protocol/mcp/module.f.js' */
-/** @import { Unknown as JsonUnknown } from 'functionalscript/fjs/media/json/module.f.js' */
-/** @import { StringMap } from 'functionalscript/fjs/types/object/module.f.js' */
+/** @import { Type } from 'functionalscript/fjs/types/rtti/module.f.mjs' */
+/** @import { ToolEntry, ToolsCallResult } from 'functionalscript/fjs/protocol/mcp/module.f.mjs' */
+/** @import { Unknown as JsonUnknown } from 'functionalscript/fjs/media/json/module.f.mjs' */
+/** @import { StringMap } from 'functionalscript/fjs/types/object/module.f.mjs' */
 
 /**
  * Every known document dialect tag, mapped to its OWN exported RTTI schema

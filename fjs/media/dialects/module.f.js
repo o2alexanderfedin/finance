@@ -1,6 +1,6 @@
 /**
  * `fjs/media/dialects` — DOC-16's local adoption of the dialect registry
- * `functionalscript/fjs/media/module.f.js` already ships, at the pinned
+ * `functionalscript/fjs/media/module.f.mjs` already ships, at the pinned
  * `functionalscript@0.43.1`: `dialectEntry(type, extraValidate)` and
  * `detect(dialects)(bytes)`, "a list of dialect decoders that falls through
  * when none match" — DOC-16's own criterion verbatim.
@@ -14,7 +14,7 @@
  * `revisionDialect` already does upstream:
  *
  * ```javascript
- * // node_modules/functionalscript/fjs/media/revision/module.f.js, verbatim
+ * // node_modules/functionalscript/fjs/media/revision/module.f.mjs, verbatim
  * import { dialectEntry } from '../module.f.js'
  * const isValidRevision = (r) => { const [tag] = checkReferences(r); return tag === 'ok' }
  * export const revisionDialect = dialectEntry(revisionSchema, isValidRevision)
@@ -74,12 +74,12 @@
  *
  * @module
  */
-import { dialectEntry, detect } from 'functionalscript/fjs/media/module.f.js'
-import { dialect as revisionDialectTag, revisionDialect } from 'functionalscript/fjs/media/revision/module.f.js'
-import { vecToCBase32 } from 'functionalscript/fjs/basen/cbase32/module.f.js'
-import { vec8 } from 'functionalscript/fjs/types/bit_vec/module.f.js'
-import { tryUtf8 } from 'functionalscript/fjs/text/module.f.js'
-import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
+import { dialectEntry, detect } from 'functionalscript/fjs/media/module.f.mjs'
+import { dialect as revisionDialectTag, revisionDialect } from 'functionalscript/fjs/media/revision/module.f.mjs'
+import { vecToCBase32 } from 'functionalscript/fjs/basen/cbase32/module.f.mjs'
+import { vec8 } from 'functionalscript/fjs/types/bit_vec/module.f.mjs'
+import { tryUtf8 } from 'functionalscript/fjs/text/module.f.mjs'
+import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
 import {
     dialect as oneZeroNineNineBDialect,
     oneZeroNineNineBSchema,
@@ -220,7 +220,7 @@ import {
     checkReferences as checkBasisCorrection,
 } from '../../document/basis_correction/module.f.js'
 
-/** @import { DialectEntry } from 'functionalscript/fjs/media/module.f.js' */
+/** @import { DialectEntry } from 'functionalscript/fjs/media/module.f.mjs' */
 
 /**
  * Every one of this repo's own dialects, registered for {@link detect}: the
@@ -278,7 +278,7 @@ export const financeDialects = [
  * `detect`, closed over {@link financeDialects} — the one function
  * `fjs/server/module.f.js`'s `cas_refresh` calls to classify a raw CAS blob
  * against every dialect this repo knows about.
- * @type {(bytes: import('functionalscript/fjs/types/bit_vec/module.f.js').Vec) => import('functionalscript/fjs/media/type/module.f.js').DetectMeta}
+ * @type {(bytes: import('functionalscript/fjs/types/bit_vec/module.f.mjs').Vec) => import('functionalscript/fjs/media/type/module.f.mjs').DetectMeta}
  */
 export const detectFinance = detect(financeDialects)
 
