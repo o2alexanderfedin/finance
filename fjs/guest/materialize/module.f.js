@@ -57,7 +57,7 @@
  * @module
  */
 import { step, catchStep, pureError } from 'functionalscript/fjs/effects/module.f.mjs'
-import { import_, mkdir, writeUtf8File, readUtf8File, errorMessage } from 'functionalscript/fjs/effects/node/module.f.mjs'
+import { import_, mkdir, writeUtf8File, readUtf8File, errorSummary } from 'functionalscript/fjs/effects/node/module.f.mjs'
 import { error, ok } from 'functionalscript/fjs/types/result/module.f.mjs'
 import { join } from 'functionalscript/fjs/path/module.f.mjs'
 import { emptyState, virtual } from 'functionalscript/fjs/effects/node/virtual/module.f.mjs'
@@ -306,23 +306,57 @@ export const materializeHome = home => join(home, materializeDir)
  * `if (mkdirResult[0] === 'error')` used to do, and the one `catchStep`
  * renders both failures where both used to be rendered separately.
  *
- * **`errorMessage`, not `errorSummary`, and the choice is not free.** At
- * 0.43.1 an `IoError` was the host's message and `String(e)` produced it;
- * `errorMessage` is that same value under 0.46.0's tagged channel, so the
- * text a caller sees is unchanged and
- * `fjs/server`'s `weekOneConvergence` leaf still reads `invalid file` out of
- * it. `errorSummary` would be the safer rendering — upstream's own docstring
- * explains that `payload.message` carries the absolute path the host could
- * not touch, and this string reaches an MCP client through `fjs_run`'s error
- * response. Behaviour is preserved here rather than changed inside a
- * migration; the boundary question is written up in
- * `fjs/todo/mcp-error-text-forwards-host-messages.md`.
+ * ## THE CONVENTION: an `IoChannel` becomes a `string` through `errorSummary`
+ *
+ * **This project has exactly one rule for rendering a node `IoChannel` into a
+ * `string` error channel, and this is where it is written down: use
+ * `errorSummary`, never `errorMessage`, and name the step that failed in the
+ * project's own words.** `cas_refresh`, `finance_documents_list`,
+ * `buildRunSnapshot`'s re-tag in `fjs/server/fjs_run`, `fjs/guest/check` and
+ * `fjs/report/amend` all already do this; `materializeProgram` was the last
+ * holdout and is one no longer. `grep -rn errorMessage fjs --include='*.f.js'`
+ * returns no code hit, which is the checkable form of the rule.
+ *
+ * The reason is not stylistic. Upstream's own docstring says `errorMessage` is
+ * "for the operator of the program, who is entitled to the host's own words —
+ * including the path that failed", and that `payload.message` is where the host
+ * puts the absolute path it could not touch. **This process has no
+ * operator-facing sink for that string.** Every rendering here reaches a remote
+ * MCP client, by one of two routes:
+ *
+ * - directly, as `fjs_run`'s / `fjs_check`'s `errorResult` text, and
+ * - indirectly, through the `status: 'error'` run record: `fjs_run` answers
+ *   with `(run record: <runHash>)`, the record's `error` field holds this same
+ *   string, and the very same server serves `cas_get` over the very same
+ *   `fileCas(sha256)(home)` the record was written to. A path in the record is
+ *   a path one tool call away — which is why "render `errorMessage` into the
+ *   record, `errorSummary` into the response" is NOT a redaction and was
+ *   rejected. (`fjs/server`'s `weekOneConvergence` leaf reads the record back
+ *   out of CAS itself; the route is not hypothetical.)
+ *
+ * At 0.43.1 an `IoError` *was* the host message and `String(e)` produced it, so
+ * `errorMessage` was the faithful successor across the 0.46.x migration and was
+ * kept for exactly as long as that migration lasted. The behaviour change is
+ * made here, deliberately and alone.
+ *
+ * `errorSummary` alone would say only `io error: ENOENT` — or, under
+ * `fjs/effects/node/virtual`, whose `fail` attaches no OS code, the bare `io
+ * error`. The `materialize failed:` prefix is what keeps the *step* named
+ * without naming the *place*, so a proof can still assert which of
+ * `executeRun`'s five steps surfaced, and it is the same
+ * `<what failed>: ${errorSummary(e)}` shape `cas_refresh` and
+ * `finance_documents_list` already use.
+ *
+ * `fjs-run-integration.test.js`'s `SEC:` case is the proof, and it has to be a
+ * real-process one: `virtual`'s `fail` builds its `IoError` from a fixed
+ * literal carrying neither a path nor an OS code, so a path-free assertion
+ * written under `virtual` would pass whichever renderer is called.
  * @type {(home: string) => (hash: string) => (source: string) => Effect<Mkdir | WriteFile, void, string>}
  */
 export const materializeProgram = home => hash => source => {
     const dir = mkdir(materializeHome(home), { recursive: true })
     const written = step(dir, () => writeUtf8File(programPath(materializeHome(home))(hash), source))
-    return catchStep(written, e => pureError(errorMessage(e)))
+    return catchStep(written, e => pureError(`materialize failed: ${errorSummary(e)}`))
 }
 
 // ── EXEC-09: import through the effect, never a raw expression ───────────────

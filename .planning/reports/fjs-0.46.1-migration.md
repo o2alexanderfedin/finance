@@ -598,7 +598,11 @@ hold — §6.3.
 
 ### 7.3 `errorMessage` vs `errorSummary` — a pre-existing leak that 0.46 made legible
 
-Still open here, written up in `fjs/todo/mcp-error-text-forwards-host-messages.md`.
+Open at the time of writing, and written up in a `fjs/todo/` note
+(`mcp-error-text-forwards-host-messages.md`) that **no longer exists: this was closed immediately
+after the migration and the note was deleted with it.** See the postscript at the end of this
+section. The rest of this section is left exactly as it was written, because the reasoning it
+records is what the postscript corrects.
 
 0.46 ships two renderers and says in as many words which is for whom: `errorMessage` for the
 operator, *"who is entitled to the host's own words — including the path that failed"*, and
@@ -621,6 +625,39 @@ small, concrete example of the value being kept alive to the place that can deci
 Nothing is asked of upstream here beyond the observation that shipping the two renderers with that
 docstring is what caused a consumer to find a live leak in its own code. It is the most direct
 example in this migration of documentation doing work.
+
+#### Postscript: the "render twice" fix was wrong, and the parenthesis above is why
+
+The two words `(local, correct)` in the paragraph above are the mistake. **The stored run record is
+not local.** `fjs_run`'s error response ends `(run record: <runHash>)`, and the same server serves
+`cas_get` over the same `fileCas(sha256)(home)` the record was written to — so "`errorMessage` into
+the record, `errorSummary` into the response" moves the absolute path one tool call away rather than
+out of reach. `fjs/server`'s own `weekOneConvergence` leaf reads the record back out of CAS, so this
+was visible in the repo the whole time; it was the word "local", not the code, that hid it.
+
+What was actually taken is the option the note ranked second and called "cheaper, strictly worse
+provenance": render **once, at the source, with `errorSummary`**, prefixed with the project's own
+name for the step — `materialize failed: ${errorSummary(e)}`, the same
+`<what failed>: ${errorSummary(e)}` shape `cas_refresh` and `finance_documents_list` already used.
+It is not worse provenance, because the provenance the record would have gained is provenance the
+client would have gained with it. The whole codebase now has one convention, stated in
+`fjs/guest/materialize/module.f.js`'s docstring: an `IoChannel` becomes a `string` through
+`errorSummary`, because this process has no operator-facing sink for the host's own words.
+
+The note's retirement condition — "two different renderers, and a proof that the remote-facing one
+contains no path separator that the local one does contain" — is therefore literally unmet and
+deliberately so: it was written on the premise the postscript above falsifies. What replaces it is
+strictly stronger. `fjs-run-integration.test.js`'s `SEC:` case blocks materialization on a real
+filesystem (a plain file where `.fjs-run` must be, so `mkdir` rejects `EEXIST` with the absolute path
+in `error.message`) and asserts the host path appears in neither the response **nor** the record the
+response names, fetched through `cas_get` as a client would. Watched to fail by restoring
+`errorMessage`.
+
+One upstream observation fell out of writing that test, and is not this repo's to fix:
+**`cas_get`'s own response envelope carries the blob's absolute host path in its `uri` field.** That
+is `fjs/mcp/cas`'s deliberate design rather than a rendering slip, and it is orthogonal to the
+renderer question — but it means a `finance` server already tells a client where its store lives, and
+it is worth deciding upstream whether that is intended for a remote transport.
 
 ---
 
