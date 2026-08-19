@@ -36,9 +36,9 @@
  * | 4 cost of goods sold | documented zero, and REFUSES if asserted | Part III |
  * | 6 other income | documented zero | the fuel tax credit and refunds this engine does not model |
  * | 8, 10, 11, 14, 15, 16a, 16b, 17, 18, 20a, 20b, 21, 22, 23, 24a, 25, 26, 27a | ✔ | `vnd.fjs.business_expenses` entries, one category per printed line |
- * | 9 car and truck | REFUSES by name | needs mileage (standard rate) or Part IV + Form 4562 (actual) |
+ * | 9 car and truck | REFUSES by name | needs mileage (standard rate) or Part IV + Form 4562 Part V (actual) — and Part V refuses, §274(d)/§280F |
  * | 12 depletion | REFUSES by name | §611 needs a multi-year property basis |
- * | 13 depreciation and §179 | REFUSES by name | Form 4562 and an asset basis history |
+ * | 13 depreciation and §179 | ✔ | `vnd.fjs.asset_register` -> `fjs/form4562` line 22 (a STORED entry in this category still refuses — it would double the figure) |
  * | 19 pension and profit-sharing | REFUSES by name | nothing distinguishes an employee's from the proprietor's |
  * | 24b deductible meals | REFUSES by name | the printed line takes an amount §274(n) has already limited |
  * | 27b | documented zero | the printed form reserves it |
@@ -183,13 +183,26 @@
  * @module
  */
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
-import { centsFromString } from '../../exact/module.f.js'
+import { centsFromString, centsToString } from '../../exact/module.f.js'
+import { parse } from '../../types/decimal/module.f.js'
+import { formFortyFiveSixtyTwo } from '../../form4562/module.f.js'
+import { macrsMethods, macrsConventions } from '../../form4562/macrs/module.f.js'
 
 /** @import { ReturnProfile } from '../../return/profile/module.f.js' */
+/** @import { AssetRegister } from '../../document/asset_register/module.f.js' */
+/** @import { DepreciableAsset, Form4562Lines } from '../../form4562/module.f.js' */
 /** @import { OneZeroNineNineNec } from '../../document/1099nec/module.f.js' */
 /** @import { BusinessExpenses } from '../../document/business_expenses/module.f.js' */
 /** @import { W2 } from '../../document/w2/module.f.js' */
 /** @import { ReportLine, Source } from '../../report/line/module.f.js' */
+
+/**
+ * Parses a business-use percentage at two decimal places, yielding HUNDREDTHS
+ * of a percent — the same fixed-scale parse `fjs/exact`'s `centsFromString`
+ * is, at the same scale, named for what it actually holds here.
+ * @type {(s: string) => bigint}
+ */
+const percentFromString = parse(2)
 
 // ── Inputs ───────────────────────────────────────────────────────────────────
 
@@ -305,9 +318,14 @@ export const refusedExpenseCategories = /** @type {const} */ ([
         label: 'Car and truck expenses',
         remedy: 'the standard mileage rate needs the business miles driven, which no document '
             + 'this engine models reports and which `vnd.fjs.business_expenses` does not carry; '
-            + 'the actual-expense method needs Part IV (lines 43-47) and, for a vehicle placed in '
-            + 'service this year, Form 4562. Neither method is supported, so this engine will not '
-            + 'deduct a vehicle expense it cannot substantiate either way (no phase yet)',
+            + 'the actual-expense method needs Part IV (lines 43-47) and Form 4562. Form 4562 '
+            + 'now EXISTS here, and it refuses this case by name for its own reason: a vehicle is '
+            + 'LISTED PROPERTY, so it belongs in Part V, where line 24a asks whether there is '
+            + 'evidence supporting the business-use percentage and line 24b whether that evidence '
+            + 'is written — §274(d) substantiation no record here carries — and §280F caps a '
+            + 'passenger automobile at a per-year dollar table. Neither method is supported, so '
+            + 'this engine will not deduct a vehicle expense it cannot substantiate either way '
+            + '(no phase yet)',
     },
     {
         category: 'depletion',
@@ -319,10 +337,15 @@ export const refusedExpenseCategories = /** @type {const} */ ([
     {
         category: 'depreciationAndSection179',
         label: 'Depreciation and section 179 expense deduction',
-        remedy: 'requires Form 4562 and an asset basis history across years: the §179 election, '
-            + 'the §168(k) bonus percentage and the MACRS recovery period all depend on when each '
-            + 'asset was placed in service and on how much of its basis earlier years already '
-            + 'recovered, none of which any document this engine holds records (no phase yet)',
+        remedy: 'this line is now COMPUTED, from a vnd.fjs.asset_register document through Form '
+            + '4562 line 22 — so a hand-entered total in this category is refused because it '
+            + 'would be counted TWICE, once from the register and once here. Record each '
+            + 'depreciable asset in the register instead: its description, the month and year it '
+            + 'was placed in service, its cost or other basis, its business-use percentage, its '
+            + 'classification, method and convention, and its §168(k) status. What Form 4562 '
+            + 'still refuses is Part I (any §179 election, because line 11’s business income '
+            + 'limitation and line 13’s carryover to next year are both outside one tax year), a '
+            + 'CURRENT-year §168(k) allowance, and Part V listed property',
     },
     {
         category: 'pensionAndProfitSharingPlans',
@@ -757,9 +780,13 @@ const expenseLine = profile => entries => category => {
  *
  * The five refused lines are then documented zeros — reachable only when no
  * entry asserted them, which is the case the zero is honest for.
- * @type {(profile: Stored<ReturnProfile>) => (entries: readonly StoredEntry[]) => (line7GrossIncome: ReportLine) => ScheduleCPartIIOutcome}
+ * `line13Depreciation` is passed IN rather than computed here: it is Form 4562
+ * line 22, and {@link scheduleC} is the layer that reads the register and owns
+ * the refusal when Form 4562 cannot be completed. A business with no register
+ * gets the documented zero this line has always been.
+ * @type {(profile: Stored<ReturnProfile>) => (entries: readonly StoredEntry[]) => (line13Depreciation: ReportLine) => (line7GrossIncome: ReportLine) => ScheduleCPartIIOutcome}
  */
-export const scheduleCPartII = profile => entries => line7GrossIncome => {
+export const scheduleCPartII = profile => entries => line13Depreciation => line7GrossIncome => {
     const zero = profileDeclaredZeroLine(profile)
     const byCategory = expenseLine(profile)(entries)
     // The five refused lines INSIDE the line-28 block, in printed order, each
@@ -780,7 +807,11 @@ export const scheduleCPartII = profile => entries => line7GrossIncome => {
     const line10 = byCategory('commissionsAndFees')
     const line11 = byCategory('contractLabor')
     const line12 = zero('Schedule C line 12 (depletion)')
-    const line13 = zero('Schedule C line 13 (depreciation and section 179 expense deduction)')
+    // 13. "Depreciation and section 179 expense deduction (not included in
+    //     Part III)." Form 4562 line 22, computed by {@link scheduleC} from a
+    //     vnd.fjs.asset_register document -- or a documented zero when the
+    //     business stores no register.
+    const line13 = line13Depreciation
     const line14 = byCategory('employeeBenefitPrograms')
     const line15 = byCategory('insuranceOtherThanHealth')
     const line16a = byCategory('mortgageInterest')
@@ -856,11 +887,20 @@ export const scheduleCPartII = profile => entries => line7GrossIncome => {
  * and a taxpayer with no business at all both produce a Schedule C of zeros,
  * and only the sources tell them apart. A caller reading `.value` — which is
  * what a report does — cannot.
+ * `form4562` is the completed Form 4562 when this business stored a
+ * `vnd.fjs.asset_register`, and `undefined` when it did not — which is a
+ * different state from "a Form 4562 of zeros", exactly as `filed`
+ * distinguishes a break-even business from no business. `fjs/form1040/core`
+ * reads its `alternativeMinimumTaxAdjustmentCents` into Form 6251 line 2l, and
+ * that is the ONLY route by which an asset register reaches the alternative
+ * minimum tax: computing the adjustment a second time somewhere else would let
+ * the two disagree.
  * @typedef {{
  *   readonly kind: 'ok',
  *   readonly filed: boolean,
  *   readonly partI: ScheduleCPartI,
  *   readonly partII: ScheduleCPartII,
+ *   readonly form4562: Form4562Lines | undefined,
  * }} ScheduleC
  */
 
@@ -872,6 +912,7 @@ export const scheduleCPartII = profile => entries => line7GrossIncome => {
  *   readonly nonemployeeCompensationForms: readonly Stored<OneZeroNineNineNec>[],
  *   readonly businessExpenseForms: readonly Stored<BusinessExpenses>[],
  *   readonly w2Forms: readonly Stored<W2>[],
+ *   readonly assetRegisters: readonly Stored<AssetRegister>[],
  * }} ScheduleCInput
  */
 
@@ -890,6 +931,50 @@ export const scheduleCPartII = profile => entries => line7GrossIncome => {
 const businessLabel = business => business.businessName === undefined
     ? `'${business.principalBusiness}'`
     : `'${business.principalBusiness}' (${business.businessName})`
+
+
+/**
+ * `vnd.fjs.asset_register`'s stored strings, as the `bigint` facts
+ * `fjs/form4562` takes — the one place the conversion happens, so a form
+ * module still reads no documents.
+ *
+ * Every vocabulary is re-narrowed here through the SAME frozen lists
+ * `fjs/document/asset_register` validated against, rather than cast: the
+ * dialect types `method` and `convention` as `string` (rtti has no enum), and
+ * a cast over that would silence exactly the check that stops a hand-edited
+ * `'200 DB'` reaching the MACRS schedule.
+ * @type {(register: AssetRegister) => readonly DepreciableAsset[]}
+ */
+const depreciableAssets = register => register.assets.map(asset => {
+    const [yearText, monthText] = asset.datePlacedInService.split('-')
+    assert(yearText !== undefined && monthText !== undefined,
+        ['a validated datePlacedInService is YYYY-MM', asset.datePlacedInService])
+    if (yearText === undefined || monthText === undefined) {
+        throw ['a validated datePlacedInService is YYYY-MM', asset.datePlacedInService]
+    }
+    const method = macrsMethods.find(candidate => candidate === asset.method)
+    assert(method !== undefined, ['a validated method is one of the three', asset.method])
+    if (method === undefined) { throw ['a validated method is one of the three', asset.method] }
+    const convention = macrsConventions.find(candidate => candidate === asset.convention)
+    assert(convention !== undefined, ['a validated convention is one of the three', asset.convention])
+    if (convention === undefined) { throw ['a validated convention is one of the three', asset.convention] }
+    const claimed = asset.specialDepreciationAllowanceClaimed
+    const elected = asset.section179ElectedCost
+    return {
+        description: asset.description,
+        placedInServiceYear: Number(yearText),
+        placedInServiceMonth: Number(monthText),
+        costOrOtherBasisCents: centsFromString(asset.costOrOtherBasis),
+        businessUseHundredthsOfPercent: percentFromString(asset.businessUsePercentage),
+        classification: asset.classification,
+        method,
+        convention,
+        section168kStatus: asset.section168kStatus,
+        specialDepreciationAllowanceClaimedCents: claimed === undefined ? 0n : centsFromString(claimed),
+        section179ElectedCostCents: elected === undefined ? 0n : centsFromString(elected),
+        listedProperty: asset.listedProperty === true,
+    }
+})
 
 /**
  * The whole of Schedule C.
@@ -926,7 +1011,7 @@ const businessLabel = business => business.businessName === undefined
  * @type {(input: ScheduleCInput) => ScheduleCOutcome}
  */
 export const scheduleC = input => {
-    const { profile, nonemployeeCompensationForms, businessExpenseForms, w2Forms } = input
+    const { profile, nonemployeeCompensationForms, businessExpenseForms, w2Forms, assetRegisters } = input
 
     // 1. A statutory employee's box 1 wages belong on THIS form's line 1, not
     //    on 1040 line 1a, and this engine puts them on 1040 line 1a. Refused
@@ -989,15 +1074,53 @@ export const scheduleC = input => {
         }
     }
 
+    // 3b. Form 4562 is filed PER BUSINESS OR ACTIVITY too (i4562 p1: "File a
+    //     separate Form 4562 for each business or activity on your return for
+    //     which Form 4562 is required"), so a second register is a second
+    //     Form 4562, and this engine computes one.
+    const [firstRegister, secondRegister] = assetRegisters
+    if (firstRegister !== undefined && secondRegister !== undefined) {
+        return {
+            kind: 'error',
+            message: `Schedule C: this return carries ${assetRegisters.length} `
+                + `vnd.fjs.asset_register documents — '${firstRegister.value.businessOrActivity}' `
+                + `and '${secondRegister.value.businessOrActivity}'. A separate Form 4562 is `
+                + `filed for each business or activity, and the mid-quarter convention is decided `
+                + `by an aggregate over ONE Form 4562's own additions, so merging two registers `
+                + `would pick a convention neither business is on. This engine computes one `
+                + `(no phase yet)`,
+        }
+    }
+    // 3c. A register with no business record. Refused rather than ignored: a
+    //     rental property's register is the case that matters, and dropping it
+    //     silently would compute a Schedule C that is right and a Schedule E
+    //     that is missing the depreciation the register exists to supply.
+    if (firstRegister !== undefined && firstBusiness === undefined) {
+        return {
+            kind: 'error',
+            message: `Schedule C: this return carries a vnd.fjs.asset_register for `
+                + `'${firstRegister.value.businessOrActivity}' but no vnd.fjs.business_expenses `
+                + `record. Form 4562 line 22 has to reach a printed line, and the only one this `
+                + `engine wires it to is Schedule C line 13 — Schedule E Part I (rental real `
+                + `estate) still refuses by name, because it also needs the rents received and `
+                + `the fair rental and personal-use days §280A(e) allocates by, which no document `
+                + `here carries. Store a vnd.fjs.business_expenses record for this activity, or `
+                + `remove the register rather than have its depreciation silently dropped`,
+        }
+    }
+
     // 4. No business at all. Not a refusal — a schedule of documented zeros,
     //    so `fjs/schedule/1`'s line 3 still carries provenance (PROV-01) and a
     //    return with no self-employment computes exactly what it computed
     //    before this phase existed.
     if (firstBusiness === undefined && nonemployeeCompensationForms.length === 0) {
         const partI = scheduleCPartI(profile)([])
-        const partII = scheduleCPartII(profile)([])(partI.line7)
+        const partII = scheduleCPartII(profile)([])(
+            profileDeclaredZeroLine(profile)(
+                'Schedule C line 13 (depreciation and section 179 expense deduction)'))(
+            partI.line7)
         assert(partII.kind === 'ok', ['an empty Schedule C cannot refuse', partII])
-        return { kind: 'ok', filed: false, partI, partII }
+        return { kind: 'ok', filed: false, partI, partII, form4562: undefined }
     }
 
     // 5. Receipts with no business record. Printed line A is required, and
@@ -1074,8 +1197,60 @@ export const scheduleC = input => {
         }
     }
 
+    // 7c. The register names a business, and it must be THIS one. DOC-01's
+    //     subject key is what binds them: `vnd.fjs.business_expenses` and
+    //     `vnd.fjs.asset_register` both carry `accountNumber`, and a register
+    //     whose account number names some other activity is a second Form
+    //     4562 arriving by the back door.
+    if (firstRegister !== undefined
+        && firstRegister.value.accountNumber !== firstBusiness.value.accountNumber) {
+        return {
+            kind: 'error',
+            message: `Schedule C: the vnd.fjs.asset_register for `
+                + `'${firstRegister.value.businessOrActivity}' carries accountNumber `
+                + `'${firstRegister.value.accountNumber}', and the business expenses record for `
+                + `${businessLabel(firstBusiness.value)} carries `
+                + `'${firstBusiness.value.accountNumber}'. A separate Form 4562 is filed for each `
+                + `business or activity, so depreciating one activity's assets against another's `
+                + `receipts would move a real deduction onto the wrong Schedule C. Make the two `
+                + `account numbers agree, or store the register for the activity it belongs to`,
+        }
+    }
+    // 7d. Form 4562. Its own refusals — Part I's §179 election, a current-year
+    //     §168(k) allowance, Part V listed property, and the three
+    //     certifications — are threaded out verbatim, so a register this
+    //     engine cannot complete a Form 4562 for never produces a Schedule C
+    //     whose line 28 is short by the depreciation.
+    const line13Rule = 'Schedule C line 13 (depreciation and section 179 expense deduction)'
+    /** @type {Form4562Lines | undefined} */
+    let form4562 = undefined
+    /** @type {ReportLine} */
+    let line13 = profileDeclaredZeroLine(profile)(line13Rule)
+    if (firstRegister !== undefined) {
+        const outcome = formFortyFiveSixtyTwo({
+            taxYear: firstRegister.value.taxYear,
+            businessOrActivity: firstRegister.value.businessOrActivity,
+            everyDepreciableAssetIsListed:
+                firstRegister.value.everyDepreciableAssetIsListed === true,
+            noDepreciablePropertyDisposedOfDuringTheYear:
+                firstRegister.value.noDepreciablePropertyDisposedOfDuringTheYear === true,
+            priorYearSection179CarryoverIsZero:
+                firstRegister.value.priorYearSection179CarryoverIsZero === true,
+            assets: depreciableAssets(firstRegister.value),
+        })
+        if (outcome.kind === 'error') {
+            return outcome
+        }
+        form4562 = outcome
+        line13 = documentLine(profile)(line13Rule)(outcome.line22)([{
+            documentHash: firstRegister.documentHash,
+            boxPath: 'assets -> Form 4562 line 22',
+            value: centsToString(outcome.line22),
+        }])
+    }
+
     const partI = scheduleCPartI(profile)(nonemployeeCompensationForms)
-    const partII = scheduleCPartII(profile)(entries)(partI.line7)
+    const partII = scheduleCPartII(profile)(entries)(line13)(partI.line7)
     if (partII.kind === 'error') {
         return partII
     }
@@ -1094,7 +1269,7 @@ export const scheduleC = input => {
     if (partII.line31.value < 0n) {
         return atRiskDeterminationLine32(partII.line31.value)
     }
-    return { kind: 'ok', filed: true, partI, partII }
+    return { kind: 'ok', filed: true, partI, partII, form4562 }
 }
 
 // ── Tests ────────────────────────────────────────────────────────────────────
@@ -1167,6 +1342,49 @@ const secondBusinessDoc = {
     },
 }
 
+
+/**
+ * An asset register for the SAME business `businessDoc` names, carrying one
+ * $10,000.00 seven-year asset placed in service in June.
+ *
+ * `accountNumber` is a parameter because the account number is the ONLY thing
+ * binding a register to a business, and the leaf that proves a mismatch
+ * refuses has to be able to break exactly that.
+ * @type {(accountNumber: string) => Stored<AssetRegister>}
+ */
+const registerDoc = accountNumber => ({
+    documentHash: 'sha256-register-a',
+    value: {
+        dialect: 'vnd.fjs.asset_register',
+        recipientTin: '222-22-2222',
+        accountNumber,
+        taxYear: 2025,
+        businessOrActivity: 'software consulting',
+        everyDepreciableAssetIsListed: /** @type {const} */ (true),
+        noDepreciablePropertyDisposedOfDuringTheYear: /** @type {const} */ (true),
+        priorYearSection179CarryoverIsZero: /** @type {const} */ (true),
+        assets: [{
+            description: 'workstation',
+            datePlacedInService: '2025-06',
+            costOrOtherBasis: '10000.00',
+            businessUsePercentage: '100.00',
+            classification: 'sevenYear',
+            method: '200DB',
+            convention: 'HY',
+            section168kStatus: 'electedOut',
+        }],
+    },
+})
+
+/** A SECOND register, for a rental activity. @type {Stored<AssetRegister>} */
+const secondRegisterDoc = {
+    documentHash: 'sha256-register-b',
+    value: {
+        ...registerDoc('BUS-0002').value,
+        businessOrActivity: 'residential rental',
+    },
+}
+
 /** @type {W2} */
 const bareW2Value = {
     dialect: 'vnd.fjs.w2',
@@ -1180,6 +1398,7 @@ const run = input => scheduleC({
     nonemployeeCompensationForms: [],
     businessExpenseForms: [],
     w2Forms: [],
+    assetRegisters: [],
     ...input,
 })
 
@@ -1866,6 +2085,136 @@ export const proof = {
         },
     },
 
+    assetRegister: {
+        /**
+         * Line 13 is a real figure now, and it is Publication 946's: Table
+         * A-1's 7-year half-year year-1 rate of 14.29% on $10,000.00 is
+         * **$1,429.00**. Gross receipts are $6,000.00 with no other expenses,
+         * so line 28 is $1,429.00 and line 31 is **$4,571.00**. Every figure
+         * hand-computed off the printed table.
+         */
+        lineThirteenIsFormFortyFiveSixtyTwoLineTwentyTwo: () => {
+            const result = ok(run({
+                nonemployeeCompensationForms: [necDoc('6000.00')('sha256-nec-1')],
+                businessExpenseForms: [businessDoc([])],
+                assetRegisters: [registerDoc('BUS-0001')],
+            }))
+            assertEq(result.partII.line13.value, 142900n, 'Table A-1, 7-year, year 1')
+            assertEq(result.partII.line28.value, 142900n, 'and it is the whole of line 28')
+            assertEq(result.partII.line31.value, 457100n, '$6,000.00 - $1,429.00')
+            // Provenance: the line cites the register, by hash and by the path
+            // the amount travelled. A rule string with the destination erased
+            // is the mutation AGENTS.md records surviving a whole suite.
+            const source = result.partII.line13.sources[0]
+            assert(source !== undefined, 'line 13 must cite something')
+            assertEq(source?.documentHash, 'sha256-register-a')
+            assertEq(source?.boxPath, 'assets -> Form 4562 line 22')
+        },
+        /**
+         * THE CONTROL: the same business with no register. Line 13 is the
+         * documented zero it has always been, and line 31 is the whole
+         * $6,000.00 — so the leaf above is evidence about the DOCUMENT rather
+         * than about the business.
+         */
+        withoutARegisterLineThirteenIsADocumentedZero: () => {
+            const result = ok(run({
+                nonemployeeCompensationForms: [necDoc('6000.00')('sha256-nec-1')],
+                businessExpenseForms: [businessDoc([])],
+            }))
+            assertEq(result.partII.line13.value, 0n)
+            assertEq(result.partII.line31.value, 600000n)
+            assertEq(result.form4562, undefined,
+                'and no Form 4562 was completed at all, which is not the same as one of zeros')
+        },
+        /**
+         * A register whose `accountNumber` names a different activity is
+         * REFUSED, not applied: depreciating one activity's assets against
+         * another's receipts moves a real deduction onto the wrong Schedule C.
+         */
+        aRegisterForADifferentActivityRefuses: () => {
+            const message = refusal(run({
+                nonemployeeCompensationForms: [necDoc('6000.00')('sha256-nec-1')],
+                businessExpenseForms: [businessDoc([])],
+                assetRegisters: [registerDoc('BUS-0002')],
+            })).message
+            assert(message.includes('BUS-0002'), ['must quote the register\'s account number', message])
+            assert(message.includes('BUS-0001'), ['and the business\'s', message])
+        },
+        /** A second register is a second Form 4562, and this engine computes one. */
+        twoRegistersRefuseNamingBoth: () => {
+            const message = refusal(run({
+                nonemployeeCompensationForms: [necDoc('6000.00')('sha256-nec-1')],
+                businessExpenseForms: [businessDoc([])],
+                assetRegisters: [registerDoc('BUS-0001'), secondRegisterDoc],
+            })).message
+            assert(message.includes('software consulting'), ['must name the first', message])
+            assert(message.includes('residential rental'), ['must name the second', message])
+            assert(message.includes('mid-quarter'), ['must say why merging is wrong', message])
+        },
+        /**
+         * **A register with no business record refuses rather than being
+         * ignored, and this is the leaf that matters most.** A rental
+         * property's register is the case: silently dropping it would compute
+         * a Schedule C that is right and leave the depreciation nowhere, which
+         * is exactly the silent-zero this engine exists not to produce.
+         */
+        aRegisterWithNoBusinessRecordRefuses: () => {
+            const message = refusal(run({
+                assetRegisters: [registerDoc('BUS-0001')],
+            })).message
+            assert(message.includes('Schedule E Part I'),
+                ['must name the printed line a rental register would need', message])
+            assert(message.includes('vnd.fjs.business_expenses'),
+                ['and what to store instead', message])
+        },
+        /**
+         * Form 4562's own refusals are threaded out VERBATIM rather than
+         * summarized — a Schedule C short by the depreciation is the failure
+         * this whole path exists to prevent.
+         */
+        formFortyFiveSixtyTwosRefusalsReachTheCaller: () => {
+            const listed = refusal(run({
+                nonemployeeCompensationForms: [necDoc('6000.00')('sha256-nec-1')],
+                businessExpenseForms: [businessDoc([])],
+                assetRegisters: [{
+                    ...registerDoc('BUS-0001'),
+                    value: {
+                        ...registerDoc('BUS-0001').value,
+                        assets: registerDoc('BUS-0001').value.assets.map(asset => ({
+                            ...asset, listedProperty: /** @type {const} */ (true),
+                        })),
+                    },
+                }],
+            })).message
+            assert(listed.includes('§280F'), ['Part V\'s refusal, verbatim', listed])
+            const uncertified = refusal(run({
+                nonemployeeCompensationForms: [necDoc('6000.00')('sha256-nec-1')],
+                businessExpenseForms: [businessDoc([])],
+                assetRegisters: [{
+                    ...registerDoc('BUS-0001'),
+                    value: {
+                        ...registerDoc('BUS-0001').value,
+                        priorYearSection179CarryoverIsZero: undefined,
+                    },
+                }],
+            })).message
+            assert(uncertified.includes('line 10'), ['line 10\'s refusal, verbatim', uncertified])
+        },
+        /**
+         * A hand-entered `depreciationAndSection179` expense entry STILL
+         * refuses, and the corrected remedy says why: it would be counted
+         * twice, once from the register and once from the entry.
+         */
+        aHandEnteredDepreciationEntryStillRefuses: () => {
+            const message = refusal(run({
+                nonemployeeCompensationForms: [necDoc('6000.00')('sha256-nec-1')],
+                businessExpenseForms: [businessDoc([entryOf('depreciationAndSection179')('500.00')])],
+                assetRegisters: [registerDoc('BUS-0001')],
+            })).message
+            assert(message.includes('TWICE'), ['must say why an entry is refused now', message])
+            assert(message.includes('vnd.fjs.asset_register'), ['and what to store instead', message])
+        },
+    },
     businessCardinality: {
         // Schedule C is filed PER BUSINESS, and a second record is two
         // Schedule Cs. Refused, naming BOTH — a refusal naming one would leave

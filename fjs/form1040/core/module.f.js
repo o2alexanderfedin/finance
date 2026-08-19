@@ -123,6 +123,8 @@ import {
 /** @import { OneZeroNineNineG } from '../../document/1099g/module.f.js' */
 /** @import { OneZeroNineNineNec } from '../../document/1099nec/module.f.js' */
 /** @import { BusinessExpenses } from '../../document/business_expenses/module.f.js' */
+/** @import { AssetRegister } from '../../document/asset_register/module.f.js' */
+/** @import { ScheduleC } from '../../schedule/c/module.f.js' */
 /** @import { PriorYearCapitalLoss } from '../../document/prior_year_capital_loss/module.f.js' */
 /** @import { Ira } from '../../document/ira/module.f.js' */
 /** @import { PriorYearIraBasis } from '../../document/prior_year_ira_basis/module.f.js' */
@@ -277,6 +279,7 @@ import {
  *   readonly unemploymentForms: readonly Stored<OneZeroNineNineG>[],
  *   readonly nonemployeeCompensationForms: readonly Stored<OneZeroNineNineNec>[],
  *   readonly businessExpenseForms: readonly Stored<BusinessExpenses>[],
+ *   readonly assetRegisters: readonly Stored<AssetRegister>[],
  *   readonly adjustmentForms: readonly Stored<Adjustments>[],
  *   readonly studentLoanInterestForms: readonly Stored<OneZeroNineEightE>[],
  *   readonly tuitionForms: readonly Stored<OneZeroNineEightT>[],
@@ -721,6 +724,7 @@ const storedFilingStatusNamed = status =>
  *   readonly dependentCareLine31Cents: bigint,
  *   readonly dependentCareApplicable: boolean,
  *   readonly dependentCare: Form2441Common,
+ *   readonly amtDepreciationAdjustmentCents: bigint,
  * }} Form1040IncomeLines
  */
 
@@ -759,7 +763,7 @@ export const form1040IncomeLines = taxParamSet => inputs => {
         itemizedDeductionForms, medicalExpenseForms,
         capitalLossCarryoverForms,
         unemploymentForms,
-        nonemployeeCompensationForms, businessExpenseForms,
+        nonemployeeCompensationForms, businessExpenseForms, assetRegisters,
         adjustmentForms, studentLoanInterestForms,
         iraForms, priorYearIraBasisForms,
         employeeStockPurchaseForms, basisCorrectionForms,
@@ -1177,6 +1181,12 @@ export const form1040IncomeLines = taxParamSet => inputs => {
     const scheduleOnePartIResult = scheduleOnePartI({
         profile, unemploymentForms, nonemployeeCompensationForms, businessExpenseForms,
         w2Forms: w2s,
+        // **Line 13 of the Schedule C inside Part I is this commit's** (Form
+        // 4562): `vnd.fjs.asset_register` reaches Schedule C line 13 through
+        // Form 4562 line 22, and its alternative-minimum-tax adjustment
+        // reaches Form 6251 line 2l off the SAME computed form below -- never
+        // by a second call, which is the only way the two could disagree.
+        assetRegisters,
         // **Line 5 is Phase 30's** (TAX-35): `fjs/schedule/e`'s own line 41,
         // reaching 1040 line 8 THROUGH Schedule 1's own Part I total, never by
         // a side channel -- the identical discipline line 3 already follows for
@@ -1707,9 +1717,21 @@ export const form1040IncomeLines = taxParamSet => inputs => {
         [...scheduleOnePartIResult.scheduleE.partII.rows,
             ...scheduleOnePartIResult.scheduleE.parts.beneficiaryRows])
 
+    // Form 6251 line 2l, off the ONE Form 4562 `fjs/schedule/c` completed
+    // inside Schedule 1 Part I above. It travels on this record for the
+    // same reason `disqualifiedPassiveIncomeCents` does: this is the only
+    // function where the Schedule C result is in scope, and
+    // `form1040TaxAndPaymentLines` -- which is where Schedule 2 and
+    // therefore Form 6251 run -- is handed only `inputs` and `income`.
+    // Reading `assetRegisters` a second time there would be a SECOND Form
+    // 4562, and the convention it picks depends on the whole register.
+    const amtDepreciationAdjustmentCents = amtDepreciationAdjustmentOf(
+        scheduleOnePartIResult.scheduleC)
+
     return {
         kind: 'ok',
         disqualifiedPassiveIncomeCents,
+        amtDepreciationAdjustmentCents,
         line1a, line1b, line1c, line1d, line1e, line1f, line1g, line1h, line1i, line1z,
         line2a, line2b,
         line3a, line3b,
@@ -2083,6 +2105,22 @@ const premiumTaxCreditLines
     }
 
 /**
+ * Form 6251 line 2l off a computed Schedule C: the §56(a)(1) depreciation
+ * adjustment `fjs/form4562` produced, or zero when this return's business
+ * stored no `vnd.fjs.asset_register` (and for a return with no business at
+ * all, which is the same zero line 2l has always carried).
+ *
+ * Written as a named function rather than inline so the ONE place that reads
+ * it is greppable: an asset register must reach the alternative minimum tax
+ * through this, and never through a second `formFortyFiveSixtyTwo` call.
+ * @type {(scheduleC: ScheduleC) => bigint}
+ */
+const amtDepreciationAdjustmentOf = scheduleC => {
+    const form4562 = scheduleC.form4562
+    return form4562 === undefined ? 0n : form4562.alternativeMinimumTaxAdjustmentCents
+}
+
+/**
  * Form 1040 lines 16 through 37 for an in-scope return, given lines 1a-15.
  *
  * Refuses — as the WHOLE report's outcome, never as a line — when line 16's
@@ -2289,6 +2327,15 @@ const form1040TaxAndPaymentLines = taxParamSet => inputs => income => {
         profile,
         status,
         scheduleThreeLine1Cents: scheduleThreeLine1.value,
+        // Form 6251 line 2l -- the §56(a)(1) depreciation adjustment, off
+        // the ONE Form 4562 `fjs/schedule/c` already completed inside
+        // Schedule 1 Part I above. Reading the asset registers a second
+        // time here would be a second Form 4562: the convention it picks
+        // depends on the whole register's aggregate, so two executions
+        // that disagree about a refusal would disagree about the AMT too.
+        // Zero for a return with no register, which is what line 2l has
+        // always been.
+        amtDepreciationAdjustmentCents: income.amtDepreciationAdjustmentCents,
         // Printed Schedule 2 line 1a, off the ONE Form 8962 execution above
         // -- never a second, independently stale one. It reaches Form 6251
         // line 10 too, through line 1z, which the printed form adds to the
@@ -3044,7 +3091,7 @@ const expectedIncomeLineCount = 31
  * so the `Exclude<>` below is what turns forgetting one of them into a
  * compile error rather than a crash on a missing `.sources` — which is
  * exactly what it did when this phase first added them.
- * @type {readonly Exclude<keyof Form1040IncomeLines, 'kind' | 'filingScheduleD' | 'scheduleD15Cents' | 'scheduleD16Cents' | 'scheduleD18Cents' | 'scheduleD19Cents' | 'selfEmployment' | 'specifiedPrivateActivityBondInterest' | 'itemizing' | 'scheduleALine7Cents' | 'scheduleOneALine37Cents' | 'disqualifiedPassiveIncomeCents' | 'dependentCareLine31Cents' | 'dependentCareApplicable' | 'dependentCare'>[]}
+ * @type {readonly Exclude<keyof Form1040IncomeLines, 'kind' | 'filingScheduleD' | 'scheduleD15Cents' | 'scheduleD16Cents' | 'scheduleD18Cents' | 'scheduleD19Cents' | 'selfEmployment' | 'specifiedPrivateActivityBondInterest' | 'itemizing' | 'scheduleALine7Cents' | 'scheduleOneALine37Cents' | 'disqualifiedPassiveIncomeCents' | 'dependentCareLine31Cents' | 'dependentCareApplicable' | 'dependentCare' | 'amtDepreciationAdjustmentCents'>[]}
  */
 const incomeLineFieldNames = /** @type {const} */ ([
     'line1a', 'line1b', 'line1c', 'line1d', 'line1e', 'line1f', 'line1g', 'line1h', 'line1i', 'line1z',
@@ -3461,6 +3508,7 @@ const inputsOf = profile => w2s => interestForms => dividendForms => brokerageFo
                 unemploymentForms: [],
                 nonemployeeCompensationForms: [],
                 businessExpenseForms: [],
+                assetRegisters: [],
                 adjustmentForms: [],
                 studentLoanInterestForms: [],
                 tuitionForms: [],
@@ -5013,6 +5061,96 @@ const exerciseAndHoldWith = estateTrustK1Forms => {
             },
         }],
         estateTrustK1Forms,
+    })
+}
+
+
+/**
+ * An asset register for the SAME business `businessExpensesDocument` names,
+ * carrying ONE $10,000.00 five-year workstation placed in service in June —
+ * with its §168(k) status as the parameter, because that one field is what
+ * decides whether §56(a)(1) adjusts the asset for the alternative minimum tax
+ * and NOTHING else on the return.
+ *
+ * `accountNumber` matches `businessExpensesDocument`'s `'BUS-0001'`
+ * deliberately: `fjs/schedule/c` refuses a register whose account number names
+ * a different activity, and a fixture that quietly disagreed would exercise
+ * that refusal instead of the wiring.
+ * @type {(documentHash: string) => (section168kStatus: string) => Stored<AssetRegister>}
+ */
+const assetRegisterDocument = documentHash => section168kStatus => ({
+    documentHash,
+    value: {
+        dialect: 'vnd.fjs.asset_register',
+        recipientTin: '222-22-2222',
+        accountNumber: 'BUS-0001',
+        taxYear: 2025,
+        businessOrActivity: 'software consulting',
+        everyDepreciableAssetIsListed: /** @type {const} */ (true),
+        noDepreciablePropertyDisposedOfDuringTheYear: /** @type {const} */ (true),
+        priorYearSection179CarryoverIsZero: /** @type {const} */ (true),
+        assets: [{
+            description: 'workstation',
+            datePlacedInService: '2025-06',
+            costOrOtherBasis: '10000.00',
+            businessUsePercentage: '100.00',
+            classification: 'fiveYear',
+            method: '200DB',
+            convention: 'HY',
+            section168kStatus,
+        }],
+    },
+})
+
+/**
+ * `exerciseAndHoldWith`'s return, PLUS a small consulting business and an
+ * asset register — the fixture the two Form 4562 wiring leaves are
+ * differentials against.
+ *
+ * The business is deliberately small ($3,000.00 of receipts) so taxable income
+ * stays below §199A(e)(2)'s threshold and Form 8995 rather than Form 8995-A
+ * applies; the ISO spread is an AMT preference and not regular income, so it
+ * does not move that threshold.
+ * @type {(section168kStatus: string) => Form1040Outcome}
+ */
+const exerciseAndHoldWithAssetRegister = section168kStatus => {
+    /** @type {ReturnProfile} */
+    const profile = {
+        ...singleProfile,
+        taxpayerBornBeforeJan2_1961: true,
+        declaredKinds: [
+            'wages', 'seniorAndOtherScheduleOneADeductions', 'alternativeMinimumTax',
+            'amtDepreciation', 'businessIncomeOrLoss', 'selfEmploymentTax',
+            'deductiblePartOfSelfEmploymentTax', 'qualifiedBusinessIncomeDeduction',
+        ],
+    }
+    const base = withBusiness(
+        inputsOf(storedProfile(profile))([
+            w2Document('sha256-2l-amt-w2')('130000.00'),
+        ])([])([])([])([])([])([])([])([]),
+    )([nonemployeeCompensationDocument('sha256-2l-nec')('3000.00')('0.00')])(
+        [businessExpensesDocument('sha256-2l-expenses')('0.00')])
+    return form1040Report(taxParams2025)({
+        ...base,
+        assetRegisters: [assetRegisterDocument('sha256-2l-register')(section168kStatus)],
+        isoExerciseForms: [{
+            documentHash: 'sha256-2l-amt-3921',
+            value: {
+                dialect: 'vnd.fjs.form3921',
+                payerTin: '11-1111111',
+                recipientTin: '222-22-2222',
+                accountNumber: 'ACC-ISO',
+                taxYear: 2025,
+                formRevision: 'April 2025',
+                sourceArtifactHash:
+                    'deadbeef00112233445566778899aabbccddeeff0011223344556677889900',
+                box1DateOptionGranted: '01/03/2023',
+                box2DateOptionExercised: '03/13/2025',
+                box3ExercisePricePerShare: '5.00',
+                box4FairMarketValuePerShareOnExerciseDate: '105.00',
+                box5NumberOfSharesTransferred: '10000',
+            },
+        }],
     })
 }
 
@@ -12252,6 +12390,118 @@ export const proof = {
             assert(
                 boxes.includes('box4FairMarketValuePerShareOnExerciseDate'),
                 ['and the box the spread was computed from', boxes])
+        },
+        /**
+         * ★ **THE WIRING LEAF FOR SCHEDULE C LINE 13 AND FORM 6251 LINE 2L.**
+         * A stored `vnd.fjs.asset_register` reaches Schedule C line 13,
+         * Schedule 1 line 3, **1040 line 8** — and, through the SAME completed
+         * Form 4562, Form 6251 line 2l, Schedule 2 line 2 and **1040 line
+         * 17**.
+         *
+         * It exists because a form-level proof structurally cannot see the
+         * wiring: `fjs/form4562`'s own leaves construct their own
+         * `Form4562Input`, and every one of them stays green while
+         * `fjs/schedule/c` is handed an EMPTY register list — the defect this
+         * project has now paid for three times.
+         *
+         * **The regular half, hand-computed.** Publication 946 Table A-1's
+         * 5-year column, year 1, half-year convention, 200 DB: 20.00% of
+         * $10,000.00 is **$2,000.00**, and that is Form 4562 line 22 and
+         * therefore Schedule C line 13. Gross receipts are $3,000.00 and there
+         * are no other expenses, so Schedule C line 31 is
+         * $3,000.00 - $2,000.00 = **$1,000.00**, and 1040 line 8 is the same
+         * $1,000.00 through Schedule 1 line 10.
+         *
+         * **The alternative half is a DIFFERENTIAL**, against the identical
+         * return with one field changed — `section168kStatus` from
+         * `notQualifiedProperty` to `electedOut`. i4562 p7: electing out of
+         * the special depreciation allowance means the property "will not be
+         * subject to an AMT adjustment for depreciation", so line 2l goes to
+         * zero while EVERY regular-tax figure stays exactly where it was
+         * (the 150% declining balance schedule is an AMT schedule and touches
+         * nothing on the 1040 itself).
+         *
+         *   6251 line 2l   200 DB 20.00% - 150 DB 15.00% of $10,000.00   $500.00
+         *   AMTI is above $239,100.00 and the exemption is fully phased out
+         *   by the ISO spread, so every extra dollar is taxed at 28%
+         *   1040 line 17   28% of $500.00                                $140.00
+         */
+        theAssetRegisterReachesScheduleCLineThirteenAndFormSixTwoFiveOneLineTwoL: () => {
+            const adjusted = exerciseAndHoldWithAssetRegister('notQualifiedProperty')
+            const electedOut = exerciseAndHoldWithAssetRegister('electedOut')
+            assert(adjusted.kind === 'ok', ['expected the adjusted return to compute', adjusted])
+            assert(electedOut.kind === 'ok', ['expected the elected-out return to compute', electedOut])
+            if (adjusted.kind !== 'ok' || electedOut.kind !== 'ok') {
+                return
+            }
+            const adjustedAt = lineRuled(adjusted.lines)
+            const electedOutAt = lineRuled(electedOut.lines)
+            // The regular tax half: Schedule C line 13 is $2,000.00 of
+            // depreciation, so line 31 -- and 1040 line 8 -- is $1,000.00.
+            assertEq(adjustedAt('1040 line 8').value, 100000n,
+                '$3,000.00 of receipts less $2,000.00 of Table A-1 depreciation')
+            assertEq(electedOutAt('1040 line 8').value, 100000n,
+                'and §168(k) status does not move ONE regular-tax figure')
+            // 1040 line 8 cites the register itself, by hash and by the path
+            // the amount travelled -- the part of the message a reader can act
+            // on, which is what an erased interpolation would silently lose.
+            const hashes = adjustedAt('1040 line 8').sources.map(source => source.documentHash)
+            assert(hashes.includes('sha256-2l-register'),
+                ['1040 line 8 must cite the asset register', hashes])
+            const boxes = adjustedAt('1040 line 8').sources.map(source => source.boxPath)
+            assert(boxes.includes('assets -> Form 4562 line 22'),
+                ['and the path the depreciation travelled', boxes])
+            // The alternative minimum tax half, as a differential.
+            const adjustedSeventeen = adjustedAt('1040 line 17').value
+            const electedOutSeventeen = electedOutAt('1040 line 17').value
+            assert(electedOutSeventeen > 0n,
+                ['the base return must actually owe alternative minimum tax, or the '
+                    + 'differential below is two zeros', electedOutSeventeen])
+            assertEq(adjustedSeventeen - electedOutSeventeen, 14000n,
+                '28% of the $500.00 §56(a)(1) depreciation adjustment')
+        },
+        /**
+         * THE CONTROL for the leaf above: the SAME filer with the register
+         * withheld. Schedule C line 13 goes to zero, so line 31 is the whole
+         * $3,000.00 of receipts, and Form 6251 line 2l is zero — which is
+         * exactly what line 2l carried before this commit.
+         *
+         * Without it, a `fjs/schedule/c` that refused every register, or one
+         * that always deducted, would be indistinguishable from one that reads
+         * it.
+         */
+        theSameFilerWithoutAnAssetRegisterDeductsNothingAndAdjustsNothing: () => {
+            const withRegister = exerciseAndHoldWithAssetRegister('electedOut')
+            /** @type {ReturnProfile} */
+            const profile = {
+                ...singleProfile,
+                taxpayerBornBeforeJan2_1961: true,
+                declaredKinds: [
+                    'wages', 'seniorAndOtherScheduleOneADeductions', 'alternativeMinimumTax',
+                    'amtDepreciation', 'businessIncomeOrLoss', 'selfEmploymentTax',
+                    'deductiblePartOfSelfEmploymentTax', 'qualifiedBusinessIncomeDeduction',
+                ],
+            }
+            const without = form1040Report(taxParams2025)({
+                ...withBusiness(
+                    inputsOf(storedProfile(profile))([
+                        w2Document('sha256-2l-amt-w2')('130000.00'),
+                    ])([])([])([])([])([])([])([])([]),
+                )([nonemployeeCompensationDocument('sha256-2l-nec')('3000.00')('0.00')])(
+                    [businessExpensesDocument('sha256-2l-expenses')('0.00')]),
+                isoExerciseForms: [],
+            })
+            assert(without.kind === 'ok', ['expected the register-less return to compute', without])
+            assert(withRegister.kind === 'ok', ['expected the register return to compute', withRegister])
+            if (without.kind !== 'ok' || withRegister.kind !== 'ok') {
+                return
+            }
+            assertEq(lineRuled(without.lines)('1040 line 8').value, 300000n,
+                'the whole $3,000.00 of receipts, undepreciated')
+            const hashes = lineRuled(without.lines)('1040 line 8').sources
+                .map(source => source.documentHash)
+            assert(!hashes.includes('sha256-2l-register'),
+                ['a return with no register must not cite one', hashes])
         },
         /**
          * ★ **THE WIRING LEAF FOR FORM 6251 LINE 2J.** A stored Schedule K-1

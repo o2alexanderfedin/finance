@@ -106,6 +106,7 @@ export const render = root => {
         iraForms: [],
         nonemployeeCompensationForms: [],
         businessExpenseForms: [],
+        assetRegisters: [],
         priorYearIraBasisForms: [],
         isoExerciseForms: [],
         employeeStockPurchaseForms: [],

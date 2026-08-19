@@ -204,6 +204,7 @@ import { taxParamsByYear } from '../../tax/params/module.f.js'
 /** @import { OneZeroNineEightE } from '../../document/1098e/module.f.js' */
 /** @import { Adjustments } from '../../document/adjustments/module.f.js' */
 /** @import { BusinessExpenses } from '../../document/business_expenses/module.f.js' */
+/** @import { AssetRegister } from '../../document/asset_register/module.f.js' */
 /** @import { OneZeroNineNineNec } from '../../document/1099nec/module.f.js' */
 /** @import { ScheduleC } from '../c/module.f.js' */
 /** @import { ScheduleE } from '../e/module.f.js' */
@@ -481,6 +482,7 @@ const earlyWithdrawalPenaltyLine = profile => forms => {
  *   readonly nonemployeeCompensationForms: readonly Stored<OneZeroNineNineNec>[],
  *   readonly businessExpenseForms: readonly Stored<BusinessExpenses>[],
  *   readonly w2Forms: readonly Stored<W2>[],
+ *   readonly assetRegisters: readonly Stored<AssetRegister>[],
  *   readonly partnershipK1Forms: readonly Stored<K1Partnership>[],
  *   readonly sCorporationK1Forms: readonly Stored<K1SCorporation>[],
  *   readonly estateTrustK1Forms: readonly Stored<K1EstateTrust>[],
@@ -523,11 +525,11 @@ const earlyWithdrawalPenaltyLine = profile => forms => {
 export const scheduleOnePartI = input => {
     const {
         profile, unemploymentForms, nonemployeeCompensationForms, businessExpenseForms, w2Forms,
-        partnershipK1Forms, sCorporationK1Forms, estateTrustK1Forms,
+        assetRegisters, partnershipK1Forms, sCorporationK1Forms, estateTrustK1Forms,
     } = input
     const zero = profileDeclaredZeroLine(profile)
     const scheduleCOutcome = scheduleC({
-        profile, nonemployeeCompensationForms, businessExpenseForms, w2Forms,
+        profile, nonemployeeCompensationForms, businessExpenseForms, w2Forms, assetRegisters,
     })
     if (scheduleCOutcome.kind === 'error') {
         return scheduleCOutcome
@@ -2001,6 +2003,7 @@ export const scheduleOnePartII = taxParamSet => input => {
  *   readonly unemploymentForms: readonly Stored<OneZeroNineNineG>[],
  *   readonly nonemployeeCompensationForms: readonly Stored<OneZeroNineNineNec>[],
  *   readonly businessExpenseForms: readonly Stored<BusinessExpenses>[],
+ *   readonly assetRegisters: readonly Stored<AssetRegister>[],
  *   readonly partnershipK1Forms: readonly Stored<K1Partnership>[],
  *   readonly sCorporationK1Forms: readonly Stored<K1SCorporation>[],
  *   readonly estateTrustK1Forms: readonly Stored<K1EstateTrust>[],
@@ -2028,14 +2031,14 @@ export const scheduleOnePartII = taxParamSet => input => {
 export const scheduleOne = taxParamSet => input => {
     const {
         profile, status, unemploymentForms, nonemployeeCompensationForms, businessExpenseForms,
-        partnershipK1Forms, sCorporationK1Forms, estateTrustK1Forms,
+        assetRegisters, partnershipK1Forms, sCorporationK1Forms, estateTrustK1Forms,
         adjustmentForms, studentLoanInterestForms, w2Forms, interestForms, totalIncomeLine,
         totalIncomeExceptTaxableSocialSecurityLine, socialSecurityBenefitsCents,
         taxExemptInterestCents, mfsLivedWithSpouseAtAnyTimeInYear, iraDistributionReceived,
     } = input
     const partI = scheduleOnePartI({
         profile, unemploymentForms, nonemployeeCompensationForms, businessExpenseForms, w2Forms,
-        partnershipK1Forms, sCorporationK1Forms, estateTrustK1Forms,
+        assetRegisters, partnershipK1Forms, sCorporationK1Forms, estateTrustK1Forms,
     })
     if (partI.kind === 'error') {
         return partI
@@ -2436,6 +2439,7 @@ const movingPartII = profile => entries => w2Forms =>
  */
 const partIOf = profile => unemploymentForms => nonemployeeCompensationForms => businessExpenseForms =>
     scheduleOnePartI({
+        assetRegisters: [],
         profile, unemploymentForms, nonemployeeCompensationForms, businessExpenseForms,
         w2Forms: [],
         partnershipK1Forms: [],
@@ -2546,6 +2550,7 @@ const noBusinessNetProfit = profile => {
         nonemployeeCompensationForms: [],
         businessExpenseForms: [],
         w2Forms: [],
+        assetRegisters: [],
     })
     assert(outcome.kind === 'ok', ['an empty Schedule C cannot refuse', outcome])
     return outcome.partII.line31
@@ -2745,6 +2750,7 @@ const lineTwentyOf = fixture => okStageOne(stageOneForIra(fixture)).line20.value
 const stageOneWithBusiness = profile => status => nonemployeeCompensationForms =>
     businessExpenseForms => w2Forms => {
         const partI = okPartI(scheduleOnePartI({
+            assetRegisters: [],
             profile,
             unemploymentForms: [],
             nonemployeeCompensationForms,
@@ -2773,6 +2779,7 @@ const stageOneWithBusiness = profile => status => nonemployeeCompensationForms =
 const stageOneWithPassThrough = profile => status => partnershipK1Forms =>
     businessExpenseForms => w2Forms => {
         const partI = okPartI(scheduleOnePartI({
+            assetRegisters: [],
             profile,
             unemploymentForms: [],
             nonemployeeCompensationForms: [],
@@ -2986,6 +2993,7 @@ export const proof = {
         //   Sch 1 line 10     (nothing else on Part I)        $80,000.00
         lineFiveIsScheduleELineFortyOneAndReachesLineTen: () => {
             const withK1 = okPartI(scheduleOnePartI({
+                assetRegisters: [],
                 profile: profileNoDeclaredKinds,
                 unemploymentForms: [],
                 nonemployeeCompensationForms: [],
@@ -3019,6 +3027,7 @@ export const proof = {
         //   line 10 260.00 + 80,000.00                       $80,260.00
         linesThreeAndFiveAreDistinctAndBothReachTheTotal: () => {
             const partI = okPartI(scheduleOnePartI({
+                assetRegisters: [],
                 profile: profileNoDeclaredKinds,
                 unemploymentForms: [],
                 nonemployeeCompensationForms: [nonemployeeCompensationDoc('350.00')],
@@ -3037,6 +3046,7 @@ export const proof = {
         // likely to be met in practice.
         aScheduleERefusalPropagatesOutOfPartOne: () => {
             const result = refusal(scheduleOnePartI({
+                assetRegisters: [],
                 profile: profileNoDeclaredKinds,
                 unemploymentForms: [],
                 nonemployeeCompensationForms: [],
@@ -3143,6 +3153,7 @@ export const proof = {
          */
         oneProprietorWhoIsAlsoAPartnerAddsBothToLineTwo: () => {
             const partI = okPartI(scheduleOnePartI({
+                assetRegisters: [],
                 profile: profileNoDeclaredKinds,
                 unemploymentForms: [],
                 nonemployeeCompensationForms: [nonemployeeCompensationDoc('350.00')],
@@ -4209,6 +4220,7 @@ export const proof = {
         // §219(f)(1)/§401(c)(2) earned income — three missing facts at once.
         selfEmploymentAlongsideAContributionRefuses: () => {
             const partI = okPartI(scheduleOnePartI({
+                assetRegisters: [],
                 profile: profileNoDeclaredKinds,
                 unemploymentForms: [],
                 nonemployeeCompensationForms: [nonemployeeCompensationDoc('40000.00')],
@@ -4988,6 +5000,7 @@ export const proof = {
         const staged = okPartII(partIIOf(profileNoDeclaredKinds)('single')(adjustmentForms)(
             studentLoanInterestForms)([])(9250000n))
         const composed = scheduleOne(taxParams2025)({
+            assetRegisters: [],
             profile: profileNoDeclaredKinds,
             interestForms: [],
             ...noSocialSecurityInteraction,
@@ -5019,6 +5032,7 @@ export const proof = {
     // than being swallowed by the composition.
     aStageOneRefusalPropagatesThroughTheComposedForm: () => {
         const composed = scheduleOne(taxParams2025)({
+            assetRegisters: [],
             profile: profileNoDeclaredKinds,
             interestForms: [],
             ...noSocialSecurityInteraction,
@@ -5092,6 +5106,7 @@ export const proof = {
     // "hand-typed count" mutation-gate idiom).
     everyPrintedLineIsNamed: () => {
         const composed = scheduleOne(taxParams2025)({
+            assetRegisters: [],
             profile: profileNoDeclaredKinds,
             interestForms: [],
             ...noSocialSecurityInteraction,

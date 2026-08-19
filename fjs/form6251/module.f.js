@@ -307,6 +307,7 @@ const min = a => b => a < b ? a : b
  *   readonly aStoredNineteenNineBReportsASale: boolean,
  *   readonly specifiedPrivateActivityBondInterestCents: bigint,
  *   readonly estateTrustK1Forms: readonly Stored<K1EstateTrust>[],
+ *   readonly amtDepreciationAdjustmentCents: bigint,
  *   readonly regularTaxCents: bigint,
  *   readonly scheduleTwoLine1zCents: bigint,
  *   readonly scheduleThreeLine1Cents: bigint,
@@ -557,6 +558,7 @@ export const form6251 = taxParamSet => input => {
         itemizing, scheduleALine7Cents, standardDeductionCents,
         isoExerciseForms, aStoredNineteenNineBReportsASale,
         specifiedPrivateActivityBondInterestCents, estateTrustK1Forms,
+        amtDepreciationAdjustmentCents,
         regularTaxCents, scheduleTwoLine1zCents, scheduleThreeLine1Cents,
         qualifiedDividendsCents, capitalGainDistributionsCents,
         filingScheduleD, scheduleD15Cents, scheduleD16Cents, scheduleD19Cents,
@@ -659,8 +661,20 @@ export const form6251 = taxParamSet => input => {
     //     EARLIER year and sold in this one lands, and it is why line 2i's
     //     own basis increase is a multi-year fact this engine cannot carry.
     const line2k = 0n
-    // 2l. Depreciation on assets placed in service after 1986 -- `amtDepreciation`.
-    const line2l = 0n
+    // 2l. "Depreciation on assets placed in service after 1986" --
+    //     `amtDepreciation`, computed by `fjs/form4562` from a
+    //     `vnd.fjs.asset_register` and threaded here through
+    //     `fjs/schedule/c`'s own completed Form 4562. §56(a)(1)(A)(ii)
+    //     puts 200% declining balance property on the 150% declining
+    //     balance method over the SAME recovery period, and the adjustment
+    //     is the difference.
+    //
+    //     **NOT floored**, for the identical reason line 2j is not: 200 DB
+    //     front-loads, so past the halfway point of an asset's life the
+    //     alternative schedule is the larger of the two and the adjustment
+    //     is NEGATIVE. Flooring it would overstate alternative minimum
+    //     taxable income for every business with mature equipment.
+    const line2l = amtDepreciationAdjustmentCents
     // 2m. Passive activities -- `amtPassiveActivities`.
     const line2m = 0n
     // 2n. Loss limitations -- `amtLossLimitations`.
@@ -971,6 +985,7 @@ const beneficiaryK1 = hash => box12 => ({
  */
 const nothing = {
     status: 'single',
+    amtDepreciationAdjustmentCents: 0n,
     adjustedGrossIncomeCents: 0n,
     totalDeductionsCents: 0n,
     scheduleOneALine37Cents: 0n,

@@ -522,6 +522,17 @@ export const modeledKinds = /** @type {const} */ ([
     'qualifiedReitDividends',      // 1099-DIV box 5 -> Form 8995 line 6 -> 1040 line 13a
     'seniorAndOtherScheduleOneADeductions', // Schedule 1-A Parts I/V/VI -> 1040 line 13b
     'alternativeMinimumTax',       // Form 6251 line 11 -> Schedule 2 line 2 -> 1040 line 17
+    // Reclassified in the SAME commit as the wiring that makes it
+    // computable: `vnd.fjs.asset_register` -> `fjs/form4562` -> Schedule C
+    // line 13 AND Form 6251 line 2l, off ONE completed Form 4562. The old
+    // remedy said this engine held "a per-asset basis, method and
+    // placed-in-service date ... for nothing", and that is what the
+    // register supplies. What §56(a)(1)(A)(ii) then needs is the SAME
+    // schedule at 150% declining balance over the same recovery period,
+    // which `fjs/form4562/macrs` already derives -- and the two printed
+    // cautions that switch the adjustment off (i4562 p7) are read off the
+    // register's own `section168kStatus`, never guessed.
+    'amtDepreciation',             // Form 4562 -> Form 6251 line 2l -> Schedule 2 line 2 -> 1040 line 17
     'selfEmploymentTax',           // Schedule SE line 12 -> Schedule 2 line 4 -> 1040 line 23
     'additionalMedicareTax',       // Form 8959 -> Schedule 2 line 11 -> 1040 lines 23/25c
     'netInvestmentIncomeTax',      // Form 8960 -> Schedule 2 line 12 -> 1040 line 23
@@ -756,7 +767,7 @@ export const unmodeledKindRefusals = /** @type {const} */ ([
     // it computable -- wire before reclassify, exactly as Phases 23, 24, 25 and
     // 27 did. The split commit before it added all five as refusals and
     // reclassified nothing.
-    { kind: 'rentalRealEstateAndRoyalties', line: 'Schedule E Part I lines 3-26 -> Schedule 1 line 5 -> 1040 line 8', label: 'rental real estate and royalty income or loss', remedy: 'requires Schedule E Part I, whose per-property columns need the rents received, the fair rental and personal-use days that §280A allocates by, and a depreciation figure from Form 4562 — the same asset basis history Schedule C line 13 already refuses for. A royalty additionally needs its own printed line 4, which is Part I’s and not Part II’s, so a Schedule K-1 royalty box cannot ride into line 41 on the partnership block (no phase yet)' },
+    { kind: 'rentalRealEstateAndRoyalties', line: 'Schedule E Part I lines 3-26 -> Schedule 1 line 5 -> 1040 line 8', label: 'rental real estate and royalty income or loss', remedy: 'requires Schedule E Part I, whose per-property columns need the rents received and the fair rental and personal-use days that §280A allocates by — neither of which any dialect here carries. The DEPRECIATION half of this refusal is gone: `vnd.fjs.asset_register` and `fjs/form4562` now compute a Form 4562 line 22, and a register for a rental activity is REFUSED by name at `fjs/schedule/c` rather than silently dropped, precisely because Part I is the printed line its depreciation would have to reach. A royalty additionally needs its own printed line 4, which is Part I’s and not Part II’s, so a Schedule K-1 royalty box cannot ride into line 41 on the partnership block (no phase yet)' },
     { kind: 'remicResidualInterest', line: 'Schedule E Part IV lines 38-39 -> Schedule 1 line 5 -> 1040 line 8', label: 'real estate mortgage investment conduit (REMIC) residual interest', remedy: 'requires Schedule Q (Form 1066), and §860E(a) taxes the excess inclusion whether or not it was received and forbids offsetting it with any net operating loss — so a zero here is not merely an omission but a floor this engine cannot enforce (no phase yet)' },
     { kind: 'netFarmRentalIncomeForm4835', line: 'Schedule E Part V line 40 -> Schedule 1 line 5 -> 1040 line 8', label: 'net farm rental income or loss', remedy: 'requires Form 4835, which a landowner uses for crop-share rents received without materially participating — and materially participating instead moves the whole activity to Schedule F, which `farmIncomeOrLoss` already refuses. Neither form is modeled (no phase yet)' },
     { kind: 'farmIncomeOrLoss', line: 'Schedule 1 line 6 -> 1040 line 8', label: 'farm income or loss', remedy: 'requires Schedule F (no phase yet)' },
@@ -879,7 +890,6 @@ export const unmodeledKindRefusals = /** @type {const} */ ([
     { kind: 'amtDepletion', line: 'Form 6251 line 2d -> Schedule 2 line 2 -> 1040 line 17', label: 'the alternative minimum tax depletion adjustment', remedy: 'requires the depletion deduction refigured under §57(a)(1) with AMT income and deductions, and with the §611 deduction limited to the property\'s AMT-adjusted basis — a per-property computation for which this engine holds no document at all (no phase yet)' },
     { kind: 'amtNetOperatingLossDeduction', line: 'Form 6251 lines 2e and 2f -> Schedule 2 line 2 -> 1040 line 17', label: 'the net operating loss add-back and the alternative tax net operating loss deduction', remedy: 'requires the ATNOL: every prior year\'s loss refigured under the AMT rules, limited to 90% of alternative minimum taxable income figured without it. That is a multi-year history this engine does not hold, and Schedule 1 line 8a — the regular deduction line 2e adds back — is itself the refused `otherIncome` kind. ONE kind covers both printed lines because they are two halves of one fact: 2e removes the regular deduction and 2f allows the AMT one in its place (no phase yet)' },
     { kind: 'amtDispositionOfProperty', line: 'Form 6251 line 2k -> Schedule 2 line 2 -> 1040 line 17', label: 'the difference between the AMT and regular-tax gain or loss on a disposition', remedy: 'requires the taxpayer\'s AMT BASIS in the property disposed of, which differs from the regular-tax basis by every adjustment made in every prior year — most commonly the §56(b)(3) incentive stock option spread, which increases AMT basis in the year of exercise and reduces the AMT gain whenever the shares are later sold. This engine computes that spread (Form 6251 line 2i) but cannot carry it forward: it holds no prior-year AMT basis document, and Form 3921 is issued for the exercise year only (no phase yet)' },
-    { kind: 'amtDepreciation', line: 'Form 6251 line 2l -> Schedule 2 line 2 -> 1040 line 17', label: 'the depreciation adjustment on assets placed in service after 1986', remedy: 'requires §56(a)(1)\'s alternative depreciation for every depreciable asset — a per-asset basis, method and placed-in-service date this engine holds for nothing, since vnd.fjs.business_expenses records Schedule C line totals rather than an asset register (no phase yet)' },
     { kind: 'amtPassiveActivities', line: 'Form 6251 line 2m -> Schedule 2 line 2 -> 1040 line 17', label: 'the passive activity adjustment', remedy: 'requires §469 passive activity losses refigured with AMT amounts, which needs Form 8582 and the Schedule E activities behind it (Phase 30 brings Schedule E Parts II and III; Form 8582 has no phase yet)' },
     { kind: 'amtLossLimitations', line: 'Form 6251 line 2n -> Schedule 2 line 2 -> 1040 line 17', label: 'the loss-limitation adjustment', remedy: 'requires the §465 at-risk and §1366(d) basis limitations refigured with AMT amounts, both of which need a partner\'s or shareholder\'s basis history this engine does not hold (no phase yet)' },
     { kind: 'amtCirculationCosts', line: 'Form 6251 line 2o -> Schedule 2 line 2 -> 1040 line 17', label: 'the circulation expenditures adjustment', remedy: 'requires §173 circulation expenditures amortized over three years for the AMT rather than deducted currently. No document this engine holds identifies an expenditure as circulation costs, and the §59(e) election that removes the adjustment entirely is an election nothing records (no phase yet)' },
@@ -1551,7 +1561,7 @@ export const classifyScope = declaredKinds => {
  * have left the other reading a cap the exclusion had already eaten.
  * @type {number}
  */
-const expectedModeledKindCount = 51
+const expectedModeledKindCount = 52
 
 /**
  * The modeled set, hand-typed a SECOND time and in {@link kindVocabulary}'s
@@ -1597,6 +1607,7 @@ const everyModeledKindHandTyped = [
     'qualifiedReitDividends',
     'seniorAndOtherScheduleOneADeductions',
     'alternativeMinimumTax',
+    'amtDepreciation',
     'selfEmploymentTax',
     'additionalMedicareTax',
     'netInvestmentIncomeTax',
@@ -1740,7 +1751,7 @@ const everyModeledKindHandTyped = [
  * split. `68 - 2`.
  * @type {number}
  */
-const expectedUnmodeledKindCount = 66
+const expectedUnmodeledKindCount = 65
 
 /**
  * The complete refusal message for a return declaring exactly
@@ -2155,18 +2166,18 @@ export const proof = {
         // "Form 6251" -- a list computed from the table under test could never
         // notice a row missing.
         //
-        // Lines 2a, 2b, 2c, 2h, 2i and 2j are absent, each for its own reason:
-        // 2a, 2i and 2j COMPUTE, 2b is a computed zero (see the leaf below),
-        // and 2c and 2h are named by `investmentInterestForm4952` and
-        // `section1202Gain`, which already existed. 2j joined the computing
-        // set with `amtEstatesAndTrusts`'s reclassification.
-        theThirteenFormSixTwoFiveOneKindsStillRefusingNameTheirOwnPrintedLine: () => {
+        // Lines 2a, 2b, 2c, 2h, 2i, 2j and 2l are absent, each for its own
+        // reason: 2a, 2i, 2j and 2l COMPUTE, 2b is a computed zero (see the
+        // leaf below), and 2c and 2h are named by
+        // `investmentInterestForm4952` and `section1202Gain`, which already
+        // existed. 2j joined the computing set with `amtEstatesAndTrusts`'s
+        // reclassification, and 2l with the Form 4562 wiring.
+        theTwelveFormSixTwoFiveOneKindsStillRefusingNameTheirOwnPrintedLine: () => {
             /** @type {readonly (readonly [Kind, string])[]} */
             const expected = [
                 ['amtDepletion', 'Form 6251 line 2d'],
                 ['amtNetOperatingLossDeduction', 'Form 6251 lines 2e and 2f'],
                 ['amtDispositionOfProperty', 'Form 6251 line 2k'],
-                ['amtDepreciation', 'Form 6251 line 2l'],
                 ['amtPassiveActivities', 'Form 6251 line 2m'],
                 ['amtLossLimitations', 'Form 6251 line 2n'],
                 ['amtCirculationCosts', 'Form 6251 line 2o'],
@@ -2182,8 +2193,8 @@ export const proof = {
             // says so -- but one of them, `amtPrivateActivityBondInterest`, is
             // now MODELED, so it has no refusal row for this table to name.
             // The two counts measure different things and must not be unified.
-            assertEq(expected.length, 13,
-                'thirteen still-refusing kinds, hand-counted off the printed Form 6251')
+            assertEq(expected.length, 12,
+                'twelve still-refusing kinds, hand-counted off the printed Form 6251')
             // Every one is in the vocabulary, in the order listed -- read from
             // `kindVocabulary`, which this module does not own.
             expected
@@ -2482,6 +2493,18 @@ export const proof = {
         businessIncomeOrLossIsInScopeAlone: () => {
             const outcome = classifyScope(['businessIncomeOrLoss'])
             assertEq(outcome.kind, 'ok', ['Schedule C\'s kind alone must be in scope', outcome])
+        },
+        // The Form 4562 wiring's ONE reclassified kind, alone -- every
+        // reclassification since Phase 12.1 has added exactly this leaf. It is
+        // the only one of the fifteen `amt*` Part I kinds that moved, so
+        // `theTwelveFormSixTwoFiveOneKindsStillRefusingNameTheirOwnPrintedLine`
+        // above is its other half: this one says it is in scope, that one says
+        // the twelve beside it are still not.
+        amtDepreciationIsInScopeAlone: () => {
+            const outcome = classifyScope(['amtDepreciation'])
+            assertEq(
+                outcome.kind, 'ok',
+                ['Form 6251 line 2l\'s kind alone must be in scope', outcome])
         },
         // **THE BOUNDARY PHASE 27 DID NOT CROSS, AND PHASE 28 DID.** This
         // leaf asserted the opposite until Phase 28: it required

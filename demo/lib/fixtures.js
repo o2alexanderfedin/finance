@@ -189,6 +189,7 @@ export const inputs = {
     iraForms: [],
     nonemployeeCompensationForms: [],
     businessExpenseForms: [],
+    assetRegisters: [],
     priorYearIraBasisForms: [],
     isoExerciseForms: [],
     partnershipK1Forms: [],

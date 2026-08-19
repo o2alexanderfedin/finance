@@ -165,6 +165,7 @@ import { dialect as oneZeroNineEightTDialect } from '../../document/1098t/module
 import { dialect as creditsDialect } from '../../document/credits/module.f.js'
 import { dialect as oneZeroNineNineNecDialect } from '../../document/1099nec/module.f.js'
 import { dialect as businessExpensesDialect } from '../../document/business_expenses/module.f.js'
+import { dialect as assetRegisterDialect } from '../../document/asset_register/module.f.js'
 import { dialect as iraDialect } from '../../document/ira/module.f.js'
 import { dialect as priorYearIraBasisDialect } from '../../document/prior_year_ira_basis/module.f.js'
 import { dialect as formThirtyNineTwentyOneDialect } from '../../document/form3921/module.f.js'
@@ -197,6 +198,7 @@ import { dialect as oneZeroNineFiveADialect } from '../../document/1095a/module.
 /** @import { Credits } from '../../document/credits/module.f.js' */
 /** @import { OneZeroNineNineNec } from '../../document/1099nec/module.f.js' */
 /** @import { BusinessExpenses } from '../../document/business_expenses/module.f.js' */
+/** @import { AssetRegister } from '../../document/asset_register/module.f.js' */
 /** @import { Ira } from '../../document/ira/module.f.js' */
 /** @import { PriorYearIraBasis } from '../../document/prior_year_ira_basis/module.f.js' */
 /** @import { FormThirtyNineTwentyOne } from '../../document/form3921/module.f.js' */
@@ -247,7 +249,7 @@ import { dialect as oneZeroNineFiveADialect } from '../../document/1095a/module.
  * `vnd.fjs.revision`, a future addition) falls straight through
  * {@link collectDocument} untouched — never coerced into a bucket, never
  * treated as a zero.
- * @typedef {ReturnProfile | W2 | OneZeroNineNineInt | OneZeroNineNineDiv | OneZeroNineNineB | OneZeroNineNineR | Ssa1099 | ItemizedDeductions | MedicalExpenses | PriorYearCapitalLoss | OneZeroNineNineG | Adjustments | OneZeroNineEightE | OneZeroNineEightT | Credits | Ira | PriorYearIraBasis | OneZeroNineNineNec | BusinessExpenses | FormThirtyNineTwentyOne | FormThirtyNineTwentyTwo | BasisCorrection | K1Partnership | K1SCorporation | K1EstateTrust | OneZeroNineFiveA} EngineDocument
+ * @typedef {ReturnProfile | W2 | OneZeroNineNineInt | OneZeroNineNineDiv | OneZeroNineNineB | OneZeroNineNineR | Ssa1099 | ItemizedDeductions | MedicalExpenses | PriorYearCapitalLoss | OneZeroNineNineG | Adjustments | OneZeroNineEightE | OneZeroNineEightT | Credits | Ira | PriorYearIraBasis | OneZeroNineNineNec | BusinessExpenses | FormThirtyNineTwentyOne | FormThirtyNineTwentyTwo | BasisCorrection | K1Partnership | K1SCorporation | K1EstateTrust | OneZeroNineFiveA | AssetRegister} EngineDocument
  */
 
 /**
@@ -278,6 +280,7 @@ import { dialect as oneZeroNineFiveADialect } from '../../document/1095a/module.
  *   readonly unemploymentForms: readonly Stored<OneZeroNineNineG>[],
  *   readonly nonemployeeCompensationForms: readonly Stored<OneZeroNineNineNec>[],
  *   readonly businessExpenseForms: readonly Stored<BusinessExpenses>[],
+ *   readonly assetRegisters: readonly Stored<AssetRegister>[],
  *   readonly adjustmentForms: readonly Stored<Adjustments>[],
  *   readonly studentLoanInterestForms: readonly Stored<OneZeroNineEightE>[],
  *   readonly tuitionForms: readonly Stored<OneZeroNineEightT>[],
@@ -355,6 +358,7 @@ export const taxReturnReportSource = [
     '        unemploymentForms: [],',
     '        nonemployeeCompensationForms: [],',
     '        businessExpenseForms: [],',
+    '        assetRegisters: [],',
     '        adjustmentForms: [],',
     '        studentLoanInterestForms: [],',
     '        tuitionForms: [],',
@@ -398,6 +402,7 @@ export const taxReturnReportSource = [
     '        if (doc.dialect === \'vnd.fjs.1099g\') { return { ...acc, unemploymentForms: [...acc.unemploymentForms, stored] } }',
     '        if (doc.dialect === \'vnd.fjs.1099nec\') { return { ...acc, nonemployeeCompensationForms: [...acc.nonemployeeCompensationForms, stored] } }',
     '        if (doc.dialect === \'vnd.fjs.business_expenses\') { return { ...acc, businessExpenseForms: [...acc.businessExpenseForms, stored] } }',
+    '        if (doc.dialect === \'vnd.fjs.asset_register\') { return { ...acc, assetRegisters: [...acc.assetRegisters, stored] } }',
     '        if (doc.dialect === \'vnd.fjs.adjustments\') { return { ...acc, adjustmentForms: [...acc.adjustmentForms, stored] } }',
     '        if (doc.dialect === \'vnd.fjs.1098e\') { return { ...acc, studentLoanInterestForms: [...acc.studentLoanInterestForms, stored] } }',
     '        if (doc.dialect === \'vnd.fjs.1098t\') { return { ...acc, tuitionForms: [...acc.tuitionForms, stored] } }',
@@ -461,6 +466,7 @@ export const taxReturnReportSource = [
     '            unemploymentForms: acc.unemploymentForms,',
     '            nonemployeeCompensationForms: acc.nonemployeeCompensationForms,',
     '            businessExpenseForms: acc.businessExpenseForms,',
+    '            assetRegisters: acc.assetRegisters,',
     '            adjustmentForms: acc.adjustmentForms,',
     '            studentLoanInterestForms: acc.studentLoanInterestForms,',
     '            tuitionForms: acc.tuitionForms,',
@@ -538,6 +544,7 @@ const emptyCollected = {
     unemploymentForms: [],
     nonemployeeCompensationForms: [],
     businessExpenseForms: [],
+    assetRegisters: [],
     adjustmentForms: [],
     studentLoanInterestForms: [],
     tuitionForms: [],
@@ -593,6 +600,7 @@ const routeDocument = documentHash => doc => acc => {
     if (doc.dialect === oneZeroNineEightTDialect) { return { ...acc, tuitionForms: [...acc.tuitionForms, { documentHash, value: doc }] } }
     if (doc.dialect === oneZeroNineNineNecDialect) { return { ...acc, nonemployeeCompensationForms: [...acc.nonemployeeCompensationForms, { documentHash, value: doc }] } }
     if (doc.dialect === businessExpensesDialect) { return { ...acc, businessExpenseForms: [...acc.businessExpenseForms, { documentHash, value: doc }] } }
+    if (doc.dialect === assetRegisterDialect) { return { ...acc, assetRegisters: [...acc.assetRegisters, { documentHash, value: doc }] } }
     if (doc.dialect === creditsDialect) { return { ...acc, creditForms: [...acc.creditForms, { documentHash, value: doc }] } }
     if (doc.dialect === iraDialect) { return { ...acc, iraForms: [...acc.iraForms, { documentHash, value: doc }] } }
     if (doc.dialect === priorYearIraBasisDialect) { return { ...acc, priorYearIraBasisForms: [...acc.priorYearIraBasisForms, { documentHash, value: doc }] } }
@@ -713,6 +721,7 @@ const renderReturn = ctx => acc => {
         unemploymentForms: acc.unemploymentForms,
         nonemployeeCompensationForms: acc.nonemployeeCompensationForms,
         businessExpenseForms: acc.businessExpenseForms,
+        assetRegisters: acc.assetRegisters,
         adjustmentForms: acc.adjustmentForms,
         studentLoanInterestForms: acc.studentLoanInterestForms,
         tuitionForms: acc.tuitionForms,
@@ -833,6 +842,7 @@ const fixtureRetireeProfileOnlyHash = 'sha256-tax-return-retiree-profile-only'
 const fixtureFounderProfileHash = 'sha256-tax-return-founder-profile'
 const fixtureFounderNecHash = 'sha256-tax-return-founder-1099nec'
 const fixtureFounderExpensesHash = 'sha256-tax-return-founder-expenses'
+const fixtureFounderRegisterHash = 'sha256-tax-return-founder-asset-register'
 const fixtureMarketplaceProfileHash = 'sha256-tax-return-marketplace-profile'
 const fixtureMarketplaceW2Hash = 'sha256-tax-return-marketplace-w2'
 const fixtureMarketplaceStatementHash = 'sha256-tax-return-marketplace-1095a'
@@ -902,6 +912,7 @@ const subjectRetireeProfileOnly = 'tax-return-subject-retiree-profile-only'
 const subjectFounderProfile = 'tax-return-subject-founder-profile'
 const subjectFounderNec = 'tax-return-subject-founder-1099nec'
 const subjectFounderExpenses = 'tax-return-subject-founder-expenses'
+const subjectFounderRegister = 'tax-return-subject-founder-asset-register'
 const subjectMarketplaceProfile = 'tax-return-subject-marketplace-profile'
 const subjectMarketplaceW2 = 'tax-return-subject-marketplace-w2'
 const subjectMarketplaceStatement = 'tax-return-subject-marketplace-1095a'
@@ -1203,7 +1214,7 @@ const documentByHash = {
     //
     // **[CLOSED] The same hole was still open for the other twenty-five
     // dispatched dialects when this paragraph was written**, and it said so
-    // rather than closing it: `sourceAndTwinDispatchOnTheSameTwentySixDialects`
+    // rather than closing it: `sourceAndTwinDispatchOnTheSameTwentySevenDialects`
     // greps the SOURCE text for each tag and asserts nothing at all about the
     // TWIN's branch, so any route branch whose dialect had no fixture in this
     // file could be deleted silently. The sweep it asked for is
@@ -1527,6 +1538,35 @@ const documentByHash = {
         box4FairMarketValuePerShareOnExerciseDate: '105.00',
         box5NumberOfSharesTransferred: '2000',
     },
+    // The Form 4562 wiring's own document. It exists for exactly the reason
+    // the 1095-A fixture above does: deleting the twin's
+    // `vnd.fjs.asset_register` route branch has to redden something, and
+    // `fjs/form1040/core`'s own asset-register leaves cannot see it -- they
+    // hand `form1040Report` a `Form1040Inputs` and never travel through this
+    // program's collect step at all.
+    //
+    // `accountNumber` matches the business expenses record's `'BUS-0001'`,
+    // because `fjs/schedule/c` refuses a register naming a different activity.
+    [fixtureFounderRegisterHash]: {
+        dialect: assetRegisterDialect,
+        recipientTin: '222-22-2222',
+        accountNumber: 'BUS-0001',
+        taxYear: 2025,
+        businessOrActivity: 'software consulting',
+        everyDepreciableAssetIsListed: true,
+        noDepreciablePropertyDisposedOfDuringTheYear: true,
+        priorYearSection179CarryoverIsZero: true,
+        assets: [{
+            description: 'laptop',
+            datePlacedInService: '2025-06',
+            costOrOtherBasis: '700.00',
+            businessUsePercentage: '100.00',
+            classification: 'sevenYear',
+            method: '200DB',
+            convention: 'HY',
+            section168kStatus: 'electedOut',
+        }],
+    },
 }
 
 /** @type {Readonly<Record<string, string>>} */
@@ -1554,6 +1594,7 @@ const snapshotBySubject = {
     [subjectFounderProfile]: fixtureFounderProfileHash,
     [subjectFounderNec]: fixtureFounderNecHash,
     [subjectFounderExpenses]: fixtureFounderExpensesHash,
+    [subjectFounderRegister]: fixtureFounderRegisterHash,
     [subjectMarketplaceProfile]: fixtureMarketplaceProfileHash,
     [subjectMarketplaceW2]: fixtureMarketplaceW2Hash,
     [subjectMarketplaceStatement]: fixtureMarketplaceStatementHash,
@@ -1623,6 +1664,11 @@ const retireeSubjects = [
 /** Phase 27's own three subjects, likewise NOT in sorted order. */
 const founderSubjects = [
     subjectFounderExpenses, subjectFounderNec, subjectFounderProfile,
+]
+
+/** The same three, plus the Form 4562 wiring's asset register. */
+const founderWithRegisterSubjects = [
+    subjectFounderRegister, subjectFounderExpenses, subjectFounderNec, subjectFounderProfile,
 ]
 
 /** TAX-37's own three subjects, likewise NOT in sorted order. */
@@ -1744,14 +1790,21 @@ const dispatchedDialects = [
     // return -- which is the shape of the "form with no production caller"
     // this repo has shipped before.
     oneZeroNineFiveADialect,
+    // The Form 4562 wiring's own, the TWENTY-SEVENTH:
+    // `vnd.fjs.asset_register`, added here in the SAME commit that adds it to
+    // the source text and to the twin. Without this entry a stored register
+    // would be classified, served a schema, and then dropped on the floor by
+    // the one program that actually assembles a return -- and Schedule C line
+    // 13 would silently go back to zero for every filer who stored one.
+    assetRegisterDialect,
 ]
 
 /**
- * `25 -> 26` is TAX-37's own `vnd.fjs.1095a`. `24 -> 25` is TAX-35's own `vnd.fjs.k1_1041`. `19 -> 24` in Phase 30: three of the five are Phase 29's, restored, and two
+ * `26 -> 27` is the Form 4562 wiring's own `vnd.fjs.asset_register`. `25 -> 26` is TAX-37's own `vnd.fjs.1095a`. `24 -> 25` is TAX-35's own `vnd.fjs.k1_1041`. `19 -> 24` in Phase 30: three of the five are Phase 29's, restored, and two
  * are this phase's own. See the list's own comments for both halves.
  * @type {number}
  */
-const expectedDispatchedDialectCount = 26
+const expectedDispatchedDialectCount = 27
 
 export const proof = {
     // The phase's central number check, and the reason this module exists:
@@ -2272,6 +2325,32 @@ export const proof = {
         assertEq(cents('1040 line 25b'), 4000n, '$40.00 of §3406 backup withholding')
         assertEq(cents('1040 line 34'), 4000n, '$40.00 overpaid')
     },
+    /**
+     * ★ **THE ROUTING LEAF FOR `vnd.fjs.asset_register`.** The stored program
+     * classifies the register, files it in `assetRegisters`, and its Form 4562
+     * line 22 reaches Schedule C line 13 and therefore 1040 line 8.
+     *
+     * Every figure hand-computed: gross receipts $350.00 (Form 1099-NEC box 1)
+     * less $90.00 of advertising less Publication 946 Table A-1's 7-year
+     * half-year year-1 rate of 14.29% on $700.00 — **$100.03** — is
+     * **$159.97**.
+     *
+     * The leaf above, which withholds the register, is what makes this one
+     * evidence about the ROUTE: without it, `$159.97` and `$260.00` would be
+     * two numbers with no relationship anybody had asserted.
+     */
+    storedProgramRoutesTheAssetRegisterAndDepreciatesScheduleCLineThirteen: () => {
+        const result = runTwin(founderWithRegisterSubjects)
+        assert(result.kind === 'ok', ['expected a computed return', result])
+        if (result.kind !== 'ok') {
+            return
+        }
+        const cents = renderedCents(result)
+        assertEq(cents('1040 line 8'), 15997n, '$260.00 less $100.03 of depreciation')
+        assertEq(cents('1040 line 9'), 15997n, 'and it is the whole of total income')
+        assertEq(cents('1040 line 11a'), 15997n, 'AGI = $159.97')
+        assertEq(cents('1040 line 25b'), 4000n, 'the §3406 backup withholding is untouched')
+    },
     // THE CONTROL: the SAME filer with the two business documents withheld.
     // Everything goes to zero, and the return still computes — so the leaf
     // above is evidence about the DOCUMENTS rather than about the profile.
@@ -2660,7 +2739,7 @@ export const proof = {
     // the SOURCE text, against a hand-typed count. The twin imports these
     // constants; the source cannot, so it spells them out — this is what
     // stops a rename from quietly desynchronizing the two.
-    sourceAndTwinDispatchOnTheSameTwentySixDialects: () => {
+    sourceAndTwinDispatchOnTheSameTwentySevenDialects: () => {
         assertEq(dispatchedDialects.length, expectedDispatchedDialectCount)
         for (const tag of dispatchedDialects) {
             assert(

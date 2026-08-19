@@ -393,6 +393,7 @@ const uncollectedTaxSources = w2s => w2s.flatMap(form =>
  *   readonly scheduleD16Cents: bigint,
  *   readonly scheduleD19Cents: bigint,
  *   readonly scheduleThreeLine1Cents: bigint,
+ *   readonly amtDepreciationAdjustmentCents: bigint,
  *   readonly excessAdvancePremiumTaxCreditRepayment: ReportLine,
  *   readonly regularPreferentialWorksheet:
  *     RegularPreferentialWorksheet | NoRegularPreferentialWorksheet,
@@ -470,6 +471,7 @@ export const scheduleTwo = taxParamSet => input => {
         isoExerciseForms, estateTrustK1Forms, aStoredNineteenNineBReportsASale,
         filingScheduleD, scheduleD15Cents, scheduleD16Cents, scheduleD19Cents,
         regularPreferentialWorksheet, excessAdvancePremiumTaxCreditRepayment,
+        amtDepreciationAdjustmentCents,
     } = input
     const zero = profileDeclaredZeroLine(profile)
     // The two facts Schedule SE actually read, unioned wherever a line on
@@ -542,6 +544,12 @@ export const scheduleTwo = taxParamSet => input => {
         // not a real one. Form 6251 subtracts it on BOTH sides (line 8 and
         // line 10), so a §904(j) credit's net effect on the AMT is zero.
         scheduleThreeLine1Cents: input.scheduleThreeLine1Cents,
+        // Form 6251 line 2l, the §56(a)(1) depreciation adjustment,
+        // computed ONCE by `fjs/form4562` inside `fjs/schedule/c`'s own
+        // Form 4562 and threaded straight through. A second execution
+        // here would read the same register and could still disagree,
+        // because the convention it picks depends on the whole register.
+        amtDepreciationAdjustmentCents,
         qualifiedDividendsCents: qualifiedDividends.value,
         // 1040 line 7a, which IS the capital gain distributions when no
         // Schedule D was filed -- the same field `fjs/tax/line16`'s dispatcher
@@ -815,6 +823,7 @@ const noSelfEmployment = selfEmploymentInput(
 const noAmounts = {
     profile: profileNoDeclaredKinds,
     status: 'single',
+    amtDepreciationAdjustmentCents: 0n,
     // Schedule 3 line 1 as `fjs/form1040/core` hands it in: zero for a return
     // with no foreign tax anywhere. The leaves below that care about it
     // override it, and `theForeignTaxCreditReachesFormSixTwoFiftyOnesBothSides`
