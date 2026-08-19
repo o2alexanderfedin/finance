@@ -836,7 +836,7 @@ export const scheduleEPartI = input => {
     //     assertion in place.
     //
     //     So the sum is proven through its MIRROR IMAGE instead: dropping line
-    //     24 reddens seven leaves, which is what says `totalLine` over these
+    //     24 reddens TWELVE leaves, which is what says `totalLine` over these
     //     two is load-bearing. Line 25 stays a summand because the printed
     //     instruction says "combine lines 24 and 25" and the day the loss
     //     refusal is lifted this line already carries it.

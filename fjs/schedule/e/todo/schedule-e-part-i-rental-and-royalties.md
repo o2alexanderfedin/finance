@@ -381,3 +381,120 @@ Schedule C figure at the ONE site that already reads it.
   left standing rather than widened in the same phase that built them, and the
   docstring claiming `fjs/return/scope` refuses the kind first is now false and
   is corrected.
+
+## 9. The mutation log
+
+AGENTS.md: *"A proof is not known to work until you have watched it fail."*
+**Forty-five mutations** were written and run against the committed tree, one at
+a time, each reverted before the next and each checked with
+`git diff --numstat`. Gate before: 2,752 pass / 0 fail, `tsc` clean. After:
+2,799 pass / 0 fail.
+
+**Three did not compile**, all of them the orphaned-binding failure AGENTS.md
+names:
+
+- Deleting `vnd.fjs.rental_property`'s entry from `fjs/media/dialects` is
+  `TS6133: 'rentalPropertySchema' is declared but its value is never read`.
+  Re-run in a semantically identical compiling form — the entry stays but its
+  `extraValidate` becomes `[0] === 'error'`, so it classifies nothing — it
+  reddens **1**.
+- Deleting the `fjs/server/finance_schema` entry is the same error on
+  `rentalPropertyDialect`. Re-run as *serving the WRONG schema* — the tag maps
+  to `assetRegisterSchema` — it reddens **1**, and that is the better mutation
+  anyway: an agent handed the wrong schema writes a program against the wrong
+  field names.
+- Forcing `businessUseHundredthsOfPercent` to 100% was first written without
+  its trailing comma and is `TS1005`. Re-run correctly it reddens **1**, which
+  is the point of running it at all: `depreciableAssets` MOVED from
+  `fjs/schedule/c` to `fjs/document/asset_register` in this change, and the leaf
+  the earlier phase added for exactly this mutation still catches it.
+
+**One survived, and it is recorded rather than worked around.** Dropping
+printed line 25 from line 26's sum cannot redden at any input — every loss
+refuses, so line 25 is permanently zero. The first attempt to make it bite was
+itself wrong and was *measured* to be wrong: a source assertion looked like the
+observable, because line 25 is the only summand that cites the profile, but
+every column leaves one of printed lines 3 and 4 empty, so `documentLine`'s
+fallback has already put `declaredKinds` into line 24's union. The mirror
+image — dropping line **24** — reddens **12**, and that is what says the sum is
+load-bearing. Written up at the site.
+
+**One survived and was FIXED, and it is the one that matters.** Replacing
+`fjs/schedule/e`'s Part I error arm with `{ ...partI, message: '' }` — a
+refusal that fires, propagates and says nothing — left the entire suite green.
+Every Part I refusal leaf calls `fjs/schedule/e/part_i` directly and never
+travels through the schedule, so nothing asserted the message survives the
+seam. `aPartIRefusalReachesAScheduleECallerWithItsContentIntact` was added; it
+now reddens.
+
+**Two leaves were strengthened by mutations that bit too weakly.**
+`deMinimisRentalDayThreshold` 15 -> 14 reddened only the predicate table,
+because every §280A fixture used 10 fair rental days — far below the boundary;
+14 and 15 were added and it now reddens **2**. And erasing `propertyLabel`
+reddened **1** leaf: only the loss refusal asserted which property it was
+about. Four more refusal leaves now assert it, and the erasure reddens **6**.
+
+| # | Mutation | Leaves red |
+|---|---|---|
+| 1 | `usedAsAHome`'s conjunction becomes a disjunction | 2 |
+| 2 | §280A(d)(1)'s 14 days becomes 15 | 1 |
+| 3 | the 10% arm becomes 1% | 2 |
+| 4 | §280A(g)'s 15 days becomes 14 | 1 -> **2** after the boundary rows |
+| 5 | personal use never refuses | 1 |
+| 6 | a loss never refuses | 2 |
+| 7 | a royalty loss gets the RENTAL refusal (Form 8582, not Form 6198) | 1 |
+| 8 | printed line 24 sums nothing | 11 |
+| 9 | printed line 20 drops line 18 | 2 |
+| 10 | printed line 21 drops the royalties | 4 |
+| 11 | printed line 26 drops line 25 | **0 — EQUIVALENT**; the mirror image reddens 12 |
+| 12 | printed line 23c totals line 20 instead of line 12 | 2 |
+| 13 | printed line 23d totals line 20 instead of line 18 | 1 |
+| 14 | any register attaches to any property | 1 |
+| 15 | printed line 6 no longer refuses | 2 |
+| 16 | a stored line 18 entry no longer refuses | 3 |
+| 17 | a self-rental no longer refuses | 1 |
+| 18 | an unknown category never refuses | 1 |
+| 19 | two documents for one property never refuse | 1 |
+| 20 | two registers for one property never refuse | 1 |
+| 21 | **Form 8960 line 4a back to a hard zero** | **2** |
+| 22 | Form 6251 line 2l drops Part I's registers | 1 |
+| 23 | printed line 41 loses printed line 26 | 5 |
+| 24 | Schedule C does not release a rental's register | 2 |
+| 25 | **the twin's `vnd.fjs.rental_property` route branch deleted** | **1** |
+| 26 | **the guest SOURCE's route line deleted** | **1** |
+| 27 | the `fjs/media/dialects` entry deleted | did not compile; **1** in compiling form |
+| 28 | the `fjs/server/finance_schema` entry deleted | did not compile; **1** serving the wrong schema |
+| 29 | the tripwire ignores royalties | 1 |
+| 30 | the tripwire never fires | 2 |
+| 31 | the royalty partition is not enforced | 12 |
+| 32 | a day count outside 0..366 never refuses | 1 |
+| 33 | the two day counts may overlap | 1 |
+| 34 | `propertyLabel` erased from every refusal | 1 -> **6** after the new assertions |
+| 35 | the loss AMOUNT erased from the refusal | 1 |
+| 36 | an expense line ignores its own category | 10 |
+| 37 | printed lines 3 and 4's `boxPath`s swapped | 3 |
+| 38 | business use forced to 100% (the MOVED converter) | 1 |
+| 39 | a Form 4562 refusal travels out with an empty message | 1 |
+| 40 | `dispatchedDialects` loses the entry | 1 |
+| 41 | the five cross-property totals are always zero | 4 |
+| 42 | **a Part I refusal travels out with an empty message** | **0 — SURVIVED**; 1 after the new leaf |
+| 43 | Part I's alternative-minimum-tax sum ignores its Form 4562s | 1 |
+
+### The fixture monoculture the asset-register phase warned about
+
+That phase found *every* fixture in the repository using 100% business use, a
+June month and the current year, so three extracted facts were unobservable.
+The same check was run against this one's fixtures deliberately:
+
+- **Days vary.** 365/0, 364/1, 100/0, 100/30, 365/20, 15/30, 14/30, 10/30,
+  200/166, 200/200, 366/0, 0/0 — and the four §280A boundaries (14 and 15
+  personal days; 14 and 15 fair rental days) each sit on their own row.
+- **Types vary.** All eight printed codes appear: six compute, `royalties`
+  computes on a different printed line, and `selfRental` refuses.
+- **Months vary.** The Part I register uses **March** (Table A-6 month 3,
+  2.879%), the alternative-minimum-tax register uses **June** — so a mutation
+  forcing the placed-in-service month would still bite through Schedule C's own
+  November fixture.
+- **Both receipt lines carry documents.** Printed line 3 and printed line 4 each
+  have a fixture where they are the ONLY document reading, which is what makes
+  mutation 37 (the `boxPath` swap) reddens three leaves rather than none.
