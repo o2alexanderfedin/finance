@@ -806,6 +806,19 @@ export const scheduleOnePartI = taxParamSet => input => {
     if (form461Outcome.kind === 'error') {
         return form461Outcome
     }
+    // **This ternary's non-zero arm is unreachable today, and that is worth
+    // writing down rather than simplifying away.** `fjs/form461` returns its
+    // error arm on exactly `line16 < 0n`, so by the time execution is here line
+    // 16 is at or above zero and `excessBusinessLossCents` is always `0n` —
+    // mutating the whole expression to `form461Outcome.line16 * 0n` leaves the
+    // entire suite green, which is an equivalent mutant in AGENTS.md's sense: a
+    // neighbouring operation (the refusal two lines up) already enforces what
+    // this token enforces. It is written as the printed rule anyway — i461:
+    // "enter the amount from line 16 as a POSITIVE number on Schedule 1 (Form
+    // 1040), line 8p" — so that the day Form 172 is modeled and a binding
+    // limitation may compute, this line is already correct and only the refusal
+    // has to go. The same argument `fjs/form1040/core` makes for writing §199A's
+    // two business terms as a sum rather than a branch.
     const excessBusinessLossCents = form461Outcome.line16 < 0n ? -form461Outcome.line16 : 0n
     const line8p = documentLine(profile)(
         'Schedule 1 line 8p (excess business loss adjustment, Form 461 line 16)')(
