@@ -172,6 +172,7 @@ const parameterProbeInputs = {
     nonemployeeCompensationForms: [],
     businessExpenseForms: [],
     assetRegisters: [],
+    rentalProperties: [],
     priorYearIraBasisForms: [],
     isoExerciseForms: [],
     partnershipK1Forms: [],

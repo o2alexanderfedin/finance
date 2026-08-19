@@ -125,6 +125,7 @@ import {
 /** @import { OneZeroNineNineNec } from '../../document/1099nec/module.f.js' */
 /** @import { BusinessExpenses } from '../../document/business_expenses/module.f.js' */
 /** @import { AssetRegister } from '../../document/asset_register/module.f.js' */
+/** @import { RentalProperty } from '../../document/rental_property/module.f.js' */
 /** @import { ScheduleC } from '../../schedule/c/module.f.js' */
 /** @import { PriorYearCapitalLoss } from '../../document/prior_year_capital_loss/module.f.js' */
 /** @import { Ira } from '../../document/ira/module.f.js' */
@@ -281,6 +282,7 @@ import {
  *   readonly nonemployeeCompensationForms: readonly Stored<OneZeroNineNineNec>[],
  *   readonly businessExpenseForms: readonly Stored<BusinessExpenses>[],
  *   readonly assetRegisters: readonly Stored<AssetRegister>[],
+ *   readonly rentalProperties: readonly Stored<RentalProperty>[],
  *   readonly adjustmentForms: readonly Stored<Adjustments>[],
  *   readonly studentLoanInterestForms: readonly Stored<OneZeroNineEightE>[],
  *   readonly tuitionForms: readonly Stored<OneZeroNineEightT>[],
@@ -726,6 +728,7 @@ const storedFilingStatusNamed = status =>
  *   readonly dependentCareApplicable: boolean,
  *   readonly dependentCare: Form2441Common,
  *   readonly amtDepreciationAdjustmentCents: bigint,
+ *   readonly rentalRealEstateAndRoyaltyIncome: ReportLine,
  * }} Form1040IncomeLines
  */
 
@@ -764,7 +767,7 @@ export const form1040IncomeLines = taxParamSet => inputs => {
         itemizedDeductionForms, medicalExpenseForms,
         capitalLossCarryoverForms,
         unemploymentForms,
-        nonemployeeCompensationForms, businessExpenseForms, assetRegisters,
+        nonemployeeCompensationForms, businessExpenseForms, assetRegisters, rentalProperties,
         adjustmentForms, studentLoanInterestForms,
         iraForms, priorYearIraBasisForms,
         employeeStockPurchaseForms, basisCorrectionForms,
@@ -1198,6 +1201,13 @@ export const form1040IncomeLines = taxParamSet => inputs => {
         // reaching 1040 line 8 THROUGH Schedule 1's own Part I total, never by
         // a side channel -- the identical discipline line 3 already follows for
         // Schedule C and line 10 for Part II's line 26.
+        //
+        // **`rentalProperties` is what makes printed Schedule E PART I compute**
+        // and reach that same line 41 through printed line 26. It goes in here
+        // rather than to `fjs/schedule/e` directly for the same reason
+        // everything else does: one Schedule E execution, whose line 41 IS
+        // Schedule 1 line 5.
+        rentalProperties,
         partnershipK1Forms, sCorporationK1Forms, estateTrustK1Forms,
     })
     if (scheduleOnePartIResult.kind === 'error') {
@@ -1758,13 +1768,28 @@ export const form1040IncomeLines = taxParamSet => inputs => {
     // therefore Form 6251 run -- is handed only `inputs` and `income`.
     // Reading `assetRegisters` a second time there would be a SECOND Form
     // 4562, and the convention it picks depends on the whole register.
+    //
+    // **BOTH schedules' registers**, summed here and nowhere else. A landlord's
+    // `vnd.fjs.asset_register` reaches printed Schedule E line 18 through its
+    // own Form 4562, and if that form's §56(a)(1) adjustment did not arrive
+    // here the alternative minimum tax would be silently short for every filer
+    // who depreciates a rental. `fjs/schedule/e/part_i` pre-sums its columns
+    // for the same reason this function does not re-read the registers: there
+    // must be exactly one execution per register.
     const amtDepreciationAdjustmentCents = amtDepreciationAdjustmentOf(
         scheduleOnePartIResult.scheduleC)
+        + scheduleOnePartIResult.scheduleE.partI.alternativeMinimumTaxAdjustmentCents
 
     return {
         kind: 'ok',
         disqualifiedPassiveIncomeCents,
         amtDepreciationAdjustmentCents,
+        // Printed Schedule E line 26, carried out for Form 8960 line 4a. It
+        // travels as a whole `ReportLine` rather than as cents because
+        // Schedule 2 line 12 cites every fact its "lesser of" comparison
+        // reads, and a landlord must be able to see the property document
+        // behind their net investment income tax.
+        rentalRealEstateAndRoyaltyIncome: scheduleOnePartIResult.scheduleE.partI.line26,
         line1a, line1b, line1c, line1d, line1e, line1f, line1g, line1h, line1i, line1z,
         line2a, line2b,
         line3a, line3b,
@@ -2392,6 +2417,9 @@ const form1040TaxAndPaymentLines = taxParamSet => inputs => income => {
         taxableInterest: income.line2b,
         ordinaryDividends: income.line3b,
         netCapitalGainOrLoss: income.line7a,
+        // Form 8960 line 4a, off the ONE Schedule E execution inside Schedule
+        // 1 Part I above -- never a second, independently stale one.
+        rentalRealEstateAndRoyaltyIncome: income.rentalRealEstateAndRoyaltyIncome,
         adjustedGrossIncome: income.line11b,
         // The ONE Schedule SE execution `form1040IncomeLines` already
         // performed, for Schedule 2 line 4 and Form 8959 Part II line 8.
@@ -3124,7 +3152,7 @@ const expectedIncomeLineCount = 31
  * so the `Exclude<>` below is what turns forgetting one of them into a
  * compile error rather than a crash on a missing `.sources` — which is
  * exactly what it did when this phase first added them.
- * @type {readonly Exclude<keyof Form1040IncomeLines, 'kind' | 'filingScheduleD' | 'scheduleD15Cents' | 'scheduleD16Cents' | 'scheduleD18Cents' | 'scheduleD19Cents' | 'selfEmployment' | 'specifiedPrivateActivityBondInterest' | 'itemizing' | 'scheduleALine7Cents' | 'scheduleOneALine37Cents' | 'disqualifiedPassiveIncomeCents' | 'dependentCareLine31Cents' | 'dependentCareApplicable' | 'dependentCare' | 'amtDepreciationAdjustmentCents'>[]}
+ * @type {readonly Exclude<keyof Form1040IncomeLines, 'kind' | 'filingScheduleD' | 'scheduleD15Cents' | 'scheduleD16Cents' | 'scheduleD18Cents' | 'scheduleD19Cents' | 'selfEmployment' | 'specifiedPrivateActivityBondInterest' | 'itemizing' | 'scheduleALine7Cents' | 'scheduleOneALine37Cents' | 'disqualifiedPassiveIncomeCents' | 'dependentCareLine31Cents' | 'dependentCareApplicable' | 'dependentCare' | 'amtDepreciationAdjustmentCents' | 'rentalRealEstateAndRoyaltyIncome'>[]}
  */
 const incomeLineFieldNames = /** @type {const} */ ([
     'line1a', 'line1b', 'line1c', 'line1d', 'line1e', 'line1f', 'line1g', 'line1h', 'line1i', 'line1z',
@@ -3637,6 +3665,7 @@ const inputsOf = profile => w2s => interestForms => dividendForms => brokerageFo
                 nonemployeeCompensationForms: [],
                 businessExpenseForms: [],
                 assetRegisters: [],
+                rentalProperties: [],
                 adjustmentForms: [],
                 studentLoanInterestForms: [],
                 tuitionForms: [],
@@ -5229,6 +5258,109 @@ const assetRegisterDocument = documentHash => section168kStatus => ({
         }],
     },
 })
+
+/**
+ * ONE printed Schedule E Part I column: a single-family residence let all year
+ * with no personal use, $24,000.00 of rent and four ordinary expenses.
+ *
+ * `accountNumber` agrees with {@link rentalAssetRegisterDocument}'s
+ * deliberately — `fjs/schedule/e/part_i` attaches a register to a property by
+ * that string, and a fixture that quietly disagreed would exercise the
+ * unmatched-register path instead of the wiring.
+ * @type {(documentHash: string) => Stored<RentalProperty>}
+ */
+const rentalPropertyDocument = documentHash => ({
+    documentHash,
+    value: {
+        dialect: 'vnd.fjs.rental_property',
+        recipientTin: '222-22-2222',
+        accountNumber: 'RENT-0001',
+        taxYear: 2025,
+        propertyType: 'singleFamilyResidence',
+        physicalAddress: '18 Alder Street, Wells, ME 04090',
+        fairRentalDays: 365,
+        personalUseDays: 0,
+        rentsReceived: '24000.00',
+        entries: [
+            { category: 'insurance', datePaid: '2025-01-15', description: 'landlord policy', amount: '1240.00' },
+            { category: 'mortgageInterestPaidToBanks', datePaid: '2025-12-31', description: 'Form 1098 interest', amount: '8600.00' },
+            { category: 'repairs', datePaid: '2025-05-02', description: 'boiler repair', amount: '975.50' },
+            { category: 'taxes', datePaid: '2025-09-30', description: 'town property tax', amount: '3180.00' },
+        ],
+    },
+})
+
+/**
+ * An asset register for the RENTAL, carrying a five-year appliance rather than
+ * the building: the §56(a)(1) adjustment only exists for a 200% declining
+ * balance asset, and residential rental property is straight line and has none.
+ * @type {(documentHash: string) => (section168kStatus: string) => Stored<AssetRegister>}
+ */
+const rentalAssetRegisterDocument = documentHash => section168kStatus => ({
+    documentHash,
+    value: {
+        dialect: 'vnd.fjs.asset_register',
+        recipientTin: '222-22-2222',
+        accountNumber: 'RENT-0001',
+        taxYear: 2025,
+        businessOrActivity: '18 Alder Street rental',
+        everyDepreciableAssetIsListed: /** @type {const} */ (true),
+        noDepreciablePropertyDisposedOfDuringTheYear: /** @type {const} */ (true),
+        priorYearSection179CarryoverIsZero: /** @type {const} */ (true),
+        assets: [{
+            description: 'kitchen appliances',
+            datePlacedInService: '2025-06',
+            costOrOtherBasis: '10000.00',
+            businessUsePercentage: '100.00',
+            classification: 'fiveYear',
+            method: '200DB',
+            convention: 'HY',
+            section168kStatus,
+        }],
+    },
+})
+
+/**
+ * `exerciseAndHoldWith`'s return, PLUS the rental property above and its own
+ * asset register — the fixture the Schedule E Part I alternative-minimum-tax
+ * wiring leaf is a differential against.
+ * @type {(section168kStatus: string) => Form1040Outcome}
+ */
+const exerciseAndHoldWithRentalRegister = section168kStatus => {
+    /** @type {ReturnProfile} */
+    const profile = {
+        ...singleProfile,
+        declaredKinds: [
+            'wages', 'alternativeMinimumTax', 'amtDepreciation', 'rentalRealEstateAndRoyalties',
+        ],
+    }
+    const base = inputsOf(storedProfile(profile))([
+        w2Document('sha256-rental-amt-w2')('130000.00'),
+    ])([])([])([])([])([])([])([])([])
+    return form1040Report(taxParams2025)({
+        ...base,
+        rentalProperties: [rentalPropertyDocument('sha256-rental-amt-property')],
+        assetRegisters: [rentalAssetRegisterDocument('sha256-rental-amt-register')(section168kStatus)],
+        isoExerciseForms: [{
+            documentHash: 'sha256-rental-amt-3921',
+            value: {
+                dialect: 'vnd.fjs.form3921',
+                payerTin: '11-1111111',
+                recipientTin: '222-22-2222',
+                accountNumber: 'ACC-ISO',
+                taxYear: 2025,
+                formRevision: 'April 2025',
+                sourceArtifactHash:
+                    'deadbeef00112233445566778899aabbccddeeff0011223344556677889900',
+                box1DateOptionGranted: '01/03/2023',
+                box2DateOptionExercised: '03/13/2025',
+                box3ExercisePricePerShare: '5.00',
+                box4FairMarketValuePerShareOnExerciseDate: '105.00',
+                box5NumberOfSharesTransferred: '10000',
+            },
+        }],
+    })
+}
 
 /**
  * `exerciseAndHoldWith`'s return, PLUS a small consulting business and an
@@ -12518,6 +12650,218 @@ export const proof = {
             assert(
                 boxes.includes('box4FairMarketValuePerShareOnExerciseDate'),
                 ['and the box the spread was computed from', boxes])
+        },
+        /**
+         * ★ **THE WIRING LEAF FOR SCHEDULE E PART I.** A stored
+         * `vnd.fjs.rental_property` reaches printed Schedule E line 26,
+         * Schedule E line 41, Schedule 1 line 5 and **1040 line 8**.
+         *
+         * It exists because a schedule-level proof structurally cannot see the
+         * wiring: `fjs/schedule/e/part_i`'s own leaves construct their own
+         * input, and every one of them stays green while `fjs/schedule/e` is
+         * handed an EMPTY property list — the defect this project has now paid
+         * for three times.
+         *
+         * Every figure hand-typed off the printed page:
+         *
+         * ```
+         *  Schedule E  3   rents received                24,000.00
+         *              9   insurance                      1,240.00
+         *             12   mortgage interest              8,600.00
+         *             14   repairs                          975.50
+         *             16   taxes                          3,180.00
+         *             20   1,240 + 8,600 + 975.50 + 3,180 = 13,995.50
+         *             21   24,000.00 - 13,995.50         10,004.50
+         *             26   the one positive line 21      10,004.50
+         *  1040        1a  wages                         60,000.00
+         *              8   Schedule 1 line 10            10,004.50
+         *              9   60,000.00 + 10,004.50         70,004.50
+         * ```
+         */
+        theRentalPropertyReachesScheduleELineTwentySixAndTenFortyLineEight: () => {
+            /** @type {ReturnProfile} */
+            const profile = {
+                ...singleProfile,
+                declaredKinds: ['wages', 'rentalRealEstateAndRoyalties'],
+            }
+            const base = inputsOf(storedProfile(profile))([
+                w2Document('sha256-rental-w2')('60000.00'),
+            ])([])([])([])([])([])([])([])([])
+            const withRental = form1040Report(taxParams2025)({
+                ...base,
+                rentalProperties: [rentalPropertyDocument('sha256-rental-property')],
+            })
+            assert(withRental.kind === 'ok', ['expected the rental return to compute', withRental])
+            if (withRental.kind !== 'ok') {
+                return
+            }
+            const at = lineRuled(withRental.lines)
+            assertEq(at('1040 line 1a').value, 6000000n, '$60,000.00 of wages')
+            assertEq(at('1040 line 8').value, 1000450n, 'Schedule E line 26 -> Schedule 1 line 5')
+            assertEq(at('1040 line 9').value, 7000450n, '$70,004.50 of total income')
+            // Provenance: 1040 line 8 cites the property document, by hash and
+            // by the path the rent travelled — the part of the message a
+            // reader can act on, which an erased interpolation would lose.
+            const hashes = at('1040 line 8').sources.map(source => source.documentHash)
+            assert(hashes.includes('sha256-rental-property'),
+                ['1040 line 8 must cite the rental property', hashes])
+            const boxes = at('1040 line 8').sources.map(source => source.boxPath)
+            assert(boxes.includes('rentsReceived'),
+                ['and the printed line 3 the rent came from', boxes])
+            assert(boxes.includes('entries[category=mortgageInterestPaidToBanks]'),
+                ['and printed line 12, which is a SEPARATE reading of the same document', boxes])
+            // ★ THE CONTROL: the SAME filer with the property withheld. 1040
+            // line 8 goes to zero and cites the profile, not a document —
+            // without this, a wiring that always added $10,004.50 from
+            // nowhere, or one that refused every return, would look identical.
+            const without = form1040Report(taxParams2025)(base)
+            assert(without.kind === 'ok', ['expected the property-less return to compute', without])
+            if (without.kind !== 'ok') {
+                return
+            }
+            assertEq(lineRuled(without.lines)('1040 line 8').value, 0n,
+                'no rental property, so printed line 26 is a documented zero')
+            assertEq(lineRuled(without.lines)('1040 line 9').value, 6000000n,
+                'and total income is the wages alone')
+            const withoutHashes = lineRuled(without.lines)('1040 line 8').sources
+                .map(source => source.documentHash)
+            assert(!withoutHashes.includes('sha256-rental-property'),
+                ['a return with no property must not cite one', withoutHashes])
+        },
+        /**
+         * ★ **THE WIRING LEAF FOR FORM 8960 LINE 4A**, and the one that says
+         * why printed Schedule E Part I could not ship without touching the
+         * net investment income tax.
+         *
+         * `fjs/schedule/2` computes Form 8960 **unconditionally** — its own
+         * comment says so, "no tripwire watches §1411's threshold" — so a
+         * landlord's rent entered Form 8960 line 13's modified adjusted gross
+         * income the moment Part I started computing, while line 8's
+         * investment income stayed at zero. Line 17 takes the LESSER of the
+         * two, so the tax would have been silently understated for every filer
+         * above the threshold. §1411(c)(1)(A)(i) names *"rents"* and
+         * *"royalties"* outright.
+         *
+         * Hand-computed, single filer:
+         *
+         * ```
+         *  1040        1a  wages                       250,000.00
+         *  Schedule E  26  9,600.00 - 1,550.00           8,050.00
+         *  1040        8   Schedule 1 line 5             8,050.00
+         *              11a AGI                         258,050.00
+         *  8960        4a  Schedule E line 26            8,050.00
+         *              8   total investment income       8,050.00
+         *              15  258,050.00 - 200,000.00      58,050.00
+         *              16  the SMALLER of the two        8,050.00
+         *              17  3.8% of 8,050.00                305.90
+         * ```
+         *
+         * The differential against the same filer with the property withheld
+         * is the whole $305.90, because with no property there is no
+         * investment income of any kind.
+         */
+        theRentalPropertyReachesFormEightNineSixtyLineFourAAndTheNetInvestmentIncomeTax: () => {
+            /** @type {ReturnProfile} */
+            const profile = {
+                ...singleProfile,
+                declaredKinds: ['wages', 'rentalRealEstateAndRoyalties', 'netInvestmentIncomeTax'],
+            }
+            const base = inputsOf(storedProfile(profile))([
+                w2Document('sha256-niit-rental-w2')('250000.00'),
+            ])([])([])([])([])([])([])([])([])
+            const withRental = form1040Report(taxParams2025)({
+                ...base,
+                rentalProperties: [{
+                    documentHash: 'sha256-niit-rental-property',
+                    value: {
+                        ...rentalPropertyDocument('x').value,
+                        rentsReceived: '9600.00',
+                        entries: [
+                            { category: 'taxes', datePaid: '2025-09-30', description: 'town property tax', amount: '1200.00' },
+                            { category: 'repairs', datePaid: '2025-05-02', description: 'boiler repair', amount: '350.00' },
+                        ],
+                    },
+                }],
+            })
+            const without = form1040Report(taxParams2025)(base)
+            assert(withRental.kind === 'ok', ['expected the rental return to compute', withRental])
+            assert(without.kind === 'ok', ['expected the control return to compute', without])
+            if (withRental.kind !== 'ok' || without.kind !== 'ok') {
+                return
+            }
+            const at = lineRuled(withRental.lines)
+            const withoutAt = lineRuled(without.lines)
+            assertEq(at('1040 line 8').value, 805000n, 'Schedule E line 26 = $8,050.00')
+            assertEq(at('1040 line 11a').value, 25805000n, 'AGI = $258,050.00')
+            // 1040 line 23 is "other taxes, including self-employment tax,
+            // from Schedule 2, line 21" -- the line Schedule 2 line 12 reaches.
+            assertEq(at('1040 line 23').value - withoutAt('1040 line 23').value, 30590n,
+                '3.8% of $8,050.00 of rental net investment income')
+            // And the CONTROL owes no net investment income tax at all, so the
+            // differential above is the whole of the figure rather than a
+            // fragment of some larger one.
+            assertEq(withoutAt('1040 line 23').value, 0n,
+                'wages alone are not net investment income')
+        },
+        /**
+         * ★ **THE WIRING LEAF FOR A RENTAL REGISTER'S FORM 6251 LINE 2L.**
+         *
+         * `fjs/schedule/c`'s Form 4562 was the ONLY route by which an asset
+         * register reached the alternative minimum tax until Schedule E Part I
+         * shipped. A landlord's register reaches printed Schedule E line 18
+         * through its own Form 4562, and if that form's §56(a)(1) adjustment
+         * did not arrive at line 2l as well, a landlord's AMT would be
+         * silently short — a wrong number that looks right, which is the whole
+         * failure mode this repository refuses.
+         *
+         * **The regular half, hand-computed.** Publication 946 Table A-1's
+         * 5-year column, year 1, half-year convention, 200 DB: 20.00% of
+         * $10,000.00 is **$2,000.00** of appliances, which is Form 4562 line 22
+         * and therefore printed Schedule E line 18. Line 20 is
+         * $13,995.50 + $2,000.00 = **$15,995.50**, so line 21 and line 26 are
+         * $24,000.00 - $15,995.50 = **$8,004.50**.
+         *
+         * **The alternative half is a DIFFERENTIAL** against the identical
+         * return with `section168kStatus` changed from `notQualifiedProperty`
+         * to `electedOut`. i4562 p7: electing out means the property "will not
+         * be subject to an AMT adjustment for depreciation", so line 2l goes to
+         * zero while every regular-tax figure stays put.
+         *
+         *   6251 line 2l   200 DB 20.00% - 150 DB 15.00% of $10,000.00   $500.00
+         *   AMTI is above $239,100.00 and the exemption is fully phased out by
+         *   the ISO spread, so every extra dollar is taxed at 28%
+         *   1040 line 17   28% of $500.00                                $140.00
+         */
+        theRentalRegisterReachesScheduleELineEighteenAndFormSixTwoFiveOneLineTwoL: () => {
+            const adjusted = exerciseAndHoldWithRentalRegister('notQualifiedProperty')
+            const electedOut = exerciseAndHoldWithRentalRegister('electedOut')
+            assert(adjusted.kind === 'ok', ['expected the adjusted return to compute', adjusted])
+            assert(electedOut.kind === 'ok', ['expected the elected-out return to compute', electedOut])
+            if (adjusted.kind !== 'ok' || electedOut.kind !== 'ok') {
+                return
+            }
+            const adjustedAt = lineRuled(adjusted.lines)
+            const electedOutAt = lineRuled(electedOut.lines)
+            // The regular tax half: printed Schedule E line 18 is $2,000.00, so
+            // line 26 -- and 1040 line 8 -- is $8,004.50.
+            assertEq(adjustedAt('1040 line 8').value, 800450n,
+                '$24,000.00 of rent less $13,995.50 of expenses less $2,000.00 of Table A-1 depreciation')
+            assertEq(electedOutAt('1040 line 8').value, 800450n,
+                'and §168(k) status does not move ONE regular-tax figure')
+            const boxes = adjustedAt('1040 line 8').sources.map(source => source.boxPath)
+            assert(boxes.includes('assets -> Form 4562 line 22'),
+                ['1040 line 8 must cite the path the depreciation travelled', boxes])
+            const hashes = adjustedAt('1040 line 8').sources.map(source => source.documentHash)
+            assert(hashes.includes('sha256-rental-amt-register'),
+                ['and the register itself', hashes])
+            // The alternative minimum tax half, as a differential.
+            const adjustedSeventeen = adjustedAt('1040 line 17').value
+            const electedOutSeventeen = electedOutAt('1040 line 17').value
+            assert(electedOutSeventeen > 0n,
+                ['the base return must actually owe alternative minimum tax, or the '
+                    + 'differential below is two zeros', electedOutSeventeen])
+            assertEq(adjustedSeventeen - electedOutSeventeen, 14000n,
+                '28% of the $500.00 §56(a)(1) depreciation adjustment, off a RENTAL register')
         },
         /**
          * ★ **THE WIRING LEAF FOR SCHEDULE C LINE 13 AND FORM 6251 LINE 2L.**

@@ -256,6 +256,15 @@ for property placed in service before 1999, a `200DB` asset that old is
   Part I still needs the rents received (no dialect carries them), the fair
   rental and personal-use **days** §280A(e) allocates by, and its own printed
   line 4 for royalties. A register alone does not make a Schedule E.
+
+  **SUPERSEDED.** `vnd.fjs.rental_property` carries all three, and
+  `fjs/schedule/e/part_i` computes printed Part I; the kind moved to
+  `modeledKinds`, and a rental register's Form 4562 line 22 now reaches printed
+  Schedule E line 18 through the `accountNumber` match this document describes
+  for Schedule C. See
+  [../../schedule/e/todo/schedule-e-part-i-rental-and-royalties.md](../../schedule/e/todo/schedule-e-part-i-rental-and-royalties.md).
+  Left in place rather than rewritten: this file records what the Form 4562
+  phase decided with what it had, and the note is the correction.
 - **`carAndTruck` (Schedule C line 9) stays REFUSED, with a corrected remedy.**
   A vehicle is listed property, and Part V refuses.
 - The two Schedule K-1 §179 boxes and Schedule E line 28(i) stay refused: a

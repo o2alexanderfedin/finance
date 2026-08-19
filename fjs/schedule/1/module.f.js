@@ -229,6 +229,7 @@ import { taxParamsByYear } from '../../tax/params/module.f.js'
 /** @import { Adjustments } from '../../document/adjustments/module.f.js' */
 /** @import { BusinessExpenses } from '../../document/business_expenses/module.f.js' */
 /** @import { AssetRegister } from '../../document/asset_register/module.f.js' */
+/** @import { RentalProperty } from '../../document/rental_property/module.f.js' */
 /** @import { OneZeroNineNineNec } from '../../document/1099nec/module.f.js' */
 /** @import { ScheduleC } from '../c/module.f.js' */
 /** @import { ScheduleE } from '../e/module.f.js' */
@@ -624,6 +625,7 @@ const earlyWithdrawalPenaltyLine = profile => forms => {
  *   readonly businessExpenseForms: readonly Stored<BusinessExpenses>[],
  *   readonly w2Forms: readonly Stored<W2>[],
  *   readonly assetRegisters: readonly Stored<AssetRegister>[],
+ *   readonly rentalProperties: readonly Stored<RentalProperty>[],
  *   readonly partnershipK1Forms: readonly Stored<K1Partnership>[],
  *   readonly sCorporationK1Forms: readonly Stored<K1SCorporation>[],
  *   readonly estateTrustK1Forms: readonly Stored<K1EstateTrust>[],
@@ -666,16 +668,25 @@ const earlyWithdrawalPenaltyLine = profile => forms => {
 export const scheduleOnePartI = input => {
     const {
         profile, unemploymentForms, nonemployeeCompensationForms, businessExpenseForms, w2Forms,
-        assetRegisters, partnershipK1Forms, sCorporationK1Forms, estateTrustK1Forms,
+        assetRegisters, rentalProperties,
+        partnershipK1Forms, sCorporationK1Forms, estateTrustK1Forms,
     } = input
     const zero = profileDeclaredZeroLine(profile)
+    // `rentalProperties` reaches BOTH schedules, and it is not a leak. Schedule
+    // C needs it only to know which asset registers are NOT its own: a register
+    // whose account number names a rental property is Schedule E Part I's, and
+    // Schedule C must neither depreciate it nor refuse it.
     const scheduleCOutcome = scheduleC({
         profile, nonemployeeCompensationForms, businessExpenseForms, w2Forms, assetRegisters,
+        rentalProperties,
     })
     if (scheduleCOutcome.kind === 'error') {
         return scheduleCOutcome
     }
-    const scheduleEOutcome = scheduleE({ profile, partnershipK1Forms, sCorporationK1Forms, estateTrustK1Forms })
+    const scheduleEOutcome = scheduleE({
+        profile, rentalProperties, assetRegisters,
+        partnershipK1Forms, sCorporationK1Forms, estateTrustK1Forms,
+    })
     if (scheduleEOutcome.kind === 'error') {
         return scheduleEOutcome
     }
@@ -2338,6 +2349,7 @@ export const scheduleOnePartII = taxParamSet => input => {
  *   readonly nonemployeeCompensationForms: readonly Stored<OneZeroNineNineNec>[],
  *   readonly businessExpenseForms: readonly Stored<BusinessExpenses>[],
  *   readonly assetRegisters: readonly Stored<AssetRegister>[],
+ *   readonly rentalProperties: readonly Stored<RentalProperty>[],
  *   readonly partnershipK1Forms: readonly Stored<K1Partnership>[],
  *   readonly sCorporationK1Forms: readonly Stored<K1SCorporation>[],
  *   readonly estateTrustK1Forms: readonly Stored<K1EstateTrust>[],
@@ -2366,7 +2378,8 @@ export const scheduleOnePartII = taxParamSet => input => {
 export const scheduleOne = taxParamSet => input => {
     const {
         profile, status, unemploymentForms, nonemployeeCompensationForms, businessExpenseForms,
-        assetRegisters, partnershipK1Forms, sCorporationK1Forms, estateTrustK1Forms,
+        assetRegisters, rentalProperties,
+        partnershipK1Forms, sCorporationK1Forms, estateTrustK1Forms,
         adjustmentForms, studentLoanInterestForms, w2Forms, interestForms, totalIncomeLine,
         totalIncomeExceptTaxableSocialSecurityLine, socialSecurityBenefitsCents,
         taxExemptInterestCents, mfsLivedWithSpouseAtAnyTimeInYear, iraDistributionReceived,
@@ -2374,7 +2387,8 @@ export const scheduleOne = taxParamSet => input => {
     } = input
     const partI = scheduleOnePartI({
         profile, unemploymentForms, nonemployeeCompensationForms, businessExpenseForms, w2Forms,
-        assetRegisters, partnershipK1Forms, sCorporationK1Forms, estateTrustK1Forms,
+        assetRegisters, rentalProperties,
+        partnershipK1Forms, sCorporationK1Forms, estateTrustK1Forms,
     })
     if (partI.kind === 'error') {
         return partI
@@ -2777,6 +2791,7 @@ const movingPartII = profile => entries => w2Forms =>
 const partIOf = profile => unemploymentForms => nonemployeeCompensationForms => businessExpenseForms =>
     scheduleOnePartI({
         assetRegisters: [],
+        rentalProperties: [],
         profile, unemploymentForms, nonemployeeCompensationForms, businessExpenseForms,
         w2Forms: [],
         partnershipK1Forms: [],
@@ -2892,6 +2907,7 @@ const noBusinessNetProfit = profile => {
         businessExpenseForms: [],
         w2Forms: [],
         assetRegisters: [],
+        rentalProperties: [],
     })
     assert(outcome.kind === 'ok', ['an empty Schedule C cannot refuse', outcome])
     return outcome.partII.line31
@@ -3093,6 +3109,7 @@ const stageOneWithBusiness = profile => status => nonemployeeCompensationForms =
     businessExpenseForms => w2Forms => {
         const partI = okPartI(scheduleOnePartI({
             assetRegisters: [],
+            rentalProperties: [],
             profile,
             unemploymentForms: [],
             nonemployeeCompensationForms,
@@ -3122,6 +3139,7 @@ const stageOneWithPassThrough = profile => status => partnershipK1Forms =>
     businessExpenseForms => w2Forms => {
         const partI = okPartI(scheduleOnePartI({
             assetRegisters: [],
+            rentalProperties: [],
             profile,
             unemploymentForms: [],
             nonemployeeCompensationForms: [],
@@ -3228,6 +3246,7 @@ const stageOneForHealthInsurance =
                 : [businessDoc([])]
             const partI = okPartI(scheduleOnePartI({
                 assetRegisters: [],
+                rentalProperties: [],
                 profile,
                 unemploymentForms: [],
                 nonemployeeCompensationForms,
@@ -3841,6 +3860,7 @@ export const proof = {
         lineFiveIsScheduleELineFortyOneAndReachesLineTen: () => {
             const withK1 = okPartI(scheduleOnePartI({
                 assetRegisters: [],
+                rentalProperties: [],
                 profile: profileNoDeclaredKinds,
                 unemploymentForms: [],
                 nonemployeeCompensationForms: [],
@@ -3875,6 +3895,7 @@ export const proof = {
         linesThreeAndFiveAreDistinctAndBothReachTheTotal: () => {
             const partI = okPartI(scheduleOnePartI({
                 assetRegisters: [],
+                rentalProperties: [],
                 profile: profileNoDeclaredKinds,
                 unemploymentForms: [],
                 nonemployeeCompensationForms: [nonemployeeCompensationDoc('350.00')],
@@ -3894,6 +3915,7 @@ export const proof = {
         aScheduleERefusalPropagatesOutOfPartOne: () => {
             const result = refusal(scheduleOnePartI({
                 assetRegisters: [],
+                rentalProperties: [],
                 profile: profileNoDeclaredKinds,
                 unemploymentForms: [],
                 nonemployeeCompensationForms: [],
@@ -4001,6 +4023,7 @@ export const proof = {
         oneProprietorWhoIsAlsoAPartnerAddsBothToLineTwo: () => {
             const partI = okPartI(scheduleOnePartI({
                 assetRegisters: [],
+                rentalProperties: [],
                 profile: profileNoDeclaredKinds,
                 unemploymentForms: [],
                 nonemployeeCompensationForms: [nonemployeeCompensationDoc('350.00')],
@@ -5068,6 +5091,7 @@ export const proof = {
         selfEmploymentAlongsideAContributionRefuses: () => {
             const partI = okPartI(scheduleOnePartI({
                 assetRegisters: [],
+                rentalProperties: [],
                 profile: profileNoDeclaredKinds,
                 unemploymentForms: [],
                 nonemployeeCompensationForms: [nonemployeeCompensationDoc('40000.00')],
@@ -5850,6 +5874,7 @@ export const proof = {
             studentLoanInterestForms)([])(9250000n))
         const composed = scheduleOne(taxParams2025)({
             assetRegisters: [],
+            rentalProperties: [],
             profile: profileNoDeclaredKinds,
             interestForms: [],
             ...noSocialSecurityInteraction,
@@ -5882,6 +5907,7 @@ export const proof = {
     aStageOneRefusalPropagatesThroughTheComposedForm: () => {
         const composed = scheduleOne(taxParams2025)({
             assetRegisters: [],
+            rentalProperties: [],
             profile: profileNoDeclaredKinds,
             interestForms: [],
             ...noSocialSecurityInteraction,
@@ -5956,6 +5982,7 @@ export const proof = {
     everyPrintedLineIsNamed: () => {
         const composed = scheduleOne(taxParams2025)({
             assetRegisters: [],
+            rentalProperties: [],
             profile: profileNoDeclaredKinds,
             interestForms: [],
             ...noSocialSecurityInteraction,

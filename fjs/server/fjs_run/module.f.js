@@ -1003,6 +1003,7 @@ export const proof = {
                             studentLoanInterestForms: [], tuitionForms: [], creditForms: [],
                             nonemployeeCompensationForms: [], businessExpenseForms: [],
                             assetRegisters: [],
+                            rentalProperties: [],
                             iraForms: [], priorYearIraBasisForms: [],
                             isoExerciseForms: [], employeeStockPurchaseForms: [],
                             partnershipK1Forms: [], sCorporationK1Forms: [], estateTrustK1Forms: [],

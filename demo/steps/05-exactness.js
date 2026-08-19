@@ -107,6 +107,7 @@ export const render = root => {
         nonemployeeCompensationForms: [],
         businessExpenseForms: [],
         assetRegisters: [],
+        rentalProperties: [],
         priorYearIraBasisForms: [],
         isoExerciseForms: [],
         employeeStockPurchaseForms: [],

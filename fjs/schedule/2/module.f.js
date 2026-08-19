@@ -375,6 +375,7 @@ const uncollectedTaxSources = w2s => w2s.flatMap(form =>
  *   readonly taxableInterest: ReportLine,
  *   readonly ordinaryDividends: ReportLine,
  *   readonly netCapitalGainOrLoss: ReportLine,
+ *   readonly rentalRealEstateAndRoyaltyIncome: ReportLine,
  *   readonly adjustedGrossIncome: ReportLine,
  *   readonly selfEmployment: SelfEmploymentOutcome,
  *   readonly qualifiedDividends: ReportLine,
@@ -463,7 +464,8 @@ export const scheduleTwo = taxParamSet => input => {
     const {
         profile, status,
         medicareWages, medicareTaxWithheld, w2Forms,
-        taxableInterest, ordinaryDividends, netCapitalGainOrLoss, adjustedGrossIncome,
+        taxableInterest, ordinaryDividends, netCapitalGainOrLoss,
+        rentalRealEstateAndRoyaltyIncome, adjustedGrossIncome,
         selfEmployment,
         qualifiedDividends, totalDeductions, regularTax,
         itemizing, scheduleALine7Cents, scheduleOneALine37Cents, standardDeductionCents,
@@ -680,6 +682,12 @@ export const scheduleTwo = taxParamSet => input => {
         taxableInterestCents: taxableInterest.value,
         ordinaryDividendsCents: ordinaryDividends.value,
         netCapitalGainOrLossCents: netCapitalGainOrLoss.value,
+        // Printed Form 8960 line 4a, "Rental real estate, royalties,
+        // partnerships, S corporations, trusts, etc." -- Schedule E line 26,
+        // off the ONE Schedule E execution inside Schedule 1 Part I. See
+        // `fjs/form8960`'s own line 4a for why this line could not stay a zero
+        // once printed Schedule E Part I started computing.
+        rentalRealEstateAndRoyaltyIncomeCents: rentalRealEstateAndRoyaltyIncome.value,
     })
     const line12 = {
         value: form8960Result.line17,
@@ -688,7 +696,10 @@ export const scheduleTwo = taxParamSet => input => {
         // III line 13. 1040 line 2a is deliberately NOT among them -- see
         // `fjs/form8960`'s own docstring on why tax-exempt interest is
         // excluded, and `theExclusionsAreWired` below, which pins it.
-        sources: unionSources([taxableInterest, ordinaryDividends, netCapitalGainOrLoss, adjustedGrossIncome]),
+        sources: unionSources([
+            taxableInterest, ordinaryDividends, netCapitalGainOrLoss,
+            rentalRealEstateAndRoyaltyIncome, adjustedGrossIncome,
+        ]),
         rule: 'Schedule 2 line 12 (net investment income tax, Form 8960 line 17)',
     }
     // 13. "Uncollected social security and Medicare or RRTA tax on tips or
@@ -843,6 +854,7 @@ const noAmounts = {
     taxableInterest: inputLine('line2b')(0n),
     ordinaryDividends: inputLine('line3b')(0n),
     netCapitalGainOrLoss: inputLine('line7a')(0n),
+    rentalRealEstateAndRoyaltyIncome: inputLine('scheduleELine26')(0n),
     adjustedGrossIncome: inputLine('line11b')(0n),
     selfEmployment: noSelfEmployment,
     qualifiedDividends: inputLine('line3a')(0n),

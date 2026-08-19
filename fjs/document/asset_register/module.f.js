@@ -113,7 +113,7 @@ import { validate as rttiValidate } from 'functionalscript/fjs/types/rtti/valida
 import { error, ok } from 'functionalscript/fjs/types/result/module.f.js'
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
 import { centsFromString } from '../../exact/module.f.js'
-import { tryParse } from '../../types/decimal/module.f.js'
+import { tryParse, parse } from '../../types/decimal/module.f.js'
 import { base, mediaTypeOf } from '../base/module.f.js'
 import { moneyFieldError } from '../money_field/module.f.js'
 import {
@@ -123,6 +123,7 @@ import {
 /** @import { Result } from 'functionalscript/fjs/types/result/module.f.js' */
 /** @import { Ts, Unknown } from 'functionalscript/fjs/types/rtti/ts/module.f.js' */
 /** @import { ValidationError } from 'functionalscript/fjs/types/rtti/validate/module.f.js' */
+/** @import { DepreciableAsset } from '../../form4562/module.f.js' */
 
 /**
  * Format tag: names the dialect of this BLOB. The media type it is served
@@ -449,6 +450,64 @@ export const validate = value => {
     }
     return checkReferences(v)
 }
+
+/**
+ * Parses a business-use percentage at two decimal places, yielding HUNDREDTHS
+ * of a percent — the same fixed-scale parse `fjs/exact`'s `centsFromString`
+ * is, at the same scale, named for what it actually holds here.
+ * @type {(s: string) => bigint}
+ */
+const percentFromString = parse(2)
+
+/**
+ * This dialect's stored strings, as the `bigint` facts `fjs/form4562` takes —
+ * the one place the conversion happens, so a form module still reads no
+ * documents.
+ *
+ * **It lives here rather than in a schedule, and that is a correction.** It
+ * was written inside `fjs/schedule/c` when Schedule C line 13 was the only
+ * printed line an asset register could reach. Schedule E Part I line 18 is the
+ * second, so a copy in the second schedule would be the "one rule, two places"
+ * AGENTS.md names — and the two copies would decide independently whether a
+ * hand-edited `'200 DB'` reaches the MACRS schedule. Moving it to the dialect
+ * puts it where its subject is.
+ *
+ * Every vocabulary is re-narrowed here through the SAME frozen lists
+ * {@link checkReferences} validated against, rather than cast: the schema types
+ * `method` and `convention` as `string` (rtti has no enum), and a cast over
+ * that would silence exactly the check that stops a bad value travelling.
+ * @type {(register: AssetRegister) => readonly DepreciableAsset[]}
+ */
+export const depreciableAssets = register => register.assets.map(asset => {
+    const [yearText, monthText] = asset.datePlacedInService.split('-')
+    assert(yearText !== undefined && monthText !== undefined,
+        ['a validated datePlacedInService is YYYY-MM', asset.datePlacedInService])
+    if (yearText === undefined || monthText === undefined) {
+        throw ['a validated datePlacedInService is YYYY-MM', asset.datePlacedInService]
+    }
+    const method = macrsMethods.find(candidate => candidate === asset.method)
+    assert(method !== undefined, ['a validated method is one of the three', asset.method])
+    if (method === undefined) { throw ['a validated method is one of the three', asset.method] }
+    const convention = macrsConventions.find(candidate => candidate === asset.convention)
+    assert(convention !== undefined, ['a validated convention is one of the three', asset.convention])
+    if (convention === undefined) { throw ['a validated convention is one of the three', asset.convention] }
+    const claimed = asset.specialDepreciationAllowanceClaimed
+    const elected = asset.section179ElectedCost
+    return {
+        description: asset.description,
+        placedInServiceYear: Number(yearText),
+        placedInServiceMonth: Number(monthText),
+        costOrOtherBasisCents: centsFromString(asset.costOrOtherBasis),
+        businessUseHundredthsOfPercent: percentFromString(asset.businessUsePercentage),
+        classification: asset.classification,
+        method,
+        convention,
+        section168kStatus: asset.section168kStatus,
+        specialDepreciationAllowanceClaimedCents: claimed === undefined ? 0n : centsFromString(claimed),
+        section179ElectedCostCents: elected === undefined ? 0n : centsFromString(elected),
+        listedProperty: asset.listedProperty === true,
+    }
+})
 
 // ── Tests ────────────────────────────────────────────────────────────────────
 

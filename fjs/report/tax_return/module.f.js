@@ -166,6 +166,7 @@ import { dialect as creditsDialect } from '../../document/credits/module.f.js'
 import { dialect as oneZeroNineNineNecDialect } from '../../document/1099nec/module.f.js'
 import { dialect as businessExpensesDialect } from '../../document/business_expenses/module.f.js'
 import { dialect as assetRegisterDialect } from '../../document/asset_register/module.f.js'
+import { dialect as rentalPropertyDialect } from '../../document/rental_property/module.f.js'
 import { dialect as iraDialect } from '../../document/ira/module.f.js'
 import { dialect as priorYearIraBasisDialect } from '../../document/prior_year_ira_basis/module.f.js'
 import { dialect as formThirtyNineTwentyOneDialect } from '../../document/form3921/module.f.js'
@@ -199,6 +200,7 @@ import { dialect as oneZeroNineFiveADialect } from '../../document/1095a/module.
 /** @import { OneZeroNineNineNec } from '../../document/1099nec/module.f.js' */
 /** @import { BusinessExpenses } from '../../document/business_expenses/module.f.js' */
 /** @import { AssetRegister } from '../../document/asset_register/module.f.js' */
+/** @import { RentalProperty } from '../../document/rental_property/module.f.js' */
 /** @import { Ira } from '../../document/ira/module.f.js' */
 /** @import { PriorYearIraBasis } from '../../document/prior_year_ira_basis/module.f.js' */
 /** @import { FormThirtyNineTwentyOne } from '../../document/form3921/module.f.js' */
@@ -249,7 +251,7 @@ import { dialect as oneZeroNineFiveADialect } from '../../document/1095a/module.
  * `vnd.fjs.revision`, a future addition) falls straight through
  * {@link collectDocument} untouched — never coerced into a bucket, never
  * treated as a zero.
- * @typedef {ReturnProfile | W2 | OneZeroNineNineInt | OneZeroNineNineDiv | OneZeroNineNineB | OneZeroNineNineR | Ssa1099 | ItemizedDeductions | MedicalExpenses | PriorYearCapitalLoss | OneZeroNineNineG | Adjustments | OneZeroNineEightE | OneZeroNineEightT | Credits | Ira | PriorYearIraBasis | OneZeroNineNineNec | BusinessExpenses | FormThirtyNineTwentyOne | FormThirtyNineTwentyTwo | BasisCorrection | K1Partnership | K1SCorporation | K1EstateTrust | OneZeroNineFiveA | AssetRegister} EngineDocument
+ * @typedef {ReturnProfile | W2 | OneZeroNineNineInt | OneZeroNineNineDiv | OneZeroNineNineB | OneZeroNineNineR | Ssa1099 | ItemizedDeductions | MedicalExpenses | PriorYearCapitalLoss | OneZeroNineNineG | Adjustments | OneZeroNineEightE | OneZeroNineEightT | Credits | Ira | PriorYearIraBasis | OneZeroNineNineNec | BusinessExpenses | FormThirtyNineTwentyOne | FormThirtyNineTwentyTwo | BasisCorrection | K1Partnership | K1SCorporation | K1EstateTrust | OneZeroNineFiveA | AssetRegister | RentalProperty} EngineDocument
  */
 
 /**
@@ -281,6 +283,7 @@ import { dialect as oneZeroNineFiveADialect } from '../../document/1095a/module.
  *   readonly nonemployeeCompensationForms: readonly Stored<OneZeroNineNineNec>[],
  *   readonly businessExpenseForms: readonly Stored<BusinessExpenses>[],
  *   readonly assetRegisters: readonly Stored<AssetRegister>[],
+ *   readonly rentalProperties: readonly Stored<RentalProperty>[],
  *   readonly adjustmentForms: readonly Stored<Adjustments>[],
  *   readonly studentLoanInterestForms: readonly Stored<OneZeroNineEightE>[],
  *   readonly tuitionForms: readonly Stored<OneZeroNineEightT>[],
@@ -359,6 +362,7 @@ export const taxReturnReportSource = [
     '        nonemployeeCompensationForms: [],',
     '        businessExpenseForms: [],',
     '        assetRegisters: [],',
+    '        rentalProperties: [],',
     '        adjustmentForms: [],',
     '        studentLoanInterestForms: [],',
     '        tuitionForms: [],',
@@ -403,6 +407,7 @@ export const taxReturnReportSource = [
     '        if (doc.dialect === \'vnd.fjs.1099nec\') { return { ...acc, nonemployeeCompensationForms: [...acc.nonemployeeCompensationForms, stored] } }',
     '        if (doc.dialect === \'vnd.fjs.business_expenses\') { return { ...acc, businessExpenseForms: [...acc.businessExpenseForms, stored] } }',
     '        if (doc.dialect === \'vnd.fjs.asset_register\') { return { ...acc, assetRegisters: [...acc.assetRegisters, stored] } }',
+    '        if (doc.dialect === \'vnd.fjs.rental_property\') { return { ...acc, rentalProperties: [...acc.rentalProperties, stored] } }',
     '        if (doc.dialect === \'vnd.fjs.adjustments\') { return { ...acc, adjustmentForms: [...acc.adjustmentForms, stored] } }',
     '        if (doc.dialect === \'vnd.fjs.1098e\') { return { ...acc, studentLoanInterestForms: [...acc.studentLoanInterestForms, stored] } }',
     '        if (doc.dialect === \'vnd.fjs.1098t\') { return { ...acc, tuitionForms: [...acc.tuitionForms, stored] } }',
@@ -467,6 +472,7 @@ export const taxReturnReportSource = [
     '            nonemployeeCompensationForms: acc.nonemployeeCompensationForms,',
     '            businessExpenseForms: acc.businessExpenseForms,',
     '            assetRegisters: acc.assetRegisters,',
+    '            rentalProperties: acc.rentalProperties,',
     '            adjustmentForms: acc.adjustmentForms,',
     '            studentLoanInterestForms: acc.studentLoanInterestForms,',
     '            tuitionForms: acc.tuitionForms,',
@@ -545,6 +551,7 @@ const emptyCollected = {
     nonemployeeCompensationForms: [],
     businessExpenseForms: [],
     assetRegisters: [],
+    rentalProperties: [],
     adjustmentForms: [],
     studentLoanInterestForms: [],
     tuitionForms: [],
@@ -601,6 +608,7 @@ const routeDocument = documentHash => doc => acc => {
     if (doc.dialect === oneZeroNineNineNecDialect) { return { ...acc, nonemployeeCompensationForms: [...acc.nonemployeeCompensationForms, { documentHash, value: doc }] } }
     if (doc.dialect === businessExpensesDialect) { return { ...acc, businessExpenseForms: [...acc.businessExpenseForms, { documentHash, value: doc }] } }
     if (doc.dialect === assetRegisterDialect) { return { ...acc, assetRegisters: [...acc.assetRegisters, { documentHash, value: doc }] } }
+    if (doc.dialect === rentalPropertyDialect) { return { ...acc, rentalProperties: [...acc.rentalProperties, { documentHash, value: doc }] } }
     if (doc.dialect === creditsDialect) { return { ...acc, creditForms: [...acc.creditForms, { documentHash, value: doc }] } }
     if (doc.dialect === iraDialect) { return { ...acc, iraForms: [...acc.iraForms, { documentHash, value: doc }] } }
     if (doc.dialect === priorYearIraBasisDialect) { return { ...acc, priorYearIraBasisForms: [...acc.priorYearIraBasisForms, { documentHash, value: doc }] } }
@@ -722,6 +730,7 @@ const renderReturn = ctx => acc => {
         nonemployeeCompensationForms: acc.nonemployeeCompensationForms,
         businessExpenseForms: acc.businessExpenseForms,
         assetRegisters: acc.assetRegisters,
+        rentalProperties: acc.rentalProperties,
         adjustmentForms: acc.adjustmentForms,
         studentLoanInterestForms: acc.studentLoanInterestForms,
         tuitionForms: acc.tuitionForms,
@@ -843,6 +852,9 @@ const fixtureFounderProfileHash = 'sha256-tax-return-founder-profile'
 const fixtureFounderNecHash = 'sha256-tax-return-founder-1099nec'
 const fixtureFounderExpensesHash = 'sha256-tax-return-founder-expenses'
 const fixtureFounderRegisterHash = 'sha256-tax-return-founder-asset-register'
+// The Schedule E Part I wiring's own two: a landlord.
+const fixtureLandlordProfileHash = 'sha256-tax-return-landlord-profile'
+const fixtureLandlordPropertyHash = 'sha256-tax-return-landlord-property'
 const fixtureMarketplaceProfileHash = 'sha256-tax-return-marketplace-profile'
 const fixtureMarketplaceW2Hash = 'sha256-tax-return-marketplace-w2'
 const fixtureMarketplaceStatementHash = 'sha256-tax-return-marketplace-1095a'
@@ -917,6 +929,8 @@ const subjectFounderProfile = 'tax-return-subject-founder-profile'
 const subjectFounderNec = 'tax-return-subject-founder-1099nec'
 const subjectFounderExpenses = 'tax-return-subject-founder-expenses'
 const subjectFounderRegister = 'tax-return-subject-founder-asset-register'
+const subjectLandlordProfile = 'tax-return-subject-landlord-profile'
+const subjectLandlordProperty = 'tax-return-subject-landlord-property'
 const subjectMarketplaceProfile = 'tax-return-subject-marketplace-profile'
 const subjectMarketplaceW2 = 'tax-return-subject-marketplace-w2'
 const subjectMarketplaceStatement = 'tax-return-subject-marketplace-1095a'
@@ -1227,7 +1241,7 @@ const documentByHash = {
     //
     // **[CLOSED] The same hole was still open for the other twenty-five
     // dispatched dialects when this paragraph was written**, and it said so
-    // rather than closing it: `sourceAndTwinDispatchOnTheSameTwentySevenDialects`
+    // rather than closing it: `sourceAndTwinDispatchOnTheSameTwentyEightDialects`
     // greps the SOURCE text for each tag and asserts nothing at all about the
     // TWIN's branch, so any route branch whose dialect had no fixture in this
     // file could be deleted silently. The sweep it asked for is
@@ -1612,6 +1626,34 @@ const documentByHash = {
         box4FairMarketValuePerShareOnExerciseDate: '105.00',
         box5NumberOfSharesTransferred: '2000',
     },
+    // The Schedule E Part I wiring's own two documents. They exist for exactly
+    // the reason the Form 4562 register below does: deleting the twin's
+    // `vnd.fjs.rental_property` route branch has to redden something, and
+    // `fjs/form1040/core`'s own Part I leaves cannot see it -- they hand
+    // `form1040Report` a `Form1040Inputs` and never travel through this
+    // program's collect step at all.
+    [fixtureLandlordProfileHash]: {
+        dialect: returnProfileDialect,
+        taxYear: 2025,
+        filingStatus: 'single',
+        dependentCount: 0,
+        declaredKinds: ['rentalRealEstateAndRoyalties'],
+    },
+    [fixtureLandlordPropertyHash]: {
+        dialect: rentalPropertyDialect,
+        recipientTin: '222-22-2222',
+        accountNumber: 'RENT-0001',
+        taxYear: 2025,
+        propertyType: 'singleFamilyResidence',
+        physicalAddress: '18 Alder Street, Wells, ME 04090',
+        fairRentalDays: 365,
+        personalUseDays: 0,
+        rentsReceived: '9600.00',
+        entries: [
+            { category: 'taxes', datePaid: '2025-09-30', description: 'town property tax', amount: '1200.00' },
+            { category: 'repairs', datePaid: '2025-05-02', description: 'boiler repair', amount: '350.00' },
+        ],
+    },
     // The Form 4562 wiring's own document. It exists for exactly the reason
     // the 1095-A fixture above does: deleting the twin's
     // `vnd.fjs.asset_register` route branch has to redden something, and
@@ -1669,6 +1711,8 @@ const snapshotBySubject = {
     [subjectFounderNec]: fixtureFounderNecHash,
     [subjectFounderExpenses]: fixtureFounderExpensesHash,
     [subjectFounderRegister]: fixtureFounderRegisterHash,
+    [subjectLandlordProfile]: fixtureLandlordProfileHash,
+    [subjectLandlordProperty]: fixtureLandlordPropertyHash,
     [subjectMarketplaceProfile]: fixtureMarketplaceProfileHash,
     [subjectMarketplaceW2]: fixtureMarketplaceW2Hash,
     [subjectMarketplaceStatement]: fixtureMarketplaceStatementHash,
@@ -1747,6 +1791,11 @@ const founderSubjects = [
 /** The same three, plus the Form 4562 wiring's asset register. */
 const founderWithRegisterSubjects = [
     subjectFounderRegister, subjectFounderExpenses, subjectFounderNec, subjectFounderProfile,
+]
+
+/** The Schedule E Part I wiring's own two subjects, NOT in sorted order. */
+const landlordSubjects = [
+    subjectLandlordProperty, subjectLandlordProfile,
 ]
 
 /** TAX-37's own three subjects, likewise NOT in sorted order. */
@@ -1875,14 +1924,22 @@ const dispatchedDialects = [
     // the one program that actually assembles a return -- and Schedule C line
     // 13 would silently go back to zero for every filer who stored one.
     assetRegisterDialect,
+    // The Schedule E Part I wiring's own, the TWENTY-EIGHTH:
+    // `vnd.fjs.rental_property`, added here in the SAME commit that adds it to
+    // the source text and to the twin. Without this entry a stored rental
+    // property would be classified, served a schema, and then dropped on the
+    // floor by the one program that actually assembles a return -- and printed
+    // Schedule E line 26 would stay the documented zero it was before the part
+    // existed, for every landlord who stored one.
+    rentalPropertyDialect,
 ]
 
 /**
- * `26 -> 27` is the Form 4562 wiring's own `vnd.fjs.asset_register`. `25 -> 26` is TAX-37's own `vnd.fjs.1095a`. `24 -> 25` is TAX-35's own `vnd.fjs.k1_1041`. `19 -> 24` in Phase 30: three of the five are Phase 29's, restored, and two
+ * `27 -> 28` is the Schedule E Part I wiring's own `vnd.fjs.rental_property`. `26 -> 27` is the Form 4562 wiring's own `vnd.fjs.asset_register`. `25 -> 26` is TAX-37's own `vnd.fjs.1095a`. `24 -> 25` is TAX-35's own `vnd.fjs.k1_1041`. `19 -> 24` in Phase 30: three of the five are Phase 29's, restored, and two
  * are this phase's own. See the list's own comments for both halves.
  * @type {number}
  */
-const expectedDispatchedDialectCount = 27
+const expectedDispatchedDialectCount = 28
 
 export const proof = {
     // The phase's central number check, and the reason this module exists:
@@ -2444,6 +2501,47 @@ export const proof = {
         assertEq(cents('1040 line 25b'), 0n)
         assertEq(cents('1040 line 34'), 0n)
     },
+    /**
+     * ★ **THE ROUTING LEAF FOR `vnd.fjs.rental_property`.** The stored program
+     * classifies the property, files it in `rentalProperties`, and printed
+     * Schedule E line 26 reaches Schedule 1 line 5 and therefore 1040 line 8.
+     *
+     * Every figure hand-computed off the printed page: rents $9,600.00 (line 3)
+     * less $1,200.00 of taxes (line 16) less $350.00 of repairs (line 14) is
+     * line 20 = $1,550.00, so line 21 and line 26 are **$8,050.00**. The
+     * standard deduction for a single filer in TY2025 is $15,750.00, so
+     * taxable income floors at zero and nothing is owed — which is the correct
+     * answer and not an absence of one.
+     *
+     * The control below, which withholds the property, is what makes this a
+     * statement about the ROUTE rather than two unrelated numbers.
+     */
+    storedProgramRoutesTheRentalPropertyAndComputesScheduleEPartI: () => {
+        const result = runTwin(landlordSubjects)
+        assert(result.kind === 'ok', ['expected a computed return', result])
+        if (result.kind !== 'ok') {
+            return
+        }
+        const cents = renderedCents(result)
+        assertEq(cents('1040 line 8'), 805000n, '$9,600.00 less $1,550.00, through Schedule 1 line 5')
+        assertEq(cents('1040 line 9'), 805000n, 'and it is the whole of total income')
+        assertEq(cents('1040 line 11a'), 805000n, 'AGI = $8,050.00')
+        assertEq(cents('1040 line 15'), 0n, 'taxable income floors at zero under the $15,750.00 standard deduction')
+    },
+    // THE CONTROL: the SAME filer with the property withheld. Everything goes
+    // to zero and the return still computes, so the leaf above is evidence
+    // about the DOCUMENT rather than about the profile.
+    theSameStoredLandlordWithoutThePropertyComputesZeros: () => {
+        const result = runTwin([subjectLandlordProfile])
+        assert(result.kind === 'ok', ['expected a computed return', result])
+        if (result.kind !== 'ok') {
+            return
+        }
+        const cents = renderedCents(result)
+        assertEq(cents('1040 line 8'), 0n)
+        assertEq(cents('1040 line 9'), 0n)
+        assertEq(cents('1040 line 11a'), 0n)
+    },
     // ── The routing sweep: one leaf per dispatched dialect that had none ──
     //
     // **What this block is, and what a green suite without it was hiding.**
@@ -2862,7 +2960,7 @@ export const proof = {
     // the SOURCE text, against a hand-typed count. The twin imports these
     // constants; the source cannot, so it spells them out — this is what
     // stops a rename from quietly desynchronizing the two.
-    sourceAndTwinDispatchOnTheSameTwentySevenDialects: () => {
+    sourceAndTwinDispatchOnTheSameTwentyEightDialects: () => {
         assertEq(dispatchedDialects.length, expectedDispatchedDialectCount)
         for (const tag of dispatchedDialects) {
             assert(

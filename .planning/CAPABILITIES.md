@@ -68,7 +68,7 @@ the form or the facts that would supply it.
 
 **The refusal surface is a partition, checked at `tsc`:** every one of **195 income, deduction,
 credit and payment kinds** is either modeled or carries a refusal naming what is missing —
-**53 modeled, 142 refused**, and `_EveryKindIsEitherModeledOrRefused` fails the build if a kind
+**54 modeled, 141 refused**, and `_EveryKindIsEitherModeledOrRefused` fails the build if a kind
 falls in neither. Re-derive with `modeledKinds.length` / `unmodeledKindRefusals.length` in
 `fjs/return/scope`.
 
@@ -81,7 +81,13 @@ is missing rather than that a whole lettered block is unmodeled.
 It then fell 143 → 142, and the modeled half rose 52 → 53, when Form 7206 made
 `selfEmployedHealthInsuranceDeduction` computable at Schedule 1 line 17. **One kind, moved across
 the partition** — the two moves are independent, so the vocabulary is still the 195 the split
-left, and 53 + 142 = 195.
+left.
+
+It fell again, 142 → 141, and the modeled half rose 53 → 54, when Schedule E Part I made
+`rentalRealEstateAndRoyalties` computable at Schedule 1 line 5. **A second single kind moved
+across the same partition**, on the same terms and for the same reason: the wiring landed first
+and the reclassification rode with it. The vocabulary is still the 195 the split left — neither
+reclassification invented or retired a kind — and 54 + 141 = 195.
 
 The conditional refusals — the ones that fire on a taxpayer whose kinds are all modeled:
 
@@ -110,7 +116,7 @@ does not owe the thing.
 
 ## The measured surface
 
-**13 tools** · protocol `2025-11-25` · server `finance-mcp 1.0.0` · **28 document dialects**
+**13 tools** · protocol `2025-11-25` · server `finance-mcp 1.0.0` · **29 document dialects**
 
 | Group | Tools |
 |---|---|

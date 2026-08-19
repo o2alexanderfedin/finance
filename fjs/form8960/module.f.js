@@ -202,10 +202,18 @@ export const netInvestmentIncomeTaxThresholdIncome = agiCents => {
  */
 
 /**
+ * `rentalRealEstateAndRoyaltyIncomeCents` is printed Schedule E line 26 — the
+ * Part I total this engine computes — and it is a REQUIRED parameter rather
+ * than an optional one for the reason every other required list on this
+ * project is: a caller that cannot supply it is a caller that would emit a
+ * Form 8960 silently short by a landlord's whole rental income, and printed
+ * line 4a's own text is *"Rental real estate, royalties, partnerships, S
+ * corporations, trusts, etc."*
  * @typedef {{
  *   readonly taxableInterestCents: bigint,
  *   readonly ordinaryDividendsCents: bigint,
  *   readonly netCapitalGainOrLossCents: bigint,
+ *   readonly rentalRealEstateAndRoyaltyIncomeCents: bigint,
  * }} Form8960PartIInput
  */
 
@@ -216,7 +224,10 @@ export const netInvestmentIncomeTaxThresholdIncome = agiCents => {
  * @type {(input: Form8960PartIInput) => Form8960PartI}
  */
 export const form8960PartI = input => {
-    const { taxableInterestCents, ordinaryDividendsCents, netCapitalGainOrLossCents } = input
+    const {
+        taxableInterestCents, ordinaryDividendsCents, netCapitalGainOrLossCents,
+        rentalRealEstateAndRoyaltyIncomeCents,
+    } = input
     // 1. "Taxable interest" -- 1040 line 2b. NOT line 2a: §103(a) keeps
     //    tax-exempt interest out of gross income, so §1411(c)(1)(A)(i) never
     //    reaches it.
@@ -245,12 +256,14 @@ export const form8960PartI = input => {
     //     computes has an honest $0.00 here, and every return that would not
     //     has been stopped.
     //
-    //     Schedule E's other four parts are each their own REFUSED
-    //     `fjs/return/scope` kind: `rentalRealEstateAndRoyalties` (Part I),
-    //     `estateAndTrustIncome` (Part III), `remicResidualInterest` (Part IV)
-    //     and `netFarmRentalIncomeForm4835` (Part V line 40). Rental real
-    //     estate and estate/trust income are the two that would most often
-    //     land here.
+    //     Of Schedule E's other four parts, TWO are still their own REFUSED
+    //     `fjs/return/scope` kind — `remicResidualInterest` (Part IV) and
+    //     `netFarmRentalIncomeForm4835` (Part V line 40) — and two are NOT:
+    //     `rentalRealEstateAndRoyalties` (Part I) and `estateAndTrustIncome`
+    //     (Part III) both became modeled kinds, which is what put a real
+    //     figure on line 4a below and what makes Part III the gap recorded
+    //     there. This paragraph said all four refused until printed Part I
+    //     shipped; it had been wrong about Part III since TAX-35.
     //
     //     **Phase 27's Schedule C does NOT reach this line**, and that is
     //     worth stating where it could be assumed otherwise: §1411(c)(2)(A)
@@ -261,10 +274,38 @@ export const form8960PartI = input => {
     //     tax. What business income CAN reach line 4a is a passive activity
     //     or a §1411(c)(2)(B) trading business, and both arrive on Schedule E
     //     rather than Schedule C.
-    const line4a = 0n
+    //
+    //     **Schedule E PART I is no longer among the refused kinds, and this
+    //     line is the reason that wiring could not be shipped without touching
+    //     Form 8960.** `fjs/form8960` is computed UNCONDITIONALLY (see
+    //     `fjs/schedule/2` line 12: "no tripwire watches §1411's threshold"),
+    //     so a landlord's rent would have entered line 13's modified adjusted
+    //     gross income while leaving line 8's investment income short — and
+    //     line 17 takes the LESSER of the two, so the tax would have been
+    //     silently understated for every filer above the threshold. Rents and
+    //     royalties are named in §1411(c)(1)(A)(i) itself, and §469(c)(2)
+    //     makes a rental activity passive whatever the taxpayer's
+    //     involvement, so the printed line's own words — "Rental real estate,
+    //     royalties, partnerships, S corporations, trusts, etc." — are the
+    //     rule and Schedule E line 26 is the figure.
+    //
+    //     **PART III is a KNOWN GAP recorded here rather than left implicit.**
+    //     `estateAndTrustIncome` became a modeled kind with TAX-35, so a
+    //     beneficiary's box 6 share reaches Schedule E line 37 and Schedule 1
+    //     line 5 — and it does NOT reach this line, because §1411(c)(1)(A)(ii)
+    //     turns on whether the ESTATE OR TRUST's activity was passive to the
+    //     beneficiary, which is `beneficiaryRow`'s material-participation
+    //     determination and is not carried out of Schedule E today. It is
+    //     recorded because a silent gap is worse than a stated one; closing it
+    //     is its own wiring.
+    const line4a = rentalRealEstateAndRoyaltyIncomeCents
     // 4b. "Adjustment for net income or loss derived in the ordinary course
-    //     of a non-section 1411 trade or business." Zero: there is nothing on
-    //     line 4a for it to adjust.
+    //     of a non-section 1411 trade or business." Zero, and it is a
+    //     STRUCTURAL zero rather than an assumption: the one Schedule E Part I
+    //     column whose income Reg. §1.1411-4(g)(6) removes from net investment
+    //     income is a SELF-RENTAL (printed type code 7), and
+    //     `fjs/schedule/e/part_i` refuses one by name — so no amount that
+    //     belongs on this line can reach line 4a in the first place.
     const line4b = 0n
     // 4c. "Combine lines 4a and 4b."
     const line4c = line4a + line4b
@@ -397,6 +438,7 @@ export const form8960PartIII = taxParamSet => input => {
  *   readonly taxableInterestCents: bigint,
  *   readonly ordinaryDividendsCents: bigint,
  *   readonly netCapitalGainOrLossCents: bigint,
+ *   readonly rentalRealEstateAndRoyaltyIncomeCents: bigint,
  * }} Form8960Input
  */
 
@@ -412,8 +454,14 @@ export const form8960PartIII = taxParamSet => input => {
  * @type {(taxParamSet: TaxParamSet) => (input: Form8960Input) => Form8960}
  */
 export const form8960 = taxParamSet => input => {
-    const { status, agiCents, taxableInterestCents, ordinaryDividendsCents, netCapitalGainOrLossCents } = input
-    const partI = form8960PartI({ taxableInterestCents, ordinaryDividendsCents, netCapitalGainOrLossCents })
+    const {
+        status, agiCents, taxableInterestCents, ordinaryDividendsCents, netCapitalGainOrLossCents,
+        rentalRealEstateAndRoyaltyIncomeCents,
+    } = input
+    const partI = form8960PartI({
+        taxableInterestCents, ordinaryDividendsCents, netCapitalGainOrLossCents,
+        rentalRealEstateAndRoyaltyIncomeCents,
+    })
     const partII = form8960PartII()
     const partIII = form8960PartIII(taxParamSet)({
         status, agiCents, partILine8: partI.line8, partIILine11: partII.line11,
@@ -433,7 +481,7 @@ assert(taxParams2025 !== undefined, 'expected TY2025 parameters to be present in
 
 /**
  * Runs the whole form against TY2025's real parameter set.
- * @type {(status: IndividualFilingStatus) => (agiCents: bigint) => (income: { readonly taxableInterestCents?: bigint, readonly ordinaryDividendsCents?: bigint, readonly netCapitalGainOrLossCents?: bigint }) => Form8960}
+ * @type {(status: IndividualFilingStatus) => (agiCents: bigint) => (income: { readonly taxableInterestCents?: bigint, readonly ordinaryDividendsCents?: bigint, readonly netCapitalGainOrLossCents?: bigint, readonly rentalRealEstateAndRoyaltyIncomeCents?: bigint }) => Form8960}
  */
 const run = status => agiCents => income => form8960(taxParams2025)({
     status,
@@ -441,6 +489,7 @@ const run = status => agiCents => income => form8960(taxParams2025)({
     taxableInterestCents: income.taxableInterestCents ?? 0n,
     ordinaryDividendsCents: income.ordinaryDividendsCents ?? 0n,
     netCapitalGainOrLossCents: income.netCapitalGainOrLossCents ?? 0n,
+    rentalRealEstateAndRoyaltyIncomeCents: income.rentalRealEstateAndRoyaltyIncomeCents ?? 0n,
 })
 
 /** Every individual filing status, hand-typed so a status dropped from
@@ -492,6 +541,51 @@ export const proof = {
             assertEq(result.line5a, 2500000n, 'line 5a = $25,000.00 of capital gain (1040 line 7a)')
             assertEq(result.line8, 4000000n, 'line 8 = $40,000.00 = $5,000 + $10,000 + $25,000')
         },
+        /**
+         * ★ **PRINTED LINE 4A IS NOT A ZERO ONCE SCHEDULE E PART I COMPUTES.**
+         * §1411(c)(1)(A)(i) names *"rents"* and *"royalties"* outright, and
+         * §469(c)(2) makes a rental activity passive whatever the taxpayer's
+         * involvement, so printed Schedule E line 26 is what printed line 4a's
+         * own text — *"Rental real estate, royalties, partnerships, S
+         * corporations, trusts, etc."* — asks for.
+         *
+         * Hand-computed, single filer, no other investment income:
+         *
+         * ```
+         *   4a  Schedule E line 26                     50,000.00
+         *    8  total investment income                50,000.00
+         *   12  less line 11 (zero)                    50,000.00
+         *   13  modified adjusted gross income        300,000.00
+         *   14  §1411(b) threshold, single            200,000.00
+         *   15  300,000.00 - 200,000.00               100,000.00
+         *   16  the SMALLER of line 12 and line 15     50,000.00
+         *   17  3.8% of 50,000.00                       1,900.00
+         * ```
+         *
+         * The last row is the point: without line 4a, line 12 would be zero,
+         * line 16 would be zero and line 17 would be **$0.00** — a landlord
+         * above the threshold paying no net investment income tax at all,
+         * silently, because Form 8960 runs unconditionally and no tripwire
+         * watches §1411.
+         */
+        rentalAndRoyaltyIncomeReachesLineFourAAndTheTax: () => {
+            const result = run('single')(30000000n)({
+                rentalRealEstateAndRoyaltyIncomeCents: 5000000n,
+            })
+            assertEq(result.line4a, 5000000n, 'line 4a = $50,000.00 of Schedule E line 26')
+            assertEq(result.line4b, 0n, 'line 4b = $0.00 -- a self-rental refuses at fjs/schedule/e/part_i')
+            assertEq(result.line4c, 5000000n, 'line 4c = $50,000.00')
+            assertEq(result.line8, 5000000n, 'line 8 = $50,000.00')
+            assertEq(result.line15, 10000000n, 'line 15 = $100,000.00 above the $200,000.00 threshold')
+            assertEq(result.line16, 5000000n, 'line 16 = the SMALLER of $50,000.00 and $100,000.00')
+            assertEq(result.line17, 190000n, 'line 17 = 3.8% of $50,000.00 = $1,900.00')
+            // THE CONTROL: the identical filer with no rental at all owes
+            // nothing, so the leaf above is evidence about line 4a rather than
+            // about the threshold arithmetic.
+            const without = run('single')(30000000n)({})
+            assertEq(without.line4a, 0n)
+            assertEq(without.line17, 0n, 'no investment income of any kind, so no tax')
+        },
         // Every documented zero, asserted individually so erasing the reason
         // for any one of them names itself -- and line 8 asserted to be the
         // sum of ALL seven addends the printed form lists, so a future
@@ -506,8 +600,9 @@ export const proof = {
             assertEq(
                 result.line4a,
                 0n,
-                'line 4a = $0.00 -- §1411(c)(6) excludes self-employment income and '
-                + 'fjs/schedule/e refuses passive pass-through income that it does not cover')
+                'line 4a = $0.00 for a filer with NO Schedule E Part I -- §1411(c)(6) excludes '
+                + 'self-employment income and fjs/schedule/e refuses passive pass-through income '
+                + 'that it does not cover')
             assertEq(result.line4b, 0n, 'line 4b = $0.00')
             assertEq(result.line4c, 0n, 'line 4c = $0.00')
             assertEq(result.line5b, 0n, 'line 5b = $0.00 -- every disposition here is investment property')

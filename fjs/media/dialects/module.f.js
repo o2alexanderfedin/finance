@@ -224,12 +224,17 @@ import {
     assetRegisterSchema,
     checkReferences as checkAssetRegister,
 } from '../../document/asset_register/module.f.js'
+import {
+    dialect as rentalPropertyDialect,
+    rentalPropertySchema,
+    checkReferences as checkRentalProperty,
+} from '../../document/rental_property/module.f.js'
 
 /** @import { DialectEntry } from 'functionalscript/fjs/media/module.f.js' */
 
 /**
  * Every one of this repo's own dialects, registered for {@link detect}: the
- * twenty-nine local finance document/return/run dialects wrapped via
+ * thirty local finance document/return/run dialects wrapped via
  * {@link dialectEntry}, plus upstream's own {@link revisionDialect} reused
  * unchanged. See this module's own docstring for why `ocr` is the one entry
  * with no `extraValidate` second argument.
@@ -281,6 +286,11 @@ export const financeDialects = [
     // Schedule C line 13 and Form 6251 line 2l -- `fjs/server/dialect_parity`
     // is what would otherwise catch one of the two being forgotten.
     dialectEntry(assetRegisterSchema, v => checkAssetRegister(v)[0] === 'ok'),
+    // `vnd.fjs.rental_property`, registered here and in
+    // `fjs/server/finance_schema` in the SAME commit that wires Schedule E
+    // Part I into printed line 26 -- `fjs/server/dialect_parity` is what would
+    // otherwise catch one of the two being forgotten.
+    dialectEntry(rentalPropertySchema, v => checkRentalProperty(v)[0] === 'ok'),
     revisionDialect,
 ]
 
@@ -296,7 +306,7 @@ export const detectFinance = detect(financeDialects)
 
 /**
  * Independently hand-typed: the number of entries {@link financeDialects}
- * is expected to carry today — TWENTY-NINE local dialects plus
+ * is expected to carry today — THIRTY local dialects plus
  * {@link revisionDialect}, which is upstream's. Deliberately NOT derived from
  * `financeDialects.length` itself (AGENTS.md's hand-typed-count idiom,
  * mirroring `fjs/document/1099b`'s `expectedMoneyBoxFieldCount`): a dialect
@@ -307,7 +317,7 @@ export const detectFinance = detect(financeDialects)
  * collection shrinking").
  * @type {number}
  */
-const expectedDialectCount = 30
+const expectedDialectCount = 31
 
 /** A sample cbase32 hash — {@link revisionDialect}'s own `snapshot`/`parents` shape needs a decodable one; the value itself is arbitrary. */
 const revisionSampleHash = vecToCBase32(vec8(0x77n))
@@ -581,6 +591,22 @@ const fixtures = {
         taxYear: 2025,
         businessOrActivity: 'software consulting',
         assets: [],
+    },
+    // `vnd.fjs.rental_property`. `accountNumber` is a REQUIRED semantic
+    // refinement, and so is the whole royalty partition — a single-family
+    // residence must carry an address, both day counts and its rents, or
+    // `checkRentalProperty` refuses and this fixture would not DETECT.
+    [rentalPropertyDialect]: {
+        dialect: rentalPropertyDialect,
+        recipientTin: '222-22-2222',
+        accountNumber: 'RENT-0001',
+        taxYear: 2025,
+        propertyType: 'singleFamilyResidence',
+        physicalAddress: '18 Alder Street, Wells, ME 04090',
+        fairRentalDays: 365,
+        personalUseDays: 0,
+        rentsReceived: '24000.00',
+        entries: [],
     },
     [revisionDialectTag]: {
         dialect: revisionDialectTag,

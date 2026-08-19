@@ -184,25 +184,18 @@
  */
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
 import { centsFromString, centsToString } from '../../exact/module.f.js'
-import { parse } from '../../types/decimal/module.f.js'
 import { formFortyFiveSixtyTwo } from '../../form4562/module.f.js'
-import { macrsMethods, macrsConventions } from '../../form4562/macrs/module.f.js'
+import { depreciableAssets } from '../../document/asset_register/module.f.js'
 
 /** @import { ReturnProfile } from '../../return/profile/module.f.js' */
 /** @import { AssetRegister } from '../../document/asset_register/module.f.js' */
-/** @import { DepreciableAsset, Form4562Lines } from '../../form4562/module.f.js' */
+/** @import { RentalProperty } from '../../document/rental_property/module.f.js' */
+/** @import { Form4562Lines } from '../../form4562/module.f.js' */
 /** @import { OneZeroNineNineNec } from '../../document/1099nec/module.f.js' */
 /** @import { BusinessExpenses } from '../../document/business_expenses/module.f.js' */
 /** @import { W2 } from '../../document/w2/module.f.js' */
 /** @import { ReportLine, Source } from '../../report/line/module.f.js' */
 
-/**
- * Parses a business-use percentage at two decimal places, yielding HUNDREDTHS
- * of a percent — the same fixed-scale parse `fjs/exact`'s `centsFromString`
- * is, at the same scale, named for what it actually holds here.
- * @type {(s: string) => bigint}
- */
-const percentFromString = parse(2)
 
 // ── Inputs ───────────────────────────────────────────────────────────────────
 
@@ -913,6 +906,7 @@ export const scheduleCPartII = profile => entries => line13Depreciation => line7
  *   readonly businessExpenseForms: readonly Stored<BusinessExpenses>[],
  *   readonly w2Forms: readonly Stored<W2>[],
  *   readonly assetRegisters: readonly Stored<AssetRegister>[],
+ *   readonly rentalProperties: readonly Stored<RentalProperty>[],
  * }} ScheduleCInput
  */
 
@@ -932,49 +926,6 @@ const businessLabel = business => business.businessName === undefined
     ? `'${business.principalBusiness}'`
     : `'${business.principalBusiness}' (${business.businessName})`
 
-
-/**
- * `vnd.fjs.asset_register`'s stored strings, as the `bigint` facts
- * `fjs/form4562` takes — the one place the conversion happens, so a form
- * module still reads no documents.
- *
- * Every vocabulary is re-narrowed here through the SAME frozen lists
- * `fjs/document/asset_register` validated against, rather than cast: the
- * dialect types `method` and `convention` as `string` (rtti has no enum), and
- * a cast over that would silence exactly the check that stops a hand-edited
- * `'200 DB'` reaching the MACRS schedule.
- * @type {(register: AssetRegister) => readonly DepreciableAsset[]}
- */
-const depreciableAssets = register => register.assets.map(asset => {
-    const [yearText, monthText] = asset.datePlacedInService.split('-')
-    assert(yearText !== undefined && monthText !== undefined,
-        ['a validated datePlacedInService is YYYY-MM', asset.datePlacedInService])
-    if (yearText === undefined || monthText === undefined) {
-        throw ['a validated datePlacedInService is YYYY-MM', asset.datePlacedInService]
-    }
-    const method = macrsMethods.find(candidate => candidate === asset.method)
-    assert(method !== undefined, ['a validated method is one of the three', asset.method])
-    if (method === undefined) { throw ['a validated method is one of the three', asset.method] }
-    const convention = macrsConventions.find(candidate => candidate === asset.convention)
-    assert(convention !== undefined, ['a validated convention is one of the three', asset.convention])
-    if (convention === undefined) { throw ['a validated convention is one of the three', asset.convention] }
-    const claimed = asset.specialDepreciationAllowanceClaimed
-    const elected = asset.section179ElectedCost
-    return {
-        description: asset.description,
-        placedInServiceYear: Number(yearText),
-        placedInServiceMonth: Number(monthText),
-        costOrOtherBasisCents: centsFromString(asset.costOrOtherBasis),
-        businessUseHundredthsOfPercent: percentFromString(asset.businessUsePercentage),
-        classification: asset.classification,
-        method,
-        convention,
-        section168kStatus: asset.section168kStatus,
-        specialDepreciationAllowanceClaimedCents: claimed === undefined ? 0n : centsFromString(claimed),
-        section179ElectedCostCents: elected === undefined ? 0n : centsFromString(elected),
-        listedProperty: asset.listedProperty === true,
-    }
-})
 
 /**
  * The whole of Schedule C.
@@ -1011,7 +962,20 @@ const depreciableAssets = register => register.assets.map(asset => {
  * @type {(input: ScheduleCInput) => ScheduleCOutcome}
  */
 export const scheduleC = input => {
-    const { profile, nonemployeeCompensationForms, businessExpenseForms, w2Forms, assetRegisters } = input
+    const {
+        profile, nonemployeeCompensationForms, businessExpenseForms, w2Forms, rentalProperties,
+    } = input
+    // **A register whose account number names a stored rental property is
+    // Schedule E Part I's, not this schedule's**, and it is removed here before
+    // any rule below counts registers. Form 4562 is filed per business or
+    // activity (i4562 p1), a rental property is an activity, and printed
+    // Schedule E line 18 is where its line 22 goes. Filtering rather than
+    // refusing is what lets a filer carry a sole proprietorship and a rental
+    // on one return; the refusal below still fires for a register that names
+    // NEITHER.
+    const assetRegisters = input.assetRegisters.filter(register =>
+        !rentalProperties.some(
+            property => property.value.accountNumber === register.value.accountNumber))
 
     // 1. A statutory employee's box 1 wages belong on THIS form's line 1, not
     //    on 1040 line 1a, and this engine puts them on 1040 line 1a. Refused
@@ -1091,21 +1055,27 @@ export const scheduleC = input => {
                 + `(no phase yet)`,
         }
     }
-    // 3c. A register with no business record. Refused rather than ignored: a
-    //     rental property's register is the case that matters, and dropping it
-    //     silently would compute a Schedule C that is right and a Schedule E
-    //     that is missing the depreciation the register exists to supply.
+    // 3c. A register that NOTHING on this return claims. Refused rather than
+    //     ignored: dropping it silently would compute a Schedule C that is
+    //     right and lose the depreciation the register exists to supply.
+    //
+    //     A register whose account number names a stored
+    //     `vnd.fjs.rental_property` never reaches here — it was filtered out at
+    //     the top of this function, because Schedule E Part I claims it. Until
+    //     that part existed this refusal fired for EVERY rental register, and
+    //     its message said so; the correction is the wiring, not the wording.
     if (firstRegister !== undefined && firstBusiness === undefined) {
         return {
             kind: 'error',
             message: `Schedule C: this return carries a vnd.fjs.asset_register for `
-                + `'${firstRegister.value.businessOrActivity}' but no vnd.fjs.business_expenses `
-                + `record. Form 4562 line 22 has to reach a printed line, and the only one this `
-                + `engine wires it to is Schedule C line 13 — Schedule E Part I (rental real `
-                + `estate) still refuses by name, because it also needs the rents received and `
-                + `the fair rental and personal-use days §280A(e) allocates by, which no document `
-                + `here carries. Store a vnd.fjs.business_expenses record for this activity, or `
-                + `remove the register rather than have its depreciation silently dropped`,
+                + `'${firstRegister.value.businessOrActivity}' with accountNumber `
+                + `'${firstRegister.value.accountNumber}', and NOTHING on this return claims it — `
+                + `no vnd.fjs.business_expenses record and no vnd.fjs.rental_property carries that `
+                + `account number. Form 4562 line 22 has to reach a printed line, and this engine `
+                + `wires it to exactly two: Schedule C line 13, from a business record, and `
+                + `Schedule E line 18, from a rental property. Store whichever of the two this `
+                + `activity is, with a MATCHING accountNumber, or remove the register rather than `
+                + `have its depreciation silently dropped`,
         }
     }
 
@@ -1399,6 +1369,7 @@ const run = input => scheduleC({
     businessExpenseForms: [],
     w2Forms: [],
     assetRegisters: [],
+    rentalProperties: [],
     ...input,
 })
 
@@ -2152,20 +2123,62 @@ export const proof = {
             assert(message.includes('mid-quarter'), ['must say why merging is wrong', message])
         },
         /**
-         * **A register with no business record refuses rather than being
-         * ignored, and this is the leaf that matters most.** A rental
-         * property's register is the case: silently dropping it would compute
-         * a Schedule C that is right and leave the depreciation nowhere, which
-         * is exactly the silent-zero this engine exists not to produce.
+         * **A register NOTHING on the return claims refuses rather than being
+         * ignored, and this is the leaf that matters most.** Silently dropping
+         * it would compute a Schedule C that is right and leave the
+         * depreciation nowhere, which is exactly the silent zero this engine
+         * exists not to produce.
+         *
+         * The message named "Schedule E Part I" as an unmodeled destination
+         * until that part shipped. It now names both destinations, because
+         * both exist, and the CONTROL below is what the wiring added: a
+         * register whose account number names a stored
+         * `vnd.fjs.rental_property` is Schedule E's, and Schedule C neither
+         * depreciates it nor refuses it.
          */
-        aRegisterWithNoBusinessRecordRefuses: () => {
+        aRegisterNothingClaimsRefuses: () => {
             const message = refusal(run({
                 assetRegisters: [registerDoc('BUS-0001')],
             })).message
-            assert(message.includes('Schedule E Part I'),
-                ['must name the printed line a rental register would need', message])
-            assert(message.includes('vnd.fjs.business_expenses'),
+            assert(message.includes('Schedule E line 18'),
+                ['must name the OTHER printed line a register can reach', message])
+            assert(message.includes('Schedule C line 13'), ['and this one', message])
+            assert(message.includes('vnd.fjs.rental_property'),
                 ['and what to store instead', message])
+            assert(message.includes('BUS-0001'), ['and which register', message])
+        },
+        /**
+         * ★ **THE CONTROL FOR THE FILTER**, and it cannot be built inside
+         * `fjs/schedule/e/part_i`: only a Schedule C execution can show that
+         * a rental register is INVISIBLE here. A return with one rental
+         * property, its matching register and no business at all computes a
+         * Schedule C of documented zeros — `filed: false`, `form4562:
+         * undefined` — rather than the refusal above.
+         */
+        aRegisterClaimedByARentalPropertyIsNotThisSchedulesAtAll: () => {
+            const outcome = run({
+                assetRegisters: [registerDoc('BUS-0001')],
+                rentalProperties: [{
+                    documentHash: 'sha256-rental-a',
+                    value: {
+                        dialect: 'vnd.fjs.rental_property',
+                        recipientTin: '222-22-2222',
+                        accountNumber: 'BUS-0001',
+                        taxYear: 2025,
+                        propertyType: 'singleFamilyResidence',
+                        physicalAddress: '18 Alder Street, Wells, ME 04090',
+                        fairRentalDays: 365,
+                        personalUseDays: 0,
+                        rentsReceived: '24000.00',
+                        entries: [],
+                    },
+                }],
+            })
+            assert(outcome.kind === 'ok', ['a rental register is not Schedule C\'s', outcome])
+            if (outcome.kind !== 'ok') { throw ['a rental register is not Schedule C\'s', outcome] }
+            assertEq(outcome.filed, false, 'no business, so no Schedule C is filed')
+            assertEq(outcome.form4562, undefined, 'and no Form 4562 is computed here')
+            assertEq(outcome.partII.line13.value, 0n, 'Schedule C line 13 stays a documented zero')
         },
         /**
          * Form 4562's own refusals are threaded out VERBATIM rather than
@@ -2217,7 +2230,9 @@ export const proof = {
         /**
          * ★ **THE LEAF A MUTATION DEMANDED.** Forcing
          * `businessUseHundredthsOfPercent` to a flat 100% in
-         * {@link depreciableAssets} left the ENTIRE suite green: every fixture
+         * `fjs/document/asset_register`'s `depreciableAssets` — which lived in
+         * THIS module when the mutation was run — left the ENTIRE suite green:
+         * every fixture
          * in this repository used 100.00% business use, a June
          * placed-in-service month and the current tax year, so three of the
          * five facts that function extracts were unobservable. This leaf makes

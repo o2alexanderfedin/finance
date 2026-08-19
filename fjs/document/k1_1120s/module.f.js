@@ -222,9 +222,9 @@ export const codedBoxFields = /** @type {const} */ ([
  * of a box number to a destination is what a shared table would get wrong.
  */
 export const unmodeledMoneyBoxes = /** @type {const} */ ([
-    ['box2NetRentalRealEstateIncome', 'Schedule E Part I (lines 3-26), rental real estate — which this engine does not model; `rentalRealEstateAndRoyalties` is an `fjs/return/scope` refusal'],
+    ['box2NetRentalRealEstateIncome', 'Schedule E PART II, the passive columns of printed line 28, after Form 8582 — NOT Part I. Printed Part I is one column per property the taxpayer owns directly, and a shareholder owns stock rather than the corporation’s buildings, so this share cannot become a Part I column even though Part I now computes. What it needs is Form 8582, which needs every passive activity on the return and every prior-year unallowed loss'],
     ['box3OtherNetRentalIncome', 'Schedule E Part II column (g) or (j) as a SECOND activity separate from box 1, with its own §469 grouping and its own basis limitation'],
-    ['box6Royalties', 'Schedule E Part I line 4 (royalties received) — Part I, not Part II, which is why a royalty cannot ride into line 41 on this schedule’s S-corporation block'],
+    ['box6Royalties', 'Schedule E Part I line 4 (royalties received) — Part I, not Part II, which is why a royalty cannot ride into line 41 on this schedule’s S-corporation block. Printed line 4 now EXISTS (`fjs/schedule/e/part_i`), so what is missing is no longer the line but the WIRING to it: a Part I column needs a printed line 1b type code and an identity of its own, and the depletion and expense this royalty carries arrive in coded boxes that every one of them refuses by name — so routing the gross box alone would report the royalty with none of its offsets'],
     ['box8bCollectiblesTwentyEightPercentGain', 'the 28% Rate Gain Worksheet and Schedule D line 18'],
     ['box8cUnrecapturedSection1250Gain', 'the Unrecaptured Section 1250 Gain Worksheet and Schedule D line 19'],
     ['box9NetSection1231Gain', 'Form 4797 Part I, and thence Schedule 1 line 4 (other gains or losses) — `otherGainsOrLosses` is an `fjs/return/scope` refusal'],

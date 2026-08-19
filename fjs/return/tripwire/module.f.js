@@ -236,6 +236,7 @@ import { dialect as k1SCorporationDialect } from '../../document/k1_1120s/module
 /** @import { K1Partnership } from '../../document/k1_1065/module.f.js' */
 /** @import { K1SCorporation } from '../../document/k1_1120s/module.f.js' */
 /** @import { K1EstateTrust } from '../../document/k1_1041/module.f.js' */
+/** @import { RentalProperty } from '../../document/rental_property/module.f.js' */
 
 // ── What a tripwire reads ────────────────────────────────────────────────────
 
@@ -267,6 +268,7 @@ import { dialect as k1SCorporationDialect } from '../../document/k1_1120s/module
  *   readonly partnershipK1Forms: readonly { readonly value: K1Partnership }[],
  *   readonly sCorporationK1Forms: readonly { readonly value: K1SCorporation }[],
  *   readonly estateTrustK1Forms: readonly { readonly value: K1EstateTrust }[],
+ *   readonly rentalProperties: readonly { readonly value: RentalProperty }[],
  * }} SuppliedDocuments
  */
 
@@ -406,6 +408,34 @@ export const tripwires = [
         // 5 are missing rather than this predicate second-guessing it, so
         // "exists" is the whole question here.
         triggered: context => context.documents.isoExerciseForms.length > 0,
+    },
+    {
+        kind: 'rentalRealEstateAndRoyalties',
+        evidence: 'a stored vnd.fjs.rental_property reports non-zero rents received or royalties '
+            + 'received, which is printed Schedule E Part I line 3 or line 4 — gross income under '
+            + '\u00a761(a)(5), whatever the property\'s expenses turn out to be — and it reaches '
+            + '1040 line 8 through printed Schedule E lines 26 and 41 and Schedule 1 line 5, none '
+            + 'of which is computed for a return that does not declare it',
+        // **The entry `vnd.fjs.rental_property` could not ship without.**
+        // `fjs/schedule/e/part_i` runs off the stored documents, but the
+        // engine's schedules are dispatched on the DECLARED kind (12.1-CONTEXT
+        // Decision 1.6), so an undeclared return would carry a stored rental
+        // property that no printed line ever reads -- rent sitting in the store
+        // while line 26 prints a documented zero. That is a silent
+        // understatement of income, which is the failure TAX-16 exists to
+        // prevent, and this row is what stops it.
+        //
+        // A ZERO on both lines does not trigger it: a property bought in
+        // December and not yet let is a real record with no income, and a
+        // tripwire that fired on it would refuse a return that has nothing to
+        // add. A property with expenses and no rent is exactly the case
+        // `fjs/schedule/e/part_i` would refuse as a LOSS anyway, one layer in,
+        // with a message naming Form 8582 -- which is a better message than
+        // this one.
+        triggered: context =>
+            context.documents.rentalProperties.some(property =>
+                boxIsNonZero(property.value.rentsReceived)
+                || boxIsNonZero(property.value.royaltiesReceived)),
     },
     {
         kind: 'businessIncomeOrLoss',
@@ -588,9 +618,16 @@ assert(taxParams2025 !== undefined, 'expected TY2025 parameters to be present in
  * stored Schedule K-1 of ANY of the three dialects with a non-zero separately
  * stated capital gain box -> `capitalGainsOrLosses`, the first whose predicate
  * reads all three document lists and six different box numbers.
+ *
+ * The Schedule E Part I wiring adds the TENTH — a stored
+ * `vnd.fjs.rental_property` with non-zero rents or royalties ->
+ * `rentalRealEstateAndRoyalties`. It is the first whose subject dialect ships
+ * in the same commit as its tripwire, which is the order the rule asks for: a
+ * dialect a filer can store before anything checks that the return declares it
+ * is a dialect that can go unread.
  * @type {number}
  */
-const expectedTripwireCount = 9
+const expectedTripwireCount = 10
 
 /** A W-2 carrying nothing but the fields its schema requires. @type {W2} */
 const bareW2 = {
@@ -626,6 +663,21 @@ const bare1099Nec = {
 const noDocuments = {
     w2s: [], retirementForms: [], nonemployeeCompensationForms: [], isoExerciseForms: [],
     partnershipK1Forms: [], sCorporationK1Forms: [], estateTrustK1Forms: [],
+    rentalProperties: [],
+}
+
+/** A rental property with a real printed line 3. @type {RentalProperty} */
+const rentalProperty = {
+    dialect: 'vnd.fjs.rental_property',
+    recipientTin: '222-22-2222',
+    accountNumber: 'RENT-0001',
+    taxYear: 2025,
+    propertyType: 'singleFamilyResidence',
+    physicalAddress: '18 Alder Street, Wells, ME 04090',
+    fairRentalDays: 365,
+    personalUseDays: 0,
+    rentsReceived: '24000.00',
+    entries: [],
 }
 
 /** A partnership Schedule K-1 with a real box 1 share. @type {K1Partnership} */
@@ -1219,6 +1271,94 @@ export const proof = {
             assertEq(outcome.kind, 'ok', ['a declared kind must not trip its own tripwire', outcome])
         },
     },
+    // ── Entry 10: vnd.fjs.rental_property -> rentalRealEstateAndRoyalties ──
+    //
+    // A landlord stores a property record and does not know printed Schedule E
+    // Part I has to be declared. Undeclared, the engine would emit a confident
+    // 1040 short by the whole of the rent, with the document sitting in the
+    // store unread — which is the exact silent understatement this table
+    // exists to stop.
+    rentalProperty: {
+        aStoredRentalPropertyWithRentRefusesWhenUndeclared: () => {
+            const outcome = classify('single')(['wages'])({
+                ...noDocuments,
+                rentalProperties: [{ value: rentalProperty }],
+            })
+            assert(outcome.kind === 'error', ['a stored rental property must refuse when undeclared', outcome])
+            if (outcome.kind !== 'error') {
+                return
+            }
+            assertEq(outcome.unmodeled.length, 1, ['expected exactly one required kind', outcome.unmodeled])
+            assertEq(
+                outcome.unmodeled[0],
+                'rentalRealEstateAndRoyalties',
+                ['expected Schedule E Part I named', outcome.unmodeled])
+            assert(
+                outcome.message.includes('Schedule E'),
+                ['the refusal must name the schedule the income belongs on', outcome.message])
+            assert(
+                outcome.message.includes('Schedule 1 line 5'),
+                ['the refusal must name the Schedule 1 line it reaches', outcome.message])
+            assert(
+                outcome.message.includes('line 3'),
+                ['the refusal must name the printed line that proved it', outcome.message])
+            // The REMEDY: the kind is MODELED, so the fix is a declaration
+            // rather than a form the taxpayer has to go and find.
+            assert(
+                outcome.message.includes('declare rentalRealEstateAndRoyalties'),
+                ['the remedy must be the declaration, not a form hunt', outcome.message])
+            // And the remedy must say where Part I STOPS, or a filer reads it
+            // as a promise it does not make.
+            assert(
+                outcome.message.includes('Form 8582'),
+                ['the remedy must name the loss limitation it cannot compute', outcome.message])
+        },
+        // A ROYALTY fires it too, through the OTHER printed line. A predicate
+        // written against `rentsReceived` alone would miss every royalty
+        // record, and nothing else here would notice.
+        aRoyaltyFiresItThroughPrintedLineFour: () => {
+            const outcome = classify('single')(['wages'])({
+                ...noDocuments,
+                rentalProperties: [{
+                    value: {
+                        ...rentalProperty,
+                        accountNumber: 'ROY-0001',
+                        propertyType: 'royalties',
+                        physicalAddress: undefined,
+                        fairRentalDays: undefined,
+                        personalUseDays: undefined,
+                        rentsReceived: undefined,
+                        royaltiesReceived: '3200.00',
+                    },
+                }],
+            })
+            assert(outcome.kind === 'error', ['a stored royalty must refuse when undeclared', outcome])
+            if (outcome.kind !== 'error') {
+                return
+            }
+            assertEq(outcome.unmodeled[0], 'rentalRealEstateAndRoyalties', outcome.unmodeled)
+        },
+        // THE NEGATIVE CONTROL: no rental property at all, and a property
+        // whose rents are zero. A December purchase not yet let is a real
+        // record with nothing to add, and a tripwire that fired on it would
+        // refuse a return that has no rental income.
+        anAbsentOrZeroRentNeverFires: () => {
+            const none = classify('single')(['wages'])(noDocuments)
+            assertEq(none.kind, 'ok', ['no rental property must not fire', none])
+            const zero = classify('single')(['wages'])({
+                ...noDocuments,
+                rentalProperties: [{ value: { ...rentalProperty, rentsReceived: '0.00' } }],
+            })
+            assertEq(zero.kind, 'ok', ['a zero line 3 must not fire', zero])
+        },
+        aDeclaredRentalSilencesTheTripwire: () => {
+            const outcome = classify('single')(['wages', 'rentalRealEstateAndRoyalties'])({
+                ...noDocuments,
+                rentalProperties: [{ value: rentalProperty }],
+            })
+            assertEq(outcome.kind, 'ok', ['a declared kind must not trip its own tripwire', outcome])
+        },
+    },
     // ── Entry 7: Form 1041 K-1 box 6 -> estateAndTrustIncome (TAX-35) ────
     beneficiaryIncome: {
         // A beneficiary holds a Schedule K-1 (Form 1041) and does not know
@@ -1584,9 +1724,9 @@ export const proof = {
     // caller's evidence string came from, so this is the leaf that keeps the
     // convention honest: the taxpayer's OWN amounts, which are the only
     // taxpayer data a predicate here ever touches, must not appear in the
-    // refusal. SEVEN distinctive amounts are supplied and each is searched for
+    // refusal. NINE distinctive amounts are supplied and each is searched for
     // separately, so a message that interpolated any one of them reddens here
-    // and says which.
+    // and says which. A stored rental property's rent is the ninth.
     noTaxpayerAmountRidesOutThroughATripwireRefusal: () => {
         const outcome = classify('single')(['wages'])({
             w2s: [{ value: { ...bareW2, box5MedicareWagesAndTips: '387654.32', box8AllocatedTips: '1234.56' } }],
@@ -1608,12 +1748,13 @@ export const proof = {
                     box4FairMarketValuePerShareOnExerciseDate: '54.32',
                 },
             }],
+            rentalProperties: [{ value: { ...rentalProperty, rentsReceived: '8765.43' } }],
         })
         assert(outcome.kind === 'error', ['expected a refusal', outcome])
         if (outcome.kind !== 'error') {
             return
         }
-        for (const amount of ['387654.32', '1234.56', '7654.21', '9876.54', '3.21', '54.32', '5432.10', '6543.21']) {
+        for (const amount of ['387654.32', '1234.56', '7654.21', '9876.54', '3.21', '54.32', '5432.10', '6543.21', '8765.43']) {
             assert(
                 !outcome.message.includes(amount),
                 ['a taxpayer amount reached the refusal message', amount, outcome.message])
@@ -1621,7 +1762,7 @@ export const proof = {
         // The control: the message is not empty, and it really did describe
         // all three findings — otherwise "contains no amount" would be
         // satisfied by a message containing nothing.
-        assertEq(outcome.unmodeled.length, 7, ['expected all seven tripwires to have fired', outcome.unmodeled])
+        assertEq(outcome.unmodeled.length, 8, ['expected all eight tripwires to have fired', outcome.unmodeled])
     },
     // The rejected fourth entry, recorded as a CHECKED claim rather than as
     // prose (see this module's docstring). `fjs/document/1099g` refuses a
