@@ -78,6 +78,8 @@ known to work until you have watched it fail"):
 
 ## Not in scope
 
-`box6ForeignTaxPaid` on the same dialect is also stored and unread, but it is
-`foreignTaxCredit` (Schedule 3 line 1), a different kind with an election this
-engine does not yet carry. It is tier B and has its own spec.
+`box6ForeignTaxPaid` on the same dialect was also stored and unread when this spec was
+written, and is now read: it is `foreignTaxCredit` (Schedule 3 line 1), a different kind
+with an election this engine did not then carry. It carries it now —
+`section904jElectionAllForeignIncomeIsQualifiedPassiveIncome` on `vnd.fjs.return_profile`
+— and the spec is `fjs/schedule/3/todo/foreign-tax-credit.md`.

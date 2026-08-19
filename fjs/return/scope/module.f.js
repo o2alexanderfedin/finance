@@ -516,9 +516,27 @@ export const modeledKinds = /** @type {const} */ ([
     'netInvestmentIncomeTax',      // Form 8960 -> Schedule 2 line 12 -> 1040 line 23
     'uncollectedTaxOnTipsOrGroupTermLife', // W-2 box 12 codes A/B/M/N -> Schedule 2 line 13 -> 1040 line 23
     'childTaxCreditOrOtherDependents', // Schedule 8812 Part I       -> 1040 line 19
+    // TAX-36, reclassified in the SAME commit as the `fjs/schedule/3` line 1
+    // wiring. **Only §904(j) is modeled, and the kind is modeled anyway** --
+    // which is the judgement call worth naming. §904(a)'s limitation is Form
+    // 1116 and this engine still does not compute it, so a filer above
+    // §904(j)(2)(B)'s $300/$600 ceiling, or one who will not make the
+    // election, is REFUSED at the line with their own figures in the message.
+    // A kind stays refused when nothing about it can be computed; this one
+    // can be computed for most of the population that has it -- anybody
+    // holding an international index fund -- and the sub-case that cannot is
+    // refused where a taxpayer can see why.
+    'foreignTaxCredit',            // 1099-DIV box 7 + 1099-INT box 6 -> Schedule 3 line 1 -> 1040 line 20
     'educationCredits',            // Form 8863 line 19 -> Schedule 3 line 3 -> 1040 line 20
     'retirementSavingsContributionsCredit', // Form 8880 -> Schedule 3 line 4 -> 1040 line 20
     'excessSocialSecurityWithheld', // W-2 box 4 -> Schedule 3 line 11 -> 1040 line 31
+    // Reclassified in the SAME commit as the `fjs/schedule/3` line 10 wiring.
+    // What made it computable is not a form arriving but a FIELD arriving:
+    // `scheduleThreeLine10AmountPaidWithExtensionRequest` on
+    // `vnd.fjs.return_profile`, beside 1040 lines 26/35a/36 and for their
+    // reason -- no information return reports a Form 4868 payment, so the
+    // taxpayer is the only source there has ever been.
+    'amountPaidWithExtensionRequest', // return profile -> Schedule 3 line 10 -> 1040 line 31
     'federalTaxWithheldOnW2',      // W-2 box 2                     -> 1040 line 25a
     'federalTaxWithheldOn1099Int', // 1099-INT box 4                -> 1040 line 25b
     'federalTaxWithheldOnOther1099', // 1099-R/1099-DIV/1099-B box 4 -> 1040 line 25b
@@ -846,12 +864,24 @@ export const unmodeledKindRefusals = /** @type {const} */ ([
     // SCHEDULE 3 line first and the 1040 line it reaches second, exactly as
     // the Schedule 1 and Schedule 2 blocks above do.
     //
-    // **Two of the seven are NOT here**, because they are MODELED:
+    // **THREE of the seven are NOT here**, because they are MODELED:
     // `educationCredits` (line 3) and `retirementSavingsContributionsCredit`
     // (line 4) moved to {@link modeledKinds} in the SAME commit as the
     // `fjs/schedule/3`/`fjs/form1040/core` wiring that makes them computable
     // -- wire before reclassify, exactly as Phases 23 and 24 did. The split
     // commit before it added all twelve as refusals and reclassified nothing.
+    //
+    // `foreignTaxCredit` (line 1) is the third, at TAX-36, and it left for a
+    // reason no other row in this table has yet: **its remedy was true of the
+    // case that motivated it and false of the case that dominates it.**
+    // "Requires Form 1116" describes §904(a)'s general limitation exactly,
+    // and describes §904(j)'s de-minimis election -- $300, or $600 on a joint
+    // return, of passive income taxes shown on payee statements -- not at
+    // all. The election needs no Form 1116, and it is what an ordinary
+    // international-index-fund holder uses. `fjs/schedule/3`'s
+    // `foreignTaxCreditLine` computes that case and REFUSES the rest at the
+    // line, carrying the taxpayer's own total and ceiling, which is a better
+    // refusal than this table could ever produce.
     //
     // `americanOpportunityCredit` (1040 line 29) moved with them, out of the
     // Part II block far below, because Form 8863's ONE execution produces
@@ -864,7 +894,6 @@ export const unmodeledKindRefusals = /** @type {const} */ ([
     // of without the other: Part III's employer-provided benefits are
     // INCLUDIBLE INCOME, and Part II's credit is a credit. Declaring one
     // would not be declaring the other.
-    { kind: 'foreignTaxCredit', line: 'Schedule 3 line 1 -> 1040 line 20', label: 'the foreign tax credit', remedy: 'requires Form 1116 (no phase yet)' },
     { kind: 'dependentCareCredit', line: 'Schedule 3 line 2 -> 1040 line 20', label: 'the credit for child and dependent care expenses', remedy: 'requires Form 2441 Part II (no phase yet)' },
     { kind: 'residentialCleanEnergyCredit', line: 'Schedule 3 line 5a -> 1040 line 20', label: 'the residential clean energy credit', remedy: 'requires Form 5695 Part I (no phase yet)' },
     { kind: 'energyEfficientHomeImprovementCredit', line: 'Schedule 3 line 5b -> 1040 line 20', label: 'the energy efficient home improvement credit', remedy: 'requires Form 5695 Part II (no phase yet)' },
@@ -887,8 +916,19 @@ export const unmodeledKindRefusals = /** @type {const} */ ([
     // survives as a rule: a remedy must distinguish a missing FORM from a
     // missing COMPUTATION, because only one of the two is something a
     // taxpayer can act on.
+    //
+    // `amountPaidWithExtensionRequest` (line 10) has now left too, and its
+    // row taught the neighbouring lesson. Its remedy read "no dialect models
+    // it — there is no information return for a payment made with Form 4868",
+    // which named a missing DIALECT rather than a missing FORM: the first of
+    // those this project can close by itself, and it did, with one
+    // `option(string)` field on `vnd.fjs.return_profile` beside the three
+    // 1040 boxes already there for exactly the same reason. So the rule the
+    // row above states has a second half — **a remedy naming a missing
+    // dialect is a remedy this repo owns**, and the three rows that still
+    // say it (`federalTaxWithheldOnOtherForms` above, and Schedule 1's own
+    // two) are where to look next.
     { kind: 'netPremiumTaxCredit', line: 'Schedule 3 line 9 -> 1040 line 31', label: 'the net premium tax credit', remedy: 'requires Form 8962 (no phase yet)' },
-    { kind: 'amountPaidWithExtensionRequest', line: 'Schedule 3 line 10 -> 1040 line 31', label: 'the amount paid with a request for an extension to file', remedy: 'no dialect models it — there is no information return for a payment made with Form 4868 (no phase yet)' },
     { kind: 'federalFuelTaxCredit', line: 'Schedule 3 line 12 -> 1040 line 31', label: 'the credit for federal tax paid on fuels', remedy: 'requires Form 4136 (no phase yet)' },
     { kind: 'otherPaymentsAndRefundableCredits', line: 'Schedule 3 line 13a-13z -> 1040 line 31', label: 'other payments or refundable credits', remedy: 'the printed form itself collapses five lettered sub-lines here and this engine models none of them (no phase yet)' },
     // ── The nine line-16 entries below matter more than they look ────────────
@@ -1384,9 +1424,21 @@ export const classifyScope = declaredKinds => {
  * (`deductiblePartOfSelfEmploymentTax`, `selfEmploymentTax` and
  * `qualifiedBusinessIncomeDeduction`), landed beside the `fjs/schedule/se`
  * and `fjs/form8995` wiring that makes all three computable.
+ *
+ * `45 -> 46` is Schedule 3 line 10's own `amountPaidWithExtensionRequest`,
+ * beside the `fjs/schedule/3` wiring that reads
+ * `scheduleThreeLine10AmountPaidWithExtensionRequest` off the return profile.
+ *
+ * `46 -> 47` is Schedule 3 line 1's own `foreignTaxCredit` (TAX-36), beside
+ * the `fjs/schedule/3` `foreignTaxCreditLine` wiring. **The first kind here
+ * that is modeled for a SUB-CASE only:** §904(j)'s de-minimis election is
+ * computed and §904(a)'s general limitation (Form 1116) is refused at the
+ * line, with the taxpayer's own total and ceiling in the message. Being
+ * modeled is a claim about what CAN be computed, not a promise that every
+ * return declaring the kind will be.
  * @type {number}
  */
-const expectedModeledKindCount = 45
+const expectedModeledKindCount = 47
 
 /**
  * The modeled set, hand-typed a SECOND time and in {@link kindVocabulary}'s
@@ -1436,9 +1488,11 @@ const everyModeledKindHandTyped = [
     'netInvestmentIncomeTax',
     'uncollectedTaxOnTipsOrGroupTermLife',
     'childTaxCreditOrOtherDependents',
+    'foreignTaxCredit',
     'educationCredits',
     'retirementSavingsContributionsCredit',
     'excessSocialSecurityWithheld',
+    'amountPaidWithExtensionRequest',
     'federalTaxWithheldOnW2',
     'federalTaxWithheldOn1099Int',
     'federalTaxWithheldOnOther1099',
@@ -1535,9 +1589,25 @@ const everyModeledKindHandTyped = [
  * `80 -> 79` is that phase's own ONE-kind reclassification one commit later
  * (`partnershipAndSCorporationIncome`), beside the `fjs/schedule/e` wiring
  * that makes it computable.
+ *
+ * `69 -> 68` is Schedule 3 line 1's own `foreignTaxCredit` (TAX-36),
+ * reclassified beside the `fjs/schedule/3` wiring. Its remedy read "requires
+ * Form 1116", which was true of §904(a)'s general case and FALSE of
+ * §904(j)'s de-minimis election — and the election is what most of the
+ * population holding a foreign tax actually uses. **A remedy can be true of
+ * the case that motivated it and false of the case that dominates it**, which
+ * is a third way for a row in this table to go stale, alongside the two the
+ * rows below record.
+ *
+ * `70 -> 69` is Schedule 3 line 10's own `amountPaidWithExtensionRequest`,
+ * reclassified beside the `fjs/schedule/3` wiring that computes it. Its
+ * remedy is the FIRST in this table to have been closed by adding a field to
+ * a dialect this repo owns rather than by building a printed form: it read
+ * "no dialect models it", and a remedy naming a missing DIALECT rather than a
+ * missing FORM is one this project can close itself.
  * @type {number}
  */
-const expectedUnmodeledKindCount = 70
+const expectedUnmodeledKindCount = 68
 
 /**
  * The complete refusal message for a return declaring exactly
@@ -2455,6 +2525,18 @@ export const proof = {
                 outcome.kind, 'ok',
                 ['Schedule 3 line 11\'s kind alone must be in scope', outcome])
         },
+        foreignTaxCreditIsInScopeAlone: () => {
+            const outcome = classifyScope(['foreignTaxCredit'])
+            assertEq(
+                outcome.kind, 'ok',
+                ['Schedule 3 line 1\'s kind alone must be in scope', outcome])
+        },
+        amountPaidWithExtensionRequestIsInScopeAlone: () => {
+            const outcome = classifyScope(['amountPaidWithExtensionRequest'])
+            assertEq(
+                outcome.kind, 'ok',
+                ['Schedule 3 line 10\'s kind alone must be in scope', outcome])
+        },
         amtEstatesAndTrustsIsInScopeAlone: () => {
             const outcome = classifyScope(['amtEstatesAndTrusts'])
             assertEq(
@@ -2777,21 +2859,19 @@ export const proof = {
         // subtracting the two wired kinds from the twelve — a list computed
         // from the tables under test could never notice a tenth kind silently
         // becoming modeled.
-        theNineScheduleThreeKindsThisPhaseDidNotWireStillRefuse: () => {
+        theSevenScheduleThreeKindsStillWithoutAFormStillRefuse: () => {
             /** @type {readonly Kind[]} */
             const stillRefused = [
-                'foreignTaxCredit',
                 'dependentCareCredit',
                 'residentialCleanEnergyCredit',
                 'energyEfficientHomeImprovementCredit',
                 'otherNonrefundableCredits',
                 'netPremiumTaxCredit',
-                'amountPaidWithExtensionRequest',
                 'federalFuelTaxCredit',
                 'otherPaymentsAndRefundableCredits',
             ]
-            assertEq(stillRefused.length, 9,
-                'twelve Schedule 3 kinds minus the two this phase wired and line 11')
+            assertEq(stillRefused.length, 7,
+                'twelve Schedule 3 kinds minus lines 1, 3, 4, 10 and 11, all five now modeled')
             for (const kind of stillRefused) {
                 const outcome = classifyScope([kind])
                 assert(
@@ -2799,18 +2879,16 @@ export const proof = {
                     ['this Schedule 3 kind must still refuse after the split', kind, outcome],
                 )
             }
-            // The two the phase's own record names, each with the reason it
-            // still cannot be computed.
-            const foreign = classifyScope(['foreignTaxCredit'])
-            assert(foreign.kind === 'error', ['the foreign tax credit must still refuse', foreign])
-            assert(
-                foreign.message.includes('Form 1116'),
-                ['the foreign tax credit refusal must name Form 1116', foreign.message],
-            )
-            assert(
-                foreign.message.includes('Schedule 3 line 1'),
-                ['it must name its own Schedule 3 line', foreign.message],
-            )
+            // **The foreign tax credit's two assertions were HERE and are
+            // gone**, not merely because the kind moved but because what they
+            // asserted became wrong: they demanded that declaring
+            // `foreignTaxCredit` refuse the return naming Form 1116, and
+            // §904(j)'s election needs no Form 1116. The refusal that
+            // replaces them is `fjs/schedule/3`'s, raised at the line with
+            // the taxpayer's own total in it, and
+            // `foreignTaxCreditReachesTheReturn` in `fjs/form1040/core`
+            // drives it end to end. A scope refusal could never have said
+            // "your $300.01 is one cent over".
             const premium = classifyScope(['netPremiumTaxCredit'])
             assert(premium.kind === 'error', ['the net premium tax credit must still refuse', premium])
             assert(

@@ -92,7 +92,7 @@ import {
 // or below the threshold, which is exactly Form 8995, so that case is delegated
 // to `fjs/form8995` from inside there. One call site, either page.
 import { qualifiedBusinessIncomeDeduction } from '../../form8995a/module.f.js'
-import { scheduleThree } from '../../schedule/3/module.f.js'
+import { scheduleThree, foreignTaxCreditLine } from '../../schedule/3/module.f.js'
 import { form8812 } from '../../form8812/module.f.js'
 import { iraTaxableAmount, rothDistributionCodeOf } from '../../form8606/module.f.js'
 import { baseTaxForAmount } from '../../tax/table/module.f.js'
@@ -1899,9 +1899,32 @@ const form1040TaxAndPaymentLines = taxParamSet => inputs => income => {
     const medicareTaxWithheld = fromDocuments('Form 8959 line 19 (Form W-2 box 6)')(
         sumBoxOverDocuments(w2s)('box6MedicareTaxWithheld')(
             w2 => w2.box6MedicareTaxWithheld))
+    // Schedule 3 line 1 -- the §904(j) foreign tax credit (TAX-36) -- is
+    // computed HERE, once, and BEFORE Schedule 2, because Form 6251 lines 8
+    // and 10 both need it and Schedule 2 is where Form 6251 runs. Schedule 3
+    // itself takes the finished line as an input rather than recomputing it,
+    // so this figure has exactly one execution and cannot go stale against a
+    // second one.
+    //
+    // `fjs/schedule/2`'s own docstring recorded this as an unbreakable cycle
+    // (Schedule 3 runs after Schedule 2 because lines 3 and 4 read 1040 line
+    // 18). It was not one: line 1 needs no tax figure at all. See
+    // `fjs/schedule/3`'s `foreignTaxCreditLine`.
+    //
+    // It can REFUSE -- a stored foreign tax with no §904(j) election, or one
+    // above §904(j)(2)(B)'s ceiling -- and the refusal is the whole return's,
+    // threaded through the same `unmodeled: []` arm every other
+    // document-data-sufficiency guard in this file uses.
+    const foreignTaxCreditOutcome
+        = foreignTaxCreditLine(taxParamSet)(status)(profile)(dividendForms)(interestForms)
+    if (foreignTaxCreditOutcome.kind === 'error') {
+        return { kind: 'error', message: foreignTaxCreditOutcome.message, unmodeled: [] }
+    }
+    const scheduleThreeLine1 = foreignTaxCreditOutcome.line
     const scheduleTwoOutcome = scheduleTwo(taxParamSet)({
         profile,
         status,
+        scheduleThreeLine1Cents: scheduleThreeLine1.value,
         medicareWages,
         medicareTaxWithheld,
         // Schedule 2 line 13's whole computation: Form W-2 box 12 codes A,
@@ -2034,6 +2057,9 @@ const form1040TaxAndPaymentLines = taxParamSet => inputs => income => {
         // refuses on the taxpayer's own assertion instead — see its docstring.
         aStored1099RProvesADistribution: retirementForms.some(
             form => form.value.box1GrossDistribution !== undefined),
+        // Printed line 1, off the ONE execution above -- never a second,
+        // independently stale `foreignTaxCreditLine(...)` call.
+        foreignTaxCreditLine1: scheduleThreeLine1,
     })
     if (scheduleThreeOutcome.kind === 'error') {
         return { kind: 'error', message: scheduleThreeOutcome.message, unmodeled: [] }
@@ -2048,12 +2074,15 @@ const form1040TaxAndPaymentLines = taxParamSet => inputs => income => {
             livedWithTaxpayer: d.livedWithTaxpayer === true,
         })),
         line18Cents: line18.value,
-        // Credit Limit Worksheet A line 2: Schedule 3 lines 3 and 4, off the
-        // SAME execution that produced them. The other ten summands the
-        // printed worksheet lists are refused `fjs/return/scope` kinds and
-        // therefore documented zeros.
-        scheduleThreeCreditsCents:
-            scheduleThreeOutcome.line3.value + scheduleThreeOutcome.line4.value,
+        // Credit Limit Worksheet A line 2: Schedule 3 lines 1, 3 and 4, off
+        // the SAME execution that produced them. **Line 1 joined them at
+        // TAX-36** -- §26 orders the foreign tax credit ahead of the child
+        // tax credit, so omitting it here would let a §904(j) filer claim a
+        // child tax credit against tax the foreign credit had already
+        // absorbed. The other nine summands the printed worksheet lists are
+        // refused `fjs/return/scope` kinds and therefore documented zeros.
+        scheduleThreeCreditsCents: scheduleThreeOutcome.line1.value
+            + scheduleThreeOutcome.line3.value + scheduleThreeOutcome.line4.value,
         earnedIncomeCents: profile.value.earnedIncome === undefined
             ? 0n
             : centsFromString(profile.value.earnedIncome),
@@ -2792,6 +2821,7 @@ const dividendAndBrokerageSourceArtifactHash
  *   readonly box2dCollectibles28PercentGain?: string,
  *   readonly box4FederalIncomeTaxWithheld?: string,
  *   readonly box5Section199ADividends?: string,
+ *   readonly box7ForeignTaxPaid?: string,
  * }} DividendBoxes
  */
 
@@ -4284,6 +4314,77 @@ const exerciseAndHoldWith = estateTrustK1Forms => {
         estateTrustK1Forms,
     })
 }
+
+/**
+ * The §904(j) persona's return profile: a single filer with wages, the
+ * withholding on them, and the foreign tax credit declared AND elected.
+ * @type {ReturnProfile}
+ */
+const singleProfileElectingSection904j = {
+    ...singleProfile,
+    declaredKinds: ['wages', 'federalTaxWithheldOnW2', 'foreignTaxCredit'],
+    section904jElectionAllForeignIncomeIsQualifiedPassiveIncome: true,
+}
+
+/** The SAME profile declaring the kind and NOT electing — the §904(j)(2)(C)
+ * control, and the only difference between it and the one above.
+ * @type {ReturnProfile}
+ */
+const singleProfileDeclaringForeignTaxCredit = {
+    ...singleProfile,
+    declaredKinds: ['wages', 'federalTaxWithheldOnW2', 'foreignTaxCredit'],
+}
+
+/**
+ * The persona's return: $52,000.00 of wages, $4,200.00 withheld, and one
+ * 1099-DIV whose box 7 carries the foreign tax given (or none at all, which
+ * is the differential control every leaf below is read against).
+ * @type {(profile: ReturnProfile) => (foreignTax: string | undefined) => Form1040Inputs}
+ */
+const foreignTaxInputsFor = profile => foreignTax => inputsOf(storedProfile(profile))([{
+    documentHash: 'sha256-ftc-w2',
+    value: {
+        ...w2Document('sha256-ftc-w2')('52000.00').value,
+        box2FederalIncomeTaxWithheld: '4200.00',
+    },
+}])([])(foreignTax === undefined ? [] : [
+    dividendDocument('sha256-ftc-div')({ box7ForeignTaxPaid: foreignTax }),
+])([])([])([])([])([])([])
+
+/** The electing persona's own return.
+ * @type {(foreignTax: string | undefined) => Form1040Inputs}
+ */
+const foreignTaxInputs = foreignTaxInputsFor(singleProfileElectingSection904j)
+
+/**
+ * The SAME persona with one qualifying child and a much smaller wage, chosen
+ * so the child tax credit is limited by the tax rather than by income:
+ * $25,750.00 - $15,750.00 = $10,000.00 of taxable income, against a
+ * $2,200.00 credit. See `theCreditIsSubtractedBeforeTheChildTaxCredit`.
+ * @type {(foreignTax: string | undefined) => Form1040Inputs}
+ */
+const childInputs = foreignTax => inputsOf(storedProfile({
+    ...singleProfileElectingSection904j,
+    declaredKinds: [
+        'wages', 'federalTaxWithheldOnW2', 'foreignTaxCredit',
+        'childTaxCreditOrOtherDependents', 'additionalChildTaxCredit',
+    ],
+    dependentCount: 1,
+    dependents: [{
+        relationship: 'daughter',
+        ssnValidForEmployment: true,
+        ageAtYearEnd: 9,
+        livedWithTaxpayer: true,
+    }],
+}))([{
+    documentHash: 'sha256-ftc-child-w2',
+    value: {
+        ...w2Document('sha256-ftc-child-w2')('25750.00').value,
+        box2FederalIncomeTaxWithheld: '900.00',
+    },
+}])([])(foreignTax === undefined ? [] : [
+    dividendDocument('sha256-ftc-div')({ box7ForeignTaxPaid: foreignTax }),
+])([])([])([])([])([])([])
 
 export const proof = {
     unionSources: {
@@ -9183,6 +9284,21 @@ export const proof = {
                 creditForms: [phaseTwentyFiveCredits],
                 tuitionForms: [phaseTwentyFiveOneZeroNineEightT],
                 aStored1099RProvesADistribution: false,
+                // This return holds no 1099 with a foreign tax box, so
+                // Schedule 3 line 1 is the profile-declared zero
+                // `foreignTaxCreditLine` returns for that case. Written out
+                // rather than obtained by calling that function, so the
+                // cross-check's expected side is not produced by code under
+                // test.
+                foreignTaxCreditLine1: {
+                    value: 0n,
+                    sources: [{
+                        documentHash: profileHash,
+                        boxPath: 'declaredKinds',
+                        value: JSON.stringify(phaseTwentyFiveProfile.declaredKinds),
+                    }],
+                    rule: 'Schedule 3 line 1 (foreign tax credit, §904(j) election -> 1040 line 20)',
+                },
             })
             assert(crossCheck.kind === 'ok', ['expected the cross-check to compute', crossCheck])
             if (crossCheck.kind !== 'ok') {
@@ -9281,6 +9397,272 @@ export const proof = {
             assertEq(cents('1040 line 37'), 255500n, 'and the whole of it owed')
         },
     },
+    // ── Schedule 3 line 10: the Form 4868 extension payment, END TO END ────
+    //
+    // **A schedule-level proof CANNOT prove a wiring.** `fjs/schedule/3`'s own
+    // five line-10 leaves read the profile this file hands it, and every one
+    // of them stays green while `form1040Report` passes a profile whose field
+    // was never populated, or while Schedule 3 line 15 drops line 10 from its
+    // summand list, or while 1040 line 31 stops reading line 15. These leaves
+    // drive the real entry point.
+    //
+    // Hand-computed from the printed forms, independently of the code:
+    //
+    //   Schedule 3 line 10  paid with Form 4868                   $1,250.00
+    //   Schedule 3 line 15  add lines 9, 10, 11, 12 and 14        $1,250.00
+    //   1040 line 31        from Schedule 3 line 15               $1,250.00
+    //   1040 line 32        add lines 27a through 31              $1,250.00
+    //   1040 line 33        add lines 25d, 26 and 32              $1,250.00
+    //   1040 line 24 (no income, no tax)                              $0.00
+    //   1040 line 34        overpaid                              $1,250.00
+    extensionPaymentReachesTheReturn: {
+        theWholePaymentIsAnOverpaymentOnAReturnWithNoIncome: () => {
+            const outcome = form1040Report(taxParams2025)(inputsOf(storedProfile({
+                ...singleProfile,
+                declaredKinds: ['amountPaidWithExtensionRequest'],
+                scheduleThreeLine10AmountPaidWithExtensionRequest: '1250.00',
+            }))([])([])([])([])([])([])([])([])([]))
+            assert(outcome.kind === 'ok', ['expected the extension return to compute', outcome])
+            if (outcome.kind !== 'ok') {
+                throw ['expected ok', outcome]
+            }
+            /** @type {(rule: string) => bigint} */
+            const cents = rule => lineRuled(outcome.lines)(rule).value
+            assertEq(cents('1040 line 24'), 0n, 'no income, no tax')
+            assertEq(cents('1040 line 31'), 125000n, '$1,250.00 — Schedule 3 line 15')
+            assertEq(cents('1040 line 32'), 125000n, 'total other payments and refundable credits')
+            assertEq(cents('1040 line 33'), 125000n, 'total payments')
+            assertEq(cents('1040 line 34'), 125000n, 'the whole payment is an overpayment')
+            assertEq(cents('1040 line 37'), 0n, 'and nothing is owed')
+        },
+        // The CITATION, through the full report. 1040 line 31 carries
+        // Schedule 3 line 15's unioned sources, and the profile field must be
+        // among them by name with the raw stored string — a figure that
+        // arrives with no provenance is the defect this engine exists to
+        // prevent.
+        lineThirtyOneCitesTheProfileFieldTheAmountCameFrom: () => {
+            const outcome = form1040Report(taxParams2025)(inputsOf(storedProfile({
+                ...singleProfile,
+                declaredKinds: ['amountPaidWithExtensionRequest'],
+                scheduleThreeLine10AmountPaidWithExtensionRequest: '1250.00',
+            }))([])([])([])([])([])([])([])([])([]))
+            assert(outcome.kind === 'ok', ['expected the extension return to compute', outcome])
+            if (outcome.kind !== 'ok') {
+                throw ['expected ok', outcome]
+            }
+            const cited = lineRuled(outcome.lines)('1040 line 31').sources.find(
+                source => source.boxPath === 'scheduleThreeLine10AmountPaidWithExtensionRequest')
+            assert(
+                cited !== undefined,
+                'line 31 must cite the profile box the extension payment was read from')
+            if (cited === undefined) {
+                throw ['unreachable', outcome]
+            }
+            assertEq(cited.documentHash, profileHash)
+            assertEq(cited.value, '1250.00', 'the raw stored string, never re-formatted')
+        },
+        // The DIFFERENTIAL, on a return that actually owes tax: the same wage
+        // return with and without the field, and the only permitted
+        // difference is $1,250.00 on the payment side. This is the leaf that
+        // survives every arithmetic change to the wage return around it, and
+        // the one that reddens when the field is ignored, when line 10 leaves
+        // line 15's summands, or when line 31 stops reading line 15.
+        theSameWageReturnMovesByExactlyThePaymentAndOnlyOnThePaymentSide: () => {
+            /** @type {(extension: string | undefined) => Form1040Inputs} */
+            const wageReturn = extension => inputsOf(storedProfile({
+                ...singleProfile,
+                declaredKinds: extension === undefined
+                    ? ['wages', 'federalTaxWithheldOnW2']
+                    : ['wages', 'federalTaxWithheldOnW2', 'amountPaidWithExtensionRequest'],
+                ...(extension === undefined
+                    ? {}
+                    : { scheduleThreeLine10AmountPaidWithExtensionRequest: extension }),
+            }))([{
+                documentHash: 'sha256-4868-w2',
+                value: {
+                    ...w2Document('sha256-4868-w2')('52000.00').value,
+                    box2FederalIncomeTaxWithheld: '4200.00',
+                },
+            }])([])([])([])([])([])([])([])([])
+            const without = form1040Report(taxParams2025)(wageReturn(undefined))
+            const with4868 = form1040Report(taxParams2025)(wageReturn('1250.00'))
+            assert(without.kind === 'ok', ['expected the plain wage return to compute', without])
+            assert(with4868.kind === 'ok', ['expected the extension return to compute', with4868])
+            if (without.kind !== 'ok' || with4868.kind !== 'ok') {
+                throw ['expected ok', without, with4868]
+            }
+            /** @type {(outcome: { readonly lines: readonly ReportLine[] }) => (rule: string) => bigint} */
+            const cents = report => rule => lineRuled(report.lines)(rule).value
+            // Unmoved: the payment is not income, not a deduction and not a
+            // credit against the tax.
+            for (const rule of ['1040 line 9', '1040 line 11', '1040 line 15', '1040 line 24']) {
+                assertEq(
+                    cents(with4868)(rule), cents(without)(rule),
+                    ['an extension PAYMENT must not move the tax side', rule])
+            }
+            assert(cents(without)('1040 line 24') > 0n, ['the control return must owe tax'])
+            // Moved, by exactly the payment.
+            assertEq(cents(without)('1040 line 31'), 0n, 'no Schedule 3 Part II figure without it')
+            assertEq(cents(with4868)('1040 line 31'), 125000n, '$1,250.00')
+            assertEq(
+                cents(with4868)('1040 line 33') - cents(without)('1040 line 33'), 125000n,
+                'total payments rise by exactly $1,250.00')
+        },
+    },
+
+    // ── Schedule 3 line 1: the §904(j) foreign tax credit, END TO END ──────
+    //
+    // **A schedule-level proof CANNOT prove a wiring**, and this file has paid
+    // for that repeatedly. `fjs/schedule/3`'s eleven `lineOneForeignTaxCredit`
+    // leaves prove the §904(j) arithmetic against document lists handed
+    // straight to them; every one stays green while THIS file passes
+    // `foreignTaxCreditLine` an empty `dividendForms`, or drops line 1 from
+    // Schedule 8812's Credit Limit Worksheet, or never propagates its
+    // refusal. The leaves below drive `form1040Report` over stored documents.
+    //
+    // The persona: an ordinary index-fund holder. $52,000.00 of wages,
+    // $4,200.00 withheld, and one 1099-DIV whose box 7 reports $250.00 of
+    // foreign tax an international fund paid on their behalf — under
+    // §904(j)(2)(B)'s $300.00 single-filer ceiling, so the election is
+    // available and Form 1116 is not needed. That $250.00 was dropped in
+    // silence by every version of this engine before TAX-36.
+    foreignTaxCreditReachesTheReturn: {
+        // The credit reaches 1040 line 20 and reduces the tax by exactly
+        // itself. The tax figures are read DIFFERENTIALLY against the same
+        // return without the 1099-DIV, so this leaf pins the wiring without
+        // re-deriving the Tax Table — and the differential is hand-typed.
+        theCreditReachesLineTwentyAndReducesTheTaxByItself: () => {
+            const withCredit = form1040Report(taxParams2025)(foreignTaxInputs('250.00'))
+            const without = form1040Report(taxParams2025)(foreignTaxInputs(undefined))
+            assert(withCredit.kind === 'ok', ['expected the §904(j) return to compute', withCredit])
+            assert(without.kind === 'ok', ['expected the control return to compute', without])
+            if (withCredit.kind !== 'ok' || without.kind !== 'ok') {
+                throw ['expected ok', withCredit, without]
+            }
+            /** @type {(report: { readonly lines: readonly ReportLine[] }) => (rule: string) => bigint} */
+            const cents = report => rule => lineRuled(report.lines)(rule).value
+            assertEq(cents(without)('1040 line 20'), 0n, 'no credit without the 1099-DIV')
+            assertEq(cents(withCredit)('1040 line 20'), 25000n, '$250.00 — Schedule 3 line 8')
+            assertEq(cents(withCredit)('1040 line 21'), 25000n, 'line 19 ($0.00) + line 20')
+            // The tax before credits is UNMOVED — a foreign tax credit is a
+            // credit, never an adjustment to income — and the tax after
+            // credits falls by exactly the credit.
+            assertEq(
+                cents(withCredit)('1040 line 18'), cents(without)('1040 line 18'),
+                'a credit does not move the tax before credits')
+            assertEq(
+                cents(without)('1040 line 22') - cents(withCredit)('1040 line 22'), 25000n,
+                'line 22 falls by exactly $250.00')
+            assert(
+                cents(withCredit)('1040 line 22') > 0n,
+                ['the fixture must still owe tax, or the credit would be capped and '
+                    + 'the differential would prove nothing',
+                cents(withCredit)('1040 line 22')])
+        },
+        // The CITATION, end to end: 1040 line 20 carries Schedule 3 line 8's
+        // unioned sources, and the 1099-DIV's box 7 must be among them by
+        // name with the raw stored string.
+        lineTwentyCitesTheNineteenNinetyNineDivBoxSeven: () => {
+            const outcome = form1040Report(taxParams2025)(foreignTaxInputs('250.00'))
+            assert(outcome.kind === 'ok', ['expected the §904(j) return to compute', outcome])
+            if (outcome.kind !== 'ok') {
+                throw ['expected ok', outcome]
+            }
+            const cited = lineRuled(outcome.lines)('1040 line 20').sources.find(
+                source => source.boxPath === 'box7ForeignTaxPaid')
+            assert(cited !== undefined, 'line 20 must cite the box the foreign tax came from')
+            if (cited === undefined) {
+                throw ['unreachable', outcome]
+            }
+            assertEq(cited.documentHash, 'sha256-ftc-div')
+            assertEq(cited.value, '250.00', 'the raw stored string, never re-formatted')
+        },
+        // §904(j)(2)(C), through the FULL entry point: the same 1099-DIV
+        // without the election refuses the whole return rather than silently
+        // dropping $250.00 the taxpayer is owed.
+        withoutTheElectionTheWholeReturnRefuses: () => {
+            const outcome = form1040Report(taxParams2025)(
+                foreignTaxInputsFor(singleProfileDeclaringForeignTaxCredit)('250.00'))
+            assert(outcome.kind === 'error', ['expected a refusal', outcome])
+            if (outcome.kind !== 'error') {
+                throw ['expected error', outcome]
+            }
+            assert(outcome.message.includes('250.00'), ['naming the amount', outcome.message])
+            assert(
+                outcome.message.includes('sha256-ftc-div'),
+                ['and the document it is stored on', outcome.message])
+            assert(
+                outcome.message.includes('Schedule 3 line 1'),
+                ['and where the amount would have gone', outcome.message])
+            assert(
+                outcome.message.includes(
+                    'section904jElectionAllForeignIncomeIsQualifiedPassiveIncome'),
+                ['and the profile field that would make it computable', outcome.message])
+            assertEq(outcome.unmodeled.length, 0, 'this is not a scope refusal')
+        },
+        // §904(j)(2)(B), through the FULL entry point: $300.01 on a single
+        // return is one cent over the ceiling, so the election is unavailable
+        // and Form 1116 — which this engine does not compute — is required.
+        aboveTheCeilingTheWholeReturnRefuses: () => {
+            const outcome = form1040Report(taxParams2025)(foreignTaxInputs('300.01'))
+            assert(outcome.kind === 'error', ['expected a refusal', outcome])
+            if (outcome.kind !== 'error') {
+                throw ['expected error', outcome]
+            }
+            assert(outcome.message.includes('300.01'), ['naming the total', outcome.message])
+            assert(outcome.message.includes('300.00'), ['and the ceiling', outcome.message])
+            assert(outcome.message.includes('Form 1116'), [outcome.message])
+        },
+        // …and the CONTROL for both refusals: $300.00 exactly, one cent less,
+        // computes end to end. Without it, a gate that refused every return
+        // carrying a 1099-DIV would pass the two leaves above.
+        threeHundredExactlyStillComputesEndToEnd: () => {
+            const outcome = form1040Report(taxParams2025)(foreignTaxInputs('300.00'))
+            assert(outcome.kind === 'ok', ['$300.00 exactly must still compute', outcome])
+            if (outcome.kind !== 'ok') {
+                throw ['expected ok', outcome]
+            }
+            assertEq(lineRuled(outcome.lines)('1040 line 20').value, 30000n, '$300.00')
+        },
+        // **Schedule 8812's Credit Limit Worksheet A**, which subtracts
+        // Schedule 3 lines 1 through 4 before the child tax credit sees the
+        // tax. This is the downstream total a form-level proof cannot see,
+        // and the one the Form 3903 slice lost three mutations to.
+        //
+        // The fixture is built so the CTC is TAX-limited: $25,750.00 of
+        // wages against the $15,750.00 single standard deduction leaves
+        // $10,000.00 of taxable income and a tax far below the $2,200.00
+        // credit one qualifying child earns. So 1040 line 19 IS the room left
+        // after Schedule 3, and it must fall by exactly the foreign tax
+        // credit — hand-typed as $100.00, never derived from the tax table.
+        theCreditIsSubtractedBeforeTheChildTaxCredit: () => {
+            const withCredit = form1040Report(taxParams2025)(childInputs('100.00'))
+            const without = form1040Report(taxParams2025)(childInputs(undefined))
+            assert(withCredit.kind === 'ok', ['expected the child return to compute', withCredit])
+            assert(without.kind === 'ok', ['expected the control to compute', without])
+            if (withCredit.kind !== 'ok' || without.kind !== 'ok') {
+                throw ['expected ok', withCredit, without]
+            }
+            /** @type {(report: { readonly lines: readonly ReportLine[] }) => (rule: string) => bigint} */
+            const cents = report => rule => lineRuled(report.lines)(rule).value
+            // The premise, asserted rather than assumed: the child tax credit
+            // is limited by the tax, so there is room for line 1 to take.
+            assertEq(
+                cents(without)('1040 line 19'), cents(without)('1040 line 18'),
+                'the CTC must be TAX-limited, or this leaf proves nothing')
+            assert(cents(without)('1040 line 19') > 10000n, ['and by more than $100.00'])
+            assertEq(
+                cents(without)('1040 line 19') - cents(withCredit)('1040 line 19'), 10000n,
+                'the child tax credit falls by exactly the $100.00 foreign tax credit')
+            // …and the total of the two nonrefundable credits is unmoved,
+            // because the foreign credit took exactly what the child credit
+            // gave up. That is §26's ordering, observed rather than asserted.
+            assertEq(
+                cents(withCredit)('1040 line 21'), cents(without)('1040 line 21'),
+                'line 21 is the same tax either way — the ordering moved it, not the total')
+        },
+    },
+
     scheduleOneAdjustments: {
         theNonProfitEmployeeReturnDeductsAllThreeAdjustmentsThroughLineTen: () => {
             const outcome = form1040Report(taxParams2025)(phaseTwentyFourInputs)

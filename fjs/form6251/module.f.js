@@ -768,11 +768,30 @@ export const form6251 = taxParamSet => input => {
     //    three ways to rot.
     const flatTwentySixTwentyEight = twentySixTwentyEightPercentTax(taxParamSet)(status)(line6)
 
-    // 8. "Alternative minimum tax foreign tax credit." A documented zero:
-    //    `foreignTaxCredit` (Schedule 3 line 1) is a refused kind, and the
-    //    AMTFTC is that credit refigured with AMT amounts — there is nothing
-    //    to refigure.
-    const line8 = 0n
+    // 8. "Alternative minimum tax foreign tax credit." EQUAL to Schedule 3
+    //    line 1, and this was a documented zero until TAX-36 made that line
+    //    real.
+    //
+    //    **Wiring line 10 without wiring this would make the AMT worse than
+    //    leaving both alone.** The form subtracts a foreign tax credit on
+    //    both sides of its comparison: line 9 = line 7 - line 8 and line 10 =
+    //    the regular tax less Schedule 3 line 1, with line 11 = line 9 - line
+    //    10. Move line 10 alone and the AMT rises by exactly the credit.
+    //
+    //    §59(a)(1) defines the AMTFTC as the §27(a) credit redetermined with
+    //    the pre-credit tentative minimum tax and AMTI substituted into §904.
+    //    Under §904(j) there is no §904(a) limitation to redetermine, so the
+    //    substitutions change nothing and the two figures are equal — which
+    //    is also what Form 6251's own line 8 instruction tells a filer who
+    //    did not file Form 1116. The correct net effect of a §904(j) credit
+    //    on the AMT is therefore ZERO.
+    //
+    //    **This equality holds only while §904(j) is the ONLY route to
+    //    Schedule 3 line 1 in this engine**, which it is: `fjs/schedule/3`'s
+    //    `foreignTaxCreditLine` refuses every other case. The day Form 1116
+    //    is modeled, line 8 becomes its own AMT-basis Form 1116 figure and
+    //    this assignment is wrong.
+    const line8 = scheduleThreeLine1Cents
 
     // 7, the FIRST bullet: Part III is required when the return reported
     //    capital gain distributions directly on 1040 line 7, or qualified
@@ -2262,7 +2281,24 @@ export const proof = {
                 'and the AMT falls by the same amount, because the AMT is the excess')
             const withCredit = expectOk(run({ ...base, scheduleThreeLine1Cents: 100000n }))
             assertEq(withCredit.line10, 5400000n, 'Schedule 3 line 1 SUBTRACTS')
-            assertEq(withCredit.line11, plain.line11 + 100000n, 'and the AMT rises')
+            // **CORRECTED at TAX-36, and the correction is the finding.**
+            // This line asserted `plain.line11 + 100000n` -- "and the AMT
+            // rises" -- which was true only while line 8 was a hard zero.
+            // Line 8 is the AMT foreign tax credit and now tracks Schedule 3
+            // line 1 (§59(a)(1) redetermines the §27(a) credit, and under
+            // §904(j) there is nothing to redetermine), so the SAME figure
+            // comes off both sides of `line11 = line9 - line10` and the AMT
+            // does not move at all. A wiring that moved line 10 alone would
+            // have raised a §904(j) filer's AMT by exactly their foreign tax.
+            assertEq(
+                withCredit.line8, 100000n,
+                'line 8 is the AMT foreign tax credit — the SAME $1,000.00')
+            assertEq(
+                withCredit.line9, plain.line9 - 100000n,
+                'so the tentative minimum tax falls by it too')
+            assertEq(
+                withCredit.line11, plain.line11,
+                'and the AMT is unmoved: a §904(j) credit nets to zero here')
         },
         // "If zero or less, enter -0-." A foreign tax credit larger than the
         // regular tax floors line 10 rather than making it negative, which

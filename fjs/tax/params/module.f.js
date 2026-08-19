@@ -1127,6 +1127,74 @@ export const socialSecurityTaxWithholding = {
 }
 
 /**
+ * The §904(j)(2)(B) de-minimis ceiling on creditable foreign taxes — the
+ * figure below which an individual may ELECT out of the §904(a) limitation
+ * and take the foreign tax credit straight onto Schedule 3 line 1, with no
+ * Form 1116 at all. TAX-36, and see
+ * `fjs/schedule/3/todo/foreign-tax-credit.md` for the whole of what the
+ * election does and does not assert.
+ *
+ * §904(j)(2)(B): *"the amount of the creditable foreign taxes paid or accrued
+ * by the individual during the taxable year does not exceed **$300 ($600 in
+ * the case of a joint return)**"*.
+ *
+ * **The ceiling is on the TAXES, not on the income.** It is the one of
+ * §904(j)(2)'s three conditions this engine can check for itself; (A)'s
+ * all-passive, all-on-a-payee-statement test and (C)'s election are taxpayer
+ * assertions carried on `vnd.fjs.return_profile`. A small figure here is not
+ * evidence that (A) holds.
+ *
+ * **`qualifyingSurvivingSpouse` is $300, NOT $600 — the trap in this group**,
+ * and the same one {@link additionalMedicareTaxThreshold} carries one
+ * parameter over. The statute's larger figure is *"in the case of a joint
+ * return"*, and a qualifying surviving spouse does not file one: that status
+ * borrows the joint rate schedule and the joint standard deduction, and
+ * nothing else. Head of household and married-filing-separately are $300 for
+ * the identical reading. Only `marriedFilingJointly` is a joint return.
+ *
+ * Hand-typed per status, deliberately never spread from another status's
+ * entry, for the reason {@link standardDeduction} states: a spread makes two
+ * statuses impossible to observe drifting apart.
+ *
+ * **NOT indexed.** §904(j)(2)(B) has read $300/$600 since the Taxpayer Relief
+ * Act of 1997 §1105 added the subsection, and no Revenue Procedure adjusts
+ * it — so `kind: 'code'`, for the same reason
+ * {@link additionalMedicareTaxThreshold}'s citations are, and inventing a Rev.
+ * Proc. number would be the sourcing error this module's own header exists to
+ * prevent. `effectiveDate` reads `'2025-01-01'` per that header: every
+ * citation here states the year the figure is being APPLIED for.
+ *
+ * No `estatesAndTrusts` entry: §904(j)(1) opens *"In the case of an
+ * individual"*, and this map is keyed by {@link IndividualFilingStatus} to
+ * say so at the type level.
+ * @type {Record<IndividualFilingStatus, AmountWithCitation>}
+ */
+export const foreignTaxCreditDeMinimisElection = {
+    single: {
+        amount: '300.00',
+        citation: { kind: 'code', section: '§904(j)(2)(B)', effectiveDate: '2025-01-01' },
+    },
+    // The ONE joint return, and therefore the one $600.
+    marriedFilingJointly: {
+        amount: '600.00',
+        citation: { kind: 'code', section: '§904(j)(2)(B)', effectiveDate: '2025-01-01' },
+    },
+    marriedFilingSeparately: {
+        amount: '300.00',
+        citation: { kind: 'code', section: '§904(j)(2)(B)', effectiveDate: '2025-01-01' },
+    },
+    headOfHousehold: {
+        amount: '300.00',
+        citation: { kind: 'code', section: '§904(j)(2)(B)', effectiveDate: '2025-01-01' },
+    },
+    // See this group's own docstring: NOT a joint return, so NOT $600.
+    qualifyingSurvivingSpouse: {
+        amount: '300.00',
+        citation: { kind: 'code', section: '§904(j)(2)(B)', effectiveDate: '2025-01-01' },
+    },
+}
+
+/**
  * Form 8960's Net Investment Income Tax thresholds — IRC **§1411(b)**,
  * TAX-21, Phase 23. The 3.8% tax applies to the LESSER of net investment
  * income and the excess of §1411's own modified adjusted gross income over
@@ -2613,6 +2681,7 @@ export const alternativeMinimumTax = {
  *   readonly additionalMedicareTaxThreshold: typeof additionalMedicareTaxThreshold,
  *   readonly additionalMedicareTaxRates: typeof additionalMedicareTaxRates,
  *   readonly socialSecurityTaxWithholding: typeof socialSecurityTaxWithholding,
+ *   readonly foreignTaxCreditDeMinimisElection: typeof foreignTaxCreditDeMinimisElection,
  *   readonly netInvestmentIncomeTaxThreshold: typeof netInvestmentIncomeTaxThreshold,
  *   readonly netInvestmentIncomeTaxRateBasisPoints: typeof netInvestmentIncomeTaxRateBasisPoints,
  *   readonly iraDeduction: typeof iraDeduction,
@@ -2654,6 +2723,7 @@ export const taxParamsByYear = {
         additionalMedicareTaxThreshold,
         additionalMedicareTaxRates,
         socialSecurityTaxWithholding,
+        foreignTaxCreditDeMinimisElection,
         netInvestmentIncomeTaxThreshold,
         netInvestmentIncomeTaxRateBasisPoints,
         iraDeduction,
@@ -2716,6 +2786,7 @@ const assertPublicLawCitation = citation => {
  * @type {readonly string[]}
  */
 const everyDollarStringField = [
+    ...individualFilingStatuses.map(status => foreignTaxCreditDeMinimisElection[status].amount),
     ...individualFilingStatuses.map(status => standardDeduction[status].amount),
     agedOrBlindAdditional.married.amount,
     agedOrBlindAdditional.unmarried.amount,
@@ -3079,6 +3150,50 @@ export const proof = {
         assertEq(
             centsToString(maximum), '10918.20',
             '$176,100.00 x 6.2% — the 2025 Schedule 3 line 11 instructions print $10,918.20')
+    },
+    // §904(j)(2)(B)'s two figures, in the statute's own words, with the
+    // citation asserted SEPARATELY from the value — a threshold that is right
+    // while citing the wrong subsection and one that is wrong while citing
+    // the right one are different defects.
+    //
+    // Asserted PER STATUS and hand-typed five times, never as one loop over
+    // an expected map, so a single wrong figure names its own status. The
+    // three $300 rows are the interesting ones: each is a status the statute
+    // does NOT call a joint return, and a copy-paste of the joint figure into
+    // any of them would hand that filer twice the ceiling.
+    theDeMinimisCeilingIsThreeHundredExceptOnAJointReturn: () => {
+        assertEq(
+            foreignTaxCreditDeMinimisElection.single.amount, '300.00',
+            '$300 — §904(j)(2)(B), a single filer is not a joint return')
+        assertEq(
+            foreignTaxCreditDeMinimisElection.marriedFilingJointly.amount, '600.00',
+            '$600 — §904(j)(2)(B), "in the case of a joint return"')
+        assertEq(
+            foreignTaxCreditDeMinimisElection.marriedFilingSeparately.amount, '300.00',
+            '$300 — a separate return is not a joint return')
+        assertEq(
+            foreignTaxCreditDeMinimisElection.headOfHousehold.amount, '300.00',
+            '$300 — head of household is not a joint return')
+        assertEq(
+            foreignTaxCreditDeMinimisElection.qualifyingSurvivingSpouse.amount, '300.00',
+            '$300 — a qualifying surviving spouse does not file a JOINT return, '
+            + 'whatever rate schedule the status borrows')
+        // Exactly ONE status may carry the larger figure. Stated as a count
+        // rather than as five equalities, so a sixth status added later
+        // cannot quietly take $600 by default.
+        assertEq(
+            individualFilingStatuses.filter(
+                status => foreignTaxCreditDeMinimisElection[status].amount === '600.00').length,
+            1,
+            'exactly one filing status is a joint return')
+    },
+    everyDeMinimisCeilingCitesSubsectionJ: () => {
+        for (const status of individualFilingStatuses) {
+            const { citation } = foreignTaxCreditDeMinimisElection[status]
+            assertEq(citation.kind, 'code', status)
+            assertEq(citation.section, '§904(j)(2)(B)', status)
+            assertEq(citation.effectiveDate, '2025-01-01', status)
+        }
     },
     // T-08-02: every stored dollar amount is a `string`, never a JSON
     // number, and round-trips exactly through

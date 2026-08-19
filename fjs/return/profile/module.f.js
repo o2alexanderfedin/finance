@@ -710,6 +710,17 @@ export const returnProfileSchema = /** @type {const} */ ({
     line26EstimatedTaxPayments: option(string),
     line35aRefundRequested: option(string),
     line36AppliedToNextYear: option(string),
+    // Schedule 3 line 10 — the amount paid with a Form 4868 request for an
+    // automatic extension of time to file. `line26EstimatedTaxPayments`'
+    // exact shape, for its exact reason: no information return reports it,
+    // because the taxpayer holds a cheque stub rather than a payee statement.
+    // See `fjs/schedule/3/todo/amount-paid-with-extension.md`.
+    //
+    // **Named for SCHEDULE 3's line 10, not a bare `line10`.** The three
+    // fields above are named for 1040 lines, so `line10AmountPaid...` would
+    // read as 1040 line 10 — the adjustments total, a different figure on a
+    // different form. The name says which printed page a reader should open.
+    scheduleThreeLine10AmountPaidWithExtensionRequest: option(string),
     // Schedule B Part III, line 7a (first sub-question) — TAX-07. Taxpayer-
     // declared; no IRS information return reports this fact.
     hadForeignFinancialAccount: option(true),
@@ -752,6 +763,40 @@ export const returnProfileSchema = /** @type {const} */ ({
     // because certifying eligibility while claiming nothing is an ordinary
     // return and every other field on this dialect is silent about moving.
     movingExpensesArmedForcesPermanentChangeOfStation: option(true),
+    // §904(j)(2)(C)'s ELECTION and §904(j)(2)(A)'s ASSERTION, in one field,
+    // and the name states both because the taxpayer is making both claims at
+    // once: "every dollar of my foreign-source gross income is qualified
+    // passive income — passive under §904(d)(2)(B) and shown on a payee
+    // statement furnished to me (§904(j)(3)(A)) — and I elect to have §904(j)
+    // apply." Read by `fjs/schedule/3`, which computes Schedule 3 line 1
+    // without Form 1116 when it is present and REFUSES the return when a
+    // foreign tax is stored and it is not. See
+    // `fjs/schedule/3/todo/foreign-tax-credit.md`.
+    //
+    // **The engine can check exactly one of §904(j)(2)'s three conditions.**
+    // (B), the $300/$600 ceiling on creditable foreign taxes, is arithmetic
+    // over stored boxes and `fjs/schedule/3` performs it. (A) is not
+    // observable at all: neither `vnd.fjs.1099div` nor `vnd.fjs.1099int`
+    // states how much of its box 1a or box 1 was foreign-source, nor which
+    // §904(d) category it fell in, and no document reports the foreign wages
+    // or rents that would break the condition. (C) is not a fact but a
+    // choice, and a costly one — §904(j)(1)(C) forbids carrying any of an
+    // electing year's excess taxes back or forward under §904(c). So this
+    // flag is a taxpayer ASSERTION, exactly like
+    // `spouseHadNoIncomeIsNotFilingAndIsNotADependent` above, and it is what
+    // makes the resulting credit attributable to a declaration rather than to
+    // an assumption. **A small stored figure is not evidence that (A)
+    // holds.**
+    //
+    // ONE field rather than two, because only one combination is actionable:
+    // asserted-but-not-elected means Form 1116, which this engine refuses,
+    // and elected-without-the-facts is not a state a taxpayer can truthfully
+    // be in. No cross-field check here, on
+    // `movingExpensesArmedForcesPermanentChangeOfStation`'s own precedent:
+    // electing while holding no 1099 with a foreign tax box is an ordinary
+    // return, and every other field on this dialect is silent about foreign
+    // taxes.
+    section904jElectionAllForeignIncomeIsQualifiedPassiveIncome: option(true),
     // TAX-12 (13-CONTEXT.md Decision 4.1) — per-dependent facts Schedule
     // 8812 needs to classify a qualifying child versus an other dependent.
     // Additive, ABSENT for a return declaring `dependentCount: 0` and
@@ -793,6 +838,7 @@ const moneyBoxFields = /** @type {const} */ ([
     'line26EstimatedTaxPayments',
     'line35aRefundRequested',
     'line36AppliedToNextYear',
+    'scheduleThreeLine10AmountPaidWithExtensionRequest',
 ])
 
 /**
@@ -971,6 +1017,21 @@ export const checkReferences = r => {
             + "'estimatedTaxPayments'",
         )
     }
+    // 7b — the identical rule for Schedule 3 line 10's own amount, which
+    // arrived on this dialect for the identical reason (no information return
+    // reports a Form 4868 payment). Written as a second `if` rather than
+    // folded into a table because there are two of them, and a table of two
+    // is harder to read than two statements; the day a third arrives, make it
+    // a loop the way `moneyBoxFields` is one.
+    if (
+        r.scheduleThreeLine10AmountPaidWithExtensionRequest !== undefined
+        && !r.declaredKinds.includes('amountPaidWithExtensionRequest')
+    ) {
+        return error(
+            'scheduleThreeLine10AmountPaidWithExtensionRequest is present but declaredKinds '
+            + "does not name 'amountPaidWithExtensionRequest'",
+        )
+    }
     // 8 — TAX-12/13-CONTEXT.md Decision 4.1: `dependentCount` stays the
     // load-bearing declaration; `dependents`, when present, must agree with
     // it exactly, or Schedule 8812's per-dependent classification and the
@@ -1050,7 +1111,11 @@ const minimal = {
  *
  * The fixture declares `'estimatedTaxPayments'` deliberately: without it, the
  * `line26EstimatedTaxPayments` leaf would be satisfied by cross-field check 7
- * rather than by the exactness loop it is meant to exercise.
+ * rather than by the exactness loop it is meant to exercise. It declares
+ * `'amountPaidWithExtensionRequest'` for the same reason and against the same
+ * hazard one check later — check 7b. **Every kind a check 7-shaped guard pairs
+ * with a money box on this dialect belongs in this list**, or that box's leaf
+ * silently stops testing exactness and starts testing the guard.
  *
  * A box's own generated leaf disappears WITH it if the box is dropped, so this
  * alone cannot catch a removal — {@link expectedMoneyBoxFieldCount} pairs it
@@ -1063,7 +1128,7 @@ const generatedMoneyBoxExactnessProof = Object.fromEntries(
         () => {
             const [t, v] = validate({
                 ...minimal,
-                declaredKinds: ['estimatedTaxPayments'],
+                declaredKinds: ['estimatedTaxPayments', 'amountPaidWithExtensionRequest'],
                 [field]: '1,234.56',
             })
             assertEq(t, 'error', ['expected a comma-grouped amount in this box to be refused', field, t, v])
@@ -1160,9 +1225,14 @@ const expectedEarnedIncomeCreditFactFieldCount = 10
  * `moneyBoxFields.length` — if it were, dropping a box would shrink both
  * sides together and this check could never fail. The duplication is the
  * mechanism, not a smell (AGENTS.md).
+ *
+ * `4 -> 5` is Schedule 3 line 10's own
+ * `scheduleThreeLine10AmountPaidWithExtensionRequest`: the FIRST money box on
+ * this dialect that is not a 1040 line, and the fourth figure this engine
+ * takes from the taxpayer because no information return states it.
  * @type {number}
  */
-const expectedMoneyBoxFieldCount = 4
+const expectedMoneyBoxFieldCount = 5
 
 /**
  * Independently hand-typed: the size of the frozen {@link kindVocabulary},
@@ -1433,6 +1503,76 @@ export const proof = {
                     line26EstimatedTaxPayments: '1234.56',
                 })
                 assertEq(t, 'ok')
+            },
+            // Check 7b, the same gate on Schedule 3 line 10's own amount. The
+            // refusal is asserted BY NAME rather than merely as an error: the
+            // fixture below it would pass against a check that refused every
+            // profile, and the pair is what AGENTS.md means by "a gate needs a
+            // control".
+            extensionPaymentWithoutDeclaredKindRefused: () => {
+                const [t, v] = validate({
+                    ...minimal,
+                    scheduleThreeLine10AmountPaidWithExtensionRequest: '450.00',
+                })
+                assertEq(t, 'error')
+                assert(typeof v === 'string', ['expected a semantic string refusal', v])
+                assert(
+                    v.includes('scheduleThreeLine10AmountPaidWithExtensionRequest'),
+                    ['the refusal must name the offending box', v])
+                assert(
+                    v.includes('amountPaidWithExtensionRequest'),
+                    ['and the kind that would have made it declarable', v])
+            },
+            extensionPaymentWithDeclaredKindAccepted: () => {
+                const [t, v] = validate({
+                    ...minimal,
+                    declaredKinds: ['amountPaidWithExtensionRequest'],
+                    scheduleThreeLine10AmountPaidWithExtensionRequest: '450.00',
+                })
+                assert(t === 'ok', ['expected ok', t, v])
+                assertEq(v.scheduleThreeLine10AmountPaidWithExtensionRequest, '450.00')
+            },
+            // The two guards are INDEPENDENT: declaring one kind does not
+            // license the other's box. Without this leaf, a check 7b written
+            // against `'estimatedTaxPayments'` by copy-paste would pass every
+            // leaf above.
+            // §904(j)'s election flag, and it deliberately has NO
+            // cross-field guard — the two leaves here pin that as a decision
+            // rather than an omission. Declaring the election while claiming
+            // no foreign tax is an ordinary return; the gate that matters
+            // lives in `fjs/schedule/3`, where the stored foreign tax is.
+            theSection904jElectionNeedsNoDeclaredKindOfItsOwn: () => {
+                const [t, v] = validate({
+                    ...minimal,
+                    section904jElectionAllForeignIncomeIsQualifiedPassiveIncome: true,
+                })
+                assert(t === 'ok', ['electing while claiming nothing must validate', t, v])
+                assertEq(v.section904jElectionAllForeignIncomeIsQualifiedPassiveIncome, true)
+            },
+            // DOC-12, the same discipline as every other checkbox on this
+            // dialect: a structural `false` is REJECTED, never read as "not
+            // electing". Absent means not elected; there is no third state,
+            // and a stored `false` would be a second way to spell the first.
+            theSection904jElectionRejectsAStoredFalse: () => {
+                const [t] = validate({
+                    ...minimal,
+                    section904jElectionAllForeignIncomeIsQualifiedPassiveIncome: false,
+                })
+                assertEq(t, 'error')
+            },
+            eachExtensionAndEstimatedGuardWatchesItsOwnKind: () => {
+                const [t1] = validate({
+                    ...minimal,
+                    declaredKinds: ['estimatedTaxPayments'],
+                    scheduleThreeLine10AmountPaidWithExtensionRequest: '450.00',
+                })
+                assertEq(t1, 'error', 'the extension amount needs its OWN kind declared')
+                const [t2] = validate({
+                    ...minimal,
+                    declaredKinds: ['amountPaidWithExtensionRequest'],
+                    line26EstimatedTaxPayments: '1234.56',
+                })
+                assertEq(t2, 'error', 'and the estimated payment needs its own')
             },
         },
     },

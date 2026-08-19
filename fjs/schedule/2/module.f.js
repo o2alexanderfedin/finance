@@ -143,12 +143,16 @@ import { form8959 } from '../../form8959/module.f.js'
 import { form8960 } from '../../form8960/module.f.js'
 import { form6251 } from '../../form6251/module.f.js'
 import { estateTrustAmtAdjustmentSources } from '../../form6251/estate_trust/module.f.js'
-// PROOF-ONLY at run time, and deliberately the ONLY thing this module reads
-// from `fjs/return/scope`: `theForeignTaxCreditCycleIsResolvedByARefusal`
-// needs to check that the foreign tax credit is still refused, because Form
-// 6251 line 10 is handed a $0.00 for it. Production code below reads nothing
-// from the scope guard, exactly as this module's own docstring says.
-import { modeledKinds } from '../../return/scope/module.f.js'
+// REMOVED at TAX-36: `import { modeledKinds } from '../../return/scope/...'`
+// stood here, proof-only, so `theForeignTaxCreditCycleIsResolvedByARefusal`
+// could assert that `foreignTaxCredit` was still a refused kind — the one
+// thing this module ever read from the scope guard. That kind is modeled now
+// and Form 6251 is handed the real Schedule 3 line 1, so the check has
+// nothing left to assert and the leaf is repointed (see
+// `theForeignTaxCreditIsForwardedToFormSixTwoFiftyOnesBothSides`). This
+// module now reads nothing at all from `fjs/return/scope`, in proofs or in
+// production, which is what its own docstring always claimed of the
+// production half.
 import { scheduleSelfEmploymentPartI } from '../se/module.f.js'
 import { taxParamsByYear } from '../../tax/params/module.f.js'
 
@@ -340,17 +344,28 @@ const uncollectedTaxSources = w2s => w2s.flatMap(form =>
  * the same-year ISO disposition rule makes the spread unknowable, and whether
  * capital gain distributions reached 1040 line 7 directly.
  *
- * **`scheduleThreeLine1Cents` is deliberately NOT among them, and there is a
- * cycle behind that.** Form 6251 line 10 subtracts Schedule 3 line 1, the
- * foreign tax credit; `fjs/schedule/3` runs AFTER this module in
- * `fjs/form1040/core`, because its own Credit Limit Worksheet reads 1040 line
- * 18, which is line 16 plus THIS schedule's line 3. The printed forms are
- * genuinely circular there. It is resolvable today only because
- * `foreignTaxCredit` is a refused `fjs/return/scope` kind, so Schedule 3 line
- * 1 is a documented zero for every return this engine computes — and
- * `theForeignTaxCreditCycleIsResolvedByARefusal` is the leaf that says so as a
- * checked claim rather than a comment, so the day that kind is modeled this
- * module fails and somebody has to break the cycle properly.
+ * **`scheduleThreeLine1Cents` IS among them as of TAX-36, and the paragraph
+ * that said it never could be is rewritten rather than deleted, because the
+ * correction is the finding.** It read: Form 6251 line 10 subtracts Schedule
+ * 3 line 1, the foreign tax credit; `fjs/schedule/3` runs AFTER this module
+ * in `fjs/form1040/core`, because its own Credit Limit Worksheet reads 1040
+ * line 18, which is line 16 plus THIS schedule's line 3 — so the printed
+ * forms are *genuinely circular there*, and passing `0n` was correct only
+ * while `foreignTaxCredit` was a refused kind.
+ *
+ * **The cycle was never real.** Schedule 3 line 1 has no tax figure on its
+ * input side at all: under §904(j) the credit is the creditable foreign taxes
+ * off two 1099 boxes, with no limitation and no worksheet. Only Schedule 3's
+ * lines 3 and 4 need 1040 line 18. So `fjs/schedule/3` exports
+ * `foreignTaxCreditLine`, `fjs/form1040/core` runs it ONCE before this
+ * module, and both schedules are handed the finished line. What looked like a
+ * cycle was one module's lines sharing an input the other line did not need.
+ *
+ * `theForeignTaxCreditCycleIsResolvedByARefusal` — the leaf written to fail
+ * on this exact day — is repointed to the property that replaces it, rather
+ * than deleted: line 10 moves by exactly the credit it is handed, and Form
+ * 6251 line 8 moves with it, so a §904(j) credit's net effect on the AMT is
+ * zero.
  * @typedef {{
  *   readonly profile: Stored<ReturnProfile>,
  *   readonly status: IndividualFilingStatus,
@@ -377,6 +392,7 @@ const uncollectedTaxSources = w2s => w2s.flatMap(form =>
  *   readonly scheduleD15Cents: bigint,
  *   readonly scheduleD16Cents: bigint,
  *   readonly scheduleD19Cents: bigint,
+ *   readonly scheduleThreeLine1Cents: bigint,
  *   readonly regularPreferentialWorksheet:
  *     RegularPreferentialWorksheet | NoRegularPreferentialWorksheet,
  * }} ScheduleTwoInput
@@ -496,12 +512,13 @@ export const scheduleTwo = taxParamSet => input => {
         aStoredNineteenNineBReportsASale,
         regularTaxCents: regularTax.value,
         scheduleTwoLine1zCents: line1z.value,
-        // The foreign tax credit, and the cycle this module's own
-        // `ScheduleTwoInput` docstring argues: `fjs/schedule/3` runs after
-        // this module because its Credit Limit Worksheet reads 1040 line 18,
-        // which is line 16 plus this schedule's line 3. A documented zero,
-        // correct only because `foreignTaxCredit` is a refused kind.
-        scheduleThreeLine1Cents: 0n,
+        // Schedule 3 line 1, the foreign tax credit, computed ONCE by
+        // `fjs/schedule/3`'s exported `foreignTaxCreditLine` before this
+        // module ran and threaded straight through -- see this module's own
+        // `ScheduleTwoInput` docstring for why the cycle recorded there was
+        // not a real one. Form 6251 subtracts it on BOTH sides (line 8 and
+        // line 10), so a §904(j) credit's net effect on the AMT is zero.
+        scheduleThreeLine1Cents: input.scheduleThreeLine1Cents,
         qualifiedDividendsCents: qualifiedDividends.value,
         // 1040 line 7a, which IS the capital gain distributions when no
         // Schedule D was filed -- the same field `fjs/tax/line16`'s dispatcher
@@ -775,6 +792,11 @@ const noSelfEmployment = selfEmploymentInput(
 const noAmounts = {
     profile: profileNoDeclaredKinds,
     status: 'single',
+    // Schedule 3 line 1 as `fjs/form1040/core` hands it in: zero for a return
+    // with no foreign tax anywhere. The leaves below that care about it
+    // override it, and `theForeignTaxCreditReachesFormSixTwoFiftyOnesBothSides`
+    // is what proves it is not being ignored.
+    scheduleThreeLine1Cents: 0n,
     specifiedPrivateActivityBondInterestCents: 0n,
     medicareWages: inputLine('box5MedicareWagesAndTips')(0n),
     medicareTaxWithheld: inputLine('box6MedicareTaxWithheld')(0n),
@@ -1285,28 +1307,57 @@ export const proof = {
                 outcome.message.includes('Form 6251 line 2i'),
                 ['and still name the line it could not compute', outcome.message])
         },
-        // THE CYCLE, as a checked claim rather than a comment. Form 6251 line
-        // 10 subtracts Schedule 3 line 1, and `fjs/schedule/3` runs AFTER this
-        // module because its Credit Limit Worksheet reads 1040 line 18 = line
-        // 16 + this schedule's line 3. Passing $0.00 is correct only because
-        // `foreignTaxCredit` is a refused scope kind; the day it is modeled,
-        // this leaf reddens and the cycle has to be broken properly.
-        theForeignTaxCreditCycleIsResolvedByARefusal: () => {
-            const result = run({ ...noAmounts, regularTax: inputLine('line16')(5500000n) })
+        // **REPOINTED at TAX-36, not deleted.** This leaf was
+        // `theForeignTaxCreditCycleIsResolvedByARefusal`, and it existed to
+        // FAIL on the day `foreignTaxCredit` became modeled — it asserted
+        // that Form 6251 line 10 was the regular tax alone and that
+        // `modeledKinds` did not contain the kind. It did its job: that
+        // assertion is what forced the cycle to be looked at instead of
+        // patched, and the cycle turned out not to exist (Schedule 3 line 1
+        // needs no tax figure, so `fjs/form1040/core` computes it before this
+        // module and hands it in). What replaces it is the property that
+        // makes the new wiring safe.
+        //
+        // Both sides of Form 6251's comparison move, and the hand-typed
+        // arithmetic is: line 10 = $55,000.00 - $1,000.00 = $54,000.00, line
+        // 8 = $1,000.00, so line 9 falls by $1,000.00 and line 11 — the AMT
+        // — does not move. `fjs/form6251`'s own `theThreeTermsEachMoveLineTen`
+        // pins the same property one layer down; this leaf pins that THIS
+        // MODULE actually forwards the input rather than passing its own
+        // zero, which that one cannot see.
+        theForeignTaxCreditIsForwardedToFormSixTwoFiftyOnesBothSides: () => {
+            // An AMT-BEARING fixture, and it has to be: on Form 6251's
+            // zero-line-6 short circuit (every return with no preference
+            // item) lines 7 through 9 are all a printed -0- and line 8 could
+            // not be observed at all. The ISO spread is the same
+            // $5.00/$105.00/10,000-share Form 3921 the neighbouring leaves
+            // use, so the AMT arithmetic here is already pinned elsewhere and
+            // the only new claim is the forwarding.
+            const base = {
+                ...noAmounts,
+                adjustedGrossIncome: inputLine('line11b')(25000000n),
+                totalDeductions: inputLine('line14')(1575000n),
+                standardDeductionCents: 1575000n,
+                regularTax: inputLine('line16')(5500000n),
+                isoExerciseForms: [isoForm('doc-iso-ftc')('5.00')('105.00')('10000')],
+            }
+            const withoutCredit = run(base)
             assertEq(
-                result.form6251.line10, 5500000n,
-                'line 10 is the regular tax alone: nothing was subtracted for a foreign tax credit')
-            // Widened to `readonly string[]` by an ordinary ASSIGNMENT, not a
-            // cast: `modeledKinds` is a literal tuple, so asking it directly
-            // whether it contains 'foreignTaxCredit' is a question `tsc`
-            // answers at compile time (TS2367, "no overlap") rather than one
-            // this leaf can ask at run time. Same device, same reason, as
-            // `fjs/return/scope`'s own `modeledKindNames`.
-            /** @type {readonly string[]} */
-            const modeledKindNames = modeledKinds
-            assert(
-                !modeledKindNames.includes('foreignTaxCredit'),
-                'Schedule 3 line 1 may be passed as zero only while the foreign tax credit is refused')
+                withoutCredit.form6251.line10, 5500000n,
+                'line 10 is the regular tax alone when no foreign tax credit is passed')
+            assertEq(withoutCredit.form6251.line8, 0n, 'and the AMT foreign tax credit is zero')
+            const withCredit = run({ ...base, scheduleThreeLine1Cents: 100000n })
+            assertEq(
+                withCredit.form6251.line10, 5400000n,
+                '$55,000.00 - $1,000.00: the credit reached line 10 through this module')
+            assertEq(
+                withCredit.form6251.line8, 100000n,
+                'and line 8, so the AMT does not rise by the credit')
+            // The consequence, at THIS module's own printed line: Schedule 2
+            // line 2 is the AMT, and it must be identical either way.
+            assertEq(
+                withCredit.line2.value, withoutCredit.line2.value,
+                'a §904(j) credit nets to zero on the AMT, so Schedule 2 line 2 is unmoved')
         },
     },
     line11: {
