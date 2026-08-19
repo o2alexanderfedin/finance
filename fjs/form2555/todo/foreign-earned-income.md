@@ -397,21 +397,34 @@ So:
 - **Line 6 zero → nothing changes.** `fjs/form6251` already returns line 7 = $0
   on that arm, and a Form 2555 filer whose alternative minimum taxable income
   does not exceed the exemption reaches it untouched.
-- **Line 6 positive, with a Form 2555 exclusion → REFUSED**, message-only, at
-  `fjs/form6251` itself, beside the two refusals already there. The worksheet's
-  line 2b — *"the total amount of any itemized deductions or exclusions you
-  couldn't claim because they are related to excluded income"* — is a Pub. 54
-  allocation this engine has not transcribed and no stored field carries; and
-  its line 4 routes through Part III *"with certain modifications"* whose own
-  instruction (i6251 p13, `Form 2555` under Line 20 and Line 27) reads the
-  regular tax's worksheets or, failing those, the 1040 worksheet's line 3.
-  Substituting zero for line 2b would OVERSTATE line 2c and the tax; omitting
-  the worksheet entirely would UNDERSTATE it. Neither is acceptable, so neither
-  happens.
+- **Line 6 positive, no preferential income → COMPUTED.** Lines 4 and 5 are the
+  page's own *"All others"* bullet applied to two different amounts: 26%/28% of
+  (line 6 plus line 2c), less 26%/28% of line 2c. `fjs/form6251/rate` already
+  prints that schedule and `fjs/form6251` already calls it three times, so this
+  is a fourth call rather than new arithmetic. Line 2b arrives from the same
+  profile field the 1040 worksheet reads — the printed wording is identical on
+  both pages, so one field serves both.
+- **Line 6 positive, WITH preferential income → REFUSED**, message-only, at
+  `fjs/form6251` itself, beside the two refusals already there. Line 4's first
+  bullet routes through Part III *"with certain modifications"*, and i6251 p13's
+  own `Form 2555` notes under Line 20 and Line 27 redirect both to the regular
+  tax's worksheets or, failing those, to the 1040 worksheet's line 3. Those are
+  untranscribed — and the flat 26%/28% BOUND this module leans on to
+  short-circuit Part III at $0.00 does not survive them, because line 39 would
+  be figured on the worksheet's line 3 rather than on line 6. Refusing BEFORE
+  the bound rather than after it is the whole of the decision: a bound that no
+  longer holds would short-circuit to $0.00 and understate the tax.
 
-The control is the pair: a Form 2555 return with line 6 zero computes, a return
-with line 6 positive and NO Form 2555 computes, and only the combination
-refuses.
+**How narrow that refusal is, and why it is affordable.** Line 6 is alternative
+minimum taxable income LESS the exemption — $88,100 single, $137,000 joint for
+2025 (Rev. Proc. 2024-40 §2.11). An expatriate whose AMTI stays under the
+exemption is untouched whatever their preferential income, which is nearly all
+of them; only a filer above it, holding qualified dividends or capital gain,
+lands here.
+
+The controls are the pair, in both directions: preferential income WITHOUT the
+exclusion computes, and the exclusion WITHOUT preferential income computes.
+Only the combination refuses.
 
 ---
 
