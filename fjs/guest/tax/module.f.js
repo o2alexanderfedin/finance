@@ -117,9 +117,12 @@ export const taxGuestCtx = (/** @type {TaxParamSet} */ taxParams) => ({
  * the wider `GuestCtx`, and a function accepting less is usable where more
  * is supplied), which is why `fjs/report/payer`'s program still runs
  * unchanged through the executor now that the executor always supplies a
- * tax context.
+ * tax context. **That assignability is why the error channel is spelled out
+ * here**: it is `string` on `Report<T>`, and leaving this one at
+ * `Effect<CasOp, T>`'s default `NotImplemented` silently broke it — a guest
+ * refusal (`blob not found: …`) is a `string`, and `NotImplemented` is not.
  * @template T
- * @typedef {(ctx: TaxGuestCtx) => (args: readonly string[]) => Effect<CasOp, T>} TaxReport
+ * @typedef {(ctx: TaxGuestCtx) => (args: readonly string[]) => Effect<CasOp, T, string>} TaxReport
  */
 
 // ── Tests ────────────────────────────────────────────────────────────────────
