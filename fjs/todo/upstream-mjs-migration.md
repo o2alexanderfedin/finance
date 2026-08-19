@@ -1,9 +1,14 @@
-# Upstream: migrating to FunctionalScript 0.46.0
+# Upstream: migrating to FunctionalScript 0.46.0, and then 0.46.1
 
-Status: **DONE except for the `parse` regression, 2026-08-18.** `tsc` is **0** and `npm test`
-is 2505 tests / 2478 pass / **27 fail**, those 27 being the `parse` leaves this note describes
-below, which are blocked on an upstream fix. See "Stage 4" at the end for the final state and
-the retirement condition that remains.
+Status: **CODE COMPLETE ON 0.46.1, 2026-08-18.** `tsc` is **0** and `npm test` is
+2505 tests / **2505 pass / 0 fail**, with **2472** project-local proof leaves. The `parse`
+regression that held the last 27 leaves red was fixed upstream, not worked around here — see
+"Stage 5" at the end. **What remains before this note is deleted is the report the upstream
+author asked for, and nothing else.**
+
+Previous status, kept because the gap it describes is the argument for how it was closed:
+*DONE except for the `parse` regression* — `tsc` 0, 2505 tests / 2478 pass / **27 fail**, those
+27 blocked on an upstream fix.
 
 Original status: **UNBLOCKED AND MEASURED, 2026-08-18.** This note read *"blocking the dependency bump"*
 from 2026-08-17 until 0.46.0 shipped. The blocking claim was true of 0.44/0.45 and is **no longer
@@ -98,6 +103,11 @@ the report the upstream author asked for.
 This note is deleted when `package.json` declares `^0.46.0`, `npm test` is green on it, and the
 report the upstream author asked for is written. Nothing here is retired by a passing suite alone.
 
+**Two of the three are met as of stage 5:** `package.json` declares `^0.46.1` (which satisfies
+`^0.46.0`, and the extra patch is *this project's own* upstream fix), and `npm test` is green on
+it — 2505/2505. **The report is the only thing outstanding**, which is why this note is still
+here and the sentence above says what it says.
+
 ## Stages 1 and 2, done and measured (2026-08-18)
 
 `tsc`: **0** on 0.43.1 -> **1526** on 0.46.0 untouched -> **629** after the specifier rewrite ->
@@ -112,6 +122,11 @@ silently typechecks the PARENT's 0.43.1 and reports **0 errors** on a tree whose
 
 ### `rtti/validate` -> `rtti/parse`, confirmed against the shipped declarations
 
+**Superseded by stage 5: on 0.46.1 the successor is `rtti/validate` again, and every one of these
+call sites took it.** The reasoning below is what was true of 0.46.0, and it is the reasoning that
+produced the upstream fix — kept because "the same signature" is exactly the observation that made
+a green `tsc` no evidence at all.
+
 - `rtti/parse/module.f.d.mts` declares `parse: <T extends Type>(rtti: T) => Parse<T>` and
   `parse/types.d.ts` declares `Parse<T> = Validate<T>` — **the same signature** old `validate`
   had. All 31 of our call sites pass a thunk/const schema and want the typed result, so `parse`
@@ -121,11 +136,11 @@ silently typechecks the PARENT's 0.43.1 and reports **0 errors** on a tree whose
   at every call site — forbidden here, and the exact failure mode that made 0.45 unconsumable.
 - `rtti/common` is the shared kernel. `ValidationError` lives in `common/types.d.ts` and is
   re-exported by `parse/types.d.ts`; we import it from `parse/types.js`, beside the function
-  whose error channel it is.
+  whose error channel it is. (Stage 5 moved that import to `common/types.js`: 0.46.1's `validate`
+  directory ships no `types.d.ts` at all, so `common` is where the name actually lives.)
 
-**One semantic difference, and it is NOT benign — see
-[`upstream-rtti-parse-materializes-absent-members.md`](./upstream-rtti-parse-materializes-absent-members.md).**
-Old `validate` returned the value it was given; `parse` returns a freshly constructed value that
+**One semantic difference, and it is NOT benign — see "Stage 5" below, which is where it was
+fixed.** Old `validate` returned the value it was given; `parse` returns a freshly constructed value that
 has **every declared key present**, an absent optional filled with `undefined`, and every
 undeclared key dropped. This project's documents distinguish absent from present-and-undefined by
 hard rule, so **27 proof leaves across 13 typecheck-clean modules go red** — a behavioural
@@ -374,10 +389,99 @@ changing the escaping module's `fetch` to `evoList` reddens exactly
   [`mcp-error-text-forwards-host-messages.md`](./mcp-error-text-forwards-host-messages.md) rather
   than changed inside the migration.
 
-### What is left
+### What was left after stage 4 (closed by stage 5)
 
 **Only the 27 `parse` leaves**, and they are blocked on upstream re-exposing the 0.43.1 verbatim
-validator beside `parse` — see
-[`upstream-rtti-parse-materializes-absent-members.md`](./upstream-rtti-parse-materializes-absent-members.md).
-Every workaround available here needs a cast or a hand-asserted type predicate. When that lands,
-consume it and this note's retirement condition is met but for the report.
+validator beside `parse`. Every workaround available here needs a cast or a hand-asserted type
+predicate. When that lands, consume it and this note's retirement condition is met but for the
+report.
+
+## Stage 5 — 0.46.1 restores `validate`, and the suite is green
+
+`tsc` **0 -> 0**. Failing proof leaves **27 -> 0**. `npm test` **2478 pass / 27 fail ->
+2505 pass / 0 fail**. Project-local proof leaves **2472 -> 2472** — unchanged, which is the
+number that matters: a green suite bought by a module that quietly stopped importing would show
+up here and nowhere else.
+
+The whole migration, end to end, measured every time from a copy outside the parent checkout:
+
+| Stage | `tsc` | `npm test` | project-local leaves |
+|---|---|---|---|
+| 0.43.1, before anything | 0 | 2500 / 2500 pass / 0 fail | 2467 |
+| 0.46.0, specifiers untouched | 1526 | (gated: never ran) | — |
+| 1 — specifiers to `.f.mjs` | 629 | — | — |
+| 2 — the two relocation classes | 513 | 2500 / 2375 pass / 123 fail | 2467 |
+| 3 — the Effect system | 282 | 113 leaves failing | — |
+| 4 — the `Result` moves to the channel | **0** | 2505 / 2478 pass / **27 fail** | 2472 |
+| 5 — **0.46.1's `validate`** | **0** | 2505 / **2505 pass / 0 fail** | **2472** |
+
+### The fix was upstream, and that is the point of the stage
+
+`upstream-rtti-parse-materializes-absent-members.md` — now deleted, and findable from any later
+state with `git log --diff-filter=D --oneline --
+fjs/todo/upstream-rtti-parse-materializes-absent-members.md`, which a pinned `HEAD~1` would not
+survive the next commit on this branch — argued that every local escape hatch —
+carrying the original value past a `parse` check, `rtti/data`'s erased `ResultE`, a hand-written
+`value is Ts<T>` predicate, stripping the materialized `undefined`s back out — lands on a cast, an
+`any`, or an unchecked soundness claim, all three forbidden by AGENTS.md. It asked upstream to
+re-expose the 0.43.1 reader instead. **That is what shipped**: PR functionalscript#1645, released
+as 0.46.1 (`2e9ad76f`, "0.46.1 (#1646)"). The note is deleted with this stage — its retirement
+condition ("a released FunctionalScript exposes a typed structural validator that returns its
+input unchanged, this project's call sites take it, and those 27 leaves are green again") is met
+in all three parts.
+
+The refused cast is worth naming as the mechanism, not just the outcome: it was refused twice, and
+what the second refusal bought was a fix in the dependency that every consumer gets, arriving as
+an **import-line-only diff here**. A cast would have been quicker and would have left the same
+27 leaves red in behaviour with a green `tsc` — the dangerous direction this note has flagged
+twice already.
+
+### The API, and the one thing that is not where you would guess
+
+`fjs/types/rtti/validate/module.f.mjs` exports
+`validate: <T extends Type>(rtti: T) => Validate<T>` — the same signature `parse` has, so no call
+site's shape changed. Verified by execution against the published 0.46.1, not read off a docstring:
+
+```
+validate: ok=true  same-object=true   absent-optional-stays-absent=true   undeclared-survives=true
+parse   : ok=true  same-object=false  absent-optional-stays-absent=false  undeclared-survives=false
+```
+
+**`ValidationError` comes from `rtti/common/types.js`, not from a sibling of `validate`.** The
+`validate` directory ships four files and none is a `types.d.ts`; `common/types.d.ts` is where
+`Path`, `ValidationError`, `Validate` and `Result` are declared, and `parse/types.d.ts` only
+re-exports them. Stage 2's rule ("a type comes from the sibling, a value from the module") has an
+exception here, and the exception is visible only by listing the shipped directory — which is the
+reason to list it rather than to pattern-match the path.
+
+### Every one of the 32 sites took `validate`; none kept `parse`
+
+Upstream's own framing is that the two are genuinely different operations and both are wanted:
+`parse` deserializes a foreign value into a known shape, `validate` asserts that a value this
+system already owns has the shape it claims. Judged one at a time against that line, **this
+project has no site of the first kind.** Every one was `validate` on 0.43.1, every one is aliased
+`rttiValidate`, and every one reads something the system already holds — a stored CAS document
+(the 26 `fjs/document/*` dialects, `fjs/return/profile`, `fjs/run`), a stored result record
+(`fjs/report/amend`), a stored snapshot (`fjs/server/finance_documents_list`), a JSON value being
+checked for being one (`fjs/server/fjs_run`).
+
+`fjs/server`'s decoder is the site that makes the difference legible, and it had been arguing
+against `parse` in a comment the whole time without anyone reading it that way:
+
+> rtti permits properties a schema does not mention — verified — so each schema below names only
+> what its own leaf reads, and a full JSON-RPC envelope validates against a partial one.
+
+Under `parse` that partial schema was not only a filter, it was also a **projection**: the
+envelope came back truncated to the fields the leaf happened to name. The comment describes
+`validate`'s contract exactly, and `parse` satisfied half of it.
+
+### What is left
+
+**The report the upstream author asked for** (`todo/update-fjs-0.46.0`, PR #96) — an extensive,
+structured account of what the migration taught, how it adapted to this project, and the main
+challenges. Nothing in the code is outstanding. The strongest material for that report is already
+in this note: the 0.45-vs-0.46 table (why a smaller error count can be the worse one), the
+effects-are-tool-calls section (and what it says about REQUIREMENTS.md's refusal of a
+`finance_compute_1040` tool), stage 4's account of what an error channel changed about how the
+code *reads*, and this stage — a constraint held until the dependency changed rather than the
+constraint.
