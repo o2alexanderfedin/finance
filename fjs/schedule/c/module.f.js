@@ -190,6 +190,7 @@ import { depreciableAssets } from '../../document/asset_register/module.f.js'
 /** @import { ReturnProfile } from '../../return/profile/module.f.js' */
 /** @import { AssetRegister } from '../../document/asset_register/module.f.js' */
 /** @import { RentalProperty } from '../../document/rental_property/module.f.js' */
+/** @import { Farm } from '../../document/farm/module.f.js' */
 /** @import { Form4562Lines } from '../../form4562/module.f.js' */
 /** @import { OneZeroNineNineNec } from '../../document/1099nec/module.f.js' */
 /** @import { BusinessExpenses } from '../../document/business_expenses/module.f.js' */
@@ -907,6 +908,7 @@ export const scheduleCPartII = profile => entries => line13Depreciation => line7
  *   readonly w2Forms: readonly Stored<W2>[],
  *   readonly assetRegisters: readonly Stored<AssetRegister>[],
  *   readonly rentalProperties: readonly Stored<RentalProperty>[],
+ *   readonly farmForms: readonly Stored<Farm>[],
  * }} ScheduleCInput
  */
 
@@ -964,18 +966,28 @@ const businessLabel = business => business.businessName === undefined
 export const scheduleC = input => {
     const {
         profile, nonemployeeCompensationForms, businessExpenseForms, w2Forms, rentalProperties,
+        farmForms,
     } = input
-    // **A register whose account number names a stored rental property is
-    // Schedule E Part I's, not this schedule's**, and it is removed here before
-    // any rule below counts registers. Form 4562 is filed per business or
-    // activity (i4562 p1), a rental property is an activity, and printed
-    // Schedule E line 18 is where its line 22 goes. Filtering rather than
-    // refusing is what lets a filer carry a sole proprietorship and a rental
-    // on one return; the refusal below still fires for a register that names
-    // NEITHER.
+    // **A register whose account number names a stored rental property or a
+    // stored FARM is that activity's, not this schedule's**, and it is removed
+    // here before any rule below counts registers. Form 4562 is filed per
+    // business or activity (i4562 p1); a rental property is an activity and
+    // printed Schedule E line 18 is where its line 22 goes, and a farm is an
+    // activity and printed Schedule F line 14 is where its line 22 goes.
+    // Filtering rather than refusing is what lets a filer carry a sole
+    // proprietorship and a rental on one return; the refusal below still fires
+    // for a register that names NONE of the three.
+    //
+    // **The farm arm was added by the Schedule F wiring, and the existing
+    // refusal is what demanded it.** A farmer's register reached this function
+    // unclaimed and the whole return refused, naming two printed lines that
+    // were no longer the only two — which is the failure mode a message
+    // enumerating a closed set has whenever the set grows.
     const assetRegisters = input.assetRegisters.filter(register =>
         !rentalProperties.some(
-            property => property.value.accountNumber === register.value.accountNumber))
+            property => property.value.accountNumber === register.value.accountNumber)
+        && !farmForms.some(
+            farm => farm.value.accountNumber === register.value.accountNumber))
 
     // 1. A statutory employee's box 1 wages belong on THIS form's line 1, not
     //    on 1040 line 1a, and this engine puts them on 1040 line 1a. Refused
@@ -1070,12 +1082,13 @@ export const scheduleC = input => {
             message: `Schedule C: this return carries a vnd.fjs.asset_register for `
                 + `'${firstRegister.value.businessOrActivity}' with accountNumber `
                 + `'${firstRegister.value.accountNumber}', and NOTHING on this return claims it — `
-                + `no vnd.fjs.business_expenses record and no vnd.fjs.rental_property carries that `
-                + `account number. Form 4562 line 22 has to reach a printed line, and this engine `
-                + `wires it to exactly two: Schedule C line 13, from a business record, and `
-                + `Schedule E line 18, from a rental property. Store whichever of the two this `
-                + `activity is, with a MATCHING accountNumber, or remove the register rather than `
-                + `have its depreciation silently dropped`,
+                + `no vnd.fjs.business_expenses record, no vnd.fjs.rental_property and no `
+                + `vnd.fjs.farm carries that account number. Form 4562 line 22 has to reach a `
+                + `printed line, and this engine wires it to exactly three: Schedule C line 13, `
+                + `from a business record; Schedule E line 18, from a rental property; and `
+                + `Schedule F line 14, from a farm. Store whichever of the three this activity `
+                + `is, with a MATCHING accountNumber, or remove the register rather than have its `
+                + `depreciation silently dropped`,
         }
     }
 
@@ -1370,6 +1383,7 @@ const run = input => scheduleC({
     w2Forms: [],
     assetRegisters: [],
     rentalProperties: [],
+    farmForms: [],
     ...input,
 })
 
