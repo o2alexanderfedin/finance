@@ -24,8 +24,8 @@
  *
  * @module
  */
-import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
-import { option, string } from 'functionalscript/fjs/types/rtti/module.f.js'
+import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
+import { option, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
 import { moneyFieldError } from '../money_field/module.f.js'
 
 /**

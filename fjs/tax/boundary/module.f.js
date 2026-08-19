@@ -36,13 +36,13 @@
  *
  * @module
  */
-import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
+import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { centsFromString } from '../../exact/module.f.js'
 import { taxParamsByYear, allFilingStatuses } from '../params/module.f.js'
 import { taxTableBandStructure } from '../table/module.f.js'
 
 /** @import { Bracket } from '../params/module.f.js' */
-/** @import { StringMap } from 'functionalscript/fjs/types/object/module.f.js' */
+/** @import { StringMap } from 'functionalscript/fjs/types/object/types.js' */
 
 /**
  * A pure, generic, tax-agnostic boundary counter: given a sorted-ascending list of boundary

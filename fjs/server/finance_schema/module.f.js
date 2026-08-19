@@ -45,12 +45,13 @@
  *
  * @module
  */
-import { string } from 'functionalscript/fjs/types/rtti/module.f.js'
-import { pure } from 'functionalscript/fjs/effects/module.f.js'
-import { runPure } from 'functionalscript/fjs/effects/module.f.js'
-import { toolEntry, okResult, errorResult } from 'functionalscript/fjs/protocol/mcp/module.f.js'
-import { toJsonSchema } from 'functionalscript/fjs/media/json/schema/module.f.js'
-import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
+import { string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
+import { pureOk } from 'functionalscript/fjs/effects/module.f.mjs'
+import { runPure } from 'functionalscript/fjs/effects/module.f.mjs'
+import { toolEntry, okResult, errorResult } from 'functionalscript/fjs/protocol/mcp/module.f.mjs'
+import { toJsonSchema } from 'functionalscript/fjs/media/json/schema/module.f.mjs'
+import { unwrap } from 'functionalscript/fjs/types/result/module.f.mjs'
+import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { dialect as oneZeroNineNineIntDialect, oneZeroNineNineIntSchema } from '../../document/1099int/module.f.js'
 import { dialect as ocrDialect, ocrSchema } from '../../document/ocr/module.f.js'
 import { dialect as w2Dialect, w2Schema } from '../../document/w2/module.f.js'
@@ -80,10 +81,10 @@ import { dialect as itemizedDeductionsDialect, itemizedDeductionsSchema } from '
 import { dialect as priorYearCapitalLossDialect, priorYearCapitalLossSchema } from '../../document/prior_year_capital_loss/module.f.js'
 import { stringify as jsonText } from '../../json/module.f.js'
 
-/** @import { Type } from 'functionalscript/fjs/types/rtti/module.f.js' */
-/** @import { ToolEntry, ToolsCallResult } from 'functionalscript/fjs/protocol/mcp/module.f.js' */
-/** @import { Unknown as JsonUnknown } from 'functionalscript/fjs/media/json/module.f.js' */
-/** @import { StringMap } from 'functionalscript/fjs/types/object/module.f.js' */
+/** @import { Type } from 'functionalscript/fjs/types/rtti/types.js' */
+/** @import { ToolEntry, ToolsCallResult } from 'functionalscript/fjs/protocol/mcp/types.js' */
+/** @import { Unknown as JsonUnknown } from 'functionalscript/fjs/media/json/types.js' */
+/** @import { StringMap } from 'functionalscript/fjs/types/object/types.js' */
 
 /**
  * Every known document dialect tag, mapped to its OWN exported RTTI schema
@@ -233,14 +234,14 @@ export const financeSchemaTool = toolEntry(
     args => {
         const schema = dialectSchemas[args.dialect]
         if (schema === undefined) {
-            return pure(errorResult(
+            return pureOk(errorResult(
                 `unknown dialect: ${args.dialect}; known: ${knownDialects.join(', ')}`,
             ))
         }
         // `toJsonSchema` returns rtti's `UnknownConst`, which differs from
         // `json`'s `Unknown` only by admitting `undefined` — and a JSON Schema
         // never holds one, since `toJsonSchema` builds every field it emits.
-        return pure(okResult(jsonText(/** @type {JsonUnknown} */ (toJsonSchema(schema)))))
+        return pureOk(okResult(jsonText(/** @type {JsonUnknown} */ (toJsonSchema(schema)))))
     },
 )
 
@@ -251,12 +252,20 @@ export const financeSchemaTool = toolEntry(
  * `ToolsCallResult` — every call resolves via `pure`, so `runPure` always
  * yields exactly one value; a genuinely empty result here would mean the
  * handler unexpectedly issued a command, which `assert` below catches.
+ *
+ * Since 0.46.0 `runPure` yields `Option<Result<T, E>>`, so the two questions
+ * are asked separately and neither is skipped: the `Option` distinguishes
+ * "reached a value" from "stopped at a command" (the `assert`), and the
+ * `Result` inside it distinguishes success from failure (the `unwrap`).
+ * `unwrap` panics, which is the honest policy here — this helper is a proof
+ * fixture, and a handler that fails is a defect in the handler, not an
+ * outcome the proof has an answer for.
  * @type {(dialect: string) => ToolsCallResult}
  */
 const call = dialect => {
     const [result] = runPure(financeSchemaTool.handle({ dialect }))
     assert(result !== undefined, 'expected finance_schema to resolve via pure, not a command')
-    return result
+    return unwrap(result)
 }
 
 /**

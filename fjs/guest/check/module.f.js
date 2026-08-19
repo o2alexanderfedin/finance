@@ -33,24 +33,29 @@
  *
  * @module
  */
-import { step, pure, mapStep } from 'functionalscript/fjs/effects/module.f.js'
-import { error, ok } from 'functionalscript/fjs/types/result/module.f.js'
-import { cBase32ToVec, vecToCBase32 } from 'functionalscript/fjs/basen/cbase32/module.f.js'
-import { collectRead, fileCas } from 'functionalscript/fjs/cas/module.f.js'
-import { utf8ToString, tryUtf8 } from 'functionalscript/fjs/text/module.f.js'
-import { sha256 } from 'functionalscript/fjs/crypto/sha2/module.f.js'
-import { vec8 } from 'functionalscript/fjs/types/bit_vec/module.f.js'
-import { parse } from 'functionalscript/fjs/path/module.f.js'
-import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
-import { emptyState, virtual } from 'functionalscript/fjs/effects/node/virtual/module.f.js'
+import { step, catchStep, pureError, mapStep, history, historyStep, unwrapStep } from 'functionalscript/fjs/effects/module.f.mjs'
+import { unwrap } from 'functionalscript/fjs/types/result/module.f.mjs'
+import { cBase32ToVec, vecToCBase32 } from 'functionalscript/fjs/basen/cbase32/module.f.mjs'
+import { collectRead, fileCas } from 'functionalscript/fjs/cas/module.f.mjs'
+import { empty, nonEmpty } from 'functionalscript/fjs/effects/list/module.f.mjs'
+import { errorSummary } from 'functionalscript/fjs/effects/node/module.f.mjs'
+import { utf8ToString, tryUtf8 } from 'functionalscript/fjs/text/module.f.mjs'
+import { sha256 } from 'functionalscript/fjs/crypto/sha2/module.f.mjs'
+import { vec8 } from 'functionalscript/fjs/types/bit_vec/module.f.mjs'
+import { parse } from 'functionalscript/fjs/path/module.f.mjs'
+import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
+import { emptyState, virtual } from 'functionalscript/fjs/effects/node/virtual/module.f.mjs'
 import { materializeProgram, loadProgram, materializeHome, programPath } from '../materialize/module.f.js'
 import { guestCtx } from '../module.f.js'
 
-/** @import { Effect, Operation } from 'functionalscript/fjs/effects/module.f.js' */
-/** @import { Mkdir, WriteFile, Import } from 'functionalscript/fjs/effects/node/module.f.js' */
-/** @import { Cas, FileCasOperation } from 'functionalscript/fjs/cas/module.f.js' */
-/** @import { Result } from 'functionalscript/fjs/types/result/module.f.js' */
-/** @import { State, Dir, JsModule } from 'functionalscript/fjs/effects/node/virtual/module.f.js' */
+/** @import { Effect, Operation } from 'functionalscript/fjs/effects/types.js' */
+/** @import { Mkdir, WriteFile, Import } from 'functionalscript/fjs/effects/node/types.js' */
+/** @import { Cas, FileCasOperation } from 'functionalscript/fjs/cas/types.js' */
+/** @import { Result } from 'functionalscript/fjs/types/result/types.js' */
+/** @import { List } from 'functionalscript/fjs/effects/list/types.js' */
+/** @import { Vec } from 'functionalscript/fjs/types/bit_vec/types.js' */
+/** @import { IoChannel } from 'functionalscript/fjs/effects/node/types.js' */
+/** @import { State, Dir, JsModule } from 'functionalscript/fjs/effects/node/virtual/types.js' */
 /** @import { Report } from '../module.f.js' */
 
 // ── fjsCheck ─────────────────────────────────────────────────────────────────
@@ -63,37 +68,30 @@ import { guestCtx } from '../module.f.js'
  * verbatim — resolve the hash, read the source out of CAS, materialize it —
  * then calls `loadProgram` (Phase 6, unchanged) and stops. Nothing after the
  * `typeof` check below reads or calls `loaded.report(...)`.
- * @type {(materializeHomeRoot: string) => (cas: Cas<FileCasOperation>) => (hash: string) => Effect<FileCasOperation | Mkdir | WriteFile | Import, Result<{ readonly exportsReport: boolean }, string>>}
+ * **Every failure is in the error channel** (0.46.0), so this whole
+ * function is its success path: the CAS miss, the materialize failure and
+ * the specifier refusal each short-circuit through `step` rather than being
+ * unpacked out of a payload `Result` by three nested `if`s. The one place
+ * that still names an error is the `catchStep` that decides what a failed
+ * read MEANS here — "program not found", not the IO detail.
+ * @type {(materializeHomeRoot: string) => (cas: Cas<FileCasOperation>) => (hash: string) => Effect<FileCasOperation | Mkdir | WriteFile | Import, { readonly exportsReport: boolean }, string>}
  */
 export const fjsCheck = materializeHomeRoot => cas => hash => {
     const hashVec = cBase32ToVec(hash)
     if (hashVec === null) {
-        return pure(error(`program not found: ${hash}`))
+        return pureError(`program not found: ${hash}`)
     }
-    return step(collectRead(cas.read(hashVec)), readResult => {
-        if (readResult[0] === 'error') {
-            return pure(error(`program not found: ${hash}`))
-        }
-        const sourceText = utf8ToString(readResult[1])
-        return step(materializeProgram(materializeHomeRoot)(hash)(sourceText), materializeResult => {
-            if (materializeResult[0] === 'error') {
-                return pure(error(materializeResult[1]))
-            }
-            return step(
-                loadProgram([])(programPath(materializeHome(materializeHomeRoot))(hash))(sourceText),
-                loadResult => {
-                    if (loadResult[0] === 'error') {
-                        return pure(/** @type {Result<{ readonly exportsReport: boolean }, string>} */ (error(loadResult[1])))
-                    }
-                    // The whole point of this module: read the presence/type
-                    // of `report` and stop. Nothing below this line reads or
-                    // calls `loaded.report(...)`.
-                    const loaded = /** @type {{ readonly report?: unknown }} */ (loadResult[1])
-                    return pure(/** @type {Result<{ readonly exportsReport: boolean }, string>} */ (
-                        ok({ exportsReport: typeof loaded.report === 'function' })))
-                },
-            )
-        })
+    const read = catchStep(collectRead(cas.read(hashVec)), () => pureError(`program not found: ${hash}`))
+    const sourceText = mapStep(read, utf8ToString)
+    const materialized = historyStep(
+        history(sourceText),
+        text => materializeProgram(materializeHomeRoot)(hash)(text))
+    return step(materialized, ([, text]) => {
+        const loaded = loadProgram([])(programPath(materializeHome(materializeHomeRoot))(hash))(text)
+        // The whole point of this module: read the presence/type of `report`
+        // and stop. Nothing below this line reads or calls
+        // `loaded.report(...)`.
+        return mapStep(loaded, m => ({ exportsReport: typeof m['report'] === 'function' }))
     })
 }
 
@@ -102,15 +100,14 @@ export const fjsCheck = materializeHomeRoot => cas => hash => {
 /**
  * Single-chunk UTF-8 CAS write, mirroring `fjs/server/fjs_run/module.f.js`'s
  * own `seedText`.
- * @type {<O extends Operation>(cas: Cas<O>) => (text: string) => Effect<O, string>}
+ * @type {<O extends Operation>(cas: Cas<O>) => (text: string) => Effect<O, string, never>}
  */
 const seedText = cas => text => {
     const bytes = tryUtf8(text)
     assert(bytes !== null, ['expected sample text to encode as UTF-8', text])
-    return mapStep(cas.write(pure({ first: ok(bytes), tail: pure(undefined) })), w => {
-        assert(w[0] === 'ok', ['expected the seed write to succeed', w])
-        return vecToCBase32(w[1])
-    })
+    /** @type {List<never, Vec, IoChannel>} */
+    const payload = nonEmpty(bytes, empty())
+    return mapStep(unwrapStep(cas.write(payload), errorSummary), vecToCBase32)
 }
 
 /**
@@ -184,15 +181,7 @@ const runFjsCheckViaFixture = home => hash => source => fixture => state => {
     const root = placeJsModuleFixture(state1.root)(path)(fixture)
     const state2 = { ...state1, root }
     return virtual(state2)(
-        step(loadProgram([])(path)(source), loadResult => {
-            if (loadResult[0] === 'error') {
-                return pure(/** @type {Result<{ readonly exportsReport: boolean }, string>} */ (error(loadResult[1])))
-            }
-            const loaded = /** @type {{ readonly report?: unknown }} */ (loadResult[1])
-            return pure(/** @type {Result<{ readonly exportsReport: boolean }, string>} */ (
-                ok({ exportsReport: typeof loaded.report === 'function' })))
-        }),
-    )
+        mapStep(loadProgram([])(path)(source), m => ({ exportsReport: typeof m['report'] === 'function' })))
 }
 
 /** A program written the way a real report is: ctx only, zero imports. */
@@ -232,9 +221,9 @@ export const proof = {
         dirtyImportSpecifierIsRefused: () => {
             const home = '/check-dirty'
             const cas = fileCas(sha256)(home)
-            const [state0, hash] = virtual(emptyState)(
+            const [state0, seeded] = virtual(emptyState)(
                 seedText(cas)(`import fs from 'node:fs'\n${cleanSource}`))
-            const [, result] = virtual(state0)(fjsCheck(home)(cas)(hash))
+            const [, result] = virtual(state0)(fjsCheck(home)(cas)(unwrap(seeded)))
             assertEq(result[0], 'error')
             if (result[0] === 'error') {
                 assert(result[1].includes('node:fs'), result[1])

@@ -59,7 +59,7 @@
  *
  * @module
  */
-import { assertEq } from 'functionalscript/fjs/asserts/module.f.js'
+import { assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { centsFromString } from '../../exact/module.f.js'
 
 /** @import { PriorYearCapitalLoss } from '../../document/prior_year_capital_loss/module.f.js' */

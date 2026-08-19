@@ -43,7 +43,7 @@
  *
  * @module
  */
-import { assert, assertEq, assertNotNullish } from 'functionalscript/fjs/asserts/module.f.js'
+import { assert, assertEq, assertNotNullish } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { centsFromString } from '../../exact/module.f.js'
 import { applyWholeDollarElection } from '../../report/line/module.f.js'
 import { dispatchLine16 } from '../../tax/line16/module.f.js'

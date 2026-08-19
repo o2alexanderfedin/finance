@@ -436,11 +436,12 @@
  *
  * @module
  */
-import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
+import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { kindVocabulary } from '../profile/module.f.js'
+import { refuses } from '../../refuses/module.f.js'
 
-/** @import { Assert } from 'functionalscript/fjs/asserts/module.f.js' */
-/** @import { Equal } from 'functionalscript/fjs/types/ts/module.f.js' */
+/** @import { Assert } from 'functionalscript/fjs/asserts/types.js' */
+/** @import { Equal } from 'functionalscript/fjs/types/ts/types.js' */
 /** @import { Kind } from '../profile/module.f.js' */
 
 // ── The frozen modeled set ───────────────────────────────────────────────────
@@ -3111,19 +3112,15 @@ export const proof = {
         // `throw:` leaf would pass for any failure, including one raised before
         // this code was reached.
         refusalNamingNothingIsItselfRefused: () => {
-            let threw = false
-            try {
-                scopeRefusal([])
-            } catch (e) {
-                threw = true
-                assert(typeof e === 'string' || Array.isArray(e), ['expected a bare thrown value, not an Error', e])
-                const message = typeof e === 'string' ? e : Array.isArray(e) ? e.join(' ') : ''
+            // `refuses` (`fjs/refuses`) is the one place under `fjs/` that may
+            // `try`; it carries the bare-thrown-value check and the "it threw
+            // at all" check this leaf used to spell out.
+            refuses(() => scopeRefusal([]))(message => {
                 assert(
                     message.includes('must name at least one unmodeled kind'),
-                    ['expected the thrown value to say what was missing', e],
+                    ['expected the thrown value to say what was missing', message],
                 )
-            }
-            assert(threw, 'expected scopeRefusal to refuse building a refusal that names nothing')
+            })
         },
     },
     // ── The complementary guard's refusal builder (Phase 22, TAX-19) ─────
@@ -3223,19 +3220,12 @@ export const proof = {
         // module exists to prevent, exactly as on the other arm — and the
         // thrown value's CONTENT is asserted, never merely that it threw.
         aRefusalNamingNothingIsItselfRefused: () => {
-            let threw = false
-            try {
-                tripwireRefusal([])
-            } catch (e) {
-                threw = true
-                assert(typeof e === 'string' || Array.isArray(e), ['expected a bare thrown value, not an Error', e])
-                const message = typeof e === 'string' ? e : Array.isArray(e) ? e.join(' ') : ''
+            refuses(() => tripwireRefusal([]))(message => {
                 assert(
                     message.includes('must name at least one required kind'),
-                    ['expected the thrown value to say what was missing', e],
+                    ['expected the thrown value to say what was missing', message],
                 )
-            }
-            assert(threw, 'expected tripwireRefusal to refuse building a refusal that names nothing')
+            })
         },
         // Every entry in the refusal table is reachable through THIS arm too,
         // naming its own line, label and remedy — so a kind a future tripwire

@@ -36,10 +36,10 @@
  *
  * @module
  */
-import { fold } from 'functionalscript/fjs/common/monoid/module.f.js'
-import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
+import { fold } from 'functionalscript/fjs/common/monoid/module.f.mjs'
+import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
 
-/** @import { List } from 'functionalscript/fjs/types/list/module.f.js' */
+/** @import { List } from 'functionalscript/fjs/types/list/types.js' */
 
 /**
  * An exact rational number: `[numerator, denominator]`. The denominator is

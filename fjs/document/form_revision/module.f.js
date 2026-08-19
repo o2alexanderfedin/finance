@@ -25,7 +25,7 @@
  *
  * @module
  */
-import { assertEq } from 'functionalscript/fjs/asserts/module.f.js'
+import { assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
 
 /**
  * Checks one dialect's present `formRevision`. `undefined` means it is
