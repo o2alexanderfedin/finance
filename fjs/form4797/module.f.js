@@ -953,6 +953,44 @@ const forklift = {
     },
 }
 
+/**
+ * **Asset F — a server rack that took the §168(k) special depreciation
+ * allowance in its placed-in-service year.**
+ *
+ * **Added because a mutation survived.** Erasing the
+ * `specialDepreciationAllowanceClaimedCents` term from
+ * `depreciationAllowedOrAllowableCents` left the entire suite green at 3,087
+ * leaves: every other fixture in this repository declares `electedOut`, so the
+ * term was unobservable. i4797 p9's line 22 Step 1 names it in so many words —
+ * *"Deductions allowed or allowable for depreciation (including any special
+ * depreciation allowance …)"* — and dropping it would let a bonus election
+ * erase its own recapture, turning $3,236.29 of ordinary income into an
+ * $8,843.20 §1231 loss.
+ *
+ * 5-year property, 200 DB, half-year, placed in service August 2022, cost
+ * $20,000.00, of which $12,345.00 was taken as §168(k) bonus — so the basis for
+ * depreciation is $7,655.00 and the recapture base is the whole $20,000.00 less
+ * what is left of it.
+ * @type {RegisteredAsset}
+ */
+const serverRack = {
+    description: 'server rack',
+    datePlacedInService: '2022-08',
+    costOrOtherBasis: '20000.00',
+    businessUsePercentage: '100.00',
+    classification: 'fiveYear',
+    method: '200DB',
+    convention: 'HY',
+    section168kStatus: 'allowanceClaimed',
+    specialDepreciationAllowanceClaimed: '12345.00',
+    disposal: {
+        dateAcquired: '2022-07-01',
+        dateSold: '2025-07-21',
+        grossSalesPrice: '5000.00',
+        expenseOfSale: '0.00',
+    },
+}
+
 /** @type {(outcome: Form4797Outcome) => Form4797Ok} */
 const expectOk = outcome => {
     assert(outcome.kind === 'ok', ['expected Form 4797 to compute', outcome])
@@ -1136,6 +1174,58 @@ export const proof = {
         assertEq(f.line17Cents, 125261n)
         assertEq(f.line18bCents, 125261n, 'the whole gain is ordinary, on Schedule 1 line 4')
         assertEq(f.longTermCapitalGainCents, 0n)
+    },
+    /**
+     * ★ **THE §168(k) ALLOWANCE IS PART OF THE RECAPTURE BASE**, and this leaf
+     * exists because a mutation erasing it survived the whole suite.
+     *
+     * ```
+     *   cost $20,000.00, §168(k) allowance claimed $12,345.00
+     *   basis for depreciation 2,000,000 - 1,234,500 =  765,500
+     *   Table A-1, 5-year, half-year: 20.00 32.00 19.20 11.52
+     *   y1  20.00% x 765,500 = 153,100
+     *   y2  32.00% x 765,500 = 244,960
+     *   y3  19.20% x 765,500 = 146,976
+     *   y4  11.52% x 765,500 x 0.5 = 44,092.8 -> 44,093   (sold July 2025, HY)
+     *   MACRS alone                                        589,129
+     *   22  1,234,500 + 589,129                          1,823,629
+     *   21  2,000,000 + 0                                2,000,000
+     *   23  2,000,000 - 1,823,629                          176,371
+     *   24    500,000 -   176,371                           323,629
+     *   25b min(323,629, 1,823,629)                         323,629
+     *   18b                                                 323,629
+     * ```
+     *
+     * **What the allowance is worth, stated as its own number**: without the
+     * $12,345.00 term line 22 would be $5,891.29, the adjusted basis
+     * $13,843.20, and line 24 a **LOSS** of $8,843.20 in Part I — so dropping
+     * it does not merely shrink a figure, it moves the disposal to a different
+     * printed Part and flips the sign. Both figures are hand-typed below.
+     */
+    theSectionOneSixtyEightKAllowanceIsInsideTheRecaptureBase: () => {
+        const f = expectOk(overOneRegister([serverRack]))
+        assertEq(f.partIIIProperties.length, 1, 'a GAIN, so Part III')
+        const [property] = f.partIIIProperties
+        assert(property !== undefined, 'expected one Part III property')
+        if (property === undefined) { return }
+        assertEq(property.line22DepreciationCents, 1823629n,
+            'the claimed allowance PLUS four years of MACRS')
+        // The two halves, hand-typed separately, so a leaf asserting only the
+        // total could not tell a wrong allowance from a wrong schedule.
+        assertEq(property.line22DepreciationCents - 1234500n, 589129n,
+            'and the MACRS half alone is $5,891.29')
+        assertEq(property.line23AdjustedBasisCents, 176371n, 'line 23')
+        assertEq(property.line24TotalGainCents, 323629n, 'line 24')
+        assertEq(property.line25bCents, 323629n, 'fully recaptured')
+        assertEq(f.line18bCents, 323629n, 'all of it ordinary')
+        // ★ The counterfactual, hand-typed: without the allowance the adjusted
+        // basis would be 2,000,000 - 589,129 = 1,410,871 and line 24 would be
+        // 500,000 - 1,410,871 = -910,871, a LOSS in Part I. Asserting that the
+        // computed figures are NOT those is what makes this leaf about the
+        // allowance rather than about arithmetic in general.
+        assertEq(property.line23AdjustedBasisCents === 1410871n, false,
+            'the allowance must not be missing from the adjusted basis')
+        assertEq(f.line2Rows.length, 0, 'and the disposal must not have landed in Part I')
     },
     /**
      * **The line 7 = 0 case needs NO certification**, because the printed
