@@ -890,6 +890,8 @@ const fixtureSweepSCorporationK1Hash = 'sha256-tax-return-sweep-k1-1120s'
 const fixtureSweepEstateTrustK1Hash = 'sha256-tax-return-sweep-k1-1041'
 const fixtureSweepGainsProfileHash = 'sha256-tax-return-sweep-gains-profile'
 const fixtureSweepBrokerageHash = 'sha256-tax-return-sweep-1099b'
+/** TAX-38: a section 1256 Form 1099-B — boxes 8 through 11, no box 1 sale at all. */
+const fixtureSweepSectionTwelveFiftySixHash = 'sha256-tax-return-sweep-1099b-1256'
 const fixtureSweepRealCarryoverHash = 'sha256-tax-return-sweep-carryover'
 const fixtureSweepCorrectedBrokerageHash = 'sha256-tax-return-sweep-1099b-corrected'
 const fixtureSweepBasisCorrectionHash = 'sha256-tax-return-sweep-basis-correction'
@@ -953,6 +955,8 @@ const subjectSweepSCorporationK1 = 'tax-return-subject-sweep-k1-1120s'
 const subjectSweepEstateTrustK1 = 'tax-return-subject-sweep-k1-1041'
 const subjectSweepGainsProfile = 'tax-return-subject-sweep-gains-profile'
 const subjectSweepBrokerage = 'tax-return-subject-sweep-1099b'
+/** The Evo subject naming {@link fixtureSweepSectionTwelveFiftySixHash}. */
+const subjectSweepSectionTwelveFiftySix = 'tax-return-subject-sweep-1099b-1256'
 const subjectSweepRealCarryover = 'tax-return-subject-sweep-carryover'
 const subjectSweepCorrectedBrokerage = 'tax-return-subject-sweep-1099b-corrected'
 const subjectSweepBasisCorrection = 'tax-return-subject-sweep-basis-correction'
@@ -1453,6 +1457,26 @@ const documentByHash = {
         box1eCostOrOtherBasis: '3000.00',
         box2ShortTermGainOrLoss: true,
     },
+    // TAX-38: the SAME dialect, carrying the section 1256 block instead of a
+    // box 1 sale. Boxes 1a through 1e are absent, which is what the printed
+    // form guarantees — box 1d "does not include proceeds from regulated
+    // futures contracts or Section 1256 option contracts", and box 1c prints
+    // nothing "for aggregate reporting in boxes 8 through 11".
+    //
+    //   box 8 - box 9 + box 10 = 40,000 - 6,000 + 9,000 = 43,000 = box 11
+    [fixtureSweepSectionTwelveFiftySixHash]: {
+        dialect: oneZeroNineNineBDialect,
+        payerTin: '55-5555555',
+        recipientTin: '222-22-2222',
+        accountNumber: 'ACC-SWEEP-1256',
+        taxYear: 2025,
+        formRevision: '2025',
+        sourceArtifactHash: 'deadbeef00112233445566778899aabbccddeeff0011223344556677889900',
+        box8ProfitOrLossRealized: '40000.00',
+        box9UnrealizedProfitOrLossPriorYearEnd: '6000.00',
+        box10UnrealizedProfitOrLossCurrentYearEnd: '9000.00',
+        box11AggregateProfitOrLoss: '43000.00',
+    },
     // A carryover with REAL figures. The Phase 21 fixture above carries four
     // zeros — it proves the year exemption and nothing else, which is why
     // deleting this dialect's route branch left the whole suite green.
@@ -1767,6 +1791,7 @@ const snapshotBySubject = {
     [subjectSweepEstateTrustK1]: fixtureSweepEstateTrustK1Hash,
     [subjectSweepGainsProfile]: fixtureSweepGainsProfileHash,
     [subjectSweepBrokerage]: fixtureSweepBrokerageHash,
+    [subjectSweepSectionTwelveFiftySix]: fixtureSweepSectionTwelveFiftySixHash,
     [subjectSweepRealCarryover]: fixtureSweepRealCarryoverHash,
     [subjectSweepCorrectedBrokerage]: fixtureSweepCorrectedBrokerageHash,
     [subjectSweepBasisCorrection]: fixtureSweepBasisCorrectionHash,
@@ -2819,6 +2844,54 @@ export const proof = {
                 renderedCents(result)('1040 line 7a'),
                 200000n,
                 '$5,000.00 of proceeds less $3,000.00 of basis')
+        },
+        // ★ TAX-38. The SAME dialect through the SAME dispatch branch, but
+        // carrying the section 1256 block: box 11's $43,000.00 aggregate
+        // becomes Form 6781 line 7, splits into $17,200.00 short-term (line
+        // 8, 40%) and $25,800.00 long-term (line 9, 60%), lands on printed
+        // Schedule D lines 4 and 11, and recombines to $43,000.00 on line 16
+        // and therefore on 1040 line 7a.
+        //
+        // This is a ROUTING proof, not an arithmetic one: `fjs/form6781` and
+        // `fjs/schedule/d` prove the split and the two printed lines. What
+        // only this file can prove is that a document arriving from the CAS
+        // store as a `vnd.fjs.1099b` blob reaches Form 6781 at all.
+        aStoredSectionTwelveFiftySixFormTenNinetyNineBReachesLineSevenA: () => {
+            const result = runTwin([
+                subjectSweepGainsProfile, subjectSweepSectionTwelveFiftySix,
+            ])
+            assert(result.kind === 'ok', ['expected a computed return', result])
+            if (result.kind !== 'ok') {
+                return
+            }
+            assertEq(
+                renderedCents(result)('1040 line 7a'),
+                4300000n,
+                '$43,000.00 — box 11, split 60/40 by Form 6781 and recombined by Schedule D')
+        },
+        // ★ And the two blocks on ONE return, through the same branch, ADD:
+        // $2,000.00 from the box 1 sale plus $43,000.00 from the section 1256
+        // aggregate. Two separate 1099-B documents here rather than one
+        // consolidated form, because that is the shape a real broker sends
+        // and because it is the case the dispatch branch has to get right —
+        // both must land in `brokerageForms` and both must be read, by two
+        // different forms, from the same list.
+        //
+        // $2,000.00 and $43,000.00 are deliberately far apart, so a wiring
+        // that dropped either produces a figure this leaf does not accept.
+        aBoxOneSaleAndASectionTwelveFiftySixAggregateBothReachLineSevenA: () => {
+            const result = runTwin([
+                subjectSweepGainsProfile, subjectSweepBrokerage,
+                subjectSweepSectionTwelveFiftySix,
+            ])
+            assert(result.kind === 'ok', ['both blocks must compute together', result])
+            if (result.kind !== 'ok') {
+                return
+            }
+            assertEq(
+                renderedCents(result)('1040 line 7a'),
+                4500000n,
+                '$45,000.00 = $2,000.00 of stock gain + $43,000.00 of section 1256 aggregate')
         },
         // `vnd.fjs.prior_year_capital_loss`, with figures that are not zeros.
         //
