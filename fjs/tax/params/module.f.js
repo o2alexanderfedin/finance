@@ -1228,6 +1228,204 @@ export const netInvestmentIncomeTaxThreshold = {
 export const netInvestmentIncomeTaxRateBasisPoints = 380
 
 /**
+ * Schedule 1 line 20's traditional IRA deduction — IRC §219, Publication
+ * 590-A Worksheet 1-2 and Appendix B Worksheet 2.
+ *
+ * ## Two indexed figures, two statutory constants, and one that is neither
+ *
+ * {@link studentLoanInterestDeduction}'s own docstring warns that copying
+ * "no Revenue Procedure adjusts these" onto an indexed group is a silent
+ * error one tax year later. This group is the sharpest case of that yet,
+ * because it holds THREE kinds of figure at once:
+ *
+ * - `deductibleAmount` and every `phaseoutThreshold` are **inflation-indexed**
+ *   (§219(b)(5)(C) and §219(g)(3)(B)'s own flush language), and IRS Notice
+ *   2024-80 is what published the TY2025 values. They moved for 2025:
+ *   $77,000 -> $79,000 (single/HoH) and $123,000 -> $126,000 (joint/QSS).
+ * - `catchUpContribution` is indexed by §219(b)(5)(C)(iii) in $500
+ *   increments and has therefore sat at **$1,000 since 2006** — the
+ *   {@link healthSavingsAccount} trap exactly: a figure that looks constant
+ *   and is not. Notice 2024-80 says "remains $1,000", not "is $1,000".
+ * - `phaseoutRange`, `minimumPhasedOutLimit` and `roundingIncrement` are
+ *   written into §219(g)(2) itself and nothing indexes them.
+ *
+ * ## `marriedFilingJointly` has NO entry, and neither does a covered spouse
+ *
+ * `fjs/schedule/1` REFUSES a joint return carrying a traditional IRA
+ * contribution — §219(f)(2) computes the limit "separately for each
+ * individual", coverage is a Form W-2 box 13 checkbox, and nothing this
+ * engine models says which spouse a Form W-2 belongs to. So the status has
+ * no dollar threshold here, exactly as {@link studentLoanInterestDeduction}
+ * omits `marriedFilingSeparately` and {@link seniorDeduction} omits it too:
+ * there is no threshold for a status whose amount never depends on one.
+ *
+ * Two published TY2025 figures are therefore recorded HERE, in prose, rather
+ * than stored — the phase that models joint returns needs both and neither is
+ * derivable from what is below:
+ *
+ * - §219(g)(3)(B)(i), a joint return where the CONTRIBUTOR is the active
+ *   participant: **$126,000**, over a **$20,000** range. (That pair IS
+ *   stored, under `qualifyingSurvivingSpouse` — see below.)
+ * - §219(g)(7)(A), a joint return where the contributor is NOT an active
+ *   participant but their spouse is: **$236,000** — over a **$10,000**
+ *   range, NOT $20,000, because §219(g)(7)(B) overrides §219(g)(2)(A)(ii)'s
+ *   joint divisor. Publication 590-A Worksheet 1-2 puts that taxpayer in its
+ *   "All others … 70% (80%)" row rather than its joint "35% (40%)" row for
+ *   exactly this reason, and getting it wrong is the classic §219
+ *   implementation bug.
+ *
+ * ## `qualifyingSurvivingSpouse` carries the JOINT figures — the opposite of
+ * {@link additionalMedicareTaxThreshold}
+ *
+ * That group gives QSS §3101(b)(2)(C)'s "any other case" amount, on the
+ * ground that a QSS return is not a JOINT return. **Here the authority says
+ * the opposite in so many words.** IRS Notice 2024-80: *"The applicable
+ * amount under section 219(g)(3)(B)(i) for determining the deductible amount
+ * of an IRA contribution for taxpayers who are active participants filing a
+ * joint return **or as a qualifying widow(er)** is increased from $123,000 to
+ * $126,000."* Publication 590-A's Table 1-2 groups "married filing jointly or
+ * qualifying surviving spouse" on one row, and Worksheet 1-2's own lines 3
+ * and 4 name that status in the $20,000/35%/40% branch.
+ *
+ * So the range is $20,000 for a QSS as well, and the two groups disagree
+ * about QSS on purpose. Both docstrings say so, so that a reader who finds
+ * one cannot copy it onto the other.
+ *
+ * ## `marriedFilingSeparately`'s `$0.00` is a real threshold, not a sentinel
+ *
+ * §219(g)(3)(B)(iii) sets the applicable dollar amount for a married
+ * individual filing separately to zero, and Notice 2024-80 states it "is not
+ * subject to an annual cost-of-living adjustment and remains $0". So the
+ * phase-out runs from the first dollar of modified AGI to $10,000 — a
+ * genuine `$0.00` threshold with a genuine range beside it, and NOT the
+ * "this status is short-circuited" absence that
+ * {@link studentLoanInterestDeduction} uses for the same status. §219(g)(4)
+ * is what makes it survivable: a couple who lived apart for the whole year
+ * are "not … treated as married individuals for purposes of this
+ * subsection", and `fjs/schedule/1` routes such a filer to `single`.
+ *
+ * ## Two figures per status, never three — and no stored percentage
+ *
+ * Publication 590-A Worksheet 1-2 line 4 prints percentages (35%/40% for a
+ * joint or QSS filer, 70%/80% for everyone else). **They are not stored**,
+ * because they are `deductibleAmount / phaseoutRange` and
+ * `(deductibleAmount + catchUpContribution) / phaseoutRange` exactly — a
+ * stored percentage would be a fourth figure able to disagree with the three
+ * the computation actually reads. The completely-phased-out end points
+ * ($89,000, $146,000, $10,000) are likewise DERIVED, per the "two figures,
+ * not three" position {@link studentLoanInterestDeduction} records;
+ * `iraDeductionPhaseoutEndPointsAndPercentagesMatchPublication590A` asserts
+ * the derived values against hand-typed ones.
+ *
+ * ## Citation kind
+ *
+ * `kind: 'code'`, §219's own subsections — the same "governing provision, not
+ * the literal source" position {@link studentLoanInterestDeduction} takes.
+ * §219(b)(5) and §219(g)(2)/(g)(3) genuinely are where these limits, this
+ * mechanism and these applicable dollar amounts live; what §219 does not
+ * contain is the TY2025 indexed figures, which come from IRS Notice 2024-80
+ * and are reprinted in Publication 590-A Tables 1-2/1-3.
+ * @type {{
+ *   readonly deductibleAmount: AmountWithCitation,
+ *   readonly catchUpContribution: AmountWithCitation,
+ *   readonly minimumPhasedOutLimit: AmountWithCitation,
+ *   readonly roundingIncrement: AmountWithCitation,
+ *   readonly phaseoutThreshold: {
+ *     readonly single: AmountWithCitation,
+ *     readonly marriedFilingSeparately: AmountWithCitation,
+ *     readonly headOfHousehold: AmountWithCitation,
+ *     readonly qualifyingSurvivingSpouse: AmountWithCitation,
+ *   },
+ *   readonly phaseoutRange: {
+ *     readonly single: AmountWithCitation,
+ *     readonly marriedFilingSeparately: AmountWithCitation,
+ *     readonly headOfHousehold: AmountWithCitation,
+ *     readonly qualifyingSurvivingSpouse: AmountWithCitation,
+ *   },
+ * }}
+ */
+export const iraDeduction = {
+    deductibleAmount: {
+        amount: '7000.00',
+        citation: { kind: 'code', section: '§219(b)(5)(A)', effectiveDate: '2025-01-01' },
+    },
+    // §219(b)(5)(B)(ii)'s "applicable amount" for an individual who attains
+    // age 50 before the close of the taxable year. **No document in this
+    // repository carries a birth date**, so `fjs/schedule/1` never assumes
+    // either answer: it computes the deduction against BOTH limits and
+    // refuses only when the two disagree.
+    catchUpContribution: {
+        amount: '1000.00',
+        citation: { kind: 'code', section: '§219(b)(5)(B)(ii)', effectiveDate: '2025-01-01' },
+    },
+    // §219(g)(2)(B), "No reduction below $200 until complete phase-out": a
+    // partially phased-out limit is never between $1 and $199. It is either
+    // at least $200 or exactly zero, and zero only when the un-floored
+    // computation was already zero.
+    minimumPhasedOutLimit: {
+        amount: '200.00',
+        citation: { kind: 'code', section: '§219(g)(2)(B)', effectiveDate: '2025-01-01' },
+    },
+    // §219(g)(2)(C) rounds "any amount determined under this paragraph" — the
+    // REDUCTION — to the next LOWEST $10. Subtracting a reduction rounded
+    // down rounds the surviving limit UP, which is the direction Publication
+    // 590-A Worksheet 1-2 line 4 states ("round it to the next highest
+    // multiple of $10. (For example, $611.40 is rounded to $620.)").
+    // `fjs/schedule/1` implements the worksheet's direction on the surviving
+    // limit; both are the same rule read from opposite ends.
+    roundingIncrement: {
+        amount: '10.00',
+        citation: { kind: 'code', section: '§219(g)(2)(C)', effectiveDate: '2025-01-01' },
+    },
+    phaseoutThreshold: {
+        single: {
+            amount: '79000.00',
+            citation: { kind: 'code', section: '§219(g)(3)(B)(ii)', effectiveDate: '2025-01-01' },
+        },
+        marriedFilingSeparately: {
+            amount: '0.00',
+            citation: { kind: 'code', section: '§219(g)(3)(B)(iii)', effectiveDate: '2025-01-01' },
+        },
+        // Publication 590-A Table 1-2 groups "single or head of household" on
+        // one row, so this carries the same figure as `single`. Hand-typed
+        // per status anyway, never spread from it, for the reason
+        // `standardDeduction` states: a spread makes two statuses impossible
+        // to observe drifting apart.
+        headOfHousehold: {
+            amount: '79000.00',
+            citation: { kind: 'code', section: '§219(g)(3)(B)(ii)', effectiveDate: '2025-01-01' },
+        },
+        qualifyingSurvivingSpouse: {
+            amount: '126000.00',
+            citation: { kind: 'code', section: '§219(g)(3)(B)(i)', effectiveDate: '2025-01-01' },
+        },
+    },
+    // §219(g)(2)(A)(ii)'s divisor: "$10,000 ($20,000 in the case of a joint
+    // return)". A qualifying surviving spouse takes the $20,000 figure on
+    // Publication 590-A Worksheet 1-2's own authority — see this group's
+    // docstring, which is also where §219(g)(7)(B)'s $10,000 override for a
+    // non-covered spouse ON a joint return is recorded.
+    phaseoutRange: {
+        single: {
+            amount: '10000.00',
+            citation: { kind: 'code', section: '§219(g)(2)(A)(ii)', effectiveDate: '2025-01-01' },
+        },
+        marriedFilingSeparately: {
+            amount: '10000.00',
+            citation: { kind: 'code', section: '§219(g)(2)(A)(ii)', effectiveDate: '2025-01-01' },
+        },
+        headOfHousehold: {
+            amount: '10000.00',
+            citation: { kind: 'code', section: '§219(g)(2)(A)(ii)', effectiveDate: '2025-01-01' },
+        },
+        qualifyingSurvivingSpouse: {
+            amount: '20000.00',
+            citation: { kind: 'code', section: '§219(g)(2)(A)(ii)', effectiveDate: '2025-01-01' },
+        },
+    },
+}
+
+/**
  * Schedule 1 line 21's student loan interest deduction — IRC §221, TAX-23,
  * Phase 24.
  *
@@ -2417,6 +2615,7 @@ export const alternativeMinimumTax = {
  *   readonly socialSecurityTaxWithholding: typeof socialSecurityTaxWithholding,
  *   readonly netInvestmentIncomeTaxThreshold: typeof netInvestmentIncomeTaxThreshold,
  *   readonly netInvestmentIncomeTaxRateBasisPoints: typeof netInvestmentIncomeTaxRateBasisPoints,
+ *   readonly iraDeduction: typeof iraDeduction,
  *   readonly studentLoanInterestDeduction: typeof studentLoanInterestDeduction,
  *   readonly educatorExpenses: typeof educatorExpenses,
  *   readonly healthSavingsAccount: typeof healthSavingsAccount,
@@ -2457,6 +2656,7 @@ export const taxParamsByYear = {
         socialSecurityTaxWithholding,
         netInvestmentIncomeTaxThreshold,
         netInvestmentIncomeTaxRateBasisPoints,
+        iraDeduction,
         studentLoanInterestDeduction,
         educatorExpenses,
         healthSavingsAccount,
@@ -2554,6 +2754,18 @@ const everyDollarStringField = [
     childTaxCredit.actcEarnedIncomeThreshold.amount,
     ...individualFilingStatuses.map(status => additionalMedicareTaxThreshold[status].amount),
     ...individualFilingStatuses.map(status => netInvestmentIncomeTaxThreshold[status].amount),
+    iraDeduction.deductibleAmount.amount,
+    iraDeduction.catchUpContribution.amount,
+    iraDeduction.minimumPhasedOutLimit.amount,
+    iraDeduction.roundingIncrement.amount,
+    iraDeduction.phaseoutThreshold.single.amount,
+    iraDeduction.phaseoutThreshold.marriedFilingSeparately.amount,
+    iraDeduction.phaseoutThreshold.headOfHousehold.amount,
+    iraDeduction.phaseoutThreshold.qualifyingSurvivingSpouse.amount,
+    iraDeduction.phaseoutRange.single.amount,
+    iraDeduction.phaseoutRange.marriedFilingSeparately.amount,
+    iraDeduction.phaseoutRange.headOfHousehold.amount,
+    iraDeduction.phaseoutRange.qualifyingSurvivingSpouse.amount,
     studentLoanInterestDeduction.maximumDeduction.amount,
     studentLoanInterestDeduction.phaseoutThreshold.single.amount,
     studentLoanInterestDeduction.phaseoutThreshold.marriedFilingJointly.amount,
@@ -3299,6 +3511,116 @@ export const proof = {
                 completelyPhasedOut,
                 ['threshold + range must equal §221(b)(2)(B)\'s completely-phased-out figure', status],
             )
+        }
+    },
+    // ── IRC §219, Schedule 1 line 20: the traditional IRA deduction ─────────
+    //
+    // Every expected value below is hand-typed from IRS Notice 2024-80 and
+    // Publication 590-A Table 1-2, never read back out of `iraDeduction`.
+    // The subsection letter is asserted beside each amount so the two cannot
+    // drift: a $126,000 figure sitting under `single` would have to arrive
+    // with a `(g)(3)(B)(i)` citation to pass, and it would still fail on the
+    // amount.
+    iraDeductionLimitsAreNoticeTwentyFourEightyFigures: () => {
+        assertEq(iraDeduction.deductibleAmount.amount, '7000.00', '§219(b)(5)(A), Notice 2024-80')
+        assertEq(iraDeduction.deductibleAmount.citation.section, '§219(b)(5)(A)')
+        assertEq(iraDeduction.deductibleAmount.citation.kind, 'code')
+        assertEq(iraDeduction.deductibleAmount.citation.effectiveDate, '2025-01-01')
+        assertEq(iraDeduction.catchUpContribution.amount, '1000.00', '§219(b)(5)(B)(ii), "remains $1,000"')
+        assertEq(iraDeduction.catchUpContribution.citation.section, '§219(b)(5)(B)(ii)')
+        // §219(g)(2)(B) and (C), the two figures written into the statute
+        // itself. Publication 590-A Worksheet 1-2 line 4 prints both in one
+        // sentence: "round it to the next highest multiple of $10 … However,
+        // if the result is less than $200, enter $200."
+        assertEq(iraDeduction.minimumPhasedOutLimit.amount, '200.00', '§219(g)(2)(B)')
+        assertEq(iraDeduction.minimumPhasedOutLimit.citation.section, '§219(g)(2)(B)')
+        assertEq(iraDeduction.roundingIncrement.amount, '10.00', '§219(g)(2)(C)')
+        assertEq(iraDeduction.roundingIncrement.citation.section, '§219(g)(2)(C)')
+    },
+    // The four statuses that can compute this deduction, each with its own
+    // threshold, its own range and its own subsection. Hand-typed as four
+    // separate rows rather than looped with a shared expectation, for the
+    // reason `additionalMedicareTaxThresholdsAreTheUnindexedStatutoryFigures`
+    // states about ITS QSS row -- except that here QSS goes the OTHER way and
+    // takes the joint figures, on Notice 2024-80's own words ("filing a joint
+    // return or as a qualifying widow(er)").
+    //
+    // `marriedFilingJointly` is deliberately absent and there is no fifth
+    // row: `fjs/schedule/1` refuses a joint return carrying a contribution,
+    // so the status has no threshold here at all.
+    iraDeductionPhaseoutThresholdsArePublication590ATableOneTwo: () => {
+        /** @type {readonly (readonly [string, string, string, string])[]} */
+        const expected = [
+            ['single', '79000.00', '10000.00', '§219(g)(3)(B)(ii)'],
+            ['headOfHousehold', '79000.00', '10000.00', '§219(g)(3)(B)(ii)'],
+            ['qualifyingSurvivingSpouse', '126000.00', '20000.00', '§219(g)(3)(B)(i)'],
+            ['marriedFilingSeparately', '0.00', '10000.00', '§219(g)(3)(B)(iii)'],
+        ]
+        assertEq(
+            expected.length, 4,
+            'four statuses compute; a joint return refuses and so stores nothing')
+        for (const [status, threshold, range, section] of expected) {
+            const storedThreshold = status === 'single' ? iraDeduction.phaseoutThreshold.single
+                : status === 'headOfHousehold' ? iraDeduction.phaseoutThreshold.headOfHousehold
+                    : status === 'qualifyingSurvivingSpouse'
+                        ? iraDeduction.phaseoutThreshold.qualifyingSurvivingSpouse
+                        : iraDeduction.phaseoutThreshold.marriedFilingSeparately
+            const storedRange = status === 'single' ? iraDeduction.phaseoutRange.single
+                : status === 'headOfHousehold' ? iraDeduction.phaseoutRange.headOfHousehold
+                    : status === 'qualifyingSurvivingSpouse'
+                        ? iraDeduction.phaseoutRange.qualifyingSurvivingSpouse
+                        : iraDeduction.phaseoutRange.marriedFilingSeparately
+            assertEq(storedThreshold.amount, threshold, ['wrong §219(g)(3)(B) applicable dollar amount', status])
+            assertEq(storedThreshold.citation.section, section, ['wrong subsection', status])
+            assertEq(storedRange.amount, range, ['wrong §219(g)(2)(A)(ii) divisor', status])
+            assertEq(storedRange.citation.section, '§219(g)(2)(A)(ii)', ['wrong divisor citation', status])
+        }
+    },
+    // The check a THIRD and FOURTH stored figure would have made impossible.
+    // Publication 590-A Worksheet 1-2's own table prints a completely-
+    // phased-out end point per status, and its line 4 prints a PERCENTAGE per
+    // status; this module stores neither, because both are derivable from the
+    // three figures the computation actually reads. Derived here and compared
+    // against hand-typed values off the printed worksheet.
+    //
+    // The percentages are `deductibleAmount / range` and
+    // `(deductibleAmount + catchUp) / range` -- 70%/80% for single, head of
+    // household and married-filing-separately, and 35%/40% for a qualifying
+    // surviving spouse, which is the pair Worksheet 1-2 prints in its
+    // "Married filing jointly or qualifying surviving spouse" row.
+    iraDeductionPhaseoutEndPointsAndPercentagesMatchPublication590A: () => {
+        /** @type {readonly (readonly [string, string, number, number])[]} */
+        const expected = [
+            ['single', '89000.00', 70, 80],
+            ['headOfHousehold', '89000.00', 70, 80],
+            ['qualifyingSurvivingSpouse', '146000.00', 35, 40],
+            ['marriedFilingSeparately', '10000.00', 70, 80],
+        ]
+        assertEq(expected.length, 4, 'one row per computable status')
+        const baseCents = centsFromString(iraDeduction.deductibleAmount.amount)
+        const catchUpCents = centsFromString(iraDeduction.catchUpContribution.amount)
+        for (const [status, endPoint, basePercent, catchUpPercent] of expected) {
+            const storedThreshold = status === 'single' ? iraDeduction.phaseoutThreshold.single
+                : status === 'headOfHousehold' ? iraDeduction.phaseoutThreshold.headOfHousehold
+                    : status === 'qualifyingSurvivingSpouse'
+                        ? iraDeduction.phaseoutThreshold.qualifyingSurvivingSpouse
+                        : iraDeduction.phaseoutThreshold.marriedFilingSeparately
+            const storedRange = status === 'single' ? iraDeduction.phaseoutRange.single
+                : status === 'headOfHousehold' ? iraDeduction.phaseoutRange.headOfHousehold
+                    : status === 'qualifyingSurvivingSpouse'
+                        ? iraDeduction.phaseoutRange.qualifyingSurvivingSpouse
+                        : iraDeduction.phaseoutRange.marriedFilingSeparately
+            const rangeCents = centsFromString(storedRange.amount)
+            assertEq(
+                centsToString(centsFromString(storedThreshold.amount) + rangeCents),
+                endPoint,
+                ['threshold + range must equal Publication 590-A’s end point', status])
+            assertEq(
+                Number(baseCents * 100n / rangeCents), basePercent,
+                ['wrong Worksheet 1-2 line 4 percentage, under age 50', status])
+            assertEq(
+                Number((baseCents + catchUpCents) * 100n / rangeCents), catchUpPercent,
+                ['wrong Worksheet 1-2 line 4 percentage, age 50 or over', status])
         }
     },
     // ── TAX-27, Phase 32: §32's own three independent checks ────────────────

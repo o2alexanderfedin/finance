@@ -184,7 +184,7 @@
  */
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
 import { of, halfUp } from '../../types/rational/module.f.js'
-import { centsFromString } from '../../exact/module.f.js'
+import { centsFromString, centsToString } from '../../exact/module.f.js'
 import { form8889PartI } from '../../form8889/module.f.js'
 import { scheduleC } from '../c/module.f.js'
 import { scheduleE } from '../e/module.f.js'
@@ -194,6 +194,7 @@ import {
     twoSelfEmployedPeopleRefusal,
     wagesAttributionRefusal,
 } from '../se/module.f.js'
+import { socialSecurityBenefitsWorksheet } from '../../tax/ssb/module.f.js'
 import { taxParamsByYear } from '../../tax/params/module.f.js'
 
 /** @import { ReturnProfile } from '../../return/profile/module.f.js' */
@@ -233,8 +234,67 @@ import { taxParamsByYear } from '../../tax/params/module.f.js'
 export const adjustmentLineTags = /** @type {const} */ ([
     ['educatorExpenses', 'Schedule 1 line 11'],
     ['hsaContribution', 'Schedule 1 line 13'],
+    // **`traditionalIraContribution`, never `iraContribution`.** A Roth
+    // contribution is not deductible at ALL (§408A(c)(1)) and belongs on no
+    // Schedule 1 line; because this vocabulary is CLOSED, an entry tagged
+    // `rothIraContribution` is refused BY NAME rather than silently deducted.
+    // A tag called `iraContribution` would invite exactly that mistake, and
+    // the mistake is worth up to $8,000 of deduction that does not exist.
+    ['traditionalIraContribution', 'Schedule 1 line 20'],
+    // **TWO tags for one printed line, and the second one is an ASSERTION.**
+    // §219(b)(5)(B)(ii) raises the deductible amount by $1,000 for an
+    // individual who attained age 50 before the close of the year, and NO
+    // DOCUMENT IN THIS REPOSITORY CARRIES A BIRTH DATE
+    // (`.planning/PERSONA-COVERAGE.md`, and the reason
+    // `form4972LumpSumDistribution` is refused). The fact is the taxpayer's
+    // to state, exactly as `vnd.fjs.adjustments`' own
+    // `eligibleForCatchUpContribution` lets them state §223(b)(3)'s age-55
+    // health-savings-account catch-up — the same kind of fact, one line up
+    // this same schedule, already carried by the same document.
+    //
+    // Untagged is NOT "under 50": it is UNKNOWN, and
+    // {@link scheduleOnePartIIExceptStudentLoanInterest} refuses whenever the
+    // unknown could change the answer rather than assuming either age.
+    ['traditionalIraContributionAgeFiftyOrOver', 'Schedule 1 line 20'],
     ['studentLoanInterest', 'Schedule 1 line 21'],
 ])
+
+/**
+ * The two {@link adjustmentLineTags} entries that feed Schedule 1 line 20 —
+ * the contribution and the same contribution with §219(b)(5)(B)(ii)'s age-50
+ * catch-up asserted beside it. Named once so the filter, the following-year
+ * rule and the citation cannot come apart.
+ * @type {readonly string[]}
+ */
+const iraContributionTags = ['traditionalIraContribution', 'traditionalIraContributionAgeFiftyOrOver']
+
+/** The one of {@link iraContributionTags} that asserts the age.
+ * @type {string}
+ */
+const catchUpAssertedTag = 'traditionalIraContributionAgeFiftyOrOver'
+
+/**
+ * The tags whose payment may legitimately be made in the FOLLOWING calendar
+ * year and still be designated for this return's tax year.
+ *
+ * §223(h)/§223(b) allows it for a health savings account contribution and
+ * **§219(f)(3) allows it for a traditional IRA contribution** — *"a taxpayer
+ * shall be deemed to have made a contribution on the last day of the
+ * preceding taxable year if the contribution is made on account of such
+ * taxable year and is made not later than the time prescribed by law for
+ * filing the return for such taxable year"*. That is how a large share of
+ * real IRA contributions are made, and a rule that refused them would refuse
+ * the ordinary case.
+ *
+ * Everything else on this schedule is deducted in the year it was paid, so a
+ * following-year `datePaid` on any other tag is refused: a classroom supply
+ * bought in March 2026 is a 2026 deduction and nothing downstream could
+ * notice. Written as its own named list rather than an inline `!==`, because
+ * it now has two members and a second `||` term in a condition is exactly
+ * where a third one gets forgotten.
+ * @type {readonly string[]}
+ */
+const followingYearContributionTags = ['hsaContribution', ...iraContributionTags]
 
 /** {@link adjustmentLineTags}' tags alone, widened to plain strings so the
  * membership question can be asked of the `string` a JSON blob's field is —
@@ -537,6 +597,11 @@ export const scheduleOnePartI = input => {
  *   readonly businessExpenseForms: readonly Stored<BusinessExpenses>[],
  *   readonly passThrough: PassThroughSelfEmployment,
  *   readonly interestForms: readonly Stored<OneZeroNineNineInt>[],
+ *   readonly totalIncomeExceptTaxableSocialSecurityLine: ReportLine,
+ *   readonly socialSecurityBenefitsCents: bigint,
+ *   readonly taxExemptInterestCents: bigint,
+ *   readonly mfsLivedWithSpouseAtAnyTimeInYear: boolean,
+ *   readonly iraDistributionReceived: boolean,
  * }} ScheduleOnePartIIStageOneInput
  */
 
@@ -623,6 +688,298 @@ const employerHsaContributionSources = w2s => w2s.flatMap(form =>
             value: entry.amount,
         })))
 
+// ── Line 20's own machinery (§219) ───────────────────────────────────────────
+
+/**
+ * The refusal a joint return carrying a traditional IRA contribution raises.
+ *
+ * **Written as a constant, in the shape `fjs/schedule/se`'s
+ * `twoSelfEmployedPeopleRefusal` already uses**, because it is one refusal
+ * with one message and three independent reasons, and inlining it at the one
+ * site would put those three reasons somewhere a reader looking for "why does
+ * this engine refuse joint returns" would not find them.
+ *
+ * §219(f)(2): *"The maximum deduction under subsection (b) shall be computed
+ * **separately for each individual**"*, and Publication 590-A repeats it —
+ * *"Even though you file a joint return, you must figure their IRA deductions
+ * separately."* Doing that needs three facts a joint return here cannot
+ * supply:
+ *
+ * 1. **Which spouse is the active participant.** Coverage is Form W-2 box 13,
+ *    and nothing this engine models says which spouse a Form W-2 belongs to —
+ *    `vnd.fjs.return_profile` carries no taxpayer or spouse TIN. This is the
+ *    same gap this schedule's own line 13 refuses for Form W-2 box 12 code W
+ *    and `fjs/form8880` refuses for box 12 elective deferrals, refused here
+ *    the same way and for the same reason.
+ * 2. **Which range applies to which spouse.** §219(g)(7) gives a NON-covered
+ *    spouse married to a covered one a $236,000 applicable dollar amount over
+ *    a $10,000 range, where the covered spouse gets $126,000 over $20,000.
+ *    Attributing the coverage to the wrong spouse swaps two ranges $110,000
+ *    apart.
+ * 3. **Whose compensation.** §219(c)'s Kay Bailey Hutchison spousal IRA
+ *    computes the lower earner's limit from the HIGHER earner's compensation
+ *    reduced by that spouse's own already-determined §219 deduction and Roth
+ *    contributions — a per-person ordering over per-person Forms W-2.
+ * @type {ScheduleOneRefusal}
+ */
+const iraJointReturnRefusal = {
+    kind: 'error',
+    message: 'Schedule 1 line 20: a traditional IRA contribution on a joint return cannot be '
+        + 'attributed. §219(f)(2) computes the deduction "separately for each individual", and '
+        + 'the three facts that takes are all missing here: which spouse Form W-2 box 13 '
+        + '"Retirement plan" belongs to (no document this engine models says whose a Form W-2 '
+        + 'is — the same gap Schedule 1 line 13 and Form 8880 already refuse), which of '
+        + '§219(g)(3)(B)(i)’s $126,000 range and §219(g)(7)’s $236,000 range each spouse reads, '
+        + 'and whose compensation caps whose IRA under §219(c)’s spousal rule. Refusing rather '
+        + 'than guessing (no phase yet)',
+}
+
+/**
+ * The four filing statuses §219's phase-out has a stored applicable dollar
+ * amount for. `marriedFilingJointly` is absent because a joint return
+ * carrying a traditional IRA contribution REFUSES — see
+ * {@link iraJointReturnRefusal}.
+ * @typedef {'single' | 'marriedFilingSeparately' | 'headOfHousehold' | 'qualifyingSurvivingSpouse'} IraPhaseoutStatus
+ */
+
+/**
+ * Narrows an {@link IndividualFilingStatus} to the status whose §219(g)(3)(B)
+ * applicable dollar amount actually governs, or `undefined` for a joint
+ * return, which has none here.
+ *
+ * **§219(g)(4) is the whole reason this is a function and not an index.**
+ * *"A husband and wife who— (A) file separate returns for any taxable year,
+ * and (B) live apart at all times during such taxable year, shall not be
+ * treated as married individuals for purposes of this subsection."* So a
+ * married-filing-separately filer who lived apart for the entire year reads
+ * the SINGLE row, and Publication 590-A's Table 1-2 says so in its own
+ * footnote: *"If you didn't live with your spouse at any time during the
+ * year, your filing status is considered Single for this purpose."* The
+ * difference is a $79,000 threshold instead of a $0 one — the largest single
+ * consequence of one checkbox anywhere on this schedule.
+ *
+ * The value that flows onward is the one from this function's own returns,
+ * never the string off the profile, which is the same device
+ * `hsaCoverageTypeNamed` above uses for the identical reason: AGENTS.md bans
+ * the cast that would otherwise be needed.
+ * @type {(status: IndividualFilingStatus) => (mfsLivedWithSpouseAtAnyTimeInYear: boolean) => IraPhaseoutStatus | undefined}
+ */
+const iraPhaseoutStatusOf = status => mfsLivedWithSpouseAtAnyTimeInYear =>
+    status === 'single' ? 'single'
+        : status === 'headOfHousehold' ? 'headOfHousehold'
+            : status === 'qualifyingSurvivingSpouse' ? 'qualifyingSurvivingSpouse'
+                : status === 'marriedFilingSeparately'
+                    ? (mfsLivedWithSpouseAtAnyTimeInYear ? 'marriedFilingSeparately' : 'single')
+                    : undefined
+
+/**
+ * **§219(g)(3)(A)'s modified adjusted gross income** — the FOURTH separately
+ * named income measure in this engine, and the second one on this schedule.
+ *
+ * Verbatim: *"Adjusted gross income of any taxpayer shall be determined— (i)
+ * after application of sections 86 and 469, and (ii) without regard to
+ * sections 85(c), 135, 137, 221, and 911 or the deduction allowable under
+ * this section."*
+ *
+ * Like {@link studentLoanInterestPhaseoutIncome} it starts from TOTAL INCOME
+ * rather than from AGI, and subtracts back exactly the adjustments that are
+ * neither this deduction itself nor the one §219(g)(3)(A)(ii) adds back — so
+ * **line 21 is deliberately NOT in `otherAdjustmentsCents`**, and that
+ * omission IS the §221 add-back. Nothing is added for §221 on top; doing both
+ * would credit the same deduction twice.
+ *
+ * Unlike that measure it takes a THIRD term, and the third term is the whole
+ * subtlety of this line: §219(g)(3)(A)(i) applies §86 FIRST, so taxable
+ * Social Security benefits are inside this income — but they are the benefits
+ * computed **as though there were no IRA deduction**, which is a different
+ * number from the one that lands on Form 1040 line 6b. See
+ * {@link scheduleOnePartIIExceptStudentLoanInterest}'s own three-pass note.
+ *
+ * The four exclusions §219(g)(3)(A)(ii) adds back are each permanently zero
+ * in this engine and are NAMED rather than omitted, mirroring
+ * {@link studentLoanInterestPhaseoutIncome}'s own three zero terms. **§85(c)
+ * is on the list and §199A is not** — the list a reader is most likely to
+ * mis-remember, because §199 (the repealed domestic production activities
+ * deduction) was struck from it by TCJA §13305(b)(1) and §85(c) was inserted
+ * by ARPA. §199A is taken from taxable income, so it could never have reached
+ * AGI in the first place; §85(c)'s unemployment exclusion applied to TY2020
+ * alone, so unemployment compensation reaches this measure in full.
+ *
+ * It is deliberately not named for the acronym the instructions use — TAX-15's
+ * rule, enforced repo-wide by the root gate.
+ * @type {(totalIncomeExceptTaxableSocialSecurityCents: bigint) => (otherAdjustmentsCents: bigint) => (taxableSocialSecurityBeforeThisDeductionCents: bigint) => bigint}
+ */
+export const iraDeductionPhaseoutIncome = totalIncomeExceptTaxableSocialSecurityCents =>
+    otherAdjustmentsCents => taxableSocialSecurityBeforeThisDeductionCents => {
+        // §219(g)(3)(A)(ii)'s own add-backs, every term permanently zero here.
+        const section85cUnemploymentCompensationExclusion = 0n
+        const section135SavingsBondInterestExclusion = 0n
+        const section137AdoptionAssistanceExclusion = 0n
+        const section911ForeignEarnedIncomeExclusion = 0n
+        return totalIncomeExceptTaxableSocialSecurityCents - otherAdjustmentsCents
+            + taxableSocialSecurityBeforeThisDeductionCents
+            + section85cUnemploymentCompensationExclusion
+            + section135SavingsBondInterestExclusion
+            + section137AdoptionAssistanceExclusion
+            + section911ForeignEarnedIncomeExclusion
+    }
+
+/**
+ * Publication 590-A Worksheet 1-2 line 4, and §219(g)(2)(A)/(B)/(C) — the
+ * surviving deductible limit for a taxpayer inside the phase-out range.
+ *
+ * **The statute and the worksheet state the same rule from opposite ends, and
+ * the rounding direction flips between them.** §219(g)(2)(A) computes the
+ * REDUCTION as `limit x (AGI - threshold) / range`, and §219(g)(2)(C) rounds
+ * *that* to the next LOWEST $10. Subtracting a reduction rounded down leaves a
+ * limit rounded UP, which is the direction the printed worksheet gives:
+ * *"Multiply line 3 by the percentage below that applies to you. If the result
+ * isn't a multiple of $10, round it to the next highest multiple of $10. (For
+ * example, $611.40 is rounded to $620.) However, if the result is less than
+ * $200, enter $200."* The worksheet's direction is what is implemented, on the
+ * surviving limit, because that is the figure line 7 compares.
+ *
+ * The ceiling is computed on the EXACT rational `remaining x limit / range`
+ * rather than on a truncated cent figure: `$620.0001` must round to `$630`,
+ * and a truncation to `$620.00` first would round it to `$620`. `remaining`,
+ * `dollarLimitCents` and `rangeCents` are all positive here, so the
+ * add-then-divide is an exact ceiling with no sign hazard.
+ *
+ * The printed percentages (70%/80%, and 35%/40% for a joint or qualifying-
+ * surviving-spouse filer) are NOT stored and not written here: they are
+ * `dollarLimitCents / rangeCents` exactly, and a stored percentage would be a
+ * figure able to disagree with the two the computation reads.
+ * @type {(taxParamSet: TaxParamSet) => (remainingCents: bigint) => (dollarLimitCents: bigint) => (rangeCents: bigint) => bigint}
+ */
+const iraPhasedDeductibleLimit = taxParamSet => remainingCents => dollarLimitCents => rangeCents => {
+    const { iraDeduction } = taxParamSet
+    const incrementCents = centsFromString(iraDeduction.roundingIncrement.amount)
+    const minimumCents = centsFromString(iraDeduction.minimumPhasedOutLimit.amount)
+    const divisor = rangeCents * incrementCents
+    const rounded = ((remainingCents * dollarLimitCents + divisor - 1n) / divisor) * incrementCents
+    return rounded < minimumCents ? minimumCents : rounded
+}
+
+/**
+ * Publication 590-A Worksheet 1-2 / Appendix B Worksheet 2, under their own
+ * printed line numbers. `w` prefixes them so a reader cannot confuse worksheet
+ * line 3 with Schedule 1 line 3 — the same convention
+ * {@link StudentLoanInterestWorksheet} uses.
+ *
+ * The two worksheets are the same seven lines; Appendix B's differs only in
+ * where line 2's modified AGI came from (its own Worksheet 1 rather than
+ * Worksheet 1-1). Line 8, the nondeductible remainder that belongs on Form
+ * 8606 line 1, is NOT modeled — see `fjs/schedule/1/todo/ira-deduction.md`.
+ * @typedef {{
+ *   readonly w1: bigint, readonly w2: bigint, readonly w3: bigint,
+ *   readonly w4: bigint, readonly w5: bigint, readonly w6: bigint,
+ *   readonly w7: bigint,
+ * }} IraDeductionWorksheet
+ */
+
+/**
+ * @typedef {{
+ *   readonly status: IraPhaseoutStatus,
+ *   readonly coveredByWorkplacePlan: boolean,
+ *   readonly dollarLimitCents: bigint,
+ *   readonly modifiedAgiCents: bigint,
+ *   readonly compensationCents: bigint,
+ *   readonly contributionCents: bigint,
+ * }} IraDeductionWorksheetInput
+ */
+
+/**
+ * The IRA Deduction Worksheet, transcribed line for line.
+ *
+ * **`coveredByWorkplacePlan` decides whether the phase-out exists at all.**
+ * §219(g)(1) reduces the limit only if *"an individual or the individual's
+ * spouse is an active participant"*, and Publication 590-A's Table 1-3 is the
+ * consequence: a single, head-of-household or qualifying-surviving-spouse
+ * filer who is not covered takes *"a full deduction"* at **any** modified AGI.
+ * The spouse half of §219(g)(1) reaches a filer here only through
+ * §219(g)(7), which requires a joint return — and a joint return refuses.
+ *
+ * `dollarLimitCents` is a PARAMETER rather than read from the tax parameter
+ * set, because the caller runs this worksheet twice — once at §219(b)(5)(A)'s
+ * $7,000 and once at $8,000 with §219(b)(5)(B)(ii)'s catch-up — and refuses
+ * when the two disagree. Nothing in this repository stores a birth date;
+ * {@link scheduleOnePartIIExceptStudentLoanInterest}'s own note carries the
+ * argument.
+ * @type {(taxParamSet: TaxParamSet) => (input: IraDeductionWorksheetInput) => IraDeductionWorksheet}
+ */
+export const iraDeductionWorksheet = taxParamSet => input => {
+    const {
+        status, coveredByWorkplacePlan, dollarLimitCents, modifiedAgiCents,
+        compensationCents, contributionCents,
+    } = input
+    const { iraDeduction } = taxParamSet
+    const thresholdCents = centsFromString(iraDeduction.phaseoutThreshold[status].amount)
+    const rangeCents = centsFromString(iraDeduction.phaseoutRange[status].amount)
+    // 1. "Enter applicable amount from table above" -- the completely-
+    //    phased-out end point, DERIVED from the threshold and the range
+    //    rather than stored a third time.
+    const w1 = thresholdCents + rangeCents
+    // 2. "Enter your modified AGI".
+    const w2 = modifiedAgiCents
+    // 3. "Subtract line 2 from line 1." The printed note on line 2 stops the
+    //    worksheet when line 2 is at or above line 1 (no deduction), and the
+    //    note on line 3 stops it when line 3 reaches the whole range (the
+    //    full deduction) -- which is the same test as "modified AGI is at or
+    //    below the threshold".
+    const w3 = w1 > w2 ? w1 - w2 : 0n
+    // 4. The reduced limit, or the whole limit where §219(g)(1) never
+    //    applies. Both printed stopping notes are branches here rather than
+    //    falling out of the arithmetic, because `marriedFilingSeparately`'s
+    //    threshold is a genuine $0 and "stop, take the full deduction" at a
+    //    $0 threshold is not something a formula could express.
+    //
+    //    **The `w3 >= rangeCents` arm is likewise unobservable, and for a
+    //    reason worth writing down**: at `w3 == rangeCents` the phased
+    //    formula gives `range x limit / range` = the limit exactly, and above
+    //    it a number LARGER than the limit -- which line 7's `min` then
+    //    discards. It is the printed page's own stopping instruction, kept
+    //    because the page prints it; the leaf
+    //    `oneCentOverTheThresholdStillTakesTheFullDeduction` pins the
+    //    surprising consequence (one cent past the threshold STILL deducts in
+    //    full, because $9,999.99 x 80% rounds up to $8,000.00) rather than
+    //    pretending the branch itself is covered.
+    const w4 = !coveredByWorkplacePlan ? dollarLimitCents
+        : w2 >= w1 ? 0n
+            : w3 >= rangeCents ? dollarLimitCents
+                : iraPhasedDeductibleLimit(taxParamSet)(w3)(dollarLimitCents)(rangeCents)
+    // 5. "Enter your compensation minus any deductions on Schedule 1 line 15
+    //    … and line 16 …" -- §219(b)(1)(B). Supplied by the caller, which is
+    //    where the refusal for a return with self-employment lives.
+    const w5 = compensationCents
+    // 6. "Enter contributions you made, or plan to make, to your traditional
+    //    IRA for 2025, but don't enter more than $7,000 ($8,000 if you are
+    //    age 50 or older)."
+    //
+    //    **The cap on this line is an EQUIVALENT MUTANT, verified by running
+    //    it** (AGENTS.md, "a mutation a neighbouring operation absorbs").
+    //    Removing it -- `w6 = contributionCents` -- leaves the whole suite
+    //    green at every input, and that is a property of the arithmetic
+    //    rather than a hole in the proofs: `w4` above is `dollarLimitCents`,
+    //    or `0n`, or a phased limit that is strictly smaller (the product of
+    //    a remainder below the range, ceiling-rounded to a $10 multiple that
+    //    the dollar limit is itself a multiple of). So `w4 <= dollarLimitCents`
+    //    ALWAYS, line 7's `min` already bounds the answer by the dollar
+    //    limit, and this cap can never be the binding one.
+    //
+    //    It stays because the printed page prints it and because it stops
+    //    being absorbed the moment either premise moves -- a dollar limit
+    //    that is not a multiple of $10, or a `w4` branch that could exceed
+    //    the limit. What DOES bite is dropping the CONTRIBUTION from this
+    //    line entirely (`w6 = dollarLimitCents`), which reddens seven leaves.
+    const w6 = contributionCents < dollarLimitCents ? contributionCents : dollarLimitCents
+    // 7. "Compare lines 4, 5, and 6. Enter the smallest amount here … Enter
+    //    this amount on your Schedule 1 (Form 1040), line 20."
+    const smallerOfFourAndFive = w4 < w5 ? w4 : w5
+    const w7 = smallerOfFourAndFive < w6 ? smallerOfFourAndFive : w6
+    assert(w7 >= 0n, ['the IRA deduction must never be negative', w7])
+    return { w1, w2, w3, w4, w5, w6, w7 }
+}
+
 /**
  * Schedule 1 Part II, stage 1 — lines 11 through 20, 22, 23, 24 and 25:
  * every adjustment that does NOT depend on income. Line 21 and the line 26
@@ -633,7 +990,9 @@ const employerHsaContributionSources = w2s => w2s.flatMap(form =>
 export const scheduleOnePartIIExceptStudentLoanInterest = taxParamSet => input => {
     const {
         profile, status, adjustmentForms, w2Forms, businessNetProfit, businessExpenseForms,
-        passThrough, interestForms,
+        passThrough, interestForms, totalIncomeExceptTaxableSocialSecurityLine,
+        socialSecurityBenefitsCents, taxExemptInterestCents, mfsLivedWithSpouseAtAnyTimeInYear,
+        iraDistributionReceived,
     } = input
     const zero = profileDeclaredZeroLine(profile)
     /** @type {readonly StoredEntry[]} */
@@ -657,13 +1016,14 @@ export const scheduleOnePartIIExceptStudentLoanInterest = taxParamSet => input =
             }
         }
         const paidInFollowingYear = entry.value.datePaid.startsWith(`${profile.value.taxYear + 1}-`)
-        if (paidInFollowingYear && entry.value.lineTag !== 'hsaContribution') {
+        if (paidInFollowingYear && !followingYearContributionTags.includes(entry.value.lineTag)) {
             return {
                 kind: 'error',
                 message: `Schedule 1 Part II: '${entry.value.description}' is tagged `
                     + `'${entry.value.lineTag}' and was paid on ${entry.value.datePaid}, in the year `
                     + `AFTER tax year ${profile.value.taxYear}. Only a health savings account `
-                    + `contribution may be designated for the prior year; every other adjustment is `
+                    + `contribution (§223) or a traditional IRA contribution (§219(f)(3)) may be `
+                    + `designated for the prior year; every other adjustment is `
                     + `deducted in the year it was paid, so this belongs on the following year's `
                     + `return`,
             }
@@ -876,7 +1236,6 @@ export const scheduleOnePartIIExceptStudentLoanInterest = taxParamSet => input =
     const line17 = zero('Schedule 1 line 17 (self-employed health insurance deduction)')
     const line18 = earlyWithdrawalPenaltyLine(profile)(interestForms)
     const line19a = zero('Schedule 1 line 19a (alimony paid)')
-    const line20 = zero('Schedule 1 line 20 (IRA deduction)')
     // 22. "Reserved for future use" -- the form's own inert line.
     const line22 = zero('Schedule 1 line 22 (reserved for future use)')
     const line23 = zero('Schedule 1 line 23 (Archer MSA deduction)')
@@ -886,6 +1245,206 @@ export const scheduleOnePartIIExceptStudentLoanInterest = taxParamSet => input =
     // 25. "Total other adjustments. Add lines 24a through 24z" -- the SAME
     //     total, restated as its own printed line.
     const line25 = { ...line24, rule: 'Schedule 1 line 25 (total other adjustments)' }
+
+    // ── Line 20: the traditional IRA deduction (§219) ───────────────────────
+    //
+    // **Computed LAST in this stage, and that is the ordering the whole line
+    // depends on.** §219(g)(3)(A) reads adjusted gross income "after
+    // application of sections 86 and 469, and without regard to sections
+    // 85(c), 135, 137, 221, and 911 or the deduction allowable under this
+    // section", so every OTHER adjustment on this stage has to be subtracted
+    // before this one's phase-out income exists.
+    const iraEntries = entries.filter(entry => iraContributionTags.includes(entry.value.lineTag))
+    const iraSources = iraEntries.map(entry => ({
+        documentHash: entry.documentHash,
+        boxPath: `entries[lineTag=${entry.value.lineTag},individual=${entry.value.individual}]`,
+        value: entry.value.amount,
+    }))
+    // §219(b)(5)(B)(ii), asserted by the tag rather than derived from a birth
+    // date nothing here stores. ANY entry carrying the assertion settles it
+    // for the whole line: every entry that reaches this point belongs to the
+    // same person, because a `spouse`-attributed entry on a non-joint return
+    // has already been refused above and a joint return refuses below.
+    const catchUpAsserted = iraEntries.some(entry => entry.value.lineTag === catchUpAssertedTag)
+    const iraContributionCents = iraSources.reduce(
+        (total, source) => total + centsFromString(source.value), 0n)
+    // Every refusal below is gated on the deduction being able to matter at
+    // all -- `fjs/form8880`'s own `creditCouldMatter` discipline, and for the
+    // reason that module's docstring gives at length: refusing a return for
+    // an unanswerable question about a deduction it is not claiming is not
+    // honesty, it is an engine that does not work. A return with no
+    // traditional IRA contribution reaches none of these.
+    const deductionCouldMatter = iraContributionCents !== 0n
+    // Form W-2 box 13's "Retirement plan" checkbox -- STORED by `vnd.fjs.w2`
+    // since that dialect shipped and read by no computation until this line.
+    // §219(g)(5) is broader than the checkbox (a SEP or a SIMPLE makes its
+    // participant an active participant too), which is one of the three
+    // reasons a return with self-employment refuses below.
+    const workplacePlanSources = w2Forms
+        .filter(form => form.value.box13RetirementPlan === true)
+        .map(form => ({
+            documentHash: form.documentHash,
+            boxPath: 'box13RetirementPlan',
+            value: 'true',
+        }))
+    const coveredByWorkplacePlan = workplacePlanSources.length !== 0
+    const iraStatus = iraPhaseoutStatusOf(status)(mfsLivedWithSpouseAtAnyTimeInYear)
+    if (deductionCouldMatter && iraStatus === undefined) {
+        return iraJointReturnRefusal
+    }
+    if (deductionCouldMatter && iraStatus === 'marriedFilingSeparately' && !coveredByWorkplacePlan) {
+        return {
+            kind: 'error',
+            message: 'Schedule 1 line 20: this return is married filing separately, lived with the '
+                + 'spouse during the year, and reports no Form W-2 with box 13 "Retirement plan" '
+                + 'checked. §219(g)(1) reduces the deduction when "an individual OR THE '
+                + "INDIVIDUAL'S SPOUSE is an active participant\", and a separate return carries no "
+                + "Form W-2 for the spouse, so that fact is absent rather than merely "
+                + 'unattributable. It decides between a full $7,000 deduction and a phase-out that '
+                + 'is complete at $10,000 of modified adjusted gross income; refusing rather than '
+                + 'guessing (no phase yet)',
+        }
+    }
+    if (deductionCouldMatter && (proprietorTin !== undefined || businessNetProfit.value !== 0n)) {
+        return {
+            kind: 'error',
+            message: 'Schedule 1 line 20: this return carries self-employment earnings alongside a '
+                + 'traditional IRA contribution, and §219(b)(1)(B) caps the deduction at the '
+                + 'compensation includible in gross income. §219(f)(1) takes that from §401(c)(2) '
+                + 'earned income, which counts only a trade or business in which the taxpayer’s '
+                + 'personal services are a material income-producing factor — a fact no document '
+                + 'this engine models records — and which the printed IRA Deduction Worksheet then '
+                + 'reduces by Schedule 1 line 15 and line 16, the second of which is still an '
+                + 'unmodeled adjustment here. A self-employed taxpayer is also the one case where '
+                + 'a §219(g)(5) retirement plan has no Form W-2 box 13 to prove it; refusing '
+                + 'rather than guessing at three facts at once (no phase yet)',
+        }
+    }
+    if (deductionCouldMatter && iraDistributionReceived) {
+        return {
+            kind: 'error',
+            message: 'Schedule 1 line 20: this return holds both a traditional IRA contribution and '
+                + 'a Form 1099-R IRA distribution for the same year. Publication 590-A: "you must '
+                + 'figure the taxable part of the traditional IRA distribution before you can '
+                + 'figure your modified AGI", and Publication 590-B’s own Worksheet 1-1 recovers '
+                + 'basis pro rata against the YEAR-END basis, which includes the nondeductible '
+                + 'part of this year’s contribution — that is, the contribution less this very '
+                + 'line. That IS a fixed point, and this engine does not model it; refusing rather '
+                + 'than approximating (no phase yet)',
+        }
+    }
+    // §219(b)(1)(B)'s compensation, and the printed worksheet's own line 5:
+    // "your compensation minus any deductions on Schedule 1 line 15 … and
+    // line 16". Both subtrahends are zero on every return that reaches here,
+    // because a return with self-employment has already refused above.
+    //
+    // Form W-2 box 1 is the whole of it. Every other item in Publication
+    // 590-A's Table 1-1 -- taxable alimony received, nontaxable combat pay,
+    // household employee wages, a taxable non-tuition fellowship -- is a
+    // refused `fjs/return/scope` kind or a documented zero on this engine's
+    // own 1040 face, and is named in `fjs/schedule/1/todo/ira-deduction.md`
+    // rather than silently omitted.
+    const compensationSources = w2Forms.flatMap(form => {
+        const printed = form.value.box1WagesTipsOtherCompensation
+        return printed === undefined
+            ? []
+            : [{
+                documentHash: form.documentHash,
+                boxPath: 'box1WagesTipsOtherCompensation',
+                value: printed,
+            }]
+    })
+    const compensationCents = compensationSources.reduce(
+        (total, source) => total + centsFromString(source.value), 0n)
+    // **PASS 1 of Publication 590-A Appendix B: taxable Social Security
+    // benefits computed as though this deduction did not exist.** This is the
+    // step every prior statement in this repository called an unmodelable
+    // fixed point, and it is not one -- see this function's own docstring.
+    // The adjustments handed over are lines 11 through 19a, 23 and 25: the
+    // Social Security worksheet's own printed range LESS line 20, which is
+    // exactly what Appendix B Worksheet 1 line 1 excludes.
+    const adjustmentsBeforeIraDeductionCents =
+        line11.value + line12.value + line13.value + line14.value + line15.value
+        + line16.value + line17.value + line18.value + line19a.value
+        + line23.value + line25.value
+    const socialSecurityBeforeIraDeduction = socialSecurityBenefitsWorksheet(taxParamSet)({
+        status,
+        mfsLivedWithSpouseAtAnyTimeInYear,
+        totalSsaAndRrbBox5Cents: socialSecurityBenefitsCents,
+        otherIncomeLine3Cents: totalIncomeExceptTaxableSocialSecurityLine.value,
+        taxExemptInterestCents,
+        scheduleOneAdjustmentsTotalCents: adjustmentsBeforeIraDeductionCents,
+    })
+    const iraPhaseoutIncomeCents = iraDeductionPhaseoutIncome(
+        totalIncomeExceptTaxableSocialSecurityLine.value)(
+        adjustmentsBeforeIraDeductionCents)(
+        socialSecurityBeforeIraDeduction.line18)
+    // **PASS 2, twice over.** §219(b)(5)(B)(ii) adds $1,000 to the deductible
+    // amount for an individual who attains age 50 before the close of the
+    // year, and NO DOCUMENT IN THIS REPOSITORY CARRIES A BIRTH DATE
+    // (`.planning/PERSONA-COVERAGE.md`; it is also why
+    // `form4972LumpSumDistribution` is refused). So the worksheet is run at
+    // BOTH candidate limits and the two answers are compared:
+    //
+    // - agreeing means the unknown fact cannot change this return, and the
+    //   return computes. That is the ordinary case, because a contribution at
+    //   or below the phased limit is bounded by the CONTRIBUTION rather than
+    //   by the dollar limit.
+    // - disagreeing means it can, and the return refuses, naming both
+    //   candidate figures.
+    //
+    // Silently allowing the catch-up overstates the deduction by up to $1,000
+    // for every filer under 50 -- and turns a §4973 excess contribution into a
+    // deduction. Silently capping at $7,000 understates it for every filer 50
+    // or over, and understates it INSIDE the phase-out range at any
+    // contribution size, because the surviving limit is proportional to the
+    // dollar amount. Both are undetectable downstream. This is neither.
+    const iraStatusNamed = iraStatus === undefined ? 'single' : iraStatus
+    const baseLimitCents = centsFromString(taxParamSet.iraDeduction.deductibleAmount.amount)
+    const catchUpLimitCents = baseLimitCents
+        + centsFromString(taxParamSet.iraDeduction.catchUpContribution.amount)
+    /** @type {(dollarLimitCents: bigint) => IraDeductionWorksheet} */
+    const iraWorksheetAt = dollarLimitCents => iraDeductionWorksheet(taxParamSet)({
+        status: iraStatusNamed,
+        coveredByWorkplacePlan,
+        dollarLimitCents,
+        modifiedAgiCents: iraPhaseoutIncomeCents,
+        compensationCents,
+        contributionCents: iraContributionCents,
+    })
+    const underFifty = iraWorksheetAt(baseLimitCents)
+    const fiftyOrOver = iraWorksheetAt(catchUpLimitCents)
+    const iraWorksheet = catchUpAsserted ? fiftyOrOver : underFifty
+    if (deductionCouldMatter && !catchUpAsserted && underFifty.w7 !== fiftyOrOver.w7) {
+        return {
+            kind: 'error',
+            message: `Schedule 1 line 20: the traditional IRA deduction is `
+                + `$${centsToString(underFifty.w7)} if the taxpayer was under 50 at the close of `
+                + `${profile.value.taxYear} and $${centsToString(fiftyOrOver.w7)} if they had `
+                + `attained age 50, because `
+                + `§219(b)(5)(B)(ii) raises the deductible amount by $1,000 — and no document this `
+                + `engine models carries a birth date. Capping at the lower figure would understate `
+                + `the deduction for a taxpayer 50 or over; taking the higher one would overstate `
+                + `it for everyone else and would deduct a §4973 excess contribution. Refusing `
+                + `rather than choosing (no phase yet). Tag the entry `
+                + `'traditionalIraContributionAgeFiftyOrOver' to assert the age`,
+        }
+    }
+    // Line 20 cites the contribution entries it read, the Form W-2 boxes
+    // behind both the coverage test and the compensation cap, the filing
+    // status (which chooses the §219(g)(3)(B) applicable dollar amount), and
+    // every source behind the income its phase-out ran against — PROV-02, and
+    // the same citation shape line 21 uses one stage later.
+    const line20 = documentLine(profile)('Schedule 1 line 20 (IRA deduction)')(iraWorksheet.w7)(
+        iraSources.length === 0
+            ? []
+            : [
+                ...iraSources,
+                ...workplacePlanSources,
+                ...compensationSources,
+                { documentHash: profile.documentHash, boxPath: 'filingStatus', value: status },
+                ...totalIncomeExceptTaxableSocialSecurityLine.sources,
+            ])
     return {
         kind: 'ok',
         line11, line12, line13, line14, line15, line16, line17, line18, line19a,
@@ -1271,6 +1830,11 @@ export const scheduleOnePartII = taxParamSet => input => {
  *   readonly w2Forms: readonly Stored<W2>[],
  *   readonly interestForms: readonly Stored<OneZeroNineNineInt>[],
  *   readonly totalIncomeLine: ReportLine,
+ *   readonly totalIncomeExceptTaxableSocialSecurityLine: ReportLine,
+ *   readonly socialSecurityBenefitsCents: bigint,
+ *   readonly taxExemptInterestCents: bigint,
+ *   readonly mfsLivedWithSpouseAtAnyTimeInYear: boolean,
+ *   readonly iraDistributionReceived: boolean,
  * }} ScheduleOneInput
  */
 
@@ -1287,6 +1851,8 @@ export const scheduleOne = taxParamSet => input => {
         profile, status, unemploymentForms, nonemployeeCompensationForms, businessExpenseForms,
         partnershipK1Forms, sCorporationK1Forms, estateTrustK1Forms,
         adjustmentForms, studentLoanInterestForms, w2Forms, interestForms, totalIncomeLine,
+        totalIncomeExceptTaxableSocialSecurityLine, socialSecurityBenefitsCents,
+        taxExemptInterestCents, mfsLivedWithSpouseAtAnyTimeInYear, iraDistributionReceived,
     } = input
     const partI = scheduleOnePartI({
         profile, unemploymentForms, nonemployeeCompensationForms, businessExpenseForms, w2Forms,
@@ -1297,6 +1863,13 @@ export const scheduleOne = taxParamSet => input => {
     }
     const stageOne = scheduleOnePartIIExceptStudentLoanInterest(taxParamSet)({
         profile, status, adjustmentForms, w2Forms, interestForms,
+        // Schedule 1 line 20's four income-interaction inputs, threaded
+        // straight through: §219(g)(3)(A) reads adjusted gross income "after
+        // application of section 86", so stage 1 runs the Social Security
+        // Benefits Worksheet ITSELF, once, with this line's own $0 in its
+        // line 6 -- Publication 590-A Appendix B Worksheet 1.
+        totalIncomeExceptTaxableSocialSecurityLine, socialSecurityBenefitsCents,
+        taxExemptInterestCents, mfsLivedWithSpouseAtAnyTimeInYear, iraDistributionReceived,
         // Printed Schedule SE line 2 asks for "Schedule C, line 31" by name,
         // so that is the line handed over -- never Part I's line 3, which is
         // the same figure under a different printed number.
@@ -1587,6 +2160,29 @@ const partnershipK1Doc = box1 => ({
  */
 const noPassThrough = { earningsCents: 0n, recipientTin: undefined }
 
+/**
+ * Stage 1's four Schedule 1 line 20 income-interaction inputs, for a fixture
+ * with no Social Security benefits, no tax-exempt interest and no Form 1099-R
+ * IRA distribution.
+ *
+ * Written as a spreadable constant rather than repeated at eight call sites,
+ * and NOT given a default on the input type: `tsc` naming every site that has
+ * to think about the Publication 590-A Appendix B ordering is the point, and
+ * an optional field would have let a real caller forget it silently.
+ */
+const noSocialSecurityInteraction = {
+    socialSecurityBenefitsCents: 0n,
+    taxExemptInterestCents: 0n,
+    mfsLivedWithSpouseAtAnyTimeInYear: false,
+    iraDistributionReceived: false,
+}
+
+/** A $0 "total income except taxable Social Security benefits" line, for the
+ * fixtures whose leaves predate Schedule 1 line 20 and carry no income at all.
+ * @type {ReportLine}
+ */
+const noOtherIncomeLine = totalIncomeOf(0n)
+
 /** Narrows a Part I outcome to its OK arm, throwing (never casting).
  * @type {(outcome: ScheduleOnePartIOutcome) => ScheduleOnePartI}
  */
@@ -1656,6 +2252,8 @@ const refusal = outcome => {
 const partIIOf = profile => status => adjustmentForms => studentLoanInterestForms => w2Forms => totalIncomeCents => {
     const stageOne = scheduleOnePartIIExceptStudentLoanInterest(taxParams2025)({
         profile, status, adjustmentForms, w2Forms, interestForms: [],
+        ...noSocialSecurityInteraction,
+        totalIncomeExceptTaxableSocialSecurityLine: totalIncomeOf(totalIncomeCents),
         businessNetProfit: noBusinessNetProfit(profile),
         businessExpenseForms: [],
         passThrough: noPassThrough,
@@ -1690,10 +2288,137 @@ const stageOneWithInterest = interestForms =>
         adjustmentForms: [],
         w2Forms: [],
         interestForms,
+        ...noSocialSecurityInteraction,
+        totalIncomeExceptTaxableSocialSecurityLine: noOtherIncomeLine,
         businessNetProfit: noBusinessNetProfit(profileNoDeclaredKinds),
         businessExpenseForms: [],
         passThrough: noPassThrough,
     })
+
+
+// ── Schedule 1 line 20's own fixtures (§219) ─────────────────────────────────
+
+/**
+ * One `vnd.fjs.adjustments` entry feeding line 20. `tag` is a parameter
+ * because the two tags are the whole of this line's age story: the plain one
+ * leaves §219(b)(5)(B)(ii) UNKNOWN and the other asserts it.
+ * @type {(tag: string) => (amount: string) => Adjustments['entries'][number]}
+ */
+const iraEntry = tag => amount => ({
+    lineTag: tag,
+    datePaid: '2025-11-14',
+    description: 'traditional IRA contribution',
+    amount,
+    individual: 'taxpayer',
+})
+
+/**
+ * A Form W-2 carrying box 1 wages and, optionally, box 13's "Retirement plan"
+ * checkbox — the box §219(g)(5) active-participant status is read from, and
+ * the box no computation in this repository read before line 20.
+ *
+ * `box13RetirementPlan` is ABSENT rather than `false` for the not-covered
+ * case: `vnd.fjs.w2` types it `option(true)`, so absence is the only way the
+ * printed form says "not checked", and a fixture that wrote `false` would not
+ * validate.
+ * @type {(documentHash: string) => (box1: string) => (coveredByWorkplacePlan: boolean) => Stored<W2>}
+ */
+const iraW2Doc = documentHash => box1 => coveredByWorkplacePlan => ({
+    documentHash,
+    value: {
+        dialect: 'vnd.fjs.w2',
+        payerTin: '11-1111111', recipientTin: '222-22-2222', accountNumber: '',
+        taxYear: 2025, formRevision: '2025',
+        box1WagesTipsOtherCompensation: box1,
+        ...(coveredByWorkplacePlan ? { box13RetirementPlan: /** @type {true} */ (true) } : {}),
+    },
+})
+
+/**
+ * Everything a line 20 leaf varies. Every field is required — no defaults —
+ * because each one of them can move the deduction by thousands of dollars and
+ * a leaf that did not state its filing status or its coverage would be
+ * unreadable.
+ * @typedef {{
+ *   readonly status: IndividualFilingStatus,
+ *   readonly wages: string | undefined,
+ *   readonly coveredByWorkplacePlan: boolean,
+ *   readonly entries: readonly Adjustments['entries'][number][],
+ *   readonly socialSecurityBenefits: string,
+ *   readonly mfsLivedWithSpouseAtAnyTimeInYear: boolean,
+ *   readonly iraDistributionReceived: boolean,
+ * }} IraFixture
+ */
+
+/**
+ * Stage 1 for a line 20 fixture: a Form W-2 (or none), an adjustments
+ * document, and a "total income except taxable Social Security" line built
+ * from the SAME wages the W-2 reports — never a figure typed to match, so a
+ * leaf cannot pass by having its income and its compensation disagree.
+ *
+ * `profileNoDeclaredKinds` throughout: line 20 reads documents and is not
+ * gated on a declaration, exactly as lines 11, 13 and 18 are not.
+ * @type {(fixture: IraFixture) => ScheduleOnePartIIStageOneOutcome}
+ */
+const stageOneForIra = fixture => {
+    const {
+        status, wages, coveredByWorkplacePlan, entries, socialSecurityBenefits,
+        mfsLivedWithSpouseAtAnyTimeInYear, iraDistributionReceived,
+    } = fixture
+    const w2Forms = wages === undefined
+        ? []
+        : [iraW2Doc('sha256-ira-w2')(wages)(coveredByWorkplacePlan)]
+    /** @type {ReportLine} */
+    const totalIncomeExceptTaxableSocialSecurityLine = wages === undefined
+        ? noOtherIncomeLine
+        : {
+            value: centsFromString(wages),
+            sources: [{
+                documentHash: 'sha256-ira-w2',
+                boxPath: 'box1WagesTipsOtherCompensation',
+                value: wages,
+            }],
+            rule: '1040 line 9 less line 6b (total income except taxable Social Security benefits)',
+        }
+    return scheduleOnePartIIExceptStudentLoanInterest(taxParams2025)({
+        profile: profileNoDeclaredKinds,
+        status,
+        adjustmentForms: entries.length === 0 ? [] : [adjustmentsDoc(entries)([])],
+        w2Forms,
+        interestForms: [],
+        totalIncomeExceptTaxableSocialSecurityLine,
+        socialSecurityBenefitsCents: centsFromString(socialSecurityBenefits),
+        taxExemptInterestCents: 0n,
+        mfsLivedWithSpouseAtAnyTimeInYear,
+        iraDistributionReceived,
+        businessNetProfit: noBusinessNetProfit(profileNoDeclaredKinds),
+        businessExpenseForms: [],
+        passThrough: noPassThrough,
+    })
+}
+
+/**
+ * The base line 20 fixture: a single filer with $50,000.00 of wages, no
+ * workplace plan, no Social Security benefits, no IRA distribution and no
+ * contribution. Every leaf below spreads this and overrides the one or two
+ * fields it is about, so a leaf's own text is the difference from the base
+ * case rather than a wall of repeated fields.
+ * @type {IraFixture}
+ */
+const iraBaseFixture = {
+    status: 'single',
+    wages: '50000.00',
+    coveredByWorkplacePlan: false,
+    entries: [],
+    socialSecurityBenefits: '0.00',
+    mfsLivedWithSpouseAtAnyTimeInYear: false,
+    iraDistributionReceived: false,
+}
+
+/** Line 20's cents for one fixture, narrowed through {@link okStageOne}.
+ * @type {(fixture: IraFixture) => bigint}
+ */
+const lineTwentyOf = fixture => okStageOne(stageOneForIra(fixture)).line20.value
 
 /**
  * Stage 1 for a return WITH a business — Schedule C run first, exactly as
@@ -1716,6 +2441,8 @@ const stageOneWithBusiness = profile => status => nonemployeeCompensationForms =
         }))
         return scheduleOnePartIIExceptStudentLoanInterest(taxParams2025)({
             profile, status, adjustmentForms: [], w2Forms, interestForms: [],
+            ...noSocialSecurityInteraction,
+            totalIncomeExceptTaxableSocialSecurityLine: noOtherIncomeLine,
             businessNetProfit: partI.scheduleC.partII.line31,
             businessExpenseForms,
             passThrough: passThroughOf(partI.scheduleE),
@@ -1742,6 +2469,8 @@ const stageOneWithPassThrough = profile => status => partnershipK1Forms =>
         }))
         return scheduleOnePartIIExceptStudentLoanInterest(taxParams2025)({
             profile, status, adjustmentForms: [], w2Forms, interestForms: [],
+            ...noSocialSecurityInteraction,
+            totalIncomeExceptTaxableSocialSecurityLine: noOtherIncomeLine,
             businessNetProfit: partI.scheduleC.partII.line31,
             businessExpenseForms,
             passThrough: passThroughOf(partI.scheduleE),
@@ -2104,6 +2833,8 @@ export const proof = {
             const stageOne = okStageOne(scheduleOnePartIIExceptStudentLoanInterest(taxParams2025)({
                 profile: profileNoDeclaredKinds,
                 interestForms: [],
+                ...noSocialSecurityInteraction,
+                totalIncomeExceptTaxableSocialSecurityLine: noOtherIncomeLine,
                 status: 'single',
                 adjustmentForms: [],
                 w2Forms: [],
@@ -2788,6 +3519,572 @@ export const proof = {
     // documented zero. Stated as a leaf so the coincidence is recorded rather
     // than relied on: line 23 (Archer MSA) is in the Social Security
     // worksheet's range and not in the student loan worksheet's.
+    // ── Line 20: the traditional IRA deduction (§219) ───────────────────────
+    //
+    // Every expected value below is a hand-typed cent literal with its dollar
+    // figure in the assertion message, computed off Publication 590-A
+    // Worksheet 1-2's printed lines and never derived from the code under
+    // test. Value and citation are asserted by SEPARATE leaves.
+    //
+    // **The base fixture has no contribution at all**, so every leaf states
+    // the entries it is about, and a leaf that stopped supplying them would
+    // fall to `$0.00` rather than quietly inheriting somebody else's.
+    lineTwentyIsAProfileCitedZeroWithNoContribution: () => {
+        const stageOne = okStageOne(stageOneForIra(iraBaseFixture))
+        assertEq(stageOne.line20.value, 0n, 'no traditional IRA contribution at all')
+        assertEq(stageOne.line20.sources.length, 1, 'the profile citation only')
+        assertEq(
+            stageOne.line20.sources[0]?.boxPath, 'declaredKinds',
+            'a computed zero cites the profile, never a document the taxpayer lacks')
+    },
+    // Publication 590-A Table 1-3: "single, head of household, or qualifying
+    // surviving spouse … any amount … a full deduction". §219(g)(1) reduces
+    // the limit only for an ACTIVE PARTICIPANT, so a filer with no Form W-2
+    // box 13 takes the whole contribution at $200,000.00 of wages — an income
+    // that would phase the deduction to nothing if the box were checked.
+    aFilerWithNoWorkplacePlanDeductsInFullAtAnyIncome: () => {
+        assertEq(
+            lineTwentyOf({
+                ...iraBaseFixture,
+                wages: '200000.00',
+                entries: [iraEntry('traditionalIraContribution')('7000.00')],
+            }),
+            700000n,
+            '$7,000.00 — §219(g)(1) never applies to a taxpayer who is not an active participant')
+    },
+    // The other half of the same fact: check ONE box on the same return and
+    // the deduction vanishes. $200,000.00 is far above $89,000.00.
+    theSameReturnWithBoxThirteenCheckedDeductsNothing: () => {
+        assertEq(
+            lineTwentyOf({
+                ...iraBaseFixture,
+                wages: '200000.00',
+                coveredByWorkplacePlan: true,
+                entries: [iraEntry('traditionalIraContribution')('7000.00')],
+            }),
+            0n,
+            '$0.00 — completely phased out above §219(g)(3)(B)(ii)’s $89,000.00')
+    },
+    // ── The boundary pairs, all at ±1 cent ──────────────────────────────────
+    //
+    // **The $79,000.00 threshold itself is NOT one of them, and that is a
+    // property of the printed page rather than a gap.** At exactly the
+    // threshold `w3` equals the whole range, and the phased limit is then
+    // `range x limit / range` = the limit — so the "stop, take the full
+    // deduction" branch and the arithmetic agree by construction, at every
+    // input, for both candidate dollar limits. One cent OVER the threshold
+    // still yields the full $8,000.00, because $9,999.99 x 80% = $7,999.99
+    // rounds UP to the next $10. That is the same surprise
+    // `theOneCentOverTheThresholdCase` records for line 21, and it is why the
+    // threshold is pinned by the leaf below instead: $79,012.50 is the first
+    // cent at which the limit actually falls.
+    oneCentOverTheThresholdStillTakesTheFullDeduction: () => {
+        /** @type {(wages: string) => bigint} */
+        const at = wages => lineTwentyOf({
+            ...iraBaseFixture,
+            wages,
+            coveredByWorkplacePlan: true,
+            entries: [iraEntry('traditionalIraContributionAgeFiftyOrOver')('8000.00')],
+        })
+        assertEq(at('79000.00'), 800000n, '$8,000.00 at the threshold exactly')
+        assertEq(at('79000.01'), 800000n,
+            '$8,000.00 one cent over — $9,999.99 x 80% = $7,999.99, rounded up to the next $10')
+    },
+    // The threshold, pinned where it is observable. $89,000.00 - $9,987.50 =
+    // $79,012.50 is the first modified AGI whose 80% product is a multiple of
+    // $10 below the full limit. Shifting `phaseoutThreshold.single` by a cent
+    // moves the end point and reddens both halves.
+    thePhaseOutFirstBitesAtSeventyNineThousandAndTwelveFifty: () => {
+        /** @type {(wages: string) => bigint} */
+        const at = wages => lineTwentyOf({
+            ...iraBaseFixture,
+            wages,
+            coveredByWorkplacePlan: true,
+            entries: [iraEntry('traditionalIraContributionAgeFiftyOrOver')('8000.00')],
+        })
+        assertEq(at('79012.49'), 800000n, '$9,987.51 x 80% = $7,990.008, up to $8,000.00')
+        assertEq(at('79012.50'), 799000n, '$9,987.50 x 80% = $7,990.00 exactly, and it stays there')
+    },
+    // **Added after a mutation.** Shifting `phaseoutThreshold.headOfHousehold`
+    // by one cent reddened the two `fjs/tax/params` leaves and NOTHING ELSE:
+    // every behavioural leaf above is a `single` filer, so head of household
+    // had a stored figure no computation was observed to read. This is that
+    // observation — the same $79,012.50 pair, one status over.
+    theHeadOfHouseholdRowIsReadAndIsTheSameAsSingles: () => {
+        /** @type {(wages: string) => bigint} */
+        const at = wages => lineTwentyOf({
+            ...iraBaseFixture,
+            status: 'headOfHousehold',
+            wages,
+            coveredByWorkplacePlan: true,
+            entries: [iraEntry('traditionalIraContributionAgeFiftyOrOver')('8000.00')],
+        })
+        assertEq(at('79012.49'), 800000n, '$9,987.51 x 80% = $7,990.008, up to $8,000.00')
+        assertEq(at('79012.50'), 799000n, 'and $7,990.00 one cent later — the same row as `single`')
+    },
+    // **Also added after a mutation**, and for the same reason one status
+    // over: shifting `phaseoutThreshold.marriedFilingSeparately` from $0.00
+    // to $0.01 reddened only the parameter leaves. The fixture below is the
+    // one place §219(g)(3)(B)(iii)'s $0 is load-bearing on a VALUE: at
+    // $6,500.00 of modified AGI the surviving range is $3,500.00, 80% of
+    // which is $2,800.00 exactly — one cent of threshold moves it to
+    // $2,810.00.
+    theMarriedFilingSeparatelyZeroThresholdIsReadAsAThreshold: () => {
+        assertEq(
+            lineTwentyOf({
+                ...iraBaseFixture,
+                status: 'marriedFilingSeparately',
+                mfsLivedWithSpouseAtAnyTimeInYear: true,
+                coveredByWorkplacePlan: true,
+                wages: '6500.00',
+                entries: [iraEntry('traditionalIraContributionAgeFiftyOrOver')('3000.00')],
+            }),
+            280000n,
+            '$10,000.00 - $6,500.00 = $3,500.00 of range, x 80% = $2,800.00')
+    },
+    // §219(g)(2)(C) rounds the REDUCTION down, which rounds the surviving
+    // limit UP — Publication 590-A Worksheet 1-2 line 4's own example is
+    // "$611.40 is rounded to $620". The pair below is that rule and its
+    // exact-multiple neighbour: a "next LOWEST $10" implementation gives
+    // $480.00 on the first half, which the leaf names so its failure says
+    // which direction went wrong.
+    theRoundingIsToTheNextHighestTenDollars: () => {
+        /** @type {(wages: string) => bigint} */
+        const at = wages => lineTwentyOf({
+            ...iraBaseFixture,
+            wages,
+            coveredByWorkplacePlan: true,
+            entries: [iraEntry('traditionalIraContributionAgeFiftyOrOver')('8000.00')],
+        })
+        assertEq(at('88388.25'), 49000n, '$611.75 x 80% = $489.40, UP to $490.00')
+        assert(at('88388.25') !== 48000n, 'rounding to the next LOWEST $10 would give $480.00')
+        assertEq(at('88387.50'), 49000n, '$612.50 x 80% = $490.00 exactly, and a ceiling leaves it')
+    },
+    // §219(g)(2)(B): "No dollar limitation shall be reduced below $200 …
+    // unless … reduced to zero." $88,750.00 is the exact cent where 80% of
+    // the remaining range first reaches $200.00.
+    theTwoHundredDollarFloorBoundary: () => {
+        /** @type {(wages: string) => bigint} */
+        const at = wages => lineTwentyOf({
+            ...iraBaseFixture,
+            wages,
+            coveredByWorkplacePlan: true,
+            entries: [iraEntry('traditionalIraContributionAgeFiftyOrOver')('8000.00')],
+        })
+        assertEq(at('88749.99'), 21000n, '$250.01 x 80% = $200.008, up to $210.00')
+        assertEq(at('88750.00'), 20000n, '$250.00 x 80% = $200.00 — the floor, reached exactly')
+    },
+    // …and the cliff the floor creates: one cent below the end point the
+    // deduction is $200.00, and at the end point it is nothing at all. A
+    // phased deduction is NEVER between $1 and $199.
+    theCompletePhaseOutIsACliffFromTwoHundredDollarsToZero: () => {
+        /** @type {(wages: string) => bigint} */
+        const at = wages => lineTwentyOf({
+            ...iraBaseFixture,
+            wages,
+            coveredByWorkplacePlan: true,
+            entries: [iraEntry('traditionalIraContributionAgeFiftyOrOver')('8000.00')],
+        })
+        assertEq(at('88999.99'), 20000n, '$0.01 of range left, floored to $200.00')
+        assertEq(at('89000.00'), 0n, '$89,000.00 — "stop here; your contributions aren’t deductible"')
+    },
+    // ── §219(b)(1)(B), the compensation cap ─────────────────────────────────
+    theDeductionCannotExceedCompensation: () => {
+        assertEq(
+            lineTwentyOf({
+                ...iraBaseFixture,
+                wages: '2000.00',
+                entries: [iraEntry('traditionalIraContribution')('7000.00')],
+            }),
+            200000n,
+            '$2,000.00 of Form W-2 box 1 caps a $7,000.00 contribution')
+    },
+    // The control, and the sharper case: a return with no compensation at all
+    // deducts nothing, and it is a DOCUMENT-cited zero rather than the
+    // profile-cited one, because the taxpayer really did assert a
+    // contribution.
+    aReturnWithNoCompensationDeductsNothingAndStillCitesTheEntry: () => {
+        const stageOne = okStageOne(stageOneForIra({
+            ...iraBaseFixture,
+            wages: undefined,
+            entries: [iraEntry('traditionalIraContribution')('5000.00')],
+        }))
+        assertEq(stageOne.line20.value, 0n, 'no compensation includible in gross income')
+        assert(
+            !stageOne.line20.sources.some(source => source.boxPath === 'declaredKinds'),
+            ['the entry was read, so the entry is what is cited', stageOne.line20.sources])
+    },
+    // ── §219(b)(5)(B)(ii), the catch-up nobody can look up ──────────────────
+    //
+    // The three-way decision this line exists to get right, as three leaves:
+    // the contribution at or below the base limit computes with no assertion
+    // at all, the contribution above it REFUSES, and the same contribution
+    // with the age asserted computes.
+    aContributionWithinTheBaseLimitNeedsNoAgeAtAll: () => {
+        assertEq(
+            lineTwentyOf({
+                ...iraBaseFixture,
+                entries: [iraEntry('traditionalIraContribution')('7000.00')],
+            }),
+            700000n,
+            '$7,000.00 — the age cannot change an answer bounded by the contribution')
+    },
+    aContributionAboveTheBaseLimitRefusesRatherThanGuessingTheAge: () => {
+        const result = refusal(stageOneForIra({
+            ...iraBaseFixture,
+            entries: [iraEntry('traditionalIraContribution')('8000.00')],
+        }))
+        // `centsToString` emits no thousands separator, so the substring
+        // asserted is the one the message really carries; the human figure
+        // stays in the assertion's own message.
+        assert(result.message.includes('$7000.00'),
+            ['the refusal must name the under-50 figure, $7,000.00', result.message])
+        assert(result.message.includes('$8000.00'),
+            ['and the age-50 figure, $8,000.00', result.message])
+        assert(result.message.includes('§219(b)(5)(B)(ii)'),
+            ['and the subsection that creates the difference', result.message])
+        assert(result.message.includes('traditionalIraContributionAgeFiftyOrOver'),
+            ['and the tag that would answer it — a refusal a reader can act on', result.message])
+    },
+    theSameContributionWithTheAgeAssertedComputes: () => {
+        assertEq(
+            lineTwentyOf({
+                ...iraBaseFixture,
+                entries: [iraEntry('traditionalIraContributionAgeFiftyOrOver')('8000.00')],
+            }),
+            800000n,
+            '$8,000.00 — $7,000.00 plus §219(b)(5)(B)(ii)’s $1,000.00')
+    },
+    // **The catch-up matters INSIDE the phase-out at any contribution size**,
+    // because the surviving limit is proportional to the dollar amount: 70%
+    // of the remaining range under 50, 80% at 50 or over. A "refuse only
+    // above $7,000.00" rule would have shipped a silent $700.00 error here.
+    thePhaseOutMakesTheAgeMatterBelowTheBaseLimitToo: () => {
+        /** @type {IraFixture} */
+        const covered = {
+            ...iraBaseFixture, wages: '82000.00', coveredByWorkplacePlan: true,
+        }
+        const unasserted = refusal(stageOneForIra({
+            ...covered, entries: [iraEntry('traditionalIraContribution')('7000.00')],
+        }))
+        assert(unasserted.message.includes('$4900.00'),
+            ['$7,000.00 of range x 70% = $4,900.00, the under-50 figure', unasserted.message])
+        assert(unasserted.message.includes('$5600.00'),
+            ['$7,000.00 of range x 80% = $5,600.00, the age-50 figure', unasserted.message])
+        assertEq(
+            lineTwentyOf({
+                ...covered, entries: [iraEntry('traditionalIraContributionAgeFiftyOrOver')('7000.00')],
+            }),
+            560000n,
+            '$5,600.00, and the contribution is only $7,000.00 — well under either dollar limit')
+    },
+    // ── Filing status ───────────────────────────────────────────────────────
+    //
+    // Notice 2024-80 puts a qualifying surviving spouse on the JOINT row
+    // ("filing a joint return or as a qualifying widow(er)"), which is the
+    // OPPOSITE of what §3101(b)(2) does with the same status in
+    // `fjs/tax/params`. The two rows are $47,000.00 apart, so the same
+    // fixture under the two statuses is the sharpest possible statement of
+    // it: $6,400.00 against nothing at all.
+    aQualifyingSurvivingSpouseReadsTheJointRowAndASingleFilerDoesNot: () => {
+        /** @type {IraFixture} */
+        const fixture = {
+            ...iraBaseFixture,
+            wages: '130000.00',
+            coveredByWorkplacePlan: true,
+            entries: [iraEntry('traditionalIraContributionAgeFiftyOrOver')('8000.00')],
+        }
+        assertEq(
+            lineTwentyOf({ ...fixture, status: 'qualifyingSurvivingSpouse' }), 640000n,
+            '$16,000.00 of range x 40% ($8,000.00 / $20,000.00) = $6,400.00')
+        assertEq(
+            lineTwentyOf({ ...fixture, status: 'single' }), 0n,
+            '$130,000.00 is past a single filer’s $89,000.00 end point entirely')
+    },
+    // §219(g)(4): a couple filing separately who "live apart at all times
+    // during such taxable year" are "not … treated as married individuals for
+    // purposes of this subsection", so the filer reads the SINGLE row. One
+    // checkbox, $3,000.00 of deduction.
+    marriedFilingSeparatelyLivingApartAllYearReadsTheSingleRow: () => {
+        /** @type {IraFixture} */
+        const fixture = {
+            ...iraBaseFixture,
+            status: 'marriedFilingSeparately',
+            wages: '20000.00',
+            coveredByWorkplacePlan: true,
+            entries: [iraEntry('traditionalIraContribution')('3000.00')],
+        }
+        assertEq(
+            lineTwentyOf({ ...fixture, mfsLivedWithSpouseAtAnyTimeInYear: true }), 0n,
+            '$0.00 — §219(g)(3)(B)(iii)’s range is over by $10,000.00 of modified AGI')
+        assertEq(
+            lineTwentyOf({ ...fixture, mfsLivedWithSpouseAtAnyTimeInYear: false }), 300000n,
+            '$3,000.00 — the whole contribution, on the $79,000.00 single row')
+    },
+    // ── The refusals, each with its control ─────────────────────────────────
+    iraDeductionRefusals: {
+        // The joint-return attribution gap — the same gap `fjs/form8880` and
+        // this schedule's own line 13 already refuse, one line further up.
+        aJointReturnCarryingAContributionRefuses: () => {
+            const result = refusal(stageOneForIra({
+                ...iraBaseFixture,
+                status: 'marriedFilingJointly',
+                entries: [iraEntry('traditionalIraContribution')('3000.00')],
+            }))
+            assert(result.message.includes('§219(f)(2)'),
+                ['the refusal must name the "separately for each individual" rule', result.message])
+            assert(result.message.includes('box 13'),
+                ['and the box it cannot attribute', result.message])
+            assert(result.message.includes('§219(g)(7)'),
+                ['and the second range attributing it wrongly would swap in', result.message])
+            assert(result.message.includes('Schedule 1 line 20'),
+                ['and its own printed line', result.message])
+        },
+        // **The control that keeps the gate from refusing everything.** The
+        // identical joint return with NO traditional IRA contribution
+        // computes — which is the ordinary joint return, and refusing it
+        // would be `fjs/form8880`'s own recorded mistake repeated.
+        aJointReturnWithNoContributionComputes: () => {
+            const stageOne = okStageOne(stageOneForIra({
+                ...iraBaseFixture,
+                status: 'marriedFilingJointly',
+            }))
+            assertEq(stageOne.line20.value, 0n, 'nothing to deduct, and nothing to refuse')
+        },
+        // A separate return carries no Form W-2 for the spouse, and
+        // §219(g)(1) turns on whether "an individual OR THE INDIVIDUAL'S
+        // SPOUSE is an active participant".
+        marriedFilingSeparatelyLivingTogetherAndNotCoveredRefuses: () => {
+            const result = refusal(stageOneForIra({
+                ...iraBaseFixture,
+                status: 'marriedFilingSeparately',
+                mfsLivedWithSpouseAtAnyTimeInYear: true,
+                coveredByWorkplacePlan: false,
+                entries: [iraEntry('traditionalIraContribution')('3000.00')],
+            }))
+            assert(result.message.includes('§219(g)(1)'),
+                ['the refusal must name the active-participant rule', result.message])
+            assert(result.message.includes('$10,000'),
+                ['and the range the missing fact decides', result.message])
+        },
+        // The control: the SAME return with the taxpayer's own box 13
+        // checked computes, because §219(g)(3)(B)(iii)'s $0 applicable dollar
+        // amount already applies and the spouse's status cannot make it
+        // worse. So the refusal is narrow rather than "MFS is refused".
+        marriedFilingSeparatelyLivingTogetherAndCoveredComputes: () => {
+            assertEq(
+                lineTwentyOf({
+                    ...iraBaseFixture,
+                    status: 'marriedFilingSeparately',
+                    mfsLivedWithSpouseAtAnyTimeInYear: true,
+                    coveredByWorkplacePlan: true,
+                    wages: '5000.00',
+                    entries: [iraEntry('traditionalIraContribution')('3000.00')],
+                }),
+                300000n,
+                '$5,000.00 of range left x 70% = $3,500.00, and the contribution is $3,000.00')
+        },
+        // §219(f)(1)/§401(c)(2) earned income — three missing facts at once.
+        selfEmploymentAlongsideAContributionRefuses: () => {
+            const partI = okPartI(scheduleOnePartI({
+                profile: profileNoDeclaredKinds,
+                unemploymentForms: [],
+                nonemployeeCompensationForms: [nonemployeeCompensationDoc('40000.00')],
+                businessExpenseForms: [businessDoc([advertisingEntry('1000.00')])],
+                w2Forms: [],
+                partnershipK1Forms: [],
+                sCorporationK1Forms: [],
+                estateTrustK1Forms: [],
+            }))
+            const result = refusal(scheduleOnePartIIExceptStudentLoanInterest(taxParams2025)({
+                profile: profileNoDeclaredKinds,
+                status: 'single',
+                adjustmentForms: [adjustmentsDoc(
+                    [iraEntry('traditionalIraContribution')('3000.00')])([])],
+                w2Forms: [],
+                interestForms: [],
+                ...noSocialSecurityInteraction,
+                totalIncomeExceptTaxableSocialSecurityLine: noOtherIncomeLine,
+                businessNetProfit: partI.scheduleC.partII.line31,
+                businessExpenseForms: [businessDoc([advertisingEntry('1000.00')])],
+                passThrough: noPassThrough,
+            }))
+            assert(result.message.includes('§401(c)(2)'),
+                ['the refusal must name the earned-income definition', result.message])
+            assert(result.message.includes('line 16'),
+                ['and the unmodeled adjustment the worksheet subtracts', result.message])
+            assert(result.message.includes('§219(b)(1)(B)'),
+                ['and the cap it cannot compute', result.message])
+        },
+        // The control: the same self-employed return with NO contribution
+        // computes exactly as it did before this line existed.
+        selfEmploymentWithNoContributionComputes: () => {
+            const stageOne = okStageOne(stageOneWithBusiness(profileNoDeclaredKinds)('single')(
+                [nonemployeeCompensationDoc('40000.00')])(
+                [businessDoc([advertisingEntry('1000.00')])])([]))
+            assertEq(stageOne.line20.value, 0n, 'no contribution, so nothing to refuse')
+            assert(stageOne.line15.value > 0n,
+                ['and the self-employment half of the return is untouched', stageOne.line15.value])
+        },
+        // Publication 590-A's own named special case: a contribution AND a
+        // distribution in the same year IS a fixed point, because the
+        // taxable part of the distribution is recovered pro rata against a
+        // year-end basis that includes this contribution's nondeductible
+        // part — which is the contribution less this very line.
+        aContributionAndADistributionInTheSameYearRefuses: () => {
+            const result = refusal(stageOneForIra({
+                ...iraBaseFixture,
+                iraDistributionReceived: true,
+                entries: [iraEntry('traditionalIraContribution')('3000.00')],
+            }))
+            assert(result.message.includes('590-B'),
+                ['the refusal must name the worksheet it would need', result.message])
+            assert(result.message.includes('fixed point'),
+                ['and say which of the two interactions actually is one', result.message])
+        },
+        // The control: a distribution with no contribution computes. A
+        // retiree taking required minimum distributions is the modal
+        // retirement return, and refusing it would be the mistake
+        // `fjs/form8880`'s docstring names.
+        aDistributionWithNoContributionComputes: () => {
+            const stageOne = okStageOne(stageOneForIra({
+                ...iraBaseFixture,
+                iraDistributionReceived: true,
+            }))
+            assertEq(stageOne.line20.value, 0n, 'nothing to deduct, and nothing to refuse')
+        },
+        // A Roth contribution is not deductible at all, and the CLOSED tag
+        // vocabulary is what makes that a refusal by name rather than a
+        // silent $7,000.00 deduction that does not exist.
+        aRothContributionTagIsRefusedByName: () => {
+            const result = refusal(stageOneForIra({
+                ...iraBaseFixture,
+                entries: [iraEntry('rothIraContribution')('7000.00')],
+            }))
+            assert(result.message.includes('rothIraContribution'),
+                ['the refusal must name the tag it did not understand', result.message])
+            assert(result.message.includes('traditionalIraContribution'),
+                ['and list the vocabulary it does', result.message])
+        },
+    },
+    // §219(f)(3): a contribution made after the close of the year and up to
+    // the return due date counts for THIS year — how a large share of real
+    // IRA contributions are made. The control is the tag beside it: an
+    // educator expense paid in 2026 is a 2026 deduction and still refuses.
+    aFollowingYearIraContributionIsAcceptedAndAnEducatorExpenseIsNot: () => {
+        assertEq(
+            lineTwentyOf({
+                ...iraBaseFixture,
+                entries: [{
+                    ...iraEntry('traditionalIraContribution')('4000.00'),
+                    datePaid: '2026-04-10',
+                }],
+            }),
+            400000n,
+            '$4,000.00 paid in April 2026 on account of tax year 2025')
+        const result = refusal(stageOneForIra({
+            ...iraBaseFixture,
+            entries: [{ ...educatorEntry('300.00')('taxpayer'), datePaid: '2026-04-10' }],
+        }))
+        assert(result.message.includes('§219(f)(3)'),
+            ['the refusal must name both exceptions it is NOT', result.message])
+    },
+    // ── The Publication 590-A Appendix B three-pass ordering ────────────────
+    //
+    // **This is the leaf the whole line turns on.** §219(g)(3)(A)(i)
+    // determines adjusted gross income "after application of section 86", so
+    // taxable Social Security benefits are inside the income the phase-out
+    // runs against — computed by Appendix B Worksheet 1, which subtracts
+    // Schedule 1 lines 11 through 20 EXCEPT line 20 itself.
+    //
+    // Single filer, covered, $60,000.00 of wages and $30,000.00 of benefits.
+    // Worksheet 1, hand-computed from the printed page:
+    //
+    //   line 1 $30,000.00   line 2 $15,000.00 (half)
+    //   line 3 $60,000.00   line 4 $0.00      line 5 $75,000.00
+    //   line 6 $0.00 (no other adjustment)    line 7 $75,000.00
+    //   line 8 $25,000.00 (single base)       line 9 $50,000.00
+    //   line 10 $9,000.00  line 11 $41,000.00 line 12 $9,000.00
+    //   line 13 $4,500.00  line 14 $4,500.00  line 15 $34,850.00 (85%)
+    //   line 16 $39,350.00 line 17 $25,500.00 (85% of line 1)
+    //   line 18 $25,500.00 -> taxable benefits for §219 purposes
+    //
+    // Modified AGI = $60,000.00 + $25,500.00 = $85,500.00, which is
+    // $3,500.00 short of the $89,000.00 end point: $3,500.00 x 80% =
+    // $2,800.00.
+    taxableSocialSecurityBenefitsAreInsideThePhaseOutIncome: () => {
+        /** @type {IraFixture} */
+        const fixture = {
+            ...iraBaseFixture,
+            wages: '60000.00',
+            coveredByWorkplacePlan: true,
+            entries: [iraEntry('traditionalIraContributionAgeFiftyOrOver')('8000.00')],
+        }
+        assertEq(
+            lineTwentyOf({ ...fixture, socialSecurityBenefits: '30000.00' }), 280000n,
+            '$2,800.00 — $85,500.00 of modified AGI, $3,500.00 of range left, x 80%')
+        assertEq(
+            lineTwentyOf(fixture), 800000n,
+            '$8,000.00 — the SAME return without the SSA-1099, at $60,000.00 of modified AGI')
+    },
+    // Line 20 reaches BOTH named adjustment totals — the Social Security
+    // worksheet's "lines 11 through 20, and 23 and 25" and the student loan
+    // worksheet's "lines 11 through 20 plus write-ins". Without this the line
+    // could be computed correctly and dropped on the way to line 26.
+    lineTwentyReachesBothAdjustmentTotals: () => {
+        const stageOne = okStageOne(stageOneForIra({
+            ...iraBaseFixture,
+            entries: [iraEntry('traditionalIraContribution')('7000.00')],
+        }))
+        assertEq(socialSecurityWorksheetAdjustmentsTotal(stageOne), 700000n,
+            'lines 11-20, 23, 25 with only line 20 non-zero')
+        assertEq(studentLoanInterestWorksheetOtherAdjustments(stageOne), 700000n,
+            'lines 11-20 plus write-ins on 24z, same single summand')
+    },
+    // PROV-02: the citation, asserted by its own leaf so a line that summed
+    // correctly while citing nothing and one that cited correctly while
+    // summing zero cannot be confused.
+    lineTwentyCitesEveryDocumentItRead: () => {
+        const stageOne = okStageOne(stageOneForIra({
+            ...iraBaseFixture,
+            wages: '82000.00',
+            coveredByWorkplacePlan: true,
+            entries: [iraEntry('traditionalIraContributionAgeFiftyOrOver')('7000.00')],
+        }))
+        const boxPaths = stageOne.line20.sources.map(source => source.boxPath)
+        assert(
+            boxPaths.includes('entries[lineTag=traditionalIraContributionAgeFiftyOrOver,individual=taxpayer]'),
+            ['the contribution entry, with the tag that carried the age', boxPaths])
+        assert(boxPaths.includes('box13RetirementPlan'),
+            ['the Form W-2 box that made §219(g) apply at all', boxPaths])
+        assert(boxPaths.includes('box1WagesTipsOtherCompensation'),
+            ['the Form W-2 box that caps the deduction under §219(b)(1)(B)', boxPaths])
+        assert(boxPaths.includes('filingStatus'),
+            ['and the status that chose the §219(g)(3)(B) applicable dollar amount', boxPaths])
+        assert(
+            !boxPaths.includes('declaredKinds'),
+            ['a line that read documents must not fall back to the profile', boxPaths])
+    },
+    // TAX-15's fourth named income measure, exercised on its own — the same
+    // shape `studentLoanInterestPhaseoutIncomeIsNotBareAgi` gives the third.
+    iraDeductionPhaseoutIncomeIsTotalIncomeLessTheOtherAdjustmentsPlusSection86: () => {
+        assertEq(iraDeductionPhaseoutIncome(8600000n)(100000n)(0n), 8500000n)
+        assertEq(iraDeductionPhaseoutIncome(6000000n)(0n)(2550000n), 8550000n)
+        assertEq(iraDeductionPhaseoutIncome(0n)(0n)(0n), 0n)
+        // It is NOT bare AGI: AGI would already have line 20 itself
+        // subtracted, which is exactly what §219(g)(3)(A)(ii) removes.
+        assert(
+            iraDeductionPhaseoutIncome(8600000n)(100000n)(0n) !== 8600000n,
+            'the other adjustments must actually be subtracted',
+        )
+        // …and it is not the student loan measure either: that one has no
+        // §86 term at all.
+        assert(
+            iraDeductionPhaseoutIncome(6000000n)(0n)(2550000n)
+                !== studentLoanInterestPhaseoutIncome(6000000n)(0n),
+            'taxable Social Security benefits are inside this measure and not that one',
+        )
+    },
     // ── Line 18: penalty on early withdrawal of savings (§62(a)(9)) ─────────
     //
     // Every expected value below is a hand-typed cent literal with its dollar
@@ -2863,6 +4160,8 @@ export const proof = {
         const stageOne = okStageOne(scheduleOnePartIIExceptStudentLoanInterest(taxParams2025)({
             profile: profileNoDeclaredKinds,
             interestForms: [],
+            ...noSocialSecurityInteraction,
+            totalIncomeExceptTaxableSocialSecurityLine: noOtherIncomeLine,
             status: 'single',
             passThrough: noPassThrough,
             adjustmentForms: [adjustmentsDoc([
@@ -2957,6 +4256,8 @@ export const proof = {
         const composed = scheduleOne(taxParams2025)({
             profile: profileNoDeclaredKinds,
             interestForms: [],
+            ...noSocialSecurityInteraction,
+            totalIncomeExceptTaxableSocialSecurityLine: noOtherIncomeLine,
             status: 'single',
             unemploymentForms: [unemploymentA],
             nonemployeeCompensationForms: [],
@@ -2986,6 +4287,8 @@ export const proof = {
         const composed = scheduleOne(taxParams2025)({
             profile: profileNoDeclaredKinds,
             interestForms: [],
+            ...noSocialSecurityInteraction,
+            totalIncomeExceptTaxableSocialSecurityLine: noOtherIncomeLine,
             status: 'single',
             unemploymentForms: [],
             nonemployeeCompensationForms: [],
@@ -3057,6 +4360,8 @@ export const proof = {
         const composed = scheduleOne(taxParams2025)({
             profile: profileNoDeclaredKinds,
             interestForms: [],
+            ...noSocialSecurityInteraction,
+            totalIncomeExceptTaxableSocialSecurityLine: noOtherIncomeLine,
             status: 'single',
             unemploymentForms: [],
             nonemployeeCompensationForms: [],
