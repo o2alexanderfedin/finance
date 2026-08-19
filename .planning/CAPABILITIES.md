@@ -148,19 +148,17 @@ pinned to `node --test *.test.js` and why earlier versions of this file reported
 
 ## Known gaps
 
-Nothing here is an open requirement. **Six** `fjs/todo/` notes remain, each carrying a **tested**
-reason and a recipe. (`fjs/todo/` holds nine files; the other three are satisfied specs kept in
+Nothing here is an open requirement. **Five** `fjs/todo/` notes remain, each carrying a **tested**
+reason and a recipe. (`fjs/todo/` holds eight files; the other three are satisfied specs kept in
 their original present tense, each with a corrected status line at the top. An earlier version of
 this list said "four" by counting table rows rather than notes.)
 
 1. **`upstream-mjs-migration.md`** — `functionalscript` is pinned at 0.43.1 because 0.44/0.45
    dropped the `.js` emit. Migrating all 396 files was *measured* on a throwaway snapshot and still
    left **288 errors**, each fixable only by a cast, an `any`, or a redeclared type — all forbidden.
-2. **`tax-return-report-source-k1-routes-unexercised.md`** — three route lines in the stored
-   program's hand-authored text are executed by no fixture, and the cheap fixture is a fake pass.
-3. **`schedule-b-omits-k1-interest-and-dividends.md`** — K-1 interest can push 1040 line 2b past
+2. **`schedule-b-omits-k1-interest-and-dividends.md`** — K-1 interest can push 1040 line 2b past
    Schedule B's $1,500 threshold while Schedule B's own line 4 stays below it.
-4. Three upstream `fjs` notes, re-verified still open against 0.45.0.
+3. Three upstream `fjs` notes, re-verified still open against 0.45.0.
 
 **Phase 16 was RESOLVED BY REMOVAL** in Phase 31 (MAINT-01): `fjs/document/1099int/from_ocr` and
 `fjs/document/ocr_amount` are deleted, and the `vnd.fjs.ocr` dialect itself stays live. This line
