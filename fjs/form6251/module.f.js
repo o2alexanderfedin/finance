@@ -41,13 +41,23 @@
  *
  * ## Part I: what is computed, and what is a documented zero
  *
- * Lines 1a/1b, 2a, 2g and 2i are computed for real. **Every other line of Part
- * I is a documented zero, and each has its own `fjs/return/scope` kind** so a
- * taxpayer who has one is refused BY NAME rather than silently given a zero.
- * That distinction is the whole reason those fifteen kinds were added in Phase
- * 29: a zero here does not merely omit a line, it UNDERSTATES the tax, and
- * TAX-16 exists for exactly that. Fourteen of the fifteen still refuse; line
- * 2g's kind was reclassified to `modeledKinds` the moment box 9 arrived.
+ * Lines 1a/1b, 2a, 2g, 2i and 2j are computed for real. **Every other line of
+ * Part I is a documented zero, and each has its own `fjs/return/scope` kind**
+ * so a taxpayer who has one is refused BY NAME rather than silently given a
+ * zero. That distinction is the whole reason those fifteen kinds were added in
+ * Phase 29: a zero here does not merely omit a line, it UNDERSTATES the tax,
+ * and TAX-16 exists for exactly that. Line 2g's kind was reclassified to
+ * `modeledKinds` the moment box 9 arrived.
+ *
+ * **Line 2j is computed while `amtEstatesAndTrusts` is still listed in
+ * `unmodeledKindRefusals`**, and that gap is deliberate rather than an
+ * oversight: the reclassification is one edit in `fjs/return/scope`, recorded
+ * in `fjs/form6251/todo/estates-and-trusts.md`, and the wiring lands first per
+ * "wire before reclassify". Until it is made, a taxpayer who DECLARES the kind
+ * is refused by scope while the same taxpayer who merely STORES the Schedule
+ * K-1 (Form 1041) receives the computed line — which is the correct direction
+ * of the two, since a declaration is an assertion about a return and a stored
+ * document is a fact about one.
  *
  * - **Line 1a** — 1040 line 14 minus Schedule 1-A line 37, and **line 37, not
  *   line 38**. Line 38 is the Schedule 1-A total that reaches 1040 line 13b;
@@ -106,7 +116,15 @@
  *   The larger and stranger of the two preference items this engine computes,
  *   and the reason an ISO exercise can produce tax on income never received. See
  *   {@link isoSpread}.
- * - **Lines 2c-2f, 2h, 2j-2t and 3** — documented zeros, each with a kind. See
+ * - **Line 2j** — *"Estates and trusts (amount from Schedule K-1 (Form 1041),
+ *   box 12, code A)"*, summed over every stored beneficiary's K-1. The printed
+ *   caption names the CODE, which is why exactly one of box 12's ten codes is
+ *   routed and the other nine still refuse at `fjs/schedule/e`'s coded sweep:
+ *   codes B-F are a *portion of* code A bound for Part III's AMT worksheets,
+ *   G-I belong on other Part I lines this engine holds at documented zeros, and
+ *   J is next year's Form 8801. **The sum is not floored** — a negative code A
+ *   is ordinary. See `fjs/form6251/estate_trust`.
+ * - **Lines 2c-2f, 2h, 2k-2t and 3** — documented zeros, each with a kind. See
  *   the named constants below, one per printed line, in printed order.
  *
  * ## Part II, and the exemption's own phase-out
@@ -198,8 +216,11 @@ import { oneShare, sharesFromString } from '../document/share_count/module.f.js'
 import { taxParamsByYear } from '../tax/params/module.f.js'
 import { twentySixTwentyEightPercentTax } from './rate/module.f.js'
 import { partThree } from './part3/module.f.js'
+import { estateTrustAmtAdjustment } from './estate_trust/module.f.js'
 
 /** @import { FormThirtyNineTwentyOne } from '../document/form3921/module.f.js' */
+/** @import { K1EstateTrust } from '../document/k1_1041/module.f.js' */
+/** @import { CodedEntry } from '../document/k1_common/module.f.js' */
 /** @import { IndividualFilingStatus, TaxParamSet } from '../tax/params/module.f.js' */
 /** @import { PartThree, RegularPreferentialWorksheet } from './part3/module.f.js' */
 
@@ -261,6 +282,19 @@ const min = a => b => a < b ? a : b
  * 2a's own box-8 sum lives. Taking the interest documents here would put a
  * second reader of that dialect in a second module, which is exactly how box 8
  * and box 9 would come to be summed by two rules that disagree.
+ *
+ * `estateTrustK1Forms` travels as DOCUMENTS, on `isoExerciseForms`' side of
+ * that line rather than line 2g's, and the test the two cases are being sorted
+ * by is *"does another module already read this box?"* — not *"is it a plain
+ * sum?"*. Box 12 has **no other reader in the engine**: `fjs/form1040/core`
+ * reads this dialect's fixed-caption boxes 1, 2a, 2b, 3 and 4a and
+ * `fjs/schedule/e` reads box 6, and every coded box is swept and refused. So
+ * putting the reader here creates no second rule for one box; it retires a box
+ * that was stored and read by nothing. The rows also need per-CODE filtering
+ * and a per-ENTRY citation, neither of which survives being pre-summed into
+ * cents. The filtering rule itself lives one level down in
+ * `fjs/form6251/estate_trust`, which is also what `fjs/schedule/e`'s coded
+ * sweep opens its gate from — one hand-typed code list, three call sites.
  * @typedef {{
  *   readonly status: IndividualFilingStatus,
  *   readonly adjustedGrossIncomeCents: bigint,
@@ -272,6 +306,7 @@ const min = a => b => a < b ? a : b
  *   readonly isoExerciseForms: readonly Stored<FormThirtyNineTwentyOne>[],
  *   readonly aStoredNineteenNineBReportsASale: boolean,
  *   readonly specifiedPrivateActivityBondInterestCents: bigint,
+ *   readonly estateTrustK1Forms: readonly Stored<K1EstateTrust>[],
  *   readonly regularTaxCents: bigint,
  *   readonly scheduleTwoLine1zCents: bigint,
  *   readonly scheduleThreeLine1Cents: bigint,
@@ -521,7 +556,7 @@ export const form6251 = taxParamSet => input => {
         status, adjustedGrossIncomeCents, totalDeductionsCents, scheduleOneALine37Cents,
         itemizing, scheduleALine7Cents, standardDeductionCents,
         isoExerciseForms, aStoredNineteenNineBReportsASale,
-        specifiedPrivateActivityBondInterestCents,
+        specifiedPrivateActivityBondInterestCents, estateTrustK1Forms,
         regularTaxCents, scheduleTwoLine1zCents, scheduleThreeLine1Cents,
         qualifiedDividendsCents, capitalGainDistributionsCents,
         filingScheduleD, scheduleD15Cents, scheduleD16Cents, scheduleD19Cents,
@@ -539,6 +574,13 @@ export const form6251 = taxParamSet => input => {
     const isoOutcome = isoSpreadTotal(isoExerciseForms)
     if (isoOutcome.kind === 'error') {
         return isoOutcome
+    }
+    // Line 2j's own document question, asked here for the same reason: a code
+    // A row printed as `STMT` carries no figure, and a half-built form is a
+    // form nobody can act on.
+    const estateTrustOutcome = estateTrustAmtAdjustment(estateTrustK1Forms)
+    if (estateTrustOutcome.kind === 'error') {
+        return estateTrustOutcome
     }
 
     // ── Part I: Alternative Minimum Taxable Income ───────────────────────
@@ -598,9 +640,20 @@ export const form6251 = taxParamSet => input => {
     //     regular tax income)" -- THE ONE PREFERENCE ITEM THIS ENGINE
     //     COMPUTES, from stored Forms 3921.
     const line2i = isoOutcome.cents
-    // 2j. Estates and trusts, Schedule K-1 (1041) box 12 code A --
-    //     `amtEstatesAndTrusts`.
-    const line2j = 0n
+    // 2j. "Estates and trusts (amount from Schedule K-1 (Form 1041), box 12,
+    //     code A)" -- THE THIRD ADJUSTMENT THIS ENGINE COMPUTES, and the only
+    //     one whose printed caption names the CODE it reads. The sum lives in
+    //     `fjs/form6251/estate_trust`, which also owns the code list
+    //     `fjs/schedule/e`'s coded sweep opens its gate from.
+    //
+    //     NOT floored: a negative code A is an ordinary AMT adjustment (an
+    //     estate whose AMT depreciation now exceeds its regular depreciation),
+    //     and flooring it would OVERSTATE alternative minimum taxable income.
+    //     Codes B-F are a PORTION of code A and belong to Part III's
+    //     worksheets, G-I belong on other Part I lines, and J belongs on next
+    //     year's Form 8801 -- every one of them still refuses at
+    //     `fjs/schedule/e`.
+    const line2j = estateTrustOutcome.cents
     // 2k. Disposition of property (a different AMT basis) --
     //     `amtDispositionOfProperty`. This is where an ISO exercised in an
     //     EARLIER year and sold in this one lands, and it is why line 2i's
@@ -871,6 +924,27 @@ const isoForm = hash => exercisePrice => fairMarketValue => shares => ({
 })
 
 /**
+ * A stored beneficiary's Schedule K-1 (Form 1041) carrying exactly the box 12
+ * rows given, and no income box at all — these leaves are about line 2j, not
+ * about Schedule E.
+ * @type {(hash: string) => (box12: readonly CodedEntry[]) => Stored<K1EstateTrust>}
+ */
+const beneficiaryK1 = hash => box12 => ({
+    documentHash: hash,
+    value: {
+        dialect: 'vnd.fjs.k1_1041',
+        payerTin: '66-6666666',
+        recipientTin: '222-22-2222',
+        taxYear: 2025,
+        formRevision: '2025',
+        payerName: 'The Harrow Family Trust',
+        boxHDomesticBeneficiary: /** @type {const} */ (true),
+        materialParticipation: 'materiallyParticipated',
+        box12AlternativeMinimumTaxItems: box12,
+    },
+})
+
+/**
  * Every input zero, no documents, single filer — the base every fixture below
  * widens. Written out rather than defaulted, so a fixture that forgets a field
  * gets an explicit zero rather than an `undefined`.
@@ -887,6 +961,7 @@ const nothing = {
     isoExerciseForms: [],
     aStoredNineteenNineBReportsASale: false,
     specifiedPrivateActivityBondInterestCents: 0n,
+    estateTrustK1Forms: [],
     regularTaxCents: 0n,
     scheduleTwoLine1zCents: 0n,
     scheduleThreeLine1Cents: 0n,
@@ -1697,6 +1772,193 @@ export const proof = {
             assert(
                 result.line2g !== result.line2i,
                 'this fixture is deliberately two DIFFERENT amounts, so a swap names itself')
+        },
+    },
+    estatesAndTrusts: {
+        // THE MOTIVATING RETURN FOR LINE 2J, and it is the quietest of the
+        // three: a salaried beneficiary of a family trust, who owes alternative
+        // minimum tax because of a form the TRUST filed. Every figure
+        // hand-typed and derived independently below.
+        //
+        //   salary                                              $250,000.00
+        //   1040 line 14 / 12e   the standard deduction           $15,750.00
+        //   K-1 (1041) box 12 code A                              $75,000.00
+        //
+        //   line 1a    the deduction, less $0.00 of Sch 1-A         $15,750.00
+        //   line 1b    250,000.00 - 15,750.00                     $234,250.00
+        //   line 2a    the standard-deduction add-back             $15,750.00
+        //   line 2j    box 12 code A                               $75,000.00
+        //   line 4     234,250.00 + 15,750.00 + 75,000.00         $325,000.00
+        //   line 5     325,000.00 is below the $626,350.00 phase-out
+        //              threshold, so the exemption survives whole   $88,100.00
+        //   line 6     325,000.00 - 88,100.00                     $236,900.00
+        //   line 7     236,900.00 is below the $239,100.00 breakpoint, so 26%
+        //              of the whole: 236,900.00 x 0.26             $61,594.00
+        //   line 10    a regular tax of                            $52,000.00
+        //   line 11    61,594.00 - 52,000.00                        $9,594.00
+        theBeneficiaryWhoOwesAlternativeMinimumTax: () => {
+            const result = expectOk(run({
+                ...wageReturn(25000000n)(singleStandardDeduction)(5200000n),
+                estateTrustK1Forms: [beneficiaryK1('doc-k1-a')([{ code: 'A', amount: '75000.00' }])],
+            }))
+            assertEq(result.line2j, 7500000n, 'line 2j = box 12 code A = $75,000.00')
+            assertEq(result.line1b, 23425000n, 'line 1b = $250,000.00 - $15,750.00 = $234,250.00')
+            assertEq(result.line2a, 1575000n, 'line 2a = the standard deduction, added back')
+            assertEq(result.line4, 32500000n, 'line 4 = AMTI = $325,000.00')
+            assertEq(result.line5, 8810000n, 'the full exemption: AMTI is below the phase-out threshold')
+            assertEq(result.line6, 23690000n, '$325,000.00 - $88,100.00 = $236,900.00')
+            assertEq(result.line7, 6159400n, '26% of $236,900.00 = $61,594.00')
+            assertEq(result.line10, 5200000n, 'line 10 = the regular tax')
+            assertEq(result.line11, 959400n, 'line 11 = $61,594.00 - $52,000.00 = $9,594.00')
+            // The other two computed preference items are untouched, so the AMT
+            // above is attributable to line 2j and to nothing else.
+            assertEq(result.line2g, 0n, 'no private-activity bond interest is involved')
+            assertEq(result.line2i, 0n, 'and no incentive stock option')
+        },
+        // THE SAME RETURN WITH NO SCHEDULE K-1 owes NOTHING, stated as a pair
+        // against the fixture above so the whole $9,594.00 is attributed to box
+        // 12 rather than to the salary.
+        //
+        //   line 4     234,250.00 + 15,750.00                     $250,000.00
+        //   line 6     250,000.00 - 88,100.00                     $161,900.00
+        //   line 7     26% of 161,900.00                           $42,094.00
+        //   line 11    42,094.00 loses to a 52,000.00 regular tax       -0-
+        theSameReturnWithoutTheScheduleKOneOwesNothing: () => {
+            const result = expectOk(run(wageReturn(25000000n)(singleStandardDeduction)(5200000n)))
+            assertEq(result.line2j, 0n, 'no K-1, no adjustment')
+            assertEq(result.line4, 25000000n, 'AMTI is the whole $250,000.00 of AGI and no more')
+            assertEq(result.line6, 16190000n, '$250,000.00 - $88,100.00 = $161,900.00')
+            assertEq(result.line7, 4209400n, '26% of $161,900.00 = $42,094.00')
+            assertEq(result.line11, 0n, 'and it loses to the regular tax')
+        },
+        // LINE 2J REACHES AMTI ONE FOR ONE, as a DIFFERENCE across the pair
+        // rather than against a second literal — the leaf that catches a line
+        // 2j computed correctly and then left out of line 4's sum, where the
+        // field would hold the right figure and the tax would not move.
+        theWholeOfCodeALandsInAlternativeMinimumTaxableIncome: () => {
+            const withK1 = expectOk(run({
+                ...wageReturn(25000000n)(singleStandardDeduction)(5200000n),
+                estateTrustK1Forms: [beneficiaryK1('doc-k1-a')([{ code: 'A', amount: '75000.00' }])],
+            }))
+            const without = expectOk(run(wageReturn(25000000n)(singleStandardDeduction)(5200000n)))
+            assertEq(
+                withK1.line4 - without.line4, 7500000n,
+                'AMTI rises by exactly box 12 code A, no more and no less')
+            assertEq(
+                withK1.line4BeforeAddBack - without.line4BeforeAddBack, 7500000n,
+                'and it is in line 4 BEFORE the married-filing-separately paragraph')
+            assert(
+                withK1.line11 > without.line11,
+                ['and the tax rises with it', withK1.line11, without.line11])
+        },
+        /**
+         * **A NEGATIVE code A REDUCES alternative minimum taxable income**, and
+         * this is the leaf a floor at zero fails. The printed line carries no
+         * "if zero or less, enter -0-" and `i6251.pdf`'s own *Who Must File*
+         * item 4 contemplates lines 2c through 3 summing negative.
+         *
+         *   line 4     234,250.00 + 15,750.00 - 25,000.00         $225,000.00
+         *   line 6     225,000.00 - 88,100.00                     $136,900.00
+         */
+        aNegativeAdjustmentReducesAlternativeMinimumTaxableIncome: () => {
+            const result = expectOk(run({
+                ...wageReturn(25000000n)(singleStandardDeduction)(5200000n),
+                estateTrustK1Forms: [beneficiaryK1('doc-k1-neg')([{ code: 'A', amount: '-25000.00' }])],
+            }))
+            assertEq(result.line2j, -2500000n, 'line 2j = minus $25,000.00, unfloored')
+            assertEq(result.line4, 22500000n, 'AMTI = $225,000.00, BELOW the $250,000.00 it would be')
+            assertEq(result.line6, 13690000n, '$225,000.00 - $88,100.00 = $136,900.00')
+            // And on a return that DOES owe alternative minimum tax, the
+            // negative adjustment lowers the tax itself. $100,000.00 of
+            // private-activity bond interest puts AMTI above the 28% breakpoint:
+            //
+            //   without   line 4  234,250 + 15,750 + 100,000      $350,000.00
+            //             line 6  350,000.00 - 88,100.00          $261,900.00
+            //             line 7  26% of 239,100.00 = 62,166.00
+            //                   + 28% of  22,800.00 =  6,384.00    $68,550.00
+            //             line 11 68,550.00 - 52,000.00            $16,550.00
+            //   with      line 4  350,000.00 - 25,000.00          $325,000.00
+            //             line 6  325,000.00 - 88,100.00          $236,900.00
+            //             line 7  26% of 236,900.00                $61,594.00
+            //             line 11 61,594.00 - 52,000.00             $9,594.00
+            const bonds = {
+                ...wageReturn(25000000n)(singleStandardDeduction)(5200000n),
+                specifiedPrivateActivityBondInterestCents: 10000000n,
+            }
+            const withoutK1 = expectOk(run(bonds))
+            const withNegative = expectOk(run({
+                ...bonds,
+                estateTrustK1Forms: [beneficiaryK1('doc-k1-neg')([{ code: 'A', amount: '-25000.00' }])],
+            }))
+            assertEq(withoutK1.line11, 1655000n, '$16,550.00 of AMT without the K-1')
+            assertEq(withNegative.line11, 959400n, '$9,594.00 with it -- the tax FELL')
+        },
+        // The figure lands on line 2j and on NO OTHER Part I line. The same
+        // explicit sweep line 2g gets, and for the same reason: box 12 wired to
+        // the neighbouring 2i or 2k would leave line 4, line 11 and every tax
+        // figure IDENTICAL, and no assertion about the tax could see it.
+        codeALandsOnTwoJAndOnNoOtherPartOneLine: () => {
+            const result = expectOk(run({
+                ...wageReturn(25000000n)(singleStandardDeduction)(5200000n),
+                estateTrustK1Forms: [beneficiaryK1('doc-k1-a')([{ code: 'A', amount: '75000.00' }])],
+            }))
+            assertEq(result.line2j, 7500000n, 'on line 2j')
+            /** @type {readonly (readonly [string, bigint])[]} */
+            const everyOtherPartOneLine = [
+                ['line2b', result.line2b], ['line2c', result.line2c], ['line2d', result.line2d],
+                ['line2e', result.line2e], ['line2f', result.line2f], ['line2g', result.line2g],
+                ['line2h', result.line2h], ['line2i', result.line2i], ['line2k', result.line2k],
+                ['line2l', result.line2l], ['line2m', result.line2m], ['line2n', result.line2n],
+                ['line2o', result.line2o], ['line2p', result.line2p], ['line2q', result.line2q],
+                ['line2r', result.line2r], ['line2s', result.line2s], ['line2t', result.line2t],
+                ['line3', result.line3],
+            ]
+            assertEq(
+                everyOtherPartOneLine.length, 19,
+                'the nineteen Part I lines that are neither 2a nor 2j, hand-counted off the printed form')
+            for (const [name, value] of everyOtherPartOneLine) {
+                assertEq(value, 0n, ['box 12 code A must not land on this line', name, value])
+            }
+        },
+        // ALL THREE computed preference items on ONE return, ADDING: §57(a)(5),
+        // §56(b)(3) and the fiduciary's adjustment are three separate printed
+        // lines and none is a limitation on the others. Three DIFFERENT
+        // amounts, so any swap between them names itself.
+        theThreeComputedPreferenceItemsAllLandAndAdd: () => {
+            const result = expectOk(run({
+                ...wageReturn(25000000n)(singleStandardDeduction)(5500000n),
+                specifiedPrivateActivityBondInterestCents: 6000000n,
+                isoExerciseForms: [isoForm('doc-iso-and-trust')('5.00')('105.00')('10000')],
+                estateTrustK1Forms: [beneficiaryK1('doc-k1-a')([{ code: 'A', amount: '75000.00' }])],
+            }))
+            assertEq(result.line2g, 6000000n, 'line 2g = $60,000.00 of box 9')
+            assertEq(result.line2i, 100000000n, 'line 2i = $1,000,000.00 of ISO spread')
+            assertEq(result.line2j, 7500000n, 'line 2j = $75,000.00 of box 12 code A')
+            // 234,250.00 + 15,750.00 + 60,000.00 + 1,000,000.00 + 75,000.00
+            assertEq(result.line4, 138500000n, 'AMTI = $1,385,000.00 -- all three, added')
+        },
+        // The `STMT` row's refusal reaches the CALLER, rather than being
+        // absorbed into a zero here: no line is computed and the whole form
+        // refuses, exactly as a Form 3921 missing a box does.
+        aCodeARowWithNoAmountRefusesTheWholeForm: () => {
+            const outcome = run({
+                ...wageReturn(25000000n)(singleStandardDeduction)(5200000n),
+                estateTrustK1Forms: [beneficiaryK1('doc-k1-stmt')([{ code: 'A' }])],
+            })
+            assert(outcome.kind === 'error', ['expected the whole form to refuse', outcome])
+            if (outcome.kind !== 'error') {
+                return
+            }
+            assert(outcome.message.includes('doc-k1-stmt'), ['name the document', outcome.message])
+            assert(outcome.message.includes('line 2j'), ['name the line', outcome.message])
+            // The CONTROL: the same return whose row carries an amount
+            // computes, so this is not a form that refuses every K-1.
+            assertEq(
+                expectOk(run({
+                    ...wageReturn(25000000n)(singleStandardDeduction)(5200000n),
+                    estateTrustK1Forms: [beneficiaryK1('doc-k1-stmt')([{ code: 'A', amount: '75000.00' }])],
+                })).line2j,
+                7500000n)
         },
     },
     partThree: {

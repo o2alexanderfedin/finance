@@ -142,6 +142,7 @@ import { centsFromString } from '../../exact/module.f.js'
 import { form8959 } from '../../form8959/module.f.js'
 import { form8960 } from '../../form8960/module.f.js'
 import { form6251 } from '../../form6251/module.f.js'
+import { estateTrustAmtAdjustmentSources } from '../../form6251/estate_trust/module.f.js'
 // PROOF-ONLY at run time, and deliberately the ONLY thing this module reads
 // from `fjs/return/scope`: `theForeignTaxCreditCycleIsResolvedByARefusal`
 // needs to check that the foreign tax credit is still refused, because Form
@@ -160,6 +161,8 @@ import { taxParamsByYear } from '../../tax/params/module.f.js'
 /** @import { RegularPreferentialWorksheet } from '../../form6251/part3/module.f.js' */
 /** @import { FormThirtyNineTwentyOne } from '../../document/form3921/module.f.js' */
 /** @import { W2 } from '../../document/w2/module.f.js' */
+/** @import { K1EstateTrust } from '../../document/k1_1041/module.f.js' */
+/** @import { CodedEntry } from '../../document/k1_common/module.f.js' */
 /** @import { SelfEmploymentOutcome } from '../se/module.f.js' */
 
 // ── Inputs ───────────────────────────────────────────────────────────────────
@@ -368,6 +371,7 @@ const uncollectedTaxSources = w2s => w2s.flatMap(form =>
  *   readonly specifiedPrivateActivityBondInterestCents: bigint,
  *   readonly standardDeductionCents: bigint,
  *   readonly isoExerciseForms: readonly Stored<FormThirtyNineTwentyOne>[],
+ *   readonly estateTrustK1Forms: readonly Stored<K1EstateTrust>[],
  *   readonly aStoredNineteenNineBReportsASale: boolean,
  *   readonly filingScheduleD: boolean,
  *   readonly scheduleD15Cents: bigint,
@@ -445,7 +449,7 @@ export const scheduleTwo = taxParamSet => input => {
         qualifiedDividends, totalDeductions, regularTax,
         itemizing, scheduleALine7Cents, scheduleOneALine37Cents, standardDeductionCents,
         specifiedPrivateActivityBondInterestCents,
-        isoExerciseForms, aStoredNineteenNineBReportsASale,
+        isoExerciseForms, estateTrustK1Forms, aStoredNineteenNineBReportsASale,
         filingScheduleD, scheduleD15Cents, scheduleD16Cents, scheduleD19Cents,
         regularPreferentialWorksheet,
     } = input
@@ -485,6 +489,10 @@ export const scheduleTwo = taxParamSet => input => {
         scheduleALine7Cents,
         standardDeductionCents,
         isoExerciseForms,
+        // Form 6251 line 2j -- box 12 code A off every stored Schedule K-1
+        // (Form 1041). The DOCUMENTS travel, not a summed figure: the rows
+        // need per-code filtering and the citations below are per ENTRY.
+        estateTrustK1Forms,
         aStoredNineteenNineBReportsASale,
         regularTaxCents: regularTax.value,
         scheduleTwoLine1zCents: line1z.value,
@@ -527,13 +535,19 @@ export const scheduleTwo = taxParamSet => input => {
                 value: fairMarketValue,
             }]
     })
+    // One citation per Schedule K-1 (Form 1041) box 12 entry that reached line
+    // 2j, built by the module that decided which entries those were -- never a
+    // second code match here, which is how a citation comes to name a row that
+    // did not contribute (or miss one that did).
+    const estateTrustSources = estateTrustAmtAdjustmentSources(estateTrustK1Forms)
     // Every fact the comparison actually reads: the profile (so a return with
     // no AMT still names the declaration the way every other zero line on this
     // schedule does), the adjusted gross income and deduction total that make
     // up alternative minimum taxable income, the regular tax it is measured
-    // against, and one citation per Form 3921 whose spread reached line 2i.
+    // against, one citation per Form 3921 whose spread reached line 2i, and one
+    // per K-1 box 12 code A row that reached line 2j.
     //
-    // The Form 3921 citations are APPENDED rather than unioned, because
+    // The document citations are APPENDED rather than unioned, because
     // `unionSources` takes `ReportLine`s and a Form 3921 box is not a report
     // line -- and no deduplication is lost: a `(documentHash, boxPath)` pair
     // naming a Form 3921 cannot collide with one naming a 1040 line.
@@ -542,7 +556,9 @@ export const scheduleTwo = taxParamSet => input => {
         adjustedGrossIncome, totalDeductions, regularTax,
     ])
     /** @type {readonly [Source, ...(readonly Source[])]} */
-    const line2Sources = [line2LineSources[0], ...line2LineSources.slice(1), ...isoSources]
+    const line2Sources = [
+        line2LineSources[0], ...line2LineSources.slice(1), ...isoSources, ...estateTrustSources,
+    ]
     const line2 = {
         value: form6251Result.line11,
         sources: line2Sources,
@@ -776,6 +792,7 @@ const noAmounts = {
     scheduleOneALine37Cents: 0n,
     standardDeductionCents: 0n,
     isoExerciseForms: [],
+    estateTrustK1Forms: [],
     aStoredNineteenNineBReportsASale: false,
     filingScheduleD: false,
     scheduleD15Cents: 0n,
@@ -841,6 +858,26 @@ const isoForm = hash => exercisePrice => fairMarketValue => shares => ({
         box3ExercisePricePerShare: exercisePrice,
         box4FairMarketValuePerShareOnExerciseDate: fairMarketValue,
         box5NumberOfSharesTransferred: shares,
+    },
+})
+
+/**
+ * A stored beneficiary's Schedule K-1 (Form 1041) carrying exactly the box 12
+ * rows given — the document Form 6251 line 2j reads.
+ * @type {(hash: string) => (box12: readonly CodedEntry[]) => Stored<K1EstateTrust>}
+ */
+const beneficiaryK1 = hash => box12 => ({
+    documentHash: hash,
+    value: {
+        dialect: 'vnd.fjs.k1_1041',
+        payerTin: '66-6666666',
+        recipientTin: '222-22-2222',
+        taxYear: 2025,
+        formRevision: '2025',
+        payerName: 'The Harrow Family Trust',
+        boxHDomesticBeneficiary: /** @type {const} */ (true),
+        materialParticipation: 'materiallyParticipated',
+        box12AlternativeMinimumTaxItems: box12,
     },
 })
 
@@ -1101,6 +1138,72 @@ export const proof = {
                 ['line 2 must cite the Form 3921 whose spread it taxed', boxes])
             const hashes = result.line2.sources.map(source => source.documentHash)
             assert(hashes.includes('doc-iso-sched-2'), ['by hash, too', hashes])
+        },
+        /**
+         * The same slice for **Form 6251 line 2j**: a stored Schedule K-1 (Form
+         * 1041) box 12 code A reaches line 2, line 3 and thence 1040 line 17,
+         * and line 2 CITES the box 12 entry that put it there.
+         *
+         * $250,000.00 of salary, a $52,000.00 regular tax and a $75,000.00 code
+         * A adjustment; every figure is hand-computed in `fjs/form6251`'s
+         * `theBeneficiaryWhoOwesAlternativeMinimumTax`, and the claim here is
+         * the routing and the citation.
+         */
+        aStoredScheduleKOneBoxTwelveCodeAReachesLineTwoAndThenceLineThree: () => {
+            const result = run({
+                ...noAmounts,
+                adjustedGrossIncome: inputLine('line11b')(25000000n),
+                totalDeductions: inputLine('line14')(1575000n),
+                standardDeductionCents: 1575000n,
+                regularTax: inputLine('line16')(5200000n),
+                estateTrustK1Forms: [beneficiaryK1('doc-k1-sched-2')([
+                    { code: 'A', amount: '75000.00' },
+                ])],
+            })
+            assertEq(result.form6251.line2j, 7500000n, 'the adjustment reached Form 6251 line 2j')
+            assertEq(result.line2.value, 959400n, 'line 2 = $9,594.00')
+            assertEq(result.line3.value, 959400n, 'line 3 = $9,594.00 -> 1040 line 17')
+            assertEq(result.line21.value, 0n, 'line 21 = $0.00 -- the AMT is not an "other tax"')
+        },
+        /** The citation, in its own leaf: no amount is asserted here. */
+        lineTwoCitesTheBoxTwelveEntryItTaxed: () => {
+            const result = run({
+                ...noAmounts,
+                adjustedGrossIncome: inputLine('line11b')(25000000n),
+                totalDeductions: inputLine('line14')(1575000n),
+                standardDeductionCents: 1575000n,
+                regularTax: inputLine('line16')(5200000n),
+                estateTrustK1Forms: [beneficiaryK1('doc-k1-sched-2')([
+                    { code: 'A', amount: '75000.00' },
+                ])],
+            })
+            const boxes = result.line2.sources.map(source => source.boxPath)
+            assert(
+                boxes.includes('k1_1041.box12[code=A]'),
+                ['line 2 must cite the box 12 entry it taxed, dialect-qualified', boxes])
+            const hashes = result.line2.sources.map(source => source.documentHash)
+            assert(hashes.includes('doc-k1-sched-2'), ['by hash, too', hashes])
+            const cited = result.line2.sources.filter(
+                source => source.boxPath === 'k1_1041.box12[code=A]')
+            assertEq(cited.length, 1, 'one contributing entry, one source')
+            const [source] = cited
+            assert(source !== undefined, 'expected the source')
+            if (source === undefined) {
+                return
+            }
+            assertEq(source.value, '75000.00', 'the RAW printed amount, not the computed tax')
+            // The CONTROL: a return with no K-1 cites no such box, so the
+            // citation is not appearing unconditionally.
+            const without = run({
+                ...noAmounts,
+                adjustedGrossIncome: inputLine('line11b')(25000000n),
+                totalDeductions: inputLine('line14')(1575000n),
+                standardDeductionCents: 1575000n,
+                regularTax: inputLine('line16')(5200000n),
+            })
+            assert(
+                !without.line2.sources.some(candidate => candidate.boxPath === 'k1_1041.box12[code=A]'),
+                without.line2.sources.map(candidate => candidate.boxPath))
         },
         // Line 2 is Form 6251 line 11, asserted as an identity against the
         // record that produced it -- so a wiring that read line 7 (the

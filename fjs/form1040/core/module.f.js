@@ -124,6 +124,7 @@ import {
 /** @import { K1Partnership } from '../../document/k1_1065/module.f.js' */
 /** @import { K1SCorporation } from '../../document/k1_1120s/module.f.js' */
 /** @import { K1EstateTrust } from '../../document/k1_1041/module.f.js' */
+/** @import { CodedEntry } from '../../document/k1_common/module.f.js' */
 /** @import { FormThirtyNineTwentyTwo } from '../../document/form3922/module.f.js' */
 /** @import { BasisCorrection } from '../../document/basis_correction/module.f.js' */
 /** @import { Kind, ReturnProfile } from '../../return/profile/module.f.js' */
@@ -1297,6 +1298,12 @@ export const form1040IncomeLines = taxParamSet => inputs => {
     // There is no circularity here, only that order: line 11 of Form 8995
     // excludes the very deduction being computed, by its own wording.
     const [firstBusinessRecord] = businessExpenseForms
+    // Form 1099-DIV box 5, §199A dividends -- Form 8995 line 6's REIT half.
+    // Bound here rather than inline because line 13a below needs BOTH halves
+    // of it: the value, to decide whether the deduction is computed at all,
+    // and the sources, to cite the box it deducted.
+    const reitDividendSum = sumBoxOverDocuments(dividendForms)('box5Section199ADividends')(
+        div => div.box5Section199ADividends)
     const qbiOutcome = qualifiedBusinessIncomeDeduction(taxParamSet)({
         status,
         // Schedule C line 31, and the SAME Schedule SE execution line 10
@@ -1328,6 +1335,17 @@ export const form1040IncomeLines = taxParamSet => inputs => {
             deductionCents: line12e.value,
             additionalDeductionsCents: line13b.value,
         }),
+        // Form 8995 line 6 / Form 8995-A line 28: §199A(b)(1)(B)'s SECOND
+        // component, 20% of qualified REIT dividends, which needs no trade or
+        // business at all. Form 1099-DIV box 5, summed over the SAME documents
+        // lines 3a, 3b, 7a and 25b already read, with one Source per
+        // contributing form -- `vnd.fjs.1099div` has validated this box to the
+        // cent since the dialect shipped and nothing read it.
+        //
+        // The PTP half of that printed line stays zero: it arrives on a
+        // Schedule K-1 as box 20 code Z or box 17 code V, and `fjs/schedule/e`
+        // refuses the whole return for either.
+        qualifiedReitDividendsCents: reitDividendSum.value,
         // Form 8995 line 12's own definition, which is the Qualified
         // Dividends and Capital Gain Tax Worksheet's lines 2 and 3 written a
         // second time -- `formEightNineNineFivesNetCapitalGainIsTheWorksheets\
@@ -1353,23 +1371,43 @@ export const form1040IncomeLines = taxParamSet => inputs => {
     if (qbiOutcome.kind === 'error') {
         return { kind: 'error', message: qbiOutcome.message, unmodeled: [] }
     }
-    // A return with no business filed keeps the documented zero it has always
-    // carried, citing the profile alone -- `scheduleC.filed` is the field
-    // that tells a break-even business apart from no business at all, and
-    // this is the second reader it has ever had.
-    const line13a = scheduleOnePartIResult.scheduleC.filed
+    // **THE GATE, and it is not `scheduleC.filed` alone.** §199A has TWO
+    // components and only the first needs a trade or business: §199A(b)(1)(B)
+    // gives 20% of qualified REIT dividends to a filer with no business at
+    // all, which is the retiree holding a REIT index fund. Gating line 13a on
+    // `scheduleC.filed` would have computed that deduction and then thrown it
+    // away one line later — the shape a form-level proof structurally cannot
+    // see, and the reason this module carries end-to-end leaves for it.
+    //
+    // A return with NEITHER a filed Schedule C nor a reported box 5 keeps the
+    // documented zero it has always carried, citing the profile alone.
+    const [firstReitSource, ...restReitSources] = reitDividendSum.sources
+    // The REIT half as a line of its own, present ONLY when a document
+    // supplied it -- an empty tuple would be untypable and a `documentLine`
+    // fallback would drag the profile's `declaredKinds` box into line 13a's
+    // citation for every business return that has no 1099-DIV.
+    /** @type {readonly ReportLine[]} */
+    const reitDividendLines = firstReitSource === undefined
+        ? []
+        : [{
+            value: reitDividendSum.value,
+            sources: [firstReitSource, ...restReitSources],
+            rule: 'Form 8995 line 6 (qualified REIT dividends, Form 1099-DIV box 5)',
+        }]
+    const line13a = scheduleOnePartIResult.scheduleC.filed || firstReitSource !== undefined
         ? {
             // Form 8995 line 15 or Form 8995-A line 39, whichever page the
             // router filled -- `deductionCents` is the one figure line 13a
             // receives either way, so this call site does not branch on it.
             value: qbiOutcome.deductionCents,
             // Every fact the deduction reads: the business documents behind
-            // the net profit and the deductible half, the AGI, and the
+            // the net profit and the deductible half, the §199A dividends
+            // behind the REIT component, the AGI, and the
             // filing-status/12d-box/itemized sources behind line 12e and line
             // 13b that decide the limitation base.
             sources: unionSources([
                 scheduleOnePartIResult.scheduleC.partII.line31,
-                line11b, line12e, line13b, line3a, line7a,
+                line11b, line12e, line13b, line3a, line7a, ...reitDividendLines,
             ]),
             rule: '1040 line 13a (qualified business income deduction, Form 8995 line 15 '
                 + 'or Form 8995-A line 39)',
@@ -1667,7 +1705,7 @@ const profileMoneyBox = profile => boxPath => {
 const form1040TaxAndPaymentLines = taxParamSet => inputs => income => {
     const {
         profile, w2s, interestForms, dividendForms, brokerageForms, retirementForms,
-        unemploymentForms, nonemployeeCompensationForms, isoExerciseForms,
+        unemploymentForms, nonemployeeCompensationForms, isoExerciseForms, estateTrustK1Forms,
     } = inputs
     const declaredZero = profileDeclaredZeroLine(profile)
     const fromDocuments = documentLine(profile)
@@ -1853,6 +1891,11 @@ const form1040TaxAndPaymentLines = taxParamSet => inputs => income => {
         scheduleOneALine37Cents: income.scheduleOneALine37Cents,
         standardDeductionCents: income.line12e.value,
         isoExerciseForms,
+        // Form 6251 line 2j -- Schedule K-1 (Form 1041) box 12 code A, the
+        // beneficiary's share of the estate's or trust's alternative minimum
+        // tax adjustment. The SAME documents lines 2b, 3a and 3b and Schedule
+        // E Part III already read; box 12 has no other reader in the engine.
+        estateTrustK1Forms,
         // §56(b)(3)'s same-year-disposition rule: `fjs/form6251` cannot tell
         // whether the shares sold were the shares exercised, so a stored Form
         // 3921 alongside ANY reported sale refuses. Asked of `box1dProceeds`
@@ -2694,6 +2737,7 @@ const dividendAndBrokerageSourceArtifactHash
  *   readonly box2bUnrecapSec1250Gain?: string,
  *   readonly box2dCollectibles28PercentGain?: string,
  *   readonly box4FederalIncomeTaxWithheld?: string,
+ *   readonly box5Section199ADividends?: string,
  * }} DividendBoxes
  */
 
@@ -3080,6 +3124,28 @@ const unemploymentDocument = documentHash => box1 => box4 => ({
 const selfEmploymentProfile = {
     ...singleProfile,
     declaredKinds: ['businessIncomeOrLoss', 'federalTaxWithheldOnOther1099'],
+}
+
+/**
+ * **A SINGLE WAGE EARNER WHO HOLDS A REIT INDEX FUND** — the §199A(b)(1)(B)
+ * persona, and the one this engine dropped a deduction for until Form 8995
+ * line 6 acquired a reader.
+ *
+ * It declares NO business kind, which is the whole point: the REIT component
+ * needs no trade or business, so `scheduleC.filed` is `false` on every return
+ * built from this profile and 1040 line 13a is nonzero anyway.
+ *
+ * It also does NOT declare `qualifiedReitDividendsAndPtpIncome`. That kind
+ * covers the publicly traded partnership half as well, which this engine still
+ * cannot compute, so it stays an `fjs/return/scope` refusal and declaring it
+ * would refuse the whole return — while Form 1099-DIV box 5 is read
+ * unconditionally, exactly as boxes 1a and 1b already are. See
+ * `fjs/form8995/todo/reit-dividends.md`.
+ * @type {ReturnProfile}
+ */
+const reitInvestorProfile = {
+    ...singleProfile,
+    declaredKinds: ['wages', 'ordinaryDividends'],
 }
 
 /** @type {(documentHash: string) => (box1: string) => (box4: string) => Stored<OneZeroNineNineNec>} */
@@ -3767,6 +3833,73 @@ const phaseOutInputs = {
     }],
 }
 
+
+/**
+ * A beneficiary's Schedule K-1 (Form 1041) carrying **box 12 rows and no income
+ * box at all** — the document Form 6251 line 2j reads, and a separate builder
+ * from {@link estateTrustPortfolioK1} for the reason the three portfolio
+ * builders are separate: a fixture that could be pointed at any box by changing
+ * one field lets a mis-numbered read pass by construction.
+ * @type {(documentHash: string) => (box12: readonly CodedEntry[]) => Stored<K1EstateTrust>}
+ */
+const estateTrustAmtK1 = documentHash => box12 => ({
+    documentHash,
+    value: {
+        dialect: 'vnd.fjs.k1_1041',
+        payerTin: '66-6666666',
+        recipientTin: '222-22-2222',
+        taxYear: 2025,
+        formRevision: '2025',
+        payerName: 'The Harrow Family Trust',
+        boxHDomesticBeneficiary: /** @type {const} */ (true),
+        materialParticipation: 'materiallyParticipated',
+        box12AlternativeMinimumTaxItems: box12,
+    },
+})
+
+/**
+ * The EXACT exercise-and-hold return `anExerciseAndHoldReachesNineteenFortyLineSeventeen`
+ * computes — a 65-year-old single filer, $130,000.00 of wages, 10,000 shares
+ * exercised at a $5.00 strike against a $105.00 fair market value — optionally
+ * carrying beneficiary Schedule K-1s.
+ *
+ * Shared so the line 2j leaves below are DIFFERENTIALS against a return whose
+ * every figure is already hand-derived one leaf above, rather than against a
+ * second fixture that could drift from it.
+ * @type {(estateTrustK1Forms: readonly Stored<K1EstateTrust>[]) => Form1040Outcome}
+ */
+const exerciseAndHoldWith = estateTrustK1Forms => {
+    /** @type {ReturnProfile} */
+    const profile = {
+        ...singleProfile,
+        taxpayerBornBeforeJan2_1961: true,
+        declaredKinds: ['wages', 'seniorAndOtherScheduleOneADeductions', 'alternativeMinimumTax'],
+    }
+    return form1040Report(taxParams2025)({
+        ...inputsOf(storedProfile(profile))([
+            w2Document('sha256-2j-amt-w2')('130000.00'),
+        ])([])([])([])([])([])([])([])([]),
+        isoExerciseForms: [{
+            documentHash: 'sha256-2j-amt-3921',
+            value: {
+                dialect: 'vnd.fjs.form3921',
+                payerTin: '11-1111111',
+                recipientTin: '222-22-2222',
+                accountNumber: 'ACC-ISO',
+                taxYear: 2025,
+                formRevision: 'April 2025',
+                sourceArtifactHash:
+                    'deadbeef00112233445566778899aabbccddeeff0011223344556677889900',
+                box1DateOptionGranted: '01/03/2023',
+                box2DateOptionExercised: '03/13/2025',
+                box3ExercisePricePerShare: '5.00',
+                box4FairMarketValuePerShareOnExerciseDate: '105.00',
+                box5NumberOfSharesTransferred: '10000',
+            },
+        }],
+        estateTrustK1Forms,
+    })
+}
 
 export const proof = {
     unionSources: {
@@ -5309,6 +5442,166 @@ export const proof = {
                 income.line13a.value !== 815505n,
                 ['net capital gain must come out of the limitation base', income.line13a.value])
             assertEq(815505n - 575505n, 240000n, '$2,400.00 = 20% of the qualified dividends')
+        },
+        /**
+         * **THE WIRING LEAF, and it exists because a mutation demanded it.**
+         *
+         * `fjs/form8995`'s own leaves prove lines 6-10's arithmetic and
+         * `fjs/form8995a`'s prove lines 28-32's. **Not one of them can notice
+         * this module handing the deduction an empty dividend list, or
+         * throwing the computed figure away one line later.** Replacing
+         * `qualifiedReitDividendsCents: reitDividendSum.value` with `0n` at the
+         * call site above, or narrowing line 13a's gate back to
+         * `scheduleC.filed` alone, left the whole suite green until these
+         * leaves existed — and a retiree holding a REIT index fund would have
+         * received a return understating their deduction by the whole of it.
+         *
+         * **The gate is the load-bearing half.** §199A(b)(1)(B) needs no trade
+         * or business, so this fixture deliberately has none: no Schedule C is
+         * filed, `scheduleC.filed` is `false`, and the deduction is real
+         * anyway.
+         *
+         *   1040 line 1a   W-2 box 1                        $60,000.00
+         *   1040 line 3b   1099-DIV box 1a                   $5,000.00
+         *   1040 line 11a  AGI, no adjustments              $65,000.00
+         *   1040 line 12e  the single standard deduction    $15,750.00
+         *   Form 8995 6    1099-DIV box 5, §199A dividends   $1,000.00
+         *   Form 8995 9    20% of 100,000                      $200.00
+         *   Form 8995 11   65,000.00 - 15,750.00            $49,250.00
+         *   Form 8995 14   20% of 4,925,000                  $9,850.00
+         *   Form 8995 15   the LESSER of 10 and 14             $200.00
+         *   1040 line 13a  = Form 8995 line 15                 $200.00
+         *   1040 line 14   15,750.00 + 200.00 + 0.00        $15,950.00
+         *   1040 line 15   65,000.00 - 15,950.00            $49,050.00
+         *
+         * Stated as a DIFFERENTIAL as well as an absolute: the identical
+         * return with box 5 removed must deduct exactly $200.00 less and fall
+         * back to the documented zero, so the leaf cannot be satisfied by
+         * anything that merely happens to total $200.00 for another reason.
+         *
+         * `qualifiedReitDividendsAndPtpIncome` is deliberately NOT declared:
+         * it is still a refused `fjs/return/scope` kind — the PTP half of it
+         * genuinely cannot be computed — and box 5 is read unconditionally
+         * anyway, exactly as lines 3a and 3b read boxes 1b and 1a off the same
+         * document. See `fjs/form8995/todo/reit-dividends.md`.
+         */
+        aReitDividendWithNoBusinessAtAllReachesLineThirteenA: () => {
+            /** @type {(boxes: DividendBoxes) => Form1040IncomeLines} */
+            const investorReturn = boxes => computedLines(
+                inputsOf(storedProfile(reitInvestorProfile))([
+                    w2Document('sha256-w2-reit-investor')('60000.00'),
+                ])([])([dividendDocument('sha256-1099div-reit')(boxes)])([])([])([])([])([])([])
+            ).income
+            const withBoxFive = investorReturn({
+                box1aTotalOrdinaryDividends: '5000.00',
+                box5Section199ADividends: '1000.00',
+            })
+            const withoutBoxFive = investorReturn({ box1aTotalOrdinaryDividends: '5000.00' })
+            assertEq(withBoxFive.line1a.value, 6000000n, '$60,000.00 of wages')
+            assertEq(withBoxFive.line3b.value, 500000n, '$5,000.00 of ordinary dividends')
+            assertEq(withBoxFive.line11a.value, 6500000n, 'AGI = $65,000.00')
+            assertEq(withBoxFive.line12e.value, 1575000n, 'the single standard deduction')
+            assertEq(withBoxFive.line13a.value, 20000n, '1040 line 13a = $200.00 = 20% of $1,000.00')
+            assertEq(withBoxFive.line14.value, 1595000n, '1040 line 14 = $15,950.00')
+            assertEq(withBoxFive.line15.value, 4905000n, '1040 line 15 = $49,050.00 of taxable income')
+            // The income limitation is nowhere near binding, hand-computed —
+            // so the $200.00 is the REIT component itself rather than a
+            // limitation that coincidentally landed there.
+            assertEq(4925000n * 20n / 100n, 985000n, 'Form 8995 line 14 would allow $9,850.00')
+            // THE CONTROL, and the differential.
+            assertEq(withoutBoxFive.line13a.value, 0n, 'without box 5, no deduction at all')
+            assertEq(
+                withBoxFive.line13a.value - withoutBoxFive.line13a.value,
+                20000n,
+                'the SAME return deducts exactly $200.00 more for carrying the box')
+            // …and without it the line is the DOCUMENTED ZERO it has always
+            // been, citing the profile alone: no Schedule C was filed on
+            // either return, which is what makes the gate observable.
+            assertEq(withoutBoxFive.line13a.sources.length, 1, 'one citation, the profile')
+            assertEq(withoutBoxFive.line13a.sources[0]?.boxPath, 'declaredKinds')
+            // The whole $5,000.00 of ordinary dividends is still ordinary
+            // income on line 3b: box 5 is a SUBSET of box 1a on the printed
+            // form, and reading it for the deduction must not remove it from
+            // income. A wiring that subtracted it would show $4,000.00 here.
+            assertEq(withoutBoxFive.line3b.value, withBoxFive.line3b.value, 'box 5 is not income of its own')
+        },
+        /**
+         * …and it arrives citing the box an auditor has to look at. A separate
+         * leaf from the value, because a citation that is right for the wrong
+         * amount and an amount that is right with no citation are different
+         * defects, and one leaf asserting both would report either as the
+         * other.
+         *
+         * Two 1099-DIVs, one of which reports box 5 and one of which does not:
+         * the cited set must name the first document and only the first, and
+         * the boxPath must be the stored field name rather than a prose
+         * description of it.
+         */
+        lineThirteenACitesTheBoxFiveItDeducted: () => {
+            const { income } = computedLines(
+                inputsOf(storedProfile(reitInvestorProfile))([
+                    w2Document('sha256-w2-reit-investor')('60000.00'),
+                ])([])([
+                    dividendDocument('sha256-1099div-reit')({
+                        box1aTotalOrdinaryDividends: '5000.00',
+                        box5Section199ADividends: '1000.00',
+                    }),
+                    dividendDocument('sha256-1099div-plain')({
+                        box1aTotalOrdinaryDividends: '250.00',
+                    }),
+                ])([])([])([])([])([])([]))
+            assertEq(income.line13a.value, 20000n, '$200.00, from the one form that reported box 5')
+            const cited = income.line13a.sources.filter(
+                source => source.boxPath === 'box5Section199ADividends')
+            assertEq(cited.length, 1, ['line 13a must cite the box it deducted', income.line13a.sources])
+            assertEq(cited[0]?.documentHash, 'sha256-1099div-reit', 'the 1099-DIV that carried it')
+            assertEq(cited[0]?.value, '1000.00', 'quoted verbatim, never re-formatted')
+        },
+        /**
+         * **THE SAME DIVIDEND, ABOVE §199A(e)(2)'s THRESHOLD**, where the
+         * return is filled on Form 8995-A instead. §199A(b)(1)(B)'s component
+         * is untouched by everything that page adds — the wage/UBIA cap and
+         * the specified-service phase-out reduce lines 2-16 and never reach
+         * line 28 — so the deduction must be the SAME $200.00. A deduction
+         * that appeared on one form and vanished on the other would be a
+         * defect a taxpayer could discover only by crossing the threshold.
+         *
+         *   1040 line 1a   W-2 box 1                       $210,000.00
+         *   1040 line 3b   1099-DIV box 1a                    $5,000.00
+         *   1040 line 11a  AGI                              $215,000.00
+         *   line 11 - 12e  taxable income before §199A      $199,250.00   <- above $197,300.00
+         *   8995-A 28      1099-DIV box 5                     $1,000.00
+         *   8995-A 31/32   20% of 100,000                       $200.00
+         *   8995-A 39      the smaller of 32 and 36 ($39,850)   $200.00
+         */
+        theSameReitDividendReachesLineThirteenAAboveTheThreshold: () => {
+            /** @type {(box1: string) => Form1040IncomeLines} */
+            const investorReturn = box1 => computedLines(
+                inputsOf(storedProfile(reitInvestorProfile))([
+                    w2Document('sha256-w2-reit-investor')(box1),
+                ])([])([
+                    dividendDocument('sha256-1099div-reit')({
+                        box1aTotalOrdinaryDividends: '5000.00',
+                        box5Section199ADividends: '1000.00',
+                    }),
+                ])([])([])([])([])([])([])
+            ).income
+            const above = investorReturn('210000.00')
+            assertEq(above.line11a.value, 21500000n, 'AGI = $215,000.00')
+            assertEq(above.line11b.value - above.line12e.value, 19925000n, '$199,250.00 before §199A')
+            // …and that really is above §199A(e)(2)'s single threshold,
+            // hand-typed from the statute rather than read from the params.
+            assert(19925000n > 19730000n, '$199,250.00 is above $197,300.00')
+            assertEq(19925000n - 19730000n, 195000n, 'by $1,950.00, so Form 8995-A is the page')
+            assertEq(above.line13a.value, 20000n, '1040 line 13a = $200.00, from Form 8995-A')
+            // THE COMPARISON that makes it worth asserting: the identical
+            // return below the threshold gets the identical figure, so the two
+            // pages cannot disagree about this component without reddening
+            // here.
+            assertEq(investorReturn('60000.00').line13a.value, 20000n, 'and $200.00 below it too')
+            // The income limitation on the comprehensive page is nowhere near
+            // binding either, hand-computed: 20% of $199,250.00 is $39,850.00.
+            assertEq(19925000n * 20n / 100n, 3985000n, 'Form 8995-A line 36 would allow $39,850.00')
         },
         /**
          * **ONE RULE, ONE PLACE, checked**: Form 8995 line 12's "net capital
@@ -9507,6 +9800,134 @@ export const proof = {
             assert(
                 boxes.includes('box4FairMarketValuePerShareOnExerciseDate'),
                 ['and the box the spread was computed from', boxes])
+        },
+        /**
+         * ★ **THE WIRING LEAF FOR FORM 6251 LINE 2J.** A stored Schedule K-1
+         * (Form 1041) box 12 code A reaches Form 6251 line 2j, Schedule 2 line
+         * 2, Schedule 2 line 3 and **1040 line 17**.
+         *
+         * It exists because a form-level proof structurally cannot see the
+         * wiring: `fjs/form6251`'s own leaves all hand the form a document list
+         * directly, and every one of them stays green while
+         * `fjs/form1040/core` hands `fjs/schedule/2` an EMPTY one — the exact
+         * defect `15c30af` shipped a fix for and this project has now paid for
+         * twice.
+         *
+         * The base return is the one hand-derived in the leaf above, so only
+         * the DELTA has to be computed here. AMTI was $1,130,000.00, the
+         * exemption is already fully phased out, and line 6 is above the
+         * $239,100.00 breakpoint — so every extra dollar of AMTI is taxed at
+         * 28% and nothing else on the return moves:
+         *
+         *   K-1 box 12 code A                                    $10,000.00
+         *   6251 line 4    1,130,000.00 + 10,000.00           $1,140,000.00
+         *   6251 line 6    the exemption is $0.00              $1,140,000.00
+         *   6251 line 7    26% of 239,100.00                      $62,166.00
+         *                + 28% of 900,900.00                     $252,252.00
+         *                                                        $314,418.00
+         *   6251 line 10   1040 line 16, unchanged                $19,139.00
+         *   6251 line 11   314,418.00 - 19,139.00                $295,279.00
+         *   1040 line 17                                         $295,279.00
+         */
+        aBoxTwelveCodeAReachesNineteenFortyLineSeventeen: () => {
+            const outcome = exerciseAndHoldWith([
+                estateTrustAmtK1('sha256-2j-k1')([{ code: 'A', amount: '10000.00' }]),
+            ])
+            assert(outcome.kind === 'ok', ['expected the beneficiary return to compute', outcome])
+            if (outcome.kind !== 'ok') {
+                return
+            }
+            const at = lineRuled(outcome.lines)
+            assertEq(at('1040 line 16').value, 1913900n, '$19,139.00 of regular tax, unchanged')
+            assertEq(at('1040 line 17').value, 29527900n, '$295,279.00 of alternative minimum tax')
+            assertEq(at('1040 line 18').value, 31441800n, '$314,418.00 = $19,139.00 + $295,279.00')
+            // THE DIFFERENTIAL: the identical return without the K-1 owes
+            // $292,479.00, so the whole $2,800.00 difference is 28% of the
+            // $10,000.00 adjustment and nothing else. An absolute assertion
+            // alone would be satisfied by a coincidence; this pair cannot be.
+            const without = exerciseAndHoldWith([])
+            assert(without.kind === 'ok', ['expected the control return to compute', without])
+            if (without.kind !== 'ok') {
+                return
+            }
+            const controlAt = lineRuled(without.lines)
+            assertEq(controlAt('1040 line 17').value, 29247900n, '$292,479.00 without the K-1')
+            assertEq(
+                at('1040 line 17').value - controlAt('1040 line 17').value, 280000n,
+                '$2,800.00 = 28% of the $10,000.00 adjustment')
+        },
+        /**
+         * **A NEGATIVE box 12 code A LOWERS 1040 line 17**, end to end. The
+         * leaf a floor at zero fails, at the entry point rather than at the
+         * form: 28% of minus $10,000.00 is minus $2,800.00 of tax.
+         *
+         *   6251 line 4    1,130,000.00 - 10,000.00           $1,120,000.00
+         *   6251 line 7    26% of 239,100.00                      $62,166.00
+         *                + 28% of 880,900.00                     $246,652.00
+         *                                                        $308,818.00
+         *   6251 line 11   308,818.00 - 19,139.00                $289,679.00
+         */
+        aNegativeBoxTwelveCodeALowersNineteenFortyLineSeventeen: () => {
+            const outcome = exerciseAndHoldWith([
+                estateTrustAmtK1('sha256-2j-k1-neg')([{ code: 'A', amount: '-10000.00' }]),
+            ])
+            assert(outcome.kind === 'ok', ['expected the negative-adjustment return to compute', outcome])
+            if (outcome.kind !== 'ok') {
+                return
+            }
+            assertEq(
+                lineRuled(outcome.lines)('1040 line 17').value, 28967900n,
+                '$289,679.00 -- BELOW the $292,479.00 the same return owes with no K-1')
+        },
+        /**
+         * Provenance, in its own leaf: 1040 line 17 cites the box 12 entry it
+         * taxed, by hash and by dialect-qualified box path — `box12` exists on
+         * a Form W-2 too, and that box also has a code A.
+         */
+        nineteenFortyLineSeventeenCitesTheBoxTwelveEntry: () => {
+            const outcome = exerciseAndHoldWith([
+                estateTrustAmtK1('sha256-2j-k1')([{ code: 'A', amount: '10000.00' }]),
+            ])
+            assert(outcome.kind === 'ok', ['expected the beneficiary return to compute', outcome])
+            if (outcome.kind !== 'ok') {
+                return
+            }
+            const seventeen = lineRuled(outcome.lines)('1040 line 17')
+            const hashes = seventeen.sources.map(source => source.documentHash)
+            assert(hashes.includes('sha256-2j-k1'), ['1040 line 17 must cite the Schedule K-1', hashes])
+            const boxes = seventeen.sources.map(source => source.boxPath)
+            assert(
+                boxes.includes('k1_1041.box12[code=A]'),
+                ['and the box AND CODE the adjustment came from', boxes])
+        },
+        /**
+         * ★ **THE CONTROL.** The same return whose box 12 carries code **J**
+         * — exclusion items, which belong on the FOLLOWING year's Form 8801
+         * and on no line of this return — **refuses**, naming the box and the
+         * code.
+         *
+         * Without it, a gate that let every box 12 code through would pass
+         * every leaf above: the three that assert a figure would still see
+         * code A summed correctly, and nothing would notice that a code
+         * belonging to another year's return had been let in beside it.
+         */
+        aBoxTwelveCodeThisEngineDoesNotRouteStillRefuses: () => {
+            const outcome = exerciseAndHoldWith([
+                estateTrustAmtK1('sha256-2j-k1-j')([{ code: 'J', amount: '10000.00' }]),
+            ])
+            assert(outcome.kind === 'error', ['expected the return to refuse', outcome])
+            if (outcome.kind !== 'error') {
+                return
+            }
+            assert(outcome.message.includes('box 12'), ['name the printed box', outcome.message])
+            assert(outcome.message.includes('J'), ['name the code', outcome.message])
+            // And the refusal is not the whole story: the SAME return with
+            // code A computes, which is what makes this a gate rather than a
+            // wall.
+            const routed = exerciseAndHoldWith([
+                estateTrustAmtK1('sha256-2j-k1')([{ code: 'A', amount: '10000.00' }]),
+            ])
+            assert(routed.kind === 'ok', ['code A must still compute', routed])
         },
         /**
          * ★ **TAX-33's motivating return, end to end** — the ONE combination
