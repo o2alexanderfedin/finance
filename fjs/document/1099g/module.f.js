@@ -178,7 +178,7 @@ const unmodeledMoneyBoxes = /** @type {const} */ ([
     ['box5RtaaPayments', 'Schedule 1 line 8z as a reemployment trade adjustment assistance payment (the `reemploymentTradeAdjustmentAssistance` kind), which no computation carries there yet'],
     ['box6TaxableGrants', 'Schedule 1 line 8z as other income the printed line does not name (the `otherIncomeNotListed` kind), which is a WRITE-IN no form closes'],
     ['box7AgriculturePayments', 'Schedule F line 4b (taxable agricultural program payments), which this engine does not model'],
-    ['box9MarketGain', 'Schedule F line 6b (Commodity Credit Corporation loan market gain), which this engine does not model — NOT Schedule 1 line 8, where this row pointed until 2026-08-18'],
+    ['box9MarketGain', 'the Schedule F reporting of Commodity Credit Corporation loan market gain — the recipient instruction for box 9 says "See the Schedule F (Form 1040) instructions" — which this engine does not model. NOT Schedule 1 line 8, where this row pointed until 2026-08-18'],
 ])
 
 /**

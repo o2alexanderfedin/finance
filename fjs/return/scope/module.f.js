@@ -956,7 +956,7 @@ export const unmodeledKindRefusals = /** @type {const} */ ([
     { kind: 'olympicAndParalympicMedalsExclusion', line: 'Schedule 1 line 24c -> 1040 line 10', label: 'the nontaxable amount of Olympic and Paralympic medals and USOC prize money', remedy: 'requires the Schedule 1 line 8m amount, which has no dialect, and the §74(d) test against adjusted gross income figured INCLUDING it — $1,000,000, or $500,000 if married filing separately (no phase yet)' },
     { kind: 'reforestationAmortizationAndExpenses', line: 'Schedule 1 line 24d -> 1040 line 10', label: 'reforestation amortization and expenses', remedy: 'requires the §194 election and the qualified timber property’s basis, amortized over 84 months through Form 4562 Part VI. `fjs/form4562` computes depreciation from `vnd.fjs.asset_register`, which models no timber property and carries no §194 election (no phase yet)' },
     { kind: 'tradeActSupplementalUnemploymentRepayment', line: 'Schedule 1 line 24e -> 1040 line 10', label: 'repayment of supplemental unemployment benefits under the Trade Act of 1974', remedy: 'requires the repayment and the earlier year in which the benefit was included in income, and no dialect models either (no phase yet)' },
-    { kind: 'section501c18DPensionContributions', line: 'Schedule 1 line 24f -> 1040 line 10', label: 'contributions to a section 501(c)(18)(D) pension plan', remedy: 'requires the contribution and the Pub. 525 determination that the plan is a §501(c)(18)(D) plan created before 25 June 1959; no stored document states a plan’s type (no phase yet)' },
+    { kind: 'section501c18DPensionContributions', line: 'Schedule 1 line 24f -> 1040 line 10', label: 'contributions to a section 501(c)(18)(D) pension plan', remedy: 'requires the contribution and the Pub. 525 determination that the plan qualifies under §501(c)(18)(D), which the printed instruction for this line refers to Pub. 525 for and no stored document states (no phase yet)' },
     { kind: 'chaplainSection403bContributions', line: 'Schedule 1 line 24g -> 1040 line 10', label: 'contributions by a chaplain to a section 403(b) plan', remedy: 'requires the Pub. 517 determination that the chaplain is self-employed for this purpose, and the contribution; no dialect records either (no phase yet)' },
     { kind: 'unlawfulDiscriminationClaimAttorneyFees', line: 'Schedule 1 line 24h -> 1040 line 10', label: 'attorney fees and court costs for an action involving an unlawful discrimination claim', remedy: 'the deduction is capped at the gross income from the action, so it needs BOTH the fees and the award — and no dialect models a settlement or how it was allocated (no phase yet)' },
     { kind: 'irsWhistleblowerAwardAttorneyFees', line: 'Schedule 1 line 24i -> 1040 line 10', label: 'attorney fees and court costs paid in connection with an IRS whistleblower award', remedy: 'capped at the award includible in gross income, so it needs both figures, and no dialect models either (no phase yet)' },
@@ -2942,6 +2942,101 @@ export const proof = {
         // modeled set rather than only the lengths
         // `theHandTypedListNamesEveryModeledKind` compares — a swap (one kind
         // out, one in) keeps every length identical.
+        // The five printed sub-lines the 2026-08-18 split covered by EXTENDING a
+        // row that already existed, rather than by adding a kind. This is the
+        // leaf that keeps that decision honest in both directions.
+        //
+        // A later phase reading the Schedule 1 block and finding no row for
+        // line 8d would naturally add one — and one taxpayer fact would then
+        // have TWO declarations, which is the failure `section1202Gain`'s row
+        // has guarded against since Phase 12.1 and which the Form 6251 leaf
+        // above already states for its own two lines. So each pair below is
+        // checked for the row that DOES name it, and for the absence of a
+        // second row naming the same printed sub-line.
+        theFiveSubLinesNamedByAKindThatAlreadyExisted: () => {
+            /** @type {readonly (readonly [Kind, string])[]} */
+            const absorbed = [
+                ['medicaidWaiverPayments', 'Schedule 1 line 8s'],
+                ['foreignEarnedIncomeForm2555', 'Schedule 1 line 8d'],
+                ['foreignEarnedIncomeForm2555', 'Schedule 1 line 24j'],
+                ['form8621', 'Schedule 2 lines 17p and 17q'],
+                ['form8978', 'Schedule 3 line 6l'],
+            ]
+            assertEq(absorbed.length, 5,
+                'five printed sub-lines are named by a kind that already existed, hand-counted')
+            for (const [kind, printedLine] of absorbed) {
+                const row = unmodeledKindRefusals.find(r => r.kind === kind)
+                if (row === undefined) {
+                    throw ['a kind that absorbed a printed sub-line must still refuse', kind]
+                }
+                assert(
+                    row.line.includes(printedLine),
+                    ['the absorbing row must name the printed sub-line it took on', kind, printedLine, row.line])
+                const outcome = classifyScope([kind])
+                assert(
+                    outcome.kind === 'error',
+                    ['an absorbing kind must still refuse on its own', kind, outcome])
+                assertEq(
+                    unmodeledKindRefusals.filter(r => r.line.includes(printedLine)).length,
+                    1,
+                    ['exactly one row may name this printed sub-line, or one taxpayer fact has two declarations',
+                        printedLine],
+                )
+            }
+            // Form 8978's THIRD destination is a write-in line that several
+            // rows legitimately share, so it is checked for presence only — the
+            // uniqueness assertion above would be false of it by design.
+            const form8978Row = unmodeledKindRefusals.find(r => r.kind === 'form8978')
+            if (form8978Row === undefined) {
+                throw ['form8978 must still refuse']
+            }
+            assert(
+                form8978Row.line.includes('Schedule 2 line 17z'),
+                ['Form 8978\u2019s negative adjustment also lands on the Schedule 2 write-in line',
+                    form8978Row.line])
+        },
+        // The three printed lines the split gave NO kind, because there is no
+        // fact behind them to declare. Two are write-in lines whose entire 2025
+        // instruction is "Leave line 24z blank" / "Leave line 6z blank"
+        // (i1040gi pp. 100, 116) and one is reserved on the form face.
+        //
+        // Stated as an assertion rather than a comment because the rule for
+        // every OTHER write-in line in this table is the opposite — line 8z,
+        // line 17z and line 13z each carry a residual kind — so these three are
+        // exactly the exceptions a later reader would "fix".
+        theThreePrintedLinesWithNoFactBehindThemHaveNoKind: () => {
+            const noFact = [
+                'Schedule 1 line 24z',
+                'Schedule 3 line 6e',
+                'Schedule 3 line 6z',
+            ]
+            assertEq(noFact.length, 3, 'three printed lines with nothing to declare, hand-counted')
+            for (const printedLine of noFact) {
+                assertEq(
+                    unmodeledKindRefusals.filter(r => r.line.includes(printedLine)).length,
+                    0,
+                    ['a printed line with no fact behind it must have no refusal row', printedLine],
+                )
+            }
+            // The control, and it is what stops this leaf passing on a table
+            // that lost every row: the three write-in lines that DO carry a
+            // residual kind still do.
+            const residuals = [
+                ['otherIncomeNotListed', 'Schedule 1 line 8z'],
+                ['otherAdditionalTaxesNotListed', 'Schedule 2 line 17z'],
+                ['otherRefundableCreditsNotListed', 'Schedule 3 line 13z'],
+            ]
+            assertEq(residuals.length, 3, 'three write-in lines carry a residual kind, hand-counted')
+            for (const [kind, printedLine] of residuals) {
+                const row = unmodeledKindRefusals.find(r => r.kind === kind)
+                if (row === undefined) {
+                    throw ['a write-in line must keep its residual kind', kind]
+                }
+                assert(
+                    row.line.startsWith(`${printedLine} `),
+                    ['a residual kind must name its own write-in line', kind, printedLine, row.line])
+            }
+        },
         theSplitReclassifiedNothing: () => {
             /** @type {readonly string[]} */
             const modeledNames = modeledKinds
