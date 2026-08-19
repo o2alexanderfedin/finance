@@ -3712,6 +3712,99 @@ const phaseTwentyFourInputs = {
 }
 
 
+// ── Form 3903's own fixture (TAX-34): a service member's PCS move ──────────
+//
+// The persona Schedule 1 line 14 exists for and nothing in this file reached
+// until Form 3903 was wired: a staff sergeant moved by military order, who
+// shipped a household, drove to the new duty station, and was reimbursed for
+// part of it in Form W-2 box 12 code P.
+//
+// **A form-level proof cannot prove a wiring.** `fjs/form3903`'s own twelve
+// leaves prove the arithmetic against three `bigint`s and would not notice
+// this engine handing it an empty document list, an empty adjustments list,
+// or nothing at all. These leaves drive the real entry point over real
+// stored documents, which is the only place that shows.
+
+/** @type {ReturnProfile} */
+const formThreeNineZeroThreeProfile = {
+    dialect: returnProfileDialect,
+    taxYear: 2025,
+    filingStatus: 'single',
+    dependentCount: 0,
+    declaredKinds: ['wages', 'movingExpensesArmedForces', 'federalTaxWithheldOnW2'],
+    // Form 3903's pre-line checkbox — §217(g), the one case TCJA §11049 left
+    // standing. Without it this return REFUSES, which
+    // `withoutTheCertificationTheWholeReturnRefuses` asserts through this
+    // same entry point.
+    movingExpensesArmedForcesPermanentChangeOfStation: true,
+}
+
+/**
+ * The service member's Form W-2. Box 12 carries code P beside `DD` and `PP` —
+ * both LARGER than the code P amount, so a match loosened to a prefix or to
+ * "any box 12 row" produces a Form 3903 line 4 that is unmistakably wrong
+ * rather than nearly right, end to end and not only in `fjs/schedule/1`'s
+ * unit proofs.
+ * @type {(codePAmount: string) => Stored<W2>}
+ */
+const formThreeNineZeroThreeW2 = codePAmount => ({
+    documentHash: 'sha256-p3903-w2',
+    value: {
+        ...w2Document('sha256-p3903-w2')('52000.00').value,
+        box2FederalIncomeTaxWithheld: '4200.00',
+        box12: [
+            { code: 'DD', amount: '14500.00' },
+            { code: 'P', amount: codePAmount },
+            { code: 'PP', amount: '9999.00' },
+        ],
+    },
+})
+
+/** The SAME Form W-2 with no code P row at all — the differential control.
+ * @type {Stored<W2>}
+ */
+const formThreeNineZeroThreeW2WithoutReimbursement = {
+    documentHash: 'sha256-p3903-w2',
+    value: {
+        ...w2Document('sha256-p3903-w2')('52000.00').value,
+        box2FederalIncomeTaxWithheld: '4200.00',
+        box12: [{ code: 'DD', amount: '14500.00' }, { code: 'PP', amount: '9999.00' }],
+    },
+}
+
+/** @type {Stored<Adjustments>} */
+const formThreeNineZeroThreeAdjustments = {
+    documentHash: 'sha256-p3903-adjustments',
+    value: {
+        dialect: adjustmentsDialect,
+        recipientTin: '222-22-2222',
+        taxYear: 2025,
+        entries: [
+            {
+                lineTag: 'movingExpensesTransportationAndStorage',
+                datePaid: '2025-07-14',
+                description: 'household goods shipped on PCS orders',
+                amount: '4837.50',
+                individual: 'taxpayer',
+            },
+            {
+                lineTag: 'movingExpensesTravelAndLodgingExcludingMeals',
+                datePaid: '2025-07-16',
+                description: 'mileage, tolls and one night of lodging en route',
+                amount: '1299.40',
+                individual: 'taxpayer',
+            },
+        ],
+    },
+}
+
+/** @type {(codePAmount: string) => Form1040Inputs} */
+const formThreeNineZeroThreeInputs = codePAmount => ({
+    ...inputsOf(storedProfile(formThreeNineZeroThreeProfile))(
+        [formThreeNineZeroThreeW2(codePAmount)])([])([])([])([])([])([])([])([]),
+    adjustmentForms: [formThreeNineZeroThreeAdjustments],
+})
+
 // ── Phase 25's own fixture (TAX-25/TAX-26): a student with a 401(k) ────────
 //
 // The persona both credits exist for and neither reached before this phase:
@@ -3861,6 +3954,49 @@ const socialSecurityWithHsaInputs = {
                 individual: 'taxpayer',
                 coverageType: 'selfOnly',
                 hadHighDeductibleCoverageAllYear: true,
+            }],
+        },
+    }],
+}
+
+/**
+ * The SAME interaction for Schedule 1 line 14, and it exists for the same
+ * reason: **a mutation found the gap.** Dropping `partII.line14.value` from
+ * `socialSecurityWorksheetAdjustmentsTotal` left the entire suite green,
+ * because not one fixture anywhere carried BOTH Social Security benefits and
+ * a moving expense — precisely the shape AGENTS.md records this repository
+ * shipping four times.
+ *
+ * Deliberately the same $30,000.00/$30,000.00/$2,000.00 return as
+ * {@link socialSecurityWithHsaInputs}, with the adjustment moved from line 13
+ * to line 14, so the two worksheets are arithmetically identical and any
+ * difference between the leaves can only be the line under test.
+ * @type {Form1040Inputs}
+ */
+const socialSecurityWithMovingExpenseInputs = {
+    ...inputsOf(storedProfile({
+        ...formThreeNineZeroThreeProfile,
+        declaredKinds: [
+            'socialSecurityBenefits', 'pensionsAndAnnuities', 'movingExpensesArmedForces',
+        ],
+    }))([])([])([])([])([
+        retirementDocument('sha256-p3903-pension')({
+            box1GrossDistribution: '30000.00',
+            box2aTaxableAmount: '30000.00',
+        }),
+    ])([socialSecurityDocument('sha256-p3903-ssa')('30000.00')])([])([])([]),
+    adjustmentForms: [{
+        documentHash: 'sha256-p3903-move-only',
+        value: {
+            dialect: adjustmentsDialect,
+            recipientTin: '222-22-2222',
+            taxYear: 2025,
+            entries: [{
+                lineTag: 'movingExpensesTransportationAndStorage',
+                datePaid: '2025-07-14',
+                description: 'household goods shipped on PCS orders',
+                amount: '2000.00',
+                individual: 'taxpayer',
             }],
         },
     }],
@@ -9379,6 +9515,281 @@ export const proof = {
             // A document-data-sufficiency refusal, never a scope one: it
             // names no `fjs/return/scope` kind.
             assertEq(outcome.unmodeled.length, 0)
+        },
+    },
+    // ── Form 3903: Schedule 1 line 14 through the FULL entry point ──────────
+    //
+    // **A form-level proof CANNOT prove a wiring**, and this repo has paid
+    // for that four times (AGENTS.md, "A proof is not known to work until you
+    // have watched it fail"). `fjs/form3903` takes three `bigint`s and
+    // returns five lines; every one of its twelve leaves stays green while
+    // this file hands it an empty W-2 list, an empty adjustments list, or a
+    // zero. The leaves below drive `form1040Report` over stored documents,
+    // which is the only layer where the assembly is observable.
+    //
+    // Hand-computed from the printed forms, independently of the code under
+    // test:
+    //
+    //   Form 3903 line 1  household goods shipped               $4,837.50
+    //   Form 3903 line 2  travel and lodging, net of meals       $1,299.40
+    //   Form 3903 line 3  add lines 1 and 2                      $6,136.90
+    //   Form 3903 line 4  W-2 box 12 code P                      $2,000.00
+    //   Form 3903 line 5  subtract line 4 from line 3            $4,136.90
+    //   Schedule 1 line 14 = line 26 (no other adjustment)       $4,136.90
+    //   1040 line 1a/1z = W-2 box 1                             $52,000.00
+    //   1040 line 9  (total income)                             $52,000.00
+    //   1040 line 10 (adjustments)                               $4,136.90
+    //   1040 line 11a/11b (AGI) $52,000.00 - $4,136.90          $47,863.10
+    //   1040 line 12e single standard deduction                 $15,750.00
+    //   1040 line 15 $47,863.10 - $15,750.00                    $32,113.10
+    formThreeNineZeroThreeMovingExpenses: {
+        movingExpensesReachTheReturnThroughTheFullEntryPoint: () => {
+            const outcome = form1040Report(taxParams2025)(formThreeNineZeroThreeInputs('2000.00'))
+            assert(outcome.kind === 'ok', ['expected the PCS return to compute', outcome])
+            if (outcome.kind !== 'ok') {
+                throw ['expected ok', outcome]
+            }
+            assertEq(lineRuled(outcome.lines)('1040 line 1a').value, 5200000n, '$52,000.00 of wages')
+            assertEq(lineRuled(outcome.lines)('1040 line 9').value, 5200000n, '$52,000.00 total income')
+            assertEq(lineRuled(outcome.lines)('1040 line 10').value, 413690n,
+                '$6,136.90 of moving expenses less $2,000.00 reimbursed = $4,136.90')
+            assertEq(lineRuled(outcome.lines)('1040 line 11a').value, 4786310n, '$47,863.10 AGI')
+            assertEq(lineRuled(outcome.lines)('1040 line 11b').value, 4786310n, 'restated on page 2')
+            assertEq(lineRuled(outcome.lines)('1040 line 12e').value, 1575000n, '$15,750.00')
+            assertEq(lineRuled(outcome.lines)('1040 line 15').value, 3211310n, '$32,113.10 taxable income')
+            assert(
+                lineRuled(outcome.lines)('1040 line 10').value > 0n,
+                ['line 10 must be a REAL figure, not the hard zero this wiring replaced',
+                    lineRuled(outcome.lines)('1040 line 10').value],
+            )
+        },
+        // THE DIFFERENTIAL, and the strongest single statement here: the
+        // identical return with no adjustments document and no code P box has
+        // a taxable income exactly $4,136.90 HIGHER. A difference rather than
+        // two absolutes, so it cannot fail for a reason unrelated to this
+        // line — not the Tax Table, not the standard deduction.
+        theSameReturnWithoutTheMoveIsExactlyThatMuchMoreTaxable: () => {
+            const withMove = form1040Report(taxParams2025)(formThreeNineZeroThreeInputs('2000.00'))
+            const without = form1040Report(taxParams2025)({
+                ...formThreeNineZeroThreeInputs('2000.00'),
+                adjustmentForms: [],
+                w2s: [formThreeNineZeroThreeW2WithoutReimbursement],
+            })
+            assert(withMove.kind === 'ok', ['expected ok', withMove])
+            assert(without.kind === 'ok', ['expected ok', without])
+            if (withMove.kind !== 'ok' || without.kind !== 'ok') {
+                throw ['expected two computed returns', withMove, without]
+            }
+            assertEq(
+                lineRuled(without.lines)('1040 line 15').value
+                    - lineRuled(withMove.lines)('1040 line 15').value,
+                413690n,
+                'the move must reduce taxable income by exactly Form 3903 line 5')
+            assertEq(lineRuled(without.lines)('1040 line 10').value, 0n,
+                'and the same return with no moving documents is still a legitimate zero')
+        },
+        // **Form 3903 line 4 must actually be SUBTRACTED, end to end.** The
+        // identical return whose Form W-2 carries no code P row deducts the
+        // whole of line 3 — $2,000.00 more. A wiring that never assembled
+        // line 4, or assembled it from the wrong box, produces the same
+        // number in both halves and this leaf goes red.
+        theBoxTwelveCodePReimbursementIsSubtractedEndToEnd: () => {
+            const reimbursed = form1040Report(taxParams2025)(
+                formThreeNineZeroThreeInputs('2000.00'))
+            const unreimbursed = form1040Report(taxParams2025)({
+                ...formThreeNineZeroThreeInputs('2000.00'),
+                w2s: [formThreeNineZeroThreeW2WithoutReimbursement],
+            })
+            assert(reimbursed.kind === 'ok', ['expected ok', reimbursed])
+            assert(unreimbursed.kind === 'ok', ['expected ok', unreimbursed])
+            if (reimbursed.kind !== 'ok' || unreimbursed.kind !== 'ok') {
+                throw ['expected two computed returns', reimbursed, unreimbursed]
+            }
+            assertEq(lineRuled(unreimbursed.lines)('1040 line 10').value, 613690n,
+                '$6,136.90 deducted in full when nothing was reimbursed')
+            assertEq(
+                lineRuled(unreimbursed.lines)('1040 line 10').value
+                    - lineRuled(reimbursed.lines)('1040 line 10').value,
+                200000n,
+                'exactly the $2,000.00 in box 12 code P, and the decoys DD and PP contribute none of it')
+        },
+        // PROV-02, end to end: 1040 line 10 must cite the documents the
+        // deduction actually came from, by the CAS hash a reader can look up
+        // and by the BOX inside each one.
+        lineTenCitesTheMovingEntriesAndTheCodePBox: () => {
+            const outcome = form1040Report(taxParams2025)(formThreeNineZeroThreeInputs('2000.00'))
+            assert(outcome.kind === 'ok', ['expected ok', outcome])
+            if (outcome.kind !== 'ok') {
+                throw ['expected ok', outcome]
+            }
+            const sources = lineRuled(outcome.lines)('1040 line 10').sources
+            const hashes = sources.map(source => source.documentHash)
+            assert(hashes.includes('sha256-p3903-adjustments'),
+                ['line 10 must cite the adjustments document', sources])
+            assert(hashes.includes('sha256-p3903-w2'),
+                ['line 10 must cite the W-2 whose box 12 code P reduced the deduction', sources])
+            const boxPaths = sources.map(source => source.boxPath)
+            assert(
+                boxPaths.includes(
+                    'entries[lineTag=movingExpensesTransportationAndStorage,individual=taxpayer]'),
+                ['line 10 must cite Form 3903 line 1', boxPaths])
+            assert(
+                boxPaths.includes(
+                    'entries[lineTag=movingExpensesTravelAndLodgingExcludingMeals,individual=taxpayer]'),
+                ['line 10 must cite Form 3903 line 2', boxPaths])
+            assert(boxPaths.includes('box12[code=P]'),
+                ['line 10 must cite the W-2 BOX, not merely the document', boxPaths])
+            assert(!boxPaths.includes('box12[code=PP]') && !boxPaths.includes('box12[code=DD]'),
+                ['and no box that did not contribute', boxPaths])
+        },
+        // **THE §217(g) GATE, through the entry point.** The same documents
+        // on a profile that does NOT certify Form 3903's pre-line
+        // requirement refuse the WHOLE return, never a partial 1040 with a
+        // civilian's moving deduction quietly taken.
+        //
+        // A document-data-sufficiency refusal, not a scope one: the kind is
+        // MODELED as of this wiring, so `unmodeled` is empty and the message
+        // names the profile field instead.
+        withoutTheCertificationTheWholeReturnRefuses: () => {
+            const outcome = form1040Report(taxParams2025)({
+                ...formThreeNineZeroThreeInputs('2000.00'),
+                profile: storedProfile({
+                    ...formThreeNineZeroThreeProfile,
+                    movingExpensesArmedForcesPermanentChangeOfStation: undefined,
+                }),
+            })
+            assert(outcome.kind === 'error', ['an uncertified move must refuse', outcome])
+            if (outcome.kind !== 'error') {
+                throw ['expected a refusal', outcome]
+            }
+            assert(
+                outcome.message.includes('movingExpensesArmedForcesPermanentChangeOfStation'),
+                ['name the field that would fix it', outcome.message])
+            assert(outcome.message.includes('permanent change of station'),
+                ['and the printed requirement it stands for', outcome.message])
+            assertEq(outcome.unmodeled.length, 0,
+                'a data-sufficiency refusal, not a scope one — the kind is modeled')
+            // THE CONTROL: the identical inputs WITH the certification
+            // compute, so this gate is not simply refusing everything.
+            assertEq(
+                form1040Report(taxParams2025)(formThreeNineZeroThreeInputs('2000.00')).kind,
+                'ok',
+                'the same return, certified, computes')
+        },
+        // **THE TRAP, end to end.** The service reimbursed $9,000.00 against
+        // a $6,136.90 move, so $2,863.10 is gross income on 1040 **line 1h**
+        // — a line this engine refuses (`otherEarnedIncome`) and sets to a
+        // declared zero. Returning a zero deduction here would emit a
+        // complete-looking Form 1040 that omits real income and UNDERSTATES
+        // the tax, which is the whole reason `fjs/form3903` refuses. The
+        // message must reach the caller VERBATIM.
+        //
+        // $9,000.00 - $6,136.90 = $2,863.10, subtracted by hand.
+        anOverReimbursedMoveRefusesTheWholeReturnNamingLineOneH: () => {
+            const outcome = form1040Report(taxParams2025)(formThreeNineZeroThreeInputs('9000.00'))
+            assert(outcome.kind === 'error', ['an over-reimbursed move must refuse', outcome])
+            if (outcome.kind !== 'error') {
+                throw ['expected a refusal', outcome]
+            }
+            assert(outcome.message.includes('$2863.10'),
+                ['name the excess amount', outcome.message])
+            assert(outcome.message.includes('line 1h'),
+                ['name WHERE it would have gone', outcome.message])
+            assert(outcome.message.includes('earned income'),
+                ['and what that line is', outcome.message])
+            assert(outcome.message.includes('8z'),
+                ['and rule out the line it is not', outcome.message])
+            assert(outcome.message.includes('UNDERSTATE'),
+                ['and which way the error runs', outcome.message])
+            assertEq(outcome.unmodeled.length, 0)
+            // THE CONTROL at the printed boundary: reimbursed to the cent is
+            // a ZERO deduction and a COMPUTED return, not a refusal —
+            // i3903.pdf reports the excess only "if the result is more than
+            // zero".
+            const exactly = form1040Report(taxParams2025)(
+                formThreeNineZeroThreeInputs('6136.90'))
+            assert(exactly.kind === 'ok', ['a perfectly reimbursed move computes', exactly])
+            if (exactly.kind !== 'ok') {
+                throw ['expected ok', exactly]
+            }
+            assertEq(lineRuled(exactly.lines)('1040 line 10').value, 0n,
+                'a zero deduction, and the return is complete')
+            assertEq(lineRuled(exactly.lines)('1040 line 15').value, 3625000n,
+                '$52,000.00 - $0.00 - $15,750.00 = $36,250.00 taxable income')
+        },
+        // **THE SOCIAL SECURITY INTERACTION — added after a mutation, exactly
+        // as Phase 24's own line-13 leaf was.**
+        //
+        // `fjs/tax/ssb`'s line 6 subtracts Schedule 1 "lines 11 through 20,
+        // and 23 and 25", and line 14 is inside that printed range. Dropping
+        // `partII.line14.value` from `socialSecurityWorksheetAdjustmentsTotal`
+        // left the whole suite green: no fixture anywhere carried BOTH Social
+        // Security benefits and a moving expense, so the newly-real summand
+        // was observed by nothing. This leaf is that fixture.
+        //
+        // Single filer, $30,000.00 of SSA-1099 box 5, a $30,000.00 taxable
+        // pension, $2,000.00 of unreimbursed moving expenses. Hand-computed
+        // from the printed worksheet:
+        //
+        //   line 1  $30,000.00   line 2  $15,000.00 (half)
+        //   line 3  $30,000.00 (the pension, 1040 line 5b)
+        //   line 4  $0.00        line 5  $45,000.00
+        //   line 6  $2,000.00 <- Schedule 1 line 14, the figure at issue
+        //   line 7  $43,000.00   line 8  $25,000.00 (single base)
+        //   line 9  $18,000.00   line 10 $9,000.00 (single second threshold)
+        //   line 11 $9,000.00    line 12 $9,000.00 (smaller of 9 and 10)
+        //   line 13 $4,500.00    line 14 $4,500.00 (smaller of 2 and 13)
+        //   line 15 $7,650.00 (85% of line 11)
+        //   line 16 $12,150.00   line 17 $25,500.00 (85% of line 1)
+        //   line 18 $12,150.00 -> 1040 line 6b
+        //
+        // With line 6 at $0.00 the same worksheet gives line 9 $20,000.00,
+        // line 11 $11,000.00, line 15 $9,350.00 and line 18 $13,850.00 —
+        // exactly $1,700.00 more, which is 85% of the $2,000.00 deduction.
+        // That 85% relationship can only hold if line 14 genuinely reaches
+        // worksheet line 6.
+        theMovingDeductionReducesTaxableSocialSecurityThroughWorksheetLineSix: () => {
+            const withMove = form1040Report(taxParams2025)(socialSecurityWithMovingExpenseInputs)
+            const without = form1040Report(taxParams2025)({
+                ...socialSecurityWithMovingExpenseInputs,
+                adjustmentForms: [],
+            })
+            assert(withMove.kind === 'ok', ['expected ok', withMove])
+            assert(without.kind === 'ok', ['expected ok', without])
+            if (withMove.kind !== 'ok' || without.kind !== 'ok') {
+                throw ['expected two computed returns', withMove, without]
+            }
+            const sixBWith = lineRuled(withMove.lines)('1040 line 6b').value
+            const sixBWithout = lineRuled(without.lines)('1040 line 6b').value
+            assertEq(sixBWith, 1215000n,
+                '$12,150.00, hand-computed from the worksheet with line 6 = $2,000.00')
+            assertEq(sixBWithout, 1385000n,
+                '$13,850.00, the SAME worksheet with line 6 = $0.00')
+            assertEq(sixBWithout - sixBWith, 170000n,
+                '$1,700.00 — exactly 85% of the $2,000.00 moving deduction, this return\'s tier')
+            // …and the deduction ALSO reduces AGI directly through line 10,
+            // so the total effect is larger than either half alone.
+            assertEq(lineRuled(withMove.lines)('1040 line 10').value, 200000n,
+                '$2,000.00 of moving expenses, nothing reimbursed')
+            assertEq(
+                lineRuled(without.lines)('1040 line 11a').value
+                    - lineRuled(withMove.lines)('1040 line 11a').value,
+                370000n,
+                '$1,700.00 of taxable benefits plus the $2,000.00 deduction itself',
+            )
+        },
+        // The kind is MODELED as of this wiring, so DECLARING it is in scope
+        // — the reclassification exercised through the entry point rather
+        // than only against `classifyScope`. Before it, this identical
+        // declaration refused the whole return.
+        decliningToDeclareIsNotRequiredAndDeclaringIsInScope: () => {
+            const outcome = form1040Report(taxParams2025)(formThreeNineZeroThreeInputs('2000.00'))
+            assertEq(outcome.kind, 'ok', 'the reclassified kind must not refuse')
+            assertEq(
+                JSON.stringify(formThreeNineZeroThreeProfile.declaredKinds),
+                JSON.stringify(['wages', 'movingExpensesArmedForces', 'federalTaxWithheldOnW2']),
+                'the fixture really does declare it, or the leaf above proves nothing',
+            )
         },
     },
     // ── §219: Schedule 1 line 20 through the FULL entry point ───────────────

@@ -489,6 +489,19 @@ export const modeledKinds = /** @type {const} */ ([
     'collectibles28RateGain',      // 1099-DIV box 2d + Sch D worksheet -> Schedule D line 18
     'educatorExpenses',            // vnd.fjs.adjustments -> Schedule 1 line 11 -> 1040 line 10
     'healthSavingsAccountDeduction', // Form 8889 Part I  -> Schedule 1 line 13 -> 1040 line 10
+    // Reclassified in the SAME commit as the `fjs/schedule/1` line 14 wiring
+    // that makes it computable -- wire before reclassify, as every slice
+    // since Phase 13 has done. `fjs/form3903` had been written, proven and
+    // committed with NO caller, because Schedule 1 was held elsewhere at the
+    // time; a form module nothing calls cannot be noticed being wired wrong,
+    // so the kind stayed refused until the caller existed.
+    //
+    // What made it computable is TWO things arriving, not one: two
+    // `vnd.fjs.adjustments` line tags for Form 3903's printed lines 1 and 2,
+    // and `movingExpensesArmedForcesPermanentChangeOfStation` on
+    // `vnd.fjs.return_profile` -- the §217(g) certification the printed form
+    // asks for before its first line, which no information return reports.
+    'movingExpensesArmedForces',   // vnd.fjs.adjustments + W-2 box 12 code P -> Form 3903 -> Schedule 1 line 14 -> 1040 line 10
     'deductiblePartOfSelfEmploymentTax', // Schedule SE line 13 -> Schedule 1 line 15 -> 1040 line 10
     'penaltyOnEarlyWithdrawalOfSavings', // 1099-INT box 2 -> Schedule 1 line 18 -> 1040 line 10
     'iraDeduction',               // vnd.fjs.adjustments + W-2 box 13 -> Schedule 1 line 20 -> 1040 line 10
@@ -698,7 +711,7 @@ export const unmodeledKindRefusals = /** @type {const} */ ([
     // 1040 line it reaches second, exactly as the Schedule 2 block above
     // does.
     //
-    // **Three of the thirteen are NOT here**, because they are MODELED:
+    // **SEVEN of the thirteen are NOT here**, because they are MODELED:
     // `educatorExpenses` (line 11), `healthSavingsAccountDeduction` (line 13)
     // and `studentLoanInterestDeduction` (line 21) moved to
     // {@link modeledKinds} in the SAME commit as the
@@ -707,8 +720,19 @@ export const unmodeledKindRefusals = /** @type {const} */ ([
     // 2 split did and as every slice this module's docstring records already
     // established. The split commit before it added all thirteen as
     // refusals and reclassified nothing.
+    //
+    // Three more followed, each beside its own wiring:
+    // `penaltyOnEarlyWithdrawalOfSavings` (line 18) and `iraDeduction` (line
+    // 20), and `deductiblePartOfSelfEmploymentTax` (line 15) in Phase 28
+    // beside the Schedule SE wiring. **`movingExpensesArmedForces` (line 14)
+    // is the seventh**, beside the `fjs/schedule/1` Form 3903 wiring.
+    //
+    // So seven of the thirteen are modeled and SIX rows remain below. The
+    // count in this sentence is the part that rots -- it read "three" for
+    // three phases after it had become six -- which is why
+    // `theScheduleOneKindsStillUnwiredRefuse` hand-types the six and asserts
+    // their number rather than trusting a sentence.
     { kind: 'reservistPerformingArtistFeeBasisExpenses', line: 'Schedule 1 line 12 -> 1040 line 10', label: 'certain business expenses of reservists, performing artists and fee-basis government officials', remedy: 'requires Form 2106 (no phase yet)' },
-    { kind: 'movingExpensesArmedForces', line: 'Schedule 1 line 14 -> 1040 line 10', label: 'moving expenses for members of the Armed Forces', remedy: 'requires Form 3903 (no phase yet)' },
     // **This remedy was corrected in Phase 28, and it is the second time this
     // table has had to make that correction.** It read "whose limit depends on
     // net self-employment earnings this engine does not compute" -- and Phase
@@ -1362,7 +1386,7 @@ export const classifyScope = declaredKinds => {
  * and `fjs/form8995` wiring that makes all three computable.
  * @type {number}
  */
-const expectedModeledKindCount = 44
+const expectedModeledKindCount = 45
 
 /**
  * The modeled set, hand-typed a SECOND time and in {@link kindVocabulary}'s
@@ -1397,6 +1421,7 @@ const everyModeledKindHandTyped = [
     'collectibles28RateGain',
     'educatorExpenses',
     'healthSavingsAccountDeduction',
+    'movingExpensesArmedForces',
     'deductiblePartOfSelfEmploymentTax',
     'penaltyOnEarlyWithdrawalOfSavings',
     'iraDeduction',
@@ -1512,7 +1537,7 @@ const everyModeledKindHandTyped = [
  * that makes it computable.
  * @type {number}
  */
-const expectedUnmodeledKindCount = 71
+const expectedUnmodeledKindCount = 70
 
 /**
  * The complete refusal message for a return declaring exactly
@@ -2442,6 +2467,25 @@ export const proof = {
                 outcome.kind, 'ok',
                 ['Form 8995 line 6\'s REIT half alone must be in scope', outcome])
         },
+        movingExpensesArmedForcesIsInScopeAlone: () => {
+            const outcome = classifyScope(['movingExpensesArmedForces'])
+            assertEq(
+                outcome.kind, 'ok',
+                ['Schedule 1 line 14\'s kind alone must be in scope', outcome])
+        },
+        // THE CONTROL for the leaf above, and it is not decorative here.
+        // Form 3903's deduction turns on a §217(g) certification that lives
+        // on `vnd.fjs.return_profile`, NOT on this declaration -- so being in
+        // scope must not be read as being eligible. `otherEarnedIncome` is
+        // the kind `fjs/form3903`'s own over-reimbursement refusal depends on
+        // staying refused, and the day it computes, that refusal becomes
+        // wrong; this asserts it has not moved.
+        otherEarnedIncomeStillRefusesBesideIt: () => {
+            const outcome = classifyScope(['otherEarnedIncome'])
+            assert(
+                outcome.kind === 'error',
+                ['1040 line 1h must still refuse: fjs/form3903 sends its excess there', outcome])
+        },
         // The control the split exists for. Reclassifying the coarse kind
         // whole would have made this pass too, and a taxpayer holding a
         // pipeline K-1 would have been told a deduction was computed for a
@@ -2599,13 +2643,13 @@ export const proof = {
         // kind silently becoming modeled.
         // **`deductiblePartOfSelfEmploymentTax` left this list in Phase 28**
         // (TAX-31), which wired Schedule 1 line 15 to Schedule SE line 13.
-        // Nine remain, and the IRA-deduction assertions below are unchanged:
-        // that fixed point is still unmodeled.
+        // **`movingExpensesArmedForces` left it beside the `fjs/schedule/1`
+        // Form 3903 wiring**, in the same commit, for the same reason. Six
+        // remain.
         theScheduleOneKindsStillUnwiredRefuse: () => {
             /** @type {readonly Kind[]} */
             const stillRefused = [
                 'reservistPerformingArtistFeeBasisExpenses',
-                'movingExpensesArmedForces',
                 'selfEmployedRetirementPlans',
                 'selfEmployedHealthInsuranceDeduction',
                 'alimonyPaid',
@@ -2613,8 +2657,9 @@ export const proof = {
                 'otherAdjustments',
             ]
             assertEq(
-                stillRefused.length, 7,
-                'thirteen Schedule 1 Part II kinds, less Phase 24\'s three, Phase 28\'s one and line 18')
+                stillRefused.length, 6,
+                'thirteen Schedule 1 Part II kinds, less Phase 24\'s three, Phase 28\'s one, '
+                + 'lines 18 and 20, and line 14\'s own Form 3903 wiring')
             for (const kind of stillRefused) {
                 const outcome = classifyScope([kind])
                 assert(

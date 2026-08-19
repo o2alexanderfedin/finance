@@ -1,8 +1,10 @@
 # Form 3903 — Moving Expenses (TY2025)
 
-Status: **module written, NOT wired.** `fjs/form3903/module.f.js` computes the five printed
-lines; nothing calls it yet. Wiring Schedule 1 line 14 is a separate change (see
-"What a caller must supply", below).
+Status: **wired.** `fjs/form3903/module.f.js` computes the five printed lines and
+`fjs/schedule/1` calls it for Schedule 1 line 14. The kind `movingExpensesArmedForces` moved
+from `unmodeledKindRefusals` to `modeledKinds` in the same commit as that wiring — wire before
+reclassify. See "What a caller must supply", below, for the three figures the caller assembles
+and "How the caller gates §217(g)" for the certification it gates on.
 
 Sources, fetched 2026-08-18 and read directly, not from recall:
 
@@ -29,9 +31,15 @@ you move because of a permanent change of station."* — §217(g), as left stand
 It is a taxpayer attestation with no document behind it: no dialect in this engine carries "active
 duty" or "permanent change of station". A caller that computes this form for a civilian would
 produce a deduction the law does not allow, so the *caller* must gate on the taxpayer's own
-declaration before calling. That gate belongs with `fjs/return/profile`'s
-`movingExpensesArmedForces` kind, which is where a taxpayer fact of exactly this shape already
-lives — not in the arithmetic.
+certification before calling — not the arithmetic. That gate is
+`vnd.fjs.return_profile`'s `movingExpensesArmedForcesPermanentChangeOfStation` checkbox, read by
+`fjs/schedule/1`; see "How the caller gates §217(g)" below for why it is a profile checkbox and
+not the declared kind, not a `lineTag`, and not a blanket refusal.
+
+> This paragraph said the gate "belongs with `fjs/return/profile`'s `movingExpensesArmedForces`
+> kind" while the module was unwired. That reading was wrong in a way worth keeping visible:
+> `declaredKinds` is a SCOPE declaration and no computation module in this repository gates a
+> figure on it. The fact needed a field of its own.
 
 ## The printed lines, transcribed
 
@@ -171,8 +179,13 @@ is proven not to refuse, at the -1/0 boundary pair.
 governmentPaymentsNotInBox1Cents })`:
 
 - `transportationAndStorageCents` — line 1. No dialect in this engine carries it; it is a
-  taxpayer-supplied figure.
-- `travelAndLodgingCents` — line 2, **net of meals**, likewise taxpayer-supplied.
+  taxpayer-supplied figure. It rides `vnd.fjs.adjustments`' free-string `lineTag` as
+  **`movingExpensesTransportationAndStorage`**, the `educatorExpenses` precedent, and the tag is
+  in `fjs/schedule/1`'s closed `adjustmentLineTags` vocabulary so a near miss is refused by name.
+- `travelAndLodgingCents` — line 2, **net of meals**, likewise taxpayer-supplied, tagged
+  **`movingExpensesTravelAndLodgingExcludingMeals`**. The exclusion is in the TAG rather than in
+  a comment: it is the only layer that can carry it, because this module has no meals input and
+  cannot tell a net figure from a gross one.
 - `governmentPaymentsNotInBox1Cents` — line 4: the sum of **W-2 box 12 code P** across every
   stored W-2 for the taxpayer. `movingExpensesLine4W2Box12Codes` is exported so the caller's
   code match and this specification cannot drift apart.
@@ -180,12 +193,62 @@ governmentPaymentsNotInBox1Cents })`:
 On `{ kind: 'ok', … }`, Schedule 1 line 14 takes `line5`. On `{ kind: 'error', message }`, the
 caller threads the message out verbatim — it is never thrown.
 
+## How the caller gates §217(g)
+
+`vnd.fjs.return_profile` carries **`movingExpensesArmedForcesPermanentChangeOfStation:
+option(true)`** — Form 3903's own pre-line checkbox, stored the way every other taxpayer
+certification on that dialect is stored (`itemizeEvenThoughLessThanStandardDeduction`,
+`hadForeignFinancialAccount`, `iraDeductionDeclared`). DOC-12's rule applies: `option(true)`,
+never `option(boolean)`, so ABSENT means *not certified* and a stored `false` is rejected
+outright rather than read as a denial.
+
+`fjs/schedule/1` **refuses** — it does not zero — whenever a moving expense entry OR a Form W-2
+box 12 code P row reaches line 14 without that certification. The three candidate behaviours and
+why only one is honest:
+
+1. **Compute anyway.** A civilian's move would produce a deduction the law allows nobody,
+   silently, with every leaf green.
+2. **Return zero.** Correct for the civilian, WRONG for the service member the line exists for,
+   and the two are indistinguishable from inside the engine: it would drop a real deduction
+   without saying so.
+3. **Refuse, naming the certification.** The taxpayer is told the one fact that is missing and
+   the field that states it.
+
+Three alternatives to a profile checkbox were considered and rejected:
+
+- **The declared kind `movingExpensesArmedForces`.** `declaredKinds` is a SCOPE declaration, not
+  an eligibility fact: `fjs/return/scope` decides whether a return can be computed at all, and no
+  computation module in this repository gates a figure on it. `fjs/schedule/1`'s own docstring
+  says it "imports NOTHING at runtime from `fjs/return/scope`". Declaring a kind also says
+  nothing about active duty or a military order — a taxpayer declares the kind to say *this
+  return has moving expenses*, which is precisely the claim that needs gating.
+- **A `lineTag` that carries the attestation** (the `traditionalIraContributionAgeFiftyOrOver`
+  shape). It works for the age-50 catch-up because that fact is per-CONTRIBUTION; §217(g)
+  eligibility is per-RETURN, and per-entry tagging would let a document assert it on one entry
+  and not the next.
+- **Refusing every moving expense outright.** That is the status quo the wiring replaces, and it
+  refuses the one population the line still exists for.
+
+## The caller computes ONE Form 3903
+
+*"If you qualify to deduct expenses for more than one move, use a separate Form 3903 for each
+move."* `vnd.fjs.adjustments` carries nothing that distinguishes one move from another — no move
+identifier, no origin, no date beyond `datePaid` — so `fjs/schedule/1` sums every
+`movingExpensesTransportationAndStorage` entry into line 1 and every
+`movingExpensesTravelAndLodgingExcludingMeals` entry into line 2, and computes the single form
+those facts describe.
+
+That is exact for the ordinary single-move return. **A taxpayer with two moves in one year, one
+of them over-reimbursed, would owe more than this line reports**: separate forms would produce a
+deduction on the under-reimbursed move and a line-1h inclusion on the other, where one combined
+form nets them. Recorded rather than guessed at — closing it needs a move identifier on the
+dialect, which is a dialect change and a separate decision.
+
 ## Traceability
 
-- Kind: `movingExpensesArmedForces` (`fjs/return/scope`, `Schedule 1 line 14 -> 1040 line 10`,
-  remedy *"requires Form 3903 (no phase yet)"*). **This module does not reclassify it** — the
-  project's "wire before reclassify" rule means the kind moves in the commit that wires line 14,
-  not in the commit that writes the arithmetic.
+- Kind: `movingExpensesArmedForces` — **MODELED**, in `fjs/return/scope`'s `modeledKinds`,
+  reclassified out of `unmodeledKindRefusals` in the same commit as the `fjs/schedule/1` wiring.
+  The module's own commit deliberately reclassified nothing: wire before reclassify.
 - The refusal above depends on `otherEarnedIncome` (`1040 line 1h`) staying refused. **When that
   kind is ever modeled, this module's refusal becomes wrong** and line 5's "No" branch should
   compute the line-1h inclusion instead. The refusal message says so.

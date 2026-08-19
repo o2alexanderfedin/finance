@@ -69,6 +69,23 @@
  *   larger, so this dialect is the only possible source. Read only by
  *   `fjs/tax/deduction`'s `deductionChoice` (13-06); without it, a
  *   legitimate itemize-anyway return could not be expressed at all.
+ * - **`movingExpensesArmedForcesPermanentChangeOfStation` (Form 3903's own
+ *   pre-line checkbox) is a taxpayer CERTIFICATION no document reports.**
+ *   §217 was suspended by TCJA §11049 for everybody except the case §217(g)
+ *   leaves standing, and the 2025 Form 3903 asks the filer to certify it in
+ *   so many words: *"You can deduct moving expenses only if you are a Member
+ *   of the Armed Forces on active duty and, due to a military order, you,
+ *   your spouse, or your dependents move because of a permanent change of
+ *   station. Check here to certify that you meet these requirements."* No
+ *   dialect in this engine carries "active duty" or "permanent change of
+ *   station" — a Form W-2 box 12 code P proves a moving reimbursement was
+ *   paid to a service member, and says nothing about a military order — so
+ *   this dialect is the only possible source, exactly as it is for
+ *   `itemizeEvenThoughLessThanStandardDeduction`. Read only by
+ *   `fjs/schedule/1`, which REFUSES rather than computes when a moving
+ *   expense reaches Schedule 1 line 14 without it: absence is *not asserted*,
+ *   never *asserted false*, and the difference decides a deduction the law
+ *   allows nobody else.
  * - **`dependents` (TAX-12, 13-CONTEXT.md Decision 4.1) is ADDITIVE, and
  *   `dependentCount` is KEPT rather than replaced.** `dependentCount` stays
  *   the load-bearing declaration existing proofs and the scope guard read;
@@ -243,11 +260,16 @@ export const kindVocabulary = /** @type {const} */ ([
     // that line number with no box to fill, so a kind for it would be a
     // declaration a taxpayer could never truthfully make.
     //
-    // Three of the thirteen are MODELED as of this phase --
+    // Three of the thirteen were MODELED as of the phase that split them --
     // `educatorExpenses`, `healthSavingsAccountDeduction` and
-    // `studentLoanInterestDeduction`. The other ten refuse by name, which is
-    // the whole point of splitting: what remains unmodeled on Part II is now
-    // something a taxpayer can be told.
+    // `studentLoanInterestDeduction`. SEVEN are today: `iraDeduction` and
+    // `penaltyOnEarlyWithdrawalOfSavings` followed, then
+    // `deductiblePartOfSelfEmploymentTax` beside the Schedule SE wiring and
+    // `movingExpensesArmedForces` beside the Form 3903 wiring. The other six
+    // refuse by name, which is the whole point of splitting: what remains
+    // unmodeled on Part II is now something a taxpayer can be told. The
+    // running count in a comment is what rots -- `fjs/return/scope`'s own
+    // hand-typed `expectedModeledKindCount` is what is actually asserted.
     'educatorExpenses',                     // Schedule 1 line 11  -> 10
     'reservistPerformingArtistFeeBasisExpenses', // Schedule 1 line 12 -> 10
     'healthSavingsAccountDeduction',        // Schedule 1 line 13  -> 10
@@ -720,6 +742,16 @@ export const returnProfileSchema = /** @type {const} */ ({
     // hadForeignFinancialAccount. Read only by `fjs/tax/deduction`'s
     // `deductionChoice` (13-06); no cross-field check needed here.
     itemizeEvenThoughLessThanStandardDeduction: option(true),
+    // Form 3903's own pre-line checkbox (§217(g), as left standing when TCJA
+    // §11049 suspended §217): "Check here to certify that you meet these
+    // requirements" — a Member of the Armed Forces on active duty moving,
+    // under a military order, because of a permanent change of station. A
+    // taxpayer certification no information return states, exactly like
+    // `itemizeEvenThoughLessThanStandardDeduction`. Read only by
+    // `fjs/schedule/1`, which gates line 14 on it; no cross-field check here,
+    // because certifying eligibility while claiming nothing is an ordinary
+    // return and every other field on this dialect is silent about moving.
+    movingExpensesArmedForcesPermanentChangeOfStation: option(true),
     // TAX-12 (13-CONTEXT.md Decision 4.1) — per-dependent facts Schedule
     // 8812 needs to classify a qualifying child versus an other dependent.
     // Additive, ABSENT for a return declaring `dependentCount: 0` and
@@ -1504,6 +1536,41 @@ export const proof = {
         falseRejected: () => {
             const [t] = validate({ ...minimal, itemizeEvenThoughLessThanStandardDeduction: false })
             assertEq(t, 'error')
+        },
+    },
+    // Form 3903's pre-line eligibility checkbox (§217(g)). Structurally
+    // independent of every check above — no leaf here touches
+    // `checkReferences`'s order or `declaredKinds`.
+    formThreeNineZeroThreeEligibilityCertification: {
+        movingExpensesArmedForcesPermanentChangeOfStationValidates: () => {
+            const [t, v] = validate({
+                ...minimal,
+                movingExpensesArmedForcesPermanentChangeOfStation: true,
+            })
+            assert(t === 'ok', ['expected ok', t, v])
+            assertEq(v.movingExpensesArmedForcesPermanentChangeOfStation, true)
+        },
+        // DOC-12, same discipline as every other checkbox on this dialect: a
+        // structural `false` is rejected, not accepted as "not applicable".
+        // The distinction matters more here than anywhere else on this
+        // dialect: `false` and ABSENT would both have to mean "did not
+        // certify", and a stored `false` would look like a denial the engine
+        // could act on, when what it actually has is silence.
+        falseRejected: () => {
+            const [t] = validate({
+                ...minimal,
+                movingExpensesArmedForcesPermanentChangeOfStation: false,
+            })
+            assertEq(t, 'error')
+        },
+        // THE CONTROL: the certification is OPTIONAL. A return that says
+        // nothing about moving expenses validates, and it is the ordinary
+        // case — a gate that made this field required would refuse every
+        // civilian return on this dialect.
+        absentValidates: () => {
+            const [t, v] = validate({ ...minimal })
+            assert(t === 'ok', ['expected ok', t, v])
+            assertEq(v.movingExpensesArmedForcesPermanentChangeOfStation, undefined)
         },
     },
     // TAX-12 (13-CONTEXT.md Decision 4.1): the `dependents` array and its

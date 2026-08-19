@@ -23,11 +23,21 @@
  *
  * A checkbox is a taxpayer attestation with no document behind it — no dialect
  * in this engine carries "active duty" or "permanent change of station" — so
- * the eligibility gate belongs with the taxpayer facts in
- * `fjs/return/profile`, beside the `movingExpensesArmedForces` kind, and NOT
- * in this arithmetic. A caller that hands a civilian's move to this module
- * gets a number the law does not allow. That is the caller's rule to enforce,
- * stated here so nobody concludes from a green proof that this module checked.
+ * the eligibility gate belongs with the taxpayer facts on
+ * `vnd.fjs.return_profile` and NOT in this arithmetic. A caller that hands a
+ * civilian's move to this module gets a number the law does not allow. That is
+ * the caller's rule to enforce, stated here so nobody concludes from a green
+ * proof that this module checked.
+ *
+ * **The caller now exists, and the field it gates on is named.**
+ * `fjs/schedule/1` reads
+ * `movingExpensesArmedForcesPermanentChangeOfStation` — Form 3903's own
+ * pre-line checkbox, stored as `option(true)` like every other certification
+ * on that dialect — and REFUSES rather than computing when a moving expense or
+ * a box 12 code P reimbursement reaches line 14 without it. This paragraph
+ * originally pointed at `fjs/return/profile`'s `movingExpensesArmedForces`
+ * KIND, which was the wrong home: `declaredKinds` is a scope declaration, and
+ * no computation module here gates a figure on it.
  *
  * ## This module reads no document
  *

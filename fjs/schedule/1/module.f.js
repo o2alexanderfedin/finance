@@ -186,6 +186,7 @@ import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
 import { of, halfUp } from '../../types/rational/module.f.js'
 import { centsFromString, centsToString } from '../../exact/module.f.js'
 import { form8889PartI } from '../../form8889/module.f.js'
+import { movingExpenses, movingExpensesLine4W2Box12Codes } from '../../form3903/module.f.js'
 import { scheduleC } from '../c/module.f.js'
 import { scheduleE } from '../e/module.f.js'
 import {
@@ -234,6 +235,27 @@ import { taxParamsByYear } from '../../tax/params/module.f.js'
 export const adjustmentLineTags = /** @type {const} */ ([
     ['educatorExpenses', 'Schedule 1 line 11'],
     ['hsaContribution', 'Schedule 1 line 13'],
+    // ── Line 14's TWO tags: Form 3903's printed lines 1 and 2 ──────────────
+    //
+    // Two tags for one printed line, the `traditionalIraContribution` /
+    // `…AgeFiftyOrOver` precedent one block down, and for the same reason:
+    // Form 3903 keeps them apart on its own face, line 3 adds them, and
+    // nothing downstream could recover the split from a single figure. NO
+    // dialect in this engine carries either amount — there is no information
+    // return for what a household move cost — so they arrive the way an
+    // educator expense does, on `vnd.fjs.adjustments`.
+    //
+    // **`…ExcludingMeals` is part of the tag, not a comment.** Line 2's
+    // printed caption ends *"Do not include the cost of meals"* and
+    // `i3903.pdf` says it twice more, while `fjs/form3903` takes line 2 as an
+    // ALREADY-NET figure and has no meals input, deliberately: a line-2
+    // figure that arrived with meals in it is indistinguishable, there, from
+    // one that did not. The exclusion can therefore only be enforced where
+    // the figure is named, which is here. A taxpayer tagging a meals-inclusive
+    // amount with this tag is making a false statement, exactly as one tagging
+    // a Roth contribution `traditionalIraContribution` would be.
+    ['movingExpensesTransportationAndStorage', 'Schedule 1 line 14'],
+    ['movingExpensesTravelAndLodgingExcludingMeals', 'Schedule 1 line 14'],
     // **`traditionalIraContribution`, never `iraContribution`.** A Roth
     // contribution is not deductible at ALL (§408A(c)(1)) and belongs on no
     // Schedule 1 line; because this vocabulary is CLOSED, an entry tagged
@@ -688,6 +710,90 @@ const employerHsaContributionSources = w2s => w2s.flatMap(form =>
             value: entry.amount,
         })))
 
+// ── Line 14's own machinery (Form 3903) ──────────────────────────────────────
+
+/**
+ * The two {@link adjustmentLineTags} entries that feed Schedule 1 line 14 —
+ * Form 3903's printed line 1 and its printed line 2. Named once so the two
+ * filters below and the vocabulary above cannot come apart.
+ * @type {readonly string[]}
+ */
+const movingExpenseTags = [
+    'movingExpensesTransportationAndStorage',
+    'movingExpensesTravelAndLodgingExcludingMeals',
+]
+
+/**
+ * Form W-2 box 12 **code P** — "excludable moving expense reimbursements paid
+ * directly to a member of the Armed Forces", which is Form 3903 line 4. The
+ * form's own caption says where to find it: *"This amount should be shown in
+ * box 12 of your Form W-2 with code P."*
+ *
+ * The match list is `fjs/form3903`'s own exported
+ * {@link movingExpensesLine4W2Box12Codes}, held rather than re-typed, so the
+ * specification and this sum cannot drift apart (AGENTS.md, "one rule, one
+ * place"). The code is normalized the way `employerHsaContributionSources`
+ * above and `fjs/form6251/estate_trust` normalize theirs — trimmed and
+ * upper-cased, compared as a WHOLE string, never as a prefix, because
+ * `fjs/document/w2` stores box 12's code as printed and never interprets it.
+ * A code that arrives as `'p'` or `' P'` is the same box; one that arrives as
+ * `'PP'` is not.
+ *
+ * **One `Source` per contributing box 12 entry**, never one per document: a
+ * single Form W-2 can carry several coded rows, and a per-document citation
+ * could not say which row put the figure on Form 3903 line 4.
+ * @type {(w2s: readonly Stored<W2>[]) => readonly Source[]}
+ */
+const movingExpenseReimbursementSources = w2s => w2s.flatMap(form =>
+    (form.value.box12 ?? [])
+        .filter(entry =>
+            movingExpensesLine4W2Box12Codes.includes(entry.code.trim().toUpperCase()))
+        .map(entry => ({
+            documentHash: form.documentHash,
+            boxPath: `box12[code=${entry.code.trim().toUpperCase()}]`,
+            value: entry.amount,
+        })))
+
+/**
+ * The refusal a return raises when a moving expense reaches this schedule
+ * without the §217(g) certification `vnd.fjs.return_profile` carries.
+ *
+ * **Why a refusal and not a zero.** TCJA §11049 suspended §217 for everybody
+ * except the case §217(g) leaves standing, so the deduction turns entirely on
+ * a fact NO document in this engine reports: active duty, and a move ordered
+ * as a permanent change of station. Form W-2 box 12 code P comes closest —
+ * the code exists only for service members — and it still says nothing about
+ * a military order. Three behaviours were available and only one is honest:
+ *
+ * 1. **Compute anyway.** A civilian's move would produce a deduction the law
+ *    allows nobody, silently, with every leaf green.
+ * 2. **Return zero.** Correct for a civilian and WRONG for the service member
+ *    the line exists for, and indistinguishable from the two of them: the
+ *    engine would drop a real deduction without saying so.
+ * 3. **Refuse, naming the certification.** The taxpayer is told the one fact
+ *    that is missing and where to state it.
+ *
+ * Absence is *not certified*, never *certified false* — the same reading
+ * `traditionalIraContributionAgeFiftyOrOver` gets one block below, and the
+ * same rule: refuse whenever the unknown could change the answer rather than
+ * assume either side of it.
+ * @type {ScheduleOneRefusal}
+ */
+const movingExpensesNotCertifiedRefusal = {
+    kind: 'error',
+    message: 'Schedule 1 line 14: this return carries a moving expense or a Form W-2 box 12 code P '
+        + 'moving reimbursement, but the return profile does not certify '
+        + 'movingExpensesArmedForcesPermanentChangeOfStation. Form 3903 asks for that '
+        + 'certification before its first line — "You can deduct moving expenses only if you are a '
+        + 'Member of the Armed Forces on active duty and, due to a military order, you, your '
+        + 'spouse, or your dependents move because of a permanent change of station" — because '
+        + '§217 is suspended by TCJA §11049 for everyone else, and NO document this engine reads '
+        + 'reports active duty or a permanent change of station (box 12 code P proves a service '
+        + 'member was reimbursed, not that a military order moved them). Refusing rather than '
+        + 'deducting a civilian move the law disallows, and rather than zeroing a service '
+        + "member's real deduction: an absent certification is UNSTATED, not denied"
+}
+
 // ── Line 20's own machinery (§219) ───────────────────────────────────────────
 
 /**
@@ -1010,7 +1116,7 @@ export const scheduleOnePartIIExceptStudentLoanInterest = taxParamSet => input =
                 message: `Schedule 1 Part II: the adjustments document carries an entry tagged `
                     + `'${entry.value.lineTag}' (${entry.value.description}, `
                     + `${entry.value.amount}), which is not one of the ${adjustmentLineTags.length} `
-                    + `Part II lines this engine computes `
+                    + `Part II adjustment tags this engine computes `
                     + `(${adjustmentLineTagNames.join(', ')}). Refusing rather than dropping an `
                     + `adjustment from line 26 and overstating the tax`,
             }
@@ -1166,7 +1272,69 @@ export const scheduleOnePartIIExceptStudentLoanInterest = taxParamSet => input =
     const line13 = documentLine(profile)('Schedule 1 line 13 (HSA deduction, Form 8889 line 13)')(
         line13Value)(line13Sources)
 
-    const line14 = zero('Schedule 1 line 14 (moving expenses for Armed Forces members)')
+    // ── Line 14: moving expenses for Armed Forces members, via Form 3903 ────
+    //
+    // The three figures `fjs/form3903` asks for, assembled HERE because this
+    // is where the documents are: printed lines 1 and 2 from the two
+    // {@link movingExpenseTags} adjustment entries, printed line 4 from Form
+    // W-2 box 12 code P. That module reads no document on purpose, so
+    // DOC-11's absent-is-absent rule is applied once, in this layer.
+    //
+    // **The certification is checked when EITHER an expense or a code P
+    // reimbursement is present**, not only when an expense is. A W-2 carrying
+    // code P with no expenses beside it is precisely the case Form 3903's
+    // line 5 "No" branch exists for, and dropping it would understate the
+    // tax by the whole reimbursement.
+    //
+    // **ONE Form 3903, from every entry on the document.** The instructions
+    // say *"If you qualify to deduct expenses for more than one move, use a
+    // separate Form 3903 for each move"*, and `vnd.fjs.adjustments` carries
+    // nothing that distinguishes one move from another — no move identifier,
+    // no origin, no date beyond `datePaid`. So this engine computes the one
+    // form the stored facts describe. That is exact for the ordinary
+    // single-move return; a taxpayer with two moves in one year, one of them
+    // over-reimbursed, would owe more than this line reports, and has no way
+    // to say so on this dialect. Recorded in
+    // `fjs/form3903/todo/moving-expenses.md` rather than guessed at here.
+    const movingEntries = entries.filter(entry =>
+        movingExpenseTags.includes(entry.value.lineTag))
+    const movingReimbursementSources = movingExpenseReimbursementSources(w2Forms)
+    const movingCertified =
+        profile.value.movingExpensesArmedForcesPermanentChangeOfStation === true
+    if (
+        (movingEntries.length !== 0 || movingReimbursementSources.length !== 0)
+        && !movingCertified
+    ) {
+        return movingExpensesNotCertifiedRefusal
+    }
+    /** @type {(tag: string) => bigint} */
+    const movingTotalTagged = tag => movingEntries
+        .filter(entry => entry.value.lineTag === tag)
+        .reduce((sum, entry) => sum + centsFromString(entry.value.amount), 0n)
+    const form3903 = movingExpenses({
+        transportationAndStorageCents: movingTotalTagged('movingExpensesTransportationAndStorage'),
+        // Already net of meals — the tag says so, and `fjs/form3903` adds
+        // nothing to whatever arrives here.
+        travelAndLodgingCents: movingTotalTagged('movingExpensesTravelAndLodgingExcludingMeals'),
+        governmentPaymentsNotInBox1Cents: movingReimbursementSources.reduce(
+            (total, source) => total + centsFromString(source.value), 0n),
+    })
+    // The refusal is threaded out VERBATIM, never thrown and never turned
+    // into a zero: its whole content is the amount of gross income this
+    // engine has nowhere to put and the 1040 line it belonged on.
+    if (form3903.kind === 'error') {
+        return { kind: 'error', message: form3903.message }
+    }
+    const line14 = documentLine(profile)(
+        'Schedule 1 line 14 (moving expenses for Armed Forces members, Form 3903 line 5)')(
+        form3903.line5)([
+            ...movingEntries.map(entry => ({
+                documentHash: entry.documentHash,
+                boxPath: `entries[lineTag=${entry.value.lineTag},individual=${entry.value.individual}]`,
+                value: entry.value.amount,
+            })),
+            ...movingReimbursementSources,
+        ])
 
     // ── Line 15: the deductible half of self-employment tax (TAX-31) ────────
     //
@@ -1363,6 +1531,17 @@ export const scheduleOnePartIIExceptStudentLoanInterest = taxParamSet => input =
     // The adjustments handed over are lines 11 through 19a, 23 and 25: the
     // Social Security worksheet's own printed range LESS line 20, which is
     // exactly what Appendix B Worksheet 1 line 1 excludes.
+    //
+    // **FINDING, recorded rather than fixed here.** Line 14's wiring ran this
+    // file's own mutation recipe over every summand below. Dropping
+    // `line14.value` left the whole suite green, and
+    // `lineFourteenReachesThePublicationFiveNineZeroAWorksheetOneAdjustments`
+    // is the leaf that closes it. **Dropping `line13.value` ALSO leaves the
+    // suite green, and that one is still open** — a pre-existing gap on a
+    // line shipped in Phase 24, not something the Form 3903 wiring
+    // introduced. Closing it needs the same fixture shape: Social Security
+    // benefits, an IRA contribution, a workplace plan, and an income where
+    // the 85% cap does not bind.
     const adjustmentsBeforeIraDeductionCents =
         line11.value + line12.value + line13.value + line14.value + line15.value
         + line16.value + line17.value + line18.value + line19a.value
@@ -2112,6 +2291,142 @@ const w2WithEmployerHsa = {
     },
 }
 
+// ── Line 14's own fixtures (Form 3903) ───────────────────────────────────────
+
+/**
+ * A return profile whose filer has CERTIFIED Form 3903's pre-line
+ * requirement — active duty, and a move under a military order because of a
+ * permanent change of station. Every legitimate line 14 leaf uses this one,
+ * and {@link profileNoDeclaredKinds} is the uncertified control.
+ * @type {Stored<ReturnProfile>}
+ */
+const profileCertifiedForMoving = {
+    documentHash: 'profile-hash-3903',
+    value: { ...minimalProfileValue, movingExpensesArmedForcesPermanentChangeOfStation: true },
+}
+
+/** Form 3903 line 1 — transportation and storage.
+ * @type {(amount: string) => Adjustments['entries'][number]} */
+const movingTransportEntry = amount => ({
+    lineTag: 'movingExpensesTransportationAndStorage',
+    datePaid: '2025-07-14',
+    description: 'household goods shipped on PCS orders',
+    amount,
+    individual: 'taxpayer',
+})
+
+/** Form 3903 line 2 — travel and lodging, already net of meals.
+ * @type {(amount: string) => Adjustments['entries'][number]} */
+const movingTravelEntry = amount => ({
+    lineTag: 'movingExpensesTravelAndLodgingExcludingMeals',
+    datePaid: '2025-07-16',
+    description: 'mileage, tolls and one night of lodging en route',
+    amount,
+    individual: 'taxpayer',
+})
+
+/**
+ * The box 12 rows that are NOT Form 3903 line 4, carried beside code P on
+ * every fixture below: `DD` is the cost of employer-sponsored health coverage
+ * and `PP` shares code P's first letter while being a different code
+ * entirely. Both are far larger than any code P amount here, so a prefix
+ * match or an "any box 12 row" read produces a wildly different line 4 rather
+ * than a near miss.
+ *
+ * **Code `W` is deliberately NOT among them, and the reason is worth
+ * recording:** it was, and every leaf using this fixture went red on
+ * `Schedule 1 line 13`'s own refusal — an employer HSA contribution with no
+ * coverage record — long before line 14 was reached. A decoy has to be inert
+ * on every OTHER line, not merely on the one under test.
+ * @type {readonly NonNullable<W2['box12']>[number][]}
+ */
+const notMovingReimbursementBoxes = [
+    { code: 'DD', amount: '14500.00' },
+    { code: 'PP', amount: '9999.00' },
+]
+
+/**
+ * A Form W-2 carrying box 12 **code P** beside {@link
+ * notMovingReimbursementBoxes}.
+ * @type {(amount: string) => Stored<W2>}
+ */
+const w2WithMovingReimbursement = amount => ({
+    documentHash: 'sha256-w2-p',
+    value: {
+        dialect: 'vnd.fjs.w2',
+        payerTin: '11-1111111', recipientTin: '222-22-2222', accountNumber: '',
+        taxYear: 2025, formRevision: '2025',
+        box12: [
+            { code: 'DD', amount: '14500.00' },
+            { code: 'P', amount },
+            { code: 'PP', amount: '9999.00' },
+        ],
+    },
+})
+
+/** The SAME form with its code P row removed — the control that pins the
+ * decoys contributing nothing rather than happening to cancel.
+ * @type {Stored<W2>}
+ */
+const w2WithoutMovingReimbursement = {
+    documentHash: 'sha256-w2-no-p',
+    value: {
+        dialect: 'vnd.fjs.w2',
+        payerTin: '11-1111111', recipientTin: '222-22-2222', accountNumber: '',
+        taxYear: 2025, formRevision: '2025',
+        box12: notMovingReimbursementBoxes,
+    },
+}
+
+/** A traditional IRA contribution entry, for the line 14 / line 20
+ * interaction leaf below.
+ * @type {(amount: string) => Adjustments['entries'][number]} */
+const iraContributionEntry = amount => ({
+    lineTag: 'traditionalIraContribution',
+    datePaid: '2025-04-01',
+    description: 'traditional IRA contribution',
+    amount,
+    individual: 'taxpayer',
+})
+
+/**
+ * Stage 1 for the Publication 590-A Worksheet 1 interaction: a single filer
+ * COVERED by a workplace plan with $48,000.00 of wages and $40,000.00 of
+ * SSA-1099 box 5 benefits, whose adjustments the leaf varies.
+ *
+ * The income is chosen so the Social Security worksheet's 85% cap does NOT
+ * bind — which is what makes its line 6 observable at all — and so modified
+ * AGI straddles §219(g)(3)(B)'s $79,000.00 threshold depending on whether
+ * Schedule 1 line 14 is subtracted.
+ * @type {(entries: readonly Adjustments['entries'][number][]) => ScheduleOnePartIIStageOneOutcome}
+ */
+const stageOneForMovingAndIra = entries =>
+    scheduleOnePartIIExceptStudentLoanInterest(taxParams2025)({
+        profile: profileCertifiedForMoving,
+        status: 'single',
+        adjustmentForms: [adjustmentsDoc(entries)([])],
+        w2Forms: [iraW2Doc('sha256-ira-w2')('48000.00')(true)],
+        interestForms: [],
+        totalIncomeExceptTaxableSocialSecurityLine: totalIncomeOf(4800000n),
+        socialSecurityBenefitsCents: 4000000n,
+        taxExemptInterestCents: 0n,
+        mfsLivedWithSpouseAtAnyTimeInYear: false,
+        iraDistributionReceived: false,
+        businessNetProfit: noBusinessNetProfit(profileCertifiedForMoving),
+        businessExpenseForms: [],
+        passThrough: noPassThrough,
+    })
+
+/**
+ * Part II for a moving-expense fixture set, at the certification and
+ * documents the leaf is about. Every other input is the empty case, so a
+ * non-zero line 14 can only have come from what was handed in.
+ * @type {(profile: Stored<ReturnProfile>) => (entries: readonly Adjustments['entries'][number][]) => (w2Forms: readonly Stored<W2>[]) => ScheduleOnePartIIOutcome}
+ */
+const movingPartII = profile => entries => w2Forms =>
+    partIIOf(profile)('single')(entries.length === 0 ? [] : [adjustmentsDoc(entries)([])])([])(
+        w2Forms)(0n)
+
 /**
  * Part I for one fixture set. Every leaf below that predates Phase 27 passes
  * no business documents at all, which is exactly the regression question
@@ -2501,9 +2816,16 @@ const w2WithSocialSecurityWages = documentHash => recipientTin => amount => ({
  * with no business rather than a declared one, and the difference is exactly
  * what `lineFifteenIsAComputedZeroCitingOnlyTheProfileWhenThereIsNoBusiness`
  * exists to state: the assertions look identical and the reason does not.
+ *
+ * **Line 14 left this list when Form 3903 was wired.** It is still a
+ * documented zero on a return with no moving documents — `lineFourteenIsA`
+ * `DocumentedZeroWithoutMovingDocuments` asserts exactly that, as the control
+ * for the leaves that compute it — but it is no longer a line NO phase has
+ * claimed, and leaving it here would make this list say something false while
+ * passing.
  * @type {readonly string[]} */
 const partIILinesStillDocumentedZero = [
-    'line12', 'line14', 'line16', 'line17', 'line18', 'line19a',
+    'line12', 'line16', 'line17', 'line18', 'line19a',
     'line20', 'line22', 'line23', 'line24', 'line25',
 ]
 
@@ -4196,6 +4518,418 @@ export const proof = {
         )
     },
 
+    // ── Line 14: moving expenses for Armed Forces members (Form 3903) ───────
+
+    /**
+     * **Form 3903 line 5 lands on Schedule 1 line 14.** A staff sergeant's
+     * permanent change of station: $4,837.50 of household goods shipped,
+     * $1,299.40 of driving and one night of lodging, $2,000.00 reimbursed by
+     * the service and reported in Form W-2 box 12 code P.
+     *
+     * $4,837.50 + $1,299.40 = $6,136.90, less $2,000.00 = **$4,136.90**,
+     * added and subtracted by hand from the printed page's own steps.
+     */
+    lineFourteenIsFormThreeNineZeroThreeLineFive: () => {
+        const result = okPartII(movingPartII(profileCertifiedForMoving)(
+            [movingTransportEntry('4837.50'), movingTravelEntry('1299.40')])(
+            [w2WithMovingReimbursement('2000.00')]))
+        assertEq(result.line14.value, 413690n, '$4,136.90 of moving expense deduction')
+    },
+
+    /**
+     * The TWO tags are Form 3903's two printed expense lines, and each one
+     * moves line 14 on its own. Asserted separately, at figures that cannot
+     * be confused: a wiring that read one tag and dropped the other, or that
+     * read one tag twice, produces a different number in every one of the
+     * three cases below.
+     */
+    bothMovingTagsReachLineFourteenAndNeitherIsTheOther: () => {
+        const shippedOnly = okPartII(movingPartII(profileCertifiedForMoving)(
+            [movingTransportEntry('4837.50')])([]))
+        assertEq(shippedOnly.line14.value, 483750n, '$4,837.50 shipped, nothing travelled')
+        const travelledOnly = okPartII(movingPartII(profileCertifiedForMoving)(
+            [movingTravelEntry('1299.40')])([]))
+        assertEq(travelledOnly.line14.value, 129940n, '$1,299.40 travelled, nothing shipped')
+        const both = okPartII(movingPartII(profileCertifiedForMoving)(
+            [movingTransportEntry('4837.50'), movingTravelEntry('1299.40')])([]))
+        assertEq(both.line14.value, 613690n, '$4,837.50 + $1,299.40 = $6,136.90, unreimbursed')
+        // …and two entries under the SAME tag add, rather than the second
+        // replacing the first: a move is billed in more than one invoice.
+        const twoInvoices = okPartII(movingPartII(profileCertifiedForMoving)(
+            [movingTransportEntry('4837.50'), movingTransportEntry('112.25')])([]))
+        assertEq(twoInvoices.line14.value, 494975n, '$4,837.50 + $112.25 = $4,949.75')
+    },
+
+    /**
+     * **Form 3903 line 4 is Form W-2 box 12 code P, and ONLY code P.** The
+     * fixture carries `DD` and `PP` beside it, both larger than the code P
+     * amount, so a prefix match (`PP`), an "any box 12 row" read or a
+     * transposed code letter produces a number that is not merely wrong but
+     * unmistakably wrong.
+     *
+     * $6,136.90 of expenses, less $2,000.00 of code P = $4,136.90. If `PP`'s
+     * $9,999.00 were swallowed the form would REFUSE instead, so this leaf
+     * would go red twice over.
+     */
+    onlyBoxTwelveCodePReducesLineFourteen: () => {
+        const withDecoys = okPartII(movingPartII(profileCertifiedForMoving)(
+            [movingTransportEntry('4837.50'), movingTravelEntry('1299.40')])(
+            [w2WithMovingReimbursement('2000.00')]))
+        assertEq(withDecoys.line14.value, 413690n, '$6,136.90 - $2,000.00 = $4,136.90')
+        // The W-2 with the decoys and NO code P row at all: the same return
+        // deducts the whole of line 3, which is what pins that the decoys
+        // contribute nothing rather than happening to cancel.
+        const noCodeP = okPartII(movingPartII(profileCertifiedForMoving)(
+            [movingTransportEntry('4837.50'), movingTravelEntry('1299.40')])(
+            [w2WithoutMovingReimbursement]))
+        assertEq(noCodeP.line14.value, 613690n, 'codes DD and PP are not a moving reimbursement')
+        // Case and whitespace: `fjs/document/w2` stores the code as printed.
+        // `' p '` IS code P; `'PP'` above is not, and both halves of that
+        // sentence are asserted, because a match loosened to a prefix passes
+        // the first and fails the second.
+        const lowerCase = okPartII(movingPartII(profileCertifiedForMoving)(
+            [movingTransportEntry('4837.50'), movingTravelEntry('1299.40')])(
+            [{
+                documentHash: 'sha256-w2-p-lower',
+                value: {
+                    dialect: 'vnd.fjs.w2',
+                    payerTin: '11-1111111', recipientTin: '222-22-2222', accountNumber: '',
+                    taxYear: 2025, formRevision: '2025',
+                    box12: [{ code: ' p ', amount: '2000.00' }],
+                },
+            }]))
+        assertEq(lowerCase.line14.value, 413690n, "' p ' is the same printed box as 'P'")
+        // Two Forms W-2 each carrying code P SUM — a service member with two
+        // employers in the year, and the case a "read the first one" bug
+        // cannot be told from a sum by any single-document fixture.
+        const twoForms = okPartII(movingPartII(profileCertifiedForMoving)(
+            [movingTransportEntry('4837.50'), movingTravelEntry('1299.40')])(
+            [w2WithMovingReimbursement('2000.00'), {
+                documentHash: 'sha256-w2-p-second',
+                value: {
+                    dialect: 'vnd.fjs.w2',
+                    payerTin: '33-3333333', recipientTin: '222-22-2222', accountNumber: '',
+                    taxYear: 2025, formRevision: '2025',
+                    box12: [{ code: 'P', amount: '136.90' }],
+                },
+            }]))
+        assertEq(twoForms.line14.value, 400000n, '$6,136.90 - ($2,000.00 + $136.90) = $4,000.00')
+    },
+
+    /**
+     * **PROV-01/PROV-02:** line 14 cites the entries and the box 12 rows it
+     * was built from, one `Source` per contributing entry, and does NOT fall
+     * back to the profile's `declaredKinds` placeholder once a document
+     * supplied a figure.
+     */
+    lineFourteenCitesEveryEntryAndEveryCodePBox: () => {
+        const result = okPartII(movingPartII(profileCertifiedForMoving)(
+            [movingTransportEntry('4837.50'), movingTravelEntry('1299.40')])(
+            [w2WithMovingReimbursement('2000.00')]))
+        const boxPaths = result.line14.sources.map(source => source.boxPath)
+        assert(
+            boxPaths.includes(
+                'entries[lineTag=movingExpensesTransportationAndStorage,individual=taxpayer]'),
+            ['line 14 must cite Form 3903 line 1', boxPaths])
+        assert(
+            boxPaths.includes(
+                'entries[lineTag=movingExpensesTravelAndLodgingExcludingMeals,individual=taxpayer]'),
+            ['line 14 must cite Form 3903 line 2', boxPaths])
+        assert(boxPaths.includes('box12[code=P]'),
+            ['line 14 must cite the W-2 BOX the reimbursement came from', boxPaths])
+        assert(!boxPaths.includes('box12[code=DD]') && !boxPaths.includes('box12[code=PP]'),
+            ['and cite no box that did not contribute', boxPaths])
+        assert(!boxPaths.includes('declaredKinds'),
+            ['a computed line 14 must not cite the profile placeholder', boxPaths])
+        assert(
+            result.line14.sources.some(source => source.documentHash === 'sha256-w2-p'),
+            ['by the CAS hash a reader can look up', result.line14.sources])
+        assertEq(result.line14.sources.length, 3,
+            'two entries and one code P box, one Source each')
+    },
+
+    /**
+     * **THE §217(g) GATE.** TCJA §11049 suspended §217 for everybody except
+     * the case §217(g) leaves standing, and Form 3903's own pre-line checkbox
+     * is where a filer certifies it. NO document this engine reads reports
+     * active duty or a permanent change of station, so an uncertified return
+     * carrying a moving expense REFUSES: computing it would deduct a civilian
+     * move the law disallows, and zeroing it would silently drop a service
+     * member's real deduction.
+     *
+     * A gate needs a control, and this one needs two — the identical
+     * documents WITH the certification must compute, and a return with no
+     * moving documents at all must not be refused for failing to certify
+     * something it never claimed.
+     */
+    aMovingExpenseWithoutTheCertificationRefuses: () => {
+        const uncertified = refusal(movingPartII(profileNoDeclaredKinds)(
+            [movingTransportEntry('4837.50')])([]))
+        assert(uncertified.message.includes('movingExpensesArmedForcesPermanentChangeOfStation'),
+            ['name the field that would fix it', uncertified.message])
+        assert(uncertified.message.includes('permanent change of station'),
+            ['and the printed requirement it stands for', uncertified.message])
+        assert(uncertified.message.includes('§217'),
+            ['and the section that suspends the deduction for everyone else', uncertified.message])
+        assert(uncertified.message.includes('Schedule 1 line 14'),
+            ['and the line that cannot be computed', uncertified.message])
+
+        // ── CONTROL 1: the same documents, certified, compute ──────────────
+        const certified = okPartII(movingPartII(profileCertifiedForMoving)(
+            [movingTransportEntry('4837.50')])([]))
+        assertEq(certified.line14.value, 483750n, '$4,837.50, certified and deducted')
+
+        // ── CONTROL 2: an ordinary return does not need to certify ─────────
+        const noMove = okPartII(emptyPartII())
+        assertEq(noMove.line14.value, 0n, 'no moving documents, no certification, no refusal')
+    },
+
+    /**
+     * A Form W-2 box 12 code P reimbursement with NO expenses recorded beside
+     * it is ALSO gated, and that is the half of the gate a naive wiring
+     * misses. Code P is *excludable moving expense reimbursements paid
+     * directly to a member of the Armed Forces* — it is money the return has
+     * to account for whether or not the taxpayer entered what the move cost.
+     */
+    aCodePReimbursementAloneIsGatedToo: () => {
+        const uncertified = refusal(movingPartII(profileNoDeclaredKinds)([])(
+            [w2WithMovingReimbursement('2000.00')]))
+        assert(uncertified.message.includes('box 12 code P'),
+            ['name where the figure came from', uncertified.message])
+        assert(uncertified.message.includes('movingExpensesArmedForcesPermanentChangeOfStation'),
+            ['and the certification that is missing', uncertified.message])
+        // CERTIFIED, it does not become a zero either: $2,000.00 reimbursed
+        // against $0.00 of expenses is $2,000.00 of gross income on 1040 line
+        // 1h, which this engine refuses. See the leaf below.
+        const certified = refusal(movingPartII(profileCertifiedForMoving)([])(
+            [w2WithMovingReimbursement('2000.00')]))
+        assert(certified.message.includes('$2000.00'),
+            ['the excess, named', certified.message])
+        // CONTROL: the decoy-only W-2 carries no code P, so the same return
+        // computes without either refusal.
+        const noCodeP = okPartII(movingPartII(profileNoDeclaredKinds)([])(
+            [w2WithoutMovingReimbursement]))
+        assertEq(noCodeP.line14.value, 0n, 'codes DD and PP are not a moving reimbursement')
+    },
+
+    /**
+     * **THE TRAP, threaded out of `fjs/form3903` VERBATIM.** When the service
+     * reimbursed more than the move cost, the excess is gross income on 1040
+     * **line 1h** — not a zero deduction, and not Schedule 1 line 8z. This
+     * engine refuses 1040 line 1h (`otherEarnedIncome`), so the return cannot
+     * be computed and says so, naming the amount and the destination.
+     *
+     * $2,400.00 + $600.00 = $3,000.00 of expenses against $4,500.00
+     * reimbursed leaves a $1,500.00 excess, subtracted by hand.
+     *
+     * The assertions are about WHAT this schedule threads out, not that
+     * something was refused: a wiring that caught the refusal and substituted
+     * its own message, or a zero, would pass a bare `throw:` leaf.
+     */
+    aReimbursementExceedingTheMoveRefusesAsTaxableIncome: () => {
+        const message = refusal(movingPartII(profileCertifiedForMoving)(
+            [movingTransportEntry('2400.00'), movingTravelEntry('600.00')])(
+            [w2WithMovingReimbursement('4500.00')])).message
+        assert(message.includes('$1500.00'), ['name the excess amount', message])
+        assert(message.includes('$3000.00'), ['and the line 3 it exceeded', message])
+        assert(message.includes('line 1h'), ['name WHERE it would have gone', message])
+        assert(message.includes('earned income'), ['and what that line is', message])
+        assert(message.includes('8z'), ['and rule out the line it is not', message])
+        assert(message.includes('UNDERSTATE'), ['and which way the error runs', message])
+        assert(message.includes('Form 3903'), ['and the form that computed it', message])
+
+        // ── THE CONTROL, at the printed boundary ──────────────────────────
+        // $3,000.00 reimbursed against $3,000.00 of expenses is a ZERO
+        // deduction and NOT a refusal: `i3903.pdf` reports the excess on line
+        // 1h only "if the result is more than zero". One cent more refuses.
+        const exactly = okPartII(movingPartII(profileCertifiedForMoving)(
+            [movingTransportEntry('2400.00'), movingTravelEntry('600.00')])(
+            [w2WithMovingReimbursement('3000.00')]))
+        assertEq(exactly.line14.value, 0n, 'a perfectly reimbursed move: zero, computed')
+        const oneCentOver = refusal(movingPartII(profileCertifiedForMoving)(
+            [movingTransportEntry('2400.00'), movingTravelEntry('600.00')])(
+            [w2WithMovingReimbursement('3000.01')]))
+        assert(oneCentOver.message.includes('$0.01'),
+            ['one cent of excess still has nowhere to go', oneCentOver.message])
+        // …and one cent UNDER deducts one cent, which is the other side of
+        // the same boundary.
+        const oneCentUnder = okPartII(movingPartII(profileCertifiedForMoving)(
+            [movingTransportEntry('2400.00'), movingTravelEntry('600.00')])(
+            [w2WithMovingReimbursement('2999.99')]))
+        assertEq(oneCentUnder.line14.value, 1n, '$3,000.00 - $2,999.99 = $0.01')
+    },
+
+    /**
+     * Line 14 must actually REACH the line 26 total that becomes 1040 line
+     * 10 — a line 14 that computes correctly and never lands in the total
+     * would leave the return overstated with every leaf above green.
+     *
+     * A DIFFERENCE rather than two absolute figures, so it cannot fail for a
+     * reason that has nothing to do with this line.
+     */
+    lineFourteenReachesTheLineTwentySixTotal: () => {
+        const withMove = okPartII(movingPartII(profileCertifiedForMoving)(
+            [movingTransportEntry('4837.50'), movingTravelEntry('1299.40')])(
+            [w2WithMovingReimbursement('2000.00')]))
+        const without = okPartII(movingPartII(profileCertifiedForMoving)([])([]))
+        assertEq(withMove.line26.value - without.line26.value, 413690n,
+            'the whole of line 14 must reach line 26')
+        assertEq(withMove.line26.value - without.line26.value, withMove.line14.value)
+        assertEq(without.line14.value, 0n, 'and the control deducts nothing')
+    },
+
+    /**
+     * The CONTROL for every leaf above, and the assertion `line14` gave up
+     * when it left {@link partIILinesStillDocumentedZero}: with no moving
+     * documents, line 14 is still a documented zero citing the profile's own
+     * `declaredKinds` box, exactly as it was before Form 3903 was wired.
+     */
+    lineFourteenIsADocumentedZeroWithoutMovingDocuments: () => {
+        const result = okPartII(emptyPartII())
+        assertEq(result.line14.value, 0n)
+        assertEq(result.line14.sources.length, 1, 'only the profile')
+        assertEq(result.line14.sources[0].boxPath, 'declaredKinds')
+        // And the rule names Form 3903 even when nothing was claimed, so a
+        // reader of the report can see what the line would have read.
+        assert(result.line14.rule.includes('Form 3903'),
+            ['the rule must name the form', result.line14.rule])
+    },
+
+    /**
+     * The two moving tags are in the CLOSED vocabulary, so a near-miss tag is
+     * refused BY NAME rather than silently contributing nothing — the
+     * `rothIraContribution` property, at the tag a taxpayer is most likely to
+     * invent. `movingExpenses` alone does not say which printed Form 3903
+     * line it is, and the two are not interchangeable: only line 2 carries
+     * the meals exclusion.
+     */
+    aNearMissMovingTagIsRefusedByName: () => {
+        const result = refusal(movingPartII(profileCertifiedForMoving)([{
+            lineTag: 'movingExpenses',
+            datePaid: '2025-07-14',
+            description: 'the move',
+            amount: '4837.50',
+            individual: 'taxpayer',
+        }])([]))
+        assert(result.message.includes("'movingExpenses'"),
+            ['name the tag that was not understood', result.message])
+        assert(result.message.includes('movingExpensesTransportationAndStorage'),
+            ['and offer the vocabulary', result.message])
+        assert(result.message.includes('movingExpensesTravelAndLodgingExcludingMeals'),
+            ['both halves of it', result.message])
+    },
+
+    /**
+     * A moving expense paid in the year AFTER the tax year is refused, like
+     * every adjustment on this schedule but an HSA (§223) or IRA (§219(f)(3))
+     * contribution. There is no §217 provision deeming a moving expense paid
+     * in the following year to have been paid in this one, and a March 2026
+     * shipment is a 2026 deduction that nothing downstream could notice.
+     */
+    aMovingExpensePaidInTheFollowingYearIsRefused: () => {
+        const result = refusal(movingPartII(profileCertifiedForMoving)([{
+            ...movingTransportEntry('4837.50'),
+            datePaid: '2026-03-02',
+        }])([]))
+        assert(result.message.includes('2026-03-02'), ['name the date', result.message])
+        assert(result.message.includes('AFTER'), ['and what is wrong with it', result.message])
+        // CONTROL: the same expense inside the tax year computes.
+        const inYear = okPartII(movingPartII(profileCertifiedForMoving)(
+            [movingTransportEntry('4837.50')])([]))
+        assertEq(inYear.line14.value, 483750n, '$4,837.50 paid in 2025')
+    },
+
+    /**
+     * **Line 14 reaches the §221 student loan interest worksheet's "other
+     * adjustments" line — added after a mutation.** Dropping
+     * `partII.line14.value` from {@link studentLoanInterestWorksheetOtherAdjustments}
+     * left the whole suite green: the worksheet's line 3 is "lines 11 through
+     * 20 plus write-ins", line 14 is inside that range, and no fixture
+     * anywhere carried BOTH student loan interest and a moving expense.
+     *
+     * $86,000.00 of income with $1,000.00 of moving expenses subtracted
+     * lands the worksheet's line 4 at exactly $85,000.00 — §221(b)(2)(B)'s
+     * single threshold — so line 6 is zero and the $1,842.63 of interest is
+     * deducted IN FULL. Drop line 14 from line 3 and line 4 is $86,000.00,
+     * line 6 is $1,000.00, and the deduction is phased. The boundary is the
+     * point: a one-dollar error in line 3 is visible in line 21.
+     */
+    lineFourteenReachesTheStudentLoanInterestWorksheetOtherAdjustments: () => {
+        const result = okPartII(partIIOf(profileCertifiedForMoving)('single')(
+            [adjustmentsDoc([movingTransportEntry('1000.00')])([])])(
+            [oneZeroNineEightEDoc('1842.63')])([])(8600000n))
+        assertEq(result.line14.value, 100000n, '$1,000.00 of moving expenses')
+        assertEq(result.studentLoanInterestWorksheet.w3, 100000n,
+            'worksheet line 3 — the other adjustments, which are line 14 alone here')
+        assertEq(result.studentLoanInterestWorksheet.w4, 8500000n, '$86,000.00 - $1,000.00')
+        assertEq(result.studentLoanInterestWorksheet.w6, 0n, 'exactly at the threshold, nothing over')
+        assertEq(result.line21.value, 184263n,
+            '$1,842.63 deducted in full, because line 14 was subtracted first')
+        // THE CONTROL: the identical return with NO moving expense sits one
+        // thousand dollars higher and IS phased, so the leaf above cannot
+        // pass by the phase-out never biting.
+        const without = okPartII(partIIOf(profileCertifiedForMoving)('single')([])(
+            [oneZeroNineEightEDoc('1842.63')])([])(8600000n))
+        assertEq(without.studentLoanInterestWorksheet.w6, 100000n, '$86,000.00 - $85,000.00')
+        assert(without.line21.value < 184263n,
+            ['without line 14 the deduction is phased', without.line21.value])
+    },
+
+    /**
+     * **Line 14 reaches Publication 590-A Appendix B Worksheet 1's line 6 —
+     * added after a mutation.** Dropping `line14.value` from
+     * `adjustmentsBeforeIraDeductionCents` left the whole suite green. That
+     * figure is the "adjustments other than the IRA deduction" the worksheet
+     * subtracts before computing taxable Social Security benefits, and those
+     * benefits are §219(g)(3)'s modified adjusted gross income — so a moving
+     * expense moves the IRA deduction TWICE, once directly and once through
+     * the benefits.
+     *
+     * Single filer covered by a workplace plan: $48,000.00 of wages,
+     * $40,000.00 of SSA-1099 box 5, a $7,000.00 traditional IRA contribution
+     * and $2,000.00 of moving expenses. Hand-computed from the printed
+     * worksheets:
+     *
+     *   Worksheet 1  line 1 $40,000.00   line 2 $20,000.00 (half)
+     *                line 3 $48,000.00   line 4 $0.00   line 5 $68,000.00
+     *                line 6 $2,000.00 <- Schedule 1 line 14, the figure at issue
+     *                line 7 $66,000.00   line 8 $25,000.00 (single base)
+     *                line 9 $41,000.00   line 10 $9,000.00
+     *                line 11 $32,000.00  line 12 $9,000.00  line 13 $4,500.00
+     *                line 14 $4,500.00   line 15 $27,200.00 (85% of line 11)
+     *                line 16 $31,700.00  line 17 $34,000.00 (85% of line 1)
+     *                line 18 $31,700.00 — the 85% cap does NOT bind here,
+     *                which is exactly what makes line 6 observable
+     *   §219(g)(3) modified AGI
+     *                $48,000.00 + $31,700.00 - $2,000.00 = $77,700.00
+     *   $77,700.00 is BELOW §219(g)(3)(B)'s $79,000.00, so there is no
+     *   phase-out and the whole $7,000.00 is deductible.
+     *
+     * Drop line 14 from worksheet line 6 and line 18 becomes $33,400.00,
+     * modified AGI becomes $79,400.00 — inside the range — and the deduction
+     * is phased.
+     */
+    lineFourteenReachesThePublicationFiveNineZeroAWorksheetOneAdjustments: () => {
+        const withMove = okStageOne(stageOneForMovingAndIra(
+            [iraContributionEntry('7000.00'), movingTransportEntry('2000.00')]))
+        assertEq(withMove.line14.value, 200000n, '$2,000.00 of moving expenses')
+        assertEq(withMove.line20.value, 700000n,
+            'the whole $7,000.00, because modified AGI is $77,700.00 — under $79,000.00')
+
+        // ── THE CONTROL ───────────────────────────────────────────────────
+        // The identical return with NO moving expense has a modified AGI of
+        // $81,400.00, which IS inside §219(g)(3)(B)'s range — and there the
+        // §219(b)(5)(B)(ii) age question changes the answer, so the schedule
+        // refuses rather than guessing. Two facts at once: the phase-out
+        // genuinely bites at this income, and the moving deduction is what
+        // takes this return out of it.
+        const withoutMove = refusal(stageOneForMovingAndIra([iraContributionEntry('7000.00')]))
+        assert(withoutMove.message.includes('$5320.00'),
+            ['$7,000.00 x 76% — the phased deduction under 50', withoutMove.message])
+        assert(withoutMove.message.includes('§219(b)(5)(B)(ii)'),
+            ['refused because the age changes a PHASED answer', withoutMove.message])
+    },
+
     // ── The structural guarantees ───────────────────────────────────────────
 
     // The phase's own success criterion, asserted mechanically: on a return
@@ -4224,10 +4958,10 @@ export const proof = {
         // still be documented zeros, so a line quietly re-pointed at a
         // document is caught by name. Derived from the printed form, never
         // from the returned object.
-        assertEq(partIILinesStillDocumentedZero.length, 11, 'sixteen Part II lines, less 11/13/15/21/26')
+        assertEq(partIILinesStillDocumentedZero.length, 10, 'sixteen Part II lines, less 11/13/14/15/21/26')
         /** @type {Record<string, ReportLine>} */
         const byName = {
-            line12: result.line12, line14: result.line14,
+            line12: result.line12,
             line16: result.line16, line17: result.line17, line18: result.line18,
             line19a: result.line19a, line20: result.line20, line22: result.line22,
             line23: result.line23, line24: result.line24, line25: result.line25,
