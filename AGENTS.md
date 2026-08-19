@@ -88,8 +88,14 @@ These are cited by name throughout the source. They are stated here so the citat
   mutation in `fjs/tax/table` stayed green. Catching is the only way to read a value that
   arrives by `throw`.
 
-  The condition is narrow and checkable: **`grep -rn 'try {' fjs demo` must return exactly one
-  code hit, in `fjs/refuses/module.f.js`.** A proof that needs to observe a refusal calls
+  The condition is narrow and checkable: **`grep -rn 'try {' fjs --include='*.f.js'` must return
+  exactly one code hit, in `fjs/refuses/module.f.js`.** Scope it to `fjs/**.f.js`, which is what
+  the rule is about. A first version of this line said `fjs demo` and "exactly one", and it was
+  wrong on a healthy tree: `demo/demo.js` has opened a `try` since the showcase was built
+  (`33c6ed1`), catching a step's render failure so a broken step shows on screen instead of
+  leaving a blank page. `demo/` is the browser shell, not FunctionalScript, and the no-`try` rule
+  never applied to it. **A check that fails when everything is well is worse than no check** — it
+  teaches the next reader that its complaint is normal. A proof that needs to observe a refusal calls
   `refuses(call)(check)`; nothing else may open a `try`. Production code may not, at all —
   a caller that must handle a refusal wants the check to RETURN it (`fjs/schedule/a`'s
   `saltIncomeTaxDriftMessage`, with the throwing form as a two-line wrapper over it, is the
