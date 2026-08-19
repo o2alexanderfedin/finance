@@ -1,19 +1,34 @@
 # Upstream: `fjs/effects/node` has an `Exec` effect, but no long-lived `Spawn` effect
 
-Status: **not filed upstream yet.** Recorded here per AGENTS.md's rule that a local
+Status: **FILED UPSTREAM** as [functionalscript#1649](https://github.com/functionalscript/functionalscript/pull/1649) —
+`fjs/effects/node/todo/spawn-effect.md`, P3. Upstream tracks issues in `todo/` FILES, not GitHub issues
+(its own `AGENTS.md`), so that file *is* the filed issue and the PR is merely how it gets added.
+The local workaround below stands until a release ships the effect. Recorded here per AGENTS.md's rule that a local
 workaround for an fjs gap must never be silent, even though the workaround (below) is
 small and does not block progress.
 
 Target: `functionalscript` `fjs/effects/node/module.f.ts` / `module.js`. Checked against
 the version pinned in this repo's `package.json` (`functionalscript ^0.43.1`).
 
-**Re-checked 2026-08-17 against 0.45.0** (release commit `8804e783`, the current npm release),
-reading `fjs/effects/node/types.ts` at that SHA. **Still open, unchanged.** There is no `Spawn`
-type and no `'spawn'` operation; `Exec` is still the only subprocess primitive, and the `Fs` union
-is still `Mkdir | ReadFile | ReadBytes | Readdir | WriteFile | Rm | Rename | Exec | Access |
-CreateExclusive | WriteBytes | Stat`. The workaround below stands. (The bump itself did not land:
-0.44.0+ is not consumable here — see
-[upstream-mjs-migration.md](./upstream-mjs-migration.md).)
+**Re-checked 2026-08-19 against 0.46.1** (`2e9ad76f`), reading `fjs/effects/node/types.ts` and grepping
+the whole tree for `spawn`. **Still open, unchanged.** No `Spawn` type, no `'spawn'` key in
+`nodeCommandSet` (`fjs/effects/node/module.f.mjs:93-102`), and `Fs` is still `Mkdir | ReadFile |
+ReadBytes | Readdir | WriteFile | Rm | Rename | Exec | Access | CreateExclusive | WriteBytes | Stat`.
+The only two `spawn` hits in `fjs/` are prose in `emergent_testing/todo/`.
+
+**0.46's effect system makes the shape expressible, which RETIRES THE DEFERRAL.** The deferral read
+"file if/when a second caller needs the shape"; the answer is now that the shape is sayable.
+`Operation` is `readonly [string, (..._: readonly never[]) => Result<unknown, unknown>]`, and
+`CreateServer`/`Listen` already thread an opaque host handle (`Server`, a `Nominal` brand minted by
+the runner with `asNominal`) through the effect system — the exact precedent a child-process handle
+needs.
+
+**One correction to the sketch below, found by type-checking it rather than reading it.** Every
+operation's return must be a `Result`, so `Spawn -> SpawnHandle` and `SpawnEnd -> void` written bare
+do NOT type-check at 0.46.1; they must be `IoResult<Child>` and `IoResult<void>`. The corrected
+five-operation design (`spawn`/`childWrite`/`childRead`/`childEnd`/`childWait`, `Vec` chunks bounded
+at 128 KiB as `readBytes`/`writeBytes` are, `null` for EOF as `Read` already spells it, argv split
+rather than a shell string) is in #1649, with two signature questions left open there deliberately.
 
 ## The gap, precisely
 
