@@ -895,6 +895,9 @@ const fixtureFarmerLossFarmHash = 'sha256-tax-return-farmer-loss-farm'
 const fixtureMarketplaceProfileHash = 'sha256-tax-return-marketplace-profile'
 const fixtureMarketplaceW2Hash = 'sha256-tax-return-marketplace-w2'
 const fixtureMarketplaceStatementHash = 'sha256-tax-return-marketplace-1095a'
+// TAX-42's own two: an expatriate on a U.S. payroll.
+const fixtureExpatriateProfileHash = 'sha256-tax-return-expatriate-profile'
+const fixtureExpatriateW2Hash = 'sha256-tax-return-expatriate-w2'
 // ── The routing sweep's own documents ───────────────────────────────────
 //
 // TAX-37 closed the `vnd.fjs.1095a` hole one dialect at a time and said so:
@@ -981,6 +984,8 @@ const subjectFarmerProfile = 'tax-return-subject-farmer-profile'
 const subjectFarmerFarm = 'tax-return-subject-farmer-farm'
 const subjectFarmerLossFarm = 'tax-return-subject-farmer-loss-farm'
 const subjectMarketplaceProfile = 'tax-return-subject-marketplace-profile'
+const subjectExpatriateProfile = 'tax-return-subject-expatriate-profile'
+const subjectExpatriateW2 = 'tax-return-subject-expatriate-w2'
 const subjectMarketplaceW2 = 'tax-return-subject-marketplace-w2'
 const subjectMarketplaceStatement = 'tax-return-subject-marketplace-1095a'
 // The routing sweep's own subjects, one per document above.
@@ -1309,6 +1314,34 @@ const documentByHash = {
         dependentCount: 0,
         declaredKinds: ['wages', 'federalTaxWithheldOnW2', 'netPremiumTaxCredit'],
         federalPovertyLineTable: 'contiguous48AndDistrictOfColumbia',
+    },
+    // TAX-42. **NOTHING new is routed here**, and that is the finding worth
+    // recording rather than a missing branch: Form 2555's five facts ride on
+    // `vnd.fjs.return_profile`, which {@link routeDocument} has dispatched
+    // since Phase 21. There is no information return for foreign earned
+    // income anywhere, so the guest program needed no edit at all — and this
+    // fixture exists to prove the whole chain still runs end to end through
+    // the stored program, which is the one place a profile field that never
+    // reached `Form1040Inputs` would show.
+    [fixtureExpatriateProfileHash]: {
+        dialect: returnProfileDialect,
+        taxYear: 2025,
+        filingStatus: 'single',
+        dependentCount: 0,
+        declaredKinds: ['wages', 'federalTaxWithheldOnW2', 'foreignEarnedIncomeExclusion'],
+        physicallyPresentInAForeignCountryThreeHundredThirtyFullDaysAndNoUnitedStatesAbode: true,
+        foreignEarnedIncomeQualifyingDays: 365,
+        foreignEarnedIncome: '60000.00',
+    },
+    [fixtureExpatriateW2Hash]: {
+        dialect: w2Dialect,
+        payerTin: '11-1111111',
+        recipientTin: '222-22-2222',
+        accountNumber: 'ACC-W2-2555',
+        taxYear: 2025,
+        formRevision: '2025',
+        box1WagesTipsOtherCompensation: '90000.00',
+        box2FederalIncomeTaxWithheld: '9000.00',
     },
     [fixtureMarketplaceW2Hash]: {
         dialect: w2Dialect,
@@ -1970,6 +2003,8 @@ const snapshotBySubject = {
     [subjectMarketplaceProfile]: fixtureMarketplaceProfileHash,
     [subjectMarketplaceW2]: fixtureMarketplaceW2Hash,
     [subjectMarketplaceStatement]: fixtureMarketplaceStatementHash,
+    [subjectExpatriateProfile]: fixtureExpatriateProfileHash,
+    [subjectExpatriateW2]: fixtureExpatriateW2Hash,
     [subjectSweepProfile]: fixtureSweepProfileHash,
     [subjectSweepInterest]: fixtureSweepInterestHash,
     [subjectSweepDividend]: fixtureSweepDividendHash,
@@ -2081,6 +2116,9 @@ const farmerSubjects = [
 const marketplaceSubjects = [
     subjectMarketplaceStatement, subjectMarketplaceProfile, subjectMarketplaceW2,
 ]
+
+/** TAX-42's own two, likewise NOT in sorted order. */
+const expatriateSubjects = [subjectExpatriateW2, subjectExpatriateProfile]
 
 /**
  * Runs the twin against a subject enumeration and returns its result.
@@ -2707,6 +2745,44 @@ export const proof = {
     // allowed is min($9,600.00, $10,200.00 - $588.00) = $9,600.00, the
     // advance paid is $4,800.00, and the net premium tax credit is
     // $4,800.00.
+    // TAX-42, through the STORED PROGRAM: a single filer with $90,000.00 of
+    // wages on a U.S. Form W-2 for work performed abroad the whole year, and
+    // a $60,000.00 §911 exclusion.
+    //
+    // Every figure hand-derived from the printed brackets, independently of
+    // this repository's code:
+    //   line 1a  $90,000.00 of wages
+    //   line 8   −$60,000.00 (Schedule 1 line 8d, Form 2555 line 45)
+    //   line 9   $30,000.00 of total income
+    //   line 15  $30,000.00 − $15,750.00 = $14,250.00 of taxable income
+    //   line 16  the Foreign Earned Income Tax Worksheet:
+    //            tax on $74,250 (Tax Table, midpoint $74,275) = $11,255.00
+    //            less tax on $60,000 (midpoint $60,025)       =  $8,120.00
+    //                                                         =  $3,135.00
+    //   line 25a $9,000.00 withheld; line 34 $9,000.00 − $3,135.00 = $5,865.00
+    //
+    // **The method tag is asserted, not only the cents**: a wrapper that
+    // silently fell through to the Tax Table would charge $1,475.00 here, and
+    // a value-only assertion on a different fixture might not have noticed.
+    storedProgramComputesAForeignEarnedIncomeExclusionEndToEnd: () => {
+        const result = runTwin(expatriateSubjects)
+        assert(result.kind === 'ok', ['expected a computed return', result])
+        if (result.kind !== 'ok') {
+            return
+        }
+        assertEq(result.line16Method, 'foreignEarnedIncomeTaxWorksheet')
+        const cents = renderedCents(result)
+        assertEq(cents('1040 line 1a'), 9000000n, '$90,000.00 of wages')
+        assertEq(cents('1040 line 8'), -6000000n, 'NEGATIVE $60,000.00 on Schedule 1 line 8d')
+        assertEq(cents('1040 line 9'), 3000000n, '$30,000.00 of total income')
+        assertEq(cents('1040 line 15'), 1425000n, '$14,250.00 of taxable income')
+        assertEq(
+            cents('1040 line 16 (Foreign Earned Income Tax Worksheet)'), 313500n,
+            '$11,255.00 − $8,120.00 = $3,135.00 — and the RULE names the worksheet, so a '
+            + 'silent fall-through to the Tax Table could not satisfy this lookup')
+        assertEq(cents('1040 line 25a'), 900000n, '$9,000.00 withheld')
+        assertEq(cents('1040 line 34'), 586500n, '$5,865.00 overpaid')
+    },
     storedProgramRoutesFormTenNinetyFiveAAndComputesThePremiumTaxCredit: () => {
         const result = runTwin(marketplaceSubjects)
         assert(result.kind === 'ok', ['expected a computed return', result])
