@@ -521,6 +521,7 @@ export const modeledKinds = /** @type {const} */ ([
     // the missing figure is a printed box on a dialect this engine already
     // stores" -- and said adding box 9 "would close it outright". It did.
     'amtPrivateActivityBondInterest', // 1099-INT box 9 -> Form 6251 line 2g -> 1040 line 17
+    'amtEstatesAndTrusts',        // K-1 (1041) box 12 code A -> Form 6251 line 2j -> 1040 line 17
     // TAX-35's own, and reclassified in the SAME commit as the wiring that
     // makes it computable -- `fjs/schedule/e`'s `beneficiaryRow` reading
     // `vnd.fjs.k1_1041` box 6 into printed Part III columns (d) and (f), which
@@ -778,7 +779,6 @@ export const unmodeledKindRefusals = /** @type {const} */ ([
     // names its Form 6251 line alongside the line it already named.
     { kind: 'amtDepletion', line: 'Form 6251 line 2d -> Schedule 2 line 2 -> 1040 line 17', label: 'the alternative minimum tax depletion adjustment', remedy: 'requires the depletion deduction refigured under §57(a)(1) with AMT income and deductions, and with the §611 deduction limited to the property\'s AMT-adjusted basis — a per-property computation for which this engine holds no document at all (no phase yet)' },
     { kind: 'amtNetOperatingLossDeduction', line: 'Form 6251 lines 2e and 2f -> Schedule 2 line 2 -> 1040 line 17', label: 'the net operating loss add-back and the alternative tax net operating loss deduction', remedy: 'requires the ATNOL: every prior year\'s loss refigured under the AMT rules, limited to 90% of alternative minimum taxable income figured without it. That is a multi-year history this engine does not hold, and Schedule 1 line 8a — the regular deduction line 2e adds back — is itself the refused `otherIncome` kind. ONE kind covers both printed lines because they are two halves of one fact: 2e removes the regular deduction and 2f allows the AMT one in its place (no phase yet)' },
-    { kind: 'amtEstatesAndTrusts', line: 'Form 6251 line 2j -> Schedule 2 line 2 -> 1040 line 17', label: 'the alternative minimum tax adjustment from an estate or trust', remedy: 'requires Schedule K-1 (Form 1041) box 12 code A, and this engine models no Form 1041 K-1 at all — DOC-24 (Phase 30) brings the partnership and S-corporation K-1s, not the fiduciary one (no phase yet)' },
     { kind: 'amtDispositionOfProperty', line: 'Form 6251 line 2k -> Schedule 2 line 2 -> 1040 line 17', label: 'the difference between the AMT and regular-tax gain or loss on a disposition', remedy: 'requires the taxpayer\'s AMT BASIS in the property disposed of, which differs from the regular-tax basis by every adjustment made in every prior year — most commonly the §56(b)(3) incentive stock option spread, which increases AMT basis in the year of exercise and reduces the AMT gain whenever the shares are later sold. This engine computes that spread (Form 6251 line 2i) but cannot carry it forward: it holds no prior-year AMT basis document, and Form 3921 is issued for the exercise year only (no phase yet)' },
     { kind: 'amtDepreciation', line: 'Form 6251 line 2l -> Schedule 2 line 2 -> 1040 line 17', label: 'the depreciation adjustment on assets placed in service after 1986', remedy: 'requires §56(a)(1)\'s alternative depreciation for every depreciable asset — a per-asset basis, method and placed-in-service date this engine holds for nothing, since vnd.fjs.business_expenses records Schedule C line totals rather than an asset register (no phase yet)' },
     { kind: 'amtPassiveActivities', line: 'Form 6251 line 2m -> Schedule 2 line 2 -> 1040 line 17', label: 'the passive activity adjustment', remedy: 'requires §469 passive activity losses refigured with AMT amounts, which needs Form 8582 and the Schedule E activities behind it (Phase 30 brings Schedule E Parts II and III; Form 8582 has no phase yet)' },
@@ -1361,7 +1361,7 @@ export const classifyScope = declaredKinds => {
  * and `fjs/form8995` wiring that makes all three computable.
  * @type {number}
  */
-const expectedModeledKindCount = 41
+const expectedModeledKindCount = 42
 
 /**
  * The modeled set, hand-typed a SECOND time and in {@link kindVocabulary}'s
@@ -1419,6 +1419,7 @@ const everyModeledKindHandTyped = [
     'additionalChildTaxCredit',
     'americanOpportunityCredit',
     'amtPrivateActivityBondInterest',
+    'amtEstatesAndTrusts',
     'estateAndTrustIncome',
 ]
 
@@ -1500,7 +1501,7 @@ const everyModeledKindHandTyped = [
  * that makes it computable.
  * @type {number}
  */
-const expectedUnmodeledKindCount = 73
+const expectedUnmodeledKindCount = 72
 
 /**
  * The complete refusal message for a return declaring exactly
@@ -1908,15 +1909,16 @@ export const proof = {
         // "Form 6251" -- a list computed from the table under test could never
         // notice a row missing.
         //
-        // Lines 2a, 2b, 2c, 2h and 2i are absent, each for its own reason:
-        // 2a and 2i COMPUTE, 2b is a computed zero (see the leaf below), and
-        // 2c and 2h are named by `investmentInterestForm4952` and
-        // `section1202Gain`, which already existed.
-        theFourteenFormSixTwoFiveOneKindsStillRefusingNameTheirOwnPrintedLine: () => {
+        // Lines 2a, 2b, 2c, 2h, 2i and 2j are absent, each for its own reason:
+        // 2a, 2i and 2j COMPUTE, 2b is a computed zero (see the leaf below),
+        // and 2c and 2h are named by `investmentInterestForm4952` and
+        // `section1202Gain`, which already existed. 2j joined the computing
+        // set with `amtEstatesAndTrusts`'s reclassification.
+        theThirteenFormSixTwoFiveOneKindsStillRefusingNameTheirOwnPrintedLine: () => {
             /** @type {readonly (readonly [Kind, string])[]} */
             const expected = [
                 ['amtDepletion', 'Form 6251 line 2d'],
-                ['amtNetOperatingLossDeduction', 'Form 6251 lines 2e and 2f'],                ['amtEstatesAndTrusts', 'Form 6251 line 2j'],
+                ['amtNetOperatingLossDeduction', 'Form 6251 lines 2e and 2f'],
                 ['amtDispositionOfProperty', 'Form 6251 line 2k'],
                 ['amtDepreciation', 'Form 6251 line 2l'],
                 ['amtPassiveActivities', 'Form 6251 line 2m'],
@@ -1934,7 +1936,8 @@ export const proof = {
             // says so -- but one of them, `amtPrivateActivityBondInterest`, is
             // now MODELED, so it has no refusal row for this table to name.
             // The two counts measure different things and must not be unified.
-            assertEq(expected.length, 14, 'fourteen still-refusing kinds, hand-counted off the printed Form 6251')
+            assertEq(expected.length, 13,
+                'thirteen still-refusing kinds, hand-counted off the printed Form 6251')
             // Every one is in the vocabulary, in the order listed -- read from
             // `kindVocabulary`, which this module does not own.
             expected
@@ -2019,7 +2022,7 @@ export const proof = {
             // would have been the other way to handle it and would have
             // refused every return with a state tax refund. Counted rather
             // than named, so a kind added for ANY Part I line without a leaf
-            // in `theFourteenFormSixTwoFiveOneKindsStillRefusingNameTheirOwnPrintedLine`
+            // in `theThirteenFormSixTwoFiveOneKindsStillRefusingNameTheirOwnPrintedLine`
             // reddens here too.
             assertEq(
                 kindVocabulary.filter(kind => kind.startsWith('amt')).length,
@@ -2416,6 +2419,12 @@ export const proof = {
                 outcome.kind, 'ok',
                 ['Schedule 3 line 11\'s kind alone must be in scope', outcome])
         },
+        amtEstatesAndTrustsIsInScopeAlone: () => {
+            const outcome = classifyScope(['amtEstatesAndTrusts'])
+            assertEq(
+                outcome.kind, 'ok',
+                ['Form 6251 line 2j\'s kind alone must be in scope', outcome])
+        },
         // TAX-30, Phase 27: the SIX Schedule 1 Part I kinds this phase did NOT
         // wire must still refuse on their own, or the split quietly widened
         // the engine's claims rather than named them. The SAME property the
@@ -2526,7 +2535,7 @@ export const proof = {
             //
             // The ten above are what still refuses on this schedule. The AMT's
             // own assertions move to `fjs/form6251` and to
-            // `theFourteenFormSixTwoFiveOneKindsStillRefusingNameTheirOwnPrintedLine`, where
+            // `theThirteenFormSixTwoFiveOneKindsStillRefusingNameTheirOwnPrintedLine`, where
             // fifteen NEW Schedule-2-line-2 kinds refuse by name — so this
             // schedule's refusal surface grew in the same phase its most
             // prominent refusal was computed away.
