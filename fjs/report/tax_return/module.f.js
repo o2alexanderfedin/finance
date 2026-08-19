@@ -173,6 +173,7 @@ import { dialect as basisCorrectionDialect } from '../../document/basis_correcti
 import { dialect as k1PartnershipDialect } from '../../document/k1_1065/module.f.js'
 import { dialect as k1SCorporationDialect } from '../../document/k1_1120s/module.f.js'
 import { dialect as k1EstateTrustDialect } from '../../document/k1_1041/module.f.js'
+import { dialect as oneZeroNineFiveADialect } from '../../document/1095a/module.f.js'
 
 /** @import { Effect, OperationMap } from 'functionalscript/fjs/effects/module.f.js' */
 /** @import { CasOp } from '../../guest/module.f.js' */
@@ -204,6 +205,7 @@ import { dialect as k1EstateTrustDialect } from '../../document/k1_1041/module.f
 /** @import { K1Partnership } from '../../document/k1_1065/module.f.js' */
 /** @import { K1SCorporation } from '../../document/k1_1120s/module.f.js' */
 /** @import { K1EstateTrust } from '../../document/k1_1041/module.f.js' */
+/** @import { OneZeroNineFiveA } from '../../document/1095a/module.f.js' */
 
 // ── The rendered wire shape ──────────────────────────────────────────────────
 
@@ -245,7 +247,7 @@ import { dialect as k1EstateTrustDialect } from '../../document/k1_1041/module.f
  * `vnd.fjs.revision`, a future addition) falls straight through
  * {@link collectDocument} untouched — never coerced into a bucket, never
  * treated as a zero.
- * @typedef {ReturnProfile | W2 | OneZeroNineNineInt | OneZeroNineNineDiv | OneZeroNineNineB | OneZeroNineNineR | Ssa1099 | ItemizedDeductions | MedicalExpenses | PriorYearCapitalLoss | OneZeroNineNineG | Adjustments | OneZeroNineEightE | OneZeroNineEightT | Credits | Ira | PriorYearIraBasis | OneZeroNineNineNec | BusinessExpenses | FormThirtyNineTwentyOne | FormThirtyNineTwentyTwo | BasisCorrection | K1Partnership | K1SCorporation | K1EstateTrust} EngineDocument
+ * @typedef {ReturnProfile | W2 | OneZeroNineNineInt | OneZeroNineNineDiv | OneZeroNineNineB | OneZeroNineNineR | Ssa1099 | ItemizedDeductions | MedicalExpenses | PriorYearCapitalLoss | OneZeroNineNineG | Adjustments | OneZeroNineEightE | OneZeroNineEightT | Credits | Ira | PriorYearIraBasis | OneZeroNineNineNec | BusinessExpenses | FormThirtyNineTwentyOne | FormThirtyNineTwentyTwo | BasisCorrection | K1Partnership | K1SCorporation | K1EstateTrust | OneZeroNineFiveA} EngineDocument
  */
 
 /**
@@ -288,6 +290,7 @@ import { dialect as k1EstateTrustDialect } from '../../document/k1_1041/module.f
  *   readonly partnershipK1Forms: readonly Stored<K1Partnership>[],
  *   readonly sCorporationK1Forms: readonly Stored<K1SCorporation>[],
  *   readonly estateTrustK1Forms: readonly Stored<K1EstateTrust>[],
+ *   readonly marketplaceStatements: readonly Stored<OneZeroNineFiveA>[],
  * }} Collected
  */
 
@@ -364,6 +367,7 @@ export const taxReturnReportSource = [
     '        partnershipK1Forms: [],',
     '        sCorporationK1Forms: [],',
     '        estateTrustK1Forms: [],',
+    '        marketplaceStatements: [],',
     '    }',
     '    const runYear = ctx.taxParams.taxYear',
     '    const noteYearMismatch = documentHash => doc => acc => {',
@@ -406,6 +410,7 @@ export const taxReturnReportSource = [
     '        if (doc.dialect === \'vnd.fjs.k1_1065\') { return { ...acc, partnershipK1Forms: [...acc.partnershipK1Forms, stored] } }',
     '        if (doc.dialect === \'vnd.fjs.k1_1120s\') { return { ...acc, sCorporationK1Forms: [...acc.sCorporationK1Forms, stored] } }',
     '        if (doc.dialect === \'vnd.fjs.k1_1041\') { return { ...acc, estateTrustK1Forms: [...acc.estateTrustK1Forms, stored] } }',
+    '        if (doc.dialect === \'vnd.fjs.1095a\') { return { ...acc, marketplaceStatements: [...acc.marketplaceStatements, stored] } }',
     '        return undefined',
     '    }',
     '    const collect = documentHash => doc => acc => {',
@@ -468,6 +473,7 @@ export const taxReturnReportSource = [
     '            partnershipK1Forms: acc.partnershipK1Forms,',
     '            sCorporationK1Forms: acc.sCorporationK1Forms,',
     '            estateTrustK1Forms: acc.estateTrustK1Forms,',
+    '            marketplaceStatements: acc.marketplaceStatements,',
     '        })',
     '        if (outcome.kind === \'error\') {',
     '            return { kind: \'error\', message: outcome.message, unmodeled: outcome.unmodeled }',
@@ -544,6 +550,7 @@ const emptyCollected = {
     partnershipK1Forms: [],
     sCorporationK1Forms: [],
     estateTrustK1Forms: [],
+    marketplaceStatements: [],
 }
 
 /**
@@ -595,6 +602,7 @@ const routeDocument = documentHash => doc => acc => {
     if (doc.dialect === k1PartnershipDialect) { return { ...acc, partnershipK1Forms: [...acc.partnershipK1Forms, { documentHash, value: doc }] } }
     if (doc.dialect === k1SCorporationDialect) { return { ...acc, sCorporationK1Forms: [...acc.sCorporationK1Forms, { documentHash, value: doc }] } }
     if (doc.dialect === k1EstateTrustDialect) { return { ...acc, estateTrustK1Forms: [...acc.estateTrustK1Forms, { documentHash, value: doc }] } }
+    if (doc.dialect === oneZeroNineFiveADialect) { return { ...acc, marketplaceStatements: [...acc.marketplaceStatements, { documentHash, value: doc }] } }
     return undefined
 }
 
@@ -717,6 +725,7 @@ const renderReturn = ctx => acc => {
         partnershipK1Forms: acc.partnershipK1Forms,
         sCorporationK1Forms: acc.sCorporationK1Forms,
         estateTrustK1Forms: acc.estateTrustK1Forms,
+        marketplaceStatements: acc.marketplaceStatements,
     })
     if (outcome.kind === 'error') {
         return { kind: 'error', message: outcome.message, unmodeled: outcome.unmodeled }
@@ -824,6 +833,9 @@ const fixtureRetireeProfileOnlyHash = 'sha256-tax-return-retiree-profile-only'
 const fixtureFounderProfileHash = 'sha256-tax-return-founder-profile'
 const fixtureFounderNecHash = 'sha256-tax-return-founder-1099nec'
 const fixtureFounderExpensesHash = 'sha256-tax-return-founder-expenses'
+const fixtureMarketplaceProfileHash = 'sha256-tax-return-marketplace-profile'
+const fixtureMarketplaceW2Hash = 'sha256-tax-return-marketplace-w2'
+const fixtureMarketplaceStatementHash = 'sha256-tax-return-marketplace-1095a'
 
 const subjectProfile = 'tax-return-subject-profile'
 const subjectW2A = 'tax-return-subject-w2-a'
@@ -853,6 +865,9 @@ const subjectRetireeProfileOnly = 'tax-return-subject-retiree-profile-only'
 const subjectFounderProfile = 'tax-return-subject-founder-profile'
 const subjectFounderNec = 'tax-return-subject-founder-1099nec'
 const subjectFounderExpenses = 'tax-return-subject-founder-expenses'
+const subjectMarketplaceProfile = 'tax-return-subject-marketplace-profile'
+const subjectMarketplaceW2 = 'tax-return-subject-marketplace-w2'
+const subjectMarketplaceStatement = 'tax-return-subject-marketplace-1095a'
 
 /** @type {Readonly<Record<string, EngineDocument | { readonly dialect: string, readonly taxYear?: number }>>} */
 const documentByHash = {
@@ -1117,6 +1132,58 @@ const documentByHash = {
         box1NonemployeeCompensation: '350.00',
         box4FederalIncomeTaxWithheld: '40.00',
     },
+    // ── TAX-37's own three documents: the ACA-marketplace enrollee ──────
+    //
+    // Added because a mutation proved they were needed. Deleting the twin's
+    // `vnd.fjs.1095a` route branch left the ENTIRE suite green — 2,568
+    // proofs, including every one of `fjs/form1040/core`'s own end-to-end
+    // premium-tax-credit leaves, because those hand the engine a
+    // `Form1040Inputs` directly and never travel through this program's
+    // document routing. That is the Phase 24 lesson this file's own founder
+    // block records, arriving for the eighth time.
+    //
+    // **The same hole is still open for the other twenty-five dispatched
+    // dialects**, and it is reported rather than closed here:
+    // `sourceAndTwinDispatchOnTheSameTwentyFourDialects` greps the SOURCE
+    // text for each tag and asserts nothing at all about the TWIN's branch,
+    // so any route branch whose dialect has no fixture in this file can be
+    // deleted silently. Closing it properly needs one minimal document per
+    // dialect, which is a sweep rather than a slice.
+    [fixtureMarketplaceProfileHash]: {
+        dialect: returnProfileDialect,
+        taxYear: 2025,
+        filingStatus: 'single',
+        dependentCount: 0,
+        declaredKinds: ['wages', 'federalTaxWithheldOnW2', 'netPremiumTaxCredit'],
+        federalPovertyLineTable: 'contiguous48AndDistrictOfColumbia',
+    },
+    [fixtureMarketplaceW2Hash]: {
+        dialect: w2Dialect,
+        payerTin: '11-1111111',
+        recipientTin: '222-22-2222',
+        accountNumber: 'ACC-W2-ACA',
+        taxYear: 2025,
+        formRevision: '2025',
+        box1WagesTipsOtherCompensation: '30000.00',
+        box2FederalIncomeTaxWithheld: '2000.00',
+    },
+    [fixtureMarketplaceStatementHash]: {
+        dialect: oneZeroNineFiveADialect,
+        marketplaceIdentifier: '99',
+        marketplaceAssignedPolicyNumber: 'POLICY-TWIN-0001',
+        policyIssuerName: 'Some Health Plan, Inc.',
+        recipientTin: '222-22-2222',
+        taxYear: 2025,
+        formRevision: '2025',
+        sourceArtifactHash: 'deadbeef00112233445566778899aabbccddeeff0011223344556677889900',
+        coveredIndividuals: [{ name: 'Some Person' }],
+        monthlyCoverage: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(month => ({
+            month,
+            columnAEnrollmentPremiums: '800.00',
+            columnBSlcspPremium: '850.00',
+            columnCAdvancePaymentOfPtc: '400.00',
+        })),
+    },
     [fixtureFounderExpensesHash]: {
         dialect: businessExpensesDialect,
         recipientTin: '222-22-2222',
@@ -1163,6 +1230,9 @@ const snapshotBySubject = {
     [subjectFounderProfile]: fixtureFounderProfileHash,
     [subjectFounderNec]: fixtureFounderNecHash,
     [subjectFounderExpenses]: fixtureFounderExpensesHash,
+    [subjectMarketplaceProfile]: fixtureMarketplaceProfileHash,
+    [subjectMarketplaceW2]: fixtureMarketplaceW2Hash,
+    [subjectMarketplaceStatement]: fixtureMarketplaceStatementHash,
 }
 
 /**
@@ -1208,6 +1278,11 @@ const retireeSubjects = [
 /** Phase 27's own three subjects, likewise NOT in sorted order. */
 const founderSubjects = [
     subjectFounderExpenses, subjectFounderNec, subjectFounderProfile,
+]
+
+/** TAX-37's own three subjects, likewise NOT in sorted order. */
+const marketplaceSubjects = [
+    subjectMarketplaceStatement, subjectMarketplaceProfile, subjectMarketplaceW2,
 ]
 
 /**
@@ -1317,14 +1392,21 @@ const dispatchedDialects = [
     // half of what closes that; `fjs/schedule/e`'s `beneficiaryRow` is the
     // other half.
     k1EstateTrustDialect,
+    // TAX-37's own, the TWENTY-SIXTH: `vnd.fjs.1095a`, added here in the SAME
+    // commit that adds it to the source text and to the twin. Without this
+    // entry a stored Form 1095-A would be classified, served a schema, and
+    // then dropped on the floor by the one program that actually assembles a
+    // return -- which is the shape of the "form with no production caller"
+    // this repo has shipped before.
+    oneZeroNineFiveADialect,
 ]
 
 /**
- * `24 -> 25` is TAX-35's own `vnd.fjs.k1_1041`. `19 -> 24` in Phase 30: three of the five are Phase 29's, restored, and two
+ * `25 -> 26` is TAX-37's own `vnd.fjs.1095a`. `24 -> 25` is TAX-35's own `vnd.fjs.k1_1041`. `19 -> 24` in Phase 30: three of the five are Phase 29's, restored, and two
  * are this phase's own. See the list's own comments for both halves.
  * @type {number}
  */
-const expectedDispatchedDialectCount = 25
+const expectedDispatchedDialectCount = 26
 
 export const proof = {
     // The phase's central number check, and the reason this module exists:
@@ -1794,6 +1876,43 @@ export const proof = {
     // {@link proof.sourceAndTwinDispatchOnTheSameNineteenDialects}'s
     // verbatim-tag grep alone. That is a real gap, named rather than papered
     // over, and it is the identical one Phases 25 and 26 each left.
+    // TAX-37. What this leaf proves that `fjs/form1040/core`'s own
+    // `premiumTaxCreditReachesTheReturn` block cannot: the TWIN's `route`
+    // branch for `vnd.fjs.1095a` is real. Delete it and this leaf is the ONLY
+    // thing in the repository that goes red — verified by mutation, which is
+    // why this fixture exists.
+    //
+    // The arithmetic is Form 8962's, worked in `fjs/form8962`'s own annual
+    // path: household income $30,000.00 is 199% of the $15,060.00 poverty
+    // line, the applicable figure is 0.0196, line 8a is $588.00, the credit
+    // allowed is min($9,600.00, $10,200.00 - $588.00) = $9,600.00, the
+    // advance paid is $4,800.00, and the net premium tax credit is
+    // $4,800.00.
+    storedProgramRoutesFormTenNinetyFiveAAndComputesThePremiumTaxCredit: () => {
+        const result = runTwin(marketplaceSubjects)
+        assert(result.kind === 'ok', ['expected a computed return', result])
+        if (result.kind !== 'ok') {
+            return
+        }
+        const cents = renderedCents(result)
+        assertEq(cents('1040 line 1a'), 3000000n, '$30,000.00 of wages')
+        assertEq(cents('1040 line 31'), 480000n, '$4,800.00 of net premium tax credit')
+        assertEq(cents('1040 line 25a'), 200000n, '$2,000.00 withheld')
+        assertEq(cents('1040 line 33'), 680000n, '$6,800.00 of total payments')
+    },
+    // THE CONTROL: the same filer with the Form 1095-A withheld. The credit
+    // disappears and the return still computes, so the leaf above is evidence
+    // about the DOCUMENT rather than about the profile.
+    theSameStoredFilerWithoutTheFormTenNinetyFiveAComputesNoCredit: () => {
+        const result = runTwin([subjectMarketplaceProfile, subjectMarketplaceW2])
+        assert(result.kind === 'ok', ['expected a computed return', result])
+        if (result.kind !== 'ok') {
+            return
+        }
+        const cents = renderedCents(result)
+        assertEq(cents('1040 line 1a'), 3000000n, 'the same $30,000.00 of wages')
+        assertEq(cents('1040 line 31'), 0n, 'and no premium tax credit at all')
+    },
     storedProgramRoutesTheTwoBusinessDialectsAndComputesScheduleC: () => {
         const result = runTwin(founderSubjects)
         assert(result.kind === 'ok', ['expected a computed return', result])

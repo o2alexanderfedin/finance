@@ -393,6 +393,7 @@ const uncollectedTaxSources = w2s => w2s.flatMap(form =>
  *   readonly scheduleD16Cents: bigint,
  *   readonly scheduleD19Cents: bigint,
  *   readonly scheduleThreeLine1Cents: bigint,
+ *   readonly excessAdvancePremiumTaxCreditRepayment: ReportLine,
  *   readonly regularPreferentialWorksheet:
  *     RegularPreferentialWorksheet | NoRegularPreferentialWorksheet,
  * }} ScheduleTwoInput
@@ -416,6 +417,7 @@ const uncollectedTaxSources = w2s => w2s.flatMap(form =>
  * this whole schedule REFUSE — see {@link ScheduleTwoOutcome}.
  * @typedef {{
  *   readonly kind: 'ok',
+ *   readonly line1a: ReportLine,
  *   readonly line1: ReportLine, readonly line1z: ReportLine, readonly line2: ReportLine,
  *   readonly line3: ReportLine,
  *   readonly line4: ReportLine, readonly line5: ReportLine, readonly line6: ReportLine,
@@ -467,7 +469,7 @@ export const scheduleTwo = taxParamSet => input => {
         specifiedPrivateActivityBondInterestCents,
         isoExerciseForms, estateTrustK1Forms, aStoredNineteenNineBReportsASale,
         filingScheduleD, scheduleD15Cents, scheduleD16Cents, scheduleD19Cents,
-        regularPreferentialWorksheet,
+        regularPreferentialWorksheet, excessAdvancePremiumTaxCreditRepayment,
     } = input
     const zero = profileDeclaredZeroLine(profile)
     // The two facts Schedule SE actually read, unioned wherever a line on
@@ -475,11 +477,32 @@ export const scheduleTwo = taxParamSet => input => {
     const selfEmploymentSources = [selfEmployment.netProfit, selfEmployment.socialSecurityWages]
 
     // ── Part I: Tax ───────────────────────────────────────────────────────
-    // 1a-1z. Excess advance premium tax credit repayment, clean-vehicle-
-    // credit repayments, EPE recapture -- a collapsed stand-in; see this
-    // module's own docstring.
-    const line1 = zero('Schedule 2 line 1 (excess APTC repayment/clean-vehicle-credit repayments/EPE recapture, 1a-1z collapsed)')
-    // 1z. "Total. Add lines 1a through 1z" -- the SAME total, restated.
+    // 1a. "Excess advance premium tax credit repayment. Attach Form 8962."
+    //     ALREADY COMPUTED by `fjs/form8962` and handed in, never recomputed
+    //     here: the same Form 8962 execution produced Schedule 3 line 9's net
+    //     premium tax credit, and the two are the mutually exclusive arms of
+    //     ONE comparison (Form 8962 lines 24 and 25). A second execution here
+    //     could disagree with the first about which arm the return is on,
+    //     which is the one way this pair can be wrong that nothing downstream
+    //     would notice. `foreignTaxCreditLine1` reaches `fjs/schedule/3` the
+    //     same way and for the same reason.
+    //
+    //     For a return holding no Form 1095-A this is a profile-declared zero
+    //     built by `fjs/form1040/core`, so an ordinary return's Part I is
+    //     byte-for-byte what it was before Form 8962 existed.
+    const line1a = excessAdvancePremiumTaxCreditRepayment
+    // 1b-1y. The clean-vehicle-credit repayments (Form 8936 Schedule A Parts
+    // II and IV) and the elective payment election recapture and excessive
+    // payments (Form 4255). Every one of them is a refused
+    // `fjs/return/scope` kind, so they collapse into line 1's own figure as
+    // documented zeros -- line 1 below IS line 1a until one of them is
+    // modeled.
+    const line1 = {
+        ...line1a,
+        rule: 'Schedule 2 line 1 (1a-1y; 1b-1y are the clean-vehicle-credit repayment and '
+            + 'elective-payment-election recapture sub-lines, all refused kinds)',
+    }
+    // 1z. "Total. Add lines 1a through 1y" -- the SAME total, restated.
     const line1z = { ...line1, rule: 'Schedule 2 line 1z (total)' }
     // 2. "Alternative minimum tax. Attach Form 6251." Part II line 11 -- the
     //    EXCESS of the tentative minimum tax over the regular tax, and only
@@ -695,7 +718,7 @@ export const scheduleTwo = taxParamSet => input => {
 
     return {
         kind: 'ok',
-        line1, line1z, line2, line3,
+        line1a, line1, line1z, line2, line3,
         line4, line5, line6, line7, line8, line9, line10, line11, line12, line13,
         line14, line15, line16, line17, line18, line19, line20, line21,
         form8959: form8959Result,
@@ -797,6 +820,13 @@ const noAmounts = {
     // override it, and `theForeignTaxCreditReachesFormSixTwoFiftyOnesBothSides`
     // is what proves it is not being ignored.
     scheduleThreeLine1Cents: 0n,
+    // Form 8962 line 29 as `fjs/form1040/core` hands it in: a
+    // profile-declared zero for a return holding no Form 1095-A, which is
+    // what keeps `sixteenLinesAreStillDeclaredZerosCitingOnlyTheProfile`
+    // asserting the same thing about line 1 that it always did. The leaves
+    // that care about it override it.
+    excessAdvancePremiumTaxCreditRepayment: profileDeclaredZeroLine(profileNoDeclaredKinds)(
+        'Schedule 2 line 1a (excess advance premium tax credit repayment, Form 8962 line 29)'),
     specifiedPrivateActivityBondInterestCents: 0n,
     medicareWages: inputLine('box5MedicareWagesAndTips')(0n),
     medicareTaxWithheld: inputLine('box6MedicareTaxWithheld')(0n),
@@ -1008,14 +1038,15 @@ export const proof = {
     // 25c reads the SAME Form 8959 execution line 11 did.
     everyPrintedLineIsNamed: () => {
         const result = run(noAmounts)
-        // 22 printed lines, plus the THREE forms' own records (8959, 8960,
-        // 6251), plus the `kind` discriminant Phase 29 added when this
-        // schedule became able to refuse.
-        const expectedFieldCount = 26
+        // 23 printed lines -- 22, plus line 1a, which Form 8962's wiring
+        // separated out of the 1a-1z collapse -- plus the THREE forms' own
+        // records (8959, 8960, 6251), plus the `kind` discriminant Phase 29
+        // added when this schedule became able to refuse.
+        const expectedFieldCount = 27
         assertEq(
             Object.keys(result).length,
             expectedFieldCount,
-            'expected exactly 22 named Schedule 2 lines, three form records and the discriminant',
+            'expected exactly 23 named Schedule 2 lines, three form records and the discriminant',
         )
     },
     dialectIndependence: () => {

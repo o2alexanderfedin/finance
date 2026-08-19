@@ -526,6 +526,27 @@ export const modeledKinds = /** @type {const} */ ([
     // can be computed for most of the population that has it -- anybody
     // holding an international index fund -- and the sub-case that cannot is
     // refused where a taxpayer can see why.
+    // TAX-37, reclassified in the SAME commit as the `fjs/form1040/core`
+    // wiring that runs Form 8962 once and hands its two answers to the two
+    // schedules. **The two are ONE comparison** -- Form 8962 line 24 against
+    // line 25 -- so neither could be reclassified without the other: an
+    // engine that credited an under-advanced enrollee and silently dropped an
+    // over-advanced one's repayment is wrong in exactly the population it
+    // misses.
+    //
+    // `excessAdvancePremiumTaxCreditRepayment` is Schedule 2 line 1a ONLY.
+    // The coarse `advancePremiumTaxCreditAndOtherRepayments` that stood in
+    // the refusal table below was split into three (see `fjs/return/profile`'s
+    // vocabulary), because lines 1b through 1f are Forms 8936 and 4255 and
+    // nothing stored distinguishes them from line 1a -- so modeling the
+    // coarse kind would have handed a clean-vehicle-credit repayer a zero
+    // while telling them the kind was in scope.
+    //
+    // Nine printed conditions REFUSE at the form rather than at this table,
+    // each naming what is missing and where the amount would have gone; see
+    // `fjs/form8962`. Being modeled is a claim about what CAN be computed,
+    // exactly as `foreignTaxCredit` below records.
+    'excessAdvancePremiumTaxCreditRepayment', // Form 1095-A -> Form 8962 line 29 -> Schedule 2 line 1a -> 1040 line 17
     'foreignTaxCredit',            // 1099-DIV box 7 + 1099-INT box 6 -> Schedule 3 line 1 -> 1040 line 20
     'educationCredits',            // Form 8863 line 19 -> Schedule 3 line 3 -> 1040 line 20
     'retirementSavingsContributionsCredit', // Form 8880 -> Schedule 3 line 4 -> 1040 line 20
@@ -565,6 +586,12 @@ export const modeledKinds = /** @type {const} */ ([
     // has already paid for once: a stored face no computation consumes cannot
     // be noticed being wrong. Wiring first, reclassify beside it.
     'estateAndTrustIncome',        // Schedule E Part III -> Schedule 1 line 5 -> 1040 line 8
+    // TAX-37's REFUNDABLE half, and the other arm of the same Form 8962
+    // comparison `excessAdvancePremiumTaxCreditRepayment` above is one arm
+    // of. Listed here rather than beside it because this list follows
+    // `kindVocabulary`'s order, which is the 1040's own, and Schedule 3 line
+    // 9 comes long after Schedule 2 line 1a.
+    'netPremiumTaxCredit',         // Form 1095-A -> Form 8962 line 26 -> Schedule 3 line 9 -> 1040 line 31
 ])
 
 /** One member of {@link modeledKinds}.
@@ -586,7 +613,7 @@ const modeledKindNames = modeledKinds
 // ── The refusal table ────────────────────────────────────────────────────────
 
 /**
- * The seventy-six declared kinds this engine does not model, each naming the
+ * The sixty-eight declared kinds this engine does not model, each naming the
  * form line that cannot be computed, a human label, and the remedy — the form
  * or schedule required and, where one exists, the requirement ID and phase
  * that will supply it. `10-RESEARCH.md`'s "Form 1040 Lines 1a-37" table is the
@@ -801,7 +828,19 @@ export const unmodeledKindRefusals = /** @type {const} */ ([
     // (Form 4137) and `form8919Wages` (Form 8919) already name those two
     // taxes, one 1040 line each, above. See `fjs/return/profile`'s own
     // vocabulary comment.
-    { kind: 'advancePremiumTaxCreditAndOtherRepayments', line: 'Schedule 2 line 1a-1z -> 1040 line 17', label: 'excess advance premium tax credit repayment and the other Part I repayments', remedy: 'requires Form 8962, and for the clean-vehicle-credit and elective-payment-election recapture sub-lines Forms 8936 and 3800 (no phase yet)' },
+    // ── TAX-37: the coarse `advancePremiumTaxCreditAndOtherRepayments` stood
+    // HERE and is now three kinds. `excessAdvancePremiumTaxCreditRepayment`
+    // (line 1a) is MODELED; the two rows below are what remains, and neither
+    // is a rewording of the kind that left -- a taxpayer can owe either
+    // without ever having bought Marketplace coverage.
+    //
+    // The old row's remedy named "Forms 8936 and 3800". **Form 3800 is the
+    // general business credit; the elective-payment-election recapture on
+    // Schedule 2 lines 1d-1f comes from Form 4255**, which the printed 2025
+    // Schedule 2 names on its own face at every one of those lines. Corrected
+    // here rather than carried forward.
+    { kind: 'cleanVehicleCreditRepayment', line: 'Schedule 2 lines 1b and 1c -> 1040 line 17', label: 'repayment of a new or previously owned clean vehicle credit transferred to a registered dealer', remedy: 'requires Form 8936 and Schedule A (Form 8936), Parts II and IV. §30D(g)(10)/§25E(f) make the buyer repay a transferred credit when it turns out they were not eligible for it — commonly because modified adjusted gross income exceeded the §30D(f)(10) threshold — and no document this engine holds records that a credit was transferred to a dealer at the point of sale (no phase yet)' },
+    { kind: 'electivePaymentElectionRecapture', line: 'Schedule 2 lines 1d, 1e and 1f, and line 19 -> 1040 line 17 and 1040 line 23', label: 'recapture of net elective payment elections, and the excessive-payment amounts that travel with it', remedy: 'requires Form 4255, whose lines 1d and 2a the printed Schedule 2 names at four separate places (lines 1d, 1e, 1f and 19). §6417 lets certain taxpayers elect to treat an energy credit as a payment of tax; the recapture is a per-property, multi-year computation this engine holds no document for. ONE kind covers all four printed lines because they are four consequences of one election (no phase yet)' },
     // ── Form 6251 Part I's own lines, one kind each (TAX-33, Phase 29) ──────
     //
     // The fifteen §56/§57 adjustments and preferences this engine cannot
@@ -849,7 +888,32 @@ export const unmodeledKindRefusals = /** @type {const} */ ([
     { kind: 'interestOnDeferredInstallmentSaleTax', line: 'Schedule 2 line 15 -> 1040 line 23', label: 'interest on the deferred tax on installment sales over $150,000', remedy: 'requires the §453A(c) computation, which no document this engine models supplies (no phase yet)' },
     { kind: 'lowIncomeHousingCreditRecapture', line: 'Schedule 2 line 16 -> 1040 line 23', label: 'recapture of the low-income housing credit', remedy: 'requires Form 8611 (no phase yet)' },
     { kind: 'otherAdditionalTaxes', line: 'Schedule 2 line 17a-17z -> 1040 line 23', label: 'other additional taxes', remedy: 'the printed form itself collapses more than twenty lettered sub-lines here and this engine models none of them (no phase yet)' },
-    { kind: 'premiumTaxCreditReconciliation', line: 'Schedule 2 line 19 -> 1040 line 23', label: 'reconciliation of the premium tax credit and excess advance payment recapture', remedy: 'requires Form 8962 (no phase yet)' },
+    // ── TAX-37's finding: THIS ROW DESCRIBED THE WRONG FORM, and it is
+    // corrected rather than reclassified.
+    //
+    // Schedule 2 (Form 1040) 2025 line 19 reads, in full: "Recapture of net
+    // EPE from Form 4255, line 1d, column (l)". It is an elective payment
+    // election recapture and has nothing to do with Form 8962. The premium
+    // tax credit reaches Form 1040 at exactly TWO places, both of which this
+    // commit wires: Schedule 3 line 9 (net PTC, Form 8962 line 26) and
+    // Schedule 2 line 1a (excess advance repayment, Form 8962 line 29). There
+    // is no third.
+    //
+    // So this kind CANNOT be honestly reclassified: its `line` named a line
+    // that is not a premium tax credit line, and Form 8962 arriving does not
+    // make Form 4255's recapture computable. The `line`, `label` and `remedy`
+    // are corrected to say what Schedule 2 line 19 actually is.
+    //
+    // **The kind's NAME is now the only wrong thing left about it**, and
+    // renaming a member of the frozen `kindVocabulary` is a separate decision
+    // from wiring a form: it invalidates every stored profile that declares
+    // it. Recorded here, and in `fjs/form8962/todo/premium-tax-credit.md`,
+    // rather than done silently — a reader who trusts the name will otherwise
+    // re-derive the same wrong mapping. `electivePaymentElectionRecapture`
+    // above is the kind that names line 19 correctly; this row remains as the
+    // second, misnamed declaration of the same fact until the vocabulary is
+    // deliberately changed.
+    { kind: 'premiumTaxCreditReconciliation', line: 'Schedule 2 line 19 -> 1040 line 23', label: 'recapture of a net elective payment election (NOT the premium tax credit, despite this kind\u2019s name)', remedy: 'requires Form 4255 line 1d column (l). This kind is MISNAMED: the 2025 printed Schedule 2 line 19 is the elective payment election recapture, not a premium tax credit line. Form 8962 reaches the return at Schedule 3 line 9 and Schedule 2 line 1a, and this engine computes both; declare netPremiumTaxCredit or excessAdvancePremiumTaxCreditRepayment for those. See fjs/form8962/todo/premium-tax-credit.md (no phase yet)' },
     { kind: 'section965NetTaxLiabilityInstallment', line: 'Schedule 2 line 20', label: 'section 965 net tax liability installment', remedy: 'requires Form 965-A (no phase yet)' },
     // ── Schedule 3 Part I's seven per-line kinds (TAX-25/26, Phase 25) ──────
     //
@@ -928,7 +992,6 @@ export const unmodeledKindRefusals = /** @type {const} */ ([
     // dialect is a remedy this repo owns**, and the three rows that still
     // say it (`federalTaxWithheldOnOtherForms` above, and Schedule 1's own
     // two) are where to look next.
-    { kind: 'netPremiumTaxCredit', line: 'Schedule 3 line 9 -> 1040 line 31', label: 'the net premium tax credit', remedy: 'requires Form 8962 (no phase yet)' },
     { kind: 'federalFuelTaxCredit', line: 'Schedule 3 line 12 -> 1040 line 31', label: 'the credit for federal tax paid on fuels', remedy: 'requires Form 4136 (no phase yet)' },
     { kind: 'otherPaymentsAndRefundableCredits', line: 'Schedule 3 line 13a-13z -> 1040 line 31', label: 'other payments or refundable credits', remedy: 'the printed form itself collapses five lettered sub-lines here and this engine models none of them (no phase yet)' },
     // ── The nine line-16 entries below matter more than they look ────────────
@@ -1436,9 +1499,18 @@ export const classifyScope = declaredKinds => {
  * line, with the taxpayer's own total and ceiling in the message. Being
  * modeled is a claim about what CAN be computed, not a promise that every
  * return declaring the kind will be.
+ *
+ * `47 -> 49` is TAX-37's own Form 8962 pair --
+ * `excessAdvancePremiumTaxCreditRepayment` and `netPremiumTaxCredit` --
+ * landed beside the `fjs/form1040/core` wiring that runs the form once and
+ * hands its two answers to Schedule 2 and Schedule 3. **Two rather than one,
+ * and the pairing is the point:** they are the mutually exclusive arms of
+ * Form 8962's own line 24 / line 25 comparison, so reclassifying either alone
+ * would leave the engine silently wrong for the half of the population on the
+ * other arm.
  * @type {number}
  */
-const expectedModeledKindCount = 47
+const expectedModeledKindCount = 49
 
 /**
  * The modeled set, hand-typed a SECOND time and in {@link kindVocabulary}'s
@@ -1487,6 +1559,7 @@ const everyModeledKindHandTyped = [
     'additionalMedicareTax',
     'netInvestmentIncomeTax',
     'uncollectedTaxOnTipsOrGroupTermLife',
+    'excessAdvancePremiumTaxCreditRepayment',
     'childTaxCreditOrOtherDependents',
     'foreignTaxCredit',
     'educationCredits',
@@ -1503,6 +1576,7 @@ const everyModeledKindHandTyped = [
     'amtPrivateActivityBondInterest',
     'amtEstatesAndTrusts',
     'estateAndTrustIncome',
+    'netPremiumTaxCredit',
 ]
 
 /**
@@ -1605,6 +1679,17 @@ const everyModeledKindHandTyped = [
  * a dialect this repo owns rather than by building a printed form: it read
  * "no dialect models it", and a remedy naming a missing DIALECT rather than a
  * missing FORM is one this project can close itself.
+ *
+ * **`68 -> 68` is TAX-37's, and the arithmetic that leaves it unchanged is
+ * exactly what a bare count cannot see.** Two rows LEAVE — `netPremiumTaxCredit`
+ * (reclassified) and the coarse `advancePremiumTaxCreditAndOtherRepayments`
+ * (split away) — and two ARRIVE: `cleanVehicleCreditRepayment` and
+ * `electivePaymentElectionRecapture`, the Schedule 2 line 1 sub-lines Form
+ * 8962 does not reach. `68 - 2 + 2`. Written out because a count that does
+ * not move across a commit that changed four rows is indistinguishable, at a
+ * glance, from a commit that changed nothing — which is why the hand-typed
+ * SET (`everyModeledKindHandTyped`) and the per-schedule `stillRefused`
+ * lists, not this number, are what actually pin this phase.
  * @type {number}
  */
 const expectedUnmodeledKindCount = 68
@@ -1936,10 +2021,15 @@ export const proof = {
         // "Reserved for future use" on the printed face, and 5 and 6 are
         // already named by `unreportedTips` (Form 4137) and `form8919Wages`
         // (Form 8919) — see `fjs/return/profile`'s own vocabulary comment.
-        theFourteenScheduleTwoKindsNameTheirOwnPrintedLine: () => {
+        theSixteenScheduleTwoKindsNameTheirOwnPrintedLine: () => {
             /** @type {readonly (readonly [string, string])[]} */
             const expected = [
-                ['advancePremiumTaxCreditAndOtherRepayments', 'Schedule 2 line 1a-1z'],
+                ['excessAdvancePremiumTaxCreditRepayment', 'Schedule 2 line 1a'],
+                ['cleanVehicleCreditRepayment', 'Schedule 2 lines 1b and 1c'],
+                // The ONE kind in this table whose `line` names two 1040
+                // destinations, because Form 4255's recapture genuinely reaches
+                // both: Part I's lines 1d-1f and Part II's line 19.
+                ['electivePaymentElectionRecapture', 'Schedule 2 lines 1d, 1e and 1f, and line 19'],
                 ['alternativeMinimumTax', 'Schedule 2 line 2'],
                 ['selfEmploymentTax', 'Schedule 2 line 4'],
                 ['additionalTaxOnTaxFavoredAccounts', 'Schedule 2 line 8'],
@@ -1954,7 +2044,9 @@ export const proof = {
                 ['premiumTaxCreditReconciliation', 'Schedule 2 line 19'],
                 ['section965NetTaxLiabilityInstallment', 'Schedule 2 line 20'],
             ]
-            assertEq(expected.length, 14, 'the split produced fourteen kinds, hand-counted off the printed form')
+            assertEq(
+                expected.length, 16,
+                'Phase 23\u2019s split produced fourteen, and TAX-37 replaced the coarse line-1 kind with three')
             // Every one is a kind the vocabulary carries, and every one is in
             // the vocabulary in the order listed above -- read from
             // `kindVocabulary`, which this module does not own.
@@ -2661,7 +2753,8 @@ export const proof = {
         theScheduleTwoKindsStillUnwiredRefuse: () => {
             /** @type {readonly Kind[]} */
             const stillRefused = [
-                'advancePremiumTaxCreditAndOtherRepayments',
+                'cleanVehicleCreditRepayment',
+                'electivePaymentElectionRecapture',
                 'additionalTaxOnTaxFavoredAccounts',
                 'householdEmploymentTaxes',
                 'interestOnResidentialLotAndTimeshareInstallments',
@@ -2672,8 +2765,10 @@ export const proof = {
                 'section965NetTaxLiabilityInstallment',
             ]
             assertEq(
-                stillRefused.length, 9,
-                'fourteen Schedule 2 kinds, less Phase 23\'s two, Phase 28\'s one, Phase 29\'s one and line 13')
+                stillRefused.length, 10,
+                'sixteen Schedule 2 kinds -- fourteen, less the coarse line-1 kind TAX-37 split, plus its '
+                + 'three sub-line kinds -- less Phase 23\'s two, Phase 28\'s one, Phase 29\'s one, TAX-37\'s '
+                + 'own line 1a and line 13')
             for (const kind of stillRefused) {
                 const outcome = classifyScope([kind])
                 assert(
@@ -2866,12 +2961,11 @@ export const proof = {
                 'residentialCleanEnergyCredit',
                 'energyEfficientHomeImprovementCredit',
                 'otherNonrefundableCredits',
-                'netPremiumTaxCredit',
                 'federalFuelTaxCredit',
                 'otherPaymentsAndRefundableCredits',
             ]
-            assertEq(stillRefused.length, 7,
-                'twelve Schedule 3 kinds minus lines 1, 3, 4, 10 and 11, all five now modeled')
+            assertEq(stillRefused.length, 6,
+                'twelve Schedule 3 kinds minus lines 1, 3, 4, 9, 10 and 11, all six now modeled')
             for (const kind of stillRefused) {
                 const outcome = classifyScope([kind])
                 assert(
@@ -2889,16 +2983,71 @@ export const proof = {
             // `foreignTaxCreditReachesTheReturn` in `fjs/form1040/core`
             // drives it end to end. A scope refusal could never have said
             // "your $300.01 is one cent over".
-            const premium = classifyScope(['netPremiumTaxCredit'])
-            assert(premium.kind === 'error', ['the net premium tax credit must still refuse', premium])
+            // **The net premium tax credit's three assertions were HERE and
+            // are gone**, for the same reason the foreign tax credit's were:
+            // they demanded that declaring `netPremiumTaxCredit` refuse the
+            // return naming Form 8962, and Form 8962 is computed now. What
+            // replaces them is `netPremiumTaxCreditIsInScopeAlone` below,
+            // plus the nine refusals `fjs/form8962` raises AT THE FORM with
+            // the taxpayer's own month and figures in the message — which a
+            // scope refusal could never have said.
+        },
+        // TAX-37's two, each in scope ON ITS OWN. Declared separately rather
+        // than together, because the failure worth catching is one of the two
+        // arms being reclassified without the other: a return declaring only
+        // the credit, or only the repayment, is an ordinary return and must
+        // compute.
+        netPremiumTaxCreditIsInScopeAlone: () => {
+            assertEq(classifyScope(['netPremiumTaxCredit']).kind, 'ok')
+        },
+        excessAdvancePremiumTaxCreditRepaymentIsInScopeAlone: () => {
+            assertEq(classifyScope(['excessAdvancePremiumTaxCreditRepayment']).kind, 'ok')
+        },
+        // ...and both together, which is what a taxpayer who does not yet
+        // know which arm they are on would truthfully declare.
+        bothPremiumTaxCreditArmsTogetherAreInScope: () => {
+            assertEq(
+                classifyScope([
+                    'netPremiumTaxCredit', 'excessAdvancePremiumTaxCreditRepayment',
+                ]).kind,
+                'ok')
+        },
+        // The CONTROL, and the finding this slice recorded: the three kinds
+        // that still name Schedule 2 line 1's OTHER sub-lines, and the
+        // misnamed line-19 kind, all still refuse. Without this, "the premium
+        // tax credit is modeled" could not be told from "Schedule 2 Part I is
+        // modeled".
+        theOtherPartOneRepaymentsAndTheMisnamedLineNineteenKindStillRefuse: () => {
+            for (const kind of /** @type {readonly Kind[]} */ ([
+                'cleanVehicleCreditRepayment',
+                'electivePaymentElectionRecapture',
+                'premiumTaxCreditReconciliation',
+            ])) {
+                const outcome = classifyScope([kind])
+                assert(
+                    outcome.kind === 'error',
+                    ['Form 8962 does not make this kind computable', kind, outcome])
+            }
+            // `premiumTaxCreditReconciliation` is MISNAMED -- Schedule 2 line
+            // 19 is Form 4255's net elective payment election recapture, not
+            // a premium tax credit line -- and its refusal now says so, in
+            // the words a reader holding the printed schedule can check.
+            const misnamed = classifyScope(['premiumTaxCreditReconciliation'])
+            assert(misnamed.kind === 'error', ['expected a refusal', misnamed])
+            if (misnamed.kind !== 'error') {
+                throw ['expected error', misnamed]
+            }
             assert(
-                premium.message.includes('Form 8962'),
-                ['the net premium tax credit refusal must name Form 8962', premium.message],
-            )
+                misnamed.message.includes('Form 4255'),
+                ['the corrected remedy must name the form Schedule 2 line 19 actually attaches',
+                    misnamed.message])
             assert(
-                premium.message.includes('1040 line 31'),
-                ['it must name the REFUNDABLE 1040 line it reaches', premium.message],
-            )
+                misnamed.message.includes('MISNAMED'),
+                ['and must say outright that the kind\u2019s own name is wrong', misnamed.message])
+            assert(
+                misnamed.message.includes('netPremiumTaxCredit'),
+                ['and must point at the kinds that DO name the premium tax credit',
+                    misnamed.message])
         },
         // The gate. Its control is the leaf immediately below, which is this
         // same declaration with `unreportedTips` removed -- without it, a

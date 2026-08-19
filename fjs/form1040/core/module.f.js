@@ -55,6 +55,7 @@ import { dialect as oneZeroNineNineRDialect } from '../../document/1099r/module.
 import { dialect as ssa1099Dialect } from '../../document/ssa1099/module.f.js'
 import { dialect as itemizedDeductionsDialect } from '../../document/itemized_deductions/module.f.js'
 import { dialect as adjustmentsDialect } from '../../document/adjustments/module.f.js'
+import { dialect as oneZeroNineFiveADialect } from '../../document/1095a/module.f.js'
 import { dialect as oneZeroNineEightEDialect } from '../../document/1098e/module.f.js'
 import { qdcgt } from '../../tax/line16/qdcgt/module.f.js'
 import { sdtw } from '../../tax/line16/sdtw/module.f.js'
@@ -94,6 +95,7 @@ import {
 import { qualifiedBusinessIncomeDeduction } from '../../form8995a/module.f.js'
 import { scheduleThree, foreignTaxCreditLine } from '../../schedule/3/module.f.js'
 import { form8812 } from '../../form8812/module.f.js'
+import { form8962 } from '../../form8962/module.f.js'
 import { iraTaxableAmount, rothDistributionCodeOf } from '../../form8606/module.f.js'
 import { baseTaxForAmount } from '../../tax/table/module.f.js'
 import {
@@ -102,6 +104,8 @@ import {
 } from '../../schedule/eic/module.f.js'
 
 /** @import { ReportLine, Source } from '../../report/line/module.f.js' */
+/** @import { OneZeroNineFiveA } from '../../document/1095a/module.f.js' */
+/** @import { FederalPovertyLineTable } from '../../tax/params/module.f.js' */
 /** @import { W2 } from '../../document/w2/module.f.js' */
 /** @import { OneZeroNineNineInt } from '../../document/1099int/module.f.js' */
 /** @import { OneZeroNineNineDiv } from '../../document/1099div/module.f.js' */
@@ -283,6 +287,7 @@ import {
  *   readonly partnershipK1Forms: readonly Stored<K1Partnership>[],
  *   readonly sCorporationK1Forms: readonly Stored<K1SCorporation>[],
  *   readonly estateTrustK1Forms: readonly Stored<K1EstateTrust>[],
+ *   readonly marketplaceStatements: readonly Stored<OneZeroNineFiveA>[],
  * }} Form1040Inputs
  */
 
@@ -1749,6 +1754,114 @@ const profileMoneyBox = profile => boxPath => {
 }
 
 /**
+ * Narrows the return profile's stored `federalPovertyLineTable` string to the
+ * three names `fjs/tax/params` actually keys a table by — the same
+ * find-by-equality idiom {@link storedFilingStatusNamed} uses one screen up,
+ * and for the same reason: a cast would silence
+ * `noUncheckedIndexedAccess`'s question instead of answering it.
+ *
+ * An unrecognized value can only reach here through a stored blob that
+ * `fjs/return/profile`'s check 10 already refuses at ingest, so `undefined`
+ * here means the taxpayer did not state the table — which is exactly what
+ * `fjs/form8962` refuses on, by name.
+ * @type {(stated: string | undefined) => FederalPovertyLineTable | undefined}
+ */
+const federalPovertyLineTableNamed = stated =>
+    stated === 'contiguous48AndDistrictOfColumbia' || stated === 'alaska' || stated === 'hawaii'
+        ? stated
+        : undefined
+
+/**
+ * The two lines Form 8962 produces — Schedule 2 line 1a and Schedule 3 line 9
+ * — from ONE execution of the form, or the refusal that stops the whole
+ * report.
+ * @typedef {{
+ *   readonly kind: 'ok',
+ *   readonly scheduleTwoLine1a: ReportLine,
+ *   readonly scheduleThreeLine9: ReportLine,
+ * } | { readonly kind: 'error', readonly message: string }} PremiumTaxCreditOutcome
+ */
+
+/**
+ * Runs Form 8962 once and builds its two destination lines.
+ *
+ * **A return holding no Form 1095-A never reaches the form at all.** Both
+ * lines are then profile-declared zeros, byte-for-byte what they were before
+ * this form existed — which is what keeps every already-shipped proof in this
+ * file, and the pinned `fjs_run` rerun, reporting exactly what they always
+ * did. It is also why none of Form 8962's nine refusals can fire on a return
+ * that bought no Marketplace coverage: a filer who never heard of the premium
+ * tax credit is never asked which federal poverty line table applies to them.
+ *
+ * The two lines cite the Part III boxes the form actually read, UNIONED with
+ * 1040 line 11b's own sources — because the credit genuinely depends on
+ * adjusted gross income, and a reader inspecting either line after an income
+ * change should see that the dependency was consulted. That is line 19's own
+ * precedent, where the `dependents` array joins line 11b for the same reason.
+ * @type {(taxParamSet: TaxParamSet) => (profile: Stored<ReturnProfile>) => (status: IndividualFilingStatus) => (income: Form1040IncomeLines) => (marketplaceStatements: readonly Stored<OneZeroNineFiveA>[]) => PremiumTaxCreditOutcome}
+ */
+const premiumTaxCreditLines
+    = taxParamSet => profile => status => income => marketplaceStatements => {
+        const declaredZero = profileDeclaredZeroLine(profile)
+        const scheduleTwoRule
+            = 'Schedule 2 line 1a (excess advance premium tax credit repayment, Form 8962 line 29)'
+        const scheduleThreeRule
+            = 'Schedule 3 line 9 (net premium tax credit, Form 8962 line 26 -> 1040 line 31)'
+        if (marketplaceStatements.length === 0) {
+            return {
+                kind: 'ok',
+                scheduleTwoLine1a: declaredZero(scheduleTwoRule),
+                scheduleThreeLine9: declaredZero(scheduleThreeRule),
+            }
+        }
+        const outcome = form8962(taxParamSet)({
+            status,
+            claimedAsDependent: profile.value.claimedAsDependent === true,
+            dependentCount: profile.value.dependentCount,
+            noDependentIsRequiredToFileAnIncomeTaxReturn:
+                profile.value.noDependentIsRequiredToFileAnIncomeTaxReturn === true,
+            federalPovertyLineTable:
+                federalPovertyLineTableNamed(profile.value.federalPovertyLineTable),
+            // 1040 line 11b is AGI. Lines 2a, 6a and 6b are Form 8962's own
+            // modified-AGI add-backs (i8962 Worksheet 1-1) -- line 2a and NOT
+            // line 2b, because the worksheet adds TAX-EXEMPT interest, which
+            // AGI does not already contain.
+            adjustedGrossIncomeCents: income.line11b.value,
+            taxExemptInterestCents: income.line2a.value,
+            socialSecurityBenefitsCents: income.line6a.value,
+            taxableSocialSecurityBenefitsCents: income.line6b.value,
+            marketplaceStatements,
+        })
+        if (outcome.kind === 'error') {
+            return { kind: 'error', message: outcome.message }
+        }
+        /** @type {readonly Source[]} */
+        const sources = [...outcome.sources, ...unionSources([income.line11b])]
+        const [first, ...rest] = sources
+        assert(
+            first !== undefined,
+            'a Form 1095-A that reached here cites at least 1040 line 11b')
+        if (first === undefined) {
+            throw 'expected at least one source'
+        }
+        /** @type {readonly [Source, ...(readonly Source[])]} */
+        const cited = [first, ...rest]
+        return {
+            kind: 'ok',
+            scheduleTwoLine1a: {
+                value: outcome.line29ExcessAdvanceRepaymentCents,
+                sources: cited,
+                rule: scheduleTwoRule,
+            },
+            scheduleThreeLine9: {
+                value: outcome.line26NetPremiumTaxCreditCents,
+                sources: cited,
+                rule: scheduleThreeRule,
+            },
+        }
+    }
+
+/**
  * Form 1040 lines 16 through 37 for an in-scope return, given lines 1a-15.
  *
  * Refuses — as the WHOLE report's outcome, never as a line — when line 16's
@@ -1760,6 +1873,7 @@ const form1040TaxAndPaymentLines = taxParamSet => inputs => income => {
     const {
         profile, w2s, interestForms, dividendForms, brokerageForms, retirementForms,
         unemploymentForms, nonemployeeCompensationForms, isoExerciseForms, estateTrustK1Forms,
+        marketplaceStatements,
     } = inputs
     const declaredZero = profileDeclaredZeroLine(profile)
     const fromDocuments = documentLine(profile)
@@ -1921,10 +2035,44 @@ const form1040TaxAndPaymentLines = taxParamSet => inputs => income => {
         return { kind: 'error', message: foreignTaxCreditOutcome.message, unmodeled: [] }
     }
     const scheduleThreeLine1 = foreignTaxCreditOutcome.line
+    // Form 8962 -- the Premium Tax Credit (TAX-37) -- is computed HERE, once,
+    // and BEFORE Schedule 2, for the same reason Schedule 3 line 1 is: its
+    // answer lands on BOTH schedules and Schedule 2 runs first.
+    //
+    // **Its two answers are the mutually exclusive arms of ONE comparison.**
+    // Form 8962 line 24 is the credit allowed and line 25 is the advance
+    // already paid; whichever is larger decides whether the return carries a
+    // net credit (line 26 -> Schedule 3 line 9 -> 1040 line 31) or a
+    // repayment (line 29 -> Schedule 2 line 1a -> 1z -> line 3 -> 1040 line
+    // 17). Running the form twice -- once per schedule -- could put the two
+    // schedules on DIFFERENT arms, which is the one way this pair can be
+    // wrong that no downstream total would notice.
+    //
+    // Every income figure it reads is off the SAME `form1040IncomeLines`
+    // execution the rest of this function uses, so the household income it
+    // prices cannot disagree with the return it is priced against.
+    //
+    // **There is no §162(l) circularity today, and that is a dependency
+    // rather than a coincidence.** Pub. 974's iterative calculation exists
+    // because the self-employed health insurance deduction reduces AGI, which
+    // moves the credit, which moves the deduction. That deduction is
+    // `selfEmployedHealthInsuranceDeduction`, a refused `fjs/return/scope`
+    // kind, so no return this engine computes carries one. If it is ever
+    // modeled, this call site is where the cycle appears.
+    const marketplaceLine = premiumTaxCreditLines(taxParamSet)(profile)(status)(income)(
+        marketplaceStatements)
+    if (marketplaceLine.kind === 'error') {
+        return { kind: 'error', message: marketplaceLine.message, unmodeled: [] }
+    }
     const scheduleTwoOutcome = scheduleTwo(taxParamSet)({
         profile,
         status,
         scheduleThreeLine1Cents: scheduleThreeLine1.value,
+        // Printed Schedule 2 line 1a, off the ONE Form 8962 execution above
+        // -- never a second, independently stale one. It reaches Form 6251
+        // line 10 too, through line 1z, which the printed form adds to the
+        // regular tax before the AMT comparison.
+        excessAdvancePremiumTaxCreditRepayment: marketplaceLine.scheduleTwoLine1a,
         medicareWages,
         medicareTaxWithheld,
         // Schedule 2 line 13's whole computation: Form W-2 box 12 codes A,
@@ -2060,6 +2208,10 @@ const form1040TaxAndPaymentLines = taxParamSet => inputs => income => {
         // Printed line 1, off the ONE execution above -- never a second,
         // independently stale `foreignTaxCreditLine(...)` call.
         foreignTaxCreditLine1: scheduleThreeLine1,
+        // Printed line 9, off the ONE Form 8962 execution above -- the same
+        // execution Schedule 2 line 1a came from, so the two schedules can
+        // never land on opposite arms of Form 8962's own comparison.
+        netPremiumTaxCreditLine9: marketplaceLine.scheduleThreeLine9,
     })
     if (scheduleThreeOutcome.kind === 'error') {
         return { kind: 'error', message: scheduleThreeOutcome.message, unmodeled: [] }
@@ -2706,6 +2858,58 @@ const w2WithWithholding = documentHash => box1WagesTipsOtherCompensation =>
     }
 
 /**
+ * A stored Form 1095-A carrying twelve uniform months: $800.00 of enrollment
+ * premiums in column A, an $850.00 second-lowest-cost silver plan premium in
+ * column B, and whatever the Marketplace advanced in column C.
+ *
+ * The three line 33 annual totals are deliberately OMITTED. They are optional
+ * on the dialect, `fjs/document/1095a` proves that a present one must agree
+ * with its own column's sum, and `fjs/form8962` reads the twelve printed rows
+ * rather than the totals — so a fixture that carried them would be asserting
+ * a fact no leaf here is about.
+ * @type {(columnCAdvancePaymentOfPtc: string) => Stored<OneZeroNineFiveA>}
+ */
+const storedMarketplaceStatement = columnCAdvancePaymentOfPtc => ({
+    documentHash: 'sha256-1095a-e2e',
+    value: {
+        dialect: oneZeroNineFiveADialect,
+        marketplaceIdentifier: '99',
+        marketplaceAssignedPolicyNumber: 'POLICY-E2E-0001',
+        policyIssuerName: 'Some Health Plan, Inc.',
+        recipientTin: '222-22-2222',
+        taxYear: 2025,
+        formRevision: '2025',
+        sourceArtifactHash: 'deadbeef00112233445566778899aabbccddeeff0011223344556677889900',
+        coveredIndividuals: [{ name: 'Some Person' }],
+        monthlyCoverage: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(month => ({
+            month,
+            columnAEnrollmentPremiums: '800.00',
+            columnBSlcspPremium: '850.00',
+            columnCAdvancePaymentOfPtc,
+        })),
+    },
+})
+
+/**
+ * The marketplace persona's whole return: $30,000.00 of wages, $2,000.00
+ * withheld, and however many Forms 1095-A the leaf hands it.
+ *
+ * The profile declares the federal poverty line table, because Form 8962 line
+ * 4's checkbox is a fact no information return carries and this engine
+ * REFUSES without it — `anAbsentPovertyLineTableStopsTheWholeReturn` is the
+ * leaf that drives the other side.
+ * @type {(marketplaceStatements: readonly Stored<OneZeroNineFiveA>[]) => Form1040Inputs}
+ */
+const marketplaceWageReturn = marketplaceStatements => ({
+    ...inputsOf(storedProfile({
+        ...singleProfile,
+        declaredKinds: ['wages', 'federalTaxWithheldOnW2'],
+        federalPovertyLineTable: 'contiguous48AndDistrictOfColumbia',
+    }))([w2WithWithholding('sha256-1095a-w2')('30000.00')('2000.00')])([])([])([])([])([])([])([])([]),
+    marketplaceStatements,
+})
+
+/**
  * A W-2 whose box 1 and box 5 carry the SAME amount — the ordinary case for a
  * wage earner with no pre-tax deferrals, and the shape TAX-19's Additional
  * Medicare Tax tripwire reads. Built ON TOP of {@link w2Document}, like
@@ -2980,6 +3184,7 @@ const inputsOf = profile => w2s => interestForms => dividendForms => brokerageFo
                 partnershipK1Forms: [],
                 sCorporationK1Forms: [],
                 estateTrustK1Forms: [],
+                marketplaceStatements: [],
             })
 
 /**
@@ -9299,6 +9504,20 @@ export const proof = {
                     }],
                     rule: 'Schedule 3 line 1 (foreign tax credit, §904(j) election -> 1040 line 20)',
                 },
+                // The same shape for Schedule 3 line 9: this return holds no
+                // Form 1095-A, so `fjs/form1040/core` hands the schedule a
+                // profile-declared zero. Written out here rather than
+                // obtained by calling `premiumTaxCreditLines`, for the reason
+                // line 1's own comment gives.
+                netPremiumTaxCreditLine9: {
+                    value: 0n,
+                    sources: [{
+                        documentHash: profileHash,
+                        boxPath: 'declaredKinds',
+                        value: JSON.stringify(phaseTwentyFiveProfile.declaredKinds),
+                    }],
+                    rule: 'Schedule 3 line 9 (net premium tax credit, Form 8962 line 26 -> 1040 line 31)',
+                },
             })
             assert(crossCheck.kind === 'ok', ['expected the cross-check to compute', crossCheck])
             if (crossCheck.kind !== 'ok') {
@@ -9660,6 +9879,361 @@ export const proof = {
             assertEq(
                 cents(withCredit)('1040 line 21'), cents(without)('1040 line 21'),
                 'line 21 is the same tax either way — the ordering moved it, not the total')
+        },
+    },
+
+    // ── Form 8962: the premium tax credit, END TO END ──────────────────────
+    //
+    // **A form-level proof CANNOT prove a wiring.** `fjs/form8962`'s own
+    // leaves compute Form 8962 against a document list handed straight to
+    // them; every one of them stays green while THIS file hands that form an
+    // empty `marketplaceStatements`, or drops Schedule 3 line 9 from line
+    // 15's summands, or never lets Schedule 2 line 1a reach line 1z. The
+    // leaves below drive `form1040Report` over stored documents and read the
+    // printed 1040 lines out of the finished report.
+    //
+    // The persona: an ACA-marketplace enrollee — a freelancer, an early
+    // retiree, anyone without employer coverage. $30,000.00 of wages,
+    // $2,000.00 withheld, and one Form 1095-A reporting twelve uniform months
+    // of $800.00 enrollment premiums, an $850.00 second-lowest-cost silver
+    // plan premium, and whatever advance the Marketplace actually paid. Every
+    // engine before this wiring reported BOTH of Form 8962's lines as hard
+    // zeros, so it neither credited the under-advanced enrollee nor collected
+    // from the over-advanced one.
+    //
+    // The Form 8962 arithmetic, worked by hand once and reused by every leaf
+    // below (see `fjs/form8962`'s own `annualPath` comment for the printed
+    // line numbers): household income $30,000.00 is 199% of the $15,060.00
+    // federal poverty line for a family of one, Table 2's applicable figure at
+    // 199 is 0.0196, line 8a is $588.00, and the annual calculation allows
+    // min($9,600.00, $10,200.00 - $588.00) = $9,600.00 of credit.
+    premiumTaxCreditReachesTheReturn: {
+        // The UNDER-ADVANCED arm: $400.00 a month advanced against $9,600.00
+        // of credit leaves $4,800.00 of net premium tax credit, and it must
+        // arrive on 1040 line 31 and survive into every payment total above
+        // it. Read differentially against the same return with no Form
+        // 1095-A, so the wage return's own tax arithmetic is not re-derived
+        // here and the difference is hand-typed.
+        theNetCreditReachesLineThirtyOneAndEveryTotalAboveIt: () => {
+            const withoutCoverage = form1040Report(taxParams2025)(marketplaceWageReturn([]))
+            const withCoverage = form1040Report(taxParams2025)(
+                marketplaceWageReturn([storedMarketplaceStatement('400.00')]))
+            assert(withoutCoverage.kind === 'ok', ['expected the plain wage return to compute', withoutCoverage])
+            assert(withCoverage.kind === 'ok', ['expected the marketplace return to compute', withCoverage])
+            if (withoutCoverage.kind !== 'ok' || withCoverage.kind !== 'ok') {
+                throw ['expected ok', withoutCoverage, withCoverage]
+            }
+            /** @type {(report: { readonly lines: readonly ReportLine[] }) => (rule: string) => bigint} */
+            const cents = report => rule => lineRuled(report.lines)(rule).value
+            // Unmoved: a refundable credit is not income, not a deduction and
+            // not a tax. The control return must genuinely owe tax, or "the
+            // tax side did not move" would be trivially true.
+            for (const rule of ['1040 line 9', '1040 line 11', '1040 line 15', '1040 line 16',
+                '1040 line 17', '1040 line 24']) {
+                assertEq(
+                    cents(withCoverage)(rule), cents(withoutCoverage)(rule),
+                    ['a NET premium tax credit must not move the tax side', rule])
+            }
+            assert(
+                cents(withoutCoverage)('1040 line 24') > 0n,
+                ['the control return must owe tax', withoutCoverage])
+            // Moved, by exactly the credit, at every printed total between
+            // Schedule 3 line 9 and the refund.
+            assertEq(cents(withoutCoverage)('1040 line 31'), 0n, 'no Schedule 3 Part II figure without a Form 1095-A')
+            assertEq(cents(withCoverage)('1040 line 31'), 480000n, '$4,800.00 of net premium tax credit')
+            assertEq(cents(withCoverage)('1040 line 32'), 480000n, 'total other payments and refundable credits')
+            assertEq(
+                cents(withCoverage)('1040 line 33') - cents(withoutCoverage)('1040 line 33'),
+                480000n,
+                'total payments rise by exactly $4,800.00')
+            assertEq(
+                cents(withCoverage)('1040 line 34') - cents(withoutCoverage)('1040 line 34'),
+                480000n,
+                'and so does the overpayment')
+        },
+        // The OVER-ADVANCED arm: $900.00 a month advanced ($10,800.00) against
+        // $9,600.00 of credit is $1,200.00 of excess, CAPPED by Table 5 at
+        // $375.00 for a single filer below 200% of the poverty line. It must
+        // arrive on 1040 line 17 as TAX and survive into every tax total above
+        // it — the direction the engine was silently missing entirely.
+        theExcessRepaymentReachesLineSeventeenAndEveryTotalAboveIt: () => {
+            const withoutCoverage = form1040Report(taxParams2025)(marketplaceWageReturn([]))
+            const withCoverage = form1040Report(taxParams2025)(
+                marketplaceWageReturn([storedMarketplaceStatement('900.00')]))
+            assert(withoutCoverage.kind === 'ok', ['expected the plain wage return to compute', withoutCoverage])
+            assert(withCoverage.kind === 'ok', ['expected the marketplace return to compute', withCoverage])
+            if (withoutCoverage.kind !== 'ok' || withCoverage.kind !== 'ok') {
+                throw ['expected ok', withoutCoverage, withCoverage]
+            }
+            /** @type {(report: { readonly lines: readonly ReportLine[] }) => (rule: string) => bigint} */
+            const cents = report => rule => lineRuled(report.lines)(rule).value
+            for (const rule of ['1040 line 9', '1040 line 11', '1040 line 15', '1040 line 16']) {
+                assertEq(
+                    cents(withCoverage)(rule), cents(withoutCoverage)(rule),
+                    ['a repayment of advance credit is not income and not the regular tax', rule])
+            }
+            assertEq(cents(withoutCoverage)('1040 line 17'), 0n, 'no Schedule 2 Part I figure without a Form 1095-A')
+            assertEq(cents(withCoverage)('1040 line 17'), 37500n, '$375.00 — Table 5’s limitation, not the $1,200.00 excess')
+            assertEq(
+                cents(withCoverage)('1040 line 18') - cents(withoutCoverage)('1040 line 18'),
+                37500n,
+                'the tax plus Schedule 2 Part I rises by exactly $375.00')
+            assertEq(
+                cents(withCoverage)('1040 line 22') - cents(withoutCoverage)('1040 line 22'),
+                37500n,
+                'and so does the tax after nonrefundable credits')
+            assertEq(
+                cents(withCoverage)('1040 line 24') - cents(withoutCoverage)('1040 line 24'),
+                37500n,
+                'and so does total tax')
+            assertEq(cents(withCoverage)('1040 line 31'), 0n, 'and the credit arm is blank on this return')
+            assertEq(
+                cents(withoutCoverage)('1040 line 34') - cents(withCoverage)('1040 line 34'),
+                37500n,
+                'the overpayment falls by exactly the repayment')
+        },
+        // The two arms are one comparison, and a return can never be on both.
+        // Driven through the WHOLE report rather than through the form, since
+        // the failure this guards against is a wiring that added the two.
+        theTwoArmsAreNeverBothNonZeroOnOneReturn: () => {
+            for (const advance of ['0.00', '400.00', '800.00', '900.00', '1500.00']) {
+                const outcome = form1040Report(taxParams2025)(
+                    marketplaceWageReturn([storedMarketplaceStatement(advance)]))
+                assert(outcome.kind === 'ok', ['expected the marketplace return to compute', advance, outcome])
+                if (outcome.kind !== 'ok') {
+                    throw ['expected ok', outcome]
+                }
+                const credit = lineRuled(outcome.lines)('1040 line 31').value
+                const repayment = lineRuled(outcome.lines)('1040 line 17').value
+                assert(
+                    credit === 0n || repayment === 0n,
+                    ['1040 lines 31 and 17 can never both carry a premium tax credit figure', advance, credit, repayment])
+            }
+        },
+        // THE REGRESSION PROPERTY. A return holding no Form 1095-A must be
+        // byte-for-byte what it was before Form 8962 existed: both lines are
+        // profile-declared zeros citing `declaredKinds` and nothing else, and
+        // no line's rule string mentions Form 8962 or Form 1095-A. This is
+        // what makes "the nine refusals cannot fire on an ordinary return"
+        // a property rather than a hope.
+        aReturnWithNoFormTenNinetyFiveAIsUntouched: () => {
+            const outcome = form1040Report(taxParams2025)(marketplaceWageReturn([]))
+            assert(outcome.kind === 'ok', ['expected the plain wage return to compute', outcome])
+            if (outcome.kind !== 'ok') {
+                throw ['expected ok', outcome]
+            }
+            assertEq(lineRuled(outcome.lines)('1040 line 17').value, 0n)
+            assertEq(lineRuled(outcome.lines)('1040 line 31').value, 0n)
+            for (const line of outcome.lines) {
+                assert(
+                    !line.rule.includes('8962') && !line.rule.includes('1095'),
+                    ['no line of an ordinary return may mention the premium tax credit', line.rule])
+            }
+        },
+        // PROVENANCE, through the full report: 1040 line 31 must cite the
+        // Part III boxes the credit was read from, at the dialect's own field
+        // names and carrying the raw stored strings. A figure that arrives
+        // with no provenance is the defect this engine exists to prevent.
+        lineThirtyOneCitesThePartThreeBoxesItRead: () => {
+            const outcome = form1040Report(taxParams2025)(
+                marketplaceWageReturn([storedMarketplaceStatement('400.00')]))
+            assert(outcome.kind === 'ok', ['expected the marketplace return to compute', outcome])
+            if (outcome.kind !== 'ok') {
+                throw ['expected ok', outcome]
+            }
+            const sources = lineRuled(outcome.lines)('1040 line 31').sources
+            const slcsp = sources.find(
+                source => source.boxPath === 'monthlyCoverage[month=7].columnBSlcspPremium')
+            assert(
+                slcsp !== undefined,
+                ['line 31 must cite the July SLCSP premium the credit was computed from', sources])
+            if (slcsp === undefined) {
+                throw ['unreachable', outcome]
+            }
+            assertEq(slcsp.documentHash, 'sha256-1095a-e2e')
+            assertEq(slcsp.value, '850.00', 'the raw stored string, never re-formatted')
+            assert(
+                sources.some(source => source.boxPath === 'monthlyCoverage[month=1].columnCAdvancePaymentOfPtc'),
+                ['and the advance payment it was reconciled against', sources])
+            // ...and 1040 line 11b's OWN sources, because the credit turns on
+            // adjusted gross income. Asserted on the W-2 box the AGI was
+            // built from rather than on the profile's hash: EVERY line on
+            // this schedule cites the profile through some declared zero, so
+            // a profile citation proves nothing about whether the AGI union
+            // happened. **Added after a mutation** — dropping
+            // `unionSources([income.line11b])` from the citation list left
+            // the whole suite green, because the leaf that was meant to catch
+            // it looked for exactly that useless profile hash.
+            assert(
+                sources.some(source => source.boxPath === 'box1WagesTipsOtherCompensation'),
+                ['line 31 must cite the wages the household income was built from', sources])
+        },
+        // The SAME citations must reach 1040 line 17 on the repayment arm.
+        // Written as its own leaf because the two lines are built from one
+        // source list and a wiring that cited only one of them would pass the
+        // leaf above alone.
+        lineSeventeenCitesThePartThreeBoxesItRead: () => {
+            const outcome = form1040Report(taxParams2025)(
+                marketplaceWageReturn([storedMarketplaceStatement('900.00')]))
+            assert(outcome.kind === 'ok', ['expected the marketplace return to compute', outcome])
+            if (outcome.kind !== 'ok') {
+                throw ['expected ok', outcome]
+            }
+            const sources = lineRuled(outcome.lines)('1040 line 17').sources
+            assert(
+                sources.some(source => source.boxPath === 'monthlyCoverage[month=12].columnAEnrollmentPremiums'),
+                ['line 17 must cite the enrollment premiums the repayment was computed from', sources])
+            assert(
+                sources.some(source => source.boxPath === 'box1WagesTipsOtherCompensation'),
+                ['and the wages the household income was built from, through 1040 line 11b', sources])
+        },
+        // A Form 8962 REFUSAL stops the whole report, threaded exactly like
+        // every other document-data-sufficiency refusal in this file. Driven
+        // end to end because a refusal the form raises and this file swallows
+        // would be a silent zero — the worst outcome of the three.
+        aFormEightNineSixTwoRefusalStopsTheWholeReturn: () => {
+            const statement = storedMarketplaceStatement('400.00')
+            const outcome = form1040Report(taxParams2025)(marketplaceWageReturn([{
+                ...statement,
+                value: {
+                    ...statement.value,
+                    monthlyCoverage: statement.value.monthlyCoverage.map(row => row.month === 5
+                        ? { month: 5, columnAEnrollmentPremiums: '800.00' }
+                        : row),
+                },
+            }]))
+            assert(
+                outcome.kind === 'error',
+                ['a month with enrollment premiums and no SLCSP premium must refuse the RETURN', outcome])
+            if (outcome.kind !== 'error') {
+                throw ['expected error', outcome]
+            }
+            assert(
+                outcome.message.includes('month 5'),
+                ['the refusal must reach the caller verbatim, naming the month', outcome.message])
+            assert(
+                outcome.message.includes('Schedule 3 line 9')
+                && outcome.message.includes('Schedule 2 line 1a'),
+                ['and both destinations the amount would have reached', outcome.message])
+            assertEq(
+                outcome.unmodeled.length, 0,
+                ['a document-data refusal names no unmodeled kind', outcome.unmodeled])
+        },
+        // The profile-fact refusal reaches the caller too, and it is the one
+        // an ordinary marketplace enrollee is most likely to hit: no declared
+        // federal poverty line table.
+        anAbsentPovertyLineTableStopsTheWholeReturn: () => {
+            const outcome = form1040Report(taxParams2025)({
+                ...marketplaceWageReturn([storedMarketplaceStatement('400.00')]),
+                profile: storedProfile({
+                    ...singleProfile,
+                    declaredKinds: ['wages', 'federalTaxWithheldOnW2'],
+                }),
+            })
+            assert(outcome.kind === 'error', ['expected the return to refuse', outcome])
+            if (outcome.kind !== 'error') {
+                throw ['expected error', outcome]
+            }
+            assert(
+                outcome.message.includes('federalPovertyLineTable'),
+                ['the refusal must name the profile field that would unlock it', outcome.message])
+        },
+        // The MONTHLY path, end to end. Six covered months rather than
+        // twelve, so the annual calculation is unavailable and lines 12-23
+        // run: six months of min($800.00, $850.00 - $49.00) = $4,800.00 of
+        // credit against $2,400.00 advanced, leaving $2,400.00 on line 31.
+        //
+        // **The annual path over the same six rows would give $4,512.00**
+        // (min($4,800.00, $5,100.00 - $588.00)), so this leaf reddens if the
+        // line 10 dispatch is bypassed in either direction — which no leaf
+        // reading only twelve uniform months can do.
+        aPartYearEnrolleeIsPricedByTheMonthlyPath: () => {
+            const statement = storedMarketplaceStatement('400.00')
+            const outcome = form1040Report(taxParams2025)(marketplaceWageReturn([{
+                ...statement,
+                value: {
+                    ...statement.value,
+                    monthlyCoverage: statement.value.monthlyCoverage.filter(row => row.month >= 7),
+                },
+            }]))
+            assert(outcome.kind === 'ok', ['expected the part-year return to compute', outcome])
+            if (outcome.kind !== 'ok') {
+                throw ['expected ok', outcome]
+            }
+            assertEq(
+                lineRuled(outcome.lines)('1040 line 31').value,
+                240000n,
+                '$2,400.00 — the MONTHLY calculation; the annual one would give $2,112.00')
+        },
+        /*
+         * **Form 8962's household income reads 1040 line 2a, NOT line 2b**,
+         * end to end. Added after a mutation: swapping the two at the call
+         * site left the entire suite green, because every fixture in this
+         * block held no interest at all and `fjs/form8962`'s own leaves are
+         * handed the two figures directly and cannot see which 1040 line the
+         * caller took them from.
+         *
+         * One 1099-INT reporting $5,000.00 of §103 tax-exempt interest in box
+         * 8 and nothing in box 1. Adjusted gross income is unchanged at
+         * $30,000.00 — §103(a) keeps the interest out of gross income — and
+         * Form 8962 household income rises to $35,000.00, which is 232% of
+         * the $15,060.00 poverty line rather than 199%.
+         *
+         *   line 7  Table 2 at 232                 0.0328
+         *   line 8a $35,000.00 x 0.0328 =          $1,148
+         *   line 11 (d) $10,200.00 - $1,148.00 =   $9,052
+         *           (e) min($9,600.00, $9,052.00) = $9,052
+         *   line 26 $9,052.00 - $4,800.00 =        $4,252
+         *
+         * Reading line 2b instead would leave household income at $30,000.00
+         * and hand this taxpayer $4,800.00 — $548.00 of credit they are not
+         * entitled to.
+         */
+        householdIncomeReadsLineTwoANotLineTwoB: () => {
+            const outcome = form1040Report(taxParams2025)({
+                ...marketplaceWageReturn([storedMarketplaceStatement('400.00')]),
+                profile: storedProfile({
+                    ...singleProfile,
+                    declaredKinds: ['wages', 'federalTaxWithheldOnW2', 'taxExemptInterest'],
+                    federalPovertyLineTable: 'contiguous48AndDistrictOfColumbia',
+                }),
+                interestForms: [interestDocument('sha256-1095a-int')({
+                    box8TaxExemptInterest: '5000.00',
+                })],
+            })
+            assert(outcome.kind === 'ok', ['expected the marketplace return to compute', outcome])
+            if (outcome.kind !== 'ok') {
+                throw ['expected ok', outcome]
+            }
+            /** @type {(rule: string) => bigint} */
+            const cents = rule => lineRuled(outcome.lines)(rule).value
+            assertEq(cents('1040 line 2a'), 500000n, '$5,000.00 of tax-exempt interest')
+            assertEq(cents('1040 line 2b'), 0n, 'and nothing taxable')
+            assertEq(cents('1040 line 11'), 3000000n, 'AGI is untouched by §103 interest')
+            assertEq(
+                cents('1040 line 31'),
+                425200n,
+                '$4,252.00 — the credit at 232% of the poverty line, not the $4,800.00 at 199%')
+        },
+        // The repayment reaches Form 6251 line 10 through Schedule 2 line 1z,
+        // which the printed Form 6251 adds to the regular tax before the AMT
+        // comparison. Asserted on the SCHEDULE'S OWN line 1z rather than on
+        // the AMT itself, because this return's AMT is zero either way — the
+        // property being pinned is that line 1a is not stranded on a line
+        // nothing reads.
+        theRepaymentReachesLineOneZAndThereforeFormSixTwoFiveOne: () => {
+            const outcome = form1040Report(taxParams2025)(
+                marketplaceWageReturn([storedMarketplaceStatement('900.00')]))
+            assert(outcome.kind === 'ok', ['expected the marketplace return to compute', outcome])
+            if (outcome.kind !== 'ok') {
+                throw ['expected ok', outcome]
+            }
+            // 1040 line 17 IS Schedule 2 line 3, which is line 1z plus line 2
+            // (the AMT). With no AMT, line 17 is line 1z exactly.
+            assertEq(
+                lineRuled(outcome.lines)('1040 line 17').value,
+                37500n,
+                'Schedule 2 line 3 = line 1z + line 2, and line 2 is zero here')
         },
     },
 

@@ -731,6 +731,7 @@ export const foreignTaxCreditLine = taxParamSet => status => profile => divForms
  *   readonly tuitionForms: readonly Stored<OneZeroNineEightT>[],
  *   readonly aStored1099RProvesADistribution: boolean,
  *   readonly foreignTaxCreditLine1: ReportLine,
+ *   readonly netPremiumTaxCreditLine9: ReportLine,
  * }} ScheduleThreeInput
  */
 
@@ -752,7 +753,7 @@ const sumSources = sources => sources.reduce((total, s) => total + centsFromStri
 export const scheduleThree = taxParamSet => input => {
     const {
         profile, status, agiCents, line18Cents, w2Forms, creditForms, tuitionForms,
-        aStored1099RProvesADistribution, foreignTaxCreditLine1,
+        aStored1099RProvesADistribution, foreignTaxCreditLine1, netPremiumTaxCreditLine9,
     } = input
     const zero = profileDeclaredZeroLine(profile)
     const fromDocuments = documentLine(profile)
@@ -987,7 +988,22 @@ export const scheduleThree = taxParamSet => input => {
     ])
 
     // ── Part II: Other Payments and Refundable Credits ──────────────────
-    const line9 = zero('Schedule 3 line 9 (net premium tax credit, Form 8962)')
+    // 9. "Net premium tax credit. Attach Form 8962." ALREADY COMPUTED by
+    //    `fjs/form8962` and handed in, never recomputed here -- the SAME
+    //    execution produced Schedule 2 line 1a's excess advance repayment,
+    //    and the two are the mutually exclusive arms of one comparison (Form
+    //    8962 lines 24 and 25). Taking it as an INPUT is what makes "one
+    //    execution" true rather than aspirational, exactly as
+    //    `foreignTaxCreditLine1` above already is.
+    //
+    //    REFUNDABLE, which is why it sits here in Part II rather than among
+    //    Part I's nonrefundable credits: it is paid out whether or not there
+    //    is any tax to offset, and line 15 carries it to 1040 line 31.
+    //
+    //    For a return holding no Form 1095-A this is a profile-declared zero
+    //    built by `fjs/form1040/core`, so an ordinary return's Part II is
+    //    byte-for-byte what it was before Form 8962 existed.
+    const line9 = netPremiumTaxCreditLine9
     // 10. The amount paid with a Form 4868 request for an automatic extension
     //     of time to file, off the return profile's own box. There is no
     //     information return for it -- the taxpayer holds a cheque stub, not a
@@ -1062,6 +1078,19 @@ const baseInput = overrides => ({
             value: '[]',
         }],
         rule: 'Schedule 3 line 1 (foreign tax credit, §904(j) election -> 1040 line 20)',
+    },
+    // Schedule 3 line 9 as `fjs/form1040/core` hands it in for a return
+    // holding no Form 1095-A: the profile-declared zero that file builds for
+    // that case, written out here rather than produced by calling anything,
+    // so this fixture is not made by code under test.
+    netPremiumTaxCreditLine9: {
+        value: 0n,
+        sources: [{
+            documentHash: 'profile-hash-0001',
+            boxPath: 'declaredKinds',
+            value: '[]',
+        }],
+        rule: 'Schedule 3 line 9 (net premium tax credit, Form 8962 line 26 -> 1040 line 31)',
     },
     status: 'single',
     agiCents: 2000000n,          // $20,000.00 -- inside the saver's credit 50% band

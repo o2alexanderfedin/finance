@@ -328,7 +328,20 @@ export const kindVocabulary = /** @type {const} */ ([
     // (1040 line 1g) already names. Adding a second kind for either would
     // give one fact two declarations and let a taxpayer declare the income
     // half without the tax half.
-    'advancePremiumTaxCreditAndOtherRepayments', // Schedule 2 line 1a-1z -> 17
+    // ── TAX-37: the coarse `advancePremiumTaxCreditAndOtherRepayments`
+    // stood here and is SPLIT into the three sub-lines Schedule 2 line 1
+    // actually prints, the way `scheduleTwoTaxes` was split one block up.
+    //
+    // The split is what makes reclassification honest. Form 8962 computes
+    // line 1a and nothing computes 1b through 1f, and NOTHING STORED
+    // DISTINGUISHES THEM: a taxpayer who transferred a clean vehicle credit
+    // to a dealer would, under the coarse kind, have declared the very kind
+    // the engine had just started computing, and received a silent zero for
+    // the repayment they owe. Three kinds, one per printed sub-line, and each
+    // says on its own face whether this engine can compute it.
+    'excessAdvancePremiumTaxCreditRepayment', // Schedule 2 line 1a -> 17
+    'cleanVehicleCreditRepayment',          // Schedule 2 lines 1b/1c -> 17
+    'electivePaymentElectionRecapture',      // Schedule 2 lines 1d/1e/1f and 19 -> 17/23
     'alternativeMinimumTax',                // Schedule 2 line 2  -> 17
     // ── Phase 29 (TAX-33): Form 6251 Part I's own lines, one kind each ──────
     //
@@ -399,7 +412,16 @@ export const kindVocabulary = /** @type {const} */ ([
     'interestOnDeferredInstallmentSaleTax', // Schedule 2 line 15 -> 23
     'lowIncomeHousingCreditRecapture',      // Schedule 2 line 16 -> 23
     'otherAdditionalTaxes',                 // Schedule 2 line 17a-17z -> 23
-    'premiumTaxCreditReconciliation',       // Schedule 2 line 19 -> 23
+    // MISNAMED, and knowingly so. Printed Schedule 2 (Form 1040) 2025 line 19
+    // is "Recapture of net EPE from Form 4255, line 1d, column (l)" -- an
+    // elective payment election recapture with no connection to Form 8962.
+    // TAX-37 corrected this kind's refusal row in `fjs/return/scope` rather
+    // than renaming it here, because renaming a member of this FROZEN
+    // vocabulary invalidates every stored profile that declares it, and that
+    // is a decision to take on purpose rather than as a side effect of wiring
+    // a form. `electivePaymentElectionRecapture` above is the correctly named
+    // kind for the same printed line.
+    'premiumTaxCreditReconciliation',       // Schedule 2 line 19 -> 23 (see above: MISNAMED)
     'section965NetTaxLiabilityInstallment', // Schedule 2 line 20 (memo)
     'childTaxCreditOrOtherDependents',      // 19
     // ── Schedule 3 Part I's own lines, one kind each (TAX-25/26, Phase 25) ──
@@ -819,9 +841,61 @@ export const returnProfileSchema = /** @type {const} */ ({
     filerQualifyingChildOfAnotherTaxpayer: option(string),
     filerAttainedAgeTwentyFiveButNotSixtyFive: option(string),
     filerPrincipalPlaceOfAbode: option(string),
+    // TAX-37 (Form 8962) -- the two facts the Premium Tax Credit needs that
+    // no information return reports. A Form 1095-A is a REAL issued statement
+    // and carries neither: the Marketplace does not know which federal
+    // poverty line table the filer's residence selects, and it certainly does
+    // not know whether a dependent has to file a return.
+    //
+    // Form 8962 line 4's own printed checkbox: Alaska, Hawaii, or the other
+    // 48 states and DC. A vocabulary-checked STRING rather than three
+    // `option(true)` flags, because the printed form admits exactly one of
+    // three and three independent booleans could say "Alaska and Hawaii" --
+    // the same reason the §32 fact fields above are vocabulary strings.
+    //
+    // **A declaration of which TABLE applies, not of a state**, because
+    // i8962's line 4 instruction is itself about the table: a filer who moved
+    // during the year, or a joint filer whose spouses lived in different
+    // states, uses "the table with the higher dollar amounts for your family
+    // size" -- an answer no state name determines. Read only by
+    // `fjs/form1040/core`, which passes it to `fjs/form8962`; that form
+    // REFUSES when it is absent and a Form 1095-A is stored, so no
+    // cross-field check is needed here (buying Marketplace coverage in no
+    // year is an ordinary return, and every other field on this dialect is
+    // silent about health coverage).
+    federalPovertyLineTable: option(string),
+    // Form 8962 line 2b: household income includes "the combined modified AGI
+    // for your dependents who are required to file an income tax return
+    // because their income meets the income tax return filing threshold".
+    // `option(true)`, DOC-12 -- absent means NOT certified, and
+    // `fjs/form8962` then refuses a return with any dependent rather than
+    // reading line 2b as zero, which would overstate the credit for every
+    // family whose teenager has a job.
+    //
+    // The certification is exactly the printed condition, not a proxy for it:
+    // the taxpayer states that no dependent meets the §6012(a)(1) filing
+    // threshold, which for the ordinary case (a six-year-old) is trivially
+    // true and which the taxpayer, unlike this engine, actually knows.
+    noDependentIsRequiredToFileAnIncomeTaxReturn: option(true),
 })
 
 /** @typedef {Ts<typeof returnProfileSchema>} ReturnProfile */
+
+/**
+ * The three federal-poverty-line tables Form 8962 line 4 prints as checkboxes,
+ * frozen here the way {@link earnedIncomeCreditVocabularies} freezes §32's
+ * answers. `fjs/tax/params` stores a table under each of these exact names,
+ * and `fjs/form8962`'s own proof is what pins the two lists to each other --
+ * a value this dialect accepted but that module had no table for would refuse
+ * deep inside a computation instead of at ingest, which is the whole reason
+ * check 10 below exists.
+ * @type {readonly string[]}
+ */
+const federalPovertyLineTableNames = [
+    'contiguous48AndDistrictOfColumbia',
+    'alaska',
+    'hawaii',
+]
 
 /** Structural-only validator: checks the shape, not the semantic refinements below. */
 const validateShape = rttiValidate(returnProfileSchema)
@@ -1060,6 +1134,20 @@ export const checkReferences = r => {
                 return error(`dependents[${index}]: ${message}`)
             }
         }
+    }
+    // 10 — TAX-37: a PRESENT federal-poverty-line table names one of the
+    // three Form 8962 line 4 prints. Refused at ingest rather than at the
+    // form, because an unrecognized answer cannot be read as any of the three
+    // and the three differ by up to 25% of the poverty line.
+    if (
+        r.federalPovertyLineTable !== undefined
+        && !federalPovertyLineTableNames.includes(r.federalPovertyLineTable)
+    ) {
+        return error(
+            `federalPovertyLineTable carries ${JSON.stringify(r.federalPovertyLineTable)}, which `
+            + `is not one of the ${federalPovertyLineTableNames.length} tables Form 8962 line 4 `
+            + `prints: ${federalPovertyLineTableNames.join(', ')}`,
+        )
     }
     return ok(r)
 }
@@ -1306,16 +1394,32 @@ const expectedMoneyBoxFieldCount = 5
  * per printed line" is the rule Phases 23 through 27 applied, and it is not
  * quite the rule. The real rule is one kind per thing a taxpayer can
  * truthfully declare having, and printed Schedule 1 line 5 is five of those.
+ *
+ * `115 -> 117` is TAX-37's own, and it is the EIGHTH split, of exactly the
+ * shape the paragraph above describes: `advancePremiumTaxCreditAndOtherRepayments`
+ * covered one printed line (Schedule 2 line 1) whose lettered sub-lines are
+ * three unrelated things a taxpayer can truthfully declare having — an excess
+ * advance premium tax credit (Form 8962), a clean vehicle credit transferred
+ * to a dealer (Form 8936 Schedule A), and an elective payment election
+ * recapture (Form 4255). One is removed and three added, `115 - 1 + 3`.
+ *
+ * **The split is what made reclassification safe**, and that is worth stating
+ * because the alternative looked cheaper. Form 8962 computes line 1a and
+ * nothing computes 1b through 1f; had the coarse kind simply become modeled,
+ * a taxpayer whose only Part I entry was a clean-vehicle repayment would have
+ * declared the exact kind the engine had just started computing and been
+ * handed a zero. Splitting is the only move that lets the engine say yes to
+ * one and no to the others.
  * @type {number}
  */
-const expectedKindCount = 115
+const expectedKindCount = 117
 
 export const proof = {
     dialectAndMediaType: () => {
         assertEq(dialect, 'vnd.fjs.return_profile')
         assertEq(mediaType, 'application/vnd.fjs.return_profile+json')
     },
-    kindVocabularyIsExactlyOneHundredAndFourteen: () => {
+    kindVocabularyIsExactlyOneHundredAndSeventeen: () => {
         assertEq(kindVocabulary.length, expectedKindCount)
         assertEq(new Set(kindVocabulary).size, kindVocabulary.length)
     },
@@ -1711,6 +1815,78 @@ export const proof = {
             const [t, v] = validate({ ...minimal })
             assert(t === 'ok', ['expected ok', t, v])
             assertEq(v.movingExpensesArmedForcesPermanentChangeOfStation, undefined)
+        },
+    },
+    // TAX-37 (Form 8962): the two Premium Tax Credit facts no information
+    // return reports.
+    premiumTaxCreditFacts: {
+        // All three printed tables validate, driven off the frozen list so a
+        // fourth added later is covered automatically -- paired below with a
+        // hand-typed count, since a loop over the list under test cannot
+        // notice that list shrinking.
+        everyPrintedTableValidates: () => {
+            for (const table of federalPovertyLineTableNames) {
+                const [t, v] = validate({ ...minimal, federalPovertyLineTable: table })
+                assert(t === 'ok', ['expected ok', table, t, v])
+                assertEq(v.federalPovertyLineTable, table)
+            }
+        },
+        // Independently hand-typed: Form 8962 line 4 prints THREE checkboxes
+        // (Alaska, Hawaii, other 48 states and DC). Deliberately not
+        // `federalPovertyLineTableNames.length` compared to itself.
+        thereAreExactlyThreeTables: () => {
+            assertEq(federalPovertyLineTableNames.length, 3)
+            assertEq(
+                new Set(federalPovertyLineTableNames).size,
+                federalPovertyLineTableNames.length,
+                'and no table is named twice')
+        },
+        // Check 10: an unrecognized answer is refused at INGEST, naming both
+        // the offending value and the three that are admitted -- because a
+        // value this dialect accepted and `fjs/tax/params` had no table for
+        // would surface as an assertion failure deep inside Form 8962.
+        anUnknownTableIsRefusedNamingTheThreeAdmitted: () => {
+            const [t, v] = validate({ ...minimal, federalPovertyLineTable: 'puertoRico' })
+            assertEq(t, 'error')
+            assert(
+                typeof v === 'string' && v.includes('puertoRico'),
+                ['the refusal must quote what was stored', v])
+            for (const table of ['contiguous48AndDistrictOfColumbia', 'alaska', 'hawaii']) {
+                assert(
+                    typeof v === 'string' && v.includes(table),
+                    ['and must name every table that IS admitted', table, v])
+            }
+        },
+        // A near-miss spelling is refused too -- the case a `startsWith` or a
+        // case-insensitive comparison would have let through.
+        aNearMissSpellingIsRefused: () => {
+            assertEq(validate({ ...minimal, federalPovertyLineTable: 'Alaska' })[0], 'error')
+            assertEq(validate({ ...minimal, federalPovertyLineTable: 'alaska ' })[0], 'error')
+        },
+        noDependentIsRequiredToFileValidates: () => {
+            const [t, v] = validate({
+                ...minimal,
+                noDependentIsRequiredToFileAnIncomeTaxReturn: true,
+            })
+            assert(t === 'ok', ['expected ok', t, v])
+            assertEq(v.noDependentIsRequiredToFileAnIncomeTaxReturn, true)
+        },
+        // DOC-12: a stored `false` would look like "I certify that a
+        // dependent DOES have to file", which is a different statement from
+        // silence and one this engine has no use for.
+        noDependentIsRequiredToFileFalseRejected: () => {
+            assertEq(
+                validate({ ...minimal, noDependentIsRequiredToFileAnIncomeTaxReturn: false })[0],
+                'error')
+        },
+        // THE CONTROL for both fields: neither is required, and a return that
+        // says nothing about health coverage -- which is most returns --
+        // validates exactly as it always did.
+        bothAbsentValidates: () => {
+            const [t, v] = validate({ ...minimal })
+            assert(t === 'ok', ['expected ok', t, v])
+            assertEq(v.federalPovertyLineTable, undefined)
+            assertEq(v.noDependentIsRequiredToFileAnIncomeTaxReturn, undefined)
         },
     },
     // TAX-12 (13-CONTEXT.md Decision 4.1): the `dependents` array and its

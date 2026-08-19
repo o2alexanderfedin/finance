@@ -196,6 +196,7 @@ export const inputs = {
     estateTrustK1Forms: [],
     employeeStockPurchaseForms: [],
     basisCorrectionForms: [],
+    marketplaceStatements: [],
 }
 
 /**
