@@ -878,6 +878,10 @@ const fixtureSweepProfileHash = 'sha256-tax-return-sweep-profile'
 const fixtureSweepInterestHash = 'sha256-tax-return-sweep-1099int'
 const fixtureSweepDividendHash = 'sha256-tax-return-sweep-1099div'
 const fixtureSweepSocialSecurityHash = 'sha256-tax-return-sweep-ssa1099'
+// The unread-field sweep's own two: a 1099-DIV carrying ONLY the two boxes
+// nothing read, and an SSA-1099 carrying its box 6 alongside box 5.
+const fixtureSweepExemptDividendHash = 'sha256-tax-return-sweep-1099div-exempt'
+const fixtureSweepSocialSecurityWithholdingHash = 'sha256-tax-return-sweep-ssa1099-w4v'
 const fixtureSweepPartnershipK1Hash = 'sha256-tax-return-sweep-k1-1065'
 const fixtureSweepSCorporationK1Hash = 'sha256-tax-return-sweep-k1-1120s'
 const fixtureSweepEstateTrustK1Hash = 'sha256-tax-return-sweep-k1-1041'
@@ -939,6 +943,8 @@ const subjectSweepProfile = 'tax-return-subject-sweep-profile'
 const subjectSweepInterest = 'tax-return-subject-sweep-1099int'
 const subjectSweepDividend = 'tax-return-subject-sweep-1099div'
 const subjectSweepSocialSecurity = 'tax-return-subject-sweep-ssa1099'
+const subjectSweepExemptDividend = 'tax-return-subject-sweep-1099div-exempt'
+const subjectSweepSocialSecurityWithholding = 'tax-return-subject-sweep-ssa1099-w4v'
 const subjectSweepPartnershipK1 = 'tax-return-subject-sweep-k1-1065'
 const subjectSweepSCorporationK1 = 'tax-return-subject-sweep-k1-1120s'
 const subjectSweepEstateTrustK1 = 'tax-return-subject-sweep-k1-1041'
@@ -1302,7 +1308,7 @@ const documentByHash = {
             amount: '90.00',
         }],
     },
-    // ── The routing sweep's own twenty-one documents ────────────────────
+    // ── The routing sweep's own twenty-three documents ──────────────────
     //
     // Persona 1: the portfolio filer. Every document below lands on a line
     // that needs NO declaration to be computed (`declaredKinds` gates
@@ -1350,6 +1356,37 @@ const documentByHash = {
         taxYear: 2025,
         formRevision: '2025',
         box5NetBenefits: '12000.00',
+    },
+    // The unread-field sweep's own 1099-DIV: boxes 12 and 13, and NO box 1a or
+    // 1b, so the leaf that reads it cannot be satisfied by the ordinary
+    // dividend routing that `fixtureSweepDividendHash` already covers. The two
+    // amounts differ from each other and from every other figure in this map,
+    // so a misrouted box prints the wrong number rather than the right one by
+    // coincidence.
+    [fixtureSweepExemptDividendHash]: {
+        dialect: oneZeroNineNineDivDialect,
+        payerTin: '44-4444444',
+        recipientTin: '222-22-2222',
+        accountNumber: 'ACC-SWEEP-DIV-EXEMPT',
+        taxYear: 2025,
+        formRevision: '2025',
+        sourceArtifactHash: 'deadbeef00112233445566778899aabbccddeeff0011223344556677889900',
+        box12ExemptInterestDividends: '3300.00',
+        box13SpecifiedPrivateActivityBondInterestDividends: '700.00',
+    },
+    // The unread-field sweep's own SSA-1099: the same shape as the one above
+    // it plus box 6, the voluntary Form W-4V withholding that reaches 1040 line
+    // 25b. Benefits are $9,000.00 rather than $12,000.00 so the two SSA
+    // fixtures cannot be confused for one another in a rendered line.
+    [fixtureSweepSocialSecurityWithholdingHash]: {
+        dialect: ssa1099Dialect,
+        payerTin: '',
+        recipientTin: '222-22-2222',
+        accountNumber: 'CLAIM-SWEEP-W4V',
+        taxYear: 2025,
+        formRevision: '2025',
+        box5NetBenefits: '9000.00',
+        box6VoluntaryFederalIncomeTaxWithheld: '810.00',
     },
     // The three K-1 faces, each carrying interest AND NOTHING ELSE. Their
     // interest boxes are numbered 5, 4 and 1 on the three printed faces —
@@ -1720,6 +1757,8 @@ const snapshotBySubject = {
     [subjectSweepInterest]: fixtureSweepInterestHash,
     [subjectSweepDividend]: fixtureSweepDividendHash,
     [subjectSweepSocialSecurity]: fixtureSweepSocialSecurityHash,
+    [subjectSweepExemptDividend]: fixtureSweepExemptDividendHash,
+    [subjectSweepSocialSecurityWithholding]: fixtureSweepSocialSecurityWithholdingHash,
     [subjectSweepPartnershipK1]: fixtureSweepPartnershipK1Hash,
     [subjectSweepSCorporationK1]: fixtureSweepSCorporationK1Hash,
     [subjectSweepEstateTrustK1]: fixtureSweepEstateTrustK1Hash,
@@ -2647,6 +2686,74 @@ export const proof = {
             const cents = renderedCents(result)
             assertEq(cents('1040 line 6a'), 1200000n, '$12,000.00 of box 5 net benefits')
             assertEq(cents('1040 line 6b'), 0n, 'and none of it taxable under §86')
+        },
+        /**
+         * **The unread-field sweep's own, at the PRINTED-LINE layer**
+         * (`fjs/todo/stored-but-unread-field-sweep.md`). `vnd.fjs.1099div`
+         * box 12 was stored, validated for exactness and read by nothing, so
+         * this rendered line was $0.00 for every filer holding a municipal
+         * bond FUND rather than the bonds themselves.
+         *
+         * $3,300.00 of box 12 and nothing else in the store, so printed line
+         * 2a is $3,300.00 exactly. Line 2b is asserted at zero alongside it:
+         * the tax-exempt and taxable interest lines are one transposition
+         * apart, and a leaf that checked only 2a could not tell them apart.
+         * Line 3b is asserted at zero for the same reason one box number over
+         * — this document carries no box 1a.
+         */
+        aStoredFormTenNinetyNineDivBoxTwelveReachesLineTwoA: () => {
+            const result = runTwin([subjectSweepProfile, subjectSweepExemptDividend])
+            assert(result.kind === 'ok', ['expected a computed return', result])
+            if (result.kind !== 'ok') {
+                return
+            }
+            const cents = renderedCents(result)
+            assertEq(cents('1040 line 2a'), 330000n, '$3,300.00 of box 12 exempt-interest dividends')
+            assertEq(cents('1040 line 2b'), 0n, 'box 12 is TAX-exempt, not taxable interest')
+            assertEq(cents('1040 line 3b'), 0n, 'and this document carries no ordinary dividend')
+            // The rendered line cites the box a reader can go and look at.
+            // Without this the leaf would pass on a line 2a that reached
+            // $3,300.00 from somewhere else entirely.
+            const lineTwoA = assertNotNullish(
+                result.lines.find(candidate => candidate.rule === '1040 line 2a'),
+                'expected line 2a')
+            assert(
+                lineTwoA.sources.some(source =>
+                    source.documentHash === fixtureSweepExemptDividendHash
+                    && source.boxPath === 'box12ExemptInterestDividends'),
+                ['expected line 2a to cite the 1099-DIV box 12 behind it', lineTwoA.sources])
+        },
+        /**
+         * **The unread-field sweep's own, second half.** `vnd.fjs.ssa1099`
+         * box 6 — the voluntary Form W-4V withholding — was stored and read by
+         * nothing, so a retiree was charged tax they had already paid.
+         *
+         * $810.00 withheld on $9,000.00 of benefits: printed line 25b is
+         * $810.00, and line 25a is zero because no W-2 is in the store. Both
+         * are asserted, because 25a and 25b are the pair a misrouted
+         * withholding term lands between.
+         */
+        aStoredFormSsaTenNinetyNineBoxSixReachesLineTwentyFiveB: () => {
+            const result = runTwin(
+                [subjectSweepProfile, subjectSweepSocialSecurityWithholding])
+            assert(result.kind === 'ok', ['expected a computed return', result])
+            if (result.kind !== 'ok') {
+                return
+            }
+            const cents = renderedCents(result)
+            assertEq(cents('1040 line 6a'), 900000n, '$9,000.00 of box 5 net benefits')
+            assertEq(cents('1040 line 25b'), 81000n, '$810.00 of box 6 voluntary withholding')
+            assertEq(cents('1040 line 25a'), 0n, 'no W-2, so nothing on the wages line')
+            assertEq(cents('1040 line 25c'), 0n, 'and nothing on the other-forms line')
+            const lineTwentyFiveB = assertNotNullish(
+                result.lines.find(candidate => candidate.rule === '1040 line 25b'),
+                'expected line 25b')
+            assert(
+                lineTwentyFiveB.sources.some(source =>
+                    source.documentHash === fixtureSweepSocialSecurityWithholdingHash
+                    && source.boxPath === 'box6VoluntaryFederalIncomeTaxWithheld'),
+                ['expected line 25b to cite the SSA-1099 box 6 behind it',
+                    lineTwentyFiveB.sources])
         },
         // `vnd.fjs.k1_1065`. The partner's interest is box FIVE on this face.
         // $700.00, and nothing else in the store, so line 2b is $700.00 — a
