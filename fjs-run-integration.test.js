@@ -44,7 +44,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
-import { mkdtempSync, existsSync, rmSync, readFileSync } from 'node:fs'
+import { mkdtempSync, existsSync, rmSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -815,6 +815,172 @@ test(
         } finally {
             // T-07-09-04: never leave a stray process or tmp dir behind,
             // even on failure/timeout.
+            if (serverProc !== null && serverProc.exitCode === null) {
+                serverProc.kill()
+            }
+            rmSync(home, { recursive: true, force: true })
+        }
+    },
+)
+
+// ── SEC: the client response never carries a host filesystem path ────────────
+//
+// `fjs/guest/materialize`'s convention docstring states the rule this proves:
+// an `IoChannel` becomes a `string` through `errorSummary`, never
+// `errorMessage`, because this process has no operator-facing sink and every
+// such string reaches a remote MCP client.
+//
+// **This has to be a real-process test, and that is not a preference.**
+// `fjs/effects/node/virtual`'s `fail` builds its `IoError` from a fixed literal
+// (`'invalid file'`) and attaches neither a path nor an OS code, so a "response
+// contains no host path" assertion written under `virtual` passes for
+// `errorMessage` and `errorSummary` alike — it would be decoration. Only a real
+// `fs.promises.mkdir` puts the absolute path into `payload.message`
+// (`EEXIST: file already exists, mkdir '<abs>'`), which is exactly what
+// `errorSummary` must drop and `errorMessage` would forward.
+//
+// The failure is provoked by planting a plain FILE where `materializeHome`
+// expects its directory, so `materializeProgram`'s unconditional
+// `mkdir(..., { recursive: true })` fails before the write is even attempted.
+// Planting happens AFTER `initialize`, so the server's startup `initEvo` scan
+// sees an ordinary home.
+//
+// TWO assertions, not one, and the second is the load-bearing one: the response
+// text carries no host path, AND neither does the run record the response
+// names. `fjs_run` answers `(run record: <runHash>)` and this same server
+// serves `cas_get` over the same store, so a "detail in the record, summary in
+// the response" split would leave the path exactly one tool call away. This
+// test fetches the record through `cas_get` — as a client would — to pin that.
+//
+// A separate `test(...)` with its own home and its own process, rather than a
+// subtest of the one above: that test's server materializes programs for real
+// and its later subtests assert the materialized `.mjs` exists, so a home whose
+// `.fjs-run` is deliberately unusable cannot be shared with it.
+test(
+    'SEC: a materialize failure surfaces no host filesystem path, in the response or in the run record it names',
+    { timeout: 60_000 },
+    async () => {
+        const home = mkdtempSync(join(tmpdir(), 'finance-fjs-run-redaction-home-'))
+        let serverProc = null
+        try {
+            serverProc = spawn('node', [join(repoRoot, 'index.js'), home], {
+                stdio: ['pipe', 'pipe', 'pipe'],
+            })
+
+            const responses = []
+            let stdoutBuf = ''
+            let stderrBuf = ''
+            serverProc.stdout.setEncoding('utf8')
+            serverProc.stdout.on('data', chunk => {
+                stdoutBuf += chunk
+                let idx
+                while ((idx = stdoutBuf.indexOf('\n')) !== -1) {
+                    const line = stdoutBuf.slice(0, idx)
+                    stdoutBuf = stdoutBuf.slice(idx + 1)
+                    if (line !== '') { responses.push(JSON.parse(line)) }
+                }
+            })
+            serverProc.stderr.setEncoding('utf8')
+            serverProc.stderr.on('data', chunk => { stderrBuf += chunk })
+
+            let nextIdCounter = 0
+            const nextId = () => { nextIdCounter += 1; return nextIdCounter }
+            const send = message => { serverProc.stdin.write(JSON.stringify(message) + '\n') }
+            const waitForId = async (id, timeoutMs = 20_000) => {
+                const deadline = Date.now() + timeoutMs
+                while (true) {
+                    const found = responses.find(r => r && r.id === id)
+                    if (found !== undefined) { return found }
+                    if (Date.now() > deadline) {
+                        throw new Error(`timed out waiting for response id ${id} (stderr: ${stderrBuf})`)
+                    }
+                    await new Promise(resolve => setTimeout(resolve, 25))
+                }
+            }
+            const call = async (name, args) => {
+                const id = nextId()
+                send({ jsonrpc: '2.0', method: 'tools/call', id, params: { name, arguments: args } })
+                return waitForId(id)
+            }
+
+            const initId = nextId()
+            send(initializeRequest(initId))
+            send(initializedNotification)
+            const initResponse = await waitForId(initId)
+            assert.ok(!('error' in initResponse), `initialize failed: ${JSON.stringify(initResponse)}`)
+
+            // A plain file exactly where the materialize directory must be.
+            // `mkdir(..., { recursive: true })` over an existing FILE rejects
+            // with EEXIST and the absolute path in `error.message` — verified
+            // directly against `fs.promises.mkdir` before this test was written.
+            const blockedMaterializeHome = materializeHome(home)
+            writeFileSync(blockedMaterializeHome, 'not a directory')
+
+            const addResponse = await call('cas_add', { content: programSource, type: 'text' })
+            assert.ok(!addResponse.result.isError, `cas_add failed: ${JSON.stringify(addResponse)}`)
+            const blockedProgramHash = addResponse.result.content[0].text
+
+            const runResponse = await call('fjs_run', { hash: blockedProgramHash, taxYear: 2025 })
+            assert.equal(
+                runResponse.result.isError, true,
+                `expected the blocked materialize to surface as an error: ${JSON.stringify(runResponse)}`)
+            const runText = runResponse.result.content[0].text
+
+            // The property, asserted BEFORE the control below and deliberately
+            // in that order: a mutation that reintroduces the leak must be
+            // reported as the leak, not as the control noticing the text moved.
+            // `home` is an absolute path under the OS temp dir, and the host's
+            // own message embeds it in full.
+            assert.ok(
+                !runText.includes(home),
+                `fjs_run's error response leaked a host filesystem path: ${runText}`)
+            assert.ok(
+                !runText.includes(blockedMaterializeHome),
+                `fjs_run's error response leaked the materialize directory: ${runText}`)
+
+            // The control, so the redaction assertions above cannot pass by the
+            // run having failed for some unrelated reason that happens to name
+            // no path: this IS the materialize step, and the host DID supply an
+            // OS code — the part `errorSummary` is allowed to forward, and the
+            // part a client can actually act on. Without it, deleting the whole
+            // message would "pass".
+            assert.ok(
+                runText.includes('materialize failed: io error: EEXIST'),
+                `expected the materialize step and its OS code to be named: ${runText}`)
+
+            // The same property for the run record the response just named —
+            // fetched the way a client would, through the server's own cas_get.
+            const runHashMatch = /run record: (\S+)\)/.exec(runText)
+            assert.ok(runHashMatch !== null, `expected the error text to name a run record hash: ${runText}`)
+            const runHash = runHashMatch[1]
+            const recordResponse = await call('cas_get', { hash: runHash, content: true })
+            assert.ok(
+                !recordResponse.result.isError,
+                `cas_get on the run record failed: ${JSON.stringify(recordResponse)}`)
+            // `cas_get`'s own envelope is `{length, mimeType, type, uri, text}`
+            // and its `uri` is the blob's absolute path on the host — upstream
+            // `fjs/mcp/cas`'s deliberate choice, not this repo's rendering, and
+            // a different question from the one this test asks. So the
+            // assertion is made against the run record's OWN `error` field,
+            // parsed out, rather than against the whole envelope: otherwise
+            // this test would redden on upstream's `uri` no matter which
+            // renderer `materializeProgram` used, and prove nothing about it.
+            const fetchedBlob = JSON.parse(recordResponse.result.content[0].text)
+            const fetchedRecord = JSON.parse(fetchedBlob.text)
+            assert.equal(
+                fetchedRecord.status, 'error',
+                `expected the fetched blob to be the error run record: ${fetchedBlob.text}`)
+            assert.ok(
+                !fetchedRecord.error.includes(home),
+                `the run record a client can fetch by the hash fjs_run handed it leaked a host filesystem path: ${fetchedRecord.error}`)
+            assert.equal(
+                fetchedRecord.error, 'materialize failed: io error: EEXIST',
+                `the stored record and the client response must be the SAME redacted rendering: ${fetchedRecord.error}`)
+
+            // EXEC-12: the same live process still answers afterwards.
+            const survives = await call('cas_list', {})
+            assert.ok(!survives.result.isError, `cas_list after the blocked run failed: ${JSON.stringify(survives)}`)
+        } finally {
             if (serverProc !== null && serverProc.exitCode === null) {
                 serverProc.kill()
             }

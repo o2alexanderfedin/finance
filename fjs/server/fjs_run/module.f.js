@@ -709,9 +709,12 @@ export const placeJsModuleFixture = root => path => fn => {
  * `fjs/effects/node/virtual`'s `writeFile` (array-of-`Vec`) and `import_`
  * (`JsModule` function) representations are incompatible at the SAME path
  * within the SAME session (confirmed empirically both ways: a pre-placed
- * `JsModule` fixture makes the REAL write fail with `'invalid file'` before
- * `loadProgram` ever runs; no fixture lets the write succeed but leaves an
- * array, so `import_` refuses with `'not a JsModule'`). This is exactly the
+ * `JsModule` fixture makes the REAL write fail before `loadProgram` ever runs
+ * — `virtual` reports `'invalid file'` on the channel, which `materializeProgram`
+ * renders as `'materialize failed: io error'` per that module's `errorSummary`
+ * convention, the host's own words never reaching a caller; no fixture lets the
+ * write succeed but leaves an array, so `import_` refuses with
+ * `'not a JsModule'`). This is exactly the
  * representational split `fjs/guest/materialize/module.f.js`'s own header
  * already documents and resolves by composing the write and the load "side
  * by side" rather than chained in one session — this helper applies that
