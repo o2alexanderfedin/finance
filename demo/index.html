@@ -16,9 +16,12 @@
   no install step: the pages load the same `.f.js` files `npm test` runs its
   2220 project-local proofs against.
 
-  `../functionalscript/` is the repository's git submodule. The GitHub Pages
-  workflow stages `node_modules/functionalscript` there, which is the same
-  approved dependency `package.json` already pins.
+  `../functionalscript/` is where the GitHub Pages workflow stages
+  `node_modules/functionalscript` — the same approved dependency `package.json`
+  pins and the suite runs against. It named a git submodule until 2026-08-19;
+  that submodule is gone, because holding a second copy of the dependency beside
+  the npm one served nothing (`todo/remove-functional-script-git-submodule.md`,
+  by its upstream author).
 -->
 <script type="importmap">
 {
