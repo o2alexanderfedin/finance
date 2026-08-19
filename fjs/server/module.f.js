@@ -929,8 +929,17 @@ export const proof = {
             assertEq(runResult.result.isError, true)
             const runText = runResult.result.content[0]?.text
             assert(runText !== undefined, ['expected fjs_run to answer with text content', runResult])
+            // `materialize failed:` is this project's own words for the step,
+            // not the host's — see `fjs/guest/materialize`'s convention
+            // docstring. It replaced `invalid file`, which was `virtual`'s
+            // `writeFile` message reaching a protocol client verbatim through
+            // `errorMessage`; on a real filesystem that same slot carries the
+            // absolute path. The prefix is what keeps this leaf able to name
+            // WHICH of executeRun's five steps surfaced now that the host's
+            // own text is gone, since `errorSummary` alone renders `io error`
+            // under `virtual` (whose `fail` attaches no OS code).
             assert(
-                runText.includes('invalid file'),
+                runText.includes('materialize failed'),
                 ['expected the surfaced error to name the materialize-write collision (07-10)', runText])
 
             const runHashMatch = /run record: (\S+)\)/.exec(runText)
