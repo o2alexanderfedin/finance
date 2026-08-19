@@ -1,6 +1,7 @@
 /**
- * Form 461 — *Limitation on Business Losses*, §461(l). All sixteen printed
- * lines, one pure function over figures the caller has already computed.
+ * Form 461 — TAX-40: *Limitation on Business Losses*, §461(l). All sixteen
+ * printed lines, one pure function over figures the caller has already
+ * computed.
  *
  * Spec:
  * [./todo/limitation-on-business-losses.md](./todo/limitation-on-business-losses.md),

@@ -1525,6 +1525,48 @@ written. They are **T3** for the same reason — none of them was blocking anyth
       Rev. Proc. 2014-41 §2.05's circularity between this deduction and the premium tax credit —
       which is TAX-37's form, and the one interaction between these four entries.
 
+### Form 461 (TAX-40) — one ID coined WITH its code, not retrofitted
+
+The four entries above were retrofitted after the fact and say so. This one is not: it was
+assigned in the same commit as `fjs/form461`, which is what the section above argues should
+happen from now on. It has no ROADMAP phase either, for the same reason — Tier-B form work
+rather than a planned slice.
+
+- [x] **TAX-40** *(M2, T3)*: **Form 461, the §461(l) excess business loss limitation** — all
+      sixteen printed lines, computed from `fjs/schedule/1` Part I over printed Schedule 1
+      lines 3, 4, 5 and 6 and 1040 line 7a, with printed line 8p as the destination. Spec:
+      `fjs/form461/todo/limitation-on-business-losses.md`.
+
+      **Delivered 2026-08-19, and NO kind was reclassified.** `excessBusinessLossAdjustment`
+      stays in `unmodeledKindRefusals`: the kind names the adjustment on printed line 8p, which
+      exists only when there IS an excess business loss, and that case refuses — the disallowed
+      amount is a §172 net operating loss carryover and `netOperatingLossDeduction` is itself a
+      refused kind with no dialect behind it. Every count is unchanged (modeled 55, refused
+      142, vocabulary 197, tripwires 11, dialects 30 known / 32 dropped).
+
+      **What DID change is `fjs/schedule/f`: a net farm loss computes at printed box 36a.**
+      i1040sf p10 disposes of §465 and §469 in one sentence on the taxpayer's own two stored
+      answers, §461(l) is figured here over the aggregate, and §199A(c)(2)'s outbound
+      carryforward reached a report field for the first time. Box 36b still refuses on §465.
+      **`fjs/schedule/c`'s loss does not move**, and the reason is a dialect rather than a
+      statute: `vnd.fjs.business_expenses` carries no field for printed line 32's at-risk box
+      and none for material participation, so neither §465 nor §469 can be asked of a Schedule
+      C business at all. `fjs/schedule/e/part_i`'s two loss refusals do not move either.
+
+      **Three remedies were corrected for naming a form or a reason that had ceased to be
+      true** — `excessBusinessLossAdjustment`'s, `farmIncomeOrLoss`'s and Schedule C's own line
+      32 message — which is the same failure mode TAX-39's entry above records for Publication
+      535. The TAX-30 body earlier in this document names §461(l) as standing behind Schedule
+      C's §465 refusal; that clause is still TRUE as a statement about the statute's ordering
+      and no longer true as a statement about what this engine cannot compute.
+
+      **The threshold was verified at Rev. Proc. 2024-40 §2.32 rather than taken from the
+      brief**, which is where the $313,000/$626,000 pair and its two per-status traps come
+      from: married filing separately takes the FULL amount (§461(l) has no halving clause) and
+      a qualifying surviving spouse does not file a joint return. The brief also said wages are
+      trade-or-business income for this purpose; i461 says the opposite, in §461(l)(6)'s own
+      words, and printed line 1 is *"Reserved for future use"* because of it.
+
 ### v2 Traceability
 
 | REQ-ID | Tier | Phase | Persona unblocked |
@@ -1544,9 +1586,10 @@ written. They are **T3** for the same reason — none of them was blocking anyth
 | TAX-36, TAX-37 | T3 | *(none — retrofitted 2026-08-19)* | Tier-B forms — Schedule 3 line 1 under §904(j), and Form 8962 over the new `vnd.fjs.1095a`. Both were hard zeros; both now compute or refuse by name |
 | TAX-38 | T3 | *(none — retrofitted 2026-08-19)* | Tier-B forms — **one ID, two forms**: Form 2441 (1040 line 1e and Schedule 3 line 2) and Form 6781 Part I (Schedule D lines 4 and 11). The collision is recorded in the section above, not retconned |
 | TAX-39 | T3 | *(none — retrofitted 2026-08-19)* | Tier-B forms — Form 7206, §162(l), Schedule 1 line 17. The remedy it replaced named a publication the IRS withdrew in 2022 |
+| TAX-40 | T3 | *(none — coined with its code 2026-08-19)* | Tier-B forms — Form 461, §461(l). No kind reclassified; a net farm loss computes at printed box 36a, and three stale remedies were corrected |
 
-**29 requirements across 10 phases and four retrofitted entries with none** — 124 in the
-document, 95 of them v1's. Each phase is a
+**29 requirements across 10 phases, four retrofitted entries with none, and one coined with its
+own code** — 125 in the document, 95 of them v1's. Each phase is a
 vertical slice that ends with something that works: a persona whose return computes, or a named
 refusal that replaces a silent wrong answer. No phase leaves a layer that only pays off later.
 
