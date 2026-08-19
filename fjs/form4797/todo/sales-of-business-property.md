@@ -393,14 +393,29 @@ hidden.
    gain. You cannot deduct a loss on the personal part"*) and this engine has
    no wiring that carries the personal part anywhere. Refusing costs a
    refusal; computing costs a Schedule D that is short.
-2. **Placed in service and disposed of in the same tax year.** i4562 p11:
-   *"no depreciation is allowed under this convention for property that is
-   placed in service and disposed of within the same tax year"*, and that
-   property is also struck from the mid-quarter aggregate. Both rules are
-   written into `fjs/form4562` (§3) so a later phase can lift this refusal
-   without reintroducing the asset into the 40% test; the refusal stands for
-   now because a same-year disposal also makes `everyDepreciableAssetIsListed`
-   unverifiable — the asset is gone from a register that lists what is held.
+2. **Placed in service and disposed of in the same tax year — refused in
+   `fjs/form4562`, and the reason is narrower than it first looked.** i4562 p11
+   says two things about such property: it is struck from the mid-quarter
+   aggregate (*"In determining whether the mid-quarter convention applies, do
+   not take into account … Property that is placed in service and disposed of
+   within the same tax year"*), and under that convention *"no depreciation is
+   allowed"* for it.
+
+   **The second sentence is printed for the MID-QUARTER convention and for no
+   other**, and Publication 946 chapter 4 — which does give the
+   year-of-disposition fraction for all three conventions — never repeats it.
+   So whether a half-year or mid-month asset bought and sold inside one year
+   takes half a year of depreciation or none is not settled by anything read
+   for this phase. Refusing rather than choosing: the wrong choice OVERSTATES
+   the deduction and UNDERSTATES the §1245 recapture at the same time, in the
+   one year both are decided.
+
+   **The exclusion from the 40% test is deliberately NOT implemented**, and
+   that is a consequence of the refusal rather than an oversight: a branch no
+   computable return can reach is a branch no proof can redden, which is
+   AGENTS.md's *"a rule illustrated by an unreachable module is a rule nobody
+   can check"*. `midQuarterConventionApplies` says so where the filter would
+   have gone.
 3. **A §179 election on a disposed asset.** `section179ElectedCost` already
    refuses the whole Form 4562, so it cannot reach here; the term is written
    into line 22's formula anyway, with this note, so that lifting the Form 4562
@@ -530,3 +545,136 @@ Kinds, in `fjs/return/scope`:
   the corrections are the point: today's `otherGainsOrLosses` remedy reads
   *"requires Form 4797, and for a casualty or theft Form 4684 (no phase yet)"*,
   which is now wrong in its first half for the population this phase serves.
+
+---
+
+## 9. The mutation log
+
+AGENTS.md: *"A proof is not known to work until you have watched it fail."*
+Forty-three mutations were written and run against the committed tree, one at a
+time, each reverted before the next and each checked with `git diff --numstat`.
+
+**Five survived**, and every one of them is a finding rather than a formality.
+
+| # | Mutation | Leaves red |
+|---|---|---|
+| 1 | Step 3's disposal decimal becomes the placed-in-service decimal | 7 |
+| 2 | Form 4562 never applies the disposal decimal in the year of sale | 3 |
+| 3 | cumulative depreciation omits the year-of-sale term | 13 |
+| 4 | **cumulative depreciation omits the claimed §168(k) allowance** | **0 — SURVIVED**; 1 after the new fixture |
+| 5 | the cumulative loop is off by one | 14 |
+| 6 | printed line 25b drops the `min` and takes line 25a | 4 |
+| 7 | unrecaptured §1250 gain takes line 24 rather than `min(22, 24)` | 2 |
+| 8 | every classification is treated as §1245 | 4 |
+| 9 | the holding-period boundary becomes inclusive (`>=`) | 1 |
+| 10 | the holding period forgets to advance the year | 5 |
+| 11 | line 24 subtracts line 21 rather than line 23 | 13 |
+| 12 | column (g) subtracts the depreciation rather than adding it | 20 |
+| 13 | the §1231 lookback refusal never fires | 2 |
+| 14 | the Schedule-D-not-filed refusal never fires | 1 |
+| 15 | the §1245/§1250 straddle refusal never fires | did not compile; 2 in compiling form |
+| 16 | the business-use refusal never fires | 2 |
+| 17 | the farm refusal never fires | 1 |
+| 18 | line 11 takes line 7 unconditionally | 4 |
+| 19 | line 6 does not take line 32 | 8 |
+| 20 | line 13 does not take line 31 | 8 |
+| 21 | a §1231 LOSS reaches Schedule D as a gain | did not compile; 1 in compiling form |
+| 22 | Schedule D line 11 drops the Form 4797 term | 3 |
+| 23 | the §1250 worksheet drops the Form 4797 term | 3 |
+| 24 | **the §1250 worksheet's line 7 CAP is removed** | **0 — SURVIVED**; 1 after the new leaves |
+| 25 | Schedule 1 line 4 ignores Form 4797 | 2 |
+| 26 | `fjs/form1040/core` never hands Form 4797 to Schedule 1 | 2 |
+| 27 | **the §1250 worksheet ignores Form 4797 line 8** | **0 — SURVIVED**; 2 after the new leaves |
+| 28 | the narrowed disposal certification never fires | 1 |
+| 29 | **the same-year placed-and-disposed refusal never fires** | **0 — SURVIVED**; 1 after the new leaf |
+| 30 | the dialect's certification-contradiction refusal never fires | did not compile; 2 in compiling form |
+| 31 | the dialect's `dateSold` tax-year check never fires | 6 |
+| 32 | the disposal block is dropped on the way out of the dialect | did not compile; 24 in compiling form |
+| 33 | the disposal tripwire never fires | 9 |
+| 34 | **Step 3's decimal is applied AFTER the rounding rather than before** | **0 — SURVIVED**; 1 after new amounts |
+| 35 | line 23 adds the depreciation rather than subtracting it | 14 |
+| 36 | the expense of sale is dropped from line 21 | 10 |
+| 37 | line 31 drops line 26g | **0 — EQUIVALENT MUTANT**, recorded at the site |
+| 38 | a refusal message loses its DESTINATION | 6 |
+| 39 | a Part III property is filed under Part I | 14 |
+| 40 | `filed` is ignored, so a return with no disposal cites a register | 1 |
+| 41 | `fjs/form1040/core` drops Form 4797's error arm | 1 |
+| 42 | **the citation loses the asset it came from** | **0 — SURVIVED**; 1 after the new leaf |
+| 43 | `otherGainsOrLosses` is deleted from `modeledKinds` | did not compile — the `tsc` partition assertion is the gate |
+
+### The five survivors
+
+**#4 — the §168(k) allowance.** i4797 p9's line 22 Step 1 includes *"any special
+depreciation allowance"* in the recapture base, and the term was unobservable
+because **every asset fixture in this repository declared `electedOut`**. That
+is the monoculture AGENTS.md's own sweep found twice before, in a different
+column. Dropping the term does not merely shrink a number: on the new fixture it
+turns a $3,236.29 ordinary gain in Part III into an $8,843.20 §1231 loss in Part
+I. `theSectionOneSixtyEightKAllowanceIsInsideTheRecaptureBase` was added, with
+the counterfactual adjusted basis hand-typed beside the real one.
+
+**#24 and #27 — the Schedule D worksheet's own arithmetic.** Both were
+unobservable through `fjs/form1040/core`, and for two different reasons that are
+worth separating. The line 7 cap (*"the smaller of line 6 or the gain from Form
+4797, line 7"*) needs an unrecaptured §1250 gain LARGER than the net §1231
+gain, which happens when a §1231 loss elsewhere nets the gain down without
+touching the depreciation inside it — no fixture had one. Line 8 is worse: it is
+Form 4797 line 8, which is a **structural zero in every return this engine
+computes**, so no end-to-end fixture could ever make it non-zero. The fix is the
+same for both and it is a general one: `fjs/schedule/d` takes NUMBERS, so its
+contract can be proven directly at values no Form 4797 here produces yet.
+
+**#29 — the same-year refusal.** A refusal with no proof at all. Nothing
+anywhere held an asset placed in service and disposed of in the same tax year,
+so the whole branch was decoration. The leaf added for it carries controls a
+year either side, because a check that refused every disposal would have passed
+a one-sided assertion.
+
+**#34 — the ROUNDING ORDER, and it is the subtlest.** Applying the disposal
+decimal after rounding the full year, rather than folding it into the exact
+rational before the single `halfUp`, is a real and plausible implementation. The
+first version of the macrs leaf claimed to catch it and did not: the amounts
+chosen happened to agree under both orders, and the comment justifying them was
+wrong about why (it reasoned about truncating bigint division, which is not what
+the mutation does). Two amounts that genuinely diverge replaced them —
+$1,002.00 of 7-year property under the half-year convention (8,762 against
+8,763) and $1,001.00 of residential rental under mid-month, where the fraction
+is 19/24 rather than 1/2 (2,881 against 2,882), so the property is not about
+halving in particular.
+
+**#42 — the provenance path.** Erasing the asset's name from every citation's
+`boxPath` was green across the entire suite. `sources.length` counts citations;
+it says nothing about whether any of them points somewhere a reader can go. The
+leaf added for it hand-types all five `(documentHash, boxPath, value)` triples,
+and two of the fixtures deliberately share a sale price so that the path is the
+only thing that can tell them apart.
+
+### The equivalent mutant, and the three that did not compile
+
+**#37 is a genuine equivalent mutant**: `line26gCents` is a structural zero for
+every property this engine can hold, so deleting the term from line 31 cannot
+turn red at any input. It is recorded at the site rather than removed, because
+it is the printed sum and because the day an accelerated §1250 class becomes
+representable the term must already be there.
+
+Three mutations were rejected by `tsc` rather than by the suite, and each was
+re-run in a semantically identical compiling form, per AGENTS.md:
+
+- **#15** — `if (section === undefined) { return refusal }` weakened to a
+  never-true condition is `TS2345`: the narrowing is load-bearing at the type
+  level, because `partIIIProperty` takes `'section1245' | 'section1250'` and
+  cannot be handed `undefined`. Re-run as `sectionOfClassification` returning
+  `'section1245'` for a straddling class, it reddens 2.
+- **#21** — dropping `isGain` from `longTermCapitalGainCents` orphans the
+  binding (`TS6133`). Re-run as `isGain || line7Cents < 0n`, it reddens 1.
+- **#32** — `disposal === undefined ? undefined : { ... }` forced to `undefined`
+  narrows the block's type to `never` and `TS2339`s on every field read. Re-run
+  as a description comparison that is false for every fixture, it reddens **24**
+  — the largest red set of the whole sweep, which is the right shape for the one
+  fact this whole phase adds to the dialect.
+
+**#43 is the most interesting non-result.** Deleting `otherGainsOrLosses` from
+`modeledKinds` does not reach the test runner at all: `_EveryKindIsEitherModeled\
+OrRefused` is a `tsc`-level assertion and the build stops with `TS2344`. The
+partition is enforced by the compiler, not by a proof, which is exactly what
+that typedef exists to say.
