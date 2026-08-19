@@ -1755,6 +1755,33 @@ export const form1040IncomeLines = taxParamSet => inputs => {
                 w2Wages: undefined,
                 unadjustedBasis: undefined,
             }
+    // **§199A(c)(1)'s two reductions apply only where there is a trade or
+    // business for them to reduce**, and this gate was invisible until
+    // `fjs/form8995` stopped flooring `qualifiedBusinessIncome` at zero (the
+    // Form 461 phase). Schedule SE line 13 is the deductible half of the WHOLE
+    // return's self-employment tax, and a general partner's box 14 code A
+    // reaches it through `fjs/schedule/e` with no Schedule C and no Schedule F
+    // anywhere on the return. Passing it ungated then made qualified business
+    // income NEGATIVE for a partner with no proprietorship at all — invisible
+    // while the floor clamped it to zero, and the moment the floor moved to its
+    // printed line it became a §199A(c)(2) carryforward that partner does not
+    // have, plus a `priorYearCarryforwardIsUnstated` refusal on two returns
+    // that had computed for two phases.
+    //
+    // So both reductions are zero with neither schedule filed, which is exactly
+    // what they were worth before: line 13a is `declaredZero` in that case
+    // unless there are REIT dividends, and the REIT component is not reduced by
+    // either term.
+    //
+    // What this does NOT fix, and is pre-existing: a return with BOTH a
+    // Schedule C and a partnership K-1 carrying self-employment earnings
+    // reduces the proprietorship's qualified business income by the whole of
+    // Schedule SE line 13, including the partner's share. That OVERSTATES the
+    // reduction and so overstates the tax, which is the safe direction, and
+    // fixing it needs a per-activity split of Schedule SE this engine does not
+    // carry.
+    const hasAQualifiedTradeOrBusiness = scheduleOnePartIResult.scheduleC.filed
+        || scheduleOnePartIResult.scheduleF.filed
     const qbiOutcome = qualifiedBusinessIncomeDeduction(taxParamSet)({
         status,
         // Schedule C line 31 PLUS Schedule F line 34, and the SAME Schedule SE
@@ -1766,7 +1793,9 @@ export const form1040IncomeLines = taxParamSet => inputs => {
         // the tax for every farmer.
         netProfitCents: scheduleOnePartIResult.scheduleC.partII.line31.value
             + scheduleOnePartIResult.scheduleF.line34.value,
-        deductibleHalfOfSelfEmploymentTaxCents: scheduleOneStageOne.selfEmployment.lines.line13,
+        deductibleHalfOfSelfEmploymentTaxCents: hasAQualifiedTradeOrBusiness
+            ? scheduleOneStageOne.selfEmployment.lines.line13
+            : 0n,
         // Schedule 1 line 17, TAX-39 -- the SAME `fjs/schedule/1` stage-one
         // execution line 15 came from, never a second Form 7206. §199A(c)(1)
         // reduces qualified business income by the self-employed health
@@ -1779,7 +1808,9 @@ export const form1040IncomeLines = taxParamSet => inputs => {
         // premium, with the whole suite green, which is why
         // `theHealthInsuranceDeductionReachesFormEightNineNineFive` asserts the
         // §199A deduction MOVED rather than only that line 17 did.
-        selfEmployedHealthInsuranceDeductionCents: scheduleOneStageOne.line17.value,
+        selfEmployedHealthInsuranceDeductionCents: hasAQualifiedTradeOrBusiness
+            ? scheduleOneStageOne.line17.value
+            : 0n,
         assertedPriorYearLossCarryforward: qualifiedBusinessFacts.carryforward,
         // Form 8995-A's three facts (Phase 31, TAX-32). Read from the SAME
         // record the carryforward comes from, and passed UNCONDITIONALLY:

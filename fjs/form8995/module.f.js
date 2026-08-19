@@ -218,10 +218,17 @@ const percentOfCents = cents => percent =>
  * exclusions. A reader has to be able to see WHICH reductions this engine
  * applies and which it merely has no figure for.
  *
- * Floored at zero, because §199A(c)(1) is a NET amount and a negative one is
- * not qualified business income but a §199A(c)(2) carryforward — and
- * `fjs/schedule/c` refuses a Schedule C loss before this function is ever
- * reached, so the floor is the printed line 4's rule rather than a live case.
+ * **NOT floored at zero, and it was until the Form 461 phase.** The floor read
+ * `net > 0n ? net : 0n`, and its own comment said it was *"the printed line 4's
+ * rule rather than a live case"* — true only while `fjs/schedule/c` refused
+ * every business loss before this function could be reached. `fjs/schedule/f`
+ * now computes a net farm LOSS at printed box 36a, and the floor sat on the
+ * wrong printed line for it: line 2 is *"Total qualified business income or
+ * **(loss)**"* and its box is parenthesised, while line 4 is *"Combine lines 2
+ * and 3. **If zero or less, enter -0-**"* — so the paper floors line 4, and
+ * {@link form8995} does. Leaving the floor here would have made printed line 16
+ * — §199A(c)(2)'s carryforward to the succeeding year — read zero for exactly
+ * the taxpayer who has one, destroying the figure this engine exists to record.
  * @type {(input: { readonly netProfitCents: bigint, readonly deductibleHalfOfSelfEmploymentTaxCents: bigint, readonly selfEmployedHealthInsuranceDeductionCents: bigint }) => bigint}
  */
 export const qualifiedBusinessIncome = input => {
@@ -238,11 +245,10 @@ export const qualifiedBusinessIncome = input => {
     // limit depends on net self-employment earnings AND on a plan document
     // nothing here records.
     const selfEmployedRetirementPlanDeductionCents = 0n
-    const net = netProfitCents
+    return netProfitCents
         - deductibleHalfOfSelfEmploymentTaxCents
         - selfEmployedHealthInsuranceDeductionCents
         - selfEmployedRetirementPlanDeductionCents
-    return net > 0n ? net : 0n
 }
 
 /**
@@ -665,19 +671,39 @@ export const proof = {
                 'health insurance and retirement contributions both refuse, so both are $0.00',
             )
         },
-        // Floored at zero: §199A(c)(1) is a NET amount, and a negative one is
-        // a §199A(c)(2) carryforward rather than negative QBI. Unreachable
-        // through the product path -- `fjs/schedule/c` refuses a loss -- so
-        // this is the printed rule implemented rather than a live case.
-        aNetNegativeFloorsAtZero: () => {
+        // **A NET NEGATIVE STAYS NEGATIVE, and the floor is one printed line
+        // further down.** This leaf asserted `0n` until the Form 461 phase,
+        // when `fjs/schedule/f` began computing a net farm loss at printed box
+        // 36a and the floor's own comment ("unreachable through the product
+        // path") stopped being true. Printed line 2 is "Total qualified
+        // business income or (LOSS)"; printed line 4 is the one that says "if
+        // zero or less, enter -0-". A floor here would have made line 16 --
+        // §199A(c)(2)'s carryforward to 2026 -- read zero for the only
+        // taxpayer who has one.
+        aNetNegativeStaysNegativeBecauseTheFloorIsPrintedOnLineFour: () => {
             assertEq(
                 qualifiedBusinessIncome({
                     netProfitCents: 10000n,
                     deductibleHalfOfSelfEmploymentTaxCents: 50000n,
                     selfEmployedHealthInsuranceDeductionCents: 0n,
                 }),
-                0n,
+                -40000n,
+                '$100.00 of profit less $500.00 of §164(f) half is -$400.00, not $0.00',
             )
+            // And the printed floor is still there, one line down: the same
+            // figure through the whole form leaves line 4 at zero while line 2
+            // keeps the loss. This half is what a re-added floor could not fake.
+            const form = form8995(taxParams2025)({
+                qualifiedBusinessIncomeCents: -40000n,
+                priorYearLossCarryforwardCents: 0n,
+                taxableIncomeBeforeQbiCents: 0n,
+                netCapitalGainCents: 0n,
+                qualifiedReitDividendsCents: 0n,
+            })
+            assertEq(form.line2, -40000n, 'printed line 2 carries the loss')
+            assertEq(form.line4, 0n, 'printed line 4 is where "-0-" is printed')
+            assertEq(form.line5, 0n, 'so the 20% component is zero')
+            assertEq(form.line16, -40000n, 'and line 16 hands -$400.00 to 2026')
         },
     },
 
