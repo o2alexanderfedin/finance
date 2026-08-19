@@ -1203,7 +1203,7 @@ const documentByHash = {
     //
     // **[CLOSED] The same hole was still open for the other twenty-five
     // dispatched dialects when this paragraph was written**, and it said so
-    // rather than closing it: `sourceAndTwinDispatchOnTheSameTwentyFourDialects`
+    // rather than closing it: `sourceAndTwinDispatchOnTheSameTwentySixDialects`
     // greps the SOURCE text for each tag and asserts nothing at all about the
     // TWIN's branch, so any route branch whose dialect had no fixture in this
     // file could be deleted silently. The sweep it asked for is
@@ -2660,7 +2660,7 @@ export const proof = {
     // the SOURCE text, against a hand-typed count. The twin imports these
     // constants; the source cannot, so it spells them out — this is what
     // stops a rename from quietly desynchronizing the two.
-    sourceAndTwinDispatchOnTheSameTwentyFourDialects: () => {
+    sourceAndTwinDispatchOnTheSameTwentySixDialects: () => {
         assertEq(dispatchedDialects.length, expectedDispatchedDialectCount)
         for (const tag of dispatchedDialects) {
             assert(
