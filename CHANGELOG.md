@@ -17,7 +17,61 @@ pinned rerun reproducing it byte for byte. That is what `1.0.0` names.
 
 ## Unreleased
 
-*Nothing yet.*
+### Schedule F — Profit or Loss From Farming
+
+**A farmer computes.** `farmIncomeOrLoss` was an `fjs/return/scope` refusal whose whole remedy
+read *"requires Schedule F (no phase yet)"*. Printed Schedule F lines A through 34 now compute
+for a cash-method farm, and printed line 34 reaches **all four** of its destinations: Schedule 1
+line 6, Schedule SE line 1a, Form 8995 line 1(i), and — through Schedule SE line 3 — the earned
+income credit's Worksheet B. Spec, written first, in
+[`fjs/schedule/f/todo/`](./fjs/schedule/f/todo/schedule-f-profit-or-loss-from-farming.md).
+
+- **`vnd.fjs.farm`**, one document per farming business. `vnd.fjs.business_expenses` is the right
+  MODEL and the wrong CONTAINER, for a reason sharper than Schedule E Part I's: `fjs/schedule/c`
+  consumes *every* record of that dialect, so a farm stored in it would be computed onto the wrong
+  printed form and reach Schedule 1 line **3** instead of line **6**. `f1040sf` Part IV polices
+  that boundary on its own printed face.
+- **Form 1099-G box 7 and box 9 became readable**, and they had refused at the document since the
+  dialect shipped. `i1040sf` p3 routes a Form 1099-G or CCC-1099-G to printed line 4a; p4 puts the
+  Commodity Credit Corporation market gain in the same line's list, and takes it out again on line
+  4b under the §77 election. **The refusal MOVED rather than being deleted**: a 1099-G carrying
+  either box with no farm stored still refuses, at `fjs/schedule/f`, because dropping it would
+  understate income in silence.
+- **A profit and a break-even zero compute; a LOSS refuses at printed line 34** — Schedule C line
+  31's and Schedule E Part I line 21's decision, from a page that says the same thing. The
+  refusal names **§461(l)**, and the brief this work was written against named §461(j): the excess
+  FARM loss is the provision a farm-shaped reading reaches for, and §461(l)(1) disapplies it for a
+  noncorporate taxpayer in any year §461(l) applies, which 2025 is. Printed box 36b adds §465 and
+  Form 6198; box 36a does not, because `i1040sf` p10 says so out loud.
+- **Printed line E answering "No" refuses, on a PROFIT as well as a loss**, and the ground is
+  §1411 rather than §469: a passive farm's income is net investment income under
+  §1411(c)(1)(A)(ii), and `fjs/form8960` computes line 4a from Schedule E line 26 alone. Admitting
+  it would let the income escape the 3.8% tax entirely.
+- **Part III (the accrual method) refuses at printed line 45**, naming the beginning-of-year
+  inventory — a prior-year figure — and, independently, the unit-livestock-price and farm-price
+  valuation methods that the printed footnote to line 49 makes the SIGN of lines 47 through 50
+  turn on.
+- **`vnd.fjs.asset_register` serves farm property with no change**, and the §168(b)(2)(B)
+  150%-declining-balance premise this work started from is stale: TCJA §13203 struck it, and
+  `i4562` p11 says the method *"is no longer required"* for 3-, 5-, 7- and 10-year farm property.
+  The surviving half — 15- and 20-year — is already enforced. Two farm-specific gaps are reported
+  rather than built: **ADS is not representable at all** (the §163(j)(7)(C) electing-farming-business
+  and §263A(d)(3) election-out cases both mandate it, and both would make line 14 too large), and
+  §179 refuses, which is the commonest farm depreciation election there is.
+
+Registries: 31 → 32 classifiable, 29 → 30 served, 28 → 29 dispatched. Refusal partition:
+**55 modeled, 142 refused** (197 unchanged — one kind crossed), **11 tripwires**. The refused
+figure composes with Form 6781's, which added two §1256 rows to the same table on a branch cut
+from the same commit: `141 + 2 - 1`, and the vocabulary keeps Form 6781's 197 rather than
+returning to the 195 this line read while the two were apart.
+`netFarmRentalIncomeForm4835` and `farmIncomeAveragingScheduleJ` stay refused; the first has its
+remedy corrected, because the clause saying Schedule F was unmodeled too stopped being true.
+
+**One gate found a real defect before the mutation campaign started.** `fjs/schedule/c`'s
+orphan-asset-register refusal — *"NOTHING on this return claims it"* — fired on a farmer's
+register and refused the whole return, because its message enumerated two printed lines and there
+were now three.
+
 
 ## 1.0.0 — 2026-08-17
 
