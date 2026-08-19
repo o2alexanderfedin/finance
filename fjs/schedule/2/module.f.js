@@ -106,6 +106,34 @@
  * so computing Form 8960 unconditionally is the ONLY thing standing between
  * an undeclared high-income investor and a silently understated return.
  *
+ * ## The §1411 tripwire decision, asked and answered rather than left open
+ *
+ * "No tripwire watches §1411" read for three phases as an admission. It is a
+ * DECISION, and the argument has two halves that have to be stated together
+ * because either alone is unconvincing.
+ *
+ * **A §1411 tripwire is not expressible.** `fjs/return/tripwire`'s contract
+ * is a predicate over the SUPPLIED DOCUMENTS, evaluated beside `classifyScope`
+ * and, like it, *before any line computes* — its own docstring says so, and
+ * every one of its ten entries reads a stored box (W-2 box 5, W-2 box 8,
+ * 1099-R box 3, 1099-NEC box 1, a K-1's box 1 or 6…). §1411(b)'s threshold is
+ * on §1411(d)'s modified adjusted gross income, which is the OUTPUT of the
+ * whole computation and is carried by no stored box at all. Writing the entry
+ * would mean running the engine inside a guard that runs before the engine.
+ *
+ * **And it is not needed**, which is the half that matters, because "we
+ * cannot" is not a reason to be comfortable. Every entry in that table exists
+ * because an undeclared return would OMIT a tax. This one is not omitted:
+ * line 12 is computed unconditionally, so an undeclared filer above the
+ * threshold gets the tax anyway. That is not an inference — it is
+ * `fjs/form1040/core`'s
+ * `anUndeclaredFilerAboveTheSection1411ThresholdStillOwesTheTax`, a filer
+ * whose `declaredKinds` do not mention `netInvestmentIncomeTax` and who owes
+ * $305.90 regardless.
+ *
+ * The decision would reverse the day this line became gated on the
+ * declaration, and that leaf is what would go red first.
+ *
  * ## Provenance: lines 11 and 12 cite the boxes their forms actually read
  *
  * Both lines arrive as {@link ReportLine}s built from the UNION of their

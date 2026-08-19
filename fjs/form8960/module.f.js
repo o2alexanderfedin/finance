@@ -289,15 +289,86 @@ export const form8960PartI = input => {
     //     royalties, partnerships, S corporations, trusts, etc." — are the
     //     rule and Schedule E line 26 is the figure.
     //
-    //     **PART III is a KNOWN GAP recorded here rather than left implicit.**
-    //     `estateAndTrustIncome` became a modeled kind with TAX-35, so a
-    //     beneficiary's box 6 share reaches Schedule E line 37 and Schedule 1
-    //     line 5 — and it does NOT reach this line, because §1411(c)(1)(A)(ii)
-    //     turns on whether the ESTATE OR TRUST's activity was passive to the
-    //     beneficiary, which is `beneficiaryRow`'s material-participation
-    //     determination and is not carried out of Schedule E today. It is
-    //     recorded because a silent gap is worse than a stated one; closing it
-    //     is its own wiring.
+    //     **PART III WAS RECORDED HERE AS A KNOWN GAP, AND IT IS NOT ONE.**
+    //     That note said a beneficiary's box 6 share "does NOT reach this line
+    //     because §1411(c)(1)(A)(ii) turns on whether the ESTATE OR TRUST's
+    //     activity was passive to the beneficiary, which is
+    //     `beneficiaryRow`'s material-participation determination and is not
+    //     carried out of Schedule E today". **The conclusion was right and the
+    //     reason was wrong** — and the reason is the half a later phase would
+    //     have acted on, by carrying the determination out and wiring line 37
+    //     here. Doing that would have taxed income §1411 does not reach.
+    //
+    //     The determination does not need to leave Schedule E, because every
+    //     row for which it would matter is REFUSED before Schedule E
+    //     finishes. Printed line 33's four columns, one at a time:
+    //
+    //     - **(c) and (e)**, the deduction and loss columns, are structural
+    //       zeros: a negative box 6 refuses at `beneficiaryLossRefusal`, and
+    //       box 9's directly apportioned deductions refuse at
+    //       `estateTrustCodedBoxes`. Nothing can put a figure in either, so
+    //       printed line 36 is zero and line 37 restates line 35.
+    //     - **(d)**, PASSIVE income, is the column §1411(c)(2)(A) taxes — and
+    //       a beneficiary's self-employment term is structurally `0n`
+    //       (§1402(a) reaches a trade or business carried on BY the taxpayer),
+    //       so `passiveIncomeOutsideSelfEmploymentRefusal` fires for any
+    //       positive box 6 in it and the return stops. The column can only
+    //       ever total $0.00. That is a REFUSAL, not an assumption, which is
+    //       this project's preferred answer to an input it cannot place.
+    //     - **(f)**, other income, carries real money and is not net
+    //       investment income: §1411(c)(2) reaches only a passive activity or
+    //       a trading business, and a beneficiary in column (f) is in neither.
+    //
+    //     **The one channel that remains is the fiduciary's own figure, and
+    //     it does not arrive on this line at all.** i8960 (2025) p.13, *Line
+    //     7 — Other Modifications to Investment Income*: *"Distributions from
+    //     estates and trusts. Enter the amount from box 14, code H, of
+    //     Schedule K-1 (Form 1041)"* — with p.8's own Note under line 4b
+    //     saying expressly that Part III adjustments go to line 7 and *"Don't
+    //     report those adjustments on line 4b."* `estateTrustCodedBoxes`
+    //     refuses ANY box 14 content by name, so a K-1 carrying code H stops
+    //     the return rather than leaving line 7 quietly at zero.
+    //
+    //     All three are now PROVED end to end rather than argued here, in
+    //     `fjs/form1040/core` where a wiring can be proved at all:
+    //     `aBeneficiarysNonpassiveShareRaisesAgiAndIsNotNetInvestmentIncome`
+    //     (the same $258,050.00 AGI as the rental leaf, and $0.00 of tax),
+    //     `aPassiveBeneficiarysShareRefusesRatherThanLeavingLineFourAAZero`
+    //     and
+    //     `aBeneficiarysBoxFourteenRefusesSoFormEightNineSixtyLineSevenCannotBeMissed`.
+    //     Before them, rewiring this line to Schedule E line 41 — exactly what
+    //     the stale note invited — reddened NOTHING in a 2,861-proof suite.
+    //
+    //     ## What the printed instruction says this line is, and why line 26
+    //     ## is nonetheless the right figure here
+    //
+    //     i8960 p.8 does not say "Schedule E line 26". It says *"Enter the
+    //     following amount from your properly completed return: Schedule 1
+    //     (Form 1040), line 3 … line 5 … line 6"* — the WHOLE of Schedules C,
+    //     E and F — and then removes what §1411 does not reach on line 4b
+    //     (*"Net income or loss from a section 162 trade or business that's
+    //     not a passive activity"*; *"…that's taken into account in
+    //     determining self-employment income"*) and, for Part III, on line 7.
+    //     This module's line 4a and the paper's therefore differ in
+    //     PRESENTATION, and agree to the cent in the only figure that leaves
+    //     the form:
+    //
+    //     - Schedule 1 line 3 (Schedule C) enters 4a and leaves again on 4b —
+    //       it is nonpassive and self-employment-taxed, both 4b bullets.
+    //     - Schedule 1 line 5's other summands: line 32 is Part II, where the
+    //       same `passiveIncomeOutsideSelfEmploymentRefusal` bites; line 37 is
+    //       Part III, above; lines 39 and 40 are `remicResidualInterest` and
+    //       `netFarmRentalIncomeForm4835`, both REFUSED kinds.
+    //     - Schedule 1 line 6 is `farmIncomeOrLoss`, a REFUSED kind.
+    //
+    //     So every summand the paper adds on 4a, this engine either subtracts
+    //     again on 4b/line 7 or refuses outright, and printed Schedule E line
+    //     26 is what is left. Writing the paper's fuller form would move no
+    //     figure and would add two computed subtractions whose value is
+    //     provably zero; it is recorded here because the NEXT reader should
+    //     know 4a's printed source is Schedule 1 rather than Schedule E, and
+    //     because the day any of those refusals is lifted this paragraph is
+    //     the checklist.
     const line4a = rentalRealEstateAndRoyaltyIncomeCents
     // 4b. "Adjustment for net income or loss derived in the ordinary course
     //     of a non-section 1411 trade or business." Zero, and it is a
@@ -328,7 +399,18 @@ export const form8960PartI = input => {
     //    no dialect models a controlled foreign corporation or a passive
     //    foreign investment company.
     const line6 = 0n
-    // 7. "Other modifications to investment income." Zero.
+    // 7. "Other modifications to investment income." Zero, and ONE of the
+    //    items i8960 p.13 lists for it is reachable enough to name: *"Distributions
+    //    from estates and trusts. Enter the amount from box 14, code H, of
+    //    Schedule K-1 (Form 1041)"* — the fiduciary's own statement of how
+    //    much of a beneficiary's share is net investment income, and (per
+    //    p.8's Note under line 4b) the ONLY prescribed way to adjust for
+    //    Schedule E Part III. `fjs/schedule/e`'s `estateTrustCodedBoxes`
+    //    refuses any box 14 content, so a K-1 that would fill this line stops
+    //    the return instead. Everything else p.13 lists — a §1411 net
+    //    operating loss, Form 8814, self-charged interest, §404(k) dividends,
+    //    deduction recoveries — arrives on a document or an election no
+    //    dialect models.
     const line7 = 0n
     // 8. "Total investment income. Combine lines 1, 2, 3, 4c, 5d, 6, and 7."
     //    Every term is added, including the documented zeros, so a future

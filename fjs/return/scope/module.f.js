@@ -2366,15 +2366,48 @@ export const proof = {
                 modeledKindNames.includes('unemploymentCompensation'),
                 'Schedule 1 line 7 has no row in this block because its kind is modeled',
             )
+            // ★ **A kind that MOVED to `modeledKinds` is looked up in the
+            // OTHER table rather than skipped**, and where it has no row in
+            // either it must be NAMED here, by hand, and counted.
+            //
+            // This loop read `if (row === undefined) { assert(modeled); continue }`
+            // until this commit — the coverage-shrinks-with-the-list shape
+            // AGENTS.md names. Every kind that started computing silently
+            // stopped having its printed line checked, so the leaf's coverage
+            // was a function of how much of Schedule 1 Part I the engine had
+            // got round to modelling. Four of these thirty-eight are modeled
+            // today; four more reclassifications and this leaf would have been
+            // checking thirty rows while still claiming thirty-eight.
+            //
+            // The treatment is `theFiveScheduleEKindsNameTheirOwnPrintedPart`'s
+            // below, which the Schedule E Part I wiring rewrote for exactly
+            // this reason, plus AGENTS.md's hand-typed-count idiom for the
+            // case that leaf does not have: a modeled kind with no remedy row
+            // at all, which cannot be checked and must therefore be listed.
+            /** Modeled kinds in this block carrying NO row in either table.
+             * Empty today: all four of Part I's modeled kinds carry a
+             * {@link modeledKindDeclarationRemedies} row, so all thirty-eight
+             * printed-line claims are checked. A fifth reclassification
+             * without a remedy row fails the `assert` inside the loop rather
+             * than quietly reducing `checkedRows`.
+             * @type {readonly string[]} */
+            const modeledWithNoRow = []
+            assertEq(modeledWithNoRow.length, 0, 'every modeled Schedule 1 Part I kind still carries a row')
+            for (const kind of modeledWithNoRow) {
+                assert(modeledKindNames.includes(kind), ['listed as modeled but is not', kind])
+            }
+            let checkedRows = 0
             for (const [kind, line] of expected) {
                 const row = unmodeledKindRefusals.find(r => r.kind === kind)
+                    ?? modeledKindDeclarationRemedies.find(r => r.kind === kind)
                 if (row === undefined) {
                     assert(
-                        modeledKindNames.includes(kind),
-                        ['a Schedule 1 Part I kind is neither refused nor modeled', kind],
+                        modeledWithNoRow.includes(kind) && modeledKindNames.includes(kind),
+                        ['a Schedule 1 Part I kind is neither refused, described, nor named here as modeled', kind],
                     )
                     continue
                 }
+                checkedRows += 1
                 // The trailing space is what stops `Schedule 1 line 1` from
                 // matching `Schedule 1 line 12`, and `line 8` from matching
                 // `line 8a-8z`.
@@ -2404,6 +2437,13 @@ export const proof = {
                     ['a Schedule 1 Part I row names Part II\'s destination', kind, row.line],
                 )
             }
+            // HAND-TYPED, and the whole point of the rewrite above: the number
+            // of printed-line claims this leaf actually checked. `38 - 0`.
+            // A kind quietly leaving `unmodeledKindRefusals` for
+            // `modeledKinds` without a remedy row moves this number, and the
+            // count is what says so — the loop alone would happily iterate one
+            // row fewer.
+            assertEq(checkedRows, 38, 'all thirty-eight printed-line claims must be checked, not skipped')
         },
         // TAX-35's split, stated INDEPENDENTLY of the table it split, and it
         // is the half the leaf above cannot state: five kinds share ONE
@@ -2529,22 +2569,45 @@ export const proof = {
                     )
                     return position
                 }, -1)
-            // …and every one carries a refusal row OR is modeled, with the
+            // …and every one carries a refusal row OR a remedy row, with the
             // printed line it names. A kind reclassified to `modeledKinds`
-            // leaves this table, which is why the modeled case is a pass
-            // rather than a failure -- what this leaf pins is that a kind
-            // cannot be BOTH absent from the table and absent from the
-            // modeled set, which `_EveryKindIsEitherModeledOrRefused` owns,
-            // and that a row which IS present names the right line.
+            // leaves the refusal table, so it is looked up in the OTHER table
+            // rather than skipped — and the six that carry no row anywhere
+            // are NAMED below and COUNTED, which is the treatment
+            // `theThirtyEightScheduleOnePartOneKindsNameTheirOwnPrintedLine`
+            // above documents at length. The `continue` this loop used to
+            // reach unconditionally is the coverage-shrinks-with-the-list
+            // shape AGENTS.md names: six of these thirty-five compute today,
+            // so six printed-line claims had stopped being checked and
+            // nothing said so.
+            /** The modeled kinds in this block that carry NO row in either
+             * table, hand-typed. Four, and each of them is a tax this engine
+             * COMPUTES rather than one a taxpayer must be sent elsewhere for,
+             * which is why {@link modeledKindDeclarationRemedies} — a table of
+             * "declare it and this happens" sentences — has no entry.
+             * @type {readonly string[]} */
+            const modeledWithNoRow = [
+                'excessAdvancePremiumTaxCreditRepayment',
+                'selfEmploymentTax',
+                'netInvestmentIncomeTax',
+                'uncollectedTaxOnTipsOrGroupTermLife',
+            ]
+            assertEq(modeledWithNoRow.length, 4, 'four Schedule 2 kinds compute with no remedy row')
+            for (const kind of modeledWithNoRow) {
+                assert(modeledKindNames.includes(kind), ['listed as modeled but is not', kind])
+            }
+            let checkedRows = 0
             for (const [kind, line] of expected) {
                 const row = unmodeledKindRefusals.find(r => r.kind === kind)
+                    ?? modeledKindDeclarationRemedies.find(r => r.kind === kind)
                 if (row === undefined) {
                     assert(
-                        modeledKindNames.includes(kind),
-                        ['a Schedule 2 kind is neither refused nor modeled', kind],
+                        modeledWithNoRow.includes(kind) && modeledKindNames.includes(kind),
+                        ['a Schedule 2 kind is neither refused, described, nor named here as modeled', kind],
                     )
                     continue
                 }
+                checkedRows += 1
                 // The trailing space (or end of string) is what stops
                 // `Schedule 2 line 1` from matching `Schedule 2 line 1a-1z`,
                 // and `line 1` from matching `line 12`. The section 965 row
@@ -2565,6 +2628,10 @@ export const proof = {
                     ],
                 )
             }
+            // HAND-TYPED: `35 - 4`. Two of the six modeled kinds here DO carry
+            // a remedy row (`alternativeMinimumTax`, `additionalMedicareTax`)
+            // and are therefore checked like any refusal row.
+            assertEq(checkedRows, 31, 'thirty-one Schedule 2 printed-line claims must be checked, not skipped')
         },
         // TAX-33, Phase 29: the fifteen Form 6251 Part I kinds, in the FORM'S
         // own printed order, each naming its own printed line. The same shape
@@ -2774,15 +2841,38 @@ export const proof = {
                     )
                     return position
                 }, -1)
+            // The same rewrite as the two leaves above, and this is the block
+            // where the old `continue` had eaten the MOST coverage: EIGHT of
+            // these twenty-two compute today, so the leaf was checking
+            // fourteen printed-line claims while its own name says
+            // twenty-two. Named, counted, and looked up in both tables.
+            /** @type {readonly string[]} */
+            const modeledWithNoRow = [
+                'educatorExpenses',
+                'healthSavingsAccountDeduction',
+                'movingExpensesArmedForces',
+                'deductiblePartOfSelfEmploymentTax',
+                'selfEmployedHealthInsuranceDeduction',
+                'penaltyOnEarlyWithdrawalOfSavings',
+                'iraDeduction',
+                'studentLoanInterestDeduction',
+            ]
+            assertEq(modeledWithNoRow.length, 8, 'eight Schedule 1 Part II adjustments compute')
+            for (const kind of modeledWithNoRow) {
+                assert(modeledKindNames.includes(kind), ['listed as modeled but is not', kind])
+            }
+            let checkedRows = 0
             for (const [kind, line] of expected) {
                 const row = unmodeledKindRefusals.find(r => r.kind === kind)
+                    ?? modeledKindDeclarationRemedies.find(r => r.kind === kind)
                 if (row === undefined) {
                     assert(
-                        modeledKindNames.includes(kind),
-                        ['a Schedule 1 kind is neither refused nor modeled', kind],
+                        modeledWithNoRow.includes(kind) && modeledKindNames.includes(kind),
+                        ['a Schedule 1 Part II kind is neither refused, described, nor named here as modeled', kind],
                     )
                     continue
                 }
+                checkedRows += 1
                 // The trailing space is what stops `Schedule 1 line 1` from
                 // matching `Schedule 1 line 12`, and `line 2` from matching
                 // `line 24a-24z`.
@@ -2798,6 +2888,8 @@ export const proof = {
                     ['every Schedule 1 Part II row must also name the 1040 line it reaches', kind, row.line],
                 )
             }
+            // HAND-TYPED: `22 - 8`.
+            assertEq(checkedRows, 14, 'fourteen Schedule 1 Part II printed-line claims must be checked, not skipped')
         },
         // TAX-25/TAX-26, Phase 25: the twelve Schedule 3 kinds, in SCHEDULE
         // 3's own printed order, each naming its own printed line. The
@@ -2867,15 +2959,37 @@ export const proof = {
                     )
                     return position
                 }, -1)
+            // The same rewrite as the three leaves above. SEVEN of these
+            // twenty-nine compute today — four Part I credits and three Part
+            // II payments — so the destination assertion below, the one whose
+            // own comment calls it "the most consequential single-token error
+            // possible here", had silently stopped covering seven rows.
+            /** @type {readonly string[]} */
+            const modeledWithNoRow = [
+                'foreignTaxCredit',
+                'dependentCareCredit',
+                'educationCredits',
+                'retirementSavingsContributionsCredit',
+                'netPremiumTaxCredit',
+                'amountPaidWithExtensionRequest',
+                'excessSocialSecurityWithheld',
+            ]
+            assertEq(modeledWithNoRow.length, 7, 'seven Schedule 3 kinds compute')
+            for (const kind of modeledWithNoRow) {
+                assert(modeledKindNames.includes(kind), ['listed as modeled but is not', kind])
+            }
+            let checkedRows = 0
             for (const [kind, line, destination] of expected) {
                 const row = unmodeledKindRefusals.find(r => r.kind === kind)
+                    ?? modeledKindDeclarationRemedies.find(r => r.kind === kind)
                 if (row === undefined) {
                     assert(
-                        modeledKindNames.includes(kind),
-                        ['a Schedule 3 kind is neither refused nor modeled', kind],
+                        modeledWithNoRow.includes(kind) && modeledKindNames.includes(kind),
+                        ['a Schedule 3 kind is neither refused, described, nor named here as modeled', kind],
                     )
                     continue
                 }
+                checkedRows += 1
                 // The trailing space is what stops `Schedule 3 line 1` from
                 // matching `Schedule 3 line 12`, and `line 5` from matching
                 // `line 5a`.
@@ -2893,6 +3007,8 @@ export const proof = {
                     ['a Schedule 3 row names the wrong 1040 destination', kind, destination, row.line],
                 )
             }
+            // HAND-TYPED: `29 - 7`.
+            assertEq(checkedRows, 22, 'twenty-two Schedule 3 printed-line claims must be checked, not skipped')
         },
         // ── The 2026-08-18 split, stated INDEPENDENTLY of the table it split ──
         //

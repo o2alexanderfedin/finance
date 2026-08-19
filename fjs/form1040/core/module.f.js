@@ -4082,6 +4082,36 @@ const withPassThrough = inputs => partnershipK1Forms => sCorporationK1Forms => (
  */
 const withEstateTrust = inputs => estateTrustK1Forms => ({ ...inputs, estateTrustK1Forms })
 
+/**
+ * A Schedule K-1 (Form 1041) carrying printed **box 6, ordinary business
+ * income** — the box that reaches printed Schedule E Part III line 33 column
+ * (d) or (f) and therefore Schedule 1 line 5. Separate from
+ * {@link estateTrustPortfolioK1} below, which carries the PORTFOLIO boxes
+ * (1, 2a, 2b, 3, 4a): those reach 1040 lines 2b/3a/3b/7a directly and never
+ * touch Schedule E at all, so a single fixture serving both would let a leaf
+ * about Part III pass on an amount that never entered Part III.
+ *
+ * `materiallyParticipated` is the DEFAULT rather than a parameter with no
+ * default, because printed column (f) is the case that computes and a fixture
+ * whose default refuses would make every leaf built on it a refusal leaf.
+ * @type {(documentHash: string) => (overrides: Partial<K1EstateTrust>) => Stored<K1EstateTrust>}
+ */
+const beneficiaryBusinessIncomeK1 = documentHash => overrides => ({
+    documentHash,
+    value: {
+        dialect: 'vnd.fjs.k1_1041',
+        payerTin: '66-6666666',
+        recipientTin: '222-22-2222',
+        taxYear: 2025,
+        formRevision: '2025',
+        payerName: 'The Harrow Family Trust',
+        boxHDomesticBeneficiary: /** @type {const} */ (true),
+        materialParticipation: 'materiallyParticipated',
+        box6OrdinaryBusinessIncome: '8050.00',
+        ...overrides,
+    },
+})
+
 // ── TAX-35: the separately stated PORTFOLIO boxes, one fixture per face ──────
 //
 // Three separate box typedefs and three separate builders, never one shared
@@ -12802,6 +12832,225 @@ export const proof = {
             // fragment of some larger one.
             assertEq(withoutAt('1040 line 23').value, 0n,
                 'wages alone are not net investment income')
+        },
+        /**
+         * ★ **THE WIRING LEAF FOR FORM 8960 LINE 4A's OTHER HALF: SCHEDULE E
+         * PART III.** The leaf above says a landlord's rent REACHES the net
+         * investment income tax; this one says a beneficiary's estate-or-trust
+         * income does NOT, at an AGI hand-built to be **identical** so the two
+         * differ in nothing but the §1411 character of the same dollar.
+         *
+         * `fjs/form8960` recorded this as a KNOWN GAP — an understatement
+         * waiting to happen, on the grounds that `beneficiaryRow`'s
+         * material-participation determination "is not carried out of Schedule
+         * E today". **The conclusion was right and the reason was wrong**, and
+         * the reason is what a later phase would have acted on. The
+         * determination does not need to be carried out, because every row for
+         * which it would matter is REFUSED before Schedule E finishes:
+         *
+         * - Printed line 33 column **(d)**, passive income, is the column
+         *   §1411(c)(2)(A) would tax. A beneficiary's self-employment term is
+         *   structurally `0n` (§1402(a) reaches a trade or business carried on
+         *   BY the taxpayer), so `passiveIncomeOutsideSelfEmploymentRefusal`
+         *   fires for ANY positive box 6 in that column and the return stops.
+         *   The column can only ever total $0.00 — a refusal, not an
+         *   assumption, which is the answer this repo prefers to a zero.
+         * - Printed line 33 column **(f)**, other income, carries real money
+         *   and is NOT net investment income: §1411(c)(2) reaches only a
+         *   passive activity or a trading business, and a beneficiary in
+         *   column (f) is in neither.
+         * - The one channel by which a beneficiary's estate-or-trust income
+         *   can still BE net investment income is the fiduciary's own figure,
+         *   and it does not arrive on line 4a at all. i8960 (2025) p.13,
+         *   *Line 7 — Other Modifications to Investment Income*:
+         *   *"Distributions from estates and trusts. Enter the amount from
+         *   box 14, code H, of Schedule K-1 (Form 1041)"*, with p.8's own Note
+         *   under line 4b sending Part III adjustments there rather than to
+         *   line 4b. `estateTrustCodedBoxes` refuses ANY box 14 content by
+         *   name, so a K-1 carrying code H stops the return instead of
+         *   silently leaving Form 8960 line 7 at zero.
+         *
+         * Hand-computed, single filer, and every figure but the last matches
+         * the rental leaf above line for line:
+         *
+         * ```
+         *  1040        1a  wages                       250,000.00
+         *  Schedule E  37  box 6, column (f)             8,050.00
+         *              41  26 + 32 + 37 + 39 + 40        8,050.00
+         *  1040        8   Schedule 1 line 5             8,050.00
+         *              11a AGI                         258,050.00
+         *  8960        4a  §1411(c)(2) reaches neither       0.00
+         *              8   total investment income           0.00
+         *              15  258,050.00 - 200,000.00      58,050.00
+         *              16  the SMALLER of the two            0.00
+         *              17  3.8% of nothing                   0.00
+         * ```
+         *
+         * Line 15 is asserted BECAUSE it is not zero: this filer really is
+         * $58,050.00 above §1411(b)(3)'s threshold, so line 23's $0.00 is the
+         * lesser-of rule doing its work rather than a filer the tax never
+         * reached.
+         */
+        aBeneficiarysNonpassiveShareRaisesAgiAndIsNotNetInvestmentIncome: () => {
+            /** @type {ReturnProfile} */
+            const profile = {
+                ...singleProfile,
+                declaredKinds: ['wages', 'estateAndTrustIncome', 'netInvestmentIncomeTax'],
+            }
+            const base = inputsOf(storedProfile(profile))([
+                w2Document('sha256-niit-trust-w2')('250000.00'),
+            ])([])([])([])([])([])([])([])([])
+            const withBeneficiary = form1040Report(taxParams2025)(withEstateTrust(base)([
+                beneficiaryBusinessIncomeK1('sha256-niit-trust-k1')({}),
+            ]))
+            const without = form1040Report(taxParams2025)(base)
+            assert(withBeneficiary.kind === 'ok', ['expected the beneficiary return to compute', withBeneficiary])
+            assert(without.kind === 'ok', ['expected the control return to compute', without])
+            if (withBeneficiary.kind !== 'ok' || without.kind !== 'ok') {
+                return
+            }
+            const at = lineRuled(withBeneficiary.lines)
+            const withoutAt = lineRuled(without.lines)
+            // The income really did arrive: same 1040 line 8 and same AGI as
+            // the rental leaf above, off a completely different Schedule E
+            // part. Without these two the leaf would pass for a document that
+            // was dropped on the floor.
+            assertEq(at('1040 line 8').value, 805000n, 'Schedule E line 37 -> line 41 -> Schedule 1 line 5 = $8,050.00')
+            assertEq(at('1040 line 11a').value, 25805000n, 'AGI = $258,050.00, the rental leaf’s figure exactly')
+            // …and it is NOT net investment income, so line 23 does not move
+            // at all — where the identical AGI built out of rent moved it by
+            // $305.90 one leaf above.
+            assertEq(at('1040 line 23').value, 0n,
+                '§1411(c)(2) reaches a passive activity or a trading business, and column (f) is neither')
+            assertEq(at('1040 line 23').value - withoutAt('1040 line 23').value, 0n,
+                'the differential against the same filer without the K-1 is zero')
+        },
+        /**
+         * ★ **AND THE PASSIVE COLUMN REFUSES, END TO END.** The leaf above is
+         * only evidence that the zero on line 4a is honest if the case that
+         * WOULD have made it dishonest cannot reach a computed return. This is
+         * that case: the identical document, `didNotMateriallyParticipate`, so
+         * box 6 lands in printed column (d) — the one §1411(c)(2)(A) taxes.
+         *
+         * `fjs/schedule/e` proves the refusal at its own layer. This proves it
+         * survives to `form1040Report`, which is the only place a caller can
+         * see it, and asserts the part of the message a reader can act on:
+         * WHERE the amount would have gone. AGENTS.md's Phase 20 finding is
+         * why — five refusal proofs once asserted the box name and none
+         * asserted the destination, and erasing the destination survived the
+         * whole suite.
+         */
+        aPassiveBeneficiarysShareRefusesRatherThanLeavingLineFourAAZero: () => {
+            /** @type {ReturnProfile} */
+            const profile = {
+                ...singleProfile,
+                declaredKinds: ['wages', 'estateAndTrustIncome', 'netInvestmentIncomeTax'],
+            }
+            const base = inputsOf(storedProfile(profile))([
+                w2Document('sha256-niit-trust-w2')('250000.00'),
+            ])([])([])([])([])([])([])([])([])
+            const outcome = form1040Report(taxParams2025)(withEstateTrust(base)([
+                beneficiaryBusinessIncomeK1('sha256-niit-trust-k1')({
+                    materialParticipation: 'didNotMateriallyParticipate',
+                }),
+            ]))
+            assert(outcome.kind === 'error', ['a passive beneficiary share must refuse', outcome])
+            if (outcome.kind !== 'error') {
+                return
+            }
+            assert(outcome.message.includes('Form 8960 line 4a'),
+                ['the refusal must name where the amount would have gone', outcome.message])
+            assert(outcome.message.includes('§1411(c)(6)'),
+                ['the refusal must name the provision that would have removed it', outcome.message])
+        },
+        /**
+         * ★ **AND THE LINE 7 CHANNEL REFUSES TOO.** i8960 p.13 puts a
+         * beneficiary's net-investment-income adjustment in **box 14, code H**
+         * of the Schedule K-1 (Form 1041), reported on Form 8960 **line 7** —
+         * not on line 4a and expressly not on line 4b. `fjs/form8960` holds
+         * line 7 at a documented zero, and this leaf is what stops that zero
+         * from being an assumption: the box that would fill it refuses the
+         * whole return.
+         *
+         * THE CONTROL is
+         * {@link proof.wiring.aBeneficiarysNonpassiveShareRaisesAgiAndIsNotNetInvestmentIncome}
+         * — the identical K-1 without box 14 computes — so this is a statement
+         * about box 14 rather than about K-1s.
+         */
+        aBeneficiarysBoxFourteenRefusesSoFormEightNineSixtyLineSevenCannotBeMissed: () => {
+            /** @type {ReturnProfile} */
+            const profile = {
+                ...singleProfile,
+                declaredKinds: ['wages', 'estateAndTrustIncome', 'netInvestmentIncomeTax'],
+            }
+            const base = inputsOf(storedProfile(profile))([
+                w2Document('sha256-niit-trust-w2')('250000.00'),
+            ])([])([])([])([])([])([])([])([])
+            const outcome = form1040Report(taxParams2025)(withEstateTrust(base)([
+                beneficiaryBusinessIncomeK1('sha256-niit-trust-k1')({
+                    box14OtherInformation: [{ code: 'H', amount: '5000.00' }],
+                }),
+            ]))
+            assert(outcome.kind === 'error', ['a box 14 item must refuse', outcome])
+            if (outcome.kind !== 'error') {
+                return
+            }
+            assert(outcome.message.includes('box 14'),
+                ['the refusal must name the box', outcome.message])
+        },
+        /**
+         * ★ **THE LEAF THAT MAKES "NO TRIPWIRE WATCHES §1411" SAFE RATHER THAN
+         * MERELY TRUE.** `fjs/schedule/2` computes Form 8960 UNCONDITIONALLY
+         * and says so; `fjs/return/tripwire` has no §1411 entry and this leaf
+         * is the argument for why it needs none. The same landlord as the
+         * rental wiring leaf, with `netInvestmentIncomeTax` **struck from
+         * `declaredKinds`**, still owes the identical $305.90.
+         *
+         * A tripwire's contract is a predicate over the SUPPLIED DOCUMENTS,
+         * evaluated before any line computes. §1411's threshold is on modified
+         * adjusted gross income — the OUTPUT of the whole computation, carried
+         * by no stored box — so no such predicate exists, and the entry the
+         * table would need cannot be written. That is the reason a tripwire is
+         * impossible; this leaf is the reason it is also unnecessary, and the
+         * two together are the whole decision. Every tripwire in that table
+         * exists because an undeclared return would OMIT a tax. This one is
+         * not omitted.
+         *
+         * It would stop being safe the day Form 8960 became gated on the
+         * declaration, and this leaf is what would go red first.
+         */
+        anUndeclaredFilerAboveTheSection1411ThresholdStillOwesTheTax: () => {
+            /** @type {ReturnProfile} */
+            const profile = {
+                ...singleProfile,
+                declaredKinds: ['wages', 'rentalRealEstateAndRoyalties'],
+            }
+            const base = inputsOf(storedProfile(profile))([
+                w2Document('sha256-niit-undeclared-w2')('250000.00'),
+            ])([])([])([])([])([])([])([])([])
+            const outcome = form1040Report(taxParams2025)({
+                ...base,
+                rentalProperties: [{
+                    documentHash: 'sha256-niit-undeclared-property',
+                    value: {
+                        ...rentalPropertyDocument('x').value,
+                        rentsReceived: '9600.00',
+                        entries: [
+                            { category: 'taxes', datePaid: '2025-09-30', description: 'town property tax', amount: '1200.00' },
+                            { category: 'repairs', datePaid: '2025-05-02', description: 'boiler repair', amount: '350.00' },
+                        ],
+                    },
+                }],
+            })
+            assert(outcome.kind === 'ok', ['an undeclared net investment income tax must still compute', outcome])
+            if (outcome.kind !== 'ok') {
+                return
+            }
+            const at = lineRuled(outcome.lines)
+            assert(!profile.declaredKinds.includes('netInvestmentIncomeTax'),
+                'the fixture must not declare the tax it is about to owe')
+            assertEq(at('1040 line 23').value, 30590n,
+                '3.8% of $8,050.00, owed by a filer who never heard of Form 8960')
         },
         /**
          * ★ **THE WIRING LEAF FOR A RENTAL REGISTER'S FORM 6251 LINE 2L.**
