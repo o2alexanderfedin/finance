@@ -5999,6 +5999,147 @@ const childInputs = foreignTax => inputsOf(storedProfile({
     dividendDocument('sha256-ftc-div')({ box7ForeignTaxPaid: foreignTax }),
 ])([])([])([])([])([])([])
 
+
+/**
+ * ONE printed Schedule E Part I column with NO expense entries — the base the
+ * Form 4797 wiring leaves are differentials against.
+ *
+ * Deliberately not {@link rentalPropertyDocument}: that fixture's four
+ * expenses would sit between printed Schedule E line 18 and 1040 line 8, and
+ * the whole point of these leaves is that the only thing moving line 8 is the
+ * depreciation and the Form 4797 line 18b beside it.
+ *
+ * `accountNumber` agrees with {@link disposalRegisterDocument}'s, because
+ * `fjs/schedule/e/part_i` attaches a register to a property by that string and
+ * a fixture that quietly disagreed would exercise the unmatched-register path
+ * instead of the wiring — and `fjs/schedule/c` REFUSES a register nothing
+ * claims, so the disagreement would not even be silent.
+ * @type {Stored<RentalProperty>}
+ */
+const bareRentalPropertyDocument = {
+    documentHash: 'sha256-4797-rental',
+    value: {
+        dialect: 'vnd.fjs.rental_property',
+        recipientTin: '222-22-2222',
+        accountNumber: 'RENT-0001',
+        taxYear: 2025,
+        propertyType: 'singleFamilyResidence',
+        physicalAddress: '18 Alder Street, Wells, ME 04090',
+        fairRentalDays: 365,
+        personalUseDays: 0,
+        rentsReceived: '24000.00',
+        entries: [],
+    },
+}
+
+/**
+ * The kitchen appliances of {@link bareRentalPropertyDocument}, sold in
+ * September 2025 for more than their adjusted basis — a §1245 gain that the
+ * recapture cap swallows entirely, so printed Form 4797 line 7 is exactly zero
+ * and no Schedule D is involved.
+ * @type {AssetRegister['assets'][number]}
+ */
+const disposedAppliances = {
+    description: 'kitchen appliances',
+    datePlacedInService: '2022-06',
+    costOrOtherBasis: '10001.00',
+    businessUsePercentage: '100.00',
+    classification: 'fiveYear',
+    method: '200DB',
+    convention: 'HY',
+    section168kStatus: 'electedOut',
+    disposal: {
+        dateAcquired: '2022-05-01',
+        dateSold: '2025-09-12',
+        grossSalesPrice: '3500.00',
+        expenseOfSale: '0.00',
+    },
+}
+
+/**
+ * The BUILDING, sold in October 2025 at a gain — §1250 property, whose line
+ * 26g is zero and whose unrecaptured §1250 gain is not.
+ * @type {AssetRegister['assets'][number]}
+ */
+const disposedDuplex = {
+    description: 'rental duplex',
+    datePlacedInService: '2019-04',
+    costOrOtherBasis: '200555.00',
+    businessUsePercentage: '100.00',
+    classification: 'residentialRental',
+    method: 'SL',
+    convention: 'MM',
+    section168kStatus: 'electedOut',
+    disposal: {
+        dateAcquired: '2019-03-15',
+        dateSold: '2025-10-07',
+        grossSalesPrice: '250000.00',
+        expenseOfSale: '6000.00',
+    },
+}
+
+/** The register {@link bareRentalPropertyDocument} claims, around one asset.
+ * @type {(asset: AssetRegister['assets'][number]) => Stored<AssetRegister>} */
+const disposalRegisterDocument = asset => ({
+    documentHash: 'sha256-4797-register',
+    value: {
+        dialect: 'vnd.fjs.asset_register',
+        recipientTin: '222-22-2222',
+        accountNumber: 'RENT-0001',
+        taxYear: 2025,
+        businessOrActivity: '18 Alder Street rental',
+        everyDepreciableAssetIsListed: /** @type {const} */ (true),
+        priorYearSection179CarryoverIsZero: /** @type {const} */ (true),
+        // The NARROWED certification, and the fixture has to swing with it:
+        // the dialect refuses a register carrying both it and a disposal
+        // block, and `fjs/form4562` refuses a register carrying NEITHER. So
+        // exactly one of the two states is legal at a time, which is the whole
+        // content of the narrowing expressed as a fixture.
+        ...(asset.disposal === undefined
+            ? { noDepreciablePropertyDisposedOfDuringTheYear: /** @type {const} */ (true) }
+            : {}),
+        assets: [asset],
+    },
+})
+
+/**
+ * A whole return: $30,000.00 of wages, the bare rental above, and one register
+ * around one asset. The two parameters are exactly the two profile facts
+ * Form 4797 reads.
+ * @type {(declaredKinds: readonly Kind[]) => (certified: boolean) => (asset: AssetRegister['assets'][number]) => Form1040Outcome}
+ */
+const runFourSevenNineSeven = declaredKinds => certified => asset => {
+    /** @type {ReturnProfile} */
+    const profile = {
+        ...singleProfile,
+        declaredKinds,
+        ...(certified
+            ? {
+                noNonrecapturedNetSectionOneTwoThreeOneLossesFromPriorYears:
+                    /** @type {const} */ (true),
+            }
+            : {}),
+    }
+    const base = inputsOf(storedProfile(profile))([
+        w2Document('sha256-4797-w2')('30000.00'),
+    ])([])([])([])([])([])([])([])([])
+    return form1040Report(taxParams2025)({
+        ...base,
+        rentalProperties: [bareRentalPropertyDocument],
+        assetRegisters: [disposalRegisterDocument(asset)],
+    })
+}
+
+/** Every printed 1040 line of a computed return, by rule prefix.
+ * @type {(outcome: Form1040Outcome) => (rulePrefix: string) => bigint} */
+const reportedCents = outcome => rulePrefix => {
+    assert(outcome.kind === 'ok', ['expected a computed return', outcome])
+    if (outcome.kind !== 'ok') {
+        throw ['expected a computed return', outcome]
+    }
+    return lineRuled(outcome.lines)(rulePrefix).value
+}
+
 export const proof = {
     unionSources: {
         // The same box of the same document, cited by two different lines, is
@@ -11336,6 +11477,181 @@ export const proof = {
             }).line47
             assertEq(crossCheck, 717600n, 'independent sdtw(...) call must reach the SAME figure')
             assertEq(line16, crossCheck, 'the wiring must feed the SAME facts an independent sdtw call would')
+        },
+    },
+    // ── TAX-41: Form 4797, end to end through form1040Report ────────────
+    //
+    // **A form-level proof cannot prove a wiring.** `fjs/form4797`'s own proofs
+    // establish every printed line from Publication 946's tables; `fjs/schedule/d`'s
+    // establish that line 11 and the Unrecaptured Section 1250 Gain Worksheet
+    // receive what they are handed. Neither can say whether
+    // `form1040IncomeLines` ever CALLS the form — and the two leaves below are
+    // the only place in this repository where that is observable.
+    salesOfBusinessPropertyReachTheReturn: {
+        /**
+         * ★ **THE ORDINARY CASE: a fully-recaptured §1245 disposal reaches
+         * 1040 line 8 and NEEDS NO SCHEDULE D.** The profile deliberately does
+         * not declare `capitalGainsOrLosses`, which is what makes this a
+         * statement about Form 4797's line 7 = 0 branch rather than about
+         * Schedule D.
+         *
+         * Single filer, $30,000.00 of wages, one rental let all year at
+         * $24,000.00 with no other expenses, and one register whose kitchen
+         * appliances were sold during the year.
+         *
+         * ```
+         *   Publication 946 Table A-1, 5-year, half-year: 20.00 32.00 19.20 11.52
+         *   basis $10,001.00 = 1,000,100 cents, placed in service June 2022
+         *   y1  20.00% x 1,000,100 = 200,020
+         *   y2  32.00% x 1,000,100 = 320,032
+         *   y3  19.20% x 1,000,100 = 192,019.2  -> 192,019
+         *   y4  11.52% x 1,000,100 x 0.5 = 57,605.76 -> 57,606   (sold, HY)
+         *
+         *   4562 line 22 (this year alone)                            57,606
+         *   4797 line 22 (all four years)                            769,677
+         *        line 21  1,000,100 + 0                            1,000,100
+         *        line 23  1,000,100 - 769,677                         230,423
+         *        line 24    350,000 - 230,423                         119,577
+         *        line 25b min(119,577, 769,677)                       119,577
+         *        line 32  119,577 - 119,577                                 0
+         *        line  7                                                    0   <- no Schedule D
+         *        line 18b                                            119,577
+         *
+         *   Sch E  line 18  = 4562 line 22                             57,606
+         *          line 21  = 2,400,000 - 57,606                    2,342,394
+         *   Sch 1  line  4  = 4797 line 18b                           119,577
+         *          line  5  = Sch E line 26                         2,342,394
+         *          line 10                                          2,461,971
+         *   1040   line  8                                          2,461,971
+         *          line  9  3,000,000 + 2,461,971                   5,461,971
+         *          line 11  no adjustments                          5,461,971
+         *          line 7a  no Schedule D                                   0
+         * ```
+         *
+         * Every figure typed from the paper, not read back off the code.
+         */
+        aFullyRecapturedDisposalReachesLineEightWithNoScheduleD: () => {
+            const outcome = runFourSevenNineSeven(
+                ['wages', 'rentalRealEstateAndRoyalties', 'otherGainsOrLosses'])(
+                false)(disposedAppliances)
+            const cents = reportedCents(outcome)
+            assertEq(cents('1040 line 1a'), 3000000n, 'wages')
+            assertEq(cents('1040 line 8'), 2461971n,
+                'Schedule 1 line 10: Form 4797 line 18b plus the rental profit')
+            assertEq(cents('1040 line 9'), 5461971n, 'total income')
+            assertEq(cents('1040 line 11'), 5461971n, 'AGI, no adjustments')
+            assertEq(cents('1040 line 7a'), 0n,
+                'no Schedule D — a fully-recaptured §1245 gain never leaves Part II')
+        },
+        /**
+         * ★ **THE CONTROL, and it is what makes the leaf above a statement
+         * about the DISPOSAL.** The identical return with the disposal removed
+         * — the same register, the same appliances, still owned — computes
+         * $0.00 on Schedule 1 line 4, and printed Schedule E line 18 grows
+         * from $576.06 to $1,152.12 because the year-of-sale half is no longer
+         * taken.
+         *
+         * ```
+         *   4562 line 22 with no disposal   11.52% x 1,000,100 = 115,211.52 -> 115,212
+         *   Sch E line 21  2,400,000 - 115,212                            2,284,788
+         *   1040 line  8   Sch 1 line 4 is zero                           2,284,788
+         *          line  9  3,000,000 + 2,284,788                         5,284,788
+         * ```
+         *
+         * The Schedule E figure moving is the half a 1040-line-8 assertion
+         * alone would miss: it proves Step 3's DISPOSAL decimal is applied to
+         * Form 4562 as well as to Form 4797, which is the change that stops a
+         * filer deducting a whole year of depreciation on a machine sold in
+         * September.
+         *
+         * The control register also has to CERTIFY
+         * `noDepreciablePropertyDisposedOfDuringTheYear`, and that is not
+         * fixture housekeeping — it is the narrowing itself, observed. A
+         * register carrying neither a disposal block nor the certification
+         * refuses at Form 4562, and one carrying both refuses at the dialect,
+         * so exactly one of the two states is legal at a time.
+         */
+        theSameRegisterWithNoDisposalComputesZeroAndAWholeYearOfDepreciation: () => {
+            const outcome = runFourSevenNineSeven(
+                ['wages', 'rentalRealEstateAndRoyalties', 'otherGainsOrLosses'])(
+                false)({ ...disposedAppliances, disposal: undefined })
+            const cents = reportedCents(outcome)
+            assertEq(cents('1040 line 8'), 2284788n,
+                'no Form 4797, and a WHOLE year of depreciation on Schedule E line 18')
+            assertEq(cents('1040 line 9'), 5284788n)
+        },
+        /**
+         * ★ **THE §1231 GAIN AND THE 25% RATE, end to end.** Selling the
+         * building itself: printed Form 4797 line 7 is a §1231 gain that
+         * reaches 1040 line 7a through Schedule D line 11, and the
+         * unrecaptured §1250 gain inside it reaches Schedule D line 19 —
+         * which is observable ONLY as the line 16 METHOD, because line 19 is
+         * what forces the Schedule D Tax Worksheet over the Qualified
+         * Dividends and Capital Gain Tax Worksheet.
+         *
+         * ```
+         *   Table A-6, 27.5-year mid-month, month 4: y1 2.576%, y2..y7 3.636%
+         *   basis $200,555.00 = 20,055,500 cents, placed in service April 2019
+         *   4562 line 22 (this year alone, sold in October: 19/24)      577,298
+         *   4797 line 22 (all seven years)                            4,740,018
+         *        line 23  20,655,500 - 4,740,018                     15,915,482
+         *        line 24  25,000,000 - 15,915,482                     9,084,518
+         *        line 26g i4797 p10 excludes post-1986 S/L real property       0
+         *        line 32  9,084,518 - 0                               9,084,518
+         *        line  7                                              9,084,518
+         *        line 18b                                                     0
+         *   Sch D  line 11 = 4797 line 7                              9,084,518
+         *          line 19 = min(4,740,018, 9,084,518) - 0            4,740,018
+         *   Sch E  line 21  2,400,000 - 577,298                       1,822,702
+         *   1040   line 7a  Schedule D line 16                        9,084,518
+         *          line  8  Sch 1 line 4 (0) + line 5 (1,822,702)     1,822,702
+         *          line  9  3,000,000 + 9,084,518 + 1,822,702        13,907,220
+         * ```
+         *
+         * The `line16Method` assertion is the load-bearing one: with line 19
+         * at zero the two worksheets are algebraically identical, so no
+         * ordinary figure can tell them apart — `fjs/tax/line16`'s own
+         * docstring says exactly that — and the method is the only observable
+         * that changes.
+         */
+        aSectionTwelveThirtyOneGainReachesLineSevenAAndForcesTheScheduleDTaxWorksheet: () => {
+            const outcome = runFourSevenNineSeven([
+                'wages', 'rentalRealEstateAndRoyalties', 'otherGainsOrLosses',
+                'capitalGainsOrLosses', 'unrecaptured1250Gain',
+            ])(true)(disposedDuplex)
+            const cents = reportedCents(outcome)
+            assertEq(cents('1040 line 7a'), 9084518n,
+                'the §1231 gain, through Schedule D lines 11 and 16')
+            assertEq(cents('1040 line 8'), 1822702n,
+                'Schedule 1 line 4 is ZERO here — the whole gain is capital, not ordinary')
+            assertEq(cents('1040 line 9'), 13907220n)
+            assert(outcome.kind === 'ok', ['expected a computed return', outcome])
+            if (outcome.kind !== 'ok') {
+                return
+            }
+            assertEq(outcome.line16Method, 'scheduleDTaxWorksheet',
+                'unrecaptured §1250 gain on Schedule D line 19 forces the SDTW over the QDCGT')
+        },
+        /**
+         * ★ **THE REFUSAL, through the whole engine.** The identical return
+         * WITHOUT the §1231 certification refuses at printed line 8 — proving
+         * the certification is read where the form runs rather than only where
+         * the form is unit-tested, and that the refusal reaches the caller
+         * instead of being swallowed into a zero.
+         */
+        theSameGainWithoutTheCertificationRefusesThroughTheWholeEngine: () => {
+            const outcome = runFourSevenNineSeven([
+                'wages', 'rentalRealEstateAndRoyalties', 'otherGainsOrLosses',
+                'capitalGainsOrLosses', 'unrecaptured1250Gain',
+            ])(false)(disposedDuplex)
+            assert(outcome.kind === 'error', ['expected a refusal', outcome])
+            if (outcome.kind !== 'error') {
+                return
+            }
+            assert(outcome.message.includes('Form 4797 line 8'),
+                ['the refusal must name the printed line', outcome.message])
+            assert(outcome.message.includes('5 preceding tax years'),
+                ['and quote the definition', outcome.message])
         },
     },
     // ── TAX-38: Form 6781 Part I, end to end through form1040Report ─────

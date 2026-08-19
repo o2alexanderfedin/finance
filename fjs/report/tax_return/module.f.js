@@ -875,6 +875,10 @@ const fixtureFounderProfileHash = 'sha256-tax-return-founder-profile'
 const fixtureFounderNecHash = 'sha256-tax-return-founder-1099nec'
 const fixtureFounderExpensesHash = 'sha256-tax-return-founder-expenses'
 const fixtureFounderRegisterHash = 'sha256-tax-return-founder-asset-register'
+/** TAX-41's two: the SAME founder declaring `otherGainsOrLosses`, and a
+ * register whose laptop was sold during the year. */
+const fixtureFounderDisposalProfileHash = 'sha256-tax-return-founder-disposal-profile'
+const fixtureFounderDisposalRegisterHash = 'sha256-tax-return-founder-disposal-register'
 // TAX-39: the SAME business record with a Form 8829 half. A separate
 // fixture rather than a field added to the one above, so the routing leaf
 // that pins $260.00 of business income keeps pinning it.
@@ -968,6 +972,8 @@ const subjectFounderProfile = 'tax-return-subject-founder-profile'
 const subjectFounderNec = 'tax-return-subject-founder-1099nec'
 const subjectFounderExpenses = 'tax-return-subject-founder-expenses'
 const subjectFounderRegister = 'tax-return-subject-founder-asset-register'
+const subjectFounderDisposalProfile = 'tax-return-subject-founder-disposal-profile'
+const subjectFounderDisposalRegister = 'tax-return-subject-founder-disposal-register'
 const subjectFounderHomeExpenses = 'tax-return-subject-founder-home-expenses'
 const subjectLandlordProfile = 'tax-return-subject-landlord-profile'
 const subjectLandlordProperty = 'tax-return-subject-landlord-property'
@@ -1882,6 +1888,49 @@ const documentByHash = {
             section168kStatus: 'electedOut',
         }],
     },
+    // TAX-41's two. They exist for the reason the register above does, one
+    // layer in: `vnd.fjs.asset_register` is already routed, so a deleted
+    // branch reddens the leaf above -- but nothing anywhere proves that the
+    // per-asset `disposal` BLOCK survives the round trip through the CAS
+    // snapshot, the dialect's structural validation and `depreciableAssets`.
+    // A nested optional object is exactly the shape that can be silently
+    // dropped by a schema edit while every flat field still travels.
+    [fixtureFounderDisposalProfileHash]: {
+        dialect: returnProfileDialect,
+        taxYear: 2025,
+        filingStatus: 'single',
+        dependentCount: 0,
+        declaredKinds: [
+            'businessIncomeOrLoss', 'federalTaxWithheldOnOther1099', 'otherGainsOrLosses',
+        ],
+    },
+    // NO `noDepreciablePropertyDisposedOfDuringTheYear`: the dialect refuses a
+    // register carrying both it and a disposal block.
+    [fixtureFounderDisposalRegisterHash]: {
+        dialect: assetRegisterDialect,
+        recipientTin: '222-22-2222',
+        accountNumber: 'BUS-0001',
+        taxYear: 2025,
+        businessOrActivity: 'software consulting',
+        everyDepreciableAssetIsListed: true,
+        priorYearSection179CarryoverIsZero: true,
+        assets: [{
+            description: 'laptop',
+            datePlacedInService: '2023-06',
+            costOrOtherBasis: '700.00',
+            businessUsePercentage: '100.00',
+            classification: 'sevenYear',
+            method: '200DB',
+            convention: 'HY',
+            section168kStatus: 'electedOut',
+            disposal: {
+                dateAcquired: '2023-05-20',
+                dateSold: '2025-04-15',
+                grossSalesPrice: '300.00',
+                expenseOfSale: '0.00',
+            },
+        }],
+    },
 }
 
 /** @type {Readonly<Record<string, string>>} */
@@ -1910,6 +1959,8 @@ const snapshotBySubject = {
     [subjectFounderNec]: fixtureFounderNecHash,
     [subjectFounderExpenses]: fixtureFounderExpensesHash,
     [subjectFounderRegister]: fixtureFounderRegisterHash,
+    [subjectFounderDisposalProfile]: fixtureFounderDisposalProfileHash,
+    [subjectFounderDisposalRegister]: fixtureFounderDisposalRegisterHash,
     [subjectFounderHomeExpenses]: fixtureFounderHomeExpensesHash,
     [subjectLandlordProfile]: fixtureLandlordProfileHash,
     [subjectLandlordProperty]: fixtureLandlordPropertyHash,
@@ -2008,6 +2059,12 @@ const founderWithHomeOfficeSubjects = [
 /** The same three, plus the Form 4562 wiring's asset register. */
 const founderWithRegisterSubjects = [
     subjectFounderRegister, subjectFounderExpenses, subjectFounderNec, subjectFounderProfile,
+]
+
+/** TAX-41: the same business, but the register's laptop was SOLD. */
+const founderWithDisposalSubjects = [
+    subjectFounderDisposalRegister, subjectFounderExpenses, subjectFounderNec,
+    subjectFounderDisposalProfile,
 ]
 
 /** The Schedule E Part I wiring's own two subjects, NOT in sorted order. */
@@ -2743,6 +2800,85 @@ export const proof = {
         assertEq(cents('1040 line 9'), 15997n, 'and it is the whole of total income')
         assertEq(cents('1040 line 11a'), 15997n, 'AGI = $159.97')
         assertEq(cents('1040 line 25b'), 4000n, 'the §3406 backup withholding is untouched')
+    },
+    /**
+     * ★ **THE ROUTING LEAF FOR THE `disposal` BLOCK.** `vnd.fjs.asset_register`
+     * is already dispatched — the leaf above proves that — so what this one
+     * proves is different and nothing else can: that the per-asset NESTED
+     * `disposal` object survives the CAS snapshot, the dialect's structural
+     * validation and `depreciableAssets`, and reaches printed Form 4797.
+     *
+     * A nested optional block is exactly the shape a schema edit can drop in
+     * silence while every flat field beside it still travels, and this program
+     * is the only path in the repository that reads a stored blob rather than
+     * a hand-built `Form1040Inputs`.
+     *
+     * Every figure hand-computed off the printed pages. The laptop cost
+     * $700.00, was placed in service in June 2023 and sold on 15 April 2025 for
+     * $300.00 — held more than a year, so Part I, and at a LOSS, so no
+     * certification is needed anywhere:
+     *
+     * ```
+     *   Publication 946 Table A-1, 7-year, half-year: 14.29 24.49 17.49
+     *   y1  14.29% x 70,000 = 10,003
+     *   y2  24.49% x 70,000 = 17,143
+     *   y3  17.49% x 70,000 x 0.5 = 6,121.5 -> 6,122     (sold, HY, half-up)
+     *
+     *   4562 line 22 (this year alone)                          6,122
+     *   4797 col (e) all three years                           33,268
+     *        col (f) 70,000 + 0                                70,000
+     *        col (g) 30,000 + 33,268 - 70,000                  -6,732   <- a §1231 LOSS
+     *        line 18b                                          -6,732
+     *
+     *   Sch C  line  7 gross receipts (1099-NEC box 1)         35,000
+     *          line  8 advertising                             -9,000
+     *          line 13 Form 4562 line 22                       -6,122
+     *          line 31                                         19,878
+     *   Sch 1  line  3                                         19,878
+     *          line  4 Form 4797 line 18b                      -6,732
+     *          line 10                                         13,146
+     *   1040   line  8                                         13,146
+     * ```
+     *
+     * **The year-of-sale rounding is a TIE, and that is deliberate**: 17.49%
+     * of $700.00 is exactly $122.43, and half of it is $61.215 — the one
+     * fractional half-cent in this whole fixture set. `halfUp` rounds it away
+     * from zero to $61.22, and a truncating implementation would give $61.21
+     * and move printed Schedule C line 31 and Schedule 1 line 4 in opposite
+     * directions by a cent each.
+     *
+     * The control below, which withholds the disposal, is what makes this
+     * evidence about the BLOCK rather than about the register.
+     */
+    storedProgramRoutesADisposalBlockAndComputesFormFortySevenNinetySeven: () => {
+        const result = runTwin(founderWithDisposalSubjects)
+        assert(result.kind === 'ok', ['expected a computed return', result])
+        if (result.kind !== 'ok') {
+            return
+        }
+        const cents = renderedCents(result)
+        assertEq(cents('1040 line 8'), 13146n,
+            '$198.78 of Schedule C profit less $67.32 of §1231 loss on Schedule 1 line 4')
+        assertEq(cents('1040 line 9'), 13146n, 'and it is the whole of total income')
+        assertEq(cents('1040 line 11a'), 13146n, 'AGI = $131.46')
+        assertEq(cents('1040 line 25b'), 4000n, 'the §3406 backup withholding is untouched')
+    },
+    /**
+     * THE CONTROL: the SAME stored filer with the register that has NO
+     * disposal — the leaf two above — reaches $159.97 instead. The two
+     * differ by the disposal alone, and in BOTH directions at once: Schedule 1
+     * line 4 appears, and printed Schedule C line 13 changes because the
+     * laptop is two recovery years older and takes Step 3's half-year disposal
+     * fraction.
+     */
+    theSameStoredFounderWithNoDisposalReachesTheOtherFigure: () => {
+        const result = runTwin(founderWithRegisterSubjects)
+        assert(result.kind === 'ok', ['expected a computed return', result])
+        if (result.kind !== 'ok') {
+            return
+        }
+        assertEq(renderedCents(result)('1040 line 8'), 15997n,
+            'no Form 4797, and a first-year laptop rather than a sold one')
     },
     // THE CONTROL: the SAME filer with the two business documents withheld.
     // Everything goes to zero, and the return still computes — so the leaf
