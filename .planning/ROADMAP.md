@@ -273,6 +273,16 @@ no filled 1040, no PDF, no e-file.
       layout, faithful enough to transcribe from or to hand to a preparer. **E-file is out of
       scope**: IRS MeF requires provider authorization no personal project obtains.
 - [ ] **Phase 36: The Conversational Path** - Documents into chat, "what do I owe for 2025?",
+
+- [ ] **Phase 37: FunctionalScript 0.46.0** - **Requested by the upstream author** in
+      `todo/update-fjs-0.46.0` (PR #96), who also asks for a structured report on the migration
+      once done — that report is a deliverable, not a courtesy. **Measured, not estimated**:
+      1526 `tsc` errors before the specifier rename, **630** after, and unlike 0.45's 288 these
+      are real API changes with real new APIs to adopt rather than errors fixable only by a
+      forbidden construct. Three causes: `rtti/validate` restructured into `parse`/`common`/`data`
+      (60), types relocated into `types.d.ts` (93), and the new error-carrying Effect system
+      `Effect<O, T, E>` (the rest, 243 of them inside `fjs/server/fjs_run` alone). Closes MAINT-06's
+      intent, open since Phase 18. Full analysis in `fjs/todo/upstream-mjs-migration.md`.
       answer end to end with citing hashes, no code touched. This is Phase 14's criterion 2,
       unchanged and still wanted.
 
@@ -1108,6 +1118,7 @@ is deferred, so three phases remain, and two reasons override the numeric defaul
 | 34. Second-Implementation Cross-Check | v3 | 0/TBD | Not started | - |
 | 35. A Filable Artifact | v3 | 0/TBD | Not started | - |
 | 36. The Conversational Path | v3 | 0/TBD | Not started | - |
+| 37. FunctionalScript 0.46.0 | v3 | 0/TBD | Measured, not started | - |
 
 > **The nine stale milestone-v2 rows were retro-filled on 2026-08-17, from measurement.** They
 > had read `0/TBD | Not started` for work that was in `develop`: phases 21 through 29 all
