@@ -1812,6 +1812,14 @@ const form1040TaxAndPaymentLines = taxParamSet => inputs => income => {
         status,
         medicareWages,
         medicareTaxWithheld,
+        // Schedule 2 line 13's whole computation: Form W-2 box 12 codes A,
+        // B, M and N -- tax the employer could NOT collect, which the
+        // employee therefore owes. Unlike boxes 5 and 6 above these are NOT
+        // pre-summed here, because line 13's citation contract is one source
+        // per contributing box-12 ENTRY, and a pre-summed `ReportLine` would
+        // have to carry those per-entry sources anyway. The SAME documents
+        // lines 1a, 25a and Form 8959 already read.
+        w2Forms: w2s,
         // Form 8960's three investment incomes, read off the 1040 lines that
         // already carry them -- line 2b and NOT line 2a, because §103(a)
         // keeps tax-exempt interest out of gross income and so out of
@@ -6379,6 +6387,77 @@ export const proof = {
             assert(
                 boxes.includes('declaredKinds'),
                 ['1040 line 23 must still cite the twelve declared zeros it also sums', boxes])
+        },
+        // ── Schedule 2 line 13, END TO END ────────────────────────────────
+        //
+        // THE WIRING LEAF, and it exists because a mutation demanded it.
+        // `fjs/schedule/2`'s own leaves prove the arithmetic and the
+        // citations; NONE of them can notice this module handing that
+        // schedule an empty `w2Forms`. Replacing `w2Forms: w2s` with
+        // `w2Forms: []` at the call site above left the whole suite green
+        // until these two leaves existed — a taxpayer holding a W-2 with box
+        // 12 code A would have received a return understating the tax by the
+        // whole of it, with 2,276 proofs passing.
+        //
+        // Stated as a DIFFERENTIAL as well as an absolute: the identical
+        // return without the box 12 entry must owe exactly $125.40 less, so
+        // the leaf cannot be satisfied by anything that merely happens to
+        // total $125.40 for another reason.
+        //
+        // `uncollectedTaxOnTipsOrGroupTermLife` is deliberately NOT declared:
+        // it is still a refused `fjs/return/scope` kind, and the tax is read
+        // unconditionally anyway — an employer's inability to collect is not
+        // elective.
+        aBoxTwelveCodeAReachesLineTwentyThree: () => {
+            /** @type {(box12: NonNullable<W2['box12']>) => Form1040Outcome} */
+            const wagesReturn = box12 => {
+                const bare = w2Document('sha256-w2-box12-uncollected')('52000.00')
+                return form1040Report(taxParams2025)(
+                    inputsOf(storedProfile({ ...singleProfile, declaredKinds: ['wages'] }))(
+                        [{ ...bare, value: { ...bare.value, box12 } }])([])([])([])([])([])([])([])([]))
+            }
+            const withCodeA = wagesReturn([{ code: 'A', amount: '125.40' }])
+            const withoutCodeA = wagesReturn([{ code: 'D', amount: '1000.00' }])
+            assert(withCodeA.kind === 'ok', ['expected the return to compute', withCodeA])
+            assert(withoutCodeA.kind === 'ok', ['expected the control to compute', withoutCodeA])
+            if (withCodeA.kind !== 'ok' || withoutCodeA.kind !== 'ok') {
+                return
+            }
+            assertEq(lineRuled(withCodeA.lines)('1040 line 23').value, 12540n,
+                '$125.40 of uncollected social security tax on tips, Schedule 2 line 13')
+            assertEq(lineRuled(withoutCodeA.lines)('1040 line 23').value, 0n,
+                'the control: box 12 code D is an elective deferral, not a tax')
+            assertEq(
+                lineRuled(withCodeA.lines)('1040 line 23').value
+                - lineRuled(withoutCodeA.lines)('1040 line 23').value,
+                12540n,
+                'the SAME return owes exactly $125.40 more for carrying the code')
+        },
+        // …and it arrives THROUGH Schedule 2's own Part II total, citable
+        // back to the box 12 entry an auditor has to look at.
+        lineTwentyThreeCitesTheBoxTwelveEntryItTaxed: () => {
+            const bare = w2Document('sha256-w2-box12-cited')('52000.00')
+            const outcome = form1040Report(taxParams2025)(
+                inputsOf(storedProfile({ ...singleProfile, declaredKinds: ['wages'] }))([{
+                    ...bare,
+                    value: {
+                        ...bare.value,
+                        box12: [{ code: 'D', amount: '1000.00' }, { code: 'N', amount: '11.25' }],
+                    },
+                }])([])([])([])([])([])([])([])([]))
+            assert(outcome.kind === 'ok', ['expected the return to compute', outcome])
+            if (outcome.kind !== 'ok') {
+                return
+            }
+            const line23 = lineRuled(outcome.lines)('1040 line 23')
+            assertEq(line23.value, 1125n, '$11.25 of uncollected Medicare tax on group-term life insurance')
+            const cited = line23.sources.filter(source => source.boxPath === 'box12[code=N]')
+            assertEq(cited.length, 1, ['1040 line 23 must cite the box 12 entry it taxed', line23.sources])
+            assertEq(cited[0]?.documentHash, 'sha256-w2-box12-cited', 'the W-2 that carried it')
+            const boxes = line23.sources.map(source => source.boxPath)
+            assert(
+                !boxes.includes('box12[code=D]'),
+                ['the elective deferral must not be cited by a tax line', boxes])
         },
         // **THE CASE WHERE THE FILER ACTUALLY OWES.** A joint couple with two
         // $150,000 employers: NEITHER employer paid anyone above $200,000, so

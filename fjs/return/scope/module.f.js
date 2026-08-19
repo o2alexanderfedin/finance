@@ -499,6 +499,7 @@ export const modeledKinds = /** @type {const} */ ([
     'selfEmploymentTax',           // Schedule SE line 12 -> Schedule 2 line 4 -> 1040 line 23
     'additionalMedicareTax',       // Form 8959 -> Schedule 2 line 11 -> 1040 lines 23/25c
     'netInvestmentIncomeTax',      // Form 8960 -> Schedule 2 line 12 -> 1040 line 23
+    'uncollectedTaxOnTipsOrGroupTermLife', // W-2 box 12 codes A/B/M/N -> Schedule 2 line 13 -> 1040 line 23
     'childTaxCreditOrOtherDependents', // Schedule 8812 Part I       -> 1040 line 19
     'educationCredits',            // Form 8863 line 19 -> Schedule 3 line 3 -> 1040 line 20
     'retirementSavingsContributionsCredit', // Form 8880 -> Schedule 3 line 4 -> 1040 line 20
@@ -800,7 +801,6 @@ export const unmodeledKindRefusals = /** @type {const} */ ([
     { kind: 'selfEmploymentOptionalMethods', line: 'Schedule SE Part II (lines 14-17) -> Schedule 2 line 4 -> 1040 line 23', label: 'the farm and non-farm optional methods of figuring net earnings', remedy: 'these are ELECTIONS to report a fixed fraction of gross income as net earnings, usually in order to earn Social Security credits in a low-income year, and no document this engine holds records an election. The non-farm method additionally needs Schedule C line 7 gross income together with the printed test that you "were self-employed at least 2 of the 3 prior years", a multi-year history this engine does not hold, and the farm method needs Schedule F (no phase yet)' },
     { kind: 'additionalTaxOnTaxFavoredAccounts', line: 'Schedule 2 line 8 -> 1040 line 23', label: 'additional tax on IRAs or other tax-favored accounts', remedy: 'requires Form 5329 (no phase yet)' },
     { kind: 'householdEmploymentTaxes', line: 'Schedule 2 line 9 -> 1040 line 23', label: 'household employment taxes', remedy: 'requires Schedule H (no phase yet)' },
-    { kind: 'uncollectedTaxOnTipsOrGroupTermLife', line: 'Schedule 2 line 13 -> 1040 line 23', label: 'uncollected Social Security, Medicare or RRTA tax on tips or group-term life insurance', remedy: 'requires Form W-2 box 12 codes A, B, M or N, which no dialect field models (no phase yet)' },
     { kind: 'interestOnResidentialLotAndTimeshareInstallments', line: 'Schedule 2 line 14 -> 1040 line 23', label: 'interest on the tax due on installment income from residential lots and timeshares', remedy: 'requires the §453(l)(3) computation, which no document this engine models supplies (no phase yet)' },
     { kind: 'interestOnDeferredInstallmentSaleTax', line: 'Schedule 2 line 15 -> 1040 line 23', label: 'interest on the deferred tax on installment sales over $150,000', remedy: 'requires the §453A(c) computation, which no document this engine models supplies (no phase yet)' },
     { kind: 'lowIncomeHousingCreditRecapture', line: 'Schedule 2 line 16 -> 1040 line 23', label: 'recapture of the low-income housing credit', remedy: 'requires Form 8611 (no phase yet)' },
@@ -1361,7 +1361,7 @@ export const classifyScope = declaredKinds => {
  * and `fjs/form8995` wiring that makes all three computable.
  * @type {number}
  */
-const expectedModeledKindCount = 39
+const expectedModeledKindCount = 40
 
 /**
  * The modeled set, hand-typed a SECOND time and in {@link kindVocabulary}'s
@@ -1406,6 +1406,7 @@ const everyModeledKindHandTyped = [
     'selfEmploymentTax',
     'additionalMedicareTax',
     'netInvestmentIncomeTax',
+    'uncollectedTaxOnTipsOrGroupTermLife',
     'childTaxCreditOrOtherDependents',
     'educationCredits',
     'retirementSavingsContributionsCredit',
@@ -1498,7 +1499,7 @@ const everyModeledKindHandTyped = [
  * that makes it computable.
  * @type {number}
  */
-const expectedUnmodeledKindCount = 75
+const expectedUnmodeledKindCount = 74
 
 /**
  * The complete refusal message for a return declaring exactly
@@ -2402,6 +2403,12 @@ export const proof = {
             const outcome = classifyScope(['netInvestmentIncomeTax'])
             assertEq(outcome.kind, 'ok', ['Form 8960\'s kind alone must be in scope', outcome])
         },
+        uncollectedTaxOnTipsOrGroupTermLifeIsInScopeAlone: () => {
+            const outcome = classifyScope(['uncollectedTaxOnTipsOrGroupTermLife'])
+            assertEq(
+                outcome.kind, 'ok',
+                ['Schedule 2 line 13\'s kind alone must be in scope', outcome])
+        },
         // TAX-30, Phase 27: the SIX Schedule 1 Part I kinds this phase did NOT
         // wire must still refuse on their own, or the split quietly widened
         // the engine's claims rather than named them. The SAME property the
@@ -2485,7 +2492,6 @@ export const proof = {
                 'advancePremiumTaxCreditAndOtherRepayments',
                 'additionalTaxOnTaxFavoredAccounts',
                 'householdEmploymentTaxes',
-                'uncollectedTaxOnTipsOrGroupTermLife',
                 'interestOnResidentialLotAndTimeshareInstallments',
                 'interestOnDeferredInstallmentSaleTax',
                 'lowIncomeHousingCreditRecapture',
@@ -2494,8 +2500,8 @@ export const proof = {
                 'section965NetTaxLiabilityInstallment',
             ]
             assertEq(
-                stillRefused.length, 10,
-                'fourteen Schedule 2 kinds, less Phase 23\'s two, Phase 28\'s one and Phase 29\'s one')
+                stillRefused.length, 9,
+                'fourteen Schedule 2 kinds, less Phase 23\'s two, Phase 28\'s one, Phase 29\'s one and line 13')
             for (const kind of stillRefused) {
                 const outcome = classifyScope([kind])
                 assert(
