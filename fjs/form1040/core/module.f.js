@@ -742,6 +742,7 @@ const storedFilingStatusNamed = status =>
  *   readonly selfEmployment: SelfEmploymentOutcome,
  *   readonly specifiedPrivateActivityBondInterest: ReportLine,
  *   readonly disqualifiedPassiveIncomeCents: bigint,
+ *   readonly qualifiedBusinessLossCarryforward: ReportLine,
  *   readonly dependentCareLine31Cents: bigint,
  *   readonly dependentCareApplicable: boolean,
  *   readonly dependentCare: Form2441Common,
@@ -1955,9 +1956,52 @@ export const form1040IncomeLines = taxParamSet => inputs => {
         // mid-quarter convention could differ from the first's.
         + scheduleOnePartIResult.scheduleF.alternativeMinimumTaxAdjustmentCents
 
+    // **Form 8995 printed line 16 — §199A(c)(2)'s carryforward to 2026 — and it
+    // is on this record because the REPORT has to print it.** *"Total qualified
+    // business (loss) carryforward. Add lines 2 and 3. If greater than zero,
+    // enter -0-."*
+    //
+    // It is not a `ReportLine` and it is not in `orderedLines`, because that
+    // list is Form 1040 lines 1a through 37 and this is a line of a different
+    // form — the same reason `disqualifiedPassiveIncomeCents` above travels as a
+    // bare `bigint`. It rides out to `fjs/report/tax_return` beside
+    // `line16Method`, which is on the report for the same kind of reason: a
+    // figure the return produces that no 1040 line carries, and without which
+    // the report cannot be acted on.
+    //
+    // **Nothing in this engine READS it, and that is the point.** This year's
+    // deduction is already zero when it is non-zero. What it does is give the
+    // outbound half of §199A(c)(2) a home, so a farmer whose printed Schedule F
+    // line 34 is a loss can transcribe it into next year's
+    // `priorYearQualifiedBusinessLossCarryforward` — the inbound field that has
+    // existed since Phase 28 and had nothing to receive. Until this phase
+    // `fjs/schedule/f`'s loss refusal named that gap ("the outbound direction
+    // has no home at all") as a blocker, and this is the home.
+    //
+    // The comprehensive path cannot produce one: `fjs/form8995a` refuses a
+    // qualified business LOSS above §199A(e)(2)'s threshold precisely because it
+    // has no line to print it on.
+    //
+    // It is a whole `ReportLine` rather than a bare `bigint`, unlike
+    // `disqualifiedPassiveIncomeCents` above and for the opposite reason: a
+    // printed line of a real form must cite the documents behind it, and the
+    // farmer reading this figure has to be able to see which business record it
+    // came from. `rentalRealEstateAndRoyaltyIncome` on this same record is the
+    // precedent — a `ReportLine` that no `orderedLines` entry carries, because
+    // that list is Form 1040 lines 1a through 37 and this is not one of them.
+    const qualifiedBusinessLossCarryforward = {
+        value: qbiOutcome.simplified === undefined ? 0n : qbiOutcome.simplified.line16,
+        sources: unionSources([
+            scheduleOnePartIResult.scheduleC.partII.line31,
+            scheduleOnePartIResult.scheduleF.line34,
+        ]),
+        rule: 'Form 8995 line 16 (total qualified business (loss) carryforward '
+            + '-> next year’s priorYearQualifiedBusinessLossCarryforward)',
+    }
     return {
         kind: 'ok',
         disqualifiedPassiveIncomeCents,
+        qualifiedBusinessLossCarryforward,
         amtDepreciationAdjustmentCents,
         // Printed Schedule E line 26, carried out for Form 8960 line 4a. It
         // travels as a whole `ReportLine` rather than as cents because
@@ -2141,6 +2185,7 @@ export const form1040IncomeLines = taxParamSet => inputs => {
  *   readonly kind: 'ok',
  *   readonly lines: readonly ReportLine[],
  *   readonly line16Method: Line16Method,
+ *   readonly qualifiedBusinessLossCarryforward: ReportLine,
  * } | {
  *   readonly kind: 'error',
  *   readonly message: string,
@@ -3166,6 +3211,8 @@ const computeForm1040 = taxParamSet => inputs => {
         kind: 'ok',
         lines: orderedLines(income)(rest.tax),
         line16Method: rest.line16Method,
+        // Form 8995 line 16, out to the report -- see `form1040IncomeLines`.
+        qualifiedBusinessLossCarryforward: income.qualifiedBusinessLossCarryforward,
     }
 }
 
@@ -3300,6 +3347,10 @@ export const form1040Report = taxParamSet => inputs => {
         kind: 'ok',
         lines: applyWholeDollarElection(profile.value.wholeDollarElection === true)(computed.lines),
         line16Method: computed.line16Method,
+        // NOT subject to the whole-dollar election: i1040gi p23's rounding is
+        // about the amounts entered on the RETURN, and this figure is entered on
+        // next year's business record rather than on any line of this one.
+        qualifiedBusinessLossCarryforward: computed.qualifiedBusinessLossCarryforward,
     }
 }
 

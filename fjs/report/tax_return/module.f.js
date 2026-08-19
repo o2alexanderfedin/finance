@@ -242,6 +242,7 @@ import { ok } from 'functionalscript/fjs/types/result/module.f.mjs'
  *   readonly kind: 'ok',
  *   readonly taxYear: number,
  *   readonly line16Method: string,
+ *   readonly qualifiedBusinessLossCarryforward: RenderedLine,
  *   readonly lines: readonly RenderedLine[],
  * } | {
  *   readonly kind: 'error',
@@ -503,6 +504,11 @@ export const taxReturnReportSource = [
     '            kind: \'ok\',',
     '            taxYear: profile.value.taxYear,',
     '            line16Method: outcome.line16Method,',
+    '            qualifiedBusinessLossCarryforward: {',
+    '                rule: outcome.qualifiedBusinessLossCarryforward.rule,',
+    '                value: ctx.centsToString(outcome.qualifiedBusinessLossCarryforward.value),',
+    '                sources: outcome.qualifiedBusinessLossCarryforward.sources,',
+    '            },',
     '            lines: outcome.lines.map(line => ({',
     '                rule: line.rule,',
     '                value: ctx.centsToString(line.value),',
@@ -764,6 +770,11 @@ const renderReturn = ctx => acc => {
         kind: 'ok',
         taxYear: profile.value.taxYear,
         line16Method: outcome.line16Method,
+        qualifiedBusinessLossCarryforward: {
+            rule: outcome.qualifiedBusinessLossCarryforward.rule,
+            value: ctx.centsToString(outcome.qualifiedBusinessLossCarryforward.value),
+            sources: outcome.qualifiedBusinessLossCarryforward.sources,
+        },
         lines: outcome.lines.map(line => ({
             rule: line.rule,
             value: ctx.centsToString(line.value),
