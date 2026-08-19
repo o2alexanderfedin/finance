@@ -581,6 +581,33 @@ guessing:
 
 ---
 
+## 7b. The mutation log, and what it found
+
+Seventy mutations across ten modules, every one applied to the real tracked
+file and reverted with `git checkout --` after a full `npm test`. **Ten
+survived**, and none of them was a mis-run:
+
+| Survivor | What it was |
+|---|---|
+| The worksheet's line 6 floor | An **equivalent mutant**. Line 3 is line 1 plus line 2c, the capital-gain-excess guard bounds the preferential slice by line 1, and the tax function is monotone — so line 4 >= line 5 identically and the printed *"-0-"* clause is unreachable. Replaced by an assertion naming the invariant, on `fjs/tax/line16/qdcgt`'s own no-floor precedent; re-run as `worksheetLine5 - lineFourOutcome.cents` it kills fourteen leaves. |
+| Schedule A's SALT add-back | **No leaf at all.** §164(b)(6)'s phase-down only bites above $500,000, and no fixture reached it. Closed with a $540,000 filer whose exclusion costs $12,000 of deduction. |
+| §911(d)(6) gated on `elected` | **Worse than untested.** An unelected §911 filer holding a stored foreign tax was told to *"declare section904jElectionAllForeignIncomeIsQualifiedPassiveIncome"* — a remedy that lands them in this very refusal on the next run. The gate now reads the exclusion and the stored tax alone. |
+| Seven wirings out of `fjs/form1040/core` | Schedule A's, Schedule 1-A's, Schedule 8812's, Schedule 3's, Schedule 2's and `fjs/schedule/eic`'s add-backs, plus the two profile readers for line 44 and the worksheets' line 2b — each replaceable by `* 0n` with the whole suite green, because each module's own leaves take the figure as an argument. Closed by eight differential leaves, every one against a filer whose adjusted gross income already equals the post-exclusion figure. |
+
+**The differential shape is the finding worth carrying forward.** An add-back's
+whole job is to restore the pre-exclusion income, so a §911 filer must match a
+plain filer at the HIGHER income and differ from one at the LOWER. Comparing
+"with the exclusion" against "without it at the same wage" can never fail when
+the add-back is dropped, because both sides move together.
+
+Two mutations did not compile, and both are informative rather than wasted:
+`&& false` inside an `if` trips `allowUnreachableCode` (AGENTS.md's own
+warning), and deleting `foreignEarnedIncomeExclusion` from `modeledKinds` stops
+the build at `_EveryKindIsEitherModeledOrRefused` — the partition guard doing
+its job at `tsc` level rather than at run time.
+
+---
+
 ## 8. What would retire each refusal
 
 | Refusal | What it takes |
