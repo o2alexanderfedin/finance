@@ -69,6 +69,28 @@
  * later phase widening either dialect (Form 4797, Schedule K-1, Form 6252,
  * the §1202 exclusion) knows exactly which named constant to revisit.
  *
+ * ## Lines 4 and 11 — Form 6781, and why they arrive as numbers (TAX-38)
+ *
+ * Printed line 4 takes Form 6781 line 8 (the 40 percent SHORT-term half of a
+ * section 1256 gain or loss) and printed line 11 takes Form 6781 line 9 (the
+ * 60 percent LONG-term half). Both were documented zeros until TAX-38.
+ *
+ * They arrive through `ScheduleDInputs.sectionTwelveFiftySix` as two bigints
+ * and their citations, **not** as a 1099-B this module reads. That is the
+ * printed form's own shape — line 8 says "Enter here and include on line 4 of
+ * Schedule D", so Schedule D copies a figure another form computed — and it
+ * is also what keeps the promise this docstring makes above: the only runtime
+ * `fjs/*` import here is still `fjs/form8949`, because `fjs/form6781` needs
+ * the parameter set for §1256(a)(3)'s rates and this module imports nothing
+ * from `fjs/tax/` at run time. `fjs/form1040/core` is where Form 6781 runs.
+ *
+ * The 40/60 assignment is inverted relative to the printed line numbers —
+ * the SMALLER 6781 line carries the SMALLER fraction and the SHORTER holding
+ * period — which is exactly the transposition `proof.sectionTwelveFiftySix
+ * Contracts` exists to make visible: it supplies no stock sale at all, so
+ * lines 7 and 15 are the two halves alone and a swap cannot hide inside other
+ * content.
+ *
  * ## Schedule D line 21 — the three-way loss-cap branch, not a pass-through
  *
  * Form 1040 line 7a is a THREE-WAY branch on Schedule D line 16's sign, not
@@ -155,7 +177,31 @@ import { capitalLossCarryoverWorksheet } from '../../tax/carryover/module.f.js'
  *   readonly partnershipK1Forms?: readonly Stored<K1Partnership>[],
  *   readonly sCorporationK1Forms?: readonly Stored<K1SCorporation>[],
  *   readonly estateTrustK1Forms?: readonly Stored<K1EstateTrust>[],
+ *   readonly sectionTwelveFiftySix?: SectionTwelveFiftySixEntries,
  * }} ScheduleDInputs
+ */
+
+/**
+ * Form 6781 Part I's two answers, as this schedule receives them — TAX-38.
+ *
+ * **This module takes NUMBERS here, not documents, and that is the printed
+ * form's own shape rather than a convenience.** Form 6781 line 8 says "Enter
+ * here and include on line 4 of Schedule D"; line 9 says "include on line 11
+ * of Schedule D". Schedule D does not read a 1099-B's section 1256 boxes any
+ * more than it reads a Form 4684 — it copies two figures another form
+ * computed. `fjs/form1040/core` is where `fjs/form6781` actually runs, which
+ * is also where the module docstring's standing promise is kept: this file
+ * imports nothing at run time from `fjs/tax/`, and `fjs/form6781` needs the
+ * parameter set for §1256(a)(3)'s 40/60 rates.
+ *
+ * OPTIONAL, for the reason the three Schedule K-1 collections above are: an
+ * absent entry is a filer with no Form 6781, which is a legitimate zero on
+ * both lines and is what a dozen proof fixtures about the loss cap mean.
+ * @typedef {{
+ *   readonly shortTermCents: bigint,
+ *   readonly longTermCents: bigint,
+ *   readonly sources: readonly Source[],
+ * }} SectionTwelveFiftySixEntries
  */
 
 // ── Output contract (Plan 12.1-04, Form 1040 wiring, builds against this) ──
@@ -242,6 +288,7 @@ export const scheduleD = inputs => {
     // An absent list is an empty one -- see `ScheduleDInputs`. Bound once
     // here so lines 5 and 12 below read the same three collections and a
     // future line cannot quietly acquire a fourth default.
+    const { sectionTwelveFiftySix } = inputs
     const partnershipK1Forms = inputs.partnershipK1Forms ?? []
     const sCorporationK1Forms = inputs.sCorporationK1Forms ?? []
     const estateTrustK1Forms = inputs.estateTrustK1Forms ?? []
@@ -291,9 +338,17 @@ export const scheduleD = inputs => {
     //    models broker-reported sales (`fjs/form8949`'s own boundary),
     //    documented 0.
     const line3 = 0n
-    // 4. ST gain from Form 6252 and Forms 4684/6781/8824 — no dialect for
-    //    any of the four, documented 0.
-    const line4 = 0n
+    // 4. "Short-term gain from Form 6252 and short-term gain or (loss) from
+    //    Forms 4684, 6781, and 8824."
+    //
+    //    **No longer a documented zero: Form 6781 line 8 lands here** (TAX-38,
+    //    the printed line 8 instruction, "Enter here and include on line 4 of
+    //    Schedule D"). Forms 6252, 4684 and 8824 remain unmodeled — no dialect
+    //    for any of the three — so this line is the section 1256 figure plus
+    //    three documented zeros that are no longer written out, exactly as
+    //    lines 5 and 12 stopped being documented zeros when TAX-35 gave them a
+    //    Schedule K-1 to read.
+    const line4 = sectionTwelveFiftySix === undefined ? 0n : sectionTwelveFiftySix.shortTermCents
     // 5. "Net short-term gain or (loss) from partnerships, S corporations,
     //    estates, and trusts from Schedule(s) K-1" — TAX-35. THREE box
     //    numbers for the one printed line: the partner's box 8, the
@@ -340,10 +395,20 @@ export const scheduleD = inputs => {
     // 10. Category F (long-term, no 1099-B received) — out of scope,
     //     documented 0.
     const line10 = 0n
-    // 11. Gain from Form 4797 Part I; LT gain from Forms 2439/6252; LT
-    //     gain/loss from Forms 4684/6781/8824 — no dialect for any,
-    //     documented 0.
-    const line11 = 0n
+    // 11. "Gain from Form 4797, Part I; long-term gain from Forms 2439 and
+    //     6252; and long-term gain or (loss) from Forms 4684, 6781, and 8824."
+    //
+    //     **Form 6781 line 9 lands here** (TAX-38, the printed line 9
+    //     instruction, "include this amount on Schedule D (Form 1040), line
+    //     11"). Forms 4797, 2439, 6252, 4684 and 8824 remain unmodeled.
+    //
+    //     Note the ASYMMETRY with line 4 above and read it against the printed
+    //     face: line 4 takes Form 6781's 40% SHORT-term half from its line 8,
+    //     and this line takes the 60% LONG-term half from its line 9. The
+    //     smaller printed 6781 line carries the smaller fraction, which is
+    //     precisely the transposition a shared helper reading "the 6781 lines"
+    //     positionally would make invisible.
+    const line11 = sectionTwelveFiftySix === undefined ? 0n : sectionTwelveFiftySix.longTermCents
     // 12. "Net long-term gain or (loss) from partnerships, S corporations,
     //     estates, and trusts from Schedule(s) K-1" — TAX-35, and again
     //     three different box numbers: the partner's 9a, the shareholder's
@@ -533,6 +598,7 @@ export const scheduleD = inputs => {
         ...line13Sum.sources, ...twentyEightPercentLine4Sum.sources, ...unrecap1250Line11Sum.sources,
         ...line6Sources, ...line14Sources,
         ...line5Sum.sources, ...line12Sum.sources,
+        ...(sectionTwelveFiftySix === undefined ? [] : sectionTwelveFiftySix.sources),
     ]
 
     return {
@@ -1018,12 +1084,21 @@ export const proof = {
         }))
         assertEq(result.line1a, 0n)
         assertEq(result.line3, 0n)
-        assertEq(result.line4, 0n)
         assertEq(result.line6, 0n)
         assertEq(result.line8a, 0n)
         assertEq(result.line10, 0n)
-        assertEq(result.line11, 0n)
         assertEq(result.line14, 0n)
+        // **Lines 4 and 11 are NO LONGER documented zeros** (TAX-38): they
+        // take Form 6781 line 8 (40%, short-term) and line 9 (60%,
+        // long-term). They are still 0n HERE, and that is now a CONTROL
+        // rather than a structural fact -- this fixture supplies no
+        // `sectionTwelveFiftySix` entry, so a wiring that manufactured a
+        // phantom summand out of an absent one would redden here. The
+        // `sectionTwelveFiftySixContracts` group below is the paired
+        // positive case, and it is where the SHORT/LONG assignment is
+        // proven; the same shape lines 5 and 12 took under TAX-35.
+        assertEq(result.line4, 0n, 'no Form 6781 supplied: a legitimate zero, not a constant')
+        assertEq(result.line11, 0n, 'no Form 6781 supplied: a legitimate zero, not a constant')
         // **Lines 5 and 12 are NO LONGER documented zeros** (TAX-35): they
         // read the separately stated capital gain off three Schedule K-1
         // faces. They are still 0n HERE, and that is now a CONTROL rather
@@ -1264,6 +1339,145 @@ export const proof = {
                 throw ['expected error', outcome]
             }
             assert(outcome.message.includes('doc-nowhere'), [outcome.message])
+        },
+    },
+    // ── TAX-38: Form 6781 lines 8 and 9 reach printed lines 4 and 11 ────
+    sectionTwelveFiftySixContracts: {
+        /*
+         * ★ THE ASSIGNMENT, and it is the only thing this group exists to
+         * prove: the SHORT-term half lands on line 4 and the LONG-term half
+         * on line 11, never the other way round. Hand-typed in cents.
+         *
+         *   Form 6781 line 7   $43,000.00
+         *   Form 6781 line 8   40%, short-term    $17,200.00  -> Sch D line 4
+         *   Form 6781 line 9   60%, long-term     $25,800.00  -> Sch D line 11
+         *
+         * The fixture supplies NO brokerage sale, so lines 1b/2/8b/9 are all
+         * zero and lines 7 and 15 are the two halves ALONE — which is what
+         * makes a transposition visible. With a stock sale in the mix, a swap
+         * would move two lines that already had other content and the totals
+         * would still agree.
+         *
+         *   line 7  = 17,200.00      line 15 = 25,800.00
+         *   line 16 = 43,000.00 (a gain, so line 21 is 0 and 7a is line 16)
+         */
+        theShortHalfLandsOnLineFourAndTheLongHalfOnLineEleven: () => {
+            const result = expectOk(scheduleD({
+                status: 'single',
+                brokerageForms: [],
+                dividendForms: [],
+                sectionTwelveFiftySix: {
+                    shortTermCents: 1720000n,
+                    longTermCents: 2580000n,
+                    sources: [{
+                        documentHash: 'doc-6781',
+                        boxPath: 'box11AggregateProfitOrLoss',
+                        value: '43000.00',
+                    }],
+                },
+            }))
+            assertEq(result.line4, 1720000n, '$17,200.00 — the 40% SHORT-term half')
+            assertEq(result.line11, 2580000n, '$25,800.00 — the 60% LONG-term half')
+            assertEq(result.line7, 1720000n, 'Part I total is the short half alone')
+            assertEq(result.line15, 2580000n, 'Part II total is the long half alone')
+            assertEq(result.line16, 4300000n, '$43,000.00 combined')
+            assertEq(result.line21, 0n, 'a gain, so no loss cap')
+            assertEq(result.line7aCapitalGainOrLoss, 4300000n)
+            // ★ The transposition guard, stated as an INEQUALITY between the
+            // two printed lines rather than only as two equalities: swapping
+            // the two halves leaves line 16 at $43,000.00 and reddens this.
+            assert(
+                result.line11 > result.line4,
+                ['the 60% long half must be the larger of the two printed lines on a gain',
+                    result.line4, result.line11])
+            // The citation rides through to the caller, so a report can say
+            // which document the figure came from.
+            assertEq(result.sources.filter(s => s.documentHash === 'doc-6781').length, 1)
+        },
+        /*
+         * ★ A section 1256 LOSS meets the $3,000 cap, which is the whole
+         * reason an undeclared filer must be tripwired rather than quietly
+         * given a zero.
+         *
+         *   Form 6781 line 7   $-37,000.00
+         *   line 8   40%   $-14,800.00  -> line 4
+         *   line 9   60%   $-22,200.00  -> line 11
+         *   line 16  $-37,000.00
+         *   line 21  -min(37,000.00, 3,000.00)  =  $-3,000.00
+         *   line 7a  line 21, because line 16 is a loss
+         */
+        aSectionTwelveFiftySixLossMeetsTheThreeThousandDollarCap: () => {
+            const result = expectOk(scheduleD({
+                status: 'single',
+                brokerageForms: [],
+                dividendForms: [],
+                sectionTwelveFiftySix: {
+                    shortTermCents: -1480000n, longTermCents: -2220000n, sources: [],
+                },
+            }))
+            assertEq(result.line4, -1480000n, '$-14,800.00')
+            assertEq(result.line11, -2220000n, '$-22,200.00')
+            assertEq(result.line16, -3700000n, '$-37,000.00')
+            assertEq(result.line21, -300000n, '$-3,000.00 — the single filer\u2019s cap')
+            assertEq(result.line7aCapitalGainOrLoss, -300000n)
+            // And the same loss for a married-filing-separately filer stops
+            // at $1,500.00, so this leaf is about the CAP and not about the
+            // constant $3,000.00 happening to be right.
+            const separately = expectOk(scheduleD({
+                status: 'marriedFilingSeparately',
+                brokerageForms: [],
+                dividendForms: [],
+                sectionTwelveFiftySix: {
+                    shortTermCents: -1480000n, longTermCents: -2220000n, sources: [],
+                },
+            }))
+            assertEq(separately.line21, -150000n, '$-1,500.00')
+        },
+        /*
+         * The section 1256 halves NET against ordinary Part I and Part II
+         * activity rather than replacing it — a $5,000.00 short-term stock
+         * gain plus a $-14,800.00 short-term section 1256 loss is $-9,800.00
+         * on line 7, and the long side is a $5,000.00 stock gain plus
+         * $-22,200.00 on line 15 = $-17,200.00.
+         *
+         *   line 1b  10,000.00 - 5,000.00   =  $5,000.00
+         *   line 4                             $-14,800.00
+         *   line 7   5,000.00 - 14,800.00   =  $-9,800.00
+         *   line 8b  12,000.00 - 7,000.00   =  $5,000.00
+         *   line 11                            $-22,200.00
+         *   line 15  5,000.00 - 22,200.00   =  $-17,200.00
+         */
+        theSectionTwelveFiftySixHalvesNetAgainstOrdinarySales: () => {
+            const result = expectOk(scheduleD({
+                status: 'single',
+                brokerageForms: [
+                    brokerageForm('doc-1256-st')({
+                        box1dProceeds: '10000.00',
+                        box1eCostOrOtherBasis: '5000.00',
+                        box2ShortTermGainOrLoss: true,
+                        box12BasisReportedToIrs: true,
+                    }),
+                    brokerageForm('doc-1256-lt')({
+                        box1dProceeds: '12000.00',
+                        box1eCostOrOtherBasis: '7000.00',
+                        box2LongTermGainOrLoss: true,
+                        box12BasisReportedToIrs: true,
+                    }),
+                ],
+                dividendForms: [],
+                sectionTwelveFiftySix: {
+                    shortTermCents: -1480000n, longTermCents: -2220000n, sources: [],
+                },
+            }))
+            assertEq(result.line1b, 500000n, '$5,000.00 of category-A stock gain')
+            assertEq(result.line8b, 500000n, '$5,000.00 of category-D stock gain')
+            assertEq(result.line7, -980000n, '$-9,800.00 short-term after the 1256 loss')
+            assertEq(result.line15, -1720000n, '$-17,200.00 long-term after the 1256 loss')
+            assertEq(result.line16, -2700000n, '$-27,000.00')
+            // TAX-34's uncorrected parallel carries both lines too, so the
+            // basis-correction overstatement is unaffected by section 1256.
+            assertEq(result.line16Unadjusted, -2700000n)
+            assertEq(result.basisCorrectionOverstatement, 0n)
         },
     },
     // This module never carries a `dialect`/`mediaType` tag -- it computes
