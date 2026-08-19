@@ -494,6 +494,7 @@ export const modeledKinds = /** @type {const} */ ([
     'studentLoanInterestDeduction', // 1098-E + worksheet -> Schedule 1 line 21 -> 1040 line 10
     'itemizedDeductions',          // Schedule A + deductionChoice   -> 1040 line 12e
     'qualifiedBusinessIncomeDeduction', // Form 8995 line 15         -> 1040 line 13a
+    'qualifiedReitDividends',      // 1099-DIV box 5 -> Form 8995 line 6 -> 1040 line 13a
     'seniorAndOtherScheduleOneADeductions', // Schedule 1-A Parts I/V/VI -> 1040 line 13b
     'alternativeMinimumTax',       // Form 6251 line 11 -> Schedule 2 line 2 -> 1040 line 17
     'selfEmploymentTax',           // Schedule SE line 12 -> Schedule 2 line 4 -> 1040 line 23
@@ -741,7 +742,7 @@ export const unmodeledKindRefusals = /** @type {const} */ ([
     // are a separate component of the same deduction, reachable by a taxpayer
     // who has no trade or business at all, and this engine computes the other
     // component and not this one.
-    { kind: 'qualifiedReitDividendsAndPtpIncome', line: 'Form 8995 lines 6-9 -> 1040 line 13a', label: 'qualified REIT dividends and publicly traded partnership income', remedy: 'requires Form 1099-DIV box 5 (§199A dividends), which `vnd.fjs.1099div` stores and no computation reads, and for publicly traded partnership income the Schedule K-1 dialects (DOC-24/TAX-35, Phase 30). Form 8995 lines 6 through 9 are therefore documented zeros, and the §199A deduction this engine computes is the qualified-business-income component alone (no phase yet)' },
+    { kind: 'qualifiedPubliclyTradedPartnershipIncome', line: 'Form 8995 line 6 -> 1040 line 13a', label: 'qualified publicly traded partnership income', remedy: 'requires Schedule K-1 box 20 code Z or box 17 code V, which `fjs/schedule/e`\u2019s `section199AInformationRefusal` refuses outright \u2014 a document-data refusal, so it stops the whole return whatever the profile declares. It also requires printed Form 8995 line 7, the prior-year REIT/PTP loss carryforward: line 6 can go negative only through a qualified PTP loss, never a REIT dividend, so line 7 is a safe structural zero ONLY while this kind refuses (no phase yet)' },
     // ── Schedule 2's fourteen per-line kinds (TAX-22, Phase 23) ─────────────
     //
     // `scheduleTwoTaxes` -- one coarse row covering this whole block --
@@ -1361,7 +1362,7 @@ export const classifyScope = declaredKinds => {
  * and `fjs/form8995` wiring that makes all three computable.
  * @type {number}
  */
-const expectedModeledKindCount = 42
+const expectedModeledKindCount = 43
 
 /**
  * The modeled set, hand-typed a SECOND time and in {@link kindVocabulary}'s
@@ -1401,6 +1402,7 @@ const everyModeledKindHandTyped = [
     'studentLoanInterestDeduction',
     'itemizedDeductions',
     'qualifiedBusinessIncomeDeduction',
+    'qualifiedReitDividends',
     'seniorAndOtherScheduleOneADeductions',
     'alternativeMinimumTax',
     'selfEmploymentTax',
@@ -1483,6 +1485,14 @@ const everyModeledKindHandTyped = [
  * exactly the case where a hand-typed constant proves nothing on its own —
  * `theHandTypedListNamesEveryModeledKind` and the vocabulary count in
  * `fjs/return/profile`, which DID move by three, are what catch it.
+ *
+ * **It happened a SECOND time, and for a different reason worth telling
+ * apart.** Splitting `qualifiedReitDividendsAndPtpIncome` moved this count
+ * `73 - 1 + 1`: the coarse row left and a `qualifiedPubliclyTradedPartnership\u2010
+ * Income` row took its place, while the REIT half went to
+ * {@link modeledKinds}. So an unmoved count meant one row reclassified and
+ * one row rewritten, not a quiet phase and not a no-op. The vocabulary count
+ * in `fjs/return/profile` moved 114 -> 115, which is again what catches it.
  *
  * `62 -> 77` is Phase 29's own first commit (TAX-33), and it is fifteen ADDED
  * rather than a coarse kind split: Form 6251 Part I's §56/§57 adjustments and
@@ -2280,7 +2290,7 @@ export const proof = {
             const added = [
                 ['churchEmployeeIncome', '§1402(g)'],
                 ['selfEmploymentOptionalMethods', 'ELECTIONS'],
-                ['qualifiedReitDividendsAndPtpIncome', 'box 5'],
+                ['qualifiedPubliclyTradedPartnershipIncome', 'code Z'],
             ]
             assertEq(added.length, 3, 'hand-counted: two Schedule SE facts and one Form 8995 component')
             for (const [kind, phrase] of added) {
@@ -2424,6 +2434,25 @@ export const proof = {
             assertEq(
                 outcome.kind, 'ok',
                 ['Form 6251 line 2j\'s kind alone must be in scope', outcome])
+        },
+        qualifiedReitDividendsIsInScopeAlone: () => {
+            const outcome = classifyScope(['qualifiedReitDividends'])
+            assertEq(
+                outcome.kind, 'ok',
+                ['Form 8995 line 6\'s REIT half alone must be in scope', outcome])
+        },
+        // The control the split exists for. Reclassifying the coarse kind
+        // whole would have made this pass too, and a taxpayer holding a
+        // pipeline K-1 would have been told a deduction was computed for a
+        // return `fjs/schedule/e` refuses outright.
+        qualifiedPubliclyTradedPartnershipIncomeStillRefusesAlone: () => {
+            const outcome = classifyScope(['qualifiedPubliclyTradedPartnershipIncome'])
+            assert(
+                outcome.kind === 'error',
+                ['the PTP half must still refuse on its own', outcome])
+            assert(
+                outcome.message.includes('code Z'),
+                ['and must name the K-1 box that refuses', outcome.message])
         },
         // TAX-30, Phase 27: the SIX Schedule 1 Part I kinds this phase did NOT
         // wire must still refuse on their own, or the split quietly widened

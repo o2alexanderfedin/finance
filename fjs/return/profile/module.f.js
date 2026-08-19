@@ -268,10 +268,22 @@ export const kindVocabulary = /** @type {const} */ ([
     //
     // Form 8995 lines 6-9 are the REIT/PTP component, and they are a
     // SEPARATE fact from the deduction itself: a taxpayer can have qualified
-    // REIT dividends with no trade or business at all. Form 1099-DIV box 5
-    // carries §199A dividends and `vnd.fjs.1099div` stores them, but nothing
-    // reads that box, and PTP income needs Schedule K-1 (DOC-24, Phase 30).
-    'qualifiedReitDividendsAndPtpIncome',   // Form 8995 lines 6-9 -> 13a
+    // REIT dividends with no trade or business at all.
+    //
+    // **One coarse kind stood here until box 5 was wired, and it had to be
+    // SPLIT rather than reclassified.** The two halves are not equally
+    // reachable: a Form 1099-DIV box 5 is a number this engine now reads and
+    // deducts, while publicly traded partnership income is refused TWICE
+    // OVER -- `fjs/schedule/e`'s `section199AInformationRefusal` stops the
+    // whole return for any K-1 carrying box 20 code Z or box 17 code V, and
+    // that is a document-data refusal, so it fires whatever the profile
+    // declares. Reclassifying the pair whole would have told a pipeline-K-1
+    // holder that this engine computes their §199A deduction when it in fact
+    // refuses to produce a return at all -- the overstatement TAX-16 exists
+    // to prevent, and worse than the gap it replaced, which at least refused
+    // loudly.
+    'qualifiedReitDividends',               // 1099-DIV box 5 -> Form 8995 line 6 -> 13a
+    'qualifiedPubliclyTradedPartnershipIncome', // K-1 box 20 code Z -> Form 8995 line 6 -> 13a
     'seniorAndOtherScheduleOneADeductions', // 13b
     // ── Schedule 2's own lines, one kind each (TAX-22, Phase 23) ────────────
     //
@@ -1194,7 +1206,7 @@ const expectedMoneyBoxFieldCount = 4
  * truthfully declare having, and printed Schedule 1 line 5 is five of those.
  * @type {number}
  */
-const expectedKindCount = 114
+const expectedKindCount = 115
 
 export const proof = {
     dialectAndMediaType: () => {
