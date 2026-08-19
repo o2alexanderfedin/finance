@@ -839,9 +839,10 @@ const selfEmploymentInput = netProfit => socialSecurityWages => ({
     lines: scheduleSelfEmploymentPartI(taxParams2025)({
         netProfitCents: netProfit.value,
         // Schedule 2 reads Schedule SE's OUTPUT and never its inputs, so a
-        // pass-through share would reach these fixtures only through
-        // `netProfit`'s own value. Held at zero here deliberately: every
-        // assertion below is about Schedule 2's own arithmetic.
+        // pass-through share or a farm profit would reach these fixtures only
+        // through `netProfit`'s own value. Both held at zero here deliberately:
+        // every assertion below is about Schedule 2's own arithmetic.
+        farmNetProfitCents: 0n,
         partnershipSelfEmploymentEarningsCents: 0n,
         socialSecurityWagesCents: socialSecurityWages.value,
     }),

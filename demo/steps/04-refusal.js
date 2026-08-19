@@ -36,11 +36,15 @@ const offered = [
     // `scheduleOneAdditionalIncome` — the coarse kind for the whole of
     // Schedule 1 Part I — was split into seven per-printed-line kinds in
     // Phase 27 (TAX-30) and no longer exists. `farmIncomeOrLoss` (Schedule 1
-    // line 6, Schedule F) is its replacement here: a Part I line that is
-    // still refused after that split, so this toggle still demonstrates the
-    // same block of the same schedule. Deliberately NOT `businessIncomeOrLoss`
-    // — that one is MODELED as of the same phase.
-    'farmIncomeOrLoss',
+    // line 6, Schedule F) replaced it here, and the Schedule F wiring MODELED
+    // that in turn — so this slot is re-pointed a second time, at
+    // `netFarmRentalIncomeForm4835`. It is still a Schedule 1 Part I line
+    // (line 5, through Schedule E Part V line 40), it is still genuinely
+    // unreachable, and it is the nearest neighbour of the kind it replaces:
+    // Form 4835 is what a landowner files when they did NOT materially
+    // participate, and materially participating is what puts them on the
+    // Schedule F this engine now computes.
+    'netFarmRentalIncomeForm4835',
     // `qualifiedBusinessIncomeDeduction` moved to `modeledKinds` in Phase 28
     // (TAX-32) — swapped for the §199A component that is STILL refused, so
     // this toggle keeps demonstrating the same deduction and the same 1040

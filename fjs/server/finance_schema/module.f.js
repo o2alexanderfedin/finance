@@ -76,6 +76,7 @@ import { dialect as basisCorrectionDialect, basisCorrectionSchema } from '../../
 import { dialect as oneZeroNineFiveADialect, oneZeroNineFiveASchema } from '../../document/1095a/module.f.js'
 import { dialect as assetRegisterDialect, assetRegisterSchema } from '../../document/asset_register/module.f.js'
 import { dialect as rentalPropertyDialect, rentalPropertySchema } from '../../document/rental_property/module.f.js'
+import { dialect as farmDialect, farmSchema } from '../../document/farm/module.f.js'
 import { dialect as k1PartnershipDialect, k1PartnershipSchema } from '../../document/k1_1065/module.f.js'
 import { dialect as k1SCorporationDialect, k1SCorporationSchema } from '../../document/k1_1120s/module.f.js'
 import { dialect as k1EstateTrustDialect, k1EstateTrustSchema } from '../../document/k1_1041/module.f.js'
@@ -150,6 +151,14 @@ const dialectSchemas = {
     // the guess this tool exists to make unnecessary. Registered in the SAME
     // commit as `fjs/media/dialects`'s entry.
     [rentalPropertyDialect]: rentalPropertySchema,
+    // `vnd.fjs.farm`. An agent filing for a farmer has to author printed Part
+    // I's fourteen amounts and printed Part II's twenty-five expense
+    // categories, and guessing whether the field is `accountingMethod` or
+    // `method` -- or that printed line 6d must be stated as `"0.00"` rather
+    // than omitted -- is exactly the guess this tool exists to make
+    // unnecessary. Registered in the SAME commit as `fjs/media/dialects`'s
+    // entry.
+    [farmDialect]: farmSchema,
 }
 
 /**
@@ -231,7 +240,8 @@ export const knownDialects = /** @type {readonly string[]} */ (Object.keys(diale
  *
  * The Schedule E Part I wiring registers the TWENTY-NINTH,
  * `vnd.fjs.rental_property`, moving the count from 28 to 29, and it gained its
- * own `*Resolves` leaf below.
+ * own `*Resolves` leaf below. The Schedule F wiring registers the THIRTIETH,
+ * `vnd.fjs.farm`, the same way.
  *
  * **`fjs/server/dialect_parity` is now what keeps this count and
  * `fjs/media/dialects`'s in step.** Raising one of the two hand-typed counts
@@ -239,7 +249,7 @@ export const knownDialects = /** @type {readonly string[]} */ (Object.keys(diale
  * which is the check the two paragraphs of prose above turned out not to be.
  * @type {number}
  */
-const expectedKnownDialectCount = 29
+const expectedKnownDialectCount = 30
 
 /**
  * `finance_schema(dialect)`: the MCP tool. Looks `dialect` up in
@@ -509,6 +519,15 @@ export const proof = {
         assertEq(
             JSON.stringify(JSON.parse(textOf(result))),
             JSON.stringify(toJsonSchema(rentalPropertySchema)),
+        )
+    },
+    // THIRTIETH, registered in the same commit as the Schedule F wiring.
+    farmResolves: () => {
+        const result = call('vnd.fjs.farm')
+        assertEq(result.isError, undefined)
+        assertEq(
+            JSON.stringify(JSON.parse(textOf(result))),
+            JSON.stringify(toJsonSchema(farmSchema)),
         )
     },
     basisCorrectionResolves: () => {

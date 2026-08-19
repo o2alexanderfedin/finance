@@ -108,6 +108,7 @@ export const render = root => {
         businessExpenseForms: [],
         assetRegisters: [],
         rentalProperties: [],
+        farmForms: [],
         priorYearIraBasisForms: [],
         isoExerciseForms: [],
         employeeStockPurchaseForms: [],
