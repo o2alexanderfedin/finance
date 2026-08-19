@@ -45,6 +45,9 @@ const neutral = {
     form4952Line4gCents: 0n,
     form4952Line4eCents: 0n,
     filingForm2555: false,
+    form2555Line45Cents: 0n,
+    form2555Line50Cents: 0n,
+    form2555ItemizedDeductionsAndExclusionsNotClaimedCents: 0n,
     form8615Applies: false,
     scheduleJElected: false,
 }

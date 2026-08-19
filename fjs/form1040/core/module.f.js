@@ -99,6 +99,7 @@ import { farmingIsNotASpecifiedServiceTradeOrBusiness } from '../../schedule/f/m
 import { scheduleThree, foreignTaxCreditLine } from '../../schedule/3/module.f.js'
 import { form8812 } from '../../form8812/module.f.js'
 import { form8962 } from '../../form8962/module.f.js'
+import { form2555 } from '../../form2555/module.f.js'
 import { form2441Credit, form2441DependentCareBenefits } from '../../form2441/module.f.js'
 import { form7206 } from '../../form7206/module.f.js'
 import { iraTaxableAmount, rothDistributionCodeOf } from '../../form8606/module.f.js'
@@ -124,6 +125,7 @@ import {
 /** @import { OneZeroNineEightT } from '../../document/1098t/module.f.js' */
 /** @import { Credits } from '../../document/credits/module.f.js' */
 /** @import { Form2441Common } from '../../form2441/module.f.js' */
+/** @import { Form2555Lines } from '../../form2555/module.f.js' */
 /** @import { OneZeroNineNineG } from '../../document/1099g/module.f.js' */
 /** @import { OneZeroNineNineNec } from '../../document/1099nec/module.f.js' */
 /** @import { BusinessExpenses } from '../../document/business_expenses/module.f.js' */
@@ -750,6 +752,7 @@ const storedFilingStatusNamed = status =>
  *   readonly dependentCare: Form2441Common,
  *   readonly amtDepreciationAdjustmentCents: bigint,
  *   readonly rentalRealEstateAndRoyaltyIncome: ReportLine,
+ *   readonly foreignEarnedIncome: Form2555Lines,
  * }} Form1040IncomeLines
  */
 
@@ -1316,6 +1319,19 @@ export const form1040IncomeLines = taxParamSet => inputs => {
     // stage-1 guard immediately below and like the Schedule D and Schedule A
     // guards above: `unmodeled: []`, since this names no `fjs/return/scope`
     // kind.
+    //
+    // **Line 8d is TAX-42's** (§911): `fjs/form2555`'s own line 45, entered as
+    // a NEGATIVE inside Part I and reaching 1040 line 8 through Schedule 1's
+    // own line 10 — never by a side channel, the identical discipline lines 3,
+    // 5 and 6 already follow. The form runs HERE, once; every other reader of
+    // its lines 45 and 50 (line 16's worksheet, Form 8962's household income,
+    // Schedule 8812, Schedule 1-A, Schedule A, Form 8863, Form 6251 and the
+    // §32/§24(d)(5) bars) reads THIS execution off `income.foreignEarnedIncome`.
+    const foreignEarnedIncomeOutcome = foreignEarnedIncomeOf(taxParamSet)(profile)
+    if (foreignEarnedIncomeOutcome.kind === 'error') {
+        return foreignEarnedIncomeOutcome
+    }
+    const foreignEarnedIncome = foreignEarnedIncomeOutcome.lines
     const scheduleOnePartIResult = scheduleOnePartI(taxParamSet)({
         profile, unemploymentForms, nonemployeeCompensationForms, businessExpenseForms,
         w2Forms: w2s,
@@ -1346,6 +1362,7 @@ export const form1040IncomeLines = taxParamSet => inputs => {
         // `formFortySevenNinetySevenGainCents` below is the only figure on this
         // record that could ever supply the split.
         form1040Line7aCents: line7a.value,
+        form2555Line45Cents: foreignEarnedIncome.line45,
         // **Line 13 of the Schedule C inside Part I is this commit's** (Form
         // 4562): `vnd.fjs.asset_register` reaches Schedule C line 13 through
         // Form 4562 line 22, and its alternative-minimum-tax adjustment
@@ -2087,6 +2104,7 @@ export const form1040IncomeLines = taxParamSet => inputs => {
         // reads, and a landlord must be able to see the property document
         // behind their net investment income tax.
         rentalRealEstateAndRoyaltyIncome: scheduleOnePartIResult.scheduleE.partI.line26,
+        foreignEarnedIncome,
         line1a, line1b, line1c, line1d, line1e, line1f, line1g, line1h, line1i, line1z,
         line2a, line2b,
         line3a, line3b,
@@ -2353,6 +2371,82 @@ const profileMoneyBox = profile => boxPath => {
 }
 
 /**
+ * Form 2555 Parts V, VII and VIII for this return — TAX-42, §911.
+ *
+ * **Computed HERE, once, and BEFORE Schedule 1 Part I**, because line 45
+ * reaches Schedule 1 line 8d and therefore 1040 line 8, while lines 45 and 50
+ * together reach the Foreign Earned Income Tax Worksheet at line 16, Form
+ * 8962's own line 2a add-back, Schedule 8812's line 2b/2c, Schedule 1-A's,
+ * Schedule A's SALT worksheet, Form 8863's modified AGI and the §32/§24(d)(5)
+ * bars. A second execution at any of those call sites is how two executions
+ * come to disagree — the reason `fjs/tax/line16`'s preferential worksheet
+ * rides out on its own `ok` arm rather than being recomputed for Form 6251.
+ *
+ * **The refusal is the day count, and it is the one range check this layer
+ * owns.** `fjs/return/profile`'s check 12 bounds the stated days by 366,
+ * because that dialect does not know whether the year it names is a leap
+ * year. The tighter bound is the actual length of THIS tax year, which lives
+ * in the parameter set, so it is checked where the parameter set is — and a
+ * qualifying period longer than the tax year is refused rather than clamped,
+ * since clamping would compute a different return than the one the taxpayer
+ * described.
+ * @type {(taxParamSet: TaxParamSet) => (profile: Stored<ReturnProfile>) => { readonly kind: 'ok', readonly lines: Form2555Lines } | Form1040Error}
+ */
+const foreignEarnedIncomeOf = taxParamSet => profile => {
+    const daysInTaxYear = taxParamSet.foreignEarnedIncome.daysInTaxYear
+    const statedDays = profile.value.foreignEarnedIncomeQualifyingDays
+    if (statedDays !== undefined && statedDays > daysInTaxYear) {
+        return {
+            kind: 'error',
+            message: `Form 2555 line 38: this return states ${statedDays} qualifying days, and the `
+                + `${taxParamSet.taxYear} tax year has ${daysInTaxYear}. i2555's line 31 `
+                + `instruction asks for "the number of days in your qualifying period that FALL `
+                + `WITHIN your tax year", so a count longer than the year is a count of something `
+                + `else — most likely the whole qualifying period, which for a filer abroad for `
+                + `years is far longer. Line 39 would then exceed 1.000 and line 40 would exceed `
+                + `the $130,000 maximum. Refusing rather than clamping it to `
+                + `${daysInTaxYear}: clamping would compute a return the taxpayer did not `
+                + `describe. Nothing reaches Schedule 1 line 8d`,
+            unmodeled: [],
+        }
+    }
+    const printedIncome = profile.value.foreignEarnedIncome
+    const printedAllocable = profile.value.foreignEarnedIncomeDeductionsAllocableToExcludedIncome
+    return { kind: 'ok', lines: form2555(taxParamSet)({
+        foreignEarnedIncomeCents: printedIncome === undefined ? 0n : centsFromString(printedIncome),
+        qualifyingDaysInTaxYear: BigInt(statedDays ?? 0),
+        // Form 2555 line 36, the housing exclusion —
+        // `foreignHousingExclusionOrDeduction` is a refused
+        // `fjs/return/scope` kind, so a return claiming it never reaches here.
+        // NAMED rather than omitted; see `fjs/form2555`'s own docstring.
+        housingExclusionCents: 0n,
+        deductionsAllocableToExcludedIncomeCents:
+            printedAllocable === undefined ? 0n : centsFromString(printedAllocable),
+    }) }
+}
+
+/**
+ * The Foreign Earned Income Tax Worksheet's own line 2b — "the total amount of
+ * any itemized deductions or exclusions you couldn't claim because they are
+ * related to excluded income" — read straight off the profile.
+ *
+ * **A different figure from Form 2555 line 44**, which
+ * {@link foreignEarnedIncomeOf} reads two fields over: line 44 is
+ * ABOVE-the-line and reduces the exclusion itself, this one is below the line
+ * and reduces the amount the tax worksheet stacks the remaining income on top
+ * of. The two field names say which is which, and folding them into one would
+ * subtract the same dollars twice on two different forms.
+ *
+ * i1040gi p37 and i6251 p10 print the line identically, which is why one
+ * function serves both worksheets.
+ * @type {(profile: Stored<ReturnProfile>) => bigint}
+ */
+const foreignEarnedIncomeWorksheetLineTwoBCents = profile => {
+    const printed = profile.value.foreignEarnedIncomeItemizedDeductionsAndExclusionsNotClaimed
+    return printed === undefined ? 0n : centsFromString(printed)
+}
+
+/**
  * Narrows the return profile's stored `federalPovertyLineTable` string to the
  * three names `fjs/tax/params` actually keys a table by — the same
  * find-by-equality idiom {@link storedFilingStatusNamed} uses one screen up,
@@ -2578,7 +2672,25 @@ const form1040TaxAndPaymentLines = taxParamSet => inputs => income => {
         filingForm4952: false,
         form4952Line4gCents: 0n,
         form4952Line4eCents: 0n,
-        filingForm2555: false,
+        // TAX-42. The switch is the EXCLUSION being non-zero rather than a
+        // profile flag, because Form 2555 line 45's own instruction is what
+        // sends a filer to the worksheet: "Complete the Foreign Earned Income
+        // Tax Worksheet in the Instructions for Form 1040 if you enter an
+        // amount on this line." A stored Form 2555 that excludes nothing —
+        // zero qualifying days, or no foreign earned income — leaves line 16
+        // exactly where it was, which is what the printed page says and what
+        // `aStoredFormTwoFiveFiveFiveThatExcludesNothingLeavesLineSixteenAlone`
+        // asserts.
+        filingForm2555: income.foreignEarnedIncome.line45 !== 0n,
+        form2555Line45Cents: income.foreignEarnedIncome.line45,
+        // Form 2555 line 50, the housing DEDUCTION —
+        // `foreignHousingExclusionOrDeduction` is a refused kind. NAMED here
+        // rather than folded into line 45, because the worksheet's own line 2a
+        // reads "lines 45 and 50" and a reader diffing this against the page
+        // needs to see both.
+        form2555Line50Cents: 0n,
+        form2555ItemizedDeductionsAndExclusionsNotClaimedCents:
+            foreignEarnedIncomeWorksheetLineTwoBCents(profile),
         form8615Applies: false,
         scheduleJElected: false,
     })
@@ -3492,7 +3604,7 @@ const expectedIncomeLineCount = 31
  * so the `Exclude<>` below is what turns forgetting one of them into a
  * compile error rather than a crash on a missing `.sources` — which is
  * exactly what it did when this phase first added them.
- * @type {readonly Exclude<keyof Form1040IncomeLines, 'kind' | 'filingScheduleD' | 'scheduleD15Cents' | 'scheduleD16Cents' | 'scheduleD18Cents' | 'scheduleD19Cents' | 'selfEmployment' | 'specifiedPrivateActivityBondInterest' | 'itemizing' | 'scheduleALine7Cents' | 'scheduleOneALine37Cents' | 'disqualifiedPassiveIncomeCents' | 'formFortySevenNinetySevenGainCents' | 'dependentCareLine31Cents' | 'dependentCareApplicable' | 'dependentCare' | 'amtDepreciationAdjustmentCents' | 'rentalRealEstateAndRoyaltyIncome'>[]}
+ * @type {readonly Exclude<keyof Form1040IncomeLines, 'kind' | 'filingScheduleD' | 'scheduleD15Cents' | 'scheduleD16Cents' | 'scheduleD18Cents' | 'scheduleD19Cents' | 'selfEmployment' | 'specifiedPrivateActivityBondInterest' | 'itemizing' | 'scheduleALine7Cents' | 'scheduleOneALine37Cents' | 'disqualifiedPassiveIncomeCents' | 'formFortySevenNinetySevenGainCents' | 'dependentCareLine31Cents' | 'dependentCareApplicable' | 'dependentCare' | 'amtDepreciationAdjustmentCents' | 'rentalRealEstateAndRoyaltyIncome' | 'foreignEarnedIncome'>[]}
  */
 const incomeLineFieldNames = /** @type {const} */ ([
     'line1a', 'line1b', 'line1c', 'line1d', 'line1e', 'line1f', 'line1g', 'line1h', 'line1i', 'line1z',

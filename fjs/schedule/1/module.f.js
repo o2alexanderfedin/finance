@@ -641,6 +641,7 @@ const earlyWithdrawalPenaltyLine = profile => forms => {
  *   readonly status: IndividualFilingStatus,
  *   readonly form1040Line7aCents: bigint,
  *   readonly otherGainsOrLosses?: OtherGainsOrLosses,
+ *   readonly form2555Line45Cents: bigint,
  * }} ScheduleOnePartIInput
  */
 
@@ -704,7 +705,7 @@ export const scheduleOnePartI = taxParamSet => input => {
         profile, unemploymentForms, nonemployeeCompensationForms, businessExpenseForms, w2Forms,
         assetRegisters, rentalProperties, farmForms,
         partnershipK1Forms, sCorporationK1Forms, estateTrustK1Forms,
-        status, form1040Line7aCents,
+        status, form1040Line7aCents, form2555Line45Cents,
     } = input
     const zero = profileDeclaredZeroLine(profile)
     // `rentalProperties` and `farmForms` reach MORE than one schedule each, and
@@ -786,16 +787,45 @@ export const scheduleOnePartI = taxParamSet => input => {
         rule: 'Schedule 1 line 6 (farm income/loss, Schedule F line 34)',
     }
     const line7 = unemploymentCompensationLine(profile)(unemploymentForms)
-    // 8. "Other income" -- a collapsed stand-in for 8a-8z (23 printed
-    //    sub-lines, 8a through 8v and 8z; the "26" this comment carried until
-    //    2026-08-18 counted letters the form does not print);
-    //    see this module's own docstring, "The 26/11 sub-line collapses".
-    const line8 = zero(
-        'Schedule 1 line 8 (other income, 8a-8z collapsed EXCEPT 8p -- none separately reachable)')
-    // **8p -- the §461(l) excess business loss adjustment, and the ONE sub-line
-    // that has come out of the 8a-8z collapse.** i461 line 16: "enter the
-    // amount from line 16 as a positive number on Schedule 1 (Form 1040),
-    // line 8p."
+    // 8. "Other income" -- twenty-three printed sub-lines, 8a through 8v and
+    //    8z (the "26" this comment carried until 2026-08-18 counted letters
+    //    the form does not print); see this module's own docstring, "The 26/11
+    //    sub-line collapses".
+    //
+    //    **TWO of the twenty-three are now separately reachable**, and they
+    //    arrive by different routes. Line 8d is Form 2555's foreign earned
+    //    income exclusion (TAX-42), computed by the caller and handed in; line
+    //    8p is Form 461's excess business loss adjustment (TAX-40), computed
+    //    below out of lines this function already holds. 8d is folded into the
+    //    collapse line itself, because it is the only term left in it; 8p is
+    //    its own `documentLine`, and printed line 9 adds the two.
+    //
+    //    i2555 p7 states 8d's sign in words: "Enter the amount from line 45 on
+    //    Schedule 1 (Form 1040), line 8d. Reduce the other items of additional
+    //    income by the NEGATIVE amount on line 8d". So the exclusion enters
+    //    here NEGATED -- an exclusion that arrived positive would ADD
+    //    $130,000 to income, which is the sign error this comment exists to
+    //    make visible at the site.
+    //
+    //    The line is a `documentLine`, not a `zero(...)` supplemented by an
+    //    amount: a return with no exclusion cites `declaredKinds` exactly as
+    //    it always did, and a return with one cites the profile box the
+    //    figure came from and does not mention `declaredKinds` at all.
+    const line8 = form2555Line45Cents === 0n
+        ? zero('Schedule 1 line 8 (other income, 8a-8z; 8d and 8p are the only ones this engine '
+            + 'computes)')
+        : documentLine(profile)(
+            'Schedule 1 line 8 (other income; 8d, the Form 2555 line 45 foreign earned income '
+            + 'exclusion, entered as a negative)')(
+            -form2555Line45Cents)([{
+                documentHash: profile.documentHash,
+                boxPath: 'foreignEarnedIncome',
+                value: profile.value.foreignEarnedIncome ?? '',
+            }])
+    // **8p -- the §461(l) excess business loss adjustment, and the SECOND of
+    // the two sub-lines that have come out of the 8a-8z collapse.** i461 line
+    // 16: "enter the amount from line 16 as a positive number on Schedule 1
+    // (Form 1040), line 8p."
     //
     // Form 461 is computed HERE rather than in `fjs/form1040/core`, for the
     // reason lines 3, 5 and 6 are restated here rather than reaching 1040 line
@@ -879,7 +909,8 @@ export const scheduleOnePartI = taxParamSet => input => {
     const line8p = documentLine(profile)(
         'Schedule 1 line 8p (excess business loss adjustment, Form 461 line 16)')(
         excessBusinessLossCents)(unionSources([line3, line5, line6]))
-    // 9. "Total other income. Add lines 8a through 8z" -- 8p plus the collapse.
+    // 9. "Total other income. Add lines 8a through 8z" -- line 8's collapse
+    //    (8d and nothing else) plus 8p.
     const line9 = totalLine('Schedule 1 line 9 (total other income)')([line8, line8p])
     // 10. "Combine lines 1 through 7 and 9." -> 1040 line 8.
     const line10 = totalLine('Schedule 1 line 10 (total additional income -> 1040 line 8)')([
@@ -2559,6 +2590,7 @@ export const scheduleOne = taxParamSet => input => {
         marketplaceCoverageStored, form1040Line7aCents,
     } = input
     const partI = scheduleOnePartI(taxParamSet)({
+        form2555Line45Cents: 0n,
         profile, unemploymentForms, nonemployeeCompensationForms, businessExpenseForms, w2Forms,
         assetRegisters, rentalProperties, farmForms,
         partnershipK1Forms, sCorporationK1Forms, estateTrustK1Forms,
@@ -2969,6 +3001,7 @@ const partIOf = profile => unemploymentForms => nonemployeeCompensationForms => 
     scheduleOnePartI(taxParams2025)({
         status: 'single',
         form1040Line7aCents: 0n,
+        form2555Line45Cents: 0n,
         assetRegisters: [],
         rentalProperties: [],
         farmForms: [],
@@ -3294,6 +3327,7 @@ const stageOneWithBusiness = profile => status => nonemployeeCompensationForms =
         const partI = okPartI(scheduleOnePartI(taxParams2025)({
             status: 'single',
             form1040Line7aCents: 0n,
+            form2555Line45Cents: 0n,
             assetRegisters: [],
             rentalProperties: [],
             farmForms: [],
@@ -3328,6 +3362,7 @@ const stageOneWithPassThrough = profile => status => partnershipK1Forms =>
         const partI = okPartI(scheduleOnePartI(taxParams2025)({
             status: 'single',
             form1040Line7aCents: 0n,
+            form2555Line45Cents: 0n,
             assetRegisters: [],
             rentalProperties: [],
             farmForms: [],
@@ -3439,6 +3474,7 @@ const stageOneForHealthInsurance =
             const partI = okPartI(scheduleOnePartI(taxParams2025)({
                 status: 'single',
                 form1040Line7aCents: 0n,
+                form2555Line45Cents: 0n,
                 assetRegisters: [],
                 rentalProperties: [],
                 farmForms: [],
@@ -4057,6 +4093,7 @@ export const proof = {
             const withK1 = okPartI(scheduleOnePartI(taxParams2025)({
                 status: 'single',
                 form1040Line7aCents: 0n,
+                form2555Line45Cents: 0n,
                 assetRegisters: [],
                 rentalProperties: [],
                 farmForms: [],
@@ -4095,6 +4132,7 @@ export const proof = {
             const partI = okPartI(scheduleOnePartI(taxParams2025)({
                 status: 'single',
                 form1040Line7aCents: 0n,
+                form2555Line45Cents: 0n,
                 assetRegisters: [],
                 rentalProperties: [],
                 farmForms: [],
@@ -4118,6 +4156,7 @@ export const proof = {
             const result = refusal(scheduleOnePartI(taxParams2025)({
                 status: 'single',
                 form1040Line7aCents: 0n,
+                form2555Line45Cents: 0n,
                 assetRegisters: [],
                 rentalProperties: [],
                 farmForms: [],
@@ -4229,6 +4268,7 @@ export const proof = {
             const partI = okPartI(scheduleOnePartI(taxParams2025)({
                 status: 'single',
                 form1040Line7aCents: 0n,
+                form2555Line45Cents: 0n,
                 assetRegisters: [],
                 rentalProperties: [],
                 farmForms: [],
@@ -5301,6 +5341,7 @@ export const proof = {
             const partI = okPartI(scheduleOnePartI(taxParams2025)({
                 status: 'single',
                 form1040Line7aCents: 0n,
+                form2555Line45Cents: 0n,
                 assetRegisters: [],
                 rentalProperties: [],
                 farmForms: [],
@@ -6227,6 +6268,7 @@ export const proof = {
          */
         theCapitalGainOrLossReachesPrintedFormFourSixtyOneLineThree: () => {
             const partI = okPartI(scheduleOnePartI(taxParams2025)({
+                form2555Line45Cents: 0n,
                 status: 'single',
                 form1040Line7aCents: -300000n,
                 assetRegisters: [],
@@ -6248,6 +6290,7 @@ export const proof = {
             // The joint threshold reaches printed line 15 from the STATUS this
             // schedule hands over, which is the second wiring here.
             const joint = okPartI(scheduleOnePartI(taxParams2025)({
+                form2555Line45Cents: 0n,
                 status: 'marriedFilingJointly',
                 form1040Line7aCents: 0n,
                 assetRegisters: [],
@@ -6298,6 +6341,7 @@ export const proof = {
             }
             /** @type {(filed: boolean) => (cents: bigint) => ScheduleOnePartI} */
             const withLineFour = filed => cents => okPartI(scheduleOnePartI(taxParams2025)({
+                form2555Line45Cents: 0n,
                 status: 'single',
                 form1040Line7aCents: 0n,
                 otherGainsOrLosses: {
@@ -6338,6 +6382,7 @@ export const proof = {
                 'toward the threshold, which is what §461(l) measures')
             // 3. ★ THE CONTROL: the SAME magnitude on printed line 3 cancels.
             const capital = okPartI(scheduleOnePartI(taxParams2025)({
+                form2555Line45Cents: 0n,
                 status: 'single',
                 form1040Line7aCents: 5000000n,
                 assetRegisters: [],

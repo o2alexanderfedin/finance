@@ -62,10 +62,51 @@
  * Qualified Dividends and Capital Gain Tax Worksheet, Schedule D Tax
  * Worksheet, or Form 8615, whichever applies." Form 8615 re-enters the
  * same way, and Schedule J is an election over a re-entered base. So they
- * are modelled here as the OUTERMOST level and each one refuses: this
- * module knows which method was selected, and knows it cannot compute the
- * wrapper around it, which is precisely a TAX-16 scope refusal rather
- * than a silently ordinary number.
+ * are modelled here as the OUTERMOST level.
+ *
+ * **As of TAX-42, level 0a COMPUTES.** That sentence about re-entering the
+ * dispatch stood in this docstring for four phases while the branch below it
+ * refused; it is now what the code does. {@link levelsOneThroughThree} is a
+ * private function that takes the taxable income to price, and BOTH the
+ * ordinary path and the worksheet's line 4 call it — one body, so the
+ * worksheet cannot drift from the dispatch it is supposed to re-enter.
+ *
+ * ## §911(f), and why an approximation here is the dangerous kind
+ *
+ * The whole content of the worksheet is that excluded income still pushes
+ * the remaining income into higher brackets. §911(f)(1) states it as the
+ * excess of the tax on (taxable income PLUS the excluded amount) over the
+ * tax on (the excluded amount alone), and i2555 p3 makes it mandatory:
+ * *"you must figure the tax on your nonexcluded income using the tax rates
+ * that would have applied had you not claimed the exclusions."*
+ *
+ * The lazy implementation — price the remaining income and stop — is always
+ * SMALLER than the printed answer under a progressive schedule, so it
+ * under-taxes silently and in the taxpayer's favour. That is why the fixture
+ * behind `theStackingRuleChangesTheBracket` is one where the difference is a
+ * whole bracket rather than a rounding.
+ *
+ * **Lines 4 and 5 name DIFFERENT method sets, and the asymmetry is the
+ * worksheet.** Line 4 lists every method including both preferential
+ * worksheets and Form 8615; line 5 says *"If the amount on line 2c is less
+ * than $100,000, use the Tax Table … $100,000 or more, use the Tax
+ * Computation Worksheet"* and names no preferential worksheet at all. So
+ * line 5 is `fjs/tax/table`'s {@link baseTaxForAmount} and nothing else.
+ *
+ * ## The one corner level 0a refuses: a capital gain excess
+ *
+ * The worksheet's footnote sends a filer whose QDCGT line 4 (or Schedule D
+ * Tax Worksheet line 10) exceeds 1040 line 15 to a SECOND, modified copy of
+ * that worksheet, with four modifications reaching as far as the Unrecaptured
+ * Section 1250 Gain Worksheet. Those four are untranscribed, and running the
+ * unmodified worksheet would price the preferential slice at the wrong band,
+ * so `foreignEarnedIncomeCapitalGainExcess` refuses. Every other Form 2555
+ * return — including one whose line 3 selects the QDCGT with no excess —
+ * computes.
+ *
+ * Level 0b and 0c still refuse outright: this module knows which method was
+ * selected, and knows it cannot compute those wrappers, which is precisely a
+ * TAX-16 scope refusal rather than a silently ordinary number.
  *
  * ## One rule, one place
  *
@@ -183,6 +224,9 @@ import { scopeRefusal } from '../../return/scope/module.f.js'
  *   readonly form4952Line4gCents: bigint,
  *   readonly form4952Line4eCents: bigint,
  *   readonly filingForm2555: boolean,
+ *   readonly form2555Line45Cents: bigint,
+ *   readonly form2555Line50Cents: bigint,
+ *   readonly form2555ItemizedDeductionsAndExclusionsNotClaimedCents: bigint,
  *   readonly form8615Applies: boolean,
  *   readonly scheduleJElected: boolean,
  * }} Line16Inputs
@@ -198,66 +242,179 @@ export const dispatchLine16 = taxParamSet => inputs => {
     const {
         status, taxableIncomeCents, qualifiedDividendsCents, capitalGainDistributionsCents,
         filingScheduleD, scheduleD15Cents, scheduleD16Cents, scheduleD18Cents, scheduleD19Cents,
-        filingForm4952, form4952Line4gCents, form4952Line4eCents, filingForm2555, form8615Applies,
-        scheduleJElected,
+        filingForm4952, form4952Line4gCents, form4952Line4eCents, filingForm2555,
+        form2555Line45Cents, form2555Line50Cents,
+        form2555ItemizedDeductionsAndExclusionsNotClaimedCents,
+        form8615Applies, scheduleJElected,
     } = inputs
-    // The QDCGT arm, shared by level 2's THREE printed bullets (2c, 2d,
-    // 2e) — each of which is written below as its own `if`, exactly as
-    // the page prints it, rather than fused into one disjunction. Fusing
-    // them would read more compactly and would destroy the property this
-    // plan exists to protect: 2c and 2e have different relationships to
-    // level 2a (2c is invisible to a taxpayer with no qualified
-    // dividends; 2e is not), so a single fused condition could not be
-    // moved past 2a in the one way the ordering mutation requires.
+    // Levels 1 through 3, as ONE body taking the taxable income to price.
     //
-    // A function, called only on the arm that selects it: the worksheet
-    // must not run for a return the dispatcher refuses.
+    // It is a function of that amount because the Foreign Earned Income Tax
+    // Worksheet's line 4 prices a DIFFERENT amount from 1040 line 15 — its own
+    // line 3 — through the very same decision tree ("Use the Tax Table, Tax
+    // Computation Worksheet, Qualified Dividends and Capital Gain Tax
+    // Worksheet, Schedule D Tax Worksheet … whichever applies"). Two copies of
+    // this tree would be two copies of the ordering that this module's own
+    // docstring says no ordinary test case can tell apart, which is exactly
+    // the "one rule, one place" failure AGENTS.md records.
     //
-    // The worksheet is bound to a local and RETURNED alongside its line 25,
-    // rather than dereferenced inline: Form 6251 Part III reads four of its
-    // lines, and computing it twice is how two executions come to disagree.
-    /** @type {() => Line16Outcome} */
-    const qdcgtOutcome = () => {
-        const worksheet = qdcgt(taxParamSet)({
-            status,
-            line1Cents: taxableIncomeCents,
-            line2Cents: qualifiedDividendsCents,
-            filingScheduleD,
-            scheduleD15Cents,
-            scheduleD16Cents,
-            line7aCents: capitalGainDistributionsCents,
-        })
+    // Every OTHER input is closed over rather than passed: the preferential
+    // conditions (qualified dividends, capital gain distributions, the four
+    // Schedule D lines, Form 4952) are facts about the return and do not
+    // change between the two calls. Only the amount does.
+    /** @type {(taxableIncomeForTheseLevelsCents: bigint) => Line16Outcome} */
+    const levelsOneThroughThree = taxableIncomeForTheseLevelsCents => {
+        // The QDCGT arm, shared by level 2's THREE printed bullets (2c, 2d,
+        // 2e) — each of which is written below as its own `if`, exactly as
+        // the page prints it, rather than fused into one disjunction. Fusing
+        // them would read more compactly and would destroy the property this
+        // plan exists to protect: 2c and 2e have different relationships to
+        // level 2a (2c is invisible to a taxpayer with no qualified
+        // dividends; 2e is not), so a single fused condition could not be
+        // moved past 2a in the one way the ordering mutation requires.
+        //
+        // A function, called only on the arm that selects it: the worksheet
+        // must not run for a return the dispatcher refuses.
+        //
+        // The worksheet is bound to a local and RETURNED alongside its line 25,
+        // rather than dereferenced inline: Form 6251 Part III reads four of its
+        // lines, and computing it twice is how two executions come to disagree.
+        /** @type {() => Line16Outcome} */
+        const qdcgtOutcome = () => {
+            const worksheet = qdcgt(taxParamSet)({
+                status,
+                line1Cents: taxableIncomeForTheseLevelsCents,
+                line2Cents: qualifiedDividendsCents,
+                filingScheduleD,
+                scheduleD15Cents,
+                scheduleD16Cents,
+                line7aCents: capitalGainDistributionsCents,
+            })
+            return {
+                kind: 'ok',
+                method: 'qdcgt',
+                cents: worksheet.line25,
+                preferential: { kind: 'qdcgt', worksheet },
+            }
+        }
+        // The Schedule D Tax Worksheet arm, mirroring `qdcgtOutcome`'s own
+        // shape — a function, called only on the arm that selects it (branch
+        // 2a's guard, below, stays byte-identical; only its BODY changes, from
+        // a refusal to this computation, in this one Plan 12.1-04 commit).
+        /** @type {() => Line16Outcome} */
+        const sdtwOutcome = () => {
+            const worksheet = sdtw(taxParamSet)({
+                status,
+                line1Cents: taxableIncomeForTheseLevelsCents,
+                line2Cents: qualifiedDividendsCents,
+                form4952Line4gCents,
+                form4952Line4eCents,
+                scheduleD15Cents,
+                scheduleD16Cents,
+                scheduleD18Cents,
+                scheduleD19Cents,
+            })
+            return {
+                kind: 'ok',
+                method: 'scheduleDTaxWorksheet',
+                cents: worksheet.line47,
+                preferential: { kind: 'scheduleDTaxWorksheet', worksheet },
+            }
+        }
+        // ── LEVEL 1 — THE PREFERENTIAL-RATE GATE ─────────────────────────────
+        //
+        // From the Schedule D Tax Worksheet header's own "Exception"
+        // (i1040sd p15).
+        //
+        // 1a. Form 1040 line 15 is zero or less: neither preferential
+        //     worksheet runs and the tax is $0. Tagged `'taxTable'` because
+        //     that is the method the printed default names for an amount
+        //     below $100,000 — not because a table lookup happened.
+        if (taxableIncomeForTheseLevelsCents <= 0n) {
+            return { kind: 'ok', method: 'taxTable', cents: 0n, preferential: { kind: 'none' } }
+        }
+        // 1b is NOT a separate branch here. 10-RESEARCH.md states it as
+        // "(Sch D line 15 <= 0 OR Sch D line 16 <= 0) AND line 3a = 0 ->
+        // neither worksheet", which is exactly the negation of 2c, 2d and 2e
+        // below: such a return falls through all three to level 3 on its own.
+        // Written down so a reader diffing this against the research tree
+        // does not conclude a level went missing.
+        //
+        // ── LEVEL 2 — WHICH PREFERENTIAL WORKSHEET ───────────────────────────
+        //
+        // The Schedule D Tax Worksheet is tested STRICTLY BEFORE the QDCGT.
+        // The instructions say so in words — the QDCGT heading opens "Use the
+        // Qualified Dividends and Capital Gain Tax Worksheet, later, to
+        // figure your tax IF YOU DON'T HAVE TO USE THE SCHEDULE D TAX
+        // WORKSHEET" — and this module's docstring says why the order is
+        // undetectable by any ordinary test case.
+        const scheduleDLinesFifteenAndSixteenAreBothGains
+            = filingScheduleD && scheduleD15Cents > 0n && scheduleD16Cents > 0n
+        // 2a. "You have to file Schedule D, line 18 or 19 of Schedule D is
+        //     more than zero, and lines 15 and 16 of Schedule D are gains."
+        //
+        //     WHY 2a MUST PRECEDE 2c. A taxpayer with both qualified
+        //     dividends and §1250 or collectibles gain routed to the QDCGT
+        //     gets the whole preferential slice taxed at 0/15/20%, while the
+        //     Schedule D Tax Worksheet taxes unrecaptured §1250 gain at up to
+        //     25% and collectibles at 28%. The answer is wrong, it is wrong
+        //     in the taxpayer's favour, and nothing screams — because with
+        //     lines 18 and 19 zero the two worksheets are algebraically
+        //     identical, so no ordinary test case can tell the two orderings
+        //     apart. Only the SELECTED METHOD can.
+        //
+        //     As of Plan 12.1-04 (12.1-CONTEXT.md Decision 1.1), this branch
+        //     COMPUTES via `sdtwOutcome()` instead of refusing — the guard
+        //     above stays byte-identical; only the body changes.
+        if (scheduleDLinesFifteenAndSixteenAreBothGains
+            && (scheduleD18Cents > 0n || scheduleD19Cents > 0n)) {
+            return sdtwOutcome()
+        }
+        // 2b. "You have to file Form 4952 and you have an amount on line 4g,
+        //     even if you don't need to file Schedule D."
+        //
+        //     [FINDING, 10-RESEARCH.md] The form face and the instructions
+        //     DISAGREE. Schedule D line 20 asks "Are lines 18 and 19 both
+        //     zero or blank AND YOU ARE NOT FILING FORM 4952?", which would
+        //     route a Form 4952 filer with line 4g = 0 into the Schedule D
+        //     Tax Worksheet. The line-16 instructions and the Schedule D Tax
+        //     Worksheet's own header both state the stricter form, `4952
+        //     filed AND 4g > 0`, and the header governs because it is the
+        //     worksheet you would be entering. The stricter form is what is
+        //     implemented; the discrepancy is recorded here because it
+        //     matters for Phase 12, when that worksheet actually computes.
+        if (filingForm4952 && form4952Line4gCents > 0n) {
+            const { message, unmodeled } = scopeRefusal(['investmentInterestForm4952'])
+            return { kind: 'error', method: 'scheduleDTaxWorksheet', message, unmodeled }
+        }
+        // 2c. "You reported qualified dividends on Form 1040 or 1040-SR,
+        //     line 3a."
+        if (qualifiedDividendsCents > 0n) {
+            return qdcgtOutcome()
+        }
+        // 2d. "You don't have to file Schedule D and you reported capital
+        //     gain distributions on Form 1040 or 1040-SR, line 7a."
+        if (!filingScheduleD && capitalGainDistributionsCents > 0n) {
+            return qdcgtOutcome()
+        }
+        // 2e. "You are filing Schedule D, and Schedule D, lines 15 and 16,
+        //     are both more than zero."
+        if (scheduleDLinesFifteenAndSixteenAreBothGains) {
+            return qdcgtOutcome()
+        }
+        // ── LEVEL 3 — THE BASE LOOKUP ────────────────────────────────────────
+        //
+        // "If your taxable income is less than $100,000, you must use the Tax
+        // Table... If your taxable income is $100,000 or more, use the Tax
+        // Computation Worksheet." Decided in ONE place — `fjs/tax/table`'s
+        // `baseTaxForAmount` — which the QDCGT's lines 22 and 24 also call
+        // back down into, so the $100,000 seam exists exactly once.
+        const base = baseTaxForAmount(taxParamSet)(status)(taxableIncomeForTheseLevelsCents)
         return {
-            kind: 'ok',
-            method: 'qdcgt',
-            cents: worksheet.line25,
-            preferential: { kind: 'qdcgt', worksheet },
+            kind: 'ok', method: base.method, cents: base.cents, preferential: { kind: 'none' },
         }
     }
-    // The Schedule D Tax Worksheet arm, mirroring `qdcgtOutcome`'s own
-    // shape — a function, called only on the arm that selects it (branch
-    // 2a's guard, below, stays byte-identical; only its BODY changes, from
-    // a refusal to this computation, in this one Plan 12.1-04 commit).
-    /** @type {() => Line16Outcome} */
-    const sdtwOutcome = () => {
-        const worksheet = sdtw(taxParamSet)({
-            status,
-            line1Cents: taxableIncomeCents,
-            line2Cents: qualifiedDividendsCents,
-            form4952Line4gCents,
-            form4952Line4eCents,
-            scheduleD15Cents,
-            scheduleD16Cents,
-            scheduleD18Cents,
-            scheduleD19Cents,
-        })
-        return {
-            kind: 'ok',
-            method: 'scheduleDTaxWorksheet',
-            cents: worksheet.line47,
-            preferential: { kind: 'scheduleDTaxWorksheet', worksheet },
-        }
-    }
+
     // ── LEVEL 0 — WRAPPERS, OUTERMOST ────────────────────────────────────
     //
     // "But if you are filing Form 2555, you must use the Foreign Earned
@@ -266,10 +423,94 @@ export const dispatchLine16 = taxParamSet => inputs => {
     // heading, which is what makes it outrank BOTH preferential
     // worksheets rather than sitting beside them.
     //
-    // 0a. Form 2555 filed.
+    // 0a. Form 2555 filed — the Foreign Earned Income Tax Worksheet
+    //     (i1040gi p37), §911(f). COMPUTES as of TAX-42, and the GUARD is
+    //     the one that stood here while the body refused, byte for byte —
+    //     branch 2a's own precedent for changing a body and not a
+    //     condition.
     if (filingForm2555) {
-        const { message, unmodeled } = scopeRefusal(['foreignEarnedIncomeForm2555'])
-        return { kind: 'error', method: 'foreignEarnedIncomeTaxWorksheet', message, unmodeled }
+        // 1. "Enter the amount from Form 1040 or 1040-SR, line 15." Printed
+        //    1040 line 15 is itself "if zero or less, enter -0-", so the floor
+        //    is the 1040's rather than this worksheet's invention.
+        //
+        //    The worksheet's CAUTION — "If Form 1040 or 1040-SR, line 15, is
+        //    zero, don't complete this worksheet" — is deliberately NOT a
+        //    short-circuit here, because the arithmetic below already returns
+        //    what skipping it would: at line 1 = 0, line 3 equals line 2c, so
+        //    lines 4 and 5 price the same amount and line 6 is zero.
+        //    `aForeignFilerWithNoTaxableIncomeOwesNothing` is the leaf that
+        //    says so rather than a comment claiming it.
+        const worksheetLine1 = taxableIncomeCents > 0n ? taxableIncomeCents : 0n
+        // 2a. "Enter the amount from your (and your spouse's if filing
+        //     jointly) Form 2555, lines 45 and 50." Line 50 is the housing
+        //     DEDUCTION and is structurally zero —
+        //     `foreignHousingExclusionOrDeduction` is a refused kind — and it
+        //     is NAMED rather than omitted, the discipline `fjs/form7206`
+        //     line 12 already follows for this same form.
+        const worksheetLine2a = form2555Line45Cents + form2555Line50Cents
+        // 2b. "Enter the total amount of any itemized deductions or
+        //     exclusions you couldn't claim because they are related to
+        //     excluded income."
+        const worksheetLine2b = form2555ItemizedDeductionsAndExclusionsNotClaimedCents
+        // 2c. "Subtract line 2b from line 2a. If zero or less, enter -0-."
+        const worksheetLine2cBeforeFloor = worksheetLine2a - worksheetLine2b
+        const worksheetLine2c = worksheetLine2cBeforeFloor > 0n ? worksheetLine2cBeforeFloor : 0n
+        // 3. "Add lines 1 and 2c."
+        const worksheetLine3 = worksheetLine1 + worksheetLine2c
+        // 4. "Figure the tax on the amount on line 3. Use the Tax Table, Tax
+        //    Computation Worksheet, Qualified Dividends and Capital Gain Tax
+        //    Worksheet, Schedule D Tax Worksheet, or Form 8615, whichever
+        //    applies." Which is this dispatch's own levels 1 through 3 on a
+        //    DIFFERENT amount — never a second copy of them.
+        const lineFourOutcome = levelsOneThroughThree(worksheetLine3)
+        if (lineFourOutcome.kind === 'error') {
+            // Level 2b's Form 4952 refusal, reached through the worksheet.
+            // Re-tagged with THIS method, because the branch a reader needs to
+            // know they were in is the wrapper, not the level under it.
+            return { ...lineFourOutcome, method: 'foreignEarnedIncomeTaxWorksheet' }
+        }
+        // The footnote's CAPITAL GAIN EXCESS test, and the one corner this
+        // wrapper refuses. "Subtract Form 1040 or 1040-SR, line 15, from line
+        // 4 of your Qualified Dividends and Capital Gain Tax Worksheet (line
+        // 10 of your Schedule D Tax Worksheet). If the result is more than
+        // zero, that amount is your capital gain excess."
+        //
+        // Read off the worksheet that actually RAN, never recomputed: QDCGT
+        // line 4 is qualified dividends plus net capital gain, and the
+        // Schedule D Tax Worksheet's line 10 is the same slice under that
+        // worksheet's own numbering. `'none'` contributes zero, which can
+        // never exceed a floored line 1 — a return that reached no
+        // preferential worksheet has no preferential slice to be in excess.
+        const preferentialSliceCents = lineFourOutcome.preferential.kind === 'qdcgt'
+            ? lineFourOutcome.preferential.worksheet.line4
+            : lineFourOutcome.preferential.kind === 'scheduleDTaxWorksheet'
+                ? lineFourOutcome.preferential.worksheet.line10
+                : 0n
+        if (preferentialSliceCents > worksheetLine1) {
+            const { message, unmodeled } = scopeRefusal(['foreignEarnedIncomeCapitalGainExcess'])
+            return { kind: 'error', method: 'foreignEarnedIncomeTaxWorksheet', message, unmodeled }
+        }
+        // 5. "Figure the tax on the amount on line 2c. If the amount on line
+        //    2c is less than $100,000, use the Tax Table … $100,000 or more,
+        //    use the Tax Computation Worksheet." NO preferential worksheet is
+        //    named on this line, and that asymmetry with line 4 is the
+        //    worksheet's whole content — so this is `baseTaxForAmount` and
+        //    nothing else, never a second `levelsOneThroughThree`.
+        const worksheetLine5 = baseTaxForAmount(taxParamSet)(status)(worksheetLine2c).cents
+        // 6. "Subtract line 5 from line 4. Enter the result. If zero or less,
+        //    enter -0-."
+        const worksheetLine6BeforeFloor = lineFourOutcome.cents - worksheetLine5
+        return {
+            kind: 'ok',
+            method: 'foreignEarnedIncomeTaxWorksheet',
+            cents: worksheetLine6BeforeFloor > 0n ? worksheetLine6BeforeFloor : 0n,
+            // The worksheet that priced line 4, carried out unchanged. Form
+            // 6251 Part III reads its lines "as figured for the regular tax",
+            // and with Form 2555 in play the regular tax's worksheet IS the
+            // one run on line 3 — i6251 p13's own `Form 2555` note under
+            // Line 20 says exactly that.
+            preferential: lineFourOutcome.preferential,
+        }
     }
     // 0b. Form 8615 conditions met (a child's unearned income over
     //     $2,700). Form 8615 re-enters this dispatch internally, so it is
@@ -286,98 +527,7 @@ export const dispatchLine16 = taxParamSet => inputs => {
         const { message, unmodeled } = scopeRefusal(['farmIncomeAveragingScheduleJ'])
         return { kind: 'error', method: 'scheduleJ', message, unmodeled }
     }
-    // ── LEVEL 1 — THE PREFERENTIAL-RATE GATE ─────────────────────────────
-    //
-    // From the Schedule D Tax Worksheet header's own "Exception"
-    // (i1040sd p15).
-    //
-    // 1a. Form 1040 line 15 is zero or less: neither preferential
-    //     worksheet runs and the tax is $0. Tagged `'taxTable'` because
-    //     that is the method the printed default names for an amount
-    //     below $100,000 — not because a table lookup happened.
-    if (taxableIncomeCents <= 0n) {
-        return { kind: 'ok', method: 'taxTable', cents: 0n, preferential: { kind: 'none' } }
-    }
-    // 1b is NOT a separate branch here. 10-RESEARCH.md states it as
-    // "(Sch D line 15 <= 0 OR Sch D line 16 <= 0) AND line 3a = 0 ->
-    // neither worksheet", which is exactly the negation of 2c, 2d and 2e
-    // below: such a return falls through all three to level 3 on its own.
-    // Written down so a reader diffing this against the research tree
-    // does not conclude a level went missing.
-    //
-    // ── LEVEL 2 — WHICH PREFERENTIAL WORKSHEET ───────────────────────────
-    //
-    // The Schedule D Tax Worksheet is tested STRICTLY BEFORE the QDCGT.
-    // The instructions say so in words — the QDCGT heading opens "Use the
-    // Qualified Dividends and Capital Gain Tax Worksheet, later, to
-    // figure your tax IF YOU DON'T HAVE TO USE THE SCHEDULE D TAX
-    // WORKSHEET" — and this module's docstring says why the order is
-    // undetectable by any ordinary test case.
-    const scheduleDLinesFifteenAndSixteenAreBothGains
-        = filingScheduleD && scheduleD15Cents > 0n && scheduleD16Cents > 0n
-    // 2a. "You have to file Schedule D, line 18 or 19 of Schedule D is
-    //     more than zero, and lines 15 and 16 of Schedule D are gains."
-    //
-    //     WHY 2a MUST PRECEDE 2c. A taxpayer with both qualified
-    //     dividends and §1250 or collectibles gain routed to the QDCGT
-    //     gets the whole preferential slice taxed at 0/15/20%, while the
-    //     Schedule D Tax Worksheet taxes unrecaptured §1250 gain at up to
-    //     25% and collectibles at 28%. The answer is wrong, it is wrong
-    //     in the taxpayer's favour, and nothing screams — because with
-    //     lines 18 and 19 zero the two worksheets are algebraically
-    //     identical, so no ordinary test case can tell the two orderings
-    //     apart. Only the SELECTED METHOD can.
-    //
-    //     As of Plan 12.1-04 (12.1-CONTEXT.md Decision 1.1), this branch
-    //     COMPUTES via `sdtwOutcome()` instead of refusing — the guard
-    //     above stays byte-identical; only the body changes.
-    if (scheduleDLinesFifteenAndSixteenAreBothGains
-        && (scheduleD18Cents > 0n || scheduleD19Cents > 0n)) {
-        return sdtwOutcome()
-    }
-    // 2b. "You have to file Form 4952 and you have an amount on line 4g,
-    //     even if you don't need to file Schedule D."
-    //
-    //     [FINDING, 10-RESEARCH.md] The form face and the instructions
-    //     DISAGREE. Schedule D line 20 asks "Are lines 18 and 19 both
-    //     zero or blank AND YOU ARE NOT FILING FORM 4952?", which would
-    //     route a Form 4952 filer with line 4g = 0 into the Schedule D
-    //     Tax Worksheet. The line-16 instructions and the Schedule D Tax
-    //     Worksheet's own header both state the stricter form, `4952
-    //     filed AND 4g > 0`, and the header governs because it is the
-    //     worksheet you would be entering. The stricter form is what is
-    //     implemented; the discrepancy is recorded here because it
-    //     matters for Phase 12, when that worksheet actually computes.
-    if (filingForm4952 && form4952Line4gCents > 0n) {
-        const { message, unmodeled } = scopeRefusal(['investmentInterestForm4952'])
-        return { kind: 'error', method: 'scheduleDTaxWorksheet', message, unmodeled }
-    }
-    // 2c. "You reported qualified dividends on Form 1040 or 1040-SR,
-    //     line 3a."
-    if (qualifiedDividendsCents > 0n) {
-        return qdcgtOutcome()
-    }
-    // 2d. "You don't have to file Schedule D and you reported capital
-    //     gain distributions on Form 1040 or 1040-SR, line 7a."
-    if (!filingScheduleD && capitalGainDistributionsCents > 0n) {
-        return qdcgtOutcome()
-    }
-    // 2e. "You are filing Schedule D, and Schedule D, lines 15 and 16,
-    //     are both more than zero."
-    if (scheduleDLinesFifteenAndSixteenAreBothGains) {
-        return qdcgtOutcome()
-    }
-    // ── LEVEL 3 — THE BASE LOOKUP ────────────────────────────────────────
-    //
-    // "If your taxable income is less than $100,000, you must use the Tax
-    // Table... If your taxable income is $100,000 or more, use the Tax
-    // Computation Worksheet." Decided in ONE place — `fjs/tax/table`'s
-    // `baseTaxForAmount` — which the QDCGT's lines 22 and 24 also call
-    // back down into, so the $100,000 seam exists exactly once.
-    const base = baseTaxForAmount(taxParamSet)(status)(taxableIncomeCents)
-    return {
-        kind: 'ok', method: base.method, cents: base.cents, preferential: { kind: 'none' },
-    }
+    return levelsOneThroughThree(taxableIncomeCents)
 }
 
 /**
@@ -418,6 +568,9 @@ const nothingSwitchedOn = {
     form4952Line4gCents: 0n,
     form4952Line4eCents: 0n,
     filingForm2555: false,
+    form2555Line45Cents: 0n,
+    form2555Line50Cents: 0n,
+    form2555ItemizedDeductionsAndExclusionsNotClaimedCents: 0n,
     form8615Applies: false,
     scheduleJElected: false,
 }
@@ -548,11 +701,15 @@ const expectedRefusingArmCount = 4
  */
 const refusingArms = [
     {
-        name: 'level 0a — Form 2555',
-        inputs: { ...nothingSwitchedOn, taxableIncomeCents: 9700000n, qualifiedDividendsCents: 30000n, filingForm2555: true },
+        // Level 0a COMPUTES as of TAX-42; what still refuses inside it is the
+        // footnote's capital gain excess. $30,000 of qualified dividends
+        // against $100.00 of taxable income is that condition exactly: the
+        // QDCGT's line 4 is the whole $30,000 and 1040 line 15 is $100.00.
+        name: 'level 0a — Form 2555, capital gain excess',
+        inputs: { ...nothingSwitchedOn, taxableIncomeCents: 10000n, qualifiedDividendsCents: 3000000n, filingForm2555: true, form2555Line45Cents: 13000000n },
         expectedMethod: 'foreignEarnedIncomeTaxWorksheet',
-        expectedUnmodeled: ['foreignEarnedIncomeForm2555'],
-        expectedLabels: ['foreign earned income exclusion'],
+        expectedUnmodeled: ['foreignEarnedIncomeCapitalGainExcess'],
+        expectedLabels: ['a capital gain excess inside the Foreign Earned Income Tax Worksheet'],
     },
     {
         name: 'level 0b — Form 8615',
@@ -936,29 +1093,443 @@ export const proof = {
             assert(outcome.kind === 'ok', ['expected a computed outcome', outcome])
             assertEq(outcome.cents, 1117400n, 'the same $11,174.00 as without Form 4952')
         },
+        // ── Level 0a: the Foreign Earned Income Tax Worksheet (TAX-42) ──────
+        //
         // Level 0a outranks level 2c: a Form 2555 filer WITH qualified
-        // dividends is a Foreign Earned Income Tax Worksheet return, not
-        // a QDCGT return. Line 3a is non-zero deliberately — with it at
-        // zero this leaf could not tell a wrapper from a fall-through.
+        // dividends is a Foreign Earned Income Tax Worksheet return, not a
+        // QDCGT return. Line 3a is non-zero deliberately — with it at zero
+        // this leaf could not tell a wrapper from a fall-through — and the
+        // worksheet's own line 4 then RE-ENTERS the dispatch and selects the
+        // QDCGT on its line 3, which is what `preferential` shows.
         formTwentyFiveFiftyFiveOutranksQdcgt: () => {
             const outcome = dispatchLine16(taxParams2025)({
                 ...nothingSwitchedOn,
                 taxableIncomeCents: 9700000n,
                 qualifiedDividendsCents: 30000n,
                 filingForm2555: true,
+                form2555Line45Cents: 6000000n,
             })
             assertEq(
                 outcome.method,
                 'foreignEarnedIncomeTaxWorksheet',
                 ['Form 2555 outranks both preferential worksheets', outcome],
             )
-            assert(outcome.kind === 'error', ['the wrapper refuses', outcome])
-            assertEq(outcome.unmodeled.length, 1, ['expected exactly one unmodeled kind', outcome.unmodeled])
-            assertEq(outcome.unmodeled[0], 'foreignEarnedIncomeForm2555', ['expected the Form 2555 kind', outcome.unmodeled])
+            assert(outcome.kind === 'ok', ['the wrapper computes as of TAX-42', outcome])
+            assertEq(
+                outcome.preferential.kind, 'qdcgt',
+                ['worksheet line 4 re-enters the dispatch and lands on the QDCGT',
+                    outcome.preferential.kind])
+        },
+        // **THE STACKING RULE, §911(f), and the leaf the whole wrapper exists
+        // for.** A single filer with $30,000.00 of taxable income left after a
+        // $130,000.00 exclusion. Hand-computed from the 2025 single brackets
+        // (Rev. Proc. 2024-40 §2.01), NOT from this module:
+        //
+        //   worksheet line 3 = $30,000 + $130,000 = $160,000
+        //   line 4  = 10%×11,925          =  1,192.50
+        //           + 12%×(48,475−11,925) =  4,386.00
+        //           + 22%×(103,350−48,475)= 12,072.50
+        //           + 24%×(160,000−103,350)=13,596.00  →  $31,247.00
+        //   line 5  = the same first three               = 17,651.00
+        //           + 24%×(130,000−103,350) =  6,396.00  →  $24,047.00
+        //   line 6  = 31,247.00 − 24,047.00              →   $7,200.00
+        //
+        // **The fudge is $3,365.00**, which `theStackingRuleChangesTheBracket`
+        // asserts is NOT the answer: taxing the remaining $30,000 on its own
+        // reads the Tax Table at the $30,000–$30,050 band's midpoint and
+        // charges 10% and 12%. The exclusion moves the whole remainder into
+        // the 24% bracket, and the two answers differ by $3,835.00 — a
+        // difference no rounding could produce, which is the point of choosing
+        // a fixture that crosses two bracket boundaries rather than one.
+        theStackingRuleChangesTheBracket: () => {
+            const outcome = dispatchLine16(taxParams2025)({
+                ...nothingSwitchedOn,
+                status: 'single',
+                taxableIncomeCents: 3000000n,
+                filingForm2555: true,
+                form2555Line45Cents: 13000000n,
+            })
+            assert(outcome.kind === 'ok', ['the worksheet computes', outcome])
+            assertEq(outcome.method, 'foreignEarnedIncomeTaxWorksheet')
+            assertEq(outcome.cents, 720000n, '$31,247.00 − $24,047.00 = $7,200.00')
             assert(
-                outcome.message.includes('foreign earned income exclusion'),
-                ['expected the refusal to name the exclusion', outcome.message],
-            )
+                outcome.cents !== 336500n,
+                ['taxing the remaining $30,000.00 alone would give $3,365.00', outcome.cents])
+        },
+        // THE CONTROL for the leaf above, and the only way to see the $3,365.00
+        // is real rather than invented: the SAME taxable income with no
+        // exclusion is an ordinary Tax Table return.
+        //
+        //   $30,000–$30,050 band, midpoint $30,025
+        //   10%×11,925 = 1,192.50 + 12%×(30,025−11,925) = 2,172.00 → 3,364.50
+        //   dollar-rounded half-up → $3,365.00
+        controlTheSameTaxableIncomeWithNoExclusionIsAnOrdinaryTaxTableReturn: () => {
+            const outcome = dispatchLine16(taxParams2025)({
+                ...nothingSwitchedOn,
+                status: 'single',
+                taxableIncomeCents: 3000000n,
+            })
+            assert(outcome.kind === 'ok', ['an ordinary return computes', outcome])
+            assertEq(outcome.method, 'taxTable')
+            assertEq(outcome.cents, 336500n, 'the $30,025 midpoint, dollar-rounded')
+        },
+        // The whole worksheet inside the Tax Table, where BOTH lines 4 and 5
+        // read band midpoints rather than the income itself. Married filing
+        // jointly, $20,000.00 of taxable income and a $60,000.00 exclusion,
+        // hand-computed from the 2025 joint brackets:
+        //
+        //   line 3 = $80,000 → band $80,000–$80,050, midpoint $80,025
+        //            10%×23,850 = 2,385.00 + 12%×(80,025−23,850) = 6,741.00
+        //                                                       →  $9,126.00
+        //   line 5 = $60,000 → midpoint $60,025
+        //            2,385.00 + 12%×(60,025−23,850) = 4,341.00   →  $6,726.00
+        //   line 6 = 9,126.00 − 6,726.00                         →  $2,400.00
+        //
+        // The bracket moves here too: $20,000 alone is entirely inside the 10%
+        // band, and stacked on $60,000 every dollar of it is at 12%.
+        theWorksheetInsideTheTaxTableReadsTwoBandMidpoints: () => {
+            const outcome = dispatchLine16(taxParams2025)({
+                ...nothingSwitchedOn,
+                taxableIncomeCents: 2000000n,
+                filingForm2555: true,
+                form2555Line45Cents: 6000000n,
+            })
+            assert(outcome.kind === 'ok', ['the worksheet computes', outcome])
+            assertEq(outcome.cents, 240000n, '$9,126.00 − $6,726.00 = $2,400.00')
+            assert(
+                outcome.cents !== 200300n,
+                ['$20,000.00 alone is $2,002.50, dollar-rounded to $2,003.00', outcome.cents])
+        },
+        // Worksheet line 2b — "any itemized deductions or exclusions you
+        // couldn't claim because they are related to excluded income" — bites,
+        // and it bites in the taxpayer's FAVOUR, which is why omitting it
+        // would be an overstatement rather than an under-tax.
+        //
+        // The same single filer as `theStackingRuleChangesTheBracket`, with
+        // $30,000.00 on line 2b:
+        //   line 2c = 130,000 − 30,000 = $100,000; line 3 = $130,000
+        //   line 4  = $24,047.00 (the previous leaf's line 5)
+        //   line 5  = 1,192.50 + 4,386.00 + 22%×(100,000−48,475) = 11,335.50
+        //                                                      →  $16,914.00
+        //   line 6  = 24,047.00 − 16,914.00                     →   $7,133.00
+        lineTwoBReducesTheStackAndTheTax: () => {
+            const outcome = dispatchLine16(taxParams2025)({
+                ...nothingSwitchedOn,
+                status: 'single',
+                taxableIncomeCents: 3000000n,
+                filingForm2555: true,
+                form2555Line45Cents: 13000000n,
+                form2555ItemizedDeductionsAndExclusionsNotClaimedCents: 3000000n,
+            })
+            assert(outcome.kind === 'ok', ['the worksheet computes', outcome])
+            assertEq(outcome.cents, 713300n, '$24,047.00 − $16,914.00 = $7,133.00')
+            assert(
+                outcome.cents !== 720000n,
+                ['ignoring line 2b would leave the $7,200.00 of the leaf above', outcome.cents])
+        },
+        // Line 2b larger than line 2a floors line 2c at zero rather than
+        // subtracting from the stack — "Subtract line 2b from line 2a. If zero
+        // or less, enter -0-." Without the floor, line 3 would fall BELOW 1040
+        // line 15 and line 5 would price a negative amount.
+        lineTwoCFloorsAtZeroRatherThanGoingNegative: () => {
+            const outcome = dispatchLine16(taxParams2025)({
+                ...nothingSwitchedOn,
+                status: 'single',
+                taxableIncomeCents: 3000000n,
+                filingForm2555: true,
+                form2555Line45Cents: 500000n,
+                form2555ItemizedDeductionsAndExclusionsNotClaimedCents: 900000n,
+            })
+            assert(outcome.kind === 'ok', ['the worksheet computes', outcome])
+            assertEq(
+                outcome.cents, 336500n,
+                'line 2c is $0.00, so line 3 is line 1 and line 6 is the ordinary $3,365.00')
+        },
+        // Line 50 is the housing DEDUCTION and is a structural zero — NAMED
+        // rather than omitted. Worksheet line 2a is "lines 45 AND 50", and
+        // this leaf is what shows the second half is added rather than
+        // ignored: the same $130,000.00 arriving half on each line reaches the
+        // identical $7,200.00.
+        lineFiftyIsAddedToLineFortyFiveOnWorksheetLineTwoA: () => {
+            const split = dispatchLine16(taxParams2025)({
+                ...nothingSwitchedOn,
+                status: 'single',
+                taxableIncomeCents: 3000000n,
+                filingForm2555: true,
+                form2555Line45Cents: 6500000n,
+                form2555Line50Cents: 6500000n,
+            })
+            assert(split.kind === 'ok', ['the worksheet computes', split])
+            assertEq(split.cents, 720000n, '$65,000.00 + $65,000.00 is the same $130,000.00 stack')
+        },
+        // The worksheet's CAUTION — "If Form 1040 or 1040-SR, line 15, is
+        // zero, don't complete this worksheet" — is NOT a short-circuit in
+        // this implementation, and this is the leaf that says the arithmetic
+        // reaches the same place. At line 1 = $0.00, line 3 equals line 2c, so
+        // lines 4 and 5 price the same amount and line 6 is $0.00.
+        aForeignFilerWithNoTaxableIncomeOwesNothing: () => {
+            const outcome = dispatchLine16(taxParams2025)({
+                ...nothingSwitchedOn,
+                status: 'single',
+                taxableIncomeCents: 0n,
+                filingForm2555: true,
+                form2555Line45Cents: 13000000n,
+            })
+            assert(outcome.kind === 'ok', ['the worksheet computes', outcome])
+            assertEq(outcome.method, 'foreignEarnedIncomeTaxWorksheet')
+            assertEq(outcome.cents, 0n, 'line 4 and line 5 price the same $130,000.00')
+        },
+        // A NEGATIVE 1040 line 15 reaches the same place through line 1's own
+        // floor. Printed 1040 line 15 is itself "if zero or less, enter -0-",
+        // so a caller handing this dispatcher a negative taxable income must
+        // not produce a negative line 3.
+        aNegativeTaxableIncomeFloorsAtZeroOnWorksheetLineOne: () => {
+            const outcome = dispatchLine16(taxParams2025)({
+                ...nothingSwitchedOn,
+                status: 'single',
+                taxableIncomeCents: -500000n,
+                filingForm2555: true,
+                form2555Line45Cents: 13000000n,
+            })
+            assert(outcome.kind === 'ok', ['the worksheet computes', outcome])
+            assertEq(outcome.cents, 0n, 'line 1 is $0.00, not −$5,000.00')
+        },
+        // A stored Form 2555 that excludes NOTHING leaves line 16 exactly
+        // where it was. Line 2c is zero, line 3 is line 1, line 5 is the tax
+        // on zero, and line 6 is the ordinary answer — the worksheet is a
+        // no-op rather than a different engine.
+        //
+        // THE CONTROL for every leaf above: without it, a worksheet that
+        // returned `line 4` and dropped line 5 entirely would pass
+        // `theStackingRuleChangesTheBracket` only by luck, and would pass this
+        // one never.
+        aStoredFormTwoFiveFiveFiveThatExcludesNothingLeavesLineSixteenAlone: () => {
+            const outcome = dispatchLine16(taxParams2025)({
+                ...nothingSwitchedOn,
+                status: 'single',
+                taxableIncomeCents: 3000000n,
+                filingForm2555: true,
+            })
+            assert(outcome.kind === 'ok', ['the worksheet computes', outcome])
+            assertEq(outcome.method, 'foreignEarnedIncomeTaxWorksheet')
+            assertEq(outcome.cents, 336500n, 'the same $3,365.00 an ordinary return pays')
+        },
+        // **The preferential re-entry, priced.** A single filer with $50,000.00
+        // of taxable income, $2,000.00 of qualified dividends and a $60,000.00
+        // exclusion. Worksheet line 3 is $110,000, which the QDCGT prices
+        // (hand-computed from that worksheet's printed lines, single column,
+        // $48,350 zero-rate ceiling and $533,400 fifteen-rate ceiling):
+        //
+        //   QDCGT line 5  = 110,000 − 2,000            = 108,000
+        //         line 9  = min(110,000, 48,350) − min(108,000, 48,350) = 0
+        //         line 17 = 2,000, line 18 = 15%×2,000 =     300.00
+        //         line 21 = 20%×0                      =       0.00
+        //         line 22 = tax on 108,000 (worksheet) = 18,767.00
+        //         line 23 = 19,067.00; line 24 = tax on 110,000 = 19,247.00
+        //         line 25 = min(23, 24)                = $19,067.00
+        //   worksheet line 5 = tax on $60,000 (Tax Table, midpoint $60,025)
+        //                    = 1,192.50 + 4,386.00 + 22%×11,550 = 8,119.50
+        //                    dollar-rounded half-up  = $8,120.00
+        //   worksheet line 6 = 19,067.00 − 8,120.00   = $10,947.00
+        theWorksheetLineFourRunsTheQdcgtOnItsOwnLineThree: () => {
+            const outcome = dispatchLine16(taxParams2025)({
+                ...nothingSwitchedOn,
+                status: 'single',
+                taxableIncomeCents: 5000000n,
+                qualifiedDividendsCents: 200000n,
+                filingForm2555: true,
+                form2555Line45Cents: 6000000n,
+            })
+            assert(outcome.kind === 'ok', ['no capital gain excess here, so it computes', outcome])
+            assertEq(outcome.method, 'foreignEarnedIncomeTaxWorksheet')
+            assertEq(outcome.preferential.kind, 'qdcgt')
+            assert(
+                outcome.preferential.kind === 'qdcgt',
+                ['the QDCGT rides out on the ok arm', outcome.preferential.kind])
+            assertEq(
+                outcome.preferential.worksheet.line1, 11000000n,
+                'and it was run on worksheet line 3, $110,000.00 — not on 1040 line 15')
+            assertEq(outcome.cents, 1094700n, '$19,067.00 − $8,120.00 = $10,947.00')
+        },
+        // **The capital gain excess**, the one corner level 0a refuses. Same
+        // filer, $1,000.00 of taxable income and $30,000.00 of qualified
+        // dividends: QDCGT line 4 is the whole $30,000.00 and 1040 line 15 is
+        // $1,000.00, so the excess is $29,000.00 and the printed footnote
+        // sends the filer to a second, modified worksheet.
+        aCapitalGainExcessInsideTheWorksheetRefusesByName: () => {
+            const outcome = dispatchLine16(taxParams2025)({
+                ...nothingSwitchedOn,
+                status: 'single',
+                taxableIncomeCents: 100000n,
+                qualifiedDividendsCents: 3000000n,
+                filingForm2555: true,
+                form2555Line45Cents: 13000000n,
+            })
+            assert(outcome.kind === 'error', ['a capital gain excess must refuse', outcome])
+            assertEq(outcome.method, 'foreignEarnedIncomeTaxWorksheet')
+            assertEq(outcome.unmodeled.length, 1, outcome.unmodeled)
+            assertEq(outcome.unmodeled[0], 'foreignEarnedIncomeCapitalGainExcess')
+            assert(
+                outcome.message.includes('capital gain excess'),
+                ['the refusal must name the printed term', outcome.message])
+            assert(
+                outcome.message.includes('1040 line 16'),
+                ['and where the amount would have gone', outcome.message])
+        },
+        // THE CONTROL for the refusal above, and it is the boundary rather
+        // than a distant case: the SAME $30,000.00 of qualified dividends
+        // against a taxable income of exactly $30,000.00 has NO excess — the
+        // footnote's test is "more than zero" — and computes.
+        controlPreferentialIncomeEqualToTaxableIncomeIsNotAnExcess: () => {
+            const outcome = dispatchLine16(taxParams2025)({
+                ...nothingSwitchedOn,
+                status: 'single',
+                taxableIncomeCents: 3000000n,
+                qualifiedDividendsCents: 3000000n,
+                filingForm2555: true,
+                form2555Line45Cents: 13000000n,
+            })
+            assert(outcome.kind === 'ok', ['equal is not an excess', outcome])
+            assertEq(outcome.method, 'foreignEarnedIncomeTaxWorksheet')
+            assertEq(outcome.preferential.kind, 'qdcgt')
+        },
+        // ONE cent over the boundary refuses. Paired with the leaf above this
+        // is what pins `>` rather than `>=`, which is the comparison mutation
+        // AGENTS.md records surviving in this very module once before.
+        oneCentOfCapitalGainExcessRefuses: () => {
+            const outcome = dispatchLine16(taxParams2025)({
+                ...nothingSwitchedOn,
+                status: 'single',
+                taxableIncomeCents: 2999999n,
+                qualifiedDividendsCents: 3000000n,
+                filingForm2555: true,
+                form2555Line45Cents: 13000000n,
+            })
+            assert(outcome.kind === 'error', ['one cent of excess refuses', outcome])
+            assertEq(outcome.unmodeled[0], 'foreignEarnedIncomeCapitalGainExcess')
+        },
+        // A return with NO preferential income has no preferential slice to be
+        // in excess, however small its taxable income. Without this leaf a
+        // `'none'` arm that contributed something other than zero would go
+        // unnoticed, and every ordinary expatriate return would refuse.
+        controlNoPreferentialIncomeIsNeverACapitalGainExcess: () => {
+            const outcome = dispatchLine16(taxParams2025)({
+                ...nothingSwitchedOn,
+                status: 'single',
+                taxableIncomeCents: 0n,
+                filingForm2555: true,
+                form2555Line45Cents: 13000000n,
+            })
+            assert(outcome.kind === 'ok', ['no worksheet ran, so no excess', outcome])
+            assertEq(outcome.preferential.kind, 'none')
+        },
+        // ── WHERE §911(f) MEETS FORM 4797, and it is a real interaction ──────
+        //
+        // These two leaves exist because two branches cut from the same commit
+        // each reached HALF of this. Form 2555 (TAX-42) made level 0a compute
+        // by re-entering levels 1 through 3 on the worksheet's line 3; Form
+        // 4797 (TAX-41) made Schedule D line 19 non-zero for the first time,
+        // which is what sends level 2a to the Schedule D Tax Worksheet instead
+        // of the QDCGT. Neither branch could write a fixture holding both, so
+        // when they were integrated the `scheduleDTaxWorksheet` arm of the
+        // capital-gain-excess test above became REACHABLE AND UNPROVEN —
+        // replacing `preferential.worksheet.line10` with `… * 0n` left the
+        // whole suite green.
+        //
+        // The composition itself is sound and these leaves say why rather
+        // than assert that it is: level 2a's condition reads Schedule D lines
+        // 15, 16, 18 and 19, none of which the stacking rule touches, so the
+        // worksheet SELECTED is the same one an identical domestic return
+        // would get — only the AMOUNT it is run on changes, from 1040 line 15
+        // to the worksheet's line 3.
+        aSectionTwelveFiftyGainKeepsTheScheduleDTaxWorksheetInsideTheStackedWorksheet: () => {
+            const outcome = dispatchLine16(taxParams2025)({
+                ...scheduleDWithUnrecapturedGainAndQualifiedDividends,
+                filingForm2555: true,
+                form2555Line45Cents: 3000000n,
+            })
+            assert(outcome.kind === 'ok', ['both together must compute', outcome])
+            // The OUTER method is the wrapper's, and the worksheet it carries
+            // out is the Schedule D Tax Worksheet — not the QDCGT. A stacking
+            // rule that re-ran level 2c would report `qdcgt` here and price the
+            // unrecaptured §1250 gain at the wrong band, in the taxpayer's
+            // favour, which is exactly the silent direction §911(f) exists to
+            // stop.
+            assertEq(outcome.method, 'foreignEarnedIncomeTaxWorksheet')
+            assertEq(outcome.preferential.kind, 'scheduleDTaxWorksheet')
+            assert(outcome.preferential.kind === 'scheduleDTaxWorksheet', 'narrowing')
+            // Run on the STACKED amount: $97,000.00 of taxable income plus the
+            // $30,000.00 exclusion is the worksheet's own line 3.
+            assertEq(
+                outcome.preferential.worksheet.line1, 12700000n,
+                'the Schedule D Tax Worksheet ran on worksheet line 3, not on 1040 line 15')
+            // And the tax is higher than the identical return without the
+            // exclusion — `scheduleDConditionsOutrankQualifiedDividends`'s own
+            // $7,575.00, hand-typed here rather than recomputed.
+            assertEq(outcome.cents, 1254900n, '$12,549.00, against $7,575.00 unstacked')
+            assert(
+                outcome.cents > 757500n,
+                ['excluded income still prices what remains', outcome.cents])
+        },
+        // The capital gain excess read off the SCHEDULE D TAX WORKSHEET's own
+        // line 10 rather than the QDCGT's line 4 — the arm the printed
+        // footnote names in its parenthesis, *"(line 10 of your Schedule D Tax
+        // Worksheet)"*, and the one no fixture reached until Form 4797 landed.
+        //
+        // ZERO qualified dividends and zero capital gain distributions, so the
+        // whole preferential slice is the §1231 gain on Schedule D lines 15 and
+        // 16: a guard that fell through to the `'none'` arm, or read a QDCGT
+        // that never ran, would contribute `0n`, never exceed line 1, and let
+        // this return compute against a worksheet the engine has not
+        // transcribed.
+        theCapitalGainExcessReadsTheScheduleDTaxWorksheetsOwnLineTen: () => {
+            const outcome = dispatchLine16(taxParams2025)({
+                ...nothingSwitchedOn,
+                taxableIncomeCents: 10000n,
+                filingScheduleD: true,
+                scheduleD15Cents: 4000000n,
+                scheduleD16Cents: 4000000n,
+                scheduleD19Cents: 1000000n,
+                filingForm2555: true,
+                form2555Line45Cents: 13000000n,
+            })
+            assert(outcome.kind === 'error', ['a $40,000.00 slice over $100.00 of taxable income is an excess', outcome])
+            assertEq(outcome.method, 'foreignEarnedIncomeTaxWorksheet')
+            assertEq(outcome.unmodeled[0], 'foreignEarnedIncomeCapitalGainExcess')
+        },
+        // THE CONTROL for the leaf above: the identical Schedule D return with
+        // no exclusion computes, so the refusal is the excess and not the
+        // §1250 gain.
+        controlTheSameScheduleDReturnWithoutAnExclusionComputes: () => {
+            const outcome = dispatchLine16(taxParams2025)({
+                ...nothingSwitchedOn,
+                taxableIncomeCents: 10000n,
+                filingScheduleD: true,
+                scheduleD15Cents: 4000000n,
+                scheduleD16Cents: 4000000n,
+                scheduleD19Cents: 1000000n,
+            })
+            assert(outcome.kind === 'ok', ['without §911 there is no worksheet to be in excess of', outcome])
+            assertEq(outcome.method, 'scheduleDTaxWorksheet')
+        },
+        // Level 2b's Form 4952 refusal, reached THROUGH the worksheet's line 4
+        // and re-tagged with the wrapper's own method. The refusal a reader
+        // needs is the one naming Form 4952; the method is what says which
+        // branch they were in when it fired.
+        aFormFourNineFiveTwoRefusalInsideTheWorksheetKeepsTheWrapperMethod: () => {
+            const outcome = dispatchLine16(taxParams2025)({
+                ...nothingSwitchedOn,
+                status: 'single',
+                taxableIncomeCents: 3000000n,
+                qualifiedDividendsCents: 30000n,
+                filingForm4952: true,
+                form4952Line4gCents: 250000n,
+                filingForm2555: true,
+                form2555Line45Cents: 13000000n,
+            })
+            assert(outcome.kind === 'error', ['the inner refusal travels out', outcome])
+            assertEq(outcome.method, 'foreignEarnedIncomeTaxWorksheet')
+            assertEq(outcome.unmodeled[0], 'investmentInterestForm4952')
         },
         // The other two wrappers, each with qualified dividends present
         // for the same reason: both must outrank level 2c.

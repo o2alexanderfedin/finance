@@ -735,6 +735,22 @@ export const modeledKinds = /** @type {const} */ ([
     // `kindVocabulary`'s order, which is the 1040's own, and Schedule 3 line
     // 9 comes long after Schedule 2 line 1a.
     'netPremiumTaxCredit',         // Form 1095-A -> Form 8962 line 26 -> Schedule 3 line 9 -> 1040 line 31
+    // TAX-42, and reclassified in the SAME commit as the wiring that makes it
+    // computable -- `fjs/schedule/1`'s Part I line 8d reading `fjs/form2555`
+    // line 45, and `fjs/tax/line16`'s level-0a wrapper computing the Foreign
+    // Earned Income Tax Worksheet instead of refusing.
+    //
+    // LAST in this list because this list is {@link kindVocabulary}'s order,
+    // which is the 1040's own, and the Form 2555 kinds sit with the line-16
+    // wrappers after every Schedule 3 line.
+    //
+    // Modeled does NOT mean always computed, and on this kind that matters
+    // more than most: `fjs/form6251` refuses when its line 6 is positive,
+    // `fjs/tax/line16` refuses a capital gain excess, `fjs/schedule/3`
+    // refuses beside a §904(j) election, and `fjs/schedule/1` refuses a
+    // qualifying-day count longer than the tax year. Each names the
+    // taxpayer's own figures, which a scope refusal could never have said.
+    'foreignEarnedIncomeExclusion', // Form 2555 line 45 -> Schedule 1 line 8d -> 1040 line 8; and 1040 line 16
 ])
 
 /** One member of {@link modeledKinds}.
@@ -1351,7 +1367,17 @@ export const unmodeledKindRefusals = /** @type {const} */ ([
     // the add-ons is exactly TAX-16's failure mode: every line above 16 agrees
     // with the taxpayer's own return, line 16 is quietly short, and nothing in
     // the report says why. They are refusals precisely so that cannot happen.
-    { kind: 'foreignEarnedIncomeForm2555', line: '1040 line 16; Schedule 1 line 8d -> 1040 line 8; Schedule 1 line 24j -> 1040 line 10', label: 'foreign earned income exclusion, and the housing deduction beside it', remedy: 'requires Form 2555 and the Foreign Earned Income Tax Worksheet. ONE kind names all three printed lines because one form produces them: line 45 is the exclusion on Schedule 1 line 8d, line 50 the housing deduction on Schedule 1 line 24j, and the worksheet reprices 1040 line 16 (no phase yet)' },
+    // ── Form 2555's THREE refusals (TAX-42) ───────────────────────────────
+    //
+    // The fourth kind, `foreignEarnedIncomeExclusion`, is MODELED and is in
+    // {@link modeledKinds}. These three are what is left, and they are three
+    // rows rather than one because they have three unrelated blockers -- the
+    // finding that made the split worth making. See
+    // `fjs/form2555/todo/foreign-earned-income.md`.
+    { kind: 'foreignEarnedIncomeBonaFideResidenceTest', line: 'Form 2555 Part II, lines 10 through 15e', label: 'the bona fide residence route to the foreign earned income exclusion', remedy: '\u00a7911(d)(1)(A) turns on INTENT, and i2555 p3 says a taxpayer\u2019s own account of it does not decide the question: \u201cwhether you are a bona fide resident \u2026 depends on your intention about the length and nature of your stay \u2026 if these conflict, your acts carry more weight than your words.\u201d A certification is words, so this test cannot become one. Form 2555 Part II asks eight questions of fact and never asks whether you are a bona fide resident, because that is what the IRS decides from the eight. Qualify under the PHYSICAL PRESENCE test instead \u2014 330 full days is a count, and `physicallyPresentInAForeignCountryThreeHundredThirtyFullDaysAndNoUnitedStatesAbode` on `vnd.fjs.return_profile` is where a filer who meets both tests declares it' },
+    { kind: 'foreignHousingExclusionOrDeduction', line: 'Form 2555 line 36; Schedule 1 line 24j -> 1040 line 10', label: 'the foreign housing exclusion and the housing deduction beside it', remedy: 'requires Notice 2025-16 \u00a73\u2019s roughly two hundred adjusted location limits, published \u201cin lieu of the otherwise applicable limitation of $39,000\u201d, which have NO compact derivation \u2014 the daily column is the full-year column over 365, but the full-year column is \u00a7911(c)(2)(B) survey output and is a function of nothing stored. Storing the general limit alone would silently cap a Hong Kong filer at $39,000 where the notice allows $114,300. Line 49\u2019s 2024 carryover needs a prior-year return this engine does not hold, and line 34\u2019s employer-provided split appears on no document (no phase yet)' },
+    { kind: 'foreignEarnedIncomeReceivedInAnotherTaxYear', line: 'Form 2555 line 45 write-in', label: 'foreign earned income received in a tax year other than the one it was earned in', remedy: 'i2555 p4: income received this year for services performed LAST year is excludable \u201cif, and to the extent, the income would have been excludable if you had received it\u201d then \u2014 against the PRIOR year\u2019s exclusion limit and qualifying days, entered as a write-in beside line 45; and income received last year for THIS year\u2019s services requires an amended prior-year return. This engine models one tax year and holds no prior-year return (no phase yet)' },
+    { kind: 'foreignEarnedIncomeCapitalGainExcess', line: '1040 line 16', label: 'a capital gain excess inside the Foreign Earned Income Tax Worksheet', remedy: 'the worksheet\u2019s own footnote (i1040gi p37): where line 4 of the Qualified Dividends and Capital Gain Tax Worksheet (line 10 of the Schedule D Tax Worksheet) exceeds 1040 line 15, the difference is a CAPITAL GAIN EXCESS and the worksheet must be completed a SECOND time with four modifications \u2014 reducing its own line 3, then line 2, then Schedule D line 18, and carrying the excess as a loss into the Unrecaptured Section 1250 Gain Worksheet. This engine has not transcribed those four, and running the unmodified worksheet would price the whole preferential slice at the wrong band. Refusing rather than computing it; this is a CONDITION detected from the return\u2019s own figures, not something to declare (no phase yet)' },
     { kind: 'childsUnearnedIncomeForm8615', line: '1040 line 16', label: "a child's unearned income", remedy: 'requires Form 8615 (no phase yet)' },
     { kind: 'farmIncomeAveragingScheduleJ', line: '1040 line 16', label: 'farm and fishing income averaging', remedy: 'requires Schedule J (no phase yet)' },
     { kind: 'form8814ChildInterestAndDividends', line: '1040 line 16', label: 'tax from Form 8814', remedy: 'requires Form 8814 (no phase yet)' },
@@ -1960,9 +1986,20 @@ export const classifyScope = declaredKinds => {
  * any personal use of a dwelling under §280A. Same footing as
  * `foreignTaxCredit` above, and as `businessIncomeOrLoss`, whose Schedule C
  * net loss refuses at its own line too.
+ *
+ * **`55 -> 57` is two independent moves that the integration composed, and
+ * the pair is worth stating because git could not see it.** `55 -> 56` is Form
+ * 4797's `otherGainsOrLosses` (TAX-41) and `55 -> 56` is ALSO Form 2555's
+ * `foreignEarnedIncomeExclusion` (TAX-42): two branches cut from the same
+ * commit, each reclassifying one kind, each writing the literal `56`. Merging
+ * them produces `56` with no conflict and no complaint, and `56` is wrong —
+ * the kinds are different kinds, so the true composition is `55 + 1 + 1`. The
+ * two set comparisons in `theHandTypedListNamesEveryModeledKind` are what
+ * would have caught it, since `everyModeledKindHandTyped` gained BOTH names
+ * and its length is checked against this constant.
  * @type {number}
  */
-const expectedModeledKindCount = 56
+const expectedModeledKindCount = 57
 
 /**
  * The modeled set, hand-typed a SECOND time and in {@link kindVocabulary}'s
@@ -2036,6 +2073,7 @@ const everyModeledKindHandTyped = [
     'amtEstatesAndTrusts',
     'estateAndTrustIncome',
     'netPremiumTaxCredit',
+    'foreignEarnedIncomeExclusion',
 ]
 
 /**
@@ -2221,9 +2259,30 @@ const everyModeledKindHandTyped = [
  * reclassified one row and added none, and the two touch disjoint rows —
  * `141 + 2 - 1`. The modeled count moves 54 -> 55 in the same commit and
  * `kindVocabulary` stays at TAX-38's 197.
+ *
+ * **`142 -> 141` is the Form 4797 wiring's** (TAX-41), and it is the FOURTH
+ * kind reclassified since the split: `otherGainsOrLosses` leaves this table
+ * for {@link modeledKinds} over a per-asset `disposal` block on
+ * `vnd.fjs.asset_register`. No row arrives, so `142 - 1`.
+ *
+ * **`141 -> 144` is Form 2555's** (TAX-42), and it is the one move here that
+ * is a SPLIT rather than a reclassification: the single coarse row
+ * `foreignEarnedIncomeForm2555` — which named three printed destinations at
+ * once — leaves this table, one of its four successors
+ * (`foreignEarnedIncomeExclusion`) joins {@link modeledKinds}, and the other
+ * three stay here under their own blockers, so `141 - 1 + 4 - 1`, i.e.
+ * `141 + 3`. The count going UP beside a reclassification is the honest
+ * direction and the same one TAX-38's Form 6781 rows went: a filer with no
+ * housing claim used to be refused by a row about a table they never needed.
+ *
+ * **These two moves were written on branches that could not see each other**,
+ * one reaching 141 and the other 145 from a shared 142, and they compose by
+ * plain arithmetic because they touch disjoint rows — `142 - 1 + 3`. Unlike
+ * {@link expectedModeledKindCount}, this one CONFLICTED in the merge, which is
+ * the only reason it did not merge silently wrong.
  * @type {number}
  */
-const expectedUnmodeledKindCount = 141
+const expectedUnmodeledKindCount = 144
 
 /**
  * The complete refusal message for a return declaring exactly
@@ -2290,20 +2349,26 @@ export const proof = {
         // `modeledKinds` without touching `expectedModeledKindCount` must
         // redden this leaf.
         //
-        // **Renamed twice by one merge, and a third time by this one.** The
-        // Schedule F wiring moved the modeled half 54 -> 55 and TAX-38 moved
-        // the refused half 141 -> 143; both left these two names spelling the
-        // number they had replaced, and both had to be renamed again when the
-        // two moves composed to 55 and 142. The Form 4797 wiring (TAX-41) then
-        // moved BOTH — `otherGainsOrLosses` crosses the partition — so 56 and
-        // 141. A leaf name that spells a count is a third copy of it — the
+        // **Renamed twice by one merge, and twice more by the two after
+        // it.** The Schedule F wiring moved the modeled half 54 -> 55 and
+        // TAX-38 moved the refused half 141 -> 143; both left these two names
+        // spelling the number they had replaced, and both had to be renamed
+        // again when the two moves composed to 55 and 142. The Form 4797
+        // wiring (TAX-41) then moved BOTH — `otherGainsOrLosses` crosses the
+        // partition — so 56 and 141. **Form 2555 (TAX-42) was written against
+        // 55/142 as well**, and independently reached 56 and 145, so the
+        // integration composed the two: `55 + 1 + 1` modeled and
+        // `142 - 1 + 3` refused, giving 57 and 144. Note what git alone would
+        // have produced — both branches wrote the literal `56`, so the modeled
+        // constant merged CLEAN at 56 and would have been silently one short.
+        // A leaf name that spells a count is a third copy of it — the
         // reason this project has spent six bugs on them — so the rule is that
         // it gets renamed in the same edit as the constant.
-        modeledKindsIsExactlyFiftySix: () => {
+        modeledKindsIsExactlyFiftySeven: () => {
             assertEq(modeledKinds.length, expectedModeledKindCount)
             assertEq(new Set(modeledKinds).size, expectedModeledKindCount)
         },
-        unmodeledRefusalsIsExactlyOneHundredAndFortyOne: () => {
+        unmodeledRefusalsIsExactlyOneHundredAndFortyFour: () => {
             assertEq(unmodeledKindRefusals.length, expectedUnmodeledKindCount)
             assertEq(
                 new Set(unmodeledKindRefusals.map(r => r.kind)).size,
@@ -3306,16 +3371,15 @@ export const proof = {
         // checked for the row that DOES name it, and for the absence of a
         // second row naming the same printed sub-line.
         theFiveSubLinesNamedByAKindThatAlreadyExisted: () => {
-            /** @type {readonly (readonly [Kind, string])[]} */
+            /** @type {readonly (readonly [UnmodeledKind, string])[]} */
             const absorbed = [
                 ['medicaidWaiverPayments', 'Schedule 1 line 8s'],
-                ['foreignEarnedIncomeForm2555', 'Schedule 1 line 8d'],
-                ['foreignEarnedIncomeForm2555', 'Schedule 1 line 24j'],
+                ['foreignHousingExclusionOrDeduction', 'Schedule 1 line 24j'],
                 ['form8621', 'Schedule 2 lines 17p and 17q'],
                 ['form8978', 'Schedule 3 line 6l'],
             ]
-            assertEq(absorbed.length, 5,
-                'five printed sub-lines are named by a kind that already existed, hand-counted')
+            assertEq(absorbed.length, 4,
+                'four printed sub-lines are named by a REFUSED kind that already existed, hand-counted')
             for (const [kind, printedLine] of absorbed) {
                 const row = unmodeledKindRefusals.find(r => r.kind === kind)
                 if (row === undefined) {
@@ -3335,6 +3399,23 @@ export const proof = {
                         printedLine],
                 )
             }
+            // **Schedule 1 line 8d was the FIFTH entry above until TAX-42, and
+            // it is now the opposite case.** `foreignEarnedIncomeForm2555`
+            // named it; that row split into four kinds, and the one that took
+            // line 8d — `foreignEarnedIncomeExclusion` — is MODELED, so no
+            // refusal row names the line at all any more. Asserted rather than
+            // deleted, because a later reader finding no row for a printed
+            // sub-line would naturally add one, and one taxpayer fact would
+            // then have two declarations. The kind that computes it is what
+            // stands in the row's place.
+            assertEq(
+                unmodeledKindRefusals.filter(r => r.line.includes('Schedule 1 line 8d')).length,
+                0,
+                'Schedule 1 line 8d is computed, so no refusal row may name it')
+            assert(
+                modeledKindNames.includes('foreignEarnedIncomeExclusion'),
+                ['and the kind that took it must be the one that computes it',
+                    modeledKindNames.length])
             // Form 8978's THIRD destination is a write-in line that several
             // rows legitimately share, so it is checked for presence only — the
             // uniqueness assertion above would be false of it by design.
@@ -3393,21 +3474,23 @@ export const proof = {
             /** @type {readonly string[]} */
             const modeledNames = modeledKinds
             // **52 until TAX-39, 53 after it, 54 after Schedule E Part I, 55
-            // after Schedule F, 56 now — and the leaf's name is still true.**
-            // The split itself
-            // reclassified nothing; three slices AFTER it each reclassified
-            // exactly one kind, `fjs/form7206`'s
+            // after Schedule F, 56 after Form 4797 (TAX-41), 57 after Form
+            // 2555 (TAX-42) — and the leaf's name is still true.** The split
+            // itself reclassified nothing; FIVE slices AFTER it each
+            // reclassified exactly one kind, `fjs/form7206`'s
             // `selfEmployedHealthInsuranceDeduction`, Schedule E Part I's
-            // `rentalRealEstateAndRoyalties`, Schedule F's `farmIncomeOrLoss`
-            // and Form 4797's `otherGainsOrLosses`, so what this literal states
-            // is `52 + 1 + 1 + 1 + 1`. The two set comparisons below carry the
+            // `rentalRealEstateAndRoyalties`, Schedule F's `farmIncomeOrLoss`,
+            // Form 4797's `otherGainsOrLosses` and `fjs/form2555`'s
+            // `foreignEarnedIncomeExclusion`, so what this literal states is
+            // `52 + 1 + 1 + 1 + 1 + 1`. The two set comparisons below carry the
             // claim — they are set equality against `everyModeledKindHandTyped`,
             // so a kind arriving in `modeledKinds` without arriving in the
             // hand-typed list reddens here whatever this number says.
             assertEq(
-                modeledNames.length, 56,
+                modeledNames.length, 57,
                 'the fifty-two the split left untouched, plus TAX-39\'s one, '
-                + 'Schedule E Part I\'s one, Schedule F\'s one and Form 4797\'s one')
+                + 'Schedule E Part I\'s one, Schedule F\'s one, Form 4797\'s one and '
+                + 'TAX-42\'s one')
             for (const kind of everyModeledKindHandTyped) {
                 assert(
                     modeledNames.includes(kind),
