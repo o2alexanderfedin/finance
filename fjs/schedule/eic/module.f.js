@@ -340,11 +340,15 @@ export const rentAndRoyaltyRefusal = kind => ({
     kind: 'error',
     message: `1040 line 27a: the return declares ${kind}, so §32(i)(2)(C) — the excess of gross `
         + 'income from rents or royalties not derived in the ordinary course of a trade or '
-        + 'business over the deductions allocable to it — is not computable. That figure comes '
-        + 'off Schedule E Part I lines 4, 20 and 23b, which this engine does not model, and '
-        + '§32(i)(1) denies the earned income credit OUTRIGHT above $11,950 of disqualified '
-        + 'income. Refusing rather than under-approximating the disqualifier and granting the '
-        + 'credit to someone ineligible',
+        + 'business over the deductions allocable to it — is not computable. Printed Schedule E '
+        + 'Part I lines 4, 20 and 23b now COMPUTE (fjs/schedule/e/part_i), and this component '
+        + 'is still not one of them: the §32 worksheet asks for the NET rent as well as the '
+        + 'royalty, and "not derived in the ordinary course of a trade or business" is a '
+        + 'determination about each property that no line of Part I makes — printed line 26 is '
+        + 'the whole of Part I, trade-or-business rents included, and is not the figure §32 '
+        + 'wants. §32(i)(1) denies the earned income credit OUTRIGHT above $11,950 of '
+        + 'disqualified income, so refusing beats under-approximating the disqualifier and '
+        + 'granting the credit to someone ineligible',
 })
 
 /**
