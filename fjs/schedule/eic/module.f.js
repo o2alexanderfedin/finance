@@ -204,9 +204,15 @@
  * this module"* until TAX-42 made the exclusion computable. **That premise is
  * now false**, and the statute is checked instead:
  *
- * > §32(c)(1)(C): *"No credit shall be allowed under this section for any
- * > taxable year if the taxpayer elects to exclude any amount from gross
- * > income under section 911 for such taxable year."*
+ * > §32(c)(1)(C), *Exception for individual claiming benefits under section
+ * > 911*: *"The term 'eligible individual' does not include any individual who
+ * > claims the benefits of section 911 (relating to citizens or residents
+ * > living abroad) for the taxable year."*
+ *
+ * **The statute disqualifies the PERSON, not the credit**, and that is why
+ * this reads the exclusion rather than a declared kind: "claims the benefits
+ * of section 911" is an act, and a stored Form 2555 that excludes nothing is
+ * not one.
  *
  * i2555 p3 repeats it flatly: *"You can't take the earned income credit if you
  * claim either of the exclusions or the housing deduction."*
@@ -789,8 +795,9 @@ export const earnedIncomeCredit = taxParamSet => input => {
     // **§32(c)(1)(C) joined this list in TAX-42** — see this module's own
     // docstring. It reads the EXCLUSION, not a declared kind: a stored Form
     // 2555 that excludes nothing (no qualifying days, or no foreign earned
-    // income) is not an election to exclude "any amount", and barring that
-    // filer's credit would be a wrong answer costing up to $8,046.
+    // income) is not a filer who "claims the benefits of section 911", and
+    // barring that filer's credit would be a wrong answer costing up to
+    // $8,046.
     if (
         form2555ExclusionCents !== 0n
         || filerSsn !== 'validForEmployment'
@@ -978,18 +985,18 @@ const refusalOf = input => {
 export const proof = {
     // ── §32(c)(1)(C), the Form 2555 bar (TAX-42) ────────────────────────────
     //
-    // "No credit shall be allowed under this section for any taxable year if
-    // the taxpayer elects to exclude any amount from gross income under
-    // section 911." A DETERMINATION, so the credit is a computed $0.00 rather
-    // than a refusal — and the fixture is a filer who would otherwise take a
-    // real credit, so the leaf measures the bar rather than a coincidence.
+    // "The term 'eligible individual' does not include any individual who
+    // claims the benefits of section 911." A DETERMINATION, so the credit is a
+    // computed $0.00 rather than a refusal — and the fixture is a filer who
+    // would otherwise take a real credit, so the leaf measures the bar rather
+    // than a coincidence.
     sectionThirtyTwoFormTwoFiveFiveFiveBar: {
         anElectionToExcludeUnderSectionNineOneOneDeniesTheCredit: () => {
             const base = wageEarner(oneChildProfile)(2000000n)
             assert(creditOf(base) > 0n, ['the control must take a real credit', creditOf(base)])
             assertEq(
                 creditOf({ ...base, form2555ExclusionCents: 13000000n }), 0n,
-                '§32(c)(1)(C) denies the credit outright')
+                '§32(c)(1)(C) makes the filer not an eligible individual at all')
         },
         // THE CONTROL that matters more than the one above: a STORED Form 2555
         // that excludes NOTHING is not an election to exclude "any amount", so
@@ -1001,8 +1008,9 @@ export const proof = {
                 creditOf({ ...base, form2555ExclusionCents: 0n }), creditOf(base),
                 'a zero exclusion changes nothing')
         },
-        // ONE CENT of exclusion is still "any amount". Paired with the leaf
-        // above, this is what pins `!== 0n` rather than some threshold.
+        // ONE CENT of exclusion is still claiming the benefits of §911. Paired
+        // with the leaf above, this is what pins `!== 0n` rather than a
+        // threshold the statute does not have.
         oneCentOfExclusionIsStillAnyAmount: () => {
             const base = wageEarner(oneChildProfile)(2000000n)
             assertEq(creditOf({ ...base, form2555ExclusionCents: 1n }), 0n)

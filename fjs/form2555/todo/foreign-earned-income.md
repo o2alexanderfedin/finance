@@ -22,23 +22,33 @@ refusal at the site that cannot compute.
 | General limitation on housing expenses, daily (line 29b) | **$106.85** | $39,000 ÷ 365, half-up to cents (3,900,000 ¢ ÷ 365 = 10,684.93… → 10,685 ¢). i2555 p5 and its *Limit on Housing Expenses Worksheet—Line 29b* line 3. |
 | Days in the 2025 tax year (line 39's denominator) | **365** | The calendar. Form 2555 line 39: *"the number of days in your 2025 tax year (usually 365)"*. |
 
-**Only two of those six are stored.** `fjs/tax/params`' `foreignEarnedIncome`
-group stores the $130,000 with its Rev. Proc. citation, the two statutory
-percentages (16 and 30) with a `code` citation, and the 365. Every other figure
-in the table is DERIVED, and `printedFiguresMatchTheDerivation` in
-`fjs/form2555` asserts the derivation against the four printed figures
-hand-typed off the form and the notice. That is the independent-expected-value
-discipline: the arithmetic and the printed page are two sources, and the leaf
-compares them.
+**Exactly two of those six are STORED**, and the other four are not stored at
+all. `fjs/tax/params`' `foreignEarnedIncome` group carries the $130,000 with its
+Rev. Proc. citation and the 365, and nothing else — because **nothing reads the
+four housing figures**: `foreignHousingExclusionOrDeduction` is a refused kind
+(§3) and Form 2555 Parts VI and IX never run. Storing them would be four dead
+parameters, and a dead parameter is a figure nobody can notice going stale.
 
-**The printed page contradicts its own daily rate, and that is transcribed
-rather than smoothed.** $56.99 × 365 = $20,801.35, not $20,800; $106.85 × 365 =
-$39,000.25, not $39,000. Form 2555 line 32 resolves it by naming the full-year
-figure as an override — *"If 365 is entered on line 31, enter $20,800 here"* —
-and the *Limit on Housing Expenses Worksheet* resolves line 29b the same way
-(*"If you enter 365 on line 1 … DO NOT complete this worksheet. Instead, enter
-$39,000"*). Both overrides are implemented as printed. The discontinuity at 364
-vs 365 days is real and is pinned by a leaf.
+They are still WRITTEN DOWN, in `fjs/tax/params`'
+`theNoticeTwentyTwentyFiveSixteenProductsFollowFromTheStoredMaximum`, as the
+notice's own arithmetic checked against the stored maximum: 16% and 30% of
+$130,000 are $20,800 and $39,000 to the cent, and those over 365 are $56.99 and
+$106.85 half-up. That is the independent-expected-value discipline — the
+arithmetic and the printed page are two sources and the leaf compares them —
+and it is what makes the maximum's own value load-bearing in a second place,
+so a drift in it fails loudly rather than silently making four derived figures
+wrong at once.
+
+**The printed page contradicts its own daily rate, and the same leaf writes
+that down rather than smoothing it.** $56.99 × 365 = $20,801.35, not $20,800;
+$106.85 × 365 = $39,000.25, not $39,000. Form 2555 line 32 resolves it by
+naming the full-year figure as an override — *"If 365 is entered on line 31,
+enter $20,800 here"* — and the *Limit on Housing Expenses Worksheet* resolves
+line 29b the same way (*"If you enter 365 on line 1 … DO NOT complete this
+worksheet. Instead, enter $39,000"*). Neither override is IMPLEMENTED, because
+neither line runs; both are recorded here and asserted there so the phase that
+lifts §3's refusal finds the discontinuity already named rather than
+rediscovering it as a rounding bug.
 
 ---
 
@@ -309,26 +319,48 @@ elect the deduction — computes today with line 36 correctly zero.
 
 ## 4. The stacking rule, §911(f) — **IMPLEMENTED**
 
-§911(f)(1): the tax is *"the excess of — (A) the tax which would be imposed …
-if the individual's taxable income were increased by the amount excluded …
-over (B) the tax which would be imposed … if the individual's taxable income
-were equal to the amount excluded"*. i1040gi p37 mechanizes it as the **Foreign
-Earned Income Tax Worksheet**, and i2555 p3 makes it mandatory: *"you must
-figure the tax on your nonexcluded income using the tax rates that would have
-applied had you not claimed the exclusions."*
+§911(f)(1), verbatim, and it is worth quoting in full because both worksheets
+are in it:
+
+> *"If, for any taxable year, any amount is excluded from gross income of a
+> taxpayer under subsection (a), then, **notwithstanding sections 1 and 55** —
+> (A) if such taxpayer has taxable income for such taxable year, the tax
+> imposed by section 1 … shall be equal to the excess (if any) of — (i) the tax
+> which would be imposed by section 1 … if the taxpayer's taxable income were
+> increased by the amount excluded under subsection (a) …, over (ii) the tax
+> which would be imposed by section 1 … if the taxpayer's taxable income were
+> equal to the amount excluded under subsection (a) …, and (B) if such taxpayer
+> has a taxable excess (as defined in section 55(b)(1)(B)) …"*
+
+**Clause (A) is 1040 line 16 and clause (B) is Form 6251 line 7** — one statute,
+two worksheets, which is why §4c below is part of this answer rather than a
+footnote to it. i1040gi p37 mechanizes (A) and i6251 p10 mechanizes (B), and
+i2555 p3 makes both mandatory: *"you must figure the tax on your nonexcluded
+income using the tax rates that would have applied had you not claimed the
+exclusions … When figuring your alternative minimum tax on Form 6251, you must
+use the Foreign Earned Income Tax Worksheet in the Instructions for Form 6251."*
 
 ### 4a. `fjs/tax/table` supports the worksheet, and the shape is already there
 
-The worksheet's six lines:
+The worksheet's lines, transcribed:
 
 | Line | Text | This engine |
 |---|---|---|
-| 1 | Form 1040 line 15; if zero or less, enter -0- | `max(taxableIncomeCents, 0n)` |
-| 2 | Form 2555 lines 45 and 50 | the exclusion plus the housing deduction |
-| 3 | Add lines 1 and 2 | |
+| 1 | Form 1040 line 15 (printed line 15 is itself *"if zero or less, enter -0-"*) | `max(taxableIncomeCents, 0n)` |
+| 2a | Form 2555 lines 45 and 50 | the exclusion plus the housing deduction (line 50 refused, hence zero) |
+| 2b | *"any itemized deductions or exclusions you couldn't claim because they are related to excluded income"* | `foreignEarnedIncomeItemizedDeductionsAndExclusionsNotClaimed` on the profile |
+| 2c | Subtract 2b from 2a; if zero or less, enter -0- | |
+| 3 | Add lines 1 and 2c | |
 | 4 | *"Figure the tax on the amount on line 3. Use the Tax Table, Tax Computation Worksheet, Qualified Dividends and Capital Gain Tax Worksheet, Schedule D Tax Worksheet, or Form 8615, whichever applies."* | **re-enters `dispatchLine16` levels 1-3** with line 3 as taxable income |
-| 5 | *"Figure the tax on the amount on line 2. Use the Tax Table or Tax Computation Worksheet, whichever applies."* | `baseTaxForAmount` — and ONLY that, because line 5 does not name the preferential worksheets |
+| 5 | *"Figure the tax on the amount on line 2c. If the amount on line 2c is less than $100,000, use the Tax Table … $100,000 or more, use the Tax Computation Worksheet."* | `baseTaxForAmount` — and ONLY that, because line 5 does not name the preferential worksheets |
 | 6 | Subtract line 5 from line 4; if zero or less, enter -0- | |
+
+**Line 2b is a fifth stored fact, and it is not Form 2555 line 44.** Line 44 is
+above the line and reduces the exclusion itself; line 2b is below the line and
+reduces the amount the worksheet stacks the remaining income on top of. Folding
+them into one field would subtract the same dollars twice on two forms. Its
+printed wording is identical in i1040gi p37 and i6251 p10, so one profile field
+serves both.
 
 Line 4 and line 5 name **different method sets**, and that asymmetry is the
 worksheet's whole content. `fjs/tax/line16`'s own docstring already said so
@@ -450,17 +482,26 @@ computes.
 Both are printed in i2555 p3 as flat bars, both are statutory, and both are
 implemented as gates rather than as arithmetic:
 
-- **The earned income credit** — §32(c)(1)(C): *"No credit shall be allowed
-  under this section for any taxable year if the taxpayer elects to exclude any
-  amount from gross income under section 911 for such taxable year."*
-  `fjs/schedule/eic`'s docstring already noted that no check was needed *"because
-  `foreignEarnedIncomeForm2555` is already an `fjs/return/scope` refusal"*; that
-  sentence is now false and the check is real.
-- **The additional child tax credit** — §24(d)(5): *"Paragraph (1) shall not
-  apply to any taxpayer for any taxable year if such taxpayer elects to exclude
-  any amount from gross income under section 911 for such taxable year."* The
-  non-refundable child tax credit is UNAFFECTED; only the refundable half is
-  barred, which is exactly what `fjs/form8812` gates.
+- **The earned income credit** — §32(c)(1)(C), *Exception for individual
+  claiming benefits under section 911*: *"The term 'eligible individual' does
+  not include any individual who claims the benefits of section 911 (relating
+  to citizens or residents living abroad) for the taxable year."* The statute
+  disqualifies the PERSON, which is why the check reads the exclusion rather
+  than a declared kind. `fjs/schedule/eic`'s docstring said no check was needed
+  *"because `foreignEarnedIncomeForm2555` is already an `fjs/return/scope`
+  refusal"*; that sentence is now false and the check is real.
+- **The additional child tax credit** — §24(d)(3), *Exception for taxpayers
+  excluding foreign earned income*: *"Paragraph (1) shall not apply to any
+  taxpayer for any taxable year if such taxpayer elects to exclude any amount
+  from gross income under section 911 for such taxable year."* Paragraph (1) is
+  §24(d)'s REFUNDABLE portion and nothing else, so the non-refundable child tax
+  credit is unaffected — which is exactly what `fjs/form8812` gates, and the
+  half a blanket check would have broken.
+
+Both credits' phase-outs also gain the add-back, and for the CTC the statute
+states it directly: §24(b)(1) defines its modified adjusted gross income as
+*"adjusted gross income increased by any amount excluded from gross income
+under section 911, 931, or 933"*.
 
 ---
 
@@ -489,13 +530,20 @@ write-in beside line 45 and computed against the PRIOR year's exclusion limit
 and qualifying days; and income received in 2024 for 2025 services requires an
 amended 2024 return. Both need a year this engine does not hold.
 
-Counts move `55 → 56` modeled, `142 → 144` unmodeled, `197 → 200` vocabulary.
+A **fifth** kind joins them, and it is the one that is a CONDITION rather than
+a declaration: `foreignEarnedIncomeCapitalGainExcess`, raised by
+`fjs/tax/line16` off the return's own figures when the worksheet's footnote
+sends the filer to a second, modified preferential worksheet. That shape is not
+new — `childsUnearnedIncomeForm8615` and `investmentInterestForm4952` have been
+raised from computed conditions since Phase 10.
+
+Counts move `55 → 56` modeled, `142 → 145` unmodeled, `197 → 201` vocabulary.
 
 ---
 
 ## 7. What a filer must supply, and where it lives
 
-Four fields on `vnd.fjs.return_profile`, all `option(...)`, none of them on any
+Five fields on `vnd.fjs.return_profile`, all `option(...)`, none of them on any
 information return — the `movingExpensesArmedForcesPermanentChangeOfStation` /
 `line26EstimatedTaxPayments` precedent:
 
@@ -505,6 +553,7 @@ information return — the `movingExpensesArmedForcesPermanentChangeOfStation` /
 | `foreignEarnedIncomeQualifyingDays` | line 31 / 38 | `option(number)` |
 | `foreignEarnedIncome` | line 26 → 27 | `option(string)`, money |
 | `foreignEarnedIncomeDeductionsAllocableToExcludedIncome` | line 44 | `option(string)`, money |
+| `foreignEarnedIncomeItemizedDeductionsAndExclusionsNotClaimed` | both worksheets' line 2b | `option(string)`, money |
 
 **Why a profile field and not a dialect.** There is no information return for
 foreign earned income at all: a foreign employer issues no Form W-2, and Part IV
@@ -515,14 +564,20 @@ else states it. It rides on the profile rather than on `vnd.fjs.adjustments`
 because Form 2555 line 45 lands in Schedule 1 **Part I** (line 8d, additional
 income), and that dialect is Part II's.
 
-**Two cross-field checks in `checkReferences`**, both refusing rather than
+**Three cross-field checks in `checkReferences`**, all refusing rather than
 guessing:
 
-1. Any of the four present without `foreignEarnedIncomeExclusion` in
-   `declaredKinds` is rejected — the amount would be silently ignored otherwise.
-2. `foreignEarnedIncome` present without the certification, or without a
-   qualifying-day count, is rejected — an exclusion computed from an unstated
-   qualifying period would prorate by a day count nobody supplied.
+11. Any of the five present without `foreignEarnedIncomeExclusion` in
+    `declaredKinds` is rejected — the amount would be silently ignored otherwise.
+12. A present day count is a whole number from 0 to `vnd.fjs.rental_property`'s
+    own `daysInTheLongestYear` (366, because this dialect does not know whether
+    its year is a leap year). The TIGHTER bound — the actual length of the tax
+    year, from `fjs/tax/params` — is checked in `fjs/form1040/core`, and a
+    longer qualifying period refuses rather than being clamped.
+13. `foreignEarnedIncome` present without the certification, or without a
+    qualifying-day count, is rejected — an exclusion computed from an unstated
+    qualifying period would prorate by a day count nobody supplied, and an
+    absent count is not 365.
 
 ---
 
@@ -533,5 +588,7 @@ guessing:
 | `foreignEarnedIncomeBonaFideResidenceTest` | Nothing short of the IRS deciding intent. The realistic path is not a certification but a determination already made — a prior year's accepted Form 2555 Part II, which is a prior-year fact this engine does not hold. |
 | `foreignHousingExclusionOrDeduction` | Notice 2025-16 §3's two hundred rows stored in full, plus a prior-year return for line 49's carryover, plus a line 34 employer-provided split no document reports. |
 | `foreignEarnedIncomeReceivedInAnotherTaxYear` | A prior-year return. |
-| Form 6251 line 6 positive with an exclusion | i6251's line 2b allocation transcribed and a field for it, plus Part III's Form 2555 modifications. |
+| Form 6251 Part III with an exclusion | i6251 p13's `Form 2555` notes under Line 20 and Line 27 transcribed. Line 2b already has a field; what is missing is Part III's own modifications, and the flat 26%/28% bound this module leans on does not survive them. |
+| A capital gain excess at 1040 line 16 | i1040gi p37's footnote — four modifications reaching into the Unrecaptured Section 1250 Gain Worksheet — transcribed. |
+| Form 7206 line 12 beside §162(l) premiums | a stored fact saying how the exclusion divides between the trade or business the plan is established under and everything else. |
 | §904(j) election with an exclusion | Pub. 514's allocation of foreign tax between excluded and non-excluded income, and a document that states the split. |

@@ -183,16 +183,19 @@ surface. **Only 2025 exists** — `finance_tax_params` with any other year refus
 
 ## Health
 
-- `npm test`: **2902 / 2902**, exit 0 (`tsc` runs first and is clean). **Wall clock is 5-31s and
+- `npm test`: **3241 / 3241**, exit 0 (`tsc` runs first and is clean). **Wall clock is 5-31s and
   is not a stable figure** — measured 31s, 4.9s, 12.5s and 11.9s across four runs on 2026-08-17
   with no code change between them. It is dominated by three tests that spawn real `node`
   subprocesses (`EXEC-14/PROV-09` alone ranged 3.5s-29.3s), so it tracks machine load, not the
-  suite. The 2863 proof leaves are milliseconds each. This pair read 2253/2220 until
-  2026-08-19 — figures from before the Tier-B forms landed, and stale on `develop` and on the
-  feature branch alike, which is what an ungated number does.
-- **2863 project-local proof leaves** — the only stable count:
+  suite. The 3196 proof leaves are milliseconds each. This pair read 2253/2220 until
+  2026-08-19, then 2902/2863 — figures from before the Tier-B forms landed, and stale on
+  `develop` and on every feature branch alike, which is what an ungated number does. **They were
+  still 2902/2863 on BOTH parents of this integration**: Form 461, Form 4797 and Form 2555 each
+  added leaves and none of the three touched this block, which is the same failure the line
+  above describes and a reason to read it as a measurement rather than a fact.
+- **3196 project-local proof leaves** — the only stable count:
   `npm test 2>&1 | grep -c '^✔ import("./fjs/'`
-- Requirements: **120 defined, 120 complete, 0 open**
+- Requirements: **127 defined, 127 complete, 0 open**
 
 **Two standing gates now compare the documents to the code**, because this file had been wrong
 about the version, the dialect count, the test total and four separate refusals at once:

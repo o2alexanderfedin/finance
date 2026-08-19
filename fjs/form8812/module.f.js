@@ -162,8 +162,12 @@ import { taxParamsByYear } from '../tax/params/module.f.js'
  * unmodeled in this engine:
  * - Puerto Rico excluded income (line 2a) — not modeled, always 0.
  * - Form 2555 lines 45 AND 50 (line 2b — ONE printed sub-line here, unlike
- *   Schedule 1-A's two) — **LIVE as of TAX-42**. Line 50 is still zero:
- *   `foreignHousingExclusionOrDeduction` is a refused kind.
+ *   Schedule 1-A's two) — **LIVE as of TAX-42**, and the printed line is the
+ *   statute: §24(b)(1) defines this measure as *"adjusted gross income
+ *   increased by any amount excluded from gross income under section 911, 931,
+ *   or 933"*, which is exactly lines 2b, 2a and 2c in the form's own order.
+ *   Line 50 is still zero: `foreignHousingExclusionOrDeduction` is a refused
+ *   kind.
  *
  * Deliberately does NOT import or call `fjs/schedule/1a`'s
  * `seniorDeductionPhaseoutIncome` or `fjs/schedule/a`'s
@@ -341,10 +345,13 @@ export const form8812 = taxParamSet => input => {
     // ── Part II-A ────────────────────────────────────────────────────────
     //
     // **The printed CAUTION at the head of this part, TAX-42**: *"If you file
-    // Form 2555, you cannot claim the additional child tax credit."* i2555 p3
-    // states the same bar from the other side: *"You can't take the additional
-    // child tax credit if you claim either of the exclusions or the housing
-    // deduction."*
+    // Form 2555, you cannot claim the additional child tax credit."* The
+    // statute is §24(d)(3), *Exception for taxpayers excluding foreign earned
+    // income*: *"Paragraph (1) shall not apply to any taxpayer for any taxable
+    // year if such taxpayer elects to exclude any amount from gross income
+    // under section 911 for such taxable year."* Paragraph (1) is §24(d)'s
+    // REFUNDABLE portion and nothing else, which is why Part I survives
+    // untouched below. i2555 p3 states the same bar from the other side.
     //
     // **Part I is UNAFFECTED**, and that is the half a blanket check would
     // have broken. The non-refundable child tax credit survives §911
