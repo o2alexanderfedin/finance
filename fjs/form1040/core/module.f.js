@@ -6155,6 +6155,101 @@ const reportedCents = outcome => rulePrefix => {
     return lineRuled(outcome.lines)(rulePrefix).value
 }
 
+
+/**
+ * A shop building in a Schedule C business's register, sold at a gain in
+ * August 2025 — §1250 property, so line 26g is zero, printed Form 4797 line
+ * 18b is zero and the WHOLE gain is §1231. That is the shape the earned
+ * income credit's Worksheet 1 line 6 turns on.
+ *
+ * 39-year nonresidential real, straight line, mid-month, placed in service May
+ * 2020, cost $30,000.00, sold for $45,000.00 with no selling expense.
+ * @type {AssetRegister['assets'][number]}
+ */
+const soldShop = {
+    description: 'shop building',
+    datePlacedInService: '2020-05',
+    costOrOtherBasis: '30000.00',
+    businessUsePercentage: '100.00',
+    classification: 'nonresidentialReal',
+    method: 'SL',
+    convention: 'MM',
+    section168kStatus: 'electedOut',
+    disposal: {
+        dateAcquired: '2020-04-30',
+        dateSold: '2025-08-19',
+        grossSalesPrice: '45000.00',
+        expenseOfSale: '0.00',
+    },
+}
+
+/** The register the Schedule C business claims, around {@link soldShop}.
+ * @type {(asset: AssetRegister['assets'][number]) => Stored<AssetRegister>} */
+const shopRegisterDocument = asset => ({
+    documentHash: 'sha256-eic-4797-register',
+    value: {
+        dialect: 'vnd.fjs.asset_register',
+        recipientTin: '222-22-2222',
+        accountNumber: 'BUS-0001',
+        taxYear: 2025,
+        businessOrActivity: 'software consulting',
+        everyDepreciableAssetIsListed: /** @type {const} */ (true),
+        priorYearSection179CarryoverIsZero: /** @type {const} */ (true),
+        ...(asset.disposal === undefined
+            ? { noDepreciablePropertyDisposedOfDuringTheYear: /** @type {const} */ (true) }
+            : {}),
+        assets: [asset],
+    },
+})
+
+/**
+ * A §32 filer with one qualifying child, $25,000.00 of wages and a small
+ * consulting business — the shape the earned income credit's Worksheet 1 line
+ * 6 is decided on. `brokerageForms` is a parameter so the CONTROL can put the
+ * identical amount on 1040 line 7a as an ordinary long-term STOCK gain, which
+ * the worksheet does NOT subtract.
+ * @type {(asset: AssetRegister['assets'][number]) => (brokerageForms: readonly Stored<OneZeroNineNineB>[]) => Form1040Outcome}
+ */
+const earnedIncomeCreditWithBusinessProperty = asset => brokerageForms => {
+    /** @type {ReturnProfile} */
+    const profile = {
+        ...singleProfile,
+        declaredKinds: [
+            'wages', 'businessIncomeOrLoss', 'otherGainsOrLosses', 'capitalGainsOrLosses',
+            'unrecaptured1250Gain', 'selfEmploymentTax', 'deductiblePartOfSelfEmploymentTax',
+            'qualifiedBusinessIncomeDeduction', 'earnedIncomeCredit',
+        ],
+        dependentCount: 1,
+        dependents: [{
+            relationship: 'daughter',
+            ssnValidForEmployment: true,
+            ageAtYearEnd: 9,
+            livedWithTaxpayer: true,
+            earnedIncomeCreditRelationship: 'child',
+            earnedIncomeCreditUnitedStatesResidency:
+                'sharedTheTaxpayersUnitedStatesAbodeForMoreThanHalfTheYear',
+            earnedIncomeCreditJointReturn: 'didNotFileAJointReturn',
+        }],
+        filerSocialSecurityNumber: 'validForEmployment',
+        filerQualifyingChildOfAnotherTaxpayer: 'isNotAnotherTaxpayersQualifyingChild',
+        // Printed Form 4797 line 7's own certification. Without it the return
+        // refuses at printed line 8 — which is `fjs/form4797`'s subject, not
+        // this leaf's, and the refusal is what confirmed the $19,038.45 gain
+        // hand-derived above before either leaf was green.
+        noNonrecapturedNetSectionOneTwoThreeOneLossesFromPriorYears: /** @type {const} */ (true),
+    }
+    const base = withBusiness(
+        inputsOf(storedProfile(profile))([
+            w2Document('sha256-eic-4797-w2')('25000.00'),
+        ])([])([])(brokerageForms)([])([])([])([])([]),
+    )([nonemployeeCompensationDocument('sha256-eic-4797-nec')('2000.00')('0.00')])(
+        [businessExpensesDocument('sha256-eic-4797-expenses')('0.00')])
+    return form1040Report(taxParams2025)({
+        ...base,
+        assetRegisters: [shopRegisterDocument(asset)],
+    })
+}
+
 export const proof = {
     unionSources: {
         // The same box of the same document, cited by two different lines, is
@@ -9125,6 +9220,99 @@ export const proof = {
         // dependents array — so a hand-derivation of any §32 return with a
         // qualifying child has to account for it. A figure adjusted until the
         // suite went green would have hidden that.
+        /**
+         * ★ **THE §1231 GAIN REACHES PUBLICATION 596 WORKSHEET 1 LINE 6**, and
+         * this leaf exists because a mutation zeroing that argument survived
+         * the whole suite. `fjs/schedule/eic`'s own leaves prove the
+         * subtraction; only this one can say whether `form1040IncomeLines`
+         * ever hands the figure over.
+         *
+         * A single filer with one qualifying child, $25,000.00 of wages, a
+         * $2,000.00 consulting business, and the shop building that business
+         * sold:
+         *
+         * ```
+         *   39-year nonresidential real, S/L, mid-month, month 5:
+         *     y1 1.603%, y2..y6 2.564%      basis $30,000.00 = 3,000,000 cents
+         *   y1  1.603% x 3,000,000 =  48,090
+         *   y2..y5 (four years) 2.564% x 3,000,000 = 76,920 each = 307,680
+         *   y6  76,920 x 15/24 = 48,075        (sold August, MM disposal decimal)
+         *
+         *   4562 line 22 (this year alone)                       48,075
+         *   4797 line 22 (all six years)                        403,845
+         *        line 23  3,000,000 - 403,845                 2,596,155
+         *        line 24  4,500,000 - 2,596,155               1,903,845
+         *        line 26g §1250 recapture, post-1986 S/L               0
+         *        line 18b                                              0   <- nothing ordinary
+         *        line  7                                       1,903,845   <- all §1231
+         *   Sch C  line  7 gross receipts                        200,000
+         *          line 13 Form 4562 line 22                     -48,075
+         *          line 31                                       151,925
+         *   Sch 1  line  3                                       151,925
+         *          line  4 Form 4797 line 18b                           0
+         *   1040   line  8                                       151,925
+         *          line 7a Schedule D line 16                   1,903,845
+         *
+         *   Pub 596 Worksheet 1  line 5  1040 line 7a           1,903,845
+         *                        line 6  Form 4797 line 7       1,903,845
+         *                        line 7  the difference                 0
+         * ```
+         *
+         * $19,038.45 is well over §32(i)(1)'s $11,950.00, so WITHOUT the
+         * subtraction this filer loses the earned income credit outright. The
+         * credit's exact amount is `fjs/schedule/eic`'s own subject, proven
+         * there against the printed 2025 EIC Table at hand-typed values; what
+         * only this leaf can establish is that it is not ZERO.
+         */
+        aSectionTwelveThirtyOneGainDoesNotDisqualifyTheEarnedIncomeCredit: () => {
+            const outcome = earnedIncomeCreditWithBusinessProperty(soldShop)([])
+            assert(outcome.kind === 'ok', ['expected a computed return', outcome])
+            if (outcome.kind !== 'ok') {
+                return
+            }
+            const at = lineRuled(outcome.lines)
+            assertEq(at('1040 line 8').value, 151925n, 'Schedule C line 31; Schedule 1 line 4 is zero')
+            assertEq(at('1040 line 7a').value, 1903845n, 'the §1231 gain, through Schedule D')
+            assert(
+                at('1040 line 27a').value > 0n,
+                ['a §1231 gain is business gain, not disqualified investment income',
+                    at('1040 line 27a').value])
+        },
+        /**
+         * ★ **THE CONTROL, and it is the same amount on the same printed
+         * line.** Replace the shop's disposal with an ordinary long-term STOCK
+         * gain of exactly $19,038.45 — 1040 line 7a is identical, the wages
+         * and the business are identical — and the credit is **zero**, because
+         * Worksheet 1 line 6 subtracts a Form 4797 gain and nothing else.
+         *
+         * The two returns differ in adjusted gross income by $288.45, and only
+         * that: with the shop still held, printed Schedule C line 13 takes a
+         * whole year of depreciation (2.564% of $30,000.00 = $769.20) rather
+         * than the 15/24 of it the year of sale allows ($480.75). That is far
+         * too small a difference to move a filer across §32's phaseout, so the
+         * cliff between these two leaves is the disqualified-income test and
+         * nothing else.
+         */
+        theSameAmountAsAStockGainDoesDisqualifyIt: () => {
+            const outcome = earnedIncomeCreditWithBusinessProperty(
+                { ...soldShop, disposal: undefined })([
+                    brokerageDocument('sha256-eic-4797-stock')({
+                        box1dProceeds: '19038.45',
+                        box1eCostOrOtherBasis: '0.00',
+                        box2LongTermGainOrLoss: true,
+                        box12BasisReportedToIrs: true,
+                    }),
+                ])
+            assert(outcome.kind === 'ok', ['expected a computed return', outcome])
+            if (outcome.kind !== 'ok') {
+                return
+            }
+            const at = lineRuled(outcome.lines)
+            assertEq(at('1040 line 7a').value, 1903845n, 'the SAME figure on the SAME printed line')
+            assertEq(at('1040 line 8').value, 123080n, '$2,000.00 less a WHOLE year of depreciation')
+            assertEq(at('1040 line 27a').value, 0n,
+                '§32(i)(1) denies the credit outright above $11,950.00 of disqualified income')
+        },
         theEarnedIncomeCreditComputesEndToEndAndIsRefunded: () => {
             const outcome = form1040Report(taxParams2025)(inputsOf(storedProfile({
                 ...singleProfile,
