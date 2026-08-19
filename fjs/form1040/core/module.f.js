@@ -13538,13 +13538,14 @@ export const proof = {
         },
         // ── THE WIRING SWEEP (TAX-42) ───────────────────────────────────────
         //
-        // **Seven of this phase's own wirings were deletable with the whole
+        // **Eight of this phase's own wirings were deletable with the whole
         // suite green**, and every one of them was measured that way rather
         // than reasoned about: replacing `income.foreignEarnedIncome.line45`
-        // with `… * 0n` at a call site and running `npm test`. Schedule A's,
-        // Schedule 1-A's, Schedule 8812's, Schedule 3's (Form 8863's), Schedule
-        // 2's (Form 6251's), `fjs/schedule/eic`'s, and the two profile readers
-        // for Form 2555 line 44 and the worksheets' line 2b.
+        // with `… * 0n` at a call site and running `npm test`. Six add-backs —
+        // Schedule A's, Schedule 1-A's, Schedule 8812's, Schedule 3's (Form
+        // 8863's), Schedule 2's (Form 6251's) and `fjs/schedule/eic`'s — plus
+        // the two profile readers for Form 2555 line 44 and the worksheets'
+        // line 2b.
         //
         // Each module's OWN leaves stayed green throughout, because each takes
         // the figure as an argument — which is precisely `fjs/report/tax_return`'s

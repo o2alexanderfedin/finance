@@ -183,13 +183,14 @@ negative, and §911(f)'s stacking rule reprices 1040 line 16.
   received in another tax year, a capital gain excess inside the worksheet, the
   AMT's Part III modifications, Form 7206 line 12's attribution, and the §904(j)
   election beside a §911 exclusion (§911(d)(6)).
-- **The mutation sweep found ten survivors and every one was a real hole.**
-  Seven wirings out of `fjs/form1040/core` were deletable with the whole suite
-  green; a Schedule A add-back had no leaf at all; the worksheet's own line 6
-  floor turned out to be an equivalent mutant and is now an assertion naming the
-  invariant; and gating §911(d)(6) on the §904(j) election was worse than
-  untested — it handed an unelected filer a remedy that lands them in the same
-  refusal.
+- **Seventy-six mutations ran and ten real gaps came back.** Eight wirings out
+  of `fjs/form1040/core` were deletable with the whole suite green; a Schedule A
+  add-back had no leaf at all; and gating §911(d)(6) on the §904(j) election was
+  worse than untested — it handed an unelected filer a remedy that lands them in
+  the same refusal. Two further green results were not gaps: one mutation was a
+  no-op, and the worksheet's line 6 floor is an equivalent mutant, now an
+  assertion naming the invariant instead. The log is in
+  `fjs/form2555/todo/foreign-earned-income.md` §7b.
 - **Counts, composed.** Form 4797 above moved modeled `55 -> 56` and refused
   `142 -> 141` from the SAME starting point this form moved `55 -> 56` and
   `142 -> 145` from, so neither branch's literal is the answer: the live
@@ -205,7 +206,6 @@ negative, and §911(f)'s stacking rule reprices 1040 line 16.
   23 files, none of which names either other form. The reasoning, and why
   `TAX-38`'s decision to record rather than split does not transfer, is in
   REQUIREMENTS.md's own section.
-
 
 ### Schedule F — Profit or Loss From Farming
 
