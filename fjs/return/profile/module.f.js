@@ -1917,6 +1917,18 @@ const expectedEarnedIncomeCreditFactFieldCount = 10
 const expectedMoneyBoxFieldCount = 8
 
 /**
+ * Independently hand-typed: the number of Form 2555 fields
+ * {@link formTwoFiveFiveFiveFields} names today, and therefore the number
+ * check 11's loop walks. Deliberately NOT `formTwoFiveFiveFiveFields.length`,
+ * for {@link expectedMoneyBoxFieldCount}'s reason — a field dropped from that
+ * list would vanish from the loop AND from
+ * `everyFormTwoFiveFiveFiveFieldNeedsTheDeclaredKind`'s own five cases in the
+ * same instant, and neither would notice. This constant is what does.
+ * @type {number}
+ */
+const expectedFormTwoFiveFiveFiveFieldCount = 5
+
+/**
  * Independently hand-typed: the size of the frozen {@link kindVocabulary},
  * counted off the 1040 face rather than read from `kindVocabulary.length`,
  * for the same reason.
@@ -2043,6 +2055,12 @@ export const proof = {
     kindVocabularyIsExactlyTwoHundredAndOne: () => {
         assertEq(kindVocabulary.length, expectedKindCount)
         assertEq(new Set(kindVocabulary).size, kindVocabulary.length)
+    },
+    thereAreExactlyFiveFormTwoFiveFiveFiveFields: () => {
+        assertEq(formTwoFiveFiveFiveFields.length, expectedFormTwoFiveFiveFiveFieldCount)
+        assertEq(
+            new Set(formTwoFiveFiveFiveFields).size, formTwoFiveFiveFiveFields.length,
+            'and each is named once')
     },
     validate: {
         minimalValidates: () => {
@@ -2387,6 +2405,135 @@ export const proof = {
                     section904jElectionAllForeignIncomeIsQualifiedPassiveIncome: false,
                 })
                 assertEq(t, 'error')
+            },
+            // ── TAX-42: Form 2555's four checks ─────────────────────────
+            //
+            // The whole set, on a return that declares the kind and states
+            // every fact — the shape `fjs/form1040/core` actually receives.
+            formTwoFiveFiveFiveFieldsValidateTogether: () => {
+                const [t, v] = validate({
+                    ...minimal,
+                    declaredKinds: ['foreignEarnedIncomeExclusion'],
+                    physicallyPresentInAForeignCountryThreeHundredThirtyFullDaysAndNoUnitedStatesAbode: true,
+                    foreignEarnedIncomeQualifyingDays: 140,
+                    foreignEarnedIncome: '150000.00',
+                    foreignEarnedIncomeDeductionsAllocableToExcludedIncome: '4000.00',
+                    foreignEarnedIncomeItemizedDeductionsAndExclusionsNotClaimed: '1200.00',
+                })
+                assert(t === 'ok', ['a complete Form 2555 profile must validate', t, v])
+                assertEq(v.foreignEarnedIncomeQualifyingDays, 140)
+                assertEq(v.foreignEarnedIncome, '150000.00')
+            },
+            // DOC-12: a structural `false` on the certification is REJECTED,
+            // never read as "not certified" — the discipline every other
+            // checkbox on this dialect follows.
+            thePhysicalPresenceCertificationRejectsAStoredFalse: () => {
+                const [t] = validate({
+                    ...minimal,
+                    declaredKinds: ['foreignEarnedIncomeExclusion'],
+                    physicallyPresentInAForeignCountryThreeHundredThirtyFullDaysAndNoUnitedStatesAbode: false,
+                })
+                assertEq(t, 'error')
+            },
+            // Check 11 — every one of the five, one at a time, so a field
+            // silently dropped from `formTwoFiveFiveFiveFields` reddens here
+            // rather than passing because a NEIGHBOUR is still in the loop.
+            // The `formTwoFiveFiveFiveFieldCount` leaf below is what catches a
+            // field dropped from the LOOP as well as from this list.
+            everyFormTwoFiveFiveFiveFieldNeedsTheDeclaredKind: () => {
+                /** @type {readonly (readonly [string, string | number | true])[]} */
+                const cases = [
+                    ['physicallyPresentInAForeignCountryThreeHundredThirtyFullDaysAndNoUnitedStatesAbode', true],
+                    ['foreignEarnedIncomeQualifyingDays', 365],
+                    ['foreignEarnedIncome', '90000.00'],
+                    ['foreignEarnedIncomeDeductionsAllocableToExcludedIncome', '100.00'],
+                    ['foreignEarnedIncomeItemizedDeductionsAndExclusionsNotClaimed', '100.00'],
+                ]
+                assertEq(cases.length, 5, 'five Form 2555 fields, hand-counted')
+                for (const [field, value] of cases) {
+                    const [t, v] = validate({ ...minimal, [field]: value })
+                    assertEq(t, 'error', ['an unstated kind must refuse this field', field, v])
+                    assert(typeof v === 'string', ['expected a semantic refusal', field, v])
+                    assert(
+                        v.includes(field) && v.includes('foreignEarnedIncomeExclusion'),
+                        ['the refusal must name the field and the kind', field, v])
+                }
+            },
+            // THE CONTROL for the loop above: with the kind declared, each of
+            // the five validates on its own. Without this, a check 11 that
+            // refused unconditionally would pass every assertion above.
+            controlEachFormTwoFiveFiveFiveFieldValidatesWithTheKindDeclared: () => {
+                const base = {
+                    ...minimal,
+                    declaredKinds: ['foreignEarnedIncomeExclusion'],
+                    physicallyPresentInAForeignCountryThreeHundredThirtyFullDaysAndNoUnitedStatesAbode: true,
+                    foreignEarnedIncomeQualifyingDays: 365,
+                }
+                for (const field of [
+                    'foreignEarnedIncomeDeductionsAllocableToExcludedIncome',
+                    'foreignEarnedIncomeItemizedDeductionsAndExclusionsNotClaimed',
+                ]) {
+                    const [t, v] = validate({ ...base, [field]: '100.00' })
+                    assert(t === 'ok', ['the declared kind must admit this field', field, v])
+                }
+                const [t] = validate(base)
+                assertEq(t, 'ok', 'and the certification with a day count alone validates')
+            },
+            // Check 12 — the day count's own boundaries, against
+            // `vnd.fjs.rental_property`'s imported `daysInTheLongestYear`.
+            // 366 is admitted and 367 is not, because this dialect does not
+            // know whether the year it names is a leap year; the TIGHTER bound
+            // is `fjs/form1040/core`'s, against the parameter set.
+            theQualifyingDayCountIsRangeChecked: () => {
+                const base = {
+                    ...minimal,
+                    declaredKinds: ['foreignEarnedIncomeExclusion'],
+                }
+                assertEq(validate({ ...base, foreignEarnedIncomeQualifyingDays: 0 })[0], 'ok')
+                assertEq(validate({ ...base, foreignEarnedIncomeQualifyingDays: 366 })[0], 'ok')
+                assertEq(validate({ ...base, foreignEarnedIncomeQualifyingDays: 367 })[0], 'error')
+                assertEq(validate({ ...base, foreignEarnedIncomeQualifyingDays: -1 })[0], 'error')
+                assertEq(validate({ ...base, foreignEarnedIncomeQualifyingDays: 140.5 })[0], 'error')
+            },
+            // Check 13 — a stored foreign earned income needs BOTH the
+            // certification and a day count. Two separate refusals, each
+            // naming what is missing, because a filer told only "something is
+            // wrong" cannot act.
+            aStoredForeignEarnedIncomeNeedsTheCertificationAndTheDayCount: () => {
+                const declared = {
+                    ...minimal,
+                    declaredKinds: ['foreignEarnedIncomeExclusion'],
+                    foreignEarnedIncome: '90000.00',
+                }
+                const [t1, v1] = validate({ ...declared, foreignEarnedIncomeQualifyingDays: 365 })
+                assertEq(t1, 'error', 'no certification')
+                assert(
+                    typeof v1 === 'string' && v1.includes('physicallyPresent'),
+                    ['the refusal must name the certification', v1])
+                const [t2, v2] = validate({
+                    ...declared,
+                    physicallyPresentInAForeignCountryThreeHundredThirtyFullDaysAndNoUnitedStatesAbode: true,
+                })
+                assertEq(t2, 'error', 'no day count')
+                assert(
+                    typeof v2 === 'string' && v2.includes('foreignEarnedIncomeQualifyingDays'),
+                    ['the refusal must name the missing day count', v2])
+                assert(
+                    typeof v2 === 'string' && v2.includes('is not 365'),
+                    ['and say why an absent count is not a full year', v2])
+            },
+            // THE CONTROL: the certification and a day count WITHOUT an amount
+            // is an ordinary return — a filer who qualified and earned nothing
+            // abroad. Without this, a check 13 that refused the certification
+            // itself would pass every assertion above.
+            controlTheCertificationWithNoAmountValidates: () => {
+                const [t, v] = validate({
+                    ...minimal,
+                    declaredKinds: ['foreignEarnedIncomeExclusion'],
+                    physicallyPresentInAForeignCountryThreeHundredThirtyFullDaysAndNoUnitedStatesAbode: true,
+                    foreignEarnedIncomeQualifyingDays: 200,
+                })
+                assert(t === 'ok', ['qualifying and earning nothing is an ordinary return', t, v])
             },
             eachExtensionAndEstimatedGuardWatchesItsOwnKind: () => {
                 const [t1] = validate({

@@ -3814,6 +3814,89 @@ const marketplaceWageReturn = marketplaceStatements => ({
     marketplaceStatements,
 })
 
+// ── TAX-42's fixtures: Form 2555, end to end ─────────────────────────────────
+//
+// The persona is a software engineer on a U.S. payroll working from Lisbon for
+// the whole tax year. Their wages arrive on a Form W-2 because their employer
+// is American, and §911 excludes them anyway — which is exactly why Form 2555
+// line 45 lands on Schedule 1 line 8d as a NEGATIVE rather than removing
+// anything from line 1.
+
+/**
+ * The expatriate persona's return profile: a single filer with wages, the
+ * withholding on them, and however much foreign earned income the leaf states.
+ *
+ * `days` is printed line 31/38 and `income` is printed line 26. `undefined`
+ * income means NO Form 2555 fields at all — the differential control every
+ * leaf below is read against, and the return this engine computed before
+ * TAX-42.
+ * @type {(days: number) => (income: string | undefined) => ReturnProfile}
+ */
+const expatriateProfile = days => income => income === undefined
+    ? { ...singleProfile, declaredKinds: ['wages', 'federalTaxWithheldOnW2'] }
+    : {
+        ...singleProfile,
+        declaredKinds: ['wages', 'federalTaxWithheldOnW2', 'foreignEarnedIncomeExclusion'],
+        physicallyPresentInAForeignCountryThreeHundredThirtyFullDaysAndNoUnitedStatesAbode: true,
+        foreignEarnedIncomeQualifyingDays: days,
+        foreignEarnedIncome: income,
+    }
+
+/** The persona's whole return: the wages given, $9,000.00 withheld, and the
+ * Form 2555 facts given.
+ * @type {(wages: string) => (days: number) => (income: string | undefined) => Form1040Inputs}
+ */
+const expatriateReturnWith = wages => days => income =>
+    inputsOf(storedProfile(expatriateProfile(days)(income)))(
+        [w2WithWithholding('sha256-2555-w2')(wages)('9000.00')])([])([])([])([])([])([])([])([])
+
+/** The persona at $90,000.00 of wages and a full qualifying year.
+ * @type {(income: string | undefined) => Form1040Inputs}
+ */
+const expatriateReturn = expatriateReturnWith('90000.00')(365)
+
+/** The SAME persona with no Form 2555 at all and the wages given — the
+ * fixture `controlTheSameTaxableIncomeWithNoExclusionPaysTheTaxTableFigure`
+ * uses to reach the same taxable income by a different route.
+ * @type {(wages: string) => Form1040Inputs}
+ */
+const expatriateReturnWithWages = wages => expatriateReturnWith(wages)(365)(undefined)
+
+/**
+ * The MARKETPLACE persona with a §911 exclusion — `marketplaceWageReturn`'s
+ * own $30,000.00 of wages and Form 1095-A, plus the Form 2555 facts.
+ *
+ * Kept separate from `expatriateReturnWith` rather than parameterised into it:
+ * this one needs `federalPovertyLineTable`, which every other leaf here would
+ * carry for no reason, and the two fixtures are read against DIFFERENT
+ * controls.
+ * @type {(wages: string) => (income: string) => Form1040Inputs}
+ */
+const marketplaceExpatriateReturn = wages => income => ({
+    ...inputsOf(storedProfile({
+        ...singleProfile,
+        declaredKinds: ['wages', 'federalTaxWithheldOnW2', 'foreignEarnedIncomeExclusion'],
+        federalPovertyLineTable: 'contiguous48AndDistrictOfColumbia',
+        physicallyPresentInAForeignCountryThreeHundredThirtyFullDaysAndNoUnitedStatesAbode: true,
+        foreignEarnedIncomeQualifyingDays: 365,
+        foreignEarnedIncome: income,
+    }))([w2WithWithholding('sha256-1095a-w2')(wages)('2000.00')])([])([])([])([])([])([])([])([]),
+    marketplaceStatements: [storedMarketplaceStatement('400.00')],
+})
+
+/** `marketplaceWageReturn` at a DIFFERENT wage — the control that shows an
+ * adjusted gross income which really falls buys a bigger credit.
+ * @type {(wages: string) => Form1040Inputs}
+ */
+const marketplaceWageReturnAt = wages => ({
+    ...inputsOf(storedProfile({
+        ...singleProfile,
+        declaredKinds: ['wages', 'federalTaxWithheldOnW2'],
+        federalPovertyLineTable: 'contiguous48AndDistrictOfColumbia',
+    }))([w2WithWithholding('sha256-1095a-w2')(wages)('2000.00')])([])([])([])([])([])([])([])([]),
+    marketplaceStatements: [storedMarketplaceStatement('400.00')],
+})
+
 // ── TAX-39's fixtures: Schedule 1 line 17, end to end ────────────────────────
 //
 // **A form-level proof cannot prove a wiring, and neither can a schedule-level
@@ -13114,6 +13197,218 @@ export const proof = {
     // federal poverty line for a family of one, Table 2's applicable figure at
     // 199 is 0.0196, line 8a is $588.00, and the annual calculation allows
     // min($9,600.00, $10,200.00 - $588.00) = $9,600.00 of credit.
+    // ── Form 2555, END TO END (TAX-42) ─────────────────────────────────────
+    //
+    // **A form-level proof CANNOT prove a wiring**, and this block is the one
+    // the brief for this phase names by hand. `fjs/form2555`'s fourteen leaves
+    // prove the exclusion's arithmetic against `bigint`s; `fjs/tax/line16`'s
+    // fifteen prove §911(f)'s stacking rule against a dispatcher input;
+    // `fjs/form8962`'s prove the premium tax credit against a household income
+    // it is HANDED. Not one of them can see this file entering line 45 at the
+    // wrong printed line, with the wrong sign, or failing to add it back into
+    // the six modified-adjusted-gross-income measures that must contain it.
+    //
+    // The persona: a software engineer on a U.S. payroll working from Lisbon
+    // for the whole year. Their wages are on a Form W-2 because their employer
+    // is American; §911 excludes them anyway, and Schedule 1 line 8d is where
+    // the exclusion lands precisely BECAUSE the income is already on line 1.
+    foreignEarnedIncomeExclusionReachesTheReturn: {
+        // The exclusion reaches Schedule 1 line 8d, arrives on 1040 line 8 as
+        // a NEGATIVE, and reduces total income and adjusted gross income by
+        // exactly itself. Read differentially against the same return with no
+        // exclusion; the differential is hand-typed.
+        theExclusionReachesLineEightAndReducesAdjustedGrossIncomeByItself: () => {
+            const without = form1040Report(taxParams2025)(expatriateReturn(undefined))
+            const withExclusion = form1040Report(taxParams2025)(expatriateReturn('60000.00'))
+            assert(without.kind === 'ok', ['expected the control return to compute', without])
+            assert(withExclusion.kind === 'ok', ['expected the §911 return to compute', withExclusion])
+            if (without.kind !== 'ok' || withExclusion.kind !== 'ok') {
+                throw ['expected ok', without, withExclusion]
+            }
+            /** @type {(report: { readonly lines: readonly ReportLine[] }) => (rule: string) => bigint} */
+            const cents = report => rule => lineRuled(report.lines)(rule).value
+            assertEq(cents(without)('1040 line 8'), 0n, 'no Schedule 1 Part I figure without it')
+            assertEq(cents(withExclusion)('1040 line 8'), -6000000n, 'NEGATIVE $60,000.00')
+            assertEq(cents(without)('1040 line 9'), 9000000n, '$90,000.00 of wages')
+            assertEq(cents(withExclusion)('1040 line 9'), 3000000n, '$90,000.00 − $60,000.00')
+            assertEq(
+                cents(without)('1040 line 11') - cents(withExclusion)('1040 line 11'), 6000000n,
+                'adjusted gross income falls by exactly the exclusion')
+            assert(
+                cents(withExclusion)('1040 line 8') < 0n,
+                ['a positive line 8d would ADD the exclusion to income',
+                    cents(withExclusion)('1040 line 8')])
+        },
+        // **§911(f)'s stacking rule, end to end.** The same return's line 16
+        // must come from the Foreign Earned Income Tax Worksheet, and the
+        // figure is hand-computed from the 2025 single brackets rather than
+        // read off any module:
+        //
+        //   1040 line 15 = $90,000 − $60,000 − $15,750 standard deduction
+        //                = $14,250
+        //   worksheet line 3 = 14,250 + 60,000 = $74,250
+        //   line 4 = tax on $74,250 (Tax Table, midpoint $74,275)
+        //          = 10%×11,925 = 1,192.50 + 12%×36,550 = 4,386.00
+        //          + 22%×(74,275 − 48,475 = 25,800) = 5,676.00  → $11,254.50
+        //          dollar-rounded half-up                       → $11,255.00
+        //   line 5 = tax on $60,000 (Tax Table, midpoint $60,025)
+        //          = 1,192.50 + 4,386.00 + 22%×11,550 = 2,541.00 → $8,119.50
+        //          dollar-rounded half-up                        → $8,120.00
+        //   line 6 = 11,255.00 − 8,120.00                        → $3,135.00
+        //
+        // **The fudge is $1,478.00**: taxing the remaining $14,250 alone reads
+        // the Tax Table at the $14,250–$14,300 midpoint of $14,275 and charges
+        // 1,192.50 + 12%×(14,275 − 11,925 = 2,350) = 282.00 → $1,474.50,
+        // dollar-rounded to $1,475.00. The stacking rule more than DOUBLES it,
+        // because the remainder sits on top of the exclusion at 22% instead of
+        // beginning again at 10%.
+        theStackingRuleRepricesLineSixteenEndToEnd: () => {
+            const outcome = form1040Report(taxParams2025)(expatriateReturn('60000.00'))
+            assert(outcome.kind === 'ok', ['expected the §911 return to compute', outcome])
+            if (outcome.kind !== 'ok') {
+                throw ['expected ok', outcome]
+            }
+            assertEq(outcome.line16Method, 'foreignEarnedIncomeTaxWorksheet')
+            const line16 = lineRuled(outcome.lines)('1040 line 16')
+            assertEq(line16.value, 313500n, '$11,255.00 − $8,120.00 = $3,135.00')
+            assert(
+                line16.value !== 147500n,
+                ['taxing the remaining $14,250.00 alone would give $1,475.00', line16.value])
+            assert(
+                line16.rule.includes('Foreign Earned Income Tax Worksheet'),
+                ['the printed line must name the method that produced it', line16.rule])
+        },
+        // THE CONTROL for the leaf above, and the one that shows $1,475.00 is
+        // a real number rather than an invented one: a return with the SAME
+        // taxable income and no exclusion pays exactly it, through the Tax
+        // Table. Without this, a worksheet that returned its own line 4 and
+        // dropped line 5 would still look like "more than the naive answer".
+        controlTheSameTaxableIncomeWithNoExclusionPaysTheTaxTableFigure: () => {
+            const outcome = form1040Report(taxParams2025)(expatriateReturnWithWages('30000.00'))
+            assert(outcome.kind === 'ok', ['expected the control return to compute', outcome])
+            if (outcome.kind !== 'ok') {
+                throw ['expected ok', outcome]
+            }
+            assertEq(
+                lineRuled(outcome.lines)('1040 line 15').value, 1425000n,
+                '$30,000.00 − $15,750.00 = $14,250.00, the same taxable income')
+            assertEq(outcome.line16Method, 'taxTable')
+            assertEq(lineRuled(outcome.lines)('1040 line 16').value, 147500n, '$1,475.00')
+        },
+        // **A stored Form 2555 that excludes NOTHING leaves the return exactly
+        // where it was.** Zero qualifying days is the case: the filer stored
+        // the form, and §911 gives them nothing. Every printed line must match
+        // the return that has no Form 2555 fields at all — including line 16's
+        // METHOD, which is the one thing a value comparison would miss.
+        aStoredFormThatExcludesNothingLeavesEveryLineAlone: () => {
+            const plain = form1040Report(taxParams2025)(expatriateReturn(undefined))
+            const zeroDays = form1040Report(taxParams2025)(
+                expatriateReturnWith('90000.00')(0)('60000.00'))
+            assert(plain.kind === 'ok', ['expected the plain return to compute', plain])
+            assert(zeroDays.kind === 'ok', ['expected the zero-day return to compute', zeroDays])
+            if (plain.kind !== 'ok' || zeroDays.kind !== 'ok') {
+                throw ['expected ok', plain, zeroDays]
+            }
+            assertEq(zeroDays.line16Method, plain.line16Method, 'the wrapper must not select')
+            assertEq(zeroDays.line16Method, 'taxTable')
+            assertEq(zeroDays.lines.length, plain.lines.length)
+            for (const [index, line] of plain.lines.entries()) {
+                const other = zeroDays.lines[index]
+                assert(other !== undefined, ['line sets must be the same length', index])
+                assertEq(other.value, line.value, ['every printed line must match', line.rule])
+            }
+        },
+        // ── THE FORM 8962 STRUCTURAL ZERO, MADE LIVE ────────────────────────
+        //
+        // i8962 Worksheet 1-1 adds Form 2555 lines 45 and 50 back into
+        // household income; §36B(d)(2)(B)(ii) states it as "any amount
+        // excluded from gross income under section 911". So the exclusion
+        // moves adjusted gross income and must NOT move the premium tax
+        // credit — and this leaf asserts exactly that equality, which is the
+        // only shape that can catch a dropped add-back.
+        //
+        // The fixture is chosen so a dropped add-back would be LOUD. $30,000
+        // of household income is 199% of the 2025 contiguous-48 poverty line
+        // for one person; $18,000 is 119%, where §36B(b)(3)(A)(i) as amended
+        // charges a 0% applicable figure and the credit becomes the whole
+        // benchmark premium. The two answers differ by hundreds of dollars,
+        // not by rounding.
+        theForeignEarnedIncomeExclusionAddsBackIntoHouseholdIncome: () => {
+            const plain = form1040Report(taxParams2025)(marketplaceWageReturnAt('40000.00'))
+            const withExclusion = form1040Report(taxParams2025)(
+                marketplaceExpatriateReturn('40000.00')('12000.00'))
+            assert(plain.kind === 'ok', ['expected the plain marketplace return to compute', plain])
+            assert(withExclusion.kind === 'ok', ['expected the §911 return to compute', withExclusion])
+            if (plain.kind !== 'ok' || withExclusion.kind !== 'ok') {
+                throw ['expected ok', plain, withExclusion]
+            }
+            /** @type {(report: { readonly lines: readonly ReportLine[] }) => (rule: string) => bigint} */
+            const cents = report => rule => lineRuled(report.lines)(rule).value
+            // The exclusion really did move adjusted gross income, or the
+            // equality below would be trivially true.
+            assertEq(cents(plain)('1040 line 11'), 4000000n, '$40,000.00')
+            assertEq(cents(withExclusion)('1040 line 11'), 2800000n, '$40,000.00 − $12,000.00')
+            // ...and the credit did not move a cent, because the add-back put
+            // the excluded $12,000.00 straight back into household income.
+            assertEq(
+                cents(withExclusion)('1040 line 31'), cents(plain)('1040 line 31'),
+                'the §911 exclusion must not buy a larger premium tax credit')
+            assert(
+                cents(plain)('1040 line 31') > 0n,
+                ['the fixture must carry a real net credit, or the equality proves nothing',
+                    cents(plain)('1040 line 31')])
+        },
+        // THE CONTROL for the leaf above, and the reason it is not vacuous: a
+        // return whose adjusted gross income genuinely falls to $28,000.00
+        // WITHOUT a §911 exclusion gets a BIGGER credit, because $28,000.00 of
+        // household income is 185% of the 2025 contiguous-48 poverty line for
+        // one person where $40,000.00 is 265%, and §36B(b)(3)(A)'s applicable
+        // figure rises steeply between them. **If the add-back were dropped,
+        // the §911 return would land on THIS figure** rather than on the
+        // plain one — which is the wrong answer the leaf above exists to
+        // catch, and it is wrong in the taxpayer's favour.
+        controlAnAdjustedGrossIncomeThatReallyFallsBuysABiggerCredit: () => {
+            const lower = form1040Report(taxParams2025)(marketplaceWageReturnAt('28000.00'))
+            const plain = form1040Report(taxParams2025)(marketplaceWageReturnAt('40000.00'))
+            assert(lower.kind === 'ok', ['expected the lower-income return to compute', lower])
+            assert(plain.kind === 'ok', ['expected the plain return to compute', plain])
+            if (lower.kind !== 'ok' || plain.kind !== 'ok') {
+                throw ['expected ok', lower, plain]
+            }
+            /** @type {(report: { readonly lines: readonly ReportLine[] }) => (rule: string) => bigint} */
+            const cents = report => rule => lineRuled(report.lines)(rule).value
+            assertEq(cents(lower)('1040 line 11'), 2800000n, 'the same $28,000.00')
+            assert(
+                cents(lower)('1040 line 31') > cents(plain)('1040 line 31'),
+                ['$28,000.00 of household income must buy MORE credit than $40,000.00 does',
+                    cents(lower)('1040 line 31'), cents(plain)('1040 line 31')])
+        },
+        // ── The day-count refusal, and its control ──────────────────────────
+        //
+        // `vnd.fjs.return_profile` bounds the stated days by 366 because it
+        // does not know whether its year is a leap year. The tighter bound is
+        // this layer's, against the parameter set's own `daysInTaxYear`.
+        aQualifyingPeriodLongerThanTheTaxYearRefusesTheWholeReturn: () => {
+            const outcome = form1040Report(taxParams2025)(
+                expatriateReturnWith('90000.00')(366)('60000.00'))
+            assert(outcome.kind === 'error', ['366 days in a 365-day year must refuse', outcome])
+            if (outcome.kind !== 'error') {
+                throw ['expected error', outcome]
+            }
+            assert(outcome.message.includes('366'), ['naming the stated count', outcome.message])
+            assert(outcome.message.includes('365'), ['and the year’s own', outcome.message])
+            assert(
+                outcome.message.includes('Schedule 1 line 8d'),
+                ['and where the amount would have gone', outcome.message])
+            assertEq(outcome.unmodeled.length, 0, 'this is not a scope refusal')
+        },
+        controlThreeHundredAndSixtyFiveDaysComputes: () => {
+            const outcome = form1040Report(taxParams2025)(
+                expatriateReturnWith('90000.00')(365)('60000.00'))
+            assertEq(outcome.kind, 'ok', ['365 days is the whole year, not too many', outcome])
+        },
+    },
+
     premiumTaxCreditReachesTheReturn: {
         // The UNDER-ADVANCED arm: $400.00 a month advanced against $9,600.00
         // of credit leaves $4,800.00 of net premium tax credit, and it must

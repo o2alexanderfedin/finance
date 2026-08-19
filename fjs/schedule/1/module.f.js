@@ -3556,6 +3556,84 @@ const soleProprietorWithPremiums = netProfit => entries =>
         [nonemployeeCompensationDoc(netProfit)])([])(entries)(false)
 
 export const proof = {
+    // ── Schedule 1 line 8d: the §911 exclusion (TAX-42) ─────────────────────
+    //
+    // **A form-level proof cannot prove a wiring.** `fjs/form2555`'s own
+    // fourteen leaves prove its arithmetic against `bigint`s and could not
+    // notice this schedule entering line 45 with the wrong SIGN, at the wrong
+    // printed line, or citing the wrong box. i2555 p7 states the sign in
+    // words: *"Enter the amount from line 45 on Schedule 1 (Form 1040), line
+    // 8d. Reduce the other items of additional income by the NEGATIVE amount
+    // on line 8d."*
+    lineEightD: {
+        theExclusionEntersLineEightAsANegativeAndReachesLineTen: () => {
+            const partI = okPartI(scheduleOnePartI(taxParams2025)({
+                status: 'single',
+                form1040Line7aCents: 0n,
+                form2555Line45Cents: 13000000n,
+                profile: profileNoDeclaredKinds,
+                unemploymentForms: [],
+                nonemployeeCompensationForms: [],
+                businessExpenseForms: [],
+                w2Forms: [],
+                assetRegisters: [],
+                rentalProperties: [],
+                farmForms: [],
+                partnershipK1Forms: [],
+                sCorporationK1Forms: [],
+                estateTrustK1Forms: [],
+            }))
+            assertEq(partI.line8.value, -13000000n, 'NEGATIVE $130,000.00, never positive')
+            assertEq(partI.line9.value, -13000000n, 'line 9 adds 8d to Form 461\'s 8p, which is zero here')
+            assertEq(partI.line10.value, -13000000n, 'and line 10 carries it to 1040 line 8')
+            assert(
+                partI.line8.rule.includes('Form 2555 line 45'),
+                ['the line must name where the figure came from', partI.line8.rule])
+            const [first] = partI.line8.sources
+            assert(first !== undefined, 'the line must cite something')
+            assertEq(first.boxPath, 'foreignEarnedIncome',
+                'and cite the profile box, not declaredKinds')
+        },
+        // The exclusion NETS against other Part I income rather than replacing
+        // it — the half a sign error would leave looking plausible. $4,554.00
+        // of unemployment beside a $130,000.00 exclusion is −$125,446.00, and
+        // a positive line 8d would have given +$134,554.00.
+        theExclusionNetsAgainstOtherAdditionalIncome: () => {
+            const partI = okPartI(scheduleOnePartI(taxParams2025)({
+                status: 'single',
+                form1040Line7aCents: 0n,
+                form2555Line45Cents: 13000000n,
+                profile: profileNoDeclaredKinds,
+                unemploymentForms: [unemploymentA],
+                nonemployeeCompensationForms: [],
+                businessExpenseForms: [],
+                w2Forms: [],
+                assetRegisters: [],
+                rentalProperties: [],
+                farmForms: [],
+                partnershipK1Forms: [],
+                sCorporationK1Forms: [],
+                estateTrustK1Forms: [],
+            }))
+            assertEq(partI.line7.value, 455400n, '$4,554.00 of unemployment')
+            assertEq(partI.line10.value, -12544600n, '$4,554.00 − $130,000.00')
+            assert(
+                partI.line10.value !== 13455400n,
+                ['a positive line 8d would have ADDED the exclusion', partI.line10.value])
+        },
+        // THE CONTROL: with no exclusion, line 8 is the profile-declared zero
+        // it has always been, citing `declaredKinds` and naming no form.
+        controlNoExclusionLeavesLineEightAProfileDeclaredZero: () => {
+            const partI = partIWithoutBusiness(profileNoDeclaredKinds)([])
+            assertEq(partI.line8.value, 0n)
+            const [first] = partI.line8.sources
+            assert(first !== undefined, 'the zero still cites the profile')
+            assertEq(first.boxPath, 'declaredKinds')
+            assert(
+                !partI.line8.rule.includes('Form 2555'),
+                ['a return with no exclusion must not name Form 2555', partI.line8.rule])
+        },
+    },
     // ── Schedule 1 line 17: the §162(l) deduction (TAX-39) ──────────────────
     //
     // **A form-level proof cannot prove a wiring.** `fjs/form7206`'s own
