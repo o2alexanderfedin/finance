@@ -3497,11 +3497,11 @@ const premiumEntry = lineTag => amount => individual => ({
  * record — `stageOneWithBusiness` widened by the two inputs line 17 needs.
  * Schedule C and Schedule E are run FIRST here, exactly as `scheduleOne` and
  * `fjs/form1040/core` run them, so `businessNetProfit` is a real line 31.
- * @type {(profile: Stored<ReturnProfile>) => (nonemployeeCompensationForms: readonly Stored<OneZeroNineNineNec>[]) => (partnershipK1Forms: readonly Stored<K1Partnership>[]) => (entries: readonly Adjustments['entries'][number][]) => (marketplaceCoverageStored: boolean) => ScheduleOnePartIIStageOneOutcome}
+ * @type {(profile: Stored<ReturnProfile>) => (nonemployeeCompensationForms: readonly Stored<OneZeroNineNineNec>[]) => (partnershipK1Forms: readonly Stored<K1Partnership>[]) => (entries: readonly Adjustments['entries'][number][]) => (marketplaceCoverageStored: boolean) => (form2555ExclusionCents: bigint) => ScheduleOnePartIIStageOneOutcome}
  */
-const stageOneForHealthInsurance =
-    profile => nonemployeeCompensationForms => partnershipK1Forms => entries =>
-        marketplaceCoverageStored => {
+const stageOneForHealthInsurance = profile => nonemployeeCompensationForms =>
+    partnershipK1Forms => entries => marketplaceCoverageStored =>
+        form2555ExclusionCents => {
             // `fjs/schedule/c` refuses a Form 1099-NEC with no business
             // record, so the two travel together — supplied here rather than
             // by each leaf, since no leaf below is about that refusal.
@@ -3532,7 +3532,7 @@ const stageOneForHealthInsurance =
                 ? /** @type {IndividualFilingStatus} */ ('marriedFilingJointly')
                 : /** @type {IndividualFilingStatus} */ ('single')
             return scheduleOnePartIIExceptStudentLoanInterest(taxParams2025)({
-                form2555ExclusionCents: 0n,
+                form2555ExclusionCents,
                 profile,
                 status,
                 adjustmentForms: entries.length === 0 ? [] : [adjustmentsDoc(entries)([])],
@@ -3553,7 +3553,7 @@ const stageOneForHealthInsurance =
  */
 const soleProprietorWithPremiums = netProfit => entries =>
     stageOneForHealthInsurance(profileCertifiedForHealthInsurance)(
-        [nonemployeeCompensationDoc(netProfit)])([])(entries)(false)
+        [nonemployeeCompensationDoc(netProfit)])([])(entries)(false)(0n)
 
 export const proof = {
     // ── Schedule 1 line 8d: the §911 exclusion (TAX-42) ─────────────────────
@@ -3708,7 +3708,7 @@ export const proof = {
         // wider regression control, since most returns are this one.
         aReturnWithNoBusinessAndNoPremiumIsUntouched: () => {
             const stageOne = okStageOne(stageOneForHealthInsurance(profileNoDeclaredKinds)(
-                [])([])([])(false))
+                [])([])([])(false)(0n))
             assertEq(stageOne.line17.value, 0n)
             assertEq(stageOne.line17.sources.length, 1)
             assertEq(stageOne.line15.value, 0n, 'and line 15 is still zero as well')
@@ -3797,7 +3797,7 @@ export const proof = {
                     premiumEntry('selfEmployedLongTermCareAgeFiftyOneToSixty')('2400.00')(
                         'taxpayer'),
                     premiumEntry('selfEmployedLongTermCareAgeFiftyOneToSixty')('2400.00')('spouse'),
-                ])(false))
+                ])(false)(0n))
             assertEq(stageOne.line17.value, 360000n, 'two $1,800.00 caps, not one')
         },
         // **The wiring INSIDE this schedule.** Line 17 is inside the Social
@@ -3879,7 +3879,7 @@ export const proof = {
                 [nonemployeeCompensationDoc('50000.00')])([])([
                     premiumEntry('selfEmployedHealthInsuranceMedicalDentalVision')('9600.00')(
                         'taxpayer'),
-                ])(false))
+                ])(false)(0n))
             assert(
                 result.message.includes(
                     'notEligibleForAnySubsidizedEmployerHealthPlanInAnyMonth'),
@@ -3899,7 +3899,7 @@ export const proof = {
                 [nonemployeeCompensationDoc('50000.00')])([])([
                     premiumEntry('selfEmployedHealthInsuranceMedicalDentalVision')('9600.00')(
                         'taxpayer'),
-                ])(true))
+                ])(true)(0n))
             assert(
                 result.message.includes('Rev. Proc. 2014-41'),
                 ['the refusal must name the governing guidance', result.message])
@@ -3910,13 +3910,48 @@ export const proof = {
                 result.message.includes('Schedule 1 line 17 -> line 26 -> 1040 line 10'),
                 ['and where the amount would have gone', result.message])
         },
+        // R2b — §911(d)(6), Form 7206 line 12 (TAX-42). Same certified return,
+        // plus a §911 exclusion.
+        premiumsBesideAForeignEarnedIncomeExclusionRefuseNamingTheAttribution: () => {
+            const result = refusal(stageOneForHealthInsurance(
+                profileCertifiedForHealthInsurance)(
+                [nonemployeeCompensationDoc('50000.00')])([])([
+                    premiumEntry('selfEmployedHealthInsuranceMedicalDentalVision')('9600.00')(
+                        'taxpayer'),
+                ])(false)(6000000n))
+            assert(
+                result.message.includes('60000.00'),
+                ['the refusal must name the exclusion', result.message])
+            assert(
+                result.message.includes('Form 7206 line 12'),
+                ['and the printed line it cannot fill in', result.message])
+            assert(
+                result.message.includes('attributable to'),
+                ['and the printed word that is the whole problem', result.message])
+            assert(
+                result.message.includes('§911(d)(6)'),
+                ['and the statute behind it', result.message])
+            assert(
+                result.message.includes('Schedule 1 line 17 -> line 26 -> 1040 line 10'),
+                ['and where the amount would have gone', result.message])
+        },
+        // THE CONTROL for R2b: a §911 exclusion with NO premium entry is an
+        // ordinary expatriate return and must still compute — the whole point
+        // of TAX-42. Without this leaf a refusal that fired on every exclusion
+        // would pass the one above and take the phase's own persona with it.
+        aForeignEarnedIncomeExclusionWithNoPremiumEntryStillComputes: () => {
+            const stageOne = okStageOne(stageOneForHealthInsurance(
+                profileCertifiedForHealthInsurance)(
+                [nonemployeeCompensationDoc('50000.00')])([])([])(false)(6000000n))
+            assertEq(stageOne.line17.value, 0n, 'nothing was claimed, so nothing refuses')
+        },
         // THE CONTROL for R2: Marketplace coverage with NO premium entry is an
         // ordinary return and must still compute. Without this leaf a refusal
         // that fired on every Form 1095-A would pass the one above.
         marketplaceCoverageWithNoPremiumEntryStillComputes: () => {
             const stageOne = okStageOne(stageOneForHealthInsurance(
                 profileCertifiedForHealthInsurance)(
-                [nonemployeeCompensationDoc('50000.00')])([])([])(true))
+                [nonemployeeCompensationDoc('50000.00')])([])([])(true)(0n))
             assertEq(stageOne.line17.value, 0n, 'nothing was claimed, so nothing refuses')
         },
         // R3 — two sources of self-employment earnings and no fact saying
@@ -3928,7 +3963,7 @@ export const proof = {
                 [nonemployeeCompensationDoc('50000.00')])([partnershipK1Doc('80000.00')])([
                     premiumEntry('selfEmployedHealthInsuranceMedicalDentalVision')('9600.00')(
                         'taxpayer'),
-                ])(false))
+                ])(false)(0n))
             assert(
                 result.message.includes('TWO sources'),
                 ['the refusal must say what is ambiguous', result.message])
@@ -3954,7 +3989,7 @@ export const proof = {
                 profileCertifiedForHealthInsurance)([])([partnershipK1Doc('80000.00')])([
                     premiumEntry('selfEmployedHealthInsuranceMedicalDentalVision')('900.00')(
                         'taxpayer'),
-                ])(false))
+                ])(false)(0n))
             assertEq(scheduleC.line17.value, 90000n, '$900.00 off a Schedule C')
             assertEq(k1.line17.value, 90000n, 'and $900.00 off a partnership K-1')
         },
@@ -3966,7 +4001,7 @@ export const proof = {
                 profileCertifiedForHealthInsurance)([])([])([
                     premiumEntry('selfEmployedHealthInsuranceMedicalDentalVision')('9600.00')(
                         'taxpayer'),
-                ])(false))
+                ])(false)(0n))
             assert(
                 result.message.includes('S-corporation') && result.message.includes('line 11'),
                 ['the refusal must name the path it cannot compute', result.message])
@@ -4010,7 +4045,7 @@ export const proof = {
                         'taxpayer'),
                     premiumEntry('selfEmployedLongTermCareAgeSixtyOneToSeventy')('5000.00')(
                         'spouse'),
-                ])(false))
+                ])(false)(0n))
             assertEq(stageOne.line17.value, 661000n, '$1,800.00 + $4,810.00 = $6,610.00')
         },
         // The tag vocabulary is CLOSED, and a near-miss tag is refused by name

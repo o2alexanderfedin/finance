@@ -661,11 +661,15 @@ export const foreignTaxCreditLine = taxParamSet => status => profile => divForms
     const total = sumSources(sources)
     const elected
         = profile.value.section904jElectionAllForeignIncomeIsQualifiedPassiveIncome === true
-    // §911(d)(6), checked BEFORE the election's own two refusals: a return
-    // carrying both is inconsistent whatever the amounts are, and reporting
+    // §911(d)(6), checked BEFORE the election's own two refusals: reporting
     // "you did not elect §904(j)" to a filer who did would send them to fix
-    // the wrong thing.
-    if (form2555ExclusionCents !== 0n && elected) {
+    // the wrong thing, and the ceiling refusal would send them to Form 1116
+    // for a credit §911(d)(6) denies outright.
+    //
+    // Gated on `total > 0n` for the reason the two refusals below are: with no
+    // foreign tax stored there is no credit to deny, and a broker's
+    // zero-filled box 7 must not refuse an ordinary expatriate return.
+    if (total > 0n && form2555ExclusionCents !== 0n && elected) {
         return {
             kind: 'error',
             message: `Schedule 3 line 1: this return excludes `
@@ -1493,6 +1497,50 @@ export const proof = {
     // $600.00) are likewise hand-typed here rather than read from the
     // parameter under test, and the boundary leaves straddle each to the
     // cent. Value and citation by SEPARATE leaves.
+    // ── §911(d)(6): the exclusion and the §904(j) election (TAX-42) ─────────
+    sectionNineOneOneDenialOfTheForeignTaxCredit: {
+        theElectionBesideAnExclusionRefuses: () => {
+            const outcome = foreignTaxCreditLine(taxParams2025)('single')(
+                profileElectingSection904j)(
+                [dividendWithForeignTax('sha256-div-911')('47.00')])([])(13000000n)
+            assert(outcome.kind === 'error', ['expected a refusal', outcome])
+            const message = foreignCreditRefusal(outcome)
+            assert(message.includes('130000.00'), ['naming the exclusion', message])
+            assert(message.includes('§911(d)(6)'), ['and the statute', message])
+            assert(message.includes('passive'), ['and the contradiction in the election', message])
+            assert(
+                message.includes('1040 line 20'),
+                ['and where the amount would have gone', message])
+        },
+        // It fires WHATEVER the amounts are — even below §904(j)(2)(B)'s
+        // ceiling and even with the election properly made, which is exactly
+        // the case the two refusals below this one would otherwise let
+        // through. It also fires ahead of them, so a filer who DID elect is
+        // never told they did not.
+        itFiresAheadOfTheElectionAndCeilingRefusals: () => {
+            const message = foreignCreditRefusal(foreignTaxCreditLine(taxParams2025)('single')(
+                profileElectingSection904j)(
+                [dividendWithForeignTax('sha256-div-911-big')('5000.00')])([])(1n))
+            assert(message.includes('§911(d)(6)'), ['§911(d)(6) wins over the ceiling', message])
+            assert(
+                !message.includes('Form 1116'),
+                ['and the ceiling refusal must not be the one reported', message])
+        },
+        // THE CONTROLS, both directions. The election alone still credits, and
+        // an exclusion WITHOUT a stored foreign tax is an ordinary return —
+        // only the combination refuses.
+        controlTheElectionAloneStillCredits: () => {
+            const line = foreignCreditLine(foreignTaxCreditLine(taxParams2025)('single')(
+                profileElectingSection904j)(
+                [dividendWithForeignTax('sha256-div-911-control')('47.00')])([])(0n))
+            assertEq(line.value, 4700n, '$47.00, exactly as without §911')
+        },
+        controlAnExclusionWithNoForeignTaxComputes: () => {
+            const outcome = foreignTaxCreditLine(taxParams2025)('single')(
+                profileElectingSection904j)([])([])(13000000n)
+            assertEq(outcome.kind, 'ok', ['no foreign tax, nothing to deny', outcome])
+        },
+    },
     lineOneForeignTaxCredit: {
         // The motivating taxpayer: one international index fund, $47.00 of
         // foreign tax withheld inside it, and the §904(j) election made.

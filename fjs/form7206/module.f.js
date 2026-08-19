@@ -103,10 +103,21 @@
  *   S-corporation Schedule K-1, because §162(l)(5) and Rev. Rul. 91-26
  *   require the corporation to have paid or reimbursed the premiums and
  *   reported them as wages, which no document here records.
- * - **Line 12**, Form 2555 line 45, is permanently zero: `foreignEarnedIncomeForm2555`
- *   is a refused `fjs/return/scope` kind, so a return claiming the exclusion
- *   never reaches this function. NAMED rather than omitted, the discipline
- *   `fjs/form8962`'s own line 2a follows for the same Form 2555 and
+ * - **Line 12**, Form 2555 line 45, is zero here — and since TAX-42 the reason
+ *   has changed, which is worth the paragraph rather than a silent edit. It
+ *   was *"permanently zero: `foreignEarnedIncomeForm2555` is a refused
+ *   `fjs/return/scope` kind"*; that kind split and
+ *   `foreignEarnedIncomeExclusion` is now MODELED, so a §911 filer does reach
+ *   this engine. What stops them reaching THIS function is
+ *   `fjs/schedule/1`'s R2b refusal, and the blocker is the printed line's own
+ *   wording: *"any amount from Form 2555, line 45, ATTRIBUTABLE TO the amount
+ *   entered on line 4 or 11 above"*. It is not the whole exclusion, it is the
+ *   part belonging to the one trade or business the plan is established
+ *   under, and nothing stored says how the exclusion divides between that
+ *   business, another, and foreign wages.
+ *
+ *   NAMED rather than omitted, the discipline `fjs/form8962`'s own line 2a
+ *   followed for the same Form 2555 until this phase made it live, and
  *   `fjs/form8995`'s `qualifiedBusinessIncome` follows for its zero terms.
  *
  * ## What this form does NOT decide, and its caller must
@@ -296,9 +307,11 @@ export const form7206 = taxParamSet => input => {
     //     in which you are a more-than-2% shareholder and in which the
     //     insurance plan is established."
     const line11 = sCorporationMedicareWagesCents
-    // 12. "Enter any amount from Form 2555, line 45, attributable to the
-    //     amount entered on line 4 or 11 above." Structurally zero; see this
-    //     module's docstring.
+    // 12. "Enter any amount from Form 2555, line 45, ATTRIBUTABLE TO the
+    //     amount entered on line 4 or 11 above." Zero here because
+    //     `fjs/schedule/1` refuses a return that stores both premiums and a
+    //     §911 exclusion -- the ATTRIBUTION is what no document states. See
+    //     this module's docstring.
     const line12 = 0n
     // 13. "Subtract line 12 from line 10 or 11, WHICHEVER APPLIES." Line 4's
     //     own instruction is what decides which: "If the business is an S
@@ -603,8 +616,12 @@ export const proof = {
             lines.line14 !== 743480n,
             ['reading line 10 would have capped it at $7,434.80', lines.line14])
     },
-    // Line 12 is a structural zero and stays one — NAMED rather than omitted,
-    // so a later phase that models Form 2555 finds the line already present.
+    // Line 12 is a structural zero and stays one. It was NAMED rather than
+    // omitted "so a later phase that models Form 2555 finds the line already
+    // present" — TAX-42 was that phase, and the line was indeed already here.
+    // What keeps it zero now is `fjs/schedule/1`'s R2b refusal rather than a
+    // scope kind; see this module's docstring for why the ATTRIBUTION, not
+    // the exclusion, is the missing fact.
     lineTwelveIsTheStructuralFormTwoFiveFiveFiveZero: () => {
         const lines = form7206(taxParams2025)({
             ...noPremiumsNoBusiness,
@@ -612,7 +629,10 @@ export const proof = {
             planBusinessNetProfitCents: 5000000n,
             allBusinessNetProfitsCents: 5000000n,
         })
-        assertEq(lines.line12, 0n, 'foreignEarnedIncomeForm2555 is a refused scope kind')
+        assertEq(
+            lines.line12, 0n,
+            'fjs/schedule/1 refuses §162(l) premiums beside a §911 exclusion, so no return '
+            + 'reaches this function with an attributable amount')
     },
     // ── The boundaries ──────────────────────────────────────────────────────
     //
