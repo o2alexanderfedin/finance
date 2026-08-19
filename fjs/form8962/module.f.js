@@ -58,10 +58,15 @@
  * line 2a), PLUS Form 2555 lines 45 and 50, PLUS the NONTAXABLE part of
  * Social Security benefits (1040 line 6a less line 6b). That is not §219's
  * add-back list and not §1411's, which is the whole reason this repo forbids
- * a shared identifier for the acronym. Form 2555's two lines are a structural
- * zero here and only while `foreignEarnedIncomeForm2555` is a refused
- * `fjs/return/scope` kind — a return claiming the exclusion never reaches
- * this module.
+ * a shared identifier for the acronym.
+ *
+ * **Form 2555's two lines became a LIVE TERM in TAX-42.** This paragraph used
+ * to say they were a structural zero "and only while
+ * `foreignEarnedIncomeForm2555` is a refused `fjs/return/scope` kind" — a
+ * condition that has now failed: that row split, `foreignEarnedIncomeExclusion`
+ * is modeled, and `fjs/form1040/core` supplies the amount. Recording the
+ * dependency at the site is what made this a two-line change rather than a
+ * hunt, and it is why the sentence is rewritten here rather than deleted.
  *
  * ## The annual path is not an optimisation of the monthly one
  *
@@ -121,6 +126,7 @@ const expectedMonthCount = 12
  *   readonly federalPovertyLineTable: FederalPovertyLineTable | undefined,
  *   readonly adjustedGrossIncomeCents: bigint,
  *   readonly taxExemptInterestCents: bigint,
+ *   readonly form2555Lines45And50Cents: bigint,
  *   readonly socialSecurityBenefitsCents: bigint,
  *   readonly taxableSocialSecurityBenefitsCents: bigint,
  *   readonly marketplaceStatements: readonly Stored<OneZeroNineFiveA>[],
@@ -397,6 +403,7 @@ export const form8962 = taxParamSet => input => {
         status, claimedAsDependent, dependentCount,
         noDependentIsRequiredToFileAnIncomeTaxReturn, federalPovertyLineTable,
         adjustedGrossIncomeCents, taxExemptInterestCents,
+        form2555Lines45And50Cents,
         socialSecurityBenefitsCents, taxableSocialSecurityBenefitsCents,
         marketplaceStatements,
     } = input
@@ -532,10 +539,25 @@ export const form8962 = taxParamSet => input => {
                 + `household’s premiums. Refusing. Nothing reaches ${destination}`,
         }
     }
-    // Line 2a — i8962 Worksheet 1-1. Form 2555 lines 45 and 50 are a
-    // structural zero: `foreignEarnedIncomeForm2555` is a refused
-    // `fjs/return/scope` kind, so a return claiming the exclusion never
-    // reaches this function. The nontaxable Social Security add-back is
+    // Line 2a — i8962 Worksheet 1-1. **Form 2555 lines 45 and 50 are a LIVE
+    // TERM as of TAX-42**, and this comment is where they stopped being a
+    // structural zero. The add-back is why excluding foreign earned income
+    // does not buy a larger premium tax credit: §36B(d)(2)(B)(ii) puts
+    // "any amount excluded from gross income under section 911" back into
+    // modified adjusted gross income by name.
+    //
+    // **It is not a circularity.** Nothing on Form 2555 reads the premium tax
+    // credit — lines 27 through 50 read foreign earned income, qualifying
+    // days, housing expenses and deductions allocable to excluded income, and
+    // §36B appears nowhere on that form or in its instructions. The edge runs
+    // one way, unlike Rev. Proc. 2014-41 §2.05's genuine §162(l) cycle, which
+    // `fjs/schedule/1` refuses for exactly the reason this one does not need
+    // to. See `fjs/form2555/todo/foreign-earned-income.md` §5a.
+    //
+    // A form-level proof here cannot see the wiring that supplies it;
+    // `fjs/form1040/core`'s
+    // `theForeignEarnedIncomeExclusionAddsBackIntoHouseholdIncome` is where
+    // that is proven. The nontaxable Social Security add-back is
     // floored at zero because worksheet line 4 is conditional — "If line 6a is
     // more than line 6b, subtract line 6b from line 6a" — and 6b can never
     // exceed 6a in practice, but a negative add-back would be a subtraction
@@ -545,7 +567,8 @@ export const form8962 = taxParamSet => input => {
             ? socialSecurityBenefitsCents - taxableSocialSecurityBenefitsCents
             : 0n
     const line2aModifiedAdjustedGrossIncomeCents
-        = adjustedGrossIncomeCents + taxExemptInterestCents + nontaxableSocialSecurityCents
+        = adjustedGrossIncomeCents + taxExemptInterestCents + form2555Lines45And50Cents
+        + nontaxableSocialSecurityCents
     // Line 3 — "Combine them even if one or both of them are negative. If the
     // total is less than zero, enter -0-." Line 2b is zero under the
     // certification checked above.
@@ -776,6 +799,7 @@ const singleFilerWith = agi => statement => ({
     federalPovertyLineTable: 'contiguous48AndDistrictOfColumbia',
     adjustedGrossIncomeCents: centsFromString(agi),
     taxExemptInterestCents: 0n,
+    form2555Lines45And50Cents: 0n,
     socialSecurityBenefitsCents: 0n,
     taxableSocialSecurityBenefitsCents: 0n,
     marketplaceStatements: [stored(statement)],

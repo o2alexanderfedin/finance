@@ -111,22 +111,24 @@ const percentOfCents = cents => percent => halfUp(multiply(of(cents)(1n))(of(per
  * shared MAGI." Its own add-back list, per the printed form (13-RESEARCH.md
  * §1), every term currently zero and unmodeled in this engine (Pitfall 6):
  * - Puerto Rico excluded income (line 2a) — not modeled, always 0.
- * - Form 2555 line 45, foreign earned income exclusion (line 2b) —
- *   refused if declared (a scope kind this engine does not model), so
- *   always 0 for any return this engine can compute.
- * - Form 2555 line 50, foreign housing exclusion (line 2c) — same.
+ * - Form 2555 line 45, foreign earned income exclusion (line 2b) — **LIVE
+ *   as of TAX-42**, and the first of these four add-backs to stop being a
+ *   documented zero.
+ * - Form 2555 line 50, foreign housing exclusion (line 2c) — still zero:
+ *   `foreignHousingExclusionOrDeduction` is a refused kind.
  * - Form 4563 line 15, American Samoa income exclusion (line 2d) — not
  *   modeled, always 0.
  *
  * Reads the ALREADY-COMPUTED AGI as input, per Pitfall 6, rather than
- * re-deriving it from stored documents.
- * @type {(agiCents: bigint) => bigint}
+ * re-deriving it from stored documents; the exclusion arrives the same way,
+ * off the ONE `fjs/form2555` execution `fjs/form1040/core` performed.
+ * @type {(agiCents: bigint) => (form2555Line45Cents: bigint) => bigint}
  */
-export const seniorDeductionPhaseoutIncome = agiCents => {
+export const seniorDeductionPhaseoutIncome = agiCents => form2555Line45Cents => {
     // Add-backs, per the printed form (see this function's own docstring
-    // above) — every term currently zero.
+    // above). Three are still zero and NAMED rather than omitted.
     const puertoRicoExcludedIncome = 0n
-    const form2555Line45ForeignEarnedIncomeExclusion = 0n
+    const form2555Line45ForeignEarnedIncomeExclusion = form2555Line45Cents
     const form2555Line50ForeignHousingExclusion = 0n
     const form4563Line15AmericanSamoaExclusion = 0n
     return agiCents
@@ -147,16 +149,18 @@ export const seniorDeductionPhaseoutIncome = agiCents => {
 /**
  * Schedule 1-A Part I, lines 1-3 — "Modified Adjusted Gross Income (MAGI)
  * Amount", the shared input to Parts II-V.
- * @type {(agiCents: bigint) => SchedulePartIResult}
+ * @type {(agiCents: bigint) => (form2555Line45Cents: bigint) => SchedulePartIResult}
  */
-export const scheduleOneAPartI = agiCents => {
+export const scheduleOneAPartI = agiCents => form2555Line45Cents => {
     // 1. "Enter the amount from Form 1040 ... line 11b" (AGI).
     const line1 = agiCents
     // 2a. Puerto Rico excluded income -- not modeled, always 0.
     const line2a = 0n
-    // 2b. Form 2555 line 45 -- refused if declared, always 0 here.
-    const line2b = 0n
-    // 2c. Form 2555 line 50 -- same.
+    // 2b. Form 2555 line 45 -- LIVE as of TAX-42. This line read `0n` with
+    // the comment "refused if declared" until then.
+    const line2b = form2555Line45Cents
+    // 2c. Form 2555 line 50 -- still zero:
+    // `foreignHousingExclusionOrDeduction` is a refused kind.
     const line2c = 0n
     // 2d. Form 4563 line 15 -- not modeled, always 0.
     const line2d = 0n
@@ -166,11 +170,11 @@ export const scheduleOneAPartI = agiCents => {
     // {@link seniorDeductionPhaseoutIncome} directly (WR-05) rather than
     // re-deriving the identical `agiCents + 0 + 0 + 0 + 0` arithmetic a
     // second time in this file -- the SAME rule written once, not twice.
-    // `line1 + line2e` is exactly what the named function already computes
-    // (every add-back above is a documented, permanent 0), so this is not a
-    // behavior change; `partILine3EqualsSeniorDeductionPhaseoutIncomeForEveryFixture`
-    // below still pins the equality, now trivially, as a regression guard.
-    const line3 = seniorDeductionPhaseoutIncome(agiCents)
+    // `line1 + line2e` is exactly what the named function computes, and since
+    // TAX-42 that is no longer trivially `agiCents`:
+    // `partILine3EqualsSeniorDeductionPhaseoutIncomeForEveryFixture` below is
+    // what keeps the two expressions of one rule from drifting.
+    const line3 = seniorDeductionPhaseoutIncome(agiCents)(form2555Line45Cents)
     return { line1, line2a, line2b, line2c, line2d, line2e, line3 }
 }
 
@@ -288,6 +292,7 @@ export const scheduleOneAPartVI = profile => line37 => {
  *   readonly taxpayerHasValidSsnAndBornBefore1961Jan2: boolean,
  *   readonly spouseHasValidSsnAndBornBefore1961Jan2: boolean,
  *   readonly profile: Stored<ReturnProfile>,
+ *   readonly form2555Line45Cents: bigint,
  * }} ScheduleOneAInput
  */
 
@@ -307,9 +312,9 @@ export const scheduleOneA = taxParamSet => input => {
     const {
         status, agiCents,
         taxpayerHasValidSsnAndBornBefore1961Jan2, spouseHasValidSsnAndBornBefore1961Jan2,
-        profile,
+        profile, form2555Line45Cents,
     } = input
-    const partI = scheduleOneAPartI(agiCents)
+    const partI = scheduleOneAPartI(agiCents)(form2555Line45Cents)
     const partV = scheduleOneAPartV(taxParamSet)({
         status, phaseoutIncomeCents: partI.line3,
         taxpayerHasValidSsnAndBornBefore1961Jan2, spouseHasValidSsnAndBornBefore1961Jan2,
@@ -361,6 +366,7 @@ export const proof = {
     // line 37 rather than line 38 does.
     theSeniorDeductionIsStillTheWHOLEOfPartSix: () => {
         const result = scheduleOneA(taxParams2025)({
+            form2555Line45Cents: 0n,
             status: 'single',
             agiCents: 8000000n,
             taxpayerHasValidSsnAndBornBefore1961Jan2: true,
@@ -558,6 +564,7 @@ export const proof = {
     // Test 5 (Parts II/III/IV documented zero; line38).
     partViSumsToLineThirtySevenWhenNoTipsOvertimeCarLoanDeclared: () => {
         const result = scheduleOneA(taxParams2025)({
+            form2555Line45Cents: 0n,
             status: 'single',
             agiCents: 8000000n, // $80,000.00
             taxpayerHasValidSsnAndBornBefore1961Jan2: true,
@@ -580,11 +587,32 @@ export const proof = {
     // assumed (TAX-15/Decision 5.6's precedent, applied within one schedule).
     partILine3EqualsSeniorDeductionPhaseoutIncomeForEveryFixture: () => {
         for (const agi of [0n, 8000000n, 17500000n, 99999999n]) {
-            assertEq(scheduleOneAPartI(agi).line3, seniorDeductionPhaseoutIncome(agi))
+            assertEq(scheduleOneAPartI(agi)(0n).line3, seniorDeductionPhaseoutIncome(agi)(0n))
+            assertEq(
+                scheduleOneAPartI(agi)(13000000n).line3,
+                seniorDeductionPhaseoutIncome(agi)(13000000n),
+                'and with §911 in play, which is the case that stopped being trivial in TAX-42')
         }
     },
-    seniorDeductionPhaseoutIncomeEqualsBareAgiToday: () => {
-        assertEq(seniorDeductionPhaseoutIncome(0n), 0n)
-        assertEq(seniorDeductionPhaseoutIncome(12345600n), 12345600n)
+    seniorDeductionPhaseoutIncomeEqualsBareAgiWithNoExclusion: () => {
+        assertEq(seniorDeductionPhaseoutIncome(0n)(0n), 0n)
+        assertEq(seniorDeductionPhaseoutIncome(12345600n)(0n), 12345600n)
+    },
+    // **TAX-42: printed line 2b is LIVE.** Schedule 1-A's Part I is the senior
+    // deduction's own MAGI, and §911's exclusion enters it at line 2b — so a
+    // filer who excluded $130,000.00 is phased out on $180,000.00, not on the
+    // $50,000.00 that survived the exclusion.
+    theForeignEarnedIncomeExclusionAddsBackAtPartOneLineTwoB: () => {
+        const partI = scheduleOneAPartI(5000000n)(13000000n)
+        assertEq(partI.line2b, 13000000n, 'Form 2555 line 45')
+        assertEq(partI.line2c, 0n, 'line 2c is the housing exclusion, still refused')
+        assertEq(partI.line2e, 13000000n, 'and lines 2a and 2d are still zero')
+        assertEq(partI.line3, 18000000n, '$50,000.00 + $130,000.00')
+    },
+    // THE CONTROL for the leaf above.
+    controlPartOneLineTwoBIsZeroWithNoExclusion: () => {
+        const partI = scheduleOneAPartI(5000000n)(0n)
+        assertEq(partI.line2b, 0n)
+        assertEq(partI.line3, 5000000n, 'bare adjusted gross income')
     },
 }

@@ -1661,6 +1661,12 @@ export const form1040IncomeLines = taxParamSet => inputs => {
     // taxpayer-asserted entries and AGI, reading NOTHING about which figure
     // eventually wins. `agiCents` is `line11b.value`, already computed above.
     const scheduleAResult = scheduleA(taxParamSet)({
+        // **TAX-42 — a live add-back, not a documented zero.** §911's
+        // exclusion re-enters this measure's own modified adjusted gross
+        // income at the printed line named in that module, so excluding
+        // foreign earned income does not buy a larger phase-out-limited
+        // benefit. Read off the ONE `fjs/form2555` execution, never a second.
+        form2555Line45Cents: foreignEarnedIncome.line45,
         status,
         agiCents: line11b.value,
         itemizedEntries,
@@ -1759,6 +1765,12 @@ export const form1040IncomeLines = taxParamSet => inputs => {
     // 8812's `dependents` array is the first place SSN validity becomes a
     // per-person fact, a later wave).
     const scheduleOneAResult = scheduleOneA(taxParamSet)({
+        // **TAX-42 — a live add-back, not a documented zero.** §911's
+        // exclusion re-enters this measure's own modified adjusted gross
+        // income at the printed line named in that module, so excluding
+        // foreign earned income does not buy a larger phase-out-limited
+        // benefit. Read off the ONE `fjs/form2555` execution, never a second.
+        form2555Line45Cents: foreignEarnedIncome.line45,
         status,
         agiCents: line11b.value,
         taxpayerHasValidSsnAndBornBefore1961Jan2: profile.value.taxpayerBornBeforeJan2_1961 === true,
@@ -2521,6 +2533,18 @@ const premiumTaxCreditLines
             // AGI does not already contain.
             adjustedGrossIncomeCents: income.line11b.value,
             taxExemptInterestCents: income.line2a.value,
+            // **TAX-42 — the add-back that was a documented structural zero.**
+            // i8962 Worksheet 1-1 adds Form 2555 lines 45 AND 50, which
+            // §36B(d)(2)(B)(ii) states as "any amount excluded from gross
+            // income under section 911". Line 50 is zero here because
+            // `foreignHousingExclusionOrDeduction` refuses, so the sum is line
+            // 45 alone, and `fjs/form2555` carries no `line50` field at all
+            // because Part IX does not run.
+            //
+            // Read off the ONE `fjs/form2555` execution `form1040IncomeLines`
+            // performed, never a second one — the same discipline the QDCGT
+            // rides out on its own `ok` arm for.
+            form2555Lines45And50Cents: income.foreignEarnedIncome.line45,
             socialSecurityBenefitsCents: income.line6a.value,
             taxableSocialSecurityBenefitsCents: income.line6b.value,
             marketplaceStatements,
@@ -2759,8 +2783,14 @@ const form1040TaxAndPaymentLines = taxParamSet => inputs => income => {
     // above §904(j)(2)(B)'s ceiling -- and the refusal is the whole return's,
     // threaded through the same `unmodeled: []` arm every other
     // document-data-sufficiency guard in this file uses.
+    //
+    // **TAX-42 adds a THIRD refusal to it**: §911(d)(6) denies a credit for
+    // foreign tax on excluded income, so a return that both excludes under
+    // §911 and elects §904(j) refuses here rather than crediting a tax paid on
+    // income it already excluded.
     const foreignTaxCreditOutcome
-        = foreignTaxCreditLine(taxParamSet)(status)(profile)(dividendForms)(interestForms)
+        = foreignTaxCreditLine(taxParamSet)(status)(profile)(dividendForms)(interestForms)(
+            income.foreignEarnedIncome.line45)
     if (foreignTaxCreditOutcome.kind === 'error') {
         return { kind: 'error', message: foreignTaxCreditOutcome.message, unmodeled: [] }
     }
@@ -2995,6 +3025,9 @@ const form1040TaxAndPaymentLines = taxParamSet => inputs => income => {
             + 'Form 2441 line 11 -> 1040 line 20)',
     }
     const scheduleThreeOutcome = scheduleThree(taxParamSet)({
+        // TAX-42: reaches Form 8863's own modified adjusted gross income at
+        // its printed line 3 — a live add-back, not a documented zero.
+        form2555ExclusionCents: income.foreignEarnedIncome.line45,
         profile,
         status,
         agiCents: income.line11b.value,
@@ -3025,6 +3058,12 @@ const form1040TaxAndPaymentLines = taxParamSet => inputs => income => {
         return { kind: 'error', message: scheduleThreeOutcome.message, unmodeled: [] }
     }
     const form8812Outcome = form8812(taxParamSet)({
+        // **TAX-42 — a live add-back, not a documented zero.** §911's
+        // exclusion re-enters this measure's own modified adjusted gross
+        // income at the printed line named in that module, so excluding
+        // foreign earned income does not buy a larger phase-out-limited
+        // benefit. Read off the ONE `fjs/form2555` execution, never a second.
+        form2555Line45Cents: income.foreignEarnedIncome.line45,
         status,
         agiCents: income.line11b.value,
         dependents: (profile.value.dependents ?? []).map(d => ({
@@ -11007,6 +11046,7 @@ export const proof = {
             // (never through the report's own call site) must reach the
             // identical line14.
             const crossCheck = form8812(taxParams2025)({
+                form2555Line45Cents: 0n,
                 status: 'single',
                 agiCents: 6000000n,
                 dependents: [
@@ -11284,6 +11324,7 @@ export const proof = {
             // (never to `form1040IncomeLines`, so this does not merely
             // re-run the code under test) must reach the identical line38.
             const crossCheck = scheduleOneA(taxParams2025)({
+                form2555Line45Cents: 0n,
                 status: 'single',
                 agiCents: 10000000n,
                 taxpayerHasValidSsnAndBornBefore1961Jan2: true,
@@ -11387,6 +11428,7 @@ export const proof = {
             // (never to `form1040IncomeLines`) must reach the identical
             // line 17 grand total.
             const crossCheck = expectScheduleAOk(scheduleA(taxParams2025)({
+                form2555Line45Cents: 0n,
                 status: 'single',
                 agiCents: line11b,
                 itemizedEntries: [
@@ -11459,6 +11501,7 @@ export const proof = {
             // under test is genuinely exercised, not a fixture that merely
             // looks like it is.
             const crossCheck = expectScheduleAOk(scheduleA(taxParams2025)({
+                form2555Line45Cents: 0n,
                 status: 'single',
                 agiCents: 9000000n,
                 itemizedEntries: [
@@ -11612,6 +11655,7 @@ export const proof = {
             // identical line14/line27.
             const line18 = lineRuled(outcome.lines)('1040 line 18').value
             const crossCheck = form8812(taxParams2025)({
+                form2555Line45Cents: 0n,
                 status: 'single',
                 agiCents: 2000000n,
                 dependents: [
@@ -12397,6 +12441,7 @@ export const proof = {
             )
             assert(line13b.value > 0n, ['expected a real, non-zero senior deduction', line13b.value])
             const scheduleOneACrossCheck = scheduleOneA(taxParams2025)({
+                form2555Line45Cents: 0n,
                 status: 'single',
                 agiCents: 7350000n,
                 taxpayerHasValidSsnAndBornBefore1961Jan2: true,
@@ -12415,6 +12460,7 @@ export const proof = {
             assertEq(line12e.value, 2000000n, '$20,000.00 itemized total, exceeding the $17,750.00 standard deduction')
             assert(line12e.value > 0n, ['expected a real, non-zero line 12e', line12e.value])
             const scheduleACrossCheck = expectScheduleAOk(scheduleA(taxParams2025)({
+                form2555Line45Cents: 0n,
                 status: 'single',
                 agiCents: 7350000n,
                 itemizedEntries: [
@@ -12444,6 +12490,7 @@ export const proof = {
             assertEq(line19.value, 220000n, '$2,200.00 — the full, uncapped CTC for one qualifying child')
             assert(line19.value > 0n, ['expected a real, non-zero line 19', line19.value])
             const form8812CrossCheck = form8812(taxParams2025)({
+                form2555Line45Cents: 0n,
                 status: 'single',
                 agiCents: 7350000n,
                 dependents: [
@@ -12609,6 +12656,7 @@ export const proof = {
             // must reach the identical figures — the cross-check idiom this
             // file already uses for `form8812` and `scheduleD`.
             const crossCheck = scheduleThree(taxParams2025)({
+                form2555ExclusionCents: 0n,
                 profile: storedProfile(phaseTwentyFiveProfile),
                 status: 'single',
                 agiCents: 3900000n,

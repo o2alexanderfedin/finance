@@ -627,14 +627,59 @@ const foreignTaxSources = divForms => intForms => [
  * creditable foreign taxes, full stop. So it is lifted out, run ONCE, and
  * handed to both schedules, the same "one execution, two destinations" shape
  * `form8863` and `form8959` already have.
- * @type {(taxParamSet: TaxParamSet) => (status: IndividualFilingStatus) => (profile: Stored<ReturnProfile>) => (divForms: readonly Stored<OneZeroNineNineDiv>[]) => (intForms: readonly Stored<OneZeroNineNineInt>[]) => ForeignTaxCreditOutcome}
+ * ## §911(d)(6) — the ONE combination this line refuses outright (TAX-42)
+ *
+ * *"No deduction or exclusion from gross income under this subtitle or credit
+ * against the tax imposed by this chapter … shall be allowed to the extent
+ * such deduction, exclusion, or credit is properly allocable to or chargeable
+ * against amounts excluded from gross income under subsection (a)."* i2555 p3
+ * restates it: *"You can't take a credit or deduction for foreign income taxes
+ * paid or accrued on income that is excluded under either of the exclusions."*
+ *
+ * **Two independent reasons make the election and a §911 exclusion
+ * incompatible, and either one alone would be enough.**
+ *
+ * 1. §911(d)(6) needs the foreign tax SPLIT between excluded and non-excluded
+ *    income — Pub. 514's allocation. No stored document states the split, and
+ *    §904(j) offers no shortcut for it.
+ * 2. The election's own assertion contradicts the claim. Its field name IS the
+ *    declaration: *every dollar of my foreign-source gross income is qualified
+ *    passive income under §904(d)(2)(B)*. Foreign EARNED income is
+ *    compensation for personal services — general category, never passive. A
+ *    return asserting both is internally inconsistent before any allocation
+ *    question arises.
+ *
+ * The refusal is message-only rather than an `fjs/return/scope` kind, on
+ * `fjs/schedule/1`'s Rev. Proc. 2014-41 precedent: both halves are separately
+ * modeled kinds and it is their COMBINATION that this engine cannot compute,
+ * which is not a thing a taxpayer declares.
+ * @type {(taxParamSet: TaxParamSet) => (status: IndividualFilingStatus) => (profile: Stored<ReturnProfile>) => (divForms: readonly Stored<OneZeroNineNineDiv>[]) => (intForms: readonly Stored<OneZeroNineNineInt>[]) => (form2555ExclusionCents: bigint) => ForeignTaxCreditOutcome}
  */
-export const foreignTaxCreditLine = taxParamSet => status => profile => divForms => intForms => {
+export const foreignTaxCreditLine = taxParamSet => status => profile => divForms => intForms => form2555ExclusionCents => {
     const rule = 'Schedule 3 line 1 (foreign tax credit, §904(j) election -> 1040 line 20)'
     const sources = foreignTaxSources(divForms)(intForms)
     const total = sumSources(sources)
     const elected
         = profile.value.section904jElectionAllForeignIncomeIsQualifiedPassiveIncome === true
+    // §911(d)(6), checked BEFORE the election's own two refusals: a return
+    // carrying both is inconsistent whatever the amounts are, and reporting
+    // "you did not elect §904(j)" to a filer who did would send them to fix
+    // the wrong thing.
+    if (form2555ExclusionCents !== 0n && elected) {
+        return {
+            kind: 'error',
+            message: `Schedule 3 line 1: this return excludes `
+                + `${centsToString(form2555ExclusionCents)} of foreign earned income under §911 `
+                + `AND elects §904(j). §911(d)(6) denies any credit "properly allocable to or `
+                + `chargeable against amounts excluded", so the foreign tax would first have to `
+                + `be split between excluded and non-excluded income under Pub. 514 — a split no `
+                + `document this engine holds states. The election also asserts that the ENTIRE `
+                + `foreign-source gross income is qualified PASSIVE income, and foreign earned `
+                + `income is compensation for personal services, which is general-category `
+                + `income and never passive. Refusing rather than crediting a foreign tax paid `
+                + `on income this return already excluded. Nothing reaches 1040 line 20`,
+        }
+    }
     // A present box reading `'0.00'` still CITES its document (DOC-11), and
     // needs no election: there is no credit to elect for. Gating the two
     // refusals on `total > 0n` rather than on the sources being non-empty is
@@ -733,6 +778,7 @@ export const foreignTaxCreditLine = taxParamSet => status => profile => divForms
  *   readonly foreignTaxCreditLine1: ReportLine,
  *   readonly netPremiumTaxCreditLine9: ReportLine,
  *   readonly dependentCareCreditLine2: ReportLine,
+ *   readonly form2555ExclusionCents: bigint,
  * }} ScheduleThreeInput
  */
 
@@ -755,7 +801,7 @@ export const scheduleThree = taxParamSet => input => {
     const {
         profile, status, agiCents, line18Cents, w2Forms, creditForms, tuitionForms,
         aStored1099RProvesADistribution, foreignTaxCreditLine1, netPremiumTaxCreditLine9,
-        dependentCareCreditLine2,
+        dependentCareCreditLine2, form2555ExclusionCents,
     } = input
     const zero = profileDeclaredZeroLine(profile)
     const fromDocuments = documentLine(profile)
@@ -854,6 +900,9 @@ export const scheduleThree = taxParamSet => input => {
         })
     }
     const educationOutcome = form8863(taxParamSet)({
+        // TAX-42: §911's exclusion is a live add-back inside Form 8863's own
+        // modified adjusted gross income (its line 3), not a documented zero.
+        form2555ExclusionCents,
         status,
         agiCents,
         students,
@@ -1079,6 +1128,7 @@ const profileNoDeclaredKinds = { documentHash: 'profile-hash-0001', value: minim
 /** @type {(overrides: Partial<ScheduleThreeInput>) => ScheduleThreeInput} */
 const baseInput = overrides => ({
     profile: profileNoDeclaredKinds,
+    form2555ExclusionCents: 0n,
     // Schedule 3 line 1 as `fjs/form1040/core` hands it in for a return with
     // no foreign tax anywhere: the profile-declared zero
     // {@link foreignTaxCreditLine} itself returns for that case, written out
@@ -1199,11 +1249,13 @@ const profileElectingSection904j = {
     },
 }
 
-/** Runs {@link foreignTaxCreditLine} for TY2025 against a filing status.
+/** Runs {@link foreignTaxCreditLine} for TY2025 against a filing status, with
+ * NO §911 exclusion — the ordinary case every leaf below the TAX-42 block
+ * exercises. The exclusion is supplied explicitly where it matters.
  * @type {(status: IndividualFilingStatus) => (profile: Stored<ReturnProfile>) => (divForms: readonly Stored<OneZeroNineNineDiv>[]) => (intForms: readonly Stored<OneZeroNineNineInt>[]) => ForeignTaxCreditOutcome}
  */
 const foreignCredit = status => profile => divForms => intForms =>
-    foreignTaxCreditLine(taxParams2025)(status)(profile)(divForms)(intForms)
+    foreignTaxCreditLine(taxParams2025)(status)(profile)(divForms)(intForms)(0n)
 
 /** Narrows {@link foreignTaxCreditLine}'s outcome to its computed line.
  * @type {(outcome: ForeignTaxCreditOutcome) => ReportLine}

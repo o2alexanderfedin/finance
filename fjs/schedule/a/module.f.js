@@ -161,6 +161,7 @@ import { refuses } from '../../refuses/module.f.js'
  *   readonly itemizedEntries: readonly Stored<ItemizedEntry>[],
  *   readonly medicalExpenseEntries: readonly Stored<MedicalExpenseEntry>[],
  *   readonly profile: Stored<ReturnProfile>,
+ *   readonly form2555Line45Cents: bigint,
  *   readonly w2Forms?: readonly Stored<W2>[],
  *   readonly oneZeroNineNineRForms?: readonly Stored<OneZeroNineNineR>[],
  * }} ScheduleAInput
@@ -336,10 +337,10 @@ const centsAtRatePercent = cents => ratePercent =>
  * §3's transcription, every term currently zero and unmodeled in this
  * engine:
  * - Puerto Rico excluded income (w3a) — not modeled, always 0.
- * - Form 2555 line 45, foreign earned income exclusion (w3b) — refused if
- *   declared (a scope kind this engine does not model), so always 0 for
- *   any return this engine can compute.
- * - Form 2555 line 50, foreign housing exclusion (w3c) — same.
+ * - Form 2555 line 45, foreign earned income exclusion (w3b) — **LIVE as of
+ *   TAX-42**, and the first of these four to stop being a documented zero.
+ * - Form 2555 line 50, foreign housing exclusion (w3c) — still zero:
+ *   `foreignHousingExclusionOrDeduction` is a refused kind.
  * - Form 4563 line 15, American Samoa income exclusion (w3d) — not
  *   modeled, always 0.
  *
@@ -350,13 +351,13 @@ const centsAtRatePercent = cents => ratePercent =>
  * precedent: identical values, stored independently, because the
  * coincidence is contingent on what remains unmodeled today, not on the
  * underlying rules being the same rule.
- * @type {(agiCents: bigint) => bigint}
+ * @type {(agiCents: bigint) => (form2555Line45Cents: bigint) => bigint}
  */
-export const saltCapPhasedownIncome = agiCents => {
-    // Add-backs, per this function's own docstring above — every term
-    // currently zero.
+export const saltCapPhasedownIncome = agiCents => form2555Line45Cents => {
+    // Add-backs, per this function's own docstring above. Three are still zero
+    // and NAMED rather than omitted.
     const puertoRicoExcludedIncome = 0n
-    const form2555Line45ForeignEarnedIncomeExclusion = 0n
+    const form2555Line45ForeignEarnedIncomeExclusion = form2555Line45Cents
     const form2555Line50ForeignHousingExclusion = 0n
     const form4563Line15AmericanSamoaExclusion = 0n
     return agiCents
@@ -387,15 +388,16 @@ export const saltCapPhasedownIncome = agiCents => {
  *   readonly status: IndividualFilingStatus,
  *   readonly agiCents: bigint,
  *   readonly line5dCents: bigint,
+ *   readonly form2555Line45Cents: bigint,
  * }) => SaltWorksheetResult}
  */
 const saltCapWorksheet = taxParamSet => input => {
-    const { status, agiCents, line5dCents } = input
+    const { status, agiCents, line5dCents, form2555Line45Cents } = input
     const { saltCap } = taxParamSet
     // w1. The flat $40,000 cap -- NOT halved for MFS here (Pitfall 2).
     const w1 = centsFromString(saltCap.flatCap.amount)
     // w2/w3a-w3e folded into w4 -- see this function's own docstring.
-    const w4 = saltCapPhasedownIncome(agiCents)
+    const w4 = saltCapPhasedownIncome(agiCents)(form2555Line45Cents)
     // w5. The worksheet's OWN status-specific threshold -- $250,000 MFS,
     // $500,000 every other status. Unlike w1/w9, this line genuinely IS
     // status-specific on the worksheet's own printed face.
@@ -543,7 +545,10 @@ const assertAssertedSaltIncomeTaxIsAtLeastStoredWithholding = itemizedEntries =>
  * @type {(taxParamSet: TaxParamSet) => (input: ScheduleAInput) => ScheduleAOutcome}
  */
 export const scheduleA = taxParamSet => input => {
-    const { status, agiCents, itemizedEntries, medicalExpenseEntries, profile } = input
+    const {
+        status, agiCents, itemizedEntries, medicalExpenseEntries, profile,
+        form2555Line45Cents,
+    } = input
     const w2Forms = input.w2Forms ?? []
     const oneZeroNineNineRForms = input.oneZeroNineNineRForms ?? []
 
@@ -598,7 +603,9 @@ export const scheduleA = taxParamSet => input => {
     const line5b = fromEntries('Schedule A line 5b')(byTag('realEstateTax'))
     const line5c = fromEntries('Schedule A line 5c')(byTag('personalPropertyTax'))
     const line5d = line5a.value + line5b.value + line5c.value
-    const saltWorksheet = saltCapWorksheet(taxParamSet)({ status, agiCents, line5dCents: line5d })
+    const saltWorksheet = saltCapWorksheet(taxParamSet)({
+        status, agiCents, line5dCents: line5d, form2555Line45Cents,
+    })
     const line5e = saltWorksheet.w10
     const line6 = fromEntries('Schedule A line 6')(byTag('otherTaxes'))
     const line7 = line5e + line6.value
@@ -744,6 +751,7 @@ export const proof = {
     medicalFloor: {
         aboveFloorFixture: () => {
             const result = expectOk(scheduleA(taxParams2025)({
+                form2555Line45Cents: 0n,
                 status: 'single',
                 agiCents: 8000000n, // $80,000.00
                 itemizedEntries: [],
@@ -756,6 +764,7 @@ export const proof = {
         },
         belowFloorFixtureFloorsAtZero: () => {
             const result = expectOk(scheduleA(taxParams2025)({
+                form2555Line45Cents: 0n,
                 status: 'single',
                 agiCents: 8000000n, // $80,000.00
                 itemizedEntries: [],
@@ -767,6 +776,7 @@ export const proof = {
         },
         reimbursementReducesLine1: () => {
             const result = expectOk(scheduleA(taxParams2025)({
+                form2555Line45Cents: 0n,
                 status: 'single',
                 agiCents: 0n,
                 itemizedEntries: [],
@@ -781,6 +791,7 @@ export const proof = {
     saltWorksheet: {
         mfsHalvesOnlyTheFinalLine: () => {
             const result = expectOk(scheduleA(taxParams2025)({
+                form2555Line45Cents: 0n,
                 status: 'marriedFilingSeparately',
                 agiCents: 60000000n, // $600,000.00 -- above the $250,000 MFS threshold
                 itemizedEntries: [itemizedEntry('saltIncomeTax')('30000.00')('itemized-doc-1')],
@@ -799,6 +810,7 @@ export const proof = {
         // any line, including w10.
         nonMfsAtTheSameExcessIncomeIsNotHalved: () => {
             const result = expectOk(scheduleA(taxParams2025)({
+                form2555Line45Cents: 0n,
                 status: 'single',
                 agiCents: 100000000n, // $1,000,000.00 -- $500,000 above the single threshold
                 itemizedEntries: [itemizedEntry('saltIncomeTax')('40000.00')('itemized-doc-1')],
@@ -811,6 +823,7 @@ export const proof = {
         // Test 3 (below-threshold skip): collapses to the ordinary cap.
         belowThresholdCollapsesToOrdinaryCapNonMfs: () => {
             const result = expectOk(scheduleA(taxParams2025)({
+                form2555Line45Cents: 0n,
                 status: 'single',
                 agiCents: 40000000n, // $400,000.00 -- below the $500,000 threshold
                 itemizedEntries: [itemizedEntry('saltIncomeTax')('50000.00')('itemized-doc-1')],
@@ -823,6 +836,7 @@ export const proof = {
         },
         belowThresholdLeavesLine5dUnreducedWhenUnderTheCap: () => {
             const result = expectOk(scheduleA(taxParams2025)({
+                form2555Line45Cents: 0n,
                 status: 'single',
                 agiCents: 40000000n, // $400,000.00 -- below threshold
                 itemizedEntries: [itemizedEntry('saltIncomeTax')('9500.00')('itemized-doc-1')],
@@ -836,6 +850,7 @@ export const proof = {
         // branch), single filer, at the $500,000 threshold.
         thresholdBoundaryTrioSingle: () => {
             const at = (/** @type {bigint} */ agiCents) => expectOk(scheduleA(taxParams2025)({
+                form2555Line45Cents: 0n,
                 status: 'single', agiCents,
                 itemizedEntries: [itemizedEntry('saltIncomeTax')('50000.00')('itemized-doc-1')],
                 medicalExpenseEntries: [],
@@ -858,6 +873,7 @@ export const proof = {
         // enough to survive rounding to the nearest cent.
         realMovementAboveThreshold: () => {
             const result = expectOk(scheduleA(taxParams2025)({
+                form2555Line45Cents: 0n,
                 status: 'single',
                 agiCents: 50010000n, // $500,100.00 -- $100.00 above threshold
                 itemizedEntries: [itemizedEntry('saltIncomeTax')('50000.00')('itemized-doc-1')],
@@ -871,6 +887,7 @@ export const proof = {
         // The floor never breaches below $10,000, even at a very large excess.
         floorNeverBreachedAtLargeExcess: () => {
             const result = expectOk(scheduleA(taxParams2025)({
+                form2555Line45Cents: 0n,
                 status: 'single',
                 agiCents: 900000000n, // $9,000,000.00 -- far above threshold
                 itemizedEntries: [itemizedEntry('saltIncomeTax')('50000.00')('itemized-doc-1')],
@@ -886,6 +903,7 @@ export const proof = {
     documentedZeros: {
         line9CitesProfileDeclaredKinds: () => {
             const result = expectOk(scheduleA(taxParams2025)({
+                form2555Line45Cents: 0n,
                 status: 'single', agiCents: 0n, itemizedEntries: [], medicalExpenseEntries: [],
                 profile: profileNoDeclaredKinds,
             }))
@@ -896,6 +914,7 @@ export const proof = {
         },
         line15CitesProfileDeclaredKinds: () => {
             const result = expectOk(scheduleA(taxParams2025)({
+                form2555Line45Cents: 0n,
                 status: 'single', agiCents: 0n, itemizedEntries: [], medicalExpenseEntries: [],
                 profile: profileNoDeclaredKinds,
             }))
@@ -909,6 +928,7 @@ export const proof = {
         // from lines 9/15's ALWAYS-zero shape, but structurally identical.
         absentTagFallsBackToDocumentedZero: () => {
             const result = expectOk(scheduleA(taxParams2025)({
+                form2555Line45Cents: 0n,
                 status: 'single', agiCents: 0n,
                 itemizedEntries: [itemizedEntry('charitableCash')('100.00')('itemized-doc-1')],
                 medicalExpenseEntries: [],
@@ -925,6 +945,7 @@ export const proof = {
     trustedTaxpayerAssertedLines: {
         mortgageAndCharitableEntriesPassThroughUnlimited: () => {
             const result = expectOk(scheduleA(taxParams2025)({
+                form2555Line45Cents: 0n,
                 status: 'single', agiCents: 100000n, // a trivially small AGI
                 itemizedEntries: [
                     itemizedEntry('mortgageInterest1098')('900000.00')('itemized-doc-1'),
@@ -946,6 +967,7 @@ export const proof = {
     line18Election: {
         trueWhenProfileElects: () => {
             const result = expectOk(scheduleA(taxParams2025)({
+                form2555Line45Cents: 0n,
                 status: 'single', agiCents: 0n, itemizedEntries: [], medicalExpenseEntries: [],
                 profile: profileItemizeAnyway,
             }))
@@ -953,6 +975,7 @@ export const proof = {
         },
         falseWhenProfileDoesNotElect: () => {
             const result = expectOk(scheduleA(taxParams2025)({
+                form2555Line45Cents: 0n,
                 status: 'single', agiCents: 0n, itemizedEntries: [], medicalExpenseEntries: [],
                 profile: profileNoDeclaredKinds,
             }))
@@ -966,6 +989,7 @@ export const proof = {
     saltLine5aElection: {
         incomeTaxOnlyReadsThatOneTag: () => {
             const result = expectOk(scheduleA(taxParams2025)({
+                form2555Line45Cents: 0n,
                 status: 'single', agiCents: 0n,
                 itemizedEntries: [itemizedEntry('saltIncomeTax')('4000.00')('itemized-doc-1')],
                 medicalExpenseEntries: [],
@@ -975,6 +999,7 @@ export const proof = {
         },
         salesTaxOnlyReadsThatOneTag: () => {
             const result = expectOk(scheduleA(taxParams2025)({
+                form2555Line45Cents: 0n,
                 status: 'single', agiCents: 0n,
                 itemizedEntries: [itemizedEntry('saltGeneralSalesTax')('3500.00')('itemized-doc-1')],
                 medicalExpenseEntries: [],
@@ -984,6 +1009,7 @@ export const proof = {
         },
         neitherTagPresentIsADocumentedZero: () => {
             const result = expectOk(scheduleA(taxParams2025)({
+                form2555Line45Cents: 0n,
                 status: 'single', agiCents: 0n, itemizedEntries: [], medicalExpenseEntries: [],
                 profile: profileNoDeclaredKinds,
             }))
@@ -995,6 +1021,7 @@ export const proof = {
         // deduction, the exact failure CR-01 names.
         bothTagsPresentRefuses: () => {
             const outcome = scheduleA(taxParams2025)({
+                form2555Line45Cents: 0n,
                 status: 'single', agiCents: 0n,
                 itemizedEntries: [
                     itemizedEntry('saltIncomeTax')('4000.00')('itemized-doc-1'),
@@ -1021,6 +1048,7 @@ export const proof = {
         },
         misspelledTagRefusesNamingIt: () => {
             const outcome = scheduleA(taxParams2025)({
+                form2555Line45Cents: 0n,
                 status: 'single', agiCents: 0n,
                 itemizedEntries: [itemizedEntry('saltIncomeTaxx')('100.00')('itemized-doc-1')],
                 medicalExpenseEntries: [],
@@ -1040,6 +1068,7 @@ export const proof = {
         everyKnownTagIsTheControlAndComputesNormally: () => {
             for (const lineTag of knownLineTags) {
                 const outcome = scheduleA(taxParams2025)({
+                    form2555Line45Cents: 0n,
                     status: 'single', agiCents: 0n,
                     itemizedEntries: [itemizedEntry(lineTag)('10.00')('itemized-doc-1')],
                     medicalExpenseEntries: [],
@@ -1056,6 +1085,7 @@ export const proof = {
     // both bite, were either implemented) still deducts in FULL, unreduced.
     obbbaTy2026ChangesNotImplemented: () => {
         const result = expectOk(scheduleA(taxParams2025)({
+            form2555Line45Cents: 0n,
             status: 'single',
             agiCents: 100000000n, // $1,000,000.00 -- well into the TY2026 high-income haircut's range
             itemizedEntries: [itemizedEntry('charitableCash')('500.00')('itemized-doc-1')],
@@ -1073,6 +1103,7 @@ export const proof = {
     // hand-totaled independently of `scheduleA`'s own arithmetic.
     computesAllEighteenLinesForAFullyItemizedFixture: () => {
         const result = expectOk(scheduleA(taxParams2025)({
+            form2555Line45Cents: 0n,
             status: 'single',
             agiCents: 10000000n, // $100,000.00
             itemizedEntries: [
@@ -1176,6 +1207,7 @@ export const proof = {
     withholdingDriftWiredIntoScheduleA: {
         realReturnWithUnderstatedSaltIncomeTaxRefuses: () => {
             const outcome = scheduleA(taxParams2025)({
+                form2555Line45Cents: 0n,
                 status: 'single', agiCents: 0n,
                 itemizedEntries: [itemizedEntry('saltIncomeTax')('1000.00')('itemized-doc-1')],
                 medicalExpenseEntries: [],
@@ -1197,6 +1229,7 @@ export const proof = {
         // not every return that happens to carry a W-2 alongside SALT.
         realReturnWithConsistentSaltIncomeTaxComputesNormally: () => {
             const outcome = scheduleA(taxParams2025)({
+                form2555Line45Cents: 0n,
                 status: 'single', agiCents: 0n,
                 itemizedEntries: [itemizedEntry('saltIncomeTax')('5000.00')('itemized-doc-1')],
                 medicalExpenseEntries: [],
@@ -1214,6 +1247,7 @@ export const proof = {
         // with nothing to compare against, never a spurious refusal.
         omittedDocumentArraysAreANoOp: () => {
             const outcome = scheduleA(taxParams2025)({
+                form2555Line45Cents: 0n,
                 status: 'single', agiCents: 0n,
                 itemizedEntries: [itemizedEntry('saltIncomeTax')('1.00')('itemized-doc-1')],
                 medicalExpenseEntries: [],
@@ -1227,6 +1261,7 @@ export const proof = {
     // `mediaType`, mirroring `fjs/schedule/b`'s own `dialectIndependence` leaf.
     dialectIndependence: () => {
         const result = expectOk(scheduleA(taxParams2025)({
+            form2555Line45Cents: 0n,
             status: 'single', agiCents: 0n, itemizedEntries: [], medicalExpenseEntries: [],
             profile: profileNoDeclaredKinds,
         }))

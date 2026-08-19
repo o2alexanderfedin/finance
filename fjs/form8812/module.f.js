@@ -148,6 +148,7 @@ import { taxParamsByYear } from '../tax/params/module.f.js'
  *   readonly scheduleThreeCreditsCents: bigint,
  *   readonly earnedIncomeCents: bigint,
  *   readonly nontaxableCombatPayCents: bigint,
+ *   readonly form2555Line45Cents: bigint,
  * }} Form8812Input
  */
 
@@ -160,10 +161,10 @@ import { taxParamsByYear } from '../tax/params/module.f.js'
  * add-back list, per the printed form, every term currently zero and
  * unmodeled in this engine:
  * - Puerto Rico excluded income (line 2a) — not modeled, always 0.
- * - Form 2555 line 45, foreign earned income exclusion (line 2b) — refused
- *   if declared (a scope kind this engine does not model), so always 0 for
- *   any return this engine can compute.
- * - Form 2555 line 50, foreign housing exclusion (line 2c) — same.
+ * - Form 2555 line 45, foreign earned income exclusion (line 2b) — **LIVE as
+ *   of TAX-42**, and no longer a documented zero.
+ * - Form 2555 line 50, foreign housing exclusion (line 2c) — still zero:
+ *   `foreignHousingExclusionOrDeduction` is a refused kind.
  *
  * Deliberately does NOT import or call `fjs/schedule/1a`'s
  * `seniorDeductionPhaseoutIncome` or `fjs/schedule/a`'s
@@ -173,13 +174,13 @@ import { taxParamsByYear } from '../tax/params/module.f.js'
  * coincidence is contingent on what remains unmodeled today, not on the
  * underlying rules being the same rule. `proof` below pins the equality
  * against this module's own line 3 explicitly, rather than assuming it.
- * @type {(agiCents: bigint) => bigint}
+ * @type {(agiCents: bigint) => (form2555Line45Cents: bigint) => bigint}
  */
-export const childTaxCreditPhaseoutIncome = agiCents => {
-    // Add-backs, per this function's own docstring above — every term
-    // currently zero.
+export const childTaxCreditPhaseoutIncome = agiCents => form2555Line45Cents => {
+    // Add-backs, per this function's own docstring above. Two are still zero
+    // and NAMED rather than omitted.
     const puertoRicoExcludedIncome = 0n
-    const form2555Line45ForeignEarnedIncomeExclusion = 0n
+    const form2555Line45ForeignEarnedIncomeExclusion = form2555Line45Cents
     const form2555Line50ForeignHousingExclusion = 0n
     return agiCents
         + puertoRicoExcludedIncome
@@ -244,7 +245,7 @@ const partTwoBThresholdCents = 510000n
 export const form8812 = taxParamSet => input => {
     const {
         status, agiCents, dependents, line18Cents, scheduleThreeCreditsCents,
-        earnedIncomeCents, nontaxableCombatPayCents,
+        earnedIncomeCents, nontaxableCombatPayCents, form2555Line45Cents,
     } = input
     const { childTaxCredit } = taxParamSet
 
@@ -258,19 +259,21 @@ export const form8812 = taxParamSet => input => {
     const line1 = agiCents
     // 2a. Puerto Rico excluded income -- not modeled, always 0.
     const line2a = 0n
-    // 2b. Form 2555 line 45 -- refused if declared, always 0 here.
-    const line2b = 0n
-    // 2c. Form 2555 line 50 -- same.
+    // 2b. Form 2555 line 45 -- LIVE as of TAX-42. This line read `0n` with the
+    // comment "refused if declared" until then.
+    const line2b = form2555Line45Cents
+    // 2c. Form 2555 line 50 -- still zero:
+    // `foreignHousingExclusionOrDeduction` is a refused kind.
     const line2c = 0n
     // 2d. "Add lines 2a through 2c."
     const line2d = line2a + line2b + line2c
     // 3. "Add lines 1 and 2d." -- "modified AGI" for CTC/ODC purposes. Calls
     // {@link childTaxCreditPhaseoutIncome} directly (WR-05) rather than
     // re-deriving the identical `line1 + line2d` arithmetic a second time in
-    // this file -- every add-back above is a documented, permanent 0, so
-    // this is not a behavior change; `lineThreeEqualsChildTaxCreditPhaseoutIncomeForEveryFixture`
-    // below still pins the equality, now trivially, as a regression guard.
-    const line3 = childTaxCreditPhaseoutIncome(agiCents)
+    // this file. Since TAX-42 the two expressions are no longer trivially
+    // equal, so `lineThreeEqualsChildTaxCreditPhaseoutIncomeForEveryFixture`
+    // below is what keeps two expressions of one rule from drifting.
+    const line3 = childTaxCreditPhaseoutIncome(agiCents)(form2555Line45Cents)
     // 4. Count of qualifying children under 17 with a required SSN.
     const line4 = BigInt(qualifyingChildren.length)
     // 5. "Multiply line 4 by $2,200."
@@ -396,6 +399,7 @@ const baseInput = overrides => ({
     dependents: [],
     line18Cents: 0n,
     scheduleThreeCreditsCents: 0n,
+    form2555Line45Cents: 0n,
     earnedIncomeCents: 0n,
     nontaxableCombatPayCents: 0n,
     ...overrides,
@@ -719,12 +723,35 @@ export const proof = {
         lineThreeEqualsChildTaxCreditPhaseoutIncomeForEveryFixture: () => {
             for (const agi of [0n, 8000000n, 20000001n, 40000001n, 99999999n]) {
                 const result = expectOk(form8812(taxParams2025)(baseInput({ agiCents: agi })))
-                assertEq(result.line3, childTaxCreditPhaseoutIncome(agi))
+                assertEq(result.line3, childTaxCreditPhaseoutIncome(agi)(0n))
             }
         },
-        childTaxCreditPhaseoutIncomeEqualsBareAgiToday: () => {
-            assertEq(childTaxCreditPhaseoutIncome(0n), 0n)
-            assertEq(childTaxCreditPhaseoutIncome(12345600n), 12345600n)
+        childTaxCreditPhaseoutIncomeEqualsBareAgiWithNoExclusion: () => {
+            assertEq(childTaxCreditPhaseoutIncome(0n)(0n), 0n)
+            assertEq(childTaxCreditPhaseoutIncome(12345600n)(0n), 12345600n)
+        },
+        // **TAX-42: the add-back is LIVE, and this is the leaf that says so.**
+        // §911's exclusion enters modified AGI at printed line 2b, so a filer
+        // who excluded $130,000.00 is phased out on $180,000.00 of modified
+        // AGI rather than on the $50,000.00 that survived the exclusion. Both
+        // figures hand-typed.
+        theForeignEarnedIncomeExclusionAddsBackAtLineTwoB: () => {
+            const result = expectOk(form8812(taxParams2025)(baseInput({
+                agiCents: 5000000n, form2555Line45Cents: 13000000n,
+            })))
+            assertEq(result.line2b, 13000000n, 'printed line 2b is Form 2555 line 45')
+            assertEq(result.line2c, 0n, 'line 2c is the housing exclusion, still refused')
+            assertEq(result.line3, 18000000n, '$50,000.00 + $130,000.00 = $180,000.00')
+            assert(
+                result.line3 !== 5000000n,
+                ['bare AGI would have been $50,000.00', result.line3])
+        },
+        // THE CONTROL: the same AGI with no exclusion is bare AGI, so the leaf
+        // above is measuring the add-back rather than an unconditional sum.
+        controlTheSameAgiWithNoExclusionIsBareAgi: () => {
+            const result = expectOk(form8812(taxParams2025)(baseInput({ agiCents: 5000000n })))
+            assertEq(result.line2b, 0n)
+            assertEq(result.line3, 5000000n)
         },
     },
 }
