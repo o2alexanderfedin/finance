@@ -43,7 +43,7 @@
  * | 24b deductible meals | REFUSES by name | the printed line takes an amount §274(n) has already limited |
  * | 27b | documented zero | the printed form reserves it |
  * | 28, 29 | ✔ | arithmetic |
- * | 30 business use of home | documented zero, and REFUSES if asserted | Form 8829 or the simplified method's square footage |
+ * | 30 business use of home | ✔ | `businessUseOfHome` on the same record -> `fjs/form8829` line 36 (a STORED entry in this category still refuses — it would double the figure) |
  * | 31 net profit | ✔ **any profit, and a break-even zero**; REFUSES a loss | see "The net-loss decision" |
  * | 32 at risk | never reached | it exists only for a loss, which refuses |
  * | Part III (33-42) | REFUSES by name | beginning and ending inventory |
@@ -184,6 +184,7 @@
  */
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { centsFromString, centsToString } from '../../exact/module.f.js'
+import { form8829 } from '../../form8829/module.f.js'
 import { formFortyFiveSixtyTwo } from '../../form4562/module.f.js'
 import { depreciableAssets } from '../../document/asset_register/module.f.js'
 
@@ -361,10 +362,18 @@ export const refusedExpenseCategories = /** @type {const} */ ([
     {
         category: 'businessUseOfHome',
         label: 'Expenses for business use of your home',
-        remedy: 'requires Form 8829, or the simplified method’s square footage of the home '
-            + 'and of the part used regularly and exclusively for business — this record '
-            + 'carries neither, and the simplified method additionally caps the deduction at line '
-            + '29’s tentative profit (no phase yet)',
+        remedy: 'this line is now COMPUTED, from this record’s own businessUseOfHome through '
+            + 'Form 8829 line 36 (TAX-39) — so a hand-entered total in this category is refused '
+            + 'because it would be counted TWICE, once from Form 8829 and once here. That record '
+            + 'carries the square footage of the home and of the part used regularly and '
+            + 'exclusively for business, the direct and indirect expenses on printed lines 16 '
+            + 'through 22, the home’s basis and land value, and the month it was first used for '
+            + 'business. What Form 8829 still refuses is an ITEMIZING filer (i8829 puts the '
+            + 'mortgage interest and real estate taxes on lines 10 and 11 for them, through Pub. '
+            + '936 and §164(b)(6), and splits the personal share back to Schedule A), the '
+            + 'SIMPLIFIED method, a daycare facility, any casualty loss, a second home, and a '
+            + 'gross-income limitation that BINDS — because printed lines 43 and 44 would then '
+            + 'carry the excess to next year',
     },
 ])
 
@@ -710,6 +719,22 @@ export const scheduleCPartIV = entries => refusalForCategory(entries)('carAndTru
 /** @typedef {ScheduleCPartII | ScheduleCRefusal} ScheduleCPartIIOutcome */
 
 /**
+ * The Form 8829 half of one business, as {@link scheduleCPartII} needs it:
+ * the stored record, the year it belongs to, the label a refusal names the
+ * business by, and the document hash a computed line 30 cites.
+ *
+ * `undefined` rather than a member of this shape when the business stores no
+ * `businessUseOfHome` at all, which is the ordinary Schedule C — line 30 is
+ * then the documented zero it has always been.
+ * @typedef {{
+ *   readonly record: NonNullable<BusinessExpenses['businessUseOfHome']>,
+ *   readonly taxYear: number,
+ *   readonly businessLabel: string,
+ *   readonly documentHash: string,
+ * }} ScheduleCHomeOffice
+ */
+
+/**
  * **Line 32, the at-risk determination.** *"If you have a loss, check the box
  * that describes your investment in this activity ... 32a All investment is at
  * risk. 32b Some investment is not at risk ... If you checked 32b, you must
@@ -777,9 +802,9 @@ const expenseLine = profile => entries => category => {
  * line 22, and {@link scheduleC} is the layer that reads the register and owns
  * the refusal when Form 4562 cannot be completed. A business with no register
  * gets the documented zero this line has always been.
- * @type {(profile: Stored<ReturnProfile>) => (entries: readonly StoredEntry[]) => (line13Depreciation: ReportLine) => (line7GrossIncome: ReportLine) => ScheduleCPartIIOutcome}
+ * @type {(profile: Stored<ReturnProfile>) => (entries: readonly StoredEntry[]) => (line13Depreciation: ReportLine) => (line7GrossIncome: ReportLine) => (homeOffice: ScheduleCHomeOffice | undefined) => ScheduleCPartIIOutcome}
  */
-export const scheduleCPartII = profile => entries => line13Depreciation => line7GrossIncome => {
+export const scheduleCPartII = profile => entries => line13Depreciation => line7GrossIncome => homeOffice => {
     const zero = profileDeclaredZeroLine(profile)
     const byCategory = expenseLine(profile)(entries)
     // The five refused lines INSIDE the line-28 block, in printed order, each
@@ -852,7 +877,38 @@ export const scheduleCPartII = profile => entries => line13Depreciation => line7
     ])
     // 29. "Tentative profit or (loss). Subtract line 28 from line 7."
     const line29 = differenceLine('Schedule C line 29 (tentative profit or loss)')(line7GrossIncome)(line28)
-    const line30 = zero('Schedule C line 30 (expenses for business use of your home)')
+    // 30. "Expenses for business use of your home ... Use the Simplified
+    //     Method Worksheet in the instructions to figure the amount to enter
+    //     on line 30." TAX-39: Form 8829 line 36, computed from this
+    //     business's own `businessUseOfHome` record -- or a documented zero
+    //     when there is none, exactly as line 13 is a documented zero when
+    //     the business stores no asset register.
+    //
+    //     **Form 8829 runs HERE and not at the top of this function**, because
+    //     its own line 8 is "the amount from Schedule C, line 29" and line 29
+    //     is one line above. That ordering is one-directional and never
+    //     circular: line 29 is total expenses BEFORE business use of home, and
+    //     the printed form stops line 28's addition at 27a for exactly that
+    //     reason.
+    const line30Rule = 'Schedule C line 30 (expenses for business use of your home)'
+    /** @type {ReportLine} */
+    let line30 = zero(line30Rule)
+    if (homeOffice !== undefined) {
+        const outcome = form8829({
+            record: homeOffice.record,
+            taxYear: homeOffice.taxYear,
+            line29TentativeProfitCents: line29.value,
+            businessLabel: homeOffice.businessLabel,
+        })
+        if (outcome.kind === 'error') {
+            return outcome
+        }
+        line30 = documentLine(profile)(line30Rule)(outcome.line36Cents)([{
+            documentHash: homeOffice.documentHash,
+            boxPath: 'businessUseOfHome -> Form 8829 line 36',
+            value: centsToString(outcome.line36Cents),
+        }])
+    }
     // 31. "Net profit or (loss). Subtract line 30 from line 29."
     const line31 = differenceLine('Schedule C line 31 (net profit or loss -> Schedule 1 line 3)')(line29)(line30)
     return {
@@ -1088,7 +1144,7 @@ export const scheduleC = input => {
         const partII = scheduleCPartII(profile)([])(
             profileDeclaredZeroLine(profile)(
                 'Schedule C line 13 (depreciation and section 179 expense deduction)'))(
-            partI.line7)
+            partI.line7)(undefined)
         assert(partII.kind === 'ok', ['an empty Schedule C cannot refuse', partII])
         return { kind: 'ok', filed: false, partI, partII, form4562: undefined }
     }
@@ -1220,7 +1276,21 @@ export const scheduleC = input => {
     }
 
     const partI = scheduleCPartI(profile)(nonemployeeCompensationForms)
-    const partII = scheduleCPartII(profile)(entries)(line13)(partI.line7)
+    // 7e. Form 8829 (TAX-39). Built here and consumed inside Part II, whose
+    //     line 29 is Form 8829's own line 8. `undefined` when the business
+    //     stores no `businessUseOfHome`, which is every Schedule C that
+    //     existed before this phase — line 30 is then the documented zero it
+    //     has always been, and nothing about such a return changes.
+    const home = firstBusiness.value.businessUseOfHome
+    const partII = scheduleCPartII(profile)(entries)(line13)(partI.line7)(
+        home === undefined
+            ? undefined
+            : {
+                record: home,
+                taxYear: firstBusiness.value.taxYear,
+                businessLabel: businessLabel(firstBusiness.value),
+                documentHash: firstBusiness.documentHash,
+            })
     if (partII.kind === 'error') {
         return partII
     }
@@ -1301,6 +1371,40 @@ const directSalesDoc = {
         box2DirectSalesOfFiveThousandOrMore: /** @type {const} */ (true),
     },
 }
+
+/**
+ * A 200-square-foot office in a 2,000-square-foot home — **10%, not 100%**.
+ * AGENTS.md records a mutation surviving in this repository because every
+ * fixture used 100% business use, one month and one year; Form 8829 is a
+ * percentage-of-use form, so the wiring fixture is deliberately not one of
+ * those.
+ * @type {NonNullable<BusinessExpenses['businessUseOfHome']>}
+ */
+const tenPercentHomeRecord = {
+    method: 'actualExpenses',
+    claimingTheStandardDeduction: /** @type {const} */ (true),
+    allGrossIncomeFromTheBusinessUseOfTheHome: /** @type {const} */ (true),
+    areaUsedForBusiness: 200,
+    totalAreaOfHome: 2000,
+    expenses: [
+        { line: '18', column: 'indirect', description: 'insurance', amount: '1800.00' },
+        { line: '21', column: 'indirect', description: 'utilities', amount: '4200.00' },
+    ],
+    homeAdjustedBasisOrFairMarketValue: '250000.00',
+    landIncludedInThatBasis: '50000.00',
+    firstUsedForBusiness: '2019-06',
+}
+
+/** The same business, plus a home office. Its own document hash, so the
+ * provenance leaf can name it.
+ * @type {(home: NonNullable<BusinessExpenses['businessUseOfHome']>) => Stored<BusinessExpenses>} */
+const homeOfficeBusinessDoc = home => ({
+    documentHash: 'sha256-business-home',
+    value: {
+        ...businessDoc([entryOf('advertising')('1200.00')]).value,
+        businessUseOfHome: home,
+    },
+})
 
 /** A second business, which must refuse. @type {Stored<BusinessExpenses>} */
 const secondBusinessDoc = {
@@ -2506,6 +2610,110 @@ export const proof = {
                     },
                 }],
             })).filed, false)
+        },
+    },
+    // ── TAX-39: printed line 30, wired to Form 8829 ─────────────────────────
+    //
+    // **A FORM-LEVEL PROOF CANNOT PROVE THIS.** `fjs/form8829`'s own leaves
+    // build their `line29TentativeProfitCents` by hand and would every one stay
+    // green while this schedule handed the form a zero, a gross figure instead
+    // of the tentative profit, or dropped line 36 on the floor between the two
+    // — which is exactly what line 30 did before this phase: a `zero(...)` with
+    // no reader at all.
+    businessUseOfHome: {
+        /*
+         * Worked by hand against f8829 and Schedule C, from the fixtures below:
+         *
+         *   Schedule C line 7  $48,000.00 of gross receipts
+         *              line 8  $1,200.00 of advertising  ->  line 28 $1,200.00
+         *              line 29 $46,800.00 tentative profit    = Form 8829 line 8
+         *   Form 8829  line 7  200/2000 = 10%
+         *              line 23(b) $6,000.00 of indirect expenses
+         *              line 24 $600.00
+         *              line 26 = line 27 $600.00 (the limitation does not bind)
+         *              line 40 ($250,000 - $50,000) x 10% = $20,000.00
+         *              line 42 $20,000.00 x 2.564% = $512.80 = line 30 = line 33
+         *              line 36 $1,112.80
+         *   Schedule C line 30 $1,112.80
+         *              line 31 46,800.00 - 1,112.80 = $45,687.20
+         */
+        aHomeOfficeReachesLineThirtyAndReducesLineThirtyOne: () => {
+            const outcome = ok(run({
+                nonemployeeCompensationForms: [necDoc('48000.00')('sha256-nec-home')],
+                businessExpenseForms: [homeOfficeBusinessDoc(tenPercentHomeRecord)],
+            }))
+            assertEq(outcome.partII.line29.value, 4680000n, '$46,800.00 of tentative profit')
+            assertEq(outcome.partII.line30.value, 111280n, '$1,112.80 from Form 8829 line 36')
+            assertEq(outcome.partII.line31.value, 4568720n, '$45,687.20 of net profit')
+        },
+        // Line 30 CITES the document it came from. A wiring that computed the
+        // right figure and lost its provenance would pass the leaf above.
+        lineThirtyCitesTheRecordAndTheFormLineItCameFrom: () => {
+            const outcome = ok(run({
+                nonemployeeCompensationForms: [necDoc('48000.00')('sha256-nec-home')],
+                businessExpenseForms: [homeOfficeBusinessDoc(tenPercentHomeRecord)],
+            }))
+            const [source, ...rest] = outcome.partII.line30.sources
+            assert(source !== undefined, ['line 30 must cite a source', outcome.partII.line30])
+            if (source === undefined) {
+                throw 'expected a source'
+            }
+            assertEq(rest.length, 0, 'one home, one source')
+            assertEq(source.documentHash, 'sha256-business-home')
+            assertEq(source.boxPath, 'businessUseOfHome -> Form 8829 line 36')
+            assertEq(source.value, '1112.80')
+        },
+        // **Form 8829 reads line 29 and NOT line 7.** The identical home
+        // against a business whose receipts are far smaller has a smaller
+        // ceiling, and here the ceiling BINDS — so the return refuses. A
+        // wiring that handed Form 8829 the gross receipts would compute
+        // happily, and by a different amount.
+        theCeilingIsLineTwentyNineAndNotLineSeven: () => {
+            const message = refusal(run({
+                nonemployeeCompensationForms: [necDoc('6000.00')('sha256-nec-home')],
+                businessExpenseForms: [homeOfficeBusinessDoc({
+                    ...tenPercentHomeRecord,
+                    areaUsedForBusiness: 2000,
+                    expenses: [{
+                        line: '19', column: 'indirect', description: 'rent', amount: '9000.00',
+                    }],
+                })],
+            })).message
+            assert(
+                message.includes('Form 8829 line 27') && message.includes('line 43'),
+                ['Form 8829’s refusal must travel out of Schedule C unchanged', message])
+            // $6,000.00 of receipts less $1,200.00 of advertising is $4,800.00
+            // of line 29, against $9,000.00 of rent at 100% use: $4,200.00
+            // carries out. Hand-typed. Reading line 7 ($6,000.00) instead of
+            // line 29 would say $3,000.00.
+            assert(
+                message.includes('4200.00'),
+                ['and quote the carryover computed from line 29, not line 7', message])
+        },
+        // THE CONTROL: a business with NO `businessUseOfHome` computes exactly
+        // what it computed before this phase — line 30 a documented zero, and
+        // line 31 equal to line 29.
+        aBusinessWithNoHomeOfficeIsUnchanged: () => {
+            const outcome = ok(run({
+                nonemployeeCompensationForms: [necDoc('48000.00')('sha256-nec-home')],
+                businessExpenseForms: [businessDoc([entryOf('advertising')('1200.00')])],
+            }))
+            assertEq(outcome.partII.line30.value, 0n)
+            assertEq(outcome.partII.line31.value, outcome.partII.line29.value)
+        },
+        // A hand-entered `businessUseOfHome` CATEGORY is still refused, and the
+        // remedy now names the record that replaced it — "wire before
+        // reclassify", and the double-count `depreciationAndSection179`
+        // already guards against on line 13.
+        aHandEnteredCategoryIsStillRefusedAndNamesTheRecord: () => {
+            const message = refusal(run({
+                nonemployeeCompensationForms: [necDoc('48000.00')('sha256-nec-home')],
+                businessExpenseForms: [businessDoc([entryOf('businessUseOfHome')('1200.00')])],
+            })).message
+            assert(
+                message.includes('counted TWICE') && message.includes('businessUseOfHome')
+                && message.includes('Form 8829 line 36'),
+                ['the refusal must say why a hand-entered total is wrong now', message])
         },
     },
 }

@@ -4114,6 +4114,34 @@ const businessExpensesDocument = documentHash => advertisingAmount => ({
 })
 
 /**
+ * The same business record, plus a Form 8829 record: a 200-square-foot office
+ * in a 2,000-square-foot home — **10%, not 100%**, because Form 8829 is a
+ * percentage-of-use form and AGENTS.md records a mutation surviving here
+ * because every fixture in the repo used 100% business use.
+ * @type {Stored<BusinessExpenses>}
+ */
+const homeOfficeBusinessDocument = {
+    documentHash: 'sha256-business-home',
+    value: {
+        ...businessExpensesDocument('sha256-business-home')('90.00').value,
+        businessUseOfHome: {
+            method: 'actualExpenses',
+            claimingTheStandardDeduction: /** @type {const} */ (true),
+            allGrossIncomeFromTheBusinessUseOfTheHome: /** @type {const} */ (true),
+            areaUsedForBusiness: 200,
+            totalAreaOfHome: 2000,
+            expenses: [
+                { line: '18', column: 'indirect', description: 'insurance', amount: '1800.00' },
+                { line: '21', column: 'indirect', description: 'utilities', amount: '4200.00' },
+            ],
+            homeAdjustedBasisOrFairMarketValue: '250000.00',
+            landIncludedInThatBasis: '50000.00',
+            firstUsedForBusiness: '2019-06',
+        },
+    },
+}
+
+/**
  * Overrides `inputsOf`'s empty business-document defaults, exactly as
  * {@link withUnemployment} does for the 1099-G — a spread rather than two more
  * curried parameters, so the existing call sites stay untouched.
@@ -6444,6 +6472,97 @@ export const proof = {
          * is the ordinary case for a proprietor with no other income, not an
          * edge case.
          */
+        /**
+         * ★ **TAX-39: Form 8829 reaches 1040 line 8, and the CONTROL prices
+         * exactly what it is worth.**
+         *
+         * A form-level proof cannot prove a wiring, and neither can a
+         * Schedule-level one: `fjs/schedule/c`'s own leaves assert line 30 and
+         * line 31 and would stay green while `fjs/schedule/1` read line 29
+         * instead of line 31, or while Schedule C's outcome never reached
+         * Schedule 1 Part I at all.
+         *
+         * Worked by hand, and it is `aRealisticFounderReturnComputesEndToEnd`
+         * above with one field added to the business record:
+         *
+         *   Schedule C line 29  $47,910.00 ($48,000.00 less $90.00)
+         *   Form 8829 line 24   $6,000.00 of indirect expenses x 10% = $600.00
+         *             line 42   ($250,000 - $50,000) x 10% x 2.564% = $512.80
+         *             line 36   $1,112.80
+         *   Schedule C line 31  47,910.00 - 1,112.80 = $46,797.20  ->  1040 line 8
+         */
+        aHomeOfficeReachesTenFortyLineEight: () => {
+            const base = inputsOf(storedProfile(selfEmploymentProfile))([])([])([])([])([])([])([])([])([])
+            const withHome = computedLines(withBusiness(base)([
+                nonemployeeCompensationDocument('sha256-1099nec-01')('48000.00')('0.00'),
+            ])([homeOfficeBusinessDocument]))
+            assertEq(
+                withHome.income.line8.value,
+                4679720n,
+                '1040 line 8 = $46,797.20 — Schedule C line 31 AFTER Form 8829 line 36')
+            assertEq(withHome.income.line9.value, 4679720n, 'total income')
+            // The deduction reduces the adjusted gross income too, which is
+            // what makes it worth more than its face value: it moves the
+            // self-employment tax, the §199A deduction and every threshold
+            // below.
+            assert(
+                withHome.income.line11a.value < 4679720n,
+                ['the deductible half of the self-employment tax still comes off',
+                    withHome.income.line11a])
+            // THE CONTROL: the SAME return with no `businessUseOfHome` is
+            // exactly $1,112.80 higher on line 8. Without it a $46,797.20 line
+            // 8 would be evidence of nothing.
+            const withoutHome = computedLines(withBusiness(base)([
+                nonemployeeCompensationDocument('sha256-1099nec-01')('48000.00')('0.00'),
+            ])([businessExpensesDocument('sha256-business-01')('90.00')]))
+            assertEq(withoutHome.income.line8.value, 4791000n, '$47,910.00 without the home')
+            assertEq(
+                withoutHome.income.line8.value - withHome.income.line8.value,
+                111280n,
+                'and the difference is Form 8829 line 36 exactly')
+            // Line 8 must CITE the record the deduction came from — the same
+            // document as the expenses, since `businessUseOfHome` lives on it.
+            const hashes = withHome.income.line8.sources.map(source => source.documentHash)
+            assert(
+                hashes.includes('sha256-business-home'),
+                ['1040 line 8 must cite the record Form 8829 read',
+                    withHome.income.line8.sources])
+        },
+        /**
+         * **A Form 8829 refusal stops the WHOLE return**, and it arrives with
+         * its message intact. Schedule C threads Form 8829's refusal out
+         * through the error arm it already had, and this is the leaf that
+         * proves the thread reaches the top rather than being swallowed into
+         * a generic "Schedule C could not be computed".
+         *
+         * The refusing case is the gross-income limitation BINDING, and the
+         * receipts that make it bind are hand-derived rather than guessed:
+         * line 26 is $600.00 (the $6,000.00 of indirect expenses at 10%), so
+         * line 15 has to fall below $600.00, so Schedule C line 29 does — and
+         * line 29 is the receipts less the fixture's $90.00 of advertising.
+         * $500.00 of receipts gives line 29 = $410.00 and a $190.00 carryover
+         * on printed line 43.
+         */
+        aFormEightyEightTwentyNineRefusalStopsTheWholeReturn: () => {
+            const base = inputsOf(storedProfile(selfEmploymentProfile))([])([])([])([])([])([])([])([])([])
+            const outcome = form1040Report(taxParams2025)(withBusiness(base)([
+                nonemployeeCompensationDocument('sha256-1099nec-01')('500.00')('0.00'),
+            ])([homeOfficeBusinessDocument]))
+            assert(outcome.kind === 'error', ['expected the limitation refusal', outcome])
+            if (outcome.kind !== 'error') {
+                throw ['expected error', outcome]
+            }
+            assert(
+                outcome.message.includes('Form 8829 line 27')
+                && outcome.message.includes('line 43'),
+                ['the refusal must arrive naming both printed lines', outcome.message])
+            assert(
+                outcome.message.includes('190.00'),
+                ['and quote the carryover it will not create', outcome.message])
+            assert(
+                outcome.message.includes('fully allowed this year computes'),
+                ['and the asymmetry that IS the design', outcome.message])
+        },
         aRealisticFounderReturnComputesEndToEnd: () => {
             const base = inputsOf(storedProfile(selfEmploymentProfile))([])([])([])([])([])([])([])([])([])
             const { income, tax } = computedLines(withBusiness(base)([
