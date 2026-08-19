@@ -40,6 +40,32 @@ import {
 /** @typedef {CasRead | EvoList | EvoHead | EvoRevision} DemoOp */
 
 /**
+ * The PROBE vocabulary: the same handler signature with the command name left
+ * as `string`, mirroring `fjs/exec/module.f.js`'s own `ProbeOp`.
+ *
+ * A program actually typed against the guest vocabulary **cannot construct a
+ * fifth command** — `tsc` stops it, and `DemoOp` above is what stops it — but
+ * the runtime refusal this panel demonstrates is the BACKSTOP for a command
+ * string that reached the interpreter some other way. Saying that no longer
+ * costs an `any`: 0.46.0's `Operation` is
+ * `readonly [string, (…) => Result<…>]`, so a name that is not statically
+ * known is an ordinary operation type rather than a hole. The map below still
+ * holds exactly four handlers, and a fifth is refused by `at` finding
+ * nothing — which is the mechanism the panel exists to show.
+ * @typedef {readonly [string, (a: string) => Result<string, string>]} ProbeOp
+ */
+
+/**
+ * `do_` at the probe vocabulary. Only the DENIED programs go through it; the
+ * permitted ones keep their narrow `CasRead`/`EvoHead` types below, and both
+ * reach the same `interpret` call because each member of `DemoOp` is
+ * assignable to {@link ProbeOp} — a literal command name is a `string`, and
+ * the signature is the same one.
+ * @type {(command: string) => (a: string) => Effect<ProbeOp, string, string>}
+ */
+const deniedDo = do_
+
+/**
  * `do_` narrowed to `casRead`. `do_('casRead')` alone under-constrains its
  * operation parameter to a bare `Operation`; this annotation pins it, the same
  * way `fjs/exec`'s own `readDo` does and for the same reason.
@@ -49,20 +75,6 @@ const casReadDo = do_('casRead')
 
 /** `do_` narrowed to `evoHead`. @type {(a: string) => Effect<EvoHead, string, string>} */
 const evoHeadDo = do_('evoHead')
-
-/**
- * A command name that is NOT in the vocabulary.
- *
- * This mirrors `fjs/exec/module.f.js`'s `unsafeDo` exactly, including the
- * reason it exists there: a program actually typed against the guest
- * vocabulary **cannot construct one of these** — `tsc` stops it — and the
- * runtime refusal this panel demonstrates is the BACKSTOP for a command string
- * that reached the interpreter some other way. Simulating that requires
- * stepping outside the type that makes it impossible, which is the one place
- * the repository's own code does the same thing.
- * @type {(command: string) => (a: string) => Effect<DemoOp, string, string>}
- */
-const deniedDo = /** @type {any} */ (do_)
 
 export const id = 'sandbox'
 export const kicker = 'Step 7'
@@ -76,7 +88,14 @@ export const tier = 'optional'
  * Each entry returns a marker rather than doing real work: what this page
  * demonstrates is which commands are ADMITTED, not what they compute.
  */
-/** @type {OperationMap<DemoOp, Result<string, string>>} */
+/**
+ * Typed at {@link ProbeOp} rather than at `DemoOp`: it holds the SAME four
+ * handlers, but the panel hands `interpret` programs that ASK for a fifth,
+ * and a map declared over the four literals could not accept one. The
+ * refusal message reads `Object.keys` of this object, so the permitted list
+ * is still exactly these four names in this order.
+ * @type {OperationMap<ProbeOp, Result<string, string>>}
+ */
 const hostMap = {
     casRead: hash => ok(`bytes of ${hash}`),
     evoList: subject => ok(`revisions of ${subject}`),
@@ -96,7 +115,7 @@ const spin = () => step(casReadDo('x'), spin)
  * @type {readonly {
  *   readonly label: string,
  *   readonly source: string,
- *   readonly effect: () => Effect<DemoOp, string, string>,
+ *   readonly effect: () => Effect<DemoOp | ProbeOp, string, string>,
  * }[]}
  */
 const guests = [

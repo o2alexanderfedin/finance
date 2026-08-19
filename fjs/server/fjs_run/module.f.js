@@ -150,6 +150,7 @@ import { stringify as jsonText } from '../../json/module.f.js'
 
 /** @import { Effect, Operation } from 'functionalscript/fjs/effects/types.js' */
 /** @import { List } from 'functionalscript/fjs/effects/list/types.js' */
+/** @import { Result } from 'functionalscript/fjs/types/result/types.js' */
 /** @import { IoChannel, NodeOp } from 'functionalscript/fjs/effects/node/types.js' */
 /** @import { MemOp } from 'functionalscript/fjs/effects/memory/types.js' */
 /** @import { Mkdir, WriteFile, Import } from 'functionalscript/fjs/effects/node/types.js' */
@@ -734,16 +735,24 @@ export const placeJsModuleFixture = root => path => fn => {
  * sequence production does not run, and a stored program reaching for
  * `ctx.form1040Report` would fail here for a reason no production caller
  * could ever hit.
- * @type {(home: string) => (taxParams: TaxParamSet) => (cas: Cas<FileCasOperation>) => (evoApi: Evo<FileCasOperation>) => (hash: string) => (source: string) => (report: TaxReport<unknown>) => (args: readonly string[]) => (pin: { readonly subject: string, readonly parents: readonly string[] } | undefined) => (state: State) => readonly [State, RunOutcome<unknown>]}
+ * **The fixture is a `JsModule`, not a typed report**, and
+ * {@link runExecuteRunViaFixture} below is the one-line adapter for the
+ * common case. That split is not a convenience: production loads a module
+ * across `import_`, where `Module` is `StringMap<unknown>` and nothing has
+ * typed `report` yet. A proof that needs to place a program the guest ABI
+ * forbids — `nonErrorThrowBecomesErrorResult`'s `fetch` dispatch — puts it
+ * here, at the same untyped boundary a real stored program crosses, instead
+ * of asserting `do_` to `any` to smuggle it past `Report`.
+ * @type {(home: string) => (taxParams: TaxParamSet) => (cas: Cas<FileCasOperation>) => (evoApi: Evo<FileCasOperation>) => (hash: string) => (source: string) => (module_: JsModule) => (args: readonly string[]) => (pin: { readonly subject: string, readonly parents: readonly string[] } | undefined) => (state: State) => readonly [State, RunOutcome<unknown>]}
  */
-const runExecuteRunViaFixture = home => taxParams => cas => evoApi => hash => source => report => args => pin => state => {
+const runExecuteRunViaModuleFixture = home => taxParams => cas => evoApi => hash => source => module_ => args => pin => state => {
     // PROV-07: mirrors executeRun's own literalCount computation, from the
     // SAME `source` parameter this helper already receives.
     const literalCount = countNumericLiterals(source)
     const [state1, materializeResult] = virtual(state)(materializeProgram(home)(hash)(source))
     assert(materializeResult[0] === 'ok', ['expected the real materialize write to succeed', materializeResult])
     const path = programPath(materializeHome(home))(hash)
-    const root = placeJsModuleFixture(state1.root)(path)(() => ({ report }))
+    const root = placeJsModuleFixture(state1.root)(path)(module_)
     const state2 = { ...state1, root }
     // MAINT-07: this is `executeRun`'s OWN tail, not a restatement of it —
     // the SAME {@link runProgramTail} that production calls, replayed here in
@@ -759,22 +768,40 @@ const runExecuteRunViaFixture = home => taxParams => cas => evoApi => hash => so
     )
 }
 
+/**
+ * {@link runExecuteRunViaModuleFixture} for the ordinary case: a report that
+ * DOES satisfy the guest ABI. Every leaf below but one goes through here, and
+ * the sequence itself lives once, in the function above.
+ * @type {(home: string) => (taxParams: TaxParamSet) => (cas: Cas<FileCasOperation>) => (evoApi: Evo<FileCasOperation>) => (hash: string) => (source: string) => (report: TaxReport<unknown>) => (args: readonly string[]) => (pin: { readonly subject: string, readonly parents: readonly string[] } | undefined) => (state: State) => readonly [State, RunOutcome<unknown>]}
+ */
+const runExecuteRunViaFixture = home => taxParams => cas => evoApi => hash => source => report => args => pin =>
+    runExecuteRunViaModuleFixture(home)(taxParams)(cas)(evoApi)(hash)(source)(() => ({ report }))(args)(pin)
+
 // ── EXEC-12: error-taxonomy proof support ────────────────────────────────────
 
 /**
- * `fjs/exec`'s own test-fixture escape hatch (`fjs/exec/module.f.js`),
- * reproduced locally rather than imported: constructing a probe outside
- * `CasOp`'s frozen vocabulary requires casting `do_` to `any`, and that
- * module's own comment confines the cast to ITS OWN test-fixture section —
- * so this file builds an equivalent local escape hatch instead of importing
- * across that boundary. A real `CasOp`-typed `Report` cannot construct this
- * (`tsc` refuses a literal `'fetch'` command), which is exactly why
- * `nonErrorThrowBecomesErrorResult` (below) needs it: it stands in for a
+ * The PROBE vocabulary — the same shape `fjs/exec`'s own proofs use, and for
+ * the same reason: `Operation` is `readonly [string, (…) => Result<…>]`, so a
+ * command whose name is not statically known is an ordinary operation type
+ * rather than a hole in the type system.
+ *
+ * A real `CasOp`-typed `Report` cannot construct one of these — `tsc` refuses
+ * a literal `'fetch'` command, which is `_CasOpIsExactlyTheFourCommands`
+ * doing its job — and that is exactly why
+ * `nonErrorThrowBecomesErrorResult` needs it: it stands in for a
  * stored/generated program whose command string bypassed `tsc` before ever
  * reaching `interpret`'s runtime refusal.
- * @type {(command: string) => (...payload: readonly unknown[]) => Effect<CasOp, string, string>}
+ *
+ * **The program built from it is placed as a `JsModule`, not as a `Report`.**
+ * That is what removed the `/** @type {any} *\/ (do_)` this used to be:
+ * the fixture crosses `import_` exactly where a real stored program does, and
+ * a `Module` is `StringMap<unknown>` on the far side of that boundary — so
+ * nothing has to be discarded to place a program the guest ABI forbids.
+ * @typedef {readonly [string, (...payload: readonly unknown[]) => Result<string, string>]} ProbeOp
  */
-const unsafeDo = /** @type {any} */ (do_)
+
+/** `do_` at the probe vocabulary. @type {(command: string) => (...payload: readonly unknown[]) => Effect<ProbeOp, string, string>} */
+const probeDo = do_
 
 /**
  * Extracts the run-record hash embedded in `fjsRunTool`'s own error text
@@ -1634,15 +1661,19 @@ export const proof = {
                 // full-path split every proof in this file uses.
                 const programSource = 'export const report = ctx => args => ctx.pure("unused")'
                 const [state2, escapingHash] = virtualOrPanic(state1)(seedText(cas)(programSource))
-                /** @type {Report<string>} */
-                const escapingReport = () => () => unsafeDo('fetch')('https://evil')
+                // Placed as a MODULE, the way a real stored program arrives:
+                // a `Report` could not name `fetch` and a `JsModule` need not
+                // be a `Report` at all, which is the whole point of the
+                // runtime backstop this leaf measures.
+                /** @type {JsModule} */
+                const escapingModule = () => ({ report: () => () => probeDo('fetch')('https://evil') })
 
                 // 07-10: decomposed via runExecuteRunViaFixture/
                 // handleRunOutcome — a pre-placed fixture would otherwise
                 // collide with executeRun's OWN real materialize-write at
                 // the SAME path (see the module header), masking the
                 // refusal this leaf exists to prove.
-                const [state2b, outcome] = runExecuteRunViaFixture(home)(taxParamsFixture)(cas)(e)(escapingHash)(programSource)(escapingReport)([])(undefined)(state2)
+                const [state2b, outcome] = runExecuteRunViaModuleFixture(home)(taxParamsFixture)(cas)(e)(escapingHash)(programSource)(escapingModule)([])(undefined)(state2)
                 const [state3, callResult] = virtualOrPanic(state2b)(handleRunOutcome(cas)(escapingHash)([])(false)({})({ taxYear: 2025, paramSetHash: 'sha256-paramset1' })(outcome))
                 assertEq(callResult.isError, true)
                 const first = callResult.content[0]
