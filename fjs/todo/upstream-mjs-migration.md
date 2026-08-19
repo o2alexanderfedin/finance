@@ -66,7 +66,7 @@ a tool that the client does not have, and a caller deciding what to do about it.
 the refusal carries only the NAME is the same: the payload may hold functions, so carrying it
 would break serializability.
 
-**This retires `upstream-total-match-dispatch.md`.** At 0.43.1 `match` refuses by throwing, which
+**This retired `upstream-total-match-dispatch.md`, and the note is now deleted.** At 0.43.1 `match` refuses by throwing, which
 is why `fjs/exec` carries a `try` that AGENTS.md's no-`try` rule otherwise forbids; that note was
 re-checked against 0.45.0 on 2026-08-17 and found still open. At 0.46.0 the refusal is
 `error(notImplemented)` and `throw` is reserved for panics. **The migration therefore DELETES a
@@ -175,8 +175,9 @@ to hold a bare value:
 direction: while the type imports were broken those positions were `any`-shaped and the compiler
 had nothing to complain about. Fixing the imports is what made the Effect mismatches visible.
 
-`fjs/exec`'s `try` is untouched — removing it is the Effect-refusal change, and it belongs to the
-same stage as the rest of `fjs/exec`.
+`fjs/exec`'s `try` is gone as of stage 3 — see the module header there for why the refusal is an
+INTERRUPTION rather than a `NotImplemented`, and why that makes `partialMatch` the wrong
+eliminator for a whitelist.
 
 ### The runtime suite, with the `tsc` gate bypassed
 

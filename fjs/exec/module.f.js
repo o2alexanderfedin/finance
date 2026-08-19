@@ -2,19 +2,55 @@
  * `interpret` — the restricted effect interpreter (EXEC-01). It translates a
  * guest `Effect` into its value by dispatching through `map`, refusing (as a
  * `Result`, never a throw — locked decision, see 03-CONTEXT.md) anything
- * `map` does not itself own. EXEC-02 (the own-property dispatch guard) is
- * delivered upstream in fjs 0.41.0's `match`/`at` and is not reimplemented
- * here — this module only catches `match`'s bare-string refusal throw and
- * reports it with the permitted set. The module imports only
- * `functionalscript/fjs/effects/module.f.mjs`,
- * `functionalscript/fjs/types/result/module.f.mjs`, and
+ * `map` does not itself own.
+ *
+ * ## The refusal is an INTERRUPTION, not a `NotImplemented` (fjs 0.46.0)
+ *
+ * 0.46.0 gives every operation an error channel, and gives a runner two
+ * eliminators. Choosing between them is the whole design of this module, and
+ * upstream states the rule this module needs verbatim
+ * (`fjs/effects/types.ts`, `NotImplemented`): a runner "may interrupt or
+ * terminate a program that is malicious, over budget, or violating host
+ * policy, and nothing in the error channel obliges it to hand control back. A
+ * capability the runner merely lacks is answered with this error; **a refusal
+ * to continue is an interruption, never dressed up as `NotImplemented`**."
+ *
+ * `interpret` is the second kind. It is not a runner that happens to lack
+ * `fetch` — it is a whitelist, and a guest that asks for something outside it
+ * does not get its control back to try again. So this module does NOT use
+ * `partialMatch`: that hands `error(notImplemented(command))` to the guest's
+ * own continuation, which would let a malicious program swallow its own
+ * refusal and return a plausible value with the denial nowhere in the run
+ * record. The refusal is `interpret`'s own `error`, and it ends the run.
+ *
+ * ## EXEC-02 is still upstream's guard, called rather than caught
+ *
+ * The own-property-only lookup is `at` from
+ * `functionalscript/fjs/types/object/module.f.mjs` — the very function
+ * `match` uses internally, so `constructor`, `toString` and
+ * `__defineGetter__` resolve to `null` here for the same reason they do
+ * there. This module calls it BEFORE dispatching instead of catching the
+ * throw that `match` raises after doing the same lookup itself. That is what
+ * retired `fjs/todo/upstream-total-match-dispatch.md`: the outcome `match`'s
+ * signature says is unobservable is simply not reached, rather than observed
+ * through an exception. (That note called this "the only `try` left in any
+ * `.f.js` file", which was already untrue when it was written — `fjs/tax/table`,
+ * `fjs/tax/deduction`, `fjs/schedule/a` and `fjs/server/fjs_run/snapshot` each
+ * catch an `assert` throw of this project's own. Those are a different gap and
+ * they are still open; this one was the only `try` forced by a DEPENDENCY
+ * refusing in the wrong shape, which is what made it unfixable locally.)
+ *
+ * The module imports only `functionalscript/fjs/effects/module.f.mjs`,
+ * `functionalscript/fjs/types/result/module.f.mjs`,
+ * `functionalscript/fjs/types/object/module.f.mjs`, and
  * `functionalscript/fjs/asserts/module.f.mjs` (no CAS, no Evo, no MCP, no
  * filesystem).
  *
  * @module
  */
-import { match, do_, pure, step } from 'functionalscript/fjs/effects/module.f.mjs'
-import { ok, error } from 'functionalscript/fjs/types/result/module.f.mjs'
+import { match, do_, pureOk, step } from 'functionalscript/fjs/effects/module.f.mjs'
+import { ok, error, mapOk } from 'functionalscript/fjs/types/result/module.f.mjs'
+import { at } from 'functionalscript/fjs/types/object/module.f.mjs'
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
 
 /** @import { Effect, Operation, OperationMap, Return } from 'functionalscript/fjs/effects/types.js' */
@@ -22,10 +58,19 @@ import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
 
 // ── Test fixtures ───────────────────────────────────────────────────────────────
 
-/** @typedef {readonly ['casRead', (a: string) => string]} CasRead */
-/** @typedef {readonly ['evoList', (a: string) => string]} EvoList */
-/** @typedef {readonly ['evoHead', (a: string) => string]} EvoHead */
-/** @typedef {readonly ['evoRevision', (a: string) => string]} EvoRevision */
+/**
+ * The fixture operations, each declared with the error channel it actually
+ * has: `never`. 0.46.0's `Operation` requires the handler to return a
+ * `Result` — there must be somewhere for a runner's refusal to go — but it
+ * does not require the operation itself to be able to fail, and these four
+ * are total string builders. Saying `never` rather than a placeholder is what
+ * makes `interpret`'s error channel collapse to `string` for this map, which
+ * is the claim these proofs then read.
+ */
+/** @typedef {readonly ['casRead', (a: string) => Result<string, never>]} CasRead */
+/** @typedef {readonly ['evoList', (a: string) => Result<string, never>]} EvoList */
+/** @typedef {readonly ['evoHead', (a: string) => Result<string, never>]} EvoHead */
+/** @typedef {readonly ['evoRevision', (a: string) => Result<string, never>]} EvoRevision */
 /** @typedef {CasRead | EvoList | EvoHead | EvoRevision} TestOp */
 
 /**
@@ -41,13 +86,13 @@ import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
  * which proves nothing about `interpret`. Leaving `Object.prototype` in place
  * means they pass only if the own-property-only `at` lookup is what refuses
  * them — the guarantee actually being claimed.
- * @type {OperationMap<TestOp, string>}
+ * @type {OperationMap<TestOp, Result<string, never>>}
  */
 const map = {
-    casRead: a => `casRead:${a}`,
-    evoList: a => `evoList:${a}`,
-    evoHead: a => `evoHead:${a}`,
-    evoRevision: a => `evoRevision:${a}`,
+    casRead: a => ok(`casRead:${a}`),
+    evoList: a => ok(`evoList:${a}`),
+    evoHead: a => ok(`evoHead:${a}`),
+    evoRevision: a => ok(`evoRevision:${a}`),
 }
 
 /**
@@ -56,7 +101,7 @@ const map = {
  * 6) — but `interpret`'s runtime refusal is the backstop for exactly this
  * case. Every non-permitted-name probe below goes through `unsafeDo`; the
  * one permitted-name probe uses plain `do_`.
- * @type {(command: string) => (...payload: readonly unknown[]) => Effect<TestOp, string>}
+ * @type {(command: string) => (...payload: readonly unknown[]) => Effect<TestOp, string, never>}
  */
 const unsafeDo = /** @type {any} */ (do_)
 
@@ -64,14 +109,14 @@ const unsafeDo = /** @type {any} */ (do_)
  * `do_` narrowed to the one permitted-name probe (`dispatch`, below).
  * `do_('casRead')` alone under-constrains `O` to bare `Operation`, not
  * `CasRead` — this annotation is what pins it.
- * @type {(a: string) => Effect<CasRead, string>}
+ * @type {(a: string) => Effect<CasRead, string, never>}
  */
 const readDo = do_('casRead')
 
 /**
  * `do_` narrowed to `evoHead`, for the two-step read-set proof below — same
  * under-constraining reason as `readDo`.
- * @type {(a: string) => Effect<EvoHead, string>}
+ * @type {(a: string) => Effect<EvoHead, string, never>}
  */
 const evoHeadDo = do_('evoHead')
 
@@ -84,11 +129,11 @@ const evoHeadDo = do_('evoHead')
  * building this costs no stack depth regardless of `remaining` — only
  * interpreting it drives the chain, one dispatch per `interpret` loop
  * iteration.
- * @type {(remaining: number) => Effect<CasRead, string>}
+ * @type {(remaining: number) => Effect<CasRead, string, never>}
  */
 const chainOfLength = remaining =>
     remaining <= 0
-        ? pure('done')
+        ? pureOk('done')
         : step(readDo('spin'), () => chainOfLength(remaining - 1))
 
 // ── interpret ────────────────────────────────────────────────────────────────
@@ -110,10 +155,36 @@ const refusalMessage = (command, map) => `operation not permitted: ${command}; p
 
 /**
  * An interpreted effect's outcome: the effect's value paired with every
- * command actually dispatched to reach it, in dispatch order — or a
- * refusal (EXEC-03's actionable text, or the step-budget refusal, EXEC-06).
+ * command actually dispatched to reach it, in dispatch order — or a failure.
+ *
+ * **The error channel is `E | string`, and the union is deliberate.** Two
+ * different things can go wrong and only one of them is this module's:
+ *
+ * - `string` — an INTERRUPTION by `interpret` itself: EXEC-03's actionable
+ *   refusal text, or the step-budget refusal (EXEC-06). The guest does not
+ *   get control back, which is the point.
+ * - `E` — the guest program's OWN failure, arriving through the `Result` its
+ *   final `Pure` holds. 0.46.0 gives every effect an error channel, so a
+ *   program can now fail on its own terms; that is a program outcome, not a
+ *   policy verdict, and `interpret` passes it through rather than renaming it.
+ *
+ * They are unioned rather than nested because every consumer here turns
+ * either one into the same thing — a run record's `kind: 'error'` message —
+ * and a nested `Result` would make all of them destructure a second level to
+ * reach a value they treat identically. Where a map's operations cannot fail,
+ * `E` is `never` and this collapses to exactly the `Result<[T, Read[]],
+ * string>` it was before 0.46.0, which is why the `TestOp` fixtures declare
+ * `never` rather than a placeholder.
+ *
+ * The cost, recorded rather than discovered later: a consumer holding only
+ * this type cannot tell a policy refusal from a program failure when `E` is
+ * itself `string`. The refusal texts are distinctive (`operation not
+ * permitted: …`, `step budget exceeded: …`) and the integration proofs match
+ * on them, so nothing depends on the distinction today. A consumer that needs
+ * it should be given a tagged channel rather than parsing the message.
  * @template T
- * @typedef {Result<readonly [T, readonly Read[]], string>} Interpreted
+ * @template E
+ * @typedef {Result<readonly [T, readonly Read[]], E | string>} Interpreted
  */
 
 /**
@@ -132,48 +203,57 @@ export const stepBudget = 10_000
  * by `stepBudget` and accumulating the read set it actually observes.
  *
  * A `Pure` effect is already-computed per its contract — `e()` forces it
- * directly, no dispatch involved, and the loop returns with everything
- * dispatched so far alongside the value. A `Do` node goes through
- * `match(map)(e)`: on `'cont'`, the dispatched command and its payload are
- * appended to `reads` **after** the dispatch succeeds, never before — a
- * refused attempt was never read, per EXEC-05 — and the loop continues with
- * the continuation applied to the operation's output.
+ * directly, no dispatch involved. What it holds since 0.46.0 is the guest's
+ * whole `Result<T, E>`, so the loop ends by `mapOk`ping the reads alongside
+ * the value: an `ok` becomes `ok([value, reads])`, and the guest's own
+ * `error` passes through untouched into this function's `E | string`
+ * channel. `mapOk` rather than a tag test because there is nothing to decide
+ * here — a program that failed has failed, and re-tagging its error would
+ * only lose which one it was.
  *
- * `match` refuses any command that is not an own property of `map` by
- * throwing the **bare command string** — not an `Error`, no `.message`
- * (verified against the installed fjs 0.41.0; see 03-CONTEXT.md). The
- * `catch` below reads the caught value directly, asserts it is that string
- * per `match`'s documented contract, and reports it as a `Result`, never a
- * throw — a refusal is a routine, correctable outcome here, not a crash.
+ * A `Do` node is checked against `map` and then dispatched. The check is
+ * `at(command)(map)`, upstream's own-property-only lookup and the same one
+ * `match` performs internally, so the two agree by construction rather than
+ * by comment: a command `at` resolves to `null` is refused here as a value,
+ * and every command that survives is one `match` is guaranteed to find. That
+ * guarantee is what lets `match` be called without a `try` — the throw it
+ * documents for a missing handler is unreachable from this call site, and the
+ * `assert` on `'cont'` states the remaining half (a `Do` node never decodes
+ * to `'done'`).
+ *
+ * The dispatched command and its payload are appended to `reads` **after**
+ * the dispatch, never before — a refused attempt was never read, per
+ * EXEC-05 — and the loop continues with the continuation applied to the
+ * operation's output. Note that the output is now the operation's `Result`:
+ * `match` hands a failed command's `error` back **through the ordinary
+ * continuation** by design, so a fallible operation's failure is the guest's
+ * to handle, and it reaches this function only if the guest lets it reach its
+ * final `Pure`.
  *
  * If the loop exhausts `stepBudget` without reaching a `Pure` node, the
  * chain is treated as non-terminating and refused the same way a denied
  * command is — a value, never a thrown error or an unbounded hang
  * (EXEC-06).
  * @template {Operation} O
- * @template T
  * @param {OperationMap<O, Return<O>>} map
- * @returns {(effect: Effect<O, T>) => Interpreted<T>}
+ * @returns {<T, E>(effect: Effect<O, T, E>) => Interpreted<T, E>}
  */
 export const interpret = map => effect => {
-    /** @type {Effect<O, T>} */
     let e = effect
     /** @type {readonly Read[]} */
     let reads = []
     for (let count = 0; count < stepBudget; count++) {
         if (typeof e === 'function') {
-            return ok(/** @type {readonly [T, readonly Read[]]} */ ([e(), reads]))
+            return mapOk(value => /** @type {const} */ ([value, reads]))(e())
         }
         const { command, payload } = e
-        try {
-            const result = match(map)(e)
-            assert(result[0] === 'cont')
-            reads = [...reads, [command, payload]]
-            e = result[2](result[1])
-        } catch (thrown) {
-            assert(typeof thrown === 'string')
-            return error(refusalMessage(thrown, map))
+        if (at(command)(map) === null) {
+            return error(refusalMessage(command, map))
         }
+        const result = match(map)(e)
+        assert(result[0] === 'cont')
+        reads = [...reads, [command, payload]]
+        e = result[2](result[1])
     }
     return error(`step budget exceeded: ${stepBudget}`)
 }
