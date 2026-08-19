@@ -43,10 +43,10 @@ facilitate Emergent Design sessions
 ## Code style
 
 - Never use `l` as an identifier — it's too easily misread as `1` or `I`.
-- Import types with `@import { Name } from '...'` (a top-level JSDoc comment), not inline `@type {import('...').Name}`. Example:
+- Import types with `@import { Name } from '...'` (a top-level JSDoc comment), not inline `@type {import('...').Name}`. A FunctionalScript type comes from the sibling `types.js`, never from `module.f.mjs`: since 0.46.0 upstream declares every type in a `types.ts` beside the module, and `types.js` is the specifier that resolves to the shipped `types.d.ts` without `allowImportingTsExtensions`, which this project deliberately does not enable. Example:
 
   ```js
-  /** @import { NodeProgram } from 'functionalscript/fjs/effects/node/module.f.mjs' */
+  /** @import { NodeProgram } from 'functionalscript/fjs/effects/node/types.js' */
 
   /** @type {NodeProgram} */
   export const main = () => /* ... */;

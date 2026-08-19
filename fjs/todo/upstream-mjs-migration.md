@@ -123,7 +123,7 @@ silently typechecks the PARENT's 0.43.1 and reports **0 errors** on a tree whose
 Old `validate` returned the value it was given; `parse` returns a freshly constructed value that
 has **every declared key present**, an absent optional filled with `undefined`, and every
 undeclared key dropped. This project's documents distinguish absent from present-and-undefined by
-hard rule, so **54 proof leaves across 13 typecheck-clean modules go red** — a behavioural
+hard rule, so **27 proof leaves across 13 typecheck-clean modules go red** — a behavioural
 regression under a green `tsc`, which is the dangerous direction. Every workaround available here
 needs a cast or a hand-asserted type predicate, so the fix is upstream: re-expose the 0.43.1
 validator beside `parse`. It was predicted as a risk when `parse` was chosen and then found by the
@@ -182,10 +182,15 @@ same stage as the rest of `fjs/exec`.
 
 `npm test` is `tsc && node --test *.test.js`, so it stops at 513 errors and runs nothing. Run the
 second half alone — `node --test '*.test.js'`, the pinned glob, never bare `node --test` — and it
-reports **2500 tests, 2375 pass, 123 fail, 2 cancelled**, with **2355** project-local proof leaves
-discovered. The failures split cleanly in two, and the split is the useful part:
+reports **2500 tests, 2375 pass, 123 fail, 2 cancelled**. The same tree at the commit before this
+work, on 0.43.1, reports **2500 tests, 2500 pass, 0 fail** — so every one of the 123 is ours, and
+the discovered project-local proof leaves are **2467 before and 2467 after**: none was lost to a
+module that failed to import, which is the failure mode a leaf count exists to catch.
 
-- **54 leaves in 13 modules that typecheck cleanly** — the `parse` reconstruction above. These are
+Of the 123: **112 are project-local proof leaves** and 11 are root gate/integration leaves. The
+112 split cleanly in two, and the split is the useful part:
+
+- **27 leaves in 13 modules that typecheck cleanly** — the `parse` reconstruction above. These are
   not Effect work and stage 3 will not fix them.
 - **the rest** — modules that also carry `tsc` errors, i.e. the Effect system, plus the
   real-process integration suites that drive `fjs_run`. One of those surfaces as a runtime

@@ -50,7 +50,7 @@ absent means *the payer did not report it*, which is a different fact from *the 
 nothing*. The second half is as bad: an undeclared key present in a stored document is **dropped
 from the returned value**, so anything forwarding a validated document forwards a lossy copy.
 
-**Measured cost: 54 proof leaves, in 13 modules, all of which typecheck cleanly** —
+**Measured cost: 27 proof leaves, in 13 modules, all of which typecheck cleanly** —
 `fjs/document/{1098e,1098t,1099g,1099nec,business_expenses,credits,form3921,form3922,ira,k1_1041,k1_1065,k1_1120s}`
 and `fjs/return/profile`. Every one of them is a *behavioural* failure with a green typecheck,
 which is the dangerous direction.
@@ -93,5 +93,9 @@ where reconstruction is not merely unnecessary but lossy. Collapsing them loses 
 ## Retirement condition
 
 Deleted when a released FunctionalScript exposes a typed structural validator that returns its
-input unchanged, this project's 31 `rttiValidate` call sites take it, and those 54 leaves are
+input unchanged, this project's 31 `rttiValidate` call sites take it, and those 27 leaves are
 green again.
+
+(27, not 54: `node --test` prints every failure twice — once inline and once in its closing
+summary — so a `grep -c` over `✖` lines doubles it. `sort -u` first. The suite's own
+`ℹ fail` line is the honest total.)
