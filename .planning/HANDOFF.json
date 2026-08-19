@@ -42,11 +42,6 @@
       "status": "blocked_upstream_with_specified_fix"
     },
     {
-      "id": 3,
-      "name": "schedule-b-omits-k1-interest-and-dividends: K-1 interest can cross the $1,500 threshold invisibly to Schedule B's own line 4",
-      "status": "open_with_reasoning"
-    },
-    {
       "id": 4,
       "name": "Three upstream fjs notes re-verified still open against 0.45.0: upstream-mcp-protocol-version-negotiation, upstream-node-spawn-effect, upstream-total-match-dispatch",
       "status": "open"
