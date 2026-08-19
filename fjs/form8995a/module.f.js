@@ -129,7 +129,7 @@
  */
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { of, multiply, halfUp } from '../types/rational/module.f.js'
-import { centsFromString } from '../exact/module.f.js'
+import { centsFromString, centsToString } from '../exact/module.f.js'
 import { taxParamsByYear } from '../tax/params/module.f.js'
 import {
     qualifiedBusinessIncome, priorYearCarryforwardIsUnstated,
@@ -752,6 +752,36 @@ export const qualifiedBusinessIncomeDeduction = taxParamSet => input => {
         ? 0n
         : centsFromString(assertedPriorYearLossCarryforward)
     const { aboveThreshold } = phaseInPosition(taxParamSet)(status)(taxableIncomeBeforeQbiCents)
+    // **A qualified business LOSS above §199A(e)(2)'s threshold refuses**, and
+    // it is the outbound half of §199A(c)(2) that stops it rather than anything
+    // this page computes. `fjs/form8995` prints the carryforward on its own line
+    // 16 — "Total qualified business (loss) carryforward. Add lines 2 and 3" —
+    // and this module carries no equivalent: printed line 40 here is the REIT
+    // and PTP carryforward, and {@link form8995a} floors the qualified business
+    // income at zero with nothing to hand 2026. So the loss would be silently
+    // destroyed exactly where the simplified page records it.
+    //
+    // Below the threshold this cannot be reached at all: that case is delegated
+    // whole to `fjs/form8995`, which records the carryforward. So the refusal is
+    // narrow — a farm loss large enough to reach here has usually pushed taxable
+    // income below the threshold on its own way through.
+    if (aboveThreshold && qualifiedBusinessIncomeCents < 0n) {
+        return {
+            kind: 'error',
+            message: `Form 8995-A: qualified business income is a LOSS of `
+                + `${centsToString(-qualifiedBusinessIncomeCents)} while taxable income before `
+                + `the qualified business income deduction is above §199A(e)(2)'s `
+                + `${taxParamSet.qualifiedBusinessIncomeDeduction.thresholdAmount[status].amount} `
+                + `threshold for a ${status} return, so Form 8995-A applies rather than Form `
+                + `8995. §199A(c)(2) makes that negative amount "a loss from a qualified trade or `
+                + `business in the succeeding taxable year", and Form 8995's printed line 16 is `
+                + `where this engine records one — this page has no equivalent line, so computing `
+                + `here would floor the loss at zero and destroy the carryforward. A qualified `
+                + `business loss AT OR BELOW the threshold computes and its carryforward is `
+                + `printed (Form 8995-A's own qualified business loss carryforward, no phase `
+                + `yet)`,
+        }
+    }
     if (!aboveThreshold) {
         // Form 8995, the simplified computation, delegated WHOLE -- through that
         // module's own end-to-end entry point rather than its bare form filler,
@@ -1624,6 +1654,44 @@ export const proof = {
                 })),
                 0n,
                 '$500,000.00 of taxable income, no business, no refusal and no deduction')
+        },
+        // **A QUALIFIED BUSINESS LOSS ABOVE THE THRESHOLD REFUSES**, because
+        // §199A(c)(2)'s carryforward has a printed line on Form 8995 (line 16)
+        // and none here. A $40,000.00 loss against $300,000.00 of taxable
+        // income -- a farmer with a bad year and a large wage-earning spouse.
+        aQualifiedBusinessLossAboveTheThresholdRefusesNamingLineSixteen: () => {
+            const result = refusal(run({
+                ...soleProprietor,
+                netProfitCents: -4000000n,
+                taxableIncomeBeforeQbiCents: 30000000n,
+            }))
+            assert(result.message.includes('40000.00'),
+                ['the loss must be quoted, POSITIVE', result.message])
+            assert(result.message.includes('§199A(c)(2)'), ['the statute', result.message])
+            assert(result.message.includes('line 16'),
+                ['and the printed line Form 8995 records it on', result.message])
+            assert(result.message.includes('destroy the carryforward'),
+                ['and what computing anyway would do', result.message])
+        },
+        // **THE CONTROL, one dollar the other side of the threshold.** The SAME
+        // $40,000.00 loss at a taxable income at or below §199A(e)(2)'s
+        // $197,300.00 computes, because that case is delegated whole to
+        // `fjs/form8995`, which prints the carryforward on its own line 16. A
+        // guard that refused every loss would fail here.
+        theSameLossBelowTheThresholdComputesAndRecordsItsCarryforward: () => {
+            const outcome = run({
+                ...soleProprietor,
+                netProfitCents: -4000000n,
+                taxableIncomeBeforeQbiCents: 19730000n,
+            })
+            assert(outcome.kind === 'ok', ['at the threshold it computes', outcome])
+            if (outcome.kind !== 'ok') { throw 'expected the ok arm' }
+            assertEq(outcome.deductionCents, 0n, 'a loss earns no deduction')
+            const simplified = outcome.simplified
+            assert(simplified !== undefined, 'and it went down the Form 8995 path')
+            if (simplified === undefined) { throw 'expected the simplified form' }
+            assertEq(simplified.line2, -4000000n, 'printed line 2 carries the loss')
+            assertEq(simplified.line16, -4000000n, 'and printed line 16 hands it to 2026')
         },
         // The carryforward guard runs FIRST, so a return missing both is told
         // about the carryforward -- one refusal at a time, and the same order
