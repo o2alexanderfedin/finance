@@ -982,6 +982,19 @@ export const scheduleF = input => {
     //     see instructions." A plain sum: `vnd.fjs.farm` refuses a negative
     //     entry amount, quoting it and naming §263A, so printed line 32f cannot
     //     come out negative here and the conditional has nothing to do.
+    //
+    //     **EQUIVALENT MUTANT, recorded rather than worked around.** REORDERING
+    //     these twenty-five summands — the mutation run was moving `line14` to
+    //     the end — cannot turn red at ANY input, because `totalLine` reduces
+    //     them with `+` and addition is commutative. It compiled, it applied
+    //     cleanly, and it left all 2,944 proofs green. That is AGENTS.md's "a
+    //     mutation a neighbouring operation absorbs", where the neighbour is
+    //     the reducer itself. The mutation that DOES bite is the deletion, and
+    //     it was re-run: dropping `line14` reddens two leaves, one here and one
+    //     in `fjs/form1040/core`. `unionSources` is not commutative — it is
+    //     first-seen order — but no leaf asserts source ORDER, deliberately:
+    //     asserting it would be asserting an accident of union order, which
+    //     `fjs/schedule/c`'s own comment already says.
     const line33 = totalLine('Schedule F line 33 (total expenses)')([
         line10, line11, line12, line13, line14, line15, line16, line17, line18, line19,
         line20, line21a, line21b, line22, line23, line24a, line24b, line25, line26, line27,

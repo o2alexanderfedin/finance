@@ -90,11 +90,11 @@ Schedule E:
    a partition of one taxpayer's activities and the printed pages police the boundary in both
    directions. A shared container would need a discriminator field, and a discriminator field
    is a new dialect with extra steps.
-2. **Printed lines 1a through 8 have no field to live in.** Ten printed income lines, six of
-   them a/b pairs where the taxpayer states a gross amount and a taxable amount separately
-   (3a/3b, 4a/4b, 5b/5c, 6a/6b). `vnd.fjs.business_expenses` has exactly one income-side
-   field, `grossReceiptsFullyReportedOnForms1099Nec`, and it is a checkbox about Forms
-   1099-NEC — a document class that reports no farm income at all.
+2. **Printed lines 1a through 8 have no field to live in.** Eight printed income lines, four of
+   them carrying a gross amount and a taxable amount separately (3a/3b, 4a/4b, 5b/5c, 6a/6b),
+   and one more (1a/1b) carrying a gross and its cost. `vnd.fjs.business_expenses` has exactly
+   one income-side field, `grossReceiptsFullyReportedOnForms1099Nec`, and it is a checkbox
+   about Forms 1099-NEC — a document class that reports no farm income at all.
 3. **The expense vocabularies are disjoint.** Schedule F prints twenty-five expense lines
    (10-32, with 21a/21b and 24a/24b split); `chemicals`, `feed`, `fertilizersAndLime`,
    `seedsAndPlants`, `storageAndWarehousing` and `veterinaryBreedingAndMedicine` have no
@@ -545,3 +545,117 @@ A schedule-level proof cannot prove a wiring. So:
 - `fjs/return/tripwire` — an undeclared farm refuses; a declared one does not.
 - `fjs/document/1099g` — box 7 and box 9 no longer refuse at the document, and they reach
   printed line 4a with provenance.
+
+---
+
+## 10. The mutation log
+
+**A proof is not known to work until you have watched it fail.** Thirty-nine mutations were
+written down, applied one at a time against a committed tree, run through `npm test`, and
+reverted. Each was checked with `git diff --numstat` for exactly one insertion and one deletion
+(or `0/1` where the mutation is a deletion), so no mutation edited its own expectation.
+
+Baseline: **2,944 pass / 0 fail**.
+
+### `fjs/schedule/f`
+
+| # | Mutation | Compiled? | Leaves reddened |
+|---|---|---|---|
+| M01 | drop `line4b` from printed line 9's ten summands | ✔ | 2 |
+| M02 | drop `line6d` from printed line 9's summands | ✔ | 1 |
+| M03 | printed line 1c: `line1a - line1b` → `line1a + line1b` | ✔ | 1 |
+| M04 | printed line 4b: swap the §77 election's arms | ✔ | 1 |
+| M05 | printed line 34's loss guard `< 0n` → `< -1n` | ✔ | 3 |
+| M06 | printed line E: `=== 'no'` → a value nothing stores | ✔ | 1 |
+| M07 | printed line C: `=== 'accrual'` → a value nothing stores | ✔ | 1 |
+| M08 | **REORDER** printed line 33's summands | ✔ | **0 — EQUIVALENT MUTANT** |
+| M08c | **DELETE** `line14` from printed line 33's sum | ✔ | 2 |
+| M09 | the orphan-1099-G guard: `=== 0n` → `>= 0n` (never fires) | ✔ | 1 |
+| M10 | drop box 9 from printed line 4a's summed boxes | ✔ | 1 |
+| M11 | route the conservation refusal to the car-and-truck message | ✔ | 1 |
+| M12 | erase `${centsToString(-lossCents)}` from the loss refusal | ✔ | 2 |
+| M13 | `farmingIsNotASpecifiedServiceTradeOrBusiness` → `'specifiedService'` | ✔ | 1 |
+| M14 | drop `storageAndWarehousing` from `farmExpenseLines` | ✔ | **20** |
+| M15 | printed box 36: `=== 'someNotAtRisk'` → `=== 'allAtRisk'` | ✔ | 2 |
+| M16 | printed line 6d: default the unstated value to `'0.00'` | ✔ | 1 |
+| M17 | printed line 6c: invert the deferral-election guard | ✔ | **22** |
+| M18 | the farm-beside-a-business guard, made unreachable | ✔ | 1 |
+| M32 | printed line 34's `unionSources([line9, line33])` → `([line9])` | ✔ | 1 |
+| M33 | erase `${farmLabel(farm)}` from the accrual refusal | ✔ | 1 |
+| M34 | erase `${amount}` from the car-and-truck refusal | ✔ | 1 |
+| M37 | drop `pensionAndProfitSharingPlans` from `refusedCategories` | ✔ | 3 |
+| M38 | printed line 4b: read the §77 flag as its own negation | ✔ | 1 |
+| M39 | printed line 14's register match: `===` → `!==` | ✔ | 5 |
+
+**M08 is the one that came back green, and it is an equivalent mutant by construction.**
+`totalLine` reduces its summands with `+`, and addition is commutative, so reordering them cannot
+turn red at any input — AGENTS.md's "a mutation a neighbouring operation absorbs", where the
+neighbour is the reducer itself. It is recorded at the site rather than worked around, and the
+mutation that DOES bite was re-run as **M08c**. `unionSources` is genuinely order-dependent, but
+no leaf asserts source ORDER on purpose: asserting it would be asserting an accident of union
+order, which `fjs/schedule/c` already says at its own site.
+
+**M14 and M17 are the two that redden twenty leaves apiece**, and the reason is worth stating: a
+row dropped from the expense vocabulary and an inverted printed-line-6c guard both make the BASE
+fixture refuse, so every leaf downstream of it goes with them. A mutation reddening everything
+proves less than one reddening exactly the predicted set — these two are the least informative
+reds in the table, and they are here because the alternative is not running them.
+
+### `vnd.fjs.farm`
+
+| # | Mutation | Compiled? | Leaves reddened |
+|---|---|---|---|
+| M19 | the taxable-amount ≤ gross check, slackened by $1.00 | ✔ | 1 |
+| M20 | the §77 cross-check, inverted | ✔ | 3 |
+| M21 | the negative-money check, slackened by $1.00 | ✔ | 1 |
+| M36 | drop `w2Wages` from `moneyFieldsOf` | ✔ | 2 |
+
+M36 is the hand-typed-count idiom doing exactly what it exists for: the loop that iterates
+`moneyFieldsOf` would happily have run one iteration fewer, and
+`theMoneyFieldTablesAreTheSizeTheyWereCountedAt` is what noticed.
+
+### The wirings
+
+| # | Mutation | Compiled? | Leaves reddened |
+|---|---|---|---|
+| M22 | `fjs/schedule/1` printed line 6 forced to `0n` | ✔ | 3 |
+| M23 | `fjs/schedule/se` printed line 1a forced to zero | ✔ | 2 |
+| M24 | `fjs/form1040/core` drops the farm from §199A's net profit | ✔ | 1 |
+| M25 | `fjs/form1040/core` drops the farm's Form 6251 line 2l adjustment | ✔ | 1 |
+| M26 | `fjs/report/tax_return` deletes the typed `vnd.fjs.farm` route branch | ✔ | 1 |
+| M27 | `fjs/report/tax_return` deletes the GUEST TWIN's route line | ✔ | 1 |
+| M28 | `fjs/schedule/c` stops recognising a farm's asset register | ✔ | 1 |
+| M29 | `fjs/return/tripwire` drops `customHireIncome` from the predicate | ✔ | 1 |
+| M31 | `fjs/form1040/core` drops line 13a from 1040 line 14 | ✔ | 4 |
+
+M27 is the one that had to be run rather than assumed. `fjs/report/tax_return` carries the route
+table TWICE — once as typed code and once as the literal program text a guest executes — and the
+module's own docstring records fifteen dialects whose twin route line could be deleted with 2,572
+proofs green. `vnd.fjs.farm` is not one of them.
+
+### The two mutations that DID NOT COMPILE, which is the stronger result
+
+| # | Mutation | Compiler said |
+|---|---|---|
+| M30 | remove `farmIncomeOrLoss` from `modeledKinds` | `TS2344: Type 'false' does not satisfy the constraint 'true'` — **twice**, at `_EveryKindIsEitherModeledOrRefused` and `_EveryDeclarationRequiredKindIsModeled` |
+| M30b | remove its `modeledKindDeclarationRemedies` entry | `fjs/return/tripwire: TS2322: Type '"farmIncomeOrLoss"' is not assignable to type 'RefusableKind'` |
+
+The reclassification is enforced by the type system in **both** directions, and neither gate is a
+proof that could be deleted. Undoing it halfway stops the build; undoing it wholly stops the build
+twice. AGENTS.md asks for a compiling re-run of a mutation that fails this way, and here there is
+none to run: the property is a `tsc` property, not a runtime one, and the runtime half is already
+covered by `theSplitReclassifiedNothing` and
+`theScheduleOnePartOneKindsNoPhaseHasWiredStillRefuse`.
+
+### Survivors
+
+**One, and it is an equivalent mutant** (M08, above), re-run in a form that bites as M08c. No
+mutation survived that named a real gap.
+
+### The gap the campaign found before it started
+
+`fjs/schedule/c`'s orphan-asset-register refusal — *"NOTHING on this return claims it"* — fired on
+a farmer's register and refused the whole return, because its message enumerated two printed lines
+and there were now three. It was found by `theFarmRegisterReachesFormSixtyTwoFiftyOneLineTwoL`
+failing on its first run, which is a check written a phase earlier doing precisely what it was
+written for.
