@@ -51,7 +51,7 @@ import { emptyState, virtual } from 'functionalscript/fjs/effects/node/virtual/m
 import { sha256 } from 'functionalscript/fjs/crypto/sha2/module.f.mjs'
 import { error, ok } from 'functionalscript/fjs/types/result/module.f.mjs'
 import { array, record, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
-import { parse as rttiValidate } from 'functionalscript/fjs/types/rtti/parse/module.f.mjs'
+import { validate as rttiValidate } from 'functionalscript/fjs/types/rtti/validate/module.f.mjs'
 import { assert, assertEq, assertNotNullish } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { dialect as runDialect, validate as validateRun } from '../../run/module.f.js'
 import { applyWholeDollarElection } from '../line/module.f.js'

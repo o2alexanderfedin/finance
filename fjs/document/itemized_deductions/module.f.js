@@ -40,7 +40,7 @@
  * @module
  */
 import { array, number, option, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
-import { parse as rttiValidate } from 'functionalscript/fjs/types/rtti/parse/module.f.mjs'
+import { validate as rttiValidate } from 'functionalscript/fjs/types/rtti/validate/module.f.mjs'
 import { error, ok } from 'functionalscript/fjs/types/result/module.f.mjs'
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { base, mediaTypeOf } from '../base/module.f.js'
@@ -49,7 +49,7 @@ import { dialect as medicalExpensesDialect, medicalExpensesSchema } from '../med
 
 /** @import { Result } from 'functionalscript/fjs/types/result/types.js' */
 /** @import { Ts, Unknown } from 'functionalscript/fjs/types/rtti/ts/types.js' */
-/** @import { ValidationError } from 'functionalscript/fjs/types/rtti/parse/types.js' */
+/** @import { ValidationError } from 'functionalscript/fjs/types/rtti/common/types.js' */
 
 /**
  * Format tag: names the dialect of this BLOB. The media type it is served

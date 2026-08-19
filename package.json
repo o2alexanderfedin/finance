@@ -20,7 +20,7 @@
     "fjs-start": "fjs r ./fjs/index.f.js"
   },
   "dependencies": {
-    "functionalscript": "^0.46.0"
+    "functionalscript": "^0.46.1"
   },
   "devDependencies": {
     "typescript": "^7.0.2"

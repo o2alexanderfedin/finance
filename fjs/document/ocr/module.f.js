@@ -22,7 +22,7 @@
  * @module
  */
 import { array, record, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
-import { parse as rttiValidate } from 'functionalscript/fjs/types/rtti/parse/module.f.mjs'
+import { validate as rttiValidate } from 'functionalscript/fjs/types/rtti/validate/module.f.mjs'
 import { assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { base, mediaTypeOf } from '../base/module.f.js'
 

@@ -78,7 +78,7 @@
  * @module
  */
 import { number, option, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
-import { parse as rttiValidate } from 'functionalscript/fjs/types/rtti/parse/module.f.mjs'
+import { validate as rttiValidate } from 'functionalscript/fjs/types/rtti/validate/module.f.mjs'
 import { step, catchStep, mapStep, foldStep, pureOk } from 'functionalscript/fjs/effects/module.f.mjs'
 import { empty, nonEmpty } from 'functionalscript/fjs/effects/list/module.f.mjs'
 import { collectRead, fileCas } from 'functionalscript/fjs/cas/module.f.mjs'
