@@ -640,7 +640,30 @@ const earlyWithdrawalPenaltyLine = profile => forms => {
  *   readonly estateTrustK1Forms: readonly Stored<K1EstateTrust>[],
  *   readonly status: IndividualFilingStatus,
  *   readonly form1040Line7aCents: bigint,
+ *   readonly otherGainsOrLosses?: OtherGainsOrLosses,
  * }} ScheduleOnePartIInput
+ */
+
+/**
+ * Form 4797 line 18b, as printed Schedule 1 line 4 receives it — TAX-41.
+ *
+ * **A NUMBER, not a document**, the shape `fjs/schedule/d`'s
+ * `SectionTwelveFiftySixEntries` set: printed Form 4797 line 18b says "Enter
+ * here and on Schedule 1 (Form 1040), Part I, line 4", so this schedule copies
+ * a figure another form computed rather than reading an asset register. It
+ * runs in `fjs/form1040/core` because its other two answers go to Schedule D,
+ * and running the form twice is the only way the three could disagree.
+ *
+ * `filed` distinguishes "no Form 4797" from "a Form 4797 whose line 18b came
+ * to zero": the first must print as a profile-declared zero citing no
+ * document, and the second as a computed zero citing the register.
+ *
+ * OPTIONAL, because a return with no disposals has no Form 4797 at all.
+ * @typedef {{
+ *   readonly filed: boolean,
+ *   readonly lineEighteenBCents: bigint,
+ *   readonly sources: readonly Source[],
+ * }} OtherGainsOrLosses
  */
 
 /**
@@ -725,7 +748,21 @@ export const scheduleOnePartI = taxParamSet => input => {
         ...scheduleCOutcome.partII.line31,
         rule: 'Schedule 1 line 3 (business income/loss, Schedule C line 31)',
     }
-    const line4 = zero('Schedule 1 line 4 (other gains/losses, Form 4797/4684)')
+    // 4. "Other gains or (losses). Attach Form 4797." -- Form 4797's own line
+    //    18b, restated under this schedule's printed number and never
+    //    recomputed here, exactly as line 3 restates Schedule C line 31.
+    //    TAX-41. Form 4684 remains unmodeled, and `otherGainsOrLosses`' remedy
+    //    in `fjs/return/scope` still names it.
+    //
+    //    A return with no disposals leaves this a profile-declared zero, which
+    //    is the SAME zero it was before this phase and is why `filed` is a
+    //    field rather than a test on the amount: a Form 4797 whose line 18b
+    //    nets to zero is a filed form and must cite the register.
+    const otherGains = input.otherGainsOrLosses
+    const line4Rule = 'Schedule 1 line 4 (other gains/losses, Form 4797 line 18b)'
+    const line4 = otherGains === undefined || !otherGains.filed
+        ? zero(line4Rule)
+        : documentLine(profile)(line4Rule)(otherGains.lineEighteenBCents)(otherGains.sources)
     // 5. "Rental real estate, royalties, partnerships, S corporations,
     //    trusts, etc. Attach Schedule E." -- Schedule E's own line 41,
     //    restated under this schedule's printed number and never recomputed
@@ -781,12 +818,31 @@ export const scheduleOnePartI = taxParamSet => input => {
     // printed lines 10/11 remove exactly it again, so printed line 14 —
     // `line9 + line13` — cancels it to the cent at every input. `fjs/form461`'s
     // Part II arm for it is unconditional (`attributableToATradeOrBusiness:
-    // false`) precisely because every capital transaction this engine holds is
-    // an investment transaction. The day Form 4797 exists and a §1231 gain can
-    // be a trade-or-business gain, that arm becomes conditional and this term
-    // stops cancelling — which is why it is threaded now rather than written as
-    // a zero with a comment. `theCapitalGainOrLossReachesPrintedFormFourSixtyOne\
-    // LineThree` is what keeps the pass-through observable in the meantime.
+    // false`). `theCapitalGainOrLossReachesPrintedFormFourSixtyOneLineThree` is
+    // what keeps the pass-through observable.
+    //
+    // **THE DAY THIS COMMENT PREDICTED HAS ARRIVED, and the term still
+    // cancels.** It read "the day Form 4797 exists and a §1231 gain can be a
+    // trade-or-business gain, that arm becomes conditional and this term stops
+    // cancelling". Form 4797 exists as of TAX-41 and a net §1231 gain on its
+    // printed line 7 does reach 1040 line 7a through Schedule D line 11, so the
+    // premise is now false — and the arm has deliberately NOT been made
+    // conditional. Making it conditional needs the §1231 SHARE of 1040 line 7a,
+    // and printed Schedule D does not carry one: it nets that gain against
+    // investment losses and caps the result at §1211(b)'s $3,000, so i461's "any
+    // such amounts included here in line 3" is not a subtraction a caller can
+    // perform from outside. Left unconditional, printed line 10 removes a
+    // trade-or-business gain it should have kept, which makes printed line 14
+    // SMALLER and §461(l) MORE likely to bind: an over-refusal, never a wrong
+    // number, which is the same one-directional admission `fjs/form461`'s
+    // docstring already makes about Schedule 1 line 5 and now makes about this.
+    //
+    // **Printed line 4 is the term that does NOT cancel.** Form 4797 line 18b
+    // arrives on Schedule 1 line 4, no Part II arm touches it, and it moves
+    // printed line 14 cent for cent.
+    // {@link proof.formFourSixtyOne.formFourSevenNineSevenLineFourMovesLineFourteenAndLineThreeStillCancels}
+    // is the leaf that proves the two are treated differently, and that Form 461
+    // reads the COMPUTED line 4 rather than the caller's figure.
     //
     // **The value is always zero on a return that computes**, and that is not a
     // structural zero: `fjs/form461` REFUSES a binding limitation (its own
@@ -6208,6 +6264,100 @@ export const proof = {
             }))
             assertEq(joint.form461.line15, 62600000n,
                 'a JOINT return reaches printed line 15 with $626,000.00')
+        },
+        /**
+         * ★ **THE TWO PHASES COMPOSE, AND THEY DO NOT TREAT THEIR TWO TERMS
+         * THE SAME.** Form 461 (TAX-40) and Form 4797 (TAX-41) were written on
+         * branches neither of which could see the other, and they meet exactly
+         * here: printed Schedule 1 line 4 is Form 4797 line 18b, and printed
+         * Form 461 line 4 is printed Schedule 1 line 4.
+         *
+         * Three claims, and each is a separate way the composition could have
+         * been wrong:
+         *
+         * 1. **The ORDER.** Line 4 is formed before `form461` is called, and
+         *    Form 461 reads the COMPUTED line rather than the caller's figure —
+         *    which is why the unfiled case below is checked. A wiring that read
+         *    `otherGainsOrLosses.lineEighteenBCents` directly would agree with
+         *    this leaf on every other fixture and disagree on that one.
+         * 2. **Line 4 survives Part II.** No `partTwoAdjustment` arm names it,
+         *    because Form 4797 amounts ARE attributable to a trade or business —
+         *    §1231 property is property used IN one. So it moves printed line 14
+         *    cent for cent, in both directions.
+         * 3. **Line 3 still cancels**, at the same magnitude. That contrast is
+         *    the finding rather than a detail: see the call site's comment for
+         *    why the capital arm was left unconditional even though Form 4797
+         *    has made its stated premise false.
+         */
+        formFourSevenNineSevenLineFourMovesLineFourteenAndLineThreeStillCancels: () => {
+            /** @type {Source} */
+            const registerSource = {
+                documentHash: 'sha256-4797-composed',
+                boxPath: 'assets[0].disposal.grossSalesPrice',
+                value: '50000.00',
+            }
+            /** @type {(filed: boolean) => (cents: bigint) => ScheduleOnePartI} */
+            const withLineFour = filed => cents => okPartI(scheduleOnePartI(taxParams2025)({
+                status: 'single',
+                form1040Line7aCents: 0n,
+                otherGainsOrLosses: {
+                    filed,
+                    lineEighteenBCents: cents,
+                    sources: [registerSource],
+                },
+                assetRegisters: [],
+                rentalProperties: [],
+                farmForms: [],
+                profile: profileNoDeclaredKinds,
+                unemploymentForms: [],
+                nonemployeeCompensationForms: [],
+                businessExpenseForms: [],
+                w2Forms: [],
+                partnershipK1Forms: [],
+                sCorporationK1Forms: [],
+                estateTrustK1Forms: [],
+            }))
+            // 1. The order, and the two states `filed` distinguishes.
+            const gain = withLineFour(true)(5000000n)
+            assertEq(gain.line4.value, 5000000n, 'Form 4797 line 18b, on printed Schedule 1 line 4')
+            assertEq(gain.form461.line4, 5000000n, 'and on printed Form 461 line 4')
+            const unfiled = withLineFour(false)(5000000n)
+            assertEq(unfiled.line4.value, 0n, 'no Form 4797 leaves line 4 a declared zero')
+            assertEq(
+                unfiled.form461.line4, 0n,
+                'and Form 461 reads the COMPUTED line 4, never the caller\'s figure')
+            // 2. Part II leaves it alone, so it reaches printed line 14 whole.
+            assertEq(gain.form461.line9, 5000000n, 'printed line 9 combines lines 1 through 8')
+            assertEq(gain.form461.line10, 0n, 'no Part II arm removes a Form 4797 amount')
+            assertEq(gain.form461.line11, 0n)
+            assertEq(gain.form461.line14, 5000000n, 'so it moves the trade-or-business net')
+            const loss = withLineFour(true)(-5000000n)
+            assertEq(loss.form461.line14, -5000000n, 'and an ORDINARY loss moves it the other way')
+            assertEq(
+                loss.form461.line16, 31300000n - 5000000n,
+                'toward the threshold, which is what §461(l) measures')
+            // 3. ★ THE CONTROL: the SAME magnitude on printed line 3 cancels.
+            const capital = okPartI(scheduleOnePartI(taxParams2025)({
+                status: 'single',
+                form1040Line7aCents: 5000000n,
+                assetRegisters: [],
+                rentalProperties: [],
+                farmForms: [],
+                profile: profileNoDeclaredKinds,
+                unemploymentForms: [],
+                nonemployeeCompensationForms: [],
+                businessExpenseForms: [],
+                w2Forms: [],
+                partnershipK1Forms: [],
+                sCorporationK1Forms: [],
+                estateTrustK1Forms: [],
+            }))
+            assertEq(capital.form461.line3, 5000000n, '1040 line 7a, on printed line 3')
+            assertEq(capital.form461.line10, 5000000n, 'Part II removes the whole of it')
+            assertEq(
+                capital.form461.line14, 0n,
+                'so the capital term cancels where the Form 4797 term did not')
+            assertEq(capital.form461.line16, 31300000n, 'and the threshold is all that is left')
         },
     },
 

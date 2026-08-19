@@ -75,6 +75,7 @@ import { deductionChoice } from '../../tax/deduction/module.f.js'
 import { individualFilingStatuses, taxParamsByYear } from '../../tax/params/module.f.js'
 import { scheduleD } from '../../schedule/d/module.f.js'
 import { form6781 } from '../../form6781/module.f.js'
+import { formFortySevenNinetySeven } from '../../form4797/module.f.js'
 import { scheduleOneA } from '../../schedule/1a/module.f.js'
 import { scheduleA } from '../../schedule/a/module.f.js'
 import {
@@ -898,11 +899,48 @@ export const form1040IncomeLines = taxParamSet => inputs => {
             sources: form6781Outcome.sources,
         }
         : undefined
+    // TAX-41: Form 4797. It runs HERE, and BEFORE Schedule D and Schedule 1,
+    // because its three answers go to three different places — line 18b to
+    // Schedule 1 line 4, a §1231 gain to Schedule D line 11, and the
+    // unrecaptured §1250 gain to Schedule D line 19's worksheet — and running
+    // it once per destination is the only way they could disagree. It is the
+    // same argument printed Schedule F line 34's two destinations already
+    // forced for `fjs/schedule/f`.
+    //
+    // **NOT gated on `filingScheduleD`**, unlike Form 6781: a return with an
+    // ordinary Form 4797 (a §1231 loss, or a fully-recaptured §1245 gain)
+    // files no Schedule D at all and still owes Schedule 1 line 4. The form
+    // makes that judgment itself, on the printed line 7 instruction, and
+    // REFUSES a §1231 gain that has no Schedule D to land on — which is why
+    // the gate cannot live here.
+    const form4797Outcome = formFortySevenNinetySeven({
+        profile, assetRegisters, farmForms,
+    })
+    if (form4797Outcome.kind === 'error') {
+        return { kind: 'error', message: form4797Outcome.message, unmodeled: [] }
+    }
+    // Narrowed a second, fully explicit way, never relying on `tsc` to carry
+    // the negation of the `if` above — `sectionTwelveFiftySix`'s idiom.
+    const form4797Ok = form4797Outcome.kind === 'ok' ? form4797Outcome : undefined
+    const formFortySevenNinetySevenEntries = form4797Ok === undefined ? undefined : {
+        partOneGainCents: form4797Ok.longTermCapitalGainCents,
+        unrecapturedSectionTwelveFiftyGainCents: form4797Ok.unrecapturedSectionTwelveFiftyGainCents,
+        lineEightCents: form4797Ok.line8Cents,
+        sources: form4797Ok.sources,
+    }
+    const otherGainsOrLosses = form4797Ok === undefined ? undefined : {
+        filed: form4797Ok.filed,
+        lineEighteenBCents: form4797Ok.line18bCents,
+        sources: form4797Ok.sources,
+    }
     /** @type {ScheduleDOutcome | undefined} */
     const scheduleDOutcome = filingScheduleD
         ? scheduleD({
             status, brokerageForms, dividendForms,
             ...(sectionTwelveFiftySix === undefined ? {} : { sectionTwelveFiftySix }),
+            ...(formFortySevenNinetySevenEntries === undefined
+                ? {}
+                : { formFortySevenNinetySeven: formFortySevenNinetySevenEntries }),
             basisCorrections: basisCorrectionForms,
             employeeStockPurchaseForms,
             // TAX-35: printed Schedule D lines 5 and 12 read the separately
@@ -1297,6 +1335,15 @@ export const form1040IncomeLines = taxParamSet => inputs => {
         // capital losses are not trade-or-business deductions, and capital
         // gains not attributable to a trade or business come back out on line
         // 10), which is why only its VALUE crosses this boundary.
+        //
+        // **"The whole of it" is an admission as of TAX-41**, not a
+        // determination: printed Form 4797 line 7's §1231 gain reaches this very
+        // figure through Schedule D line 11 and IS attributable to a trade or
+        // business, and Part II removes it anyway because Schedule D carries no
+        // §1231 share to remove instead. `fjs/form461`'s docstring argues the
+        // direction — an over-refusal, never a wrong number — and
+        // `formFortySevenNinetySevenGainCents` below is the only figure on this
+        // record that could ever supply the split.
         form1040Line7aCents: line7a.value,
         // **Line 13 of the Schedule C inside Part I is this commit's** (Form
         // 4562): `vnd.fjs.asset_register` reaches Schedule C line 13 through
@@ -1322,6 +1369,10 @@ export const form1040IncomeLines = taxParamSet => inputs => {
         // schedule twice is the only way those two could disagree.
         farmForms,
         partnershipK1Forms, sCorporationK1Forms, estateTrustK1Forms,
+        // Printed Form 4797 line 18b's own destination: "Enter here and on
+        // Schedule 1 (Form 1040), Part I, line 4." Read off the SAME Form 4797
+        // execution Schedule D lines 11 and 19 came from, never a second one.
+        ...(otherGainsOrLosses === undefined ? {} : { otherGainsOrLosses }),
     })
     if (scheduleOnePartIResult.kind === 'error') {
         return { kind: 'error', message: scheduleOnePartIResult.message, unmodeled: [] }

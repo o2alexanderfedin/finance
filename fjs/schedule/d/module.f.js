@@ -178,6 +178,7 @@ import { capitalLossCarryoverWorksheet } from '../../tax/carryover/module.f.js'
  *   readonly sCorporationK1Forms?: readonly Stored<K1SCorporation>[],
  *   readonly estateTrustK1Forms?: readonly Stored<K1EstateTrust>[],
  *   readonly sectionTwelveFiftySix?: SectionTwelveFiftySixEntries,
+ *   readonly formFortySevenNinetySeven?: FormFortySevenNinetySevenEntries,
  * }} ScheduleDInputs
  */
 
@@ -202,6 +203,39 @@ import { capitalLossCarryoverWorksheet } from '../../tax/carryover/module.f.js'
  *   readonly longTermCents: bigint,
  *   readonly sources: readonly Source[],
  * }} SectionTwelveFiftySixEntries
+ */
+
+/**
+ * Form 4797's three answers, as this schedule receives them.
+ *
+ * **NUMBERS, not documents**, for the reason
+ * {@link SectionTwelveFiftySixEntries} gives: printed Form 4797 line 7 says to
+ * enter the gain *"as a long-term capital gain on the Schedule D filed with
+ * your return"*, and this schedule copies a figure another form computed
+ * rather than reading an asset register a second time. `fjs/form1040/core` is
+ * where `fjs/form4797` actually runs.
+ *
+ * - `partOneGainCents` is printed line 7 when it is a GAIN, and `0n` otherwise.
+ *   It reaches printed Schedule D line 11 and is also the cap on the
+ *   Unrecaptured Section 1250 Gain Worksheet's line 7. Never negative: a §1231
+ *   LOSS is ordinary and leaves through Form 4797 line 11 -> line 18b ->
+ *   Schedule 1 line 4, never through this schedule.
+ * - `unrecapturedSectionTwelveFiftyGainCents` is that worksheet's line 3
+ *   summed over Form 4797's Part III properties, UNCAPPED — *"the smaller of
+ *   line 22 or line 24"* less *"the amount from Form 4797, line 26g"*. The cap
+ *   is applied HERE, on worksheet line 7, because worksheet line 6 first adds
+ *   two summands (Forms 6252 and Schedule K-1) that Form 4797 knows nothing
+ *   about.
+ * - `lineEightCents` is Form 4797 line 8, which worksheet line 8 reads by name.
+ *
+ * OPTIONAL, for the reason the K-1 collections are: an absent entry is a filer
+ * with no Form 4797, which is a legitimate zero on all three.
+ * @typedef {{
+ *   readonly partOneGainCents: bigint,
+ *   readonly unrecapturedSectionTwelveFiftyGainCents: bigint,
+ *   readonly lineEightCents: bigint,
+ *   readonly sources: readonly Source[],
+ * }} FormFortySevenNinetySevenEntries
  */
 
 // ── Output contract (Plan 12.1-04, Form 1040 wiring, builds against this) ──
@@ -288,7 +322,7 @@ export const scheduleD = inputs => {
     // An absent list is an empty one -- see `ScheduleDInputs`. Bound once
     // here so lines 5 and 12 below read the same three collections and a
     // future line cannot quietly acquire a fourth default.
-    const { sectionTwelveFiftySix } = inputs
+    const { sectionTwelveFiftySix, formFortySevenNinetySeven } = inputs
     const partnershipK1Forms = inputs.partnershipK1Forms ?? []
     const sCorporationK1Forms = inputs.sCorporationK1Forms ?? []
     const estateTrustK1Forms = inputs.estateTrustK1Forms ?? []
@@ -408,7 +442,18 @@ export const scheduleD = inputs => {
     //     smaller printed 6781 line carries the smaller fraction, which is
     //     precisely the transposition a shared helper reading "the 6781 lines"
     //     positionally would make invisible.
-    const line11 = sectionTwelveFiftySix === undefined ? 0n : sectionTwelveFiftySix.longTermCents
+    //
+    //     **Form 4797 Part I lands here too**, and it is the FIRST name the
+    //     printed line prints. Form 4797 line 7's own instruction: "enter the
+    //     gain from line 7 as a long-term capital gain on the Schedule D filed
+    //     with your return". Only a GAIN arrives — a net §1231 LOSS is
+    //     ordinary and leaves through Form 4797 line 11 -> line 18b ->
+    //     Schedule 1 line 4, never through this schedule — so nothing here
+    //     needs to floor it. Forms 2439, 6252, 4684 and 8824 remain unmodeled.
+    const line11 = (sectionTwelveFiftySix === undefined ? 0n : sectionTwelveFiftySix.longTermCents)
+        + (formFortySevenNinetySeven === undefined
+            ? 0n
+            : formFortySevenNinetySeven.partOneGainCents)
     // 12. "Net long-term gain or (loss) from partnerships, S corporations,
     //     estates, and trusts from Schedule(s) K-1" — TAX-35, and again
     //     three different box numbers: the partner's 9a, the shareholder's
@@ -501,12 +546,51 @@ export const scheduleD = inputs => {
     //    pp.13-14) ─────────────────────────────────────────────────────
     // Per Decision 2.5: only line 11 is populatable this phase.
 
-    // 1-9. Property-level and Form 4797/6252 installment-sale mechanics
-    //      (Steps 1-3, p.13) — entirely about real property/depreciation
-    //      recapture this project has no document type for, so this whole
-    //      block, and its own printed running-total line 9, are documented
-    //      0.
-    const unrecap1250Line9 = 0n
+    // 1-3. "If you have a section 1250 property in Part III of Form 4797 for
+    //      which you made an entry in Part I of Form 4797 … enter the smaller
+    //      of line 22 or line 24 of Form 4797 for that property" (line 1),
+    //      less "the amount from Form 4797, line 26g" (line 2).
+    //
+    //      **This block stopped being a documented zero in the Form 4797
+    //      phase.** Its comment used to read "entirely about real
+    //      property/depreciation recapture this project has no document type
+    //      for", and `vnd.fjs.asset_register`'s per-asset `disposal` block is
+    //      that document type. `fjs/form4797` computes lines 1-3 per property
+    //      and hands over the sum, because only that module holds Form 4797's
+    //      lines 22, 24 and 26g.
+    const unrecap1250Line3 = formFortySevenNinetySeven === undefined
+        ? 0n
+        : formFortySevenNinetySeven.unrecapturedSectionTwelveFiftyGainCents
+    // 4. Form 6252 installment sales — documented 0, no Form 6252.
+    const unrecap1250Line4 = 0n
+    // 5. "Enter the total of any amounts reported to you on a Schedule K-1
+    //    from a partnership or an S corporation as 'unrecaptured section 1250
+    //    gain'" — documented 0 for the reason line 10 below is: the §1250
+    //    slice BOXES on both K-1 dialects refuse at storage.
+    const unrecap1250Line5 = 0n
+    // 6. "Add lines 3 through 5."
+    const unrecap1250Line6 = unrecap1250Line3 + unrecap1250Line4 + unrecap1250Line5
+    // 7. "Enter the smaller of line 6 or the gain from Form 4797, line 7."
+    //    The cap is applied HERE rather than inside `fjs/form4797`, because
+    //    line 6 first adds two summands that form knows nothing about. And it
+    //    is what the worksheet's own opening sentence means — "If you aren't
+    //    reporting a gain on Form 4797, line 7, skip lines 1 through 9" —
+    //    since `partOneGainCents` is `0n` whenever line 7 is not a gain.
+    const formFortySevenNinetySevenGain = formFortySevenNinetySeven === undefined
+        ? 0n
+        : formFortySevenNinetySeven.partOneGainCents
+    const unrecap1250Line7 = unrecap1250Line6 < formFortySevenNinetySevenGain
+        ? unrecap1250Line6
+        : formFortySevenNinetySevenGain
+    // 8. "Enter the amount, if any, from Form 4797, line 8" — the
+    //    nonrecaptured net §1231 losses §1231(c) has already turned into
+    //    ordinary income, which must not ALSO be taxed at 25%.
+    const unrecap1250Line8 = formFortySevenNinetySeven === undefined
+        ? 0n
+        : formFortySevenNinetySeven.lineEightCents
+    // 9. "Subtract line 8 from line 7. If zero or less, enter -0-."
+    const unrecap1250Line9Raw = unrecap1250Line7 - unrecap1250Line8
+    const unrecap1250Line9 = unrecap1250Line9Raw > 0n ? unrecap1250Line9Raw : 0n
     // 10. Partnership §1250 gain share via Schedule K-1 — documented 0,
     //     and **the reason changed with TAX-35 even though the value did
     //     not**. It used to be "no K-1 dialect"; there are three now, and
@@ -599,6 +683,7 @@ export const scheduleD = inputs => {
         ...line6Sources, ...line14Sources,
         ...line5Sum.sources, ...line12Sum.sources,
         ...(sectionTwelveFiftySix === undefined ? [] : sectionTwelveFiftySix.sources),
+        ...(formFortySevenNinetySeven === undefined ? [] : formFortySevenNinetySeven.sources),
     ]
 
     return {

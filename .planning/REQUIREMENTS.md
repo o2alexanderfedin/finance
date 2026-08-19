@@ -1567,6 +1567,73 @@ rather than a planned slice.
       trade-or-business income for this purpose; i461 says the opposite, in §461(l)(6)'s own
       words, and printed line 1 is *"Reserved for future use"* because of it.
 
+### Form 4797 (TAX-41) — the SECOND `TAX-40` collision, split by its integrator
+
+`feature/form-4797-impl` coined **`TAX-40`** for Form 4797 on 2026-08-19, on a branch cut from
+`5d5fb7f` — before `feature/form-461`'s own `TAX-40` existed to be found. Both authors were
+right to check and neither could have seen the other: the two IDs were coined the same day, on
+branches with no common descendant, and the registry that resolves it is this file.
+
+**This one IS split rather than recorded, and TAX-38's own note above is why.** That note
+declined the split on a measured cost — *"renumbering 61 citations across fourteen files, six of
+which name both forms, and two live branches are editing those files right now"* — and named who
+should pay it instead: *"the split belongs to whoever integrates them, not to the retrofit that
+found it."* This is that integration, and the cost here is **14 citations across six files**,
+none of which name both forms, on a branch nothing is built on. Form 461 keeps `TAX-40` because
+it is the one already on the trunk; Form 4797, the newcomer, takes `TAX-41`.
+
+So the two collisions are recorded differently and for a stated reason, which is the point: TAX-38
+records the tree's real state because splitting it was unsafe, and TAX-41 splits because it was
+cheap. Neither is retconned — this paragraph is the history.
+
+- [x] **TAX-41** *(M2, T3)*: **Schedule 1 line 4 — other gains or losses, §1231/§1245/§1250**
+      — through **Form 4797**, Parts I, II and III, over a per-asset `disposal` block added to
+      `vnd.fjs.asset_register`. Line 18b reaches Schedule 1 line 4 and 1040 line 8; a net
+      §1231 gain on line 7 reaches Schedule D line 11 and 1040 line 7a; and the unrecaptured
+      §1250 gain reaches Schedule D line 19 through the *Unrecaptured Section 1250 Gain
+      Worksheet*'s lines 1 through 9, which `fjs/schedule/d` carried as a single documented zero
+      until this phase. Spec: `fjs/form4797/todo/sales-of-business-property.md`.
+
+      **Delivered.** `otherGainsOrLosses` left `unmodeledKindRefusals` for `modeledKinds`
+      (`142 → 141` refused, `55 → 56` modeled), and a twelfth tripwire fires on a stored
+      disposal that the return does not declare. `kindVocabulary` stays at 197. **No dialect was
+      added**: the disposal block went on the register because four of the six figures Part III
+      needs are already on the register asset and the only join key a separate document could
+      use is `description`, a free-text field.
+
+      **The finding is an ASYMMETRY, and it is the printed page's rather than this engine's.**
+      §1231(c)'s five-year lookback lives on printed line 8, and the line 7 instruction says
+      *"If line 7 is zero or a loss … skip lines 8 and 9."* So a net §1231 **loss** year
+      is fully computable with no prior-year figure at all, and a net §1231 **gain** year is
+      not — it needs `noNonrecapturedNetSectionOneTwoThreeOneLossesFromPriorYears` on
+      `vnd.fjs.return_profile`, the state the same printed sentence names, and refuses at line 8
+      without it. It is the exact mirror of `fjs/schedule/e/part_i`, where a PROFIT computes and
+      a LOSS refuses because §469 sits on printed line 22.
+
+      **Line 7 = 0 is the third case, and it is the common one.** §1245 caps the recapture at
+      the total gain (line 25b is *"the smaller of line 24 or 25a"*), so an ordinary machine sold
+      for less than it cost has line 32 = 0, line 7 = 0, and the whole gain ordinary on Schedule 1
+      line 4 — no certification, no Schedule D. That is what makes the form worth having under
+      a prior-year blocker.
+
+      **Depreciation is derived allowed OR ALLOWABLE, never transcribed.** i4797 p9's line 22 Step
+      1 recaptures what was allowable whether or not it was claimed, and
+      `fjs/form4562/macrs`'s `macrsColumn` already produces the whole schedule from the unadjusted
+      basis — the same property that let the register omit accumulated depreciation in the
+      first place. `fjs/form4562/macrs` gained `disposalTwentyFourths`, Step 3's SECOND printed
+      decimal column, which `fjs/form4562` now applies in the year of sale: without it every
+      filer who sold something would have deducted a full year of depreciation on it.
+
+      `noDepreciablePropertyDisposedOfDuringTheYear` is **NARROWED, not retired**. Form 4562
+      requires it only when no disposal is recorded, and the dialect refuses a register carrying
+      both. What replaced the blanket precondition is five named refusals, each on a disposal
+      this engine cannot characterize: 15- and 20-year property (the class straddles §1245
+      and §1250, and the two differ by the whole recapture), business use below 100% (the
+      allocation moves a personal part to Schedule D), an asset placed in service and sold inside
+      one tax year (i4562 states the no-depreciation rule for the mid-quarter convention only),
+      a register bound to a stored farm (§1231(b)(3) livestock holding periods and §1252
+      farmland), and a §1231 gain on a return that files no Schedule D.
+
 ### v2 Traceability
 
 | REQ-ID | Tier | Phase | Persona unblocked |
@@ -1587,9 +1654,10 @@ rather than a planned slice.
 | TAX-38 | T3 | *(none — retrofitted 2026-08-19)* | Tier-B forms — **one ID, two forms**: Form 2441 (1040 line 1e and Schedule 3 line 2) and Form 6781 Part I (Schedule D lines 4 and 11). The collision is recorded in the section above, not retconned |
 | TAX-39 | T3 | *(none — retrofitted 2026-08-19)* | Tier-B forms — Form 7206, §162(l), Schedule 1 line 17. The remedy it replaced named a publication the IRS withdrew in 2022 |
 | TAX-40 | T3 | *(none — coined with its code 2026-08-19)* | Tier-B forms — Form 461, §461(l). No kind reclassified; a net farm loss computes at printed box 36a, and three stale remedies were corrected |
+| TAX-41 | T3 | *(none — coined with its code 2026-08-19, as `TAX-40`, and renumbered by the integrator)* | Tier-B forms — Form 4797 over a per-asset `disposal` block on `vnd.fjs.asset_register`. Schedule 1 line 4 was a documented zero; a §1231 LOSS now computes with no prior-year figure and a §1231 GAIN refuses at printed line 8 without the return-profile certification |
 
-**29 requirements across 10 phases, four retrofitted entries with none, and one coined with its
-own code** — 125 in the document, 95 of them v1's. Each phase is a
+**29 requirements across 10 phases, four retrofitted entries with none, and two coined with their
+own code** — 126 in the document, 95 of them v1's. Each phase is a
 vertical slice that ends with something that works: a persona whose return computes, or a named
 refusal that replaces a silent wrong answer. No phase leaves a layer that only pays off later.
 
@@ -1599,7 +1667,7 @@ refusal that replaces a silent wrong answer. No phase leaves a layer that only p
 > now derived:
 > ```sh
 > sed -n '/^## v1 Requirements/,/^## v2 Requirements/p' .planning/REQUIREMENTS.md | grep -cE '^- \[[ x]\] \*\*[A-Z]+-[0-9]+'   # 95
-> sed -n '/^## v2 Requirements/,/^## v2 (Deferred)/p'   .planning/REQUIREMENTS.md | grep -cE '^- \[[ x]\] \*\*[A-Z]+-[0-9]+'   # 25
+> sed -n '/^## v2 Requirements/,/^## v2 (Deferred)/p'   .planning/REQUIREMENTS.md | grep -cE '^- \[[ x]\] \*\*[A-Z]+-[0-9]+'   # 31
 > grep -oE '^- \[[ x]\] \*\*[A-Z]+-[0-9]+' .planning/REQUIREMENTS.md | grep -oE '[A-Z]+-[0-9]+' | sort | uniq -d              # must be empty
 > ```
 

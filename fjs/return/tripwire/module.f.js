@@ -239,6 +239,7 @@ import { dialect as k1SCorporationDialect } from '../../document/k1_1120s/module
 /** @import { RentalProperty } from '../../document/rental_property/module.f.js' */
 /** @import { OneZeroNineNineB } from '../../document/1099b/module.f.js' */
 /** @import { Farm } from '../../document/farm/module.f.js' */
+/** @import { AssetRegister } from '../../document/asset_register/module.f.js' */
 
 // ── What a tripwire reads ────────────────────────────────────────────────────
 
@@ -273,6 +274,7 @@ import { dialect as k1SCorporationDialect } from '../../document/k1_1120s/module
  *   readonly rentalProperties: readonly { readonly value: RentalProperty }[],
  *   readonly brokerageForms: readonly { readonly value: OneZeroNineNineB }[],
  *   readonly farmForms: readonly { readonly value: Farm }[],
+ *   readonly assetRegisters: readonly { readonly value: AssetRegister }[],
  * }} SuppliedDocuments
  */
 
@@ -488,6 +490,36 @@ export const tripwires = [
                 || boxIsNonZero(farm.value.otherIncome)),
     },
     {
+        kind: 'otherGainsOrLosses',
+        evidence: 'a stored vnd.fjs.asset_register carries a per-asset disposal block, which is a '
+            + 'sale of business property: \u00a71245 or \u00a71250 recaptures the depreciation '
+            + 'allowed or allowable on it as ORDINARY income, and it reaches 1040 line 8 through '
+            + 'Form 4797 line 18b and Schedule 1 line 4 \u2014 and printed Form 4797 line 7 may '
+            + 'reach 1040 line 7a through Schedule D line 11 besides \u2014 none of which is '
+            + 'computed for a return that does not declare it',
+        // **The twelfth entry**, and the one whose evidence is the most nearly
+        // conclusive of any here: a `disposal` block is not a threshold on an
+        // amount, it is a taxpayer stating that they sold a depreciable
+        // business asset. There is no reading of that record under which no
+        // Form 4797 is required.
+        //
+        // It fires on the disposal's PRESENCE and on no amount, which is the
+        // difference between this row and every income row above. A sale for
+        // $0.00 still recaptures: printed line 24's total gain is the sales
+        // price less the ADJUSTED basis, and an asset depreciated below its
+        // sale price produces ordinary income at any price at all, including
+        // none. `boxIsNonZero` is deliberately not used.
+        //
+        // Note what it does NOT read: `noDepreciablePropertyDisposedOfDuring\
+        // TheYear`. A register certifying that has no disposal block, so the
+        // predicate is already false; reading the certification too would be
+        // reading one fact twice, and would let a register that carried BOTH
+        // (which the dialect refuses at storage) turn the tripwire off.
+        triggered: context =>
+            context.documents.assetRegisters.some(
+                register => register.value.assets.some(asset => asset.disposal !== undefined)),
+    },
+    {
         kind: 'businessIncomeOrLoss',
         evidence: 'a stored Form 1099-NEC reports non-zero box 1 nonemployee compensation, which is '
             + 'self-employment income by definition — the payer filed a 1099-NEC precisely because '
@@ -599,9 +631,10 @@ export const tripwires = [
         // declaring.
         //
         // **TAX-38 adds the 1099-B box 11 disjunct to THIS row rather than
-        // adding a row.** `theTableIsExactlyElevenDistinctTripwires` (named
-        // `…Ten…` when TAX-38 shipped, before the Schedule F wiring added the
-        // eleventh row) requires the
+        // adding a row.** `theTableIsExactlyTwelveDistinctTripwires` (named
+        // `…Ten…` when TAX-38 shipped, `…Eleven…` after the Schedule F wiring
+        // added the eleventh row, and renamed again by TAX-41's twelfth)
+        // requires the
         // kinds to be distinct, and that is the right rule: one kind's
         // evidence belongs in one place, so a reader who is refused sees every
         // reason at once instead of two refusals naming the same declaration.
@@ -720,7 +753,7 @@ assert(taxParams2025 !== undefined, 'expected TY2025 parameters to be present in
  * Schedule SE line 1a charges on the same Schedule F line 34.
  * @type {number}
  */
-const expectedTripwireCount = 11
+const expectedTripwireCount = 12
 
 /** A W-2 carrying nothing but the fields its schema requires. @type {W2} */
 const bareW2 = {
@@ -756,7 +789,47 @@ const bare1099Nec = {
 const noDocuments = {
     w2s: [], retirementForms: [], nonemployeeCompensationForms: [], isoExerciseForms: [],
     partnershipK1Forms: [], sCorporationK1Forms: [], estateTrustK1Forms: [],
-    rentalProperties: [], brokerageForms: [], farmForms: [],
+    rentalProperties: [], brokerageForms: [], farmForms: [], assetRegisters: [],
+}
+
+/**
+ * An asset register carrying ONE disposed asset — the twelfth entry's
+ * evidence. Every field is what `vnd.fjs.asset_register`'s own
+ * `checkReferences` would accept, because a fixture that could not survive
+ * validation proves nothing about a stored document.
+ * @type {AssetRegister}
+ */
+const registerWithADisposal = {
+    dialect: 'vnd.fjs.asset_register',
+    recipientTin: '222-22-2222',
+    accountNumber: 'BUS-0001',
+    taxYear: 2025,
+    businessOrActivity: 'software consulting',
+    everyDepreciableAssetIsListed: true,
+    priorYearSection179CarryoverIsZero: true,
+    assets: [{
+        description: 'lathe',
+        datePlacedInService: '2022-03',
+        costOrOtherBasis: '20001.00',
+        businessUsePercentage: '100.00',
+        classification: 'sevenYear',
+        method: '200DB',
+        convention: 'HY',
+        section168kStatus: 'electedOut',
+        disposal: {
+            dateAcquired: '2022-02-10',
+            dateSold: '2025-08-14',
+            grossSalesPrice: '1357.91',
+            expenseOfSale: '0.00',
+        },
+    }],
+}
+
+/** The SAME register with the disposal removed — the twelfth entry's control. @type {AssetRegister} */
+const registerWithNoDisposal = {
+    ...registerWithADisposal,
+    noDepreciablePropertyDisposedOfDuringTheYear: true,
+    assets: registerWithADisposal.assets.map(asset => ({ ...asset, disposal: undefined })),
 }
 
 /**
@@ -974,8 +1047,8 @@ const everyStatus = [
 ]
 
 export const proof = {
-    // The hand-typed count, and the structural facts a loop cannot see: eleven
-    // rows, eleven DISTINCT kinds, and no empty evidence string. A tripwire
+    // The hand-typed count, and the structural facts a loop cannot see: twelve
+    // rows, twelve DISTINCT kinds, and no empty evidence string. A tripwire
     // whose evidence were blank would refuse without saying what proved it,
     // which is the silence this whole module replaces.
     //
@@ -983,10 +1056,11 @@ export const proof = {
     // named `theTableIsExactlyFiveDistinctTripwires` at the same time. Both
     // were prose about a number, and neither is what `expectedTripwireCount`
     // asserts — which is precisely why the count stayed right while its own
-    // description went wrong. Corrected with the name — and renamed a second
+    // description went wrong. Corrected with the name — renamed a second
     // time by the Schedule F wiring, whose `vnd.fjs.farm` entry is the
-    // eleventh row.
-    theTableIsExactlyElevenDistinctTripwires: () => {
+    // eleventh row, and a THIRD time by TAX-41, whose stored-disposal entry is
+    // the twelfth.
+    theTableIsExactlyTwelveDistinctTripwires: () => {
         assertEq(tripwires.length, expectedTripwireCount)
         assertEq(new Set(tripwires.map(t => t.kind)).size, expectedTripwireCount)
         for (const tripwire of tripwires) {
@@ -1606,6 +1680,116 @@ export const proof = {
             assertEq(declared.kind, 'ok', ['a declared kind must not trip its own tripwire', declared])
         },
     },
+    // ── Entry 12: vnd.fjs.asset_register disposal -> otherGainsOrLosses ────
+    //
+    // A proprietor sells a machine, records the sale on the register that
+    // already holds its basis, and does not know printed Form 4797 has to be
+    // declared. Undeclared, the engine would emit a confident 1040 short by
+    // the whole §1245 recapture, with the disposal sitting in the store unread.
+    businessPropertyDisposal: {
+        aStoredDisposalRefusesWhenUndeclared: () => {
+            const outcome = classify('single')(['wages'])({
+                ...noDocuments,
+                assetRegisters: [{ value: registerWithADisposal }],
+            })
+            assert(outcome.kind === 'error',
+                ['a stored disposal must refuse when undeclared', outcome])
+            if (outcome.kind !== 'error') {
+                return
+            }
+            assertEq(outcome.unmodeled.length, 1,
+                ['expected exactly one required kind', outcome.unmodeled])
+            assertEq(
+                outcome.unmodeled[0],
+                'otherGainsOrLosses',
+                ['expected Form 4797 named', outcome.unmodeled])
+            assert(
+                outcome.message.includes('Form 4797'),
+                ['the refusal must name the form the gain belongs on', outcome.message])
+            assert(
+                outcome.message.includes('Schedule 1 line 4'),
+                ['the refusal must name the Schedule 1 line it reaches', outcome.message])
+            // ★ **THE CHARACTER, not just the destination.** A filer who reads
+            // "gains" thinks capital gain rates; §1245 makes it ORDINARY, and
+            // the evidence has to say the word or the refusal understates what
+            // is at stake by the difference between 15% and the top bracket.
+            assert(
+                outcome.message.includes('ORDINARY'),
+                ['the evidence must name the character of the recapture', outcome.message])
+            // The REMEDY: the kind is MODELED, so the fix is a declaration.
+            assert(
+                outcome.message.includes('declare otherGainsOrLosses'),
+                ['the remedy must be the declaration, not a form hunt', outcome.message])
+            // And the remedy must say where Form 4797 STOPS — in particular
+            // that a §1231 GAIN needs a second declaration and a certification
+            // a §1231 loss does not.
+            assert(
+                outcome.message.includes('noNonrecapturedNetSectionOneTwoThreeOneLossesFromPriorYears'),
+                ['the remedy must name the certification a gain needs', outcome.message])
+            assert(
+                outcome.message.includes('allowed OR ALLOWABLE'),
+                ['the remedy must say the depreciation is derived, not claimed', outcome.message])
+        },
+        /**
+         * ★ **THE CONTROL, and it is what makes this entry an entry about the
+         * DISPOSAL rather than about the register.** The identical register
+         * with the disposal removed — the ordinary case, a business that still
+         * owns everything it depreciates — does NOT fire. A predicate that
+         * fired on any stored register would refuse every Schedule C filer who
+         * owns a desk.
+         */
+        theSameRegisterWithNoDisposalIsSilent: () => {
+            const quiet = classify('single')(['wages'])({
+                ...noDocuments,
+                assetRegisters: [{ value: registerWithNoDisposal }],
+            })
+            assertEq(quiet.kind, 'ok',
+                ['a register with nothing disposed of must not fire', quiet])
+        },
+        /**
+         * ★ **A SALE FOR NOTHING STILL FIRES**, and this leaf is why the
+         * predicate reads presence rather than an amount. Printed line 24's
+         * total gain is the sales price less the ADJUSTED basis, so an asset
+         * depreciated below its sale price produces ordinary income at ANY
+         * price — including $0.00. Every other entry in this table is a
+         * `boxIsNonZero`; this one must not be, and a `boxIsNonZero` here
+         * would pass every leaf above.
+         */
+        aDisposalForNothingStillFires: () => {
+            const [asset] = registerWithADisposal.assets
+            assert(asset !== undefined, 'the fixture has one asset')
+            if (asset === undefined) {
+                return
+            }
+            const disposal = asset.disposal
+            assert(disposal !== undefined, 'the fixture asset is disposed of')
+            if (disposal === undefined) {
+                return
+            }
+            const outcome = classify('single')(['wages'])({
+                ...noDocuments,
+                assetRegisters: [{
+                    value: {
+                        ...registerWithADisposal,
+                        assets: [{ ...asset, disposal: { ...disposal, grossSalesPrice: '0.00' } }],
+                    },
+                }],
+            })
+            assert(outcome.kind === 'error',
+                ['a disposal for nothing must still fire', outcome])
+        },
+        // THE NEGATIVE CONTROLS: no register at all, and the declared case.
+        anAbsentRegisterNeverFiresAndADeclaredOneIsSilent: () => {
+            const none = classify('single')(['wages'])(noDocuments)
+            assertEq(none.kind, 'ok', ['no register must not fire', none])
+            const declared = classify('single')(['wages', 'otherGainsOrLosses'])({
+                ...noDocuments,
+                assetRegisters: [{ value: registerWithADisposal }],
+            })
+            assertEq(declared.kind, 'ok',
+                ['a declared kind must not trip its own tripwire', declared])
+        },
+    },
     // ── Entry 7: Form 1041 K-1 box 6 -> estateAndTrustIncome (TAX-35) ────
     beneficiaryIncome: {
         // A beneficiary holds a Schedule K-1 (Form 1041) and does not know
@@ -2098,12 +2282,13 @@ export const proof = {
             farmForms: [{
                 value: { ...farm, salesOfRaisedProductsAndLivestock: '2109.87' },
             }],
+            assetRegisters: [{ value: registerWithADisposal }],
         })
         assert(outcome.kind === 'error', ['expected a refusal', outcome])
         if (outcome.kind !== 'error') {
             return
         }
-        for (const amount of ['387654.32', '1234.56', '7654.21', '9876.54', '3.21', '54.32', '5432.10', '6543.21', '8765.43', '2468.13', '2109.87']) {
+        for (const amount of ['387654.32', '1234.56', '7654.21', '9876.54', '3.21', '54.32', '5432.10', '6543.21', '8765.43', '2468.13', '2109.87', '1357.91']) {
             assert(
                 !outcome.message.includes(amount),
                 ['a taxpayer amount reached the refusal message', amount, outcome.message])
@@ -2118,7 +2303,11 @@ export const proof = {
         // — and because both sides wrote the identical `8 -> 9`, git merged
         // the two changes into one without a conflict. A count that agrees
         // with both parents is exactly the shape a silent merge loss takes.
-        assertEq(outcome.unmodeled.length, 10, ['expected all ten tripwires to have fired', outcome.unmodeled])
+        // **Eleven now**: the Form 4797 wiring's `otherGainsOrLosses` entry
+        // fires on a stored disposal block, a document none of the other ten
+        // read, so it adds rather than overlaps. Its distinctive amount is the
+        // twelfth searched for above.
+        assertEq(outcome.unmodeled.length, 11, ['expected all eleven tripwires to have fired', outcome.unmodeled])
     },
     // The rejected fourth entry, recorded as a CHECKED claim rather than as
     // prose (see this module's docstring). `fjs/document/1099g` refuses a

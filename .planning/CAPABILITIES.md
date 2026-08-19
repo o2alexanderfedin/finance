@@ -68,7 +68,7 @@ the form or the facts that would supply it.
 
 **The refusal surface is a partition, checked at `tsc`:** every one of **197 income, deduction,
 credit and payment kinds** is either modeled or carries a refusal naming what is missing —
-**55 modeled, 142 refused**, and `_EveryKindIsEitherModeledOrRefused` fails the build if a kind
+**56 modeled, 141 refused**, and `_EveryKindIsEitherModeledOrRefused` fails the build if a kind
 falls in neither. Re-derive with `modeledKinds.length` / `unmodeledKindRefusals.length` in
 `fjs/return/scope`.
 
@@ -136,7 +136,7 @@ AMT with capital gains or qualified dividends (Phase 29, `fjs/form6251/part3`), 
 Part II.
 
 **There is also a complementary guard.** Some taxes trigger on a threshold from data already held,
-on a taxpayer who has never heard of the form — so **11 tripwires** refuse when the documents prove
+on a taxpayer who has never heard of the form — so **12 tripwires** refuse when the documents prove
 an obligation was not declared. Without them, a $300,000 W-2 understated tax by ~$900, silently.
 A tripwire that always fires is not a tripwire; each one is proven to stay quiet on a return that
 does not owe the thing.
