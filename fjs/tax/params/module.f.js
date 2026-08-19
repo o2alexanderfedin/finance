@@ -2468,6 +2468,91 @@ export const qualifiedBusinessIncomeDeduction = {
 }
 
 /**
+ * **§461(l)'s excess business loss threshold** — printed Form 461 line 15, and
+ * the *Who Must File* figure that decides whether the form is filed at all.
+ * For `fjs/form461`; the argument for every number below is in
+ * `fjs/form461/todo/limitation-on-business-losses.md` §1.
+ *
+ * Source, fetched and read directly (2026-08-19), not from recall:
+ * `https://www.irs.gov/pub/irs-drop/rp-24-40.pdf` §2.32 —
+ *
+ * > **.32 Threshold for Excess Business Loss.** For taxable years beginning in
+ * > 2025, in determining a taxpayer's excess business loss, the amount under
+ * > § 461(l)(3)(A)(ii)(II) is $313,000 ($626,000 for joint returns).
+ *
+ * cross-checked against `https://www.irs.gov/pub/irs-pdf/f461.pdf` (2025, Cat.
+ * No. 16654I, "Created 2/26/25"), whose printed line 15 reads *"Enter $313,000
+ * (or $626,000 if married filing jointly)"*, and against `i461.pdf` (2025, Cat.
+ * No. 71453Z, `Dec 10, 2025`), whose *Threshold amount* definition prints the
+ * same pair and names this very Revenue Procedure section.
+ *
+ * **Only `marriedFilingJointly` gets the doubled figure, and the two ways of
+ * getting that wrong point in opposite directions.**
+ *
+ * - **Married filing separately gets the FULL $313,000.** §461(l) has no
+ *   halving clause anywhere. `fjs/schedule/d`'s §1211(b) cap does
+ *   (`$3,000`/`$1,500`), and it is the nearest loss-limitation figure in this
+ *   repository — so the mistake available here is to copy that shape and halve
+ *   a threshold the statute never halves, which would **overstate** the
+ *   disallowance for every separately-filing taxpayer.
+ * - **A qualifying surviving spouse gets $313,000, not $626,000.** Both the
+ *   printed line (*"if married filing jointly"*) and the statute (*"in the case
+ *   of a joint return"*) name the joint RETURN, which a surviving spouse does
+ *   not file. This is {@link qualifiedBusinessIncomeDeduction}'s
+ *   `thresholdAmount` trap and {@link additionalMedicareTaxThreshold}'s, a
+ *   third time — and it is worth restating each time, because most per-status
+ *   groups in this module do give QSS the joint figure.
+ *
+ * `singleLineFilingTest` is i461's *Who Must File* clause (ii): *"you would
+ * report a loss of more than $156,500 on any one of Form 461, lines 1 through
+ * 8."* It is **not** per status — the instructions state one figure for every
+ * filer, and it is not doubled on a joint return even though it is exactly half
+ * the single threshold. It decides whether the form is FILED and never enters
+ * Part III's arithmetic, which is why it sits beside the table rather than in
+ * it. Its citation is the Code paragraph the instruction implements rather than
+ * a Revenue Procedure section: no Rev. Proc. adjusts it, and inventing a
+ * section number would be the sourcing error this module's own header exists to
+ * prevent.
+ * @type {{
+ *   readonly thresholdAmount: Record<IndividualFilingStatus, AmountWithCitation>,
+ *   readonly singleLineFilingTest: AmountWithCitation,
+ * }}
+ */
+export const excessBusinessLossThreshold = {
+    thresholdAmount: {
+        single: {
+            amount: '313000.00',
+            citation: { kind: 'revProc', revProc: '2024-40', section: '§2.32', effectiveDate: '2025-01-01' },
+        },
+        // "$626,000 for joint returns" -- §461(l)(3)(A)(ii)(II) doubled by the
+        // flush text of §461(l)(3)(A)(ii), and the ONLY status that takes it.
+        marriedFilingJointly: {
+            amount: '626000.00',
+            citation: { kind: 'revProc', revProc: '2024-40', section: '§2.32', effectiveDate: '2025-01-01' },
+        },
+        // The FULL amount, not half of it -- see this group's own docstring.
+        marriedFilingSeparately: {
+            amount: '313000.00',
+            citation: { kind: 'revProc', revProc: '2024-40', section: '§2.32', effectiveDate: '2025-01-01' },
+        },
+        headOfHousehold: {
+            amount: '313000.00',
+            citation: { kind: 'revProc', revProc: '2024-40', section: '§2.32', effectiveDate: '2025-01-01' },
+        },
+        // A surviving spouse does not FILE a joint return, so the $626,000 does
+        // not reach it -- see this group's own docstring.
+        qualifyingSurvivingSpouse: {
+            amount: '313000.00',
+            citation: { kind: 'revProc', revProc: '2024-40', section: '§2.32', effectiveDate: '2025-01-01' },
+        },
+    },
+    singleLineFilingTest: {
+        amount: '156500.00',
+        citation: { kind: 'code', section: '§461(l)(1)', effectiveDate: '2025-01-01' },
+    },
+}
+
+/**
  * **§55's alternative minimum tax** — the exemption, its phase-out, and the
  * two rates. TAX-33, Phase 29, for `fjs/form6251`.
  *
@@ -3328,6 +3413,7 @@ export const longTermCarePremiumLimits = [
  *   readonly qualifiedCharitableDistribution: typeof qualifiedCharitableDistribution,
  *   readonly selfEmploymentTax: typeof selfEmploymentTax,
  *   readonly qualifiedBusinessIncomeDeduction: typeof qualifiedBusinessIncomeDeduction,
+ *   readonly excessBusinessLossThreshold: typeof excessBusinessLossThreshold,
  *   readonly alternativeMinimumTax: typeof alternativeMinimumTax,
  *   readonly federalPovertyLine: typeof federalPovertyLine,
  *   readonly premiumTaxCreditApplicablePercentage: typeof premiumTaxCreditApplicablePercentage,
@@ -3379,6 +3465,7 @@ export const taxParamsByYear = {
         qualifiedCharitableDistribution,
         selfEmploymentTax,
         qualifiedBusinessIncomeDeduction,
+        excessBusinessLossThreshold,
         alternativeMinimumTax,
         federalPovertyLine,
         premiumTaxCreditApplicablePercentage,
@@ -3526,6 +3613,9 @@ const everyDollarStringField = [
     selfEmploymentTax.socialSecurityWageBase.amount,
     ...individualFilingStatuses.map(
         status => qualifiedBusinessIncomeDeduction.thresholdAmount[status].amount),
+    ...individualFilingStatuses.map(
+        status => excessBusinessLossThreshold.thresholdAmount[status].amount),
+    excessBusinessLossThreshold.singleLineFilingTest.amount,
     ...individualFilingStatuses.flatMap(status => [
         alternativeMinimumTax.exemption[status].amount,
         alternativeMinimumTax.exemptionPhaseoutThreshold[status].amount,
@@ -5329,6 +5419,93 @@ export const proof = {
             // which is a consequence of both figures doubling rather than an
             // input: it holds only if the range doubled too.
             assertEq(jointUpperBound, generalUpperBound * 2n)
+        },
+    },
+    // ── §461(l)'s excess business loss threshold, for `fjs/form461` ─────────
+    excessBusinessLossThreshold: {
+        // Every figure hand-typed from Rev. Proc. 2024-40 §2.32 and Form 461's
+        // printed line 15, per status, so a status that silently took the wrong
+        // row names itself. The expected side is a literal `Record`, never a
+        // spread of the stored table.
+        everyStatusMatchesRevProc2024Dash40Section2Dot32: () => {
+            /** @type {Record<IndividualFilingStatus, string>} */
+            const printed = {
+                single: '313000.00',
+                marriedFilingJointly: '626000.00',
+                marriedFilingSeparately: '313000.00',
+                headOfHousehold: '313000.00',
+                qualifyingSurvivingSpouse: '313000.00',
+            }
+            assertEq(Object.keys(printed).length, 5, 'five hand-typed expectations')
+            for (const status of individualFilingStatuses) {
+                assertEq(
+                    excessBusinessLossThreshold.thresholdAmount[status].amount,
+                    printed[status],
+                    ['Form 461 line 15 for this status', status])
+                const citation = assertRevProcCitation(
+                    excessBusinessLossThreshold.thresholdAmount[status].citation)
+                assertEq(citation.revProc, '2024-40', status)
+                // §2.32, never §2.31 or §2.33 -- a section number naming a real
+                // but different rule is what this assertion exists for. §2.31
+                // is the qualified transportation fringe and §2.33 the
+                // agricultural-organization dues limit.
+                assertEq(citation.section, '§2.32', status)
+            }
+        },
+        // **THE TWO TRAPS, stated as arithmetic rather than as prose.** Only
+        // the joint figure is doubled; separately-filing and surviving-spouse
+        // filers take the general amount. Each half fails on a different wrong
+        // edit: halving MFS the way §1211(b) halves its cap, or spreading the
+        // joint figure to QSS the way most groups in this module do.
+        onlyTheJointReturnDoublesAndNothingIsEverHalved: () => {
+            const general = centsFromString(
+                excessBusinessLossThreshold.thresholdAmount.single.amount)
+            const joint = centsFromString(
+                excessBusinessLossThreshold.thresholdAmount.marriedFilingJointly.amount)
+            assertEq(general, 31300000n, '$313,000.00')
+            assertEq(joint, 62600000n, '$626,000.00')
+            assertEq(joint, general * 2n, 'the joint return takes 200% of the general amount')
+            assertEq(
+                centsFromString(
+                    excessBusinessLossThreshold.thresholdAmount.marriedFilingSeparately.amount),
+                31300000n,
+                '§461(l) has no halving clause -- MFS takes the FULL $313,000.00')
+            assertEq(
+                centsFromString(
+                    excessBusinessLossThreshold.thresholdAmount.qualifyingSurvivingSpouse.amount),
+                31300000n,
+                'a surviving spouse does not file a JOINT return, so $313,000.00')
+            // Both halves as inequalities too, so an edit that made MFS half or
+            // QSS double reddens here even if it kept `general` and `joint`
+            // right.
+            assert(
+                centsFromString(
+                    excessBusinessLossThreshold.thresholdAmount.marriedFilingSeparately.amount)
+                    !== general / 2n,
+                ['MFS is not half the general amount'])
+            assert(
+                centsFromString(
+                    excessBusinessLossThreshold.thresholdAmount.qualifyingSurvivingSpouse.amount)
+                    !== joint,
+                ['QSS is not the joint amount'])
+        },
+        // i461's *Who Must File* clause (ii) is ONE figure for every status,
+        // and it is exactly half the general threshold -- which is a fact worth
+        // pinning, because it is also what makes copying it into the threshold
+        // table look plausible. It is stored beside the table, not in it.
+        theSingleLineFilingTestIsOneFigureForEveryStatus: () => {
+            const test = centsFromString(excessBusinessLossThreshold.singleLineFilingTest.amount)
+            assertEq(test, 15650000n, '$156,500.00')
+            assertEq(
+                test * 2n,
+                centsFromString(excessBusinessLossThreshold.thresholdAmount.single.amount),
+                'exactly half the general threshold, arithmetically')
+            // NOT doubled on a joint return: it is not per status at all, so
+            // there is nothing to look up, and this leaf is what would redden
+            // if a later edit turned it into a `Record`.
+            assertEq(excessBusinessLossThreshold.singleLineFilingTest.citation.kind, 'code')
+            assertEq(
+                excessBusinessLossThreshold.singleLineFilingTest.citation.section, '§461(l)(1)')
         },
     },
     // ── TAX-33 (Phase 29): §55's exemption, phase-out and two rates ─────────
