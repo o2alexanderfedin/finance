@@ -884,7 +884,38 @@ export const proof = {
             assertEq(result.saltWorksheet.w7, 3000n, 'w7 = $30.00 -- 30% of $100.00, cent-exact')
             assertEq(result.line5e, 3997000n, 'line 5e = $39,970.00 -- $30.00 below the flat cap')
         },
-        // The floor never breaches below $10,000, even at a very large excess.
+        // **TAX-42: §911's exclusion pushes w4 over the threshold**, and this
+        // is the leaf that says printed w3b is live. $480,000.00 of adjusted
+        // gross income is BELOW the $500,000.00 threshold and takes the whole
+        // $40,000.00 cap; the same filer with a $60,000.00 exclusion has
+        // $540,000.00 of phase-down income:
+        //   w6 = 540,000 − 500,000 = $40,000.00
+        //   w7 = 30% × 40,000      = $12,000.00
+        //   w8 = 40,000 − 12,000   = $28,000.00
+        //   w9 = max(28,000, 10,000) = $28,000.00 → line 5e
+        // The exclusion costs this filer $12,000.00 of deduction, which is
+        // exactly what §911 add-backs exist to do.
+        theForeignEarnedIncomeExclusionPushesTheSaltCapOverItsThreshold: () => {
+            /** @type {(form2555Line45Cents: bigint) => ScheduleAOk} */
+            const at = form2555Line45Cents => expectOk(scheduleA(taxParams2025)({
+                form2555Line45Cents,
+                status: 'single',
+                agiCents: 48000000n, // $480,000.00 -- below the threshold on its own
+                itemizedEntries: [itemizedEntry('saltIncomeTax')('50000.00')('itemized-doc-1')],
+                medicalExpenseEntries: [],
+                profile: profileNoDeclaredKinds,
+            }))
+            const without = at(0n)
+            assertEq(without.saltWorksheet.w4, 48000000n, 'bare adjusted gross income')
+            assertEq(without.saltWorksheet.w6, 0n, 'below the threshold, so no phase-down')
+            assertEq(without.line5e, 4000000n, 'and the whole $40,000.00 cap')
+            const withExclusion = at(6000000n)
+            assertEq(withExclusion.saltWorksheet.w4, 54000000n, '$480,000.00 + $60,000.00')
+            assertEq(withExclusion.saltWorksheet.w6, 4000000n, '$40,000.00 of excess')
+            assertEq(withExclusion.saltWorksheet.w7, 1200000n, '30% of it = $12,000.00')
+            assertEq(withExclusion.line5e, 2800000n, '$40,000.00 − $12,000.00 = $28,000.00')
+        },
+                // The floor never breaches below $10,000, even at a very large excess.
         floorNeverBreachedAtLargeExcess: () => {
             const result = expectOk(scheduleA(taxParams2025)({
                 form2555Line45Cents: 0n,
