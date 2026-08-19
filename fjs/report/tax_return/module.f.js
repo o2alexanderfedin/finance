@@ -871,6 +871,9 @@ const fixtureFounderHomeExpensesHash = 'sha256-tax-return-founder-home-expenses'
 // The Schedule E Part I wiring's own two: a landlord.
 const fixtureLandlordProfileHash = 'sha256-tax-return-landlord-profile'
 const fixtureLandlordPropertyHash = 'sha256-tax-return-landlord-property'
+// The Schedule F wiring's own two: a farmer.
+const fixtureFarmerProfileHash = 'sha256-tax-return-farmer-profile'
+const fixtureFarmerFarmHash = 'sha256-tax-return-farmer-farm'
 const fixtureMarketplaceProfileHash = 'sha256-tax-return-marketplace-profile'
 const fixtureMarketplaceW2Hash = 'sha256-tax-return-marketplace-w2'
 const fixtureMarketplaceStatementHash = 'sha256-tax-return-marketplace-1095a'
@@ -954,6 +957,8 @@ const subjectFounderRegister = 'tax-return-subject-founder-asset-register'
 const subjectFounderHomeExpenses = 'tax-return-subject-founder-home-expenses'
 const subjectLandlordProfile = 'tax-return-subject-landlord-profile'
 const subjectLandlordProperty = 'tax-return-subject-landlord-property'
+const subjectFarmerProfile = 'tax-return-subject-farmer-profile'
+const subjectFarmerFarm = 'tax-return-subject-farmer-farm'
 const subjectMarketplaceProfile = 'tax-return-subject-marketplace-profile'
 const subjectMarketplaceW2 = 'tax-return-subject-marketplace-w2'
 const subjectMarketplaceStatement = 'tax-return-subject-marketplace-1095a'
@@ -1781,6 +1786,32 @@ const documentByHash = {
             { category: 'repairs', datePaid: '2025-05-02', description: 'boiler repair', amount: '350.00' },
         ],
     },
+    // The Schedule F wiring's own two documents, for the identical reason:
+    // deleting the twin's `vnd.fjs.farm` route branch has to redden something,
+    // and `fjs/form1040/core`'s own Schedule F leaves cannot see it -- they
+    // hand `form1040Report` a `Form1040Inputs` and never travel through this
+    // program's collect step at all.
+    [fixtureFarmerProfileHash]: {
+        dialect: returnProfileDialect,
+        taxYear: 2025,
+        filingStatus: 'single',
+        dependentCount: 0,
+        declaredKinds: ['farmIncomeOrLoss'],
+    },
+    [fixtureFarmerFarmHash]: {
+        dialect: farmDialect,
+        recipientTin: '222-22-2222',
+        accountNumber: 'FARM-0001',
+        taxYear: 2025,
+        principalCropOrActivity: 'corn and soybeans',
+        accountingMethod: 'cash',
+        materiallyParticipated: 'yes',
+        investmentAtRisk: 'allAtRisk',
+        salesOfRaisedProductsAndLivestock: '40000.00',
+        cropInsuranceProceedsDeferredFromPriorYear: '0.00',
+        priorYearQualifiedBusinessLossCarryforward: '0.00',
+        entries: [],
+    },
     // The Form 4562 wiring's own document. It exists for exactly the reason
     // the 1095-A fixture above does: deleting the twin's
     // `vnd.fjs.asset_register` route branch has to redden something, and
@@ -1841,6 +1872,8 @@ const snapshotBySubject = {
     [subjectFounderHomeExpenses]: fixtureFounderHomeExpensesHash,
     [subjectLandlordProfile]: fixtureLandlordProfileHash,
     [subjectLandlordProperty]: fixtureLandlordPropertyHash,
+    [subjectFarmerProfile]: fixtureFarmerProfileHash,
+    [subjectFarmerFarm]: fixtureFarmerFarmHash,
     [subjectMarketplaceProfile]: fixtureMarketplaceProfileHash,
     [subjectMarketplaceW2]: fixtureMarketplaceW2Hash,
     [subjectMarketplaceStatement]: fixtureMarketplaceStatementHash,
@@ -1938,6 +1971,11 @@ const founderWithRegisterSubjects = [
 /** The Schedule E Part I wiring's own two subjects, NOT in sorted order. */
 const landlordSubjects = [
     subjectLandlordProperty, subjectLandlordProfile,
+]
+
+/** The Schedule F wiring's own two subjects, likewise NOT in sorted order. */
+const farmerSubjects = [
+    subjectFarmerFarm, subjectFarmerProfile,
 ]
 
 /** TAX-37's own three subjects, likewise NOT in sorted order. */
@@ -2719,6 +2757,60 @@ export const proof = {
         assertEq(cents('1040 line 8'), 0n)
         assertEq(cents('1040 line 9'), 0n)
         assertEq(cents('1040 line 11a'), 0n)
+    },
+    /**
+     * * **THE ROUTING LEAF FOR `vnd.fjs.farm`.** The stored program classifies
+     * the farm, files it in `farmForms`, and printed Schedule F line 34 reaches
+     * Schedule 1 line 6 — and printed Schedule SE line 1a, which is the half a
+     * routing leaf checking 1040 line 8 alone would miss entirely.
+     *
+     * Every figure hand-computed off the printed pages, and the same arithmetic
+     * `fjs/form1040/core`'s own Schedule F leaf sets out line by line:
+     *
+     * ```
+     *  Schedule F  34  sales of raised products     40,000.00
+     *  Schedule 1   6  Schedule F line 34           40,000.00
+     *  Schedule SE 1a  Schedule F line 34           40,000.00
+     *              4a  92.35% of 40,000.00          36,940.00
+     *              12  12.4% + 2.9% of 36,940.00     5,651.82
+     *              13  one half                      2,825.91
+     *  1040         8  Schedule 1 line 10           40,000.00
+     *              10  Schedule 1 line 26            2,825.91
+     *              11a 40,000.00 - 2,825.91         37,174.09
+     *              23  Schedule 2 line 4             5,651.82
+     * ```
+     *
+     * The control below, which withholds the farm, is what makes this a
+     * statement about the ROUTE rather than four unrelated numbers.
+     */
+    storedProgramRoutesTheFarmAndComputesScheduleF: () => {
+        const result = runTwin(farmerSubjects)
+        assert(result.kind === 'ok', ['expected a computed return', result])
+        if (result.kind !== 'ok') {
+            return
+        }
+        const cents = renderedCents(result)
+        assertEq(cents('1040 line 8'), 4000000n, 'Schedule F line 34, through Schedule 1 line 6')
+        assertEq(cents('1040 line 9'), 4000000n, 'and it is the whole of total income')
+        assertEq(cents('1040 line 10'), 282591n, 'the deductible half of self-employment tax')
+        assertEq(cents('1040 line 11a'), 3717409n, 'AGI = $37,174.09')
+        assertEq(cents('1040 line 23'), 565182n,
+            '$5,651.82 of self-employment tax — the destination a 1040-line-8 assertion misses')
+    },
+    // THE CONTROL: the SAME filer with the farm withheld. Everything goes to
+    // zero and the return still computes, so the leaf above is evidence about
+    // the DOCUMENT rather than about the profile.
+    theSameStoredFarmerWithoutTheFarmComputesZeros: () => {
+        const result = runTwin([subjectFarmerProfile])
+        assert(result.kind === 'ok', ['expected a computed return', result])
+        if (result.kind !== 'ok') {
+            return
+        }
+        const cents = renderedCents(result)
+        assertEq(cents('1040 line 8'), 0n)
+        assertEq(cents('1040 line 9'), 0n)
+        assertEq(cents('1040 line 11a'), 0n)
+        assertEq(cents('1040 line 23'), 0n)
     },
     // ── The routing sweep: one leaf per dispatched dialect that had none ──
     //

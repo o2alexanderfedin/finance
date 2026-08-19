@@ -677,13 +677,15 @@ export const scheduleOnePartI = input => {
         partnershipK1Forms, sCorporationK1Forms, estateTrustK1Forms,
     } = input
     const zero = profileDeclaredZeroLine(profile)
-    // `rentalProperties` reaches BOTH schedules, and it is not a leak. Schedule
-    // C needs it only to know which asset registers are NOT its own: a register
-    // whose account number names a rental property is Schedule E Part I's, and
-    // Schedule C must neither depreciate it nor refuse it.
+    // `rentalProperties` and `farmForms` reach MORE than one schedule each, and
+    // neither is a leak. Schedule C needs both only to know which asset
+    // registers are NOT its own: a register whose account number names a rental
+    // property is Schedule E Part I's and one whose account number names a farm
+    // is Schedule F's, and Schedule C must neither depreciate them nor refuse
+    // them.
     const scheduleCOutcome = scheduleC({
         profile, nonemployeeCompensationForms, businessExpenseForms, w2Forms, assetRegisters,
-        rentalProperties,
+        rentalProperties, farmForms,
     })
     if (scheduleCOutcome.kind === 'error') {
         return scheduleCOutcome
@@ -2948,6 +2950,7 @@ const noBusinessNetProfit = profile => {
         w2Forms: [],
         assetRegisters: [],
         rentalProperties: [],
+        farmForms: [],
     })
     assert(outcome.kind === 'ok', ['an empty Schedule C cannot refuse', outcome])
     return outcome.partII.line31
