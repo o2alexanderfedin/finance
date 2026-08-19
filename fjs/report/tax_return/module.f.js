@@ -836,6 +836,43 @@ const fixtureFounderExpensesHash = 'sha256-tax-return-founder-expenses'
 const fixtureMarketplaceProfileHash = 'sha256-tax-return-marketplace-profile'
 const fixtureMarketplaceW2Hash = 'sha256-tax-return-marketplace-w2'
 const fixtureMarketplaceStatementHash = 'sha256-tax-return-marketplace-1095a'
+// ── The routing sweep's own documents ───────────────────────────────────
+//
+// TAX-37 closed the `vnd.fjs.1095a` hole one dialect at a time and said so:
+// "the same hole is still open for the other twenty-five dispatched
+// dialects". A mutation sweep over every branch of {@link routeDocument} —
+// deleting one line at a time and running `npm test` — priced it: FIFTEEN of
+// the twenty-six branches could be deleted with the ENTIRE suite green.
+// These fixtures are what closes the fifteen.
+//
+// Four personas, not one, and the split is load-bearing rather than tidy:
+// `capitalGainsOrLosses` turns Schedule D on and changes what line 7a means,
+// `itemizeEvenThoughLessThanStandardDeduction` changes what line 12e means,
+// and `alternativeMinimumTax` is the one declaration a stored Form 3921
+// REQUIRES (its tripwire fires on the document's mere presence). A single
+// profile carrying all of them would make every leaf below depend on
+// declarations it is not about.
+const fixtureSweepProfileHash = 'sha256-tax-return-sweep-profile'
+const fixtureSweepInterestHash = 'sha256-tax-return-sweep-1099int'
+const fixtureSweepDividendHash = 'sha256-tax-return-sweep-1099div'
+const fixtureSweepSocialSecurityHash = 'sha256-tax-return-sweep-ssa1099'
+const fixtureSweepPartnershipK1Hash = 'sha256-tax-return-sweep-k1-1065'
+const fixtureSweepSCorporationK1Hash = 'sha256-tax-return-sweep-k1-1120s'
+const fixtureSweepEstateTrustK1Hash = 'sha256-tax-return-sweep-k1-1041'
+const fixtureSweepGainsProfileHash = 'sha256-tax-return-sweep-gains-profile'
+const fixtureSweepBrokerageHash = 'sha256-tax-return-sweep-1099b'
+const fixtureSweepRealCarryoverHash = 'sha256-tax-return-sweep-carryover'
+const fixtureSweepCorrectedBrokerageHash = 'sha256-tax-return-sweep-1099b-corrected'
+const fixtureSweepBasisCorrectionHash = 'sha256-tax-return-sweep-basis-correction'
+const fixtureSweepEsppHash = 'sha256-tax-return-sweep-form3922'
+const fixtureSweepDeductionProfileHash = 'sha256-tax-return-sweep-deduction-profile'
+const fixtureSweepItemizedHash = 'sha256-tax-return-sweep-itemized'
+const fixtureSweepMedicalHash = 'sha256-tax-return-sweep-medical'
+const fixtureSweepAdjustmentProfileHash = 'sha256-tax-return-sweep-adjustment-profile'
+const fixtureSweepAdjustmentsHash = 'sha256-tax-return-sweep-adjustments'
+const fixtureSweepStudentLoanHash = 'sha256-tax-return-sweep-1098e'
+const fixtureSweepIsoProfileHash = 'sha256-tax-return-sweep-iso-profile'
+const fixtureSweepIsoHash = 'sha256-tax-return-sweep-form3921'
 
 const subjectProfile = 'tax-return-subject-profile'
 const subjectW2A = 'tax-return-subject-w2-a'
@@ -868,6 +905,28 @@ const subjectFounderExpenses = 'tax-return-subject-founder-expenses'
 const subjectMarketplaceProfile = 'tax-return-subject-marketplace-profile'
 const subjectMarketplaceW2 = 'tax-return-subject-marketplace-w2'
 const subjectMarketplaceStatement = 'tax-return-subject-marketplace-1095a'
+// The routing sweep's own subjects, one per document above.
+const subjectSweepProfile = 'tax-return-subject-sweep-profile'
+const subjectSweepInterest = 'tax-return-subject-sweep-1099int'
+const subjectSweepDividend = 'tax-return-subject-sweep-1099div'
+const subjectSweepSocialSecurity = 'tax-return-subject-sweep-ssa1099'
+const subjectSweepPartnershipK1 = 'tax-return-subject-sweep-k1-1065'
+const subjectSweepSCorporationK1 = 'tax-return-subject-sweep-k1-1120s'
+const subjectSweepEstateTrustK1 = 'tax-return-subject-sweep-k1-1041'
+const subjectSweepGainsProfile = 'tax-return-subject-sweep-gains-profile'
+const subjectSweepBrokerage = 'tax-return-subject-sweep-1099b'
+const subjectSweepRealCarryover = 'tax-return-subject-sweep-carryover'
+const subjectSweepCorrectedBrokerage = 'tax-return-subject-sweep-1099b-corrected'
+const subjectSweepBasisCorrection = 'tax-return-subject-sweep-basis-correction'
+const subjectSweepEspp = 'tax-return-subject-sweep-form3922'
+const subjectSweepDeductionProfile = 'tax-return-subject-sweep-deduction-profile'
+const subjectSweepItemized = 'tax-return-subject-sweep-itemized'
+const subjectSweepMedical = 'tax-return-subject-sweep-medical'
+const subjectSweepAdjustmentProfile = 'tax-return-subject-sweep-adjustment-profile'
+const subjectSweepAdjustments = 'tax-return-subject-sweep-adjustments'
+const subjectSweepStudentLoan = 'tax-return-subject-sweep-1098e'
+const subjectSweepIsoProfile = 'tax-return-subject-sweep-iso-profile'
+const subjectSweepIso = 'tax-return-subject-sweep-form3921'
 
 /** @type {Readonly<Record<string, EngineDocument | { readonly dialect: string, readonly taxYear?: number }>>} */
 const documentByHash = {
@@ -1142,13 +1201,15 @@ const documentByHash = {
     // document routing. That is the Phase 24 lesson this file's own founder
     // block records, arriving for the eighth time.
     //
-    // **The same hole is still open for the other twenty-five dispatched
-    // dialects**, and it is reported rather than closed here:
-    // `sourceAndTwinDispatchOnTheSameTwentyFourDialects` greps the SOURCE
-    // text for each tag and asserts nothing at all about the TWIN's branch,
-    // so any route branch whose dialect has no fixture in this file can be
-    // deleted silently. Closing it properly needs one minimal document per
-    // dialect, which is a sweep rather than a slice.
+    // **[CLOSED] The same hole was still open for the other twenty-five
+    // dispatched dialects when this paragraph was written**, and it said so
+    // rather than closing it: `sourceAndTwinDispatchOnTheSameTwentyFourDialects`
+    // greps the SOURCE text for each tag and asserts nothing at all about the
+    // TWIN's branch, so any route branch whose dialect had no fixture in this
+    // file could be deleted silently. The sweep it asked for is
+    // {@link proof.routingSweep}, and it measured the hole before closing it:
+    // fifteen of the twenty-six branches were deletable with the whole suite
+    // green. Every one of the twenty-six now reddens at least one leaf.
     [fixtureMarketplaceProfileHash]: {
         dialect: returnProfileDialect,
         taxYear: 2025,
@@ -1203,6 +1264,269 @@ const documentByHash = {
             amount: '90.00',
         }],
     },
+    // ── The routing sweep's own twenty-one documents ────────────────────
+    //
+    // Persona 1: the portfolio filer. Every document below lands on a line
+    // that needs NO declaration to be computed (`declaredKinds` gates
+    // whole-return refusals, not individual modeled lines), so the four
+    // amounts are deliberately DIFFERENT — a 1099-INT misrouted into a K-1
+    // bucket, or a K-1 into the 1099-INT's, would print the wrong figure
+    // rather than the right one by coincidence.
+    [fixtureSweepProfileHash]: {
+        dialect: returnProfileDialect,
+        taxYear: 2025,
+        filingStatus: 'single',
+        dependentCount: 0,
+        declaredKinds: [
+            'taxableInterest', 'ordinaryDividends', 'qualifiedDividends',
+            'socialSecurityBenefits',
+        ],
+    },
+    [fixtureSweepInterestHash]: {
+        dialect: oneZeroNineNineIntDialect,
+        payerTin: '33-3333333',
+        recipientTin: '222-22-2222',
+        accountNumber: 'ACC-SWEEP-INT',
+        taxYear: 2025,
+        formRevision: '2025',
+        box1InterestIncome: '5000.00',
+    },
+    [fixtureSweepDividendHash]: {
+        dialect: oneZeroNineNineDivDialect,
+        payerTin: '44-4444444',
+        recipientTin: '222-22-2222',
+        accountNumber: 'ACC-SWEEP-DIV',
+        taxYear: 2025,
+        formRevision: '2025',
+        sourceArtifactHash: 'deadbeef00112233445566778899aabbccddeeff0011223344556677889900',
+        box1aTotalOrdinaryDividends: '1000.00',
+        box1bQualifiedDividends: '400.00',
+    },
+    // `payerTin: ''` is the dialect's own deliberate deviation — an SSA-1099
+    // prints no payer TIN, and a non-empty one is refused.
+    [fixtureSweepSocialSecurityHash]: {
+        dialect: ssa1099Dialect,
+        payerTin: '',
+        recipientTin: '222-22-2222',
+        accountNumber: 'CLAIM-SWEEP',
+        taxYear: 2025,
+        formRevision: '2025',
+        box5NetBenefits: '12000.00',
+    },
+    // The three K-1 faces, each carrying interest AND NOTHING ELSE. Their
+    // interest boxes are numbered 5, 4 and 1 on the three printed faces —
+    // the collision DOC-24's separate dialects exist to prevent — and the
+    // ordinary-business-income boxes are deliberately absent, because those
+    // trip `fjs/return/tripwire`'s undeclared-kind refusals and would make
+    // each leaf a proof about a declaration rather than about routing.
+    [fixtureSweepPartnershipK1Hash]: {
+        dialect: k1PartnershipDialect,
+        payerTin: '33-3333333',
+        recipientTin: '222-22-2222',
+        accountNumber: 'PTR-SWEEP',
+        taxYear: 2025,
+        formRevision: '2025',
+        boxGGeneralPartnerOrLlcMemberManager: true,
+        materialParticipation: 'materiallyParticipated',
+        box5InterestIncome: '700.00',
+    },
+    [fixtureSweepSCorporationK1Hash]: {
+        dialect: k1SCorporationDialect,
+        payerTin: '44-4444444',
+        recipientTin: '222-22-2222',
+        accountNumber: 'SHR-SWEEP',
+        taxYear: 2025,
+        formRevision: '2025',
+        materialParticipation: 'materiallyParticipated',
+        box4InterestIncome: '30.00',
+    },
+    // No `accountNumber`: the Schedule K-1 (Form 1041) face has no such box.
+    [fixtureSweepEstateTrustK1Hash]: {
+        dialect: k1EstateTrustDialect,
+        payerTin: '66-6666666',
+        recipientTin: '222-22-2222',
+        taxYear: 2025,
+        formRevision: '2025',
+        boxHDomesticBeneficiary: true,
+        materialParticipation: 'materiallyParticipated',
+        box1InterestIncome: '400.00',
+    },
+    // Persona 2: the investor who declares capital gains. `filingScheduleD`
+    // is read VERBATIM off this declaration and never off document
+    // presence, so without it a stored 1099-B, a stored carryover and a
+    // stored basis correction are each dropped in a different way.
+    [fixtureSweepGainsProfileHash]: {
+        dialect: returnProfileDialect,
+        taxYear: 2025,
+        filingStatus: 'single',
+        dependentCount: 0,
+        declaredKinds: ['capitalGainsOrLosses'],
+    },
+    [fixtureSweepBrokerageHash]: {
+        dialect: oneZeroNineNineBDialect,
+        payerTin: '55-5555555',
+        recipientTin: '222-22-2222',
+        accountNumber: 'ACC-SWEEP-B',
+        taxYear: 2025,
+        formRevision: '2025',
+        sourceArtifactHash: 'deadbeef00112233445566778899aabbccddeeff0011223344556677889900',
+        box1aDescriptionOfProperty: '100 sh SOMECO',
+        box1dProceeds: '5000.00',
+        box1eCostOrOtherBasis: '3000.00',
+        box2ShortTermGainOrLoss: true,
+    },
+    // A carryover with REAL figures. The Phase 21 fixture above carries four
+    // zeros — it proves the year exemption and nothing else, which is why
+    // deleting this dialect's route branch left the whole suite green.
+    [fixtureSweepRealCarryoverHash]: {
+        dialect: priorYearCapitalLossDialect,
+        recipientTin: '222-22-2222',
+        taxYear: 2024,
+        priorYearFormLine15: '20000.00',
+        priorYearScheduleDLine7: '-10000.00',
+        priorYearScheduleDLine15: '1000.00',
+        priorYearScheduleDLine21: '-3000.00',
+    },
+    // The RSU pair: a broker who reported $0.00 of basis because that is
+    // what the employee paid, and the correction that says the whole
+    // proceeds figure is already inside Form W-2 box 1.
+    [fixtureSweepCorrectedBrokerageHash]: {
+        dialect: oneZeroNineNineBDialect,
+        payerTin: '77-7777777',
+        recipientTin: '222-22-2222',
+        accountNumber: 'ACC-SWEEP-RSU',
+        taxYear: 2025,
+        formRevision: '2025',
+        sourceArtifactHash: 'deadbeef00112233445566778899aabbccddeeff0011223344556677889900',
+        box1aDescriptionOfProperty: '40 sh MEGACORP',
+        box1dProceeds: '6000.00',
+        box1eCostOrOtherBasis: '0.00',
+        box2ShortTermGainOrLoss: true,
+        box12BasisReportedToIrs: true,
+    },
+    [fixtureSweepBasisCorrectionHash]: {
+        dialect: basisCorrectionDialect,
+        recipientTin: '222-22-2222',
+        taxYear: 2025,
+        brokerageDocumentHash: fixtureSweepCorrectedBrokerageHash,
+        correctedCostOrOtherBasis: '6000.00',
+        reason: '40 restricted stock units vested at $150.00 and the whole $6,000.00 is '
+            + 'inside Form W-2 box 1; the broker reported $0.00 because that is what the '
+            + 'employee paid.',
+    },
+    // Form 3922 is the one dispatched dialect with NO figure of its own on
+    // any printed line: its only reader is a refusal. See the leaf.
+    [fixtureSweepEsppHash]: {
+        dialect: formThirtyNineTwentyTwoDialect,
+        payerTin: '11-1111111',
+        recipientTin: '222-22-2222',
+        accountNumber: 'ACC-SWEEP-ESPP',
+        taxYear: 2025,
+        formRevision: 'April 2025',
+        sourceArtifactHash: 'deadbeef00112233445566778899aabbccddeeff0011223344556677889900',
+        box1DateOptionGranted: '01/01/2025',
+        box2DateOptionExercised: '06/30/2025',
+        box3FairMarketValuePerShareOnGrantDate: '100.00',
+        box4FairMarketValuePerShareOnExerciseDate: '150.00',
+        box5ExercisePricePaidPerShare: '85.00',
+        box6NumberOfSharesTransferred: '100',
+        box7DateLegalTitleTransferred: '06/30/2025',
+        box8ExercisePricePerShareAsIfExercisedOnGrantDate: '85.00',
+    },
+    // Persona 3: the itemizer, with NO income document at all. That is what
+    // makes both deduction dialects observable in one figure each — §213's
+    // 7.5%-of-AGI medical floor is 7.5% of nothing here, so the medical
+    // document's own amount survives to Schedule A line 4 intact.
+    //
+    // `itemizeEvenThoughLessThanStandardDeduction` is the line 18 election.
+    // Without it `deductionChoice` takes the $15,750.00 standard deduction
+    // and BOTH documents become invisible — which is not a routing fact and
+    // would make these leaves prove the wrong thing.
+    [fixtureSweepDeductionProfileHash]: {
+        dialect: returnProfileDialect,
+        taxYear: 2025,
+        filingStatus: 'single',
+        dependentCount: 0,
+        declaredKinds: ['itemizedDeductions'],
+        itemizeEvenThoughLessThanStandardDeduction: true,
+    },
+    [fixtureSweepItemizedHash]: {
+        dialect: itemizedDeductionsDialect,
+        recipientTin: '222-22-2222',
+        taxYear: 2025,
+        entries: [{
+            lineTag: 'saltIncomeTax',
+            provider: 'State of California',
+            amount: '4200.00',
+        }],
+    },
+    [fixtureSweepMedicalHash]: {
+        dialect: medicalExpensesDialect,
+        recipientTin: '222-22-2222',
+        taxYear: 2025,
+        entries: [{
+            datePaid: '2025-03-01',
+            provider: 'Some Hospital',
+            category: 'medical',
+            amount: '1000.00',
+        }],
+    },
+    // Persona 4: the filer with two above-the-line adjustments and nothing
+    // else. Both reach 1040 line 10 through Schedule 1 Part II, which is why
+    // they share a profile and are asserted one document at a time.
+    [fixtureSweepAdjustmentProfileHash]: {
+        dialect: returnProfileDialect,
+        taxYear: 2025,
+        filingStatus: 'single',
+        dependentCount: 0,
+        declaredKinds: ['educatorExpenses', 'studentLoanInterestDeduction'],
+    },
+    [fixtureSweepAdjustmentsHash]: {
+        dialect: adjustmentsDialect,
+        recipientTin: '222-22-2222',
+        taxYear: 2025,
+        entries: [{
+            lineTag: 'educatorExpenses',
+            datePaid: '2025-09-02',
+            description: 'classroom supplies',
+            amount: '300.00',
+            individual: 'taxpayer',
+        }],
+    },
+    [fixtureSweepStudentLoanHash]: {
+        dialect: oneZeroNineEightEDialect,
+        payerTin: '55-5555555',
+        recipientTin: '222-22-2222',
+        accountNumber: 'LOAN-SWEEP',
+        taxYear: 2025,
+        formRevision: '2025',
+        box1StudentLoanInterestReceived: '1000.00',
+    },
+    // Persona 5: the employee who exercised an incentive stock option and
+    // held the shares. `alternativeMinimumTax` must be declared — the
+    // tripwire fires on the DOCUMENT'S MERE PRESENCE, with no threshold,
+    // because a Form 3921 is issued for nothing except an ISO exercise.
+    [fixtureSweepIsoProfileHash]: {
+        dialect: returnProfileDialect,
+        taxYear: 2025,
+        filingStatus: 'single',
+        dependentCount: 0,
+        declaredKinds: ['alternativeMinimumTax'],
+    },
+    [fixtureSweepIsoHash]: {
+        dialect: formThirtyNineTwentyOneDialect,
+        payerTin: '11-1111111',
+        recipientTin: '222-22-2222',
+        accountNumber: 'ACC-SWEEP-ISO',
+        taxYear: 2025,
+        formRevision: 'April 2025',
+        sourceArtifactHash: 'deadbeef00112233445566778899aabbccddeeff0011223344556677889900',
+        box1DateOptionGranted: '01/03/2023',
+        box2DateOptionExercised: '03/13/2025',
+        box3ExercisePricePerShare: '5.00',
+        box4FairMarketValuePerShareOnExerciseDate: '105.00',
+        box5NumberOfSharesTransferred: '2000',
+    },
 }
 
 /** @type {Readonly<Record<string, string>>} */
@@ -1233,6 +1557,27 @@ const snapshotBySubject = {
     [subjectMarketplaceProfile]: fixtureMarketplaceProfileHash,
     [subjectMarketplaceW2]: fixtureMarketplaceW2Hash,
     [subjectMarketplaceStatement]: fixtureMarketplaceStatementHash,
+    [subjectSweepProfile]: fixtureSweepProfileHash,
+    [subjectSweepInterest]: fixtureSweepInterestHash,
+    [subjectSweepDividend]: fixtureSweepDividendHash,
+    [subjectSweepSocialSecurity]: fixtureSweepSocialSecurityHash,
+    [subjectSweepPartnershipK1]: fixtureSweepPartnershipK1Hash,
+    [subjectSweepSCorporationK1]: fixtureSweepSCorporationK1Hash,
+    [subjectSweepEstateTrustK1]: fixtureSweepEstateTrustK1Hash,
+    [subjectSweepGainsProfile]: fixtureSweepGainsProfileHash,
+    [subjectSweepBrokerage]: fixtureSweepBrokerageHash,
+    [subjectSweepRealCarryover]: fixtureSweepRealCarryoverHash,
+    [subjectSweepCorrectedBrokerage]: fixtureSweepCorrectedBrokerageHash,
+    [subjectSweepBasisCorrection]: fixtureSweepBasisCorrectionHash,
+    [subjectSweepEspp]: fixtureSweepEsppHash,
+    [subjectSweepDeductionProfile]: fixtureSweepDeductionProfileHash,
+    [subjectSweepItemized]: fixtureSweepItemizedHash,
+    [subjectSweepMedical]: fixtureSweepMedicalHash,
+    [subjectSweepAdjustmentProfile]: fixtureSweepAdjustmentProfileHash,
+    [subjectSweepAdjustments]: fixtureSweepAdjustmentsHash,
+    [subjectSweepStudentLoan]: fixtureSweepStudentLoanHash,
+    [subjectSweepIsoProfile]: fixtureSweepIsoProfileHash,
+    [subjectSweepIso]: fixtureSweepIsoHash,
 }
 
 /**
@@ -1941,6 +2286,374 @@ export const proof = {
         assertEq(cents('1040 line 9'), 0n)
         assertEq(cents('1040 line 25b'), 0n)
         assertEq(cents('1040 line 34'), 0n)
+    },
+    // ── The routing sweep: one leaf per dispatched dialect that had none ──
+    //
+    // **What this block is, and what a green suite without it was hiding.**
+    // TAX-37 closed `vnd.fjs.1095a` by mutation and wrote down that the same
+    // hole stayed open for the other twenty-five dispatched dialects. It was
+    // measured rather than estimated: deleting ONE line of
+    // {@link routeDocument} at a time and running `npm test` for each of the
+    // twenty-six branches, FIFTEEN deletions left all 2,572 proofs green —
+    // `vnd.fjs.1099int`, `1099div`, `1099b`, `ssa1099`, `itemized_deductions`,
+    // `medical_expenses`, `prior_year_capital_loss`, `adjustments`, `1098e`,
+    // `form3921`, `form3922`, `basis_correction`, `k1_1065`, `k1_1120s` and
+    // `k1_1041`. Every one of those dialects could have been silently
+    // unrouted in production and nothing here would have said so.
+    //
+    // `fjs/form1040/core`'s own end-to-end leaves cannot see it, and that is
+    // the whole point: they hand `form1040Report` a `Form1040Inputs`
+    // directly and never travel through a stored document at all. Only a
+    // leaf that starts from a SUBJECT can.
+    //
+    // Each leaf below is paired with the mutation that reddens it, and every
+    // expected figure is hand-derived from the printed rules at the leaf,
+    // never read out of a run.
+    //
+    // **The narrowing Phases 25, 26 and 27 each recorded applies to every
+    // leaf here too, and they do not close it.** `runTwin` interprets
+    // {@link taxReturnReport} — the function TWIN. The literal
+    // {@link taxReturnReportSource} is executed only by
+    // `tax-return-integration.test.js`, whose fixture is two W-2s and a
+    // 1099-G, so the SOURCE text's own twenty-six route lines remain covered
+    // by a `String.includes` and nothing else.
+    // `fjs/todo/tax-return-report-source-k1-routes-unexercised.md` sizes that
+    // separate gap for three of them and is still OPEN.
+    routingSweep: {
+        // THE CONTROL for the six portfolio leaves. The same profile with
+        // every document withheld: each line they move is zero, and the
+        // return still computes. Without it, a leaf asserting `$5,000.00`
+        // could not distinguish "the 1099-INT was routed" from "the profile
+        // alone produces $5,000.00 of interest somehow".
+        theProfileAloneComputesEveryPortfolioLineAtZero: () => {
+            const result = runTwin([subjectSweepProfile])
+            assert(result.kind === 'ok', ['expected a computed return', result])
+            if (result.kind !== 'ok') {
+                return
+            }
+            const cents = renderedCents(result)
+            assertEq(cents('1040 line 2b'), 0n)
+            assertEq(cents('1040 line 3a'), 0n)
+            assertEq(cents('1040 line 3b'), 0n)
+            assertEq(cents('1040 line 6a'), 0n)
+        },
+        // `vnd.fjs.1099int`. Box 1 is taxable interest and 1040 line 2b is
+        // where it prints: $5,000.00 of box 1 and nothing else in the store,
+        // so line 2b is $5,000.00 exactly. Deleting the twin's
+        // `oneZeroNineNineIntDialect` branch drops the document and line 2b
+        // returns to the control's zero.
+        aStoredFormTenNinetyNineIntReachesLineTwoB: () => {
+            const result = runTwin([subjectSweepProfile, subjectSweepInterest])
+            assert(result.kind === 'ok', ['expected a computed return', result])
+            if (result.kind !== 'ok') {
+                return
+            }
+            const cents = renderedCents(result)
+            assertEq(cents('1040 line 2b'), 500000n, '$5,000.00 of box 1 interest')
+            // Box 1 is TAXABLE interest; line 2a is the tax-exempt line and
+            // this document carries no box 8. Asserted because the two lines
+            // are one transposition apart.
+            assertEq(cents('1040 line 2a'), 0n)
+        },
+        // `vnd.fjs.1099div`. Box 1a is the ordinary-dividend total and box 1b
+        // is the qualified SUBSET of it, so $1,000.00 prints on line 3b and
+        // $400.00 on line 3a — the subset is never added into 3b twice.
+        aStoredFormTenNinetyNineDivReachesLinesThreeAAndThreeB: () => {
+            const result = runTwin([subjectSweepProfile, subjectSweepDividend])
+            assert(result.kind === 'ok', ['expected a computed return', result])
+            if (result.kind !== 'ok') {
+                return
+            }
+            const cents = renderedCents(result)
+            assertEq(cents('1040 line 3b'), 100000n, '$1,000.00 of box 1a')
+            assertEq(cents('1040 line 3a'), 40000n, '$400.00 of box 1b, the qualified subset')
+        },
+        // `vnd.fjs.ssa1099`. Line 6a is box 5 verbatim; line 6b is §86's
+        // eighteen-line worksheet, and for a single filer with $12,000.00 of
+        // benefits and NO other income the worksheet's line 5 is half the
+        // benefits ($6,000.00), which is below the $25,000.00 base amount —
+        // so none of it is taxable. Both halves are asserted, because a
+        // wiring that dropped the worksheet and printed 6a on 6b would pass a
+        // leaf that only checked 6a.
+        aStoredFormSsaTenNinetyNineReachesLineSixA: () => {
+            const result = runTwin([subjectSweepProfile, subjectSweepSocialSecurity])
+            assert(result.kind === 'ok', ['expected a computed return', result])
+            if (result.kind !== 'ok') {
+                return
+            }
+            const cents = renderedCents(result)
+            assertEq(cents('1040 line 6a'), 1200000n, '$12,000.00 of box 5 net benefits')
+            assertEq(cents('1040 line 6b'), 0n, 'and none of it taxable under §86')
+        },
+        // `vnd.fjs.k1_1065`. The partner's interest is box FIVE on this face.
+        // $700.00, and nothing else in the store, so line 2b is $700.00 — a
+        // different figure from the 1099-INT leaf's and from the other two
+        // K-1 leaves', so a document routed into the wrong bucket prints the
+        // wrong number rather than the right one by coincidence.
+        aStoredPartnershipScheduleKOneReachesLineTwoB: () => {
+            const result = runTwin([subjectSweepProfile, subjectSweepPartnershipK1])
+            assert(result.kind === 'ok', ['expected a computed return', result])
+            if (result.kind !== 'ok') {
+                return
+            }
+            assertEq(renderedCents(result)('1040 line 2b'), 70000n, '$700.00 of box 5')
+        },
+        // `vnd.fjs.k1_1120s`. The shareholder's interest is box FOUR.
+        aStoredSCorporationScheduleKOneReachesLineTwoB: () => {
+            const result = runTwin([subjectSweepProfile, subjectSweepSCorporationK1])
+            assert(result.kind === 'ok', ['expected a computed return', result])
+            if (result.kind !== 'ok') {
+                return
+            }
+            assertEq(renderedCents(result)('1040 line 2b'), 3000n, '$30.00 of box 4')
+        },
+        // `vnd.fjs.k1_1041`. The beneficiary's interest is box ONE — the box
+        // number that is ordinary business income on the other two faces.
+        aStoredEstateTrustScheduleKOneReachesLineTwoB: () => {
+            const result = runTwin([subjectSweepProfile, subjectSweepEstateTrustK1])
+            assert(result.kind === 'ok', ['expected a computed return', result])
+            if (result.kind !== 'ok') {
+                return
+            }
+            assertEq(renderedCents(result)('1040 line 2b'), 40000n, '$400.00 of box 1')
+        },
+        // THE CONTROL for the four capital-gains leaves: the same declaring
+        // profile with every document withheld computes line 7a at zero.
+        theCapitalGainsProfileAloneComputesLineSevenAAtZero: () => {
+            const result = runTwin([subjectSweepGainsProfile])
+            assert(result.kind === 'ok', ['expected a computed return', result])
+            if (result.kind !== 'ok') {
+                return
+            }
+            assertEq(renderedCents(result)('1040 line 7a'), 0n)
+        },
+        // `vnd.fjs.1099b`. One short-term sale: $5,000.00 of proceeds less
+        // $3,000.00 of basis is a $2,000.00 gain, which is Schedule D's whole
+        // line 16 and therefore 1040 line 7a.
+        aStoredFormTenNinetyNineBReachesLineSevenA: () => {
+            const result = runTwin([subjectSweepGainsProfile, subjectSweepBrokerage])
+            assert(result.kind === 'ok', ['expected a computed return', result])
+            if (result.kind !== 'ok') {
+                return
+            }
+            assertEq(
+                renderedCents(result)('1040 line 7a'),
+                200000n,
+                '$5,000.00 of proceeds less $3,000.00 of basis')
+        },
+        // `vnd.fjs.prior_year_capital_loss`, with figures that are not zeros.
+        //
+        // **This dialect already had a fixture and the branch was still
+        // deletable**, which is the sharpest lesson in this block: Phase 21's
+        // carryover document carries `'0.00'` in all four fields, so the leaf
+        // that proves its YEAR exemption asserts the fixture's own unchanged
+        // refund either way. A fixture is not coverage.
+        //
+        // The 2024 Capital Loss Carryover Worksheet, on the four stored
+        // figures: prior-year 1040 line 15 was $20,000.00 and prior-year
+        // Schedule D line 21 was the $3,000.00 cap taken in full, so nothing
+        // was absorbed by a zero-taxable-income year; the short-term loss of
+        // $10,000.00 (line 7) less the $1,000.00 long-term gain (line 15) and
+        // less the $3,000.00 deducted leaves $6,000.00 of short-term
+        // carryover. It arrives on this year's Schedule D line 6, survives to
+        // line 16 as a $6,000.00 net loss, and §1211(b) caps the deduction at
+        // $3,000.00 on line 21 — so line 7a is NEGATIVE $3,000.00.
+        aStoredPriorYearCapitalLossReachesLineSevenA: () => {
+            const result = runTwin([subjectSweepGainsProfile, subjectSweepRealCarryover])
+            assert(result.kind === 'ok', ['expected a computed return', result])
+            if (result.kind !== 'ok') {
+                return
+            }
+            assertEq(
+                renderedCents(result)('1040 line 7a'),
+                -300000n,
+                '$3,000.00 of the $6,000.00 carryover, §1211(b)\'s cap')
+        },
+        // `vnd.fjs.basis_correction`, and its own control in one leaf. The
+        // broker reported $6,000.00 of proceeds against $0.00 of basis
+        // because $0.00 is what the employee paid for restricted stock; the
+        // correction says the $6,000.00 is already inside Form W-2 box 1. So
+        // the corrected return has NO gain, and the uncorrected one has a
+        // $6,000.00 one. Both figures are asserted, because a correction that
+        // was routed but ignored and one that was never routed at all produce
+        // the same line without the pair.
+        aStoredBasisCorrectionMovesLineSevenAToZero: () => {
+            const corrected = runTwin([
+                subjectSweepGainsProfile, subjectSweepCorrectedBrokerage,
+                subjectSweepBasisCorrection,
+            ])
+            assert(corrected.kind === 'ok', ['expected a computed return', corrected])
+            if (corrected.kind === 'ok') {
+                assertEq(
+                    renderedCents(corrected)('1040 line 7a'),
+                    0n,
+                    'basis corrected to the $6,000.00 already taxed as wages')
+            }
+            const uncorrected = runTwin([subjectSweepGainsProfile, subjectSweepCorrectedBrokerage])
+            assert(uncorrected.kind === 'ok', ['expected a computed return', uncorrected])
+            if (uncorrected.kind === 'ok') {
+                assertEq(
+                    renderedCents(uncorrected)('1040 line 7a'),
+                    600000n,
+                    'and $6,000.00 of phantom gain without the correction')
+            }
+        },
+        // `vnd.fjs.form3922` — **the one dispatched dialect with no figure of
+        // its own on any printed line.** Its only reader in the entire engine
+        // is a refusal: an ESPP share sale's ordinary-income component is on
+        // the employee's Form W-2, not on the Form 3922, so a stored 3922
+        // beside a stored sale is a return this engine cannot price and says
+        // so. There is therefore no "computes X" leaf to write for it, and
+        // inventing one would be the fake assertion this repository has
+        // already paid for four times.
+        //
+        // The refusal IS the observable, and it is a genuine routing proof:
+        // delete the `formThirtyNineTwentyTwoDialect` branch and the document
+        // never reaches Form 8949, so the sale computes and this leaf reddens
+        // on the `kind` assertion. The second half is the control — the same
+        // sale without the 3922 computes the $2,000.00 gain.
+        aStoredFormThirtyNineTwentyTwoRefusesTheSaleItCannotPrice: () => {
+            const refused = runTwin([
+                subjectSweepGainsProfile, subjectSweepBrokerage, subjectSweepEspp,
+            ])
+            assertEq(refused.kind, 'error', 'a stored Form 3922 beside a sale must refuse')
+            if (refused.kind === 'error') {
+                // The informative half of the message, not the easy half:
+                // WHICH document the reader has to go and look at.
+                assert(
+                    refused.message.includes(fixtureSweepEsppHash),
+                    ['the refusal must name the Form 3922', refused.message])
+                assertEq(
+                    refused.unmodeled.length,
+                    0,
+                    'a document-data-sufficiency refusal names no fjs/return/scope kind')
+            }
+            const control = runTwin([subjectSweepGainsProfile, subjectSweepBrokerage])
+            assert(control.kind === 'ok', ['the same sale without the 3922 must compute', control])
+            if (control.kind === 'ok') {
+                assertEq(renderedCents(control)('1040 line 7a'), 200000n)
+            }
+        },
+        // THE CONTROL for the two deduction leaves. The itemizer's profile
+        // with both documents withheld: Schedule A totals nothing, and the
+        // line 18 election means nothing is what line 12e prints.
+        theItemizerProfileAloneComputesLineTwelveEAtZero: () => {
+            const result = runTwin([subjectSweepDeductionProfile])
+            assert(result.kind === 'ok', ['expected a computed return', result])
+            if (result.kind !== 'ok') {
+                return
+            }
+            assertEq(renderedCents(result)('1040 line 12e'), 0n)
+        },
+        // `vnd.fjs.itemized_deductions`. One $4,200.00 state income tax
+        // entry, which is below §164(b)(6)'s $10,000.00 cap and so survives
+        // whole to Schedule A line 5e, line 7 and the line 17 total.
+        aStoredItemizedDeductionsDocumentReachesLineTwelveE: () => {
+            const result = runTwin([subjectSweepDeductionProfile, subjectSweepItemized])
+            assert(result.kind === 'ok', ['expected a computed return', result])
+            if (result.kind !== 'ok') {
+                return
+            }
+            assertEq(
+                renderedCents(result)('1040 line 12e'),
+                420000n,
+                '$4,200.00 of state income tax, under the $10,000.00 cap')
+        },
+        // `vnd.fjs.medical_expenses`. §213(a) allows the excess over 7.5% of
+        // AGI, and this filer's AGI is zero — no income document at all — so
+        // 7.5% of it is zero and the whole $1,000.00 survives to Schedule A
+        // line 4. Chosen deliberately over pairing it with wages: with wages
+        // the floor eats a small figure entirely, and a leaf asserting zero
+        // could not tell a routed document from an unrouted one.
+        aStoredMedicalExpensesDocumentReachesLineTwelveE: () => {
+            const result = runTwin([subjectSweepDeductionProfile, subjectSweepMedical])
+            assert(result.kind === 'ok', ['expected a computed return', result])
+            if (result.kind !== 'ok') {
+                return
+            }
+            assertEq(
+                renderedCents(result)('1040 line 12e'),
+                100000n,
+                '$1,000.00 over a 7.5%-of-nothing floor')
+        },
+        // THE CONTROL for the two adjustment leaves.
+        theAdjustmentProfileAloneComputesLineTenAtZero: () => {
+            const result = runTwin([subjectSweepAdjustmentProfile])
+            assert(result.kind === 'ok', ['expected a computed return', result])
+            if (result.kind !== 'ok') {
+                return
+            }
+            assertEq(renderedCents(result)('1040 line 10'), 0n)
+        },
+        // `vnd.fjs.adjustments`. §62(a)(2)(D) caps the educator-expense
+        // deduction at $300.00 per eligible educator; the entry is $300.00
+        // exactly, so the cap neither bites nor hides the figure, and
+        // Schedule 1 line 11 becomes line 26 becomes 1040 line 10.
+        aStoredAdjustmentsDocumentReachesLineTen: () => {
+            const result = runTwin([subjectSweepAdjustmentProfile, subjectSweepAdjustments])
+            assert(result.kind === 'ok', ['expected a computed return', result])
+            if (result.kind !== 'ok') {
+                return
+            }
+            assertEq(
+                renderedCents(result)('1040 line 10'),
+                30000n,
+                '$300.00 of educator expenses, §62(a)(2)(D)')
+        },
+        // `vnd.fjs.1098e`. §221 allows up to $2,500.00 of student loan
+        // interest, phased out above $85,000.00 of MAGI for a single filer.
+        // Box 1 is $1,000.00 and this filer's MAGI is zero, so neither limit
+        // applies and the whole $1,000.00 reaches Schedule 1 line 21 and
+        // 1040 line 10.
+        aStoredFormTenNinetyEightEReachesLineTen: () => {
+            const result = runTwin([subjectSweepAdjustmentProfile, subjectSweepStudentLoan])
+            assert(result.kind === 'ok', ['expected a computed return', result])
+            if (result.kind !== 'ok') {
+                return
+            }
+            assertEq(
+                renderedCents(result)('1040 line 10'),
+                100000n,
+                '$1,000.00 of box 1, under both §221 limits')
+        },
+        // `vnd.fjs.form3921` — the ISO exercise, and the only one of these
+        // dialects whose whole effect is a TAX rather than an income or
+        // deduction line.
+        //
+        // Hand-derived from the printed forms, and worth reading because the
+        // figure is the point of the form: 2,000 shares exercised at $5.00
+        // when the stock was worth $105.00 is a $200,000.00 §56(b)(3)
+        // preference — income never received, in a year the shares may not be
+        // sellable. This filer has NO other income, so Form 6251 line 1b is
+        // negative $15,750.00 (AGI of nothing less the standard deduction)
+        // and line 2a adds the same $15,750.00 straight back, leaving AMTI at
+        // the preference alone: $200,000.00. TY2025's single AMT exemption is
+        // $88,100.00 and its phase-out does not start until $626,350.00, so
+        // the exemption survives whole: $200,000.00 - $88,100.00 =
+        // $111,900.00, which is below the $239,100.00 point where the rate
+        // steps to 28%, so the tentative minimum tax is 26% of it =
+        // $29,094.00. The regular tax is zero (taxable income is zero), so
+        // Form 6251 line 11 is the whole $29,094.00 and it reaches 1040 line
+        // 17 through Schedule 2 line 2.
+        //
+        // The control is the profile alone: no document, no preference, no
+        // AMT — which also proves the $29,094.00 is the DOCUMENT's and not
+        // the declaration's.
+        aStoredFormThirtyNineTwentyOneReachesLineSeventeen: () => {
+            const result = runTwin([subjectSweepIsoProfile, subjectSweepIso])
+            assert(result.kind === 'ok', ['expected a computed return', result])
+            if (result.kind === 'ok') {
+                const cents = renderedCents(result)
+                assertEq(cents('1040 line 15'), 0n, 'no taxable income at all')
+                assertEq(cents('1040 line 17'), 2909400n, '$29,094.00 of alternative minimum tax')
+                assertEq(cents('1040 line 37'), 2909400n, 'and the whole of it owed')
+            }
+            const control = runTwin([subjectSweepIsoProfile])
+            assert(control.kind === 'ok', ['expected a computed return', control])
+            if (control.kind === 'ok') {
+                assertEq(renderedCents(control)('1040 line 17'), 0n, 'and none of it without the form')
+            }
+        },
     },
     // The one mechanical half of the source/twin hand-sync (see the module
     // header): every dialect tag the TWIN dispatches on appears verbatim in
