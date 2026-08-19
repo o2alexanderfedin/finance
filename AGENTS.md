@@ -304,7 +304,15 @@ typecheck lies, and it lies green.
 Measure from outside the parent checkout, which has no ancestor `node_modules` to find:
 
 ```sh
-rsync -a --delete --exclude .git --exclude .planning "$PWD/" /tmp/measure/
+rsync -a --delete --exclude .git "$PWD/" /tmp/measure/
+
+> **Do not add `--exclude .planning` here.** It was excluded until 2026-08-19, and it broke the
+> suite it exists to measure: `planning-truth-gate.test.js` reads `.planning/REQUIREMENTS.md` and
+> dies `ENOENT`, five failures, in a copy of a perfectly green tree. The exclusion predated that
+> gate — the gate was added later by someone (me) who did not re-run this recipe afterwards. It is
+> the third verification command this week that failed on a healthy tree, so: **after changing any
+> check or any recipe, run it once against a tree you know is green.** A command that complains
+> when nothing is wrong trains the next reader to ignore it.
 ( cd /tmp/measure && npx tsc --noEmit ) | grep -cE 'error TS'
 ```
 
