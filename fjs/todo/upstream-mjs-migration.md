@@ -1,6 +1,11 @@
 # Upstream: migrating to FunctionalScript 0.46.0
 
-Status: **UNBLOCKED AND MEASURED, 2026-08-18.** This note read *"blocking the dependency bump"*
+Status: **DONE except for the `parse` regression, 2026-08-18.** `tsc` is **0** and `npm test`
+is 2505 tests / 2478 pass / **27 fail**, those 27 being the `parse` leaves this note describes
+below, which are blocked on an upstream fix. See "Stage 4" at the end for the final state and
+the retirement condition that remains.
+
+Original status: **UNBLOCKED AND MEASURED, 2026-08-18.** This note read *"blocking the dependency bump"*
 from 2026-08-17 until 0.46.0 shipped. The blocking claim was true of 0.44/0.45 and is **no longer
 true**. Superseded rather than deleted, because the reason 0.45 was refused is the reason 0.46 can
 be taken, and a reader needs both halves.
@@ -203,10 +208,10 @@ Of the 123: **112 are project-local proof leaves** and 11 are root gate/integrat
 Do not read the 123 as a stage-3 estimate: fixing the Effect system leaves the 54 exactly where
 they are.
 
-## Stage 3 — the Effect system: what landed, and the map for what is left
+## Stage 3 — the Effect system: what landed
 
 `tsc` **513 -> 282**. Failing proof leaves **112 -> 113**, of which **27 are the `parse`
-regression** (unchanged set, verified byte-identical) and **86 are Effect work still open**.
+regression** (unchanged set, verified byte-identical) and **86 were Effect work**.
 `fjs/exec`'s `try` is gone and `upstream-total-match-dispatch.md` with it.
 
 **Order taken was `exec` -> `guest` -> `fjs_run`, not `exec` -> `fjs_run`.** `CasOp` — the
@@ -231,46 +236,148 @@ constraint. Doing `guest` second turned 472 into 288 across seven modules at onc
    typechecks as a *bit-vector* complaint (`Property '1' does not exist on type 'Symbol & {
    bit_vec … }'`) and fails at runtime three frames inside `types/bigint`.
 
-### What is left, and the one decision it turns on
+Rule 4 was the right move for stage 3 and the WRONG one to stop at. Stage 4 undid most of its
+sites: a `resultStep` whose continuation immediately branches on `r[0]` is a hand-written
+short-circuit, and moving the failure into the channel deletes the branch instead of typing it.
+`resultStep` is for a site where **both** branches genuinely matter.
 
-| Module | `tsc` | failing leaves |
+## Stage 4 — the payload's `Result` moves to the channel, and `tsc` reaches 0
+
+`tsc` **282 -> 0**. Failing proof leaves **113 -> 27**, and those 27 are the `parse` regression,
+byte-identical to the set stage 2 recorded. Project-local proof leaves **2467 -> 2472**, the five
+new ones being `fjs/refuses`'s own.
+
+Per-pass, measured from outside the checkout each time:
+
+| Pass | `tsc` | leaves failing |
 |---|---|---|
-| `fjs/server/fjs_run` | 149 | 25 |
-| `fjs/server/fjs_run/snapshot` | 40 | 5 |
-| `fjs/report/amend` | 19 | 13 |
-| `demo/steps` | 19 | 0 (not proof-covered) |
-| `fjs/server` | 16 | 3 |
-| `fjs/server/finance_documents_list` | 10 | 8 |
-| `fjs/guest/materialize` | 10 | 4 |
-| `fjs/guest/check` | 9 | 3 |
-| `fjs/report/payer` / `tax_return` / `provenance` | 8 | 23 |
-| `fjs/server/response`, `fjs/index.f.js` | 2 | 2 |
+| `fjs/report/amend` — `readRunRecord`, `readResultRecord` | 282 -> 263 | 113 -> 100 |
+| `fjs/guest/materialize` + `check` + `fjs_run` seams — `materializeProgram`, `loadProgram`, `fjsCheck` | 263 -> 241 | — |
+| `fjs/server/fjs_run/snapshot` — the fold's two skips, and a stale `try` | 241 -> 201 | — |
+| `fjs/server/fjs_run` — the proof spine | 201 -> 58 | 100 -> 63 |
+| `fjs/server`, `finance_documents_list`, `response`, `report/*`, `index.f.js` | 58 -> 19 | 63 -> 28 |
+| `demo/steps/07-sandbox`, and the `fjs` CLI's renamed entry point | 19 -> **0** | 28 -> **27** |
 
-**The decision: this project's OWN fallible helpers still carry their `Result` in the PAYLOAD.**
-`readRunRecord`, `readResultRecord`, `materializeProgram`, `loadProgram` are all declared
-`Effect<O, Result<T, string>, …>` — the pre-0.46.0 spelling, because there was no channel to put
-it in. Every remaining cluster above is downstream of that one choice, and it is a design
-decision rather than a mechanical edit:
+### What the error channel changed about how the code reads
 
-- **Move them to the channel** (`Effect<O, T, string>`). Then `resultMapStep` is the natural
-  combinator at the definition, every caller's hand-written `if (r[0] === 'error')` disappears
-  into a plain `step`, and short-circuiting is the layer's job rather than each call site's. This
-  is what the error channel is FOR, and it is what upstream did to `collectRead`.
-- **Keep the payload spelling.** Cheaper per file, but it leaves two conventions in one codebase
-  and every caller keeps discharging by hand — which is exactly the shape that hid the BigInt bug.
+The decision stage 3 left open was taken as written: this project's own fallible helpers moved
+their `Result` from the payload to the channel, one helper at a time with all callers in the same
+pass. The effect is not that the code got shorter — it is that **the success path became the only
+path a reader has to follow**, and the places that handle failure became the places that decided
+something.
 
-The first is right, and it should be taken deliberately in one pass per helper rather than
-drifted into: changing a helper's channel changes its callers' types, so a half-converted spine
-type-checks in neither spelling.
+`fjs/report/amend` is the clearest single site. Before:
 
-Two smaller items, both recorded rather than done:
+```js
+const compareRunsAndDiff = cas => elected => runHashA => runHashB => resultA => resultB => {
+    if (resultA[0] === 'error') {
+        return pure(error(`could not read run A (${runHashA}): ${resultA[1]}`))
+    }
+    if (resultB[0] === 'error') {
+        return pure(error(`could not read run B (${runHashB}): ${resultB[1]}`))
+    }
+    const runA = resultA[1]
+    const runB = resultB[1]
+    if (runA.programHash !== runB.programHash) { /* the real comparison */ }
+```
 
-- **`foldStep`/`forEachStep` now short-circuit on the first `error`;** the Result-blind ones ran
-  every item. `snapshot` folds over revisions and has a proof
-  (`subjectUndecodableHead`) that depends on skipping an undecodable one. If that fold's items
-  become fallible, the skip must be written as a per-item `catchStep`, not recovered by reverting.
-- **`fjs/exec`'s `unsafeDo` is still `/** @type {any} *\/ (do_)`** — pre-existing, confined to the
-  test-fixture section, and the only `any` under `fjs/`. It exists to build a `Do` node whose
-  command string bypassed `tsc`, which is the exact thing `interpret` is the backstop for. Left
-  as found; removing it needs `interpret`'s signature to admit an effect whose op-set is WIDER
-  than its map's, which is true and currently unsayable.
+After — the two arms are gone from the callee entirely, and the context they added moved to the
+two call sites that know which side is which:
+
+```js
+export const amendmentDiff = cas => elected => runHashA => runHashB => {
+    const runA = catchStep(readRunRecord(cas)(runHashA), e => pureError(`could not read run A (${runHashA}): ${e}`))
+    const runB = catchStep(readRunRecord(cas)(runHashB), e => pureError(`could not read run B (${runHashB}): ${e}`))
+    const both = historyStep(history(runA), () => runB)
+    return step(both, ([b, a]) => compareRunsAndDiff(cas)(elected)(runHashA)(runHashB)(a)(b))
+}
+
+const compareRunsAndDiff = cas => elected => runHashA => runHashB => runA => runB => {
+    if (runA.programHash !== runB.programHash) { /* the real comparison */ }
+```
+
+`compareRunsAndDiff`'s signature is the part that matters: it takes two `Run`s, so the compiler —
+not a comment, and not a reader's care — is what guarantees the comparison below it never sees an
+unread record.
+
+The same shape repeats at every scale. `fjs/guest/check`'s `fjsCheck` lost three nested
+`if (r[0] === 'error')` arms and became five straight-line bindings. `fjs/server/fjs_run`'s
+`executeRun` lost four `pureOk({ kind: 'error', … })` arms to a single named combinator,
+`asRunOutcome`, applied on the last line — which is also where the decision now lives, visibly:
+*this* is the layer that says an infrastructure failure and a guest failure are the same thing to
+a caller, because both end as a `status: 'error'` run record.
+
+Three more things the channel made sayable rather than merely shorter:
+
+- **`Effect<O, T, never>` is a claim.** `fjsRunTool`'s handler and `handleRunOutcome` declare it,
+  and `toolEntry` requires it: an MCP handler turns every failure into a JSON-RPC error response.
+  That was always true and was previously unwritten.
+- **`unwrapStep(e, summary)` is a greppable panic with a scope.** It replaced
+  `assert(writeResult[0] === 'ok', …)` in `writeTextToCas`. Same bare-value panic, but the
+  `summary` argument means a widening error channel becomes a compile error at the site that
+  chose to crash, instead of quietly enlarging what it crashes on.
+- **`exitStep`.** `fjs/index.f.js` was `step(financeMcpServer(…), () => pureOk(0))`, which
+  reported a server that never started as a clean exit 0 — `step` discarded a failure it could not
+  see, because there was nothing to see it in.
+
+### `foldStep` / `forEachStep` short-circuit now, and the skips had to be rewritten
+
+Stage 3 flagged this and stage 4 acted on it. Three folds contained a deliberate SKIP that the
+`Result`-blind fold expressed by simply carrying on:
+
+- `fjs/server/fjs_run/snapshot`'s `buildRunSnapshot` — **two** skips, and they must stay two.
+  A hash `cas.list()` reported but that will not read is skipped; a blob that reads but is not a
+  revision is skipped **while still contributing its bytes to `blobs`**. One outer `catchStep`
+  would have discarded the bytes in the second case, and
+  `undecodableHeadStaysObservable` (subject `subjectUndecodableHead`) is the leaf that measures
+  exactly that difference. Each skip is a `catchStep` around precisely the effect whose failure it
+  forgives.
+- `fjs/server`'s `casRefreshTool` — one unreadable blob must not abandon the dialect count.
+- `fjs/server/finance_documents_list`'s `entryFor` — an undecodable revision and a broken snapshot
+  blob mean the same thing (this (subject, head) pair yields no row), so they are ONE recovery;
+  but it stays per-pair, or one bad document would drop every remaining row.
+
+A failure of `cas.list()` itself is deliberately NOT skipped in any of them and travels the
+channel: a snapshot of a store that cannot be listed is not a smaller snapshot, it is no snapshot.
+
+### The `any`s are gone, and 0.46.0 is what made them sayable
+
+Stage 3 recorded `fjs/exec`'s `unsafeDo` as out of scope because *"removing it needs `interpret`'s
+signature to admit an effect whose op-set is WIDER than its map's, which is true and currently
+unsayable."* That is right about `match` and wrong about what was needed: nothing has to admit a
+wider op-set, because the map and the effect can both live at a wider **vocabulary**. `Operation`
+is `readonly [string, (…) => Result<…>]`, so a command name that is not statically known is an
+ordinary operation type. Each site gained a `ProbeOp` and `probeDo` is an annotated binding of
+`do_`, not an assertion of it.
+
+`fjs/server/fjs_run`'s was different and is worth recording separately: widening was not available
+there, because a `Report` is typed at `CasOp` and `_CasOpIsExactlyTheFourCommands` is a security
+claim. The fixture is placed as a **`JsModule`** instead — `runExecuteRunViaFixture` is a one-line
+adapter over `runExecuteRunViaModuleFixture` — so the adversarial program crosses `import_` exactly
+where a real stored program does, and a `Module` is `StringMap<unknown>` on the far side. The lie
+lands at the untyped boundary, which is where reality puts it.
+
+Both were watched to fail: weakening `interpret`'s guard reddens 8 `fjs/exec` refusal leaves, and
+changing the escaping module's `fetch` to `evoList` reddens exactly
+`nonErrorThrowBecomesErrorResult`.
+
+### Two findings that were not Effect work
+
+- **The `fjs` CLI moved.** `cas-refresh-cross-process.test.js` spawned
+  `node_modules/functionalscript/fjs/module.js` by a hard-coded literal; 0.46.0 renamed it
+  `module.mjs`, so the child died with `MODULE_NOT_FOUND` before its first assertion — which reads
+  in a report as "the cross-process refresh broke". It reads `bin.fjs` from the dependency's own
+  manifest now.
+- **`fjs_run`'s error response forwards the host's IO message to the client.** Pre-existing, and
+  0.46.0 is what made it legible, because upstream now ships `errorMessage` (operator) and
+  `errorSummary` (remote) and says which is for whom. Written up in
+  [`mcp-error-text-forwards-host-messages.md`](./mcp-error-text-forwards-host-messages.md) rather
+  than changed inside the migration.
+
+### What is left
+
+**Only the 27 `parse` leaves**, and they are blocked on upstream re-exposing the 0.43.1 verbatim
+validator beside `parse` — see
+[`upstream-rtti-parse-materializes-absent-members.md`](./upstream-rtti-parse-materializes-absent-members.md).
+Every workaround available here needs a cast or a hand-asserted type predicate. When that lands,
+consume it and this note's retirement condition is met but for the report.
