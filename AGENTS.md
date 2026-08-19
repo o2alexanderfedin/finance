@@ -43,10 +43,10 @@ facilitate Emergent Design sessions
 ## Code style
 
 - Never use `l` as an identifier — it's too easily misread as `1` or `I`.
-- Import types with `@import { Name } from '...'` (a top-level JSDoc comment), not inline `@type {import('...').Name}`. Example:
+- Import types with `@import { Name } from '...'` (a top-level JSDoc comment), not inline `@type {import('...').Name}`. A FunctionalScript type comes from the sibling `types.js`, never from `module.f.mjs`: since 0.46.0 upstream declares every type in a `types.ts` beside the module, and `types.js` is the specifier that resolves to the shipped `types.d.ts` without `allowImportingTsExtensions`, which this project deliberately does not enable. Example:
 
   ```js
-  /** @import { NodeProgram } from 'functionalscript/fjs/effects/node/module.f.js' */
+  /** @import { NodeProgram } from 'functionalscript/fjs/effects/node/types.js' */
 
   /** @type {NodeProgram} */
   export const main = () => /* ... */;
@@ -56,7 +56,7 @@ facilitate Emergent Design sessions
 
 - Any `.f.js` module may export a `proof` object: a tree of zero-argument functions (nested via plain objects/arrays). A leaf passes if it doesn't throw; leaves nested under a `throw` key must throw to pass.
 - `all.test.js` (root) registers every discovered `proof` with Node's test runner, so `node --test` (and thus `npm test`) picks it up automatically via Node's default `*.test.js` convention — no manual test registration or explicit path needed.
-- Add tests by adding/extending a `proof` export in the relevant `.f.js` file (see `node_modules/functionalscript/fjs/dev/proof.f.js` or `.../emergent_testing/example.f.js` for the pattern).
+- Add tests by adding/extending a `proof` export in the relevant `.f.js` file (see `node_modules/functionalscript/fjs/dev/proof.f.mjs` or `.../emergent_testing/example.f.mjs` for the pattern).
 - **Only run proofs through root discovery — `npm test`, or `node --test all.test.js`.** Emergent Testing registration happens when `all.test.js` is imported; it walks the project via `loadModuleMap` and registers every discovered `proof`. Any invocation that bypasses that reports a *fake pass*, not a failure, which is the dangerous direction:
   - `node --test fjs` — errors with `Cannot find module`, because there is no `fjs/index.js` (the entry point is `fjs/index.f.js`). A hard failure is the safe direction; this bullet described a fake pass that the layout no longer permits.
   - `node --test fjs/some/module.f.js` — targeting a source file by explicit path is **also** a fake pass. Node executes it as a plain script; no `proof` leaf runs. Verified by injecting a leaf that throws unconditionally: `npm test` reported `tests 8, pass 7, fail 1`, while `node --test fjs/server/module.f.js` reported `tests 1, pass 1, fail 0` on the identical file.
@@ -80,6 +80,34 @@ These are cited by name throughout the source. They are stated here so the citat
   `typeof e === 'string'` or an array; `e instanceof Error` is `false` and `e.message` is
   `undefined`. Never branch on `instanceof Error` — such a branch misses every refusal this
   codebase raises.
+- **No `try` in a `.f.js`, with exactly one carve-out: [`fjs/refuses`](./fjs/refuses/module.f.js).**
+  `throw` is reserved for panics, so a recoverable failure belongs in a `Result` or in an
+  effect's error channel and is READ, never caught. The carve-out exists because this project's
+  refusals throw BARE values, and a proof that a refusal fired must assert **what** it said —
+  a leaf nested under a `throw` key passes for any throw, which is precisely how the `<`/`<=`
+  mutation in `fjs/tax/table` stayed green. Catching is the only way to read a value that
+  arrives by `throw`.
+
+  The condition is narrow and checkable: **`grep -rn 'try {' fjs --include='*.f.js'` must return
+  exactly one code hit, in `fjs/refuses/module.f.js`.** Scope it to `fjs/**.f.js`, which is what
+  the rule is about. A first version of this line said `fjs demo` and "exactly one", and it was
+  wrong on a healthy tree: `demo/demo.js` has opened a `try` since the showcase was built
+  (`33c6ed1`), catching a step's render failure so a broken step shows on screen instead of
+  leaving a blank page. `demo/` is the browser shell, not FunctionalScript, and the no-`try` rule
+  never applied to it. **A check that fails when everything is well is worse than no check** — it
+  teaches the next reader that its complaint is normal. A proof that needs to observe a refusal calls
+  `refuses(call)(check)`; nothing else may open a `try`. Production code may not, at all —
+  a caller that must handle a refusal wants the check to RETURN it (`fjs/schedule/a`'s
+  `saltIncomeTaxDriftMessage`, with the throwing form as a two-line wrapper over it, is the
+  pattern), and an effect's failure wants `catchStep`.
+
+  This rule is written down because eight `try`s accumulated while it was not. Six were the
+  same idiom copied into four modules — two of them private `refuses` helpers whose own
+  docstrings said they were reimplemented because the other was not exported. One
+  (`fjs/exec`) was a genuine workaround that 0.46.0 retired. One
+  (`fjs/server/fjs_run/snapshot`) had outlived its subject: the code it caught had stopped
+  throwing, so the `assert(false, …)` inside the `try` fired instead and the `catch` caught
+  *that*, leaving the leaf asserting against its own failure message.
 - **No new dependency, including a devDependency, without every repo owner's approval.**
 - **A missing generic capability is written here in this project, shaped so it could be lifted
   upstream unchanged** — no locale or domain assumptions baked into a generic module. See
@@ -257,6 +285,40 @@ node -p "require('./package-lock.json').packages['node_modules/functionalscript'
 cheapest place to catch it. Note also that the vendored-proof total differs between checkouts for
 the same reason (2717 in one, 494 in another, both correct) — a second reason the project-local
 `grep -c` count is the only comparable number.
+
+### A worktree nested inside the checkout makes `tsc` typecheck the PARENT's dependency
+
+Worse than drift, because it reports **zero errors** rather than sixteen. Worktrees live at
+`<repo>/.claude/worktrees/agent-*/`, i.e. *inside* the parent checkout. TypeScript resolves a bare
+specifier by walking every ancestor `node_modules` in a first pass that prefers TypeScript and
+Declaration extensions. FunctionalScript 0.46.0 ships only `.d.mts`, so a legacy
+`functionalscript/**.f.js` specifier finds no `.d.ts` in the worktree's own `node_modules`, keeps
+walking up, and binds to `<repo>/node_modules/functionalscript` — a different, older version.
+
+Measured 2026-08-18 during the 0.46.0 migration: `npx tsc --noEmit` in the worktree reported **0
+errors** against 0.46.0-with-old-specifiers, a state whose true count is **1526**. `--traceResolution`
+names the culprit in one line (`... was successfully resolved to <repo>/node_modules/... @0.43.1`).
+Node's own runtime resolution is *not* affected — it takes the nearest `node_modules` — so only the
+typecheck lies, and it lies green.
+
+Measure from outside the parent checkout, which has no ancestor `node_modules` to find:
+
+```sh
+rsync -a --delete --exclude .git "$PWD/" /tmp/measure/
+
+> **Do not add `--exclude .planning` here.** It was excluded until 2026-08-19, and it broke the
+> suite it exists to measure: `planning-truth-gate.test.js` reads `.planning/REQUIREMENTS.md` and
+> dies `ENOENT`, five failures, in a copy of a perfectly green tree. The exclusion predated that
+> gate — the gate was added later by someone (me) who did not re-run this recipe afterwards. It is
+> the third verification command this week that failed on a healthy tree, so: **after changing any
+> check or any recipe, run it once against a tree you know is green.** A command that complains
+> when nothing is wrong trains the next reader to ignore it.
+( cd /tmp/measure && npx tsc --noEmit ) | grep -cE 'error TS'
+```
+
+Sanity-check any surprisingly clean `tsc` with
+`npx tsc --noEmit --traceResolution | grep -c "$PWD/node_modules"` — a zero there means nothing
+resolved to your own dependencies.
 
 ### The mutation that deletes the last use of a binding does not compile
 

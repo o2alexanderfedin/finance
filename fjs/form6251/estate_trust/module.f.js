@@ -75,7 +75,7 @@
  *
  * @module
  */
-import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
+import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { centsFromString } from '../../exact/module.f.js'
 
 /** @import { K1EstateTrust } from '../../document/k1_1041/module.f.js' */

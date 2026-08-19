@@ -38,15 +38,18 @@
  *
  * @module
  */
-import { tryUtf8 } from 'functionalscript/fjs/text/module.f.js'
-import { computeSync, sha256 } from 'functionalscript/fjs/crypto/sha2/module.f.js'
-import { cBase32ToVec, vecToCBase32 } from 'functionalscript/fjs/basen/cbase32/module.f.js'
-import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
+import { tryUtf8 } from 'functionalscript/fjs/text/module.f.mjs'
+import { computeSync, sha256 } from 'functionalscript/fjs/crypto/sha2/module.f.mjs'
+import { cBase32ToVec, vecToCBase32 } from 'functionalscript/fjs/basen/cbase32/module.f.mjs'
+import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { stringify as jsonText } from '../../json/module.f.js'
-import { fileCas } from 'functionalscript/fjs/cas/module.f.js'
-import { pure } from 'functionalscript/fjs/effects/module.f.js'
-import { emptyState, virtual } from 'functionalscript/fjs/effects/node/virtual/module.f.js'
-import { ok } from 'functionalscript/fjs/types/result/module.f.js'
+import { fileCas } from 'functionalscript/fjs/cas/module.f.mjs'
+import { empty, nonEmpty } from 'functionalscript/fjs/effects/list/module.f.mjs'
+
+/** @import { List } from 'functionalscript/fjs/effects/list/types.js' */
+/** @import { Vec } from 'functionalscript/fjs/types/bit_vec/types.js' */
+/** @import { IoChannel } from 'functionalscript/fjs/effects/node/types.js' */
+import { emptyState, virtual } from 'functionalscript/fjs/effects/node/virtual/module.f.mjs'
 import { dialect as runDialect } from '../../run/module.f.js'
 
 /** @import { TaxParamSet } from '../../tax/params/module.f.js' */
@@ -191,7 +194,9 @@ export const proof = {
             const cas = fileCas(sha256)(home)
             const bytes = tryUtf8(jsonText(taxParams2025))
             assert(bytes !== null, ['expected the parameter-set text to encode as UTF-8', taxParams2025])
-            const [, write] = virtual(emptyState)(cas.write(pure({ first: ok(bytes), tail: pure(undefined) })))
+            /** @type {List<never, Vec, IoChannel>} */
+            const payload = nonEmpty(bytes, empty())
+            const [, write] = virtual(emptyState)(cas.write(payload))
             assert(write[0] === 'ok', ['expected the CAS write to succeed', write])
             assertEq(vecToCBase32(write[1]), paramSetHash(taxParams2025))
         },

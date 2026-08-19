@@ -205,7 +205,7 @@
  *
  * @module
  */
-import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
+import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { of, halfUp } from '../../types/rational/module.f.js'
 import { centsFromString, centsToString } from '../../exact/module.f.js'
 import { form8889PartI } from '../../form8889/module.f.js'

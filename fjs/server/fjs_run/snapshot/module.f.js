@@ -112,24 +112,30 @@
  *
  * @module
  */
-import { step, mapStep, foldStep, pure } from 'functionalscript/fjs/effects/module.f.js'
-import { collectRead, fileCas } from 'functionalscript/fjs/cas/module.f.js'
-import { vecToCBase32 } from 'functionalscript/fjs/basen/cbase32/module.f.js'
-import { utf8ToString, tryUtf8 } from 'functionalscript/fjs/text/module.f.js'
-import { initEvo, evo, syncRevision } from 'functionalscript/fjs/cas/evo/module.f.js'
-import { sha256 } from 'functionalscript/fjs/crypto/sha2/module.f.js'
-import { emptyState, virtual } from 'functionalscript/fjs/effects/node/virtual/module.f.js'
-import { ok } from 'functionalscript/fjs/types/result/module.f.js'
-import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
-import { dialect as revisionDialect } from 'functionalscript/fjs/media/revision/module.f.js'
+import { step, catchStep, mapStep, foldStep, pureOk } from 'functionalscript/fjs/effects/module.f.mjs'
+import { empty, nonEmpty } from 'functionalscript/fjs/effects/list/module.f.mjs'
+import { collectRead, fileCas } from 'functionalscript/fjs/cas/module.f.mjs'
+import { vecToCBase32 } from 'functionalscript/fjs/basen/cbase32/module.f.mjs'
+import { utf8ToString, tryUtf8 } from 'functionalscript/fjs/text/module.f.mjs'
+import { initEvo, evo, syncRevision } from 'functionalscript/fjs/cas/evo/module.f.mjs'
+import { sha256 } from 'functionalscript/fjs/crypto/sha2/module.f.mjs'
+import { emptyState, virtual } from 'functionalscript/fjs/effects/node/virtual/module.f.mjs'
+import { ok, error, unwrap } from 'functionalscript/fjs/types/result/module.f.mjs'
+import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
+import { dialect as revisionDialect } from 'functionalscript/fjs/media/revision/module.f.mjs'
 import { interpret } from '../../../exec/module.f.js'
 import { guestCtx } from '../../../guest/module.f.js'
 import { stringify as jsonText } from '../../../json/module.f.js'
 
-/** @import { Effect, Operation, OperationMap } from 'functionalscript/fjs/effects/module.f.js' */
-/** @import { MemOp } from 'functionalscript/fjs/effects/memory/module.f.js' */
-/** @import { Cas } from 'functionalscript/fjs/cas/module.f.js' */
-/** @import { Evo } from 'functionalscript/fjs/cas/evo/module.f.js' */
+/** @import { Effect, Operation, OperationMap } from 'functionalscript/fjs/effects/types.js' */
+/** @import { Result } from 'functionalscript/fjs/types/result/types.js' */
+/** @import { MemOp } from 'functionalscript/fjs/effects/memory/types.js' */
+/** @import { Cas } from 'functionalscript/fjs/cas/types.js' */
+/** @import { List } from 'functionalscript/fjs/effects/list/types.js' */
+/** @import { Vec } from 'functionalscript/fjs/types/bit_vec/types.js' */
+/** @import { IoChannel, NodeOp } from 'functionalscript/fjs/effects/node/types.js' */
+/** @import { State } from 'functionalscript/fjs/effects/node/virtual/types.js' */
+/** @import { Evo } from 'functionalscript/fjs/cas/evo/types.js' */
 /** @import { CasOp } from '../../../guest/module.f.js' */
 
 // ── RunSnapshot: the whole reachable store, resolved before interpret runs ───
@@ -196,39 +202,43 @@ const emptyFoldState = { ...emptySnapshot, archivedHashes: {} }
  * `heads` entry with `pin.parents`, regardless of what the live store's
  * current head for that subject is. Every other subject's heads resolve
  * live, as normal.
- * @type {<O extends Operation>(cas: Cas<O>) => (evoApi: Evo<O>) => (pin: Pin) => Effect<O | MemOp, RunSnapshot>}
+ * **The two per-item skips are `catchStep`s, and they must stay per-item.**
+ * `foldStep` short-circuits on the first `error` since 0.46.0, where the
+ * `Result`-blind fold it replaced ran every item — so an unreadable blob or
+ * an undecodable revision would now abandon the whole snapshot rather than
+ * being skipped. Each skip is therefore written as a `catchStep` around
+ * exactly the effect whose failure it forgives, and the two are NOT merged
+ * into one: a hash that reads but does not decode as a revision must still
+ * contribute its bytes to `blobs`, which a single outer recovery would
+ * discard. `undecodableHeadStaysObservable` is the leaf that measures this.
+ *
+ * A failure of `cas.list()` itself is NOT skipped and travels the channel: a
+ * snapshot of a store that cannot be listed is not a smaller snapshot, it is
+ * no snapshot.
+ * @type {<O extends Operation>(cas: Cas<O>) => (evoApi: Evo<O>) => (pin: Pin) => Effect<O | MemOp, RunSnapshot, IoChannel>}
  */
 export const buildRunSnapshot = cas => evoApi => pin => {
     const withBlobsAndRevisions = step(
         cas.list(),
         hashes => foldStep(
-            pure(hashes),
+            pureOk(hashes),
             emptyFoldState,
-            hash => state => step(
-                collectRead(cas.read(hash)),
-                blobResult => {
-                    if (blobResult[0] === 'error') {
-                        // A hash cas.list() reported but could not itself be
-                        // read: skip it, mirroring buildCache's own "ignore
-                        // what does not decode" precedent rather than
-                        // failing the whole snapshot over one bad blob.
-                        return pure(state)
-                    }
-                    const hashStr = vecToCBase32(hash)
-                    const blobs = { ...state.blobs, [hashStr]: utf8ToString(blobResult[1]) }
-                    return step(
-                        evoApi.revision(hashStr),
-                        revResult => {
-                            // DOC-15: whether this hash decoded AT ALL, and
-                            // whether it is archived, are both known right
-                            // here — the exact point to record both, rather
-                            // than collapsing them into one "absent from
-                            // revisions" signal that `withHeads` could not
-                            // later tell apart. See the module header's
-                            // "Archived vs. undecodable" section.
-                            const decodedArchived = revResult[0] === 'ok' && revResult[1].archived === true
-                            /** @type {FoldState} */
-                            const nextState = {
+            hash => state => {
+                const read = step(
+                    collectRead(cas.read(hash)),
+                    blob => {
+                        const hashStr = vecToCBase32(hash)
+                        const blobs = { ...state.blobs, [hashStr]: utf8ToString(blob) }
+                        // DOC-15: whether this hash decoded AT ALL, and
+                        // whether it is archived, are both known right
+                        // here — the exact point to record both, rather
+                        // than collapsing them into one "absent from
+                        // revisions" signal that `withHeads` could not
+                        // later tell apart. See the module header's
+                        // "Archived vs. undecodable" section.
+                        const decoded = mapStep(
+                            evoApi.revision(hashStr),
+                            revision => /** @type {FoldState} */ ({
                                 ...state,
                                 blobs,
                                 // A revision flagged `archived: true` is
@@ -239,25 +249,31 @@ export const buildRunSnapshot = cas => evoApi => pin => {
                                 // separate pass afterward. See the module
                                 // header's "Retraction (DOC-15)" section for
                                 // the full guarantee and its honest boundary.
-                                revisions: revResult[0] === 'ok' && revResult[1].archived !== true
-                                    ? { ...state.revisions, [hashStr]: jsonText(revResult[1]) }
-                                    : state.revisions,
+                                revisions: revision.archived === true
+                                    ? state.revisions
+                                    : { ...state.revisions, [hashStr]: jsonText(revision) },
                                 // The explicit "known archived" record
                                 // `withHeads` filters on — NOT set merely
                                 // because this hash failed to decode/read
-                                // (that case leaves `decodedArchived` false,
-                                // so the hash is absent from BOTH `revisions`
-                                // AND `archivedHashes`, and stays observable
-                                // in `heads`).
-                                archivedHashes: decodedArchived
+                                // (that case is the `catchStep` below, which
+                                // leaves the hash absent from BOTH
+                                // `revisions` AND `archivedHashes`, so it
+                                // stays observable in `heads`).
+                                archivedHashes: revision.archived === true
                                     ? { ...state.archivedHashes, [hashStr]: true }
                                     : state.archivedHashes,
-                            }
-                            return pure(nextState)
-                        },
-                    )
-                },
-            ),
+                            }))
+                        // A blob that is not a revision is SKIPPED, not an
+                        // error — buildCache's own "ignore non-revision
+                        // blobs" precedent. Its bytes still reach `blobs`.
+                        return catchStep(decoded, () => pureOk(/** @type {FoldState} */ ({ ...state, blobs })))
+                    },
+                )
+                // A hash cas.list() reported but could not itself be read:
+                // skip it, rather than failing the whole snapshot over one
+                // bad blob.
+                return catchStep(read, () => pureOk(state))
+            },
         ),
     )
     const withSubjects = step(
@@ -266,14 +282,14 @@ export const buildRunSnapshot = cas => evoApi => pin => {
             evoApi.list(),
             activeSubjects => step(
                 evoApi.list(true),
-                archivedSubjects => pure({ ...state, activeSubjects, archivedSubjects }),
+                archivedSubjects => pureOk({ ...state, activeSubjects, archivedSubjects }),
             ),
         ),
     )
     const withHeads = step(
         withSubjects,
         state => foldStep(
-            pure([...state.activeSubjects, ...state.archivedSubjects]),
+            pureOk([...state.activeSubjects, ...state.archivedSubjects]),
             state,
             subject => s => step(
                 evoApi.head(subject),
@@ -293,7 +309,7 @@ export const buildRunSnapshot = cas => evoApi => pin => {
                     // is then `[]` — indistinguishable from an unknown
                     // subject, to a report program.
                     const activeHeadHashes = headHashes.filter(h => state.archivedHashes[h] !== true)
-                    return pure({ ...s, heads: { ...s.heads, [subject]: activeHeadHashes } })
+                    return pureOk({ ...s, heads: { ...s.heads, [subject]: activeHeadHashes } })
                 },
             ),
         ),
@@ -322,43 +338,74 @@ export const buildRunSnapshot = cas => evoApi => pin => {
 // ── buildHostMap: the plain synchronous OperationMap<CasOp, string> ──────────
 
 /**
- * The synchronous `OperationMap<CasOp, string>` `interpret` dispatches
- * through. Every handler reads ONLY from `snapshot` — never performs I/O,
- * never returns an `Effect`.
+ * The synchronous `OperationMap<CasOp, Result<string, string>>` `interpret`
+ * dispatches through. Every handler reads ONLY from `snapshot` — never
+ * performs I/O, never returns an `Effect`.
  *
- * `casRead`/`evoRevision` throw a plain string (never an `Error`) when the
- * hash is absent from the snapshot — consistent with this codebase's
- * bare-throw discipline; `interpret`'s own `assert(typeof thrown ===
- * 'string')` catch-and-report path already converts it into an actionable
- * refusal message.
+ * `casRead`/`evoRevision` answer `error('… not found: <hash>')` when the hash
+ * is absent from the snapshot. **They used to THROW that string**, and the
+ * change is a correction rather than a translation: the throw crossed
+ * `interpret`'s `try` and came back out as
+ * `operation not permitted: blob not found: <hash>; permitted: …` — a
+ * data-availability failure reported as a POLICY refusal. Nothing asserted
+ * the label, so nothing caught it. Now the failure travels the guest's own
+ * error channel, `step` short-circuits the chain on it, and it reaches the
+ * run record under its own name.
+ *
+ * The guest can also now RECOVER from it (`catchStep`), which the throw made
+ * impossible. Nothing here does yet; the capability is the point of the
+ * channel, not an obligation.
+ *
+ * `evoList`/`evoHead` cannot fail: an unknown subject has an empty head list,
+ * which is an answer. They return `ok` unconditionally, and the shared
+ * `Result<string, string>` return type is `CasOp`'s, not each handler's —
+ * an operation set declares one channel for all four.
  *
  * `evoList`'s argument selects active vs. archived: `'true'` (the literal
- * string, since `CasOp` carries only `string -> string`) answers with the
- * archived subjects, anything else with the active ones — mirroring
- * `Evo.list(archived?: true)`'s own default-is-active convention.
- * @type {(snapshot: RunSnapshot) => OperationMap<CasOp, string>}
+ * string, since `CasOp` carries only `string -> Result<string, string>`)
+ * answers with the archived subjects, anything else with the active ones —
+ * mirroring `Evo.list(archived?: true)`'s own default-is-active convention.
+ * @type {(snapshot: RunSnapshot) => OperationMap<CasOp, Result<string, string>>}
  */
 export const buildHostMap = snapshot => ({
     casRead: hash => {
         const blob = snapshot.blobs[hash]
-        if (blob === undefined) {
-            throw `blob not found: ${hash}`
-        }
-        return blob
+        return blob === undefined ? error(`blob not found: ${hash}`) : ok(blob)
     },
-    evoList: archivedFlag => jsonText(
-        archivedFlag === 'true' ? snapshot.archivedSubjects : snapshot.activeSubjects),
-    evoHead: subject => jsonText(snapshot.heads[subject] ?? []),
+    evoList: archivedFlag => ok(jsonText(
+        archivedFlag === 'true' ? snapshot.archivedSubjects : snapshot.activeSubjects)),
+    evoHead: subject => ok(jsonText(snapshot.heads[subject] ?? [])),
     evoRevision: hash => {
         const revision = snapshot.revisions[hash]
-        if (revision === undefined) {
-            throw `revision not found: ${hash}`
-        }
-        return revision
+        return revision === undefined ? error(`revision not found: ${hash}`) : ok(revision)
     },
 })
 
 // ── Tests ────────────────────────────────────────────────────────────────────
+
+/**
+ * A single-chunk `cas.write` payload. **The annotation is load-bearing**:
+ * `nonEmpty`/`empty` are generic in their operation set, and without a
+ * contextual type the write's op-set widens to the whole `Operation`
+ * universe and `virtual` will not accept it.
+ * @type {(bytes: Vec) => List<never, Vec, IoChannel>}
+ */
+const oneChunk = bytes => nonEmpty(bytes, empty())
+
+/**
+ * `virtual`, with the effect's error channel discharged by a panic.
+ *
+ * Every use below is fixture setup — seeding a store, initialising an Evo
+ * cache, resolving a snapshot the proof is about to assert against. A proof
+ * whose fixture cannot be built has no answer to that, so it panics, and
+ * `unwrap` throws a BARE value exactly as `assert` does. Sites that are
+ * *asserting on* the outcome keep plain `virtual` and read the `Result`.
+ * @type {(state: State) => <O extends NodeOp, T, E>(e: Effect<O, T, E>) => readonly [State, T]}
+ */
+const virtualOrPanic = state => e => {
+    const [next, r] = virtual(state)(e)
+    return [next, unwrap(r)]
+}
 
 /** A hand-built snapshot, for the `buildHostMap` proofs that don't need a real store. */
 /** @type {RunSnapshot} */
@@ -412,29 +459,40 @@ export const proof = {
             assertEq(v[0], JSON.stringify(['PINNED_HASH']))
             assert(v[0] !== JSON.stringify(snapshot.heads['subjectS']), 'must not answer with the live head')
         },
-        // A hash absent from the snapshot refuses, and does so by throwing
-        // (this codebase's bare-throw discipline, 07-CONTEXT.md).
+        // A hash absent from the snapshot refuses, and it does so by
+        // ANSWERING — `error('blob not found: <hash>')` — not by throwing.
         //
-        // MERGE NOTE (do not re-revert). A feedback pass rewrote this as a bare
-        // `throw: { casReadOnAbsentHash }` leaf, dropping all three assertions
-        // below, on the stated grounds that "reading a thrown value requires
-        // catching it, and a `.f.js` module may not". That premise is false —
-        // `fjs/exec/module.f.js` catches in shipped production code, and this
-        // proof passes under `npm test`. The `throw:` form is strictly weaker:
-        // it passes for ANY throw, including one raised by an unrelated path
-        // before `casRead` is ever consulted. Asserting WHAT was thrown, not
-        // merely that something was, is the specific gap the mutation sweep
-        // found across this codebase, so the assertions stay.
-        casReadOnAbsentHashThrowsAPlainString: () => {
+        // **The leaf was renamed, and the rename is the finding.** It was
+        // `casReadOnAbsentHashThrowsAPlainString`, and it wrapped `map.casRead`
+        // in the `try` AGENTS.md forbids in a `.f.js`. That `try` outlived the
+        // behaviour it was written for: `buildHostMap`'s handlers stopped
+        // throwing when they gained a `Result` return (see `buildHostMap`'s
+        // docstring), so the call could no longer throw, the `assert(false, …)`
+        // inside the `try` fired instead, the `catch` swallowed it, and the
+        // three assertions below then ran against the ASSERTION's own message
+        // rather than against `casRead`'s. It passed on the wrong value until
+        // it happened to fail on one — a `try` in a proof is exactly the
+        // construct that can turn a broken expectation into a green leaf.
+        //
+        // MERGE NOTE (do not re-revert). A feedback pass once rewrote this as
+        // a bare `throw: { casReadOnAbsentHash }` leaf, dropping the
+        // assertions, on the stated grounds that "reading a thrown value
+        // requires catching it, and a `.f.js` module may not". The premise was
+        // false then and the whole question is moot now: there is no throw to
+        // read. Asserting WHAT is refused, not merely that something was, is
+        // the specific gap the mutation sweep found across this codebase, so
+        // the assertions stay — at the value the handler actually returns.
+        //
+        // The old third assertion (`!(thrown instanceof Error)`) is gone
+        // because the compiler now makes it unfalsifiable: the refusal's type
+        // is `string`. That is a stronger guarantee than the runtime check
+        // was, not a dropped one.
+        casReadOnAbsentHashAnswersAPlainStringError: () => {
             const map = buildHostMap(twoBlobSnapshot)
-            try {
-                map.casRead('absent-hash')
-                assert(false, 'expected casRead to throw for an absent hash')
-            } catch (thrown) {
-                assertEq(typeof thrown, 'string')
-                assert(!(thrown instanceof Error), 'must never throw an Error')
-                assert(String(thrown).includes('absent-hash'), String(thrown))
-            }
+            const [t, v] = map.casRead('absent-hash')
+            assertEq(t, 'error')
+            assertEq(typeof v, 'string')
+            assert(v.includes('absent-hash'), v)
         },
     },
 
@@ -447,13 +505,13 @@ export const proof = {
         blobsSubjectsHeadsAndRevisions: () => {
             const home = '/'
             const cas = fileCas(sha256)(home)
-            const [state0, cacheKey] = virtual(emptyState)(initEvo(cas))
+            const [state0, cacheKey] = virtualOrPanic(emptyState)(initEvo(cas))
             // A plain (non-revision) document blob.
             const docText = '{"box1InterestIncome":"12.34"}'
             const docBytes = tryUtf8(docText)
             assert(docBytes !== null, 'expected the sample document to encode as UTF-8')
             const [state1, docWrite] = virtual(state0)(
-                cas.write(pure({ first: ok(docBytes), tail: pure(undefined) })))
+                cas.write(oneChunk(docBytes)))
             assert(docWrite[0] === 'ok', ['expected the document write to succeed', docWrite])
             const docHash = vecToCBase32(docWrite[1])
             // A revision naming that document as its snapshot, for a fresh
@@ -464,7 +522,7 @@ export const proof = {
                 e.add({ parents: [], subject: 'subjectS', snapshot: docHash }))
             assert(addResult[0] === 'ok', ['expected the revision add to succeed', addResult])
             const revisionHash = addResult[1]
-            const [, snapshot] = virtual(state2)(buildRunSnapshot(cas)(e)(undefined))
+            const [, snapshot] = virtualOrPanic(state2)(buildRunSnapshot(cas)(e)(undefined))
             // The plain document blob's own bytes are resolved verbatim.
             assertEq(snapshot.blobs[docHash], docText)
             // The revision blob is ALSO just a blob in cas.list()'s eyes, so
@@ -487,11 +545,11 @@ export const proof = {
         pinOverridesTheResolvedHead: () => {
             const home = '/'
             const cas = fileCas(sha256)(home)
-            const [state0, cacheKey] = virtual(emptyState)(initEvo(cas))
+            const [state0, cacheKey] = virtualOrPanic(emptyState)(initEvo(cas))
             const docBytes = tryUtf8('{}')
             assert(docBytes !== null, 'expected "{}" to encode as UTF-8')
             const [state1, docWrite] = virtual(state0)(
-                cas.write(pure({ first: ok(docBytes), tail: pure(undefined) })))
+                cas.write(oneChunk(docBytes)))
             assert(docWrite[0] === 'ok', ['expected the document write to succeed', docWrite])
             const docHash = vecToCBase32(docWrite[1])
             const e = evo(cas)(cacheKey)
@@ -499,9 +557,9 @@ export const proof = {
                 e.add({ parents: [], subject: 'subjectS', snapshot: docHash }))
             assert(addResult[0] === 'ok', ['expected the revision add to succeed', addResult])
             const liveHead = addResult[1]
-            const [, unpinned] = virtual(state2)(buildRunSnapshot(cas)(e)(undefined))
+            const [, unpinned] = virtualOrPanic(state2)(buildRunSnapshot(cas)(e)(undefined))
             assertEq(JSON.stringify(unpinned.heads['subjectS']), JSON.stringify([liveHead]))
-            const [, pinned] = virtual(state2)(
+            const [, pinned] = virtualOrPanic(state2)(
                 buildRunSnapshot(cas)(e)({ subject: 'subjectS', parents: ['PINNED_INSTEAD'] }))
             assertEq(JSON.stringify(pinned.heads['subjectS']), JSON.stringify(['PINNED_INSTEAD']))
             assert(
@@ -514,7 +572,7 @@ export const proof = {
     // vocabulary, even when its exact hash is supplied directly ─────────────
     //
     // Seeding follows buildRunSnapshotResolvesTheStore's exact pattern above:
-    // a real FileCas under home = '/', virtual(emptyState)(initEvo(cas)), then
+    // a real FileCas under home = '/', virtualOrPanic(emptyState)(initEvo(cas)), then
     // via evo(cas)(cacheKey): an ACTIVE head, then a SECOND add superseding it
     // with archived: true and snapshot OMITTED (this module's own documented
     // retraction call, inheriting the parent's snapshot per resolveSnapshot's
@@ -526,7 +584,7 @@ export const proof = {
         adversarialAndControl: () => {
             const home = '/'
             const cas = fileCas(sha256)(home)
-            const [state0, cacheKey] = virtual(emptyState)(initEvo(cas))
+            const [state0, cacheKey] = virtualOrPanic(emptyState)(initEvo(cas))
             const e = evo(cas)(cacheKey)
 
             // Seed the archived subject: an active head, then a superseding
@@ -534,7 +592,7 @@ export const proof = {
             const docBytes = tryUtf8('{"dialect":"vnd.fjs.w2"}')
             assert(docBytes !== null, 'expected the sample document to encode as UTF-8')
             const [state1, docWrite] = virtual(state0)(
-                cas.write(pure({ first: ok(docBytes), tail: pure(undefined) })))
+                cas.write(oneChunk(docBytes)))
             assert(docWrite[0] === 'ok', ['expected the document write to succeed', docWrite])
             const docHash = vecToCBase32(docWrite[1])
             const [state2, activeAddResult] = virtual(state1)(
@@ -550,14 +608,14 @@ export const proof = {
             // a gate needs a control (AGENTS.md), proving the filter is
             // selective, not a blanket break.
             const [state4, controlDocWrite] = virtual(state3)(
-                cas.write(pure({ first: ok(docBytes), tail: pure(undefined) })))
+                cas.write(oneChunk(docBytes)))
             assert(controlDocWrite[0] === 'ok', ['expected the control document write to succeed', controlDocWrite])
             const [state5, controlAddResult] = virtual(state4)(
                 e.add({ parents: [], subject: 'subjectActive', snapshot: docHash }))
             assert(controlAddResult[0] === 'ok', ['expected the control add to succeed', controlAddResult])
             const controlHead = controlAddResult[1]
 
-            const [, snapshot] = virtual(state5)(buildRunSnapshot(cas)(e)(undefined))
+            const [, snapshot] = virtualOrPanic(state5)(buildRunSnapshot(cas)(e)(undefined))
 
             // buildRunSnapshot-level assertions: the archived-only subject
             // has NO surviving head (indistinguishable from unknown), and the
@@ -589,15 +647,14 @@ export const proof = {
 
             // ctx.evoRevision on the archived hash — supplied directly, as it
             // would be if smuggled in via fjs_run's args. `buildHostMap`'s own
-            // handler throws a plain bare string (verified directly against
-            // it, same as casReadOnAbsentHashThrowsAPlainString above) — but
-            // `interpret` (fjs/exec/module.f.js) catches that throw itself
-            // and converts it into the error arm of a Result, it never
-            // re-throws to this caller. So the assertion here is against
-            // THAT Result's error arm — same discipline as
-            // casReadOnAbsentHashThrowsAPlainString (assert the type, assert
-            // it is never an Error, assert the message names the hash),
-            // applied at the layer `interpret` actually surfaces it.
+            // handler ANSWERS `error('revision not found: <hash>')` (verified
+            // directly against it by
+            // `casReadOnAbsentHashAnswersAPlainStringError` above), and
+            // `interpret` carries that refusal out as the error arm of its own
+            // Result rather than as a throw. So the assertion here is against
+            // THAT Result's error arm — same discipline as that leaf (assert
+            // the type, assert the message names the hash), applied at the
+            // layer `interpret` actually surfaces it.
             const revResult = interpret(hostMap)(guestCtx.evoRevision(archivedHead))
             assert(revResult[0] === 'error', ['expected evoRevision to be refused', revResult])
             const thrown = revResult[1]
@@ -632,7 +689,7 @@ export const proof = {
         undecodableHeadStaysObservable: () => {
             const home = '/'
             const cas = fileCas(sha256)(home)
-            const [state0, cacheKey] = virtual(emptyState)(initEvo(cas))
+            const [state0, cacheKey] = virtualOrPanic(emptyState)(initEvo(cas))
             const e = evo(cas)(cacheKey)
 
             // Write GARBAGE bytes to CAS — this hash's actual stored
@@ -640,7 +697,7 @@ export const proof = {
             const garbageBytes = tryUtf8('not a revision at all {{{')
             assert(garbageBytes !== null, 'expected the garbage bytes to encode as UTF-8')
             const [state1, garbageWrite] = virtual(state0)(
-                cas.write(pure({ first: ok(garbageBytes), tail: pure(undefined) })))
+                cas.write(oneChunk(garbageBytes)))
             assert(garbageWrite[0] === 'ok', ['expected the garbage write to succeed', garbageWrite])
             const garbageHashVec = garbageWrite[1]
             const garbageHashStr = vecToCBase32(garbageHashVec)
@@ -670,7 +727,7 @@ export const proof = {
             const controlDocBytes = tryUtf8('{"dialect":"vnd.fjs.w2"}')
             assert(controlDocBytes !== null, 'expected the control document to encode as UTF-8')
             const [state3, controlDocWrite] = virtual(state2)(
-                cas.write(pure({ first: ok(controlDocBytes), tail: pure(undefined) })))
+                cas.write(oneChunk(controlDocBytes)))
             assert(controlDocWrite[0] === 'ok', ['expected the control document write to succeed', controlDocWrite])
             const controlDocHash = vecToCBase32(controlDocWrite[1])
             const [state4, controlAddResult] = virtual(state3)(
@@ -678,7 +735,7 @@ export const proof = {
             assert(controlAddResult[0] === 'ok', ['expected the control add to succeed', controlAddResult])
             const controlHead = controlAddResult[1]
 
-            const [, snapshot] = virtual(state4)(buildRunSnapshot(cas)(e)(undefined))
+            const [, snapshot] = virtualOrPanic(state4)(buildRunSnapshot(cas)(e)(undefined))
 
             // The undecodable head hash STAYS in `heads` — it is not known
             // to be archived, so it is not filtered — even though it never

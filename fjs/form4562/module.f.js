@@ -116,7 +116,7 @@
  *
  * @module
  */
-import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
+import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { of, multiply, ofInt, halfUp } from '../types/rational/module.f.js'
 import { centsToString } from '../exact/module.f.js'
 import { macrsClassifications, macrsDeductionCents } from './macrs/module.f.js'

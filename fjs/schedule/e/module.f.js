@@ -228,7 +228,7 @@
  *
  * @module
  */
-import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
+import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { centsFromString } from '../../exact/module.f.js'
 import { materialParticipationNamed } from '../../document/k1_common/module.f.js'
 import { scheduleEPartI } from './part_i/module.f.js'

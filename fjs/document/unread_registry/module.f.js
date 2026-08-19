@@ -87,7 +87,7 @@
  *
  * @module
  */
-import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
+import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
 import {
     dialect as oneZeroNineFiveADialect,
     moneyBoxFields as oneZeroNineFiveAMoneyBoxFields,

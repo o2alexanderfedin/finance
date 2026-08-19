@@ -211,7 +211,7 @@
  *
  * @module
  */
-import { assert, assertEq, assertNotNullish } from 'functionalscript/fjs/asserts/module.f.js'
+import { assert, assertEq, assertNotNullish } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { centsFromString } from '../exact/module.f.js'
 import { of, multiply, halfUp } from '../types/rational/module.f.js'
 import { oneShare, sharesFromString } from '../document/share_count/module.f.js'

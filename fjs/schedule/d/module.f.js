@@ -93,7 +93,7 @@
  *
  * @module
  */
-import { assert, assertEq, assertNotNullish } from 'functionalscript/fjs/asserts/module.f.js'
+import { assert, assertEq, assertNotNullish } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { centsFromString, centsToString } from '../../exact/module.f.js'
 import { form8949 } from '../../form8949/module.f.js'
 import { capitalLossCarryoverWorksheet } from '../../tax/carryover/module.f.js'

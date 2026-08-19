@@ -165,7 +165,7 @@
  *
  * @module
  */
-import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
+import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { centsFromString } from '../../exact/module.f.js'
 import { form8959 } from '../../form8959/module.f.js'
 import { form8960 } from '../../form8960/module.f.js'

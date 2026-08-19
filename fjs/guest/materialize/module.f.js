@@ -37,7 +37,7 @@
  *   `fjs/effects/node/virtual`'s `writeFile` stores a file as an array of
  *   `Vec` chunks, while `import_` requires the entry at its path to be a
  *   `JsModule` (a plain function) — verified by reading
- *   `node_modules/functionalscript/fjs/effects/node/virtual/module.f.js`
+ *   `node_modules/functionalscript/fjs/effects/node/virtual/module.f.mjs`
  *   directly. `virtual` has no JS parser and cannot execute freshly-written
  *   bytes as a module, so write-then-import cannot be composed in one
  *   virtual session; this module's own proof therefore verifies the write
@@ -56,18 +56,18 @@
  *
  * @module
  */
-import { step, pure } from 'functionalscript/fjs/effects/module.f.js'
-import { import_, mkdir, writeUtf8File, readUtf8File } from 'functionalscript/fjs/effects/node/module.f.js'
-import { error, ok } from 'functionalscript/fjs/types/result/module.f.js'
-import { join } from 'functionalscript/fjs/path/module.f.js'
-import { emptyState, virtual } from 'functionalscript/fjs/effects/node/virtual/module.f.js'
-import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
+import { step, catchStep, pureError } from 'functionalscript/fjs/effects/module.f.mjs'
+import { import_, mkdir, writeUtf8File, readUtf8File, errorSummary } from 'functionalscript/fjs/effects/node/module.f.mjs'
+import { error, ok } from 'functionalscript/fjs/types/result/module.f.mjs'
+import { join } from 'functionalscript/fjs/path/module.f.mjs'
+import { emptyState, virtual } from 'functionalscript/fjs/effects/node/virtual/module.f.mjs'
+import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { guestCtx } from '../module.f.js'
 import { interpret } from '../../exec/module.f.js'
 
-/** @import { Effect, OperationMap } from 'functionalscript/fjs/effects/module.f.js' */
-/** @import { Import, Module, Mkdir, WriteFile } from 'functionalscript/fjs/effects/node/module.f.js' */
-/** @import { Result } from 'functionalscript/fjs/types/result/module.f.js' */
+/** @import { Effect, OperationMap } from 'functionalscript/fjs/effects/types.js' */
+/** @import { Import, Module, Mkdir, WriteFile } from 'functionalscript/fjs/effects/node/types.js' */
+/** @import { Result } from 'functionalscript/fjs/types/result/types.js' */
 /** @import { CasOp, Report } from '../module.f.js' */
 
 // ── SEC-02: the specifier allow-list ─────────────────────────────────────────
@@ -298,24 +298,66 @@ export const materializeHome = home => join(home, materializeDir)
  * idempotent by construction — there is nothing a check could refuse that
  * the hash does not already guarantee is identical.
  *
- * Converts the effect's `IoResult<void>` outcome into this project's
- * `Result<void, string>` convention on both steps, so a caller never sees a
- * raw thrown value or an unconverted upstream error type cross this
- * function's boundary.
- * @type {(home: string) => (hash: string) => (source: string) => Effect<Mkdir | WriteFile, Result<void, string>>}
+ * Re-tags the two writes' `IoChannel` into this project's `string` error
+ * channel, so a caller never sees a raw thrown value or an unconverted
+ * upstream error type cross this function's boundary. **The failure is in
+ * the channel, not the payload** (0.46.0): `step` short-circuits the write
+ * when the `mkdir` failed, which is what the hand-written
+ * `if (mkdirResult[0] === 'error')` used to do, and the one `catchStep`
+ * renders both failures where both used to be rendered separately.
+ *
+ * ## THE CONVENTION: an `IoChannel` becomes a `string` through `errorSummary`
+ *
+ * **This project has exactly one rule for rendering a node `IoChannel` into a
+ * `string` error channel, and this is where it is written down: use
+ * `errorSummary`, never `errorMessage`, and name the step that failed in the
+ * project's own words.** `cas_refresh`, `finance_documents_list`,
+ * `buildRunSnapshot`'s re-tag in `fjs/server/fjs_run`, `fjs/guest/check` and
+ * `fjs/report/amend` all already do this; `materializeProgram` was the last
+ * holdout and is one no longer. `grep -rn errorMessage fjs --include='*.f.js'`
+ * returns no code hit, which is the checkable form of the rule.
+ *
+ * The reason is not stylistic. Upstream's own docstring says `errorMessage` is
+ * "for the operator of the program, who is entitled to the host's own words —
+ * including the path that failed", and that `payload.message` is where the host
+ * puts the absolute path it could not touch. **This process has no
+ * operator-facing sink for that string.** Every rendering here reaches a remote
+ * MCP client, by one of two routes:
+ *
+ * - directly, as `fjs_run`'s / `fjs_check`'s `errorResult` text, and
+ * - indirectly, through the `status: 'error'` run record: `fjs_run` answers
+ *   with `(run record: <runHash>)`, the record's `error` field holds this same
+ *   string, and the very same server serves `cas_get` over the very same
+ *   `fileCas(sha256)(home)` the record was written to. A path in the record is
+ *   a path one tool call away — which is why "render `errorMessage` into the
+ *   record, `errorSummary` into the response" is NOT a redaction and was
+ *   rejected. (`fjs/server`'s `weekOneConvergence` leaf reads the record back
+ *   out of CAS itself; the route is not hypothetical.)
+ *
+ * At 0.43.1 an `IoError` *was* the host message and `String(e)` produced it, so
+ * `errorMessage` was the faithful successor across the 0.46.x migration and was
+ * kept for exactly as long as that migration lasted. The behaviour change is
+ * made here, deliberately and alone.
+ *
+ * `errorSummary` alone would say only `io error: ENOENT` — or, under
+ * `fjs/effects/node/virtual`, whose `fail` attaches no OS code, the bare `io
+ * error`. The `materialize failed:` prefix is what keeps the *step* named
+ * without naming the *place*, so a proof can still assert which of
+ * `executeRun`'s five steps surfaced, and it is the same
+ * `<what failed>: ${errorSummary(e)}` shape `cas_refresh` and
+ * `finance_documents_list` already use.
+ *
+ * `fjs-run-integration.test.js`'s `SEC:` case is the proof, and it has to be a
+ * real-process one: `virtual`'s `fail` builds its `IoError` from a fixed
+ * literal carrying neither a path nor an OS code, so a path-free assertion
+ * written under `virtual` would pass whichever renderer is called.
+ * @type {(home: string) => (hash: string) => (source: string) => Effect<Mkdir | WriteFile, void, string>}
  */
-export const materializeProgram = home => hash => source => step(
-    mkdir(materializeHome(home), { recursive: true }),
-    mkdirResult => {
-        if (mkdirResult[0] === 'error') {
-            return pure(error(String(mkdirResult[1])))
-        }
-        return step(
-            writeUtf8File(programPath(materializeHome(home))(hash), source),
-            writeResult => pure(writeResult[0] === 'error' ? error(String(writeResult[1])) : ok(undefined)),
-        )
-    },
-)
+export const materializeProgram = home => hash => source => {
+    const dir = mkdir(materializeHome(home), { recursive: true })
+    const written = step(dir, () => writeUtf8File(programPath(materializeHome(home))(hash), source))
+    return catchStep(written, e => pureError(`materialize failed: ${errorSummary(e)}`))
+}
 
 // ── EXEC-09: import through the effect, never a raw expression ───────────────
 
@@ -331,17 +373,14 @@ export const materializeProgram = home => hash => source => step(
  * No raw `import(...)` expression appears anywhere in this module (EXEC-09)
  * — `import_` is an operation, so the entire path runs under `virtual` with
  * no filesystem.
- * @type {(allowed: readonly string[]) => (path: string) => (source: string) => Effect<Import, Result<Module, string>>}
+ * @type {(allowed: readonly string[]) => (path: string) => (source: string) => Effect<Import, Module, string>}
  */
 export const loadProgram = allowed => path => source => {
     const [t, v] = checkSpecifiers(allowed)(source)
     if (t === 'error') {
-        return pure(error(v))
+        return pureError(v)
     }
-    return step(import_(path), imported => {
-        const [it, iv] = imported
-        return pure(it === 'error' ? error(`import failed: ${String(iv)}`) : ok(iv))
-    })
+    return catchStep(import_(path), e => pureError(`import failed: ${String(e)}`))
 }
 
 // ── Tests ────────────────────────────────────────────────────────────────────
@@ -358,12 +397,12 @@ const cleanSource = 'export const report = ctx => args => ctx.casRead(args[0])'
 const guestReport = ctx => args => ctx.casRead(args[0] ?? '')
 
 /** A host map for the frozen vocabulary, so a loaded program can be RUN. */
-/** @type {OperationMap<CasOp, string>} */
+/** @type {OperationMap<CasOp, Result<string, string>>} */
 const hostMap = {
-    casRead: a => `casRead:${a}`,
-    evoList: a => `evoList:${a}`,
-    evoHead: a => `evoHead:${a}`,
-    evoRevision: a => `evoRevision:${a}`,
+    casRead: a => ok(`casRead:${a}`),
+    evoList: a => ok(`evoList:${a}`),
+    evoHead: a => ok(`evoHead:${a}`),
+    evoRevision: a => ok(`evoRevision:${a}`),
 }
 
 export const proof = {

@@ -132,7 +132,7 @@
  *
  * @module
  */
-import { assert } from 'functionalscript/fjs/asserts/module.f.js'
+import { assert } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { of, multiply, halfUp } from '../types/rational/module.f.js'
 import { centsFromString } from '../exact/module.f.js'
 
@@ -318,7 +318,7 @@ export const form7206 = taxParamSet => input => {
 
 // ── Tests ────────────────────────────────────────────────────────────────────
 
-import { assertEq } from 'functionalscript/fjs/asserts/module.f.js'
+import { assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { taxParamsByYear } from '../tax/params/module.f.js'
 
 const taxParams2025 = taxParamsByYear[2025]

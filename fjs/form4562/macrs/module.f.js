@@ -96,7 +96,7 @@
  *
  * @module
  */
-import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
+import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { of, multiply, ofInt, halfUp } from '../../types/rational/module.f.js'
 
 /** @import { Rational } from '../../types/rational/module.f.js' */

@@ -31,10 +31,10 @@
  *
  * @module
  */
-import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
-import { error, ok, unwrap } from 'functionalscript/fjs/types/result/module.f.js'
+import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
+import { error, ok, unwrap } from 'functionalscript/fjs/types/result/module.f.mjs'
 
-/** @import { Result } from 'functionalscript/fjs/types/result/module.f.js' */
+/** @import { Result } from 'functionalscript/fjs/types/result/types.js' */
 
 /**
  * Matches a full decimal string: an optional leading `-`, one or more

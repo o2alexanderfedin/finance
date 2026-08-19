@@ -182,7 +182,7 @@
  *
  * @module
  */
-import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
+import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { centsFromString, centsToString } from '../../exact/module.f.js'
 import { formFortyFiveSixtyTwo } from '../../form4562/module.f.js'
 import { depreciableAssets } from '../../document/asset_register/module.f.js'

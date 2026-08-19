@@ -89,7 +89,7 @@
  *
  * @module
  */
-import { assert, assertEq, assertNotNullish } from 'functionalscript/fjs/asserts/module.f.js'
+import { assert, assertEq, assertNotNullish } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { centsFromString, centsToString } from '../exact/module.f.js'
 import { of, halfUp } from '../types/rational/module.f.js'
 import { taxParamsByYear } from '../tax/params/module.f.js'
