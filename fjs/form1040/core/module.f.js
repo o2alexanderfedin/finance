@@ -934,24 +934,55 @@ export const form1040IncomeLines = taxParamSet => inputs => {
         line1a, line1b, line1c, line1d, line1e, line1f, line1g, line1h,
     ])
 
-    // 2a — tax-exempt interest (1099-INT box 8); 2b — taxable interest
-    // (1099-INT box 1 plus box 3).
-    const line2a = fromDocuments('1040 line 2a')(
-        sumBoxOverDocuments(interestForms)('box8TaxExemptInterest')(
-            form => form.box8TaxExemptInterest))
-    // Box 9, the §57(a)(5) private-activity slice of box 8, summed here and
-    // NOWHERE ELSE. It reaches Form 6251 line 2g through Schedule 2 and has no
-    // other reader in the engine.
+    // 2a — tax-exempt interest (1099-INT box 8 AND 1099-DIV box 12); 2b —
+    // taxable interest (1099-INT box 1 plus box 3).
     //
-    // **It must never join a regular-tax line.** Box 9 is a SUBSET of box 8,
-    // which line 2a above already sums, so adding it anywhere in Parts I or II
-    // would count the same interest twice — and §103(a) excludes every cent of
-    // it from gross income regardless, which is why the AMT is the only place
-    // it can appear. `proof.privateActivityBonds.lineTwoAIsUnmovedByBoxNine`
-    // is the assertion that keeps this true rather than merely intended.
-    const specifiedPrivateActivityBondInterest = fromDocuments('Form 6251 line 2g')(
+    // **The 1099-DIV term is the unread-field sweep's own** (see
+    // `fjs/todo/stored-but-unread-field-sweep.md`). `box12ExemptInterestDividends`
+    // was stored, walked by that dialect's exactness loop, and read by NOTHING,
+    // so a filer holding a municipal bond FUND — which is how most people hold
+    // municipal bonds — got $0.00 on this line while a filer holding the bonds
+    // directly got their real figure. i1040 (2025) p.25 is unambiguous about
+    // the pair: *"Also include on line 2a any exempt-interest dividends from a
+    // mutual fund or other regulated investment company. This amount should be
+    // shown in box 12 of Form 1099-DIV."*
+    //
+    // The direction of the old error was UNDERSTATEMENT of tax, which is not
+    // obvious from a line that is itself untaxed: §86(b)(2)(B) adds line 2a to
+    // the provisional income that decides how much of a Social Security benefit
+    // is taxable, and Form 8962's household income includes it too.
+    const line2a = fromDocuments('1040 line 2a')(addBoxSums(
+        sumBoxOverDocuments(interestForms)('box8TaxExemptInterest')(
+            form => form.box8TaxExemptInterest))(
+        sumBoxOverDocuments(dividendForms)('box12ExemptInterestDividends')(
+            form => form.box12ExemptInterestDividends)))
+    // 1099-INT box 9 and 1099-DIV box 13 — the §57(a)(5) private-activity
+    // slices of box 8 and box 12 respectively, summed here and NOWHERE ELSE.
+    // They reach Form 6251 line 2g through Schedule 2 and have no other reader
+    // in the engine.
+    //
+    // **Neither may join a regular-tax line.** Each is a SUBSET of the box line
+    // 2a above already sums — the 1099-DIV's own printed instruction for box 13
+    // is *"Shows exempt-interest dividends subject to the alternative minimum
+    // tax. This amount is included in box 12."*, word for word what the
+    // 1099-INT says of its box 9 and box 8 — so adding either anywhere in Parts
+    // I or II would count the same interest twice, and §103(a) excludes every
+    // cent of both from gross income regardless. That is why the AMT is the
+    // only place they can appear.
+    // `proof.privateActivityBonds.lineTwoAIsUnmovedByBoxNine` and
+    // `proof.exemptInterestDividends.lineTwoAIsUnmovedByBoxThirteen` are the
+    // assertions that keep this true rather than merely intended.
+    //
+    // i6251, Line 2g, on the fund case: *"Exempt-interest dividends paid by a
+    // mutual fund or other regulated investment company are treated as interest
+    // income on specified private activity bonds ... This specified private
+    // activity bond interest dividends amount should be reported to you in box
+    // 13 of Form 1099-DIV."*
+    const specifiedPrivateActivityBondInterest = fromDocuments('Form 6251 line 2g')(addBoxSums(
         sumBoxOverDocuments(interestForms)('box9SpecifiedPrivateActivityBondInterest')(
-            form => form.box9SpecifiedPrivateActivityBondInterest))
+            form => form.box9SpecifiedPrivateActivityBondInterest))(
+        sumBoxOverDocuments(dividendForms)('box13SpecifiedPrivateActivityBondInterestDividends')(
+            form => form.box13SpecifiedPrivateActivityBondInterestDividends)))
     // **TAX-35 — the separately stated interest on all three Schedule K-1
     // faces lands here too**, and each face numbers it DIFFERENTLY: the
     // partner's is box 5 (§702(a)(8)), the shareholder's box 4
@@ -2189,6 +2220,9 @@ const amtDepreciationAdjustmentOf = scheduleC => {
 const form1040TaxAndPaymentLines = taxParamSet => inputs => income => {
     const {
         profile, w2s, interestForms, dividendForms, brokerageForms, retirementForms,
+        // The unread-field sweep's own addition: line 25b reads the SSA-1099's
+        // box 6, which nothing had read.
+        socialSecurityForms,
         unemploymentForms, nonemployeeCompensationForms, isoExerciseForms, estateTrustK1Forms,
         marketplaceStatements,
     } = inputs
@@ -2699,6 +2733,24 @@ const form1040TaxAndPaymentLines = taxParamSet => inputs => income => {
     // join this line in this task rather than being deferred to a later
     // wave. 25c is every other form, which no dialect models. 25d is the
     // total the printed form adds.
+    //
+    // **The SSA-1099 term is the unread-field sweep's own** (see
+    // `fjs/todo/stored-but-unread-field-sweep.md`).
+    // `box6VoluntaryFederalIncomeTaxWithheld` was stored, walked by that
+    // dialect's exactness loop, and read by NOTHING, so a retiree who had
+    // elected voluntary withholding on their benefits under Form W-4V was not
+    // credited for tax they had already paid — an OVERSTATEMENT of tax, the
+    // safe direction and still money. The printed instruction names the box
+    // outright rather than by family, i1040 (2025) p.39, "Line 25b — Form(s)
+    // 1099": *"If you received a 2025 Form 1099 showing federal income tax
+    // withheld on ... social security benefits ... include the amount withheld
+    // in the total on line 25b. This should be shown in box 4 of Form 1099,
+    // box 6 of Form SSA-1099, or box 10 of Form RRB-1099."*
+    //
+    // It joins line 25b and NOT line 25c, which is where an SSA-1099 would
+    // land if "Form(s) 1099" were read as the 1099-series alone. The printed
+    // sentence settles it, and `federalTaxWithheldOnOtherForms` — line 25c's
+    // kind — stays REFUSED, so nothing else can reach that line.
     const line25a = fromDocuments('1040 line 25a')(
         sumBoxOverDocuments(w2s)('box2FederalIncomeTaxWithheld')(
             w2 => w2.box2FederalIncomeTaxWithheld))
@@ -2718,15 +2770,24 @@ const form1040TaxAndPaymentLines = taxParamSet => inputs => income => {
                 addBoxSums(
                     sumBoxOverDocuments(unemploymentForms)('box4FederalIncomeTaxWithheld')(
                         form => form.box4FederalIncomeTaxWithheld))(
-                    // Phase 27 (DOC-20). §3406 backup withholding on a
-                    // 1099-NEC reaches line 25b exactly as the 1099-G's own
-                    // box 4 does (Phase 20's precedent, followed rather than
-                    // re-argued) — it is 1099-family withholding, and
-                    // `federalTaxWithheldOnOther1099`'s remedy already names
-                    // that family. Omitting it would overstate the balance due
-                    // by money the payer has already sent the IRS.
-                    sumBoxOverDocuments(nonemployeeCompensationForms)('box4FederalIncomeTaxWithheld')(
-                        form => form.box4FederalIncomeTaxWithheld)))))
+                    addBoxSums(
+                        // Phase 27 (DOC-20). §3406 backup withholding on a
+                        // 1099-NEC reaches line 25b exactly as the 1099-G's own
+                        // box 4 does (Phase 20's precedent, followed rather than
+                        // re-argued) — it is 1099-family withholding, and
+                        // `federalTaxWithheldOnOther1099`'s remedy already names
+                        // that family. Omitting it would overstate the balance due
+                        // by money the payer has already sent the IRS.
+                        sumBoxOverDocuments(nonemployeeCompensationForms)('box4FederalIncomeTaxWithheld')(
+                            form => form.box4FederalIncomeTaxWithheld))(
+                        // The SSA-1099's box is SIX, not four — the only
+                        // document in this sum whose withholding box is
+                        // numbered differently, which is exactly why a
+                        // "box 4 across every 1099" rule could never have
+                        // picked it up.
+                        sumBoxOverDocuments(socialSecurityForms)(
+                            'box6VoluntaryFederalIncomeTaxWithheld')(
+                            form => form.box6VoluntaryFederalIncomeTaxWithheld))))))
     // 25c — Form 8959 Part V line 24, the Additional Medicare Tax an employer
     // already withheld, off the SAME `scheduleTwoResult` line 11 came from.
     //
@@ -3518,6 +3579,8 @@ const dividendAndBrokerageSourceArtifactHash
  *   readonly box4FederalIncomeTaxWithheld?: string,
  *   readonly box5Section199ADividends?: string,
  *   readonly box7ForeignTaxPaid?: string,
+ *   readonly box12ExemptInterestDividends?: string,
+ *   readonly box13SpecifiedPrivateActivityBondInterestDividends?: string,
  * }} DividendBoxes
  */
 
@@ -3614,6 +3677,23 @@ const socialSecurityDocument = documentHash => box5NetBenefits => ({
         box5NetBenefits,
     },
 })
+
+/**
+ * An SSA-1099 carrying box 5 net benefits AND box 6 voluntary federal income
+ * tax withheld — the two boxes lines 6a and 25b read. Written as a wrapper over
+ * {@link socialSecurityDocument} rather than as a second literal, the same
+ * shape `w2WithWithholding` already uses one dialect over, so the call sites
+ * that name only box 5 do not move.
+ * @type {(documentHash: string) => (box5NetBenefits: string) => (box6VoluntaryFederalIncomeTaxWithheld: string) => Stored<Ssa1099>}
+ */
+const socialSecurityDocumentWithWithholding
+    = documentHash => box5NetBenefits => box6VoluntaryFederalIncomeTaxWithheld => {
+        const withoutWithholding = socialSecurityDocument(documentHash)(box5NetBenefits)
+        return {
+            ...withoutWithholding,
+            value: { ...withoutWithholding.value, box6VoluntaryFederalIncomeTaxWithheld },
+        }
+    }
 
 /**
  * A `vnd.fjs.itemized_deductions` document carrying one entry per named
@@ -7331,6 +7411,153 @@ export const proof = {
                 'and $2,500.00 of it is the §57(a)(5) preference')
         },
     },
+    // ── The unread-field sweep's own: 1099-DIV boxes 12 and 13 ──────────────
+    //
+    // `fjs/todo/stored-but-unread-field-sweep.md`. Both boxes were stored,
+    // walked by that dialect's own exactness loop, and read by NOTHING. The
+    // fund holder — which is how most people hold municipal bonds — got
+    // $0.00 on line 2a while the direct bond holder got their real figure.
+    //
+    // **Every amount below is hand-typed from the printed instruction, and no
+    // two of them are equal.** Box 8 is $4,000.00, box 12 is $2,500.00, box 9
+    // is $900.00 and box 13 is $300.00: four distinct figures, so a wiring
+    // that read the wrong box, or summed one box twice, cannot land on the
+    // right total by coincidence. That is the monoculture trap this repo has
+    // already been caught by twice.
+    exemptInterestDividends: {
+        /**
+         * i1040 (2025) p.25: *"Also include on line 2a any exempt-interest
+         * dividends from a mutual fund or other regulated investment company.
+         * This amount should be shown in box 12 of Form 1099-DIV."*
+         *
+         * $4,000.00 of 1099-INT box 8 plus $2,500.00 of 1099-DIV box 12 is
+         * $6,500.00 on line 2a. The SOURCE list is asserted alongside the
+         * value, and it is the half that sees a transposition: a line summing
+         * $6,500.00 from one box read twice is the same number and a different
+         * return.
+         */
+        boxTwelveJoinsLineTwoAAlongsideTheOneZeroNineNineIntBoxEight: () => {
+            const interestForm = interestDocument('sha256-int-muni-direct')({
+                box8TaxExemptInterest: '4000.00',
+            })
+            const dividendForm = dividendDocument('sha256-div-muni-fund')({
+                box12ExemptInterestDividends: '2500.00',
+            })
+            const { income } = computedLines(inputsOf(storedProfile(singleProfile))(
+                [])([interestForm])([dividendForm])([])([])([])([])([])([]))
+            assertEq(income.line2a.value, 650000n, '$4,000.00 + $2,500.00 = $6,500.00 on line 2a')
+            assertEq(income.line2a.sources.length, 2, 'one citation per PRESENT box')
+            const [fromInterest, fromDividend] = income.line2a.sources
+            assertEq(fromInterest?.boxPath, 'box8TaxExemptInterest')
+            assertEq(fromInterest?.documentHash, 'sha256-int-muni-direct')
+            assertEq(fromDividend?.boxPath, 'box12ExemptInterestDividends')
+            assertEq(fromDividend?.documentHash, 'sha256-div-muni-fund')
+            // Box 12 is TAX-EXEMPT. It must not have joined line 2b, and it
+            // must not have joined the ordinary-dividend lines it sits between
+            // on the printed page — the three destinations one transposition
+            // apart from this one.
+            assertEq(income.line2b.value, 0n, 'box 12 is not taxable interest')
+            assertEq(income.line3b.value, 0n, 'nor an ordinary dividend')
+            assertEq(income.line3a.value, 0n, 'nor a qualified one')
+        },
+        /**
+         * THE CONTROL. The same 1099-DIV with box 12 ABSENT leaves line 2a at
+         * the 1099-INT's box 8 alone, and cites one box rather than two —
+         * DOC-11's absent-is-absent, which only the source COUNT can observe
+         * since a defaulted `'0.00'` would give the same value.
+         */
+        controlADividendWithNoBoxTwelveCitesNothingOnLineTwoA: () => {
+            const interestForm = interestDocument('sha256-int-muni-direct-2')({
+                box8TaxExemptInterest: '4000.00',
+            })
+            const dividendForm = dividendDocument('sha256-div-plain')({
+                box1aTotalOrdinaryDividends: '1000.00',
+            })
+            const { income } = computedLines(inputsOf(storedProfile(singleProfile))(
+                [])([interestForm])([dividendForm])([])([])([])([])([])([]))
+            assertEq(income.line2a.value, 400000n, 'box 8 alone')
+            assertEq(income.line2a.sources.length, 1, 'and only box 8 is cited')
+            assertEq(income.line3b.value, 100000n, 'the ordinary dividend still routes')
+        },
+        /**
+         * i6251, Line 2g: *"... This specified private activity bond interest
+         * dividends amount should be reported to you in box 13 of Form
+         * 1099-DIV."* Box 13 is a SUBSET of box 12 by the 1099-DIV's own
+         * printed instruction — *"This amount is included in box 12."* — so it
+         * joins Form 6251 line 2g and NO regular-tax line.
+         *
+         * $900.00 of 1099-INT box 9 plus $300.00 of 1099-DIV box 13 is
+         * $1,200.00 on line 2g, while line 2a stays at box 8 plus box 12.
+         */
+        boxThirteenJoinsFormSixTwoFiveOneLineTwoGAlongsideBoxNine: () => {
+            const interestForm = interestDocument('sha256-int-pab')({
+                box8TaxExemptInterest: '4000.00',
+                box9SpecifiedPrivateActivityBondInterest: '900.00',
+            })
+            const dividendForm = dividendDocument('sha256-div-pab')({
+                box12ExemptInterestDividends: '2500.00',
+                box13SpecifiedPrivateActivityBondInterestDividends: '300.00',
+            })
+            const { income } = computedLines(inputsOf(storedProfile(singleProfile))(
+                [])([interestForm])([dividendForm])([])([])([])([])([])([]))
+            assertEq(
+                income.specifiedPrivateActivityBondInterest.value, 120000n,
+                '$900.00 + $300.00 = $1,200.00 on Form 6251 line 2g')
+            assertEq(income.specifiedPrivateActivityBondInterest.sources.length, 2)
+            const [fromBoxNine, fromBoxThirteen]
+                = income.specifiedPrivateActivityBondInterest.sources
+            assertEq(fromBoxNine?.boxPath, 'box9SpecifiedPrivateActivityBondInterest')
+            assertEq(
+                fromBoxThirteen?.boxPath, 'box13SpecifiedPrivateActivityBondInterestDividends')
+            // Line 2a is box 8 plus box 12 and NOTHING ELSE. If box 13 had
+            // been added here as a fourth summand the same interest would be
+            // reported twice: $6,500.00, not $6,800.00.
+            assertEq(income.line2a.value, 650000n, 'box 8 + box 12, with box 13 already inside 12')
+            assertEq(income.line2a.sources.length, 2, 'and still two citations, not four')
+        },
+        /**
+         * **The no-double-count guard, for the fund holder.** Two returns with
+         * the SAME box 12 and different box 13. Every 1040 figure must be
+         * identical; only the AMT input moves. The whole printed return is
+         * compared rather than line 2a alone, exactly as
+         * `proof.privateActivityBonds.lineTwoAIsUnmovedByBoxNine` does for the
+         * direct bond holder — an edit that read box 13 into line 2b, or into
+         * the Social Security worksheet through line 2a, would slip past a
+         * line-2a-only assertion.
+         */
+        lineTwoAIsUnmovedByBoxThirteen: () => {
+            const withoutBoxThirteen = dividendDocument('sha256-div-fund-a')({
+                box1aTotalOrdinaryDividends: '500.00',
+                box12ExemptInterestDividends: '60000.00',
+            })
+            const withBoxThirteen = dividendDocument('sha256-div-fund-b')({
+                box1aTotalOrdinaryDividends: '500.00',
+                box12ExemptInterestDividends: '60000.00',
+                box13SpecifiedPrivateActivityBondInterestDividends: '60000.00',
+            })
+            /** @type {(form: Stored<OneZeroNineNineDiv>) => ReturnType<typeof computedLines>} */
+            const linesFor = form => computedLines(
+                inputsOf(storedProfile(singleProfile))([])([])([form])([])([])([])([])([])([]))
+            const plain = linesFor(withoutBoxThirteen)
+            const preference = linesFor(withBoxThirteen)
+            assertEq(plain.income.line2a.value, 6000000n, 'line 2a = box 12 = $60,000.00')
+            assertEq(preference.income.line2a.value, 6000000n, 'and box 13 does not add to it')
+            assertEq(plain.income.line3b.value, 50000n, 'line 3b = box 1a = $500.00')
+            assertEq(preference.income.line3b.value, 50000n, 'box 13 is not an ordinary dividend')
+            assertEq(plain.income.line9.value, preference.income.line9.value, 'total income unmoved')
+            assertEq(
+                plain.income.line15.value, preference.income.line15.value, 'taxable income unmoved')
+            assertEq(
+                plain.tax.line16.value, preference.tax.line16.value, 'the regular tax is unmoved')
+            // ...and box 13 IS read, exactly once, on its own carrier.
+            assertEq(
+                plain.income.specifiedPrivateActivityBondInterest.value, 0n,
+                'no box 13 means no preference')
+            assertEq(
+                preference.income.specifiedPrivateActivityBondInterest.value, 6000000n,
+                'box 13 reaches Form 6251 line 2g as $60,000.00')
+        },
+    },
     withholding: {
         // 25a is W-2 box 2 over every W-2; 25b is 1099-INT box 4 over every
         // 1099-INT; 25d is their total with 25c. $5,000 + $2,500 = $7,500.00
@@ -9080,11 +9307,15 @@ export const proof = {
             const [pension5aSource] = lines.line5a.sources
             assertEq(pension5aSource.documentHash, 'sha256-r-pension')
         },
-        // line25b now sums FIVE document types: 1099-INT, 1099-R, 1099-DIV,
-        // 1099-B and 1099-G, each `box4FederalIncomeTaxWithheld` — matching
-        // `federalTaxWithheldOnOther1099`'s own remedy string
-        // (`fjs/return/scope`). $10 + $100 + $50 + $25 + $20 = $205.00,
-        // hand-typed, never re-derived from the code under test.
+        // line25b sums SEVEN document types: 1099-INT, 1099-R, 1099-DIV,
+        // 1099-B, 1099-G and 1099-NEC at `box4FederalIncomeTaxWithheld`, and
+        // the SSA-1099 at `box6VoluntaryFederalIncomeTaxWithheld` — the one
+        // document in the sum whose withholding box is numbered differently,
+        // which is exactly why a "box 4 across every 1099" rule could not have
+        // picked it up. $10 + $100 + $50 + $25 + $20 + $40 + $75 = $320.00,
+        // hand-typed, never re-derived from the code under test. **No two of
+        // the seven amounts are equal**, so a term read twice or a term
+        // dropped cannot land on the same total.
         //
         // **This leaf said FOUR, and tested four, for a day after line 25b
         // began summing five.** Phase 20 added the 1099-G term and its own
@@ -9093,7 +9324,16 @@ export const proof = {
         // of five summing correctly is a true statement about a subset. It is
         // the same defect as the hand-typed modeled-kind list in
         // `fjs/return/scope`, on the same day, from the same commit.
-        line25bSumsAllFiveWithholdingDocumentTypes: () => {
+        //
+        // **And it happened AGAIN, twice, and this sweep is what found it.**
+        // Phase 27 added the 1099-NEC term to line 25b and left this leaf
+        // saying five; the unread-field sweep then added the SSA-1099's box 6,
+        // a box no computation had ever read. So the leaf was two terms behind
+        // the line it exists to police, green the whole time. A leaf whose job
+        // is a COMPLETE SET has to be edited by whoever widens the set, and
+        // this is the third record of that not happening — which is the
+        // argument for a standing gate rather than for a fourth reminder.
+        line25bSumsAllSevenWithholdingDocumentTypes: () => {
             const retirementForm = retirementDocument('sha256-r-wh')({
                 box4FederalIncomeTaxWithheld: '100.00',
             })
@@ -9106,12 +9346,75 @@ export const proof = {
             const interestForm = interestDocument('sha256-int-wh')({
                 box4FederalIncomeTaxWithheld: '10.00',
             })
+            const socialSecurityForm
+                = socialSecurityDocumentWithWithholding('sha256-ssa-wh')('20000.00')('75.00')
             const unemploymentForm = unemploymentDocument('sha256-1099g-wh')('0.00')('20.00')
-            const { tax } = computedLines(withUnemployment(
-                inputsOf(storedProfile(singleProfile))([])([interestForm])([dividendForm])([brokerageForm])(
-                    [retirementForm])([])([])([])([]))([unemploymentForm]))
-            assertEq(tax.line25b.value, 20500n, '$205.00 across all five document types')
-            assertEq(tax.line25b.sources.length, 5)
+            const base = inputsOf(storedProfile(selfEmploymentProfile))(
+                [])([interestForm])([dividendForm])([brokerageForm])(
+                [retirementForm])([socialSecurityForm])([])([])([])
+            const { tax } = computedLines(withUnemployment(withBusiness(base)([
+                nonemployeeCompensationDocument('sha256-1099nec-wh')('350.00')('40.00'),
+            ])([businessExpensesDocument('sha256-business-wh')('90.00')]))([unemploymentForm]))
+            assertEq(tax.line25b.value, 32000n, '$320.00 across all seven document types')
+            assertEq(tax.line25b.sources.length, 7)
+            // The SSA-1099's citation names box SIX, and it is the only one of
+            // the seven that does. Asserted by name because the value alone
+            // cannot distinguish "the SSA-1099 was summed" from "some other
+            // document contributed $75.00".
+            const boxPaths = tax.line25b.sources.map(source => source.boxPath)
+            assertEq(
+                boxPaths.filter(path => path === 'box6VoluntaryFederalIncomeTaxWithheld').length,
+                1,
+                ['exactly one box-6 citation, from the SSA-1099', boxPaths])
+            assertEq(
+                boxPaths.filter(path => path === 'box4FederalIncomeTaxWithheld').length,
+                6,
+                ['and six box-4 citations, one per 1099-family document', boxPaths])
+        },
+        /**
+         * The SSA-1099's box 6 ALONE, with its control — the unread-field
+         * sweep's own leaf (`fjs/todo/stored-but-unread-field-sweep.md`).
+         *
+         * i1040 (2025) p.39, "Line 25b — Form(s) 1099": *"If you received a
+         * 2025 Form 1099 showing federal income tax withheld on ... social
+         * security benefits ... include the amount withheld in the total on
+         * line 25b. This should be shown in box 4 of Form 1099, box 6 of Form
+         * SSA-1099, or box 10 of Form RRB-1099."*
+         *
+         * $1,500.00 of voluntary withholding on $20,000.00 of benefits. Before
+         * the wiring this box was stored, validated for exactness and read by
+         * nothing, so a retiree who had elected withholding under Form W-4V
+         * was charged tax they had already paid — an OVERSTATEMENT, the safe
+         * direction and still money.
+         */
+        theSsaTenNinetyNineBoxSixReachesLineTwentyFiveB: () => {
+            const withWithholding
+                = socialSecurityDocumentWithWithholding('sha256-ssa-w4v')('20000.00')('1500.00')
+            const { income, tax } = computedLines(inputsOf(storedProfile(singleProfile))(
+                [])([])([])([])([])([withWithholding])([])([])([]))
+            assertEq(income.line6a.value, 2000000n, 'line 6a still reads box 5, $20,000.00')
+            assertEq(tax.line25b.value, 150000n, 'and line 25b carries box 6, $1,500.00')
+            assertEq(tax.line25b.sources.length, 1)
+            const [only] = tax.line25b.sources
+            assertEq(only?.documentHash, 'sha256-ssa-w4v')
+            assertEq(only?.boxPath, 'box6VoluntaryFederalIncomeTaxWithheld')
+            assertEq(tax.line25a.value, 0n, 'nothing on the W-2 line')
+            assertEq(tax.line25c.value, 0n, 'and nothing on the other-forms line')
+        },
+        /**
+         * THE CONTROL: the SAME benefits with box 6 ABSENT. Line 6a is
+         * unchanged and line 25b returns to zero, citing the profile's
+         * `declaredKinds` rather than a document — DOC-11's absent-is-absent,
+         * which the source shape is what observes.
+         */
+        controlAnSsaTenNinetyNineWithNoBoxSixLeavesLineTwentyFiveBAtZero: () => {
+            const withoutWithholding = socialSecurityDocument('sha256-ssa-no-w4v')('20000.00')
+            const { income, tax } = computedLines(inputsOf(storedProfile(singleProfile))(
+                [])([])([])([])([])([withoutWithholding])([])([])([]))
+            assertEq(income.line6a.value, 2000000n, 'the same $20,000.00 of benefits')
+            assertEq(tax.line25b.value, 0n, 'and no withholding at all')
+            const [only] = tax.line25b.sources
+            assertEq(only?.boxPath, 'declaredKinds', 'a zero line cites the profile, never a box')
         },
         // The IRA-deduction circularity refusal (Decision 3.3/5.1): a
         // profile declaring `iraDeductionDeclared: true` refuses the WHOLE
