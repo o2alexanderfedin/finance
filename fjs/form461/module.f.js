@@ -438,7 +438,16 @@ export const proof = {
         const message = expectRefusal(form461(params2025)({
             ...allZero, scheduleOneLine6Cents: -31300001n,
         }))
-        assert(message.includes('0.01'), ['one cent IS an excess business loss', message])
+        // **The SIGNS, as one contiguous phrase.** `includes('0.01')` alone is
+        // satisfied by the string `-0.01` too, so dropping the negation in
+        // `centsToString(-line16)` — printing the excess as a NEGATIVE amount
+        // the filer is then told to enter "as a positive number on line 8p" —
+        // survived every other assertion in this leaf. AGENTS.md's own
+        // "erasing a string interpolation" mutation, found by running it.
+        assert(
+            message.includes('line 16 is -0.01, which is below zero, so §461(l) '
+                + 'BINDS and 0.01 of this year'),
+            ['line 16 negative, the excess POSITIVE, in one phrase', message])
         assert(message.includes('313000.00'), ['the threshold must be quoted', message])
         assert(message.includes('-313000.01'), ['and printed line 14', message])
         assert(message.includes('line 8p'), ['where the amount would have gone', message])
