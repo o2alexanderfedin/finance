@@ -196,8 +196,8 @@ across sixteen dialects — exactly once**, with one of three dispositions:
 
 | Disposition | Count | Meaning |
 |---|---|---|
-| `read` | 75 | a computation reads the amount and it can reach a printed line |
-| `refused` | 31 | the ONLY reader is a refusal predicate, and that is correct |
+| `read` | 64 | a computation reads the amount and it can reach a printed line |
+| `refused` | 42 | the ONLY reader is a refusal predicate, and that is correct |
 | `dropped` | 36 | nothing reads it; the note prices the gap and names the error direction |
 
 The partition is checked against the tuples the dialects themselves walk through
