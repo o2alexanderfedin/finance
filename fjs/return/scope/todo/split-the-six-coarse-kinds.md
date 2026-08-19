@@ -159,3 +159,56 @@ Two smaller notes, recorded so the next reader does not re-derive them:
   **box 3**, while the 2025 Form 1099-NEC face labels box 3 *Reserved for future use* — which is
   what `vnd.fjs.1099nec` transcribes as `box3ReservedForFutureUse`. `goldenParachutePaymentsTax`'s
   remedy therefore names Form W-2 box 12 code K, which both sources agree on.
+
+## Mutation log
+
+*"A proof is not known to work until you have watched it fail."* Twenty-two mutations, each applied
+alone to a committed tree and reverted (`git diff --numstat` checked at `1 1` for every one but M4,
+a deletion, and M19, an insertion). Counts came from `npm test`; the reddened leaf names from
+`node --test all.test.js`, which is the same registration path without the `tsc` gate in front.
+
+| # | mutation | red | leaves |
+|---|---|---|---|
+| M1 | `expectedModeledKindCount` 52 → 51 | 3 | `modeledKindsIsExactlyFiftyTwo`, `theTwoHandTypedCountsSumToTheWholeVocabulary`, `theHandTypedListNamesEveryModeledKind` |
+| M2 | `expectedUnmodeledKindCount` 143 → 142 | 2 | `unmodeledRefusalsIsExactlyOneHundredAndFortyThree`, `theTwoHandTypedCountsSumToTheWholeVocabulary` |
+| M3 | `expectedKindCount` 195 → 194 (profile) | 1 | `kindVocabularyIsExactlyOneHundredAndNinetyFive` |
+| M4 | `everyModeledKindHandTyped` loses `netPremiumTaxCredit` | 2 | `theHandTypedListNamesEveryModeledKind`, `theSplitReclassifiedNothing` |
+| M5 | the `amt*` vocabulary count 21 → 20 | 1 | `formSixTwoFiveOneLineTwoBIsAComputedZeroNotARefusedOne` |
+| M6 | Schedule 1 Part I block leaf 38 → 37 | 1 | `theThirtyEightScheduleOnePartOneKindsNameTheirOwnPrintedLine` |
+| M7 | Schedule 1 Part II block leaf 22 → 21 | 1 | `theTwentyTwoScheduleOneKindsNameTheirOwnPrintedLine` |
+| M8 | Schedule 2 block leaf 35 → 34 | 1 | `theThirtyFiveScheduleTwoKindsNameTheirOwnPrintedLine` |
+| M9 | Form 6251 block leaf 18 → 17 | 1 | `theEighteenFormSixTwoFiveOneKindsStillRefusingNameTheirOwnPrintedLine` |
+| M10 | Schedule 3 block leaf 29 → 28 | 1 | `theTwentyNineScheduleThreeKindsNameTheirOwnPrintedLine` |
+| M11 | the split leaf's 84 → 83 | 1 | `everyKindThisSplitAddedRefusesWithItsOwnSentence` |
+| M12 | the control leaf's 52 → 51 | 1 | `theSplitReclassifiedNothing` |
+| M13 | Schedule 1 Part I `stillRefused` 35 → 34 | 1 | `theScheduleOnePartOneKindsNoPhaseHasWiredStillRefuse` |
+| M14 | Schedule 2 `stillRefused` 29 → 28 | 1 | `theScheduleTwoKindsStillUnwiredRefuse` |
+| M15 | Schedule 1 Part II `stillRefused` 15 → 14 | 1 | `theScheduleOneKindsStillUnwiredRefuse` |
+| M16 | Schedule 3 `stillRefused` 22 → 21 | 1 | `theTwentyTwoScheduleThreeKindsStillWithoutAFormStillRefuse` |
+| M17 | `gamblingWinnings` copies `cancellationOfDebt`'s line/label/remedy | 2 | `everyKindThisSplitAddedRefusesWithItsOwnSentence`, `theThirtyEightScheduleOnePartOneKindsNameTheirOwnPrintedLine` |
+| M18 | a kind is left classified nowhere | **TS2344** | the build stops before a test runs; under `node --test` alone, 8 leaves |
+| M19 | `gamblingWinnings` joins `modeledKinds` AND keeps its refusal row | 6 | `theSplitReclassifiedNothing`, `modeledKindsIsExactlyFiftyTwo`, `partitionCoversTheVocabularyWithNoOverlap`, `everyKindThisSplitAddedRefusesWithItsOwnSentence`, `everyUnmodeledKindRefusesNamingItsOwnLineAndLabel`, `theScheduleOnePartOneKindsNoPhaseHasWiredStillRefuse` |
+| M20 | `medicaidWaiverPayments` stops naming Schedule 1 line 8s | 1 | `theFiveSubLinesNamedByAKindThatAlreadyExisted` |
+| M21 | a SECOND row is invented for Schedule 1 line 8d | 2 | `theFiveSubLinesNamedByAKindThatAlreadyExisted`, `theThirtyEightScheduleOnePartOneKindsNameTheirOwnPrintedLine` |
+| M22 | line 8z's residual is re-pointed at line 24z | 2 | `theThreePrintedLinesWithNoFactBehindThemHaveNoKind`, `theThirtyEightScheduleOnePartOneKindsNameTheirOwnPrintedLine` |
+
+Three of these are worth more than the rest.
+
+**M17 and M19 are the two mutations that state what this change claims.** M17 makes two rows say
+the same thing with different kind names in front of them — which is exactly what a coarse kind
+*is* — and `everyKindThisSplitAddedRefusesWithItsOwnSentence` catches it. M19 is a genuine
+reclassification that `tsc` cannot see, because a kind present in BOTH halves leaves
+`Kind = ModeledKind | UnmodeledKind` unchanged; only `theSplitReclassifiedNothing` and
+`partitionCoversTheVocabularyWithNoOverlap` catch it, and only because they compare sets rather
+than lengths.
+
+**M17 also found a proof that could never have reddened, before it was run.** The distinctness
+assertion was first written over `outcome.message`, and `scopeRefusal` interpolates `r.kind` into
+every message — so eighty-four distinct messages followed from eighty-four distinct names, which
+the line above already asserted. It now compares `line | label | remedy`, and M17 is the mutation
+that fails it.
+
+**M18 measures the compiler, not the suite, and is recorded twice for that reason.** `npm test` is
+`tsc && node --test`, so a kind classified nowhere never reaches a test; the eight leaves listed
+are what `node --test` alone reports. Both numbers are true of different commands, and quoting
+only the first would suggest the runtime proofs are redundant.
