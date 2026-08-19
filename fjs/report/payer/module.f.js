@@ -63,7 +63,10 @@ import { assert, assertEq, assertNotNullish } from 'functionalscript/fjs/asserts
 import { guestCtx } from '../../guest/module.f.js'
 import { interpret } from '../../exec/module.f.js'
 
+import { ok } from 'functionalscript/fjs/types/result/module.f.mjs'
+
 /** @import { OperationMap } from 'functionalscript/fjs/effects/types.js' */
+/** @import { Result } from 'functionalscript/fjs/types/result/types.js' */
 /** @import { CasOp, Report } from '../../guest/module.f.js' */
 
 /**
@@ -226,7 +229,7 @@ export const payerReportSource = [
  */
 export const payerReport = ctx => () => ctx.step(ctx.evoList('false'), activeJson => {
     /**
-     * @type {(subjects: readonly string[]) => (byPayer: ByPayer) => import('functionalscript/fjs/effects/types.js').Effect<CasOp, ByPayer>}
+     * @type {(subjects: readonly string[]) => (byPayer: ByPayer) => import('functionalscript/fjs/effects/types.js').Effect<CasOp, ByPayer, string>}
      */
     const walk = subjects => byPayer => {
         const subject = subjects[0]
@@ -338,16 +341,22 @@ const documentByHash = {
  * OWN aggregation logic — that is what makes it a unit proof rather than an
  * integration proof (Task 3 is the integration proof, against the real
  * thing).
- * @type {OperationMap<CasOp, string>}
+ *
+ * Every handler answers `ok`: this fixture's own lookups panic (via
+ * `assertNotNullish`) rather than refusing, because a missing fixture entry
+ * is a broken proof and not a case the report is meant to survive. The
+ * `Result` return is `CasOp`'s — an operation set declares one channel for
+ * all four — not a claim that any of these four can fail.
+ * @type {OperationMap<CasOp, Result<string, string>>}
  */
 const hostMap = {
-    evoList: () => JSON.stringify([subjectIntPresent, subjectIntAbsent, subjectDivPresent]),
+    evoList: () => ok(JSON.stringify([subjectIntPresent, subjectIntAbsent, subjectDivPresent])),
     evoHead: (/** @type {string} */ subject) =>
-        JSON.stringify(assertNotNullish(headsBySubject[subject], ['unknown subject', subject])),
+        ok(JSON.stringify(assertNotNullish(headsBySubject[subject], ['unknown subject', subject]))),
     evoRevision: (/** @type {string} */ headHash) =>
-        JSON.stringify({ snapshot: assertNotNullish(snapshotByHead[headHash], ['unknown head', headHash]) }),
+        ok(JSON.stringify({ snapshot: assertNotNullish(snapshotByHead[headHash], ['unknown head', headHash]) })),
     casRead: (/** @type {string} */ hash) =>
-        JSON.stringify(assertNotNullish(documentByHash[hash], ['unknown document hash', hash])),
+        ok(JSON.stringify(assertNotNullish(documentByHash[hash], ['unknown document hash', hash]))),
 }
 
 export const proof = {

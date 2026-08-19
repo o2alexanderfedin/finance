@@ -196,7 +196,11 @@ const initializedNotification = { jsonrpc: '2.0', method: 'notifications/initial
  */
 const runToolCallSession = registry => toolName => toolId => {
     const handlers = fromRegistry(registry)
-    const [state0, sessionKey] = virtual(emptyState)(create(uninitializedState))
+    const [state0, session] = virtual(emptyState)(create(uninitializedState))
+    // `virtual` answers a `Result` in 0.46.0; allocating a memory slot cannot
+    // fail against the virtual runner, and `unwrap` panics with a bare value
+    // if it somehow did.
+    const sessionKey = unwrap(session)
     const toolsCallRequest = { jsonrpc: '2.0', method: 'tools/call', id: toolId, params: { name: toolName, arguments: {} } }
     const input = [initializeRequest, initializedNotification, toolsCallRequest]
         .map(m => JSON.stringify(m))

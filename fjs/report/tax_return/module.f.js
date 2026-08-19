@@ -174,7 +174,10 @@ import { dialect as k1PartnershipDialect } from '../../document/k1_1065/module.f
 import { dialect as k1SCorporationDialect } from '../../document/k1_1120s/module.f.js'
 import { dialect as k1EstateTrustDialect } from '../../document/k1_1041/module.f.js'
 
+import { ok } from 'functionalscript/fjs/types/result/module.f.mjs'
+
 /** @import { Effect, OperationMap } from 'functionalscript/fjs/effects/types.js' */
+/** @import { Result } from 'functionalscript/fjs/types/result/types.js' */
 /** @import { CasOp } from '../../guest/module.f.js' */
 /** @import { TaxReport } from '../../guest/tax/module.f.js' */
 /** @import { Stored } from '../../form1040/core/module.f.js' */
@@ -740,7 +743,7 @@ const renderReturn = ctx => acc => {
  * @type {TaxReport<TaxReturnResult>}
  */
 export const taxReturnReport = ctx => () => ctx.step(ctx.evoList('false'), activeJson => {
-    /** @type {(subjects: readonly string[]) => (acc: Collected) => Effect<CasOp, TaxReturnResult>} */
+    /** @type {(subjects: readonly string[]) => (acc: Collected) => Effect<CasOp, TaxReturnResult, string>} */
     const walk = subjects => acc => {
         const subject = subjects[0]
         if (subject === undefined) {
@@ -1178,18 +1181,24 @@ const snapshotBySubject = {
  * a fixed map could not express. The head hash is derived by prefixing the
  * subject, so `evoHead`/`evoRevision` remain two genuinely separate lookups
  * rather than one collapsed step.
- * @type {(subjects: readonly string[]) => OperationMap<CasOp, string>}
+ *
+ * Every handler answers `ok`: this fixture's own lookups panic (via
+ * `assertNotNullish`) rather than refusing, because a missing fixture entry
+ * is a broken proof and not a case the report is meant to survive. The
+ * `Result` return is `CasOp`'s — an operation set declares one channel for
+ * all four — not a claim that any of these four can fail.
+ * @type {(subjects: readonly string[]) => OperationMap<CasOp, Result<string, string>>}
  */
 const hostMapOver = subjects => ({
-    evoList: () => JSON.stringify(subjects),
-    evoHead: (/** @type {string} */ subject) => JSON.stringify([`head:${subject}`]),
-    evoRevision: (/** @type {string} */ headHash) => JSON.stringify({
+    evoList: () => ok(JSON.stringify(subjects)),
+    evoHead: (/** @type {string} */ subject) => ok(JSON.stringify([`head:${subject}`])),
+    evoRevision: (/** @type {string} */ headHash) => ok(JSON.stringify({
         snapshot: assertNotNullish(
             snapshotBySubject[headHash.slice('head:'.length)],
             ['unknown head', headHash]),
-    }),
+    })),
     casRead: (/** @type {string} */ hash) =>
-        JSON.stringify(assertNotNullish(documentByHash[hash], ['unknown document hash', hash])),
+        ok(JSON.stringify(assertNotNullish(documentByHash[hash], ['unknown document hash', hash]))),
 })
 
 /** The fixture's five subjects, deliberately NOT in sorted order. */

@@ -51,7 +51,9 @@
  *
  * @module
  */
-import { mapStep, pureOk, step, foldStep } from 'functionalscript/fjs/effects/module.f.mjs'
+import { mapStep, catchStep, pureOk, step, foldStep } from 'functionalscript/fjs/effects/module.f.mjs'
+import { empty, nonEmpty } from 'functionalscript/fjs/effects/list/module.f.mjs'
+import { errorSummary } from 'functionalscript/fjs/effects/node/module.f.mjs'
 import { create, write } from 'functionalscript/fjs/effects/memory/module.f.mjs'
 import { stdioTransport } from 'functionalscript/fjs/protocol/mcp/stdio/module.f.mjs'
 import { mcpStep, uninitializedState, fromRegistry, toolEntry, okResult, errorResult } from 'functionalscript/fjs/protocol/mcp/module.f.mjs'
@@ -69,7 +71,7 @@ import { assert, assertEq, assertNotNullish } from 'functionalscript/fjs/asserts
 import { dialect as revisionDialect } from 'functionalscript/fjs/media/revision/module.f.mjs'
 import { cBase32ToVec, vecToCBase32 } from 'functionalscript/fjs/basen/cbase32/module.f.mjs'
 import { vec8 } from 'functionalscript/fjs/types/bit_vec/module.f.mjs'
-import { ok } from 'functionalscript/fjs/types/result/module.f.mjs'
+import { unwrap } from 'functionalscript/fjs/types/result/module.f.mjs'
 import { tryUtf8, utf8ToString } from 'functionalscript/fjs/text/module.f.mjs'
 import { collectRead } from 'functionalscript/fjs/cas/module.f.mjs'
 import { financeSchemaTool } from './finance_schema/module.f.js'
@@ -83,12 +85,12 @@ import { programPath, materializeHome } from '../guest/materialize/module.f.js'
 import { validate as validateRun } from '../run/module.f.js'
 import { dialect as oneZeroNineNineIntDialect, validate as validateOneZeroNineNineInt } from '../document/1099int/module.f.js'
 import { parse as jsonParse, stringify as jsonText } from '../json/module.f.js'
-import { unwrap } from 'functionalscript/fjs/types/result/module.f.mjs'
 
 /** @import { McpConfig, McpHandlers, ToolEntry } from 'functionalscript/fjs/protocol/mcp/types.js' */
 /** @import { Effect, Operation } from 'functionalscript/fjs/effects/types.js' */
 /** @import { MemOp, Key } from 'functionalscript/fjs/effects/memory/types.js' */
-/** @import { Read, Write, Mkdir, WriteFile, Import } from 'functionalscript/fjs/effects/node/types.js' */
+/** @import { Read, Write, Mkdir, WriteFile, Import, IoChannel, NodeOp } from 'functionalscript/fjs/effects/node/types.js' */
+/** @import { List } from 'functionalscript/fjs/effects/list/types.js' */
 /** @import { FileCasOperation } from 'functionalscript/fjs/cas/types.js' */
 /** @import { Cache } from 'functionalscript/fjs/cas/evo/types.js' */
 /** @import { Cas } from 'functionalscript/fjs/cas/types.js' */
@@ -148,28 +150,37 @@ export const casRefreshTool = cas => cacheKey => toolEntry(
     // fold over cas, and that fold's result becomes the response.
     // `mapStep(e, () => v)` is the constant form — upstream's own docstring
     // explains why no `constStep` exists.
-    () => mapStep(
-        step(
-            step(buildCache(cas), newCache => write(cacheKey, newCache)),
-            () => step(
-                cas.list(),
-                hashes => foldStep(
-                    pureOk(hashes),
-                    /** @type {{ [mimeType: string]: number }} */ ({}),
-                    hash => acc => mapStep(
+    () => {
+        const rebuilt = step(buildCache(cas), newCache => write(cacheKey, newCache))
+        const counted = step(rebuilt, () => step(
+            cas.list(),
+            hashes => foldStep(
+                pureOk(hashes),
+                /** @type {{ [mimeType: string]: number }} */ ({}),
+                // The per-item skip is a `catchStep`, and it has to be:
+                // `foldStep` short-circuits on the first `error` since
+                // 0.46.0, so a single unreadable blob would otherwise abandon
+                // the whole count instead of being passed over. Only the
+                // read is forgiven — a failure of `cas.list()` itself is not
+                // skippable and reaches the handler's answer below.
+                hash => acc => catchStep(
+                    mapStep(
                         collectRead(cas.read(hash)),
-                        readResult => {
-                            if (readResult[0] === 'error') {
-                                return acc
-                            }
-                            const mimeType = detectFinance(readResult[1]).mime_type
+                        blob => {
+                            const mimeType = detectFinance(blob).mime_type
                             return { ...acc, [mimeType]: (acc[mimeType] ?? 0) + 1 }
                         },
                     ),
+                    () => pureOk(acc),
                 ),
             ),
-        ),
-        dialectCounts => okResult(jsonText({ status: 'refreshed', dialectCounts }))),
+        ))
+        const answered = mapStep(counted, dialectCounts => okResult(jsonText({ status: 'refreshed', dialectCounts })))
+        // An MCP handler answers `never`, and that is the claim upstream says
+        // it is: a refresh that could not read the store becomes a JSON-RPC
+        // error response rather than a failure the transport has to carry.
+        return catchStep(answered, e => pureOk(errorResult(`cas_refresh failed: ${errorSummary(e)}`)))
+    },
 )
 
 // ── fjs_check (MCP-09) ────────────────────────────────────────────────────────
@@ -194,9 +205,10 @@ export const fjsCheckTool = materializeHomeRoot => cas => toolEntry(
     'boundary, and the program\'s top-level code has already run by the time this ' +
     'answers. Use fjs_run to actually execute a program.',
     { hash: string },
-    args => mapStep(
-        fjsCheck(materializeHomeRoot)(cas)(args.hash),
-        result => result[0] === 'error' ? errorResult(result[1]) : okResult(jsonText(result[1]))),
+    args => {
+        const checked = mapStep(fjsCheck(materializeHomeRoot)(cas)(args.hash), r => okResult(jsonText(r)))
+        return catchStep(checked, message => pureOk(errorResult(message)))
+    },
 )
 
 // ── Handlers ────────────────────────────────────────────────────────────────────
@@ -252,7 +264,7 @@ export const financeConfig = {
  * read → parse → dispatch → write loop until stdin EOF. Mirrors fjs's own
  * `casMcpServer` exactly, substituting `financeConfig`/`financeMcpHandlers`
  * for `casConfig`/`casMcpHandlers`.
- * @type {(home: string) => Effect<Read | Write | MemOp | FileCasOperation | Mkdir | WriteFile | Import, void>}
+ * @type {(home: string) => Effect<Read | Write | MemOp | FileCasOperation | Mkdir | WriteFile | Import, void, IoChannel>}
  */
 export const financeMcpServer = home => step(
     initEvo(fileCas(sha256)(home)),
@@ -263,6 +275,26 @@ export const financeMcpServer = home => step(
 )
 
 // ── Tests ────────────────────────────────────────────────────────────────────
+
+/**
+ * A single-chunk `cas.write` payload. **The annotation is load-bearing**:
+ * `nonEmpty`/`empty` are generic in their operation set, and without a
+ * contextual type the write's op-set widens to the whole `Operation`
+ * universe and `virtual` will not accept it.
+ * @type {(bytes: Vec) => List<never, Vec, IoChannel>}
+ */
+const oneChunk = bytes => nonEmpty(bytes, empty())
+
+/**
+ * `virtual`, with the effect's error channel discharged by a panic — fixture
+ * setup a proof has no answer to. `unwrap` throws a BARE value, as `assert`
+ * does. Sites that ASSERT on the outcome keep plain `virtual`.
+ * @type {(state: State) => <O extends NodeOp, T, E>(e: Effect<O, T, E>) => readonly [State, T]}
+ */
+const virtualOrPanic = state => e => {
+    const [next, r] = virtual(state)(e)
+    return [next, unwrap(r)]
+}
 /**
  * UTF-8 bytes of `s` as a plain array — the virtual stdin byte stream, same
  * helper `fjs/protocol/mcp/stdio/proof.f.js` and `fjs/mcp/proof.f.js` use.
@@ -574,7 +606,7 @@ export const proof = {
             const cas = fileCas(sha256)(home)
             // 1. The cache financeMcpHandlers reads from, built over an empty
             //    store — nothing to find yet.
-            const [state0, cacheKey] = virtual(emptyState)(initEvo(cas))
+            const [state0, cacheKey] = virtualOrPanic(emptyState)(initEvo(cas))
             // 2. Seed a revision directly into the store, bypassing evo.add,
             //    strictly AFTER the cache above was already built.
             const subject = vecToCBase32(vec8(0x77n))
@@ -582,20 +614,22 @@ export const proof = {
             const bytes = tryUtf8(text)
             assert(bytes !== null, 'expected the sample revision text to encode as UTF-8')
             // A single-chunk `List<never, IoResult<Vec>>`, built directly via
-            // `pure` rather than `fjs/effects/list`'s `nonEmpty`/`empty`: those
-            // are declared `<O extends Operation, T>`, and calling them with no
-            // usable inference context (as `node_modules/functionalscript/fjs/cas/evo/proof.f.mjs`
-            // does — a file this project's `tsconfig.json` excludes from
-            // checking) widens `O` to the bare `Operation` constraint here,
-            // which then fails to unify with `virtual`'s `NodeOp`. `pure`
-            // fixes its effect parameter at `never`, side-stepping the
-            // inference gap while building the identical `{first, tail}` cons
-            // cell shape `nonEmpty`/`empty` themselves construct.
-            const [state1, w] = virtual(state0)(cas.write(pureOk({ first: ok(bytes), tail: pureOk(undefined) })))
+            // `oneChunk` rather than a bare `nonEmpty(bytes, empty())`: those
+            // two are declared `<O extends Operation, T, E>`, and calling them
+            // with no usable inference context widens `O` to the bare
+            // `Operation` constraint, which then fails to unify with
+            // `virtual`'s `NodeOp`. The annotation on `oneChunk` supplies the
+            // context. (An earlier version of this comment concluded that the
+            // cons cell had to be hand-built with `pure` instead. It does not
+            // — `cas.write`'s payload is a `List<O, Vec, IoChannel>` in
+            // 0.46.0, whose items are bare `Vec`s, so a hand-built
+            // `{ first: ok(bytes), … }` is now the wrong shape as well as the
+            // long way round.)
+            const [state1, w] = virtual(state0)(cas.write(oneChunk(bytes)))
             assert(w[0] === 'ok', ['expected seed write ok', w])
             const seededHash = vecToCBase32(w[1])
             // 3. The session-state slot, exactly as financeMcpServer allocates it.
-            const [state2, sessionKey] = virtual(state1)(create(uninitializedState))
+            const [state2, sessionKey] = virtualOrPanic(state1)(create(uninitializedState))
             const handlers = financeMcpHandlers(home)(cacheKey)
             /**
              * Drives one NDJSON batch of `messages` against the composed
@@ -650,7 +684,7 @@ export const proof = {
         dialectCountsReportsPerDialectClassification: () => {
             const home = '/'
             const cas = fileCas(sha256)(home)
-            const [state0, cacheKey] = virtual(emptyState)(initEvo(cas))
+            const [state0, cacheKey] = virtualOrPanic(emptyState)(initEvo(cas))
             /**
              * Writes `text` directly into `cas` — the same seeding
              * technique `seedInvisibleUntilRefreshed` (above) uses —
@@ -660,7 +694,7 @@ export const proof = {
             const seedBlob = state => text => {
                 const bytes = tryUtf8(text)
                 assert(bytes !== null, ['expected the seed text to encode as UTF-8', text])
-                const [nextState, w] = virtual(state)(cas.write(pureOk({ first: ok(bytes), tail: pureOk(undefined) })))
+                const [nextState, w] = virtual(state)(cas.write(oneChunk(bytes)))
                 assert(w[0] === 'ok', ['expected the seed write to succeed', w])
                 return /** @type {const} */ ([nextState, vecToCBase32(w[1])])
             }
@@ -676,7 +710,7 @@ export const proof = {
             const [state2] = seedBlob(state1)(
                 `{"dialect":"${revisionDialect}","subject":"${revisionSubject}","parents":[],"snapshot":"${revisionSubject}","generation":0}`)
             const [state3] = seedBlob(state2)(JSON.stringify({ dialect: 'vnd.fjs.not-a-real-dialect' }))
-            const [state4, sessionKey] = virtual(state3)(create(uninitializedState))
+            const [state4, sessionKey] = virtualOrPanic(state3)(create(uninitializedState))
             const handlers = financeMcpHandlers(home)(cacheKey)
             /**
              * @type {(state: State, messages: readonly unknown[]) => readonly [State, readonly Unknown[]]}
@@ -765,7 +799,7 @@ export const proof = {
             const seedText = state => text => {
                 const bytes = tryUtf8(text)
                 assert(bytes !== null, ['expected seed text to encode as UTF-8', text])
-                const [nextState, w] = virtual(state)(cas.write(pureOk({ first: ok(bytes), tail: pureOk(undefined) })))
+                const [nextState, w] = virtual(state)(cas.write(oneChunk(bytes)))
                 assert(w[0] === 'ok', ['expected the seed write to succeed', w])
                 return [nextState, vecToCBase32(w[1])]
             }
@@ -808,7 +842,7 @@ export const proof = {
              * (fjs/server/fjs_run/module.f.js) already proves at the
              * executeRun layer, extended here to actually skip an absent
              * field rather than assuming every document has one.
-             * @type {(subjects: readonly string[]) => (acc: bigint) => Effect<CasOp, string>}
+             * @type {(subjects: readonly string[]) => (acc: bigint) => Effect<CasOp, string, string>}
              */
             const sumInterestOverSubjects = subjects => acc => {
                 const [subject, ...rest] = subjects
@@ -850,8 +884,8 @@ export const proof = {
             // builds the cache BEFORE its seed to demonstrate invisibility.
             // The session-state slot is allocated exactly as financeMcpServer
             // allocates it.
-            const [state8, cacheKey] = virtual(state7)(initEvo(cas))
-            const [state9, sessionKey] = virtual(state8)(create(uninitializedState))
+            const [state8, cacheKey] = virtualOrPanic(state7)(initEvo(cas))
+            const [state9, sessionKey] = virtualOrPanic(state8)(create(uninitializedState))
             const handlers = financeMcpHandlers(home)(cacheKey)
 
             /**

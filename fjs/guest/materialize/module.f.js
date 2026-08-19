@@ -57,7 +57,7 @@
  * @module
  */
 import { step, catchStep, pureError } from 'functionalscript/fjs/effects/module.f.mjs'
-import { import_, mkdir, writeUtf8File, readUtf8File } from 'functionalscript/fjs/effects/node/module.f.mjs'
+import { import_, mkdir, writeUtf8File, readUtf8File, errorMessage } from 'functionalscript/fjs/effects/node/module.f.mjs'
 import { error, ok } from 'functionalscript/fjs/types/result/module.f.mjs'
 import { join } from 'functionalscript/fjs/path/module.f.mjs'
 import { emptyState, virtual } from 'functionalscript/fjs/effects/node/virtual/module.f.mjs'
@@ -304,13 +304,25 @@ export const materializeHome = home => join(home, materializeDir)
  * the channel, not the payload** (0.46.0): `step` short-circuits the write
  * when the `mkdir` failed, which is what the hand-written
  * `if (mkdirResult[0] === 'error')` used to do, and the one `catchStep`
- * renders both failures the way both used to be rendered — `String(e)`.
+ * renders both failures where both used to be rendered separately.
+ *
+ * **`errorMessage`, not `errorSummary`, and the choice is not free.** At
+ * 0.43.1 an `IoError` was the host's message and `String(e)` produced it;
+ * `errorMessage` is that same value under 0.46.0's tagged channel, so the
+ * text a caller sees is unchanged and
+ * `fjs/server`'s `weekOneConvergence` leaf still reads `invalid file` out of
+ * it. `errorSummary` would be the safer rendering — upstream's own docstring
+ * explains that `payload.message` carries the absolute path the host could
+ * not touch, and this string reaches an MCP client through `fjs_run`'s error
+ * response. Behaviour is preserved here rather than changed inside a
+ * migration; the boundary question is written up in
+ * `fjs/todo/mcp-error-text-forwards-host-messages.md`.
  * @type {(home: string) => (hash: string) => (source: string) => Effect<Mkdir | WriteFile, void, string>}
  */
 export const materializeProgram = home => hash => source => {
     const dir = mkdir(materializeHome(home), { recursive: true })
     const written = step(dir, () => writeUtf8File(programPath(materializeHome(home))(hash), source))
-    return catchStep(written, e => pureError(String(e)))
+    return catchStep(written, e => pureError(errorMessage(e)))
 }
 
 // ── EXEC-09: import through the effect, never a raw expression ───────────────
