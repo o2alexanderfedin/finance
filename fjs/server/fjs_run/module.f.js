@@ -115,11 +115,12 @@
  *
  * @module
  */
-import { step, pureOk, mapStep, do_, resultStep } from 'functionalscript/fjs/effects/module.f.mjs'
+import { step, catchStep, pureOk, pureError, mapStep, do_, history, historyStep, unwrapStep } from 'functionalscript/fjs/effects/module.f.mjs'
+import { empty, nonEmpty } from 'functionalscript/fjs/effects/list/module.f.mjs'
 import { collectRead, fileCas } from 'functionalscript/fjs/cas/module.f.mjs'
 import { cBase32ToVec, vecToCBase32 } from 'functionalscript/fjs/basen/cbase32/module.f.mjs'
 import { utf8ToString, tryUtf8 } from 'functionalscript/fjs/text/module.f.mjs'
-import { ok } from 'functionalscript/fjs/types/result/module.f.mjs'
+import { unwrap } from 'functionalscript/fjs/types/result/module.f.mjs'
 import { option, array, number, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
 import { toolEntry, okResult, errorResult } from 'functionalscript/fjs/protocol/mcp/module.f.mjs'
 import { sha256 } from 'functionalscript/fjs/crypto/sha2/module.f.mjs'
@@ -142,12 +143,14 @@ import { taxParamsByYear } from '../../tax/params/module.f.js'
 import { dialect as returnProfileDialect } from '../../return/profile/module.f.js'
 import { paramSetHash, reviewedEstimateFraming } from '../../report/provenance/module.f.js'
 import { sizeGuard, previewBytes, guardBytes } from '../response/module.f.js'
-import { readUtf8File } from 'functionalscript/fjs/effects/node/module.f.mjs'
+import { readUtf8File, errorSummary } from 'functionalscript/fjs/effects/node/module.f.mjs'
 import { vec8, length as bitLength } from 'functionalscript/fjs/types/bit_vec/module.f.mjs'
 import { parse } from 'functionalscript/fjs/path/module.f.mjs'
 import { stringify as jsonText } from '../../json/module.f.js'
 
 /** @import { Effect, Operation } from 'functionalscript/fjs/effects/types.js' */
+/** @import { List } from 'functionalscript/fjs/effects/list/types.js' */
+/** @import { IoChannel } from 'functionalscript/fjs/effects/node/types.js' */
 /** @import { MemOp } from 'functionalscript/fjs/effects/memory/types.js' */
 /** @import { Mkdir, WriteFile, Import } from 'functionalscript/fjs/effects/node/types.js' */
 /** @import { Cas, FileCasOperation } from 'functionalscript/fjs/cas/types.js' */
@@ -229,28 +232,47 @@ import { stringify as jsonText } from '../../json/module.f.js'
  * that does not read `ctx.form1040Report`/`ctx.taxParams` is unaffected by
  * their presence, which is why `fjs/report/payer`'s own stored program
  * still runs here unchanged.
- * @type {(cas: Cas<FileCasOperation>) => (evoApi: Evo<FileCasOperation>) => (taxParams: TaxParamSet) => (path: string) => (source: string) => (literalCount: number) => (args: readonly string[]) => (pin: { readonly subject: string, readonly parents: readonly string[] } | undefined) => Effect<FileCasOperation | Mkdir | WriteFile | Import | MemOp, RunOutcome<unknown>>}
+ * **The failures are in the channel** (0.46.0), as plain messages, and
+ * {@link asRunOutcome} is the single place they become a `kind: 'error'`
+ * outcome. Splitting it that way is what lets `loadProgram`'s refusal and
+ * `interpret`'s refusal reach the run record by the same route: the tail
+ * describes the success path, and the one function that names the failures
+ * is the one whose job is to record them.
+ * @type {(cas: Cas<FileCasOperation>) => (evoApi: Evo<FileCasOperation>) => (taxParams: TaxParamSet) => (path: string) => (source: string) => (literalCount: number) => (args: readonly string[]) => (pin: { readonly subject: string, readonly parents: readonly string[] } | undefined) => Effect<FileCasOperation | Mkdir | WriteFile | Import | MemOp, RunOutcome<unknown>, string>}
  */
-const runProgramTail = cas => evoApi => taxParams => path => source => literalCount => args => pin =>
-    step(loadProgram([])(path)(source), loadResult => {
-        if (loadResult[0] === 'error') {
-            return pureOk(/** @type {RunOutcome<unknown>} */ ({ kind: 'error', message: loadResult[1], reads: [] }))
+const runProgramTail = cas => evoApi => taxParams => path => source => literalCount => args => pin => {
+    const loaded = loadProgram([])(path)(source)
+    const withSnapshot = historyStep(history(loaded), () => buildRunSnapshot(cas)(evoApi)(pin))
+    return step(withSnapshot, ([snapshot, module_]) => {
+        const hostMap = buildHostMap(snapshot)
+        const report = /** @type {{ readonly report: TaxReport<unknown> }} */ (module_)
+        const [t, v] = interpret(hostMap)(report.report(taxGuestCtx(taxParams))(args))
+        if (t === 'error') {
+            return pureError(v)
         }
-        return step(buildRunSnapshot(cas)(evoApi)(pin), snapshot => {
-            const hostMap = buildHostMap(snapshot)
-            const loaded = /** @type {{ readonly report: TaxReport<unknown> }} */ (loadResult[1])
-            const [t, v] = interpret(hostMap)(loaded.report(taxGuestCtx(taxParams))(args))
-            if (t === 'error') {
-                return pureOk(/** @type {RunOutcome<unknown>} */ ({ kind: 'error', message: v, reads: [] }))
-            }
-            const [value, reads] = v
-            // 09-06: classifyRunOutcome (imported from
-            // fjs/report/guard/module.f.js) is the zero-read kill
-            // condition's ONLY definition — this is the production call
-            // site, reached by BOTH run paths since MAINT-07.
-            return pureOk(classifyRunOutcome(literalCount)(value, reads))
-        })
+        const [value, reads] = v
+        // 09-06: classifyRunOutcome (imported from
+        // fjs/report/guard/module.f.js) is the zero-read kill
+        // condition's ONLY definition — this is the production call
+        // site, reached by BOTH run paths since MAINT-07.
+        return pureOk(classifyRunOutcome(literalCount)(value, reads))
     })
+}
+
+/**
+ * Absorbs a run pipeline's error channel into the `kind: 'error'` arm of
+ * {@link RunOutcome} — the one place this module decides that an
+ * infrastructure failure and a guest failure are the same thing to a
+ * caller, because both end as a `status: 'error'` run record.
+ *
+ * The `never` it returns is the claim upstream's docstring describes: past
+ * this point there is no failure left to handle, and the type says so
+ * rather than a comment.
+ * @type {<O extends Operation>(e: Effect<O, RunOutcome<unknown>, string>) => Effect<O, RunOutcome<unknown>, never>}
+ */
+const asRunOutcome = e => catchStep(
+    e,
+    message => pureOk(/** @type {RunOutcome<unknown>} */ ({ kind: 'error', message, reads: [] })))
 
 /**
  * Runs a stored program (by CAS hash) against `input.args`, optionally
@@ -272,46 +294,40 @@ const runProgramTail = cas => evoApi => taxParams => path => source => literalCo
  * guest.** It was not dropped; read it there. The short version, so nobody
  * has to: re-resolving instead of threading survives the whole suite today,
  * for the arithmetic reason that `taxParamsByYear` holds exactly one year.
- * @type {(materializeHomeRoot: string) => (cas: Cas<FileCasOperation>) => (evoApi: Evo<FileCasOperation>) => (input: { readonly hash: string, readonly args: readonly string[], readonly taxParams: TaxParamSet, readonly subject?: string, readonly parents?: readonly string[] }) => Effect<FileCasOperation | Mkdir | WriteFile | Import | MemOp, RunOutcome<unknown>>}
+ * **Read as its success path.** Every failure below — a CAS miss, a
+ * materialize failure, a refused specifier, a guest refusal — travels in
+ * the error channel and is turned into an error `RunOutcome` exactly once,
+ * by {@link asRunOutcome} on the last line. The four hand-written
+ * `if (r[0] === 'error') return pureOk({ kind: 'error', … })` arms this
+ * function used to be made of are that one call now.
+ * @type {(materializeHomeRoot: string) => (cas: Cas<FileCasOperation>) => (evoApi: Evo<FileCasOperation>) => (input: { readonly hash: string, readonly args: readonly string[], readonly taxParams: TaxParamSet, readonly subject?: string, readonly parents?: readonly string[] }) => Effect<FileCasOperation | Mkdir | WriteFile | Import | MemOp, RunOutcome<unknown>, never>}
  */
 export const executeRun = materializeHomeRoot => cas => evoApi => input => {
     const hashVec = cBase32ToVec(input.hash)
     if (hashVec === null) {
         return pureOk(/** @type {RunOutcome<unknown>} */ ({ kind: 'error', message: `program not found: ${input.hash}`, reads: [] }))
     }
-    // `resultStep`, not `step`. Upstream moved `collectRead`'s failure out of
-    // the payload and into the effect's error channel in 0.46.0, and `step`
-    // now short-circuits on that channel — so a `step` continuation receives
-    // the `Vec` itself, and `readResult[0]` would index a bit-vector. That is
-    // exactly what produced `TypeError: Cannot mix BigInt and other types`
-    // inside `types/bigint`'s `log2`, three frames below `utf8ToString`, with
-    // no type error at the site. `resultStep` IS the Result-blind `step` this
-    // line was written against (upstream's own words), at the type that says
-    // what its continuation receives — so the branch below is unchanged and
-    // now type-checked.
-    return resultStep(collectRead(cas.read(hashVec)), readResult => {
-        if (readResult[0] === 'error') {
-            return pureOk(/** @type {RunOutcome<unknown>} */ ({ kind: 'error', message: `program not found: ${input.hash}`, reads: [] }))
-        }
-        const sourceText = utf8ToString(readResult[1])
+    const read = catchStep(
+        collectRead(cas.read(hashVec)),
+        () => pureError(`program not found: ${input.hash}`))
+    const sourceText = mapStep(read, utf8ToString)
+    const materialized = historyStep(
+        history(sourceText),
+        text => materializeProgram(materializeHomeRoot)(input.hash)(text))
+    return asRunOutcome(step(materialized, ([, text]) => {
         // PROV-07 (the reported half): computed HERE, at the exact point
         // checkSpecifiers will read this SAME string from moments later
         // (inside loadProgram) — never a second reading of the source.
-        const literalCount = countNumericLiterals(sourceText)
-        return step(materializeProgram(materializeHomeRoot)(input.hash)(sourceText), materializeResult => {
-            if (materializeResult[0] === 'error') {
-                return pureOk(/** @type {RunOutcome<unknown>} */ ({ kind: 'error', message: materializeResult[1], reads: [] }))
-            }
-            const pin = input.subject !== undefined && input.parents !== undefined
-                ? { subject: input.subject, parents: input.parents }
-                : undefined
-            // MAINT-07: the tail's ORDER lives once, in runProgramTail. This
-            // path and runExecuteRunViaFixture's replay are now the same
-            // definition, so inserting or reordering a step cannot reach one
-            // without reaching the other.
-            return runProgramTail(cas)(evoApi)(input.taxParams)(programPath(materializeHome(materializeHomeRoot))(input.hash))(sourceText)(literalCount)(input.args)(pin)
-        })
-    })
+        const literalCount = countNumericLiterals(text)
+        const pin = input.subject !== undefined && input.parents !== undefined
+            ? { subject: input.subject, parents: input.parents }
+            : undefined
+        // MAINT-07: the tail's ORDER lives once, in runProgramTail. This
+        // path and runExecuteRunViaFixture's replay are now the same
+        // definition, so inserting or reordering a step cannot reach one
+        // without reaching the other.
+        return runProgramTail(cas)(evoApi)(input.taxParams)(programPath(materializeHome(materializeHomeRoot))(input.hash))(text)(literalCount)(input.args)(pin)
+    }))
 }
 
 // ── fjsRunTool: handler-performed writes, the run record, the response ──────
@@ -321,23 +337,28 @@ export const executeRun = materializeHomeRoot => cas => evoApi => input => {
  * `cas.write(pureOk({first: ok(bytes), tail: pureOk(undefined)}))` pattern
  * `fjs/server/module.f.js`'s `casRefresh` proof and
  * `fjs/server/fjs_run/snapshot/module.f.js`'s own store-seeding proofs use —
- * and returns the resulting content hash. A write failure here is asserted,
- * not branched on: writing a moderately-sized in-memory string is not a
+ * and returns the resulting content hash. A write failure here is a PANIC,
+ * not a branch: writing a moderately-sized in-memory string is not a
  * normal-operation failure mode this plan's error taxonomy covers (that
  * taxonomy is about GUEST failures — missing hash, dirty specifier, a
  * non-`Error` throw — not CAS infrastructure failures).
- * @type {<O extends Operation>(cas: Cas<O>) => (text: string) => Effect<O, string>}
+ *
+ * The panic is `unwrapStep` since 0.46.0, which is the same decision the
+ * `assert(writeResult[0] === 'ok', …)` here made — a bare value thrown —
+ * written in a function whose name says it is a policy, and whose `summary`
+ * argument makes a widening error channel a compile error at this site
+ * rather than a quietly larger set of things to crash on.
+ * @type {<O extends Operation>(cas: Cas<O>) => (text: string) => Effect<O, string, never>}
  */
 const writeTextToCas = cas => text => {
     const bytes = tryUtf8(text)
     assert(bytes !== null, ['expected text destined for CAS to encode as UTF-8', text])
-    return mapStep(
-        cas.write(pureOk({ first: ok(bytes), tail: pureOk(undefined) })),
-        writeResult => {
-            assert(writeResult[0] === 'ok', ['expected a CAS write to succeed', writeResult])
-            return vecToCBase32(writeResult[1])
-        },
-    )
+    /** @type {List<never, Vec, IoChannel>} */
+    const payload = nonEmpty(bytes, empty())
+    const written = unwrapStep(
+        cas.write(payload),
+        e => `expected a CAS write to succeed: ${errorSummary(e)}`)
+    return mapStep(written, vecToCBase32)
 }
 
 /** rtti validator for "is this a JSON value", from `fjs/media/json`'s own schema. */
@@ -609,14 +630,13 @@ export const fjsRunTool = materializeHomeRoot => cas => evoApi => toolEntry(
 const taxParamsFixture = taxParamsByYear[2025]
 assert(taxParamsFixture !== undefined, 'expected TY2025 parameters to be present in taxParamsByYear')
 
-/** Single-chunk UTF-8 CAS write, mirroring the proofs `fjs/server/fjs_run/snapshot/module.f.js` and `fjs/server/module.f.js` already establish. @type {<O extends Operation>(cas: Cas<O>) => (text: string) => Effect<O, string>} */
+/** Single-chunk UTF-8 CAS write, mirroring the proofs `fjs/server/fjs_run/snapshot/module.f.js` and `fjs/server/module.f.js` already establish. @type {<O extends Operation>(cas: Cas<O>) => (text: string) => Effect<O, string, never>} */
 const seedText = cas => text => {
     const bytes = tryUtf8(text)
     assert(bytes !== null, ['expected sample text to encode as UTF-8', text])
-    return mapStep(cas.write(pureOk({ first: ok(bytes), tail: pureOk(undefined) })), w => {
-        assert(w[0] === 'ok', ['expected the seed write to succeed', w])
-        return vecToCBase32(w[1])
-    })
+    /** @type {List<never, Vec, IoChannel>} */
+    const payload = nonEmpty(bytes, empty())
+    return mapStep(unwrapStep(cas.write(payload), errorSummary), vecToCBase32)
 }
 
 /**
