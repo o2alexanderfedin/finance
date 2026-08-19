@@ -74,6 +74,7 @@ import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { of, add, multiply, halfUp } from '../../types/rational/module.f.js'
 import { centsFromString, centsToString } from '../../exact/module.f.js'
 import { taxParamsByYear, individualFilingStatuses } from '../params/module.f.js'
+import { refuses } from '../../refuses/module.f.js'
 
 /** @import { TaxParamSet, Bracket, IndividualFilingStatus } from '../params/module.f.js' */
 /** @import { Rational } from '../../types/rational/module.f.js' */
@@ -668,24 +669,20 @@ export const proof = {
     // verbatim, exactly as Publication 1040 itself does. A lookup one
     // cent below still resolves, to the table's own last row.
     tableRefusesAtOneHundredThousandAndAbove: () => {
-        let threw = false
-        try {
-            lookupTaxTable(taxParams2025)(centsFromString('100000.00'))
-        } catch (e) {
-            threw = true
-            assert(typeof e === 'string' || Array.isArray(e), ['expected a bare thrown value, not an Error', e])
-            assert(!(e instanceof Error), ['must never throw an Error instance', e])
-            const message = typeof e === 'string' ? e : Array.isArray(e) ? e.join(' ') : ''
+        // `refuses` (`fjs/refuses`) is the one place under `fjs/` that may
+        // `try`, and it carries the two assertions this leaf used to make
+        // itself: that the thrown value is a bare string or array (never an
+        // `Error`) and that the call threw at all.
+        refuses(() => lookupTaxTable(taxParams2025)(centsFromString('100000.00')))(message => {
             assert(
                 message.includes('100,000'),
-                ['expected the thrown message to name the $100,000 boundary', e],
+                ['expected the thrown message to name the $100,000 boundary', message],
             )
             assert(
                 message.includes('Tax Computation Worksheet'),
-                ['expected the thrown message to name the Tax Computation Worksheet', e],
+                ['expected the thrown message to name the Tax Computation Worksheet', message],
             )
-        }
-        assert(threw, 'expected lookupTaxTable to refuse a $100,000.00 lookup')
+        })
     },
     // One cent below still resolves, to the table's own last row — the
     // control that makes the refusal above a boundary rather than a blanket
@@ -796,24 +793,18 @@ export const proof = {
     // cannot cover the income, so "it threw" alone cannot tell the
     // boundary refusal apart from an unrelated data failure.
     taxComputationWorksheetRefusesBelowOneHundredThousand: () => {
-        let threw = false
-        try {
-            taxComputationWorksheet(taxParams2025.ordinaryBrackets.single.brackets)(centsFromString('99999.99'))
-        } catch (e) {
-            threw = true
-            assert(typeof e === 'string' || Array.isArray(e), ['expected a bare thrown value, not an Error', e])
-            assert(!(e instanceof Error), ['must never throw an Error instance', e])
-            const message = typeof e === 'string' ? e : Array.isArray(e) ? e.join(' ') : ''
+        refuses(
+            () => taxComputationWorksheet(taxParams2025.ordinaryBrackets.single.brackets)(centsFromString('99999.99')),
+        )(message => {
             assert(
                 message.includes('100,000'),
-                ['expected the thrown message to name the $100,000 boundary', e],
+                ['expected the thrown message to name the $100,000 boundary', message],
             )
             assert(
                 message.includes('Tax Table'),
-                ['expected the thrown message to name the Tax Table', e],
+                ['expected the thrown message to name the Tax Table', message],
             )
-        }
-        assert(threw, 'expected taxComputationWorksheet to refuse an income below $100,000.00')
+        })
     },
     // The control leg the refusal above needs (AGENTS.md: "a gate needs a
     // control"): at EXACTLY $100,000.00 the worksheet answers, and

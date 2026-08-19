@@ -80,6 +80,28 @@ These are cited by name throughout the source. They are stated here so the citat
   `typeof e === 'string'` or an array; `e instanceof Error` is `false` and `e.message` is
   `undefined`. Never branch on `instanceof Error` — such a branch misses every refusal this
   codebase raises.
+- **No `try` in a `.f.js`, with exactly one carve-out: [`fjs/refuses`](./fjs/refuses/module.f.js).**
+  `throw` is reserved for panics, so a recoverable failure belongs in a `Result` or in an
+  effect's error channel and is READ, never caught. The carve-out exists because this project's
+  refusals throw BARE values, and a proof that a refusal fired must assert **what** it said —
+  a leaf nested under a `throw` key passes for any throw, which is precisely how the `<`/`<=`
+  mutation in `fjs/tax/table` stayed green. Catching is the only way to read a value that
+  arrives by `throw`.
+
+  The condition is narrow and checkable: **`grep -rn 'try {' fjs demo` must return exactly one
+  code hit, in `fjs/refuses/module.f.js`.** A proof that needs to observe a refusal calls
+  `refuses(call)(check)`; nothing else may open a `try`. Production code may not, at all —
+  a caller that must handle a refusal wants the check to RETURN it (`fjs/schedule/a`'s
+  `saltIncomeTaxDriftMessage`, with the throwing form as a two-line wrapper over it, is the
+  pattern), and an effect's failure wants `catchStep`.
+
+  This rule is written down because eight `try`s accumulated while it was not. Six were the
+  same idiom copied into four modules — two of them private `refuses` helpers whose own
+  docstrings said they were reimplemented because the other was not exported. One
+  (`fjs/exec`) was a genuine workaround that 0.46.0 retired. One
+  (`fjs/server/fjs_run/snapshot`) had outlived its subject: the code it caught had stopped
+  throwing, so the `assert(false, …)` inside the `try` fired instead and the `catch` caught
+  *that*, leaving the leaf asserting against its own failure message.
 - **No new dependency, including a devDependency, without every repo owner's approval.**
 - **A missing generic capability is written here in this project, shaped so it could be lifted
   upstream unchanged** — no locale or domain assumptions baked into a generic module. See

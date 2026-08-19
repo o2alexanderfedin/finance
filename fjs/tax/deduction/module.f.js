@@ -44,6 +44,7 @@
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { centsFromString } from '../../exact/module.f.js'
 import { taxParamsByYear } from '../params/module.f.js'
+import { refuses } from '../../refuses/module.f.js'
 
 /** @import { IndividualFilingStatus, TaxParamSet } from '../params/module.f.js' */
 /** @import { StringMap } from 'functionalscript/fjs/types/object/types.js' */
@@ -412,30 +413,6 @@ const chartInput = (status, boxes) => ({
     dualStatusAlien: false,
     earnedIncomeCents: 0n,
 })
-
-/**
- * Runs a line-12e call that must REFUSE, and hands the thrown value's text
- * to `check` so a leaf can assert WHAT was thrown, never merely that
- * something threw (AGENTS.md: the mutation sweep found several assertions
- * making exactly that mistake). `assert` throws a BARE value — a string or
- * an array — never an `Error`, which is why the value is read directly
- * instead of through `.message`.
- * @type {(call: () => bigint) => (check: (message: string) => void) => void}
- */
-const refuses = call => check => {
-    let threw = false
-    try {
-        call()
-    } catch (thrown) {
-        threw = true
-        assert(
-            typeof thrown === 'string' || Array.isArray(thrown),
-            ['expected a bare thrown value: a string or an array', thrown],
-        )
-        check(typeof thrown === 'string' ? thrown : thrown.join(' '))
-    }
-    assert(threw, 'expected the call to refuse, but it returned an amount')
-}
 
 /**
  * One generated proof leaf per printed chart combination, keyed

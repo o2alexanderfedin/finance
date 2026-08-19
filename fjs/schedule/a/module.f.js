@@ -107,6 +107,7 @@ import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { of, multiply, halfUp } from '../../types/rational/module.f.js'
 import { centsFromString } from '../../exact/module.f.js'
 import { taxParamsByYear } from '../../tax/params/module.f.js'
+import { refuses } from '../../refuses/module.f.js'
 
 /** @import { TaxParamSet, IndividualFilingStatus } from '../../tax/params/module.f.js' */
 /** @import { ReturnProfile } from '../../return/profile/module.f.js' */
@@ -436,14 +437,18 @@ const saltCapWorksheet = taxParamSet => input => {
  * nothing to compare, and this is a silent no-op — never a refusal for a
  * return that legitimately elected the sales-tax line.
  *
- * Stays THROW-based (never returns an outcome directly) so this module's own
- * proofs can keep exercising it in isolation via {@link refuses}, exactly as
- * before WR-02; {@link scheduleA} is the ONE production caller, and it
- * catches the throw and translates it into `{ kind: 'error' }` (this
- * codebase's merge-note precedent that catching a bare thrown value in
- * shipped production code is legitimate — `fjs/exec/module.f.js` already
- * does it — never branching on `instanceof Error`, since nothing here ever
- * throws one).
+ * **The rule lives in {@link saltIncomeTaxDriftMessage}, which RETURNS the
+ * refusal instead of throwing it, and this function is the two-line
+ * assertion wrapper over it.** It used to be the other way round: the check
+ * threw, and `scheduleA` wrapped its one production call in a `try` to turn
+ * the bare thrown value back into `{ kind: 'error' }` — a `try` in a `.f.js`,
+ * which AGENTS.md forbids, defended by `fjs/exec`'s precedent at a time when
+ * `fjs/exec` genuinely had one. `fjs/exec`'s is gone (0.46.0 made a runner's
+ * refusal a value), and this one is gone for the more ordinary reason that
+ * a refusal a caller must handle was never a panic to begin with. The
+ * throwing spelling stays because this module's proofs exercise it through
+ * {@link refuses}, and because the two spellings are one rule with one
+ * definition — not two checks that can drift.
  *
  * `fjs/document/w2`'s `stateIncomeTax` (inside `box15Through20`) and
  * `fjs/document/1099r`'s `stateTaxWithheld` (inside `stateLocal`) — see both
@@ -452,15 +457,15 @@ const saltCapWorksheet = taxParamSet => input => {
  * Reading them still never FEEDS them into any computed line — line 5a stays
  * taxpayer-asserted, never derived from either box; this check only GATES a
  * refusal.
- * @type {(itemizedEntries: readonly Stored<ItemizedEntry>[]) => (w2Forms: readonly Stored<W2>[]) => (oneZeroNineNineRForms: readonly Stored<OneZeroNineNineR>[]) => void}
+ * @type {(itemizedEntries: readonly Stored<ItemizedEntry>[]) => (w2Forms: readonly Stored<W2>[]) => (oneZeroNineNineRForms: readonly Stored<OneZeroNineNineR>[]) => string | null}
  */
-const assertAssertedSaltIncomeTaxIsAtLeastStoredWithholding = itemizedEntries => w2Forms => oneZeroNineNineRForms => {
+const saltIncomeTaxDriftMessage = itemizedEntries => w2Forms => oneZeroNineNineRForms => {
     const incomeTaxEntries = itemizedEntries.filter(entry => entry.value.lineTag === 'saltIncomeTax')
     if (incomeTaxEntries.length === 0) {
         // The general-sales-tax election is in force (or nothing at all is
         // asserted on line 5a) -- this check watches the income-tax
         // election only.
-        return
+        return null
     }
     const assertedCents = incomeTaxEntries.reduce(
         (total, entry) => total + centsFromString(entry.value.amount), 0n)
@@ -473,15 +478,26 @@ const assertAssertedSaltIncomeTaxIsAtLeastStoredWithholding = itemizedEntries =>
             rowTotal + (row.stateTaxWithheld === undefined ? 0n : centsFromString(row.stateTaxWithheld)), 0n),
         0n)
     const storedWithholdingCents = w2WithholdingCents + oneZeroNineNineRWithholdingCents
-    assert(
-        assertedCents >= storedWithholdingCents,
-        [
-            'Schedule A line 5a (SALT income tax, taxpayer-asserted) is below the state/local '
-            + 'income tax already withheld and reported on stored W-2s/1099-Rs -- withheld tax '
-            + 'is necessarily paid',
-            'asserted', assertedCents, 'storedWithholding', storedWithholdingCents,
-        ],
-    )
+    if (assertedCents >= storedWithholdingCents) { return null }
+    // Assembled here rather than left as the array the `assert` used to
+    // throw, and spaced to join identically: the old thrown value was
+    // `[sentence, 'asserted', a, 'storedWithholding', b]` and both readers
+    // rendered it with `.join(' ')`, so this string is the same text every
+    // proof already asserts substrings of.
+    return 'Schedule A line 5a (SALT income tax, taxpayer-asserted) is below the state/local '
+        + 'income tax already withheld and reported on stored W-2s/1099-Rs -- withheld tax '
+        + `is necessarily paid asserted ${assertedCents} storedWithholding ${storedWithholdingCents}`
+}
+
+/**
+ * {@link saltIncomeTaxDriftMessage} as an assertion — the spelling this
+ * module's own proofs exercise through {@link refuses}, and the only reason
+ * the throwing form still exists.
+ * @type {(itemizedEntries: readonly Stored<ItemizedEntry>[]) => (w2Forms: readonly Stored<W2>[]) => (oneZeroNineNineRForms: readonly Stored<OneZeroNineNineR>[]) => void}
+ */
+const assertAssertedSaltIncomeTaxIsAtLeastStoredWithholding = itemizedEntries => w2Forms => oneZeroNineNineRForms => {
+    const message = saltIncomeTaxDriftMessage(itemizedEntries)(w2Forms)(oneZeroNineNineRForms)
+    assert(message === null, message)
 }
 
 // ── Schedule A itself ───────────────────────────────────────────────────────
@@ -571,18 +587,13 @@ export const scheduleA = taxParamSet => input => {
     const line5a = fromEntries('Schedule A line 5a')(addBoxSums(saltIncomeTaxSum)(saltGeneralSalesTaxSum))
     // WR-02 (13-REVIEW.md): Decision 2.2's withholding-drift check, WIRED
     // into this real computation path (previously exercised only by its own
-    // hand-written proof fixtures). Catches the check's own throw and
-    // translates it into this module's `{ kind: 'error' }` shape -- the
-    // SAME data-sufficiency refusal category as CR-01/WR-04 above, never a
-    // `fjs/return/scope` kind.
-    try {
-        assertAssertedSaltIncomeTaxIsAtLeastStoredWithholding(itemizedEntries)(w2Forms)(oneZeroNineNineRForms)
-    } catch (thrown) {
-        assert(
-            typeof thrown === 'string' || Array.isArray(thrown),
-            ['expected a bare thrown value: a string or an array', thrown],
-        )
-        return { kind: 'error', message: typeof thrown === 'string' ? thrown : thrown.join(' ') }
+    // hand-written proof fixtures). It READS the refusal rather than
+    // catching it -- the SAME data-sufficiency refusal category as
+    // CR-01/WR-04 above, never a `fjs/return/scope` kind, and no longer a
+    // `try` in a `.f.js`.
+    const driftMessage = saltIncomeTaxDriftMessage(itemizedEntries)(w2Forms)(oneZeroNineNineRForms)
+    if (driftMessage !== null) {
+        return { kind: 'error', message: driftMessage }
     }
     const line5b = fromEntries('Schedule A line 5b')(byTag('realEstateTax'))
     const line5c = fromEntries('Schedule A line 5c')(byTag('personalPropertyTax'))
@@ -642,29 +653,6 @@ export const scheduleA = taxParamSet => input => {
 // fixtures. `refuses` below stays a test-only helper: it lets this module's
 // OWN proofs exercise the throwing check function directly, independent of
 // `scheduleA`'s try/catch translation into `{ kind: 'error' }`.
-
-/**
- * Runs a call that must REFUSE, and hands the thrown value's text to
- * `check` — reimplemented locally per `fjs/tax/deduction`'s own private
- * `refuses` (not exported there, so not importable; the same
- * "reimplement an idiom you cannot import" precedent this module's own
- * `sumEntriesByLineTag`-family helpers above already follow).
- * @type {(call: () => void) => (check: (message: string) => void) => void}
- */
-const refuses = call => check => {
-    let threw = false
-    try {
-        call()
-    } catch (thrown) {
-        threw = true
-        assert(
-            typeof thrown === 'string' || Array.isArray(thrown),
-            ['expected a bare thrown value: a string or an array', thrown],
-        )
-        check(typeof thrown === 'string' ? thrown : thrown.join(' '))
-    }
-    assert(threw, 'expected the call to refuse, but it completed without throwing')
-}
 
 // ── Tests ────────────────────────────────────────────────────────────────────
 
