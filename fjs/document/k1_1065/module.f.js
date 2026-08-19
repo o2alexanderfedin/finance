@@ -322,7 +322,7 @@ export const unmodeledMoneyBoxes = /** @type {const} */ ([
     ['box9bCollectiblesTwentyEightPercentGain', 'the 28% Rate Gain Worksheet and Schedule D line 18'],
     ['box9cUnrecapturedSection1250Gain', 'the Unrecaptured Section 1250 Gain Worksheet and Schedule D line 19'],
     ['box10NetSection1231Gain', 'Form 4797 Part I, and thence Schedule 1 line 4 (other gains or losses) — `otherGainsOrLosses` is an `fjs/return/scope` refusal'],
-    ['box12Section179Deduction', 'Schedule E Part II line 28 column (i), which the printed form takes from Form 4562 — the same asset basis history Schedule C line 13 already refuses for'],
+    ['box12Section179Deduction', 'Schedule E Part II line 28 column (i), which the printed form takes from Form 4562. Form 4562 now EXISTS here and it refuses Part I by name: a partner’s or shareholder’s §179 deduction is limited on line 11 by THEIR OWN business income — i4562 p4: “For a partnership, these limitations apply to the partnership and each partner” — and whatever line 11 disallows carries to next year on line 13, which this engine cannot store'],
     ['box21ForeignTaxesPaidOrAccrued', 'Schedule 3 line 1 (foreign tax credit), through Form 1116 — and NOT through §904(j), whose de-minimis election `fjs/schedule/3` does compute: §904(j)(3) reaches only passive income shown on a payee statement furnished to the individual, which a partner\'s distributive share of partnership-level foreign taxes is not. This row also keeps §904(j)(2)(B)\'s $300/$600 ceiling honest, since that ceiling is on the taxpayer\'s TOTAL creditable foreign taxes and this box is the only one in the document set `fjs/schedule/3` does not read'],
 ])
 

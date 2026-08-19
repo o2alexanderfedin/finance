@@ -261,3 +261,76 @@ for property placed in service before 1999, a `200DB` asset that old is
 - The two Schedule K-1 §179 boxes and Schedule E line 28(i) stay refused: a
   partner's §179 deduction is subject to the partner's OWN business income
   limitation on this Form 4562's line 11, which is the line Part I refuses at.
+
+## 9. The mutation log
+
+AGENTS.md: *"A proof is not known to work until you have watched it fail."*
+Thirty-two mutations were written and run against the committed tree, one at a
+time, each reverted before the next and each checked with
+`git diff --numstat` for exactly one insertion and one deletion.
+
+**One did not compile.** `asset.convention !== expected` weakened to
+`&& asset.convention === 'ZZ'` is `TS2367` — `convention` is narrowed to
+`'HY' | 'MQ' | 'MM'` at that point and has no overlap with `'ZZ'`. Re-run in a
+semantically identical compiling form (`&& asset.description === 'no such
+asset'`), it reddens 1 leaf. The same `'ZZ'` trick DOES compile inside
+`fjs/document/asset_register`, where the field is still a bare `string`.
+
+**One survived**, and it is the one worth recording:
+`businessUseHundredthsOfPercent: percentFromString(...)` forced to a flat
+`10000n` — 100% business use — left the entire suite green. Every fixture in
+this repository used 100.00% business use, a June placed-in-service month and
+the current tax year, so **three of the five facts `depreciableAssets`
+extracts were unobservable**. `aPartialBusinessUseAndAPriorYearAssetBothTravel`
+and its control were added for it: a 60%-business November asset (mid-quarter,
+Table A-5) beside a March 2022 five-year asset (half-year, Table A-1, recovery
+year 4). All three mutations now redden — the percentage, the month
+(`Number(monthText)` → `6`) and the year (`Number(yearText)` → the register's
+own `taxYear`).
+
+| # | Mutation | Leaves red |
+|---|---|---|
+| 1 | MACRS never switches to straight line | 5 |
+| 2 | the first-year convention fraction is ignored | 21 |
+| 3 | the recovery year is off by one | 16 |
+| 4 | the mid-quarter 40% boundary becomes inclusive | 2 |
+| 5 | the last quarter is months 11-12 rather than 10-12 | 1 |
+| 6 | real property is NOT excluded from the mid-quarter test | 1 |
+| 7 | the basis ignores the claimed §168(k) allowance | 4 |
+| 8 | the AMT adjustment ignores `section168kStatus` | 2 |
+| 9 | Schedule C line 13 does not receive Form 4562 line 22 | 3 |
+| 10 | Form 6251 line 2l back to a hard zero | 1 |
+| 11 | **the `vnd.fjs.asset_register` routing branch is deleted** | **1** |
+| 12 | the stored-convention cross-check never fires | did not compile; 1 in compiling form |
+| 13 | the §179 election no longer refuses | 1 |
+| 14 | the completeness certification is not required | 1 |
+| 15 | the register's account number is not matched | 1 |
+| 16 | **business-use percentage forced to 100%** | **0 — SURVIVED**; 1 after the new leaf |
+| 17 | `listedProperty` never travels out of the dialect | 1 |
+| 18 | the asset name is erased from the listed-property refusal | 1 |
+| 19 | the convention/class agreement check never fires | 1 |
+| 20 | a method the class forbids is accepted | 1 |
+| 21 | the placed-in-service MONTH is forced to June | 1 |
+| 22 | the placed-in-service YEAR is forced to the register's tax year | 1 |
+| 23 | line 17 sums current-year assets instead of prior-year | 14 |
+| 24 | line 22 drops line 17 | 3 |
+| 25 | a current-year §168(k) allowance no longer refuses | 1 |
+| 26 | the 200 DB factor becomes 150 DB | 19 |
+| 27 | the printed precision is always two decimals | 6 |
+| 28 | the register-with-no-business refusal never fires | 1 |
+| 29 | the disposal certification is not required | 1 |
+| 30 | pre-1999 200 DB property no longer refuses | 1 |
+
+**Mutation 11 is the one this project has been burned by before.** Deleting a
+dialect's routing branch in `fjs/report/tax_return` left the whole suite green
+for `vnd.fjs.1095a`, because every end-to-end leaf hands `form1040Report` a
+`Form1040Inputs` directly. It reddens here, and it reddens exactly one leaf —
+`storedProgramRoutesTheAssetRegisterAndDepreciatesScheduleCLineThirteen`, which
+is the only proof in the repository that travels through the stored program's
+own collect step with a register in the store.
+
+**Mutation 27's six red leaves are the finding behind §3.** Forcing every
+column to two decimals of a percent reddens the 444-cell sweep, the Table A-7a
+divergence leaf, the whole-basis sweep and three worked deductions — which is
+what makes `printedDecimals` a stored parameter with a reader rather than a
+comment.

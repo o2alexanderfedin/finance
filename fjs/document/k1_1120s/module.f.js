@@ -228,7 +228,7 @@ export const unmodeledMoneyBoxes = /** @type {const} */ ([
     ['box8bCollectiblesTwentyEightPercentGain', 'the 28% Rate Gain Worksheet and Schedule D line 18'],
     ['box8cUnrecapturedSection1250Gain', 'the Unrecaptured Section 1250 Gain Worksheet and Schedule D line 19'],
     ['box9NetSection1231Gain', 'Form 4797 Part I, and thence Schedule 1 line 4 (other gains or losses) — `otherGainsOrLosses` is an `fjs/return/scope` refusal'],
-    ['box11Section179Deduction', 'Schedule E Part II line 28 column (i), which the printed form takes from Form 4562 — the same asset basis history Schedule C line 13 already refuses for'],
+    ['box11Section179Deduction', 'Schedule E Part II line 28 column (i), which the printed form takes from Form 4562. Form 4562 now EXISTS here and it refuses Part I by name: a partner’s or shareholder’s §179 deduction is limited on line 11 by THEIR OWN business income — i4562 p4: “For a partnership, these limitations apply to the partnership and each partner” — and whatever line 11 disallows carries to next year on line 13, which this engine cannot store'],
 ])
 
 /**

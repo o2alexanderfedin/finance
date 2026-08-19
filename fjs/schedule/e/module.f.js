@@ -1147,7 +1147,11 @@ export const scheduleEPartII = profile => rows => {
     const line28h = zero('Schedule E line 28 column (h) (nonpassive loss allowed)')
     // 28(i). "Section 179 expense deduction from Form 4562." Structural zero:
     //        1065 box 12 and 1120-S box 11 both refuse at storage when
-    //        non-zero, naming this very column.
+    //        non-zero, naming this very column. `fjs/form4562` exists as of the
+    //        asset-register commit and does NOT change that: it refuses Part I
+    //        by name, because a partner's §179 deduction is limited on line 11
+    //        by their own business income and line 13 carries the disallowed
+    //        part into a year this engine cannot store.
     const line28i = zero('Schedule E line 28 column (i) (section 179 expense deduction)')
     // 28(j). "Nonpassive income from Schedule K-1."
     const line28j = documentLine(profile)('Schedule E line 28 column (j) (nonpassive income from Schedule K-1)')(
