@@ -32,7 +32,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
-import { mkdtempSync, writeFileSync, rmSync } from 'node:fs'
+import { mkdtempSync, writeFileSync, rmSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -79,8 +79,19 @@ const initializedNotification = { jsonrpc: '2.0', method: 'notifications/initial
  * Nothing about the proof weakens: this is still a real `spawn` of a real,
  * genuinely separate OS process, and it produces a byte-identical content
  * hash (verified directly against the `npx` route before the change).
+ *
+ * **The path is READ from the dependency's own `bin` field, not written out
+ * here.** It was hard-coded as `fjs/module.js`, and 0.46.0 renamed that file
+ * to `fjs/module.mjs` — so this test spawned a child that died with
+ * `MODULE_NOT_FOUND` before reaching a single assertion, which reads in the
+ * report as "the cross-process refresh broke". A literal path into another
+ * package's internals is a second copy of that package's entry point, and
+ * this is what the second copy costs. `bin.fjs` is the value `npm` itself
+ * links, so it cannot drift from what `fjs` actually runs.
  */
-const fjsCliPath = join(repoRoot, 'node_modules', 'functionalscript', 'fjs', 'module.js')
+const fjsManifest = JSON.parse(
+    readFileSync(join(repoRoot, 'node_modules', 'functionalscript', 'package.json'), 'utf8'))
+const fjsCliPath = join(repoRoot, 'node_modules', 'functionalscript', fjsManifest.bin.fjs)
 
 /**
  * Runs the pinned `fjs <args>` CLI to completion with `HOME` overridden to

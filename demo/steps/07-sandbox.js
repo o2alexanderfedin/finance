@@ -15,11 +15,12 @@
 import { el, input, section, table, callout, note, code } from '../lib/dom.js'
 import { sourceFooter } from '../lib/github.js'
 import {
-    interpret, stepBudget, checkSpecifiers, casOpNames, guestCtx, do_, step,
+    interpret, stepBudget, checkSpecifiers, casOpNames, guestCtx, do_, step, ok,
 } from '../lib/engine.js'
 
 /** @import { Step } from '../demo.js' */
 /** @import { Effect, OperationMap } from 'functionalscript/fjs/effects/types.js' */
+/** @import { Result } from 'functionalscript/fjs/types/result/types.js' */
 
 // ── The operation types this panel runs against ──────────────────────────────
 //
@@ -27,21 +28,26 @@ import {
 // `fjs/exec/module.f.js` spells its own — a name literal paired with the
 // operation's signature.
 
-/** @typedef {readonly ['casRead', (a: string) => string]} CasRead */
-/** @typedef {readonly ['evoList', (a: string) => string]} EvoList */
-/** @typedef {readonly ['evoHead', (a: string) => string]} EvoHead */
-/** @typedef {readonly ['evoRevision', (a: string) => string]} EvoRevision */
+// Each signature returns a `Result`, and that is 0.46.0's `Operation`
+// constraint rather than a local style choice: a runner may decline any
+// command, so an operation whose return admitted no error would leave the
+// refusal nowhere to go. These four mirror `fjs/guest`'s `CasOp` exactly.
+
+/** @typedef {readonly ['casRead', (a: string) => Result<string, string>]} CasRead */
+/** @typedef {readonly ['evoList', (a: string) => Result<string, string>]} EvoList */
+/** @typedef {readonly ['evoHead', (a: string) => Result<string, string>]} EvoHead */
+/** @typedef {readonly ['evoRevision', (a: string) => Result<string, string>]} EvoRevision */
 /** @typedef {CasRead | EvoList | EvoHead | EvoRevision} DemoOp */
 
 /**
  * `do_` narrowed to `casRead`. `do_('casRead')` alone under-constrains its
  * operation parameter to a bare `Operation`; this annotation pins it, the same
  * way `fjs/exec`'s own `readDo` does and for the same reason.
- * @type {(a: string) => Effect<CasRead, string>}
+ * @type {(a: string) => Effect<CasRead, string, string>}
  */
 const casReadDo = do_('casRead')
 
-/** `do_` narrowed to `evoHead`. @type {(a: string) => Effect<EvoHead, string>} */
+/** `do_` narrowed to `evoHead`. @type {(a: string) => Effect<EvoHead, string, string>} */
 const evoHeadDo = do_('evoHead')
 
 /**
@@ -54,7 +60,7 @@ const evoHeadDo = do_('evoHead')
  * that reached the interpreter some other way. Simulating that requires
  * stepping outside the type that makes it impossible, which is the one place
  * the repository's own code does the same thing.
- * @type {(command: string) => (a: string) => Effect<DemoOp, string>}
+ * @type {(command: string) => (a: string) => Effect<DemoOp, string, string>}
  */
 const deniedDo = /** @type {any} */ (do_)
 
@@ -70,19 +76,19 @@ export const tier = 'optional'
  * Each entry returns a marker rather than doing real work: what this page
  * demonstrates is which commands are ADMITTED, not what they compute.
  */
-/** @type {OperationMap<DemoOp, string>} */
+/** @type {OperationMap<DemoOp, Result<string, string>>} */
 const hostMap = {
-    casRead: hash => `bytes of ${hash}`,
-    evoList: subject => `revisions of ${subject}`,
-    evoHead: subject => `head of ${subject}`,
-    evoRevision: id => `revision ${id}`,
+    casRead: hash => ok(`bytes of ${hash}`),
+    evoList: subject => ok(`revisions of ${subject}`),
+    evoHead: subject => ok(`head of ${subject}`),
+    evoRevision: id => ok(`revision ${id}`),
 }
 
 /**
  * A chain that never reaches a value. Building it costs nothing — `step`'s
  * deferred case means only INTERPRETING it drives the chain, and the step
  * budget is what bounds that.
- * @type {() => Effect<CasRead, string>}
+ * @type {() => Effect<CasRead, string, string>}
  */
 const spin = () => step(casReadDo('x'), spin)
 
@@ -90,7 +96,7 @@ const spin = () => step(casReadDo('x'), spin)
  * @type {readonly {
  *   readonly label: string,
  *   readonly source: string,
- *   readonly effect: () => Effect<DemoOp, string>,
+ *   readonly effect: () => Effect<DemoOp, string, string>,
  * }[]}
  */
 const guests = [

@@ -38,13 +38,14 @@ import { interpret, stepBudget } from '../../fjs/exec/module.f.js'
 import { checkSpecifiers, programFileName } from '../../fjs/guest/materialize/module.f.js'
 import { casOpNames, guestCtx } from '../../fjs/guest/module.f.js'
 import { computeSync, sha256 } from 'functionalscript/fjs/crypto/sha2/module.f.mjs'
+import { ok } from 'functionalscript/fjs/types/result/module.f.mjs'
 import { vecToCBase32 } from 'functionalscript/fjs/basen/cbase32/module.f.mjs'
 import { vec8 } from 'functionalscript/fjs/types/bit_vec/module.f.mjs'
 import { do_, step, pure } from 'functionalscript/fjs/effects/module.f.mjs'
 
 export {
     interpret, stepBudget, checkSpecifiers, programFileName, casOpNames, guestCtx,
-    do_, step, pure,
+    do_, step, pure, ok,
     form1040Report, form1040IncomeLines, unionSources,
     dispatchLine16, qdcgt,
     lookupTaxTable, taxComputationWorksheet, baseTaxForAmount, rowFor,
