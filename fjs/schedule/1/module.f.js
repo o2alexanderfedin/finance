@@ -214,6 +214,7 @@ import { scheduleC } from '../c/module.f.js'
 import { form7206, longTermCareCapCents } from '../../form7206/module.f.js'
 import { scheduleE } from '../e/module.f.js'
 import { scheduleF } from '../f/module.f.js'
+import { form461 } from '../../form461/module.f.js'
 import {
     scheduleSelfEmploymentPartI,
     socialSecurityWagesAlreadyTaxed,
@@ -236,6 +237,7 @@ import { taxParamsByYear } from '../../tax/params/module.f.js'
 /** @import { ScheduleC } from '../c/module.f.js' */
 /** @import { ScheduleE } from '../e/module.f.js' */
 /** @import { ScheduleF } from '../f/module.f.js' */
+/** @import { Form461 } from '../../form461/module.f.js' */
 /** @import { K1Partnership } from '../../document/k1_1065/module.f.js' */
 /** @import { K1SCorporation } from '../../document/k1_1120s/module.f.js' */
 /** @import { K1EstateTrust } from '../../document/k1_1041/module.f.js' */
@@ -611,11 +613,13 @@ const earlyWithdrawalPenaltyLine = profile => forms => {
  *   readonly kind: 'ok',
  *   readonly line1: ReportLine, readonly line2a: ReportLine, readonly line3: ReportLine,
  *   readonly line4: ReportLine, readonly line5: ReportLine, readonly line6: ReportLine,
- *   readonly line7: ReportLine, readonly line8: ReportLine, readonly line9: ReportLine,
+ *   readonly line7: ReportLine, readonly line8: ReportLine, readonly line8p: ReportLine,
+ *   readonly line9: ReportLine,
  *   readonly line10: ReportLine,
  *   readonly scheduleC: ScheduleC,
  *   readonly scheduleE: ScheduleE,
  *   readonly scheduleF: ScheduleF,
+ *   readonly form461: Form461,
  * }} ScheduleOnePartI
  */
 
@@ -634,6 +638,8 @@ const earlyWithdrawalPenaltyLine = profile => forms => {
  *   readonly partnershipK1Forms: readonly Stored<K1Partnership>[],
  *   readonly sCorporationK1Forms: readonly Stored<K1SCorporation>[],
  *   readonly estateTrustK1Forms: readonly Stored<K1EstateTrust>[],
+ *   readonly status: IndividualFilingStatus,
+ *   readonly form1040Line7aCents: bigint,
  * }} ScheduleOnePartIInput
  */
 
@@ -668,13 +674,14 @@ const earlyWithdrawalPenaltyLine = profile => forms => {
  * tax-year parameter at all, and so is this. See `fjs/schedule/c`'s own
  * {@link scheduleC} docstring for why keeping an unread argument "for
  * symmetry" is the thing not to do.
- * @type {(input: ScheduleOnePartIInput) => ScheduleOnePartIOutcome}
+ * @type {(taxParamSet: TaxParamSet) => (input: ScheduleOnePartIInput) => ScheduleOnePartIOutcome}
  */
-export const scheduleOnePartI = input => {
+export const scheduleOnePartI = taxParamSet => input => {
     const {
         profile, unemploymentForms, nonemployeeCompensationForms, businessExpenseForms, w2Forms,
         assetRegisters, rentalProperties, farmForms,
         partnershipK1Forms, sCorporationK1Forms, estateTrustK1Forms,
+        status, form1040Line7aCents,
     } = input
     const zero = profileDeclaredZeroLine(profile)
     // `rentalProperties` and `farmForms` reach MORE than one schedule each, and
@@ -746,20 +753,63 @@ export const scheduleOnePartI = input => {
     //    sub-lines, 8a through 8v and 8z; the "26" this comment carried until
     //    2026-08-18 counted letters the form does not print);
     //    see this module's own docstring, "The 26/11 sub-line collapses".
-    const line8 = zero('Schedule 1 line 8 (other income, 8a-8z collapsed -- none separately reachable)')
-    // 9. "Total other income. Add lines 8a through 8z" -- the SAME total,
-    //    restated as its own printed line.
-    const line9 = { ...line8, rule: 'Schedule 1 line 9 (total other income)' }
+    const line8 = zero(
+        'Schedule 1 line 8 (other income, 8a-8z collapsed EXCEPT 8p -- none separately reachable)')
+    // **8p -- the §461(l) excess business loss adjustment, and the ONE sub-line
+    // that has come out of the 8a-8z collapse.** i461 line 16: "enter the
+    // amount from line 16 as a positive number on Schedule 1 (Form 1040),
+    // line 8p."
+    //
+    // Form 461 is computed HERE rather than in `fjs/form1040/core`, for the
+    // reason lines 3, 5 and 6 are restated here rather than reaching 1040 line
+    // 8 by a side channel: printed line 8p is a Schedule 1 line, and the total
+    // it belongs to is line 9's. i461's *Ordering Rules* put §461(l) after the
+    // at-risk and passive rules, which is exactly where this sits -- every
+    // schedule above has already produced its own line, each having asked §465
+    // and §469 on its own printed page.
+    //
+    // `form1040Line7aCents` is the one figure this function cannot compute for
+    // itself: printed Form 461 line 3 is 1040 line 7a, and Schedule D runs in
+    // `fjs/form1040/core`. It arrives as a bare `bigint` because Form 461 reads
+    // only its value; the `Source`s behind it are already cited on 1040 line 7a
+    // itself, and citing them a second time would put a brokerage statement
+    // under a Schedule 1 line that is zero.
+    //
+    // **The value is always zero on a return that computes**, and that is not a
+    // structural zero: `fjs/form461` REFUSES a binding limitation (its own
+    // docstring says why), so reaching this line at all means printed Form 461
+    // line 16 was at or above zero and the whole business loss is allowed. The
+    // line is separate rather than folded back into the collapse because a
+    // reader has to be able to tell "Form 461 was computed and allowed
+    // everything" from "no sub-line of line 8 is modeled".
+    const form461Outcome = form461(taxParamSet)({
+        status,
+        scheduleOneLine3Cents: line3.value,
+        form1040Line7aCents,
+        scheduleOneLine4Cents: line4.value,
+        scheduleOneLine5Cents: line5.value,
+        scheduleOneLine6Cents: line6.value,
+    })
+    if (form461Outcome.kind === 'error') {
+        return form461Outcome
+    }
+    const excessBusinessLossCents = form461Outcome.line16 < 0n ? -form461Outcome.line16 : 0n
+    const line8p = documentLine(profile)(
+        'Schedule 1 line 8p (excess business loss adjustment, Form 461 line 16)')(
+        excessBusinessLossCents)(unionSources([line3, line5, line6]))
+    // 9. "Total other income. Add lines 8a through 8z" -- 8p plus the collapse.
+    const line9 = totalLine('Schedule 1 line 9 (total other income)')([line8, line8p])
     // 10. "Combine lines 1 through 7 and 9." -> 1040 line 8.
     const line10 = totalLine('Schedule 1 line 10 (total additional income -> 1040 line 8)')([
         line1, line2a, line3, line4, line5, line6, line7, line9,
     ])
     return {
         kind: 'ok',
-        line1, line2a, line3, line4, line5, line6, line7, line8, line9, line10,
+        line1, line2a, line3, line4, line5, line6, line7, line8, line8p, line9, line10,
         scheduleC: scheduleCOutcome,
         scheduleE: scheduleEOutcome,
         scheduleF: scheduleFOutcome,
+        form461: form461Outcome,
     }
 }
 
@@ -2366,7 +2416,8 @@ export const scheduleOnePartII = taxParamSet => input => {
  *   readonly kind: 'ok',
  *   readonly line1: ReportLine, readonly line2a: ReportLine, readonly line3: ReportLine,
  *   readonly line4: ReportLine, readonly line5: ReportLine, readonly line6: ReportLine,
- *   readonly line7: ReportLine, readonly line8: ReportLine, readonly line9: ReportLine,
+ *   readonly line7: ReportLine, readonly line8: ReportLine, readonly line8p: ReportLine,
+ *   readonly line9: ReportLine,
  *   readonly line10: ReportLine,
  *   readonly line11: ReportLine, readonly line12: ReportLine, readonly line13: ReportLine,
  *   readonly line14: ReportLine, readonly line15: ReportLine, readonly line16: ReportLine,
@@ -2403,6 +2454,7 @@ export const scheduleOnePartII = taxParamSet => input => {
  *   readonly mfsLivedWithSpouseAtAnyTimeInYear: boolean,
  *   readonly iraDistributionReceived: boolean,
  *   readonly marketplaceCoverageStored: boolean,
+ *   readonly form1040Line7aCents: bigint,
  * }} ScheduleOneInput
  */
 
@@ -2422,12 +2474,14 @@ export const scheduleOne = taxParamSet => input => {
         adjustmentForms, studentLoanInterestForms, w2Forms, interestForms, totalIncomeLine,
         totalIncomeExceptTaxableSocialSecurityLine, socialSecurityBenefitsCents,
         taxExemptInterestCents, mfsLivedWithSpouseAtAnyTimeInYear, iraDistributionReceived,
-        marketplaceCoverageStored,
+        marketplaceCoverageStored, form1040Line7aCents,
     } = input
-    const partI = scheduleOnePartI({
+    const partI = scheduleOnePartI(taxParamSet)({
         profile, unemploymentForms, nonemployeeCompensationForms, businessExpenseForms, w2Forms,
         assetRegisters, rentalProperties, farmForms,
         partnershipK1Forms, sCorporationK1Forms, estateTrustK1Forms,
+        // Printed Form 461 lines 15 and 3 -- see {@link scheduleOnePartI}.
+        status, form1040Line7aCents,
     })
     if (partI.kind === 'error') {
         return partI
@@ -2466,7 +2520,7 @@ export const scheduleOne = taxParamSet => input => {
         kind: 'ok',
         line1: partI.line1, line2a: partI.line2a, line3: partI.line3, line4: partI.line4,
         line5: partI.line5, line6: partI.line6, line7: partI.line7, line8: partI.line8,
-        line9: partI.line9, line10: partI.line10,
+        line8p: partI.line8p, line9: partI.line9, line10: partI.line10,
         line11: partII.line11, line12: partII.line12, line13: partII.line13,
         line14: partII.line14, line15: partII.line15, line16: partII.line16,
         line17: partII.line17, line18: partII.line18, line19a: partII.line19a,
@@ -2830,7 +2884,9 @@ const movingPartII = profile => entries => w2Forms =>
  * @type {(profile: Stored<ReturnProfile>) => (unemploymentForms: readonly Stored<OneZeroNineNineG>[]) => (nonemployeeCompensationForms: readonly Stored<OneZeroNineNineNec>[]) => (businessExpenseForms: readonly Stored<BusinessExpenses>[]) => ScheduleOnePartIOutcome}
  */
 const partIOf = profile => unemploymentForms => nonemployeeCompensationForms => businessExpenseForms =>
-    scheduleOnePartI({
+    scheduleOnePartI(taxParams2025)({
+        status: 'single',
+        form1040Line7aCents: 0n,
         assetRegisters: [],
         rentalProperties: [],
         farmForms: [],
@@ -3153,7 +3209,9 @@ const lineTwentyOf = fixture => okStageOne(stageOneForIra(fixture)).line20.value
  */
 const stageOneWithBusiness = profile => status => nonemployeeCompensationForms =>
     businessExpenseForms => w2Forms => {
-        const partI = okPartI(scheduleOnePartI({
+        const partI = okPartI(scheduleOnePartI(taxParams2025)({
+            status: 'single',
+            form1040Line7aCents: 0n,
             assetRegisters: [],
             rentalProperties: [],
             farmForms: [],
@@ -3185,7 +3243,9 @@ const stageOneWithBusiness = profile => status => nonemployeeCompensationForms =
  */
 const stageOneWithPassThrough = profile => status => partnershipK1Forms =>
     businessExpenseForms => w2Forms => {
-        const partI = okPartI(scheduleOnePartI({
+        const partI = okPartI(scheduleOnePartI(taxParams2025)({
+            status: 'single',
+            form1040Line7aCents: 0n,
             assetRegisters: [],
             rentalProperties: [],
             farmForms: [],
@@ -3294,7 +3354,9 @@ const stageOneForHealthInsurance =
             const businessExpenseForms = nonemployeeCompensationForms.length === 0
                 ? []
                 : [businessDoc([])]
-            const partI = okPartI(scheduleOnePartI({
+            const partI = okPartI(scheduleOnePartI(taxParams2025)({
+                status: 'single',
+                form1040Line7aCents: 0n,
                 assetRegisters: [],
                 rentalProperties: [],
                 farmForms: [],
@@ -3910,7 +3972,9 @@ export const proof = {
         //   Sch 1 line 5                                      $80,000.00
         //   Sch 1 line 10     (nothing else on Part I)        $80,000.00
         lineFiveIsScheduleELineFortyOneAndReachesLineTen: () => {
-            const withK1 = okPartI(scheduleOnePartI({
+            const withK1 = okPartI(scheduleOnePartI(taxParams2025)({
+                status: 'single',
+                form1040Line7aCents: 0n,
                 assetRegisters: [],
                 rentalProperties: [],
                 farmForms: [],
@@ -3946,7 +4010,9 @@ export const proof = {
         //   line 5  Schedule E line 41                       $80,000.00
         //   line 10 260.00 + 80,000.00                       $80,260.00
         linesThreeAndFiveAreDistinctAndBothReachTheTotal: () => {
-            const partI = okPartI(scheduleOnePartI({
+            const partI = okPartI(scheduleOnePartI(taxParams2025)({
+                status: 'single',
+                form1040Line7aCents: 0n,
                 assetRegisters: [],
                 rentalProperties: [],
                 farmForms: [],
@@ -3967,7 +4033,9 @@ export const proof = {
         // swallowed, exactly as Schedule C's does. A LOSS is the refusal most
         // likely to be met in practice.
         aScheduleERefusalPropagatesOutOfPartOne: () => {
-            const result = refusal(scheduleOnePartI({
+            const result = refusal(scheduleOnePartI(taxParams2025)({
+                status: 'single',
+                form1040Line7aCents: 0n,
                 assetRegisters: [],
                 rentalProperties: [],
                 farmForms: [],
@@ -4076,7 +4144,9 @@ export const proof = {
          *     8,026,000 x 9,235 = 74,120,110,000; / 10,000 = 7,412,011 exactly
          */
         oneProprietorWhoIsAlsoAPartnerAddsBothToLineTwo: () => {
-            const partI = okPartI(scheduleOnePartI({
+            const partI = okPartI(scheduleOnePartI(taxParams2025)({
+                status: 'single',
+                form1040Line7aCents: 0n,
                 assetRegisters: [],
                 rentalProperties: [],
                 farmForms: [],
@@ -5146,7 +5216,9 @@ export const proof = {
         },
         // §219(f)(1)/§401(c)(2) earned income — three missing facts at once.
         selfEmploymentAlongsideAContributionRefuses: () => {
-            const partI = okPartI(scheduleOnePartI({
+            const partI = okPartI(scheduleOnePartI(taxParams2025)({
+                status: 'single',
+                form1040Line7aCents: 0n,
                 assetRegisters: [],
                 rentalProperties: [],
                 farmForms: [],
@@ -5933,6 +6005,7 @@ export const proof = {
         const staged = okPartII(partIIOf(profileNoDeclaredKinds)('single')(adjustmentForms)(
             studentLoanInterestForms)([])(9250000n))
         const composed = scheduleOne(taxParams2025)({
+            form1040Line7aCents: 0n,
             assetRegisters: [],
             rentalProperties: [],
             farmForms: [],
@@ -5967,6 +6040,7 @@ export const proof = {
     // than being swallowed by the composition.
     aStageOneRefusalPropagatesThroughTheComposedForm: () => {
         const composed = scheduleOne(taxParams2025)({
+            form1040Line7aCents: 0n,
             assetRegisters: [],
             rentalProperties: [],
             farmForms: [],
@@ -6043,6 +6117,7 @@ export const proof = {
     // "hand-typed count" mutation-gate idiom).
     everyPrintedLineIsNamed: () => {
         const composed = scheduleOne(taxParams2025)({
+            form1040Line7aCents: 0n,
             assetRegisters: [],
             rentalProperties: [],
             farmForms: [],
@@ -6063,11 +6138,14 @@ export const proof = {
             totalIncomeLine: totalIncomeOf(0n),
         })
         assert(composed.kind === 'ok', ['expected a computed schedule', composed])
-        const expectedFieldCount = 27
+        // 26 printed lines, plus line 8p -- the one lettered sub-line of the
+        // 8a-8z group that has its own computation (Form 461 line 16, the
+        // §461(l) excess business loss adjustment) -- plus the kind tag.
+        const expectedFieldCount = 28
         assertEq(
             Object.keys(composed).length,
             expectedFieldCount,
-            'expected exactly 26 named Schedule 1 fields plus the kind tag',
+            'expected exactly 26 named Schedule 1 fields, plus line 8p, plus the kind tag',
         )
     },
     // This module computes a schedule, not a stored document -- no
