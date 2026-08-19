@@ -655,20 +655,45 @@ export const proof = {
             assertEq(
                 macrsDisposalDeductionCents(333300n)('sevenYear')('200DB')(6)('HY')(3)(6),
                 29147n)
-            // And the case where they DIVERGE, which is why the disposal
-            // decimal is folded in before the single `halfUp`. $3,335.00:
-            // 333500 x 0.1749 = 58,329.15 cents, so the full year is $583.29
-            // -- an ODD number of cents. Rounding first and halving in bigint
-            // gives 58329n / 2n = 29164n. The exact half is 29,164.575 ->
-            // 29165n. One cent apart, and 29165 is the honest one.
+            // ★ **AND THE CASES WHERE THE TWO ORDERS DIVERGE**, which is the
+            // whole reason the disposal decimal is folded into the rational
+            // BEFORE the single `halfUp`. Rounding the full year first and
+            // applying the decimal second is a real, plausible implementation,
+            // and it is wrong by a cent whenever the rounding pushes the
+            // product across a boundary. The first version of this leaf chose
+            // amounts where the two orders happened to AGREE, and the
+            // mutation that reorders them survived the entire suite.
+            //
+            // $1,002.00 of 7-year property in recovery year 3, sold in a
+            // half-year-convention year:
+            //
+            //   17.49% x 100,200 = 17,524.98 cents exactly
+            //   full year, rounded             ->  17,525
+            //   honest: halfUp(17,524.98 / 2)  ->   8,762   (8,762.49)
+            //   reordered: halfUp(17,525 / 2)  ->   8,763   (8,762.5, rounds up)
             assertEq(
-                macrsDeductionCents(333500n)('sevenYear')('200DB')(6)('HY')(3),
-                58329n,
-                'an odd number of cents, on purpose')
+                macrsDeductionCents(100200n)('sevenYear')('200DB')(6)('HY')(3),
+                17525n,
+                'the full year rounds UP, and that is what makes the halves differ')
             assertEq(
-                macrsDisposalDeductionCents(333500n)('sevenYear')('200DB')(6)('HY')(3)(6),
-                29165n,
-                'the single rounding, not 29164')
+                macrsDisposalDeductionCents(100200n)('sevenYear')('200DB')(6)('HY')(3)(6),
+                8762n,
+                'the single rounding gives 8,762 — reordering gives 8,763')
+            // And the same divergence under the MID-MONTH convention, where
+            // the fraction is 19/24 rather than 1/2 — so this is not a
+            // property of halving in particular:
+            //
+            //   3.636% x 100,100 = 3,639.636 cents exactly
+            //   full year, rounded                    ->  3,640
+            //   honest: halfUp(3,639.636 x 19/24)     ->  2,881   (2,881.3785)
+            //   reordered: halfUp(3,640 x 19/24)      ->  2,882   (2,881.6667)
+            assertEq(
+                macrsDeductionCents(100100n)('residentialRental')('SL')(4)('MM')(7),
+                3640n)
+            assertEq(
+                macrsDisposalDeductionCents(100100n)('residentialRental')('SL')(4)('MM')(7)(10),
+                2881n,
+                'the single rounding gives 2,881 — reordering gives 2,882')
         },
     },
     publication946: {
