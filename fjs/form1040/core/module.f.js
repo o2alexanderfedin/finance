@@ -744,6 +744,7 @@ const storedFilingStatusNamed = status =>
  *   readonly specifiedPrivateActivityBondInterest: ReportLine,
  *   readonly disqualifiedPassiveIncomeCents: bigint,
  *   readonly qualifiedBusinessLossCarryforward: ReportLine,
+ *   readonly formFortySevenNinetySevenGainCents: bigint,
  *   readonly dependentCareLine31Cents: bigint,
  *   readonly dependentCareApplicable: boolean,
  *   readonly dependentCare: Form2441Common,
@@ -2071,6 +2072,14 @@ export const form1040IncomeLines = taxParamSet => inputs => {
         kind: 'ok',
         disqualifiedPassiveIncomeCents,
         qualifiedBusinessLossCarryforward,
+        // Printed Form 4797 line 7 when it is a GAIN, carried out for
+        // Publication 596 Worksheet 1 line 6 — a THIRD reader of the one Form
+        // 4797 execution, beside Schedule 1 line 4 and Schedule D lines 11 and
+        // 19. Running the form again for it is the only way the four could
+        // disagree, which is the argument Schedule F line 34's own two
+        // destinations already forced.
+        formFortySevenNinetySevenGainCents:
+            form4797Ok === undefined ? 0n : form4797Ok.longTermCapitalGainCents,
         amtDepreciationAdjustmentCents,
         // Printed Schedule E line 26, carried out for Form 8960 line 4a. It
         // travels as a whole `ReportLine` rather than as cents because
@@ -3120,6 +3129,12 @@ const form1040TaxAndPaymentLines = taxParamSet => inputs => income => {
             line2bCents: income.line2b.value,
             line3bCents: income.line3b.value,
             line7aCents: income.line7a.value,
+            // Publication 596 Worksheet 1 line 6, live as of TAX-41: the
+            // §1231 gain is SUBTRACTED from capital gain net income, because
+            // it is business gain and arrives on 1040 line 7a through Schedule
+            // D line 11 exactly as a stock sale does. Read off the SAME Form
+            // 4797 execution Schedule D and Schedule 1 line 4 came from.
+            formFortySevenNinetySevenGainCents: income.formFortySevenNinetySevenGainCents,
             disqualifiedPassiveIncomeCents: income.disqualifiedPassiveIncomeCents,
         })
         : undefined
@@ -3477,7 +3492,7 @@ const expectedIncomeLineCount = 31
  * so the `Exclude<>` below is what turns forgetting one of them into a
  * compile error rather than a crash on a missing `.sources` — which is
  * exactly what it did when this phase first added them.
- * @type {readonly Exclude<keyof Form1040IncomeLines, 'kind' | 'filingScheduleD' | 'scheduleD15Cents' | 'scheduleD16Cents' | 'scheduleD18Cents' | 'scheduleD19Cents' | 'selfEmployment' | 'specifiedPrivateActivityBondInterest' | 'itemizing' | 'scheduleALine7Cents' | 'scheduleOneALine37Cents' | 'disqualifiedPassiveIncomeCents' | 'dependentCareLine31Cents' | 'dependentCareApplicable' | 'dependentCare' | 'amtDepreciationAdjustmentCents' | 'rentalRealEstateAndRoyaltyIncome'>[]}
+ * @type {readonly Exclude<keyof Form1040IncomeLines, 'kind' | 'filingScheduleD' | 'scheduleD15Cents' | 'scheduleD16Cents' | 'scheduleD18Cents' | 'scheduleD19Cents' | 'selfEmployment' | 'specifiedPrivateActivityBondInterest' | 'itemizing' | 'scheduleALine7Cents' | 'scheduleOneALine37Cents' | 'disqualifiedPassiveIncomeCents' | 'formFortySevenNinetySevenGainCents' | 'dependentCareLine31Cents' | 'dependentCareApplicable' | 'dependentCare' | 'amtDepreciationAdjustmentCents' | 'rentalRealEstateAndRoyaltyIncome'>[]}
  */
 const incomeLineFieldNames = /** @type {const} */ ([
     'line1a', 'line1b', 'line1c', 'line1d', 'line1e', 'line1f', 'line1g', 'line1h', 'line1i', 'line1z',
