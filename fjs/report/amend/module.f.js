@@ -301,7 +301,7 @@ const readResultsAndDiff = cas => elected => runHashA => runHashB => resultHashA
             if (wireB[0] === 'error') {
                 return pureOk(/** @type {Result<AmendmentDiffResult, string>} */ (error(`run B's (${runHashB}) stored result is invalid: ${wireB[1]}`)))
             }
-            return pureOk(diffWireRecords(elected)(wireA[1])(wireB[1]))
+            return pure(diffWireRecords(elected)(wireA[1])(wireB[1]))
         }))
 
 /**
