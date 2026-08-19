@@ -68,7 +68,7 @@ the form or the facts that would supply it.
 
 **The refusal surface is a partition, checked at `tsc`:** every one of **195 income, deduction,
 credit and payment kinds** is either modeled or carries a refusal naming what is missing —
-**52 modeled, 143 refused**, and `_EveryKindIsEitherModeledOrRefused` fails the build if a kind
+**53 modeled, 142 refused**, and `_EveryKindIsEitherModeledOrRefused` fails the build if a kind
 falls in neither. Re-derive with `modeledKinds.length` / `unmodeledKindRefusals.length` in
 `fjs/return/scope`.
 
@@ -77,6 +77,11 @@ printed line that collapsed many unrelated facts — became 84 per-fact kinds re
 printed forms and instructions. **Nothing was reclassified in that change**: the modeled count
 did not move, and a taxpayer who is refused now gets told which document, form or determination
 is missing rather than that a whole lettered block is unmodeled.
+
+It then fell 143 → 142, and the modeled half rose 52 → 53, when Form 7206 made
+`selfEmployedHealthInsuranceDeduction` computable at Schedule 1 line 17. **One kind, moved across
+the partition** — the two moves are independent, so the vocabulary is still the 195 the split
+left, and 53 + 142 = 195.
 
 The conditional refusals — the ones that fire on a taxpayer whose kinds are all modeled:
 

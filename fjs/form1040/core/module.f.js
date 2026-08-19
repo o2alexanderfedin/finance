@@ -97,6 +97,7 @@ import { scheduleThree, foreignTaxCreditLine } from '../../schedule/3/module.f.j
 import { form8812 } from '../../form8812/module.f.js'
 import { form8962 } from '../../form8962/module.f.js'
 import { form2441Credit, form2441DependentCareBenefits } from '../../form2441/module.f.js'
+import { form7206 } from '../../form7206/module.f.js'
 import { iraTaxableAmount, rothDistributionCodeOf } from '../../form8606/module.f.js'
 import { baseTaxForAmount } from '../../tax/table/module.f.js'
 import {
@@ -772,6 +773,12 @@ export const form1040IncomeLines = taxParamSet => inputs => {
         // `form1040TaxAndPaymentLines` (where Schedule 3 already reads it for
         // Forms 8880 and 8863), because Part III must run before line 1z.
         creditForms,
+        // TAX-39: read HERE for its PRESENCE only, and read again in
+        // `form1040TaxAndPaymentLines` for its amounts. Schedule 1 line 17
+        // refuses a return that also holds Marketplace coverage, and that
+        // refusal has to fire in stage 1 — before an adjusted gross income
+        // exists that Form 8962 could be priced against.
+        marketplaceStatements,
     } = inputs
     const declaredZero = profileDeclaredZeroLine(profile)
     const fromDocuments = documentLine(profile)
@@ -1256,6 +1263,19 @@ export const form1040IncomeLines = taxParamSet => inputs => {
     // wage base.
     const scheduleOneStageOne = scheduleOnePartIIExceptStudentLoanInterest(taxParamSet)({
         profile, status, adjustmentForms, w2Forms: w2s,
+        // TAX-39. Schedule 1 line 17 REFUSES a return that stores both §162(l)
+        // premiums and a Form 1095-A, because Rev. Proc. 2014-41 §2.05's
+        // circular relationship has no convergent method to implement. The
+        // PRESENCE of the statement, never its amounts: a Form 1095-A with no
+        // advance payments still prices a credit that moves the deduction.
+        //
+        // **The one-way half of this dependency is already right and is worth
+        // seeing here.** Form 8962 is computed several hundred lines below
+        // from `income.line11b`, an adjusted gross income that has by then
+        // been reduced by this very line — so §162(l) -> AGI -> household
+        // income runs in the correct order without any change. What has no
+        // implementable answer is the feedback edge, and that is what refuses.
+        marketplaceCoverageStored: marketplaceStatements.length !== 0,
         // Schedule 1 line 20's own inputs (§219). The Publication 590-A
         // Appendix B ordering in three passes, of which stage 1 runs the
         // first two: Worksheet 1 computes taxable Social Security benefits
@@ -1593,6 +1613,19 @@ export const form1040IncomeLines = taxParamSet => inputs => {
         // rather than two figures that could drift.
         netProfitCents: scheduleOnePartIResult.scheduleC.partII.line31.value,
         deductibleHalfOfSelfEmploymentTaxCents: scheduleOneStageOne.selfEmployment.lines.line13,
+        // Schedule 1 line 17, TAX-39 -- the SAME `fjs/schedule/1` stage-one
+        // execution line 15 came from, never a second Form 7206. §199A(c)(1)
+        // reduces qualified business income by the self-employed health
+        // insurance deduction, and this term stood as a hard zero inside
+        // `qualifiedBusinessIncome` until this phase.
+        //
+        // **The direction is worth naming: this LOWERS the §199A deduction and
+        // so RAISES the tax.** A wiring that quietly kept passing zero would
+        // have understated tax on every self-employed return that pays a
+        // premium, with the whole suite green, which is why
+        // `theHealthInsuranceDeductionReachesFormEightNineNineFive` asserts the
+        // §199A deduction MOVED rather than only that line 17 did.
+        selfEmployedHealthInsuranceDeductionCents: scheduleOneStageOne.line17.value,
         assertedPriorYearLossCarryforward: firstBusinessRecord === undefined
             ? undefined
             : firstBusinessRecord.value.priorYearQualifiedBusinessLossCarryforward,
@@ -3243,6 +3276,101 @@ const marketplaceWageReturn = marketplaceStatements => ({
         federalPovertyLineTable: 'contiguous48AndDistrictOfColumbia',
     }))([w2WithWithholding('sha256-1095a-w2')('30000.00')('2000.00')])([])([])([])([])([])([])([])([]),
     marketplaceStatements,
+})
+
+// ── TAX-39's fixtures: Schedule 1 line 17, end to end ────────────────────────
+//
+// **A form-level proof cannot prove a wiring, and neither can a schedule-level
+// one.** `fjs/form7206` proves the arithmetic and `fjs/schedule/1` proves that
+// this engine hands it the right figures; NEITHER can notice `fjs/form1040/core`
+// dropping line 17 out of 1040 line 10, out of adjusted gross income, or out of
+// §199A(c)(1)'s reduction to qualified business income. These leaves drive the
+// real entry point over real stored documents.
+//
+// **The fixture deliberately breaks a monoculture.** Every self-employment
+// fixture in this file before TAX-39 carried self-employment and nothing else;
+// a return that carries a business, health premiums AND Social Security
+// benefits at once is what makes line 17's arrival in the Social Security
+// Benefits Worksheet's own "lines 11 through 20" range observable at all.
+
+/** @type {(entries: readonly Adjustments['entries'][number][]) => Stored<Adjustments>} */
+const healthPremiumAdjustments = entries => ({
+    documentHash: 'sha256-7206-adjustments',
+    value: {
+        dialect: adjustmentsDialect,
+        recipientTin: '222-22-2222',
+        taxYear: 2025,
+        entries,
+    },
+})
+
+/** @type {(amount: string) => Adjustments['entries'][number]} */
+const medicalPremiumEntry = amount => ({
+    lineTag: 'selfEmployedHealthInsuranceMedicalDentalVision',
+    datePaid: '2025-07-01',
+    description: 'private family medical plan',
+    amount,
+    individual: 'taxpayer',
+})
+
+/**
+ * The §162(l) persona's whole return: a sole proprietor with $50,000.00 of
+ * Schedule C gross receipts and no expenses, who certified §162(l)(2)(B), and
+ * who paid whatever the leaf hands over.
+ *
+ * The Schedule SE arithmetic, worked from the printed captions and reused by
+ * every leaf below:
+ *
+ *   Schedule C line 31                                        50,000.00
+ *   Schedule SE line 4a = 0.9235 x 5,000,000  =                4,617,500
+ *   line 10 = 0.124 x 4,617,500               =                  572,570
+ *   line 11 = 0.029 x 4,617,500               =                  133,908  (half-up)
+ *   line 12                                    =                  706,478
+ *   line 13 = 50% of line 12                   =                  353,239  -> Sch 1 line 15
+ *
+ * @type {(entries: readonly Adjustments['entries'][number][]) => Form1040Inputs}
+ */
+const selfEmployedWithHealthPremiums = entries => ({
+    ...inputsOf(storedProfile({
+        ...singleProfile,
+        declaredKinds: [
+            'businessIncomeOrLoss', 'selfEmploymentTax', 'deductiblePartOfSelfEmploymentTax',
+            'qualifiedBusinessIncomeDeduction', 'selfEmployedHealthInsuranceDeduction',
+        ],
+        notEligibleForAnySubsidizedEmployerHealthPlanInAnyMonth: true,
+    }))([])([])([])([])([])([])([])([])([]),
+    nonemployeeCompensationForms: [
+        nonemployeeCompensationDocument('sha256-7206-nec')('50000.00')('0.00'),
+    ],
+    businessExpenseForms: [businessExpensesDocument('sha256-7206-exp')('0.00')],
+    adjustmentForms: entries.length === 0 ? [] : [healthPremiumAdjustments(entries)],
+})
+
+/**
+ * The SAME persona with $40,000.00 of Form W-2 wages beside the business —
+ * the fixture the §199A leaf needs, and a second break of this file's
+ * self-employment monoculture.
+ *
+ * **Why a second fixture rather than one more assertion on the first.** On a
+ * PURE sole-proprietor return, adjusted gross income and qualified business
+ * income are the same figure, so taxable income before the §199A deduction is
+ * always AGI less the standard deduction and Form 8995 line 15's
+ * taxable-income arm ALWAYS binds. Zeroing the health-insurance term inside
+ * `qualifiedBusinessIncome` would then change nothing observable, because the
+ * 20%-of-QBI arm it moves is never the smaller one — discovered by writing the
+ * leaf against the first fixture and watching the assertion fail with the
+ * wrong figure rather than the right one.
+ *
+ * Wages fix it: they raise taxable income without raising qualified business
+ * income, so the two arms separate and the QBI arm is the one that binds.
+ * $40,000.00 also leaves Schedule SE untouched — $40,000.00 + $46,175.00 of
+ * line 4a is well under the §1402(b)(1) wage base, so Schedule 1 line 15 is
+ * still $3,532.39 and every figure worked above still holds.
+ * @type {(entries: readonly Adjustments['entries'][number][]) => Form1040Inputs}
+ */
+const selfEmployedWithWagesAndHealthPremiums = entries => ({
+    ...selfEmployedWithHealthPremiums(entries),
+    w2s: [w2Document('sha256-7206-w2')('40000.00')],
 })
 
 /**
@@ -13453,6 +13581,245 @@ export const proof = {
     //              line 7 $43,000 -> line 8's "41,000—43,000" row = **.21**
     //              line 9a 1000 x 0.21              = **$210.00**
     //              line 11 min(210, tax) = $210.00 -> Schedule 3 line 2
+    // ── TAX-39: Schedule 1 line 17, end to end ──────────────────────────────
+    selfEmployedHealthInsuranceEndToEnd: {
+        // ── TAX-39: Schedule 1 line 17 reaching the finished report ─────────
+        //
+        // Line 17 must reach 1040 line 10 and so adjusted gross income. Stated
+        // as a DIFFERENCE against the identical return with no premium entry,
+        // which is what distinguishes "the deduction was computed and landed"
+        // from "the deduction was computed".
+        theHealthInsuranceDeductionReachesNineteenFortyLineTenAndAgi: () => {
+            const withPremium = form1040Report(taxParams2025)(
+                selfEmployedWithHealthPremiums([medicalPremiumEntry('9600.00')]))
+            const without = form1040Report(taxParams2025)(selfEmployedWithHealthPremiums([]))
+            assert(withPremium.kind === 'ok', ['expected this return to compute', withPremium])
+            assert(without.kind === 'ok', ['and the control too', without])
+            if (withPremium.kind !== 'ok' || without.kind !== 'ok') {
+                throw ['expected ok', withPremium, without]
+            }
+            const paid = lineRuled(withPremium.lines)
+            const none = lineRuled(without.lines)
+            // Schedule 1 line 15 is unaffected: §164(f)'s half does not depend
+            // on §162(l), and a wiring that fed line 17 back into Schedule SE
+            // would show here first.
+            assertEq(
+                paid('1040 line 10').value - none('1040 line 10').value, 960000n,
+                '1040 line 10 must rise by the whole $9,600.00 deduction')
+            assertEq(
+                none('1040 line 11a').value - paid('1040 line 11a').value, 960000n,
+                'and adjusted gross income must FALL by exactly the same amount')
+            // The absolute figures, hand-typed, so a leaf reading only
+            // differences cannot pass on two equally wrong returns:
+            //   line 9 = 50,000.00, line 10 = 3,532.39 + 9,600.00 = 13,132.39
+            //   line 11a = 50,000.00 - 13,132.39 = 36,867.61
+            assertEq(paid('1040 line 10').value, 1313239n, '$3,532.39 + $9,600.00')
+            assertEq(paid('1040 line 11a').value, 3686761n, '$50,000.00 - $13,132.39')
+        },
+        // **§199A(c)(1). The subtraction that LOWERS the deduction and RAISES
+        // the tax**, and the one a wiring could have left passing zero with the
+        // whole suite green — it stood as a hard `0n` inside
+        // `fjs/form8995`'s `qualifiedBusinessIncome` until this phase.
+        //
+        //   QBI without the premium = 50,000.00 - 3,532.39            = 46,467.61
+        //   QBI with it             = 46,467.61 - 9,600.00            = 36,867.61
+        //   20% of each                       9,293.52  and            7,373.52
+        //
+        // The 20%-of-QBI arm must be the binding one, or the taxable-income
+        // limitation would hide the difference; asserted below rather than
+        // assumed.
+        theHealthInsuranceDeductionReducesTheSectionOneNineNineADeduction: () => {
+            const withPremium = form1040Report(taxParams2025)(
+                selfEmployedWithWagesAndHealthPremiums([medicalPremiumEntry('9600.00')]))
+            const without = form1040Report(taxParams2025)(
+                selfEmployedWithWagesAndHealthPremiums([]))
+            assert(withPremium.kind === 'ok', ['expected this return to compute', withPremium])
+            assert(without.kind === 'ok', ['and the control too', without])
+            if (withPremium.kind !== 'ok' || without.kind !== 'ok') {
+                throw ['expected ok', withPremium, without]
+            }
+            const paid = lineRuled(withPremium.lines)
+            const none = lineRuled(without.lines)
+            assertEq(none('1040 line 13a').value, 929352n, '20% of $46,467.61')
+            assertEq(paid('1040 line 13a').value, 737352n, '20% of $36,867.61')
+            assertEq(
+                none('1040 line 13a').value - paid('1040 line 13a').value, 192000n,
+                'exactly 20% of the $9,600.00 deduction — §199A(c)(1) reduces QBI by it')
+            // …and the OTHER arm must be the larger one, or the leaf above is
+            // measuring the taxable-income limitation instead. Taxable income
+            // before the deduction is $86,467.61 - $9,600.00 - $15,750.00 =
+            // $61,117.61, and 20% of that is $12,223.52 — comfortably above
+            // both figures asserted above.
+            assert(
+                paid('1040 line 13a').value * 5n < paid('1040 line 11a').value
+                    - centsFromString(taxParams2025.standardDeduction.single.amount),
+                ['the 20%-of-QBI arm must be the binding one', paid('1040 line 13a').value])
+        },
+        // The direction, stated on its own: taking the deduction CUTS the
+        // §199A deduction, so the two move against each other. A reader who
+        // only saw the AGI leaf above would reasonably expect both to fall.
+        theTwoDeductionsMoveInOppositeDirections: () => {
+            const withPremium = form1040Report(taxParams2025)(
+                selfEmployedWithWagesAndHealthPremiums([medicalPremiumEntry('9600.00')]))
+            const without = form1040Report(taxParams2025)(
+                selfEmployedWithWagesAndHealthPremiums([]))
+            assert(withPremium.kind === 'ok' && without.kind === 'ok', 'both compute')
+            if (withPremium.kind !== 'ok' || without.kind !== 'ok') {
+                throw ['expected ok', withPremium, without]
+            }
+            const paid = lineRuled(withPremium.lines)
+            const none = lineRuled(without.lines)
+            assert(
+                paid('1040 line 11a').value < none('1040 line 11a').value,
+                ['adjusted gross income falls', paid('1040 line 11a').value])
+            assert(
+                paid('1040 line 13a').value < none('1040 line 13a').value,
+                ['and so does the §199A deduction', paid('1040 line 13a').value])
+        },
+        // **Long-term care, end to end.** The band tag chooses a $1,800.00 cap
+        // against a $2,400.00 payment, and the capped figure — not the paid one
+        // — is what reaches the return.
+        theLongTermCareCapSurvivesTheWholeWiring: () => {
+            const outcome = form1040Report(taxParams2025)(selfEmployedWithHealthPremiums([
+                medicalPremiumEntry('9600.00'),
+                {
+                    lineTag: 'selfEmployedLongTermCareAgeFiftyOneToSixty',
+                    datePaid: '2025-07-01',
+                    description: 'long-term care contract',
+                    amount: '2400.00',
+                    individual: 'taxpayer',
+                },
+            ]))
+            const without = form1040Report(taxParams2025)(selfEmployedWithHealthPremiums([]))
+            assert(outcome.kind === 'ok' && without.kind === 'ok', 'both compute')
+            if (outcome.kind !== 'ok' || without.kind !== 'ok') {
+                throw ['expected ok', outcome, without]
+            }
+            assertEq(
+                lineRuled(outcome.lines)('1040 line 10').value
+                    - lineRuled(without.lines)('1040 line 10').value,
+                1140000n,
+                '$9,600.00 + the CAPPED $1,800.00, never the $2,400.00 paid')
+        },
+        // **Rev. Proc. 2014-41's circularity, refusing the whole return.** The
+        // same certified self-employed return plus a Form 1095-A. A refusal
+        // that only fired inside `fjs/schedule/1` and was swallowed here would
+        // leave the return computing one arm of a circle.
+        premiumsBesideAFormTenNinetyFiveARefuseTheWholeReturn: () => {
+            const outcome = form1040Report(taxParams2025)({
+                ...selfEmployedWithHealthPremiums([medicalPremiumEntry('9600.00')]),
+                profile: storedProfile({
+                    ...singleProfile,
+                    declaredKinds: [
+                        'businessIncomeOrLoss', 'selfEmploymentTax',
+                        'deductiblePartOfSelfEmploymentTax', 'qualifiedBusinessIncomeDeduction',
+                        'selfEmployedHealthInsuranceDeduction', 'netPremiumTaxCredit',
+                    ],
+                    notEligibleForAnySubsidizedEmployerHealthPlanInAnyMonth: true,
+                    federalPovertyLineTable: 'contiguous48AndDistrictOfColumbia',
+                }),
+                marketplaceStatements: [storedMarketplaceStatement('300.00')],
+            })
+            assert(outcome.kind === 'error', ['expected the circularity refusal', outcome])
+            if (outcome.kind !== 'error') {
+                throw ['expected error', outcome]
+            }
+            assert(
+                outcome.message.includes('Rev. Proc. 2014-41'),
+                ['the refusal must reach the report naming the guidance', outcome.message])
+            assert(
+                outcome.message.includes('circular'),
+                ['and the shape of the problem', outcome.message])
+            assert(
+                outcome.message.includes('Schedule 1 line 17 -> line 26 -> 1040 line 10'),
+                ['and where the amount would have gone', outcome.message])
+        },
+        // THE CONTROL: the SAME Form 1095-A on a return with no §162(l)
+        // premium anywhere still computes its credit. Without this leaf, a
+        // refusal that fired on every Marketplace return would pass the one
+        // above — and Form 8962 is a shipped, working form.
+        aFormTenNinetyFiveAWithNoPremiumEntryStillComputesItsCredit: () => {
+            const outcome = form1040Report(taxParams2025)(
+                marketplaceWageReturn([storedMarketplaceStatement('300.00')]))
+            assert(
+                outcome.kind === 'ok',
+                ['Marketplace coverage alone must still compute', outcome])
+        },
+        // THE OTHER CONTROL: §162(l) premiums on a return with no Form 1095-A
+        // compute, which is the leaf above's mirror and is what says the
+        // refusal is about the PAIR rather than about either member.
+        premiumsWithNoMarketplaceStatementCompute: () => {
+            const outcome = form1040Report(taxParams2025)(
+                selfEmployedWithHealthPremiums([medicalPremiumEntry('9600.00')]))
+            assert(outcome.kind === 'ok', ['premiums alone must compute', outcome])
+        },
+        // §162(l)(2)(B)'s certification, reaching the finished report. The same
+        // return with the profile flag removed must refuse rather than compute,
+        // and the message must name the field that unlocks it — a scope refusal
+        // could never have said that.
+        theUncertifiedSelfEmployedReturnRefusesTheWholeReport: () => {
+            const outcome = form1040Report(taxParams2025)({
+                ...selfEmployedWithHealthPremiums([medicalPremiumEntry('9600.00')]),
+                profile: storedProfile({
+                    ...singleProfile,
+                    declaredKinds: [
+                        'businessIncomeOrLoss', 'selfEmploymentTax',
+                        'deductiblePartOfSelfEmploymentTax', 'qualifiedBusinessIncomeDeduction',
+                        'selfEmployedHealthInsuranceDeduction',
+                    ],
+                }),
+            })
+            assert(outcome.kind === 'error', ['expected the §162(l)(2)(B) refusal', outcome])
+            if (outcome.kind !== 'error') {
+                throw ['expected error', outcome]
+            }
+            assert(
+                outcome.message.includes(
+                    'notEligibleForAnySubsidizedEmployerHealthPlanInAnyMonth'),
+                ['the refusal must name the field that unlocks it', outcome.message])
+        },
+        // **An independent `fjs/form7206` call over the SAME facts must reach
+        // the identical figure the report did** — the cross-check idiom this
+        // file already uses for `form8812`, `scheduleD` and `form2441`. What it
+        // catches is a wiring that hands the form the right shape and the wrong
+        // numbers: an empty entry list, the long-term care half routed into the
+        // uncapped line 1, or Schedule 1 line 15 read from the wrong execution.
+        anIndependentFormSeventyTwoZeroSixCallReachesTheSameDeduction: () => {
+            const outcome = form1040Report(taxParams2025)(selfEmployedWithHealthPremiums([
+                medicalPremiumEntry('9600.00'),
+                {
+                    lineTag: 'selfEmployedLongTermCareAgeFiftyOneToSixty',
+                    datePaid: '2025-07-01',
+                    description: 'long-term care contract',
+                    amount: '2400.00',
+                    individual: 'taxpayer',
+                },
+            ]))
+            const without = form1040Report(taxParams2025)(selfEmployedWithHealthPremiums([]))
+            assert(outcome.kind === 'ok' && without.kind === 'ok', 'both compute')
+            if (outcome.kind !== 'ok' || without.kind !== 'ok') {
+                throw ['expected ok', outcome, without]
+            }
+            const independent = form7206(taxParams2025)({
+                medicalDentalVisionPremiumsCents: 960000n,
+                longTermCarePersons: [
+                    { ageBand: 'ageFiftyOneToSixty', premiumsCents: 240000n },
+                ],
+                planBusinessNetProfitCents: 5000000n,
+                allBusinessNetProfitsCents: 5000000n,
+                deductiblePartOfSelfEmploymentTaxCents: 353239n,
+                retirementPlanDeductionForPlanBusinessCents: 0n,
+                sCorporationMedicareWagesCents: 0n,
+            })
+            assertEq(independent.line14, 1140000n, '$11,400.00 off the form directly')
+            assertEq(
+                lineRuled(outcome.lines)('1040 line 10').value
+                    - lineRuled(without.lines)('1040 line 10').value,
+                independent.line14,
+                'and the report must have moved by exactly that')
+        },
+    },
+
     formTwentyFourFortyOne: {
         // The whole chain, in one leaf, on the finished report's own lines.
         boxTenReachesLineOneEAndTheCreditReachesLineTwenty: () => {

@@ -693,6 +693,7 @@ export const form8995a = taxParamSet => status => input => {
  *   readonly status: IndividualFilingStatus,
  *   readonly netProfitCents: bigint,
  *   readonly deductibleHalfOfSelfEmploymentTaxCents: bigint,
+ *   readonly selfEmployedHealthInsuranceDeductionCents: bigint,
  *   readonly assertedPriorYearLossCarryforward: string | undefined,
  *   readonly assertedSpecifiedService: string | undefined,
  *   readonly assertedW2Wages: string | undefined,
@@ -731,12 +732,14 @@ export const form8995a = taxParamSet => status => input => {
 export const qualifiedBusinessIncomeDeduction = taxParamSet => input => {
     const {
         status, netProfitCents, deductibleHalfOfSelfEmploymentTaxCents,
+        selfEmployedHealthInsuranceDeductionCents,
         assertedPriorYearLossCarryforward, assertedSpecifiedService,
         assertedW2Wages, assertedUnadjustedBasis,
         taxableIncomeBeforeQbiCents, netCapitalGainCents, qualifiedReitDividendsCents,
     } = input
     const qualifiedBusinessIncomeCents = qualifiedBusinessIncome({
         netProfitCents, deductibleHalfOfSelfEmploymentTaxCents,
+        selfEmployedHealthInsuranceDeductionCents,
     })
     const carryforward = priorYearCarryforwardIsUnstated({
         qualifiedBusinessIncomeCents,
@@ -759,6 +762,7 @@ export const qualifiedBusinessIncomeDeduction = taxParamSet => input => {
         // of range by anything else.
         const outcome = simplifiedComputation(taxParamSet)({
             status, netProfitCents, deductibleHalfOfSelfEmploymentTaxCents,
+            selfEmployedHealthInsuranceDeductionCents,
             assertedPriorYearLossCarryforward, taxableIncomeBeforeQbiCents, netCapitalGainCents,
             qualifiedReitDividendsCents,
         })
@@ -839,6 +843,7 @@ const soleProprietor = {
     status: 'single',
     netProfitCents: 0n,
     deductibleHalfOfSelfEmploymentTaxCents: 0n,
+    selfEmployedHealthInsuranceDeductionCents: 0n,
     assertedPriorYearLossCarryforward: '0.00',
     assertedSpecifiedService: 'notSpecifiedService',
     assertedW2Wages: '0.00',
@@ -964,6 +969,7 @@ export const proof = {
                 ...soleProprietor,
                 netProfitCents: 5000000n,
                 deductibleHalfOfSelfEmploymentTaxCents: 353239n,
+                selfEmployedHealthInsuranceDeductionCents: 0n,
                 taxableIncomeBeforeQbiCents,
             })
             const eightNineNineFive = simplified(outcome)
@@ -998,6 +1004,7 @@ export const proof = {
                 ...soleProprietor,
                 netProfitCents: 5000000n,
                 deductibleHalfOfSelfEmploymentTaxCents: 353239n,
+                selfEmployedHealthInsuranceDeductionCents: 0n,
                 taxableIncomeBeforeQbiCents: 12000000n,
             })),
             929352n,
@@ -1566,6 +1573,7 @@ export const proof = {
                 ...soleProprietor,
                 netProfitCents: 5000000n,
                 deductibleHalfOfSelfEmploymentTaxCents: 353239n,
+                selfEmployedHealthInsuranceDeductionCents: 0n,
                 assertedSpecifiedService: undefined,
                 assertedW2Wages: undefined,
                 assertedUnadjustedBasis: undefined,

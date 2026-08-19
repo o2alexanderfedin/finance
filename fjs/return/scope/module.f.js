@@ -395,6 +395,17 @@
  * same repair Phase 27 made to the second row and the reason this paragraph
  * exists rather than a silent edit.
  *
+ * **TAX-39 corrects THIS paragraph, and the correction is the interesting
+ * one.** Pairing the two rows here was read by a later reader as a claim that
+ * they shared a blocker, and they did not. The retirement plan's missing fact
+ * is a PLAN DOCUMENT that no dialect can hold without modelling the plan; the
+ * premiums' missing fact was a `lineTag` on a dialect that already existed.
+ * One of the two shipped a phase later and the other has no phase in sight.
+ * **Two rows whose remedies quote the same form are not two rows with the same
+ * problem** — see `fjs/schedule/1/todo/self-employed-health-insurance.md` §1,
+ * which makes the same point about `fjs/form2441`'s Schedule SE refusal, the
+ * other row this one kept company with.
+ *
  * ## Schedule E's boundary, as of Phase 30 (DOC-24/TAX-35)
  *
  * The two-commit shape again, on the ONE kind Phase 27's own split left too
@@ -568,6 +579,14 @@ export const modeledKinds = /** @type {const} */ ([
     // asks for before its first line, which no information return reports.
     'movingExpensesArmedForces',   // vnd.fjs.adjustments + W-2 box 12 code P -> Form 3903 -> Schedule 1 line 14 -> 1040 line 10
     'deductiblePartOfSelfEmploymentTax', // Schedule SE line 13 -> Schedule 1 line 15 -> 1040 line 10
+    // TAX-39. What made it computable was NOT an ordering change: every
+    // figure Form 7206 reads was already in scope where Schedule 1 line 17 is
+    // built. It was SIX `vnd.fjs.adjustments` line tags (Form 7206's printed
+    // line 1 and its five §213(d)(10) age bands) and ONE profile certification
+    // (`notEligibleForAnySubsidizedEmployerHealthPlanInAnyMonth`, §162(l)(2)(B)),
+    // which is `movingExpensesArmedForces`' own two-things-arriving shape one
+    // line up. No dialect was added.
+    'selfEmployedHealthInsuranceDeduction', // vnd.fjs.adjustments -> Form 7206 line 14 -> Schedule 1 line 17 -> 1040 line 10
     'penaltyOnEarlyWithdrawalOfSavings', // 1099-INT box 2 -> Schedule 1 line 18 -> 1040 line 10
     'iraDeduction',               // vnd.fjs.adjustments + W-2 box 13 -> Schedule 1 line 20 -> 1040 line 10
     'studentLoanInterestDeduction', // 1098-E + worksheet -> Schedule 1 line 21 -> 1040 line 10
@@ -923,20 +942,28 @@ export const unmodeledKindRefusals = /** @type {const} */ ([
     // a figure that is no longer missing. What still blocks the line is
     // everything ELSE Pub. 560's worksheet needs, and the row says so.
     { kind: 'selfEmployedRetirementPlans', line: 'Schedule 1 line 16 -> 1040 line 10', label: 'self-employed SEP, SIMPLE and qualified plan contributions', remedy: 'requires the Pub. 560 deduction worksheet. Its net-earnings input is computable as of Phase 28 (Schedule SE line 4a), but nothing this engine holds records the PLAN — which of SEP, SIMPLE and qualified the contribution was made to, the plan\u2019s own contribution rate, and how much was actually contributed, none of which appears on any information return (no phase yet)' },
-    // The remedy below said "and a Schedule C or Schedule K-1 this engine does
-    // not model" until Phase 27, which built Schedule C. Half a remedy going
-    // false is worse than a vague one: a reader is told the gap is a missing
-    // form that is no longer missing. What still blocks the line is the
-    // WORKSHEET, whose §162(l)(2)(A) cap is the net earnings from the trade or
-    // business -- Schedule SE line 4, Phase 28 -- so the row stays and the
-    // false clause goes.
-    // The SAME correction, and this row has now had it twice: Phase 27
-    // deleted "and a Schedule C or Schedule K-1 this engine does not model"
-    // when it built Schedule C, and Phase 28 deletes "that net-earnings
-    // figure is Schedule SE's" when it builds Schedule SE. Both clauses named
-    // a phase that then shipped. What is left is the part no phase has
-    // promised: the premiums themselves appear on no information return.
-    { kind: 'selfEmployedHealthInsuranceDeduction', line: 'Schedule 1 line 17 -> 1040 line 10', label: 'the self-employed health insurance deduction', remedy: 'requires the Pub. 535 self-employed health insurance deduction worksheet. Both figures it once lacked now exist — Schedule C as of Phase 27 and §162(l)(2)(A)\u2019s net-earnings cap as of Phase 28 — and what remains missing is the premiums: no dialect here records what was paid for medical, dental or long-term-care coverage, nor whether the taxpayer was eligible for an employer plan in any month, which §162(l)(2)(B) disqualifies (no phase yet)' },
+    // **`selfEmployedHealthInsuranceDeduction` STOOD HERE until TAX-39, and it
+    // is worth reading what its remedy said, because the remedy was WRONG in a
+    // way three phases of careful correction never caught.** It read:
+    //
+    //   "requires the Pub. 535 self-employed health insurance deduction
+    //    worksheet. Both figures it once lacked now exist ... and what remains
+    //    missing is the premiums"
+    //
+    // Two phases had already repaired this row -- Phase 27 deleted a clause
+    // naming a Schedule C it then built, Phase 28 deleted one naming a
+    // Schedule SE it then built -- and each repair left the FIRST clause
+    // untouched, because nobody re-checked it. **Publication 535 was
+    // discontinued after tax year 2022.** IRS, *About Publication 535*: "We
+    // have discontinued Publication 535, Business Expenses; the last revision
+    // was for 2022." A reader sent to find that worksheet in 2025 would have
+    // found a three-year-old revision and computed a prior year's rule.
+    //
+    // The replacement is a printed FORM, Form 7206, and `fjs/form7206`'s own
+    // header carries the citation. The lesson this table should keep is the
+    // one the two earlier repairs did not surface: **a remedy naming an
+    // external source has an expiry the repository cannot see, and the clause
+    // least likely to be re-read is the one that has been true longest.**
     { kind: 'alimonyPaid', line: 'Schedule 1 line 19a -> 1040 line 10', label: 'alimony paid', remedy: 'requires the recipient\u2019s SSN and the divorce-decree date, since only a pre-2019 decree makes alimony deductible, and no dialect models either (no phase yet)' },
     { kind: 'archerMsaDeduction', line: 'Schedule 1 line 23 -> 1040 line 10', label: 'the Archer MSA deduction', remedy: 'requires Form 8853 (no phase yet)' },
     // ── Schedule 1 line 24's ten kinds (2026-08-18) ────────────────────────
@@ -1793,7 +1820,7 @@ export const classifyScope = declaredKinds => {
  * have left the other reading a cap the exclusion had already eaten.
  * @type {number}
  */
-const expectedModeledKindCount = 52
+const expectedModeledKindCount = 53
 
 /**
  * The modeled set, hand-typed a SECOND time and in {@link kindVocabulary}'s
@@ -1831,6 +1858,7 @@ const everyModeledKindHandTyped = [
     'healthSavingsAccountDeduction',
     'movingExpensesArmedForces',
     'deductiblePartOfSelfEmploymentTax',
+    'selfEmployedHealthInsuranceDeduction',
     'penaltyOnEarlyWithdrawalOfSavings',
     'iraDeduction',
     'studentLoanInterestDeduction',
@@ -1999,9 +2027,17 @@ const everyModeledKindHandTyped = [
  * fact be declared twice, which is the failure `section1202Gain`'s own row
  * has guarded against since Phase 12.1. See
  * `fjs/return/scope/todo/split-the-six-coarse-kinds.md`.
+ *
+ * **`143 -> 142` is TAX-39's**, and it is the ONE kind reclassified since the
+ * split: `selfEmployedHealthInsuranceDeduction` leaves this table for
+ * {@link modeledKinds}, beside `fjs/form7206` and Schedule 1 line 17's own
+ * wiring. No row arrives, so `143 - 1`. The two moves compose by plain
+ * subtraction because they do not overlap — the split invented ten new
+ * Schedule 1 Part II rows for printed line 24 and touched none of the
+ * thirteen Phase 24 wrote, one of which is line 17.
  * @type {number}
  */
-const expectedUnmodeledKindCount = 143
+const expectedUnmodeledKindCount = 142
 
 /**
  * The complete refusal message for a return declaring exactly
@@ -2067,11 +2103,11 @@ export const proof = {
         // Plan 13-10's own two-kind move) targets: removing one entry from
         // `modeledKinds` without touching `expectedModeledKindCount` must
         // redden this leaf.
-        modeledKindsIsExactlyFiftyTwo: () => {
+        modeledKindsIsExactlyFiftyThree: () => {
             assertEq(modeledKinds.length, expectedModeledKindCount)
             assertEq(new Set(modeledKinds).size, expectedModeledKindCount)
         },
-        unmodeledRefusalsIsExactlyOneHundredAndFortyThree: () => {
+        unmodeledRefusalsIsExactlyOneHundredAndFortyTwo: () => {
             assertEq(unmodeledKindRefusals.length, expectedUnmodeledKindCount)
             assertEq(
                 new Set(unmodeledKindRefusals.map(r => r.kind)).size,
@@ -3040,9 +3076,18 @@ export const proof = {
         theSplitReclassifiedNothing: () => {
             /** @type {readonly string[]} */
             const modeledNames = modeledKinds
+            // **52 until TAX-39, 53 now, and the leaf's name is still true.**
+            // The split itself reclassified nothing; `fjs/form7206` then
+            // reclassified exactly one kind
+            // (`selfEmployedHealthInsuranceDeduction`), so what this literal
+            // states is `52 + 1`. The two set comparisons below are what
+            // actually carry the claim — they are set equality against
+            // `everyModeledKindHandTyped`, so a kind arriving in `modeledKinds`
+            // without arriving in the hand-typed list reddens here whatever
+            // this number says.
             assertEq(
-                modeledNames.length, 52,
-                'the modeled set is the same fifty-two it was before the split')
+                modeledNames.length, 53,
+                'the fifty-two the split left untouched, plus TAX-39\'s one')
             for (const kind of everyModeledKindHandTyped) {
                 assert(
                     modeledNames.includes(kind),
@@ -3613,13 +3658,15 @@ export const proof = {
         // (TAX-31), which wired Schedule 1 line 15 to Schedule SE line 13.
         // **`movingExpensesArmedForces` left it beside the `fjs/schedule/1`
         // Form 3903 wiring**, in the same commit, for the same reason. Six
-        // remain.
+        // remained; the 2026-08-18 split then added ten line-24 kinds, and
+        // **`selfEmployedHealthInsuranceDeduction` left beside `fjs/form7206`
+        // and Schedule 1 line 17's own wiring (TAX-39)**, for the third time
+        // the same reason. Fourteen remain.
         theScheduleOneKindsStillUnwiredRefuse: () => {
             /** @type {readonly Kind[]} */
             const stillRefused = [
                 'reservistPerformingArtistFeeBasisExpenses',
                 'selfEmployedRetirementPlans',
-                'selfEmployedHealthInsuranceDeduction',
                 'alimonyPaid',
                 'archerMsaDeduction',
                 'juryDutyPayGivenToEmployer',
@@ -3634,10 +3681,10 @@ export const proof = {
                 'excessDeductionsOfSection67eExpenses',
             ]
             assertEq(
-                stillRefused.length, 15,
+                stillRefused.length, 14,
                 'thirteen Schedule 1 Part II kinds, less Phase 24\'s three, Phase 28\'s one, '
-                + 'lines 18 and 20, and line 14\'s own Form 3903 wiring, and the coarse line-24 '
-                + 'kind replaced by ten: 6 - 1 + 10')
+                + 'TAX-39\'s line 17, lines 18 and 20, and line 14\'s own Form 3903 wiring, '
+                + 'and the coarse line-24 kind replaced by ten: 6 - 1 - 1 + 10')
             for (const kind of stillRefused) {
                 const outcome = classifyScope([kind])
                 assert(
@@ -3669,12 +3716,25 @@ export const proof = {
             assertEq(
                 classifyScope(['deductiblePartOfSelfEmploymentTax']).kind, 'ok',
                 'the deductible half is Schedule 1 line 15, and Phase 28 computes it')
-            for (const kind of ['selfEmployedRetirementPlans', 'selfEmployedHealthInsuranceDeduction']) {
+            // **This loop ran over TWO kinds until TAX-39 and now runs over
+            // one.** Phase 28's note above said both remedies named Schedule SE
+            // and that what each actually still lacked was "the plan or the
+            // premium record". That was right about the retirement plan and
+            // WRONG about the premiums, in the only way that matters: a premium
+            // record was buildable on a dialect that already existed, and the
+            // retirement plan's is not -- Pub. 560's worksheet needs which of
+            // SEP, SIMPLE or qualified the contribution went to and at what
+            // plan rate, which no document and no certification can supply
+            // without modelling the plan itself.
+            for (const kind of ['selfEmployedRetirementPlans']) {
                 const narrowed = kindVocabulary.find(candidate => candidate === kind)
                 assert(narrowed !== undefined, ['not a kind', kind])
                 const outcome = classifyScope([narrowed])
                 assert(outcome.kind === 'error', ['this one still refuses', kind, outcome])
             }
+            assertEq(
+                classifyScope(['selfEmployedHealthInsuranceDeduction']).kind, 'ok',
+                'Schedule 1 line 17 computes as of TAX-39, through Form 7206')
         },
         // **TAX-27, Phase 25: the requirement whose whole delivery is this
         // refusal.** The Earned Income Credit is NOT computed by this phase

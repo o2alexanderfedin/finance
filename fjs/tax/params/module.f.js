@@ -3108,6 +3108,123 @@ export const dependentCareDeemedEarnedIncomePerMonth = {
 }
 
 /**
+ * One age band of §213(d)(10)'s eligible-long-term-care-premium limitation:
+ * the band as printed on Form 7206 line 2(b), and the per-person dollar cap
+ * for that band.
+ *
+ * `maximumAge` is `undefined` on the open-topped last band — no sentinel,
+ * matching {@link Bracket}'s own convention for a bracket with no ceiling.
+ * `minimumAgeExclusive` is EXCLUSIVE because the statute's own bands are:
+ * "more than 40 but not more than 50". Getting that boundary backwards moves
+ * a 50-year-old from $900 to $1,800.
+ * @typedef {{
+ *   readonly band: LongTermCareAgeBand,
+ *   readonly minimumAgeExclusive: number | undefined,
+ *   readonly maximumAge: number | undefined,
+ *   readonly amount: string,
+ *   readonly citation: Citation,
+ * }} LongTermCarePremiumLimit
+ */
+
+/**
+ * The five age bands §213(d)(10) prints, named. Exported so consumers iterate
+ * this list rather than hand-typing the same five names — {@link
+ * individualFilingStatuses}' and {@link federalPovertyLineTables}' precedent.
+ *
+ * **The names are the AGES, not ordinals.** A band called `tier3` would be
+ * unreadable at the call site and impossible to check against the printed
+ * page; `fjs/schedule/1` turns each of these into a `vnd.fjs.adjustments`
+ * `lineTag` a taxpayer has to pick correctly, so the name is the whole user
+ * interface to a figure that ranges over an order of magnitude.
+ * @typedef {'ageFortyOrYounger' | 'ageFortyOneToFifty' | 'ageFiftyOneToSixty' | 'ageSixtyOneToSeventy' | 'ageSeventyOneOrOlder'} LongTermCareAgeBand
+ */
+
+/**
+ * §213(d)(10)'s eligible long-term care premium limitations, as indexed for
+ * taxable years beginning in 2025 — Form 7206 line 2(b), TAX-39.
+ *
+ * ## Where these come from, and why the Rev. Proc. SECTION number matters
+ *
+ * Rev. Proc. 2024-40 **§2.28**, "Eligible Long-Term Care Premiums", verbatim:
+ * *"For taxable years beginning in 2025, the limitations under § 213(d)(10),
+ * regarding eligible long-term care premiums includible in the term 'medical
+ * care', as adjusted for inflation, are as follows"*. It is **§2.28 and not
+ * §2.27** — §2.27 is the qualified-business-income threshold, an unrelated
+ * figure this module also stores, and a mis-typed section number would cite a
+ * real section of a real Revenue Procedure that says something else entirely.
+ *
+ * The five amounts are corroborated on the face of **Form 7206 (2025)** line
+ * 2(b), transcribed from the printed PDF rather than recalled: *"$480 — if
+ * that person is age 40 or younger / $900 — if age 41 to 50 / $1,800 — if age
+ * 51 to 60 / $4,810 — if age 61 to 70 / $6,020 — if age 71 or older"*. The
+ * printed form states the bands INCLUSIVELY ("age 41 to 50") and the statute
+ * states them EXCLUSIVELY ("more than 40 but not more than 50"); the two agree
+ * on every integer age, and this table stores the statutory form because that
+ * is the one that answers what happens at exactly 40 and exactly 50.
+ *
+ * ## The cap is PER PERSON, and that is the part an aggregate would lose
+ *
+ * Form 7206 line 2: *"For coverage under a qualified long-term care insurance
+ * contract, enter for each person covered the smaller of (a) or (b)"*, and
+ * the note beneath it: *"If more than one person is covered, figure
+ * separately the amount to enter for each person. Then enter the total of
+ * those amounts."* A couple aged 55 and 65 paying $3,000 each may deduct
+ * $1,800 + $3,000 = $4,800, not one $4,810 cap against $6,000 and not one
+ * $1,800 cap either. `fjs/form7206` applies the cap per covered person for
+ * exactly this reason and its own proof pins the two-person case.
+ *
+ * ## `age at the end of the tax year`, which is why these are TAGS and not
+ * a birth date
+ *
+ * The band is the person's *"age at the end of the tax year"* (Form 7206 line
+ * 2(b)). **No document in this repository carries a birth date** — the same
+ * fact `adjustmentLineTags`' own `traditionalIraContributionAgeFiftyOrOver`
+ * records, and the reason `form4972LumpSumDistribution` is refused. So the
+ * band is asserted by the taxpayer through the `lineTag` they choose, exactly
+ * as §219(b)(5)(B)(ii)'s age-50 catch-up already is one line up the same
+ * schedule and on the same document.
+ * @type {readonly LongTermCarePremiumLimit[]}
+ */
+export const longTermCarePremiumLimits = [
+    {
+        band: 'ageFortyOrYounger',
+        minimumAgeExclusive: undefined,
+        maximumAge: 40,
+        amount: '480.00',
+        citation: { kind: 'revProc', revProc: 'Rev. Proc. 2024-40', section: '§2.28, age 40 or less', effectiveDate: '2025-01-01' },
+    },
+    {
+        band: 'ageFortyOneToFifty',
+        minimumAgeExclusive: 40,
+        maximumAge: 50,
+        amount: '900.00',
+        citation: { kind: 'revProc', revProc: 'Rev. Proc. 2024-40', section: '§2.28, more than 40 but not more than 50', effectiveDate: '2025-01-01' },
+    },
+    {
+        band: 'ageFiftyOneToSixty',
+        minimumAgeExclusive: 50,
+        maximumAge: 60,
+        amount: '1800.00',
+        citation: { kind: 'revProc', revProc: 'Rev. Proc. 2024-40', section: '§2.28, more than 50 but not more than 60', effectiveDate: '2025-01-01' },
+    },
+    {
+        band: 'ageSixtyOneToSeventy',
+        minimumAgeExclusive: 60,
+        maximumAge: 70,
+        amount: '4810.00',
+        citation: { kind: 'revProc', revProc: 'Rev. Proc. 2024-40', section: '§2.28, more than 60 but not more than 70', effectiveDate: '2025-01-01' },
+    },
+    {
+        band: 'ageSeventyOneOrOlder',
+        minimumAgeExclusive: 70,
+        maximumAge: undefined,
+        amount: '6020.00',
+        citation: { kind: 'revProc', revProc: 'Rev. Proc. 2024-40', section: '§2.28, more than 70', effectiveDate: '2025-01-01' },
+    },
+]
+
+
+/**
  * A full tax-year parameter set: every TY2025 parameter this phase
  * requires, together.
  *
@@ -3166,6 +3283,7 @@ export const dependentCareDeemedEarnedIncomePerMonth = {
  *   readonly dependentCareCreditPercentage: typeof dependentCareCreditPercentage,
  *   readonly dependentCareAssistanceExclusionLimit: typeof dependentCareAssistanceExclusionLimit,
  *   readonly dependentCareDeemedEarnedIncomePerMonth: typeof dependentCareDeemedEarnedIncomePerMonth,
+ *   readonly longTermCarePremiumLimits: typeof longTermCarePremiumLimits,
  * }} TaxParamSet
  */
 
@@ -3215,6 +3333,7 @@ export const taxParamsByYear = {
         dependentCareCreditPercentage,
         dependentCareAssistanceExclusionLimit,
         dependentCareDeemedEarnedIncomePerMonth,
+        longTermCarePremiumLimits,
     },
 }
 
@@ -3379,6 +3498,78 @@ const everyDollarStringField = [
 ]
 
 export const proof = {
+    // ── TAX-39: §213(d)(10)'s long-term care premium limits ────────────────
+    //
+    // **Hand-typed from Form 7206 (2025) line 2(b) and Rev. Proc. 2024-40
+    // §2.28, not from the table above.** The expected side is a literal
+    // `Record` written out band by band, which is the idiom
+    // `standardDeductionCitesObbbaRevision` uses two leaves down and the
+    // reason AGENTS.md gives for it: an expected value produced by the code
+    // under test proves the code equals itself.
+    //
+    // The COUNT is asserted beside the loop for the fourth-shipped-defect
+    // reason — `longTermCarePremiumLimits` is both the iteration set and the
+    // subject, so a deleted band would vanish from the loop in the same
+    // instant it vanished from the data.
+    longTermCarePremiumLimitsMatchThePrintedFormAndTheRevenueProcedure: () => {
+        /** @type {Record<LongTermCareAgeBand, string>} */
+        const printed = {
+            ageFortyOrYounger: '480.00',
+            ageFortyOneToFifty: '900.00',
+            ageFiftyOneToSixty: '1800.00',
+            ageSixtyOneToSeventy: '4810.00',
+            ageSeventyOneOrOlder: '6020.00',
+        }
+        assertEq(longTermCarePremiumLimits.length, 5, 'five printed bands')
+        assertEq(Object.keys(printed).length, 5, 'and five hand-typed expectations')
+        for (const limit of longTermCarePremiumLimits) {
+            const expected = printed[limit.band]
+            assertEq(limit.amount, expected, `band ${limit.band}`)
+            // Every figure carries Rev. Proc. 2024-40 §2.28 — never §2.27,
+            // which is the qualified-business-income threshold. A section
+            // number that names a real but different rule is the failure this
+            // assertion exists for.
+            assertEq(limit.citation.kind, 'revProc')
+            assert(
+                limit.citation.kind === 'revProc' && limit.citation.revProc === 'Rev. Proc. 2024-40',
+                ['the governing Revenue Procedure', limit.band, limit.citation])
+            assert(
+                limit.citation.section.startsWith('§2.28'),
+                ['§2.28, Eligible Long-Term Care Premiums', limit.band, limit.citation.section])
+        }
+    },
+    // The bands must PARTITION the ages: each one's exclusive floor is the
+    // previous one's inclusive ceiling, the first is open below and the last
+    // open above. Stated as arithmetic over consecutive pairs rather than as
+    // five more literals, because what this leaf is for is the boundary the
+    // statute and the printed form state differently — "more than 40 but not
+    // more than 50" versus "age 41 to 50".
+    theLongTermCareBandsPartitionEveryAgeWithNoGapAndNoOverlap: () => {
+        const [first, ...rest] = longTermCarePremiumLimits
+        assert(first !== undefined, 'five bands')
+        if (first === undefined) { throw 'expected a first band' }
+        assertEq(first.minimumAgeExclusive, undefined, 'the first band is open below')
+        assertEq(rest.length, 4, 'four bands follow the first')
+        const last = longTermCarePremiumLimits[longTermCarePremiumLimits.length - 1]
+        assert(last !== undefined, 'a last band')
+        if (last === undefined) { throw 'expected a last band' }
+        assertEq(last.maximumAge, undefined, 'and the last is open above')
+        for (let index = 1; index < longTermCarePremiumLimits.length; index += 1) {
+            const previous = longTermCarePremiumLimits[index - 1]
+            const current = longTermCarePremiumLimits[index]
+            assert(previous !== undefined && current !== undefined, ['a pair', index])
+            if (previous === undefined || current === undefined) { throw 'expected a pair' }
+            assertEq(
+                current.minimumAgeExclusive, previous.maximumAge,
+                `band ${current.band} must start exactly where ${previous.band} ends`)
+            // And the amounts must ascend, which is what makes a transposed
+            // pair of rows visible: $4,810 and $6,020 are adjacent and easy to
+            // swap, and every other assertion here would still pass.
+            assert(
+                centsFromString(current.amount) > centsFromString(previous.amount),
+                ['the cap must rise with age', previous.band, current.band])
+        }
+    },
     // Phase 21 (EXEC-14): every parameter set agrees with the KEY it is
     // stored under. A set travelling on its own — which is what
     // `taxGuestCtx` now does with it — is only trustworthy if its own

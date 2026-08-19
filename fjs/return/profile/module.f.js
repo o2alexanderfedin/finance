@@ -1069,6 +1069,45 @@ export const returnProfileSchema = /** @type {const} */ ({
     // threshold, which for the ordinary case (a six-year-old) is trivially
     // true and which the taxpayer, unlike this engine, actually knows.
     noDependentIsRequiredToFileAnIncomeTaxReturn: option(true),
+    // TAX-39 (Form 7206) -- §162(l)(2)(B)'s "other coverage" disqualifier, the
+    // one fact the self-employed health insurance deduction needs that appears
+    // on NO information return and that no amount this engine holds implies.
+    //
+    // The statute, 26 U.S.C. §162(l)(2)(B): "Paragraph (1) shall not apply to
+    // any taxpayer for any calendar month for which the taxpayer is eligible
+    // to participate in any subsidized health plan maintained by any employer
+    // of the taxpayer or of the spouse of, or any dependent, or individual
+    // described in subparagraph (D) of paragraph (1) with respect to, the
+    // taxpayer." Form 7206 line 1 restates it as an exclusion from the
+    // premiums themselves: "don't include ... Amounts for any month you were
+    // eligible to participate in a health plan subsidized by your employer or
+    // your spouse's employer or the employer of either your dependent or your
+    // child who was under the age of 27 at the end of 2025."
+    //
+    // **The certification is WHOLE-YEAR while the statute is month-by-month,
+    // and that is a deliberate narrowing rather than an approximation.** A
+    // taxpayer eligible for an employer plan in three of twelve months has a
+    // real, partial deduction; they cannot make this declaration, and
+    // `fjs/schedule/1` then REFUSES rather than computing one. Refusing a
+    // return this engine cannot compute is the honest direction; a whole-year
+    // flag read as "eligible in no month" when the taxpayer meant "eligible in
+    // some" would overstate the deduction, which is the direction that costs
+    // the taxpayer a notice.
+    //
+    // It is also broader than §162(l)(2)(B) in a second way: the statute
+    // applies the test SEPARATELY to long-term-care plans and to plans that
+    // are not long-term-care ones (Form 7206 line 2's note), and this one flag
+    // covers both. A filer eligible for one but not the other cannot certify,
+    // and again refuses rather than deducting. Both narrowings are recorded in
+    // `fjs/schedule/1/todo/self-employed-health-insurance.md`.
+    //
+    // `option(true)`, DOC-12 -- absent means NOT certified. Read only by
+    // `fjs/schedule/1`, which refuses when premiums are stored and it is
+    // absent, so no cross-field check is needed here: certifying while
+    // claiming no premium is an ordinary return, exactly as
+    // `movingExpensesArmedForcesPermanentChangeOfStation`'s own note says of
+    // certifying a permanent change of station while claiming no move.
+    notEligibleForAnySubsidizedEmployerHealthPlanInAnyMonth: option(true),
 })
 
 /** @typedef {Ts<typeof returnProfileSchema>} ReturnProfile */
@@ -2007,6 +2046,38 @@ export const proof = {
             const [t, v] = validate({ ...minimal })
             assert(t === 'ok', ['expected ok', t, v])
             assertEq(v.movingExpensesArmedForcesPermanentChangeOfStation, undefined)
+        },
+    },
+    // TAX-39 (Form 7206): §162(l)(2)(B)'s employer-plan disqualifier, the same
+    // three-leaf shape `movingExpensesArmedForcesPermanentChangeOfStation`
+    // has above — it validates, a structural `false` is rejected, and the
+    // CONTROL shows absence is ordinary.
+    selfEmployedHealthInsuranceCertification: {
+        certificationValidates: () => {
+            const [t, v] = validate({
+                ...minimal,
+                notEligibleForAnySubsidizedEmployerHealthPlanInAnyMonth: true,
+            })
+            assert(t === 'ok', ['expected ok', t, v])
+            assertEq(v.notEligibleForAnySubsidizedEmployerHealthPlanInAnyMonth, true)
+        },
+        // DOC-12. A stored `false` would read as a DENIAL the engine could act
+        // on, when what it actually has is silence — and here the two would
+        // reach the same refusal by different routes, which is exactly the
+        // confusion this convention exists to prevent.
+        falseRejected: () => {
+            const [t] = validate({
+                ...minimal,
+                notEligibleForAnySubsidizedEmployerHealthPlanInAnyMonth: false,
+            })
+            assertEq(t, 'error')
+        },
+        // THE CONTROL. Every return that is not self-employed says nothing
+        // here, and a gate that made this required would refuse all of them.
+        absentValidates: () => {
+            const [t, v] = validate({ ...minimal })
+            assert(t === 'ok', ['expected ok', t, v])
+            assertEq(v.notEligibleForAnySubsidizedEmployerHealthPlanInAnyMonth, undefined)
         },
     },
     // TAX-37 (Form 8962): the two Premium Tax Credit facts no information

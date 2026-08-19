@@ -880,6 +880,10 @@ const fixtureSweepItemizedHash = 'sha256-tax-return-sweep-itemized'
 const fixtureSweepMedicalHash = 'sha256-tax-return-sweep-medical'
 const fixtureSweepAdjustmentProfileHash = 'sha256-tax-return-sweep-adjustment-profile'
 const fixtureSweepAdjustmentsHash = 'sha256-tax-return-sweep-adjustments'
+const fixtureHealthProfileHash = 'sha256-tax-return-7206-profile'
+const fixtureHealthNecHash = 'sha256-tax-return-7206-1099nec'
+const fixtureHealthBusinessHash = 'sha256-tax-return-7206-business'
+const fixtureHealthAdjustmentsHash = 'sha256-tax-return-7206-adjustments'
 const fixtureSweepStudentLoanHash = 'sha256-tax-return-sweep-1098e'
 const fixtureSweepIsoProfileHash = 'sha256-tax-return-sweep-iso-profile'
 const fixtureSweepIsoHash = 'sha256-tax-return-sweep-form3921'
@@ -938,6 +942,15 @@ const subjectSweepAdjustments = 'tax-return-subject-sweep-adjustments'
 const subjectSweepStudentLoan = 'tax-return-subject-sweep-1098e'
 const subjectSweepIsoProfile = 'tax-return-subject-sweep-iso-profile'
 const subjectSweepIso = 'tax-return-subject-sweep-form3921'
+
+// TAX-39's own four subjects — the §162(l) persona. A sole proprietor needs a
+// profile, a Form 1099-NEC, a `vnd.fjs.business_expenses` record (Schedule C
+// refuses without one) and the `vnd.fjs.adjustments` record carrying the
+// premium.
+const subjectHealthProfile = 'tax-return-subject-7206-profile'
+const subjectHealthNec = 'tax-return-subject-7206-1099nec'
+const subjectHealthBusiness = 'tax-return-subject-7206-business'
+const subjectHealthAdjustments = 'tax-return-subject-7206-adjustments'
 
 /** @type {Readonly<Record<string, EngineDocument | { readonly dialect: string, readonly taxYear?: number }>>} */
 const documentByHash = {
@@ -1513,6 +1526,64 @@ const documentByHash = {
         formRevision: '2025',
         box1StudentLoanInterestReceived: '1000.00',
     },
+    // Persona 8 (TAX-39): the self-employed filer who paid for their own
+    // health coverage. Four stored documents, and the deduction reaches 1040
+    // line 10 only if every one of them is routed, read and combined — which
+    // is what no form-level or schedule-level proof can show.
+    [fixtureHealthProfileHash]: {
+        dialect: returnProfileDialect,
+        taxYear: 2025,
+        filingStatus: 'single',
+        dependentCount: 0,
+        declaredKinds: [
+            'businessIncomeOrLoss', 'selfEmploymentTax', 'deductiblePartOfSelfEmploymentTax',
+            'qualifiedBusinessIncomeDeduction', 'selfEmployedHealthInsuranceDeduction',
+        ],
+        // §162(l)(2)(B). Without it `fjs/schedule/1` refuses the whole return,
+        // and `theHealthInsurancePersonaRefusesWithoutTheCertification` is the
+        // leaf that drives that side through this same rendering path.
+        notEligibleForAnySubsidizedEmployerHealthPlanInAnyMonth: true,
+    },
+    [fixtureHealthNecHash]: {
+        dialect: oneZeroNineNineNecDialect,
+        payerTin: '66-6666666',
+        recipientTin: '222-22-2222',
+        accountNumber: 'CLIENT-7206',
+        taxYear: 2025,
+        formRevision: '2025',
+        box1NonemployeeCompensation: '50000.00',
+    },
+    [fixtureHealthBusinessHash]: {
+        dialect: businessExpensesDialect,
+        recipientTin: '222-22-2222',
+        accountNumber: 'BUS-7206',
+        taxYear: 2025,
+        principalBusiness: 'software consulting',
+        grossReceiptsFullyReportedOnForms1099Nec: true,
+        priorYearQualifiedBusinessLossCarryforward: '0.00',
+        entries: [],
+    },
+    [fixtureHealthAdjustmentsHash]: {
+        dialect: adjustmentsDialect,
+        recipientTin: '222-22-2222',
+        taxYear: 2025,
+        entries: [
+            {
+                lineTag: 'selfEmployedHealthInsuranceMedicalDentalVision',
+                datePaid: '2025-07-01',
+                description: 'private family medical plan',
+                amount: '9600.00',
+                individual: 'taxpayer',
+            },
+            {
+                lineTag: 'selfEmployedLongTermCareAgeFiftyOneToSixty',
+                datePaid: '2025-07-01',
+                description: 'long-term care contract',
+                amount: '2400.00',
+                individual: 'taxpayer',
+            },
+        ],
+    },
     // Persona 5: the employee who exercised an incentive stock option and
     // held the shares. `alternativeMinimumTax` must be declared — the
     // tripwire fires on the DOCUMENT'S MERE PRESENCE, with no threshold,
@@ -1619,6 +1690,10 @@ const snapshotBySubject = {
     [subjectSweepStudentLoan]: fixtureSweepStudentLoanHash,
     [subjectSweepIsoProfile]: fixtureSweepIsoProfileHash,
     [subjectSweepIso]: fixtureSweepIsoHash,
+    [subjectHealthProfile]: fixtureHealthProfileHash,
+    [subjectHealthNec]: fixtureHealthNecHash,
+    [subjectHealthBusiness]: fixtureHealthBusinessHash,
+    [subjectHealthAdjustments]: fixtureHealthAdjustmentsHash,
 }
 
 /**
@@ -2654,6 +2729,51 @@ export const proof = {
                 renderedCents(result)('1040 line 12e'),
                 100000n,
                 '$1,000.00 over a 7.5%-of-nothing floor')
+        },
+        // ── TAX-39: the §162(l) deduction, from stored blobs to a rendered
+        // 1040 line ─────────────────────────────────────────────────────────
+        //
+        // Four documents, three dialects, one deduction. Hand-typed:
+        //
+        //   Schedule C line 31                                   50,000.00
+        //   Schedule 1 line 15 (Schedule SE line 13)              3,532.39
+        //   Form 7206 line 1                                      9,600.00
+        //   Form 7206 line 2 = min(2,400.00, 1,800.00)            1,800.00
+        //   Form 7206 line 14 = min(11,400.00, 46,467.61)        11,400.00
+        //   1040 line 10 = 3,532.39 + 11,400.00                  14,932.39
+        theSelfEmployedHealthInsuranceDeductionReachesLineTen: () => {
+            const result = runTwin([
+                subjectHealthProfile, subjectHealthAdjustments, subjectHealthNec,
+                subjectHealthBusiness,
+            ])
+            assert(result.kind === 'ok', ['expected a computed return', result])
+            if (result.kind !== 'ok') {
+                return
+            }
+            assertEq(
+                renderedCents(result)('1040 line 10'),
+                1493239n,
+                '$3,532.39 of §164(f) plus $11,400.00 of §162(l)')
+            // The long-term care CAP must have survived the whole path. An
+            // uncapped $2,400.00 would render $15,532.39, and only asserting
+            // the total above would not say which of the two halves was wrong.
+            assert(
+                renderedCents(result)('1040 line 10') !== 1553239n,
+                'the §213(d)(10) cap must not have been lost in the routing')
+        },
+        // THE CONTROL: the same four documents less the adjustments record.
+        // 1040 line 10 falls back to Schedule 1 line 15 alone, which is what
+        // says the $11,400.00 above came from the document rather than from
+        // anywhere else on this return.
+        theSameBusinessWithoutTheAdjustmentsRecordCarriesOnlyTheSectionOneSixFourFHalf: () => {
+            const result = runTwin([
+                subjectHealthProfile, subjectHealthNec, subjectHealthBusiness,
+            ])
+            assert(result.kind === 'ok', ['expected a computed return', result])
+            if (result.kind !== 'ok') {
+                return
+            }
+            assertEq(renderedCents(result)('1040 line 10'), 353239n, 'Schedule 1 line 15 alone')
         },
         // THE CONTROL for the two adjustment leaves.
         theAdjustmentProfileAloneComputesLineTenAtZero: () => {
