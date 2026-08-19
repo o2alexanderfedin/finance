@@ -49,18 +49,18 @@ import { emptyState, virtual } from 'functionalscript/fjs/effects/node/virtual/m
 import { sha256 } from 'functionalscript/fjs/crypto/sha2/module.f.mjs'
 import { error, ok } from 'functionalscript/fjs/types/result/module.f.mjs'
 import { array, record, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
-import { validate as rttiValidate } from 'functionalscript/fjs/types/rtti/validate/module.f.mjs'
+import { parse as rttiValidate } from 'functionalscript/fjs/types/rtti/parse/module.f.mjs'
 import { assert, assertEq, assertNotNullish } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { dialect as runDialect, validate as validateRun } from '../../run/module.f.js'
 import { applyWholeDollarElection } from '../line/module.f.js'
 import { centsFromString, centsToString, tryCentsFromString } from '../../exact/module.f.js'
 
-/** @import { Effect } from 'functionalscript/fjs/effects/module.f.mjs' */
-/** @import { Cas, FileCasOperation } from 'functionalscript/fjs/cas/module.f.mjs' */
-/** @import { Result } from 'functionalscript/fjs/types/result/module.f.mjs' */
+/** @import { Effect } from 'functionalscript/fjs/effects/types.js' */
+/** @import { Cas, FileCasOperation } from 'functionalscript/fjs/cas/types.js' */
+/** @import { Result } from 'functionalscript/fjs/types/result/types.js' */
 /** @import { Run, RunError } from '../../run/module.f.js' */
 /** @import { ReportLine, Source } from '../line/module.f.js' */
-/** @import { Ts, Unknown as RttiUnknown } from 'functionalscript/fjs/types/rtti/ts/module.f.mjs' */
+/** @import { Ts, Unknown as RttiUnknown } from 'functionalscript/fjs/types/rtti/ts/types.js' */
 
 // ── The stored result's wire shape ──────────────────────────────────────────
 //

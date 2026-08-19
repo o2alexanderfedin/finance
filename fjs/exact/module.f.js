@@ -17,7 +17,7 @@ import { parse, tryParse, format } from '../types/decimal/module.f.js'
 import { ofInt, multiply, of, halfUp } from '../types/rational/module.f.js'
 import { assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
 
-/** @import { Result } from 'functionalscript/fjs/types/result/module.f.mjs' */
+/** @import { Result } from 'functionalscript/fjs/types/result/types.js' */
 
 /**
  * This project's money scale: 2 fractional digits, i.e. cents.

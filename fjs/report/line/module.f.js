@@ -18,8 +18,8 @@ import { assert, assertEq, assertNotNullish } from 'functionalscript/fjs/asserts
 import { centsToString } from '../../exact/module.f.js'
 import { of, halfUp } from '../../types/rational/module.f.js'
 
-/** @import { Assert } from 'functionalscript/fjs/asserts/module.f.mjs' */
-/** @import { Equal } from 'functionalscript/fjs/types/ts/module.f.mjs' */
+/** @import { Assert } from 'functionalscript/fjs/asserts/types.js' */
+/** @import { Equal } from 'functionalscript/fjs/types/ts/types.js' */
 
 /**
  * One `(documentHash, boxPath, value)` tuple as a named object — greppable

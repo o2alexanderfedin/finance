@@ -80,10 +80,10 @@ import { dialect as itemizedDeductionsDialect, itemizedDeductionsSchema } from '
 import { dialect as priorYearCapitalLossDialect, priorYearCapitalLossSchema } from '../../document/prior_year_capital_loss/module.f.js'
 import { stringify as jsonText } from '../../json/module.f.js'
 
-/** @import { Type } from 'functionalscript/fjs/types/rtti/module.f.mjs' */
-/** @import { ToolEntry, ToolsCallResult } from 'functionalscript/fjs/protocol/mcp/module.f.mjs' */
-/** @import { Unknown as JsonUnknown } from 'functionalscript/fjs/media/json/module.f.mjs' */
-/** @import { StringMap } from 'functionalscript/fjs/types/object/module.f.mjs' */
+/** @import { Type } from 'functionalscript/fjs/types/rtti/types.js' */
+/** @import { ToolEntry, ToolsCallResult } from 'functionalscript/fjs/protocol/mcp/types.js' */
+/** @import { Unknown as JsonUnknown } from 'functionalscript/fjs/media/json/types.js' */
+/** @import { StringMap } from 'functionalscript/fjs/types/object/types.js' */
 
 /**
  * Every known document dialect tag, mapped to its OWN exported RTTI schema

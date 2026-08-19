@@ -17,8 +17,8 @@ import { match, do_, pure, step } from 'functionalscript/fjs/effects/module.f.mj
 import { ok, error } from 'functionalscript/fjs/types/result/module.f.mjs'
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
 
-/** @import { Effect, Operation, OperationMap, Return } from 'functionalscript/fjs/effects/module.f.mjs' */
-/** @import { Result } from 'functionalscript/fjs/types/result/module.f.mjs' */
+/** @import { Effect, Operation, OperationMap, Return } from 'functionalscript/fjs/effects/types.js' */
+/** @import { Result } from 'functionalscript/fjs/types/result/types.js' */
 
 // ── Test fixtures ───────────────────────────────────────────────────────────────
 

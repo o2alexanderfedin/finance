@@ -75,7 +75,7 @@ import { form1040Report } from '../../form1040/core/module.f.js'
 import { taxParamsByYear } from '../../tax/params/module.f.js'
 import { dialect as returnProfileDialect } from '../../return/profile/module.f.js'
 
-/** @import { Effect } from 'functionalscript/fjs/effects/module.f.mjs' */
+/** @import { Effect } from 'functionalscript/fjs/effects/types.js' */
 /** @import { CasOp } from '../module.f.js' */
 /** @import { TaxParamSet } from '../../tax/params/module.f.js' */
 /** @import { Form1040Inputs } from '../../form1040/core/module.f.js' */

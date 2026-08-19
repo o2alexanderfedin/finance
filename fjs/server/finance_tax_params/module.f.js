@@ -55,10 +55,10 @@ import { taxParamsByYear } from '../../tax/params/module.f.js'
 import { taxTableBandStructure } from '../../tax/table/module.f.js'
 import { stringify as jsonText } from '../../json/module.f.js'
 
-/** @import { ToolEntry, ToolsCallResult } from 'functionalscript/fjs/protocol/mcp/module.f.mjs' */
+/** @import { ToolEntry, ToolsCallResult } from 'functionalscript/fjs/protocol/mcp/types.js' */
 /** @import { TaxParamSet } from '../../tax/params/module.f.js' */
 /** @import { BandRegion } from '../../tax/table/module.f.js' */
-/** @import { StringMap } from 'functionalscript/fjs/types/object/module.f.mjs' */
+/** @import { StringMap } from 'functionalscript/fjs/types/object/types.js' */
 
 /**
  * The shape `finance_tax_params` actually returns: every Plan 08-01

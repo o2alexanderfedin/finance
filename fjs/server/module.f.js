@@ -64,7 +64,7 @@ import { emptyState, virtual } from 'functionalscript/fjs/effects/node/virtual/m
 import { fromVec } from 'functionalscript/fjs/types/uint8array/module.f.mjs'
 import { utf8 } from 'functionalscript/fjs/text/module.f.mjs'
 import { array, option, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
-import { validate as rttiValidate } from 'functionalscript/fjs/types/rtti/validate/module.f.mjs'
+import { parse as rttiValidate } from 'functionalscript/fjs/types/rtti/parse/module.f.mjs'
 import { assert, assertEq, assertNotNullish } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { dialect as revisionDialect } from 'functionalscript/fjs/media/revision/module.f.mjs'
 import { cBase32ToVec, vecToCBase32 } from 'functionalscript/fjs/basen/cbase32/module.f.mjs'
@@ -85,19 +85,19 @@ import { dialect as oneZeroNineNineIntDialect, validate as validateOneZeroNineNi
 import { parse as jsonParse, stringify as jsonText } from '../json/module.f.js'
 import { unwrap } from 'functionalscript/fjs/types/result/module.f.mjs'
 
-/** @import { McpConfig, McpHandlers, ToolEntry } from 'functionalscript/fjs/protocol/mcp/module.f.mjs' */
-/** @import { Effect, Operation } from 'functionalscript/fjs/effects/module.f.mjs' */
-/** @import { MemOp, Key } from 'functionalscript/fjs/effects/memory/module.f.mjs' */
-/** @import { Read, Write, Mkdir, WriteFile, Import } from 'functionalscript/fjs/effects/node/module.f.mjs' */
-/** @import { FileCasOperation } from 'functionalscript/fjs/cas/module.f.mjs' */
-/** @import { Cache } from 'functionalscript/fjs/cas/evo/module.f.mjs' */
-/** @import { Cas } from 'functionalscript/fjs/cas/module.f.mjs' */
-/** @import { Unknown } from 'functionalscript/fjs/media/json/module.f.mjs' */
-/** @import { Result } from 'functionalscript/fjs/types/result/module.f.mjs' */
-/** @import { ValidationError } from 'functionalscript/fjs/types/rtti/validate/module.f.mjs' */
-/** @import { Vec } from 'functionalscript/fjs/types/bit_vec/module.f.mjs' */
+/** @import { McpConfig, McpHandlers, ToolEntry } from 'functionalscript/fjs/protocol/mcp/types.js' */
+/** @import { Effect, Operation } from 'functionalscript/fjs/effects/types.js' */
+/** @import { MemOp, Key } from 'functionalscript/fjs/effects/memory/types.js' */
+/** @import { Read, Write, Mkdir, WriteFile, Import } from 'functionalscript/fjs/effects/node/types.js' */
+/** @import { FileCasOperation } from 'functionalscript/fjs/cas/types.js' */
+/** @import { Cache } from 'functionalscript/fjs/cas/evo/types.js' */
+/** @import { Cas } from 'functionalscript/fjs/cas/types.js' */
+/** @import { Unknown } from 'functionalscript/fjs/media/json/types.js' */
+/** @import { Result } from 'functionalscript/fjs/types/result/types.js' */
+/** @import { ValidationError } from 'functionalscript/fjs/types/rtti/parse/types.js' */
+/** @import { Vec } from 'functionalscript/fjs/types/bit_vec/types.js' */
 /** @import { Report, CasOp } from '../guest/module.f.js' */
-/** @import { State } from 'functionalscript/fjs/effects/node/virtual/module.f.mjs' */
+/** @import { State } from 'functionalscript/fjs/effects/node/virtual/types.js' */
 
 // ── cas_refresh (DOC-14) ────────────────────────────────────────────────────────
 /**

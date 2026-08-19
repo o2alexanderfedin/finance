@@ -126,10 +126,10 @@ import { interpret } from '../../../exec/module.f.js'
 import { guestCtx } from '../../../guest/module.f.js'
 import { stringify as jsonText } from '../../../json/module.f.js'
 
-/** @import { Effect, Operation, OperationMap } from 'functionalscript/fjs/effects/module.f.mjs' */
-/** @import { MemOp } from 'functionalscript/fjs/effects/memory/module.f.mjs' */
-/** @import { Cas } from 'functionalscript/fjs/cas/module.f.mjs' */
-/** @import { Evo } from 'functionalscript/fjs/cas/evo/module.f.mjs' */
+/** @import { Effect, Operation, OperationMap } from 'functionalscript/fjs/effects/types.js' */
+/** @import { MemOp } from 'functionalscript/fjs/effects/memory/types.js' */
+/** @import { Cas } from 'functionalscript/fjs/cas/types.js' */
+/** @import { Evo } from 'functionalscript/fjs/cas/evo/types.js' */
 /** @import { CasOp } from '../../../guest/module.f.js' */
 
 // ── RunSnapshot: the whole reachable store, resolved before interpret runs ───

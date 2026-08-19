@@ -74,9 +74,9 @@ import { internalError, jsonrpc } from 'functionalscript/fjs/protocol/json_rpc/m
 import { parse as jsonParse } from '../../json/module.f.js'
 import { unwrap } from 'functionalscript/fjs/types/result/module.f.mjs'
 
-/** @import { Vec } from 'functionalscript/fjs/types/bit_vec/module.f.mjs' */
-/** @import { McpConfig, ToolEntry } from 'functionalscript/fjs/protocol/mcp/module.f.mjs' */
-/** @import { State } from 'functionalscript/fjs/effects/node/virtual/module.f.mjs' */
+/** @import { Vec } from 'functionalscript/fjs/types/bit_vec/types.js' */
+/** @import { McpConfig, ToolEntry } from 'functionalscript/fjs/protocol/mcp/types.js' */
+/** @import { State } from 'functionalscript/fjs/effects/node/virtual/types.js' */
 
 /**
  * The inline-preview threshold (8 KiB, in bytes): a result whose UTF-8

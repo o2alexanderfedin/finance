@@ -92,3 +92,83 @@ the report the upstream author asked for.
 
 This note is deleted when `package.json` declares `^0.46.0`, `npm test` is green on it, and the
 report the upstream author asked for is written. Nothing here is retired by a passing suite alone.
+
+## Stages 1 and 2, done and measured (2026-08-18)
+
+`tsc`: **0** on 0.43.1 -> **1526** on 0.46.0 untouched -> **629** after the specifier rewrite ->
+**513** after the two relocation classes. The 1526 and the 630/629 both reproduce the measurement
+above, and so does its distribution, to the error: 170 / 73 / 49 / 29.
+
+**Every measurement above was taken from OUTSIDE the checkout**, for a reason now written into
+AGENTS.md: a worktree lives inside its parent checkout, TypeScript searches ancestor
+`node_modules` preferring `.d.ts`, 0.46.0 ships only `.d.mts` — so an in-worktree `npx tsc`
+silently typechecks the PARENT's 0.43.1 and reports **0 errors** on a tree whose real count is
+1526. A green typecheck was the first result this migration produced, and it was false.
+
+### `rtti/validate` -> `rtti/parse`, confirmed against the shipped declarations
+
+- `rtti/parse/module.f.d.mts` declares `parse: <T extends Type>(rtti: T) => Parse<T>` and
+  `parse/types.d.ts` declares `Parse<T> = Validate<T>` — **the same signature** old `validate`
+  had. All 31 of our call sites pass a thunk/const schema and want the typed result, so `parse`
+  is the successor for every one of them.
+- `rtti/data`'s `validate` is NOT the successor despite the name: it takes a `Data` (from
+  `toData`), not a `Type`, and returns the erased `ResultE`. Adopting it would have cost a cast
+  at every call site — forbidden here, and the exact failure mode that made 0.45 unconsumable.
+- `rtti/common` is the shared kernel. `ValidationError` lives in `common/types.d.ts` and is
+  re-exported by `parse/types.d.ts`; we import it from `parse/types.js`, beside the function
+  whose error channel it is.
+
+**One semantic difference, deliberately accepted.** Old `validate` returned the value it was
+given; `parse` returns a freshly constructed value carrying only the fields the schema declares.
+Structs and tuples stay open on the way IN — an extra field is still accepted — so no document
+that validated before is refused now. What changes is the way OUT: undeclared fields are absent
+from the result. Every call site here reads only declared fields, so nothing observable moves;
+recorded because a future call site that forwards a validated value wholesale would.
+
+### The `types.ts` convention, consumed but not adopted
+
+226 type-import names across our sources, and **not one of them is still exported from a
+`module.f.mjs`** — the relocation is total, not partial, and no import line mixes a moved name
+with a staying one. So the rewrite is one rule: a type comes from the sibling, a value from the
+module.
+
+The specifier we write is **`types.js`, not `types.ts`**. Upstream's own sources say `./types.ts`
+because their tsconfig sets `allowImportingTsExtensions`; ours deliberately does not (see the
+`tsconfig.json` comment). Under `nodenext`, `types.js` strips to `types.ts` / `types.d.ts` and
+binds to the shipped `types.d.ts`. Every such specifier here sits in a JSDoc `@import`, so it is
+erased before runtime and no `types.js` is ever fetched — verified: no `import` statement in the
+project names one.
+
+A third, smaller relocation turned up in the residue: the rtti schema VALUES `primitive`,
+`unknown`, `object` and `array` left `media/json/module.f.mjs` for `media/json/rtti/module.f.mjs`.
+One call site, `fjs/server/fjs_run`.
+
+**We consume the convention; we have not adopted it for our own types.** That is the owner's
+call, and the upstream author's suggestion is recorded here rather than acted on.
+
+### What is left is the Effect system, and only that
+
+513 errors, and every sampled one is `Effect<O, T, E>`, the `Result<T, E>` an effect now returns,
+the tightened `Operation` constraint, or `NotImplemented` / `IoChannel` reaching a place that used
+to hold a bare value:
+
+| Module | Errors |
+|---|---|
+| `fjs/server/fjs_run` | 202 |
+| `fjs/server/fjs_run/snapshot` | 90 |
+| `fjs/exec` | 42 |
+| `fjs/server` | 30 |
+| `fjs/server/finance_documents_list` | 24 |
+| `fjs/report/amend` | 21 |
+| `demo/steps` | 18 |
+| `fjs/guest` + `check` + `materialize` + `tax` | 44 |
+| `fjs/report/payer` / `tax_return` / `provenance` | 27 |
+| `fjs/server/response` / `finance_schema` / `finance_tax_params` | 13 |
+| `fjs/index.f.js` | 2 |
+
+`fjs/exec` rose from 13 to 42 and `fjs_run` from 170 to 202 across stage 2. That is the right
+direction: while the type imports were broken those positions were `any`-shaped and the compiler
+had nothing to complain about. Fixing the imports is what made the Effect mismatches visible.
+
+`fjs/exec`'s `try` is untouched — removing it is the Effect-refusal change, and it belongs to the
+same stage as the rest of `fjs/exec`.

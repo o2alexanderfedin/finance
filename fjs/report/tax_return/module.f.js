@@ -174,7 +174,7 @@ import { dialect as k1PartnershipDialect } from '../../document/k1_1065/module.f
 import { dialect as k1SCorporationDialect } from '../../document/k1_1120s/module.f.js'
 import { dialect as k1EstateTrustDialect } from '../../document/k1_1041/module.f.js'
 
-/** @import { Effect, OperationMap } from 'functionalscript/fjs/effects/module.f.mjs' */
+/** @import { Effect, OperationMap } from 'functionalscript/fjs/effects/types.js' */
 /** @import { CasOp } from '../../guest/module.f.js' */
 /** @import { TaxReport } from '../../guest/tax/module.f.js' */
 /** @import { Stored } from '../../form1040/core/module.f.js' */

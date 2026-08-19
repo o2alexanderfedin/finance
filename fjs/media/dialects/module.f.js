@@ -220,7 +220,7 @@ import {
     checkReferences as checkBasisCorrection,
 } from '../../document/basis_correction/module.f.js'
 
-/** @import { DialectEntry } from 'functionalscript/fjs/media/module.f.mjs' */
+/** @import { DialectEntry } from 'functionalscript/fjs/media/types.js' */
 
 /**
  * Every one of this repo's own dialects, registered for {@link detect}: the
@@ -278,7 +278,7 @@ export const financeDialects = [
  * `detect`, closed over {@link financeDialects} — the one function
  * `fjs/server/module.f.js`'s `cas_refresh` calls to classify a raw CAS blob
  * against every dialect this repo knows about.
- * @type {(bytes: import('functionalscript/fjs/types/bit_vec/module.f.mjs').Vec) => import('functionalscript/fjs/media/type/module.f.mjs').DetectMeta}
+ * @type {(bytes: import('functionalscript/fjs/types/bit_vec/types.js').Vec) => import('functionalscript/fjs/media/type/types.js').DetectMeta}
  */
 export const detectFinance = detect(financeDialects)
 

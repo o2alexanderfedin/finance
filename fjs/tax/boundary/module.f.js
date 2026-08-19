@@ -42,7 +42,7 @@ import { taxParamsByYear, allFilingStatuses } from '../params/module.f.js'
 import { taxTableBandStructure } from '../table/module.f.js'
 
 /** @import { Bracket } from '../params/module.f.js' */
-/** @import { StringMap } from 'functionalscript/fjs/types/object/module.f.mjs' */
+/** @import { StringMap } from 'functionalscript/fjs/types/object/types.js' */
 
 /**
  * A pure, generic, tax-agnostic boundary counter: given a sorted-ascending list of boundary

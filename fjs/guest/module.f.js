@@ -43,9 +43,9 @@ import { assert, assertEq, assertNotNullish } from 'functionalscript/fjs/asserts
 import { interpret } from '../exec/module.f.js'
 import { centsFromString, centsToString } from '../exact/module.f.js'
 
-/** @import { Effect, OperationMap } from 'functionalscript/fjs/effects/module.f.mjs' */
-/** @import { Assert } from 'functionalscript/fjs/asserts/module.f.mjs' */
-/** @import { Equal } from 'functionalscript/fjs/types/ts/module.f.mjs' */
+/** @import { Effect, OperationMap } from 'functionalscript/fjs/effects/types.js' */
+/** @import { Assert } from 'functionalscript/fjs/asserts/types.js' */
+/** @import { Equal } from 'functionalscript/fjs/types/ts/types.js' */
 
 // ── The frozen vocabulary ────────────────────────────────────────────────────
 

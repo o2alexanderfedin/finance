@@ -39,7 +39,7 @@ import { identity } from 'functionalscript/fjs/types/function/module.f.mjs'
 import { unwrap } from 'functionalscript/fjs/types/result/module.f.mjs'
 import { assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
 
-/** @import { Unknown } from 'functionalscript/fjs/media/json/module.f.mjs' */
+/** @import { Unknown } from 'functionalscript/fjs/media/json/types.js' */
 
 export { parse }
 

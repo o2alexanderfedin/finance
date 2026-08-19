@@ -65,9 +65,9 @@ import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { guestCtx } from '../module.f.js'
 import { interpret } from '../../exec/module.f.js'
 
-/** @import { Effect, OperationMap } from 'functionalscript/fjs/effects/module.f.mjs' */
-/** @import { Import, Module, Mkdir, WriteFile } from 'functionalscript/fjs/effects/node/module.f.mjs' */
-/** @import { Result } from 'functionalscript/fjs/types/result/module.f.mjs' */
+/** @import { Effect, OperationMap } from 'functionalscript/fjs/effects/types.js' */
+/** @import { Import, Module, Mkdir, WriteFile } from 'functionalscript/fjs/effects/node/types.js' */
+/** @import { Result } from 'functionalscript/fjs/types/result/types.js' */
 /** @import { CasOp, Report } from '../module.f.js' */
 
 // ── SEC-02: the specifier allow-list ─────────────────────────────────────────

@@ -126,8 +126,9 @@ import { sha256 } from 'functionalscript/fjs/crypto/sha2/module.f.mjs'
 import { initEvo, evo } from 'functionalscript/fjs/cas/evo/module.f.mjs'
 import { emptyState, virtual } from 'functionalscript/fjs/effects/node/virtual/module.f.mjs'
 import { assert, assertEq, assertNotNullish } from 'functionalscript/fjs/asserts/module.f.mjs'
-import { validate as rttiValidate } from 'functionalscript/fjs/types/rtti/validate/module.f.mjs'
-import { unknown as jsonUnknown, stringify as jsonStringify } from 'functionalscript/fjs/media/json/module.f.mjs'
+import { parse as rttiValidate } from 'functionalscript/fjs/types/rtti/parse/module.f.mjs'
+import { stringify as jsonStringify } from 'functionalscript/fjs/media/json/module.f.mjs'
+import { unknown as jsonUnknown } from 'functionalscript/fjs/media/json/rtti/module.f.mjs'
 import { identity } from 'functionalscript/fjs/types/function/module.f.mjs'
 import { interpret } from '../../exec/module.f.js'
 import { countNumericLiterals } from '../../report/audit/module.f.js'
@@ -146,23 +147,23 @@ import { vec8, length as bitLength } from 'functionalscript/fjs/types/bit_vec/mo
 import { parse } from 'functionalscript/fjs/path/module.f.mjs'
 import { stringify as jsonText } from '../../json/module.f.js'
 
-/** @import { Effect, Operation } from 'functionalscript/fjs/effects/module.f.mjs' */
-/** @import { MemOp } from 'functionalscript/fjs/effects/memory/module.f.mjs' */
-/** @import { Mkdir, WriteFile, Import } from 'functionalscript/fjs/effects/node/module.f.mjs' */
-/** @import { Cas, FileCasOperation } from 'functionalscript/fjs/cas/module.f.mjs' */
-/** @import { Evo } from 'functionalscript/fjs/cas/evo/module.f.mjs' */
-/** @import { ToolEntry, ToolsCallResult } from 'functionalscript/fjs/protocol/mcp/module.f.mjs' */
-/** @import { Vec } from 'functionalscript/fjs/types/bit_vec/module.f.mjs' */
+/** @import { Effect, Operation } from 'functionalscript/fjs/effects/types.js' */
+/** @import { MemOp } from 'functionalscript/fjs/effects/memory/types.js' */
+/** @import { Mkdir, WriteFile, Import } from 'functionalscript/fjs/effects/node/types.js' */
+/** @import { Cas, FileCasOperation } from 'functionalscript/fjs/cas/types.js' */
+/** @import { Evo } from 'functionalscript/fjs/cas/evo/types.js' */
+/** @import { ToolEntry, ToolsCallResult } from 'functionalscript/fjs/protocol/mcp/types.js' */
+/** @import { Vec } from 'functionalscript/fjs/types/bit_vec/types.js' */
 /** @import { CasOp, Report } from '../../guest/module.f.js' */
 /** @import { TaxReport } from '../../guest/tax/module.f.js' */
 /** @import { TaxParamSet } from '../../tax/params/module.f.js' */
 /** @import { ReturnProfile } from '../../return/profile/module.f.js' */
-/** @import { State, Dir, JsModule } from 'functionalscript/fjs/effects/node/virtual/module.f.mjs' */
+/** @import { State, Dir, JsModule } from 'functionalscript/fjs/effects/node/virtual/types.js' */
 /** @import { Run } from '../../run/module.f.js' */
 /** @import { RunOutcome } from '../../report/guard/module.f.js' */
 /** @import { ReportLine } from '../../report/line/module.f.js' */
-/** @import { Unknown as JsonUnknown } from 'functionalscript/fjs/media/json/module.f.mjs' */
-/** @import { Ts, Unknown as RttiUnknown } from 'functionalscript/fjs/types/rtti/ts/module.f.mjs' */
+/** @import { Unknown as JsonUnknown } from 'functionalscript/fjs/media/json/types.js' */
+/** @import { Ts, Unknown as RttiUnknown } from 'functionalscript/fjs/types/rtti/ts/types.js' */
 
 // ── executeRun ────────────────────────────────────────────────────────────────
 //

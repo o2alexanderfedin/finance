@@ -46,11 +46,11 @@ import { emptyState, virtual } from 'functionalscript/fjs/effects/node/virtual/m
 import { materializeProgram, loadProgram, materializeHome, programPath } from '../materialize/module.f.js'
 import { guestCtx } from '../module.f.js'
 
-/** @import { Effect, Operation } from 'functionalscript/fjs/effects/module.f.mjs' */
-/** @import { Mkdir, WriteFile, Import } from 'functionalscript/fjs/effects/node/module.f.mjs' */
-/** @import { Cas, FileCasOperation } from 'functionalscript/fjs/cas/module.f.mjs' */
-/** @import { Result } from 'functionalscript/fjs/types/result/module.f.mjs' */
-/** @import { State, Dir, JsModule } from 'functionalscript/fjs/effects/node/virtual/module.f.mjs' */
+/** @import { Effect, Operation } from 'functionalscript/fjs/effects/types.js' */
+/** @import { Mkdir, WriteFile, Import } from 'functionalscript/fjs/effects/node/types.js' */
+/** @import { Cas, FileCasOperation } from 'functionalscript/fjs/cas/types.js' */
+/** @import { Result } from 'functionalscript/fjs/types/result/types.js' */
+/** @import { State, Dir, JsModule } from 'functionalscript/fjs/effects/node/virtual/types.js' */
 /** @import { Report } from '../module.f.js' */
 
 // ── fjsCheck ─────────────────────────────────────────────────────────────────

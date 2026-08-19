@@ -46,7 +46,7 @@ import { centsFromString } from '../../exact/module.f.js'
 import { taxParamsByYear } from '../params/module.f.js'
 
 /** @import { IndividualFilingStatus, TaxParamSet } from '../params/module.f.js' */
-/** @import { StringMap } from 'functionalscript/fjs/types/object/module.f.mjs' */
+/** @import { StringMap } from 'functionalscript/fjs/types/object/types.js' */
 
 /**
  * Which of `fjs/tax/params`' two aged/blind additional amounts a filing

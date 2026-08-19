@@ -439,8 +439,8 @@
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { kindVocabulary } from '../profile/module.f.js'
 
-/** @import { Assert } from 'functionalscript/fjs/asserts/module.f.mjs' */
-/** @import { Equal } from 'functionalscript/fjs/types/ts/module.f.mjs' */
+/** @import { Assert } from 'functionalscript/fjs/asserts/types.js' */
+/** @import { Equal } from 'functionalscript/fjs/types/ts/types.js' */
 /** @import { Kind } from '../profile/module.f.js' */
 
 // ── The frozen modeled set ───────────────────────────────────────────────────

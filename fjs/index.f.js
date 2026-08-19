@@ -1,7 +1,7 @@
 import { pure, step } from 'functionalscript/fjs/effects/module.f.mjs'
 import { financeMcpServer } from './server/module.f.js'
 
-/** @import { NodeProgram } from 'functionalscript/fjs/effects/node/module.f.mjs' */
+/** @import { NodeProgram } from 'functionalscript/fjs/effects/node/types.js' */
 
 /**
  * `options.args[0]` is the CAS/Evo store home path an invoker supplies —
