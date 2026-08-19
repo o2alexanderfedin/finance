@@ -66,9 +66,9 @@ Two figures worth knowing, both computed by the engine on real fixtures:
 The engine **refuses rather than guessing** wherever it cannot compute honestly. Each refusal names
 the form or the facts that would supply it.
 
-**The refusal surface is a partition, checked at `tsc`:** every one of **195 income, deduction,
+**The refusal surface is a partition, checked at `tsc`:** every one of **197 income, deduction,
 credit and payment kinds** is either modeled or carries a refusal naming what is missing —
-**54 modeled, 141 refused**, and `_EveryKindIsEitherModeledOrRefused` fails the build if a kind
+**54 modeled, 143 refused**, and `_EveryKindIsEitherModeledOrRefused` fails the build if a kind
 falls in neither. Re-derive with `modeledKinds.length` / `unmodeledKindRefusals.length` in
 `fjs/return/scope`.
 
@@ -86,8 +86,17 @@ left.
 It fell again, 142 → 141, and the modeled half rose 53 → 54, when Schedule E Part I made
 `rentalRealEstateAndRoyalties` computable at Schedule 1 line 5. **A second single kind moved
 across the same partition**, on the same terms and for the same reason: the wiring landed first
-and the reclassification rode with it. The vocabulary is still the 195 the split left — neither
-reclassification invented or retired a kind — and 54 + 141 = 195.
+and the reclassification rode with it. Neither reclassification invented or retired a kind.
+
+Then it rose 141 → 143 and the **vocabulary itself grew, 195 → 197**, when Form 6781 Part I
+wired Form 1099-B box 11 onto Schedule D lines 4 and 11 under §1256(a)(3)'s 60/40 split. This is
+the opposite move from the two above and worth distinguishing: **nothing was reclassified**, and
+the modeled half did not change. The two new kinds — `straddleGainsAndLosses` and
+`netSectionTwelveFiftySixContractsLossCarryback` — name the parts of Form 6781 that remain
+uncomputable (Parts II and III need per-position records no information return carries; the box D
+election needs three prior years' returns), and they exist because §1256 contracts had **no kind
+at all** before that wiring: a futures trader fell through the scope guard entirely. Adding a
+refused kind where there was silence is a gain in honesty, not a loss of coverage. 54 + 143 = 197.
 
 The conditional refusals — the ones that fire on a taxpayer whose kinds are all modeled:
 
