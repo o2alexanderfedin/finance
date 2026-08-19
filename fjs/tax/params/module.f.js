@@ -3360,6 +3360,49 @@ export const longTermCarePremiumLimits = [
     },
 ]
 
+/**
+ * §911's foreign earned income exclusion — Form 2555 line 37, TAX-42.
+ *
+ * **Two members, and the second has no authority to cite.** Form 2555 line 39
+ * divides the qualifying-day count by *"the number of days in your 2025 tax
+ * year (usually 365)"*, which is a fact about the calendar rather than a
+ * figure any Revenue Procedure or Code section sets — so {@link daysInTaxYear}
+ * is a bare `number` beside a cited {@link AmountWithCitation}, the shape
+ * `TaxParamSet`'s own `taxYear` already uses.
+ *
+ * It is STORED, keyed by the year like everything else in this map, rather
+ * than computed from the year number. A leap-year branch over a year is
+ * precisely the hardcoded-year comparison `year-genericity-gate` forbids, and
+ * `vnd.fjs.rental_property`'s `daysInTheLongestYear = 366` already records
+ * that this project does no calendar arithmetic anywhere.
+ *
+ * ## What is deliberately NOT here
+ *
+ * §911(c)'s housing figures — the 16% base housing amount ($20,800 full year,
+ * $56.99 daily) and the 30% general limitation on housing expenses ($39,000
+ * full year, $106.85 daily), both restated in Notice 2025-16 §2 — are absent
+ * because **nothing reads them**: `foreignHousingExclusionOrDeduction` is a
+ * refused `fjs/return/scope` kind, so Form 2555 Parts VI and IX never run.
+ *
+ * That is a decision rather than an omission, and the reason is worth stating
+ * where the next reader will look for the numbers. Notice 2025-16 §3 raises
+ * the 30% limit for roughly two hundred named locations *"in lieu of the
+ * otherwise applicable limitation of $39,000"*, and that table has **no
+ * compact derivation**: its daily column is its own full-year column over 365,
+ * but the full-year column is survey output under §911(c)(2)(B) and is a
+ * function of nothing stored. Storing the general limit alone, with two
+ * hundred locations silently capped at it, is the partial table AGENTS.md says
+ * to refuse rather than ship. See
+ * `fjs/form2555/todo/foreign-earned-income.md` §3.
+ */
+export const foreignEarnedIncome = {
+    maximumExclusion: {
+        amount: '130000.00',
+        citation: { kind: 'revProc', revProc: 'Rev. Proc. 2024-40', section: '§2.39', effectiveDate: '2025-01-01' },
+    },
+    daysInTaxYear: 365,
+}
+
 
 /**
  * A full tax-year parameter set: every TY2025 parameter this phase
@@ -3423,6 +3466,7 @@ export const longTermCarePremiumLimits = [
  *   readonly dependentCareAssistanceExclusionLimit: typeof dependentCareAssistanceExclusionLimit,
  *   readonly dependentCareDeemedEarnedIncomePerMonth: typeof dependentCareDeemedEarnedIncomePerMonth,
  *   readonly longTermCarePremiumLimits: typeof longTermCarePremiumLimits,
+ *   readonly foreignEarnedIncome: typeof foreignEarnedIncome,
  * }} TaxParamSet
  */
 
@@ -3475,6 +3519,7 @@ export const taxParamsByYear = {
         dependentCareAssistanceExclusionLimit,
         dependentCareDeemedEarnedIncomePerMonth,
         longTermCarePremiumLimits,
+        foreignEarnedIncome,
     },
 }
 
@@ -3639,6 +3684,7 @@ const everyDollarStringField = [
     dependentCareAssistanceExclusionLimit.marriedFilingSeparately.amount,
     dependentCareDeemedEarnedIncomePerMonth.oneQualifyingPerson.amount,
     dependentCareDeemedEarnedIncomePerMonth.twoOrMoreQualifyingPersons.amount,
+    foreignEarnedIncome.maximumExclusion.amount,
 ]
 
 export const proof = {

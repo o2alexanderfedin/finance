@@ -680,9 +680,13 @@ so they are scheduled rather than remembered. All are T3 — none blocks the v1 
 measured the engine against four taxpayers: a retiree, a non-profit employee, a FAANG engineer
 and a startup founder. At the time of that survey, one of the four was supported, one computed a *wrong* return, and two refused. **All four now compute** — see the v2 traceability table below. The present-tense sentence stood here until 2026-08-17, after every phase that fixed it had shipped.
 
-**These 29 requirements are counted separately from v1's 95** and do not move v1's completion
+**These 32 requirements are counted separately from v1's 95** and do not move v1's completion
 figure. (This read 25 until 2026-08-19, when TAX-36 through TAX-39 — coined in code and traced
-nowhere — were retrofitted into their own section below.) v1 remains what it always was: a 65+ TY2025 return with brokerage, dependents and
+nowhere — were retrofitted into their own section below, 29 until Form 461 and Form 4797 landed
+as TAX-40 and TAX-41, and 31 until Form 2555 landed as TAX-42. **It said 29 through both of the
+first two**, because each of those branches moved the derived figure in the footer below and not
+this sentence; re-deriving during this integration is what caught it, which is the whole argument
+for the command block at the end of this section.) v1 remains what it always was: a 65+ TY2025 return with brokerage, dependents and
 itemizing, which is complete, the eight MAINT items included — MAINT-01 through MAINT-06 closed on 2026-08-17 and MAINT-07/08 in Phase 18. (This read "apart from the eight open MAINT items" until they were all closed.)
 
 > **Read the ordering constraint before planning any of this.** TAX-19 (computable tripwires)
@@ -1634,6 +1638,77 @@ cheap. Neither is retconned — this paragraph is the history.
       a register bound to a stored farm (§1231(b)(3) livestock holding periods and §1252
       farmland), and a §1231 gain on a return that files no Schedule D.
 
+### Form 2555 (TAX-42) — the THIRD `TAX-40` collision, and the most expensive to split
+
+`feature/form-2555-impl` coined **`TAX-40`** for Form 2555 on 2026-08-19, on a branch cut from
+`5d5fb7f` — the same commit `feature/form-4797-impl` was cut from, and for the same reason:
+neither Form 461's `TAX-40` nor Form 4797's existed on any branch it could see. Three separate
+works therefore coined one ID on one day, on three branches with no common descendant. That is
+not three mistakes; it is one missing registry, consulted three times too late.
+
+**This one is split too, and the cost was measured before the decision rather than after it.**
+It is **88 citations across 23 files** — six times TAX-41's fourteen across six, and half again
+the 61 across fourteen that TAX-38 declined. Eighty-five were renumbered mechanically; the other
+three are this document's own, rewritten by hand into the record you are reading. Three things decided it anyway, and the first is
+the one that matters:
+
+- **Not splitting is not on offer.** TAX-38 could record one ID over two forms because neither
+  entry had been written yet, so one entry could honestly describe both. Here `TAX-40` already
+  carries a written body for Form 461 on the trunk. Keeping the ID would mean either two
+  `- [x] **TAX-40**` entries in this document — which the `uniq -d` command below rejects and
+  `planning-truth-gate.test.js` fails on — or fusing §461(l) and §911 into one entry that
+  shares nothing. TAX-38 *recorded* a collision that had already happened; doing the same here
+  would *manufacture* one.
+- **The size of TAX-38's number was never the deciding fact — its ambiguity was.** Six of those
+  61 citations named both forms, so each had to be read rather than substituted. **None of these
+  88 names Form 461 or Form 4797.** Only three files carry a `TAX-40` from more than one of the
+  three works at all — `.planning/REQUIREMENTS.md`, `CHANGELOG.md` and
+  `fjs/schedule/1/module.f.js` — and in all three the two sets are disjoint paragraphs about
+  disjoint statutes. TAX-38's other reason, *"two live branches are editing those files right
+  now"*, has also expired: this is the integration it named as the payer.
+- **The newcomer renumbers, by the rule TAX-41 set one section ago.** Form 461 keeps `TAX-40`
+  because it was on the trunk first; Form 4797 took `TAX-41` for the same reason; Form 2555,
+  integrated last and built on by nothing, takes **`TAX-42`**.
+
+So the three collisions are now recorded three different ways, each with its reason on the page:
+TAX-38 records the tree's real state because splitting it was unsafe, TAX-41 splits because it
+was cheap, and TAX-42 splits because the alternative had stopped existing. None is retconned —
+the traceability row below states the ID this work coined and who renumbered it, exactly as
+TAX-41's does.
+
+- [x] **TAX-42** *(M2, T3)*: **Form 2555 — the foreign earned income exclusion, §911** — Parts V,
+      VII and VIII computed, reaching Schedule 1 line 8d → 1040 line 8, and repricing 1040 line 16
+      through the **Foreign Earned Income Tax Worksheet** (§911(f)'s stacking rule). Spec:
+      `fjs/form2555/todo/foreign-earned-income.md`.
+
+      **Delivered.** `foreignEarnedIncomeForm2555` — one row naming three printed destinations —
+      splits into FIVE, one modelled and four refused by name, and the split is the finding:
+      the three destinations had three different blockers, so a filer with no housing claim was
+      being refused by a row about a table they never needed. (**This entry read "four, one
+      modelled and three refused" until the integration re-derived it**, while CHANGELOG.md on
+      the same branch said five — the live table holds `foreignEarnedIncomeExclusion` modelled
+      beside `foreignEarnedIncomeBonaFideResidenceTest`, `foreignHousingExclusionOrDeduction`,
+      `foreignEarnedIncomeReceivedInAnotherTaxYear` and `foreignEarnedIncomeCapitalGainExcess`.
+      The refused count moving `142 -> 145` for a split that removes one row and adds four is
+      the arithmetic that gives it away, and nothing gated either sentence.)
+
+      **The two qualifying tests are settled differently, and that asymmetry is the point.**
+      Physical presence (§911(d)(1)(B)) is a COUNT and becomes a profile certification,
+      deliberately narrower than the statute on its tax-home half. Bona fide residence
+      (§911(d)(1)(A)) turns on *intent*, and i2555's own instruction says a taxpayer's words lose
+      to their acts — so it is not certifiable at all and refuses.
+
+      **The stacking rule is implemented rather than approximated**, and it is the requirement's
+      whole risk: taxing only the remaining income under-taxes, silently, in the taxpayer's
+      favour. `fjs/tax/line16`'s level-0a wrapper re-enters its own levels 1-3 with the
+      worksheet's line 3, exactly as the printed page instructs, and refuses the one corner the
+      page sends to a second modified worksheet (a capital gain excess). The alternative minimum
+      tax's own Foreign Earned Income Tax Worksheet refuses where Form 6251 line 6 is positive.
+
+      **Form 8962's structural zero goes live.** Its line 2a add-back was a documented zero *only
+      while this kind stayed refused*; it is now a real term, wired and proven in
+      `fjs/form1040/core` where a form-level proof cannot see it.
+
 ### v2 Traceability
 
 | REQ-ID | Tier | Phase | Persona unblocked |
@@ -1655,9 +1730,10 @@ cheap. Neither is retconned — this paragraph is the history.
 | TAX-39 | T3 | *(none — retrofitted 2026-08-19)* | Tier-B forms — Form 7206, §162(l), Schedule 1 line 17. The remedy it replaced named a publication the IRS withdrew in 2022 |
 | TAX-40 | T3 | *(none — coined with its code 2026-08-19)* | Tier-B forms — Form 461, §461(l). No kind reclassified; a net farm loss computes at printed box 36a, and three stale remedies were corrected |
 | TAX-41 | T3 | *(none — coined with its code 2026-08-19, as `TAX-40`, and renumbered by the integrator)* | Tier-B forms — Form 4797 over a per-asset `disposal` block on `vnd.fjs.asset_register`. Schedule 1 line 4 was a documented zero; a §1231 LOSS now computes with no prior-year figure and a §1231 GAIN refuses at printed line 8 without the return-profile certification |
+| TAX-42 | T3 | *(none — coined with its code 2026-08-19, as `TAX-40`, and renumbered by the integrator)* | Tier-B forms — Form 2555, §911, Schedule 1 line 8d and 1040 line 16's Foreign Earned Income Tax Worksheet. One coarse kind became five, and Form 8962's documented structural zero became a live term |
 
-**29 requirements across 10 phases, four retrofitted entries with none, and two coined with their
-own code** — 126 in the document, 95 of them v1's. Each phase is a
+**32 requirements across 10 phases, four retrofitted entries with none, and three coined with
+their own code** — 127 in the document, 95 of them v1's. Each phase is a
 vertical slice that ends with something that works: a persona whose return computes, or a named
 refusal that replaces a silent wrong answer. No phase leaves a layer that only pays off later.
 
@@ -1667,7 +1743,7 @@ refusal that replaces a silent wrong answer. No phase leaves a layer that only p
 > now derived:
 > ```sh
 > sed -n '/^## v1 Requirements/,/^## v2 Requirements/p' .planning/REQUIREMENTS.md | grep -cE '^- \[[ x]\] \*\*[A-Z]+-[0-9]+'   # 95
-> sed -n '/^## v2 Requirements/,/^## v2 (Deferred)/p'   .planning/REQUIREMENTS.md | grep -cE '^- \[[ x]\] \*\*[A-Z]+-[0-9]+'   # 31
+> sed -n '/^## v2 Requirements/,/^## v2 (Deferred)/p'   .planning/REQUIREMENTS.md | grep -cE '^- \[[ x]\] \*\*[A-Z]+-[0-9]+'   # 32
 > grep -oE '^- \[[ x]\] \*\*[A-Z]+-[0-9]+' .planning/REQUIREMENTS.md | grep -oE '[A-Z]+-[0-9]+' | sort | uniq -d              # must be empty
 > ```
 
