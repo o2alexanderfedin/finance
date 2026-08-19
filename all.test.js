@@ -1,1 +1,1 @@
-import 'functionalscript/fjs/emergent_testing/all.test.js'
+import 'functionalscript/fjs/emergent_testing/all.test.mjs'

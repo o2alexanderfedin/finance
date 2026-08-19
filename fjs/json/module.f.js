@@ -34,12 +34,12 @@
  *
  * @module
  */
-import { stringify as jsonStringify, parse } from 'functionalscript/fjs/media/json/module.f.js'
-import { identity } from 'functionalscript/fjs/types/function/module.f.js'
-import { unwrap } from 'functionalscript/fjs/types/result/module.f.js'
-import { assertEq } from 'functionalscript/fjs/asserts/module.f.js'
+import { stringify as jsonStringify, parse } from 'functionalscript/fjs/media/json/module.f.mjs'
+import { identity } from 'functionalscript/fjs/types/function/module.f.mjs'
+import { unwrap } from 'functionalscript/fjs/types/result/module.f.mjs'
+import { assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
 
-/** @import { Unknown } from 'functionalscript/fjs/media/json/module.f.js' */
+/** @import { Unknown } from 'functionalscript/fjs/media/json/types.js' */
 
 export { parse }
 

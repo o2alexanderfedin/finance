@@ -37,7 +37,7 @@
  *   `fjs/effects/node/virtual`'s `writeFile` stores a file as an array of
  *   `Vec` chunks, while `import_` requires the entry at its path to be a
  *   `JsModule` (a plain function) — verified by reading
- *   `node_modules/functionalscript/fjs/effects/node/virtual/module.f.js`
+ *   `node_modules/functionalscript/fjs/effects/node/virtual/module.f.mjs`
  *   directly. `virtual` has no JS parser and cannot execute freshly-written
  *   bytes as a module, so write-then-import cannot be composed in one
  *   virtual session; this module's own proof therefore verifies the write
@@ -56,18 +56,18 @@
  *
  * @module
  */
-import { step, pure } from 'functionalscript/fjs/effects/module.f.js'
-import { import_, mkdir, writeUtf8File, readUtf8File } from 'functionalscript/fjs/effects/node/module.f.js'
-import { error, ok } from 'functionalscript/fjs/types/result/module.f.js'
-import { join } from 'functionalscript/fjs/path/module.f.js'
-import { emptyState, virtual } from 'functionalscript/fjs/effects/node/virtual/module.f.js'
-import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
+import { step, catchStep, pureError } from 'functionalscript/fjs/effects/module.f.mjs'
+import { import_, mkdir, writeUtf8File, readUtf8File, errorMessage } from 'functionalscript/fjs/effects/node/module.f.mjs'
+import { error, ok } from 'functionalscript/fjs/types/result/module.f.mjs'
+import { join } from 'functionalscript/fjs/path/module.f.mjs'
+import { emptyState, virtual } from 'functionalscript/fjs/effects/node/virtual/module.f.mjs'
+import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { guestCtx } from '../module.f.js'
 import { interpret } from '../../exec/module.f.js'
 
-/** @import { Effect, OperationMap } from 'functionalscript/fjs/effects/module.f.js' */
-/** @import { Import, Module, Mkdir, WriteFile } from 'functionalscript/fjs/effects/node/module.f.js' */
-/** @import { Result } from 'functionalscript/fjs/types/result/module.f.js' */
+/** @import { Effect, OperationMap } from 'functionalscript/fjs/effects/types.js' */
+/** @import { Import, Module, Mkdir, WriteFile } from 'functionalscript/fjs/effects/node/types.js' */
+/** @import { Result } from 'functionalscript/fjs/types/result/types.js' */
 /** @import { CasOp, Report } from '../module.f.js' */
 
 // ── SEC-02: the specifier allow-list ─────────────────────────────────────────
@@ -298,24 +298,32 @@ export const materializeHome = home => join(home, materializeDir)
  * idempotent by construction — there is nothing a check could refuse that
  * the hash does not already guarantee is identical.
  *
- * Converts the effect's `IoResult<void>` outcome into this project's
- * `Result<void, string>` convention on both steps, so a caller never sees a
- * raw thrown value or an unconverted upstream error type cross this
- * function's boundary.
- * @type {(home: string) => (hash: string) => (source: string) => Effect<Mkdir | WriteFile, Result<void, string>>}
+ * Re-tags the two writes' `IoChannel` into this project's `string` error
+ * channel, so a caller never sees a raw thrown value or an unconverted
+ * upstream error type cross this function's boundary. **The failure is in
+ * the channel, not the payload** (0.46.0): `step` short-circuits the write
+ * when the `mkdir` failed, which is what the hand-written
+ * `if (mkdirResult[0] === 'error')` used to do, and the one `catchStep`
+ * renders both failures where both used to be rendered separately.
+ *
+ * **`errorMessage`, not `errorSummary`, and the choice is not free.** At
+ * 0.43.1 an `IoError` was the host's message and `String(e)` produced it;
+ * `errorMessage` is that same value under 0.46.0's tagged channel, so the
+ * text a caller sees is unchanged and
+ * `fjs/server`'s `weekOneConvergence` leaf still reads `invalid file` out of
+ * it. `errorSummary` would be the safer rendering — upstream's own docstring
+ * explains that `payload.message` carries the absolute path the host could
+ * not touch, and this string reaches an MCP client through `fjs_run`'s error
+ * response. Behaviour is preserved here rather than changed inside a
+ * migration; the boundary question is written up in
+ * `fjs/todo/mcp-error-text-forwards-host-messages.md`.
+ * @type {(home: string) => (hash: string) => (source: string) => Effect<Mkdir | WriteFile, void, string>}
  */
-export const materializeProgram = home => hash => source => step(
-    mkdir(materializeHome(home), { recursive: true }),
-    mkdirResult => {
-        if (mkdirResult[0] === 'error') {
-            return pure(error(String(mkdirResult[1])))
-        }
-        return step(
-            writeUtf8File(programPath(materializeHome(home))(hash), source),
-            writeResult => pure(writeResult[0] === 'error' ? error(String(writeResult[1])) : ok(undefined)),
-        )
-    },
-)
+export const materializeProgram = home => hash => source => {
+    const dir = mkdir(materializeHome(home), { recursive: true })
+    const written = step(dir, () => writeUtf8File(programPath(materializeHome(home))(hash), source))
+    return catchStep(written, e => pureError(errorMessage(e)))
+}
 
 // ── EXEC-09: import through the effect, never a raw expression ───────────────
 
@@ -331,17 +339,14 @@ export const materializeProgram = home => hash => source => step(
  * No raw `import(...)` expression appears anywhere in this module (EXEC-09)
  * — `import_` is an operation, so the entire path runs under `virtual` with
  * no filesystem.
- * @type {(allowed: readonly string[]) => (path: string) => (source: string) => Effect<Import, Result<Module, string>>}
+ * @type {(allowed: readonly string[]) => (path: string) => (source: string) => Effect<Import, Module, string>}
  */
 export const loadProgram = allowed => path => source => {
     const [t, v] = checkSpecifiers(allowed)(source)
     if (t === 'error') {
-        return pure(error(v))
+        return pureError(v)
     }
-    return step(import_(path), imported => {
-        const [it, iv] = imported
-        return pure(it === 'error' ? error(`import failed: ${String(iv)}`) : ok(iv))
-    })
+    return catchStep(import_(path), e => pureError(`import failed: ${String(e)}`))
 }
 
 // ── Tests ────────────────────────────────────────────────────────────────────
@@ -358,12 +363,12 @@ const cleanSource = 'export const report = ctx => args => ctx.casRead(args[0])'
 const guestReport = ctx => args => ctx.casRead(args[0] ?? '')
 
 /** A host map for the frozen vocabulary, so a loaded program can be RUN. */
-/** @type {OperationMap<CasOp, string>} */
+/** @type {OperationMap<CasOp, Result<string, string>>} */
 const hostMap = {
-    casRead: a => `casRead:${a}`,
-    evoList: a => `evoList:${a}`,
-    evoHead: a => `evoHead:${a}`,
-    evoRevision: a => `evoRevision:${a}`,
+    casRead: a => ok(`casRead:${a}`),
+    evoList: a => ok(`evoList:${a}`),
+    evoHead: a => ok(`evoHead:${a}`),
+    evoRevision: a => ok(`evoRevision:${a}`),
 }
 
 export const proof = {

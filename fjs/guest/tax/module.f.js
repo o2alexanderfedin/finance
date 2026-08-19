@@ -69,13 +69,13 @@
  *
  * @module
  */
-import { assert, assertEq, assertNotNullish } from 'functionalscript/fjs/asserts/module.f.js'
+import { assert, assertEq, assertNotNullish } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { guestCtx, casOpNames } from '../module.f.js'
 import { form1040Report } from '../../form1040/core/module.f.js'
 import { taxParamsByYear } from '../../tax/params/module.f.js'
 import { dialect as returnProfileDialect } from '../../return/profile/module.f.js'
 
-/** @import { Effect } from 'functionalscript/fjs/effects/module.f.js' */
+/** @import { Effect } from 'functionalscript/fjs/effects/types.js' */
 /** @import { CasOp } from '../module.f.js' */
 /** @import { TaxParamSet } from '../../tax/params/module.f.js' */
 /** @import { Form1040Inputs } from '../../form1040/core/module.f.js' */
@@ -117,9 +117,12 @@ export const taxGuestCtx = (/** @type {TaxParamSet} */ taxParams) => ({
  * the wider `GuestCtx`, and a function accepting less is usable where more
  * is supplied), which is why `fjs/report/payer`'s program still runs
  * unchanged through the executor now that the executor always supplies a
- * tax context.
+ * tax context. **That assignability is why the error channel is spelled out
+ * here**: it is `string` on `Report<T>`, and leaving this one at
+ * `Effect<CasOp, T>`'s default `NotImplemented` silently broke it — a guest
+ * refusal (`blob not found: …`) is a `string`, and `NotImplemented` is not.
  * @template T
- * @typedef {(ctx: TaxGuestCtx) => (args: readonly string[]) => Effect<CasOp, T>} TaxReport
+ * @typedef {(ctx: TaxGuestCtx) => (args: readonly string[]) => Effect<CasOp, T, string>} TaxReport
  */
 
 // ── Tests ────────────────────────────────────────────────────────────────────

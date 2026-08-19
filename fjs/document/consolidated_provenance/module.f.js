@@ -21,7 +21,7 @@
  * `dialect` tags). Both forms nonetheless share the SAME originating artifact.
  *
  * Evo's `parents` mechanism cannot record that shared origin: `validateParentSubjects`
- * (`node_modules/functionalscript/fjs/cas/evo/module.f.js`, ~lines 226-239)
+ * (`node_modules/functionalscript/fjs/cas/evo/module.f.mjs`, ~lines 226-239)
  * rejects a parent whose subject differs from the child's own subject — it is
  * built to link revisions of ONE subject's history, not to cross-reference two
  * DIFFERENT subjects. That is why `sourceArtifactHash` is a plain data field on
@@ -37,7 +37,7 @@
  *
  * @module
  */
-import { assertEq, assert } from 'functionalscript/fjs/asserts/module.f.js'
+import { assertEq, assert } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { formSubject } from '../subject/module.f.js'
 import {
     dialect as oneZeroNineNineDivDialect,
@@ -80,7 +80,7 @@ const sharedSourceArtifactHash = 'deadbeef00112233445566778899aabbccddeeff001122
  * `differentArtifactsDoNotShareProvenance` below as a control, never as a
  * fixture claiming shared provenance. Confirmed to decode via `isHash`
  * (verified live: both `sharedSourceArtifactHash` and this literal pass
- * `functionalscript/fjs/media/revision/module.f.js`'s `isHash`; `'not-a-hash'`
+ * `functionalscript/fjs/media/revision/module.f.mjs`'s `isHash`; `'not-a-hash'`
  * — the shape either dialect's own `sourceArtifactHashRejectedWhenNotAHash`
  * leaf exercises — does not).
  * @type {string}

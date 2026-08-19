@@ -19,7 +19,7 @@ import {
 } from '../lib/engine.js'
 
 /** @import { Step } from '../demo.js' */
-/** @import { Unknown } from 'functionalscript/fjs/media/json/module.f.js' */
+/** @import { Unknown } from 'functionalscript/fjs/media/json/types.js' */
 
 export const id = 'documents'
 export const kicker = 'Step 1'

@@ -33,7 +33,7 @@
  *
  * This module is one of three mechanisms PROV-07 uses against a program that
  * CONTAINS the answer instead of computing it — the archetype being
- * `() => pure({ line16: 9137 })`, which compiles, returns a plausible figure,
+ * `() => pureOk({ line16: 9137 })`, which compiles, returns a plausible figure,
  * and reads nothing. The other two are the zero-read kill condition and the
  * perturbation gate with its control leg.
  *
@@ -49,7 +49,7 @@
  *
  * @module
  */
-import { assertEq } from 'functionalscript/fjs/asserts/module.f.js'
+import { assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
 
 // ── String/comment stripping ─────────────────────────────────────────────────
 
@@ -175,7 +175,7 @@ export const proof = {
     digitInsideBlockCommentNotCountedButRealLiteralCounted: () => {
         assertEq(countNumericLiterals('/* 2024 */ const x = 1'), 1)
     },
-    // The exact verbatim adversary fixture 09-CONTEXT.md names — `() => pure({
+    // The exact verbatim adversary fixture 09-CONTEXT.md names — `() => pureOk({
     // line16: 9137 })`, adapted to this project's `ctx`-based entry point —
     // is the same string Plan 09-04 later stores and runs for real (kept
     // byte-for-byte identical here for that reason). It must count EXACTLY

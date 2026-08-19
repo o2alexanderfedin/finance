@@ -32,7 +32,7 @@
  *
  * @module
  */
-import { assertEq } from 'functionalscript/fjs/asserts/module.f.js'
+import { assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { stringify as jsonText } from '../../json/module.f.js'
 
 /**

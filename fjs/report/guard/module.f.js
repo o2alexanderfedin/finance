@@ -2,7 +2,7 @@
  * PROV-07's anti-hardcoding kill condition: `classifyRunOutcome` and the
  * `RunOutcome` type it produces — the mechanism that actually refuses a
  * report program that computed nothing from any stored document, the shipped
- * defeat of `() => pure({ line16: 9137 })`.
+ * defeat of `() => pureOk({ line16: 9137 })`.
  *
  * ## Where this fits
  *
@@ -123,7 +123,7 @@
  *
  * @module
  */
-import { assertEq, assert } from 'functionalscript/fjs/asserts/module.f.js'
+import { assertEq, assert } from 'functionalscript/fjs/asserts/module.f.mjs'
 
 /** @import { Read } from '../../exec/module.f.js' */
 
@@ -147,7 +147,7 @@ import { assertEq, assert } from 'functionalscript/fjs/asserts/module.f.js'
  * PROV-07's actual kill condition: a program whose `interpret` run dispatched
  * ZERO observed reads computed nothing from any stored document, and is
  * refused as an error result rather than returned as a silent `'ok'` — this
- * is what defeats `() => pure({ line16: 9137 })`.
+ * is what defeats `() => pureOk({ line16: 9137 })`.
  *
  * This is the ONLY place the observed-read count is checked against zero, and
  * the ONLY place the zero-read error message is built. Both `executeRun`

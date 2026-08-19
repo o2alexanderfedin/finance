@@ -57,7 +57,7 @@ import { fileURLToPath } from 'node:url'
 // `.f.js` modules.
 import { centsFromString, centsToString } from './fjs/exact/module.f.js'
 import { dialect as oneZeroNineNineIntDialect, validate as validateOneZeroNineNineInt } from './fjs/document/1099int/module.f.js'
-import { dialect as revisionDialect } from 'functionalscript/fjs/media/revision/module.f.js'
+import { dialect as revisionDialect } from 'functionalscript/fjs/media/revision/module.f.mjs'
 import { materializeHome, programPath } from './fjs/guest/materialize/module.f.js'
 import { countsTowardReproducibilityAcceptance } from './fjs/report/provenance/module.f.js'
 
@@ -134,7 +134,7 @@ test(
             // composed from the SAME expressions so the two can never drift
             // apart. Real Node's `import_` effect only resolves a specifier
             // against `process.cwd()` when the specifier is bare/relative
-            // (`node_modules/functionalscript/fjs/effects/node/module.js`'s
+            // (`node_modules/functionalscript/fjs/effects/node/module.mjs`'s
             // `asyncImport`: `concat(process.cwd())(v)` only for a specifier
             // that is neither absolute nor a URL); an absolute path is used
             // as-is regardless of the launcher's own cwd. The server below

@@ -222,7 +222,7 @@
  *
  * @module
  */
-import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
+import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { centsFromString } from '../../exact/module.f.js'
 import { materialParticipationNamed } from '../../document/k1_common/module.f.js'
 // The ONE code this schedule's coded sweep lets through on the 1041 face, read

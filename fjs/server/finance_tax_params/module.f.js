@@ -47,18 +47,19 @@
  *
  * @module
  */
-import { number } from 'functionalscript/fjs/types/rtti/module.f.js'
-import { pure, runPure } from 'functionalscript/fjs/effects/module.f.js'
-import { toolEntry, okResult, errorResult } from 'functionalscript/fjs/protocol/mcp/module.f.js'
-import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
+import { number } from 'functionalscript/fjs/types/rtti/module.f.mjs'
+import { pureOk, runPure } from 'functionalscript/fjs/effects/module.f.mjs'
+import { toolEntry, okResult, errorResult } from 'functionalscript/fjs/protocol/mcp/module.f.mjs'
+import { unwrap } from 'functionalscript/fjs/types/result/module.f.mjs'
+import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { taxParamsByYear } from '../../tax/params/module.f.js'
 import { taxTableBandStructure } from '../../tax/table/module.f.js'
 import { stringify as jsonText } from '../../json/module.f.js'
 
-/** @import { ToolEntry, ToolsCallResult } from 'functionalscript/fjs/protocol/mcp/module.f.js' */
+/** @import { ToolEntry, ToolsCallResult } from 'functionalscript/fjs/protocol/mcp/types.js' */
 /** @import { TaxParamSet } from '../../tax/params/module.f.js' */
 /** @import { BandRegion } from '../../tax/table/module.f.js' */
-/** @import { StringMap } from 'functionalscript/fjs/types/object/module.f.js' */
+/** @import { StringMap } from 'functionalscript/fjs/types/object/types.js' */
 
 /**
  * The shape `finance_tax_params` actually returns: every Plan 08-01
@@ -153,11 +154,11 @@ export const financeTaxParamsTool = toolEntry(
     args => {
         const response = taxParamsResponses[args.year]
         if (response === undefined) {
-            return pure(errorResult(
+            return pureOk(errorResult(
                 `unknown tax year: ${args.year}; known: ${knownYears.join(', ')}`,
             ))
         }
-        return pure(okResult(jsonText(response)))
+        return pureOk(okResult(jsonText(response)))
     },
 )
 
@@ -168,12 +169,20 @@ export const financeTaxParamsTool = toolEntry(
  * `ToolsCallResult` — every call resolves via `pure`, so `runPure` always
  * yields exactly one value; a genuinely empty result here would mean the
  * handler unexpectedly issued a command, which `assert` below catches.
+ *
+ * Since 0.46.0 `runPure` yields `Option<Result<T, E>>`, so the two questions
+ * are asked separately and neither is skipped: the `Option` distinguishes
+ * "reached a value" from "stopped at a command" (the `assert`), and the
+ * `Result` inside it distinguishes success from failure (the `unwrap`).
+ * `unwrap` panics, which is the honest policy here — this helper is a proof
+ * fixture, and a handler that fails is a defect in the handler, not an
+ * outcome the proof has an answer for.
  * @type {(year: number) => ToolsCallResult}
  */
 const call = year => {
     const [result] = runPure(financeTaxParamsTool.handle({ year }))
     assert(result !== undefined, 'expected finance_tax_params to resolve via pure, not a command')
-    return result
+    return unwrap(result)
 }
 
 /**

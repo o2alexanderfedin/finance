@@ -34,7 +34,7 @@
  *    revision passed the bare hash-derived filename here instead, which
  *    real Node's `import_` effect resolves against `process.cwd()`, not
  *    `materializeHomeRoot` — see
- *    `node_modules/functionalscript/fjs/effects/node/module.js`'s
+ *    `node_modules/functionalscript/fjs/effects/node/module.mjs`'s
  *    `asyncImport`. Every proof below existed at the time and none caught
  *    it, because each one placed its `JsModule` fixture at that SAME bare
  *    name — see `fjs/todo/upstream-node-spawn-effect.md`-adjacent 07-10 fix
@@ -104,7 +104,7 @@
  *
  * The zero-read kill condition ({@link classifyRunOutcome}, imported from
  * `fjs/report/guard/module.f.js`) is the mechanism that defeats
- * `() => pure({ line16: 9137 })` — a program that recites an answer instead
+ * `() => pureOk({ line16: 9137 })` — a program that recites an answer instead
  * of computing one from a stored document. This file no longer defines that
  * rule; it CONSUMES it, at the two call sites below ({@link executeRun} and
  * {@link runExecuteRunViaFixture}). The full plain-words account of all
@@ -115,20 +115,22 @@
  *
  * @module
  */
-import { step, pure, mapStep, do_ } from 'functionalscript/fjs/effects/module.f.js'
-import { collectRead, fileCas } from 'functionalscript/fjs/cas/module.f.js'
-import { cBase32ToVec, vecToCBase32 } from 'functionalscript/fjs/basen/cbase32/module.f.js'
-import { utf8ToString, tryUtf8 } from 'functionalscript/fjs/text/module.f.js'
-import { ok } from 'functionalscript/fjs/types/result/module.f.js'
-import { option, array, number, string } from 'functionalscript/fjs/types/rtti/module.f.js'
-import { toolEntry, okResult, errorResult } from 'functionalscript/fjs/protocol/mcp/module.f.js'
-import { sha256 } from 'functionalscript/fjs/crypto/sha2/module.f.js'
-import { initEvo, evo } from 'functionalscript/fjs/cas/evo/module.f.js'
-import { emptyState, virtual } from 'functionalscript/fjs/effects/node/virtual/module.f.js'
-import { assert, assertEq, assertNotNullish } from 'functionalscript/fjs/asserts/module.f.js'
-import { validate as rttiValidate } from 'functionalscript/fjs/types/rtti/validate/module.f.js'
-import { unknown as jsonUnknown, stringify as jsonStringify } from 'functionalscript/fjs/media/json/module.f.js'
-import { identity } from 'functionalscript/fjs/types/function/module.f.js'
+import { step, catchStep, pureOk, pureError, mapStep, do_, history, historyStep, unwrapStep } from 'functionalscript/fjs/effects/module.f.mjs'
+import { empty, nonEmpty } from 'functionalscript/fjs/effects/list/module.f.mjs'
+import { collectRead, fileCas } from 'functionalscript/fjs/cas/module.f.mjs'
+import { cBase32ToVec, vecToCBase32 } from 'functionalscript/fjs/basen/cbase32/module.f.mjs'
+import { utf8ToString, tryUtf8 } from 'functionalscript/fjs/text/module.f.mjs'
+import { unwrap } from 'functionalscript/fjs/types/result/module.f.mjs'
+import { option, array, number, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
+import { toolEntry, okResult, errorResult } from 'functionalscript/fjs/protocol/mcp/module.f.mjs'
+import { sha256 } from 'functionalscript/fjs/crypto/sha2/module.f.mjs'
+import { initEvo, evo } from 'functionalscript/fjs/cas/evo/module.f.mjs'
+import { emptyState, virtual } from 'functionalscript/fjs/effects/node/virtual/module.f.mjs'
+import { assert, assertEq, assertNotNullish } from 'functionalscript/fjs/asserts/module.f.mjs'
+import { validate as rttiValidate } from 'functionalscript/fjs/types/rtti/validate/module.f.mjs'
+import { stringify as jsonStringify } from 'functionalscript/fjs/media/json/module.f.mjs'
+import { unknown as jsonUnknown } from 'functionalscript/fjs/media/json/rtti/module.f.mjs'
+import { identity } from 'functionalscript/fjs/types/function/module.f.mjs'
 import { interpret } from '../../exec/module.f.js'
 import { countNumericLiterals } from '../../report/audit/module.f.js'
 import { classifyRunOutcome } from '../../report/guard/module.f.js'
@@ -141,28 +143,31 @@ import { taxParamsByYear } from '../../tax/params/module.f.js'
 import { dialect as returnProfileDialect } from '../../return/profile/module.f.js'
 import { paramSetHash, reviewedEstimateFraming } from '../../report/provenance/module.f.js'
 import { sizeGuard, previewBytes, guardBytes } from '../response/module.f.js'
-import { readUtf8File } from 'functionalscript/fjs/effects/node/module.f.js'
-import { vec8, length as bitLength } from 'functionalscript/fjs/types/bit_vec/module.f.js'
-import { parse } from 'functionalscript/fjs/path/module.f.js'
+import { readUtf8File, errorSummary } from 'functionalscript/fjs/effects/node/module.f.mjs'
+import { vec8, length as bitLength } from 'functionalscript/fjs/types/bit_vec/module.f.mjs'
+import { parse } from 'functionalscript/fjs/path/module.f.mjs'
 import { stringify as jsonText } from '../../json/module.f.js'
 
-/** @import { Effect, Operation } from 'functionalscript/fjs/effects/module.f.js' */
-/** @import { MemOp } from 'functionalscript/fjs/effects/memory/module.f.js' */
-/** @import { Mkdir, WriteFile, Import } from 'functionalscript/fjs/effects/node/module.f.js' */
-/** @import { Cas, FileCasOperation } from 'functionalscript/fjs/cas/module.f.js' */
-/** @import { Evo } from 'functionalscript/fjs/cas/evo/module.f.js' */
-/** @import { ToolEntry, ToolsCallResult } from 'functionalscript/fjs/protocol/mcp/module.f.js' */
-/** @import { Vec } from 'functionalscript/fjs/types/bit_vec/module.f.js' */
+/** @import { Effect, Operation } from 'functionalscript/fjs/effects/types.js' */
+/** @import { List } from 'functionalscript/fjs/effects/list/types.js' */
+/** @import { Result } from 'functionalscript/fjs/types/result/types.js' */
+/** @import { IoChannel, NodeOp } from 'functionalscript/fjs/effects/node/types.js' */
+/** @import { MemOp } from 'functionalscript/fjs/effects/memory/types.js' */
+/** @import { Mkdir, WriteFile, Import } from 'functionalscript/fjs/effects/node/types.js' */
+/** @import { Cas, FileCasOperation } from 'functionalscript/fjs/cas/types.js' */
+/** @import { Evo } from 'functionalscript/fjs/cas/evo/types.js' */
+/** @import { ToolEntry, ToolsCallResult } from 'functionalscript/fjs/protocol/mcp/types.js' */
+/** @import { Vec } from 'functionalscript/fjs/types/bit_vec/types.js' */
 /** @import { CasOp, Report } from '../../guest/module.f.js' */
 /** @import { TaxReport } from '../../guest/tax/module.f.js' */
 /** @import { TaxParamSet } from '../../tax/params/module.f.js' */
 /** @import { ReturnProfile } from '../../return/profile/module.f.js' */
-/** @import { State, Dir, JsModule } from 'functionalscript/fjs/effects/node/virtual/module.f.js' */
+/** @import { State, Dir, JsModule } from 'functionalscript/fjs/effects/node/virtual/types.js' */
 /** @import { Run } from '../../run/module.f.js' */
 /** @import { RunOutcome } from '../../report/guard/module.f.js' */
 /** @import { ReportLine } from '../../report/line/module.f.js' */
-/** @import { Unknown as JsonUnknown } from 'functionalscript/fjs/media/json/module.f.js' */
-/** @import { Ts, Unknown as RttiUnknown } from 'functionalscript/fjs/types/rtti/ts/module.f.js' */
+/** @import { Unknown as JsonUnknown } from 'functionalscript/fjs/media/json/types.js' */
+/** @import { Ts, Unknown as RttiUnknown } from 'functionalscript/fjs/types/rtti/ts/types.js' */
 
 // ── executeRun ────────────────────────────────────────────────────────────────
 //
@@ -228,28 +233,53 @@ import { stringify as jsonText } from '../../json/module.f.js'
  * that does not read `ctx.form1040Report`/`ctx.taxParams` is unaffected by
  * their presence, which is why `fjs/report/payer`'s own stored program
  * still runs here unchanged.
- * @type {(cas: Cas<FileCasOperation>) => (evoApi: Evo<FileCasOperation>) => (taxParams: TaxParamSet) => (path: string) => (source: string) => (literalCount: number) => (args: readonly string[]) => (pin: { readonly subject: string, readonly parents: readonly string[] } | undefined) => Effect<FileCasOperation | Mkdir | WriteFile | Import | MemOp, RunOutcome<unknown>>}
+ * **The failures are in the channel** (0.46.0), as plain messages, and
+ * {@link asRunOutcome} is the single place they become a `kind: 'error'`
+ * outcome. Splitting it that way is what lets `loadProgram`'s refusal and
+ * `interpret`'s refusal reach the run record by the same route: the tail
+ * describes the success path, and the one function that names the failures
+ * is the one whose job is to record them.
+ * @type {(cas: Cas<FileCasOperation>) => (evoApi: Evo<FileCasOperation>) => (taxParams: TaxParamSet) => (path: string) => (source: string) => (literalCount: number) => (args: readonly string[]) => (pin: { readonly subject: string, readonly parents: readonly string[] } | undefined) => Effect<FileCasOperation | Mkdir | WriteFile | Import | MemOp, RunOutcome<unknown>, string>}
  */
-const runProgramTail = cas => evoApi => taxParams => path => source => literalCount => args => pin =>
-    step(loadProgram([])(path)(source), loadResult => {
-        if (loadResult[0] === 'error') {
-            return pure(/** @type {RunOutcome<unknown>} */ ({ kind: 'error', message: loadResult[1], reads: [] }))
+const runProgramTail = cas => evoApi => taxParams => path => source => literalCount => args => pin => {
+    const loaded = loadProgram([])(path)(source)
+    // `buildRunSnapshot` reports an unlistable store on the node `IoChannel`;
+    // this module's channel is a plain message, so the re-tag happens once,
+    // here, where the two meet.
+    const snapshotOf = catchStep(
+        buildRunSnapshot(cas)(evoApi)(pin),
+        e => pureError(errorSummary(e)))
+    const withSnapshot = historyStep(history(loaded), () => snapshotOf)
+    return step(withSnapshot, ([snapshot, module_]) => {
+        const hostMap = buildHostMap(snapshot)
+        const report = /** @type {{ readonly report: TaxReport<unknown> }} */ (module_)
+        const [t, v] = interpret(hostMap)(report.report(taxGuestCtx(taxParams))(args))
+        if (t === 'error') {
+            return pureError(v)
         }
-        return step(buildRunSnapshot(cas)(evoApi)(pin), snapshot => {
-            const hostMap = buildHostMap(snapshot)
-            const loaded = /** @type {{ readonly report: TaxReport<unknown> }} */ (loadResult[1])
-            const [t, v] = interpret(hostMap)(loaded.report(taxGuestCtx(taxParams))(args))
-            if (t === 'error') {
-                return pure(/** @type {RunOutcome<unknown>} */ ({ kind: 'error', message: v, reads: [] }))
-            }
-            const [value, reads] = v
-            // 09-06: classifyRunOutcome (imported from
-            // fjs/report/guard/module.f.js) is the zero-read kill
-            // condition's ONLY definition — this is the production call
-            // site, reached by BOTH run paths since MAINT-07.
-            return pure(classifyRunOutcome(literalCount)(value, reads))
-        })
+        const [value, reads] = v
+        // 09-06: classifyRunOutcome (imported from
+        // fjs/report/guard/module.f.js) is the zero-read kill
+        // condition's ONLY definition — this is the production call
+        // site, reached by BOTH run paths since MAINT-07.
+        return pureOk(classifyRunOutcome(literalCount)(value, reads))
     })
+}
+
+/**
+ * Absorbs a run pipeline's error channel into the `kind: 'error'` arm of
+ * {@link RunOutcome} — the one place this module decides that an
+ * infrastructure failure and a guest failure are the same thing to a
+ * caller, because both end as a `status: 'error'` run record.
+ *
+ * The `never` it returns is the claim upstream's docstring describes: past
+ * this point there is no failure left to handle, and the type says so
+ * rather than a comment.
+ * @type {<O extends Operation>(e: Effect<O, RunOutcome<unknown>, string>) => Effect<O, RunOutcome<unknown>, never>}
+ */
+const asRunOutcome = e => catchStep(
+    e,
+    message => pureOk(/** @type {RunOutcome<unknown>} */ ({ kind: 'error', message, reads: [] })))
 
 /**
  * Runs a stored program (by CAS hash) against `input.args`, optionally
@@ -271,62 +301,71 @@ const runProgramTail = cas => evoApi => taxParams => path => source => literalCo
  * guest.** It was not dropped; read it there. The short version, so nobody
  * has to: re-resolving instead of threading survives the whole suite today,
  * for the arithmetic reason that `taxParamsByYear` holds exactly one year.
- * @type {(materializeHomeRoot: string) => (cas: Cas<FileCasOperation>) => (evoApi: Evo<FileCasOperation>) => (input: { readonly hash: string, readonly args: readonly string[], readonly taxParams: TaxParamSet, readonly subject?: string, readonly parents?: readonly string[] }) => Effect<FileCasOperation | Mkdir | WriteFile | Import | MemOp, RunOutcome<unknown>>}
+ * **Read as its success path.** Every failure below — a CAS miss, a
+ * materialize failure, a refused specifier, a guest refusal — travels in
+ * the error channel and is turned into an error `RunOutcome` exactly once,
+ * by {@link asRunOutcome} on the last line. The four hand-written
+ * `if (r[0] === 'error') return pureOk({ kind: 'error', … })` arms this
+ * function used to be made of are that one call now.
+ * @type {(materializeHomeRoot: string) => (cas: Cas<FileCasOperation>) => (evoApi: Evo<FileCasOperation>) => (input: { readonly hash: string, readonly args: readonly string[], readonly taxParams: TaxParamSet, readonly subject?: string, readonly parents?: readonly string[] }) => Effect<FileCasOperation | Mkdir | WriteFile | Import | MemOp, RunOutcome<unknown>, never>}
  */
 export const executeRun = materializeHomeRoot => cas => evoApi => input => {
     const hashVec = cBase32ToVec(input.hash)
     if (hashVec === null) {
-        return pure(/** @type {RunOutcome<unknown>} */ ({ kind: 'error', message: `program not found: ${input.hash}`, reads: [] }))
+        return pureOk(/** @type {RunOutcome<unknown>} */ ({ kind: 'error', message: `program not found: ${input.hash}`, reads: [] }))
     }
-    return step(collectRead(cas.read(hashVec)), readResult => {
-        if (readResult[0] === 'error') {
-            return pure(/** @type {RunOutcome<unknown>} */ ({ kind: 'error', message: `program not found: ${input.hash}`, reads: [] }))
-        }
-        const sourceText = utf8ToString(readResult[1])
+    const read = catchStep(
+        collectRead(cas.read(hashVec)),
+        () => pureError(`program not found: ${input.hash}`))
+    const sourceText = mapStep(read, utf8ToString)
+    const materialized = historyStep(
+        history(sourceText),
+        text => materializeProgram(materializeHomeRoot)(input.hash)(text))
+    return asRunOutcome(step(materialized, ([, text]) => {
         // PROV-07 (the reported half): computed HERE, at the exact point
         // checkSpecifiers will read this SAME string from moments later
         // (inside loadProgram) — never a second reading of the source.
-        const literalCount = countNumericLiterals(sourceText)
-        return step(materializeProgram(materializeHomeRoot)(input.hash)(sourceText), materializeResult => {
-            if (materializeResult[0] === 'error') {
-                return pure(/** @type {RunOutcome<unknown>} */ ({ kind: 'error', message: materializeResult[1], reads: [] }))
-            }
-            const pin = input.subject !== undefined && input.parents !== undefined
-                ? { subject: input.subject, parents: input.parents }
-                : undefined
-            // MAINT-07: the tail's ORDER lives once, in runProgramTail. This
-            // path and runExecuteRunViaFixture's replay are now the same
-            // definition, so inserting or reordering a step cannot reach one
-            // without reaching the other.
-            return runProgramTail(cas)(evoApi)(input.taxParams)(programPath(materializeHome(materializeHomeRoot))(input.hash))(sourceText)(literalCount)(input.args)(pin)
-        })
-    })
+        const literalCount = countNumericLiterals(text)
+        const pin = input.subject !== undefined && input.parents !== undefined
+            ? { subject: input.subject, parents: input.parents }
+            : undefined
+        // MAINT-07: the tail's ORDER lives once, in runProgramTail. This
+        // path and runExecuteRunViaFixture's replay are now the same
+        // definition, so inserting or reordering a step cannot reach one
+        // without reaching the other.
+        return runProgramTail(cas)(evoApi)(input.taxParams)(programPath(materializeHome(materializeHomeRoot))(input.hash))(text)(literalCount)(input.args)(pin)
+    }))
 }
 
 // ── fjsRunTool: handler-performed writes, the run record, the response ──────
 
 /**
  * Writes `text`'s UTF-8 bytes to CAS as a single chunk — the same
- * `cas.write(pure({first: ok(bytes), tail: pure(undefined)}))` pattern
+ * `cas.write(pureOk({first: ok(bytes), tail: pureOk(undefined)}))` pattern
  * `fjs/server/module.f.js`'s `casRefresh` proof and
  * `fjs/server/fjs_run/snapshot/module.f.js`'s own store-seeding proofs use —
- * and returns the resulting content hash. A write failure here is asserted,
- * not branched on: writing a moderately-sized in-memory string is not a
+ * and returns the resulting content hash. A write failure here is a PANIC,
+ * not a branch: writing a moderately-sized in-memory string is not a
  * normal-operation failure mode this plan's error taxonomy covers (that
  * taxonomy is about GUEST failures — missing hash, dirty specifier, a
  * non-`Error` throw — not CAS infrastructure failures).
- * @type {<O extends Operation>(cas: Cas<O>) => (text: string) => Effect<O, string>}
+ *
+ * The panic is `unwrapStep` since 0.46.0, which is the same decision the
+ * `assert(writeResult[0] === 'ok', …)` here made — a bare value thrown —
+ * written in a function whose name says it is a policy, and whose `summary`
+ * argument makes a widening error channel a compile error at this site
+ * rather than a quietly larger set of things to crash on.
+ * @type {<O extends Operation>(cas: Cas<O>) => (text: string) => Effect<O, string, never>}
  */
 const writeTextToCas = cas => text => {
     const bytes = tryUtf8(text)
     assert(bytes !== null, ['expected text destined for CAS to encode as UTF-8', text])
-    return mapStep(
-        cas.write(pure({ first: ok(bytes), tail: pure(undefined) })),
-        writeResult => {
-            assert(writeResult[0] === 'ok', ['expected a CAS write to succeed', writeResult])
-            return vecToCBase32(writeResult[1])
-        },
-    )
+    /** @type {List<never, Vec, IoChannel>} */
+    const payload = nonEmpty(bytes, empty())
+    const written = unwrapStep(
+        cas.write(payload),
+        e => `expected a CAS write to succeed: ${errorSummary(e)}`)
+    return mapStep(written, vecToCBase32)
 }
 
 /** rtti validator for "is this a JSON value", from `fjs/media/json`'s own schema. */
@@ -430,7 +469,7 @@ const withResultText = o => {
  * case. Real Node has no such limitation — `fjsRunTool` itself is
  * unchanged, and `fjs-run-integration.test.js` proves the real, single-call
  * round trip end to end against a genuinely separate process.
- * @type {(cas: Cas<FileCasOperation>) => (programHash: string) => (programArgs: readonly string[]) => (pinned: boolean) => (pinFields: { readonly subject?: string, readonly parents?: readonly string[] }) => (provenance: { readonly taxYear: number, readonly paramSetHash: string }) => (outcome: RunOutcome<unknown>) => Effect<FileCasOperation | MemOp, ToolsCallResult>}
+ * @type {(cas: Cas<FileCasOperation>) => (programHash: string) => (programArgs: readonly string[]) => (pinned: boolean) => (pinFields: { readonly subject?: string, readonly parents?: readonly string[] }) => (provenance: { readonly taxYear: number, readonly paramSetHash: string }) => (outcome: RunOutcome<unknown>) => Effect<FileCasOperation | MemOp, ToolsCallResult, never>}
  */
 const handleRunOutcome = cas => programHash => programArgs => pinned => pinFields => provenance => rawOutcome => {
     const outcome = withResultText(rawOutcome)
@@ -463,7 +502,7 @@ const handleRunOutcome = cas => programHash => programArgs => pinned => pinField
                 // counter (09-CONTEXT.md). literalCount is outcome's own
                 // count, computed once in executeRun/runExecuteRunViaFixture
                 // at the point the source text was already in hand.
-                return pure(okResult(jsonText({
+                return pureOk(okResult(jsonText({
                     resultHash,
                     runHash,
                     preview,
@@ -494,7 +533,7 @@ const handleRunOutcome = cas => programHash => programArgs => pinned => pinField
     const [vt, vv] = validateRun(record)
     assert(vt === 'ok', ['fjs_run assembled an invalid error run record - executor bug', vv])
     return step(writeTextToCas(cas)(jsonText(vv)), runHash =>
-        pure(errorResult(`fjs_run failed: ${outcome.message} (run record: ${runHash})`)))
+        pureOk(errorResult(`fjs_run failed: ${outcome.message} (run record: ${runHash})`)))
 }
 
 /**
@@ -539,7 +578,7 @@ export const fjsRunTool = materializeHomeRoot => cas => evoApi => toolEntry(
     'set was in effect for this run). Supply subject and parents together to pin ' +
     'the snapshot the program\'s evoHead reads; omit both for an ordinary unpinned run.',
     fjsRunInputSchema,
-    /** @type {(args: Ts<typeof fjsRunInputSchema>) => Effect<FileCasOperation | Mkdir | WriteFile | Import | MemOp, ToolsCallResult>} */
+    /** @type {(args: Ts<typeof fjsRunInputSchema>) => Effect<FileCasOperation | Mkdir | WriteFile | Import | MemOp, ToolsCallResult, never>} */
     (args => {
         // PROV-04: taxYear is an explicit caller argument, never inferred
         // (mirroring the `elected` precedent Phase 15 set for the same
@@ -549,7 +588,7 @@ export const fjsRunTool = materializeHomeRoot => cas => evoApi => toolEntry(
         // noUncheckedIndexedAccess produces.
         const taxParamSet = taxParamsByYear[args.taxYear]
         if (taxParamSet === undefined) {
-            return pure(errorResult(
+            return pureOk(errorResult(
                 `unknown tax year: ${args.taxYear}; known: ${Object.keys(taxParamsByYear).map(Number).join(', ')}`,
             ))
         }
@@ -584,6 +623,22 @@ export const fjsRunTool = materializeHomeRoot => cas => evoApi => toolEntry(
 // ── Tests ────────────────────────────────────────────────────────────────────
 
 /**
+ * `virtual`, with the effect's error channel discharged by a panic.
+ *
+ * Every use below is fixture setup or a call whose failure the proof has no
+ * answer to — seeding CAS, initialising an Evo cache, driving a tool handler
+ * whose own channel is already `never`. `unwrap` throws a BARE value exactly
+ * as `assert` does. Sites that ASSERT on the outcome (`addResult[0] === 'ok'`,
+ * a `collectRead` a leaf is checking) keep plain `virtual` and read the
+ * `Result` themselves — that difference is the point of having both spellings.
+ * @type {(state: State) => <O extends NodeOp, T, E>(e: Effect<O, T, E>) => readonly [State, T]}
+ */
+const virtualOrPanic = state => e => {
+    const [next, r] = virtual(state)(e)
+    return [next, unwrap(r)]
+}
+
+/**
  * TY2025's parameter set, narrowed exactly once — the value every proof
  * below hands to `executeRun`/{@link runExecuteRunViaFixture} in place of
  * the one `fjsRunTool` resolves from its caller's `taxYear`.
@@ -598,14 +653,13 @@ export const fjsRunTool = materializeHomeRoot => cas => evoApi => toolEntry(
 const taxParamsFixture = taxParamsByYear[2025]
 assert(taxParamsFixture !== undefined, 'expected TY2025 parameters to be present in taxParamsByYear')
 
-/** Single-chunk UTF-8 CAS write, mirroring the proofs `fjs/server/fjs_run/snapshot/module.f.js` and `fjs/server/module.f.js` already establish. @type {<O extends Operation>(cas: Cas<O>) => (text: string) => Effect<O, string>} */
+/** Single-chunk UTF-8 CAS write, mirroring the proofs `fjs/server/fjs_run/snapshot/module.f.js` and `fjs/server/module.f.js` already establish. @type {<O extends Operation>(cas: Cas<O>) => (text: string) => Effect<O, string, never>} */
 const seedText = cas => text => {
     const bytes = tryUtf8(text)
     assert(bytes !== null, ['expected sample text to encode as UTF-8', text])
-    return mapStep(cas.write(pure({ first: ok(bytes), tail: pure(undefined) })), w => {
-        assert(w[0] === 'ok', ['expected the seed write to succeed', w])
-        return vecToCBase32(w[1])
-    })
+    /** @type {List<never, Vec, IoChannel>} */
+    const payload = nonEmpty(bytes, empty())
+    return mapStep(unwrapStep(cas.write(payload), errorSummary), vecToCBase32)
 }
 
 /**
@@ -681,16 +735,24 @@ export const placeJsModuleFixture = root => path => fn => {
  * sequence production does not run, and a stored program reaching for
  * `ctx.form1040Report` would fail here for a reason no production caller
  * could ever hit.
- * @type {(home: string) => (taxParams: TaxParamSet) => (cas: Cas<FileCasOperation>) => (evoApi: Evo<FileCasOperation>) => (hash: string) => (source: string) => (report: TaxReport<unknown>) => (args: readonly string[]) => (pin: { readonly subject: string, readonly parents: readonly string[] } | undefined) => (state: State) => readonly [State, RunOutcome<unknown>]}
+ * **The fixture is a `JsModule`, not a typed report**, and
+ * {@link runExecuteRunViaFixture} below is the one-line adapter for the
+ * common case. That split is not a convenience: production loads a module
+ * across `import_`, where `Module` is `StringMap<unknown>` and nothing has
+ * typed `report` yet. A proof that needs to place a program the guest ABI
+ * forbids — `nonErrorThrowBecomesErrorResult`'s `fetch` dispatch — puts it
+ * here, at the same untyped boundary a real stored program crosses, instead
+ * of asserting `do_` to `any` to smuggle it past `Report`.
+ * @type {(home: string) => (taxParams: TaxParamSet) => (cas: Cas<FileCasOperation>) => (evoApi: Evo<FileCasOperation>) => (hash: string) => (source: string) => (module_: JsModule) => (args: readonly string[]) => (pin: { readonly subject: string, readonly parents: readonly string[] } | undefined) => (state: State) => readonly [State, RunOutcome<unknown>]}
  */
-const runExecuteRunViaFixture = home => taxParams => cas => evoApi => hash => source => report => args => pin => state => {
+const runExecuteRunViaModuleFixture = home => taxParams => cas => evoApi => hash => source => module_ => args => pin => state => {
     // PROV-07: mirrors executeRun's own literalCount computation, from the
     // SAME `source` parameter this helper already receives.
     const literalCount = countNumericLiterals(source)
     const [state1, materializeResult] = virtual(state)(materializeProgram(home)(hash)(source))
     assert(materializeResult[0] === 'ok', ['expected the real materialize write to succeed', materializeResult])
     const path = programPath(materializeHome(home))(hash)
-    const root = placeJsModuleFixture(state1.root)(path)(() => ({ report }))
+    const root = placeJsModuleFixture(state1.root)(path)(module_)
     const state2 = { ...state1, root }
     // MAINT-07: this is `executeRun`'s OWN tail, not a restatement of it —
     // the SAME {@link runProgramTail} that production calls, replayed here in
@@ -698,27 +760,48 @@ const runExecuteRunViaFixture = home => taxParams => cas => evoApi => hash => so
     // the criterion's bar meetable: reorder or insert a step in the tail and
     // BOTH this proof and `fjs-run-integration.test.js` must go red, because
     // there is only one sequence left to change.
-    return virtual(state2)(
-        runProgramTail(cas)(evoApi)(taxParams)(path)(source)(literalCount)(args)(pin),
+    // `asRunOutcome` is applied HERE, not inside `runProgramTail`, because
+    // that is where production applies it too (`executeRun`'s last line) —
+    // this helper replays `executeRun`'s steps, so it must replay that one.
+    return virtualOrPanic(state2)(
+        asRunOutcome(runProgramTail(cas)(evoApi)(taxParams)(path)(source)(literalCount)(args)(pin)),
     )
 }
+
+/**
+ * {@link runExecuteRunViaModuleFixture} for the ordinary case: a report that
+ * DOES satisfy the guest ABI. Every leaf below but one goes through here, and
+ * the sequence itself lives once, in the function above.
+ * @type {(home: string) => (taxParams: TaxParamSet) => (cas: Cas<FileCasOperation>) => (evoApi: Evo<FileCasOperation>) => (hash: string) => (source: string) => (report: TaxReport<unknown>) => (args: readonly string[]) => (pin: { readonly subject: string, readonly parents: readonly string[] } | undefined) => (state: State) => readonly [State, RunOutcome<unknown>]}
+ */
+const runExecuteRunViaFixture = home => taxParams => cas => evoApi => hash => source => report => args => pin =>
+    runExecuteRunViaModuleFixture(home)(taxParams)(cas)(evoApi)(hash)(source)(() => ({ report }))(args)(pin)
 
 // ── EXEC-12: error-taxonomy proof support ────────────────────────────────────
 
 /**
- * `fjs/exec`'s own test-fixture escape hatch (`fjs/exec/module.f.js`),
- * reproduced locally rather than imported: constructing a probe outside
- * `CasOp`'s frozen vocabulary requires casting `do_` to `any`, and that
- * module's own comment confines the cast to ITS OWN test-fixture section —
- * so this file builds an equivalent local escape hatch instead of importing
- * across that boundary. A real `CasOp`-typed `Report` cannot construct this
- * (`tsc` refuses a literal `'fetch'` command), which is exactly why
- * `nonErrorThrowBecomesErrorResult` (below) needs it: it stands in for a
+ * The PROBE vocabulary — the same shape `fjs/exec`'s own proofs use, and for
+ * the same reason: `Operation` is `readonly [string, (…) => Result<…>]`, so a
+ * command whose name is not statically known is an ordinary operation type
+ * rather than a hole in the type system.
+ *
+ * A real `CasOp`-typed `Report` cannot construct one of these — `tsc` refuses
+ * a literal `'fetch'` command, which is `_CasOpIsExactlyTheFourCommands`
+ * doing its job — and that is exactly why
+ * `nonErrorThrowBecomesErrorResult` needs it: it stands in for a
  * stored/generated program whose command string bypassed `tsc` before ever
  * reaching `interpret`'s runtime refusal.
- * @type {(command: string) => (...payload: readonly unknown[]) => Effect<CasOp, string>}
+ *
+ * **The program built from it is placed as a `JsModule`, not as a `Report`.**
+ * That is what removed the `/** @type {any} *\/ (do_)` this used to be:
+ * the fixture crosses `import_` exactly where a real stored program does, and
+ * a `Module` is `StringMap<unknown>` on the far side of that boundary — so
+ * nothing has to be discarded to place a program the guest ABI forbids.
+ * @typedef {readonly [string, (...payload: readonly unknown[]) => Result<string, string>]} ProbeOp
  */
-const unsafeDo = /** @type {any} */ (do_)
+
+/** `do_` at the probe vocabulary. @type {(command: string) => (...payload: readonly unknown[]) => Effect<ProbeOp, string, string>} */
+const probeDo = do_
 
 /**
  * Extracts the run-record hash embedded in `fjsRunTool`'s own error text
@@ -769,10 +852,7 @@ const goodProgramSource = 'export const report = ctx => args => ctx.step(ctx.evo
  * {@link assertSessionSurvivesAFollowingCall}.
  * @type {(cas: Cas<FileCasOperation>) => (state: State) => readonly [State, string]}
  */
-const seedGoodProgram = cas => state => {
-    const [state1, hash] = virtual(state)(seedText(cas)(goodProgramSource))
-    return [state1, hash]
-}
+const seedGoodProgram = cas => state => virtualOrPanic(state)(seedText(cas)(goodProgramSource))
 
 /**
  * Drives a KNOWN-GOOD run against `state` and asserts it succeeds — the
@@ -809,7 +889,7 @@ const assertSessionSurvivesAFollowingCall = home => cas => e => state => goodHas
     /** @type {Report<string>} */
     const goodReport = ctx => () => ctx.step(ctx.evoList('false'), () => ctx.pure('ok'))
     const [state1, outcome] = runExecuteRunViaFixture(home)(taxParamsFixture)(cas)(e)(goodHash)(goodProgramSource)(goodReport)([])(undefined)(state)
-    const [, followUp] = virtual(state1)(handleRunOutcome(cas)(goodHash)([])(false)({})({ taxYear: 2025, paramSetHash: 'sha256-paramset1' })(outcome))
+    const [, followUp] = virtualOrPanic(state1)(handleRunOutcome(cas)(goodHash)([])(false)({})({ taxYear: 2025, paramSetHash: 'sha256-paramset1' })(outcome))
     assertEq(followUp.isError, undefined)
 }
 
@@ -828,11 +908,11 @@ export const proof = {
         multiDocumentSumAcrossTwoStoredDocuments: () => {
             const home = '/success'
             const cas = fileCas(sha256)(home)
-            const [state0, cacheKey] = virtual(emptyState)(initEvo(cas))
+            const [state0, cacheKey] = virtualOrPanic(emptyState)(initEvo(cas))
             const e = evo(cas)(cacheKey)
 
-            const [state1, docAHash] = virtual(state0)(seedText(cas)('{"amount":"10.00"}'))
-            const [state2, docBHash] = virtual(state1)(seedText(cas)('{"amount":"20.00"}'))
+            const [state1, docAHash] = virtualOrPanic(state0)(seedText(cas)('{"amount":"10.00"}'))
+            const [state2, docBHash] = virtualOrPanic(state1)(seedText(cas)('{"amount":"20.00"}'))
             const [state3, addA] = virtual(state2)(e.add({ parents: [], subject: 'subjectA', snapshot: docAHash }))
             assert(addA[0] === 'ok', ['expected subject A revision add to succeed', addA])
             const [state4, addB] = virtual(state3)(e.add({ parents: [], subject: 'subjectB', snapshot: docBHash }))
@@ -843,9 +923,9 @@ export const proof = {
             // irrelevant to this proof — the loaded module comes from the
             // JsModule fixture below, not from parsing this text.
             const programSource = 'export const report = ctx => args => ctx.pure("0.00")'
-            const [state5, programHash] = virtual(state4)(seedText(cas)(programSource))
+            const [state5, programHash] = virtualOrPanic(state4)(seedText(cas)(programSource))
 
-            /** @type {(subjects: readonly string[]) => (acc: bigint) => Effect<CasOp, string>} */
+            /** @type {(subjects: readonly string[]) => (acc: bigint) => Effect<CasOp, string, string>} */
             const sumOverSubjects = subjects => acc => {
                 const [subject, ...rest] = subjects
                 if (subject === undefined) {
@@ -883,9 +963,9 @@ export const proof = {
         missingHashShortCircuitsBeforeMaterializeOrInterpret: () => {
             const home = '/missing'
             const cas = fileCas(sha256)(home)
-            const [state0, cacheKey] = virtual(emptyState)(initEvo(cas))
+            const [state0, cacheKey] = virtualOrPanic(emptyState)(initEvo(cas))
             const e = evo(cas)(cacheKey)
-            const [state1, outcome] = virtual(state0)(
+            const [state1, outcome] = virtualOrPanic(state0)(
                 executeRun(home)(cas)(e)({ hash: 'not-a-real-hash', args: [], taxParams: taxParamsFixture }))
             assertEq(outcome.kind, 'error')
             if (outcome.kind === 'error') {
@@ -900,11 +980,11 @@ export const proof = {
         dirtySpecifierNamesTheOffendingSpecifier: () => {
             const home = '/dirty'
             const cas = fileCas(sha256)(home)
-            const [state0, cacheKey] = virtual(emptyState)(initEvo(cas))
+            const [state0, cacheKey] = virtualOrPanic(emptyState)(initEvo(cas))
             const e = evo(cas)(cacheKey)
-            const [state1, dirtyHash] = virtual(state0)(
+            const [state1, dirtyHash] = virtualOrPanic(state0)(
                 seedText(cas)(`import fs from 'node:fs'\nexport const report = ctx => args => ctx.pure('x')`))
-            const [, outcome] = virtual(state1)(executeRun(home)(cas)(e)({ hash: dirtyHash, args: [], taxParams: taxParamsFixture }))
+            const [, outcome] = virtualOrPanic(state1)(executeRun(home)(cas)(e)({ hash: dirtyHash, args: [], taxParams: taxParamsFixture }))
             assertEq(outcome.kind, 'error')
             if (outcome.kind === 'error') {
                 assert(outcome.message.includes('node:fs'), outcome.message)
@@ -918,14 +998,14 @@ export const proof = {
         pinOverridesTheLiveHeadThroughFullExecuteRun: () => {
             const home = '/pin'
             const cas = fileCas(sha256)(home)
-            const [state0, cacheKey] = virtual(emptyState)(initEvo(cas))
+            const [state0, cacheKey] = virtualOrPanic(emptyState)(initEvo(cas))
             const e = evo(cas)(cacheKey)
-            const [state1, docHash] = virtual(state0)(seedText(cas)('{}'))
+            const [state1, docHash] = virtualOrPanic(state0)(seedText(cas)('{}'))
             const [state2, addResult] = virtual(state1)(e.add({ parents: [], subject: 'subjectS', snapshot: docHash }))
             assert(addResult[0] === 'ok', ['expected the revision add to succeed', addResult])
 
             const programSource = 'export const report = ctx => args => ctx.pure("unused")'
-            const [state3, programHash] = virtual(state2)(seedText(cas)(programSource))
+            const [state3, programHash] = virtualOrPanic(state2)(seedText(cas)(programSource))
             /** @type {Report<string>} */
             const pinReport = ctx => runArgs => ctx.evoHead(runArgs[0] ?? '')
 
@@ -959,9 +1039,9 @@ export const proof = {
         theEngineReachesALoadedProgramThroughFullExecuteRun: () => {
             const home = '/tax-engine'
             const cas = fileCas(sha256)(home)
-            const [state0, cacheKey] = virtual(emptyState)(initEvo(cas))
+            const [state0, cacheKey] = virtualOrPanic(emptyState)(initEvo(cas))
             const e = evo(cas)(cacheKey)
-            const [state1, profileHash] = virtual(state0)(seedText(cas)(jsonText({
+            const [state1, profileHash] = virtualOrPanic(state0)(seedText(cas)(jsonText({
                 dialect: returnProfileDialect,
                 taxYear: 2025,
                 filingStatus: 'single',
@@ -973,7 +1053,7 @@ export const proof = {
             assert(addResult[0] === 'ok', ['expected the profile revision add to succeed', addResult])
 
             const programSource = 'export const report = ctx => args => ctx.pure("unused")'
-            const [state3, programHash] = virtual(state2)(seedText(cas)(programSource))
+            const [state3, programHash] = virtualOrPanic(state2)(seedText(cas)(programSource))
 
             /** @type {TaxReport<string>} */
             const engineReport = ctx => runArgs => ctx.step(ctx.evoHead(runArgs[0] ?? ''), headsJson => {
@@ -1051,12 +1131,12 @@ export const proof = {
             persistedRunRecordContainsAnUncitedRead: () => {
                 const home = '/adversarial'
                 const cas = fileCas(sha256)(home)
-                const [state0, cacheKey] = virtual(emptyState)(initEvo(cas))
+                const [state0, cacheKey] = virtualOrPanic(emptyState)(initEvo(cas))
                 const e = evo(cas)(cacheKey)
-                const [state1, citedHash] = virtual(state0)(seedText(cas)('{"cited":true}'))
-                const [state2, uncitedHash] = virtual(state1)(seedText(cas)('{"uncited":true}'))
+                const [state1, citedHash] = virtualOrPanic(state0)(seedText(cas)('{"cited":true}'))
+                const [state2, uncitedHash] = virtualOrPanic(state1)(seedText(cas)('{"uncited":true}'))
                 const programSource = 'export const report = ctx => args => ctx.pure("unused")'
-                const [state3, programHash] = virtual(state2)(seedText(cas)(programSource))
+                const [state3, programHash] = virtualOrPanic(state2)(seedText(cas)(programSource))
 
                 /** @type {Report<string>} */
                 const adversarialReport = ctx => () => ctx.step(
@@ -1070,7 +1150,7 @@ export const proof = {
                 // sequence and handed to handleRunOutcome directly —
                 // fjsRunTool's OWN post-outcome logic, unchanged.
                 const [state3b, outcome] = runExecuteRunViaFixture(home)(taxParamsFixture)(cas)(e)(programHash)(programSource)(adversarialReport)([])(undefined)(state3)
-                const [state4, callResult] = virtual(state3b)(handleRunOutcome(cas)(programHash)([])(false)({})({ taxYear: 2025, paramSetHash: 'sha256-paramset1' })(outcome))
+                const [state4, callResult] = virtualOrPanic(state3b)(handleRunOutcome(cas)(programHash)([])(false)({})({ taxYear: 2025, paramSetHash: 'sha256-paramset1' })(outcome))
                 assertEq(callResult.isError, undefined)
                 const first = callResult.content[0]
                 if (first === undefined || first.type !== 'text') {
@@ -1099,17 +1179,17 @@ export const proof = {
             exactlyTwoNewHandlerConstructedHashesAppear: () => {
                 const home = '/behavioral'
                 const cas = fileCas(sha256)(home)
-                const [state0, cacheKey] = virtual(emptyState)(initEvo(cas))
+                const [state0, cacheKey] = virtualOrPanic(emptyState)(initEvo(cas))
                 const e = evo(cas)(cacheKey)
                 const programSource = 'export const report = ctx => args => ctx.pure("answer-42")'
-                const [state1, programHash] = virtual(state0)(seedText(cas)(programSource))
+                const [state1, programHash] = virtualOrPanic(state0)(seedText(cas)(programSource))
                 // PROV-07: one harmless evoList dispatch gives
                 // reads.length === 1, required now that a zero-read outcome
                 // is refused as an error instead of returned as 'ok'.
                 /** @type {Report<string>} */
                 const trivialReport = ctx => () => ctx.step(ctx.evoList('false'), () => ctx.pure('answer-42'))
 
-                const [, hashesBefore] = virtual(state1)(cas.list())
+                const [, hashesBefore] = virtualOrPanic(state1)(cas.list())
                 const hashesBeforeSet = new Set(hashesBefore.map(vecToCBase32))
 
                 // 07-10: decomposed via runExecuteRunViaFixture/
@@ -1117,7 +1197,7 @@ export const proof = {
                 // why a direct fjsRunTool.handle call can no longer succeed
                 // under virtual.
                 const [state1b, outcome] = runExecuteRunViaFixture(home)(taxParamsFixture)(cas)(e)(programHash)(programSource)(trivialReport)([])(undefined)(state1)
-                const [state2, callResult] = virtual(state1b)(handleRunOutcome(cas)(programHash)([])(false)({})({ taxYear: 2025, paramSetHash: 'sha256-paramset1' })(outcome))
+                const [state2, callResult] = virtualOrPanic(state1b)(handleRunOutcome(cas)(programHash)([])(false)({})({ taxYear: 2025, paramSetHash: 'sha256-paramset1' })(outcome))
                 assertEq(callResult.isError, undefined)
                 const first = callResult.content[0]
                 if (first === undefined || first.type !== 'text') {
@@ -1125,7 +1205,7 @@ export const proof = {
                 }
                 const parsed = /** @type {{ readonly resultHash: string, readonly runHash: string, readonly preview: string, readonly truncated: boolean }} */ (JSON.parse(first.text))
 
-                const [, hashesAfter] = virtual(state2)(cas.list())
+                const [, hashesAfter] = virtualOrPanic(state2)(cas.list())
                 const hashesAfterSet = new Set(hashesAfter.map(vecToCBase32))
                 const newHashes = [...hashesAfterSet].filter(h => !hashesBeforeSet.has(h))
                 assertEq(newHashes.length, 2)
@@ -1155,10 +1235,10 @@ export const proof = {
             objectResultIsSerializedNotStringified: () => {
                 const home = '/objectresult'
                 const cas = fileCas(sha256)(home)
-                const [state0, cacheKey] = virtual(emptyState)(initEvo(cas))
+                const [state0, cacheKey] = virtualOrPanic(emptyState)(initEvo(cas))
                 const e = evo(cas)(cacheKey)
                 const programSource = 'export const report = ctx => args => ctx.step(ctx.evoList("false"), () => ctx.pure({ total: "1234.56" }))'
-                const [state1, programHash] = virtual(state0)(seedText(cas)(programSource))
+                const [state1, programHash] = virtualOrPanic(state0)(seedText(cas)(programSource))
                 // One dispatched read, so the zero-read gate (09-03) lets the
                 // outcome through as 'ok' — this leaf is about serialization,
                 // not about that gate.
@@ -1166,7 +1246,7 @@ export const proof = {
                 const objectReport = ctx => () => ctx.step(ctx.evoList('false'), () => ctx.pure({ total: '1234.56' }))
 
                 const [state1b, outcome] = runExecuteRunViaFixture(home)(taxParamsFixture)(cas)(e)(programHash)(programSource)(objectReport)([])(undefined)(state1)
-                const [state2, callResult] = virtual(state1b)(handleRunOutcome(cas)(programHash)([])(false)({})({ taxYear: 2025, paramSetHash: 'sha256-paramset1' })(outcome))
+                const [state2, callResult] = virtualOrPanic(state1b)(handleRunOutcome(cas)(programHash)([])(false)({})({ taxYear: 2025, paramSetHash: 'sha256-paramset1' })(outcome))
                 assertEq(callResult.isError, undefined)
                 const first = callResult.content[0]
                 if (first === undefined || first.type !== 'text') {
@@ -1194,13 +1274,13 @@ export const proof = {
             literalCountSurvivesResultSerialization: () => {
                 const home = '/literalcount'
                 const cas = fileCas(sha256)(home)
-                const [state0, cacheKey] = virtual(emptyState)(initEvo(cas))
+                const [state0, cacheKey] = virtualOrPanic(emptyState)(initEvo(cas))
                 const e = evo(cas)(cacheKey)
                 // Three numeric literals in the source, and a structured
                 // result — so the value goes through `stringify`, the path
                 // that rebuilds the outcome.
                 const programSource = 'export const report = ctx => args => ctx.step(ctx.evoList("false"), () => ctx.pure({ a: 1, b: 2, c: 3 }))'
-                const [state1, programHash] = virtual(state0)(seedText(cas)(programSource))
+                const [state1, programHash] = virtualOrPanic(state0)(seedText(cas)(programSource))
                 /** @type {Report<unknown>} */
                 const countedReport = ctx => () => ctx.step(ctx.evoList('false'), () => ctx.pure({ a: 1, b: 2, c: 3 }))
 
@@ -1209,7 +1289,7 @@ export const proof = {
                 const expected = outcome.literalCount
                 assert(expected > 0, ['the fixture must have numeric literals to count', expected])
 
-                const [, callResult] = virtual(state1b)(handleRunOutcome(cas)(programHash)([])(false)({})({ taxYear: 2025, paramSetHash: 'sha256-paramset1' })(outcome))
+                const [, callResult] = virtualOrPanic(state1b)(handleRunOutcome(cas)(programHash)([])(false)({})({ taxYear: 2025, paramSetHash: 'sha256-paramset1' })(outcome))
                 const first = callResult.content[0]
                 if (first === undefined || first.type !== 'text') {
                     throw ['expected a text content item', callResult]
@@ -1223,15 +1303,15 @@ export const proof = {
             stringResultIsUnquoted: () => {
                 const home = '/stringresult'
                 const cas = fileCas(sha256)(home)
-                const [state0, cacheKey] = virtual(emptyState)(initEvo(cas))
+                const [state0, cacheKey] = virtualOrPanic(emptyState)(initEvo(cas))
                 const e = evo(cas)(cacheKey)
                 const programSource = 'export const report = ctx => args => ctx.step(ctx.evoList("false"), () => ctx.pure("0.00"))'
-                const [state1, programHash] = virtual(state0)(seedText(cas)(programSource))
+                const [state1, programHash] = virtualOrPanic(state0)(seedText(cas)(programSource))
                 /** @type {Report<unknown>} */
                 const stringReport = ctx => () => ctx.step(ctx.evoList('false'), () => ctx.pure('0.00'))
 
                 const [state1b, outcome] = runExecuteRunViaFixture(home)(taxParamsFixture)(cas)(e)(programHash)(programSource)(stringReport)([])(undefined)(state1)
-                const [state2, callResult] = virtual(state1b)(handleRunOutcome(cas)(programHash)([])(false)({})({ taxYear: 2025, paramSetHash: 'sha256-paramset1' })(outcome))
+                const [state2, callResult] = virtualOrPanic(state1b)(handleRunOutcome(cas)(programHash)([])(false)({})({ taxYear: 2025, paramSetHash: 'sha256-paramset1' })(outcome))
                 const first = callResult.content[0]
                 if (first === undefined || first.type !== 'text') {
                     throw ['expected a text content item', callResult]
@@ -1248,15 +1328,15 @@ export const proof = {
             nonJsonResultBecomesAnErrorRecord: () => {
                 const home = '/bigintresult'
                 const cas = fileCas(sha256)(home)
-                const [state0, cacheKey] = virtual(emptyState)(initEvo(cas))
+                const [state0, cacheKey] = virtualOrPanic(emptyState)(initEvo(cas))
                 const e = evo(cas)(cacheKey)
                 const programSource = 'export const report = ctx => args => ctx.step(ctx.evoList("false"), () => ctx.pure(1n))'
-                const [state1, programHash] = virtual(state0)(seedText(cas)(programSource))
+                const [state1, programHash] = virtualOrPanic(state0)(seedText(cas)(programSource))
                 /** @type {Report<unknown>} */
                 const bigintReport = ctx => () => ctx.step(ctx.evoList('false'), () => ctx.pure(1n))
 
                 const [state1b, outcome] = runExecuteRunViaFixture(home)(taxParamsFixture)(cas)(e)(programHash)(programSource)(bigintReport)([])(undefined)(state1)
-                const [state2, callResult] = virtual(state1b)(handleRunOutcome(cas)(programHash)([])(false)({})({ taxYear: 2025, paramSetHash: 'sha256-paramset1' })(outcome))
+                const [state2, callResult] = virtualOrPanic(state1b)(handleRunOutcome(cas)(programHash)([])(false)({})({ taxYear: 2025, paramSetHash: 'sha256-paramset1' })(outcome))
                 assertEq(callResult.isError, true)
                 const first = callResult.content[0]
                 if (first === undefined || first.type !== 'text') {
@@ -1283,10 +1363,10 @@ export const proof = {
             tenKeysExactlyAndResultAlwaysResolvable: () => {
                 const home = '/shape'
                 const cas = fileCas(sha256)(home)
-                const [state0, cacheKey] = virtual(emptyState)(initEvo(cas))
+                const [state0, cacheKey] = virtualOrPanic(emptyState)(initEvo(cas))
                 const e = evo(cas)(cacheKey)
                 const programSource = 'export const report = ctx => args => ctx.pure("tiny")'
-                const [state1, programHash] = virtual(state0)(seedText(cas)(programSource))
+                const [state1, programHash] = virtualOrPanic(state0)(seedText(cas)(programSource))
                 // PROV-07: one harmless evoList dispatch gives
                 // reads.length === 1, required now that a zero-read outcome
                 // is refused as an error instead of returned as 'ok'.
@@ -1298,7 +1378,7 @@ export const proof = {
                 // why a direct fjsRunTool.handle call can no longer succeed
                 // under virtual.
                 const [state1b, outcome] = runExecuteRunViaFixture(home)(taxParamsFixture)(cas)(e)(programHash)(programSource)(tinyReport)([])(undefined)(state1)
-                const [state2, callResult] = virtual(state1b)(handleRunOutcome(cas)(programHash)([])(false)({})({ taxYear: 2025, paramSetHash: 'sha256-paramset1' })(outcome))
+                const [state2, callResult] = virtualOrPanic(state1b)(handleRunOutcome(cas)(programHash)([])(false)({})({ taxYear: 2025, paramSetHash: 'sha256-paramset1' })(outcome))
                 assertEq(callResult.isError, undefined)
                 const first = callResult.content[0]
                 if (first === undefined || first.type !== 'text') {
@@ -1341,9 +1421,9 @@ export const proof = {
             failedRunStillGetsARunRecord: () => {
                 const home = '/error-path'
                 const cas = fileCas(sha256)(home)
-                const [state0, cacheKey] = virtual(emptyState)(initEvo(cas))
+                const [state0, cacheKey] = virtualOrPanic(emptyState)(initEvo(cas))
                 const e = evo(cas)(cacheKey)
-                const [state1, callResult] = virtual(state0)(
+                const [state1, callResult] = virtualOrPanic(state0)(
                     fjsRunTool(home)(cas)(e).handle({ hash: 'not-a-real-hash', taxYear: 2025 }))
                 assertEq(callResult.isError, true)
                 const first = callResult.content[0]
@@ -1391,9 +1471,9 @@ export const proof = {
             subjectOnlyWithoutParentsPersistsPinnedFalse: () => {
                 const home = '/pin-subject-only'
                 const cas = fileCas(sha256)(home)
-                const [state0, cacheKey] = virtual(emptyState)(initEvo(cas))
+                const [state0, cacheKey] = virtualOrPanic(emptyState)(initEvo(cas))
                 const e = evo(cas)(cacheKey)
-                const [state1, callResult] = virtual(state0)(
+                const [state1, callResult] = virtualOrPanic(state0)(
                     fjsRunTool(home)(cas)(e).handle({ hash: 'not-a-real-hash', taxYear: 2025, subject: 'someSubject' }))
                 assertEq(callResult.isError, true)
                 const first = callResult.content[0]
@@ -1443,16 +1523,16 @@ export const proof = {
             successfulRunRecordsPinnedTrueWhenTheCallActuallyPinned: () => {
                 const home = '/pin-ok-arm'
                 const cas = fileCas(sha256)(home)
-                const [state0, cacheKey] = virtual(emptyState)(initEvo(cas))
+                const [state0, cacheKey] = virtualOrPanic(emptyState)(initEvo(cas))
                 const e = evo(cas)(cacheKey)
                 const programSource = 'export const report = ctx => args => ctx.pure("unused")'
-                const [state1, programHash] = virtual(state0)(seedText(cas)(programSource))
+                const [state1, programHash] = virtualOrPanic(state0)(seedText(cas)(programSource))
                 /** @type {Report<string>} */
                 const trivialReport = ctx => () => ctx.step(ctx.evoList('false'), () => ctx.pure('pinned-ok-value'))
                 const [state1b, outcome] = runExecuteRunViaFixture(home)(taxParamsFixture)(cas)(e)(programHash)(programSource)(trivialReport)([])(undefined)(state1)
                 assert(outcome.kind === 'ok', ['expected an ok outcome', outcome])
                 const pinFields = /** @type {{ readonly subject?: string, readonly parents?: readonly string[] }} */ ({ subject: 'pinnedSubject', parents: ['pinnedParent'] })
-                const [state2, callResult] = virtual(state1b)(handleRunOutcome(cas)(programHash)([])(true)(pinFields)({ taxYear: 2025, paramSetHash: 'sha256-paramset1' })(outcome))
+                const [state2, callResult] = virtualOrPanic(state1b)(handleRunOutcome(cas)(programHash)([])(true)(pinFields)({ taxYear: 2025, paramSetHash: 'sha256-paramset1' })(outcome))
                 assertEq(callResult.isError, undefined)
                 const first = callResult.content[0]
                 if (first === undefined || first.type !== 'text') {
@@ -1498,7 +1578,7 @@ export const proof = {
                 const cas = fileCas(sha256)(home)
                 /** @type {RunOutcome<unknown>} */
                 const outcome = { kind: 'error', message: 'refused: fetch', reads: [['casRead', ['observed-before-failure-hash']]] }
-                const [state1, callResult] = virtual(emptyState)(
+                const [state1, callResult] = virtualOrPanic(emptyState)(
                     handleRunOutcome(cas)('program-hash-error-arm-inputs')([])(false)({})({ taxYear: 2025, paramSetHash: 'sha256-paramset1' })(outcome))
                 assertEq(callResult.isError, true)
                 const first = callResult.content[0]
@@ -1526,16 +1606,16 @@ export const proof = {
             okArmPersistsTheArgsActuallyPassedIn: () => {
                 const home = '/ok-arm-args'
                 const cas = fileCas(sha256)(home)
-                const [state0, cacheKey] = virtual(emptyState)(initEvo(cas))
+                const [state0, cacheKey] = virtualOrPanic(emptyState)(initEvo(cas))
                 const e = evo(cas)(cacheKey)
                 const programSource = 'export const report = ctx => args => ctx.pure("unused")'
-                const [state1, programHash] = virtual(state0)(seedText(cas)(programSource))
+                const [state1, programHash] = virtualOrPanic(state0)(seedText(cas)(programSource))
                 /** @type {Report<string>} */
                 const trivialReport = ctx => () => ctx.step(ctx.evoList('false'), () => ctx.pure('args-proof-value'))
                 const [state1b, outcome] = runExecuteRunViaFixture(home)(taxParamsFixture)(cas)(e)(programHash)(programSource)(trivialReport)([])(undefined)(state1)
                 assert(outcome.kind === 'ok', ['expected an ok outcome', outcome])
                 const distinctiveArgs = ['distinctive-arg-alpha', 'distinctive-arg-beta']
-                const [state2, callResult] = virtual(state1b)(handleRunOutcome(cas)(programHash)(distinctiveArgs)(false)({})({ taxYear: 2025, paramSetHash: 'sha256-paramset1' })(outcome))
+                const [state2, callResult] = virtualOrPanic(state1b)(handleRunOutcome(cas)(programHash)(distinctiveArgs)(false)({})({ taxYear: 2025, paramSetHash: 'sha256-paramset1' })(outcome))
                 assertEq(callResult.isError, undefined)
                 const first = callResult.content[0]
                 if (first === undefined || first.type !== 'text') {
@@ -1571,7 +1651,7 @@ export const proof = {
             nonErrorThrowBecomesErrorResult: () => {
                 const home = '/error-taxonomy-non-error-throw'
                 const cas = fileCas(sha256)(home)
-                const [state0, cacheKey] = virtual(emptyState)(initEvo(cas))
+                const [state0, cacheKey] = virtualOrPanic(emptyState)(initEvo(cas))
                 const e = evo(cas)(cacheKey)
                 const [state1, goodHash] = seedGoodProgram(cas)(state0)
 
@@ -1580,17 +1660,21 @@ export const proof = {
                 // module header's documented materialize-write/JsModule-at-
                 // full-path split every proof in this file uses.
                 const programSource = 'export const report = ctx => args => ctx.pure("unused")'
-                const [state2, escapingHash] = virtual(state1)(seedText(cas)(programSource))
-                /** @type {Report<string>} */
-                const escapingReport = () => () => unsafeDo('fetch')('https://evil')
+                const [state2, escapingHash] = virtualOrPanic(state1)(seedText(cas)(programSource))
+                // Placed as a MODULE, the way a real stored program arrives:
+                // a `Report` could not name `fetch` and a `JsModule` need not
+                // be a `Report` at all, which is the whole point of the
+                // runtime backstop this leaf measures.
+                /** @type {JsModule} */
+                const escapingModule = () => ({ report: () => () => probeDo('fetch')('https://evil') })
 
                 // 07-10: decomposed via runExecuteRunViaFixture/
                 // handleRunOutcome — a pre-placed fixture would otherwise
                 // collide with executeRun's OWN real materialize-write at
                 // the SAME path (see the module header), masking the
                 // refusal this leaf exists to prove.
-                const [state2b, outcome] = runExecuteRunViaFixture(home)(taxParamsFixture)(cas)(e)(escapingHash)(programSource)(escapingReport)([])(undefined)(state2)
-                const [state3, callResult] = virtual(state2b)(handleRunOutcome(cas)(escapingHash)([])(false)({})({ taxYear: 2025, paramSetHash: 'sha256-paramset1' })(outcome))
+                const [state2b, outcome] = runExecuteRunViaModuleFixture(home)(taxParamsFixture)(cas)(e)(escapingHash)(programSource)(escapingModule)([])(undefined)(state2)
+                const [state3, callResult] = virtualOrPanic(state2b)(handleRunOutcome(cas)(escapingHash)([])(false)({})({ taxYear: 2025, paramSetHash: 'sha256-paramset1' })(outcome))
                 assertEq(callResult.isError, true)
                 const first = callResult.content[0]
                 if (first === undefined || first.type !== 'text') {
@@ -1613,12 +1697,12 @@ export const proof = {
             missingHashBecomesErrorResult: () => {
                 const home = '/error-taxonomy-missing-hash'
                 const cas = fileCas(sha256)(home)
-                const [state0, cacheKey] = virtual(emptyState)(initEvo(cas))
+                const [state0, cacheKey] = virtualOrPanic(emptyState)(initEvo(cas))
                 const e = evo(cas)(cacheKey)
                 const [state1, goodHash] = seedGoodProgram(cas)(state0)
                 const missingHash = vecToCBase32(vec8(0xabn))
 
-                const [state2, callResult] = virtual(state1)(
+                const [state2, callResult] = virtualOrPanic(state1)(
                     fjsRunTool(home)(cas)(e).handle({ hash: missingHash, taxYear: 2025 }))
                 assertEq(callResult.isError, true)
                 const first = callResult.content[0]
@@ -1654,17 +1738,17 @@ export const proof = {
             importFailureBecomesErrorResult: () => {
                 const home = '/error-taxonomy-import-failure'
                 const cas = fileCas(sha256)(home)
-                const [state0, cacheKey] = virtual(emptyState)(initEvo(cas))
+                const [state0, cacheKey] = virtualOrPanic(emptyState)(initEvo(cas))
                 const e = evo(cas)(cacheKey)
                 const [state1, goodHash] = seedGoodProgram(cas)(state0)
 
-                const [state2, unimportableHash] = virtual(state1)(
+                const [state2, unimportableHash] = virtualOrPanic(state1)(
                     seedText(cas)('export const report = ctx => args => ctx.pure("unused")'))
                 // Deliberately no fixture placed at
                 // `programPath(materializeHome(home))(unimportableHash)` —
                 // the whole point of this leaf.
 
-                const [state3, callResult] = virtual(state2)(
+                const [state3, callResult] = virtualOrPanic(state2)(
                     fjsRunTool(home)(cas)(e).handle({ hash: unimportableHash, taxYear: 2025 }))
                 assertEq(callResult.isError, true)
                 const first = callResult.content[0]
@@ -1689,9 +1773,9 @@ export const proof = {
         missingTaxYearRejectedByToolEntry: () => {
             const home = '/tax-year-missing'
             const cas = fileCas(sha256)(home)
-            const [state0, cacheKey] = virtual(emptyState)(initEvo(cas))
+            const [state0, cacheKey] = virtualOrPanic(emptyState)(initEvo(cas))
             const e = evo(cas)(cacheKey)
-            const [, callResult] = virtual(state0)(
+            const [, callResult] = virtualOrPanic(state0)(
                 fjsRunTool(home)(cas)(e).handle({ hash: 'not-a-real-hash' }))
             assertEq(callResult.isError, true)
             const first = callResult.content[0]
@@ -1706,9 +1790,9 @@ export const proof = {
         unknownTaxYearRefused: () => {
             const home = '/tax-year-unknown'
             const cas = fileCas(sha256)(home)
-            const [state0, cacheKey] = virtual(emptyState)(initEvo(cas))
+            const [state0, cacheKey] = virtualOrPanic(emptyState)(initEvo(cas))
             const e = evo(cas)(cacheKey)
-            const [, callResult] = virtual(state0)(
+            const [, callResult] = virtualOrPanic(state0)(
                 fjsRunTool(home)(cas)(e).handle({ hash: 'not-a-real-hash', taxYear: 1999 }))
             assertEq(callResult.isError, true)
             const first = callResult.content[0]
@@ -1723,23 +1807,23 @@ export const proof = {
     // ── PROV-07's decisive proof: zero observed reads becomes an error ───
     zeroReadGate: {
         // A purpose-built zero-read report — distinct from Plan 09-04's own
-        // verbatim `() => pure({ line16: 9137 })` adversary fixture — proves
+        // verbatim `() => pureOk({ line16: 9137 })` adversary fixture — proves
         // the gate itself: a report that dispatches NO CAS/Evo read is
         // refused as an error result, never returned as a silent 'ok'.
         zeroReadOutcomeBecomesAnErrorResult: () => {
             const home = '/zero-read-gate'
             const cas = fileCas(sha256)(home)
-            const [state0, cacheKey] = virtual(emptyState)(initEvo(cas))
+            const [state0, cacheKey] = virtualOrPanic(emptyState)(initEvo(cas))
             const e = evo(cas)(cacheKey)
             const programSource = 'export const report = ctx => args => ctx.pure("unused")'
-            const [state1, programHash] = virtual(state0)(seedText(cas)(programSource))
+            const [state1, programHash] = virtualOrPanic(state0)(seedText(cas)(programSource))
             /** @type {Report<string>} */
             const zeroReadReport = ctx => () => ctx.pure('unused')
 
             const [state1b, outcome] = runExecuteRunViaFixture(home)(taxParamsFixture)(cas)(e)(programHash)(programSource)(zeroReadReport)([])(undefined)(state1)
             assertEq(outcome.kind, 'error')
 
-            const [state2, callResult] = virtual(state1b)(handleRunOutcome(cas)(programHash)([])(false)({})({ taxYear: 2025, paramSetHash: 'sha256-paramset1' })(outcome))
+            const [state2, callResult] = virtualOrPanic(state1b)(handleRunOutcome(cas)(programHash)([])(false)({})({ taxYear: 2025, paramSetHash: 'sha256-paramset1' })(outcome))
             assertEq(callResult.isError, true)
             const first = callResult.content[0]
             if (first === undefined || first.type !== 'text') {
@@ -1788,7 +1872,7 @@ export const proof = {
     // claim, not a proof (09-CONTEXT.md). This section runs the decisive
     // comparison both ways: a real, minimal ReportLine-shaped program whose
     // output MOVES when a stored document changes (the leaf above), and the
-    // exact adversary `() => pure({ line16: 9137 })`, written verbatim, whose
+    // exact adversary `() => pureOk({ line16: 9137 })`, written verbatim, whose
     // failure does NOT move under the identical perturbation (the leaf
     // below, `hardcodedAdversaryFailsAndIsInvariantToInputChange`) — the
     // control that makes the assertion about the gate itself rather than
@@ -1801,11 +1885,11 @@ export const proof = {
         realProgramOutputMovesWhenTheInputDocumentChanges: () => {
             const home = '/perturbation'
             const cas = fileCas(sha256)(home)
-            const [state0, cacheKey] = virtual(emptyState)(initEvo(cas))
+            const [state0, cacheKey] = virtualOrPanic(emptyState)(initEvo(cas))
             const e = evo(cas)(cacheKey)
             const subject = 'perturbation-subject'
 
-            const [state1, docHash1] = virtual(state0)(seedText(cas)('{"box1InterestIncome":"10.00"}'))
+            const [state1, docHash1] = virtualOrPanic(state0)(seedText(cas)('{"box1InterestIncome":"10.00"}'))
             const [state2, addResult1] = virtual(state1)(e.add({ parents: [], subject, snapshot: docHash1 }))
             assert(addResult1[0] === 'ok', ['expected the first revision add to succeed', addResult1])
             const rev1 = addResult1[1]
@@ -1815,7 +1899,7 @@ export const proof = {
             // irrelevant to this proof — the loaded module comes from the
             // JsModule fixture below, not from parsing this text.
             const programSource = 'export const report = ctx => args => ctx.pure("unused")'
-            const [state3, programHash] = virtual(state2)(seedText(cas)(programSource))
+            const [state3, programHash] = virtualOrPanic(state2)(seedText(cas)(programSource))
 
             // The smallest possible demonstration reading one real stored
             // document: subject's head -> revision -> snapshot ->
@@ -1858,7 +1942,7 @@ export const proof = {
             // the subject's SOLE live head (headsOf's own rule, fjs/cas/evo/
             // module.f.js: a hash filtered out of `hashes` once it appears
             // in another revision's `parents`).
-            const [state5, docHash2] = virtual(state4)(seedText(cas)('{"box1InterestIncome":"20.00"}'))
+            const [state5, docHash2] = virtualOrPanic(state4)(seedText(cas)('{"box1InterestIncome":"20.00"}'))
             const [state6, addResult2] = virtual(state5)(e.add({ parents: [rev1], subject, snapshot: docHash2 }))
             assert(addResult2[0] === 'ok', ['expected the second revision add to succeed', addResult2])
 
@@ -1875,7 +1959,7 @@ export const proof = {
             // anything other than an array,
             // fjs/effects/node/virtual/module.f.js) — so the second run
             // targets its own, fresh path instead.
-            const [state6b, programHash2] = virtual(state6)(seedText(cas)(programSource + '\n'))
+            const [state6b, programHash2] = virtualOrPanic(state6)(seedText(cas)(programSource + '\n'))
 
             const [, outcome2] = runExecuteRunViaFixture(home)(taxParamsFixture)(cas)(e)(programHash2)(programSource + '\n')(demoReport)([])(undefined)(state6b)
             assert(outcome2.kind === 'ok', ['expected the second run to succeed', outcome2])
@@ -1897,14 +1981,14 @@ export const proof = {
         hardcodedAdversaryFailsAndIsInvariantToInputChange: () => {
             const home = '/adversary-perturbation'
             const cas = fileCas(sha256)(home)
-            const [state0, cacheKey] = virtual(emptyState)(initEvo(cas))
+            const [state0, cacheKey] = virtualOrPanic(emptyState)(initEvo(cas))
             const e = evo(cas)(cacheKey)
             const subject = 'adversary-subject'
 
             // Even though the adversary never reads it, the control needs a
             // real document to perturb — the SAME perturbation the real leg
             // above applies.
-            const [state1, docHash1] = virtual(state0)(seedText(cas)('{"box1InterestIncome":"10.00"}'))
+            const [state1, docHash1] = virtualOrPanic(state0)(seedText(cas)('{"box1InterestIncome":"10.00"}'))
             const [state2, addResult1] = virtual(state1)(e.add({ parents: [], subject, snapshot: docHash1 }))
             assert(addResult1[0] === 'ok', ['expected the first revision add to succeed', addResult1])
             const rev1 = addResult1[1]
@@ -1914,7 +1998,7 @@ export const proof = {
             // unavoidable `ctx.` prefix (a stored program has zero imports,
             // EXEC-07, and cannot reach a bare `pure` any other way).
             const adversarySource = 'export const report = ctx => () => ctx.pure({ line16: 9137 })'
-            const [state3, adversaryHash] = virtual(state2)(seedText(cas)(adversarySource))
+            const [state3, adversaryHash] = virtualOrPanic(state2)(seedText(cas)(adversarySource))
             /** @type {Report<{ readonly line16: number }>} */
             const adversaryReport = ctx => () => ctx.pure({ line16: 9137 })
 
@@ -1933,7 +2017,7 @@ export const proof = {
             }
 
             // Perturb the SAME document exactly as the real leg does.
-            const [state5, docHash2] = virtual(state4)(seedText(cas)('{"box1InterestIncome":"20.00"}'))
+            const [state5, docHash2] = virtualOrPanic(state4)(seedText(cas)('{"box1InterestIncome":"20.00"}'))
             const [state6, addResult2] = virtual(state5)(e.add({ parents: [rev1], subject, snapshot: docHash2 }))
             assert(addResult2[0] === 'ok', ['expected the second revision add to succeed', addResult2])
 
@@ -1947,7 +2031,7 @@ export const proof = {
             // fresh path; `countNumericLiterals` still counts the SAME one
             // literal either way, so the control's identical-message
             // assertion below is unaffected.
-            const [state6b, adversaryHash2] = virtual(state6)(seedText(cas)(adversarySource + '\n'))
+            const [state6b, adversaryHash2] = virtualOrPanic(state6)(seedText(cas)(adversarySource + '\n'))
 
             const [state7, outcome2] = runExecuteRunViaFixture(home)(taxParamsFixture)(cas)(e)(adversaryHash2)(adversarySource + '\n')(adversaryReport)([])(undefined)(state6b)
             assert(outcome2.kind === 'error', ['expected the verbatim adversary to be refused again', outcome2])
@@ -1963,7 +2047,7 @@ export const proof = {
             // PROV-03: provenance that covers only successes is not
             // provenance — a status:'error' run record is still persisted
             // for a zero-read refusal.
-            const [state8, callResult] = virtual(state7)(handleRunOutcome(cas)(adversaryHash)([])(false)({})({ taxYear: 2025, paramSetHash: 'sha256-paramset1' })(outcome2))
+            const [state8, callResult] = virtualOrPanic(state7)(handleRunOutcome(cas)(adversaryHash)([])(false)({})({ taxYear: 2025, paramSetHash: 'sha256-paramset1' })(outcome2))
             assertEq(callResult.isError, true)
             const first = callResult.content[0]
             if (first === undefined || first.type !== 'text') {

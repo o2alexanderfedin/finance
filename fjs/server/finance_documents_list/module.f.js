@@ -77,26 +77,31 @@
  *
  * @module
  */
-import { number, option, string } from 'functionalscript/fjs/types/rtti/module.f.js'
-import { validate as rttiValidate } from 'functionalscript/fjs/types/rtti/validate/module.f.js'
-import { step, mapStep, foldStep, pure } from 'functionalscript/fjs/effects/module.f.js'
-import { collectRead, fileCas } from 'functionalscript/fjs/cas/module.f.js'
-import { cBase32ToVec, vecToCBase32 } from 'functionalscript/fjs/basen/cbase32/module.f.js'
-import { utf8ToString, tryUtf8 } from 'functionalscript/fjs/text/module.f.js'
-import { toolEntry, okResult } from 'functionalscript/fjs/protocol/mcp/module.f.js'
-import { initEvo, evo as evoOf } from 'functionalscript/fjs/cas/evo/module.f.js'
-import { sha256 } from 'functionalscript/fjs/crypto/sha2/module.f.js'
-import { emptyState, virtual } from 'functionalscript/fjs/effects/node/virtual/module.f.js'
-import { ok } from 'functionalscript/fjs/types/result/module.f.js'
-import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
+import { number, option, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
+import { validate as rttiValidate } from 'functionalscript/fjs/types/rtti/validate/module.f.mjs'
+import { step, catchStep, mapStep, foldStep, pureOk } from 'functionalscript/fjs/effects/module.f.mjs'
+import { empty, nonEmpty } from 'functionalscript/fjs/effects/list/module.f.mjs'
+import { collectRead, fileCas } from 'functionalscript/fjs/cas/module.f.mjs'
+import { cBase32ToVec, vecToCBase32 } from 'functionalscript/fjs/basen/cbase32/module.f.mjs'
+import { utf8ToString, tryUtf8 } from 'functionalscript/fjs/text/module.f.mjs'
+import { toolEntry, okResult, errorResult } from 'functionalscript/fjs/protocol/mcp/module.f.mjs'
+import { errorSummary } from 'functionalscript/fjs/effects/node/module.f.mjs'
+import { initEvo, evo as evoOf } from 'functionalscript/fjs/cas/evo/module.f.mjs'
+import { sha256 } from 'functionalscript/fjs/crypto/sha2/module.f.mjs'
+import { emptyState, virtual } from 'functionalscript/fjs/effects/node/virtual/module.f.mjs'
+import { unwrap } from 'functionalscript/fjs/types/result/module.f.mjs'
+import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { parse, stringify as jsonText } from '../../json/module.f.js'
 
-/** @import { Operation } from 'functionalscript/fjs/effects/module.f.js' */
-/** @import { MemOp } from 'functionalscript/fjs/effects/memory/module.f.js' */
-/** @import { Cas, FileCas, FileCasOperation } from 'functionalscript/fjs/cas/module.f.js' */
-/** @import { Evo } from 'functionalscript/fjs/cas/evo/module.f.js' */
-/** @import { ToolEntry } from 'functionalscript/fjs/protocol/mcp/module.f.js' */
-/** @import { State } from 'functionalscript/fjs/effects/node/virtual/module.f.js' */
+/** @import { Effect, Operation } from 'functionalscript/fjs/effects/types.js' */
+/** @import { List } from 'functionalscript/fjs/effects/list/types.js' */
+/** @import { Vec } from 'functionalscript/fjs/types/bit_vec/types.js' */
+/** @import { IoChannel, NodeOp } from 'functionalscript/fjs/effects/node/types.js' */
+/** @import { MemOp } from 'functionalscript/fjs/effects/memory/types.js' */
+/** @import { Cas, FileCas, FileCasOperation } from 'functionalscript/fjs/cas/types.js' */
+/** @import { Evo } from 'functionalscript/fjs/cas/evo/types.js' */
+/** @import { ToolEntry } from 'functionalscript/fjs/protocol/mcp/types.js' */
+/** @import { State } from 'functionalscript/fjs/effects/node/virtual/types.js' */
 
 /**
  * A LOCAL, deliberately loose identity-peek schema — see the module header's
@@ -141,52 +146,54 @@ export const financeDocumentsListTool = evo => cas => {
      * own signature rather than re-stated against a type parameter that is
      * not in scope for a nested `@type` annotation.
      */
-    const entryFor = (/** @type {string} */ subject) => (/** @type {string} */ headHash) => step(
-        evo.revision(headHash),
-        revResult => {
-            if (revResult[0] === 'error') {
-                // Should not happen: headHash was itself just returned by
-                // evo.head, but code defensively per this project's
-                // noUncheckedIndexedAccess discipline.
-                return pure(undefined)
-            }
-            const snapshotRef = revResult[1].snapshot
-            if (snapshotRef === undefined) {
-                // Should not happen either: readRevision's own contract
-                // says `snapshot` is "always present" on output, but the
-                // field is typed optional (RevisionData's input/output
-                // vocabulary is shared) -- narrow rather than assume.
-                return pure(undefined)
-            }
-            const snapshotHash = cBase32ToVec(snapshotRef)
-            if (snapshotHash === null) {
-                return pure(undefined)
-            }
-            return step(
-                collectRead(cas.read(snapshotHash)),
-                blobResult => {
-                    if (blobResult[0] === 'error') {
-                        // A genuinely broken/missing snapshot blob -- skip.
-                        return pure(undefined)
-                    }
-                    const [parseTag, parsed] = parse(utf8ToString(blobResult[1]))
-                    if (parseTag === 'error') {
-                        // The "non-JSON snapshot blob" skip case -- see the
-                        // module header's "Failure modes" section.
-                        return pure(undefined)
-                    }
-                    const [t, identity] = rttiValidate(documentIdentitySchema)(parsed)
-                    const dialect = t === 'ok' && identity.dialect !== undefined
-                        ? identity.dialect
-                        : 'unknown'
-                    const taxYear = t === 'ok' ? identity.taxYear : undefined
-                    /** @type {DocumentListEntry} */
-                    const entry = { subject, dialect, ...(taxYear === undefined ? {} : { taxYear }), hash: headHash }
-                    return pure(entry)
-                },
-            )
-        },
-    )
+    const entryFor = (/** @type {string} */ subject) => (/** @type {string} */ headHash) => {
+        const resolved = step(
+            evo.revision(headHash),
+            revision => {
+                const snapshotRef = revision.snapshot
+                if (snapshotRef === undefined) {
+                    // Should not happen: readRevision's own contract says
+                    // `snapshot` is "always present" on output, but the field
+                    // is typed optional (RevisionData's input/output
+                    // vocabulary is shared) -- narrow rather than assume.
+                    return pureOk(undefined)
+                }
+                const snapshotHash = cBase32ToVec(snapshotRef)
+                if (snapshotHash === null) {
+                    return pureOk(undefined)
+                }
+                return step(
+                    collectRead(cas.read(snapshotHash)),
+                    blob => {
+                        const [parseTag, parsed] = parse(utf8ToString(blob))
+                        if (parseTag === 'error') {
+                            // The "non-JSON snapshot blob" skip case -- see the
+                            // module header's "Failure modes" section.
+                            return pureOk(undefined)
+                        }
+                        const [t, identity] = rttiValidate(documentIdentitySchema)(parsed)
+                        const dialect = t === 'ok' && identity.dialect !== undefined
+                            ? identity.dialect
+                            : 'unknown'
+                        const taxYear = t === 'ok' ? identity.taxYear : undefined
+                        /** @type {DocumentListEntry} */
+                        const entry = { subject, dialect, ...(taxYear === undefined ? {} : { taxYear }), hash: headHash }
+                        return pureOk(entry)
+                    },
+                )
+            },
+        )
+        // **The skip is a `catchStep`, and it covers both fallible reads.**
+        // An undecodable revision (should not happen: `headHash` came from
+        // `evo.head`) and a broken or missing snapshot blob were two
+        // hand-written `if (r[0] === 'error') return pureOk(undefined)` arms;
+        // both mean the same thing here — this (subject, head) pair yields no
+        // row — so they are one recovery now. It must stay a per-pair
+        // recovery: `foldStep` short-circuits on the first `error` since
+        // 0.46.0, so letting either failure reach the fold would drop every
+        // remaining document rather than this one row.
+        return catchStep(resolved, () => pureOk(undefined))
+    }
     return toolEntry(
         'finance_documents_list',
         'Enumerates stored documents as a JSON array of ' +
@@ -195,16 +202,16 @@ export const financeDocumentsListTool = evo => cas => {
         '(subject, head) pair -- a subject with concurrent heads yields ' +
         'one row per head, all sharing the same subject.',
         { archived: option(true) },
-        ({ archived }) => mapStep(
+        ({ archived }) => catchStep(mapStep(
             step(
                 evo.list(archived),
                 subjects => foldStep(
-                    pure(subjects),
+                    pureOk(subjects),
                     /** @type {readonly DocumentListEntry[]} */ ([]),
                     subject => acc => step(
                         evo.head(subject),
                         heads => foldStep(
-                            pure(heads),
+                            pureOk(heads),
                             acc,
                             headHash => innerAcc => mapStep(
                                 entryFor(subject)(headHash),
@@ -215,11 +222,34 @@ export const financeDocumentsListTool = evo => cas => {
                 ),
             ),
             list => okResult(jsonText(list)),
-        ),
+        // An MCP handler answers `never`: a runner that cannot dispatch
+        // `evo.list`/`evo.head` becomes a JSON-RPC error response here rather
+        // than a failure the transport has to carry.
+        ), e => pureOk(errorResult(`finance_documents_list failed: ${errorSummary(e)}`))),
     )
 }
 
 // ── Tests ────────────────────────────────────────────────────────────────────
+
+/**
+ * A single-chunk `cas.write` payload. **The annotation is load-bearing**:
+ * `nonEmpty`/`empty` are generic in their operation set, and without a
+ * contextual type the write's op-set widens to the whole `Operation`
+ * universe and `virtual` will not accept it.
+ * @type {(bytes: Vec) => List<never, Vec, IoChannel>}
+ */
+const oneChunk = bytes => nonEmpty(bytes, empty())
+
+/**
+ * `virtual`, with the effect's error channel discharged by a panic — fixture
+ * setup a proof has no answer to. `unwrap` throws a BARE value, as `assert`
+ * does. Sites that ASSERT on the outcome keep plain `virtual`.
+ * @type {(state: State) => <O extends NodeOp, T, E>(e: Effect<O, T, E>) => readonly [State, T]}
+ */
+const virtualOrPanic = state => e => {
+    const [next, r] = virtual(state)(e)
+    return [next, unwrap(r)]
+}
 
 /**
  * Runs `financeDocumentsListTool(...).handle` against an already-seeded
@@ -232,7 +262,7 @@ export const financeDocumentsListTool = evo => cas => {
  */
 const listThrough = state => cas => e => args => {
     const tool = financeDocumentsListTool(e)(cas)
-    const [, result] = virtual(state)(tool.handle(args))
+    const [, result] = virtualOrPanic(state)(tool.handle(args))
     assert(result.isError !== true, ['expected finance_documents_list to succeed', result])
     const item = result.content[0]
     assert(item !== undefined && item.type === 'text', ['expected a text content item', item])
@@ -272,7 +302,7 @@ const findSubject = entries => subject => entries.find(entry => entry.subject ==
 const buildFixture = () => {
     const home = '/'
     const cas = fileCas(sha256)(home)
-    const [state0, cacheKey] = virtual(emptyState)(initEvo(cas))
+    const [state0, cacheKey] = virtualOrPanic(emptyState)(initEvo(cas))
     const e = evoOf(cas)(cacheKey)
 
     /**
@@ -283,7 +313,7 @@ const buildFixture = () => {
         const bytes = tryUtf8(text)
         assert(bytes !== null, ['expected the sample document to encode as UTF-8', text])
         const [nextState, writeResult] = virtual(state)(
-            cas.write(pure({ first: ok(bytes), tail: pure(undefined) })))
+            cas.write(oneChunk(bytes)))
         assert(writeResult[0] === 'ok', ['expected the document write to succeed', writeResult])
         return /** @type {const} */ ([nextState, vecToCBase32(writeResult[1])])
     }
@@ -331,7 +361,7 @@ const buildFixture = () => {
     const brokenBytes = tryUtf8('not valid json at all {{{')
     assert(brokenBytes !== null, 'expected the broken sample to encode as UTF-8')
     const [state11, brokenWrite] = virtual(state10)(
-        cas.write(pure({ first: ok(brokenBytes), tail: pure(undefined) })))
+        cas.write(oneChunk(brokenBytes)))
     assert(brokenWrite[0] === 'ok', ['expected the broken-blob write to succeed', brokenWrite])
     const brokenHash = vecToCBase32(brokenWrite[1])
     const [state12, brokenAdd] = virtual(state11)(
