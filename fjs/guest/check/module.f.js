@@ -33,7 +33,7 @@
  *
  * @module
  */
-import { step, pure, pureOk, mapStep } from 'functionalscript/fjs/effects/module.f.mjs'
+import { step, pure, pureOk, mapStep, resultStep } from 'functionalscript/fjs/effects/module.f.mjs'
 import { error, ok } from 'functionalscript/fjs/types/result/module.f.mjs'
 import { cBase32ToVec, vecToCBase32 } from 'functionalscript/fjs/basen/cbase32/module.f.mjs'
 import { collectRead, fileCas } from 'functionalscript/fjs/cas/module.f.mjs'
@@ -70,7 +70,11 @@ export const fjsCheck = materializeHomeRoot => cas => hash => {
     if (hashVec === null) {
         return pure(error(`program not found: ${hash}`))
     }
-    return step(collectRead(cas.read(hashVec)), readResult => {
+    // `resultStep`: `collectRead`'s failure is the effect's error channel
+    // since 0.46.0, and `step` short-circuits on it rather than handing it to
+    // the continuation. See `fjs/server/fjs_run`'s copy of this comment for
+    // the runtime symptom the wrong choice produces.
+    return resultStep(collectRead(cas.read(hashVec)), readResult => {
         if (readResult[0] === 'error') {
             return pure(error(`program not found: ${hash}`))
         }

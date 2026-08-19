@@ -115,7 +115,7 @@
  *
  * @module
  */
-import { step, pureOk, mapStep, do_ } from 'functionalscript/fjs/effects/module.f.mjs'
+import { step, pureOk, mapStep, do_, resultStep } from 'functionalscript/fjs/effects/module.f.mjs'
 import { collectRead, fileCas } from 'functionalscript/fjs/cas/module.f.mjs'
 import { cBase32ToVec, vecToCBase32 } from 'functionalscript/fjs/basen/cbase32/module.f.mjs'
 import { utf8ToString, tryUtf8 } from 'functionalscript/fjs/text/module.f.mjs'
@@ -279,7 +279,17 @@ export const executeRun = materializeHomeRoot => cas => evoApi => input => {
     if (hashVec === null) {
         return pureOk(/** @type {RunOutcome<unknown>} */ ({ kind: 'error', message: `program not found: ${input.hash}`, reads: [] }))
     }
-    return step(collectRead(cas.read(hashVec)), readResult => {
+    // `resultStep`, not `step`. Upstream moved `collectRead`'s failure out of
+    // the payload and into the effect's error channel in 0.46.0, and `step`
+    // now short-circuits on that channel — so a `step` continuation receives
+    // the `Vec` itself, and `readResult[0]` would index a bit-vector. That is
+    // exactly what produced `TypeError: Cannot mix BigInt and other types`
+    // inside `types/bigint`'s `log2`, three frames below `utf8ToString`, with
+    // no type error at the site. `resultStep` IS the Result-blind `step` this
+    // line was written against (upstream's own words), at the type that says
+    // what its continuation receives — so the branch below is unchanged and
+    // now type-checked.
+    return resultStep(collectRead(cas.read(hashVec)), readResult => {
         if (readResult[0] === 'error') {
             return pureOk(/** @type {RunOutcome<unknown>} */ ({ kind: 'error', message: `program not found: ${input.hash}`, reads: [] }))
         }
