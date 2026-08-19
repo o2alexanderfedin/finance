@@ -207,10 +207,10 @@ export const moneyFieldDisposition = [
     [oneZeroNineNineBDialect, 'box1fAccruedMarketDiscount', 'refused', 'requires Form 8949 column (f) code D, which this engine does not emit; the refusal names the box and the code'],
     [oneZeroNineNineBDialect, 'box1gWashSaleLossDisallowed', 'refused', 'requires column (f) code W, likewise refused by name'],
     [oneZeroNineNineBDialect, 'box4FederalIncomeTaxWithheld', 'read', '1040 line 25b'],
-    [oneZeroNineNineBDialect, 'box8ProfitOrLossRealized', 'dropped', 'BLOCKED: the §1256 regulated-futures block goes to Form 6781, which does not exist here, and thence Schedule D lines 4 and 11 under the 60/40 split. Direction: either, by sign. No refusal fires, so a §1256 contract is silently absent'],
-    [oneZeroNineNineBDialect, 'box9UnrealizedProfitOrLossPriorYearEnd', 'dropped', 'BLOCKED: the same Form 6781 block, prior year end'],
-    [oneZeroNineNineBDialect, 'box10UnrealizedProfitOrLossCurrentYearEnd', 'dropped', 'BLOCKED: the same Form 6781 block, current year end'],
-    [oneZeroNineNineBDialect, 'box11AggregateProfitOrLoss', 'dropped', 'BLOCKED: the same Form 6781 block, and the net of boxes 8 through 10'],
+    [oneZeroNineNineBDialect, 'box8ProfitOrLossRealized', 'refused', 'the only reader is `fjs/form6781`\'s cross-check: box 8 minus box 9 plus box 10 must equal box 11, and a disagreement refuses the document by name. Box 8 carries no figure of its own — Form 6781 line 1 takes box 11 (its own line 1 instruction, the 1099-B\'s box 11 instruction, and Pub 550 p.58 all say so). The same shape as `vnd.fjs.1095a`\'s line 33 totals'],
+    [oneZeroNineNineBDialect, 'box9UnrealizedProfitOrLossPriorYearEnd', 'refused', 'the same cross-check. NOT a prior-year blocker: the box is printed on THIS year\'s 1099-B ("Unrealized profit or (loss) on open contracts—12/31/2024"), so it is transcribed, never remembered. An ABSENT box 9 is read as the hypothesis zero INSIDE the check only, which is what distinguishes a first-year trader\'s genuinely empty box from one a transcription lost'],
+    [oneZeroNineNineBDialect, 'box10UnrealizedProfitOrLossCurrentYearEnd', 'refused', 'the same cross-check, this year\'s mark to market under §1256(a)(1)'],
+    [oneZeroNineNineBDialect, 'box11AggregateProfitOrLoss', 'read', 'Form 6781 Part I line 1 -> line 7 -> line 8 (40% short-term) and line 9 (60% long-term) under §1256(a)(3) -> Schedule D lines 4 and 11 -> 1040 line 7a. Wired by TAX-38'],
     [oneZeroNineNineBDialect, 'box13Bartering', 'dropped', 'BLOCKED: Schedule C or Schedule 1 line 8z, and nothing stored says which. Direction: UNDERSTATEMENT of tax'],
     [oneZeroNineNineBDialect, 'stateTaxWithheld', 'dropped', 'STATE: REQUIREMENTS.md puts state returns out of scope — store faithfully, compute nothing. NOTE it is not in `fjs/schedule/a`\'s SALT floor either, which reads only the W-2\'s and the 1099-R\'s'],
     // ── vnd.fjs.1099div ─────────────────────────────────────────────────
@@ -366,9 +366,17 @@ export const expectedMoneyFieldCount = 142
  * It is stated separately from the total so that flipping a row from `'read'`
  * to `'dropped'` fails a check rather than passing quietly under an unchanged
  * total.
+ *
+ * **`36 -> 32` is TAX-38's**, and it is the largest single fall this figure
+ * has taken: `vnd.fjs.1099b`'s whole §1256 block. Box 11 becomes `'read'` —
+ * Form 6781 Part I line 1 takes it, splits it 60/40 and reaches Schedule D
+ * lines 4 and 11 — and boxes 8, 9 and 10 become `'refused'`, because their
+ * only reader is that form's cross-check, which is precisely the disposition
+ * `'refused'` names. Four rows changed disposition and none was added or
+ * removed, so {@link expectedMoneyFieldCount} does not move.
  * @type {number}
  */
-export const expectedDroppedCount = 36
+export const expectedDroppedCount = 32
 
 /**
  * Every dialect that has money fields, paired with the tuples that dialect
@@ -508,6 +516,18 @@ export const proof = {
      * and 11 — box 11 is the one of the four that is still `'dropped'`, and
      * deliberately, so it is asserted to be `'dropped'` rather than `'read'` —
      * and 1099-DIV boxes 12 and 13 and SSA-1099 box 6 from the sweep.
+     *
+     * **An EIGHTH joins them with TAX-38, and it is a different kind of
+     * entry:** `vnd.fjs.1099b` box 11. The other seven were boxes this repo
+     * had already paid for by shipping them unread. Box 11 was never
+     * unnoticed — the sweep classified it BLOCKED, with a named blocker
+     * ("Form 6781, which does not exist here") and a stated error direction.
+     * It is pinned for the same reason the other seven are and against the
+     * same failure: it is now the load-bearing input to a whole form, and the
+     * cheapest way to silence a future Form 6781 regression would be to flip
+     * this row back to `'dropped'` and lower {@link expectedDroppedCount} by
+     * one. Boxes 8, 9 and 10 are pinned as `'refused'` beside it, because the
+     * same silencing works one disposition over.
      */
     theKnownDefectsKeepTheirDisposition: () => {
         /** @type {readonly (readonly [string, string, string])[]} */
@@ -519,8 +539,14 @@ export const proof = {
             [oneZeroNineNineDivDialect, 'box12ExemptInterestDividends', 'read'],
             [oneZeroNineNineDivDialect, 'box13SpecifiedPrivateActivityBondInterestDividends', 'read'],
             [ssa1099Dialect, 'box6VoluntaryFederalIncomeTaxWithheld', 'read'],
+            [oneZeroNineNineBDialect, 'box11AggregateProfitOrLoss', 'read'],
+            [oneZeroNineNineBDialect, 'box8ProfitOrLossRealized', 'refused'],
+            [oneZeroNineNineBDialect, 'box9UnrealizedProfitOrLossPriorYearEnd', 'refused'],
+            [oneZeroNineNineBDialect, 'box10UnrealizedProfitOrLossCurrentYearEnd', 'refused'],
         ]
-        assertEq(pinned.length, 7, 'seven known instances, hand-counted')
+        assertEq(
+            pinned.length, 11,
+            'seven known instances plus the four §1256 boxes TAX-38 wired, hand-counted')
         for (const [dialect, field, expected] of pinned) {
             const row = moneyFieldDisposition.find(
                 ([rowDialect, rowField]) => rowDialect === dialect && rowField === field)
