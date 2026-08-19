@@ -130,13 +130,23 @@
  * vocabulary expresses it" — stood here until Phase 25 and is corrected
  * rather than deleted, because a docstring that quotes a finding inherits its
  * expiry (`fjs/schedule/1`'s own header records the same kind of correction).
- * What has NOT changed is the boundary itself: `line11` below is a
- * `profileDeclaredZeroLine` exactly
- * like every other line on this module, not a document-derived
- * computation — a documented boundary, not a silent omission, mirroring
- * `fjs/schedule/b`'s Form 8815 treatment (money the underlying documents
- * could support, deliberately not computed this phase, with the reason
- * recorded here for whichever future phase reaches it).
+ *
+ * **The boundary itself is now gone too, and this paragraph is its third
+ * correction.** `line11` is a document-derived computation over Form W-2 box 4
+ * — see {@link excessSocialSecurityWithheldLine}. Everything above stands as
+ * the record of why it took three phases: the figure was always in reach, the
+ * missing pieces were the wage base (Phase 28) and §3101(a)'s rate, and each
+ * intervening phase said so rather than omitting it silently. `fjs/schedule/b`'s
+ * Form 8815 treatment is the remaining example of the shape this line used to
+ * be.
+ *
+ * What line 11 still does NOT compute is the **tier-1 RRTA** half of its own
+ * printed title. `vnd.fjs.w2` has no box 14, which is where a railroad
+ * employer reports tier-1 tax, and railroad employment sits outside FICA
+ * entirely — so no stored figure is dropped, but no railroad return is served
+ * either. `fjs/schedule/3/todo/excess-social-security.md` records it as a
+ * scope question for whoever reclassifies the kind, whose own label names
+ * tier-1 RRTA.
  *
  * The `totalLine`/`unionSources`/`profileDeclaredZeroLine` helpers below
  * are reimplemented locally, private and NOT imported from
@@ -146,7 +156,8 @@
  * @module
  */
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.js'
-import { centsFromString } from '../../exact/module.f.js'
+import { centsFromString, centsToString } from '../../exact/module.f.js'
+import { of, halfUp } from '../../types/rational/module.f.js'
 import { form8863 } from '../../form8863/module.f.js'
 import { form8880 } from '../../form8880/module.f.js'
 import { taxParamsByYear } from '../../tax/params/module.f.js'
@@ -156,6 +167,8 @@ import { taxParamsByYear } from '../../tax/params/module.f.js'
 /** @import { Credits } from '../../document/credits/module.f.js' */
 /** @import { OneZeroNineEightT } from '../../document/1098t/module.f.js' */
 /** @import { W2 } from '../../document/w2/module.f.js' */
+/** @import { OneZeroNineNineDiv } from '../../document/1099div/module.f.js' */
+/** @import { OneZeroNineNineInt } from '../../document/1099int/module.f.js' */
 /** @import { TaxParamSet, IndividualFilingStatus } from '../../tax/params/module.f.js' */
 /** @import { Form8863Result, Form8863Student, EducationCreditElection } from '../../form8863/module.f.js' */
 /** @import { Form8880Result, Form8880Person, Form8880Individual } from '../../form8880/module.f.js' */
@@ -237,6 +250,32 @@ const documentLine = profile => rule => value => sources => {
     return first === undefined
         ? profileDeclaredZeroLine(profile)(rule)
         : { value, sources: [first, ...rest], rule }
+}
+
+/**
+ * A line read off one of the return profile's OWN money boxes — the shape
+ * `fjs/form1040/core`'s `profileMoneyBox` gives 1040 lines 26, 35a and 36,
+ * reimplemented here for the same reason every helper above it is (this
+ * module does not import that one).
+ *
+ * PRESENT means one citation at that field's own `boxPath` carrying the raw
+ * decimal string exactly as stored — never re-formatted. ABSENT falls back to
+ * {@link profileDeclaredZeroLine}, which cites `declaredKinds` instead: DOC-11
+ * says an absent box is absent, and quoting a `'0.00'` at a field the taxpayer
+ * left blank would put a value in the report's provenance that no document
+ * contains. A stored `'0.00'` cites the field, because the taxpayer did state
+ * it.
+ * @type {(profile: Stored<ReturnProfile>) => (rule: string) => (boxPath: 'scheduleThreeLine10AmountPaidWithExtensionRequest') => ReportLine}
+ */
+const profileMoneyLine = profile => rule => boxPath => {
+    const printed = profile.value[boxPath]
+    return printed === undefined
+        ? profileDeclaredZeroLine(profile)(rule)
+        : {
+            value: centsFromString(printed),
+            sources: [{ documentHash: profile.documentHash, boxPath, value: printed }],
+            rule,
+        }
 }
 
 // ── Reading the documents lines 3 and 4 need ────────────────────────────────
@@ -340,6 +379,295 @@ const educationCreditElectionNamed = credit =>
         : credit === 'lifetimeLearning' ? 'lifetimeLearning'
             : undefined
 
+// ── Line 11: excess Social Security tax withheld ────────────────────────────
+
+/**
+ * The values of `values`, first-seen order, each once.
+ * @type {(values: readonly string[]) => readonly string[]}
+ */
+const distinct = values => values.filter((value, index) => values.indexOf(value) === index)
+
+/**
+ * The maximum §3101(a) tax any ONE employer may withhold from any ONE
+ * employee in the year: the Social Security wage base times 6.2%. For TY2025
+ * that is $176,100.00 x 6.2% = **$10,918.20**, which is the figure the printed
+ * Schedule 3 line 11 instructions state outright.
+ *
+ * Both operands come off `taxParamSet` rather than out of a literal here, so a
+ * second tax year computes its own maximum — `fjs/tax/params` pins the TY2025
+ * product against the instructions' own $10,918.20.
+ *
+ * **The wage base is `selfEmploymentTax`'s, and that is not a borrow.**
+ * §1402(b)(1) (chapter 2) and §3121(a)(1) (chapter 21) do not each state a
+ * dollar amount; both defer to *"the contribution and benefit base (as
+ * determined under section 230 of the Social Security Act)"*. One number, read
+ * by two statutes — so a second stored copy could only ever disagree with a
+ * base the Social Security Administration sets once. The RATE is the opposite
+ * case and is stored separately for that reason; `fjs/tax/params`'
+ * {@link socialSecurityTaxWithholding} argues both halves.
+ *
+ * Cent-exact and half-up through `fjs/types/rational`, never through a float —
+ * the arithmetic `fjs/form8959` performs on the neighbouring §3101(b) rates.
+ * @type {(taxParamSet: TaxParamSet) => bigint}
+ */
+const socialSecurityWithholdingMaximum = taxParamSet => halfUp(of(
+    centsFromString(taxParamSet.selfEmploymentTax.socialSecurityWageBase.amount)
+    * BigInt(taxParamSet.socialSecurityTaxWithholding.employeeRateBasisPoints))(10000n))
+
+/**
+ * One stored Form W-2 that actually REPORTED box 4, paired with the printed
+ * string it reported.
+ *
+ * The pair exists because line 11 needs the box AND the form: the amount is
+ * summed, while `recipientTin` and `payerTin` decide which sums are allowed to
+ * happen at all. Building it with `flatMap` over an `undefined` check keeps
+ * the narrowing the compiler already did — no second lookup, so no
+ * `T | undefined` to cast away.
+ * @typedef {{ readonly form: Stored<W2>, readonly withheld: string }} BoxFourReading
+ */
+
+/**
+ * Every W-2 that reported box 4, in document order.
+ *
+ * **Presence, never value.** A W-2 reporting `'0.00'` withholding is kept: it
+ * said something, and line 11 cites it. A W-2 with no box 4 at all is dropped
+ * entirely — it is not cited, and it does not count towards §6413(c)(1)'s
+ * employer count either, because an employer that withheld no Social Security
+ * tax cannot have contributed to an excess of it. This is the same
+ * presence-not-value rule `fjs/schedule/1`'s `earlyWithdrawalPenaltyLine`
+ * follows for 1099-INT box 2.
+ * @type {(forms: readonly Stored<W2>[]) => readonly BoxFourReading[]}
+ */
+const boxFourReadings = forms => forms.flatMap(form => {
+    const withheld = form.value.box4SocialSecurityTaxWithheld
+    return withheld === undefined ? [] : [{ form, withheld }]
+})
+
+/**
+ * The EMPLOYEE a reading belongs to — box a, the employee's own SSN. Each one
+ * gets a wage base of their own, so this is the key the excess is computed
+ * per. Named once and read twice (to enumerate the employees and to select
+ * each one's forms), so the two cannot drift apart: AGENTS.md's "one rule, one
+ * place".
+ * @type {(reading: BoxFourReading) => string}
+ */
+const employeeOf = reading => reading.form.value.recipientTin
+
+/**
+ * The EMPLOYER a reading belongs to — box b, the employer's EIN. §6413(c)(1)
+ * counts these, never documents.
+ * @type {(reading: BoxFourReading) => string}
+ */
+const employerOf = reading => reading.form.value.payerTin
+
+/**
+ * Line 11, excess Social Security tax withheld: what §31(b) allows as a
+ * payment because §6413(c)(1) allows it as a special refund.
+ *
+ * Each employer withholds §3101(a)'s 6.2% up to the wage base **independently**
+ * — no employer knows what another paid — so an employee who changed jobs or
+ * held two at once can have more than the annual maximum taken out of wages
+ * that were never above the base in total. §6413(c)(1) gives that surplus
+ * back, and §31(b) delivers it as a credit against the income tax rather than
+ * as a separate claim, which is why it lands on Schedule 3 Part II beside the
+ * withholding and not among the credits in Part I.
+ *
+ * Three things here are statute rather than arithmetic, and each one is a way
+ * "sum the boxes and subtract the cap" gets a real refund wrong:
+ *
+ * **1. More than one employer, or nothing.** §6413(c)(1) opens *"if by reason
+ * of an employee receiving wages from more than one employer during a calendar
+ * year…"*. The instructions say the same thing the other way round: *"If any
+ * one employer withheld too much social security or tier 1 RRTA tax, you can't
+ * claim the excess as a credit against your income tax. Your employer should
+ * adjust the excess for you."* A single employer's over-withholding is the
+ * employer's to refund under Reg. §31.6413(a)-1, and paying it here as well
+ * would pay it twice. So a lone employer's box 4 can be any figure at all and
+ * this line stays zero.
+ *
+ * **2. Employers are counted by `payerTin`, never by document.** A corrected
+ * form, a successor filing, or simply two W-2s from one EIN do not create a
+ * second wage base.
+ *
+ * **3. The base is per EMPLOYEE, so a joint return gets two of them.**
+ * §6413(c)(1) is written about "an employee", and a married couple filing
+ * jointly are two. One shared cap would understate the refund by up to the
+ * whole maximum. The grouping key is the W-2's own `recipientTin` — box a, the
+ * employee's SSN — and NOT the return profile, which carries no TIN at all.
+ * That is also why this line needs no answer to "which spouse does this W-2
+ * belong to", the question `fjs/form8880` refuses a joint return for being
+ * unable to answer: the form itself says whose it is.
+ *
+ * **Every W-2 carrying box 4 is cited, including one whose employee did not
+ * clear the two-employer gate.** The cited set is the set that was READ, and a
+ * reader told the line is zero is owed the boxes that produced the zero.
+ * @type {(taxParamSet: TaxParamSet) => (profile: Stored<ReturnProfile>) => (w2Forms: readonly Stored<W2>[]) => ReportLine}
+ */
+const excessSocialSecurityWithheldLine = taxParamSet => profile => w2Forms => {
+    const rule = 'Schedule 3 line 11 (excess Social Security tax withheld -> 1040 line 31)'
+    const readings = boxFourReadings(w2Forms)
+    /** @type {readonly Source[]} */
+    const sources = readings.map(reading => ({
+        documentHash: reading.form.documentHash,
+        boxPath: 'box4SocialSecurityTaxWithheld',
+        value: reading.withheld,
+    }))
+    const maximum = socialSecurityWithholdingMaximum(taxParamSet)
+    const employees = distinct(readings.map(employeeOf))
+    const value = employees.reduce((total, employee) => {
+        const theirs = readings.filter(reading => employeeOf(reading) === employee)
+        const employers = distinct(theirs.map(employerOf))
+        if (employers.length < 2) {
+            return total
+        }
+        const withheld = theirs.reduce(
+            (sum, reading) => sum + centsFromString(reading.withheld), 0n)
+        // The `>` below is an EQUIVALENT MUTANT under `>=`, and that is
+        // recorded here rather than left for the next reader to rediscover
+        // (AGENTS.md, "the equivalent mutant"). The two operators differ at
+        // exactly one input, `withheld === maximum`, and at that input the
+        // subtraction in the other arm yields `0n` — the same value the `0n`
+        // arm yields. The neighbouring arithmetic absorbs the whole
+        // comparison, so `>=` cannot turn any leaf red at any input.
+        //
+        // What the comparison DOES carry is the floor, and that is not
+        // absorbed: dropping the ternary entirely reddens
+        // `twoEmployersUnderTheMaximumIsZero`, which would otherwise return a
+        // NEGATIVE payment. The two boundary leaves pin the maximum itself —
+        // `maximum + 1n` and `maximum - 1n` each redden six and seven leaves.
+        return total + (withheld > maximum ? withheld - maximum : 0n)
+    }, 0n)
+    return documentLine(profile)(rule)(value)(sources)
+}
+
+/**
+ * Every stored foreign income tax this engine can read, as citable
+ * {@link Source}s — 1099-DIV box 7 and 1099-INT box 6, and nothing else.
+ *
+ * **Those two boxes are the whole set, and that is a checked fact rather than
+ * an assumption.** The only other foreign-tax box in the document set is
+ * `box21ForeignTaxesPaidOrAccrued` on `vnd.fjs.k1_1065`, and that dialect's
+ * own `unmodeledMoneyBoxes` REFUSES any K-1 carrying a non-zero one at
+ * validation — so a return whose §904(j)(2)(B) total this function would
+ * understate cannot reach this module at all.
+ *
+ * A PRESENT box is cited even when it reads `'0.00'` (DOC-11); an absent box
+ * produces no reading, which is what lets {@link documentLine} fall back to
+ * the profile.
+ * @type {(divForms: readonly Stored<OneZeroNineNineDiv>[]) => (intForms: readonly Stored<OneZeroNineNineInt>[]) => readonly Source[]}
+ */
+const foreignTaxSources = divForms => intForms => [
+    ...divForms.flatMap(form => {
+        const printed = form.value.box7ForeignTaxPaid
+        return printed === undefined
+            ? []
+            : [{ documentHash: form.documentHash, boxPath: 'box7ForeignTaxPaid', value: printed }]
+    }),
+    ...intForms.flatMap(form => {
+        const printed = form.value.box6ForeignTaxPaid
+        return printed === undefined
+            ? []
+            : [{ documentHash: form.documentHash, boxPath: 'box6ForeignTaxPaid', value: printed }]
+    }),
+]
+
+/**
+ * Either Schedule 3 line 1, computed, or this module's refusal.
+ * @typedef {{ readonly kind: 'ok', readonly line: ReportLine } | ScheduleThreeRefusal} ForeignTaxCreditOutcome
+ */
+
+/**
+ * **Schedule 3 line 1 — the foreign tax credit, under §904(j) and only under
+ * §904(j).** TAX-36; the whole argument lives in
+ * `fjs/schedule/3/todo/foreign-tax-credit.md` and is summarised here.
+ *
+ * §901 allows the credit; §904(a) limits it to the US tax on foreign-source
+ * income, and computing that limitation is what Form 1116 is. This engine does
+ * not model Form 1116. §904(j)(2) is the exemption that makes a computable
+ * line: an individual may ELECT out of the §904(a) limitation, and off Form
+ * 1116 entirely, when
+ *
+ *   (A) the entire foreign-source gross income is *qualified passive income*
+ *       — passive under §904(d)(2)(B) **and** shown on a payee statement
+ *       (§904(j)(3)(A)),
+ *   (B) the creditable foreign taxes do not exceed $300, or $600 on a joint
+ *       return (§904(j)(2)(B)), and
+ *   (C) the individual elects.
+ *
+ * The three are CONJUNCTIVE, and **this engine can verify exactly one of
+ * them**: (B), which it performs here against
+ * `fjs/tax/params`' own `foreignTaxCreditDeMinimisElection`. (A) is unobservable — neither
+ * 1099 states how much of its ordinary dividends or interest was
+ * foreign-source, nor which §904(d) category it fell in, and no stored
+ * document could reveal foreign wages or rents that break the condition. (C)
+ * is a choice, not a fact, and a costly one: §904(j)(1)(C) forbids carrying an
+ * electing year's excess taxes back or forward under §904(c). So (A) and (C)
+ * both ride on ONE taxpayer assertion,
+ * `section904jElectionAllForeignIncomeIsQualifiedPassiveIncome` on
+ * `vnd.fjs.return_profile`, whose name states both.
+ *
+ * **A small amount is not evidence the conditions hold.** $12.00 of foreign
+ * tax is perfectly consistent with a taxpayer who also earned foreign wages,
+ * for whom (A) fails at any figure. The threshold is (B) and only (B).
+ *
+ * REFUSES rather than zeroing, in both failing arms, and the asymmetry is the
+ * one Schedule 1 line 14 argues: zeroing silently deletes a credit the
+ * taxpayer is owed, and computing claims one whose §904(a) limitation nobody
+ * computed. The engine cannot tell those apart without the assertion, so it
+ * asks — carrying the taxpayer's OWN figures, because a refusal naming your
+ * $847.00 and the $300.00 you would have had to be under is worth more than
+ * one naming a form.
+ *
+ * **Exported and called by `fjs/form1040/core` BEFORE Schedule 2**, not
+ * computed inside {@link scheduleThree}. `fjs/schedule/2`'s own
+ * `ScheduleTwoInput` docstring recorded a cycle here — Form 6251 line 10
+ * subtracts this line, and Schedule 3 runs after Schedule 2 because lines 3
+ * and 4 read 1040 line 18 — and the cycle is not real: **line 1 has no tax
+ * figure on its input side at all.** Under §904(j) the credit is the
+ * creditable foreign taxes, full stop. So it is lifted out, run ONCE, and
+ * handed to both schedules, the same "one execution, two destinations" shape
+ * `form8863` and `form8959` already have.
+ * @type {(taxParamSet: TaxParamSet) => (status: IndividualFilingStatus) => (profile: Stored<ReturnProfile>) => (divForms: readonly Stored<OneZeroNineNineDiv>[]) => (intForms: readonly Stored<OneZeroNineNineInt>[]) => ForeignTaxCreditOutcome}
+ */
+export const foreignTaxCreditLine = taxParamSet => status => profile => divForms => intForms => {
+    const rule = 'Schedule 3 line 1 (foreign tax credit, §904(j) election -> 1040 line 20)'
+    const sources = foreignTaxSources(divForms)(intForms)
+    const total = sumSources(sources)
+    const elected
+        = profile.value.section904jElectionAllForeignIncomeIsQualifiedPassiveIncome === true
+    // A present box reading `'0.00'` still CITES its document (DOC-11), and
+    // needs no election: there is no credit to elect for. Gating the two
+    // refusals on `total > 0n` rather than on the sources being non-empty is
+    // what keeps a broker's zero-filled box 7 from refusing an ordinary
+    // return.
+    if (total > 0n && !elected) {
+        const boxes = sources.map(source => `${source.documentHash} ${source.boxPath}`).join(', ')
+        return {
+            kind: 'error',
+            message: `Schedule 3 line 1: ${centsToString(total)} of foreign tax is stored `
+                + `(${boxes}) and this return does not elect §904(j). Claiming a foreign tax `
+                + `credit otherwise requires Form 1116, which this engine does not compute. `
+                + `Declare section904jElectionAllForeignIncomeIsQualifiedPassiveIncome on the `
+                + `return profile to certify that the ENTIRE foreign-source gross income is `
+                + `passive income shown on a payee statement and to make the §904(j) election `
+                + `— which gives up carrying any excess credit back or forward under §904(c). `
+                + `Refusing rather than dropping the amount and understating the credit`,
+        }
+    }
+    const ceiling = centsFromString(taxParamSet.foreignTaxCreditDeMinimisElection[status].amount)
+    if (total > ceiling) {
+        return {
+            kind: 'error',
+            message: `Schedule 3 line 1: ${centsToString(total)} of foreign tax exceeds `
+                + `§904(j)(2)(B)'s ${centsToString(ceiling)} ceiling for a ${status} return, `
+                + `so the election is not available and the §904(a) limitation applies. That `
+                + `limitation is Form 1116, which this engine does not compute. Refusing rather `
+                + `than claiming an unlimited credit`,
+        }
+    }
+    return { kind: 'ok', line: documentLine(profile)(rule)(total)(sources) }
+}
+
 // ── Schedule 3 itself ───────────────────────────────────────────────────────
 
 /**
@@ -384,6 +712,15 @@ const educationCreditElectionNamed = credit =>
  * run AFTER line 18 and BEFORE `fjs/form8812`, whose own Credit Limit
  * Worksheet A subtracts this schedule's lines 3 and 4. See this module's own
  * docstring, "The ORDER of the three nonrefundable credits".
+ *
+ * `foreignTaxCreditLine1` is printed line 1, ALREADY COMPUTED by
+ * {@link foreignTaxCreditLine} and handed in rather than recomputed here.
+ * `fjs/form1040/core` runs that function once, before Schedule 2, because
+ * Form 6251 lines 8 and 10 need the same figure and Schedule 2 runs first —
+ * see {@link foreignTaxCreditLine}'s own docstring for why the cycle
+ * `fjs/schedule/2` recorded is not a real one. Taking it as an INPUT is what
+ * makes "one execution" true rather than aspirational: a second call here
+ * would be a second thing to go stale.
  * @typedef {{
  *   readonly profile: Stored<ReturnProfile>,
  *   readonly status: IndividualFilingStatus,
@@ -393,6 +730,7 @@ const educationCreditElectionNamed = credit =>
  *   readonly creditForms: readonly Stored<Credits>[],
  *   readonly tuitionForms: readonly Stored<OneZeroNineEightT>[],
  *   readonly aStored1099RProvesADistribution: boolean,
+ *   readonly foreignTaxCreditLine1: ReportLine,
  * }} ScheduleThreeInput
  */
 
@@ -414,7 +752,7 @@ const sumSources = sources => sources.reduce((total, s) => total + centsFromStri
 export const scheduleThree = taxParamSet => input => {
     const {
         profile, status, agiCents, line18Cents, w2Forms, creditForms, tuitionForms,
-        aStored1099RProvesADistribution,
+        aStored1099RProvesADistribution, foreignTaxCreditLine1,
     } = input
     const zero = profileDeclaredZeroLine(profile)
     const fromDocuments = documentLine(profile)
@@ -517,11 +855,14 @@ export const scheduleThree = taxParamSet => input => {
         agiCents,
         students,
         line18Cents,
-        // Schedule 3 lines 1 and 2 and Schedule R -- every one a refused
-        // `fjs/return/scope` kind, so every one a documented zero. Named
-        // rather than omitted, exactly as `fjs/form8812`'s Credit Limit
-        // Worksheet A line 2 was until this phase made it real.
-        earlierScheduleThreeCreditsCents: 0n,
+        // The Credit Limit Worksheet's line 2: Schedule 3 lines 1 and 2 and
+        // Schedule R. **Line 1 is REAL as of TAX-36** -- §26's ordering puts
+        // the foreign tax credit ahead of the education credits, so a
+        // §904(j) credit reduces what line 3 may claim, and a wiring that
+        // left this `0n` would overstate the education credit by exactly the
+        // foreign tax. Line 2 and Schedule R remain refused
+        // `fjs/return/scope` kinds and therefore documented zeros.
+        earlierScheduleThreeCreditsCents: foreignTaxCreditLine1.value,
         filerAttainedAgeTwentyFour: creditForms.some(
             form => form.value.filerAttainedAgeTwentyFourBeforeTheEndOfTheYear === true),
     })
@@ -607,11 +948,14 @@ export const scheduleThree = taxParamSet => input => {
             'retirementSavingsContributionsCredit'),
         line18Cents,
         // The Credit Limit Worksheet's line 2: Schedule 3 lines 1, 2, 3, 6d,
-        // 6l and 6m plus Forms 5695/8910/8936. Only line 3 is non-zero in
-        // this engine, and it is REAL -- which is the whole of §26's ordering
-        // between these two credits, expressed as the printed worksheet
-        // expresses it.
-        earlierScheduleThreeCreditsCents: line3.value,
+        // 6l and 6m plus Forms 5695/8910/8936. Lines 1 and 3 are both real in
+        // this engine as of TAX-36, and both belong here -- which is the
+        // whole of §26's ordering among these credits, expressed as the
+        // printed worksheet expresses it. Dropping line 1 from this sum would
+        // overstate the saver's credit by exactly the foreign tax credit,
+        // which is why `fjs/form1040/core` drives a fixture carrying all
+        // three.
+        earlierScheduleThreeCreditsCents: foreignTaxCreditLine1.value + line3.value,
         aStored1099RProvesADistribution,
     })
     if (saversOutcome.kind === 'error') {
@@ -621,7 +965,11 @@ export const scheduleThree = taxParamSet => input => {
         saversOutcome.line12)([...contributionSources, ...deferralSources])
 
     // ── Part I: Nonrefundable Credits ────────────────────────────────────
-    const line1 = zero('Schedule 3 line 1 (foreign tax credit, Form 1116)')
+    // 1. The foreign tax credit under §904(j), computed by
+    //    {@link foreignTaxCreditLine} before this module ran. The hard zero
+    //    is REPLACED, not supplemented -- on a return carrying 1099-DIV box 7
+    //    or 1099-INT box 6 this line cites those boxes and not `declaredKinds`.
+    const line1 = foreignTaxCreditLine1
     const line2 = zero('Schedule 3 line 2 (credit for child and dependent care expenses, Form 2441)')
     const line5a = zero('Schedule 3 line 5a (residential clean energy credit, Form 5695)')
     const line5b = zero('Schedule 3 line 5b (energy-efficient home improvement credit, Form 5695)')
@@ -640,10 +988,22 @@ export const scheduleThree = taxParamSet => input => {
 
     // ── Part II: Other Payments and Refundable Credits ──────────────────
     const line9 = zero('Schedule 3 line 9 (net premium tax credit, Form 8962)')
-    const line10 = zero('Schedule 3 line 10 (amount paid with request for extension to file)')
-    // 11. Excess Social Security/tier-1 RRTA tax withheld -- see this
-    //     module's own docstring, "Line 11 ... a DIFFERENT boundary".
-    const line11 = zero('Schedule 3 line 11 (excess Social Security/tier-1 RRTA tax withheld -- theoretically W-2-derivable, out of this phase\'s scope)')
+    // 10. The amount paid with a Form 4868 request for an automatic extension
+    //     of time to file, off the return profile's own box. There is no
+    //     information return for it -- the taxpayer holds a cheque stub, not a
+    //     payee statement -- which is why it lives on the profile beside 1040
+    //     lines 26, 35a and 36. `fjs/return/profile`'s check 7b refuses the
+    //     amount unless `amountPaidWithExtensionRequest` is declared, so a
+    //     figure here can never be an input the scope guard did not see.
+    //     See `fjs/schedule/3/todo/amount-paid-with-extension.md`.
+    const line10 = profileMoneyLine(profile)(
+        'Schedule 3 line 10 (amount paid with request for extension to file -> 1040 line 31)')(
+        'scheduleThreeLine10AmountPaidWithExtensionRequest')
+    // 11. Excess Social Security tax withheld -- §31(b) via §6413(c)(1), read
+    //     off Form W-2 box 4. The hard zero is REPLACED, not supplemented:
+    //     there is no `zero(...)` call here, and on a return carrying box 4
+    //     this line does not cite `declaredKinds` at all.
+    const line11 = excessSocialSecurityWithheldLine(taxParamSet)(profile)(w2Forms)
     const line12 = zero('Schedule 3 line 12 (federal fuel tax credit, Form 4136)')
     // 13a-13z. "Other payments or refundable credits" -- a collapsed
     // stand-in for five sub-lines.
@@ -689,6 +1049,20 @@ const profileNoDeclaredKinds = { documentHash: 'profile-hash-0001', value: minim
 /** @type {(overrides: Partial<ScheduleThreeInput>) => ScheduleThreeInput} */
 const baseInput = overrides => ({
     profile: profileNoDeclaredKinds,
+    // Schedule 3 line 1 as `fjs/form1040/core` hands it in for a return with
+    // no foreign tax anywhere: the profile-declared zero
+    // {@link foreignTaxCreditLine} itself returns for that case, written out
+    // here rather than by calling that function, so this fixture is not
+    // produced by code under test.
+    foreignTaxCreditLine1: {
+        value: 0n,
+        sources: [{
+            documentHash: 'profile-hash-0001',
+            boxPath: 'declaredKinds',
+            value: '[]',
+        }],
+        rule: 'Schedule 3 line 1 (foreign tax credit, §904(j) election -> 1040 line 20)',
+    },
     status: 'single',
     agiCents: 2000000n,          // $20,000.00 -- inside the saver's credit 50% band
     line18Cents: 100000000n,     // ample, so no credit limit binds
@@ -698,6 +1072,99 @@ const baseInput = overrides => ({
     aStored1099RProvesADistribution: false,
     ...overrides,
 })
+
+/**
+ * A stored profile carrying Schedule 3 line 10's own amount, and the kind
+ * `fjs/return/profile`'s check 7b demands beside it — so this fixture is one
+ * the validator would accept, not merely one this module's types allow.
+ * @type {(amount: string) => Stored<ReturnProfile>}
+ */
+const profileWithExtensionPayment = amount => ({
+    documentHash: 'profile-hash-0001',
+    value: {
+        ...minimalProfileValue,
+        declaredKinds: ['amountPaidWithExtensionRequest'],
+        scheduleThreeLine10AmountPaidWithExtensionRequest: amount,
+    },
+})
+
+/**
+ * A stored 1099-DIV carrying box 7 and nothing else that matters here.
+ * @type {(hash: string) => (foreignTax: string | undefined) => Stored<OneZeroNineNineDiv>}
+ */
+const dividendWithForeignTax = hash => foreignTax => ({
+    documentHash: hash,
+    value: {
+        dialect: 'vnd.fjs.1099div',
+        payerTin: '44-4444444',
+        recipientTin: '222-22-2222',
+        accountNumber: 'ACC-DIV',
+        taxYear: 2025,
+        formRevision: '2025',
+        sourceArtifactHash:
+            'deadbeef00112233445566778899aabbccddeeff0011223344556677889900',
+        box1aTotalOrdinaryDividends: '4200.00',
+        ...(foreignTax === undefined ? {} : { box7ForeignTaxPaid: foreignTax }),
+    },
+})
+
+/**
+ * A stored 1099-INT carrying box 6 — the OTHER foreign-tax box, so the two
+ * can be shown summing together rather than one shadowing the other.
+ * @type {(hash: string) => (foreignTax: string) => Stored<OneZeroNineNineInt>}
+ */
+const interestWithForeignTax = hash => foreignTax => ({
+    documentHash: hash,
+    value: {
+        dialect: 'vnd.fjs.1099int',
+        payerTin: '33-3333333',
+        recipientTin: '222-22-2222',
+        accountNumber: 'ACC-INT',
+        taxYear: 2025,
+        formRevision: '2025',
+        box1InterestIncome: '900.00',
+        box6ForeignTaxPaid: foreignTax,
+    },
+})
+
+/**
+ * A stored profile that makes the §904(j) election — the certification that
+ * the ENTIRE foreign-source gross income is qualified passive income shown on
+ * a payee statement, and the election itself.
+ * @type {Stored<ReturnProfile>}
+ */
+const profileElectingSection904j = {
+    documentHash: 'profile-hash-0001',
+    value: {
+        ...minimalProfileValue,
+        declaredKinds: ['foreignTaxCredit'],
+        section904jElectionAllForeignIncomeIsQualifiedPassiveIncome: true,
+    },
+}
+
+/** Runs {@link foreignTaxCreditLine} for TY2025 against a filing status.
+ * @type {(status: IndividualFilingStatus) => (profile: Stored<ReturnProfile>) => (divForms: readonly Stored<OneZeroNineNineDiv>[]) => (intForms: readonly Stored<OneZeroNineNineInt>[]) => ForeignTaxCreditOutcome}
+ */
+const foreignCredit = status => profile => divForms => intForms =>
+    foreignTaxCreditLine(taxParams2025)(status)(profile)(divForms)(intForms)
+
+/** Narrows {@link foreignTaxCreditLine}'s outcome to its computed line.
+ * @type {(outcome: ForeignTaxCreditOutcome) => ReportLine}
+ */
+const foreignCreditLine = outcome => {
+    assert(outcome.kind === 'ok', ['expected a computed Schedule 3 line 1', outcome])
+    if (outcome.kind !== 'ok') { throw ['unreachable', outcome] }
+    return outcome.line
+}
+
+/** Narrows it to its refusal.
+ * @type {(outcome: ForeignTaxCreditOutcome) => string}
+ */
+const foreignCreditRefusal = outcome => {
+    assert(outcome.kind === 'error', ['expected a refusal', outcome])
+    if (outcome.kind !== 'error') { throw ['unreachable', outcome] }
+    return outcome.message
+}
 
 /** @type {(outcome: ScheduleThreeOutcome) => ScheduleThree} */
 const okResult = outcome => {
@@ -757,6 +1224,57 @@ const w2WithBox12 = code => amount => ({
         box12: [{ code, amount }],
     },
 })
+
+/**
+ * A stored Form W-2 carrying box 3 wages and, usually, box 4 Social Security
+ * tax — the line 11 fixture.
+ *
+ * Every parameter is a parameter for a reason line 11 can get wrong:
+ *
+ * - `hash`, because the citation contract is ONE source per contributing
+ *   document, and a fixture reusing one hash could not tell "two documents
+ *   summed" from "one document counted twice".
+ * - `payerTin`, because §6413(c)(1) counts EMPLOYERS, and two forms from one
+ *   EIN are one employer.
+ * - `recipientTin`, because the wage base is per EMPLOYEE, and a joint return
+ *   has two.
+ * - `wages` (box 3) is always present and always equals `tax / 6.2%` to the
+ *   cent, so that a mutation transposing the box READ produces a wrong number
+ *   rather than the same one. A fixture that left box 3 out would make that
+ *   whole class of defect invisible.
+ * - `tax` is `undefined` for the "this employer reported no box 4" case,
+ *   which is a different fact from a reported `'0.00'` and is cited
+ *   differently.
+ * @type {(hash: string) => (payerTin: string) => (recipientTin: string) => (wages: string) => (tax: string | undefined) => Stored<W2>}
+ */
+const w2WithSocialSecurity = hash => payerTin => recipientTin => wages => tax => ({
+    documentHash: hash,
+    value: {
+        dialect: 'vnd.fjs.w2',
+        payerTin,
+        recipientTin,
+        accountNumber: '',
+        taxYear: 2025,
+        formRevision: '2025',
+        box3SocialSecurityWages: wages,
+        ...(tax === undefined ? {} : { box4SocialSecurityTaxWithheld: tax }),
+    },
+})
+
+/** The taxpayer's own SSN in every line 11 fixture. @type {string} */
+const taxpayerSsn = '222-22-2222'
+
+/** The spouse's, used only by the joint-return leaf. @type {string} */
+const spouseSsn = '333-33-3333'
+
+/**
+ * Schedule 3 line 11 over a set of Forms W-2 and nothing else.
+ *
+ * Every other input is `baseInput`'s empty case, so a non-zero line 11 can
+ * only have come from the box under test.
+ * @type {(w2Forms: readonly Stored<W2>[]) => ReportLine}
+ */
+const lineEleven = w2Forms => okResult(compute(baseInput({ w2Forms }))).line11
 
 /** Hand-typed: the number of box-12 codes Form 8880 line 2 reads. NOT
  * `electiveDeferralBox12Codes.length` — a code silently dropped would take
@@ -829,11 +1347,16 @@ export const proof = {
                 assertEq(line.sources[0]?.boxPath, 'declaredKinds', field)
             }
         },
-        // Line 11's own boundary, unchanged by this phase: a documented zero,
-        // never a computation over the stored W-2 box 4 figures that could
-        // support one. Asserted with a W-2 actually present, which is the
-        // only input at which the claim can be observed at all.
-        lineElevenIsStillADocumentedZeroEvenWithAW2Present: () => {
+        // CORRECTED, not deleted. This leaf used to be called
+        // `lineElevenIsStillADocumentedZeroEvenWithAW2Present` and asserted
+        // line 11's old boundary: "this module now reads W-2s, and line 11
+        // still does not." It does now. What survives is the half that is
+        // still true and still worth pinning — a W-2 carrying box 12 and NO
+        // box 4 leaves line 11 a profile-cited zero, because the filter is on
+        // the BOX, not on the dialect. Renamed so the name states what it
+        // proves; the value assertions are unchanged and the line-4 contrast
+        // is kept, since it is what makes the W-2 demonstrably in scope.
+        lineElevenIgnoresAW2ThatNeverReportedBoxFour: () => {
             const result = okResult(compute(baseInput({
                 w2Forms: [w2WithBox12('D')('1000.00')],
                 creditForms: [creditsDocument({
@@ -848,8 +1371,483 @@ export const proof = {
             assertEq(result.line11.sources.length, 1, 'line 11 cites exactly the profile, never a W-2 box')
             assertEq(result.line11.sources[0]?.boxPath, 'declaredKinds')
             // …while line 4, on the SAME W-2, is real. The contrast is the
-            // point: this module now reads W-2s, and line 11 still does not.
+            // point: the W-2 is unquestionably in scope, and line 11 still
+            // declines to cite it, because it reported no box 4.
             assert(result.line4.value > 0n, ['line 4 must be real', result.line4])
+        },
+    },
+
+    // ── Line 1: the foreign tax credit, §904(j) only (TAX-36) ─────────────
+    //
+    // Every expected value is a hand-typed cent literal with its dollar
+    // figure in the assertion message; the two thresholds ($300.00 and
+    // $600.00) are likewise hand-typed here rather than read from the
+    // parameter under test, and the boundary leaves straddle each to the
+    // cent. Value and citation by SEPARATE leaves.
+    lineOneForeignTaxCredit: {
+        // The motivating taxpayer: one international index fund, $47.00 of
+        // foreign tax withheld inside it, and the §904(j) election made.
+        // Before this slice the whole $47.00 was dropped in silence.
+        anElectedCreditUnderTheCeilingIsTheWholeForeignTax: () => {
+            const line = foreignCreditLine(foreignCredit('single')(profileElectingSection904j)(
+                [dividendWithForeignTax('sha256-div-ftc')('47.00')])([]))
+            assertEq(line.value, 4700n, 'line 1 = $47.00 — the creditable foreign taxes, in full')
+        },
+        // The citation, on its own: ONE source per contributing document, at
+        // the exact box, carrying the raw stored string.
+        theCreditCitesEachContributingBox: () => {
+            const line = foreignCreditLine(foreignCredit('single')(profileElectingSection904j)(
+                [dividendWithForeignTax('sha256-div-ftc')('47.00')])(
+                [interestWithForeignTax('sha256-int-ftc')('13.50')]))
+            assertEq(line.value, 6050n, '$47.00 + $13.50 = $60.50')
+            assertEq(line.sources.length, 2, 'one source per contributing document')
+            const [dividend, interest] = line.sources
+            assertEq(dividend.documentHash, 'sha256-div-ftc')
+            assertEq(dividend.boxPath, 'box7ForeignTaxPaid')
+            assertEq(dividend.value, '47.00')
+            assertEq(interest?.documentHash, 'sha256-int-ftc')
+            assertEq(interest?.boxPath, 'box6ForeignTaxPaid')
+            assertEq(interest?.value, '13.50')
+        },
+        // **Both boxes, not one.** A wiring that read 1099-DIV box 7 and
+        // forgot 1099-INT box 6 would look right on every single-document
+        // fixture, so each is also shown carrying the line ALONE.
+        eachOfTheTwoBoxesCarriesTheLineOnItsOwn: () => {
+            const dividendOnly = foreignCreditLine(foreignCredit('single')(
+                profileElectingSection904j)(
+                [dividendWithForeignTax('sha256-div-solo')('20.00')])([]))
+            assertEq(dividendOnly.value, 2000n, '1099-DIV box 7 alone = $20.00')
+            assertEq(dividendOnly.sources[0]?.boxPath, 'box7ForeignTaxPaid')
+            const interestOnly = foreignCreditLine(foreignCredit('single')(
+                profileElectingSection904j)([])(
+                [interestWithForeignTax('sha256-int-solo')('31.00')]))
+            assertEq(interestOnly.value, 3100n, '1099-INT box 6 alone = $31.00')
+            assertEq(interestOnly.sources[0]?.boxPath, 'box6ForeignTaxPaid')
+        },
+        // §904(j)(2)(B)'s ceiling, straddled to the cent on a SINGLE return.
+        // $300.00 exactly is "does not exceed", so it computes; one cent more
+        // is Form 1116 territory and refuses.
+        threeHundredExactlyComputesAndThreeHundredAndOneCentRefuses: () => {
+            const atTheCeiling = foreignCreditLine(foreignCredit('single')(
+                profileElectingSection904j)(
+                [dividendWithForeignTax('sha256-div-300')('300.00')])([]))
+            assertEq(
+                atTheCeiling.value, 30000n,
+                '$300.00 exactly — §904(j)(2)(B) says "does not exceed", so it qualifies')
+            const overIt = foreignCreditRefusal(foreignCredit('single')(
+                profileElectingSection904j)(
+                [dividendWithForeignTax('sha256-div-301')('300.01')])([]))
+            assert(overIt.includes('300.01'), ['the refusal must name the taxpayer\'s own total', overIt])
+            assert(overIt.includes('300.00'), ['and the ceiling they had to be under', overIt])
+            assert(overIt.includes('Form 1116'), ['and the form that would compute it', overIt])
+            assert(
+                overIt.includes('Schedule 3 line 1'),
+                ['and where the amount would have gone', overIt])
+        },
+        // …and the joint return's own $600.00, straddled the same way. THE
+        // per-status mutation this catches is a ceiling read for the wrong
+        // status: $450.00 computes on a joint return and refuses on a single
+        // one, so one fixture at that figure distinguishes them.
+        aJointReturnGetsSixHundredAndASingleFilerDoesNot: () => {
+            const joint = foreignCreditLine(foreignCredit('marriedFilingJointly')(
+                profileElectingSection904j)(
+                [dividendWithForeignTax('sha256-div-450')('450.00')])([]))
+            assertEq(joint.value, 45000n, '$450.00 — under §904(j)(2)(B)\'s joint-return $600.00')
+            const single = foreignCreditRefusal(foreignCredit('single')(
+                profileElectingSection904j)(
+                [dividendWithForeignTax('sha256-div-450')('450.00')])([]))
+            assert(single.includes('300.00'), ['a single filer\'s ceiling is $300.00', single])
+            const atSixHundred = foreignCreditLine(foreignCredit('marriedFilingJointly')(
+                profileElectingSection904j)(
+                [dividendWithForeignTax('sha256-div-600')('600.00')])([]))
+            assertEq(atSixHundred.value, 60000n, '$600.00 exactly still qualifies')
+            const overSixHundred = foreignCreditRefusal(foreignCredit('marriedFilingJointly')(
+                profileElectingSection904j)(
+                [dividendWithForeignTax('sha256-div-60001')('600.01')])([]))
+            assert(overSixHundred.includes('600.00'), ['and one cent over does not', overSixHundred])
+        },
+        // **A qualifying surviving spouse does NOT file a joint return**, so
+        // the ceiling is $300.00. This is the trap
+        // `additionalMedicareTaxThreshold` carries one parameter over, and it
+        // is worth a leaf of its own because every OTHER per-status parameter
+        // in this engine gives QSS the married-filing-jointly figure.
+        aQualifyingSurvivingSpouseTakesThreeHundredNotSixHundred: () => {
+            const refused = foreignCreditRefusal(foreignCredit('qualifyingSurvivingSpouse')(
+                profileElectingSection904j)(
+                [dividendWithForeignTax('sha256-div-qss')('450.00')])([]))
+            assert(
+                refused.includes('300.00'),
+                ['a QSS return is not a JOINT return: §904(j)(2)(B) gives it $300.00', refused])
+            assert(refused.includes('qualifyingSurvivingSpouse'), [refused])
+        },
+        // §904(j)(2)(C). Without the election the credit needs Form 1116, and
+        // the engine REFUSES rather than zeroing — zeroing would silently
+        // delete money the taxpayer is owed.
+        aStoredForeignTaxWithNoElectionRefusesRatherThanZeroing: () => {
+            const message = foreignCreditRefusal(foreignCredit('single')(
+                profileNoDeclaredKinds)(
+                [dividendWithForeignTax('sha256-div-noelect')('47.00')])([]))
+            assert(message.includes('47.00'), ['the refusal must name the amount', message])
+            assert(
+                message.includes('sha256-div-noelect'),
+                ['and the document it is stored on', message])
+            assert(
+                message.includes('box7ForeignTaxPaid'),
+                ['and the box, so a reader can find it', message])
+            assert(message.includes('Form 1116'), [message])
+            assert(
+                message.includes('section904jElectionAllForeignIncomeIsQualifiedPassiveIncome'),
+                ['and the profile field that would make it computable', message])
+            assert(
+                message.includes('§904(c)'),
+                ['and what the election costs — no carryback or carryforward', message])
+            assert(
+                message.includes('Schedule 3 line 1'),
+                ['and where the amount would have gone', message])
+        },
+        // THE CONTROL for every refusal above: an election alone is not a
+        // credit, and a return with no foreign tax anywhere is not refused.
+        // Without this leaf a gate that refused every return would pass.
+        aReturnWithNoForeignTaxIsAProfileDeclaredZero: () => {
+            const line = foreignCreditLine(foreignCredit('single')(profileNoDeclaredKinds)(
+                [dividendWithForeignTax('sha256-div-nobox')(undefined)])([]))
+            assertEq(line.value, 0n)
+            assertEq(line.sources.length, 1)
+            assertEq(
+                line.sources[0]?.boxPath, 'declaredKinds',
+                'an ABSENT box produces no reading, so the line cites the profile')
+        },
+        // A PRESENT box reading `'0.00'` is a different state, and needs no
+        // election: there is no credit to elect for. DOC-11 — a present box
+        // cites its document.
+        aStoredZeroBoxCitesItsDocumentAndNeedsNoElection: () => {
+            const line = foreignCreditLine(foreignCredit('single')(profileNoDeclaredKinds)(
+                [dividendWithForeignTax('sha256-div-zero')('0.00')])([]))
+            assertEq(line.value, 0n)
+            assertEq(line.sources.length, 1)
+            assertEq(line.sources[0]?.boxPath, 'box7ForeignTaxPaid')
+            assertEq(line.sources[0]?.value, '0.00')
+        },
+        // The line reaches Schedule 3's Part I total, and thence 1040 line
+        // 20. `scheduleThree` takes the finished line as an INPUT, so this is
+        // what proves it is added rather than discarded.
+        theCreditReachesLineEight: () => {
+            const result = okResult(compute(baseInput({
+                profile: profileElectingSection904j,
+                foreignTaxCreditLine1: foreignCreditLine(foreignCredit('single')(
+                    profileElectingSection904j)(
+                    [dividendWithForeignTax('sha256-div-total')('47.00')])([])),
+            })))
+            assertEq(result.line1.value, 4700n, 'line 1 = $47.00')
+            assertEq(
+                result.line8.value, 4700n,
+                'line 8 = $47.00 -> 1040 line 20: lines 2, 3, 4, 5a, 5b and 7 are all zero')
+            // …and NOT Part II. A nonrefundable credit is not a payment.
+            assertEq(result.line15.value, 0n, 'a CREDIT is not an "other payment"')
+        },
+    },
+
+    // ── Line 10: the amount paid with a Form 4868 extension request ───────
+    //
+    // Value and citation by SEPARATE leaves, per this file's own line 11
+    // convention: a line that read the right box while citing nothing and a
+    // line that cited the right box while reading zero are different defects.
+    lineTen: {
+        // The value, hand-typed as a cent literal with its dollar figure in
+        // the message. $1,250.00 is the ONLY figure on this return, which is
+        // what makes line 15 below unambiguous.
+        theProfilesAmountIsReadIntoLineTen: () => {
+            const result = okResult(compute(baseInput({
+                profile: profileWithExtensionPayment('1250.00'),
+            })))
+            assertEq(result.line10.value, 125000n, 'line 10 = $1,250.00, paid with Form 4868')
+        },
+        // The citation, on its own, and asserting the RAW STORED STRING —
+        // never a re-formatted one. `'1250.00'` went in and `'1250.00'` must
+        // come back out, at the field's own boxPath on the profile's own
+        // document hash.
+        lineTenCitesTheProfileFieldWithTheRawStoredString: () => {
+            const result = okResult(compute(baseInput({
+                profile: profileWithExtensionPayment('1250.00'),
+            })))
+            assertEq(result.line10.sources.length, 1, 'exactly one source: the profile field')
+            const [source] = result.line10.sources
+            assertEq(source.documentHash, 'profile-hash-0001')
+            assertEq(source.boxPath, 'scheduleThreeLine10AmountPaidWithExtensionRequest')
+            assertEq(source.value, '1250.00')
+            assert(
+                result.line10.rule.includes('Schedule 3 line 10'),
+                ['the rule must name its own printed line', result.line10.rule])
+        },
+        // It reaches line 15, and thence 1040 line 31. THE mutation this leaf
+        // exists for is line 10 being dropped from line 15's summand list:
+        // the line above computes perfectly and the money never arrives.
+        lineTenReachesLineFifteen: () => {
+            const result = okResult(compute(baseInput({
+                profile: profileWithExtensionPayment('1250.00'),
+            })))
+            assertEq(
+                result.line15.value, 125000n,
+                'line 15 = $1,250.00 -> 1040 line 31: lines 9, 11, 12 and 14 are all zero')
+            // …and line 8 is untouched. Part II's payment must not leak into
+            // Part I's nonrefundable-credit total.
+            assertEq(result.line8.value, 0n, 'a PAYMENT is not a nonrefundable credit')
+        },
+        // DOC-11's absent case, as a control for all three leaves above: with
+        // the field left out, line 10 is the profile-declared zero it has
+        // always been and cites `declaredKinds`, not a `'0.00'` no document
+        // contains.
+        anAbsentFieldLeavesLineTenAProfileDeclaredZero: () => {
+            const result = okResult(compute(baseInput({})))
+            assertEq(result.line10.value, 0n)
+            assertEq(result.line10.sources.length, 1)
+            assertEq(result.line10.sources[0]?.boxPath, 'declaredKinds')
+        },
+        // …and a STORED `'0.00'` is a different state from an absent field,
+        // because the taxpayer did state it. The value agrees with the absent
+        // case; the citation does not, and that is the whole of DOC-11.
+        aStoredZeroCitesTheFieldRatherThanDeclaredKinds: () => {
+            const result = okResult(compute(baseInput({
+                profile: profileWithExtensionPayment('0.00'),
+            })))
+            assertEq(result.line10.value, 0n)
+            assertEq(
+                result.line10.sources[0]?.boxPath,
+                'scheduleThreeLine10AmountPaidWithExtensionRequest',
+                'a stored zero cites the box the taxpayer filled in')
+            assertEq(result.line10.sources[0]?.value, '0.00')
+        },
+    },
+
+    // ── Line 11: excess Social Security tax withheld (§31(b)/§6413(c)(1)) ──
+    //
+    // Every expected value below is a hand-typed cent literal with its dollar
+    // figure in the assertion message, never derived from the sum under test.
+    // The maximum those figures straddle — $176,100.00 x 6.2% = $10,918.20 —
+    // is likewise never computed here: the two boundary leaves pin it to the
+    // cent from outside, one at exactly the maximum and one a penny over.
+    //
+    // Value and citation are asserted by SEPARATE leaves. A line that summed
+    // correctly while citing nothing and a line that cited correctly while
+    // summing zero are different defects, and one leaf could not tell them
+    // apart.
+    lineEleven: {
+        // §6413(c)(1)'s gate, first, because every other leaf depends on it
+        // being open. ONE employer, under the maximum: nothing to refund, and
+        // the document still cited because the box was read.
+        oneEmployerUnderTheMaximumIsZeroAndStillCitesItsW2: () => {
+            const line = lineEleven([
+                w2WithSocialSecurity('sha256-w2-a')('11-1111111')(taxpayerSsn)('100000.00')('6200.00'),
+            ])
+            assertEq(line.value, 0n, '$6,200.00 withheld, well under $10,918.20')
+            assertEq(line.sources.length, 1, 'the document, not the profile')
+            assertEq(
+                line.sources[0]?.boxPath, 'box4SocialSecurityTaxWithheld',
+                'the box that was read')
+        },
+        // The control the gate needs: a single employer who withheld MORE
+        // than the annual maximum. Reg. §31.6413(a)-1 makes that the
+        // employer's to refund, so claiming it here would claim it twice.
+        // Without this leaf, dropping the two-employer test entirely would go
+        // unnoticed on every fixture in this block.
+        oneEmployerOverTheMaximumIsStillZeroBecauseSixFourOneThreeCNeedsTwo: () => {
+            const line = lineEleven([
+                w2WithSocialSecurity('sha256-w2-a')('11-1111111')(taxpayerSsn)('193548.39')('12000.00'),
+            ])
+            assertEq(
+                line.value, 0n,
+                '$12,000.00 from ONE employer is that employer\'s to refund, never Schedule 3\'s')
+            assertEq(line.sources.length, 1, 'and the box is still cited, so the zero is explicable')
+        },
+        // Two employers, combined UNDER the maximum. The floor at zero is
+        // what makes this leaf zero rather than -$5,958.20, and it is the
+        // only fixture in the block where a missing floor would leak.
+        twoEmployersUnderTheMaximumIsZero: () => {
+            const line = lineEleven([
+                w2WithSocialSecurity('sha256-w2-a')('11-1111111')(taxpayerSsn)('48000.00')('2976.00'),
+                w2WithSocialSecurity('sha256-w2-b')('22-2222222')(taxpayerSsn)('32000.00')('1984.00'),
+            ])
+            assertEq(line.value, 0n, '$2,976.00 + $1,984.00 = $4,960.00, under $10,918.20')
+            assertEq(line.sources.length, 2, 'both documents cited even though the answer is zero')
+        },
+        // The main case: two employers, combined over the maximum.
+        twoEmployersOverTheMaximumRefundTheExcess: () => {
+            const line = lineEleven([
+                w2WithSocialSecurity('sha256-w2-a')('11-1111111')(taxpayerSsn)('100000.00')('6200.00'),
+                w2WithSocialSecurity('sha256-w2-b')('22-2222222')(taxpayerSsn)('96000.00')('5952.00'),
+            ])
+            assertEq(
+                line.value, 123380n,
+                '$6,200.00 + $5,952.00 = $12,152.00, less $10,918.20, is $1,233.80')
+        },
+        // The SAME fixture, citations only — the separate-leaf rule.
+        theSameTwoEmployersAreCitedOncePerDocumentAtTheBoxThatWasRead: () => {
+            const line = lineEleven([
+                w2WithSocialSecurity('sha256-w2-a')('11-1111111')(taxpayerSsn)('100000.00')('6200.00'),
+                w2WithSocialSecurity('sha256-w2-b')('22-2222222')(taxpayerSsn)('96000.00')('5952.00'),
+            ])
+            assertEq(line.sources.length, 2, 'one source per contributing document')
+            assertEq(
+                line.sources.map(source => source.documentHash).join(','),
+                'sha256-w2-a,sha256-w2-b',
+                'both documents cited, in document order')
+            for (const source of line.sources) {
+                assertEq(
+                    source.boxPath, 'box4SocialSecurityTaxWithheld',
+                    'box 4, never box 3 and never the profile')
+            }
+            assertEq(
+                line.sources.map(source => source.value).join(','), '6200.00,5952.00',
+                'each source carries the printed string its own form reported')
+        },
+        // Boundary, exactly at the maximum. $100,000.00 + $76,100.00 is the
+        // wage base to the dollar, so this is the largest correctly withheld
+        // pair that exists.
+        exactlyAtTheMaximumIsZero: () => {
+            const line = lineEleven([
+                w2WithSocialSecurity('sha256-w2-a')('11-1111111')(taxpayerSsn)('100000.00')('6200.00'),
+                w2WithSocialSecurity('sha256-w2-b')('22-2222222')(taxpayerSsn)('76100.00')('4718.20'),
+            ])
+            assertEq(line.value, 0n, '$6,200.00 + $4,718.20 = $10,918.20 exactly — nothing is excess')
+        },
+        // Boundary, one cent over. The pair above with seventeen more cents
+        // of wages at the second employer.
+        oneCentOverTheMaximumRefundsOneCent: () => {
+            const line = lineEleven([
+                w2WithSocialSecurity('sha256-w2-a')('11-1111111')(taxpayerSsn)('100000.00')('6200.00'),
+                w2WithSocialSecurity('sha256-w2-b')('22-2222222')(taxpayerSsn)('76100.17')('4718.21'),
+            ])
+            assertEq(line.value, 1n, '$10,918.21 less $10,918.20 is $0.01')
+        },
+        // A W-2 with NO box 4 neither contributes nor is cited — and, just as
+        // importantly, does not count as an employer. Three forms, three
+        // EINs, and the answer is the two-employer answer.
+        aW2WithNoBoxFourIsNeitherSummedNorCitedNorCountedAsAnEmployer: () => {
+            const line = lineEleven([
+                w2WithSocialSecurity('sha256-w2-a')('11-1111111')(taxpayerSsn)('100000.00')('6200.00'),
+                w2WithSocialSecurity('sha256-w2-b')('22-2222222')(taxpayerSsn)('96000.00')('5952.00'),
+                w2WithSocialSecurity('sha256-w2-c')('33-3333333')(taxpayerSsn)('5000.00')(undefined),
+            ])
+            assertEq(line.value, 123380n, 'the same $1,233.80 the two box-4 forms produce alone')
+            assertEq(line.sources.length, 2, 'the third form is not cited')
+            assertEq(
+                line.sources.map(source => source.documentHash).join(','),
+                'sha256-w2-a,sha256-w2-b',
+                'and it is the third form specifically that is absent')
+        },
+        // The presence-not-value rule, as two leaves. A box that is absent
+        // and a box present and zero are the same NUMBER and different FACTS;
+        // only the citation tells them apart.
+        aZeroBoxFourStillCitesItsDocument: () => {
+            const line = lineEleven([
+                w2WithSocialSecurity('sha256-w2-a')('11-1111111')(taxpayerSsn)('0.00')('0.00'),
+            ])
+            assertEq(line.value, 0n, 'a reported zero withholding')
+            assertEq(line.sources.length, 1, 'the document, not the profile')
+            assertEq(
+                line.sources[0]?.boxPath, 'box4SocialSecurityTaxWithheld',
+                'the form reported the box, so the form is what is cited')
+        },
+        noW2AtAllIsAProfileCitedZero: () => {
+            const line = lineEleven([])
+            assertEq(line.value, 0n, 'no Form W-2 at all')
+            assertEq(line.sources.length, 1, 'the profile citation only')
+            assertEq(
+                line.sources[0]?.boxPath, 'declaredKinds',
+                'a computed zero cites the profile, never a document the taxpayer lacks')
+        },
+        // Two W-2s from ONE employer are one employer. Same EIN, same
+        // employee, combined well over the maximum — and no refund, because
+        // §6413(c)(1) needs "more than one employer" and this is not two.
+        twoW2sFromOneEmployerAreOneEmployer: () => {
+            const line = lineEleven([
+                w2WithSocialSecurity('sha256-w2-a')('11-1111111')(taxpayerSsn)('100000.00')('6200.00'),
+                w2WithSocialSecurity('sha256-w2-b')('11-1111111')(taxpayerSsn)('96000.00')('5952.00'),
+            ])
+            assertEq(
+                line.value, 0n,
+                '$12,152.00 through one EIN — a corrected or successor form, not a second job')
+            assertEq(line.sources.length, 2, 'both documents are still cited')
+        },
+        // The wage base is per EMPLOYEE. Two spouses, two employers each, and
+        // the answer is the SUM OF TWO SEPARATE excesses — not one excess
+        // over one shared maximum, which for this fixture would be
+        // $23,312.00 - $10,918.20 = $12,393.80, ten times too much.
+        aJointReturnGetsOneWageBasePerSpouse: () => {
+            const line = okResult(compute(baseInput({
+                status: 'marriedFilingJointly',
+                w2Forms: [
+                    w2WithSocialSecurity('sha256-w2-a')('11-1111111')(taxpayerSsn)('100000.00')('6200.00'),
+                    w2WithSocialSecurity('sha256-w2-b')('22-2222222')(taxpayerSsn)('96000.00')('5952.00'),
+                    w2WithSocialSecurity('sha256-w2-c')('33-3333333')(spouseSsn)('90000.00')('5580.00'),
+                    w2WithSocialSecurity('sha256-w2-d')('44-4444444')(spouseSsn)('90000.00')('5580.00'),
+                ],
+            }))).line11
+            assertEq(
+                line.value, 147560n,
+                'the taxpayer\'s $1,233.80 plus the spouse\'s $241.80 is $1,475.60')
+            assertEq(line.sources.length, 4, 'all four documents cited')
+        },
+        // The other half of "per employee", and the case a real couple hits:
+        // two spouses with ONE employer each, whose combined withholding is
+        // over the maximum. Nothing is refundable — neither of them received
+        // wages from more than one employer, so §6413(c)(1) never opens. A
+        // return that pooled the two would hand back $1,481.80 that is not
+        // owed, which is why this leaf exists beside the joint one below.
+        twoSpousesWithOneEmployerEachRefundNothing: () => {
+            const line = okResult(compute(baseInput({
+                status: 'marriedFilingJointly',
+                w2Forms: [
+                    w2WithSocialSecurity('sha256-w2-a')('11-1111111')(taxpayerSsn)('100000.00')('6200.00'),
+                    w2WithSocialSecurity('sha256-w2-b')('22-2222222')(spouseSsn)('100000.00')('6200.00'),
+                ],
+            }))).line11
+            assertEq(
+                line.value, 0n,
+                '$12,400.00 between two people, one employer each — $0.00, not $1,481.80')
+            assertEq(line.sources.length, 2, 'and both documents are still cited')
+        },
+        // The spouse's half of that sum on its own, so the joint figure above
+        // is checkable by hand rather than only as a total.
+        theSpousesOwnExcessIsComputedFromTheSpousesOwnTwoEmployers: () => {
+            const line = lineEleven([
+                w2WithSocialSecurity('sha256-w2-c')('33-3333333')(spouseSsn)('90000.00')('5580.00'),
+                w2WithSocialSecurity('sha256-w2-d')('44-4444444')(spouseSsn)('90000.00')('5580.00'),
+            ])
+            assertEq(
+                line.value, 24180n,
+                '$5,580.00 + $5,580.00 = $11,160.00, less $10,918.20, is $241.80')
+        },
+        // Line 11 reaches Part II's total. Without this the line could be
+        // computed correctly and dropped on the way to 1040 line 31.
+        lineElevenReachesLineFifteen: () => {
+            const result = okResult(compute(baseInput({
+                w2Forms: [
+                    w2WithSocialSecurity('sha256-w2-a')('11-1111111')(taxpayerSsn)('100000.00')('6200.00'),
+                    w2WithSocialSecurity('sha256-w2-b')('22-2222222')(taxpayerSsn)('96000.00')('5952.00'),
+                ],
+            })))
+            assertEq(
+                result.line15.value, 123380n,
+                'lines 9, 10, 11, 12 and 14 with only line 11 non-zero -> 1040 line 31')
+            assert(
+                result.line15.sources.some(source => source.documentHash === 'sha256-w2-a'),
+                ['the total must carry line 11\'s own citations', result.line15.sources])
+        },
+        // The hard zero is REPLACED, not supplemented: on a return carrying
+        // box 4, line 11 does not mention `declaredKinds` at all. The control
+        // for `noW2AtAllIsAProfileCitedZero` above.
+        aRealLineElevenNeverCitesTheProfile: () => {
+            const line = lineEleven([
+                w2WithSocialSecurity('sha256-w2-a')('11-1111111')(taxpayerSsn)('100000.00')('6200.00'),
+                w2WithSocialSecurity('sha256-w2-b')('22-2222222')(taxpayerSsn)('96000.00')('5952.00'),
+            ])
+            assertEq(
+                line.sources.filter(source => source.boxPath === 'declaredKinds').length, 0,
+                'no `declaredKinds` source survives beside real document readings')
+            assertEq(
+                line.rule, 'Schedule 3 line 11 (excess Social Security tax withheld -> 1040 line 31)',
+                'and the rule names the printed line and where it goes')
         },
     },
 
@@ -1095,6 +2093,87 @@ export const proof = {
 
     // ── §26's ordering, expressed through the two printed worksheets ───────
     creditOrdering: {
+        // **§26 puts the FOREIGN TAX CREDIT first of all**, and these two
+        // leaves are what prove line 1 reaches both Credit Limit Worksheets
+        // rather than only Schedule 3's own total. A line computed correctly
+        // and then dropped from a worksheet's summand is the exact defect
+        // that survived three mutations in the Form 3903 slice.
+        //
+        // Hand-derived: line 18 = $1,550.00, line 1 = $100.00. Form 8863's
+        // Credit Limit Worksheet line 2 is $100.00, so its line 3 (the limit)
+        // is $1,450.00 and the education credit — which WANTED $1,500.00 —
+        // is cut to $1,450.00. Line 8 = $100.00 + $1,450.00 = $1,550.00,
+        // which is the whole tax and not a penny more.
+        theForeignTaxCreditIsOrderedBeforeTheEducationCredit: () => {
+            const result = okResult(compute(baseInput({
+                profile: profileElectingSection904j,
+                agiCents: 2000000n,
+                line18Cents: 155000n,
+                foreignTaxCreditLine1: foreignCreditLine(foreignCredit('single')(
+                    profileElectingSection904j)(
+                    [dividendWithForeignTax('sha256-div-order')('100.00')])([])),
+                tuitionForms: [tuitionDocument({
+                    box1PaymentsReceivedForQualifiedTuition: '9000.00',
+                })],
+                creditForms: [creditsDocument({
+                    educationStudents: [{
+                        studentTin: '333-33-3333',
+                        studentName: 'A. Student',
+                        credit: 'americanOpportunity',
+                        enrolledAtLeastHalfTimeInADegreeProgram: true,
+                    }],
+                    filerAttainedAgeTwentyFourBeforeTheEndOfTheYear: true,
+                })],
+            })))
+            assertEq(result.line1.value, 10000n, 'line 1 = $100.00')
+            assertEq(
+                result.form8863.creditLimitWorksheet.c5, 10000n,
+                'and it is Form 8863\'s Credit Limit Worksheet line 2 (`c5` here — the'
+                + ' worksheet\'s own lines are numbered from its top, not the form\'s)')
+            assertEq(
+                result.form8863.creditLimitWorksheet.c6, 145000n,
+                '$1,550.00 - $100.00 = $1,450.00 of room left for the education credit')
+            assertEq(
+                result.line3.value, 145000n,
+                'so the education credit is cut from $1,500.00 to $1,450.00')
+            assertEq(result.line8.value, 155000n, '$100.00 + $1,450.00 = the whole $1,550.00 tax')
+        },
+        // …and Form 8880's worksheet, one credit further down the same order.
+        // Hand-derived: line 18 = $1,050.00, line 1 = $100.00, no education
+        // credit — so Form 8880's Credit Limit Worksheet line 2 is $100.00,
+        // its limit is $950.00, and the saver's credit, which WANTED
+        // $1,000.00, is cut to $950.00.
+        theForeignTaxCreditIsOrderedBeforeTheSaversCredit: () => {
+            const result = okResult(compute(baseInput({
+                profile: profileElectingSection904j,
+                agiCents: 2000000n,
+                line18Cents: 105000n,
+                foreignTaxCreditLine1: foreignCreditLine(foreignCredit('single')(
+                    profileElectingSection904j)(
+                    [dividendWithForeignTax('sha256-div-savers')('100.00')])([])),
+                creditForms: [creditsDocument({
+                    retirementContributions: [{
+                        contributionTag: 'iraContribution',
+                        datePaid: '2025-07-15',
+                        description: 'traditional IRA contribution',
+                        amount: '2000.00',
+                        individual: 'taxpayer',
+                    }],
+                    saversCreditEligibility: [{
+                        individual: 'taxpayer',
+                        attainedAgeEighteen: true,
+                        noTestingPeriodDistributions: true,
+                    }],
+                })],
+            })))
+            assertEq(result.form8880.line10, 100000n, 'the saver\'s credit WANTED $1,000.00')
+            assertEq(
+                result.form8880.creditLimitWorksheet.w2, 10000n,
+                'Form 8880\'s Credit Limit Worksheet line 2 is the $100.00 foreign tax credit')
+            assertEq(result.line4.value, 95000n, 'so it gets $950.00, not $1,000.00')
+            assertEq(result.line8.value, 105000n, '$100.00 + $950.00 = the whole $1,050.00 tax')
+        },
+
         // The education credits come out of the liability BEFORE the saver's
         // credit sees it. $1,500 of tax, a $1,500 nonrefundable education
         // credit and a $1,000 saver's credit: the education credit takes the

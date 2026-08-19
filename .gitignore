@@ -156,3 +156,6 @@ vite.config.ts.timestamp-*
 
 # Worktrees created by Claude Code sessions — never part of the repo
 .claude/worktrees/
+
+# Generated demo exports (print-to-PDF of the live demo) — an artifact, not source
+demo-outputs/

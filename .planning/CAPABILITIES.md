@@ -99,7 +99,7 @@ does not owe the thing.
 
 ## The measured surface
 
-**13 tools** · protocol `2025-11-25` · server `finance-mcp 1.0.0` · **26 document dialects**
+**13 tools** · protocol `2025-11-25` · server `finance-mcp 1.0.0` · **27 document dialects**
 
 | Group | Tools |
 |---|---|

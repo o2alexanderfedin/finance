@@ -16,6 +16,7 @@ import { ty2025, money, centsFromString, individualFilingStatuses, maxAgedOrBlin
 
 /** @import { Step } from '../demo.js' */
 /** @import { StandardDeductionInput } from '../../fjs/tax/deduction/module.f.js' */
+/** @import { Citation } from '../../fjs/tax/params/module.f.js' */
 
 export const id = 'parameters'
 export const kicker = 'Step 6'
@@ -25,17 +26,26 @@ export const tier = 'optional'
 
 /**
  * A `Citation` as one printable string. `Citation` is a discriminated union
- * (`fjs/tax/params`'s `kind: 'revProc' | 'publicLaw' | 'code'`, widened in
- * Phase 13) because not every parameter this engine stores comes from an
- * annual Revenue Procedure — some are direct Public Law text, some are
- * long-standing bare IRC sections with no annual update at all. This page
- * renders whichever authority actually governs the figure, rather than
- * assuming Rev. Proc. for everything.
- * @type {(citation: { readonly kind: 'revProc', readonly revProc: string, readonly section: string } | { readonly kind: 'publicLaw', readonly publicLaw: string, readonly section: string } | { readonly kind: 'code', readonly section: string }) => string}
+ * (`fjs/tax/params`'s `kind: 'revProc' | 'publicLaw' | 'code' |
+ * 'federalRegister'`, widened in Phase 13 and again for the federal poverty
+ * line) because not every parameter this engine stores comes from an annual
+ * Revenue Procedure — some are direct Public Law text, some are long-standing
+ * bare IRC sections with no annual update at all, and the poverty guidelines
+ * are an HHS Federal Register notice the tax law incorporates by reference.
+ * This page renders whichever authority actually governs the figure, rather
+ * than assuming Rev. Proc. for everything.
+ *
+ * The parameter is typed as the imported `Citation` itself rather than as a
+ * hand-copied structural echo of it: the echo silently stopped matching the
+ * moment a fourth arm was added, and a renderer that cannot be handed every
+ * citation this engine stores is a renderer that will one day print the wrong
+ * authority for a figure.
+ * @type {(citation: Citation) => string}
  */
 const cite = citation => {
     if (citation.kind === 'revProc') { return `Rev. Proc. ${citation.revProc} ${citation.section}` }
     if (citation.kind === 'publicLaw') { return `Pub. L. ${citation.publicLaw} ${citation.section}` }
+    if (citation.kind === 'federalRegister') { return `${citation.federalRegister} — ${citation.section}` }
     return `IRC ${citation.section}`
 }
 

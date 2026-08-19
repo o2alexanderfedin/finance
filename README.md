@@ -15,7 +15,7 @@ document it came from.
 
 Built for personal use, on top of the `fjs` CAS, Evo, and MCP modules.
 
-**Shipped as `finance-mcp 1.0.0`** on MCP protocol `2025-11-25`: **13 tools**, **26 document
+**Shipped as `finance-mcp 1.0.0`** on MCP protocol `2025-11-25`: **13 tools**, **27 document
 dialects** with readable schemas, tax year **2025**, and all four reference taxpayers computing a
 full Form 1040 — a retiree, a non-profit worker, a FAANG engineer and a startup founder.
 
