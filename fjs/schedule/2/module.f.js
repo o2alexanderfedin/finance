@@ -426,6 +426,8 @@ const uncollectedTaxSources = w2s => w2s.flatMap(form =>
  *   readonly excessAdvancePremiumTaxCreditRepayment: ReportLine,
  *   readonly regularPreferentialWorksheet:
  *     RegularPreferentialWorksheet | NoRegularPreferentialWorksheet,
+ *   readonly form2555ExclusionCents: bigint,
+ *   readonly form2555ItemizedDeductionsAndExclusionsNotClaimedCents: bigint,
  * }} ScheduleTwoInput
  */
 
@@ -502,6 +504,7 @@ export const scheduleTwo = taxParamSet => input => {
         filingScheduleD, scheduleD15Cents, scheduleD16Cents, scheduleD19Cents,
         regularPreferentialWorksheet, excessAdvancePremiumTaxCreditRepayment,
         amtDepreciationAdjustmentCents,
+        form2555ExclusionCents, form2555ItemizedDeductionsAndExclusionsNotClaimedCents,
     } = input
     const zero = profileDeclaredZeroLine(profile)
     // The two facts Schedule SE actually read, unioned wherever a line on
@@ -552,6 +555,10 @@ export const scheduleTwo = taxParamSet => input => {
     //    form, and `fjs/form6251`'s own docstring records the check.
     const form6251Result = form6251(taxParamSet)({
         status,
+        // TAX-42: i6251 p10's own Foreign Earned Income Tax Worksheet reprices
+        // line 7 for a §911 filer, exactly as i1040gi p37's does line 16.
+        form2555ExclusionCents,
+        form2555ItemizedDeductionsAndExclusionsNotClaimedCents,
         adjustedGrossIncomeCents: adjustedGrossIncome.value,
         totalDeductionsCents: totalDeductions.value,
         scheduleOneALine37Cents,
@@ -864,6 +871,8 @@ const noAmounts = {
     profile: profileNoDeclaredKinds,
     status: 'single',
     amtDepreciationAdjustmentCents: 0n,
+    form2555ExclusionCents: 0n,
+    form2555ItemizedDeductionsAndExclusionsNotClaimedCents: 0n,
     // Schedule 3 line 1 as `fjs/form1040/core` hands it in: zero for a return
     // with no foreign tax anywhere. The leaves below that care about it
     // override it, and `theForeignTaxCreditReachesFormSixTwoFiftyOnesBothSides`

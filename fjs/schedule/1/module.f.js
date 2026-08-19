@@ -980,6 +980,7 @@ export const scheduleOnePartI = taxParamSet => input => {
  *   readonly mfsLivedWithSpouseAtAnyTimeInYear: boolean,
  *   readonly iraDistributionReceived: boolean,
  *   readonly marketplaceCoverageStored: boolean,
+ *   readonly form2555ExclusionCents: bigint,
  * }} ScheduleOnePartIIStageOneInput
  */
 
@@ -1453,7 +1454,8 @@ export const scheduleOnePartIIExceptStudentLoanInterest = taxParamSet => input =
     const {
         profile, status, adjustmentForms, w2Forms, businessNetProfit, farmNetProfit,
         businessExpenseForms,
-        passThrough, interestForms, marketplaceCoverageStored, totalIncomeExceptTaxableSocialSecurityLine,
+        passThrough, interestForms, marketplaceCoverageStored, form2555ExclusionCents,
+        totalIncomeExceptTaxableSocialSecurityLine,
         socialSecurityBenefitsCents, taxExemptInterestCents, mfsLivedWithSpouseAtAnyTimeInYear,
         iraDistributionReceived,
     } = input
@@ -1873,6 +1875,34 @@ export const scheduleOnePartIIExceptStudentLoanInterest = taxParamSet => input =
                 + 'the two answers differ by the whole credit. Refusing rather than computing one '
                 + 'arm and ignoring the feedback'
                 + `. Nothing reaches ${line17Destination}`,
+        }
+    }
+    // R2b -- Form 7206 line 12, §911(d)(6) (TAX-42). The printed line reads
+    // "Enter any amount from Form 2555, line 45, ATTRIBUTABLE TO THE AMOUNT
+    // ENTERED ON LINE 4 OR 11 ABOVE", and that attribution is the problem: it
+    // is not the whole exclusion, it is the part of it that belongs to the one
+    // trade or business the insurance plan is established under. Nothing
+    // stored says how the exclusion divides between a foreign business, a
+    // domestic one, and foreign WAGES, and the three shares reduce line 13 by
+    // three different amounts.
+    //
+    // `fjs/form7206` keeps line 12 as a structural zero and this is the layer
+    // that stops a return reaching it with a non-zero exclusion -- the same
+    // division of labour line 11's S-corporation refusal already uses.
+    if (premiumsCouldMatter && form2555ExclusionCents !== 0n) {
+        return {
+            kind: 'error',
+            message: `Schedule 1 line 17: this return stores self-employed health insurance `
+                + `premiums and excludes ${centsToString(form2555ExclusionCents)} of foreign `
+                + `earned income under §911. Form 7206 line 12 asks for the part of Form 2555 `
+                + `line 45 "attributable to the amount entered on line 4 or 11" -- the net profit `
+                + `of the one trade or business the insurance plan is established under -- and `
+                + `subtracts it from the ceiling on line 13. Nothing stored says how the `
+                + `exclusion divides between that business, any other, and foreign wages, and `
+                + `§911(d)(6) denies "any deduction ... properly allocable to or chargeable `
+                + `against amounts excluded". Entering zero would claim the whole ceiling for `
+                + `income this return already excluded. Refusing rather than attributing it by `
+                + `guess (no phase yet). Nothing reaches ${line17Destination}`,
         }
     }
     // R3/R4 -- Form 7206 line 4 is "your net profit ... from the TRADE OR
@@ -2601,6 +2631,7 @@ export const scheduleOne = taxParamSet => input => {
         return partI
     }
     const stageOne = scheduleOnePartIIExceptStudentLoanInterest(taxParamSet)({
+        form2555ExclusionCents: 0n,
         profile, status, adjustmentForms, w2Forms, interestForms, marketplaceCoverageStored,
         // Schedule 1 line 20's four income-interaction inputs, threaded
         // straight through: §219(g)(3)(A) reads adjusted gross income "after
@@ -2963,6 +2994,7 @@ const iraContributionEntry = amount => ({
  */
 const stageOneForMovingAndIra = entries =>
     scheduleOnePartIIExceptStudentLoanInterest(taxParams2025)({
+        form2555ExclusionCents: 0n,
         profile: profileCertifiedForMoving,
         status: 'single',
         adjustmentForms: [adjustmentsDoc(entries)([])],
@@ -3142,6 +3174,7 @@ const refusal = outcome => {
  */
 const partIIOf = profile => status => adjustmentForms => studentLoanInterestForms => w2Forms => totalIncomeCents => {
     const stageOne = scheduleOnePartIIExceptStudentLoanInterest(taxParams2025)({
+        form2555ExclusionCents: 0n,
         profile, status, adjustmentForms, w2Forms, interestForms: [],
         ...noSocialSecurityInteraction,
         totalIncomeExceptTaxableSocialSecurityLine: totalIncomeOf(totalIncomeCents),
@@ -3175,6 +3208,7 @@ const emptyPartII = () => partIIOf(profileNoDeclaredKinds)('single')([])([])([])
  */
 const stageOneWithInterest = interestForms =>
     scheduleOnePartIIExceptStudentLoanInterest(taxParams2025)({
+        form2555ExclusionCents: 0n,
         profile: profileNoDeclaredKinds,
         status: 'single',
         adjustmentForms: [],
@@ -3274,6 +3308,7 @@ const stageOneForIra = fixture => {
             rule: '1040 line 9 less line 6b (total income except taxable Social Security benefits)',
         }
     return scheduleOnePartIIExceptStudentLoanInterest(taxParams2025)({
+        form2555ExclusionCents: 0n,
         profile: profileNoDeclaredKinds,
         status,
         adjustmentForms: entries.length === 0 ? [] : [adjustmentsDoc(entries)([])],
@@ -3341,6 +3376,7 @@ const stageOneWithBusiness = profile => status => nonemployeeCompensationForms =
             estateTrustK1Forms: [],
         }))
         return scheduleOnePartIIExceptStudentLoanInterest(taxParams2025)({
+            form2555ExclusionCents: 0n,
             profile, status, adjustmentForms: [], w2Forms, interestForms: [],
             ...noSocialSecurityInteraction,
             totalIncomeExceptTaxableSocialSecurityLine: noOtherIncomeLine,
@@ -3376,6 +3412,7 @@ const stageOneWithPassThrough = profile => status => partnershipK1Forms =>
             estateTrustK1Forms: [],
         }))
         return scheduleOnePartIIExceptStudentLoanInterest(taxParams2025)({
+            form2555ExclusionCents: 0n,
             profile, status, adjustmentForms: [], w2Forms, interestForms: [],
             ...noSocialSecurityInteraction,
             totalIncomeExceptTaxableSocialSecurityLine: noOtherIncomeLine,
@@ -3495,6 +3532,7 @@ const stageOneForHealthInsurance =
                 ? /** @type {IndividualFilingStatus} */ ('marriedFilingJointly')
                 : /** @type {IndividualFilingStatus} */ ('single')
             return scheduleOnePartIIExceptStudentLoanInterest(taxParams2025)({
+                form2555ExclusionCents: 0n,
                 profile,
                 status,
                 adjustmentForms: entries.length === 0 ? [] : [adjustmentsDoc(entries)([])],
@@ -4282,6 +4320,7 @@ export const proof = {
                 estateTrustK1Forms: [],
             }))
             const stageOne = okStageOne(scheduleOnePartIIExceptStudentLoanInterest(taxParams2025)({
+                form2555ExclusionCents: 0n,
                 profile: profileNoDeclaredKinds,
                 interestForms: [],
                 ...noSocialSecurityInteraction,
@@ -5355,6 +5394,7 @@ export const proof = {
                 estateTrustK1Forms: [],
             }))
             const result = refusal(scheduleOnePartIIExceptStudentLoanInterest(taxParams2025)({
+                form2555ExclusionCents: 0n,
                 profile: profileNoDeclaredKinds,
                 status: 'single',
                 adjustmentForms: [adjustmentsDoc(
@@ -5617,6 +5657,7 @@ export const proof = {
     },
     theTwoAdjustmentTotalsAreSeparateRulesThatHappenToAgree: () => {
         const stageOne = okStageOne(scheduleOnePartIIExceptStudentLoanInterest(taxParams2025)({
+            form2555ExclusionCents: 0n,
             profile: profileNoDeclaredKinds,
             interestForms: [],
             ...noSocialSecurityInteraction,

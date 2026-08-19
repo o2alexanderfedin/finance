@@ -1454,6 +1454,11 @@ export const form1040IncomeLines = taxParamSet => inputs => {
     // `recipientTin`, which decides whose Forms W-2 consume the §1402(b)(1)
     // wage base.
     const scheduleOneStageOne = scheduleOnePartIIExceptStudentLoanInterest(taxParamSet)({
+        // TAX-42. Schedule 1 line 17 also refuses a return that stores both
+        // §162(l) premiums and a §911 exclusion: Form 7206 line 12 asks for
+        // the part of Form 2555 line 45 "attributable to" the plan's own trade
+        // or business, and nothing stored says how the exclusion divides.
+        form2555ExclusionCents: foreignEarnedIncome.line45,
         profile, status, adjustmentForms, w2Forms: w2s,
         // TAX-39. Schedule 1 line 17 REFUSES a return that stores both §162(l)
         // premiums and a Form 1095-A, because Rev. Proc. 2014-41 §2.05's
@@ -2827,6 +2832,12 @@ const form1040TaxAndPaymentLines = taxParamSet => inputs => income => {
     const scheduleTwoOutcome = scheduleTwo(taxParamSet)({
         profile,
         status,
+        // TAX-42: Form 6251 line 7 has its OWN Foreign Earned Income Tax
+        // Worksheet (i6251 p10), and it reads the same two figures 1040 line
+        // 16's does. Off the ONE `fjs/form2555` execution, never a second.
+        form2555ExclusionCents: income.foreignEarnedIncome.line45,
+        form2555ItemizedDeductionsAndExclusionsNotClaimedCents:
+            foreignEarnedIncomeWorksheetLineTwoBCents(profile),
         scheduleThreeLine1Cents: scheduleThreeLine1.value,
         // Form 6251 line 2l -- the §56(a)(1) depreciation adjustment, off
         // the ONE Form 4562 `fjs/schedule/c` already completed inside
@@ -3276,6 +3287,12 @@ const form1040TaxAndPaymentLines = taxParamSet => inputs => income => {
             scheduleSeLine3Cents: income.selfEmployment.lines.line3,
             scheduleSeLine13Cents: income.selfEmployment.lines.line13,
             adjustedGrossIncomeCents: income.line11b.value,
+            // TAX-42: §32(c)(1)(C) bars the credit outright for a filer who
+            // elects to exclude any amount under §911. Supplied as the
+            // EXCLUSION rather than as a declared kind — a stored Form 2555
+            // that excludes nothing is not an election to exclude "any
+            // amount", and barring that filer would cost them up to $8,046.
+            form2555ExclusionCents: income.foreignEarnedIncome.line45,
             line2aCents: income.line2a.value,
             line2bCents: income.line2b.value,
             line3bCents: income.line3b.value,

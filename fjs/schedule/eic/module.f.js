@@ -197,9 +197,26 @@
  * nobody can review — and because §32(c)(3) has nine clauses and this file
  * checks eight.
  *
- * §32(c)(1)(C)'s Form 2555 exclusion needs no check here:
- * `foreignEarnedIncomeForm2555` is already an `fjs/return/scope` refusal, so
- * a filer claiming §911 cannot reach this module.
+ * ## §32(c)(1)(C)'s Form 2555 bar is a real check now (TAX-42)
+ *
+ * This paragraph read *"needs no check here: `foreignEarnedIncomeForm2555` is
+ * already an `fjs/return/scope` refusal, so a filer claiming §911 cannot reach
+ * this module"* until TAX-42 made the exclusion computable. **That premise is
+ * now false**, and the statute is checked instead:
+ *
+ * > §32(c)(1)(C): *"No credit shall be allowed under this section for any
+ * > taxable year if the taxpayer elects to exclude any amount from gross
+ * > income under section 911 for such taxable year."*
+ *
+ * i2555 p3 repeats it flatly: *"You can't take the earned income credit if you
+ * claim either of the exclusions or the housing deduction."*
+ *
+ * **It is a DETERMINATION, not a refusal**, and that distinction is the whole
+ * reason it belongs in the denial block rather than beside the four refusals
+ * above. §32 answers zero — exactly, and for a stated reason — rather than
+ * this engine being unable to tell. Refusing here would send a filer who is
+ * simply not entitled to the credit off to find a document that does not
+ * exist.
  *
  * @module
  */
@@ -270,6 +287,7 @@ import { taxParamsByYear } from '../../tax/params/module.f.js'
  *   readonly line7aCents: bigint,
  *   readonly formFortySevenNinetySevenGainCents: bigint,
  *   readonly disqualifiedPassiveIncomeCents: bigint,
+ *   readonly form2555ExclusionCents: bigint,
  * }} EarnedIncomeCreditInput
  */
 
@@ -695,7 +713,7 @@ export const earnedIncomeCreditTierFor = count =>
  * @type {(taxParamSet: TaxParamSet) => (input: EarnedIncomeCreditInput) => EarnedIncomeCreditOutcome}
  */
 export const earnedIncomeCredit = taxParamSet => input => {
-    const { profile } = input
+    const { profile, form2555ExclusionCents } = input
     const params = taxParamSet.earnedIncomeCredit
     // Step 1 — §32(d)(1), and §32(c)(1)(D) through line 12c.
     if (profile.filingStatus === 'marriedFilingSeparately') {
@@ -767,8 +785,15 @@ export const earnedIncomeCredit = taxParamSet => input => {
     // Every DETERMINATION that denies the credit lands here, as a computed
     // zero. §32(i)(1) is checked before the table because it denies the credit
     // outright rather than reducing it.
+    //
+    // **§32(c)(1)(C) joined this list in TAX-42** — see this module's own
+    // docstring. It reads the EXCLUSION, not a declared kind: a stored Form
+    // 2555 that excludes nothing (no qualifying days, or no foreign earned
+    // income) is not an election to exclude "any amount", and barring that
+    // filer's credit would be a wrong answer costing up to $8,046.
     if (
-        filerSsn !== 'validForEmployment'
+        form2555ExclusionCents !== 0n
+        || filerSsn !== 'validForEmployment'
         || (joint && spouseSsn !== 'validForEmployment')
         || otherTaxpayersChild !== 'isNotAnotherTaxpayersQualifyingChild'
         || investmentIncomeCents > centsFromString(params.investmentIncomeLimit.amount)
@@ -929,6 +954,7 @@ const wageEarner = profile => wagesCents => ({
     line2aCents: 0n, line2bCents: 0n, line3bCents: 0n, line7aCents: 0n,
     formFortySevenNinetySevenGainCents: 0n,
     disqualifiedPassiveIncomeCents: 0n,
+    form2555ExclusionCents: 0n,
 })
 
 /** The computed credit, or a throw naming the refusal that was not expected.
@@ -950,6 +976,38 @@ const refusalOf = input => {
 }
 
 export const proof = {
+    // ── §32(c)(1)(C), the Form 2555 bar (TAX-42) ────────────────────────────
+    //
+    // "No credit shall be allowed under this section for any taxable year if
+    // the taxpayer elects to exclude any amount from gross income under
+    // section 911." A DETERMINATION, so the credit is a computed $0.00 rather
+    // than a refusal — and the fixture is a filer who would otherwise take a
+    // real credit, so the leaf measures the bar rather than a coincidence.
+    sectionThirtyTwoFormTwoFiveFiveFiveBar: {
+        anElectionToExcludeUnderSectionNineOneOneDeniesTheCredit: () => {
+            const base = wageEarner(oneChildProfile)(2000000n)
+            assert(creditOf(base) > 0n, ['the control must take a real credit', creditOf(base)])
+            assertEq(
+                creditOf({ ...base, form2555ExclusionCents: 13000000n }), 0n,
+                '§32(c)(1)(C) denies the credit outright')
+        },
+        // THE CONTROL that matters more than the one above: a STORED Form 2555
+        // that excludes NOTHING is not an election to exclude "any amount", so
+        // the credit survives. Reading a declared kind instead of the amount
+        // would cost this filer up to $8,046.
+        aStoredFormThatExcludesNothingIsNotAnElection: () => {
+            const base = wageEarner(oneChildProfile)(2000000n)
+            assertEq(
+                creditOf({ ...base, form2555ExclusionCents: 0n }), creditOf(base),
+                'a zero exclusion changes nothing')
+        },
+        // ONE CENT of exclusion is still "any amount". Paired with the leaf
+        // above, this is what pins `!== 0n` rather than some threshold.
+        oneCentOfExclusionIsStillAnyAmount: () => {
+            const base = wageEarner(oneChildProfile)(2000000n)
+            assertEq(creditOf({ ...base, form2555ExclusionCents: 1n }), 0n)
+        },
+    },
     // ── The table rule, at the discontinuities it actually has ──────────────
     //
     // Every expected figure below is hand-derived from §32(a) and Rev. Proc.
