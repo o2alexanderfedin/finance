@@ -148,7 +148,7 @@ const validateShape = rttiValidate(oneZeroNineEightESchema)
  * it is a checkbox, not a dollar amount, and follows DOC-12's `option(true)`
  * convention instead.
  */
-const moneyBoxFields = /** @type {const} */ ([
+export const moneyBoxFields = /** @type {const} */ ([
     'box1StudentLoanInterestReceived',
 ])
 

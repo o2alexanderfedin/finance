@@ -185,7 +185,7 @@ const validateShape = rttiValidate(oneZeroNineNineRSchema)
  * `box13DateOfPayment` (a free-text date) are excluded for the same reason:
  * neither is a money amount.
  */
-const moneyBoxFields = /** @type {const} */ ([
+export const moneyBoxFields = /** @type {const} */ ([
     'box1GrossDistribution',
     'box2aTaxableAmount',
     'box3CapitalGain',
@@ -206,7 +206,7 @@ const moneyBoxFields = /** @type {const} */ ([
  * than the check and its test being free to drift apart (AGENTS.md, "one
  * rule, one place").
  */
-const stateLocalMoneyFields = /** @type {const} */ ([
+export const stateLocalMoneyFields = /** @type {const} */ ([
     'stateTaxWithheld',
     'stateDistribution',
     'localTaxWithheld',

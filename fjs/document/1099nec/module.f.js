@@ -152,7 +152,7 @@ const validateShape = rttiValidate(oneZeroNineNineNecSchema)
  * it is not a dollar amount, and the $5,000 in its own caption is a threshold
  * the PAYER applied, never a figure the form reports.
  */
-const moneyBoxFields = /** @type {const} */ ([
+export const moneyBoxFields = /** @type {const} */ ([
     'box1NonemployeeCompensation',
     'box3ReservedForFutureUse',
     'box4FederalIncomeTaxWithheld',
@@ -165,7 +165,7 @@ const moneyBoxFields = /** @type {const} */ ([
  * proof walk the identical list — `fjs/document/w2`'s `stateLocalMoneyFields`
  * precedent, and AGENTS.md's "one rule, one place".
  */
-const stateMoneyFields = /** @type {const} */ ([
+export const stateMoneyFields = /** @type {const} */ ([
     'box5StateTaxWithheld',
     'box7StateIncome',
 ])

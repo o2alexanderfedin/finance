@@ -148,7 +148,7 @@ const validateShape = rttiValidate(w2Schema)
  * way. Box 12 and boxes 15–20 carry amounts too, but nested inside arrays,
  * so they are checked separately below.
  */
-const moneyBoxFields = /** @type {const} */ ([
+export const moneyBoxFields = /** @type {const} */ ([
     'box1WagesTipsOtherCompensation',
     'box2FederalIncomeTaxWithheld',
     'box3SocialSecurityWages',
@@ -169,7 +169,7 @@ const moneyBoxFields = /** @type {const} */ ([
  * than the check and its test being free to drift apart (AGENTS.md, "one
  * rule, one place").
  */
-const stateLocalMoneyFields = /** @type {const} */ ([
+export const stateLocalMoneyFields = /** @type {const} */ ([
     'stateWagesTipsEtc',
     'stateIncomeTax',
     'localWagesTipsEtc',

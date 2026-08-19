@@ -188,8 +188,38 @@ invisible — the line was never zero, so nothing looked wrong.
   `box7IncludesAmountsForAnAcademicPeriodBeginningInTheFollowingYear`, the K-1 `ScheduleK3Attached`
   and `MoreThanOneActivity` checkboxes.** Informational checkboxes with no printed federal line.
 
-## What a standing gate would need
+## The standing gate
 
-See `fjs/document/unread_registry` — the gate built by this sweep. It is a hand-typed list of
-every deliberately-unread money field, checked against a mechanical count per dialect, so a money
-box added to a dialect and forgotten fails a proof instead of being dropped in silence.
+`fjs/document/unread_registry` is the gate this sweep leaves behind, and it is worth more than any
+single wiring here. It names **every money field of every dialect that has one — 142 of them
+across sixteen dialects — exactly once**, with one of three dispositions:
+
+| Disposition | Count | Meaning |
+|---|---|---|
+| `read` | 75 | a computation reads the amount and it can reach a printed line |
+| `refused` | 31 | the ONLY reader is a refusal predicate, and that is correct |
+| `dropped` | 36 | nothing reads it; the note prices the gap and names the error direction |
+
+The partition is checked against the tuples the dialects themselves walk through
+`centsFromString`, in both directions, so:
+
+- a money box **added to a dialect and forgotten** is in that dialect's tuple and in no registry
+  row — the gate fails and NAMES it. That is the defect;
+- a money box **removed** leaves an orphaned row — the gate fails the other way;
+- a **row deleted** shrinks the registry, which the hand-typed `expectedMoneyFieldCount` refuses;
+- a row flipped from `read` to `dropped` moves `expectedDroppedCount`, which is stated separately
+  from the total for exactly that reason;
+- and the seven boxes this project has already paid for are pinned BY NAME, so the specific
+  regression of silencing the gate by reclassifying a wired box fails
+  `theKnownDefectsKeepTheirDisposition`.
+
+The dialect list the gate iterates is **hand-typed in the registry**, not derived from the dialect
+registry, because AGENTS.md's fourth defect is precisely a proof whose iteration set comes from
+the code under test.
+
+**What the gate cannot do:** verify that a `read` row is telling the truth. Only the wiring proofs
+in `fjs/form1040/core` and `fjs/report/tax_return` do that. The gate's job is narrower and is the
+one nobody was doing — making a money field's status a thing somebody had to write down.
+
+It covers MONEY fields only. Dates, checkboxes, identity labels and free text are outside it: all
+seven known defects were money, and a partition including `payerName` would be mostly noise.

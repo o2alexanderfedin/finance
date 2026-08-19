@@ -126,7 +126,7 @@ const validateShape = rttiValidate(oneZeroNineNineIntSchema)
  * `r[field]` below resolves to exactly `string | undefined` — every listed
  * field is `option(string)` — rather than the union of every field's type.
  */
-const moneyBoxFields = /** @type {const} */ ([
+export const moneyBoxFields = /** @type {const} */ ([
     'box1InterestIncome',
     'box2EarlyWithdrawalPenalty',
     'box3UsSavingsBondsAndTreasuryInterest',

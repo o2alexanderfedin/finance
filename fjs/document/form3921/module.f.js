@@ -174,7 +174,7 @@ const validateShape = rttiValidate(formThirtyNineTwentyOneSchema)
  * check here could tell: both are valid decimals. The field NAMES carry
  * `PerShare` for exactly that reason.
  */
-const moneyBoxFields = /** @type {const} */ ([
+export const moneyBoxFields = /** @type {const} */ ([
     'box3ExercisePricePerShare',
     'box4FairMarketValuePerShareOnExerciseDate',
 ])

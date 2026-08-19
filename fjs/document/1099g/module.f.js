@@ -132,7 +132,7 @@ const validateShape = rttiValidate(oneZeroNineNineGSchema)
  * `box3RefundTaxYear` (a year) and `box8TradeOrBusinessIncome` (a checkbox)
  * are deliberately absent — they are not dollar amounts.
  */
-const moneyBoxFields = /** @type {const} */ ([
+export const moneyBoxFields = /** @type {const} */ ([
     'box1UnemploymentCompensation',
     'box2StateOrLocalIncomeTaxRefunds',
     'box4FederalIncomeTaxWithheld',
@@ -149,7 +149,7 @@ const moneyBoxFields = /** @type {const} */ ([
  * proof walk the identical list — `fjs/document/w2`'s `stateLocalMoneyFields`
  * precedent, and AGENTS.md's "one rule, one place".
  */
-const stateMoneyFields = /** @type {const} */ ([
+export const stateMoneyFields = /** @type {const} */ ([
     'stateIncomeTaxWithheld',
 ])
 

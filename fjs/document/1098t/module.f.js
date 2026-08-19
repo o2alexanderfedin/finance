@@ -175,7 +175,7 @@ const validateShape = rttiValidate(oneZeroNineEightTSchema)
  * The three checkbox fields are deliberately absent: they are checkboxes, not
  * dollar amounts, and follow DOC-12's `option(true)` convention instead.
  */
-const moneyBoxFields = /** @type {const} */ ([
+export const moneyBoxFields = /** @type {const} */ ([
     'box1PaymentsReceivedForQualifiedTuition',
     'box4AdjustmentsForAPriorYear',
     'box5ScholarshipsOrGrants',
