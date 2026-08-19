@@ -66,9 +66,9 @@ Two figures worth knowing, both computed by the engine on real fixtures:
 The engine **refuses rather than guessing** wherever it cannot compute honestly. Each refusal names
 the form or the facts that would supply it.
 
-**The refusal surface is a partition, checked at `tsc`:** every one of **114 income, deduction,
+**The refusal surface is a partition, checked at `tsc`:** every one of **117 income, deduction,
 credit and payment kinds** is either modeled or carries a refusal naming what is missing —
-**38 modeled, 76 refused**, and `_EveryKindIsEitherModeledOrRefused` fails the build if a kind
+**52 modeled, 65 refused**, and `_EveryKindIsEitherModeledOrRefused` fails the build if a kind
 falls in neither. Re-derive with `modeledKinds.length` / `unmodeledKindRefusals.length` in
 `fjs/return/scope`.
 
