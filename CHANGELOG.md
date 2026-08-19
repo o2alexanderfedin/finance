@@ -115,11 +115,20 @@ first, in [`fjs/form4797/todo/`](./fjs/form4797/todo/sales-of-business-property.
 - **Counts.** modeled `55 → 56`, refused `142 → 141`, tripwires `11 → 12` (a stored disposal on an
   undeclared return), vocabulary unchanged at 197, dialects unchanged at 32 classified / 30 served /
   29 dispatched.
-- **Five mutations survived and every one produced a leaf**: the §168(k) allowance inside the
+- **The earned income credit was WRONG, and no mutation found it.** Publication 596 Worksheet 1
+  line 6 subtracts the Form 4797 line 7 gain from capital gain net income — a §1231 gain is business
+  gain, not investment income, and it arrives on 1040 line 7a through Schedule D line 11 exactly as
+  a stock sale does. That line had been a documented zero because Form 4797 did not exist. Leaving
+  it out OVERSTATES §32(i) disqualified income, and §32(i)(1) is a cliff at $11,950.00 — so the
+  consequence was the credit denied outright to a working parent who sold a machine. Found by
+  grepping for what this phase INVALIDATED rather than for what it touched; two Schedule K-1 box
+  remedies naming the same retired refusal were corrected in the same pass. §10 of the spec.
+- **Six mutations survived and every one produced a leaf**: the §168(k) allowance inside the
   recapture base (every fixture in the repository said `electedOut`), the §1250 worksheet's line 7
   cap and its line 8, the same-year refusal (which had no proof at all), the ROUNDING ORDER of the
-  disposal decimal, and the provenance path in every citation. One equivalent mutant is recorded at
-  its site; three did not compile and were re-run in compiling form. The full log is §9 of the spec.
+  disposal decimal, the provenance path in every citation, and the earned income credit's new input
+  never being handed over. One equivalent mutant is recorded at its site; four did not compile and
+  were re-run in compiling form. The full log is §9 of the spec.
 - **It composes with Form 461, and the two branches could not see each other.** Both coined
   `TAX-40` on 2026-08-19; Form 461 was on the trunk first, so Form 4797 became **TAX-41** when the
   two were integrated — the split `TAX-38`'s own note in REQUIREMENTS.md said belongs to whoever

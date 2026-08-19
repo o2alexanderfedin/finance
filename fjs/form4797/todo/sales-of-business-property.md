@@ -551,10 +551,15 @@ Kinds, in `fjs/return/scope`:
 ## 9. The mutation log
 
 AGENTS.md: *"A proof is not known to work until you have watched it fail."*
-Forty-three mutations were written and run against the committed tree, one at a
+Forty-six mutations were written and run against the committed tree, one at a
 time, each reverted before the next and each checked with `git diff --numstat`.
 
-**Five survived**, and every one of them is a finding rather than a formality.
+**Six survived**, and every one of them is a finding rather than a formality.
+
+**One of the six was not found by mutating at all**, and that is worth naming
+first. Grepping for what this phase INVALIDATED — rather than for what it
+touched — turned up three prose claims that Form 4797 does not exist, and one of
+them was load-bearing. See §10.
 
 | # | Mutation | Leaves red |
 |---|---|---|
@@ -601,6 +606,9 @@ time, each reverted before the next and each checked with `git diff --numstat`.
 | 41 | `fjs/form1040/core` drops Form 4797's error arm | 1 |
 | 42 | **the citation loses the asset it came from** | **0 — SURVIVED**; 1 after the new leaf |
 | 43 | `otherGainsOrLosses` is deleted from `modeledKinds` | did not compile — the `tsc` partition assertion is the gate |
+| 44 | the earned income credit's Worksheet 1 line 6 no longer subtracts | did not compile; 2 in compiling form |
+| 45 | Worksheet 1 line 7's floor is removed | 1 |
+| 46 | **`fjs/form1040/core` hands the credit a zero §1231 gain** | **0 — SURVIVED**; 1 after the new leaves |
 
 ### The five survivors
 
@@ -642,6 +650,12 @@ $1,002.00 of 7-year property under the half-year convention (8,762 against
 is 19/24 rather than 1/2 (2,881 against 2,882), so the property is not about
 halving in particular.
 
+**#46 — the earned income credit's wiring.** `fjs/schedule/eic` proves the
+subtraction; nothing said whether `fjs/form1040/core` ever hands the figure
+over. The leaf added for it is a differential at the same amount on the same
+printed line: a $19,038.45 §1231 gain keeps the credit and a $19,038.45 STOCK
+gain loses it outright. See §10 for why that line existed to be wired at all.
+
 **#42 — the provenance path.** Erasing the asset's name from every citation's
 `boxPath` was green across the entire suite. `sources.length` counts citations;
 it says nothing about whether any of them points somewhere a reader can go. The
@@ -678,3 +692,44 @@ re-run in a semantically identical compiling form, per AGENTS.md:
 OrRefused` is a `tsc`-level assertion and the build stops with `TS2344`. The
 partition is enforced by the compiler, not by a proof, which is exactly what
 that typedef exists to say.
+
+---
+
+## 10. What this phase INVALIDATED, and the one that mattered
+
+A phase is not finished when its own gates go green. Three places in this
+repository said, in prose, that Form 4797 does not exist. Two were remedies; one
+was arithmetic.
+
+```
+grep -rn "Form 4797" fjs .planning
+```
+
+- **`fjs/document/k1_1065` box 10 and `fjs/document/k1_1120s` box 9** both read
+  *"`otherGainsOrLosses` is an `fjs/return/scope` refusal"*. It is modeled now.
+  Both remedies were rewritten to name what is ACTUALLY missing, which is
+  narrower and more useful than what they said: the form exists, and what a
+  partner's distributive share lacks is a route into its Part I, because this
+  engine builds printed lines 2 and 10 exclusively from register disposals that
+  carry a basis, a method and a placed-in-service date. i4797 p6's line 7
+  instruction — *"enter any amounts from your Schedule K-1 (Form 1065), box 10,
+  in Part I of Form 4797"* — says the share enters as a line 2 row of its own,
+  and §469 stands behind it for a limited partner's loss.
+- **`fjs/schedule/eic` was WRONG, not merely stale.** Publication 596
+  Worksheet 1 line 6 is *"Enter any gain from Form 4797, line 7"* and line 7 is
+  *"Subtract line 6 of this worksheet from line 5"*. That subtraction had been a
+  documented zero because Form 4797 did not exist. It exists now, and its §1231
+  gain arrives on 1040 line 7a through Schedule D line 11 exactly as a stock
+  sale does — so leaving line 6 out **overstates §32(i) disqualified income**.
+  §32(i)(1) is a cliff at $11,950.00, so the consequence is not an approximation:
+  it is the earned income credit denied outright to a working parent who sold a
+  machine. The one credit in this engine whose whole purpose is to reach
+  low-income filers, failing in the direction that costs them money.
+
+**The general lesson is the second one's.** A refusal's neighbours accumulate
+sentences of the form "and this engine models no X". Every one of those becomes
+false the day X ships, and the ones that are merely stale are harmless while the
+ones that are ARITHMETIC are not. Neither `tsc` nor any proof can distinguish
+them, because a documented zero that has become wrong is still a zero. Grepping
+for the FORM NAME — not for the kind, not for the module — is what found it,
+and it should be the last step of any phase that makes something exist.
