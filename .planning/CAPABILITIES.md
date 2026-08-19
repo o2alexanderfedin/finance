@@ -107,7 +107,7 @@ AMT with capital gains or qualified dividends (Phase 29, `fjs/form6251/part3`), 
 Part II.
 
 **There is also a complementary guard.** Some taxes trigger on a threshold from data already held,
-on a taxpayer who has never heard of the form — so **8 tripwires** refuse when the documents prove
+on a taxpayer who has never heard of the form — so **10 tripwires** refuse when the documents prove
 an obligation was not declared. Without them, a $300,000 W-2 understated tax by ~$900, silently.
 A tripwire that always fires is not a tripwire; each one is proven to stay quiet on a return that
 does not owe the thing.

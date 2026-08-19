@@ -853,7 +853,7 @@ export const proof = {
     // rows, five DISTINCT kinds, and no empty evidence string. A tripwire
     // whose evidence were blank would refuse without saying what proved it,
     // which is the silence this whole module replaces.
-    theTableIsExactlyFiveDistinctTripwires: () => {
+    theTableIsExactlyTenDistinctTripwires: () => {
         assertEq(tripwires.length, expectedTripwireCount)
         assertEq(new Set(tripwires.map(t => t.kind)).size, expectedTripwireCount)
         for (const tripwire of tripwires) {

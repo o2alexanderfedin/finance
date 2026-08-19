@@ -70,6 +70,8 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { expectedServedToolCount } from './fjs/server/module.f.js'
 import { knownDialects } from './fjs/server/finance_schema/module.f.js'
+import { modeledKinds, unmodeledKindRefusals } from './fjs/return/scope/module.f.js'
+import { tripwires } from './fjs/return/tripwire/module.f.js'
 
 const repoRoot = fileURLToPath(new URL('.', import.meta.url))
 const planningDir = join(repoRoot, '.planning')
@@ -158,6 +160,38 @@ const toolCountPattern = /(?<![\w-])(\d+) tools\b/g
  */
 const dialectCountPattern = /(?<![\w-])(\d+) (?:document )?dialects\b/g
 
+/**
+ * The partition figures -- `54 modeled, 141 refused, 10 tripwires` -- are
+ * scanned over a NARROWER set than the tool and dialect counts, and the
+ * narrowing is the whole design rather than a convenience.
+ *
+ * `CHANGELOG.md:244` says "6 modeled kinds, 44 refused by", and
+ * `.planning/ROADMAP.md:519` says "the 6/44 modeled partition". Both are
+ * TRUE -- they record what was so when they were written, and a changelog
+ * that gets rewritten as the code moves has stopped being a changelog. Only
+ * two documents claim the partition as it stands TODAY, and those two are
+ * what this reads.
+ *
+ * This gate did not exist until 2026-08-19, and its absence is why three
+ * branches merged that day each wrote a different partition into these two
+ * files with nothing complaining. When first run it found
+ * `CAPABILITIES.md:110`'s "8 tripwires" against a live table of 10.
+ */
+const currentPartitionDocuments = () => ['CAPABILITIES.md', 'STATE.md']
+    .map(name => ({
+        name: `.planning/${name}`,
+        text: readFileSync(join(planningDir, name), 'utf8'),
+    }))
+
+/** Finds `54 modeled` / `**54 modeled, 141 refused**`. */
+const modeledCountPattern = /(?<![\w-])(\d+) modeled\b/g
+
+/** Finds `141 refused`. */
+const refusedCountPattern = /(?<![\w-])(\d+) refused\b/g
+
+/** Finds `10 tripwires` / `**8 tripwires**`. */
+const tripwireCountPattern = /(?<![\w-])(\d+) tripwires\b/g
+
 const claimsIn = (text, pattern) => [...text.matchAll(pattern)].map(m => Number(m[1]))
 
 test('every requirement is traced somewhere, and every traced ID has a body', () => {
@@ -207,6 +241,30 @@ test('every documented dialect count equals the schema registry', () => {
     assert.deepEqual(wrong, [], wrong.join('; '))
 })
 
+test('every documented modeled-kind count equals the scope registry', () => {
+    const wrong = currentPartitionDocuments().flatMap(({ name, text }) =>
+        claimsIn(text, modeledCountPattern)
+            .filter(claimed => claimed !== modeledKinds.length)
+            .map(claimed => `${name} claims ${claimed} modeled, registry has ${modeledKinds.length}`))
+    assert.deepEqual(wrong, [], wrong.join('; '))
+})
+
+test('every documented refused-kind count equals the scope registry', () => {
+    const wrong = currentPartitionDocuments().flatMap(({ name, text }) =>
+        claimsIn(text, refusedCountPattern)
+            .filter(claimed => claimed !== unmodeledKindRefusals.length)
+            .map(claimed => `${name} claims ${claimed} refused, registry has ${unmodeledKindRefusals.length}`))
+    assert.deepEqual(wrong, [], wrong.join('; '))
+})
+
+test('every documented tripwire count equals the tripwire table', () => {
+    const wrong = currentPartitionDocuments().flatMap(({ name, text }) =>
+        claimsIn(text, tripwireCountPattern)
+            .filter(claimed => claimed !== tripwires.length)
+            .map(claimed => `${name} claims ${claimed} tripwires, table has ${tripwires.length}`))
+    assert.deepEqual(wrong, [], wrong.join('; '))
+})
+
 // ── Positive controls: each check above must be able to FAIL ───────────────
 //
 // A gate nobody has watched redden is a gate nobody knows works. These drive
@@ -240,4 +298,23 @@ test('positive control: a wrong tool count in prose is detected', () => {
 test('negative control: `K-1 dialects` is not read as a dialect count', () => {
     assert.deepEqual(claimsIn('Part II lines 27-32 from both K-1 dialects', dialectCountPattern), [])
     assert.deepEqual(claimsIn('**26 document dialects**', dialectCountPattern), [26])
+})
+
+test('positive control: a wrong partition figure in prose is detected', () => {
+    assert.deepEqual(claimsIn('**38 modeled, 76 refused**', modeledCountPattern), [38])
+    assert.deepEqual(claimsIn('**38 modeled, 76 refused**', refusedCountPattern), [76])
+    assert.deepEqual(claimsIn('so **8 tripwires** refuse when', tripwireCountPattern), [8])
+})
+
+test('negative control: a historical partition figure is out of the scanned set', () => {
+    // `6/44 modeled` in ROADMAP.md and `6 modeled kinds, 44 refused` in
+    // CHANGELOG.md are true of the day they were written. Neither file is in
+    // `currentPartitionDocuments()`, and that is what keeps this gate from
+    // demanding that history be falsified.
+    assert.deepEqual(
+        currentPartitionDocuments().map(d => d.name),
+        ['.planning/CAPABILITIES.md', '.planning/STATE.md'])
+    // And the scoping is doing real work rather than being belt-and-braces:
+    // ROADMAP's slash form DOES match, capturing the denominator.
+    assert.deepEqual(claimsIn('the 6/44 modeled partition as a `tsc` property', modeledCountPattern), [44])
 })
