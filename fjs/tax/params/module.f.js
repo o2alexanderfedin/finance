@@ -2919,6 +2919,312 @@ export const premiumTaxCreditRepaymentLimitation = {
 }
 
 /**
+ * §21(c)'s ceiling on the work-related expenses the credit may be figured on
+ * — Form 2441's own lines 3 and 27, which print the two amounts twice each.
+ *
+ * TWO amounts and not a per-person multiplier: §21(c) reads *"$3,000 if there
+ * is 1 qualifying individual ... $6,000 if there are 2 or more"*, and stops.
+ * Three qualifying persons is $6,000, not $9,000, and a reader who models this
+ * as `$3,000 x count` gets the two-person case right and every larger family
+ * wrong.
+ *
+ * **Zero qualifying persons is not a stored row**, because the printed page
+ * has none: a filer with no qualifying person cannot take the credit at all.
+ * `fjs/form2441` supplies the $0 that follows and says so at the site.
+ * @type {{
+ *   readonly oneQualifyingPerson: AmountWithCitation,
+ *   readonly twoOrMoreQualifyingPersons: AmountWithCitation,
+ * }}
+ */
+export const dependentCareExpenseLimit = {
+    oneQualifyingPerson: {
+        amount: '3000.00',
+        citation: { kind: 'code', section: '§21(c)(1)', effectiveDate: '2025-01-01' },
+    },
+    twoOrMoreQualifyingPersons: {
+        amount: '6000.00',
+        citation: { kind: 'code', section: '§21(c)(2)', effectiveDate: '2025-01-01' },
+    },
+}
+
+/**
+ * One printed row of Form 2441 line 8's decimal-amount table: the adjusted
+ * gross income the row runs up to (INCLUSIVE — the printed column head is
+ * *"But not over"*), and the applicable percentage in whole percentage points.
+ *
+ * `adjustedGrossIncomeCeiling` is `undefined` on the last row, never a large
+ * sentinel, exactly as {@link ApplicablePercentageTier}'s `ceilingPercent` is:
+ * the printed row reads *"43,000 — No limit"*, and a sentinel would be a
+ * ceiling the first time anybody compared against it.
+ *
+ * `percent` is a whole number because the printed column carries exactly two
+ * decimal places of a fraction (`.35`) and never a third. Stored as 35 rather
+ * than as 0.35 for {@link netInvestmentIncomeTaxRateBasisPoints}' own reason:
+ * money here is exact integer arithmetic, and a fraction in a parameter table
+ * is a float waiting to happen.
+ * @typedef {{
+ *   readonly adjustedGrossIncomeCeiling: string | undefined,
+ *   readonly percent: number,
+ * }} DependentCarePercentageBand
+ */
+
+/**
+ * Form 2441 line 8 — §21(a)(2)'s applicable percentage, all sixteen printed
+ * rows transcribed.
+ *
+ * ## Sixteen rows rather than the formula, and the formula rather than the rows
+ *
+ * §21(a)(2) states it as arithmetic: 35 percent *"reduced (but not below 20
+ * percent) by 1 percentage point for each $2,000 (or fraction thereof) by
+ * which the taxpayer's adjusted gross income for the taxable year exceeds
+ * $15,000."* The form prints the sixteen rows that arithmetic produces.
+ *
+ * The ROWS are stored, unlike {@link premiumTaxCreditApplicablePercentage}'s
+ * six interpolated tiers, and the difference is not a matter of taste: that
+ * table's printed form has 252 rows and storing them would be a transcription
+ * error waiting to happen, while this one has sixteen and fits on the page
+ * whole. A stored row cannot be wrong about its own fraction-of-$2,000
+ * rounding, which is the part of §21(a)(2) a formula gets wrong most easily —
+ * $17,000.01 of adjusted gross income is a FRACTION of the second $2,000 and
+ * therefore costs a whole percentage point.
+ *
+ * ## The boundaries are INCLUSIVE at the top, and that is worth a sentence
+ *
+ * The printed columns are *"Over"* and *"But not over"*, so exactly $15,000
+ * takes 35% and $15,000.01 takes 34%. Reading the boundary the other way moves
+ * a filer at a round income one point, which on the $6,000 cap is $60.
+ *
+ * ## These are the PRE-OBBBA figures, and 2026 will not share them
+ *
+ * P.L. 119-21 §70404 raises the starting percentage to 50 and re-cuts the
+ * whole schedule **for taxable years beginning after December 31, 2025**. So
+ * this table is TY2025's and a second tax year added to {@link taxParamsByYear}
+ * must carry its own — the reason it is a per-year parameter rather than a
+ * constant in `fjs/form2441`.
+ *
+ * `kind: 'code'`: §21 sets plain dollar amounts and plain percentages that no
+ * annual Revenue Procedure inflation-adjusts. A reader looking for these in
+ * Rev. Proc. 2024-40 will not find them.
+ * @type {{
+ *   readonly bands: readonly DependentCarePercentageBand[],
+ *   readonly citation: Citation,
+ * }}
+ */
+export const dependentCareCreditPercentage = {
+    bands: [
+        { adjustedGrossIncomeCeiling: '15000.00', percent: 35 },
+        { adjustedGrossIncomeCeiling: '17000.00', percent: 34 },
+        { adjustedGrossIncomeCeiling: '19000.00', percent: 33 },
+        { adjustedGrossIncomeCeiling: '21000.00', percent: 32 },
+        { adjustedGrossIncomeCeiling: '23000.00', percent: 31 },
+        { adjustedGrossIncomeCeiling: '25000.00', percent: 30 },
+        { adjustedGrossIncomeCeiling: '27000.00', percent: 29 },
+        { adjustedGrossIncomeCeiling: '29000.00', percent: 28 },
+        { adjustedGrossIncomeCeiling: '31000.00', percent: 27 },
+        { adjustedGrossIncomeCeiling: '33000.00', percent: 26 },
+        { adjustedGrossIncomeCeiling: '35000.00', percent: 25 },
+        { adjustedGrossIncomeCeiling: '37000.00', percent: 24 },
+        { adjustedGrossIncomeCeiling: '39000.00', percent: 23 },
+        { adjustedGrossIncomeCeiling: '41000.00', percent: 22 },
+        { adjustedGrossIncomeCeiling: '43000.00', percent: 21 },
+        // "43,000 — No limit". Open-topped, and 20 is §21(a)(2)'s own floor
+        // rather than the end of a list that happened to stop.
+        { adjustedGrossIncomeCeiling: undefined, percent: 20 },
+    ],
+    citation: { kind: 'code', section: '§21(a)(2)', effectiveDate: '2025-01-01' },
+}
+
+/**
+ * §129(a)(2)(A)'s ceiling on what a dependent care assistance program may
+ * exclude from gross income — Form 2441 line 21.
+ *
+ * i2441 p5, Line 21, states both figures for 2025 in its own words: *"the
+ * maximum amount that can be excluded from your income through a dependent
+ * care assistance program is $5,000 ($2,500 if married filing separately)"*.
+ *
+ * **The $2,500 row is stored and never reached today**, and that is recorded
+ * rather than left to be discovered: `fjs/form2441` refuses every married-
+ * filing-separately return, because line 21's own printed condition — *"and
+ * you were required to enter your spouse's earned income on line 19"* — turns
+ * on the same three facts Form 2441 line A certifies and no document here
+ * carries. A parameter table is a transcription of a page, so the row is
+ * present as printed.
+ *
+ * Line 21 also says *"don't enter more than the maximum amount allowed under
+ * your dependent care plan"*. That per-plan cap is a TAXPAYER fact, not a tax
+ * parameter, and lives on `vnd.fjs.credits`; this figure is the statutory
+ * ceiling it is taken against.
+ *
+ * P.L. 119-21 §70404 raises $5,000 to $7,500 for taxable years beginning after
+ * December 31, 2025 — so, exactly like {@link dependentCareCreditPercentage},
+ * this is TY2025's row and not a constant.
+ * @type {{
+ *   readonly standard: AmountWithCitation,
+ *   readonly marriedFilingSeparately: AmountWithCitation,
+ * }}
+ */
+export const dependentCareAssistanceExclusionLimit = {
+    standard: {
+        amount: '5000.00',
+        citation: { kind: 'code', section: '§129(a)(2)(A)', effectiveDate: '2025-01-01' },
+    },
+    marriedFilingSeparately: {
+        amount: '2500.00',
+        citation: { kind: 'code', section: '§129(a)(2)(A)', effectiveDate: '2025-01-01' },
+    },
+}
+
+/**
+ * §21(d)(2)'s DEEMED earned income, per month, for a spouse who was a full-
+ * time student or was incapable of self-care — Form 2441's line B and i2441
+ * p4's *If You or Your Spouse Was a Student or Disabled*.
+ *
+ * These two figures are stored so that `fjs/form2441`'s refusal can QUOTE
+ * them. The engine holds no per-month student or disability status, so it
+ * never applies the rule; what it does instead is tell a filer whose earned-
+ * income limitation binds exactly what they would be entitled to if they
+ * qualified, which is the only part of that refusal a reader can act on.
+ * A parameter nothing reads is a parameter nobody checks, so this one is read.
+ *
+ * The amount depends on the number of QUALIFYING PERSONS, not on the number
+ * of students — *"at least $250 ($500 if you had two or more qualifying
+ * persons at any time during 2025)"* — which is the same $3,000/$6,000 split
+ * {@link dependentCareExpenseLimit} makes, and the same trap: three qualifying
+ * persons is $500 a month, not $750.
+ * @type {{
+ *   readonly oneQualifyingPerson: AmountWithCitation,
+ *   readonly twoOrMoreQualifyingPersons: AmountWithCitation,
+ * }}
+ */
+export const dependentCareDeemedEarnedIncomePerMonth = {
+    oneQualifyingPerson: {
+        amount: '250.00',
+        citation: { kind: 'code', section: '§21(d)(2)(A)', effectiveDate: '2025-01-01' },
+    },
+    twoOrMoreQualifyingPersons: {
+        amount: '500.00',
+        citation: { kind: 'code', section: '§21(d)(2)(B)', effectiveDate: '2025-01-01' },
+    },
+}
+
+/**
+ * One age band of §213(d)(10)'s eligible-long-term-care-premium limitation:
+ * the band as printed on Form 7206 line 2(b), and the per-person dollar cap
+ * for that band.
+ *
+ * `maximumAge` is `undefined` on the open-topped last band — no sentinel,
+ * matching {@link Bracket}'s own convention for a bracket with no ceiling.
+ * `minimumAgeExclusive` is EXCLUSIVE because the statute's own bands are:
+ * "more than 40 but not more than 50". Getting that boundary backwards moves
+ * a 50-year-old from $900 to $1,800.
+ * @typedef {{
+ *   readonly band: LongTermCareAgeBand,
+ *   readonly minimumAgeExclusive: number | undefined,
+ *   readonly maximumAge: number | undefined,
+ *   readonly amount: string,
+ *   readonly citation: Citation,
+ * }} LongTermCarePremiumLimit
+ */
+
+/**
+ * The five age bands §213(d)(10) prints, named. Exported so consumers iterate
+ * this list rather than hand-typing the same five names — {@link
+ * individualFilingStatuses}' and {@link federalPovertyLineTables}' precedent.
+ *
+ * **The names are the AGES, not ordinals.** A band called `tier3` would be
+ * unreadable at the call site and impossible to check against the printed
+ * page; `fjs/schedule/1` turns each of these into a `vnd.fjs.adjustments`
+ * `lineTag` a taxpayer has to pick correctly, so the name is the whole user
+ * interface to a figure that ranges over an order of magnitude.
+ * @typedef {'ageFortyOrYounger' | 'ageFortyOneToFifty' | 'ageFiftyOneToSixty' | 'ageSixtyOneToSeventy' | 'ageSeventyOneOrOlder'} LongTermCareAgeBand
+ */
+
+/**
+ * §213(d)(10)'s eligible long-term care premium limitations, as indexed for
+ * taxable years beginning in 2025 — Form 7206 line 2(b), TAX-39.
+ *
+ * ## Where these come from, and why the Rev. Proc. SECTION number matters
+ *
+ * Rev. Proc. 2024-40 **§2.28**, "Eligible Long-Term Care Premiums", verbatim:
+ * *"For taxable years beginning in 2025, the limitations under § 213(d)(10),
+ * regarding eligible long-term care premiums includible in the term 'medical
+ * care', as adjusted for inflation, are as follows"*. It is **§2.28 and not
+ * §2.27** — §2.27 is the qualified-business-income threshold, an unrelated
+ * figure this module also stores, and a mis-typed section number would cite a
+ * real section of a real Revenue Procedure that says something else entirely.
+ *
+ * The five amounts are corroborated on the face of **Form 7206 (2025)** line
+ * 2(b), transcribed from the printed PDF rather than recalled: *"$480 — if
+ * that person is age 40 or younger / $900 — if age 41 to 50 / $1,800 — if age
+ * 51 to 60 / $4,810 — if age 61 to 70 / $6,020 — if age 71 or older"*. The
+ * printed form states the bands INCLUSIVELY ("age 41 to 50") and the statute
+ * states them EXCLUSIVELY ("more than 40 but not more than 50"); the two agree
+ * on every integer age, and this table stores the statutory form because that
+ * is the one that answers what happens at exactly 40 and exactly 50.
+ *
+ * ## The cap is PER PERSON, and that is the part an aggregate would lose
+ *
+ * Form 7206 line 2: *"For coverage under a qualified long-term care insurance
+ * contract, enter for each person covered the smaller of (a) or (b)"*, and
+ * the note beneath it: *"If more than one person is covered, figure
+ * separately the amount to enter for each person. Then enter the total of
+ * those amounts."* A couple aged 55 and 65 paying $3,000 each may deduct
+ * $1,800 + $3,000 = $4,800, not one $4,810 cap against $6,000 and not one
+ * $1,800 cap either. `fjs/form7206` applies the cap per covered person for
+ * exactly this reason and its own proof pins the two-person case.
+ *
+ * ## `age at the end of the tax year`, which is why these are TAGS and not
+ * a birth date
+ *
+ * The band is the person's *"age at the end of the tax year"* (Form 7206 line
+ * 2(b)). **No document in this repository carries a birth date** — the same
+ * fact `adjustmentLineTags`' own `traditionalIraContributionAgeFiftyOrOver`
+ * records, and the reason `form4972LumpSumDistribution` is refused. So the
+ * band is asserted by the taxpayer through the `lineTag` they choose, exactly
+ * as §219(b)(5)(B)(ii)'s age-50 catch-up already is one line up the same
+ * schedule and on the same document.
+ * @type {readonly LongTermCarePremiumLimit[]}
+ */
+export const longTermCarePremiumLimits = [
+    {
+        band: 'ageFortyOrYounger',
+        minimumAgeExclusive: undefined,
+        maximumAge: 40,
+        amount: '480.00',
+        citation: { kind: 'revProc', revProc: 'Rev. Proc. 2024-40', section: '§2.28, age 40 or less', effectiveDate: '2025-01-01' },
+    },
+    {
+        band: 'ageFortyOneToFifty',
+        minimumAgeExclusive: 40,
+        maximumAge: 50,
+        amount: '900.00',
+        citation: { kind: 'revProc', revProc: 'Rev. Proc. 2024-40', section: '§2.28, more than 40 but not more than 50', effectiveDate: '2025-01-01' },
+    },
+    {
+        band: 'ageFiftyOneToSixty',
+        minimumAgeExclusive: 50,
+        maximumAge: 60,
+        amount: '1800.00',
+        citation: { kind: 'revProc', revProc: 'Rev. Proc. 2024-40', section: '§2.28, more than 50 but not more than 60', effectiveDate: '2025-01-01' },
+    },
+    {
+        band: 'ageSixtyOneToSeventy',
+        minimumAgeExclusive: 60,
+        maximumAge: 70,
+        amount: '4810.00',
+        citation: { kind: 'revProc', revProc: 'Rev. Proc. 2024-40', section: '§2.28, more than 60 but not more than 70', effectiveDate: '2025-01-01' },
+    },
+    {
+        band: 'ageSeventyOneOrOlder',
+        minimumAgeExclusive: 70,
+        maximumAge: undefined,
+        amount: '6020.00',
+        citation: { kind: 'revProc', revProc: 'Rev. Proc. 2024-40', section: '§2.28, more than 70', effectiveDate: '2025-01-01' },
+    },
+]
+
+
+/**
  * A full tax-year parameter set: every TY2025 parameter this phase
  * requires, together.
  *
@@ -2973,6 +3279,11 @@ export const premiumTaxCreditRepaymentLimitation = {
  *   readonly federalPovertyLine: typeof federalPovertyLine,
  *   readonly premiumTaxCreditApplicablePercentage: typeof premiumTaxCreditApplicablePercentage,
  *   readonly premiumTaxCreditRepaymentLimitation: typeof premiumTaxCreditRepaymentLimitation,
+ *   readonly dependentCareExpenseLimit: typeof dependentCareExpenseLimit,
+ *   readonly dependentCareCreditPercentage: typeof dependentCareCreditPercentage,
+ *   readonly dependentCareAssistanceExclusionLimit: typeof dependentCareAssistanceExclusionLimit,
+ *   readonly dependentCareDeemedEarnedIncomePerMonth: typeof dependentCareDeemedEarnedIncomePerMonth,
+ *   readonly longTermCarePremiumLimits: typeof longTermCarePremiumLimits,
  * }} TaxParamSet
  */
 
@@ -3018,6 +3329,11 @@ export const taxParamsByYear = {
         federalPovertyLine,
         premiumTaxCreditApplicablePercentage,
         premiumTaxCreditRepaymentLimitation,
+        dependentCareExpenseLimit,
+        dependentCareCreditPercentage,
+        dependentCareAssistanceExclusionLimit,
+        dependentCareDeemedEarnedIncomePerMonth,
+        longTermCarePremiumLimits,
     },
 }
 
@@ -3167,9 +3483,93 @@ const everyDollarStringField = [
         federalPovertyLine[table].eachAdditionalPerson.amount,
     ]),
     ...premiumTaxCreditRepaymentLimitation.bands.flatMap(band => [band.single, band.other]),
+    dependentCareExpenseLimit.oneQualifyingPerson.amount,
+    dependentCareExpenseLimit.twoOrMoreQualifyingPersons.amount,
+    // The last band's ceiling is `undefined` ("43,000 — No limit") and is
+    // filtered out rather than coerced, exactly as the last ordinary bracket's
+    // is above.
+    ...dependentCareCreditPercentage.bands
+        .map(band => band.adjustedGrossIncomeCeiling)
+        .filter(isDefinedString),
+    dependentCareAssistanceExclusionLimit.standard.amount,
+    dependentCareAssistanceExclusionLimit.marriedFilingSeparately.amount,
+    dependentCareDeemedEarnedIncomePerMonth.oneQualifyingPerson.amount,
+    dependentCareDeemedEarnedIncomePerMonth.twoOrMoreQualifyingPersons.amount,
 ]
 
 export const proof = {
+    // ── TAX-39: §213(d)(10)'s long-term care premium limits ────────────────
+    //
+    // **Hand-typed from Form 7206 (2025) line 2(b) and Rev. Proc. 2024-40
+    // §2.28, not from the table above.** The expected side is a literal
+    // `Record` written out band by band, which is the idiom
+    // `standardDeductionCitesObbbaRevision` uses two leaves down and the
+    // reason AGENTS.md gives for it: an expected value produced by the code
+    // under test proves the code equals itself.
+    //
+    // The COUNT is asserted beside the loop for the fourth-shipped-defect
+    // reason — `longTermCarePremiumLimits` is both the iteration set and the
+    // subject, so a deleted band would vanish from the loop in the same
+    // instant it vanished from the data.
+    longTermCarePremiumLimitsMatchThePrintedFormAndTheRevenueProcedure: () => {
+        /** @type {Record<LongTermCareAgeBand, string>} */
+        const printed = {
+            ageFortyOrYounger: '480.00',
+            ageFortyOneToFifty: '900.00',
+            ageFiftyOneToSixty: '1800.00',
+            ageSixtyOneToSeventy: '4810.00',
+            ageSeventyOneOrOlder: '6020.00',
+        }
+        assertEq(longTermCarePremiumLimits.length, 5, 'five printed bands')
+        assertEq(Object.keys(printed).length, 5, 'and five hand-typed expectations')
+        for (const limit of longTermCarePremiumLimits) {
+            const expected = printed[limit.band]
+            assertEq(limit.amount, expected, `band ${limit.band}`)
+            // Every figure carries Rev. Proc. 2024-40 §2.28 — never §2.27,
+            // which is the qualified-business-income threshold. A section
+            // number that names a real but different rule is the failure this
+            // assertion exists for.
+            assertEq(limit.citation.kind, 'revProc')
+            assert(
+                limit.citation.kind === 'revProc' && limit.citation.revProc === 'Rev. Proc. 2024-40',
+                ['the governing Revenue Procedure', limit.band, limit.citation])
+            assert(
+                limit.citation.section.startsWith('§2.28'),
+                ['§2.28, Eligible Long-Term Care Premiums', limit.band, limit.citation.section])
+        }
+    },
+    // The bands must PARTITION the ages: each one's exclusive floor is the
+    // previous one's inclusive ceiling, the first is open below and the last
+    // open above. Stated as arithmetic over consecutive pairs rather than as
+    // five more literals, because what this leaf is for is the boundary the
+    // statute and the printed form state differently — "more than 40 but not
+    // more than 50" versus "age 41 to 50".
+    theLongTermCareBandsPartitionEveryAgeWithNoGapAndNoOverlap: () => {
+        const [first, ...rest] = longTermCarePremiumLimits
+        assert(first !== undefined, 'five bands')
+        if (first === undefined) { throw 'expected a first band' }
+        assertEq(first.minimumAgeExclusive, undefined, 'the first band is open below')
+        assertEq(rest.length, 4, 'four bands follow the first')
+        const last = longTermCarePremiumLimits[longTermCarePremiumLimits.length - 1]
+        assert(last !== undefined, 'a last band')
+        if (last === undefined) { throw 'expected a last band' }
+        assertEq(last.maximumAge, undefined, 'and the last is open above')
+        for (let index = 1; index < longTermCarePremiumLimits.length; index += 1) {
+            const previous = longTermCarePremiumLimits[index - 1]
+            const current = longTermCarePremiumLimits[index]
+            assert(previous !== undefined && current !== undefined, ['a pair', index])
+            if (previous === undefined || current === undefined) { throw 'expected a pair' }
+            assertEq(
+                current.minimumAgeExclusive, previous.maximumAge,
+                `band ${current.band} must start exactly where ${previous.band} ends`)
+            // And the amounts must ascend, which is what makes a transposed
+            // pair of rows visible: $4,810 and $6,020 are adjacent and easy to
+            // swap, and every other assertion here would still pass.
+            assert(
+                centsFromString(current.amount) > centsFromString(previous.amount),
+                ['the cap must rise with age', previous.band, current.band])
+        }
+    },
     // Phase 21 (EXEC-14): every parameter set agrees with the KEY it is
     // stored under. A set travelling on its own — which is what
     // `taxGuestCtx` now does with it — is only trustworthy if its own
@@ -5238,6 +5638,222 @@ export const proof = {
             assertEq(citation.revProc, '2024-40')
             assertEq(citation.section, '§2.07')
             assertEq(citation.effectiveDate, '2025-01-01')
+        },
+    },
+    // ── Form 2441 (TAX-38) ──────────────────────────────────────────────────
+    //
+    // Every expected value below is hand-typed off the printed 2025 Form 2441
+    // and its instructions. Nothing here is produced by `fjs/form2441`.
+    dependentCareExpenseLimit: {
+        // f2441 line 3: "Don't enter more than $3,000 if you had one
+        // qualifying person or $6,000 if you had two or more persons", and
+        // line 27 prints the identical pair.
+        theTwoPrintedAmounts: () => {
+            assertEq(
+                centsFromString(dependentCareExpenseLimit.oneQualifyingPerson.amount),
+                300000n,
+                '$3,000.00 for one qualifying person')
+            assertEq(
+                centsFromString(dependentCareExpenseLimit.twoOrMoreQualifyingPersons.amount),
+                600000n,
+                '$6,000.00 for two or more')
+        },
+        // The pair is 1:2, which is a property of the printed page and not of
+        // how either amount is stored. A transposed digit in either breaks it.
+        theSecondIsExactlyTwiceTheFirst: () => {
+            assertEq(
+                centsFromString(dependentCareExpenseLimit.twoOrMoreQualifyingPersons.amount),
+                centsFromString(dependentCareExpenseLimit.oneQualifyingPerson.amount) * 2n)
+        },
+        // `kind: 'code'` and not `'revProc'`: §21(c) is a plain statutory
+        // dollar amount that no annual Revenue Procedure inflation-adjusts.
+        bothCiteTheCodeSectionRatherThanARevenueProcedure: () => {
+            for (const entry of [
+                dependentCareExpenseLimit.oneQualifyingPerson,
+                dependentCareExpenseLimit.twoOrMoreQualifyingPersons,
+            ]) {
+                assertEq(entry.citation.kind, 'code', ['§21(c) is not inflation-adjusted', entry])
+                assertEq(entry.citation.effectiveDate, '2025-01-01')
+            }
+            assertEq(dependentCareExpenseLimit.oneQualifyingPerson.citation.section, '§21(c)(1)')
+            assertEq(
+                dependentCareExpenseLimit.twoOrMoreQualifyingPersons.citation.section,
+                '§21(c)(2)')
+        },
+    },
+    dependentCareCreditPercentage: {
+        // All sixteen printed rows of Form 2441 line 8's table, hand-typed as
+        // the form prints them: the "But not over" ceiling and the decimal
+        // amount, in printed order. The count is hand-typed BESIDE the list
+        // so a row silently dropped from the stored table fails here even
+        // though a loop over the stored rows would happily iterate one fewer.
+        theSixteenPrintedRows: () => {
+            /** @type {readonly (readonly [string | undefined, number])[]} */
+            const printed = [
+                ['15000.00', 35], ['17000.00', 34], ['19000.00', 33], ['21000.00', 32],
+                ['23000.00', 31], ['25000.00', 30], ['27000.00', 29], ['29000.00', 28],
+                ['31000.00', 27], ['33000.00', 26], ['35000.00', 25], ['37000.00', 24],
+                ['39000.00', 23], ['41000.00', 22], ['43000.00', 21], [undefined, 20],
+            ]
+            assertEq(printed.length, 16, 'the printed table has sixteen rows')
+            assertEq(
+                dependentCareCreditPercentage.bands.length,
+                16,
+                'and the stored table has sixteen too')
+            for (let i = 0; i < printed.length; ++i) {
+                const row = assertNotNullish(printed[i], ['printed row', i])
+                const band = assertNotNullish(dependentCareCreditPercentage.bands[i], ['band', i])
+                const [ceiling, percent] = row
+                assertEq(band.adjustedGrossIncomeCeiling, ceiling, ['row ceiling', i])
+                assertEq(band.percent, percent, ['row percentage', i])
+            }
+        },
+        // §21(a)(2)'s own arithmetic, checked against the transcription from
+        // the other side: 35 less one point per $2,000 (or fraction) above
+        // $15,000, floored at 20. Independent of the loop above because it
+        // derives each row rather than reading it.
+        everyRowMatchesTheStatutoryArithmetic: () => {
+            const bands = dependentCareCreditPercentage.bands
+            for (let i = 0; i < bands.length; ++i) {
+                const band = assertNotNullish(bands[i], ['band', i])
+                assertEq(
+                    band.percent,
+                    Math.max(20, 35 - i),
+                    ['§21(a)(2) drops one percentage point per $2,000 step', i])
+            }
+        },
+        // The last row is OPEN-TOPPED — "43,000 — No limit" — and every other
+        // row has a ceiling. A sentinel in the last slot would look like a
+        // ceiling and become one the first time anybody compared against it.
+        onlyTheLastRowIsOpenTopped: () => {
+            const bands = dependentCareCreditPercentage.bands
+            const last = assertNotNullish(bands[bands.length - 1], 'the last band')
+            assertEq(last.adjustedGrossIncomeCeiling, undefined, '"43,000 — No limit"')
+            assertEq(last.percent, 20, 'the statutory floor of 20 percent')
+            for (let i = 0; i < bands.length - 1; ++i) {
+                assert(
+                    assertNotNullish(bands[i], ['band', i]).adjustedGrossIncomeCeiling !== undefined,
+                    ['every row but the last prints a "But not over" amount', i])
+            }
+        },
+        // The ceilings rise and the percentages fall, monotonically. Two rows
+        // transposed break this without breaking any single hand-typed row
+        // outside the transposed pair.
+        theCeilingsRiseAndThePercentagesFall: () => {
+            const bands = dependentCareCreditPercentage.bands
+            for (let i = 1; i < bands.length; ++i) {
+                const previous = assertNotNullish(bands[i - 1], ['previous', i])
+                const current = assertNotNullish(bands[i], ['current', i])
+                const previousCeiling = previous.adjustedGrossIncomeCeiling
+                const currentCeiling = current.adjustedGrossIncomeCeiling
+                assert(previousCeiling !== undefined, ['only the last row is open-topped', i])
+                if (previousCeiling !== undefined && currentCeiling !== undefined) {
+                    assert(
+                        centsFromString(previousCeiling) < centsFromString(currentCeiling),
+                        ['the table reads downwards in increasing income order', i])
+                }
+                assert(
+                    current.percent < previous.percent,
+                    ['and the percentage falls as income rises', i])
+            }
+        },
+        // Every printed step is exactly $2,000 wide after the first, which is
+        // §21(a)(2)'s "$2,000 (or fraction thereof)" written as a table.
+        everyStepAfterTheFirstIsTwoThousandDollarsWide: () => {
+            const bands = dependentCareCreditPercentage.bands
+            for (let i = 2; i < bands.length - 1; ++i) {
+                const previous = assertNotNullish(
+                    assertNotNullish(bands[i - 1], ['previous', i]).adjustedGrossIncomeCeiling,
+                    ['previous ceiling', i])
+                const current = assertNotNullish(
+                    assertNotNullish(bands[i], ['current', i]).adjustedGrossIncomeCeiling,
+                    ['current ceiling', i])
+                assertEq(
+                    centsFromString(current) - centsFromString(previous),
+                    200000n,
+                    ['$2,000.00 per step', i])
+            }
+        },
+        theCitationIsTheCodeSection: () => {
+            assertEq(dependentCareCreditPercentage.citation.kind, 'code')
+            assertEq(dependentCareCreditPercentage.citation.section, '§21(a)(2)')
+            assertEq(dependentCareCreditPercentage.citation.effectiveDate, '2025-01-01')
+        },
+    },
+    dependentCareAssistanceExclusionLimit: {
+        // i2441 p5, Line 21: "For 2025, the maximum amount that can be
+        // excluded from your income through a dependent care assistance
+        // program is $5,000 ($2,500 if married filing separately)."
+        theTwoPrintedAmounts: () => {
+            assertEq(
+                centsFromString(dependentCareAssistanceExclusionLimit.standard.amount),
+                500000n,
+                '$5,000.00')
+            assertEq(
+                centsFromString(
+                    dependentCareAssistanceExclusionLimit.marriedFilingSeparately.amount),
+                250000n,
+                '$2,500.00 — HALF, not the same figure')
+        },
+        // The married-filing-separately figure is exactly half, asserted in
+        // the direction a copy-paste of the $5,000 row would break.
+        theSeparateFigureIsHalf: () => {
+            assertEq(
+                centsFromString(
+                    dependentCareAssistanceExclusionLimit.marriedFilingSeparately.amount) * 2n,
+                centsFromString(dependentCareAssistanceExclusionLimit.standard.amount))
+        },
+        bothCiteSectionOneTwentyNine: () => {
+            for (const entry of [
+                dependentCareAssistanceExclusionLimit.standard,
+                dependentCareAssistanceExclusionLimit.marriedFilingSeparately,
+            ]) {
+                assertEq(entry.citation.kind, 'code')
+                assertEq(entry.citation.section, '§129(a)(2)(A)')
+                assertEq(entry.citation.effectiveDate, '2025-01-01')
+            }
+        },
+    },
+    dependentCareDeemedEarnedIncomePerMonth: {
+        // i2441 p4: "Their earned income for each month is considered to be
+        // at least $250 ($500 if you had two or more qualifying persons at
+        // any time during 2025)."
+        theTwoPrintedMonthlyAmounts: () => {
+            assertEq(
+                centsFromString(
+                    dependentCareDeemedEarnedIncomePerMonth.oneQualifyingPerson.amount),
+                25000n,
+                '$250.00 a month')
+            assertEq(
+                centsFromString(
+                    dependentCareDeemedEarnedIncomePerMonth.twoOrMoreQualifyingPersons.amount),
+                50000n,
+                '$500.00 a month for two or more qualifying persons')
+        },
+        // Twelve months of the deemed amount is exactly the matching expense
+        // cap ($3,000 and $6,000) — an arithmetic relationship between two
+        // INDEPENDENTLY stored tables, which is why it is worth asserting: it
+        // catches a digit dropped from either one.
+        twelveMonthsOfEachIsTheMatchingExpenseCap: () => {
+            assertEq(
+                centsFromString(
+                    dependentCareDeemedEarnedIncomePerMonth.oneQualifyingPerson.amount) * 12n,
+                centsFromString(dependentCareExpenseLimit.oneQualifyingPerson.amount),
+                '12 x $250.00 = $3,000.00')
+            assertEq(
+                centsFromString(
+                    dependentCareDeemedEarnedIncomePerMonth.twoOrMoreQualifyingPersons.amount)
+                    * 12n,
+                centsFromString(dependentCareExpenseLimit.twoOrMoreQualifyingPersons.amount),
+                '12 x $500.00 = $6,000.00')
+        },
+        bothCiteTheirOwnSubparagraph: () => {
+            assertEq(
+                dependentCareDeemedEarnedIncomePerMonth.oneQualifyingPerson.citation.section,
+                '§21(d)(2)(A)')
+            assertEq(
+                dependentCareDeemedEarnedIncomePerMonth.twoOrMoreQualifyingPersons.citation.section,
+                '§21(d)(2)(B)')
         },
     },
 }

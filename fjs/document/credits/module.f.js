@@ -159,7 +159,7 @@
 import { array, number, option, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
 import { validate as rttiValidate } from 'functionalscript/fjs/types/rtti/validate/module.f.mjs'
 import { error, ok } from 'functionalscript/fjs/types/result/module.f.mjs'
-import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
+import { assert, assertEq, assertNotNullish } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { base, mediaTypeOf } from '../base/module.f.js'
 import { moneyFieldError } from '../money_field/module.f.js'
 
@@ -255,6 +255,62 @@ const educationStudentEntry = /** @type {const} */ ({
 })
 
 /**
+ * One care provider — Form 2441 Part I line 1, columns (a) through (e).
+ *
+ * Every column is here, including the two that are not amounts, because the
+ * printed line is *"You must complete this part"* and a credit claimed without
+ * it *"may be disallowed unless you can show you used due diligence"* (i2441
+ * p2). `fjs/form2441` refuses a return that paid qualified expenses and
+ * recorded no provider.
+ *
+ * `identifyingNumber` is a free STRING and not a TIN pattern, because i2441 p3
+ * prints four things that legitimately go in column (c) and only one of them
+ * is a number: an SSN or ITIN, an EIN, the word *"Tax-Exempt"* for a tax-exempt
+ * organization, and *"LAFCP"* for a Living Abroad Foreign Care Provider. A
+ * pattern check here would refuse three printed answers, so the field carries
+ * what the taxpayer would write on the paper.
+ *
+ * `householdEmployee` is column (d)'s Yes/No box, `option(true)` per DOC-12.
+ * Nothing on Form 2441 reads it — it is the trigger for Schedule H, which this
+ * engine does not compute — and it is stored anyway because the printed line
+ * requires an answer and a transcription that drops a printed box is a
+ * transcription a reader cannot check against the page.
+ */
+const dependentCareProviderEntry = /** @type {const} */ ({
+    name: string,
+    address: string,
+    identifyingNumber: string,
+    householdEmployee: option(true),
+    amountPaid: string,
+})
+
+/**
+ * One qualifying person — Form 2441 Part II line 2, columns (a) through (d).
+ *
+ * `qualifiedExpensesIncurredAndPaid` is column (d) and is deliberately NOT the
+ * same figure as {@link creditsSchema}'s `dependentCareQualifiedExpensesIncurred`
+ * (line 16). The printed page asks two different questions: column (d) wants
+ * what was *"incurred and paid in 2025"*, and line 16 wants what was
+ * *"incurred in 2025 ... It doesn't matter when the expenses were paid."* They
+ * coincide for most filers and diverge for anyone who paid a December bill in
+ * January, which is exactly the population Form 2441 line 9b and Worksheet A
+ * exist for. Storing one figure and using it for both would erase the
+ * distinction the form is built around.
+ *
+ * `overAgeTwelveAndDisabled` is column (c). It is a taxpayer ASSERTION about a
+ * person, in the shape `educationStudentEntry`'s four Form 8863 boxes already
+ * are, and this dialect does not police it: §21(b)(1)(B)'s "physically or
+ * mentally incapable of caring for themselves" is not a fact any document
+ * reports and not one arithmetic can check.
+ */
+const dependentCareQualifyingPersonEntry = /** @type {const} */ ({
+    name: string,
+    tin: string,
+    overAgeTwelveAndDisabled: option(true),
+    qualifiedExpensesIncurredAndPaid: string,
+})
+
+/**
  * rtti schema for a `credits` BLOB. `dialect` is spread first (via `base`) so
  * structural validation reports it as the first failing field on a mismatched
  * blob (DOC-00's discriminant). NO `formRevision` — DOC-10 does not apply;
@@ -278,6 +334,68 @@ export const creditsSchema = /** @type {const} */ ({
     // than inside `educationStudents`. See this module's own docstring, "The
     // filer's own age".
     filerAttainedAgeTwentyFourBeforeTheEndOfTheYear: option(true),
+    // ── Form 2441, TAX-38 ───────────────────────────────────────────────────
+    //
+    // The third Schedule 3 credit whose asserted half lives on this dialect,
+    // and it satisfies this module's own inclusion rule exactly: what a
+    // taxpayer paid a daycare is substantiated by their own records, arrives
+    // with no payer and no account, and has one-record-per-taxpayer-per-year
+    // cardinality. What a taxpayer's EMPLOYER provided is not here — that is
+    // Form W-2 box 10, which `fjs/document/w2` already stores and which
+    // `fjs/form1040/core` now reads.
+    //
+    // FLAT rather than one nested `dependentCare` object, matching every other
+    // field on this dialect and on `vnd.fjs.return_profile`: the two arrays
+    // below are the printed form's own two tables, and the seven scalars are
+    // seven separate printed lines rather than members of anything.
+    dependentCareProviders: option(array(dependentCareProviderEntry)),
+    dependentCareQualifyingPersons: option(array(dependentCareQualifyingPersonEntry)),
+    // Line 16 — "the total of all qualified expenses incurred in 2025 for the
+    // care of your qualifying person(s). It doesn't matter when the expenses
+    // were paid." ABSENT reads as zero and NOT as "the same as column (d)",
+    // and the direction is deliberate: line 17 is min(line 15, line 16), so a
+    // zero here makes every dependent care benefit taxable. A filer who
+    // cannot substantiate an expense cannot exclude a benefit against it, and
+    // erring the other way would understate income.
+    dependentCareQualifiedExpensesIncurred: option(string),
+    // Line 13 — an amount carried over from 2024 and used during 2025's grace
+    // period (Notice 2005-42). Adds to the benefits being reconciled.
+    dependentCareGraceCarryoverUsed: option(string),
+    // Line 14 — an amount forfeited, or permitted to be carried forward into
+    // 2026. SUBTRACTS on line 15, which is why the printed line prints its own
+    // parentheses; stored as a positive amount, negated where the form
+    // subtracts it.
+    dependentCareForfeitedOrCarriedForward: option(string),
+    // Line 22 — "Is any amount on line 12 or 13 from your sole proprietorship
+    // or partnership?" `fjs/form2441` REFUSES a non-zero amount here rather
+    // than computing line 24, because line 24's deductible benefits land on
+    // Schedule C line 14, Schedule E line 19 or 28, or Schedule F line 15
+    // (i2441 p5) and this engine would exclude the benefit from income
+    // without ever deducting it on the business schedule.
+    dependentCareBenefitsFromSoleProprietorshipOrPartnership: option(string),
+    // Line 21's second sentence — "don't enter more than the maximum amount
+    // allowed under your dependent care plan". A PLAN fact, not a statutory
+    // one: §129(a)(2)(A)'s $5,000 is in `fjs/tax/params`, and this is the
+    // taxpayer's own lower ceiling where their plan sets one. Absent means the
+    // plan set none, which is safe in the one direction that matters — a plan
+    // cannot pay out more than its own maximum, so box 10 already bounds it.
+    dependentCarePlanMaximumExclusion: option(string),
+    // Form 2441 line B's printed checkbox, read in the NEGATIVE direction:
+    // the box certifies that deemed income IS being entered, and this field
+    // certifies that it is NOT needed. §21(d)(2) deems a student or disabled
+    // filer $250 (or $500) of earned income a MONTH, and no document here
+    // carries per-month student or disability status. `fjs/form2441` refuses,
+    // rather than assuming either way, whenever the earned-income limitation
+    // actually binds and this certification is absent — and computes without
+    // it when the limitation does not bind, because the deemed amount is a
+    // floor and cannot then move any printed line.
+    dependentCareFilerWasNeitherAStudentNorDisabled: option(true),
+    // Line 9b — "If you paid 2024 expenses in 2025, complete Worksheet A".
+    // `fjs/form2441` REFUSES a non-zero amount: Worksheet A needs five 2024
+    // figures (that year's Form 2441 lines 3 and 6, its adjusted gross income,
+    // and both spouses' earned income) and no stored document carries a prior
+    // year's Form 2441 at all.
+    dependentCarePriorYearExpensesPaidThisYear: option(string),
 })
 
 /** @typedef {Ts<typeof creditsSchema>} Credits */
@@ -327,6 +445,22 @@ const studentExpenseFields = /** @type {const} */ ([
 ])
 
 /**
+ * The six SCALAR Form 2441 money fields, walked in one loop for the reason
+ * {@link studentExpenseFields} gives. The two ARRAY amounts — a provider's
+ * `amountPaid` and a qualifying person's `qualifiedExpensesIncurredAndPaid` —
+ * are checked separately below, exactly as `fjs/document/w2` separates its
+ * scalar money boxes from the ones nested inside boxes 12 and 15-20.
+ */
+const dependentCareMoneyFields = /** @type {const} */ ([
+    'dependentCareQualifiedExpensesIncurred',
+    'dependentCareGraceCarryoverUsed',
+    'dependentCareForfeitedOrCarriedForward',
+    'dependentCareBenefitsFromSoleProprietorshipOrPartnership',
+    'dependentCarePlanMaximumExclusion',
+    'dependentCarePriorYearExpensesPaidThisYear',
+])
+
+/**
  * Checks the semantic refinements the structural schema cannot express:
  *
  * 1. Every `datePaid` is an ISO `YYYY-MM-DD` date whose YEAR is the
@@ -343,6 +477,13 @@ const studentExpenseFields = /** @type {const} */ ([
  *    first match is the shape of error this repository exists to prevent —
  *    `vnd.fjs.adjustments`' own `hsaCoverage` duplicate check, applied to two
  *    arrays instead of one.
+ * 6. Every Form 2441 amount — the six scalars, a care provider's `amountPaid`
+ *    and a qualifying person's `qualifiedExpensesIncurredAndPaid` — is an
+ *    exact decimal within safe magnitude.
+ * 7. No care provider carries an EMPTY `identifyingNumber` (Form 2441 line 1
+ *    column (c) admits four printed answers, none of them blank), and no
+ *    qualifying person's TIN appears twice — a duplicate there raises §21(c)'s
+ *    expense cap from $3,000 to $6,000.
  *
  * Every refusal names the offending VALUE, not merely the field: a message
  * saying "credit must be americanOpportunity or lifetimeLearning" tells a
@@ -417,6 +558,58 @@ export const checkReferences = r => {
             }
         }
     }
+    // ── Form 2441 (TAX-38) ──────────────────────────────────────────────────
+    for (const field of dependentCareMoneyFields) {
+        const printed = r[field]
+        if (printed === undefined) {
+            continue
+        }
+        const message = moneyFieldError(field)(printed)
+        if (message !== undefined) {
+            return error(message)
+        }
+    }
+    for (const provider of r.dependentCareProviders ?? []) {
+        const message = moneyFieldError(`amountPaid for care provider ${provider.name}`)(
+            provider.amountPaid)
+        if (message !== undefined) {
+            return error(message)
+        }
+        // Form 2441 line 1 column (c) admits four printed answers — an SSN or
+        // ITIN, an EIN, "Tax-Exempt" and "LAFCP" — so the VALUE is not
+        // checked, only its presence. An empty column (c) is a return the IRS
+        // may disallow the credit on (i2441 p2, Due Diligence), and refusing
+        // it here says so at ingest rather than at the form.
+        if (provider.identifyingNumber === '') {
+            return error(
+                `care provider ${provider.name} carries an empty identifyingNumber — Form 2441 `
+                + `line 1 column (c) admits an SSN or ITIN, an EIN, "Tax-Exempt" for a tax-exempt `
+                + `organization, or "LAFCP" for a living-abroad foreign care provider, but not a `
+                + `blank; a credit claimed without it may be disallowed`)
+        }
+    }
+    /** @type {string[]} */
+    const seenQualifyingPersonTins = []
+    for (const person of r.dependentCareQualifyingPersons ?? []) {
+        const message = moneyFieldError(
+            `qualifiedExpensesIncurredAndPaid for ${person.name}`)(
+            person.qualifiedExpensesIncurredAndPaid)
+        if (message !== undefined) {
+            return error(message)
+        }
+        // §21(c)'s cap is per RETURN and keyed to how many qualifying persons
+        // there are, so one person entered twice does not merely double their
+        // expenses — it moves the whole return from the $3,000 cap to the
+        // $6,000 one. `educationStudents`' own duplicate check, applied where
+        // a duplicate is worth twice as much.
+        if (seenQualifyingPersonTins.includes(person.tin)) {
+            return error(
+                `dependentCareQualifyingPersons carries two entries for ${person.name} — Form `
+                + `2441 line 2 is one row per person, and a person counted twice raises §21(c)'s `
+                + `expense cap from $3,000 to $6,000`)
+        }
+        seenQualifyingPersonTins.push(person.tin)
+    }
     return ok(r)
 }
 
@@ -470,6 +663,12 @@ const expectedIndividualCount = 2
 const expectedElectionCount = 2
 /** @type {number} */
 const expectedStudentExpenseFieldCount = 2
+/** Independently hand-typed: the six SCALAR Form 2441 money fields. A field
+ * dropped from `dependentCareMoneyFields` would otherwise shrink the exactness
+ * loop AND the leaf that walks it in the same instant — AGENTS.md's fourth
+ * shipped defect, in the shape this dialect is most exposed to.
+ * @type {number} */
+const expectedDependentCareMoneyFieldCount = 6
 
 export const proof = {
     dialectAndMediaType: () => {
@@ -889,6 +1088,160 @@ export const proof = {
     // value — the dialect this one is modelled on, and therefore the one
     // whose shape is most nearly compatible — fails THIS dialect's
     // `validate`, and the failure's path is exactly `['dialect']`.
+    // ── Form 2441 (TAX-38) ──────────────────────────────────────────────────
+    dependentCare: {
+        // A complete Part I / Part II / Part III record round-trips, and the
+        // CONTROL for every refusal below.
+        aCompleteRecordRoundTrips: () => {
+            const [t, v] = validate({
+                ...minimal,
+                dependentCareProviders: [{
+                    name: 'Sunny Days Daycare',
+                    address: '1 Main St, Springfield, IL 62701',
+                    identifyingNumber: '11-1111111',
+                    amountPaid: '7200.00',
+                }],
+                dependentCareQualifyingPersons: [{
+                    name: 'A. Child',
+                    tin: '444-44-4444',
+                    qualifiedExpensesIncurredAndPaid: '7200.00',
+                }],
+                dependentCareQualifiedExpensesIncurred: '7200.00',
+                dependentCareFilerWasNeitherAStudentNorDisabled: true,
+            })
+            assert(t === 'ok', ['expected ok', t, v])
+            if (t !== 'ok') {
+                throw ['expected ok', v]
+            }
+            const provider = assertNotNullish(v.dependentCareProviders?.[0], 'the provider')
+            assertEq(provider.amountPaid, '7200.00', 'the raw stored decimal, never re-formatted')
+            assertEq(provider.householdEmployee, undefined, 'column (d) was not answered')
+            const person = assertNotNullish(
+                v.dependentCareQualifyingPersons?.[0], 'the qualifying person')
+            assertEq(person.qualifiedExpensesIncurredAndPaid, '7200.00')
+            assertEq(v.dependentCareQualifiedExpensesIncurred, '7200.00')
+        },
+        // Every one of the eight Form 2441 money fields is exactness-checked.
+        // Written as a LOOP over a hand-typed list of the six scalars plus two
+        // hand-written array cases, so a field dropped from
+        // `dependentCareMoneyFields` fails the count beside it rather than
+        // silently shrinking this leaf's coverage.
+        everyMoneyFieldRejectsAnInexactDecimal: () => {
+            assertEq(
+                dependentCareMoneyFields.length,
+                expectedDependentCareMoneyFieldCount,
+                'six scalar Form 2441 money fields')
+            for (const field of dependentCareMoneyFields) {
+                const [t, v] = validate({ ...minimal, [field]: '1,000.00' })
+                assertEq(t, 'error', [field, 'a thousands separator is not an exact decimal', v])
+            }
+            const [providerT] = validate({
+                ...minimal,
+                dependentCareProviders: [{
+                    name: 'X', address: 'Y', identifyingNumber: 'Z', amountPaid: '1e3',
+                }],
+            })
+            assertEq(providerT, 'error', 'a care provider amount is checked too')
+            const [personT] = validate({
+                ...minimal,
+                dependentCareQualifyingPersons: [{
+                    name: 'X', tin: '444-44-4444', qualifiedExpensesIncurredAndPaid: '12.345',
+                }],
+            })
+            assertEq(personT, 'error', 'and a qualifying person amount, at three decimal places')
+        },
+        // The CONTROL for the exactness loop: the same eight fields accept a
+        // well-formed decimal. A check that refused everything would pass the
+        // leaf above on its own.
+        everyMoneyFieldAcceptsAnExactDecimal: () => {
+            for (const field of dependentCareMoneyFields) {
+                const [t, v] = validate({ ...minimal, [field]: '1000.00' })
+                assert(t === 'ok', [field, 'an exact decimal is accepted', v])
+            }
+        },
+        anEmptyProviderIdentifyingNumberIsRefusedByName: () => {
+            const [t, v] = validate({
+                ...minimal,
+                dependentCareProviders: [{
+                    name: 'Sunny Days Daycare',
+                    address: '1 Main St',
+                    identifyingNumber: '',
+                    amountPaid: '7200.00',
+                }],
+            })
+            assertEq(t, 'error')
+            assert(
+                typeof v === 'string'
+                && v.includes('Sunny Days Daycare')
+                && v.includes('Tax-Exempt')
+                && v.includes('LAFCP'),
+                ['the refusal must name the provider and the printed alternatives', v])
+        },
+        // The three NON-numeric answers Form 2441 line 1 column (c) prints are
+        // all accepted. This is the control for the emptiness check, and it is
+        // three leaves in one because a pattern check added later would pass
+        // the empty-string test and fail every one of these.
+        theThreePrintedNonNumericIdentifyingNumbersAreAccepted: () => {
+            for (const printed of ['Tax-Exempt', 'LAFCP', 'See W-2']) {
+                const [t, v] = validate({
+                    ...minimal,
+                    dependentCareProviders: [{
+                        name: 'An Employer',
+                        address: '1 Main St',
+                        identifyingNumber: printed,
+                        amountPaid: '0.00',
+                    }],
+                })
+                assert(t === 'ok', [printed, 'i2441 p3 prints this in column (c)', v])
+            }
+        },
+        aDuplicateQualifyingPersonIsRefusedNamingTheCapItWouldMove: () => {
+            const person = {
+                name: 'A. Child',
+                tin: '444-44-4444',
+                qualifiedExpensesIncurredAndPaid: '3000.00',
+            }
+            const [t, v] = validate({
+                ...minimal,
+                dependentCareQualifyingPersons: [person, { ...person, name: 'A. Child (again)' }],
+            })
+            assertEq(t, 'error')
+            assert(
+                typeof v === 'string' && v.includes('$3,000') && v.includes('$6,000'),
+                ['the refusal must name what a duplicate is worth, not merely that it exists', v])
+        },
+        // The CONTROL: two DIFFERENT qualifying persons are the ordinary
+        // two-child return and must not be refused.
+        twoDifferentQualifyingPersonsAreAccepted: () => {
+            const [t, v] = validate({
+                ...minimal,
+                dependentCareQualifyingPersons: [
+                    { name: 'A. Child', tin: '444-44-4444', qualifiedExpensesIncurredAndPaid: '3000.00' },
+                    { name: 'B. Child', tin: '555-55-5555', qualifiedExpensesIncurredAndPaid: '3000.00' },
+                ],
+            })
+            assert(t === 'ok', ['two children is an ordinary return', v])
+        },
+        // DOC-12 in both directions: an absent certification stays absent
+        // rather than reading back as `false`, and `false` is REFUSED rather
+        // than accepted as "not certified" — the same discipline every other
+        // `option(true)` on this dialect follows.
+        theStudentOrDisabledCertificationIsOptionTrue: () => {
+            const [absentT, absentV] = validate(minimal)
+            assert(absentT === 'ok', ['expected ok', absentV])
+            if (absentT !== 'ok') {
+                throw ['expected ok', absentV]
+            }
+            assert(
+                !('dependentCareFilerWasNeitherAStudentNorDisabled' in absentV),
+                ['an absent certification must stay absent', absentV])
+            const [falseT] = validate({
+                ...minimal,
+                dependentCareFilerWasNeitherAStudentNorDisabled: false,
+            })
+            assertEq(falseT, 'error', 'DOC-12: `false` is not a value this field takes')
+        },
+    },
     crossDialect: {
         adjustmentsShapeRejectedByCredits: () => {
             const [t, v] = validate({

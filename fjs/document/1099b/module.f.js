@@ -202,7 +202,7 @@ const validateShape = rttiValidate(oneZeroNineNineBSchema)
  * `box1cDateSoldOrDisposed`, `cusipNumber`, and
  * `applicableCheckboxOnForm8949` are deliberately NOT here — none is money.
  */
-const moneyBoxFields = /** @type {const} */ ([
+export const moneyBoxFields = /** @type {const} */ ([
     'box1dProceeds',
     'box1eCostOrOtherBasis',
     'box1fAccruedMarketDiscount',
@@ -232,7 +232,7 @@ const expectedMoneyBoxFieldCount = 10
  * identical list rather than the check and its test being free to drift
  * apart (AGENTS.md, "one rule, one place").
  */
-const stateLocalMoneyFields = /** @type {const} */ ([
+export const stateLocalMoneyFields = /** @type {const} */ ([
     'stateTaxWithheld',
 ])
 

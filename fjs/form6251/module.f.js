@@ -86,8 +86,10 @@
  *   entered as a negative. A **computed** zero rather than a refused one, and
  *   this is the one Part I line where that is honest: `fjs/document/1099g`
  *   REFUSES a present, non-zero box 2 at validation, so Schedule 1 line 1
- *   cannot be non-zero for any document that reaches this engine, and line 8z
- *   is `otherIncome`, a refused scope kind. `fjs/return/scope`'s own
+ *   cannot be non-zero for any document that reaches this engine, and line 8z's
+ *   recovery is `recoveriesOfAmountsDeductedInAnEarlierYear`, a refused scope
+ *   kind (`otherIncome`, the coarse kind for the whole of printed line 8, until
+ *   the 2026-08-18 split named the recovery specifically). `fjs/return/scope`'s own
  *   `theFormSixTwoFiveOneLinesAreNameableByKind` leaf is where those two
  *   claims are checked rather than asserted here.
  * - **Line 2g** — *"Interest from specified private activity bonds exempt from
@@ -307,6 +309,7 @@ const min = a => b => a < b ? a : b
  *   readonly aStoredNineteenNineBReportsASale: boolean,
  *   readonly specifiedPrivateActivityBondInterestCents: bigint,
  *   readonly estateTrustK1Forms: readonly Stored<K1EstateTrust>[],
+ *   readonly amtDepreciationAdjustmentCents: bigint,
  *   readonly regularTaxCents: bigint,
  *   readonly scheduleTwoLine1zCents: bigint,
  *   readonly scheduleThreeLine1Cents: bigint,
@@ -557,6 +560,7 @@ export const form6251 = taxParamSet => input => {
         itemizing, scheduleALine7Cents, standardDeductionCents,
         isoExerciseForms, aStoredNineteenNineBReportsASale,
         specifiedPrivateActivityBondInterestCents, estateTrustK1Forms,
+        amtDepreciationAdjustmentCents,
         regularTaxCents, scheduleTwoLine1zCents, scheduleThreeLine1Cents,
         qualifiedDividendsCents, capitalGainDistributionsCents,
         filingScheduleD, scheduleD15Cents, scheduleD16Cents, scheduleD19Cents,
@@ -600,7 +604,8 @@ export const form6251 = taxParamSet => input => {
     // 2b. State/local tax refund from Schedule 1 line 1 or 8z, as a negative.
     //     A COMPUTED zero: `fjs/document/1099g` refuses a non-zero box 2 at
     //     validation, so Schedule 1 line 1 cannot be non-zero here, and line
-    //     8z is the refused `otherIncome` kind.
+    //     8z's recovery is the refused
+    //     `recoveriesOfAmountsDeductedInAnEarlierYear` kind.
     const line2b = 0n
     // 2c. Investment interest expense (Form 4952) -- `investmentInterestForm4952`.
     const line2c = 0n
@@ -659,8 +664,20 @@ export const form6251 = taxParamSet => input => {
     //     EARLIER year and sold in this one lands, and it is why line 2i's
     //     own basis increase is a multi-year fact this engine cannot carry.
     const line2k = 0n
-    // 2l. Depreciation on assets placed in service after 1986 -- `amtDepreciation`.
-    const line2l = 0n
+    // 2l. "Depreciation on assets placed in service after 1986" --
+    //     `amtDepreciation`, computed by `fjs/form4562` from a
+    //     `vnd.fjs.asset_register` and threaded here through
+    //     `fjs/schedule/c`'s own completed Form 4562. §56(a)(1)(A)(ii)
+    //     puts 200% declining balance property on the 150% declining
+    //     balance method over the SAME recovery period, and the adjustment
+    //     is the difference.
+    //
+    //     **NOT floored**, for the identical reason line 2j is not: 200 DB
+    //     front-loads, so past the halfway point of an asset's life the
+    //     alternative schedule is the larger of the two and the adjustment
+    //     is NEGATIVE. Flooring it would overstate alternative minimum
+    //     taxable income for every business with mature equipment.
+    const line2l = amtDepreciationAdjustmentCents
     // 2m. Passive activities -- `amtPassiveActivities`.
     const line2m = 0n
     // 2n. Loss limitations -- `amtLossLimitations`.
@@ -679,7 +696,13 @@ export const form6251 = taxParamSet => input => {
     // 2t. Intangible drilling costs preference -- `amtIntangibleDrillingCosts`.
     const line2t = 0n
     // 3. "Other adjustments, including income-based related adjustments" --
-    //    `amtOtherAdjustments`.
+    //    SEVEN kinds as of the 2026-08-18 split, one per printed heading in
+    //    i6251 pp. 8-9 (`amtPre1987Depreciation`,
+    //    `amtPollutionControlFacilities`, `amtTaxShelterFarmActivities`,
+    //    `amtCharitableContributionsOfCertainProperty`,
+    //    `amtBusinessInterestLimitation`,
+    //    `amtNonPrincipalResidenceMortgageInterest`, `amtRelatedAdjustments`),
+    //    plus `netQualifiedDisasterLoss`, which already named the eighth.
     const line3 = 0n
 
     // 4. "Alternative minimum taxable income. Combine lines 1b through 3."
@@ -971,6 +994,7 @@ const beneficiaryK1 = hash => box12 => ({
  */
 const nothing = {
     status: 'single',
+    amtDepreciationAdjustmentCents: 0n,
     adjustedGrossIncomeCents: 0n,
     totalDeductionsCents: 0n,
     scheduleOneALine37Cents: 0n,

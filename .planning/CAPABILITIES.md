@@ -66,11 +66,28 @@ Two figures worth knowing, both computed by the engine on real fixtures:
 The engine **refuses rather than guessing** wherever it cannot compute honestly. Each refusal names
 the form or the facts that would supply it.
 
-**The refusal surface is a partition, checked at `tsc`:** every one of **114 income, deduction,
+**The refusal surface is a partition, checked at `tsc`:** every one of **195 income, deduction,
 credit and payment kinds** is either modeled or carries a refusal naming what is missing —
-**38 modeled, 76 refused**, and `_EveryKindIsEitherModeledOrRefused` fails the build if a kind
+**54 modeled, 141 refused**, and `_EveryKindIsEitherModeledOrRefused` fails the build if a kind
 falls in neither. Re-derive with `modeledKinds.length` / `unmodeledKindRefusals.length` in
 `fjs/return/scope`.
+
+The refused half jumped 65 → 143 on 2026-08-18, when the last six coarse kinds — each naming a
+printed line that collapsed many unrelated facts — became 84 per-fact kinds read off the 2025
+printed forms and instructions. **Nothing was reclassified in that change**: the modeled count
+did not move, and a taxpayer who is refused now gets told which document, form or determination
+is missing rather than that a whole lettered block is unmodeled.
+
+It then fell 143 → 142, and the modeled half rose 52 → 53, when Form 7206 made
+`selfEmployedHealthInsuranceDeduction` computable at Schedule 1 line 17. **One kind, moved across
+the partition** — the two moves are independent, so the vocabulary is still the 195 the split
+left.
+
+It fell again, 142 → 141, and the modeled half rose 53 → 54, when Schedule E Part I made
+`rentalRealEstateAndRoyalties` computable at Schedule 1 line 5. **A second single kind moved
+across the same partition**, on the same terms and for the same reason: the wiring landed first
+and the reclassification rode with it. The vocabulary is still the 195 the split left — neither
+reclassification invented or retired a kind — and 54 + 141 = 195.
 
 The conditional refusals — the ones that fire on a taxpayer whose kinds are all modeled:
 
@@ -90,7 +107,7 @@ AMT with capital gains or qualified dividends (Phase 29, `fjs/form6251/part3`), 
 Part II.
 
 **There is also a complementary guard.** Some taxes trigger on a threshold from data already held,
-on a taxpayer who has never heard of the form — so **8 tripwires** refuse when the documents prove
+on a taxpayer who has never heard of the form — so **10 tripwires** refuse when the documents prove
 an obligation was not declared. Without them, a $300,000 W-2 understated tax by ~$900, silently.
 A tripwire that always fires is not a tripwire; each one is proven to stay quiet on a return that
 does not owe the thing.
@@ -99,7 +116,7 @@ does not owe the thing.
 
 ## The measured surface
 
-**13 tools** · protocol `2025-11-25` · server `finance-mcp 1.0.0` · **27 document dialects**
+**13 tools** · protocol `2025-11-25` · server `finance-mcp 1.0.0` · **29 document dialects**
 
 | Group | Tools |
 |---|---|
@@ -120,13 +137,14 @@ surface. **Only 2025 exists** — `finance_tax_params` with any other year refus
 
 ## Health
 
-- `npm test`: **2253 / 2253**, exit 0 (`tsc` runs first and is clean). **Wall clock is 5-31s and
+- `npm test`: **2902 / 2902**, exit 0 (`tsc` runs first and is clean). **Wall clock is 5-31s and
   is not a stable figure** — measured 31s, 4.9s, 12.5s and 11.9s across four runs on 2026-08-17
   with no code change between them. It is dominated by three tests that spawn real `node`
   subprocesses (`EXEC-14/PROV-09` alone ranged 3.5s-29.3s), so it tracks machine load, not the
-  suite. The 2220 proof leaves are milliseconds each. Was 2242
-  before the two standing gates below were added.
-- **2220 project-local proof leaves** — the only stable count:
+  suite. The 2863 proof leaves are milliseconds each. This pair read 2253/2220 until
+  2026-08-19 — figures from before the Tier-B forms landed, and stale on `develop` and on the
+  feature branch alike, which is what an ungated number does.
+- **2863 project-local proof leaves** — the only stable count:
   `npm test 2>&1 | grep -c '^✔ import("./fjs/'`
 - Requirements: **120 defined, 120 complete, 0 open**
 
@@ -148,18 +166,27 @@ pinned to `node --test *.test.js` and why earlier versions of this file reported
 
 ## Known gaps
 
-Nothing here is an open requirement, and **nothing left open is fixable in this repository.**
-`fjs/todo/` holds five files. Three are satisfied specs kept in their original present tense, each
-with a corrected status line on top — deleting them would lose the ability to check a spec against
-the thing that satisfied it. The other two are upstream, and both are filed upstream:
+Nothing here is an open requirement. `fjs/todo/` holds **seven** files. Three are satisfied specs
+kept in their original present tense, each with a corrected status line on top — deleting them
+would lose the ability to check a spec against the thing that satisfied it. Two are upstream, and
+both are filed upstream. **Two are this repository's own, and both are sized rather than open
+questions** — this section said "nothing left open is fixable in this repository" while `develop`
+carried five files, and the Tier-B forms brought two more with them:
 
-1. **`upstream-node-spawn-effect.md`** — `fjs/effects/node` has an `Exec` effect but no long-lived
+1. **`tax-return-report-source-route-lines-unexercised.md`** — eight of the stored program's
+   twenty-eight route lines are EXECUTED against the real stored bytes; twenty are covered by a
+   `String.includes` of the dialect tag, which cannot see a line that is present and wrong. The
+   note carries the recipe and the measured cost per remaining line.
+2. **`stored-but-unread-field-sweep.md`** — the standing gate over the stored-but-unread money
+   box: `fjs/document/unread_registry` names every field a document stores and no form reads,
+   and the note carries the partition.
+3. **`upstream-node-spawn-effect.md`** — `fjs/effects/node` has an `Exec` effect but no long-lived
    `Spawn`. 0.46's error channel makes the shape expressible (`CreateServer`/`Listen` already thread
    an opaque `Nominal` host handle, which is the precedent), so the old "wait for a second caller"
    deferral is retired. Filed as `functionalscript#1649`. The note's own sketch does not type-check
    at 0.46.1 — every operation must return a `Result` — and the corrected five-operation design is
    in the issue.
-2. **`upstream-cas-get-uri-discloses-host-path.md`** — `cas_get` puts the blob's **absolute host
+4. **`upstream-cas-get-uri-discloses-host-path.md`** — `cas_get` puts the blob's **absolute host
    path** in its `uri` field, unconditionally: one call reveals the home directory, the account name
    and the store layout. Verified by execution. A design decision on a public protocol surface, so
    it is filed as `functionalscript#1650` and left to the maintainer. Latent rather than live —

@@ -132,7 +132,7 @@ const validateShape = rttiValidate(oneZeroNineNineGSchema)
  * `box3RefundTaxYear` (a year) and `box8TradeOrBusinessIncome` (a checkbox)
  * are deliberately absent — they are not dollar amounts.
  */
-const moneyBoxFields = /** @type {const} */ ([
+export const moneyBoxFields = /** @type {const} */ ([
     'box1UnemploymentCompensation',
     'box2StateOrLocalIncomeTaxRefunds',
     'box4FederalIncomeTaxWithheld',
@@ -149,7 +149,7 @@ const moneyBoxFields = /** @type {const} */ ([
  * proof walk the identical list — `fjs/document/w2`'s `stateLocalMoneyFields`
  * precedent, and AGENTS.md's "one rule, one place".
  */
-const stateMoneyFields = /** @type {const} */ ([
+export const stateMoneyFields = /** @type {const} */ ([
     'stateIncomeTaxWithheld',
 ])
 
@@ -170,10 +170,15 @@ const stateMoneyFields = /** @type {const} */ ([
  */
 const unmodeledMoneyBoxes = /** @type {const} */ ([
     ['box2StateOrLocalIncomeTaxRefunds', 'Schedule 1 line 1 (taxable state/local income tax refunds), which depends on whether the taxpayer itemized in the PRIOR year — this engine models one tax year and holds no prior-year return'],
-    ['box5RtaaPayments', "Schedule 1 line 8's collapsed other-income block, which no dialect can attribute an amount to"],
-    ['box6TaxableGrants', "Schedule 1 line 8's collapsed other-income block, which no dialect can attribute an amount to"],
+    // These three named "Schedule 1 line 8's collapsed other-income block,
+    // which no dialect can attribute an amount to" until 2026-08-18, when that
+    // block was split into twenty-eight kinds and the sentence stopped being
+    // true: line 8z's RTAA payments now have a kind of their own, and this
+    // dialect is the thing that would attribute the amount to it.
+    ['box5RtaaPayments', 'Schedule 1 line 8z as a reemployment trade adjustment assistance payment (the `reemploymentTradeAdjustmentAssistance` kind), which no computation carries there yet'],
+    ['box6TaxableGrants', 'Schedule 1 line 8z as other income the printed line does not name (the `otherIncomeNotListed` kind), which is a WRITE-IN no form closes'],
     ['box7AgriculturePayments', 'Schedule F line 4b (taxable agricultural program payments), which this engine does not model'],
-    ['box9MarketGain', "Schedule 1 line 8's collapsed other-income block, which no dialect can attribute an amount to"],
+    ['box9MarketGain', 'the Schedule F reporting of Commodity Credit Corporation loan market gain — the recipient instruction for box 9 says "See the Schedule F (Form 1040) instructions" — which this engine does not model. NOT Schedule 1 line 8, where this row pointed until 2026-08-18'],
 ])
 
 /**

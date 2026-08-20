@@ -106,6 +106,8 @@ export const render = root => {
         iraForms: [],
         nonemployeeCompensationForms: [],
         businessExpenseForms: [],
+        assetRegisters: [],
+        rentalProperties: [],
         priorYearIraBasisForms: [],
         isoExerciseForms: [],
         employeeStockPurchaseForms: [],
@@ -113,6 +115,7 @@ export const render = root => {
         partnershipK1Forms: [],
         sCorporationK1Forms: [],
         estateTrustK1Forms: [],
+        marketplaceStatements: [],
     }
     const withoutElection = { ...withElection, profile: store(profileElecting(false)) }
 

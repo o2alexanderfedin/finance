@@ -189,6 +189,8 @@ export const inputs = {
     iraForms: [],
     nonemployeeCompensationForms: [],
     businessExpenseForms: [],
+    assetRegisters: [],
+    rentalProperties: [],
     priorYearIraBasisForms: [],
     isoExerciseForms: [],
     partnershipK1Forms: [],
@@ -196,6 +198,7 @@ export const inputs = {
     estateTrustK1Forms: [],
     employeeStockPurchaseForms: [],
     basisCorrectionForms: [],
+    marketplaceStatements: [],
 }
 
 /**

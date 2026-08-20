@@ -1315,7 +1315,9 @@ itemizing, which is complete, the eight MAINT items included — MAINT-01 throug
 
       What computes: Part II lines 27-32 from both K-1 dialects, and Part V's line 41, which is
       the destination the requirement names. Line 41 combines printed lines 26, 32, 37, 39 and 40,
-      four of them documented zeros, and reaches **Schedule 1 line 5 → 1040 line 8 through
+      four of them documented zeros **when TAX-35 shipped — TWO today**, because Part III started
+      computing in this same requirement and Part I did later, with `vnd.fjs.rental_property` and
+      `fjs/schedule/e/part_i`. It reaches **Schedule 1 line 5 → 1040 line 8 through
       Schedule 1's own Part I total** rather than by a side channel. The founder's
       self-employment tax is charged or not charged according to the entity: a general partner's
       1065 box 14 code A reaches printed Schedule SE line 2, which names that box in its own

@@ -40,7 +40,7 @@
  * | Printed input | This engine |
  * |---|---|
  * | Step 5 line 1 — 1040 line 1z | LIVE. Equals line 1a, since `householdEmployeeWages` through `nontaxableCombatPayElection` (lines 1b-1i) are all `fjs/return/scope` refusals |
- * | Step 5 line 2 — Medicaid waiver payments on Schedule 1 line 8s | zero: `otherIncome` refuses, and so does `medicaidWaiverPayments` |
+ * | Step 5 line 2 — Medicaid waiver payments on Schedule 1 line 8s | zero: `medicaidWaiverPayments` refuses, and as of the 2026-08-18 split its refusal row names Schedule 1 line 8s outright rather than a coarse `otherIncome` naming the whole block |
  * | Step 5 line 4 — nontaxable combat pay elected in | zero: `nontaxableCombatPayElection` refuses |
  * | Worksheet B line 1a — Schedule SE Part I line 3 | LIVE |
  * | Worksheet B line 1b — Schedule SE lines 4b and 5a | zero: `selfEmploymentOptionalMethods` and `churchEmployeeIncome` refuse |
@@ -122,31 +122,36 @@
  * | 1 — 1040 line 2b | (A) interest includible in gross income | COMPUTED, 1099-INT boxes 1 and 3 |
  * | 2 — 1040 line 2a, plus Form 8814 line 1b | (B) tax-exempt interest | COMPUTED, 1099-INT box 8. Form 8814 is `form8814ChildInterestAndDividends`, a scope refusal |
  * | 3 — 1040 line 3b | (A) dividends includible in gross income | COMPUTED, 1099-DIV box 1a |
- * | 4 — Schedule 1 line 8z from Form 8814 | (A) | zero: `otherIncome` refuses, and so does Form 8814 |
+ * | 4 — Schedule 1 line 8z from Form 8814 | (A) | zero: `otherIncomeNotListed` (line 8z's residual kind, 2026-08-18) refuses, and so does Form 8814 |
  * | 5-7 — 1040 line 7a floored at zero, less Form 4797 line 7 | (D) capital gain net income, §1222(9) | COMPUTED, floored. Form 4797 is `otherGainsOrLosses`, a scope refusal |
  * | 8-10 — Schedule E line 23b royalties, less line 20 | (C) net rent and royalty | see {@link rentAndRoyaltyRefusal} |
  * | 11-13 — passive income less passive losses | (E) net passive income | COMPUTED, see {@link disqualifiedPassiveIncomeCents} |
  *
- * **(C), net rent and royalty income, is the one that REFUSES.** Two gates
- * make a non-zero (C) unreachable through a whole report, and this module
- * refuses on the first of them by name rather than relying on either:
+ * **(C), net rent and royalty income, is the one that REFUSES**, and
+ * {@link rentAndRoyaltyRefusal} is now the ONLY gate rather than the second of
+ * two. That correction is worth writing down rather than quietly editing:
  *
- * - A profile DECLARING `rentalRealEstateAndRoyalties` (Schedule E Part I,
- *   which is where printed line 23b lives), `remicResidualInterest` or
- *   `netFarmRentalIncomeForm4835` is refused whole by `fjs/return/scope`
- *   before any line is computed. {@link rentAndRoyaltyRefusal} says the same
- *   thing one layer in, so a direct caller of this module gets a §32 answer
- *   rather than silence.
- * - A stored Schedule K-1 carrying rent or a royalty is refused at DOCUMENT
- *   VALIDATION: `vnd.fjs.k1_1065`'s `unmodeledMoneyBoxes` refuses a non-zero
- *   `box2NetRentalRealEstateIncome` and `box7Royalties`, `vnd.fjs.k1_1120s`
- *   its `box2NetRentalRealEstateIncome` and `box6Royalties`, and
- *   `vnd.fjs.k1_1041` its `box7NetRentalRealEstateIncome` and
- *   `box8OtherRentalIncome`. So the amount cannot enter through a document
- *   either.
+ * - Until printed Schedule E Part I shipped, a profile declaring
+ *   `rentalRealEstateAndRoyalties` was refused whole by `fjs/return/scope`
+ *   before any line was computed, and this refusal was described here as the
+ *   belt to that brace. **The kind is MODELED now** — `fjs/schedule/e/part_i`
+ *   computes a profitable rental and a royalty — so a return declaring it
+ *   reaches this module, and {@link rentAndRoyaltyRefusal} is what stops the
+ *   earned income credit being computed against a §32(i)(2)(C) component this
+ *   engine cannot form. The refusal is DELIBERATELY left standing in the same
+ *   change that built two of its three inputs: printed lines 23b and 20 now
+ *   exist, and the §32 worksheet's *net rent* is neither of them and is not
+ *   printed line 26 either.
+ * - A stored Schedule K-1 carrying rent or a royalty is still refused at
+ *   DOCUMENT VALIDATION: `vnd.fjs.k1_1065`'s `unmodeledMoneyBoxes` refuses a
+ *   non-zero `box2NetRentalRealEstateIncome` and `box7Royalties`,
+ *   `vnd.fjs.k1_1120s` its `box2NetRentalRealEstateIncome` and
+ *   `box6Royalties`, and `vnd.fjs.k1_1041` its `box7NetRentalRealEstateIncome`
+ *   and `box8OtherRentalIncome`. So a K-1's rent cannot enter through a
+ *   document either.
  *
- * What remains outside both gates is a taxpayer with rent who declares
- * nothing and stores nothing — which is TAX-16's boundary, the reason
+ * What remains outside both is a taxpayer with rent who declares nothing and
+ * stores nothing — which is TAX-16's boundary, the reason
  * `vnd.fjs.return_profile` exists at all, and not a §32 question.
  *
  * **(E), net passive income, is COMPUTED and is not assumed to be zero.**
@@ -320,22 +325,30 @@ const rentAndRoyaltyKinds = [
  * §32(i)(2)(C)'s refusal — the one disqualified-income component that is not
  * computable, named for what is missing rather than for the schedule.
  *
- * Reached by a DIRECT caller of this module. Through a whole report
- * `fjs/return/scope` refuses these three kinds first, which is why this
- * refusal is checked rather than assumed: a component that is silently zero
+ * `fjs/return/scope` used to refuse all three kinds before a report reached
+ * this module, and this refusal was written as the check that would survive
+ * that upstream refusal being lifted. **It has been**, for
+ * `rentalRealEstateAndRoyalties`, and this function is now the only thing
+ * standing between a landlord and an earned income credit computed against a
+ * disqualified-income component that does not exist. Written down as evidence
+ * that the reasoning was worth the trouble: "a component that is silently zero
  * because something upstream happens to refuse is a component nobody can see
- * go wrong when the upstream refusal is lifted.
+ * go wrong when the upstream refusal is lifted".
  * @type {(kind: string) => EarnedIncomeCreditRefusal}
  */
 export const rentAndRoyaltyRefusal = kind => ({
     kind: 'error',
     message: `1040 line 27a: the return declares ${kind}, so §32(i)(2)(C) — the excess of gross `
         + 'income from rents or royalties not derived in the ordinary course of a trade or '
-        + 'business over the deductions allocable to it — is not computable. That figure comes '
-        + 'off Schedule E Part I lines 4, 20 and 23b, which this engine does not model, and '
-        + '§32(i)(1) denies the earned income credit OUTRIGHT above $11,950 of disqualified '
-        + 'income. Refusing rather than under-approximating the disqualifier and granting the '
-        + 'credit to someone ineligible',
+        + 'business over the deductions allocable to it — is not computable. Printed Schedule E '
+        + 'Part I lines 4, 20 and 23b now COMPUTE (fjs/schedule/e/part_i), and this component '
+        + 'is still not one of them: the §32 worksheet asks for the NET rent as well as the '
+        + 'royalty, and "not derived in the ordinary course of a trade or business" is a '
+        + 'determination about each property that no line of Part I makes — printed line 26 is '
+        + 'the whole of Part I, trade-or-business rents included, and is not the figure §32 '
+        + 'wants. §32(i)(1) denies the earned income credit OUTRIGHT above $11,950 of '
+        + 'disqualified income, so refusing beats under-approximating the disqualifier and '
+        + 'granting the credit to someone ineligible',
 })
 
 /**
@@ -1195,6 +1208,11 @@ export const proof = {
         // §32(i)(2)(C) refuses by name, for each of the three declarable kinds
         // that could carry rent or royalty income.
         rentAndRoyaltyRefusesByName: () => {
+            // `rentalRealEstateAndRoyalties` is a MODELED kind now, so this
+            // loop is the whole of what stops the earned income credit being
+            // computed for a landlord — `fjs/return/scope` no longer refuses
+            // it first, and this leaf is therefore load-bearing in a way it
+            // was not when it was written.
             for (const kind of ['rentalRealEstateAndRoyalties', 'remicResidualInterest', 'netFarmRentalIncomeForm4835']) {
                 const message = refusalOf(wageEarner({
                     ...oneChildProfile, declaredKinds: ['wages', 'earnedIncomeCredit', kind],
