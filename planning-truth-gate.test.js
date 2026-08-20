@@ -316,6 +316,76 @@ const citingSources = () => [
 /** Measured 2026-08-19: 171. A floor, so a broken walk cannot pass silently. */
 const minimumCitingSourceCount = 150
 
+/**
+ * A phase report states its status TWICE: once in frontmatter (`status:
+ * passed`) and once in the body (`**Status:** passed`). Two statements of one
+ * fact, in one file, and nothing compared them -- the same shape as
+ * REQUIREMENTS.md's checkbox-versus-table drift this file already watches.
+ *
+ * It is not hypothetical. On 2026-08-20 two reports were found disagreeing
+ * with themselves:
+ *
+ * - `13-VERIFICATION.md` -- frontmatter `passed` (updated when the manual-only
+ *   item was discharged on 2026-08-17), body `human_needed` (never touched).
+ *   Both true on their own day; both in the file at once for three days.
+ * - `20-VERIFICATION.md` -- `gaps_found` in both places while the gap had been
+ *   closed by `1697896` on the day the report was written.
+ *
+ * And then, while fixing exactly that, the fix updated 20's frontmatter and
+ * left its body -- **recreating the defect inside the commit that repaired
+ * it**. A one-off scan caught that, which is the whole argument for making the
+ * scan a standing check instead of something someone remembers to run.
+ *
+ * The body form is compared on its FIRST WORD only: a body status is allowed
+ * to carry an explanation after it (`passed -- 6 of 6 criteria met, ...`) and
+ * routinely does. The frontmatter form carries no prose.
+ */
+const statusPairs = () => readTree(planningDir, name => name.endsWith('.md'))
+    .flatMap(({ name, text }) => {
+        if (!text.startsWith('---')) { return [] }
+        const end = text.indexOf('\n---', 3)
+        if (end === -1) { return [] }
+        const front = text.slice(0, end)
+        const body = text.slice(end)
+        const declared = /^status: *(\S+)/m.exec(front)
+        const stated = /^\*\*Status:\*\* *([A-Za-z_]+)/m.exec(body)
+        return declared === null || stated === null
+            ? []
+            : [{ name, declared: declared[1].replace(/["']/g, ''), stated: stated[1] }]
+    })
+
+/** Measured 2026-08-20: 18. A floor, so a broken walk cannot pass silently. */
+const minimumStatusPairCount = 12
+
+test('no phase report disagrees with itself about its own status', () => {
+    const pairs = statusPairs()
+    assert.ok(pairs.length >= minimumStatusPairCount,
+        `found ${pairs.length} frontmatter/body status pairs, expected at least ${minimumStatusPairCount}`)
+    const disagreeing = pairs.filter(({ declared, stated }) => declared !== stated)
+    assert.deepEqual(disagreeing, [],
+        'a report whose frontmatter and body state different statuses; the newer edit updated one and not the other')
+})
+
+test('positive control: a report disagreeing with itself IS detected', () => {
+    // Built by concatenation rather than written literally, for the reason
+    // `citingSources()` gives: this file is inside its own scanned set.
+    const front = ['---', 'phase: 99-synthetic', 'sta' + 'tus: passed', '---'].join('\n')
+    const body = ['', '# Synthetic', '', '**Sta' + 'tus:** human_needed', ''].join('\n')
+    const text = front + body
+    const end = text.indexOf('\n---', 3)
+    assert.notEqual(end, -1)
+    assert.equal(/^status: *(\S+)/m.exec(text.slice(0, end))[1], 'passed')
+    assert.equal(/^\*\*Status:\*\* *([A-Za-z_]+)/m.exec(text.slice(end))[1], 'human_needed')
+})
+
+test('negative control: an explanation after the body status is not a disagreement', () => {
+    // `20-VERIFICATION.md` carries exactly this shape, and a whole-line
+    // comparison would read it as a mismatch against a bare `passed`.
+    const stated = /^\*\*Status:\*\* *([A-Za-z_]+)/m.exec(
+        '\n**Status:** passed -- 6 of 6 criteria met. Read `gaps_found` until 2026-08-20.\n')
+    assert.equal(stated[1], 'passed')
+})
+
 test('every requirement is traced somewhere, and every traced ID has a body', () => {
     const { body, traced } = parseRequirements()
     assert.ok(body.size > 0, 'no requirements parsed -- the body pattern has drifted')
