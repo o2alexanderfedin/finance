@@ -1900,7 +1900,7 @@ them. Week 0 is research's addition in front of the plan's Week 1.
 | EXEC-10 | T1 | Phase 7 - `fjs_run` and Run Records | Week 1 | Complete |
 | EXEC-11 | T1 | Phase 7 - `fjs_run` and Run Records | Week 1 | Complete |
 | EXEC-12 | T1 | Phase 7 - `fjs_run` and Run Records | Week 1 | Complete |
-| EXEC-13 | T2 | Phase 19 - Reproducibility and Report Provenance | Week 4 | Complete |
+| EXEC-13 | T2 | Phase 19 - Reproducibility and Report Provenance | Week 4 | Complete — SCOPE-BOUNDED: the `pinned` mark and its predicate are real and proven; NO production path gates on it, and none can until Phase 14's acceptance exists. Read the body note before citing this row. |
 | DOC-00 | T0 | Phase 5 - Document Base and First Dialects | Week 1 | Complete |
 | DOC-01 | T0 | Phase 5 - Document Base and First Dialects | Week 1 | Complete |
 | DOC-02 | T0 | Phase 2 - Server Skeleton and Registration | Week 0 | Done |
