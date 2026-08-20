@@ -741,6 +741,47 @@ const dependentEntrySchema = /** @type {const} */ ({
 })
 
 /**
+ * The largest `ageAtYearEnd` a {@link dependentEntrySchema} entry may carry,
+ * enforced by check 11 in {@link checkReferences}.
+ *
+ * A named constant rather than a literal in the comparison, for the reason
+ * `fjs/document/rental_property`'s `daysInTheLongestYear` gives: the
+ * refusal quotes the bound, so the bound must be written once.
+ *
+ * ## Why 150, and why a bound at all
+ *
+ * The FLOOR is the interesting half and it is not arguable: a child born on
+ * 31 December is `0` at year end, and no dependent is `-1`. Both consumers
+ * compare against a threshold with `<` (`fjs/form8812`'s "under 17",
+ * `fjs/schedule/eic`'s §152(c)(3) 19 and 24), so a negative age is *counted
+ * as a child* — the expensive direction — and a fraction decides those
+ * comparisons on a number that is not an age. Measured on this tree before
+ * this check existed: a single dependent stored at `ageAtYearEnd: 16.999999`
+ * takes Schedule 8812 line 14 to $2,200.00, and `17` takes it to $500.00.
+ * $1,700 turned on a fourth decimal place of a whole-number field.
+ *
+ * The CEILING is the one that could do harm if chosen badly, because a
+ * dependent is not necessarily a child: §152(d)'s qualifying relative has no
+ * age test at all, so a filer supporting a parent or a grandparent stores a
+ * real age in the nineties here. AGENTS.md — **"a check that fails when
+ * everything is well is worse than no check"** — and the same trade the
+ * rental-property author made picking 366 in EVERY year rather than 365 in
+ * most: admitting an impossible value in the far tail costs nothing, and
+ * refusing a legitimate one costs a return.
+ *
+ * So the ceiling is set far past any human lifetime rather than at one. 150
+ * clears the oldest verified human on record (Jeanne Calment, 122) by 28
+ * years, and it is above the largest age this dialect could ever be asked to
+ * carry for any other reason. Nothing in the engine reads the region above
+ * 24 differently from the region below 150 — every consumer branch is at 17,
+ * 19 or 24 — so the ceiling decides no money at any input. Its whole job is
+ * to catch a transcription that is not an age: a tax year typed into the age
+ * box (`2025`), an age in months (`204`), or an overflowed double (`1e308`).
+ * @type {number}
+ */
+export const oldestPlausibleDependentAge = 150
+
+/**
  * The FROZEN vocabularies for §32's ten asserted facts — five per dependent
  * on {@link dependentEntrySchema} and five about the filer on
  * {@link returnProfileSchema}.
@@ -1236,7 +1277,21 @@ const statusesWithoutSpouseBoxes = ['single', 'headOfHousehold', 'qualifyingSurv
  * 5b. Married filing separately's spouse boxes require the footnote condition.
  * 6. Every PRESENT money box is an exact decimal string at the cents scale.
  * 7. A present line-26 amount has `'estimatedTaxPayments'` declared.
+ * 7b. The identical rule for Schedule 3 line 10's own amount.
  * 8. A present `dependents` array's length equals `dependentCount`.
+ * 9. Every PRESENT §32 fact — five on the filer, five per dependent — names a
+ *    value {@link earnedIncomeCreditVocabularies} admits.
+ * 10. A PRESENT `federalPovertyLineTable` names one of Form 8962 line 4's
+ *    three prints.
+ * 11. Every dependent's `ageAtYearEnd` is a whole number in
+ *    `0 .. {@link oldestPlausibleDependentAge}`.
+ *
+ * This list enumerated 1–8 only, omitting 7b, 9 and 10, from the day check 7b
+ * landed until 2026-08-19 — the same documentation drift the leaf-name sweep
+ * has now found nine times. The body is the authority; a reader who trusted
+ * this list would have concluded that a present §32 fact and a present
+ * poverty-line table were unchecked, which is the direction that costs
+ * something.
  *
  * Nothing here throws: every refusal is an `error(...)` the caller unwraps, so
  * a hostile blob can never escape `validate` as an exception.
@@ -1387,6 +1442,34 @@ export const checkReferences = r => {
             + `is not one of the ${federalPovertyLineTableNames.length} tables Form 8962 line 4 `
             + `prints: ${federalPovertyLineTableNames.join(', ')}`,
         )
+    }
+    // 11 — every dependent's age is a whole number of years in range. See
+    // {@link oldestPlausibleDependentAge} for the bound and for the $1,700
+    // this check was measured to be worth.
+    //
+    // ONE field, so ONE statement inside the loop that already exists for
+    // every per-dependent check — deliberately NOT the `[name, value]` table
+    // `moneyBoxFields` and `fjs/document/rental_property`'s two day counts
+    // use. That device pays when a rule is written more than once; a table of
+    // one is the check-7b judgement in the other direction. The loop over
+    // `dependents` IS the DRY device here.
+    //
+    // Appended rather than inserted beside check 8, where it belongs by
+    // subject: these numbers are cited from this module's docstrings and
+    // from its proof leaf names, and renumbering 9 and 10 to make room would
+    // break those citations for nothing a reader gains.
+    for (const [index, entry] of (r.dependents ?? []).entries()) {
+        const age = entry.ageAtYearEnd
+        if (!Number.isInteger(age) || age < 0 || age > oldestPlausibleDependentAge) {
+            return error(
+                `dependents[${index}]: ageAtYearEnd ${age} is not a whole number of years in `
+                + `0..${oldestPlausibleDependentAge} — Schedule 8812 line 4 splits the $2,000 `
+                + `child tax credit from the $500 other-dependent credit on "under age 17", and `
+                + `§152(c)(3) tests 19 and 24 for the earned income credit, so a fractional or `
+                + `out-of-range age would decide those comparisons on a number that is not an `
+                + `age at all`,
+            )
+        }
     }
     return ok(r)
 }
@@ -1761,6 +1844,109 @@ export const proof = {
             fractionalRefused: () => {
                 const [t] = validate({ ...minimal, dependentCount: 1.5 })
                 assertEq(t, 'error')
+            },
+        },
+        /**
+         * Check 11. `ageAtYearEnd` was a required, entirely unvalidated
+         * `number` on {@link dependentEntrySchema} until 2026-08-19: `-3`,
+         * `9.5` and `1e308` all validated `ok`, and every one of them then
+         * decided a credit. Measured on the tree immediately before the check
+         * landed, one dependent and a $50,000 AGI: `ageAtYearEnd: 16.999999`
+         * takes Schedule 8812 line 14 to $2,200.00 and `17` takes it to
+         * $500.00.
+         *
+         * Every bound below is HAND-TYPED, not read from
+         * {@link oldestPlausibleDependentAge} — a fixture derived from the
+         * constant under test moves with it and can never notice it moving,
+         * which is the Phase 10 defect AGENTS.md records.
+         */
+        dependentAge: {
+            /** The floor, the ceiling, and one step outside each. */
+            theBoundariesRefuse: () => {
+                for (const age of [-1, 151]) {
+                    const [t, v] = validate({
+                        ...minimal,
+                        dependentCount: 1,
+                        dependents: [{ relationship: 'daughter', ageAtYearEnd: age }],
+                    })
+                    assertEq(t, 'error', ['expected an out-of-range age to be refused', age, v])
+                    assert(typeof v === 'string', ['expected a semantic string refusal', age, v])
+                    assert(v.includes('ageAtYearEnd'), ['expected the field named', age, v])
+                    assert(v.includes(String(age)), ['expected the offending VALUE quoted', age, v])
+                }
+            },
+            /**
+             * The control, and the half of this leaf that makes the one above
+             * mean something: a gate that refuses everything passes a refusal
+             * proof. `0` is a child born on 31 December; `150` is the bound
+             * itself and is INCLUSIVE; `122` is the oldest verified human
+             * lifetime and must never be refused — a §152(d) qualifying
+             * relative has no age test.
+             */
+            theBoundariesThemselvesAreLegitimate: () => {
+                for (const age of [0, 17, 122, 150]) {
+                    const [t, v] = validate({
+                        ...minimal,
+                        dependentCount: 1,
+                        dependents: [{ relationship: 'mother', ageAtYearEnd: age }],
+                    })
+                    assertEq(t, 'ok', ['expected a legitimate age to validate', age, v])
+                }
+            },
+            /**
+             * A fraction is the dangerous input, because it lands on the
+             * RIGHT side of every consumer's threshold while not being an
+             * age: `16.999999 < 17` is true, so Schedule 8812 pays the child
+             * tax credit on it.
+             */
+            aFractionalAgeRefusesEvenInsideTheRange: () => {
+                for (const age of [9.5, 16.999999, -0.0001]) {
+                    const [t, v] = validate({
+                        ...minimal,
+                        dependentCount: 1,
+                        dependents: [{ relationship: 'daughter', ageAtYearEnd: age }],
+                    })
+                    assertEq(t, 'error', ['expected a fractional age to be refused', age, v])
+                    assert(typeof v === 'string', ['expected a semantic string refusal', age, v])
+                    assert(v.includes(String(age)), ['expected the offending VALUE quoted', age, v])
+                }
+            },
+            /**
+             * On a multi-dependent return the refusal must say WHICH
+             * dependent, the same reason check 9 names its index: a filer
+             * with three children cannot act on "an age is wrong".
+             */
+            theRefusalNamesWhichDependent: () => {
+                const [t, v] = validate({
+                    ...minimal,
+                    dependentCount: 3,
+                    dependents: [
+                        { relationship: 'daughter', ageAtYearEnd: 10 },
+                        { relationship: 'son', ageAtYearEnd: 12 },
+                        { relationship: 'son', ageAtYearEnd: 2025 },
+                    ],
+                })
+                assertEq(t, 'error')
+                assert(typeof v === 'string', ['expected a semantic string refusal', v])
+                assert(v.includes('dependents[2]'), ['expected the offending INDEX named', v])
+                assert(v.includes('2025'), ['expected the offending VALUE quoted', v])
+            },
+            /**
+             * The refusal must say what the number was supposed to be, not
+             * merely that it was wrong. AGENTS.md, on the `${destination}`
+             * mutation that survived a whole suite: assert the part of a
+             * message that carries the information.
+             */
+            theRefusalQuotesTheRangeAndWhyItMatters: () => {
+                const [, v] = validate({
+                    ...minimal,
+                    dependentCount: 1,
+                    dependents: [{ relationship: 'daughter', ageAtYearEnd: 151 }],
+                })
+                assert(typeof v === 'string', ['expected a semantic string refusal', v])
+                assert(v.includes('0..150'), ['expected the permitted RANGE quoted', v])
+                assert(v.includes('17'), ['expected the 8812 threshold the age decides named', v])
+                assert(v.includes('152(c)(3)'), ['expected the EIC authority named', v])
             },
         },
         declaredKinds: {
