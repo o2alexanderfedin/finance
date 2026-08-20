@@ -16,7 +16,8 @@ findings:
   warning: 3
   info: 1
   total: 4
-status: issues_found
+status: resolved
+resolved: 2026-08-20 — all four findings verified closed against the current source
 ---
 
 # Phase 11: Code Review Report
@@ -24,7 +25,7 @@ status: issues_found
 **Reviewed:** 2026-08-07
 **Depth:** standard
 **Files Reviewed:** 7
-**Status:** issues_found
+**Status:** resolved — all four closed, re-verified 2026-08-20 (see the end of this report)
 
 ## Summary
 
@@ -185,3 +186,22 @@ sentinel.
 _Reviewed: 2026-08-07_
 _Reviewer: Claude (gsd-code-reviewer)_
 _Depth: standard_
+
+---
+
+## Re-verified 2026-08-20 — every finding checked against the code, not against a later document
+
+This report kept `issues_found` long after the code stopped matching it. Each finding below was
+re-checked by reading the current source; a planning document claiming a fix was never accepted as
+evidence for one.
+
+| ID | Disposition | Evidence |
+|---|---|---|
+| WR-01 | **CLOSED** | `fjs/server/fjs_run/snapshot/module.f.js:311` — `headHashes.filter(h => state.archivedHashes[h] !== true)`. An explicit `archivedHashes` record replaced the absence-from-`revisions` inference. Guarded by `undecodableHeadStaysObservable` (`:689`), confirmed to RUN, not merely to exist. |
+| WR-02 | **CLOSED** | `fjs/document/ssa1099/module.f.js:127-128` refuses a non-empty `payerTin`, first statement in `checkReferences`; control leaf `nonEmptyPayerTinRejected` (`:279`). |
+| WR-03 | **CLOSED** | `fjs-run-integration.test.js:351-354` — the `.some(...)` became the prescribed `.every(... .some(...))`. Cited at `306-320` in this report; the assertion has since moved. |
+| IN-01 | **CLOSED** | `fjs/server/finance_documents_list/module.f.js:45-47` documents both cases and `:434`'s `wrongTypeDialectFieldUsesSentinel` proves the mistyped one. The fix offered either/or; the code did both. |
+
+**One thing this re-verification found that the findings did not:** this report's own line-number
+citations have drifted as the files grew — WR-03's `306-320` is now `351-354`. A coordinate in a
+report is a claim about a file at one moment, and nothing re-checks it.

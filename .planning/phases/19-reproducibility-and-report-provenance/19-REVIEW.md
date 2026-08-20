@@ -19,7 +19,8 @@ findings:
   warning: 4
   info: 2
   total: 6
-status: issues_found
+status: partially_resolved
+resolved: 2026-08-20 — 5 of 6 closed; IN-01 is blocked on a second tax year existing
 ---
 
 # Phase 19: Code Review Report
@@ -29,7 +30,7 @@ status: issues_found
 **Files Reviewed:** 10 (every file in `git diff e191d75..HEAD --stat` except the four
 `*-SUMMARY.md`/`ROADMAP.md`/`REQUIREMENTS.md` planning artifacts, which were read for
 cross-reference but excluded from primary scope per this review's own rules)
-**Status:** issues_found
+**Status:** partially_resolved — 5 of 6 closed, re-verified 2026-08-20 (see the end of this report)
 
 ## Summary
 
@@ -258,3 +259,20 @@ file — per AGENTS.md's own snapshot-copy recipe for exactly this situation.
 _Reviewed: 2026-08-12T16:56:19Z_
 _Reviewer: Claude (gsd-code-reviewer)_
 _Depth: deep_
+
+---
+
+## Re-verified 2026-08-20 — every finding checked against the code, not against a later document
+
+This report kept `issues_found` long after the code stopped matching it. Each finding below was
+re-checked by reading the current source; a planning document claiming a fix was never accepted as
+evidence for one.
+
+| ID | Disposition | Evidence |
+|---|---|---|
+| WR-01 | **CLOSED 2026-08-20 — by disclosure, and the last piece landed today** | The code-level fact is unchanged and deliberate: `pinned` still has no production consumer (`fjs/report/provenance/module.f.js:112` and tests only). What this finding actually asked for was that the checkbox stop implying otherwise, and `.planning/REQUIREMENTS.md:191-213` says so at length. **The residual this re-verification found:** the traceability row at `:1903` still read a bare `Complete`, with no pointer to that block — so a reader arriving through the table met exactly the misreading WR-01 predicted. The row now carries `SCOPE-BOUNDED` and sends the reader to the body note. |
+| WR-02 | **CLOSED** | `fjs/report/provenance/module.f.js:69` — *"The serialization is source-order, NOT canonical — do not call it that"*, with `:86` forbidding the word's return. |
+| WR-03 | **CLOSED** | `fjs-run-integration.test.js` is fourteen entry points, not one block; the split is recorded at `:212`. Verified by experiment rather than by reading node:test's docs — two failing sibling subtests report BOTH failures. |
+| WR-04 | **CLOSED** | `19-VALIDATION.md:4-6` — `status: complete`, `nyquist_compliant: true`, `wave_0_complete: true`; every Sign-Off box ticked (`:147-155`); `:157` records the approval. |
+| IN-02 | **CLOSED** | `fjs/server/fjs_run/snapshot/module.f.js:333` reads `pin.parents`. The finding was a point-in-time observation of a concurrent `npm test` mutating the file live; the working tree is clean. |
+| IN-01 | **STILL OPEN — manual, blocked** | `fjs/tax/params/module.f.js:3848` still asserts `Object.keys(taxParamsByYear).length === 1`. The literal two-real-years test cannot be written until a second year exists, and inventing parameter data would prove the test, not the property. Softening, not closing: Phase 21 made `taxYear` the FIRST member of `TaxParamSet` (`:3446-3452`), so two years can no longer hash identically by construction — which is stronger than the row's claim in one direction and silent in the other. |

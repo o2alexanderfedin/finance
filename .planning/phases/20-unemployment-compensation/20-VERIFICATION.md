@@ -1,15 +1,17 @@
 ---
 phase: 20-unemployment-compensation
 verified: 2026-08-15T00:00:00Z
-status: gaps_found
-score: 5/6 success criteria met
+status: passed
+score: 6/6 success criteria met — the one gap was closed by 1697896 on 2026-08-15 and
+  by 73f18ca on 2026-08-19; re-verified by mutation on 2026-08-20 (see "Gap closed" below).
+  This file read `gaps_found` for five days after the commit that closed it.
 overrides_applied: 0
 retrofit: true
 code_commit: 8d00990
 suite_baseline: "tests 6384, pass 6384, fail 0, exit 0; 951 unique project-local proof leaves"
 gaps:
   - truth: "Criterion 4 — boxes 2, 5, 6, 7 and 9 are refused by name, NAMING THE DESTINATION LINE, when present and non-zero"
-    status: partial
+    status: closed 2026-08-20 — see "Gap closed" at the end of this report
     reason: >-
       The refusal itself, the by-name half, the accepted-when-zero control and box 11's
       exclusion are all real and all mutation-confirmed by this verifier. The
@@ -77,7 +79,9 @@ human_verification:
 withholding reaches line 25b, and every box this engine cannot compute is refused by name
 rather than silently dropped.
 **Verified:** 2026-08-15
-**Status:** gaps_found — 5 of 6 criteria met, 1 partial
+**Status:** passed — 6 of 6 criteria met. Read `gaps_found — 5 of 6, 1 partial` from 2026-08-15
+until 2026-08-20; the gap was closed by `1697896` on the day this report was written and the
+record was never re-read. See "Gap closed" at the end.
 **Re-verification:** No — initial verification
 **Phase type:** Retrofit. The code shipped 2026-08-14 in `8d00990` with no PLAN, SUMMARY,
 CONTEXT, VALIDATION, PATTERNS or code review. Their absence is the premise of the phase and
@@ -474,3 +478,54 @@ This also aligns the dialect with REQUIREMENTS.md's Out-of-Scope entry for state
 *"store W-2 boxes 15-20 faithfully, compute nothing"* — which is now what the 1099-G does too.
 
 **Suite after both fixes: `npm test` 6394/6394, exit 0, `tsc` clean.**
+
+---
+
+## Gap closed — verified 2026-08-20 by execution, not by reading the fix commit
+
+This report carried `status: gaps_found` for five days after the commit that closed it, and
+five more after the second half went away on its own. **The record was stale, not the code.**
+Both halves of the one partial criterion are now closed, and each was checked the way the
+original gap was found — by mutation, not by reading.
+
+### Half 1 — the destination is now observed
+
+`1697896` (2026-08-15, *"fix(1099g): close the gaps Phase 20's verification found"*) added the
+missing assertion. `fjs/document/1099g/module.f.js:326`:
+
+```js
+assert(typeof v === 'string' && v.includes(destination), [field, destination, v])
+```
+
+**Re-run of the exact mutation that survived here on 2026-08-15** — `${destination}` →
+`${destination.slice(0, 0)}` at `module.f.js:252`:
+
+| Then (this report) | Now |
+|---|---|
+| `6384/6384`, exit 0 — **survived** | `3244/3247`, **3 leaves red** |
+
+The three: `box2StateOrLocalIncomeTaxRefundsIsRefusedWhenNonZero`,
+`box5RtaaPaymentsIsRefusedWhenNonZero`, `box6TaxableGrantsIsRefusedWhenNonZero`. Production
+restored byte-identically; `git status --porcelain` empty afterwards.
+
+### Half 2 — box 7 no longer names a form, because it is no longer refused
+
+The second artifact was box 7's destination naming *"Schedule F, which this engine does not
+model"* — a form where every sibling names a line. That sentence stopped being true on
+2026-08-19: `73f18ca` wired Schedule F, and boxes 7 and 9 moved from refused to **read**.
+`fjs/document/unread_registry/module.f.js:241`:
+
+> `[oneZeroNineNineGDialect, 'box7AgriculturePayments', 'read', 'Schedule F line 4a -> line 4b -> line 9 -> line 34 -> Schedule 1 line 6 …']`
+
+`unmodeledMoneyBoxes` now holds three entries, not five, and each names a line. The remedy this
+report asked for — *"either a destination for box 7 that names a line, or a note that Schedule F
+has no single destination line"* — was overtaken by the third possibility neither option
+anticipated: **the engine learned to compute it.**
+
+### What this file itself demonstrates
+
+The report that discovered "true of the code, observed by nothing" then sat for five days
+asserting a gap that was already closed — *true when written, false afterwards, and nothing
+re-read it*. A verification record is a claim with a timestamp, and this repository's standing
+rule applies to it as much as to a count: **derive the status, do not read it.**
+

@@ -35,8 +35,13 @@ human_verification:
 dependents that itemizes is no longer missing anything it is required to have.
 
 **Verified:** 2026-08-11
-**Status:** human_needed
-**Re-verification:** No — initial verification
+**Re-verified:** 2026-08-17
+**Status:** passed — the manual-only item was DISCHARGED on 2026-08-17 against the printed pages
+(frontmatter: `reverified`, `human_verification.result: passed`, `resolved: 2026-08-17` — the
+record lives there and nowhere else in this file, which is part of why the body header went unread).
+This line read `human_needed` until 2026-08-20: the frontmatter was updated at the discharge and
+the body header was not, so the file stated both at once for three days.
+**Re-verification:** Yes — 2026-08-17, on the manual-only item
 
 **Note on ROADMAP `mode: mvp`.** Phase 13's ROADMAP goal text is not written as an "As a ...,
 I want ..., so that ..." user story — it is a structural-completeness goal with five explicit,

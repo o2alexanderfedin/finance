@@ -15,7 +15,8 @@ findings:
   warning: 1
   info: 0
   total: 1
-status: issues_found
+status: resolved
+resolved: 2026-08-20 — the one finding verified closed against the current source
 ---
 
 # Phase 12: Code Review Report
@@ -23,7 +24,7 @@ status: issues_found
 **Reviewed:** 2026-08-07T00:00:00Z
 **Depth:** standard (with targeted mutation verification beyond the standard baseline, per AGENTS.md's "a proof is not known to work until you have watched it fail")
 **Files Reviewed:** 6
-**Status:** issues_found
+**Status:** resolved — closed, re-verified 2026-08-20 (see the end of this report)
 
 ## Summary
 
@@ -118,3 +119,15 @@ this new leaf should match.
 _Reviewed: 2026-08-07T00:00:00Z_
 _Reviewer: Claude (gsd-code-reviewer)_
 _Depth: standard_
+
+---
+
+## Re-verified 2026-08-20 — every finding checked against the code, not against a later document
+
+This report kept `issues_found` long after the code stopped matching it. Each finding below was
+re-checked by reading the current source; a planning document claiming a fix was never accepted as
+evidence for one.
+
+| ID | Disposition | Evidence |
+|---|---|---|
+| WR-01 | **CLOSED** | `fjs/return/profile/module.f.js:2590-2591` — the third checkbox assertion was added to `foreignAccountFields.eachCheckboxRejectsFalse`, with a comment at `:2581-2589` recording why: an `option(true)` → `option(boolean)` widening passed `tsc` **and** the whole suite. The proof leaf was confirmed to run. |
