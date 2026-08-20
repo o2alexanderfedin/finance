@@ -46,6 +46,24 @@ of this file, which is kept only as the record of what was first proposed.**
   it.** That is the same defect this repo's anti-pattern table records as *"a note whose remedy is
   wrong"*.
 
+**Two more, from the second review round (2026-08-20) — both about hanging, and both settled
+upstream in the same commit:**
+
+- **No handle table; brand the child itself.** `asNominal` at mint, `asBase` at recovery, exactly
+  as `createServer` already does (`fjs/effects/node/module.mjs:321`/`:324`). A `Map` from id to
+  `ChildProcess` needs `Map#set` per spawn and a delete per exit path — mutation of shared state,
+  which upstream's `fjs/AGENTS.md` §3.1 forbids by name. The sketch below already used a `Nominal`
+  brand, so this repo's copy was right by accident; the upstream task list was not.
+- **Both hang cases are now specified.** A missing executable is reported by an async `'error'`
+  with **no `'exit'` at all**, so `spawn` races `'spawn'` against that first `'error'` and answers
+  without minting a handle. And a child may exit before anyone waits — a later `'exit'` listener
+  never fires — so `childWait` reads `exitCode`/`signalCode` first and subscribes only when both
+  are `null`. **That is also what makes "no table" work:** the state a cache would have held is
+  already on the child.
+
+  This matters here directly: `cas-refresh-cross-process.test.js` is the caller waiting for this
+  effect, and both hang cases are ones it would hit — a hanging test is worse than a failing one.
+
 ## The gap, precisely
 
 `fjs/effects/node` already has one subprocess primitive — `Exec`:
