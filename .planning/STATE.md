@@ -43,7 +43,7 @@ test total (8533) that a bug fix had already halved.
 | Suite | 2902 tests, 0 fail, `tsc` clean. Wall clock 5-31s and load-dependent — see CAPABILITIES.md; do not quote one number |
 | Project-local proofs | **2823** — the only stable count |
 | MCP surface | 13 tools, protocol `2025-11-25`, `finance-mcp 1.0.0`, 29 dialects |
-| Refusal partition | 195 kinds: 54 modeled, 141 refused, 10 tripwires |
+| Refusal partition | 197 kinds: 54 modeled, 143 refused, 10 tripwires |
 
 Re-derive instead of reading:
 

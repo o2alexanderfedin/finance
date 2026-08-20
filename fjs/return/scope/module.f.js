@@ -814,6 +814,15 @@ export const unmodeledKindRefusals = /** @type {const} */ ([
     { kind: 'nontaxableCombatPayElection', line: '1040 line 1i', label: 'nontaxable combat pay election', remedy: 'no dialect models it (no phase yet)' },
     { kind: 'section1202Gain', line: 'Form 1099-DIV box 2c; Form 6251 line 2h -> Schedule 2 line 2 -> 1040 line 17', label: 'section 1202 gain', remedy: 'requires the §1202 exclusion percentage, which no 1099-DIV box carries. The SAME missing percentage blocks Form 6251 line 2h, which is 7% of the excluded gain as a positive AMT preference — so this one kind names both, rather than Phase 29 inventing a second declaration for one taxpayer fact (no phase yet)' },
     { kind: 'investmentInterestForm4952', line: 'Form 4952 line 4g; Form 6251 line 2c -> Schedule 2 line 2 -> 1040 line 17', label: 'investment interest expense election', remedy: 'requires Form 4952 and the Schedule D Tax Worksheet (TAX-11, Phase 12). The SAME missing form blocks Form 6251 line 2c, which is the difference between the regular-tax and AMT investment interest deductions and needs a SECOND Form 4952 filled in with AMT amounts — so this one kind names both, rather than Phase 29 inventing a second declaration for one taxpayer fact' },
+    // ── Form 6781's two unmodeled halves (TAX-38) ──────────────────────────
+    //
+    // Part I of Form 6781 IS modeled: `fjs/form6781` reads Form 1099-B box 11
+    // and splits it 60/40 under §1256(a)(3) onto Schedule D lines 4 and 11.
+    // These two rows are the rest of the form, and they are separate rows
+    // rather than one because they fail for genuinely different reasons and a
+    // filer can have either without the other.
+    { kind: 'straddleGainsAndLosses', line: 'Form 6781 Parts II and III -> Schedule D lines 4 and 11 -> 1040 line 7a', label: 'gains and losses from straddles', remedy: 'requires per-position records no information return carries: Part II line 10 needs a description of the property, the date entered into or acquired, the date closed out or sold, the gross sales price, the cost or other basis plus expense of sale, AND the unrecognized gain on offsetting positions (column (g)); Part III line 14 needs the fair market value on the last business day of the tax year and the adjusted basis. Form 1099-B reports boxes 8 through 11 in AGGREGATE — its own box 1c instruction says "For aggregate reporting in boxes 8 through 11, no entry will be present" — so no stored document holds a single position. This kind ALSO covers the Form 6781 box A, B and C mixed straddle elections, because a mixed straddle is "any straddle in which at least one but not all of the positions is a section 1256 contract" and so cannot arise without a straddle; checking any of the three moves the §1256 component out of Part I and into Part II, which is exactly what cannot compute (no phase yet)' },
+    { kind: 'netSectionTwelveFiftySixContractsLossCarryback', line: 'Form 6781 box D and line 6 -> Form 1045 or Form 1040-X for three prior years', label: 'net section 1256 contracts loss carryback election', remedy: 'requires the three PRIOR years\u2019 returns: §1212(c) carries the loss back three years, the amount is capped by the gain each carryback year would have reported on Schedule D line 16 taking only §1256 contracts into account, and the election is made by filing an amended Form 6781 AND an amended Schedule D for each of those years. This engine models one tax year and holds no prior-year return. Not electing is the SAFE direction for the current year — the whole loss stays here, flows 60/40 to Schedule D and meets the $3,000/$1,500 cap and the carryforward — so what is refused is the election, never the loss (no phase yet)' },
     // ── Schedule 1 Part I's seven per-line kinds (TAX-30, Phase 27) ─────────
     //
     // `scheduleOneAdditionalIncome` -- one coarse row covering this whole
@@ -2107,9 +2116,26 @@ const everyModeledKindHandTyped = [
  * reason that one composed with the split: the split invented twenty-eight
  * new Schedule 1 line-8 rows and left line 5's five Schedule E parts — added
  * by Phase 30, not by the split — untouched, and TAX-39 moved a Part II row.
+ *
+ * **`141 -> 143` is TAX-38's, and it is the FIRST move since the split that
+ * is not a reclassification.** Form 6781 Part I wired Form 1099-B box 11 onto
+ * Schedule D lines 4 and 11 under §1256(a)(3)'s 60/40 split, and the two rows
+ * that arrive — `straddleGainsAndLosses` and
+ * `netSectionTwelveFiftySixContractsLossCarryback` — name the parts of that
+ * form which still cannot compute. Nothing left this table and nothing joined
+ * {@link modeledKinds}, so the modeled count did not move at all and
+ * `kindVocabulary` itself grew, 195 -> 197.
+ *
+ * That direction is worth distinguishing from the two above rather than
+ * filed alongside them. §1256 contracts had **no kind at all** before that
+ * wiring: a futures trader declared `capitalGainsOrLosses`, which is modeled,
+ * and every part of Form 6781 this engine cannot do fell through the guard in
+ * silence. Adding a refused kind where there was silence RAISES this count
+ * and raises honesty with it — the number going up is not always the wrong
+ * direction, and reading it as one would have argued against the change.
  * @type {number}
  */
-const expectedUnmodeledKindCount = 141
+const expectedUnmodeledKindCount = 143
 
 /**
  * The complete refusal message for a return declaring exactly

@@ -237,6 +237,7 @@ import { dialect as k1SCorporationDialect } from '../../document/k1_1120s/module
 /** @import { K1SCorporation } from '../../document/k1_1120s/module.f.js' */
 /** @import { K1EstateTrust } from '../../document/k1_1041/module.f.js' */
 /** @import { RentalProperty } from '../../document/rental_property/module.f.js' */
+/** @import { OneZeroNineNineB } from '../../document/1099b/module.f.js' */
 
 // ── What a tripwire reads ────────────────────────────────────────────────────
 
@@ -269,6 +270,7 @@ import { dialect as k1SCorporationDialect } from '../../document/k1_1120s/module
  *   readonly sCorporationK1Forms: readonly { readonly value: K1SCorporation }[],
  *   readonly estateTrustK1Forms: readonly { readonly value: K1EstateTrust }[],
  *   readonly rentalProperties: readonly { readonly value: RentalProperty }[],
+ *   readonly brokerageForms: readonly { readonly value: OneZeroNineNineB }[],
  * }} SuppliedDocuments
  */
 
@@ -512,7 +514,12 @@ export const tripwires = [
             + 'require the owner to take into account SEPARATELY, retaining its short-term or '
             + 'long-term character in the owner\'s hands, and it reaches 1040 line 7a through '
             + 'printed Schedule D lines 5 and 12, which are not computed for a return that does '
-            + 'not declare it',
+            + 'not declare it; OR a stored Form 1099-B reports a non-zero box 11 (aggregate '
+            + 'profit or loss on regulated futures, foreign currency or section 1256 option '
+            + 'contracts), which \u00a71256(a)(3) treats as 60% long-term and 40% short-term '
+            + 'capital gain or loss regardless of holding period, and which reaches 1040 line 7a '
+            + 'through Form 6781 lines 8 and 9 and printed Schedule D lines 4 and 11 — likewise '
+            + 'not computed for a return that does not declare it',
         // **The entry TAX-35's routing half could not ship without.** Until
         // that routing, these six boxes REFUSED at storage, so the amount
         // could not reach a return at all and no tripwire was needed. Now
@@ -542,6 +549,34 @@ export const tripwires = [
         // LOSS still requires the declaration -- Schedule D line 21's
         // $3,000 cap is exactly the computation a filer would lose by not
         // declaring.
+        //
+        // **TAX-38 adds the 1099-B box 11 disjunct to THIS row rather than
+        // adding a row.** `theTableIsExactlyTenDistinctTripwires` requires the
+        // kinds to be distinct, and that is the right rule: one kind's
+        // evidence belongs in one place, so a reader who is refused sees every
+        // reason at once instead of two refusals naming the same declaration.
+        // The reasoning is identical to the K-1 half's — `filingScheduleD` is
+        // read off the declared kind, so a futures trader who does not declare
+        // `capitalGainsOrLosses` would run no Schedule D and the whole box 11
+        // aggregate would vanish.
+        //
+        // Box 11 rather than boxes 8, 9 and 10: box 11 is the ONLY one of the
+        // four that reaches a printed line (Form 6781 line 1), and a document
+        // with a non-zero component and a zero aggregate is a real, filed
+        // 1099-B — a trader who closed the year exactly flat — whose Schedule
+        // D contribution is nothing. Firing on the components would refuse
+        // that return for an amount of zero.
+        //
+        // Box 11 rather than box 1d: the box-1 capital-gain path already has
+        // its own coverage through the K-1 half and through `fjs/form8949`'s
+        // own refusals, and the printed form makes the two disjoint —
+        // "This box does not include proceeds from regulated futures contracts
+        // or Section 1256 option contracts."
+        //
+        // A ZERO box 11 does not trigger it and a NEGATIVE one does, for the
+        // same two reasons: a flat year is a real filed form, and a section
+        // 1256 LOSS still needs the declaration before Schedule D line 21's
+        // $3,000 cap can be computed on it.
         triggered: context =>
             context.documents.partnershipK1Forms.some(
                 form => boxIsNonZero(form.value.box8NetShortTermCapitalGain)
@@ -551,7 +586,9 @@ export const tripwires = [
                     || boxIsNonZero(form.value.box8aNetLongTermCapitalGain))
             || context.documents.estateTrustK1Forms.some(
                 form => boxIsNonZero(form.value.box3NetShortTermCapitalGain)
-                    || boxIsNonZero(form.value.box4aNetLongTermCapitalGain)),
+                    || boxIsNonZero(form.value.box4aNetLongTermCapitalGain))
+            || context.documents.brokerageForms.some(
+                form => boxIsNonZero(form.value.box11AggregateProfitOrLoss)),
     },
 ]
 
@@ -663,7 +700,24 @@ const bare1099Nec = {
 const noDocuments = {
     w2s: [], retirementForms: [], nonemployeeCompensationForms: [], isoExerciseForms: [],
     partnershipK1Forms: [], sCorporationK1Forms: [], estateTrustK1Forms: [],
-    rentalProperties: [],
+    rentalProperties: [], brokerageForms: [],
+}
+
+/**
+ * A 1099-B carrying nothing but the fields its schema requires — the base the
+ * section 1256 leaves widen. `sourceArtifactHash` is a real cBase32 hash: this
+ * dialect requires one, and a fixture that could not survive `validate` proves
+ * nothing about a stored document.
+ * @type {OneZeroNineNineB}
+ */
+const bare1099B = {
+    dialect: 'vnd.fjs.1099b',
+    payerTin: '55-5555555',
+    recipientTin: '222-22-2222',
+    accountNumber: '',
+    taxYear: 2025,
+    formRevision: '2025',
+    sourceArtifactHash: 'bhtsw5fzcphk3hqrsyzk5wzp2ktnkkfnc8p8w6ynqxwlfa2vcrfg',
 }
 
 /** A rental property with a real printed line 3. @type {RentalProperty} */
@@ -1583,6 +1637,102 @@ export const proof = {
             }
             assertEq(outcome.unmodeled[0], 'capitalGainsOrLosses', [outcome.unmodeled])
         },
+        // ── TAX-38's disjunct: a 1099-B box 11 -> capitalGainsOrLosses ──
+        //
+        // ★ THE CASE THE FORM 6781 WIRING COULD NOT SHIP WITHOUT. Before that
+        // wiring, box 11 was stored, exactness-checked and read by NOTHING, so
+        // an undeclared futures trader lost the amount either way. After it,
+        // the amount reaches 1040 line 7a -- but only through
+        // `filingScheduleD`, which is read off the DECLARED kind. Without this
+        // disjunct the wiring would have moved the silent drop rather than
+        // closed it.
+        aSectionTwelveFiftySixAggregateUndeclaredRefusesNamingScheduleD: () => {
+            const outcome = classify('single')(['wages'])({
+                ...noDocuments,
+                brokerageForms: [{
+                    value: { ...bare1099B, box11AggregateProfitOrLoss: '43000.00' },
+                }],
+            })
+            assert(outcome.kind === 'error', ['a stored box 11 must refuse when undeclared', outcome])
+            if (outcome.kind !== 'error') {
+                return
+            }
+            assertEq(outcome.unmodeled[0], 'capitalGainsOrLosses', [outcome.unmodeled])
+            assert(outcome.message.includes('Schedule D'), [outcome.message])
+            assert(
+                outcome.message.includes('capital gain'),
+                ['the remedy must say what the amount IS', outcome.message])
+        },
+        // THE CONTROL: declared, it is silent -- stated separately from the
+        // K-1 control above, because a disjunct added to the predicate and
+        // NOT to the declaration check would pass that one and fail this.
+        aDeclaredCapitalGainsOrLossesSilencesTheSectionTwelveFiftySixHalfToo: () => {
+            const outcome = classify('single')(['wages', 'capitalGainsOrLosses'])({
+                ...noDocuments,
+                brokerageForms: [{
+                    value: { ...bare1099B, box11AggregateProfitOrLoss: '43000.00' },
+                }],
+            })
+            assertEq(outcome.kind, 'ok', ['a declared kind must not trip its own tripwire', outcome])
+        },
+        // THE SECOND CONTROL, and the reason the predicate reads box 11 and
+        // not boxes 8, 9 and 10: a trader who closed the year exactly flat
+        // files a real 1099-B whose components are non-zero and whose
+        // AGGREGATE is zero. Their Schedule D contribution is nothing, so
+        // refusing them would be an outage rather than a guard.
+        aFlatYearWithNonZeroComponentsAndAZeroAggregateIsNotEvidence: () => {
+            const outcome = classify('single')(['wages'])({
+                ...noDocuments,
+                brokerageForms: [{
+                    value: {
+                        ...bare1099B,
+                        box8ProfitOrLossRealized: '5000.00',
+                        box9UnrealizedProfitOrLossPriorYearEnd: '3000.00',
+                        box10UnrealizedProfitOrLossCurrentYearEnd: '-2000.00',
+                        box11AggregateProfitOrLoss: '0.00',
+                    },
+                }],
+            })
+            assertEq(outcome.kind, 'ok', ['a zero aggregate must not trip the tripwire', outcome])
+        },
+        // THE THIRD CONTROL, and the one that keeps this disjunct from
+        // swallowing the ordinary brokerage 1099-B: a form carrying a stock
+        // sale in box 1d and NONE of the section 1256 boxes is silent. The
+        // printed form makes the two disjoint -- box 1d "does not include
+        // proceeds from regulated futures contracts or Section 1256 option
+        // contracts" -- and a predicate reading any non-zero money box on this
+        // dialect would refuse every taxpayer who ever sold a share.
+        anOrdinaryStockSaleNineteenNineBIsNotEvidence: () => {
+            const outcome = classify('single')(['wages'])({
+                ...noDocuments,
+                brokerageForms: [{
+                    value: {
+                        ...bare1099B,
+                        box1dProceeds: '10000.00',
+                        box1eCostOrOtherBasis: '7000.00',
+                        box4FederalIncomeTaxWithheld: '250.00',
+                    },
+                }],
+            })
+            assertEq(outcome.kind, 'ok', ['an ordinary sale is not section 1256 evidence', outcome])
+        },
+        // A section 1256 LOSS still requires the declaration, for exactly the
+        // reason the K-1 leaf above gives: Schedule D line 21's $3,000 cap is
+        // the computation an undeclared filer would lose, and §1256(a)(3)
+        // splits a LOSS 60/40 just as it splits a gain.
+        aNegativeSectionTwelveFiftySixAggregateStillRequiresTheDeclaration: () => {
+            const outcome = classify('single')(['wages'])({
+                ...noDocuments,
+                brokerageForms: [{
+                    value: { ...bare1099B, box11AggregateProfitOrLoss: '-37000.00' },
+                }],
+            })
+            assert(outcome.kind === 'error', ['a loss still requires the declaration', outcome])
+            if (outcome.kind !== 'error') {
+                return
+            }
+            assertEq(outcome.unmodeled[0], 'capitalGainsOrLosses', [outcome.unmodeled])
+        },
     },
     // ── Entry 6: Schedule K-1 box 1 -> partnershipAndSCorporationIncome ──
     passThroughIncome: {
@@ -1730,9 +1880,10 @@ export const proof = {
     // caller's evidence string came from, so this is the leaf that keeps the
     // convention honest: the taxpayer's OWN amounts, which are the only
     // taxpayer data a predicate here ever touches, must not appear in the
-    // refusal. NINE distinctive amounts are supplied and each is searched for
+    // refusal. TEN distinctive amounts are supplied and each is searched for
     // separately, so a message that interpolated any one of them reddens here
-    // and says which. A stored rental property's rent is the ninth.
+    // and says which. A stored rental property's rent is the ninth, and a
+    // stored 1099-B's box 11 section 1256 aggregate is the tenth.
     noTaxpayerAmountRidesOutThroughATripwireRefusal: () => {
         const outcome = classify('single')(['wages'])({
             w2s: [{ value: { ...bareW2, box5MedicareWagesAndTips: '387654.32', box8AllocatedTips: '1234.56' } }],
@@ -1755,12 +1906,13 @@ export const proof = {
                 },
             }],
             rentalProperties: [{ value: { ...rentalProperty, rentsReceived: '8765.43' } }],
+            brokerageForms: [{ value: { ...bare1099B, box11AggregateProfitOrLoss: '2468.13' } }],
         })
         assert(outcome.kind === 'error', ['expected a refusal', outcome])
         if (outcome.kind !== 'error') {
             return
         }
-        for (const amount of ['387654.32', '1234.56', '7654.21', '9876.54', '3.21', '54.32', '5432.10', '6543.21', '8765.43']) {
+        for (const amount of ['387654.32', '1234.56', '7654.21', '9876.54', '3.21', '54.32', '5432.10', '6543.21', '8765.43', '2468.13']) {
             assert(
                 !outcome.message.includes(amount),
                 ['a taxpayer amount reached the refusal message', amount, outcome.message])
@@ -1768,7 +1920,7 @@ export const proof = {
         // The control: the message is not empty, and it really did describe
         // all three findings — otherwise "contains no amount" would be
         // satisfied by a message containing nothing.
-        assertEq(outcome.unmodeled.length, 8, ['expected all eight tripwires to have fired', outcome.unmodeled])
+        assertEq(outcome.unmodeled.length, 9, ['expected all nine tripwires to have fired', outcome.unmodeled])
     },
     // The rejected fourth entry, recorded as a CHECKED claim rather than as
     // prose (see this module's docstring). `fjs/document/1099g` refuses a

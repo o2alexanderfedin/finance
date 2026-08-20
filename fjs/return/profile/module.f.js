@@ -164,6 +164,14 @@ export const kindVocabulary = /** @type {const} */ ([
     'collectibles28RateGain',               // Schedule D line 18
     'section1202Gain',                      // 1099-DIV box 2c
     'investmentInterestForm4952',           // Form 4952 line 4g
+    // TAX-38. Form 6781 Part I -- section 1256 contracts marked to market --
+    // IS modeled (`fjs/form6781`, over Form 1099-B box 11), and it computes
+    // for a filer who declares `capitalGainsOrLosses` and nothing more. These
+    // two name the parts of that form which are NOT modeled, so a filer who
+    // has one can be told which printed line stops rather than being handed a
+    // Part I computed as though the thing did not exist.
+    'straddleGainsAndLosses',               // Form 6781 Parts II/III -> Schedule D 4/11
+    'netSectionTwelveFiftySixContractsLossCarryback', // Form 6781 box D/line 6 -> Form 1045
     // ── Schedule 1 Part I's own lines, one kind each (DOC-20/21/TAX-30, Phase 27) ─
     //
     // `scheduleOneAdditionalIncome` stood here as ONE coarse kind for the
@@ -1641,16 +1649,24 @@ const expectedMoneyBoxFieldCount = 5
  * declared the exact kind the engine had just started computing and been
  * handed a zero. Splitting is the only move that lets the engine say yes to
  * one and no to the others.
+ *
+ * **195 -> 197 is TAX-38's**, and it is the first widening since that split:
+ * Form 6781 Part I made §1256 contracts computable from Form 1099-B box 11,
+ * and `straddleGainsAndLosses` and
+ * `netSectionTwelveFiftySixContractsLossCarryback` name the two parts of that
+ * form which are not. Both join `unmodeledKindRefusals`; nothing joins
+ * `modeledKinds`, and nothing is reclassified. Before it, a futures trader
+ * had no kind at all to declare and fell through the scope guard entirely.
  * @type {number}
  */
-const expectedKindCount = 195
+const expectedKindCount = 197
 
 export const proof = {
     dialectAndMediaType: () => {
         assertEq(dialect, 'vnd.fjs.return_profile')
         assertEq(mediaType, 'application/vnd.fjs.return_profile+json')
     },
-    kindVocabularyIsExactlyOneHundredAndNinetyFive: () => {
+    kindVocabularyIsExactlyOneHundredAndNinetySeven: () => {
         assertEq(kindVocabulary.length, expectedKindCount)
         assertEq(new Set(kindVocabulary).size, kindVocabulary.length)
     },

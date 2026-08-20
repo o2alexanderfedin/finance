@@ -103,10 +103,24 @@ invisible — the line was never zero, so nothing looked wrong.
 
 ## Category (b) — blocked, with the blocker named
 
-- `vnd.fjs.1099b` `box8ProfitOrLossRealized`, `box9UnrealizedProfitOrLossPriorYearEnd`,
+- ~~`vnd.fjs.1099b` `box8ProfitOrLossRealized`, `box9UnrealizedProfitOrLossPriorYearEnd`,
   `box10UnrealizedProfitOrLossCurrentYearEnd`, `box11AggregateProfitOrLoss` — the §1256
   regulated-futures block. Destination is **Form 6781**, which does not exist here, and thence
-  Schedule D lines 4 and 11 under the 60/40 split. Direction: either, by sign.
+  Schedule D lines 4 and 11 under the 60/40 split. Direction: either, by sign.~~
+  **CLOSED (TAX-38).** `fjs/form6781` exists; see
+  [`fjs/form6781/todo/section-1256-contracts-marked-to-market.md`](../form6781/todo/section-1256-contracts-marked-to-market.md).
+  Box 11 is `read` — Form 6781 line 1 -> line 7 -> lines 8 and 9 -> Schedule D lines 4 and 11.
+  Boxes 8, 9 and 10 are `refused`: their only reader is the cross-check `box 8 − box 9 + box 10
+  === box 11`, which refuses the document by name on a disagreement.
+
+  **Two of this entry's own claims were wrong, and both were wrong in the direction of making
+  the work look harder than it was.** Box 9 was filed under the same "prior year" heading this
+  repo uses for a genuine architectural blocker, but it is printed on THIS year's 1099-B and is
+  transcribed, never remembered. And the block was described as needing a form "which does not
+  exist here" as though the form were the obstacle — the obstacle was one number, and the
+  printed instruction hands it over: *"include on line 1 the amount from box 11 of each form."*
+  Worth keeping visible: a blocker written down once is read as settled, and this one priced
+  four boxes as unreachable for as long as nobody re-read the paper.
 - `vnd.fjs.1099b` `box13Bartering` — Schedule C or Schedule 1 line 8z, and nothing stored says
   which. Direction: understatement.
 - `vnd.fjs.1099div` `box3NondividendDistributions`, `box9CashLiquidationDistributions`,

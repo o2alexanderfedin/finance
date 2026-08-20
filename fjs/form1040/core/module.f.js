@@ -74,6 +74,7 @@ import { classifyTripwires } from '../../return/tripwire/module.f.js'
 import { deductionChoice } from '../../tax/deduction/module.f.js'
 import { individualFilingStatuses, taxParamsByYear } from '../../tax/params/module.f.js'
 import { scheduleD } from '../../schedule/d/module.f.js'
+import { form6781 } from '../../form6781/module.f.js'
 import { scheduleOneA } from '../../schedule/1a/module.f.js'
 import { scheduleA } from '../../schedule/a/module.f.js'
 import {
@@ -144,6 +145,7 @@ import {
 /** @import { RegularPreferentialWorksheet } from '../../form6251/part3/module.f.js' */
 /** @import { RefusableKind } from '../../return/scope/module.f.js' */
 /** @import { ScheduleDOutcome } from '../../schedule/d/module.f.js' */
+/** @import { Form6781Outcome } from '../../form6781/module.f.js' */
 /** @import { SelfEmploymentOutcome } from '../../schedule/se/module.f.js' */
 /** @import { ScheduleAOutcome } from '../../schedule/a/module.f.js' */
 
@@ -841,10 +843,48 @@ export const form1040IncomeLines = taxParamSet => inputs => {
             unmodeled: [],
         }
     }
+    // TAX-38: Form 6781 Part I, whose lines 8 and 9 are printed Schedule D
+    // lines 4 and 11. It runs HERE rather than inside `fjs/schedule/d` for
+    // two reasons that both point the same way: §1256(a)(3)'s 40/60 rates
+    // live in `fjs/tax/params`, and `fjs/schedule/d`'s own docstring promises
+    // it imports nothing from `fjs/tax/` at run time; and the printed form
+    // says Schedule D RECEIVES two figures ("Enter here and include on line 4
+    // of Schedule D") rather than reading the 1099-B a third time.
+    //
+    // Gated on `filingScheduleD` for the same reason Schedule D itself is: a
+    // Part I computed for a return that files no Schedule D would reach no
+    // printed line. A filer holding a §1256 1099-B who does not declare
+    // `capitalGainsOrLosses` never gets here — `fjs/return/tripwire`'s
+    // `capitalGainsOrLosses` row fires on a non-zero box 11 BEFORE any line
+    // computes, which is the guard that stops this gating from turning into a
+    // silent drop.
+    /** @type {Form6781Outcome | undefined} */
+    const form6781Outcome = filingScheduleD
+        ? form6781(taxParamSet)({ brokerageForms })
+        : undefined
+    // Threaded exactly as `scheduleDOutcome`'s error arm below is, and one
+    // step EARLIER, because Schedule D cannot be called at all without Form
+    // 6781's two answers. A document-data-sufficiency refusal, so `unmodeled`
+    // is empty rather than naming a `fjs/return/scope` kind.
+    if (form6781Outcome !== undefined && form6781Outcome.kind === 'error') {
+        return { kind: 'error', message: form6781Outcome.message, unmodeled: [] }
+    }
+    // Narrowed a second, fully explicit way, never relying on `tsc` to carry
+    // the negation of the `if` above — the same idiom `scheduleDOk` uses two
+    // functions down.
+    const sectionTwelveFiftySix = form6781Outcome !== undefined
+        && form6781Outcome.kind === 'ok'
+        ? {
+            shortTermCents: form6781Outcome.line8ShortTermCents,
+            longTermCents: form6781Outcome.line9LongTermCents,
+            sources: form6781Outcome.sources,
+        }
+        : undefined
     /** @type {ScheduleDOutcome | undefined} */
     const scheduleDOutcome = filingScheduleD
         ? scheduleD({
             status, brokerageForms, dividendForms,
+            ...(sectionTwelveFiftySix === undefined ? {} : { sectionTwelveFiftySix }),
             basisCorrections: basisCorrectionForms,
             employeeStockPurchaseForms,
             // TAX-35: printed Schedule D lines 5 and 12 read the separately
@@ -10400,6 +10440,340 @@ export const proof = {
             }).line47
             assertEq(crossCheck, 717600n, 'independent sdtw(...) call must reach the SAME figure')
             assertEq(line16, crossCheck, 'the wiring must feed the SAME facts an independent sdtw call would')
+        },
+    },
+    // ── TAX-38: Form 6781 Part I, end to end through form1040Report ─────
+    //
+    // **A form-level proof cannot prove a wiring.** `fjs/form6781`'s own
+    // proofs establish that box 11 splits 60/40; `fjs/schedule/d`'s establish
+    // that lines 4 and 11 receive the two halves the right way round. Neither
+    // can say whether `form1040IncomeLines` ever calls the form, and that is
+    // what this group is for.
+    sectionTwelveFiftySixContractsReachTheReturn: {
+        /*
+         * ★ THE WHOLE CHAIN, on hand-typed cents from the printed faces.
+         *
+         * Single filer, $30,000.00 of wages, one 1099-B carrying ONLY the
+         * four section 1256 boxes (no box 1d at all — the printed form
+         * guarantees box 1d excludes section 1256 proceeds).
+         *
+         *   1099-B box 8    profit realized on closed contracts   $40,000.00
+         *   1099-B box 9    unrealized at 12/31/2024              $ 6,000.00
+         *   1099-B box 10   unrealized at 12/31/2025              $ 9,000.00
+         *   1099-B box 11   40,000 - 6,000 + 9,000                $43,000.00
+         *
+         *   6781 line 7                                           $43,000.00
+         *   6781 line 8   40%   $17,200.00   -> Sch D line 4
+         *   6781 line 9   60%   $25,800.00   -> Sch D line 11
+         *
+         *   Sch D line 7  = line 4 alone                          $17,200.00
+         *   Sch D line 15 = line 11 alone                         $25,800.00
+         *   Sch D line 16                                         $43,000.00
+         *   1040 line 7a  (a gain, so line 16 itself)             $43,000.00
+         *   1040 line 9   30,000 + 43,000                         $73,000.00
+         *   1040 line 11  AGI, no adjustments                     $73,000.00
+         *   1040 line 15  73,000 - 15,750 standard deduction      $57,250.00
+         *
+         * Every figure is typed from the paper, not read back off the code.
+         */
+        aSectionTwelveFiftySixAggregateReachesLineSevenAAndLineFifteen: () => {
+            const brokerageForm = brokerageDocument('sha256-b-1256-e2e')({
+                box8ProfitOrLossRealized: '40000.00',
+                box9UnrealizedProfitOrLossPriorYearEnd: '6000.00',
+                box10UnrealizedProfitOrLossCurrentYearEnd: '9000.00',
+                box11AggregateProfitOrLoss: '43000.00',
+            })
+            const inputs = inputsOf(storedProfile(declaringCapitalGainsOrLossesProfile))([
+                w2Document('sha256-w2-1256-e2e')('30000.00'),
+            ])([])([])([brokerageForm])([])([])([])([])([])
+            const outcome = form1040Report(taxParams2025)(inputs)
+            assert(outcome.kind === 'ok', ['expected the full chain to compute', outcome])
+            if (outcome.kind !== 'ok') {
+                throw ['expected ok', outcome]
+            }
+            assertEq(
+                lineRuled(outcome.lines)('1040 line 7a').value, 4300000n,
+                '$43,000.00 — box 11, split 60/40 and recombined by Schedule D')
+            assertEq(lineRuled(outcome.lines)('1040 line 9').value, 7300000n, '$73,000.00')
+            assertEq(lineRuled(outcome.lines)('1040 line 11').value, 7300000n, '$73,000.00 AGI')
+            assertEq(lineRuled(outcome.lines)('1040 line 15').value, 5725000n, '$57,250.00')
+            // ★ The two HALVES, read off the income lines the dispatcher
+            // sees. Line 7a alone cannot distinguish the correct split from a
+            // transposed one, because 17,200 + 25,800 = 25,800 + 17,200 —
+            // exactly the shape `fjs/schedule/d`'s Mutation Gate M2 exists
+            // for. These two assertions are what a swap reddens.
+            const income = expectIncomeOk(form1040IncomeLines(taxParams2025)(inputs))
+            assertEq(income.scheduleD15Cents, 2580000n, '$25,800.00 LONG-term, Schedule D line 15')
+            assertEq(income.scheduleD16Cents, 4300000n, '$43,000.00 combined')
+            assertEq(income.filingScheduleD, true)
+            // And the citation reaches the report, naming box 11 on the
+            // document it came from — the only box of the four that feeds a
+            // line, so the only one that may be cited.
+            const line7aSources = lineRuled(outcome.lines)('1040 line 7a').sources
+            assert(
+                line7aSources.some(source =>
+                    source.documentHash === 'sha256-b-1256-e2e'
+                    && source.boxPath === 'box11AggregateProfitOrLoss'),
+                ['1040 line 7a must cite the 1099-B box it came from', line7aSources])
+            for (const source of line7aSources) {
+                assert(
+                    source.boxPath !== 'box8ProfitOrLossRealized'
+                    && source.boxPath !== 'box9UnrealizedProfitOrLossPriorYearEnd'
+                    && source.boxPath !== 'box10UnrealizedProfitOrLossCurrentYearEnd',
+                    ['a component box reaches no line, so it must not be cited as one', source])
+            }
+        },
+        /*
+         * ★ A section 1256 LOSS through the full chain, so the wiring is
+         * proven at both signs and a lost minus cannot hide.
+         *
+         *   box 11                                          $-37,000.00
+         *   6781 line 8   40%   $-14,800.00  -> Sch D line 4
+         *   6781 line 9   60%   $-22,200.00  -> Sch D line 11
+         *   Sch D line 16                                   $-37,000.00
+         *   Sch D line 21  -min(37,000, 3,000)              $ -3,000.00
+         *   1040 line 7a   line 21, because line 16 is a loss
+         *   1040 line 9    30,000 - 3,000                   $27,000.00
+         *   1040 line 15   27,000 - 15,750                  $11,250.00
+         *
+         * The $3,000.00 cap is the point: $34,000.00 of the loss carries
+         * forward and NONE of it reaches this return, which is what an
+         * undeclared filer would silently lose.
+         */
+        aSectionTwelveFiftySixLossReachesLineSevenAThroughTheThreeThousandCap: () => {
+            const brokerageForm = brokerageDocument('sha256-b-1256-loss')({
+                box8ProfitOrLossRealized: '-30000.00',
+                box9UnrealizedProfitOrLossPriorYearEnd: '5000.00',
+                box10UnrealizedProfitOrLossCurrentYearEnd: '-2000.00',
+                box11AggregateProfitOrLoss: '-37000.00',
+            })
+            const inputs = inputsOf(storedProfile(declaringCapitalGainsOrLossesProfile))([
+                w2Document('sha256-w2-1256-loss')('30000.00'),
+            ])([])([])([brokerageForm])([])([])([])([])([])
+            const outcome = form1040Report(taxParams2025)(inputs)
+            assert(outcome.kind === 'ok', ['expected the loss chain to compute', outcome])
+            if (outcome.kind !== 'ok') {
+                throw ['expected ok', outcome]
+            }
+            assertEq(
+                lineRuled(outcome.lines)('1040 line 7a').value, -300000n,
+                '$-3,000.00 — the cap, not the $-37,000.00 loss')
+            assertEq(lineRuled(outcome.lines)('1040 line 9').value, 2700000n, '$27,000.00')
+            assertEq(lineRuled(outcome.lines)('1040 line 15').value, 1125000n, '$11,250.00')
+            const income = expectIncomeOk(form1040IncomeLines(taxParams2025)(inputs))
+            assertEq(income.scheduleD16Cents, -3700000n, 'the UNCAPPED loss is still visible')
+            assertEq(income.scheduleD15Cents, -2220000n, '$-22,200.00 — the LONG half, negative')
+        },
+        /*
+         * ★ Q6's CONTROL, at the return level. A CONSOLIDATED 1099-B
+         * carrying an ordinary long-term stock sale AND the four section 1256
+         * boxes: both paths run, and their amounts add rather than one
+         * replacing the other.
+         *
+         *   box 1d  proceeds    $12,000.00   box 1e  basis   $7,000.00
+         *   -> Form 8949 category D gain                      $5,000.00 -> Sch D line 8b
+         *   box 11  aggregate                                 $2,000.00
+         *   -> 6781 line 8  40%  $  800.00 -> Sch D line 4
+         *   -> 6781 line 9  60%  $1,200.00 -> Sch D line 11
+         *
+         *   Sch D line 7  = 800.00                            $   800.00
+         *   Sch D line 15 = 5,000.00 + 1,200.00               $ 6,200.00
+         *   Sch D line 16                                     $ 7,000.00
+         *   1040 line 7a                                      $ 7,000.00
+         *
+         * $5,000.00 and $2,000.00 are deliberately different, and neither is
+         * a multiple of the other, so a wiring that double-counted either or
+         * dropped one produces a line 7a this leaf does not accept.
+         */
+        aConsolidatedFormRunsBothPathsAndTheAmountsAdd: () => {
+            const brokerageForm = brokerageDocument('sha256-b-1256-consolidated')({
+                box1dProceeds: '12000.00',
+                box1eCostOrOtherBasis: '7000.00',
+                box2LongTermGainOrLoss: true,
+                box12BasisReportedToIrs: true,
+                box8ProfitOrLossRealized: '1500.00',
+                box9UnrealizedProfitOrLossPriorYearEnd: '500.00',
+                box10UnrealizedProfitOrLossCurrentYearEnd: '1000.00',
+                box11AggregateProfitOrLoss: '2000.00',
+            })
+            const inputs = inputsOf(storedProfile(declaringCapitalGainsOrLossesProfile))([
+                w2Document('sha256-w2-1256-both')('30000.00'),
+            ])([])([])([brokerageForm])([])([])([])([])([])
+            const outcome = form1040Report(taxParams2025)(inputs)
+            assert(outcome.kind === 'ok', ['both paths must compute together', outcome])
+            if (outcome.kind !== 'ok') {
+                throw ['expected ok', outcome]
+            }
+            assertEq(
+                lineRuled(outcome.lines)('1040 line 7a').value, 700000n,
+                '$7,000.00 = $5,000.00 of stock gain + $2,000.00 of section 1256 aggregate')
+            const income = expectIncomeOk(form1040IncomeLines(taxParams2025)(inputs))
+            assertEq(
+                income.scheduleD15Cents, 620000n,
+                '$6,200.00 long-term: the stock gain PLUS the 60% half')
+            // ★ The comparison that makes this a control rather than a
+            // coincidence: the SAME document with the section 1256 boxes
+            // stripped produces exactly $5,000.00, so the $2,000.00 really is
+            // the section 1256 contribution and the stock path is untouched
+            // by this work. `fjs/form8949` skips a document with no box 1d,
+            // and every one of its nine refusals sits after that skip.
+            const stockOnly = brokerageDocument('sha256-b-1256-consolidated')({
+                box1dProceeds: '12000.00',
+                box1eCostOrOtherBasis: '7000.00',
+                box2LongTermGainOrLoss: true,
+                box12BasisReportedToIrs: true,
+            })
+            const stockOnlyOutcome = form1040Report(taxParams2025)(
+                inputsOf(storedProfile(declaringCapitalGainsOrLossesProfile))([
+                    w2Document('sha256-w2-1256-both')('30000.00'),
+                ])([])([])([stockOnly])([])([])([])([])([]))
+            assert(
+                stockOnlyOutcome.kind === 'ok',
+                ['the stock-only control must compute', stockOnlyOutcome])
+            if (stockOnlyOutcome.kind !== 'ok') {
+                throw ['expected ok', stockOnlyOutcome]
+            }
+            assertEq(
+                lineRuled(stockOnlyOutcome.lines)('1040 line 7a').value, 500000n,
+                '$5,000.00 — the stock sale ALONE, unchanged by this work')
+        },
+        /**
+         * ★ **R2 refuses the WHOLE return**, not merely line 7a. A stored box
+         * 11 that its own components contradict stops the return before any
+         * line is built, threaded through the same error arm Schedule D's own
+         * refusals already use, with `unmodeled` empty — this is a
+         * document-data-sufficiency refusal, never a `fjs/return/scope` kind.
+         */
+        aDisagreeingAggregateRefusesTheWholeReturn: () => {
+            const brokerageForm = brokerageDocument('sha256-b-1256-drift')({
+                box8ProfitOrLossRealized: '3000.00',
+                box10UnrealizedProfitOrLossCurrentYearEnd: '1000.00',
+                box11AggregateProfitOrLoss: '2000.00',
+            })
+            const outcome = form1040Report(taxParams2025)(
+                inputsOf(storedProfile(declaringCapitalGainsOrLossesProfile))([
+                    w2Document('sha256-w2-1256-drift')('30000.00'),
+                ])([])([])([brokerageForm])([])([])([])([])([]))
+            assert(outcome.kind === 'error', ['a contradicted aggregate must refuse', outcome])
+            if (outcome.kind !== 'error') {
+                throw ['expected error', outcome]
+            }
+            assertEq(outcome.unmodeled.length, 0, 'a document-sufficiency refusal names no kind')
+            assert(outcome.message.includes('sha256-b-1256-drift'), [outcome.message])
+            assert(outcome.message.includes('Form 6781 line 1'), [outcome.message])
+            assert(outcome.message.includes('4000.00'), ['the computed aggregate', outcome.message])
+        },
+        /**
+         * ★ **THE TRIPWIRE, end to end.** The identical 1099-B on a profile
+         * that does NOT declare `capitalGainsOrLosses` refuses by NAME —
+         * without this, the wiring above would have moved the silent drop
+         * rather than closed it, because `filingScheduleD` is read off the
+         * declared kind.
+         */
+        anUndeclaredSectionTwelveFiftySixReturnIsTripwired: () => {
+            const brokerageForm = brokerageDocument('sha256-b-1256-undeclared')({
+                box8ProfitOrLossRealized: '40000.00',
+                box9UnrealizedProfitOrLossPriorYearEnd: '6000.00',
+                box10UnrealizedProfitOrLossCurrentYearEnd: '9000.00',
+                box11AggregateProfitOrLoss: '43000.00',
+            })
+            const outcome = form1040Report(taxParams2025)(
+                inputsOf(storedProfile(singleProfile))([
+                    w2Document('sha256-w2-1256-undeclared')('30000.00'),
+                ])([])([])([brokerageForm])([])([])([])([])([]))
+            assert(outcome.kind === 'error', ['an undeclared box 11 must refuse', outcome])
+            if (outcome.kind !== 'error') {
+                throw ['expected error', outcome]
+            }
+            assert(
+                outcome.unmodeled.includes('capitalGainsOrLosses'),
+                ['the tripwire must name the kind to declare', outcome.unmodeled])
+            // And the amount does NOT ride out in the message — T-10-07-04,
+            // asserted here as well as inside `fjs/return/tripwire`, because
+            // this is the path a taxpayer actually reaches.
+            assert(
+                !outcome.message.includes('43000.00') && !outcome.message.includes('43,000'),
+                ['no taxpayer amount may reach a tripwire refusal', outcome.message])
+        },
+        /**
+         * THE CONTROL for the tripwire leaf: the same undeclared profile with
+         * an ordinary stock-sale 1099-B computes. A tripwire that fired on
+         * any 1099-B at all would pass the leaf above and fail here.
+         */
+        anUndeclaredOrdinarySaleIsNotTripwired: () => {
+            const brokerageForm = brokerageDocument('sha256-b-1256-control')({
+                box1dProceeds: '12000.00',
+                box1eCostOrOtherBasis: '7000.00',
+                box2LongTermGainOrLoss: true,
+                box12BasisReportedToIrs: true,
+            })
+            const outcome = form1040Report(taxParams2025)(
+                inputsOf(storedProfile(singleProfile))([
+                    w2Document('sha256-w2-1256-control')('30000.00'),
+                ])([])([])([brokerageForm])([])([])([])([])([]))
+            assert(outcome.kind === 'ok', ['an ordinary undeclared sale must still compute', outcome])
+            if (outcome.kind !== 'ok') {
+                throw ['expected ok', outcome]
+            }
+            // The stock gain reaches NOTHING, because no Schedule D runs —
+            // which is the pre-existing, deliberate Decision 1.6 behaviour
+            // this work must not have changed.
+            assertEq(lineRuled(outcome.lines)('1040 line 7a').value, 0n)
+        },
+        /**
+         * ★ Both new refused kinds refuse by name at the scope guard, each
+         * naming the printed line and what is missing — and neither is
+         * reachable from any document, which is exactly why they are declared
+         * kinds rather than tripwires.
+         */
+        theTwoUnmodeledHalvesOfFormSixSevenEightOneRefuseByName: () => {
+            /** @type {readonly (readonly [Kind, string, string])[]} */
+            const cases = [
+                ['straddleGainsAndLosses', 'Form 6781 Parts II and III', 'unrecognized gain'],
+                ['netSectionTwelveFiftySixContractsLossCarryback', 'Form 6781 box D', '§1212(c)'],
+            ]
+            assertEq(cases.length, 2, 'two kinds, hand-counted')
+            for (const [kind, line, remedyFragment] of cases) {
+                const outcome = form1040Report(taxParams2025)(
+                    inputsOf(storedProfile({
+                        ...singleProfile,
+                        declaredKinds: /** @type {readonly Kind[]} */ (['wages', kind]),
+                    }))([w2Document('sha256-w2-1256-kind')('30000.00')])([])([])([])([])([])([])([])([]))
+                assert(
+                    outcome.kind === 'error',
+                    ['a declared unmodeled kind must refuse', kind, outcome])
+                if (outcome.kind !== 'error') {
+                    throw ['expected error', kind]
+                }
+                assert(
+                    outcome.unmodeled.some(named => named === kind),
+                    [kind, outcome.unmodeled])
+                assert(outcome.message.includes(line), ['the printed line', kind, outcome.message])
+                assert(
+                    outcome.message.includes(remedyFragment),
+                    ['what is missing', kind, outcome.message])
+            }
+        },
+        /**
+         * THE CONTROL for the leaf above: the SAME return declaring
+         * `capitalGainsOrLosses` and nothing else computes. Part I alone is a
+         * complete deliverable for a filer with no straddle and no carryback
+         * election, and a guard that refused every section 1256 trader would
+         * pass every leaf above and fail here.
+         */
+        aPlainSectionTwelveFiftySixTraderIsNotRefused: () => {
+            const outcome = form1040Report(taxParams2025)(
+                inputsOf(storedProfile(declaringCapitalGainsOrLossesProfile))([
+                    w2Document('sha256-w2-1256-plain')('30000.00'),
+                ])([])([])([brokerageDocument('sha256-b-1256-plain')({
+                    box8ProfitOrLossRealized: '5000.00',
+                    box11AggregateProfitOrLoss: '5000.00',
+                })])([])([])([])([])([]))
+            assert(outcome.kind === 'ok', ['Part I alone must be a complete return', outcome])
+            if (outcome.kind !== 'ok') {
+                throw ['expected ok', outcome]
+            }
+            assertEq(lineRuled(outcome.lines)('1040 line 7a').value, 500000n, '$5,000.00')
         },
     },
     // Plan 13-12 Task 2 — the FIRST proof in this codebase combining every

@@ -1304,6 +1304,58 @@ export const netInvestmentIncomeTaxThreshold = {
 export const netInvestmentIncomeTaxRateBasisPoints = 380
 
 /**
+ * Form 6781 lines 8 and 9 — §1256(a)(3)'s character split for a section 1256
+ * contract, TAX-38.
+ *
+ * The statute, quoted in full:
+ *
+ * > any gain or loss with respect to a section 1256 contract shall be treated
+ * > as— (A) short-term capital gain or loss, to the extent of **40 percent**
+ * > of such gain or loss, and (B) long-term capital gain or loss, to the
+ * > extent of **60 percent** of such gain or loss
+ *
+ * Two `ratePercent` fields with **two separate citations**, one per statutory
+ * clause, never one citation shared across the pair — the convention
+ * {@link additionalMedicareTaxThreshold} states and every group in this module
+ * follows. Sharing one would have made §1256(a)(3)(A) look like the authority
+ * for the 60 percent figure, which is the sourcing error
+ * {@link childTaxCredit}'s docstring records at length.
+ *
+ * `ratePercent`, not `amount`: these are fractions applied to Form 6781 line
+ * 7, so they cross no money boundary and join neither
+ * {@link everyDollarStringField} nor `fjs/tax/boundary`'s threshold set — the
+ * same reason {@link medicalExpenseFloor} does not. Both are whole numbers of
+ * percent, so unlike {@link netInvestmentIncomeTaxRateBasisPoints} there is no
+ * IEEE 754 exactness problem to route around: 40 and 60 are exact.
+ *
+ * **The printed ORDER inverts the fractions, and the field names say so
+ * rather than the reader having to remember it.** Form 6781's line 8 is the
+ * 40 percent SHORT-term half and its line 9 is the 60 percent LONG-term half,
+ * so the smaller printed line number carries the smaller fraction and the
+ * shorter holding period while the split is universally spoken of as "60/40".
+ * `fjs/form6781` reads these by name for exactly that reason.
+ *
+ * `kind: 'code'`, not `'revProc'`: §1256(a)(3) has carried these two figures
+ * unchanged since the Economic Recovery Tax Act of 1981 and no Revenue
+ * Procedure adjusts them. `effectiveDate` is the year they are APPLIED for,
+ * matching every other entry here.
+ * @type {{
+ *   readonly shortTerm: { readonly ratePercent: number, readonly citation: Citation },
+ *   readonly longTerm: { readonly ratePercent: number, readonly citation: Citation },
+ * }}
+ */
+export const sectionTwelveFiftySixCharacterSplit = {
+    shortTerm: {
+        ratePercent: 40,
+        citation: { kind: 'code', section: '§1256(a)(3)(A)', effectiveDate: '2025-01-01' },
+    },
+    longTerm: {
+        ratePercent: 60,
+        citation: { kind: 'code', section: '§1256(a)(3)(B)', effectiveDate: '2025-01-01' },
+    },
+}
+
+/**
  * Schedule 1 line 20's traditional IRA deduction — IRC §219, Publication
  * 590-A Worksheet 1-2 and Appendix B Worksheet 2.
  *
@@ -3266,6 +3318,7 @@ export const longTermCarePremiumLimits = [
  *   readonly foreignTaxCreditDeMinimisElection: typeof foreignTaxCreditDeMinimisElection,
  *   readonly netInvestmentIncomeTaxThreshold: typeof netInvestmentIncomeTaxThreshold,
  *   readonly netInvestmentIncomeTaxRateBasisPoints: typeof netInvestmentIncomeTaxRateBasisPoints,
+ *   readonly sectionTwelveFiftySixCharacterSplit: typeof sectionTwelveFiftySixCharacterSplit,
  *   readonly iraDeduction: typeof iraDeduction,
  *   readonly studentLoanInterestDeduction: typeof studentLoanInterestDeduction,
  *   readonly educatorExpenses: typeof educatorExpenses,
@@ -3316,6 +3369,7 @@ export const taxParamsByYear = {
         foreignTaxCreditDeMinimisElection,
         netInvestmentIncomeTaxThreshold,
         netInvestmentIncomeTaxRateBasisPoints,
+        sectionTwelveFiftySixCharacterSplit,
         iraDeduction,
         studentLoanInterestDeduction,
         educatorExpenses,
@@ -3798,6 +3852,47 @@ export const proof = {
                 ],
             )
         }
+    },
+    // §1256(a)(3)'s two halves, hand-typed from the statute's own words —
+    // "(A) ... to the extent of 40 percent" and "(B) ... to the extent of 60
+    // percent" — with each half's CITATION asserted separately from its
+    // value, for the same reason the Social Security rate below is: a rate
+    // that is right while citing the wrong clause and a rate that is wrong
+    // while citing the right one are different defects, and one leaf
+    // asserting only the pair would catch neither cleanly.
+    //
+    // The last two assertions are what a transposition would have to survive.
+    // 40 and 60 sum to 100, so a swap leaves the SUM untouched — the same
+    // shape as `fjs/schedule/d`'s short-for-long swap, which is invisible in
+    // the total and visible only in the halves. So the halves are asserted by
+    // NAME, and the sum is asserted too, because a pair that no longer
+    // exhausts the gain would silently drop or duplicate part of it.
+    theSectionTwelveFiftySixSplitIsFortyShortAndSixtyLong: () => {
+        assertEq(
+            sectionTwelveFiftySixCharacterSplit.shortTerm.ratePercent, 40,
+            'IRC §1256(a)(3)(A): short-term "to the extent of 40 percent"')
+        assertEq(
+            sectionTwelveFiftySixCharacterSplit.longTerm.ratePercent, 60,
+            'IRC §1256(a)(3)(B): long-term "to the extent of 60 percent"')
+        assertEq(sectionTwelveFiftySixCharacterSplit.shortTerm.citation.kind, 'code')
+        assertEq(sectionTwelveFiftySixCharacterSplit.shortTerm.citation.section, '§1256(a)(3)(A)')
+        assertEq(
+            sectionTwelveFiftySixCharacterSplit.shortTerm.citation.effectiveDate, '2025-01-01')
+        assertEq(sectionTwelveFiftySixCharacterSplit.longTerm.citation.kind, 'code')
+        assertEq(sectionTwelveFiftySixCharacterSplit.longTerm.citation.section, '§1256(a)(3)(B)')
+        assertEq(
+            sectionTwelveFiftySixCharacterSplit.longTerm.citation.effectiveDate, '2025-01-01')
+        assertEq(
+            sectionTwelveFiftySixCharacterSplit.shortTerm.ratePercent
+            + sectionTwelveFiftySixCharacterSplit.longTerm.ratePercent,
+            100,
+            'the two halves must exhaust the gain — §1256(a)(3) splits it, it does not sample it')
+        assert(
+            sectionTwelveFiftySixCharacterSplit.longTerm.ratePercent
+            > sectionTwelveFiftySixCharacterSplit.shortTerm.ratePercent,
+            ['the LONG-term half is the larger one — this is the "60/40 rule", and the printed '
+                + 'form inverts the order (line 8 is the 40% short half, line 9 the 60% long half)',
+                sectionTwelveFiftySixCharacterSplit])
     },
     // §3101(a)'s 6.2%, in the statute's own words, with its citation asserted
     // SEPARATELY from its value — a rate that is right while citing the wrong
