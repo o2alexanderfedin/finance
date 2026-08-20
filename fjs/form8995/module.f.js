@@ -44,11 +44,20 @@
  * | Reduces QBI | This engine |
  * |---|---|
  * | Schedule 1 line 15, the deductible half of self-employment tax | **computed** (Phase 28, TAX-31) |
- * | Schedule 1 line 17, the self-employed health insurance deduction | a documented zero; `selfEmployedHealthInsuranceDeduction` is an `fjs/return/scope` refusal |
+ * | Schedule 1 line 17, the self-employed health insurance deduction | **computed** (TAX-39), through `fjs/form7206` |
  * | Schedule 1 line 16, self-employed SEP/SIMPLE/qualified plan contributions | a documented zero; `selfEmployedRetirementPlans` is an `fjs/return/scope` refusal |
  *
+ * **The line 17 row read "a documented zero" until TAX-39, and the row above
+ * it read the same until Phase 28.** Two of the three subtractions have now
+ * gone from named-zero to real, one phase apart, and each time the table was
+ * the thing that had to be corrected rather than the arithmetic — which is the
+ * argument for naming a zero instead of omitting it. A `qualifiedBusinessIncome`
+ * that had simply not mentioned line 17 would have needed the term DISCOVERED
+ * before it could be wired; what it needed instead was one input threaded to a
+ * subtraction that was already written down.
+ *
  * {@link qualifiedBusinessIncome} performs all three subtractions, with the
- * two permanent zeros NAMED rather than omitted — the same discipline
+ * one remaining permanent zero NAMED rather than omitted — the same discipline
  * `fjs/schedule/1`'s `studentLoanInterestPhaseoutIncome` follows for
  * §221(b)(2)(C)'s three unreachable exclusions. **The reduction LOWERS the
  * deduction**, so leaving it out would be an understatement of tax, and it is
@@ -117,7 +126,22 @@
  * `priorYearQualifiedBusinessLossCarryforward` (Phase 28), `'0.00'` is the
  * assertion "none", and absence is *unstated* rather than none:
  * {@link priorYearCarryforwardIsUnstated} refuses by name whenever a deduction
- * would otherwise be computed. That dialect's own header carries the argument
+ * would otherwise be computed.
+ *
+ * **The OUTBOUND half is printed line 16, and it acquired a reader in the Form
+ * 461 phase.** *"Total qualified business (loss) carryforward. Add lines 2 and
+ * 3. If greater than zero, enter -0-."* This module has computed it since Phase
+ * 28 and nothing read it, which is the `box13StatutoryEmployee` shape this
+ * repository has paid for twice — and `fjs/schedule/f`'s own loss refusal named
+ * the gap out loud, saying the outbound direction *"has no home at all"*. Two
+ * things were actually missing. The zero floor sat inside
+ * {@link qualifiedBusinessIncome}, i.e. on printed line 2, where the paper
+ * floors line 4 — so the first real business loss to arrive would have been
+ * clamped to zero before line 16 ever saw it. And line 16 reached no report
+ * field. Both are fixed: the floor is on line 4 where it is printed,
+ * `fjs/form1040/core` carries line 16 out as a `ReportLine`, and
+ * `fjs/report/tax_return` prints it — so a farmer whose Schedule F line 34 is a
+ * loss can transcribe it into next year's assertion. That dialect's own header carries the argument
  * for why absence cannot mean zero here when it does mean zero for
  * `vnd.fjs.prior_year_capital_loss`.
  *
@@ -209,29 +233,37 @@ const percentOfCents = cents => percent =>
  * exclusions. A reader has to be able to see WHICH reductions this engine
  * applies and which it merely has no figure for.
  *
- * Floored at zero, because §199A(c)(1) is a NET amount and a negative one is
- * not qualified business income but a §199A(c)(2) carryforward — and
- * `fjs/schedule/c` refuses a Schedule C loss before this function is ever
- * reached, so the floor is the printed line 4's rule rather than a live case.
- * @type {(input: { readonly netProfitCents: bigint, readonly deductibleHalfOfSelfEmploymentTaxCents: bigint }) => bigint}
+ * **NOT floored at zero, and it was until the Form 461 phase.** The floor read
+ * `net > 0n ? net : 0n`, and its own comment said it was *"the printed line 4's
+ * rule rather than a live case"* — true only while `fjs/schedule/c` refused
+ * every business loss before this function could be reached. `fjs/schedule/f`
+ * now computes a net farm LOSS at printed box 36a, and the floor sat on the
+ * wrong printed line for it: line 2 is *"Total qualified business income or
+ * **(loss)**"* and its box is parenthesised, while line 4 is *"Combine lines 2
+ * and 3. **If zero or less, enter -0-**"* — so the paper floors line 4, and
+ * {@link form8995} does. Leaving the floor here would have made printed line 16
+ * — §199A(c)(2)'s carryforward to the succeeding year — read zero for exactly
+ * the taxpayer who has one, destroying the figure this engine exists to record.
+ * @type {(input: { readonly netProfitCents: bigint, readonly deductibleHalfOfSelfEmploymentTaxCents: bigint, readonly selfEmployedHealthInsuranceDeductionCents: bigint }) => bigint}
  */
 export const qualifiedBusinessIncome = input => {
-    const { netProfitCents, deductibleHalfOfSelfEmploymentTaxCents } = input
-    // Schedule 1 line 17. `selfEmployedHealthInsuranceDeduction` is an
-    // `fjs/return/scope` refusal -- the Pub. 535 worksheet's §162(l)(2)(A)
-    // cap needs facts this engine does not hold -- so it is permanently zero
-    // here and NAMED so a reader can see the term exists.
-    const selfEmployedHealthInsuranceDeductionCents = 0n
+    const {
+        netProfitCents, deductibleHalfOfSelfEmploymentTaxCents,
+        // Schedule 1 line 17, REAL as of TAX-39 -- `fjs/form7206` line 14,
+        // restated by `fjs/schedule/1` under its printed Schedule 1 number and
+        // threaded here by `fjs/form1040/core`. It stood as a hard `0n`
+        // written at this very line until then, with a comment saying why.
+        selfEmployedHealthInsuranceDeductionCents,
+    } = input
     // Schedule 1 line 16. `selfEmployedRetirementPlans` is an
     // `fjs/return/scope` refusal for the same shape of reason: Pub. 560's
     // limit depends on net self-employment earnings AND on a plan document
     // nothing here records.
     const selfEmployedRetirementPlanDeductionCents = 0n
-    const net = netProfitCents
+    return netProfitCents
         - deductibleHalfOfSelfEmploymentTaxCents
         - selfEmployedHealthInsuranceDeductionCents
         - selfEmployedRetirementPlanDeductionCents
-    return net > 0n ? net : 0n
 }
 
 /**
@@ -506,6 +538,7 @@ export const form8995 = taxParamSet => input => {
  *   readonly status: IndividualFilingStatus,
  *   readonly netProfitCents: bigint,
  *   readonly deductibleHalfOfSelfEmploymentTaxCents: bigint,
+ *   readonly selfEmployedHealthInsuranceDeductionCents: bigint,
  *   readonly assertedPriorYearLossCarryforward: string | undefined,
  *   readonly taxableIncomeBeforeQbiCents: bigint,
  *   readonly netCapitalGainCents: bigint,
@@ -527,11 +560,13 @@ export const form8995 = taxParamSet => input => {
 export const qualifiedBusinessIncomeDeduction = taxParamSet => input => {
     const {
         status, netProfitCents, deductibleHalfOfSelfEmploymentTaxCents,
+        selfEmployedHealthInsuranceDeductionCents,
         assertedPriorYearLossCarryforward, taxableIncomeBeforeQbiCents, netCapitalGainCents,
         qualifiedReitDividendsCents,
     } = input
     const qualifiedBusinessIncomeCents = qualifiedBusinessIncome({
         netProfitCents, deductibleHalfOfSelfEmploymentTaxCents,
+        selfEmployedHealthInsuranceDeductionCents,
     })
     const carryforward = priorYearCarryforwardIsUnstated({
         qualifiedBusinessIncomeCents,
@@ -589,6 +624,7 @@ const soleProprietor = {
     status: 'single',
     netProfitCents: 0n,
     deductibleHalfOfSelfEmploymentTaxCents: 0n,
+    selfEmployedHealthInsuranceDeductionCents: 0n,
     assertedPriorYearLossCarryforward: '0.00',
     taxableIncomeBeforeQbiCents: 0n,
     netCapitalGainCents: 0n,
@@ -622,6 +658,7 @@ export const proof = {
                 qualifiedBusinessIncome({
                     netProfitCents: 5000000n,
                     deductibleHalfOfSelfEmploymentTaxCents: 353239n,
+                    selfEmployedHealthInsuranceDeductionCents: 0n,
                 }),
                 4646761n,
                 '$50,000.00 - $3,532.39 = $46,467.61',
@@ -643,23 +680,45 @@ export const proof = {
                 qualifiedBusinessIncome({
                     netProfitCents: 5000000n,
                     deductibleHalfOfSelfEmploymentTaxCents: 0n,
+                    selfEmployedHealthInsuranceDeductionCents: 0n,
                 }),
                 5000000n,
                 'health insurance and retirement contributions both refuse, so both are $0.00',
             )
         },
-        // Floored at zero: §199A(c)(1) is a NET amount, and a negative one is
-        // a §199A(c)(2) carryforward rather than negative QBI. Unreachable
-        // through the product path -- `fjs/schedule/c` refuses a loss -- so
-        // this is the printed rule implemented rather than a live case.
-        aNetNegativeFloorsAtZero: () => {
+        // **A NET NEGATIVE STAYS NEGATIVE, and the floor is one printed line
+        // further down.** This leaf asserted `0n` until the Form 461 phase,
+        // when `fjs/schedule/f` began computing a net farm loss at printed box
+        // 36a and the floor's own comment ("unreachable through the product
+        // path") stopped being true. Printed line 2 is "Total qualified
+        // business income or (LOSS)"; printed line 4 is the one that says "if
+        // zero or less, enter -0-". A floor here would have made line 16 --
+        // §199A(c)(2)'s carryforward to 2026 -- read zero for the only
+        // taxpayer who has one.
+        aNetNegativeStaysNegativeBecauseTheFloorIsPrintedOnLineFour: () => {
             assertEq(
                 qualifiedBusinessIncome({
                     netProfitCents: 10000n,
                     deductibleHalfOfSelfEmploymentTaxCents: 50000n,
+                    selfEmployedHealthInsuranceDeductionCents: 0n,
                 }),
-                0n,
+                -40000n,
+                '$100.00 of profit less $500.00 of §164(f) half is -$400.00, not $0.00',
             )
+            // And the printed floor is still there, one line down: the same
+            // figure through the whole form leaves line 4 at zero while line 2
+            // keeps the loss. This half is what a re-added floor could not fake.
+            const form = form8995(taxParams2025)({
+                qualifiedBusinessIncomeCents: -40000n,
+                priorYearLossCarryforwardCents: 0n,
+                taxableIncomeBeforeQbiCents: 0n,
+                netCapitalGainCents: 0n,
+                qualifiedReitDividendsCents: 0n,
+            })
+            assertEq(form.line2, -40000n, 'printed line 2 carries the loss')
+            assertEq(form.line4, 0n, 'printed line 4 is where "-0-" is printed')
+            assertEq(form.line5, 0n, 'so the 20% component is zero')
+            assertEq(form.line16, -40000n, 'and line 16 hands -$400.00 to 2026')
         },
     },
 
@@ -778,6 +837,7 @@ export const proof = {
             ...soleProprietor,
             netProfitCents: 5000000n,
             deductibleHalfOfSelfEmploymentTaxCents: 353239n,
+            selfEmployedHealthInsuranceDeductionCents: 0n,
             taxableIncomeBeforeQbiCents: 3071761n,
         }))
         assertEq(form.line1i, 4646761n, 'line 1(i)(c) = $46,467.61 of QBI')
@@ -806,6 +866,7 @@ export const proof = {
             ...soleProprietor,
             netProfitCents: 1000000n,
             deductibleHalfOfSelfEmploymentTaxCents: 0n,
+            selfEmployedHealthInsuranceDeductionCents: 0n,
             taxableIncomeBeforeQbiCents: 12000000n,
         }))
         assertEq(form.line10, 200000n, 'line 10 = $2,000.00 = 20% of $10,000.00')
@@ -824,6 +885,7 @@ export const proof = {
             ...soleProprietor,
             netProfitCents: 1000000n,
             deductibleHalfOfSelfEmploymentTaxCents: 0n,
+            selfEmployedHealthInsuranceDeductionCents: 0n,
             taxableIncomeBeforeQbiCents: 12000000n,
             netCapitalGainCents: 11000000n,
         }))
@@ -835,6 +897,7 @@ export const proof = {
             ...soleProprietor,
             netProfitCents: 1000000n,
             deductibleHalfOfSelfEmploymentTaxCents: 0n,
+            selfEmployedHealthInsuranceDeductionCents: 0n,
             taxableIncomeBeforeQbiCents: 12000000n,
             netCapitalGainCents: 11500000n,
         }))
@@ -852,6 +915,7 @@ export const proof = {
                 ...soleProprietor,
                 netProfitCents: 5000000n,
                 deductibleHalfOfSelfEmploymentTaxCents: 353239n,
+                selfEmployedHealthInsuranceDeductionCents: 0n,
                 assertedPriorYearLossCarryforward: '18400.00',
                 taxableIncomeBeforeQbiCents: 12000000n,
             }))
@@ -866,6 +930,7 @@ export const proof = {
                 ...soleProprietor,
                 netProfitCents: 5000000n,
                 deductibleHalfOfSelfEmploymentTaxCents: 353239n,
+                selfEmployedHealthInsuranceDeductionCents: 0n,
                 taxableIncomeBeforeQbiCents: 12000000n,
             }))
             assertEq(none.line15, 929352n, 'without it, $9,293.52')
@@ -880,6 +945,7 @@ export const proof = {
                 ...soleProprietor,
                 netProfitCents: 5000000n,
                 deductibleHalfOfSelfEmploymentTaxCents: 0n,
+                selfEmployedHealthInsuranceDeductionCents: 0n,
                 assertedPriorYearLossCarryforward: '80000.00',
                 taxableIncomeBeforeQbiCents: 12000000n,
             }))
@@ -896,6 +962,7 @@ export const proof = {
                 ...soleProprietor,
                 netProfitCents: 5000000n,
                 deductibleHalfOfSelfEmploymentTaxCents: 0n,
+                selfEmployedHealthInsuranceDeductionCents: 0n,
                 taxableIncomeBeforeQbiCents: 12000000n,
             }))
             assert(form.line4 > 0n, 'the control: line 4 is a real positive amount')
@@ -908,6 +975,7 @@ export const proof = {
                 ...soleProprietor,
                 netProfitCents: 5000000n,
                 deductibleHalfOfSelfEmploymentTaxCents: 353239n,
+                selfEmployedHealthInsuranceDeductionCents: 0n,
                 assertedPriorYearLossCarryforward: undefined,
                 taxableIncomeBeforeQbiCents: 12000000n,
             }))
@@ -939,6 +1007,7 @@ export const proof = {
                 ...soleProprietor,
                 netProfitCents: 5000000n,
                 deductibleHalfOfSelfEmploymentTaxCents: 353239n,
+                selfEmployedHealthInsuranceDeductionCents: 0n,
                 assertedPriorYearLossCarryforward: '0.00',
                 taxableIncomeBeforeQbiCents: 12000000n,
             }))
@@ -1101,6 +1170,7 @@ export const proof = {
                 ...soleProprietor,
                 netProfitCents: 5000000n,
                 deductibleHalfOfSelfEmploymentTaxCents: 353239n,
+                selfEmployedHealthInsuranceDeductionCents: 0n,
                 qualifiedReitDividendsCents: 100000n,
                 taxableIncomeBeforeQbiCents: 12000000n,
             }))
@@ -1115,6 +1185,7 @@ export const proof = {
                 ...soleProprietor,
                 netProfitCents: 5000000n,
                 deductibleHalfOfSelfEmploymentTaxCents: 353239n,
+                selfEmployedHealthInsuranceDeductionCents: 0n,
                 taxableIncomeBeforeQbiCents: 12000000n,
             }))
             assertEq(none.line15, 929352n, 'without it, $9,293.52')

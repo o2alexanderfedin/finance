@@ -447,8 +447,24 @@ export const churchEmployeeIncomeLine5a = () => ({
  * every return with no partnership stake, and `0n` for every S-corporation
  * shareholder no matter how large their share — see {@link
  * scheduleSelfEmploymentPartI}'s own line 2 comment.
+ * `farmNetProfitCents` is **Schedule F line 34**, which printed line 1a names
+ * in its own caption. It is `0n` for every return with no farm, and **it CAN be
+ * negative** as of the Form 461 phase: `fjs/schedule/f` computes a net farm loss
+ * at printed box 36a, so the parenthesised half of "net farm profit or (loss)"
+ * reaches this line for real.
+ *
+ * Nothing here needed changing for it, and the printed page is why. Line 4a is
+ * *"If line 3 is more than zero, multiply line 3 by 92.35%. **Otherwise, enter
+ * amount from line 3**"* — the §1402(a)(12) factor is applied only to a positive
+ * amount — and line 4c's *"if less than $400, stop; you don't owe
+ * self-employment tax"* is implemented at line 6, which zeroes below the floor.
+ * A negative line 1a therefore falls out at line 6 with no self-employment tax
+ * and no negative deduction on line 13. `aFarmLossOwesNoSelfEmploymentTax` is
+ * the leaf that pins it, because "no change was needed" is a claim, not an
+ * observation.
  * @typedef {{
  *   readonly netProfitCents: bigint,
+ *   readonly farmNetProfitCents: bigint,
  *   readonly partnershipSelfEmploymentEarningsCents: bigint,
  *   readonly socialSecurityWagesCents: bigint,
  * }} ScheduleSelfEmploymentPartIInput
@@ -462,20 +478,46 @@ export const churchEmployeeIncomeLine5a = () => ({
  */
 export const scheduleSelfEmploymentPartI = taxParamSet => input => {
     const {
-        netProfitCents, partnershipSelfEmploymentEarningsCents, socialSecurityWagesCents,
+        netProfitCents, farmNetProfitCents, partnershipSelfEmploymentEarningsCents,
+        socialSecurityWagesCents,
     } = input
     const { selfEmploymentTax } = taxParamSet
     const factor = netEarningsFactorBasisPoints(taxParamSet)
     // 1a. "Net farm profit or (loss) from Schedule F, line 34, and farm
-    //     partnerships, Schedule K-1 (Form 1065), box 14, code A." A
-    //     documented zero: `farmIncomeOrLoss` is an `fjs/return/scope`
-    //     refusal, so a taxpayer with farm income is refused whole before
-    //     this line is reached, and Schedule K-1 is Phase 30's.
-    const line1a = 0n
+    //     partnerships, Schedule K-1 (Form 1065), box 14, code A."
+    //
+    //     **Schedule F line 34, as of the Schedule F phase.** i1040sf p9 gives
+    //     line 34 two printed destinations -- "Schedule 1 (Form 1040), line 6
+    //     and; Schedule SE (Form 1040), line 1a" -- and this is the second.
+    //     Wiring only the first would have put the farm profit into adjusted
+    //     gross income while leaving self-employment tax at zero, understating
+    //     the tax by roughly 15.3% of 92.35% of it.
+    //
+    //     The FARM PARTNERSHIP half of the printed caption is still zero:
+    //     `fjs/schedule/e` cannot tell a farm partnership's box 14 code A from
+    //     any other, so every code A goes to printed line 2 under "(other than
+    //     farming)". The two lines are added together on printed line 3, so
+    //     the misallocation changes no figure on this form -- see line 2's own
+    //     comment, which has said so since Phase 30.
+    const line1a = farmNetProfitCents
     // 1b. "...enter the amount of Conservation Reserve Program payments
-    //     included on Schedule F, line 4b." A SUBTRACTION on the printed
-    //     page (the box is parenthesised), and zero for the same reason 1a
-    //     is: there is no Schedule F to exclude anything from.
+    //     included on Schedule F, line 4b." A SUBTRACTION on the printed page
+    //     (the box is parenthesised), and a DOCUMENTED ZERO rather than a
+    //     structural one.
+    //
+    //     i1040sf p9: "If you received social security retirement or disability
+    //     benefits in addition to CRP payments, the CRP payments aren't subject
+    //     to self-employment tax." Two facts are needed and neither is
+    //     available: which part of Schedule F line 4b is a Conservation Reserve
+    //     Program payment (no document distinguishes it -- Form 1099-G box 7
+    //     reports every agricultural program payment under one caption), and
+    //     whether the taxpayer received social security retirement or
+    //     disability benefits.
+    //
+    //     **The direction is stated because it is the safe one.** A zero here
+    //     OVERSTATES self-employment tax for a retired farmer receiving CRP
+    //     payments, which is `fjs/schedule/c` line 2's documented-zero
+    //     direction and not TAX-16's failure mode (§1402(a)(1), no phase yet).
     const line1b = 0n
     // 2. "Net profit or (loss) from Schedule C, line 31; and Schedule K-1
     //    (Form 1065), box 14, code A (other than farming)." TWO printed
@@ -621,7 +663,8 @@ assert(taxParams2025 !== undefined, 'expected TY2025 parameters to be present in
  */
 const run = netProfitCents => socialSecurityWagesCents =>
     scheduleSelfEmploymentPartI(taxParams2025)({
-        netProfitCents, partnershipSelfEmploymentEarningsCents: 0n, socialSecurityWagesCents,
+        netProfitCents, farmNetProfitCents: 0n, partnershipSelfEmploymentEarningsCents: 0n,
+        socialSecurityWagesCents,
     })
 
 /**
@@ -633,7 +676,8 @@ const run = netProfitCents => socialSecurityWagesCents =>
  */
 const runWithPartnershipShare = netProfitCents => partnershipSelfEmploymentEarningsCents =>
     scheduleSelfEmploymentPartI(taxParams2025)({
-        netProfitCents, partnershipSelfEmploymentEarningsCents, socialSecurityWagesCents: 0n,
+        netProfitCents, farmNetProfitCents: 0n, partnershipSelfEmploymentEarningsCents,
+        socialSecurityWagesCents: 0n,
     })
 
 /** @type {W2} */
@@ -679,6 +723,44 @@ const printedNetEarningsFactorBasisPoints = 9235n
 const printedMinimumNetEarningsCents = 40000n
 
 export const proof = {
+    /**
+     * ★ **A NET FARM LOSS ON PRINTED LINE 1a OWES NO SELF-EMPLOYMENT TAX**, and
+     * no line of this form needed changing for it — which is a claim, so here is
+     * the observation.
+     *
+     * `fjs/schedule/f` refused every net farm loss until the Form 461 phase, so
+     * printed line 1a could only be zero or positive and this module's own
+     * docstring said so. It can be negative now. A $50,000.00 farm loss against
+     * $10,000.00 of Schedule C profit: line 3 is -$40,000.00, line 4a takes the
+     * printed "otherwise, enter amount from line 3" branch rather than the
+     * 92.35% one, line 4c is below the $400 floor, and line 6 zeroes.
+     */
+    aFarmLossOwesNoSelfEmploymentTax: () => {
+        const result = scheduleSelfEmploymentPartI(taxParams2025)({
+            netProfitCents: 1000000n,
+            farmNetProfitCents: -5000000n,
+            partnershipSelfEmploymentEarningsCents: 0n,
+            socialSecurityWagesCents: 0n,
+        })
+        assertEq(result.line1a, -5000000n, 'printed line 1a carries the farm LOSS')
+        assertEq(result.line3, -4000000n, '$10,000.00 - $50,000.00 = -$40,000.00')
+        assertEq(result.line4a, -4000000n,
+            'the 92.35% factor is NOT applied: "otherwise, enter amount from line 3"')
+        assertEq(result.line6, 0n, 'below the $400 floor, so line 6 is zero')
+        assertEq(result.line12, 0n, 'no self-employment tax')
+        assertEq(result.line13, 0n, 'and no negative deduction on Schedule 1 line 15')
+        // THE CONTROL: the same farm figure POSITIVE takes the 92.35% branch and
+        // owes tax, so this leaf is not merely observing that everything is zero.
+        const profit = scheduleSelfEmploymentPartI(taxParams2025)({
+            netProfitCents: 1000000n,
+            farmNetProfitCents: 5000000n,
+            partnershipSelfEmploymentEarningsCents: 0n,
+            socialSecurityWagesCents: 0n,
+        })
+        assertEq(profit.line3, 6000000n, '$60,000.00')
+        assertEq(profit.line4a, 5541000n, '6,000,000 x 0.9235 = $55,410.00')
+        assert(profit.line12 > 0n, ['a profit owes self-employment tax', profit.line12])
+    },
     partnershipShare: {
         /**
          * **Printed line 2 has TWO sources and line 3 adds them**, and the two

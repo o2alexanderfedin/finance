@@ -110,6 +110,7 @@ import { error, ok } from 'functionalscript/fjs/types/result/module.f.mjs'
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { base, mediaTypeOf } from '../../document/base/module.f.js'
 import { moneyFieldError } from '../../document/money_field/module.f.js'
+import { daysInTheLongestYear } from '../../document/rental_property/module.f.js'
 import {
     dialect as oneZeroNineNineIntDialect,
     oneZeroNineNineIntSchema,
@@ -164,13 +165,23 @@ export const kindVocabulary = /** @type {const} */ ([
     'collectibles28RateGain',               // Schedule D line 18
     'section1202Gain',                      // 1099-DIV box 2c
     'investmentInterestForm4952',           // Form 4952 line 4g
+    // TAX-38. Form 6781 Part I -- section 1256 contracts marked to market --
+    // IS modeled (`fjs/form6781`, over Form 1099-B box 11), and it computes
+    // for a filer who declares `capitalGainsOrLosses` and nothing more. These
+    // two name the parts of that form which are NOT modeled, so a filer who
+    // has one can be told which printed line stops rather than being handed a
+    // Part I computed as though the thing did not exist.
+    'straddleGainsAndLosses',               // Form 6781 Parts II/III -> Schedule D 4/11
+    'netSectionTwelveFiftySixContractsLossCarryback', // Form 6781 box D/line 6 -> Form 1045
     // ── Schedule 1 Part I's own lines, one kind each (DOC-20/21/TAX-30, Phase 27) ─
     //
     // `scheduleOneAdditionalIncome` stood here as ONE coarse kind for the
     // whole of Part I -- taxable state and local refunds, alimony received,
     // business income on Schedule C, other gains on Form 4797, rental and
     // pass-through income on Schedule E, farm income on Schedule F, and the
-    // twenty-six lettered sub-lines at 8a-8z. A single kind covering that
+    // twenty-three lettered sub-lines at 8a-8z (8a through 8v and 8z; the
+    // remedy that said twenty-six was counting letters the form does not
+    // print). A single kind covering that
     // many distinct income items could only ever refuse them together, so
     // nothing on Part I was nameable and nothing on it could be reclassified
     // one line at a time. It is split here into one kind per printed line, in
@@ -194,7 +205,8 @@ export const kindVocabulary = /** @type {const} */ ([
     // order in this list, and that is history rather than design.
     //
     // Lines 9 and 10 get no kind either: line 9 is the TOTAL of the 8a-8z
-    // block `otherIncome` already covers, and line 10 is Part I's own total.
+    // block, which is now twenty-eight kinds of its own below, and line 10
+    // is Part I's own total.
     // A kind for either would be a declaration a taxpayer could never
     // truthfully make -- the identical reasoning Schedule 3's lines 7/8/14/15
     // already carry.
@@ -243,7 +255,66 @@ export const kindVocabulary = /** @type {const} */ ([
     'remicResidualInterest',                // Schedule E Part IV (38-39) -> Schedule 1 line 5 -> 8
     'netFarmRentalIncomeForm4835',          // Schedule E Part V line 40  -> Schedule 1 line 5 -> 8
     'farmIncomeOrLoss',                     // Schedule 1 line 6   -> 8
-    'otherIncome',                          // Schedule 1 line 8a-8z -> 8
+    // ── Schedule 1 line 8's own twenty-eight kinds (2026-08-18) ────────────
+    //
+    // `otherIncome` stood here as ONE kind for the whole of printed line 8 --
+    // twenty-three lettered sub-lines, from a net operating loss carried in
+    // from a year this engine does not hold, through gambling winnings,
+    // Alaska Permanent Fund dividends, jury duty pay, prizes, hobby income
+    // and stock options, to a write-in line the instructions leave open. A
+    // single kind covering that many unrelated facts could only refuse them
+    // together: a taxpayer with a Form 1099-C and a taxpayer with an
+    // Alaska dividend read the SAME sentence, naming neither document.
+    //
+    // Split off `f1040s1.pdf` (2025) and `i1040gi.pdf` (2025) pp. 90-93, one
+    // kind per printed sub-line, in the form's own order. The old remedy
+    // said "twenty-six lettered sub-lines"; the printed form has
+    // twenty-three -- 8a through 8v and 8z, with no 8w, 8x or 8y.
+    //
+    // **Two sub-lines get no kind here, because a kind for each already
+    // exists.** Line 8d is the Form 2555 foreign earned income exclusion,
+    // which `foreignEarnedIncomeForm2555` names; line 8s is the nontaxable
+    // Medicaid waiver payment, which `medicaidWaiverPayments` names at 1040
+    // line 1d. Both rows in `fjs/return/scope` are extended to name their
+    // Schedule 1 line as well, the way `section1202Gain` names both a
+    // 1099-DIV box and a Form 6251 line -- rather than a second declaration
+    // being invented for one taxpayer fact. Since TAX-42 the line 8d kind is
+    // `foreignEarnedIncomeExclusion`, and it is MODELED.
+    //
+    // **Line 8z is a WRITE-IN and is EIGHT kinds, not one.** Its
+    // instructions name seven examples and then leave the line open ("any
+    // taxable income not reported elsewhere"), so the seven are kinds and an
+    // eighth, `otherIncomeNotListed`, is the residual. Seven alone would
+    // assert a closed list the form refuses to close; the residual alone
+    // would be the coarse kind under a new name.
+    'netOperatingLossDeduction',                       // Schedule 1 line 8a  -> 8
+    'gamblingWinnings',                                // Schedule 1 line 8b  -> 8
+    'cancellationOfDebt',                              // Schedule 1 line 8c  -> 8
+    'form8853MsaAndLongTermCareIncome',                // Schedule 1 line 8e  -> 8
+    'healthSavingsAccountIncome',                      // Schedule 1 line 8f  -> 8
+    'alaskaPermanentFundDividends',                    // Schedule 1 line 8g  -> 8
+    'juryDutyPay',                                     // Schedule 1 line 8h  -> 8
+    'prizesAndAwards',                                 // Schedule 1 line 8i  -> 8
+    'notForProfitActivityIncome',                      // Schedule 1 line 8j  -> 8
+    'stockOptionIncome',                               // Schedule 1 line 8k  -> 8
+    'personalPropertyRentalIncome',                    // Schedule 1 line 8l  -> 8
+    'olympicAndParalympicMedals',                      // Schedule 1 line 8m  -> 8
+    'section951Inclusion',                             // Schedule 1 line 8n  -> 8
+    'section951AInclusion',                            // Schedule 1 line 8o  -> 8
+    'excessBusinessLossAdjustment',                    // Schedule 1 line 8p  -> 8
+    'ableAccountDistributions',                        // Schedule 1 line 8q  -> 8
+    'scholarshipAndFellowshipGrants',                  // Schedule 1 line 8r  -> 8
+    'nonqualifiedDeferredCompensationPension',         // Schedule 1 line 8t  -> 8
+    'wagesEarnedWhileIncarcerated',                    // Schedule 1 line 8u  -> 8
+    'digitalAssetOrdinaryIncome',                      // Schedule 1 line 8v  -> 8
+    'recoveriesOfAmountsDeductedInAnEarlierYear',      // Schedule 1 line 8z  -> 8
+    'reemploymentTradeAdjustmentAssistance',           // Schedule 1 line 8z  -> 8
+    'lossOnCorrectiveDistributionsOfExcessDeferrals',  // Schedule 1 line 8z  -> 8
+    'insurancePolicyDividendsExceedingPremiums',       // Schedule 1 line 8z  -> 8
+    'charitableContributionDeductionRecapture',        // Schedule 1 line 8z  -> 8
+    'disasterReliefPayments',                          // Schedule 1 line 8z  -> 8
+    'educationSavingsAccountDistributions',            // Schedule 1 line 8z  -> 8
+    'otherIncomeNotListed',                            // Schedule 1 line 8z  -> 8
     // ── Schedule 1 Part II's own lines, one kind each (TAX-23/24, Phase 24) ─
     //
     // `scheduleOneAdjustments` stood here as ONE coarse kind for the whole of
@@ -282,7 +353,37 @@ export const kindVocabulary = /** @type {const} */ ([
     'iraDeduction',                         // Schedule 1 line 20  -> 10
     'studentLoanInterestDeduction',         // Schedule 1 line 21  -> 10
     'archerMsaDeduction',                   // Schedule 1 line 23  -> 10
-    'otherAdjustments',                     // Schedule 1 line 24a-24z -> 10
+    // ── Schedule 1 line 24's own ten kinds (2026-08-18) ────────────────────
+    //
+    // `otherAdjustments` stood here as ONE kind for the whole of printed line
+    // 24, and the same argument applies as at line 8 above. Split off
+    // `f1040s1.pdf` (2025) page 2 and `i1040gi.pdf` (2025) pp. 99-100, one
+    // kind per printed sub-line. The old remedy said "eleven lettered
+    // sub-lines"; the printed form has twelve, 24a through 24k and 24z.
+    //
+    // **Line 24j gets no kind here**: the Form 2555 housing deduction is
+    // named by `foreignHousingExclusionOrDeduction`, one of Form 2555's four
+    // kinds above. It was `foreignEarnedIncomeForm2555` until TAX-42 split
+    // that row, and the split is exactly why line 24j and line 8d no longer
+    // share one refusal: the deduction is blocked by Notice 2025-16's
+    // underivable table and a prior-year carryover, and the exclusion is not
+    // blocked at all.
+    //
+    // **Line 24z gets no kind at all**, and this is the one place in this
+    // vocabulary where a write-in line does not. Its whole 2025 instruction
+    // reads "Leave line 24z blank" (i1040gi p100), so there is nothing a
+    // taxpayer could truthfully declare -- the same reasoning that gives a
+    // reserved line and a total line no kind.
+    'juryDutyPayGivenToEmployer',                 // Schedule 1 line 24a -> 10
+    'personalPropertyRentalExpenses',             // Schedule 1 line 24b -> 10
+    'olympicAndParalympicMedalsExclusion',        // Schedule 1 line 24c -> 10
+    'reforestationAmortizationAndExpenses',       // Schedule 1 line 24d -> 10
+    'tradeActSupplementalUnemploymentRepayment',  // Schedule 1 line 24e -> 10
+    'section501c18DPensionContributions',         // Schedule 1 line 24f -> 10
+    'chaplainSection403bContributions',           // Schedule 1 line 24g -> 10
+    'unlawfulDiscriminationClaimAttorneyFees',    // Schedule 1 line 24h -> 10
+    'irsWhistleblowerAwardAttorneyFees',          // Schedule 1 line 24i -> 10
+    'excessDeductionsOfSection67eExpenses',       // Schedule 1 line 24k -> 10
     'itemizedDeductions',                   // 12e
     'netQualifiedDisasterLoss',             // 12e exception 5
     'qualifiedBusinessIncomeDeduction',     // 13a
@@ -328,7 +429,20 @@ export const kindVocabulary = /** @type {const} */ ([
     // (1040 line 1g) already names. Adding a second kind for either would
     // give one fact two declarations and let a taxpayer declare the income
     // half without the tax half.
-    'advancePremiumTaxCreditAndOtherRepayments', // Schedule 2 line 1a-1z -> 17
+    // ── TAX-37: the coarse `advancePremiumTaxCreditAndOtherRepayments`
+    // stood here and is SPLIT into the three sub-lines Schedule 2 line 1
+    // actually prints, the way `scheduleTwoTaxes` was split one block up.
+    //
+    // The split is what makes reclassification honest. Form 8962 computes
+    // line 1a and nothing computes 1b through 1f, and NOTHING STORED
+    // DISTINGUISHES THEM: a taxpayer who transferred a clean vehicle credit
+    // to a dealer would, under the coarse kind, have declared the very kind
+    // the engine had just started computing, and received a silent zero for
+    // the repayment they owe. Three kinds, one per printed sub-line, and each
+    // says on its own face whether this engine can compute it.
+    'excessAdvancePremiumTaxCreditRepayment', // Schedule 2 line 1a -> 17
+    'cleanVehicleCreditRepayment',          // Schedule 2 lines 1b/1c -> 17
+    'electivePaymentElectionRecapture',      // Schedule 2 lines 1d/1e/1f and 19 -> 17/23
     'alternativeMinimumTax',                // Schedule 2 line 2  -> 17
     // ── Phase 29 (TAX-33): Form 6251 Part I's own lines, one kind each ──────
     //
@@ -363,8 +477,8 @@ export const kindVocabulary = /** @type {const} */ ([
     // Line 2b (a state or local tax refund) gets no kind either, and that is
     // the one case where a zero is COMPUTED rather than unmodeled:
     // `fjs/document/1099g` refuses a non-zero box 2 at validation, so
-    // Schedule 1 line 1 cannot be non-zero here, and line 8z is `otherIncome`,
-    // already above.
+    // Schedule 1 line 1 cannot be non-zero here, and line 8z's recovery is
+    // `recoveriesOfAmountsDeductedInAnEarlierYear`, already above.
     'amtDepletion',                         // Form 6251 line 2d -> Sch 2 line 2
     'amtNetOperatingLossDeduction',         // Form 6251 lines 2e/2f -> Sch 2 line 2
     'amtPrivateActivityBondInterest',       // Form 6251 line 2g -> Sch 2 line 2
@@ -379,7 +493,32 @@ export const kindVocabulary = /** @type {const} */ ([
     'amtResearchAndExperimentalCosts',      // Form 6251 line 2r -> Sch 2 line 2
     'amtPre1987InstallmentSales',           // Form 6251 line 2s -> Sch 2 line 2
     'amtIntangibleDrillingCosts',           // Form 6251 line 2t -> Sch 2 line 2
-    'amtOtherAdjustments',                  // Form 6251 line 3  -> Sch 2 line 2
+    // ── Form 6251 line 3's own seven kinds (2026-08-18) ────────────────────
+    //
+    // `amtOtherAdjustments` stood here as ONE kind for printed line 3. Split
+    // off `i6251.pdf` (2025) pp. 8-9, which gives line 3 seven named
+    // headings plus a "Related Adjustments" group.
+    //
+    // Six headings become kinds. The SEVENTH, "Net Qualified Disaster Loss",
+    // gets none: it is the same increased standard deduction
+    // `netQualifiedDisasterLoss` already names at 1040 line 12e, added back
+    // for the AMT, and that row is extended to name this line too.
+    //
+    // **"Related Adjustments" is ONE kind, `amtRelatedAdjustments`, and that
+    // is the one deliberate departure from one-kind-per-printed-fact in this
+    // whole split.** Its seven affected items share a single blocker exactly
+    // -- each is a limit recomputed on an AMT income base this engine does
+    // not compute -- the printed form takes them COMBINED into one line 3
+    // entry, and the instructions say "include the following", so the list is
+    // not closed. Seven kinds would be seven copies of one remedy asserting a
+    // closed set.
+    'amtPre1987Depreciation',                       // Form 6251 line 3   -> 17
+    'amtPollutionControlFacilities',                // Form 6251 line 3   -> 17
+    'amtTaxShelterFarmActivities',                  // Form 6251 line 3   -> 17
+    'amtCharitableContributionsOfCertainProperty',  // Form 6251 line 3   -> 17
+    'amtBusinessInterestLimitation',                // Form 6251 line 3   -> 17
+    'amtNonPrincipalResidenceMortgageInterest',     // Form 6251 line 3   -> 17
+    'amtRelatedAdjustments',                        // Form 6251 line 3   -> 17
     'selfEmploymentTax',                    // Schedule 2 line 4  -> 23
     // ── Phase 28 (TAX-31): the two Schedule SE facts nothing stored can
     // reveal, each its own kind because they are separate taxpayer facts
@@ -398,8 +537,56 @@ export const kindVocabulary = /** @type {const} */ ([
     'interestOnResidentialLotAndTimeshareInstallments', // Schedule 2 line 14 -> 23
     'interestOnDeferredInstallmentSaleTax', // Schedule 2 line 15 -> 23
     'lowIncomeHousingCreditRecapture',      // Schedule 2 line 16 -> 23
-    'otherAdditionalTaxes',                 // Schedule 2 line 17a-17z -> 23
-    'premiumTaxCreditReconciliation',       // Schedule 2 line 19 -> 23
+    // ── Schedule 2 line 17's own twenty kinds (2026-08-18) ─────────────────
+    //
+    // `otherAdditionalTaxes` stood here as ONE kind for the whole of printed
+    // line 17. Split off `f1040s2.pdf` (2025) page 2 and `i1040gi.pdf` (2025)
+    // pp. 113-114. The old remedy said "more than twenty lettered sub-lines";
+    // the printed form has eighteen, 17a through 17q and 17z.
+    //
+    // **Line 17a is FOUR kinds, not one.** Its instruction lists five
+    // numbered recaptures reaching four different forms, and the first two
+    // are both the Form 3468 investment credit recaptured through Form 4255,
+    // so they share one kind.
+    //
+    // **Lines 17p and 17q get no kind here**: both are interest from Form
+    // 8621, the same PFIC holding `form8621` already names at 1040 line 16.
+    //
+    // **Line 17z is a WRITE-IN and is TWO kinds plus an extension.** Its
+    // instructions name the prevailing wage and apprenticeship penalties
+    // (its own kind) and a negative Form 8978 adjustment (`form8978`, whose
+    // row is extended), and leave the line open -- so
+    // `otherAdditionalTaxesNotListed` is the residual.
+    'investmentCreditRecapture',                                // Schedule 2 line 17a -> 23
+    'newMarketsCreditRecapture',                                // Schedule 2 line 17a -> 23
+    'employerProvidedChildcareCreditRecapture',                 // Schedule 2 line 17a -> 23
+    'section6418TransferRecapture',                             // Schedule 2 line 17a -> 23
+    'federalMortgageSubsidyRecapture',                          // Schedule 2 line 17b -> 23
+    'hsaDistributionAdditionalTax',                             // Schedule 2 line 17c -> 23
+    'hsaIneligibleIndividualAdditionalTax',                     // Schedule 2 line 17d -> 23
+    'archerMsaDistributionAdditionalTax',                       // Schedule 2 line 17e -> 23
+    'medicareAdvantageMsaDistributionAdditionalTax',            // Schedule 2 line 17f -> 23
+    'charitableFractionalInterestRecaptureTax',                 // Schedule 2 line 17g -> 23
+    'section409ANonqualifiedPlanTax',                           // Schedule 2 line 17h -> 23
+    'section457ANonqualifiedPlanTax',                           // Schedule 2 line 17i -> 23
+    'section72m5ExcessBenefitsTax',                             // Schedule 2 line 17j -> 23
+    'goldenParachutePaymentsTax',                               // Schedule 2 line 17k -> 23
+    'accumulationDistributionOfTrustsTax',                      // Schedule 2 line 17l -> 23
+    'expatriatedCorporationInsiderStockCompensationExciseTax',  // Schedule 2 line 17m -> 23
+    'lookBackInterest',                                         // Schedule 2 line 17n -> 23
+    'nonresidentAlienNonEffectivelyConnectedIncomeTax',         // Schedule 2 line 17o -> 23
+    'prevailingWageAndApprenticeshipPenalties',                 // Schedule 2 line 17z -> 23
+    'otherAdditionalTaxesNotListed',                            // Schedule 2 line 17z -> 23
+    // MISNAMED, and knowingly so. Printed Schedule 2 (Form 1040) 2025 line 19
+    // is "Recapture of net EPE from Form 4255, line 1d, column (l)" -- an
+    // elective payment election recapture with no connection to Form 8962.
+    // TAX-37 corrected this kind's refusal row in `fjs/return/scope` rather
+    // than renaming it here, because renaming a member of this FROZEN
+    // vocabulary invalidates every stored profile that declares it, and that
+    // is a decision to take on purpose rather than as a side effect of wiring
+    // a form. `electivePaymentElectionRecapture` above is the correctly named
+    // kind for the same printed line.
+    'premiumTaxCreditReconciliation',       // Schedule 2 line 19 -> 23 (see above: MISNAMED)
     'section965NetTaxLiabilityInstallment', // Schedule 2 line 20 (memo)
     'childTaxCreditOrOtherDependents',      // 19
     // ── Schedule 3 Part I's own lines, one kind each (TAX-25/26, Phase 25) ──
@@ -415,24 +602,47 @@ export const kindVocabulary = /** @type {const} */ ([
     // the block as a whole, since every one of these feeds line 8 and thence
     // 1040 line 20.
     //
-    // **6a-6z stays ONE collapsed kind**, exactly as Schedule 1's
-    // `otherAdjustments` (24a-24z) and Schedule 2's `otherAdditionalTaxes`
-    // (17a-17z) do: the printed line 6 is a header over lettered sub-lines
-    // with no dollar box of its own, this engine models none of them, and
-    // inventing a kind per sub-line would put names in this frozen vocabulary
-    // that no work here read off the printed page.
+    // **6a-6z stayed ONE collapsed kind until 2026-08-18**, on the argument
+    // that "inventing a kind per sub-line would put names in this frozen
+    // vocabulary that no work here read off the printed page". That was a
+    // statement about the work, not about the form, and it is answered by
+    // doing the work: the eleven kinds in the block below are read off
+    // `f1040s3.pdf` (2025) and `i1040gi.pdf` (2025) p116.
     //
-    // Line 7 deliberately gets no kind: it is the TOTAL of the 6a-6z block
-    // `otherNonrefundableCredits` already covers, and line 8 is Part I's own
-    // total. A kind for either would be a declaration a taxpayer could never
-    // truthfully make.
+    // Line 7 deliberately gets no kind: it is the TOTAL of the 6a-6z block,
+    // and line 8 is Part I's own total. A kind for either would be a
+    // declaration a taxpayer could never truthfully make.
     'foreignTaxCredit',                     // Schedule 3 line 1  -> 20
     'dependentCareCredit',                  // Schedule 3 line 2  -> 20
     'educationCredits',                     // Schedule 3 line 3  -> 20
     'retirementSavingsContributionsCredit', // Schedule 3 line 4  -> 20
     'residentialCleanEnergyCredit',         // Schedule 3 line 5a -> 20
     'energyEfficientHomeImprovementCredit', // Schedule 3 line 5b -> 20
-    'otherNonrefundableCredits',            // Schedule 3 line 6a-6z -> 20
+    // ── Schedule 3 line 6's own eleven kinds (2026-08-18) ──────────────────
+    //
+    // `otherNonrefundableCredits` stood here as ONE kind for the whole of
+    // printed line 6, and the comment above -- written when this block was
+    // split and arguing that "inventing a kind per sub-line would put names
+    // in this frozen vocabulary that no work here read off the printed page"
+    // -- is what this split answers: the names below ARE read off the printed
+    // page, `f1040s3.pdf` (2025), and off `i1040gi.pdf` (2025) p116.
+    //
+    // **Line 6e gets no kind**: the printed form reserves it for future use.
+    // **Line 6l gets none either**: it is Form 8978's negative adjustment
+    // arriving as a credit, the same audit `form8978` already names.
+    // **Line 6z gets none at all**: its whole instruction reads "Leave
+    // line 6z blank" (i1040gi p116).
+    'generalBusinessCredit',                          // Schedule 3 line 6a  -> 20
+    'priorYearMinimumTaxCredit',                      // Schedule 3 line 6b  -> 20
+    'adoptionCredit',                                 // Schedule 3 line 6c  -> 20
+    'creditForTheElderlyOrDisabled',                  // Schedule 3 line 6d  -> 20
+    'newCleanVehicleCredit',                          // Schedule 3 line 6f  -> 20
+    'mortgageInterestCredit',                         // Schedule 3 line 6g  -> 20
+    'districtOfColumbiaFirstTimeHomebuyerCredit',     // Schedule 3 line 6h  -> 20
+    'qualifiedElectricVehicleCredit',                 // Schedule 3 line 6i  -> 20
+    'alternativeFuelVehicleRefuelingPropertyCredit',  // Schedule 3 line 6j  -> 20
+    'creditToHoldersOfTaxCreditBonds',                // Schedule 3 line 6k  -> 20
+    'previouslyOwnedCleanVehicleCredit',              // Schedule 3 line 6m  -> 20
     'federalTaxWithheldOnW2',               // 25a
     'federalTaxWithheldOn1099Int',          // 25b
     'federalTaxWithheldOnOther1099',        // 25b
@@ -447,8 +657,8 @@ export const kindVocabulary = /** @type {const} */ ([
     // `scheduleThreeRefundableCredits` stood here as ONE coarse kind for the
     // whole of Part II, and is split for the identical reason as Part I's
     // above. Every one of these feeds Schedule 3 line 15 and thence 1040 line
-    // 31; 13a-13z stays one collapsed kind, and lines 14 and 15 get none
-    // because they are totals.
+    // 31; 13a-13z is its own eight kinds as of 2026-08-18, and lines 14 and
+    // 15 get none because they are totals.
     //
     // **None of the five is MODELED after this phase.** TAX-25 and TAX-26
     // reach Part I's lines 3 and 4 only; Part II is untouched. `excessSocial\
@@ -461,8 +671,43 @@ export const kindVocabulary = /** @type {const} */ ([
     'amountPaidWithExtensionRequest',       // Schedule 3 line 10 -> 31
     'excessSocialSecurityWithheld',         // Schedule 3 line 11 -> 31
     'federalFuelTaxCredit',                 // Schedule 3 line 12 -> 31
-    'otherPaymentsAndRefundableCredits',    // Schedule 3 line 13a-13z -> 31
-    'foreignEarnedIncomeForm2555',          // line 16 wrapper
+    // ── Schedule 3 line 13's own eight kinds (2026-08-18) ──────────────────
+    //
+    // `otherPaymentsAndRefundableCredits` stood here as ONE kind for the
+    // whole of printed line 13. Split off `f1040s3.pdf` (2025) and
+    // `i1040gi.pdf` (2025) p117. The old remedy's "five lettered sub-lines"
+    // was right -- 13a, 13b, 13c, 13d and 13z.
+    //
+    // **Line 13z is a WRITE-IN and is FOUR kinds**: its instructions name
+    // three credits outright -- §960(c)'s excess limitation account, Form
+    // 8689's Virgin Islands allocation and Form 1062's farmland deferral --
+    // and leave the line open, so a residual stands beside them.
+    'form2439UndistributedCapitalGains',  // Schedule 3 line 13a -> 31
+    'section1341CreditForRepayment',      // Schedule 3 line 13b -> 31
+    'netElectivePaymentElectionAmount',   // Schedule 3 line 13c -> 31
+    'deferredNet965TaxLiability',         // Schedule 3 line 13d -> 31
+    'section960cExcessLimitationCredit',  // Schedule 3 line 13z -> 31
+    'usVirginIslandsTaxAllocation',       // Schedule 3 line 13z -> 31
+    'qualifiedFarmlandGainDeferral',      // Schedule 3 line 13z -> 31
+    'otherRefundableCreditsNotListed',    // Schedule 3 line 13z -> 31
+    // ── Form 2555's four kinds (TAX-42) ───────────────────────────────────
+    //
+    // `foreignEarnedIncomeForm2555` stood here as ONE kind naming three
+    // printed destinations -- 1040 line 16, Schedule 1 line 8d and Schedule 1
+    // line 24j -- on the stated ground that "one form produces them". That
+    // was right while nothing was modelled and wrong the moment something
+    // was: the three have three unrelated blockers, so a filer with no
+    // housing claim was refused by a sentence about Notice 2025-16's table,
+    // and nothing could be reclassified without reclassifying all of it.
+    //
+    // Split under this vocabulary's own rule -- one kind per fact a taxpayer
+    // can truthfully declare having. See
+    // `fjs/form2555/todo/foreign-earned-income.md` §6.
+    'foreignEarnedIncomeExclusion',         // Schedule 1 line 8d -> 8; line 16 wrapper
+    'foreignEarnedIncomeBonaFideResidenceTest',   // Form 2555 Part II
+    'foreignHousingExclusionOrDeduction',   // Schedule 1 line 24j -> 10
+    'foreignEarnedIncomeReceivedInAnotherTaxYear', // Form 2555 line 45 write-in
+    'foreignEarnedIncomeCapitalGainExcess', // line 16 worksheet footnote
     'childsUnearnedIncomeForm8615',         // line 16 wrapper
     'farmIncomeAveragingScheduleJ',         // line 16 wrapper
     'form8814ChildInterestAndDividends',    // line 16 add-on
@@ -517,6 +762,47 @@ const dependentEntrySchema = /** @type {const} */ ({
     earnedIncomeCreditUnitedStatesResidency: option(string),
     earnedIncomeCreditJointReturn: option(string),
 })
+
+/**
+ * The largest `ageAtYearEnd` a {@link dependentEntrySchema} entry may carry,
+ * enforced by check 11 in {@link checkReferences}.
+ *
+ * A named constant rather than a literal in the comparison, for the reason
+ * `fjs/document/rental_property`'s `daysInTheLongestYear` gives: the
+ * refusal quotes the bound, so the bound must be written once.
+ *
+ * ## Why 150, and why a bound at all
+ *
+ * The FLOOR is the interesting half and it is not arguable: a child born on
+ * 31 December is `0` at year end, and no dependent is `-1`. Both consumers
+ * compare against a threshold with `<` (`fjs/form8812`'s "under 17",
+ * `fjs/schedule/eic`'s §152(c)(3) 19 and 24), so a negative age is *counted
+ * as a child* — the expensive direction — and a fraction decides those
+ * comparisons on a number that is not an age. Measured on this tree before
+ * this check existed: a single dependent stored at `ageAtYearEnd: 16.999999`
+ * takes Schedule 8812 line 14 to $2,200.00, and `17` takes it to $500.00.
+ * $1,700 turned on a fourth decimal place of a whole-number field.
+ *
+ * The CEILING is the one that could do harm if chosen badly, because a
+ * dependent is not necessarily a child: §152(d)'s qualifying relative has no
+ * age test at all, so a filer supporting a parent or a grandparent stores a
+ * real age in the nineties here. AGENTS.md — **"a check that fails when
+ * everything is well is worse than no check"** — and the same trade the
+ * rental-property author made picking 366 in EVERY year rather than 365 in
+ * most: admitting an impossible value in the far tail costs nothing, and
+ * refusing a legitimate one costs a return.
+ *
+ * So the ceiling is set far past any human lifetime rather than at one. 150
+ * clears the oldest verified human on record (Jeanne Calment, 122) by 28
+ * years, and it is above the largest age this dialect could ever be asked to
+ * carry for any other reason. Nothing in the engine reads the region above
+ * 24 differently from the region below 150 — every consumer branch is at 17,
+ * 19 or 24 — so the ceiling decides no money at any input. Its whole job is
+ * to catch a transcription that is not an age: a tax year typed into the age
+ * box (`2025`), an age in months (`204`), or an overflowed double (`1e308`).
+ * @type {number}
+ */
+export const oldestPlausibleDependentAge = 150
 
 /**
  * The FROZEN vocabularies for §32's ten asserted facts — five per dependent
@@ -763,6 +1049,37 @@ export const returnProfileSchema = /** @type {const} */ ({
     // because certifying eligibility while claiming nothing is an ordinary
     // return and every other field on this dialect is silent about moving.
     movingExpensesArmedForcesPermanentChangeOfStation: option(true),
+    // Form 4797 line 7's own printed instruction, which names this state in so
+    // many words: "If line 7 is a gain and you didn't have any prior year
+    // section 1231 losses, or they were recaptured in an earlier year, enter
+    // the gain from line 7 as a long-term capital gain on the Schedule D filed
+    // with your return and skip lines 8, 9, 11, and 12."
+    //
+    // §1231(c) recharacterizes a current-year net §1231 gain as ordinary to
+    // the extent of "your net section 1231 losses deducted during the 5
+    // preceding tax years that have not yet been applied against any net
+    // section 1231 gain" (i4797 p6, line 8) — five prior years plus the
+    // running ledger of what has already been applied. `vnd.fjs.prior_year_\
+    // capital_loss` is the precedent for transcribing a prior-year fact and it
+    // is a precedent AGAINST transcribing this one: that dialect stores "ONLY
+    // the four raw prior-year figures, never a pre-computed carryover total",
+    // and line 8 has no raw printed figures behind it — i4797 p7 calls it a
+    // "For recordkeeping purposes" amount. So a checkbox, in
+    // `movingExpensesArmedForcesPermanentChangeOfStation`'s exact shape.
+    //
+    // **It belongs on THIS dialect and not on `vnd.fjs.asset_register`, and
+    // the cardinality is the argument.** §1231 nets across the whole return; a
+    // taxpayer with two businesses files two Forms 4562 (i4562 p1: "File a
+    // separate Form 4562 for each business or activity") and holds two
+    // registers, but exactly ONE Form 4797 and one netting. A per-register
+    // certification would be a return-level fact stored per business, with two
+    // copies free to disagree.
+    //
+    // Read only by `fjs/form4797`, which REFUSES at printed line 8 without it
+    // — and only when line 7 is a GAIN, because the printed page skips lines 8
+    // and 9 entirely for a loss. See
+    // `fjs/form4797/todo/sales-of-business-property.md` §4.
+    noNonrecapturedNetSectionOneTwoThreeOneLossesFromPriorYears: option(true),
     // §904(j)(2)(C)'s ELECTION and §904(j)(2)(A)'s ASSERTION, in one field,
     // and the name states both because the taxpayer is making both claims at
     // once: "every dollar of my foreign-source gross income is qualified
@@ -819,9 +1136,235 @@ export const returnProfileSchema = /** @type {const} */ ({
     filerQualifyingChildOfAnotherTaxpayer: option(string),
     filerAttainedAgeTwentyFiveButNotSixtyFive: option(string),
     filerPrincipalPlaceOfAbode: option(string),
+    // TAX-37 (Form 8962) -- the two facts the Premium Tax Credit needs that
+    // no information return reports. A Form 1095-A is a REAL issued statement
+    // and carries neither: the Marketplace does not know which federal
+    // poverty line table the filer's residence selects, and it certainly does
+    // not know whether a dependent has to file a return.
+    //
+    // Form 8962 line 4's own printed checkbox: Alaska, Hawaii, or the other
+    // 48 states and DC. A vocabulary-checked STRING rather than three
+    // `option(true)` flags, because the printed form admits exactly one of
+    // three and three independent booleans could say "Alaska and Hawaii" --
+    // the same reason the §32 fact fields above are vocabulary strings.
+    //
+    // **A declaration of which TABLE applies, not of a state**, because
+    // i8962's line 4 instruction is itself about the table: a filer who moved
+    // during the year, or a joint filer whose spouses lived in different
+    // states, uses "the table with the higher dollar amounts for your family
+    // size" -- an answer no state name determines. Read only by
+    // `fjs/form1040/core`, which passes it to `fjs/form8962`; that form
+    // REFUSES when it is absent and a Form 1095-A is stored, so no
+    // cross-field check is needed here (buying Marketplace coverage in no
+    // year is an ordinary return, and every other field on this dialect is
+    // silent about health coverage).
+    federalPovertyLineTable: option(string),
+    // Form 8962 line 2b: household income includes "the combined modified AGI
+    // for your dependents who are required to file an income tax return
+    // because their income meets the income tax return filing threshold".
+    // `option(true)`, DOC-12 -- absent means NOT certified, and
+    // `fjs/form8962` then refuses a return with any dependent rather than
+    // reading line 2b as zero, which would overstate the credit for every
+    // family whose teenager has a job.
+    //
+    // The certification is exactly the printed condition, not a proxy for it:
+    // the taxpayer states that no dependent meets the §6012(a)(1) filing
+    // threshold, which for the ordinary case (a six-year-old) is trivially
+    // true and which the taxpayer, unlike this engine, actually knows.
+    noDependentIsRequiredToFileAnIncomeTaxReturn: option(true),
+    // TAX-39 (Form 7206) -- §162(l)(2)(B)'s "other coverage" disqualifier, the
+    // one fact the self-employed health insurance deduction needs that appears
+    // on NO information return and that no amount this engine holds implies.
+    //
+    // The statute, 26 U.S.C. §162(l)(2)(B): "Paragraph (1) shall not apply to
+    // any taxpayer for any calendar month for which the taxpayer is eligible
+    // to participate in any subsidized health plan maintained by any employer
+    // of the taxpayer or of the spouse of, or any dependent, or individual
+    // described in subparagraph (D) of paragraph (1) with respect to, the
+    // taxpayer." Form 7206 line 1 restates it as an exclusion from the
+    // premiums themselves: "don't include ... Amounts for any month you were
+    // eligible to participate in a health plan subsidized by your employer or
+    // your spouse's employer or the employer of either your dependent or your
+    // child who was under the age of 27 at the end of 2025."
+    //
+    // **The certification is WHOLE-YEAR while the statute is month-by-month,
+    // and that is a deliberate narrowing rather than an approximation.** A
+    // taxpayer eligible for an employer plan in three of twelve months has a
+    // real, partial deduction; they cannot make this declaration, and
+    // `fjs/schedule/1` then REFUSES rather than computing one. Refusing a
+    // return this engine cannot compute is the honest direction; a whole-year
+    // flag read as "eligible in no month" when the taxpayer meant "eligible in
+    // some" would overstate the deduction, which is the direction that costs
+    // the taxpayer a notice.
+    //
+    // It is also broader than §162(l)(2)(B) in a second way: the statute
+    // applies the test SEPARATELY to long-term-care plans and to plans that
+    // are not long-term-care ones (Form 7206 line 2's note), and this one flag
+    // covers both. A filer eligible for one but not the other cannot certify,
+    // and again refuses rather than deducting. Both narrowings are recorded in
+    // `fjs/schedule/1/todo/self-employed-health-insurance.md`.
+    //
+    // `option(true)`, DOC-12 -- absent means NOT certified. Read only by
+    // `fjs/schedule/1`, which refuses when premiums are stored and it is
+    // absent, so no cross-field check is needed here: certifying while
+    // claiming no premium is an ordinary return, exactly as
+    // `movingExpensesArmedForcesPermanentChangeOfStation`'s own note says of
+    // certifying a permanent change of station while claiming no move.
+    notEligibleForAnySubsidizedEmployerHealthPlanInAnyMonth: option(true),
+    // ── TAX-42 (Form 2555, §911): four facts, none on any information return ─
+    //
+    // There is no information return for foreign earned income AT ALL. A
+    // foreign employer issues no Form W-2, and Form 2555 Part IV lines 19
+    // through 23 are the taxpayer's own tally of wages, non-cash lodging,
+    // meals, a car, allowances and reimbursements. So all four arrive the way
+    // a household move's cost does -- stated, because nobody else states them.
+    //
+    // They ride on THIS dialect rather than on `vnd.fjs.adjustments` because
+    // Form 2555 line 45 lands in Schedule 1 **Part I** (line 8d, additional
+    // income), and that dialect is Part II's. See
+    // `fjs/form2555/todo/foreign-earned-income.md` §7.
+    //
+    // §911(d)(1)(B)'s physical presence test, together with §911(d)(3)'s tax
+    // home test, in ONE declaration -- because a taxpayer claiming the
+    // exclusion is making both claims at once and neither is worth anything
+    // alone:
+    //
+    // > "I was physically present in a foreign country or countries for at
+    // > least 330 full days during a period of 12 consecutive months, my tax
+    // > home was in a foreign country throughout my qualifying period, and I
+    // > maintained no abode in the United States during that period."
+    //
+    // **The 330-day half is a COUNT**, which is what makes it certifiable at
+    // all: i2555 p3 defines a full day as "the 24-hour period that starts at
+    // midnight", and on any given midnight-to-midnight day a person either was
+    // or was not inside a foreign country. That is the same kind of fact as
+    // `movingExpensesArmedForcesPermanentChangeOfStation`'s military order --
+    // the taxpayer holds the evidence and nobody else does, because no
+    // information return reports travel.
+    //
+    // **The abode half is deliberately NARROWER than §911(d)(3).** The statute
+    // denies a foreign tax home "for any period for which his abode is within
+    // the United States", and i2555 p2 makes that a weighing of "family,
+    // economic, and personal ties" -- a judgement an ordinary taxpayer is not
+    // competent to make, and the instructions' own offshore-oil-rig example is
+    // a filer with well over 330 days abroad who still fails it. So this field
+    // asks for the bright line underneath instead. A filer who kept a home in
+    // the United States may still qualify under the statute; they cannot make
+    // this declaration and are refused, which is the
+    // `notEligibleForAnySubsidizedEmployerHealthPlanInAnyMonth` trade exactly:
+    // a certification easier to state truthfully than the statute is to
+    // satisfy, so everyone who CAN state it truthfully certainly qualifies.
+    //
+    // **§911(d)(1)(A)'s bona fide residence test gets NO field here**, and
+    // that is the decision this phase turned on rather than an omission. It
+    // depends on "your intention about the length and nature of your stay",
+    // and i2555 p3 continues: "If these conflict, your acts carry more weight
+    // than your words." A certification IS words. An instruction whose own
+    // text discounts them cannot be turned into a checkbox, so
+    // `foreignEarnedIncomeBonaFideResidenceTest` refuses by name instead.
+    //
+    // `option(true)`, DOC-12 -- absent means NOT certified. Check 11 below is
+    // what makes absence bite, because unlike the certifications above this
+    // one sits beside stored AMOUNTS on the same dialect.
+    physicallyPresentInAForeignCountryThreeHundredThirtyFullDaysAndNoUnitedStatesAbode: option(true),
+    // Form 2555 line 31/38, and i2555's line 31 instruction defines it
+    // exactly: "the number of days in your qualifying period that fall within
+    // your 2025 tax year. Your qualifying period is the period during which
+    // you meet the tax home test and either the bona fide residence or
+    // physical presence test."
+    //
+    // **Not the 330 full days and not line 16's 12-month window.** A filer
+    // abroad continuously from 2023 to 2027 enters 365 here while their line
+    // 16 window is a 12-month slice; i2555's own example -- a tax home
+    // established August 14 and held past year end -- enters 140.
+    //
+    // `option(number)` on `vnd.fjs.rental_property`'s precedent, where
+    // `fairRentalDays` and `personalUseDays` are day counts and ABSENT is not
+    // zero. Range-checked in check 11 against that dialect's own
+    // {@link daysInTheLongestYear}, for its reason: this dialect does not know
+    // whether the year it names is a leap year, and 366 is the bound that is
+    // safe in every year. The tighter bound -- the actual length of the tax
+    // year -- is `fjs/tax/params`' `foreignEarnedIncome.daysInTaxYear`, and
+    // `fjs/schedule/1` refuses against THAT, because a parameter set is where
+    // a year's own facts live.
+    foreignEarnedIncomeQualifyingDays: option(number),
+    // Form 2555 line 26 -> line 27, the 2025 foreign earned income itself, a
+    // money box. Already NET of line 25's §119 excludable meals and lodging,
+    // exactly as `fjs/form7206`'s line 1 premiums arrive net of that line's
+    // own printed exclusions: the split cannot be recovered downstream, so it
+    // is enforced where the figure is named.
+    foreignEarnedIncome: option(string),
+    // Form 2555 line 44 -- "Deductions allowed in figuring your adjusted gross
+    // income (Form 1040 or 1040-SR, line 11) that are allocable to the
+    // excluded income", which is §911(d)(6) in its deduction half. A money
+    // box, absent meaning $0, which the printed line permits (it is left blank
+    // by every filer with none).
+    //
+    // Understating it OVERSTATES the exclusion, so it is not a safe field to
+    // omit -- which is why check 11 refuses a stored foreign earned income
+    // that arrives without the certification, and why this field exists at all
+    // rather than being assumed away.
+    foreignEarnedIncomeDeductionsAllocableToExcludedIncome: option(string),
+    // The Foreign Earned Income Tax Worksheet's own line 2b, printed
+    // identically in i1040gi p37 (the 1040 line 16 worksheet) and i6251 p10
+    // (the Form 6251 line 7 one): "the total amount of any itemized deductions
+    // or exclusions you couldn't claim because they are related to excluded
+    // income".
+    //
+    // **A DIFFERENT figure from
+    // `foreignEarnedIncomeDeductionsAllocableToExcludedIncome` above, and the
+    // names say which is which.** That one is Form 2555 line 44 -- deductions
+    // taken in figuring ADJUSTED GROSS INCOME, which reduce the exclusion
+    // itself. This one is below the line: itemized deductions and exclusions,
+    // which reduce the amount the tax worksheet stacks the remaining income on
+    // top of. Folding them into one field would subtract the same dollars
+    // twice on two different lines of two different forms.
+    //
+    // Absent means $0, which the printed line permits -- it is left blank by
+    // every filer with none, and every filer taking the standard deduction has
+    // no itemized deduction to be disallowed. Omitting it OVERSTATES the tax
+    // rather than understating it: worksheet line 2c grows, and line 6 is
+    // increasing in line 2c under a progressive schedule. That is the safe
+    // direction and still not a reason to guess, which is why the field exists.
+    foreignEarnedIncomeItemizedDeductionsAndExclusionsNotClaimed: option(string),
 })
 
 /** @typedef {Ts<typeof returnProfileSchema>} ReturnProfile */
+
+/**
+ * The three federal-poverty-line tables Form 8962 line 4 prints as checkboxes,
+ * frozen here the way {@link earnedIncomeCreditVocabularies} freezes §32's
+ * answers. `fjs/tax/params` stores a table under each of these exact names,
+ * and `fjs/form8962`'s own proof is what pins the two lists to each other --
+ * a value this dialect accepted but that module had no table for would refuse
+ * deep inside a computation instead of at ingest, which is the whole reason
+ * check 10 below exists.
+ * @type {readonly string[]}
+ */
+const federalPovertyLineTableNames = [
+    'contiguous48AndDistrictOfColumbia',
+    'alaska',
+    'hawaii',
+]
+
+/**
+ * The five Form 2555 fields this dialect carries, walked in check 11's loop so
+ * the declared-kind pairing is written once rather than five times — the
+ * {@link moneyBoxFields} idiom, and what check 7b's own comment says to do
+ * once a third such field arrives.
+ *
+ * Typed `@type {const}` — not a wider `keyof ReturnProfile` annotation — so
+ * `r[field]` resolves to exactly `string | number | true | undefined` rather
+ * than the union of every field's type, the same device {@link moneyBoxFields}
+ * uses.
+ */
+const formTwoFiveFiveFiveFields = /** @type {const} */ ([
+    'physicallyPresentInAForeignCountryThreeHundredThirtyFullDaysAndNoUnitedStatesAbode',
+    'foreignEarnedIncomeQualifyingDays',
+    'foreignEarnedIncome',
+    'foreignEarnedIncomeDeductionsAllocableToExcludedIncome',
+    'foreignEarnedIncomeItemizedDeductionsAndExclusionsNotClaimed',
+])
 
 /** Structural-only validator: checks the shape, not the semantic refinements below. */
 const validateShape = rttiValidate(returnProfileSchema)
@@ -839,6 +1382,9 @@ const moneyBoxFields = /** @type {const} */ ([
     'line35aRefundRequested',
     'line36AppliedToNextYear',
     'scheduleThreeLine10AmountPaidWithExtensionRequest',
+    'foreignEarnedIncome',
+    'foreignEarnedIncomeDeductionsAllocableToExcludedIncome',
+    'foreignEarnedIncomeItemizedDeductionsAndExclusionsNotClaimed',
 ])
 
 /**
@@ -923,7 +1469,29 @@ const statusesWithoutSpouseBoxes = ['single', 'headOfHousehold', 'qualifyingSurv
  * 5b. Married filing separately's spouse boxes require the footnote condition.
  * 6. Every PRESENT money box is an exact decimal string at the cents scale.
  * 7. A present line-26 amount has `'estimatedTaxPayments'` declared.
+ * 7b. The identical rule for Schedule 3 line 10's own amount.
  * 8. A present `dependents` array's length equals `dependentCount`.
+ * 9. Every PRESENT §32 fact — five on the filer, five per dependent — names a
+ *    value {@link earnedIncomeCreditVocabularies} admits.
+ * 10. A PRESENT `federalPovertyLineTable` names one of Form 8962 line 4's
+ *    three prints.
+ * 11. Every dependent's `ageAtYearEnd` is a whole number in
+ *    `0 .. {@link oldestPlausibleDependentAge}`.
+ * 12. Every present Form 2555 field has `'foreignEarnedIncomeExclusion'` declared.
+ * 13. A present `foreignEarnedIncomeQualifyingDays` is a whole count no larger
+ *     than {@link daysInTheLongestYear}.
+ * 14. A present `foreignEarnedIncome` carries both §911(d)(1)(B)'s certification
+ *     and a qualifying-day count.
+ *
+ * This list enumerated 1–8 only, omitting 7b, 9 and 10, from the day check 7b
+ * landed until 2026-08-19 — the same documentation drift the leaf-name sweep
+ * has now found nine times. The body is the authority; a reader who trusted
+ * this list would have concluded that a present §32 fact and a present
+ * poverty-line table were unchecked, which is the direction that costs
+ * something. **Checks 12 through 14 were written as 11 through 13 on a branch
+ * that could not see check 11**, and are renumbered here rather than
+ * renumbered around: the numbers are cited from this module's own docstrings
+ * and proof-leaf names, and the citations move with them.
  *
  * Nothing here throws: every refusal is an `error(...)` the caller unwraps, so
  * a hostile blob can never escape `validate` as an exception.
@@ -1061,6 +1629,108 @@ export const checkReferences = r => {
             }
         }
     }
+    // 10 — TAX-37: a PRESENT federal-poverty-line table names one of the
+    // three Form 8962 line 4 prints. Refused at ingest rather than at the
+    // form, because an unrecognized answer cannot be read as any of the three
+    // and the three differ by up to 25% of the poverty line.
+    if (
+        r.federalPovertyLineTable !== undefined
+        && !federalPovertyLineTableNames.includes(r.federalPovertyLineTable)
+    ) {
+        return error(
+            `federalPovertyLineTable carries ${JSON.stringify(r.federalPovertyLineTable)}, which `
+            + `is not one of the ${federalPovertyLineTableNames.length} tables Form 8962 line 4 `
+            + `prints: ${federalPovertyLineTableNames.join(', ')}`,
+        )
+    }
+    // 11 — every dependent's age is a whole number of years in range. See
+    // {@link oldestPlausibleDependentAge} for the bound and for the $1,700
+    // this check was measured to be worth.
+    //
+    // ONE field, so ONE statement inside the loop that already exists for
+    // every per-dependent check — deliberately NOT the `[name, value]` table
+    // `moneyBoxFields` and `fjs/document/rental_property`'s two day counts
+    // use. That device pays when a rule is written more than once; a table of
+    // one is the check-7b judgement in the other direction. The loop over
+    // `dependents` IS the DRY device here.
+    //
+    // Appended rather than inserted beside check 8, where it belongs by
+    // subject: these numbers are cited from this module's docstrings and
+    // from its proof leaf names, and renumbering 9 and 10 to make room would
+    // break those citations for nothing a reader gains.
+    for (const [index, entry] of (r.dependents ?? []).entries()) {
+        const age = entry.ageAtYearEnd
+        if (!Number.isInteger(age) || age < 0 || age > oldestPlausibleDependentAge) {
+            return error(
+                `dependents[${index}]: ageAtYearEnd ${age} is not a whole number of years in `
+                + `0..${oldestPlausibleDependentAge} — Schedule 8812 line 4 splits the $2,000 `
+                + `child tax credit from the $500 other-dependent credit on "under age 17", and `
+                + `§152(c)(3) tests 19 and 24 for the earned income credit, so a fractional or `
+                + `out-of-range age would decide those comparisons on a number that is not an `
+                + `age at all`,
+            )
+        }
+    }
+    // 12 — TAX-42: an amount or a day count with no declared kind is exactly
+    // check 7's failure mode on a different line. All four Form 2555 fields
+    // route through ONE loop rather than four `if`s, which is what check 7b's
+    // own comment says to do the day a third arrives: "make it a loop the way
+    // `moneyBoxFields` is one."
+    for (const field of formTwoFiveFiveFiveFields) {
+        if (r[field] !== undefined && !r.declaredKinds.includes('foreignEarnedIncomeExclusion')) {
+            return error(
+                `${field} is present but declaredKinds does not name `
+                + "'foreignEarnedIncomeExclusion'",
+            )
+        }
+    }
+    // 13 — the day count is a whole number of days that could fall inside a
+    // tax year. Bounded by `vnd.fjs.rental_property`'s own
+    // {@link daysInTheLongestYear}, IMPORTED rather than re-declared: 366 in
+    // every year for that dialect's stated reason, which is this dialect's
+    // reason too. The tighter bound — the actual length of THIS tax year — is
+    // `fjs/tax/params`' `foreignEarnedIncome.daysInTaxYear`, and
+    // `fjs/schedule/1` refuses against that; a parameter set is where a year's
+    // own facts live, and this dialect is not.
+    const qualifyingDays = r.foreignEarnedIncomeQualifyingDays
+    if (
+        qualifyingDays !== undefined
+        && (!Number.isInteger(qualifyingDays)
+            || qualifyingDays < 0
+            || qualifyingDays > daysInTheLongestYear)
+    ) {
+        return error(
+            `foreignEarnedIncomeQualifyingDays must be a whole count of days from 0 to `
+            + `${daysInTheLongestYear}: ${qualifyingDays}`,
+        )
+    }
+    // 14 — §911(a) allows the exclusion only to a "qualified individual", and
+    // §911(b)(2)(A) prorates it by the qualifying period. A stored foreign
+    // earned income without BOTH is an amount this engine could only exclude
+    // by assuming a qualification nobody claimed or a day count nobody
+    // supplied — and assuming 365 days would hand a filer who qualified for
+    // three months the whole $130,000.
+    //
+    // Refused HERE rather than at the form, because both missing facts are
+    // visible on this one document and a refusal at ingest names the document
+    // the taxpayer must fix.
+    if (r.foreignEarnedIncome !== undefined) {
+        if (r.physicallyPresentInAForeignCountryThreeHundredThirtyFullDaysAndNoUnitedStatesAbode === undefined) {
+            return error(
+                'foreignEarnedIncome is present but '
+                + 'physicallyPresentInAForeignCountryThreeHundredThirtyFullDaysAndNoUnitedStatesAbode '
+                + 'is not declared: §911(d)(1)(A) bona fide residence is a refused kind, so the '
+                + 'physical presence test is the only route to the exclusion this engine models',
+            )
+        }
+        if (qualifyingDays === undefined) {
+            return error(
+                'foreignEarnedIncome is present but foreignEarnedIncomeQualifyingDays is absent: '
+                + 'Form 2555 line 38 prorates the exclusion by the qualifying days that fall '
+                + 'within the tax year, and an absent count is not 365',
+            )
+        }
+    }
     return ok(r)
 }
 
@@ -1128,7 +1798,13 @@ const generatedMoneyBoxExactnessProof = Object.fromEntries(
         () => {
             const [t, v] = validate({
                 ...minimal,
-                declaredKinds: ['estimatedTaxPayments', 'amountPaidWithExtensionRequest'],
+                declaredKinds: [
+                    'estimatedTaxPayments',
+                    'amountPaidWithExtensionRequest',
+                    'foreignEarnedIncomeExclusion',
+                ],
+                physicallyPresentInAForeignCountryThreeHundredThirtyFullDaysAndNoUnitedStatesAbode: true,
+                foreignEarnedIncomeQualifyingDays: 365,
                 [field]: '1,234.56',
             })
             assertEq(t, 'error', ['expected a comma-grouped amount in this box to be refused', field, t, v])
@@ -1230,9 +1906,27 @@ const expectedEarnedIncomeCreditFactFieldCount = 10
  * `scheduleThreeLine10AmountPaidWithExtensionRequest`: the FIRST money box on
  * this dialect that is not a 1040 line, and the fourth figure this engine
  * takes from the taxpayer because no information return states it.
+ *
+ * `5 -> 8` is TAX-42's three — Form 2555 lines 26 and 44, and the Foreign
+ * Earned Income Tax Worksheet's own line 2b. The first money boxes here that
+ * are not a 1040 or a schedule line at all, but a form's and a worksheet's.
+ * They are on this dialect for the reason their own comments give: there is no
+ * information return for foreign earned income anywhere.
  * @type {number}
  */
-const expectedMoneyBoxFieldCount = 5
+const expectedMoneyBoxFieldCount = 8
+
+/**
+ * Independently hand-typed: the number of Form 2555 fields
+ * {@link formTwoFiveFiveFiveFields} names today, and therefore the number
+ * check 11's loop walks. Deliberately NOT `formTwoFiveFiveFiveFields.length`,
+ * for {@link expectedMoneyBoxFieldCount}'s reason — a field dropped from that
+ * list would vanish from the loop AND from
+ * `everyFormTwoFiveFiveFiveFieldNeedsTheDeclaredKind`'s own five cases in the
+ * same instant, and neither would notice. This constant is what does.
+ * @type {number}
+ */
+const expectedFormTwoFiveFiveFiveFieldCount = 5
 
 /**
  * Independently hand-typed: the size of the frozen {@link kindVocabulary},
@@ -1306,18 +2000,67 @@ const expectedMoneyBoxFieldCount = 5
  * per printed line" is the rule Phases 23 through 27 applied, and it is not
  * quite the rule. The real rule is one kind per thing a taxpayer can
  * truthfully declare having, and printed Schedule 1 line 5 is five of those.
+ *
+ * `115 -> 117` is TAX-37's own, and it is the EIGHTH split, of exactly the
+ * shape the paragraph above describes: `advancePremiumTaxCreditAndOtherRepayments`
+ * covered one printed line (Schedule 2 line 1) whose lettered sub-lines are
+ * three unrelated things a taxpayer can truthfully declare having — an excess
+ * advance premium tax credit (Form 8962), a clean vehicle credit transferred
+ * to a dealer (Form 8936 Schedule A), and an elective payment election
+ * recapture (Form 4255). One is removed and three added, `115 - 1 + 3`.
+ *
+ * **The split is what made reclassification safe**, and that is worth stating
+ * because the alternative looked cheaper. Form 8962 computes line 1a and
+ * nothing computes 1b through 1f; had the coarse kind simply become modeled,
+ * a taxpayer whose only Part I entry was a clean-vehicle repayment would have
+ * declared the exact kind the engine had just started computing and been
+ * handed a zero. Splitting is the only move that lets the engine say yes to
+ * one and no to the others.
+ *
+ * **195 -> 197 is TAX-38's**, and it is the first widening since that split:
+ * Form 6781 Part I made §1256 contracts computable from Form 1099-B box 11,
+ * and `straddleGainsAndLosses` and
+ * `netSectionTwelveFiftySixContractsLossCarryback` name the two parts of that
+ * form which are not. Both join `unmodeledKindRefusals`; nothing joins
+ * `modeledKinds`, and nothing is reclassified. Before it, a futures trader
+ * had no kind at all to declare and fell through the scope guard entirely.
+ *
+ * **197 -> 201 is TAX-42's**, and it is a SPLIT rather than a widening:
+ * `foreignEarnedIncomeForm2555` named three printed destinations under one
+ * row on the stated ground that "one form produces them", and that was right
+ * while nothing was modelled and wrong the moment something was. It becomes
+ * four — `foreignEarnedIncomeExclusion` (modeled),
+ * `foreignEarnedIncomeBonaFideResidenceTest`,
+ * `foreignHousingExclusionOrDeduction`,
+ * `foreignEarnedIncomeReceivedInAnotherTaxYear` and
+ * `foreignEarnedIncomeCapitalGainExcess` (all refused) — so `197 - 1 + 5`.
+ * The four refusals have four unrelated blockers, and under the old row a
+ * filer with no housing claim was refused by a sentence about a table they
+ * never needed.
+ *
+ * **The last of the four is a CONDITION this engine detects, not a fact a
+ * filer would think to declare** — and that is not new here. `fjs/tax/line16`
+ * has raised `childsUnearnedIncomeForm8615` and `investmentInterestForm4952`
+ * off computed conditions since Phase 10; a kind is a thing the engine can
+ * NAME, and being declarable is what most of them additionally are.
  * @type {number}
  */
-const expectedKindCount = 115
+const expectedKindCount = 201
 
 export const proof = {
     dialectAndMediaType: () => {
         assertEq(dialect, 'vnd.fjs.return_profile')
         assertEq(mediaType, 'application/vnd.fjs.return_profile+json')
     },
-    kindVocabularyIsExactlyOneHundredAndFourteen: () => {
+    kindVocabularyIsExactlyTwoHundredAndOne: () => {
         assertEq(kindVocabulary.length, expectedKindCount)
         assertEq(new Set(kindVocabulary).size, kindVocabulary.length)
+    },
+    thereAreExactlyFiveFormTwoFiveFiveFiveFields: () => {
+        assertEq(formTwoFiveFiveFiveFields.length, expectedFormTwoFiveFiveFiveFieldCount)
+        assertEq(
+            new Set(formTwoFiveFiveFiveFields).size, formTwoFiveFiveFiveFields.length,
+            'and each is named once')
     },
     validate: {
         minimalValidates: () => {
@@ -1410,6 +2153,109 @@ export const proof = {
             fractionalRefused: () => {
                 const [t] = validate({ ...minimal, dependentCount: 1.5 })
                 assertEq(t, 'error')
+            },
+        },
+        /**
+         * Check 11. `ageAtYearEnd` was a required, entirely unvalidated
+         * `number` on {@link dependentEntrySchema} until 2026-08-19: `-3`,
+         * `9.5` and `1e308` all validated `ok`, and every one of them then
+         * decided a credit. Measured on the tree immediately before the check
+         * landed, one dependent and a $50,000 AGI: `ageAtYearEnd: 16.999999`
+         * takes Schedule 8812 line 14 to $2,200.00 and `17` takes it to
+         * $500.00.
+         *
+         * Every bound below is HAND-TYPED, not read from
+         * {@link oldestPlausibleDependentAge} — a fixture derived from the
+         * constant under test moves with it and can never notice it moving,
+         * which is the Phase 10 defect AGENTS.md records.
+         */
+        dependentAge: {
+            /** The floor, the ceiling, and one step outside each. */
+            theBoundariesRefuse: () => {
+                for (const age of [-1, 151]) {
+                    const [t, v] = validate({
+                        ...minimal,
+                        dependentCount: 1,
+                        dependents: [{ relationship: 'daughter', ageAtYearEnd: age }],
+                    })
+                    assertEq(t, 'error', ['expected an out-of-range age to be refused', age, v])
+                    assert(typeof v === 'string', ['expected a semantic string refusal', age, v])
+                    assert(v.includes('ageAtYearEnd'), ['expected the field named', age, v])
+                    assert(v.includes(String(age)), ['expected the offending VALUE quoted', age, v])
+                }
+            },
+            /**
+             * The control, and the half of this leaf that makes the one above
+             * mean something: a gate that refuses everything passes a refusal
+             * proof. `0` is a child born on 31 December; `150` is the bound
+             * itself and is INCLUSIVE; `122` is the oldest verified human
+             * lifetime and must never be refused — a §152(d) qualifying
+             * relative has no age test.
+             */
+            theBoundariesThemselvesAreLegitimate: () => {
+                for (const age of [0, 17, 122, 150]) {
+                    const [t, v] = validate({
+                        ...minimal,
+                        dependentCount: 1,
+                        dependents: [{ relationship: 'mother', ageAtYearEnd: age }],
+                    })
+                    assertEq(t, 'ok', ['expected a legitimate age to validate', age, v])
+                }
+            },
+            /**
+             * A fraction is the dangerous input, because it lands on the
+             * RIGHT side of every consumer's threshold while not being an
+             * age: `16.999999 < 17` is true, so Schedule 8812 pays the child
+             * tax credit on it.
+             */
+            aFractionalAgeRefusesEvenInsideTheRange: () => {
+                for (const age of [9.5, 16.999999, -0.0001]) {
+                    const [t, v] = validate({
+                        ...minimal,
+                        dependentCount: 1,
+                        dependents: [{ relationship: 'daughter', ageAtYearEnd: age }],
+                    })
+                    assertEq(t, 'error', ['expected a fractional age to be refused', age, v])
+                    assert(typeof v === 'string', ['expected a semantic string refusal', age, v])
+                    assert(v.includes(String(age)), ['expected the offending VALUE quoted', age, v])
+                }
+            },
+            /**
+             * On a multi-dependent return the refusal must say WHICH
+             * dependent, the same reason check 9 names its index: a filer
+             * with three children cannot act on "an age is wrong".
+             */
+            theRefusalNamesWhichDependent: () => {
+                const [t, v] = validate({
+                    ...minimal,
+                    dependentCount: 3,
+                    dependents: [
+                        { relationship: 'daughter', ageAtYearEnd: 10 },
+                        { relationship: 'son', ageAtYearEnd: 12 },
+                        { relationship: 'son', ageAtYearEnd: 2025 },
+                    ],
+                })
+                assertEq(t, 'error')
+                assert(typeof v === 'string', ['expected a semantic string refusal', v])
+                assert(v.includes('dependents[2]'), ['expected the offending INDEX named', v])
+                assert(v.includes('2025'), ['expected the offending VALUE quoted', v])
+            },
+            /**
+             * The refusal must say what the number was supposed to be, not
+             * merely that it was wrong. AGENTS.md, on the `${destination}`
+             * mutation that survived a whole suite: assert the part of a
+             * message that carries the information.
+             */
+            theRefusalQuotesTheRangeAndWhyItMatters: () => {
+                const [, v] = validate({
+                    ...minimal,
+                    dependentCount: 1,
+                    dependents: [{ relationship: 'daughter', ageAtYearEnd: 151 }],
+                })
+                assert(typeof v === 'string', ['expected a semantic string refusal', v])
+                assert(v.includes('0..150'), ['expected the permitted RANGE quoted', v])
+                assert(v.includes('17'), ['expected the 8812 threshold the age decides named', v])
+                assert(v.includes('152(c)(3)'), ['expected the EIC authority named', v])
             },
         },
         declaredKinds: {
@@ -1559,6 +2405,135 @@ export const proof = {
                     section904jElectionAllForeignIncomeIsQualifiedPassiveIncome: false,
                 })
                 assertEq(t, 'error')
+            },
+            // ── TAX-42: Form 2555's four checks ─────────────────────────
+            //
+            // The whole set, on a return that declares the kind and states
+            // every fact — the shape `fjs/form1040/core` actually receives.
+            formTwoFiveFiveFiveFieldsValidateTogether: () => {
+                const [t, v] = validate({
+                    ...minimal,
+                    declaredKinds: ['foreignEarnedIncomeExclusion'],
+                    physicallyPresentInAForeignCountryThreeHundredThirtyFullDaysAndNoUnitedStatesAbode: true,
+                    foreignEarnedIncomeQualifyingDays: 140,
+                    foreignEarnedIncome: '150000.00',
+                    foreignEarnedIncomeDeductionsAllocableToExcludedIncome: '4000.00',
+                    foreignEarnedIncomeItemizedDeductionsAndExclusionsNotClaimed: '1200.00',
+                })
+                assert(t === 'ok', ['a complete Form 2555 profile must validate', t, v])
+                assertEq(v.foreignEarnedIncomeQualifyingDays, 140)
+                assertEq(v.foreignEarnedIncome, '150000.00')
+            },
+            // DOC-12: a structural `false` on the certification is REJECTED,
+            // never read as "not certified" — the discipline every other
+            // checkbox on this dialect follows.
+            thePhysicalPresenceCertificationRejectsAStoredFalse: () => {
+                const [t] = validate({
+                    ...minimal,
+                    declaredKinds: ['foreignEarnedIncomeExclusion'],
+                    physicallyPresentInAForeignCountryThreeHundredThirtyFullDaysAndNoUnitedStatesAbode: false,
+                })
+                assertEq(t, 'error')
+            },
+            // Check 11 — every one of the five, one at a time, so a field
+            // silently dropped from `formTwoFiveFiveFiveFields` reddens here
+            // rather than passing because a NEIGHBOUR is still in the loop.
+            // The `formTwoFiveFiveFiveFieldCount` leaf below is what catches a
+            // field dropped from the LOOP as well as from this list.
+            everyFormTwoFiveFiveFiveFieldNeedsTheDeclaredKind: () => {
+                /** @type {readonly (readonly [string, string | number | true])[]} */
+                const cases = [
+                    ['physicallyPresentInAForeignCountryThreeHundredThirtyFullDaysAndNoUnitedStatesAbode', true],
+                    ['foreignEarnedIncomeQualifyingDays', 365],
+                    ['foreignEarnedIncome', '90000.00'],
+                    ['foreignEarnedIncomeDeductionsAllocableToExcludedIncome', '100.00'],
+                    ['foreignEarnedIncomeItemizedDeductionsAndExclusionsNotClaimed', '100.00'],
+                ]
+                assertEq(cases.length, 5, 'five Form 2555 fields, hand-counted')
+                for (const [field, value] of cases) {
+                    const [t, v] = validate({ ...minimal, [field]: value })
+                    assertEq(t, 'error', ['an unstated kind must refuse this field', field, v])
+                    assert(typeof v === 'string', ['expected a semantic refusal', field, v])
+                    assert(
+                        v.includes(field) && v.includes('foreignEarnedIncomeExclusion'),
+                        ['the refusal must name the field and the kind', field, v])
+                }
+            },
+            // THE CONTROL for the loop above: with the kind declared, each of
+            // the five validates on its own. Without this, a check 11 that
+            // refused unconditionally would pass every assertion above.
+            controlEachFormTwoFiveFiveFiveFieldValidatesWithTheKindDeclared: () => {
+                const base = {
+                    ...minimal,
+                    declaredKinds: ['foreignEarnedIncomeExclusion'],
+                    physicallyPresentInAForeignCountryThreeHundredThirtyFullDaysAndNoUnitedStatesAbode: true,
+                    foreignEarnedIncomeQualifyingDays: 365,
+                }
+                for (const field of [
+                    'foreignEarnedIncomeDeductionsAllocableToExcludedIncome',
+                    'foreignEarnedIncomeItemizedDeductionsAndExclusionsNotClaimed',
+                ]) {
+                    const [t, v] = validate({ ...base, [field]: '100.00' })
+                    assert(t === 'ok', ['the declared kind must admit this field', field, v])
+                }
+                const [t] = validate(base)
+                assertEq(t, 'ok', 'and the certification with a day count alone validates')
+            },
+            // Check 12 — the day count's own boundaries, against
+            // `vnd.fjs.rental_property`'s imported `daysInTheLongestYear`.
+            // 366 is admitted and 367 is not, because this dialect does not
+            // know whether the year it names is a leap year; the TIGHTER bound
+            // is `fjs/form1040/core`'s, against the parameter set.
+            theQualifyingDayCountIsRangeChecked: () => {
+                const base = {
+                    ...minimal,
+                    declaredKinds: ['foreignEarnedIncomeExclusion'],
+                }
+                assertEq(validate({ ...base, foreignEarnedIncomeQualifyingDays: 0 })[0], 'ok')
+                assertEq(validate({ ...base, foreignEarnedIncomeQualifyingDays: 366 })[0], 'ok')
+                assertEq(validate({ ...base, foreignEarnedIncomeQualifyingDays: 367 })[0], 'error')
+                assertEq(validate({ ...base, foreignEarnedIncomeQualifyingDays: -1 })[0], 'error')
+                assertEq(validate({ ...base, foreignEarnedIncomeQualifyingDays: 140.5 })[0], 'error')
+            },
+            // Check 13 — a stored foreign earned income needs BOTH the
+            // certification and a day count. Two separate refusals, each
+            // naming what is missing, because a filer told only "something is
+            // wrong" cannot act.
+            aStoredForeignEarnedIncomeNeedsTheCertificationAndTheDayCount: () => {
+                const declared = {
+                    ...minimal,
+                    declaredKinds: ['foreignEarnedIncomeExclusion'],
+                    foreignEarnedIncome: '90000.00',
+                }
+                const [t1, v1] = validate({ ...declared, foreignEarnedIncomeQualifyingDays: 365 })
+                assertEq(t1, 'error', 'no certification')
+                assert(
+                    typeof v1 === 'string' && v1.includes('physicallyPresent'),
+                    ['the refusal must name the certification', v1])
+                const [t2, v2] = validate({
+                    ...declared,
+                    physicallyPresentInAForeignCountryThreeHundredThirtyFullDaysAndNoUnitedStatesAbode: true,
+                })
+                assertEq(t2, 'error', 'no day count')
+                assert(
+                    typeof v2 === 'string' && v2.includes('foreignEarnedIncomeQualifyingDays'),
+                    ['the refusal must name the missing day count', v2])
+                assert(
+                    typeof v2 === 'string' && v2.includes('is not 365'),
+                    ['and say why an absent count is not a full year', v2])
+            },
+            // THE CONTROL: the certification and a day count WITHOUT an amount
+            // is an ordinary return — a filer who qualified and earned nothing
+            // abroad. Without this, a check 13 that refused the certification
+            // itself would pass every assertion above.
+            controlTheCertificationWithNoAmountValidates: () => {
+                const [t, v] = validate({
+                    ...minimal,
+                    declaredKinds: ['foreignEarnedIncomeExclusion'],
+                    physicallyPresentInAForeignCountryThreeHundredThirtyFullDaysAndNoUnitedStatesAbode: true,
+                    foreignEarnedIncomeQualifyingDays: 200,
+                })
+                assert(t === 'ok', ['qualifying and earning nothing is an ordinary return', t, v])
             },
             eachExtensionAndEstimatedGuardWatchesItsOwnKind: () => {
                 const [t1] = validate({
@@ -1711,6 +2686,142 @@ export const proof = {
             const [t, v] = validate({ ...minimal })
             assert(t === 'ok', ['expected ok', t, v])
             assertEq(v.movingExpensesArmedForcesPermanentChangeOfStation, undefined)
+        },
+    },
+    // Form 4797 line 7's "you didn't have any prior year section 1231 losses"
+    // certification, the same three-leaf shape.
+    sectionTwelveThirtyOneLookbackCertification: {
+        certificationValidates: () => {
+            const [t, v] = validate({
+                ...minimal,
+                noNonrecapturedNetSectionOneTwoThreeOneLossesFromPriorYears: true,
+            })
+            assert(t === 'ok', ['expected ok', t, v])
+            assertEq(v.noNonrecapturedNetSectionOneTwoThreeOneLossesFromPriorYears, true)
+        },
+        // DOC-12. A stored `false` would read as "I DID have prior year §1231
+        // losses, and here is nothing about how much" — a denial with no
+        // amount behind it, which is worse than silence because a reader would
+        // act on it.
+        falseRejected: () => {
+            const [t] = validate({
+                ...minimal,
+                noNonrecapturedNetSectionOneTwoThreeOneLossesFromPriorYears: false,
+            })
+            assertEq(t, 'error')
+        },
+        // THE CONTROL: absence is the ordinary case, and it is what makes
+        // `fjs/form4797` refuse a GAIN year rather than this dialect refusing
+        // the document. A return with no business property disposals says
+        // nothing here and validates.
+        absentValidates: () => {
+            const [t, v] = validate({ ...minimal })
+            assert(t === 'ok', ['expected ok', t, v])
+            assertEq(v.noNonrecapturedNetSectionOneTwoThreeOneLossesFromPriorYears, undefined)
+        },
+    },
+    // TAX-39 (Form 7206): §162(l)(2)(B)'s employer-plan disqualifier, the same
+    // three-leaf shape `movingExpensesArmedForcesPermanentChangeOfStation`
+    // has above — it validates, a structural `false` is rejected, and the
+    // CONTROL shows absence is ordinary.
+    selfEmployedHealthInsuranceCertification: {
+        certificationValidates: () => {
+            const [t, v] = validate({
+                ...minimal,
+                notEligibleForAnySubsidizedEmployerHealthPlanInAnyMonth: true,
+            })
+            assert(t === 'ok', ['expected ok', t, v])
+            assertEq(v.notEligibleForAnySubsidizedEmployerHealthPlanInAnyMonth, true)
+        },
+        // DOC-12. A stored `false` would read as a DENIAL the engine could act
+        // on, when what it actually has is silence — and here the two would
+        // reach the same refusal by different routes, which is exactly the
+        // confusion this convention exists to prevent.
+        falseRejected: () => {
+            const [t] = validate({
+                ...minimal,
+                notEligibleForAnySubsidizedEmployerHealthPlanInAnyMonth: false,
+            })
+            assertEq(t, 'error')
+        },
+        // THE CONTROL. Every return that is not self-employed says nothing
+        // here, and a gate that made this required would refuse all of them.
+        absentValidates: () => {
+            const [t, v] = validate({ ...minimal })
+            assert(t === 'ok', ['expected ok', t, v])
+            assertEq(v.notEligibleForAnySubsidizedEmployerHealthPlanInAnyMonth, undefined)
+        },
+    },
+    // TAX-37 (Form 8962): the two Premium Tax Credit facts no information
+    // return reports.
+    premiumTaxCreditFacts: {
+        // All three printed tables validate, driven off the frozen list so a
+        // fourth added later is covered automatically -- paired below with a
+        // hand-typed count, since a loop over the list under test cannot
+        // notice that list shrinking.
+        everyPrintedTableValidates: () => {
+            for (const table of federalPovertyLineTableNames) {
+                const [t, v] = validate({ ...minimal, federalPovertyLineTable: table })
+                assert(t === 'ok', ['expected ok', table, t, v])
+                assertEq(v.federalPovertyLineTable, table)
+            }
+        },
+        // Independently hand-typed: Form 8962 line 4 prints THREE checkboxes
+        // (Alaska, Hawaii, other 48 states and DC). Deliberately not
+        // `federalPovertyLineTableNames.length` compared to itself.
+        thereAreExactlyThreeTables: () => {
+            assertEq(federalPovertyLineTableNames.length, 3)
+            assertEq(
+                new Set(federalPovertyLineTableNames).size,
+                federalPovertyLineTableNames.length,
+                'and no table is named twice')
+        },
+        // Check 10: an unrecognized answer is refused at INGEST, naming both
+        // the offending value and the three that are admitted -- because a
+        // value this dialect accepted and `fjs/tax/params` had no table for
+        // would surface as an assertion failure deep inside Form 8962.
+        anUnknownTableIsRefusedNamingTheThreeAdmitted: () => {
+            const [t, v] = validate({ ...minimal, federalPovertyLineTable: 'puertoRico' })
+            assertEq(t, 'error')
+            assert(
+                typeof v === 'string' && v.includes('puertoRico'),
+                ['the refusal must quote what was stored', v])
+            for (const table of ['contiguous48AndDistrictOfColumbia', 'alaska', 'hawaii']) {
+                assert(
+                    typeof v === 'string' && v.includes(table),
+                    ['and must name every table that IS admitted', table, v])
+            }
+        },
+        // A near-miss spelling is refused too -- the case a `startsWith` or a
+        // case-insensitive comparison would have let through.
+        aNearMissSpellingIsRefused: () => {
+            assertEq(validate({ ...minimal, federalPovertyLineTable: 'Alaska' })[0], 'error')
+            assertEq(validate({ ...minimal, federalPovertyLineTable: 'alaska ' })[0], 'error')
+        },
+        noDependentIsRequiredToFileValidates: () => {
+            const [t, v] = validate({
+                ...minimal,
+                noDependentIsRequiredToFileAnIncomeTaxReturn: true,
+            })
+            assert(t === 'ok', ['expected ok', t, v])
+            assertEq(v.noDependentIsRequiredToFileAnIncomeTaxReturn, true)
+        },
+        // DOC-12: a stored `false` would look like "I certify that a
+        // dependent DOES have to file", which is a different statement from
+        // silence and one this engine has no use for.
+        noDependentIsRequiredToFileFalseRejected: () => {
+            assertEq(
+                validate({ ...minimal, noDependentIsRequiredToFileAnIncomeTaxReturn: false })[0],
+                'error')
+        },
+        // THE CONTROL for both fields: neither is required, and a return that
+        // says nothing about health coverage -- which is most returns --
+        // validates exactly as it always did.
+        bothAbsentValidates: () => {
+            const [t, v] = validate({ ...minimal })
+            assert(t === 'ok', ['expected ok', t, v])
+            assertEq(v.federalPovertyLineTable, undefined)
+            assertEq(v.noDependentIsRequiredToFileAnIncomeTaxReturn, undefined)
         },
     },
     // TAX-12 (13-CONTEXT.md Decision 4.1): the `dependents` array and its

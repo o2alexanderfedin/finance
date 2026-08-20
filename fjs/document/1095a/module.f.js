@@ -166,7 +166,7 @@ const validateShape = rttiValidate(oneZeroNineFiveASchema)
  * wider `keyof OneZeroNineFiveA`) so `r[field]` resolves to exactly `string |
  * undefined`, the device every other dialect here uses.
  */
-const moneyBoxFields = /** @type {const} */ ([
+export const moneyBoxFields = /** @type {const} */ ([
     'line33AnnualEnrollmentPremiums',
     'line33AnnualSlcspPremium',
     'line33AnnualAdvancePaymentOfPtc',
@@ -188,7 +188,7 @@ const expectedMoneyBoxFieldCount = 3
  * and this module's generated exactness proof walk the identical list rather
  * than being free to drift apart (AGENTS.md, "one rule, one place").
  */
-const monthlyMoneyFields = /** @type {const} */ ([
+export const monthlyMoneyFields = /** @type {const} */ ([
     'columnAEnrollmentPremiums',
     'columnBSlcspPremium',
     'columnCAdvancePaymentOfPtc',

@@ -32,7 +32,7 @@
  * `dialectEntry`'s own documented default: no second argument, structural
  * (rtti) match alone.
  *
- * `financeDialects` carries TWENTY-EIGHT entries: the twenty-seven local
+ * `financeDialects` carries THIRTY entries: the twenty-nine local
  * dialects below, plus `revisionDialect`, reused unchanged from upstream — not
  * reconstructed locally, since `fjs/media/revision` already IS one of this
  * repo's dialects (`vnd.fjs.revision` blobs are written directly into the
@@ -219,12 +219,27 @@ import {
     basisCorrectionSchema,
     checkReferences as checkBasisCorrection,
 } from '../../document/basis_correction/module.f.js'
+import {
+    dialect as assetRegisterDialect,
+    assetRegisterSchema,
+    checkReferences as checkAssetRegister,
+} from '../../document/asset_register/module.f.js'
+import {
+    dialect as rentalPropertyDialect,
+    rentalPropertySchema,
+    checkReferences as checkRentalProperty,
+} from '../../document/rental_property/module.f.js'
+import {
+    dialect as farmDialect,
+    farmSchema,
+    checkReferences as checkFarm,
+} from '../../document/farm/module.f.js'
 
 /** @import { DialectEntry } from 'functionalscript/fjs/media/types.js' */
 
 /**
  * Every one of this repo's own dialects, registered for {@link detect}: the
- * twenty-six local finance document/return/run dialects wrapped via
+ * thirty-one local finance document/return/run dialects wrapped via
  * {@link dialectEntry}, plus upstream's own {@link revisionDialect} reused
  * unchanged. See this module's own docstring for why `ocr` is the one entry
  * with no `extraValidate` second argument.
@@ -271,6 +286,21 @@ export const financeDialects = [
     // Form 8962 -- `fjs/server/dialect_parity` is what would otherwise catch
     // one of the two being forgotten.
     dialectEntry(oneZeroNineFiveASchema, v => checkOneZeroNineFiveA(v)[0] === 'ok'),
+    // `vnd.fjs.asset_register`, registered here and in
+    // `fjs/server/finance_schema` in the SAME commit that wires Form 4562 into
+    // Schedule C line 13 and Form 6251 line 2l -- `fjs/server/dialect_parity`
+    // is what would otherwise catch one of the two being forgotten.
+    dialectEntry(assetRegisterSchema, v => checkAssetRegister(v)[0] === 'ok'),
+    // `vnd.fjs.rental_property`, registered here and in
+    // `fjs/server/finance_schema` in the SAME commit that wires Schedule E
+    // Part I into printed line 26 -- `fjs/server/dialect_parity` is what would
+    // otherwise catch one of the two being forgotten.
+    dialectEntry(rentalPropertySchema, v => checkRentalProperty(v)[0] === 'ok'),
+    // `vnd.fjs.farm`, registered here and in `fjs/server/finance_schema` in the
+    // SAME commit that wires Schedule F line 34 into Schedule 1 line 6 --
+    // `fjs/server/dialect_parity` is what would otherwise catch one of the two
+    // being forgotten.
+    dialectEntry(farmSchema, v => checkFarm(v)[0] === 'ok'),
     revisionDialect,
 ]
 
@@ -286,7 +316,7 @@ export const detectFinance = detect(financeDialects)
 
 /**
  * Independently hand-typed: the number of entries {@link financeDialects}
- * is expected to carry today — TWENTY-EIGHT local dialects plus
+ * is expected to carry today — THIRTY-ONE local dialects plus
  * {@link revisionDialect}, which is upstream's. Deliberately NOT derived from
  * `financeDialects.length` itself (AGENTS.md's hand-typed-count idiom,
  * mirroring `fjs/document/1099b`'s `expectedMoneyBoxFieldCount`): a dialect
@@ -297,7 +327,7 @@ export const detectFinance = detect(financeDialects)
  * collection shrinking").
  * @type {number}
  */
-const expectedDialectCount = 29
+const expectedDialectCount = 32
 
 /** A sample cbase32 hash — {@link revisionDialect}'s own `snapshot`/`parents` shape needs a decodable one; the value itself is arbitrary. */
 const revisionSampleHash = vecToCBase32(vec8(0x77n))
@@ -558,6 +588,50 @@ const fixtures = {
         sourceArtifactHash: 'deadbeef00112233445566778899aabbccddeeff0011223344556677889900',
         coveredIndividuals: [{ name: 'Some Person' }],
         monthlyCoverage: [],
+    },
+    // `vnd.fjs.asset_register`. `businessOrActivity` is a REQUIRED semantic
+    // refinement, not merely a stored field: `checkAssetRegister` refuses a
+    // blob whose printed-header business or activity is blank, so the fixture
+    // that must DETECT has to carry one. Same shape as `basisCorrectionDialect`'s
+    // `reason` above.
+    [assetRegisterDialect]: {
+        dialect: assetRegisterDialect,
+        recipientTin: '222-22-2222',
+        accountNumber: 'BUS-0001',
+        taxYear: 2025,
+        businessOrActivity: 'software consulting',
+        assets: [],
+    },
+    // `vnd.fjs.rental_property`. `accountNumber` is a REQUIRED semantic
+    // refinement, and so is the whole royalty partition — a single-family
+    // residence must carry an address, both day counts and its rents, or
+    // `checkRentalProperty` refuses and this fixture would not DETECT.
+    [rentalPropertyDialect]: {
+        dialect: rentalPropertyDialect,
+        recipientTin: '222-22-2222',
+        accountNumber: 'RENT-0001',
+        taxYear: 2025,
+        propertyType: 'singleFamilyResidence',
+        physicalAddress: '18 Alder Street, Wells, ME 04090',
+        fairRentalDays: 365,
+        personalUseDays: 0,
+        rentsReceived: '24000.00',
+        entries: [],
+    },
+    // `vnd.fjs.farm`. Printed lines A, C, E and 36 are REQUIRED, and printed
+    // line 6d is not — the absence that `fjs/schedule/f` refuses on is a
+    // SCHEDULE refusal, not a document one, so this fixture omits it and still
+    // DETECTs.
+    [farmDialect]: {
+        dialect: farmDialect,
+        recipientTin: '222-22-2222',
+        accountNumber: 'FARM-0001',
+        taxYear: 2025,
+        principalCropOrActivity: 'corn and soybeans',
+        accountingMethod: 'cash',
+        materiallyParticipated: 'yes',
+        investmentAtRisk: 'allAtRisk',
+        entries: [],
     },
     [revisionDialectTag]: {
         dialect: revisionDialectTag,

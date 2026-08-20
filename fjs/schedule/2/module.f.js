@@ -106,6 +106,34 @@
  * so computing Form 8960 unconditionally is the ONLY thing standing between
  * an undeclared high-income investor and a silently understated return.
  *
+ * ## The §1411 tripwire decision, asked and answered rather than left open
+ *
+ * "No tripwire watches §1411" read for three phases as an admission. It is a
+ * DECISION, and the argument has two halves that have to be stated together
+ * because either alone is unconvincing.
+ *
+ * **A §1411 tripwire is not expressible.** `fjs/return/tripwire`'s contract
+ * is a predicate over the SUPPLIED DOCUMENTS, evaluated beside `classifyScope`
+ * and, like it, *before any line computes* — its own docstring says so, and
+ * every one of its ten entries reads a stored box (W-2 box 5, W-2 box 8,
+ * 1099-R box 3, 1099-NEC box 1, a K-1's box 1 or 6…). §1411(b)'s threshold is
+ * on §1411(d)'s modified adjusted gross income, which is the OUTPUT of the
+ * whole computation and is carried by no stored box at all. Writing the entry
+ * would mean running the engine inside a guard that runs before the engine.
+ *
+ * **And it is not needed**, which is the half that matters, because "we
+ * cannot" is not a reason to be comfortable. Every entry in that table exists
+ * because an undeclared return would OMIT a tax. This one is not omitted:
+ * line 12 is computed unconditionally, so an undeclared filer above the
+ * threshold gets the tax anyway. That is not an inference — it is
+ * `fjs/form1040/core`'s
+ * `anUndeclaredFilerAboveTheSection1411ThresholdStillOwesTheTax`, a filer
+ * whose `declaredKinds` do not mention `netInvestmentIncomeTax` and who owes
+ * $305.90 regardless.
+ *
+ * The decision would reverse the day this line became gated on the
+ * declaration, and that leaf is what would go red first.
+ *
  * ## Provenance: lines 11 and 12 cite the boxes their forms actually read
  *
  * Both lines arrive as {@link ReportLine}s built from the UNION of their
@@ -375,6 +403,7 @@ const uncollectedTaxSources = w2s => w2s.flatMap(form =>
  *   readonly taxableInterest: ReportLine,
  *   readonly ordinaryDividends: ReportLine,
  *   readonly netCapitalGainOrLoss: ReportLine,
+ *   readonly rentalRealEstateAndRoyaltyIncome: ReportLine,
  *   readonly adjustedGrossIncome: ReportLine,
  *   readonly selfEmployment: SelfEmploymentOutcome,
  *   readonly qualifiedDividends: ReportLine,
@@ -393,8 +422,12 @@ const uncollectedTaxSources = w2s => w2s.flatMap(form =>
  *   readonly scheduleD16Cents: bigint,
  *   readonly scheduleD19Cents: bigint,
  *   readonly scheduleThreeLine1Cents: bigint,
+ *   readonly amtDepreciationAdjustmentCents: bigint,
+ *   readonly excessAdvancePremiumTaxCreditRepayment: ReportLine,
  *   readonly regularPreferentialWorksheet:
  *     RegularPreferentialWorksheet | NoRegularPreferentialWorksheet,
+ *   readonly form2555ExclusionCents: bigint,
+ *   readonly form2555ItemizedDeductionsAndExclusionsNotClaimedCents: bigint,
  * }} ScheduleTwoInput
  */
 
@@ -416,6 +449,7 @@ const uncollectedTaxSources = w2s => w2s.flatMap(form =>
  * this whole schedule REFUSE — see {@link ScheduleTwoOutcome}.
  * @typedef {{
  *   readonly kind: 'ok',
+ *   readonly line1a: ReportLine,
  *   readonly line1: ReportLine, readonly line1z: ReportLine, readonly line2: ReportLine,
  *   readonly line3: ReportLine,
  *   readonly line4: ReportLine, readonly line5: ReportLine, readonly line6: ReportLine,
@@ -460,14 +494,17 @@ export const scheduleTwo = taxParamSet => input => {
     const {
         profile, status,
         medicareWages, medicareTaxWithheld, w2Forms,
-        taxableInterest, ordinaryDividends, netCapitalGainOrLoss, adjustedGrossIncome,
+        taxableInterest, ordinaryDividends, netCapitalGainOrLoss,
+        rentalRealEstateAndRoyaltyIncome, adjustedGrossIncome,
         selfEmployment,
         qualifiedDividends, totalDeductions, regularTax,
         itemizing, scheduleALine7Cents, scheduleOneALine37Cents, standardDeductionCents,
         specifiedPrivateActivityBondInterestCents,
         isoExerciseForms, estateTrustK1Forms, aStoredNineteenNineBReportsASale,
         filingScheduleD, scheduleD15Cents, scheduleD16Cents, scheduleD19Cents,
-        regularPreferentialWorksheet,
+        regularPreferentialWorksheet, excessAdvancePremiumTaxCreditRepayment,
+        amtDepreciationAdjustmentCents,
+        form2555ExclusionCents, form2555ItemizedDeductionsAndExclusionsNotClaimedCents,
     } = input
     const zero = profileDeclaredZeroLine(profile)
     // The two facts Schedule SE actually read, unioned wherever a line on
@@ -475,11 +512,32 @@ export const scheduleTwo = taxParamSet => input => {
     const selfEmploymentSources = [selfEmployment.netProfit, selfEmployment.socialSecurityWages]
 
     // ── Part I: Tax ───────────────────────────────────────────────────────
-    // 1a-1z. Excess advance premium tax credit repayment, clean-vehicle-
-    // credit repayments, EPE recapture -- a collapsed stand-in; see this
-    // module's own docstring.
-    const line1 = zero('Schedule 2 line 1 (excess APTC repayment/clean-vehicle-credit repayments/EPE recapture, 1a-1z collapsed)')
-    // 1z. "Total. Add lines 1a through 1z" -- the SAME total, restated.
+    // 1a. "Excess advance premium tax credit repayment. Attach Form 8962."
+    //     ALREADY COMPUTED by `fjs/form8962` and handed in, never recomputed
+    //     here: the same Form 8962 execution produced Schedule 3 line 9's net
+    //     premium tax credit, and the two are the mutually exclusive arms of
+    //     ONE comparison (Form 8962 lines 24 and 25). A second execution here
+    //     could disagree with the first about which arm the return is on,
+    //     which is the one way this pair can be wrong that nothing downstream
+    //     would notice. `foreignTaxCreditLine1` reaches `fjs/schedule/3` the
+    //     same way and for the same reason.
+    //
+    //     For a return holding no Form 1095-A this is a profile-declared zero
+    //     built by `fjs/form1040/core`, so an ordinary return's Part I is
+    //     byte-for-byte what it was before Form 8962 existed.
+    const line1a = excessAdvancePremiumTaxCreditRepayment
+    // 1b-1y. The clean-vehicle-credit repayments (Form 8936 Schedule A Parts
+    // II and IV) and the elective payment election recapture and excessive
+    // payments (Form 4255). Every one of them is a refused
+    // `fjs/return/scope` kind, so they collapse into line 1's own figure as
+    // documented zeros -- line 1 below IS line 1a until one of them is
+    // modeled.
+    const line1 = {
+        ...line1a,
+        rule: 'Schedule 2 line 1 (1a-1y; 1b-1y are the clean-vehicle-credit repayment and '
+            + 'elective-payment-election recapture sub-lines, all refused kinds)',
+    }
+    // 1z. "Total. Add lines 1a through 1y" -- the SAME total, restated.
     const line1z = { ...line1, rule: 'Schedule 2 line 1z (total)' }
     // 2. "Alternative minimum tax. Attach Form 6251." Part II line 11 -- the
     //    EXCESS of the tentative minimum tax over the regular tax, and only
@@ -497,6 +555,10 @@ export const scheduleTwo = taxParamSet => input => {
     //    form, and `fjs/form6251`'s own docstring records the check.
     const form6251Result = form6251(taxParamSet)({
         status,
+        // TAX-42: i6251 p10's own Foreign Earned Income Tax Worksheet reprices
+        // line 7 for a §911 filer, exactly as i1040gi p37's does line 16.
+        form2555ExclusionCents,
+        form2555ItemizedDeductionsAndExclusionsNotClaimedCents,
         adjustedGrossIncomeCents: adjustedGrossIncome.value,
         totalDeductionsCents: totalDeductions.value,
         scheduleOneALine37Cents,
@@ -519,6 +581,12 @@ export const scheduleTwo = taxParamSet => input => {
         // not a real one. Form 6251 subtracts it on BOTH sides (line 8 and
         // line 10), so a §904(j) credit's net effect on the AMT is zero.
         scheduleThreeLine1Cents: input.scheduleThreeLine1Cents,
+        // Form 6251 line 2l, the §56(a)(1) depreciation adjustment,
+        // computed ONCE by `fjs/form4562` inside `fjs/schedule/c`'s own
+        // Form 4562 and threaded straight through. A second execution
+        // here would read the same register and could still disagree,
+        // because the convention it picks depends on the whole register.
+        amtDepreciationAdjustmentCents,
         qualifiedDividendsCents: qualifiedDividends.value,
         // 1040 line 7a, which IS the capital gain distributions when no
         // Schedule D was filed -- the same field `fjs/tax/line16`'s dispatcher
@@ -649,6 +717,12 @@ export const scheduleTwo = taxParamSet => input => {
         taxableInterestCents: taxableInterest.value,
         ordinaryDividendsCents: ordinaryDividends.value,
         netCapitalGainOrLossCents: netCapitalGainOrLoss.value,
+        // Printed Form 8960 line 4a, "Rental real estate, royalties,
+        // partnerships, S corporations, trusts, etc." -- Schedule E line 26,
+        // off the ONE Schedule E execution inside Schedule 1 Part I. See
+        // `fjs/form8960`'s own line 4a for why this line could not stay a zero
+        // once printed Schedule E Part I started computing.
+        rentalRealEstateAndRoyaltyIncomeCents: rentalRealEstateAndRoyaltyIncome.value,
     })
     const line12 = {
         value: form8960Result.line17,
@@ -657,7 +731,10 @@ export const scheduleTwo = taxParamSet => input => {
         // III line 13. 1040 line 2a is deliberately NOT among them -- see
         // `fjs/form8960`'s own docstring on why tax-exempt interest is
         // excluded, and `theExclusionsAreWired` below, which pins it.
-        sources: unionSources([taxableInterest, ordinaryDividends, netCapitalGainOrLoss, adjustedGrossIncome]),
+        sources: unionSources([
+            taxableInterest, ordinaryDividends, netCapitalGainOrLoss,
+            rentalRealEstateAndRoyaltyIncome, adjustedGrossIncome,
+        ]),
         rule: 'Schedule 2 line 12 (net investment income tax, Form 8960 line 17)',
     }
     // 13. "Uncollected social security and Medicare or RRTA tax on tips or
@@ -695,7 +772,7 @@ export const scheduleTwo = taxParamSet => input => {
 
     return {
         kind: 'ok',
-        line1, line1z, line2, line3,
+        line1a, line1, line1z, line2, line3,
         line4, line5, line6, line7, line8, line9, line10, line11, line12, line13,
         line14, line15, line16, line17, line18, line19, line20, line21,
         form8959: form8959Result,
@@ -769,9 +846,10 @@ const selfEmploymentInput = netProfit => socialSecurityWages => ({
     lines: scheduleSelfEmploymentPartI(taxParams2025)({
         netProfitCents: netProfit.value,
         // Schedule 2 reads Schedule SE's OUTPUT and never its inputs, so a
-        // pass-through share would reach these fixtures only through
-        // `netProfit`'s own value. Held at zero here deliberately: every
-        // assertion below is about Schedule 2's own arithmetic.
+        // pass-through share or a farm profit would reach these fixtures only
+        // through `netProfit`'s own value. Both held at zero here deliberately:
+        // every assertion below is about Schedule 2's own arithmetic.
+        farmNetProfitCents: 0n,
         partnershipSelfEmploymentEarningsCents: 0n,
         socialSecurityWagesCents: socialSecurityWages.value,
     }),
@@ -792,11 +870,21 @@ const noSelfEmployment = selfEmploymentInput(
 const noAmounts = {
     profile: profileNoDeclaredKinds,
     status: 'single',
+    amtDepreciationAdjustmentCents: 0n,
+    form2555ExclusionCents: 0n,
+    form2555ItemizedDeductionsAndExclusionsNotClaimedCents: 0n,
     // Schedule 3 line 1 as `fjs/form1040/core` hands it in: zero for a return
     // with no foreign tax anywhere. The leaves below that care about it
     // override it, and `theForeignTaxCreditReachesFormSixTwoFiftyOnesBothSides`
     // is what proves it is not being ignored.
     scheduleThreeLine1Cents: 0n,
+    // Form 8962 line 29 as `fjs/form1040/core` hands it in: a
+    // profile-declared zero for a return holding no Form 1095-A, which is
+    // what keeps `sixteenLinesAreStillDeclaredZerosCitingOnlyTheProfile`
+    // asserting the same thing about line 1 that it always did. The leaves
+    // that care about it override it.
+    excessAdvancePremiumTaxCreditRepayment: profileDeclaredZeroLine(profileNoDeclaredKinds)(
+        'Schedule 2 line 1a (excess advance premium tax credit repayment, Form 8962 line 29)'),
     specifiedPrivateActivityBondInterestCents: 0n,
     medicareWages: inputLine('box5MedicareWagesAndTips')(0n),
     medicareTaxWithheld: inputLine('box6MedicareTaxWithheld')(0n),
@@ -804,6 +892,7 @@ const noAmounts = {
     taxableInterest: inputLine('line2b')(0n),
     ordinaryDividends: inputLine('line3b')(0n),
     netCapitalGainOrLoss: inputLine('line7a')(0n),
+    rentalRealEstateAndRoyaltyIncome: inputLine('scheduleELine26')(0n),
     adjustedGrossIncome: inputLine('line11b')(0n),
     selfEmployment: noSelfEmployment,
     qualifiedDividends: inputLine('line3a')(0n),
@@ -1008,14 +1097,15 @@ export const proof = {
     // 25c reads the SAME Form 8959 execution line 11 did.
     everyPrintedLineIsNamed: () => {
         const result = run(noAmounts)
-        // 22 printed lines, plus the THREE forms' own records (8959, 8960,
-        // 6251), plus the `kind` discriminant Phase 29 added when this
-        // schedule became able to refuse.
-        const expectedFieldCount = 26
+        // 23 printed lines -- 22, plus line 1a, which Form 8962's wiring
+        // separated out of the 1a-1z collapse -- plus the THREE forms' own
+        // records (8959, 8960, 6251), plus the `kind` discriminant Phase 29
+        // added when this schedule became able to refuse.
+        const expectedFieldCount = 27
         assertEq(
             Object.keys(result).length,
             expectedFieldCount,
-            'expected exactly 22 named Schedule 2 lines, three form records and the discriminant',
+            'expected exactly 23 named Schedule 2 lines, three form records and the discriminant',
         )
     },
     dialectIndependence: () => {

@@ -35,11 +35,13 @@
  * line 13.** Part II (distributions) lands on Schedule 1 line 8f and Schedule
  * 2 line 17c; Part III (failure to maintain coverage during a testing period)
  * lands on Schedule 2 line 17c as well. Both destinations are inside
- * collapsed lettered blocks (`otherIncome` at Schedule 1 line 8a-8z,
- * `otherAdditionalTaxes` at Schedule 2 line 17a-17z) whose kinds already
- * refuse in `fjs/return/scope`, so a taxpayer with HSA distributions is
- * refused by the scope guard rather than silently given a deduction with no
- * matching income. That is why this module models Part I alone and says so
+ * lettered blocks that the 2026-08-18 split took apart: the income half is
+ * `healthSavingsAccountIncome` (Schedule 1 line 8f) and the additional-tax
+ * halves are `hsaDistributionAdditionalTax` (Schedule 2 line 17c) and
+ * `hsaIneligibleIndividualAdditionalTax` (line 17d) — three kinds where two
+ * coarse ones stood, each refusing in `fjs/return/scope` by its own printed
+ * line, so a taxpayer with HSA distributions is refused by the scope guard
+ * rather than silently given a deduction with no matching income. That is why this module models Part I alone and says so
  * rather than pretending the form is finished.
  *
  * ## Line 3, and the one refusal that carries the most weight

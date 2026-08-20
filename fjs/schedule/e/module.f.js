@@ -1,7 +1,13 @@
 /**
- * Schedule E (Form 1040) — TAX-35: *Supplemental Income and Loss*, Parts II
- * and III addressed in full, Parts I, IV and V's line 40 refused by name, and
- * Part V's line 41 computed because it is the destination.
+ * Schedule E (Form 1040) — *Supplemental Income and Loss*. Parts I, II and III
+ * addressed in full, Part IV and Part V's line 40 refused by name, and Part V's
+ * line 41 computed because it is the destination.
+ *
+ * TAX-35 shipped Parts II and III; Part I arrived afterwards, with
+ * `vnd.fjs.rental_property` and `fjs/schedule/e/part_i` — see that submodule's
+ * own docstring and
+ * [./todo/schedule-e-part-i-rental-and-royalties.md](./todo/schedule-e-part-i-rental-and-royalties.md)
+ * for why a rental PROFIT computes and a rental LOSS cannot.
  *
  * Source, transcribed from the printed 2025 `f1040se.pdf` face: Part I
  * (Income or Loss From Rental Real Estate and Royalties, lines 1-26), Part II
@@ -25,12 +31,12 @@
  *
  * | Printed | This engine |
  * |---|---|
- * | Part I, lines 3-26 | REFUSES by name, through `rentalRealEstateAndRoyalties`; line 26 is a documented zero |
+ * | Part I, lines 3-26 | **COMPUTES** — from `vnd.fjs.rental_property`, in `fjs/schedule/e/part_i`. A profitable property and a royalty compute; a LOSS refuses at printed line 21, because printed line 22 is Form 8582's |
  * | Part II, lines 27-32 | **COMPUTES** — this is the requirement |
- * | Part III, lines 33-37 | REFUSES by name, through `estateAndTrustIncome`; every line is a documented zero |
+ * | Part III, lines 33-37 | **COMPUTES** — columns (d) and (f) read `vnd.fjs.k1_1041` box 6 (TAX-35). This row said "REFUSES … every line is a documented zero" until the Part I wiring corrected it, which is the third row in this table to have gone stale between the code and the prose |
  * | Part IV, lines 38-39 | REFUSES by name, through `remicResidualInterest`; line 39 is a documented zero |
  * | Part V, line 40 | REFUSES by name, through `netFarmRentalIncomeForm4835` |
- * | Part V, **line 41** | **COMPUTES** — it is the sum of lines 26, 32, 37, 39 and 40, four of which are documented zeros |
+ * | Part V, **line 41** | **COMPUTES** — it is the sum of lines 26, 32, 37, 39 and 40, two of which (39 and 40) are documented zeros |
  * | Part V, lines 42-43 | documented zeros; neither is a summand of anything |
  *
  * Line 41 is not "Part V" in the sense the requirement excludes: it is the
@@ -225,6 +231,7 @@
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { centsFromString } from '../../exact/module.f.js'
 import { materialParticipationNamed } from '../../document/k1_common/module.f.js'
+import { scheduleEPartI } from './part_i/module.f.js'
 // The ONE code this schedule's coded sweep lets through on the 1041 face, read
 // from the module that computes it. See {@link estateTrustCodedBoxes}.
 import { line2jCodes } from '../../form6251/estate_trust/module.f.js'
@@ -233,6 +240,9 @@ import { line2jCodes } from '../../form6251/estate_trust/module.f.js'
 /** @import { K1Partnership } from '../../document/k1_1065/module.f.js' */
 /** @import { K1SCorporation } from '../../document/k1_1120s/module.f.js' */
 /** @import { K1EstateTrust } from '../../document/k1_1041/module.f.js' */
+/** @import { RentalProperty } from '../../document/rental_property/module.f.js' */
+/** @import { AssetRegister } from '../../document/asset_register/module.f.js' */
+/** @import { ScheduleEPartI } from './part_i/module.f.js' */
 /** @import { CodedEntry } from '../../document/k1_common/module.f.js' */
 /** @import { ReportLine, Source } from '../../report/line/module.f.js' */
 
@@ -658,36 +668,6 @@ export const unroutedCodedItemRefusal = entityName => entityType => box => code 
 })
 
 // ── The parts this module addresses only in order to refuse ──────────────────
-
-/**
- * **Part I, Income or Loss From Rental Real Estate and Royalties (lines
- * 1-26).** A real named function for a real printed part, returning the only
- * honest answer this engine has — the same shape, and for the same reason, as
- * `fjs/schedule/c`'s `atRiskDeterminationLine32` and `fjs/schedule/se`'s
- * `optionalMethodsPartII`.
- *
- * **It is reached through the `rentalRealEstateAndRoyalties` declared kind
- * rather than through stored data**, because there is no stored data that
- * could reach it: no dialect models a rental property, and a K-1's rental
- * boxes (1065 box 2/3/7, 1120-S box 2/3/6) refuse at storage. That is the
- * identical position `fjs/schedule/se`'s Part II function is in, and it is
- * what makes the declared-kind guard load-bearing rather than decorative for
- * this part.
- * @type {() => ScheduleERefusal}
- */
-export const partIRentalRealEstateAndRoyalties = () => ({
-    kind: 'error',
-    message: 'Schedule E Part I (lines 1-26), rental real estate and royalties: this engine does '
-        + 'not model it. Each printed property column needs the rents received, the fair rental '
-        + 'and personal-use DAYS §280A(e) allocates expenses by, and a depreciation figure from '
-        + 'Form 4562 — the same asset basis history Schedule C line 13 already refuses for. A '
-        + 'royalty needs printed line 4, which is Part I\'s and not Part II\'s, so a Schedule K-1 '
-        + 'royalty box cannot ride into line 41 on the partnership block instead. §469(i)\'s '
-        + '$25,000 special allowance for active participation, and its phase-out between $100,000 '
-        + 'and $150,000 of modified adjusted gross income, would then decide how much of a loss '
-        + 'is allowed at all. Refusing rather than computing a Schedule E missing a whole part '
-        + '(no phase yet)',
-})
 
 /**
  * **Part IV, Income or Loss From Real Estate Mortgage Investment Conduits
@@ -1144,7 +1124,11 @@ export const scheduleEPartII = profile => rows => {
     const line28h = zero('Schedule E line 28 column (h) (nonpassive loss allowed)')
     // 28(i). "Section 179 expense deduction from Form 4562." Structural zero:
     //        1065 box 12 and 1120-S box 11 both refuse at storage when
-    //        non-zero, naming this very column.
+    //        non-zero, naming this very column. `fjs/form4562` exists as of the
+    //        asset-register commit and does NOT change that: it refuses Part I
+    //        by name, because a partner's §179 deduction is limited on line 11
+    //        by their own business income and line 13 carries the disallowed
+    //        part into a year this engine cannot store.
     const line28i = zero('Schedule E line 28 column (i) (section 179 expense deduction)')
     // 28(j). "Nonpassive income from Schedule K-1."
     const line28j = documentLine(profile)('Schedule E line 28 column (j) (nonpassive income from Schedule K-1)')(
@@ -1185,9 +1169,10 @@ export const scheduleEPartII = profile => rows => {
 
 /**
  * Part III's printed fields (lines 33-37), Part IV's (38-39) and Part V's
- * (40-43). Part III's columns (d) and (f) now carry real readings; every other
- * line but 41 is a documented zero. See this module's own docstring for which
- * part each refuses through.
+ * (40-43), plus Part I's own line 26 threaded through from
+ * `fjs/schedule/e/part_i`. Part III's columns (d) and (f) carry real readings
+ * and line 26 now does too; every other line but 41 is a documented zero. See
+ * this module's own docstring for which part each refuses through.
  * @typedef {{
  *   readonly beneficiaryRows: readonly ScheduleEBeneficiaryRow[],
  *   readonly line33c: ReportLine, readonly line33d: ReportLine,
@@ -1214,15 +1199,16 @@ export const scheduleEPartII = profile => rows => {
  * "no Schedule K-1 (Form 1041)", and it reproduces the old behaviour exactly —
  * `documentLine` falls back to the profile-cited zero when no row supplied a
  * source.
- * @type {(profile: Stored<ReturnProfile>) => (line32: ReportLine) => (beneficiaryRows: readonly ScheduleEBeneficiaryRow[]) => ScheduleERemainingParts}
+ *
+ * **`line26` is now PASSED IN, and that is the Schedule E Part I wiring.** It
+ * was a documented zero built here, on the stated grounds that Part I refused
+ * whole; `fjs/schedule/e/part_i` computes it now, and building a second zero
+ * here would be a line 41 that silently drops a landlord's rent. The parameter
+ * sits FIRST among the three, in printed order.
+ * @type {(profile: Stored<ReturnProfile>) => (line26: ReportLine) => (line32: ReportLine) => (beneficiaryRows: readonly ScheduleEBeneficiaryRow[]) => ScheduleERemainingParts}
  */
-export const scheduleERemainingParts = profile => line32 => beneficiaryRows => {
+export const scheduleERemainingParts = profile => line26 => line32 => beneficiaryRows => {
     const zero = profileDeclaredZeroLine(profile)
-    // 26. Part I's own total, "Total rental real estate and royalty income or
-    //     (loss)". A documented zero: Part I refuses through
-    //     {@link partIRentalRealEstateAndRoyalties}, reached by the declared
-    //     kind, so a return that computes at all has no Part I.
-    const line26 = zero('Schedule E line 26 (total rental real estate and royalty income or loss)')
     // 33(c)-(f). The four Part III columns: passive deduction or loss allowed,
     //            passive income, nonpassive deduction or loss, other income.
     //
@@ -1327,8 +1313,14 @@ export const scheduleERemainingParts = profile => line32 => beneficiaryRows => {
  * time to get it would be the drift `fjs/schedule/se`'s own `SelfEmployment\
  * Outcome` docstring warns about. It is the sum over rows of 1065 box 14 code
  * A, and it is zero for every S-corporation row by construction.
+ * `partI` is `fjs/schedule/e/part_i`'s whole record, carried out for the same
+ * reason `selfEmploymentEarningsCents` is: `fjs/form1040/core` needs its
+ * `alternativeMinimumTaxAdjustmentCents` for Form 6251 line 2l, and re-running
+ * Part I to get it would be a SECOND Form 4562 whose mid-quarter convention
+ * could disagree with the first's.
  * @typedef {{
  *   readonly kind: 'ok',
+ *   readonly partI: ScheduleEPartI,
  *   readonly partII: ScheduleEPartII,
  *   readonly parts: ScheduleERemainingParts,
  *   readonly selfEmploymentEarningsCents: bigint,
@@ -1339,8 +1331,15 @@ export const scheduleERemainingParts = profile => line32 => beneficiaryRows => {
 /** @typedef {ScheduleE | ScheduleERefusal} ScheduleEOutcome */
 
 /**
+ * `rentalProperties` and `assetRegisters` are printed Part I's, and they are
+ * REQUIRED rather than optional for `beneficiaryRows`' reason: a caller that
+ * cannot supply them is a caller that would silently produce a Schedule E
+ * missing a landlord's rent. An empty array is the honest way to say "no
+ * rental property".
  * @typedef {{
  *   readonly profile: Stored<ReturnProfile>,
+ *   readonly rentalProperties: readonly Stored<RentalProperty>[],
+ *   readonly assetRegisters: readonly Stored<AssetRegister>[],
  *   readonly partnershipK1Forms: readonly Stored<K1Partnership>[],
  *   readonly sCorporationK1Forms: readonly Stored<K1SCorporation>[],
  *   readonly estateTrustK1Forms: readonly Stored<K1EstateTrust>[],
@@ -1358,7 +1357,17 @@ export const scheduleERemainingParts = profile => line32 => beneficiaryRows => {
  * @type {(input: ScheduleEInput) => ScheduleEOutcome}
  */
 export const scheduleE = input => {
-    const { profile, partnershipK1Forms, sCorporationK1Forms, estateTrustK1Forms } = input
+    const {
+        profile, rentalProperties, assetRegisters,
+        partnershipK1Forms, sCorporationK1Forms, estateTrustK1Forms,
+    } = input
+    // Printed Part I FIRST, because it is the first printed part and because
+    // every one of its refusals -- §280A, the loss, Form 4562's own -- must
+    // reach a caller before any Part II total is formed.
+    const partI = scheduleEPartI({ profile, rentalProperties, assetRegisters })
+    if (partI.kind === 'error') {
+        return partI
+    }
     /** @type {ScheduleERow[]} */
     const rows = []
     /** @type {ScheduleEBeneficiaryRow[]} */
@@ -1409,7 +1418,7 @@ export const scheduleE = input => {
         }
     }
     const partII = scheduleEPartII(profile)(rows)
-    const parts = scheduleERemainingParts(profile)(partII.line32)(beneficiaryRows)
+    const parts = scheduleERemainingParts(profile)(partI.line26)(partII.line32)(beneficiaryRows)
     // Beneficiary rows are summed in too, and every one contributes its
     // structural zero. Written as a second reduce rather than omitted so that
     // mutating `beneficiaryRow`'s `selfEmploymentEarningsCents = 0n` reddens
@@ -1425,6 +1434,7 @@ export const scheduleE = input => {
     const selfEmployed = rows.find(row => row.selfEmploymentEarningsCents !== 0n)
     return {
         kind: 'ok',
+        partI,
         partII,
         parts,
         selfEmploymentEarningsCents,
@@ -1514,9 +1524,33 @@ const estateTrustDoc = overrides => ({
     },
 })
 
+/**
+ * ONE `vnd.fjs.rental_property`: a residence let all year with no personal
+ * use and $24,000.00 of rent, varied by the overrides.
+ * @type {(overrides: Partial<RentalProperty>) => Stored<RentalProperty>}
+ */
+const rentalPropertyDoc = overrides => ({
+    documentHash: 'sha256-rental-a',
+    value: {
+        dialect: 'vnd.fjs.rental_property',
+        recipientTin: '222-22-2222',
+        accountNumber: 'RENT-0001',
+        taxYear: 2025,
+        propertyType: 'singleFamilyResidence',
+        physicalAddress: '18 Alder Street, Wells, ME 04090',
+        fairRentalDays: 365,
+        personalUseDays: 0,
+        rentsReceived: '24000.00',
+        entries: [],
+        ...overrides,
+    },
+})
+
 /** @type {(input: Partial<ScheduleEInput>) => ScheduleEOutcome} */
 const run = input => scheduleE({
     profile,
+    rentalProperties: [],
+    assetRegisters: [],
     partnershipK1Forms: [],
     sCorporationK1Forms: [],
     estateTrustK1Forms: [],
@@ -1550,7 +1584,7 @@ const refusal = outcome => {
  * @type {readonly (readonly [string, string, boolean])[]}
  */
 const printedPartTable = [
-    ['I', 'lines 1-26 (rental real estate and royalties)', false],
+    ['I', 'lines 1-26 (rental real estate and royalties)', true],
     ['II', 'lines 27-32 (partnerships and S corporations)', true],
     ['III', 'lines 33-37 (estates and trusts)', true],
     ['IV', 'lines 38-39 (REMICs)', false],
@@ -1560,11 +1594,15 @@ const printedPartTable = [
 /** Hand-typed off the printed form: five parts. */
 const expectedPartCount = 5
 /**
- * Hand-typed: TWO of the five compute. Was `1` until TAX-35 gave
- * `vnd.fjs.k1_1041` a reader — Part III's columns (d) and (f) now carry real
- * box 6 readings, so Part III joined Part II.
+ * Hand-typed: THREE of the five compute. It was `1` until TAX-35 gave
+ * `vnd.fjs.k1_1041` a reader — Part III's columns (d) and (f) carry real box 6
+ * readings, so Part III joined Part II — and `2` until `vnd.fjs.rental_property`
+ * gave printed Part I one. Part I computes a PROFIT and refuses a loss, which
+ * is a refusal at the LINE (printed line 21) rather than a part refusal; the
+ * distinction is exactly the one Part II already draws, where every K-1 loss
+ * refuses and the part still computes.
  */
-const expectedComputedPartCount = 2
+const expectedComputedPartCount = 3
 
 export const proof = {
     // ── THE REGRESSION CONTROL ───────────────────────────────────────────────
@@ -1586,6 +1624,91 @@ export const proof = {
             assertEq(line.sources[0].documentHash, profile.documentHash)
             assertEq(line.sources[0].boxPath, 'declaredKinds')
         }
+    },
+
+    // ── PART I: rental real estate and royalties ─────────────────────────────
+    //
+    // The arithmetic lives in `fjs/schedule/e/part_i` and is proven there.
+    // What is proven HERE is the seam, which that module structurally cannot
+    // see: printed line 26 reaching printed line 41, and a Part I refusal
+    // reaching a caller of `scheduleE` with its content intact.
+    partI: {
+        /**
+         * ★ **THE LEAF A SURVIVING MUTATION DEMANDED.** Replacing this
+         * module's Part I error arm with `{ ...partI, message: '' }` — a
+         * refusal that fires, propagates, and says NOTHING — left the entire
+         * suite green. `fjs/schedule/e/part_i`'s own refusal leaves call that
+         * module directly and never travel through this one, so nothing
+         * asserted that a Part I refusal survives the trip.
+         *
+         * Two refusals with two different subjects are checked, so a seam that
+         * happened to carry one message correctly cannot pass.
+         */
+        aPartIRefusalReachesAScheduleECallerWithItsContentIntact: () => {
+            const loss = run({
+                rentalProperties: [rentalPropertyDoc({
+                    rentsReceived: '1000.00',
+                    entries: [{
+                        category: 'repairs',
+                        datePaid: '2025-05-02',
+                        description: 'boiler repair',
+                        amount: '1500.00',
+                    }],
+                })],
+            })
+            assert(loss.kind === 'error', ['a rental loss must refuse through Schedule E', loss])
+            if (loss.kind !== 'error') {
+                return
+            }
+            assert(loss.message.includes('Form 8582'),
+                ['the form the filer needs must survive the seam', loss.message])
+            assert(loss.message.includes('RENT-0001'),
+                ['and the property it is about', loss.message])
+            const personalUse = run({
+                rentalProperties: [rentalPropertyDoc({ fairRentalDays: 100, personalUseDays: 30 })],
+            })
+            assert(personalUse.kind === 'error', ['a §280A property must refuse through Schedule E', personalUse])
+            if (personalUse.kind !== 'error') {
+                return
+            }
+            assert(personalUse.message.includes('\u00a7280A(c)(5)'),
+                ['a DIFFERENT Part I refusal must survive the seam too', personalUse.message])
+            assert(!personalUse.message.includes('Form 8582'),
+                ['and it must not be the loss refusal wearing another name', personalUse.message])
+        },
+        /**
+         * ★ **THE SEAM ITSELF**: printed line 26 IS a summand of printed line
+         * 41, and line 41 is what `fjs/schedule/1` reads into line 5. A
+         * profitable property beside a partnership K-1 proves both halves are
+         * carried rather than one replacing the other.
+         *
+         * Hand-typed: rents $24,000.00 less $1,500.00 of repairs is printed
+         * line 26 = **$22,500.00**; the partnership's box 1 is $80,000.00 on
+         * printed line 32; line 41 combines them at **$102,500.00**.
+         */
+        printedLineTwentySixIsASummandOfPrintedLineFortyOne: () => {
+            const result = ok(run({
+                rentalProperties: [rentalPropertyDoc({
+                    entries: [{
+                        category: 'repairs',
+                        datePaid: '2025-05-02',
+                        description: 'boiler repair',
+                        amount: '1500.00',
+                    }],
+                })],
+                partnershipK1Forms: [partnershipDoc({})],
+            }))
+            assertEq(result.partI.line26.value, 2250000n, 'Schedule E line 26 $22,500.00')
+            assertEq(result.parts.line26.value, 2250000n, 'and the summary carries the SAME line 26')
+            assertEq(result.partII.line32.value, 8000000n, 'Schedule E line 32 $80,000.00')
+            assertEq(result.parts.line41.value, 10250000n, 'line 41 = 26 + 32 + 37 + 39 + 40')
+            // THE CONTROL: the same partnership with no property. Line 41 is
+            // the partnership share alone, so the leaf above is evidence about
+            // line 26 rather than about line 32.
+            const withoutProperty = ok(run({ partnershipK1Forms: [partnershipDoc({})] }))
+            assertEq(withoutProperty.partI.line26.value, 0n)
+            assertEq(withoutProperty.parts.line41.value, 8000000n)
+        },
     },
 
     // ── PART III: the reader `vnd.fjs.k1_1041` did not have (TAX-35) ─────────
@@ -1866,17 +1989,22 @@ export const proof = {
          * left standing. A part refusal that no longer refuses is worse than
          * none: it reads as this engine's stated position while the code has
          * the opposite one.
+         *
+         * The Schedule E Part I wiring did the same to
+         * `partIRentalRealEstateAndRoyalties`, for the same reason and by the
+         * same rule. Part I's refusals now live at the LINE
+         * (`fjs/schedule/e/part_i`'s §280A, loss and category refusals), which
+         * is where a refusal belongs once the part around it computes.
          */
         theHandTypedPartTableAgreesWithTheCode: () => {
             assertEq(printedPartTable.length, expectedPartCount)
             assertEq(
                 printedPartTable.filter(([, , computes]) => computes).length,
                 expectedComputedPartCount,
-                'exactly two printed parts compute',
+                'exactly three printed parts compute',
             )
             /** @type {Record<string, () => ScheduleERefusal>} */
             const refusalForPart = {
-                I: partIRentalRealEstateAndRoyalties,
                 IV: partIVRealEstateMortgageInvestmentConduits,
                 V: partVNetFarmRentalIncomeLine40,
             }
@@ -1907,11 +2035,10 @@ export const proof = {
         everyPartRefusalNamesWhatIsMissing: () => {
             /** @type {readonly (readonly [() => ScheduleERefusal, string])[]} */
             const expected = [
-                [partIRentalRealEstateAndRoyalties, 'Form 4562'],
                 [partIVRealEstateMortgageInvestmentConduits, 'Form 1066'],
                 [partVNetFarmRentalIncomeLine40, 'Form 4835'],
             ]
-            assertEq(expected.length, 3, 'three printed parts refuse')
+            assertEq(expected.length, 2, 'two printed parts refuse')
             for (const [named, form] of expected) {
                 const message = named().message
                 assert(message.includes(form), ['a part refusal must name the form it needs', form, message])

@@ -680,8 +680,13 @@ so they are scheduled rather than remembered. All are T3 — none blocks the v1 
 measured the engine against four taxpayers: a retiree, a non-profit employee, a FAANG engineer
 and a startup founder. At the time of that survey, one of the four was supported, one computed a *wrong* return, and two refused. **All four now compute** — see the v2 traceability table below. The present-tense sentence stood here until 2026-08-17, after every phase that fixed it had shipped.
 
-**These 25 requirements are counted separately from v1's 95** and do not move v1's completion
-figure. v1 remains what it always was: a 65+ TY2025 return with brokerage, dependents and
+**These 32 requirements are counted separately from v1's 95** and do not move v1's completion
+figure. (This read 25 until 2026-08-19, when TAX-36 through TAX-39 — coined in code and traced
+nowhere — were retrofitted into their own section below, 29 until Form 461 and Form 4797 landed
+as TAX-40 and TAX-41, and 31 until Form 2555 landed as TAX-42. **It said 29 through both of the
+first two**, because each of those branches moved the derived figure in the footer below and not
+this sentence; re-deriving during this integration is what caught it, which is the whole argument
+for the command block at the end of this section.) v1 remains what it always was: a 65+ TY2025 return with brokerage, dependents and
 itemizing, which is complete, the eight MAINT items included — MAINT-01 through MAINT-06 closed on 2026-08-17 and MAINT-07/08 in Phase 18. (This read "apart from the eight open MAINT items" until they were all closed.)
 
 > **Read the ordering constraint before planning any of this.** TAX-19 (computable tripwires)
@@ -1315,7 +1320,9 @@ itemizing, which is complete, the eight MAINT items included — MAINT-01 throug
 
       What computes: Part II lines 27-32 from both K-1 dialects, and Part V's line 41, which is
       the destination the requirement names. Line 41 combines printed lines 26, 32, 37, 39 and 40,
-      four of them documented zeros, and reaches **Schedule 1 line 5 → 1040 line 8 through
+      four of them documented zeros **when TAX-35 shipped — TWO today**, because Part III started
+      computing in this same requirement and Part I did later, with `vnd.fjs.rental_property` and
+      `fjs/schedule/e/part_i`. It reaches **Schedule 1 line 5 → 1040 line 8 through
       Schedule 1's own Part I total** rather than by a side channel. The founder's
       self-employment tax is charged or not charged according to the entity: a general partner's
       1065 box 14 code A reaches printed Schedule SE line 2, which names that box in its own
@@ -1361,6 +1368,347 @@ itemizing, which is complete, the eight MAINT items included — MAINT-01 throug
       filer holding one is told which line this engine cannot fill rather than having the amount
       dropped.
 
+### Tier-B Forms (TAX) — four IDs coined in code, retrofitted here
+
+**Retrofitted 2026-08-19, and recorded as retrofitted**, exactly as DOC-18 and TAX-18 were.
+`TAX-36` through `TAX-39` were coined by four separate pieces of work as code-local handles
+and cited in **21 files** under `fjs/**` — sources and `todo/` specs alike — while the highest
+ID this document traced was `TAX-35`. Nothing could see that:
+`planning-truth-gate.test.js` checked that every requirement here is traced and that every
+traced ID has a body — **never that an ID the code CITES exists at all.** That gate now runs in both directions, and these four entries are what
+makes the new direction green. The IDs are assigned after the fact and the fact is stated,
+because the value of this table is that its history is true, not that it is tidy.
+
+**None of the four has a ROADMAP phase, and inventing one would be the tidy lie.** All four
+landed after every persona in this milestone had closed, as Tier-B form work rather than as a
+planned slice; the `Phase` column below says so instead of pointing at a phase that was never
+written. They are **T3** for the same reason — none of them was blocking anything.
+
+> **`TAX-38` names TWO unrelated forms, and that is the finding this retrofit exists to
+> record.** `feature/form-2441` coined it for Form 2441 on 2026-08-18 22:10; `feature/form-6781`
+> coined it for Form 6781 on 2026-08-19 01:58, on a branch that already contained the first
+> commit. The second author *did* check — the spec at
+> `fjs/form6781/todo/section-1256-contracts-marked-to-market.md` says so — but checked with a
+> grep "across every markdown file in the repo", and Form 2441's claim lived in `.f.js` files a
+> markdown-only grep cannot see. **The registry that would have answered the question is this
+> file**, which is precisely what the new gate forces the next coiner to consult.
+>
+> The entry below therefore describes both works under one ID rather than splitting them.
+> Splitting requires renumbering **61 citations across fourteen files**, six of which name both
+> forms, and two live branches are editing those files right now — so the split belongs to
+> whoever integrates them, not to the retrofit that found it. What is recorded here is the state
+> the tree is actually in.
+
+- [x] **TAX-36** *(M2, T3)*: **Schedule 3 line 1 — the foreign tax credit, under §904(j) and
+      only under §904(j)** → 1040 line 20. `box7ForeignTaxPaid` on `vnd.fjs.1099div` and
+      `box6ForeignTaxPaid` on `vnd.fjs.1099int` had been stored and read by **nothing** since
+      those two dialects shipped, so anyone holding an international index fund had the box
+      dropped in silence.
+
+      **Delivered.** `foreignTaxCredit` moved into `fjs/return/scope`'s `modeledKinds`, in the
+      same commit as the `fjs/schedule/3` line 1 wiring. Spec:
+      `fjs/schedule/3/todo/foreign-tax-credit.md`.
+
+      **§901 allows the credit and §904(a) limits it; computing that limitation is what Form
+      1116 is, and this engine does not model Form 1116.** §904(j)(2) is the exemption that
+      makes a computable line, and its three conditions are CONJUNCTIVE: (A) the entire
+      foreign-source gross income is qualified passive income shown on a payee statement, (B)
+      the creditable foreign taxes do not exceed $300, or $600 on a joint return, and (C) the
+      individual elects. **Exactly one of the three is verifiable here** — (B), against
+      `fjs/tax/params`' own `foreignTaxCreditDeMinimisElection`. (A) is unobservable, because no
+      1099 states how much of its income was foreign-source or which §904(d) category it fell
+      in, and (C) is a choice rather than a fact, and a costly one: §904(j)(1)(C) forbids
+      carrying an electing year's excess taxes back or forward. So (A) and (C) both ride on ONE
+      taxpayer assertion, `section904jElectionAllForeignIncomeIsQualifiedPassiveIncome` on
+      `vnd.fjs.return_profile`, whose name states both halves.
+
+      **Above the ceiling, or without the election, the line REFUSES rather than zeroing**, and
+      carries the taxpayer's own figures — the $847.00 they have and the $300.00 they would have
+      had to be under. Zeroing would silently delete a credit they are owed; computing would
+      claim one whose §904(a) limitation nobody computed. **A small amount is not evidence the
+      conditions hold**: $12.00 of foreign tax is perfectly consistent with a filer who also
+      earned foreign wages, for whom (A) fails at any figure.
+
+      The one hole is already shut: the §904(j)(2)(B) threshold is on the taxpayer's TOTAL
+      creditable foreign taxes, and the only other foreign-tax box in the document set —
+      `box21ForeignTaxesPaidOrAccrued` on `vnd.fjs.k1_1065` — is refused by name at validation
+      whenever it is non-zero, before a return can reach this schedule.
+- [x] **TAX-37** *(M2, T3)*: **Form 8962, the Premium Tax Credit**, over a new `vnd.fjs.1095a`
+      dialect — the twenty-sixth. **One execution, TWO destinations, and neither ships alone**:
+      Form 8962 line 26, the net PTC, reaches Schedule 3 line 9 → 1040 line 31 and increases the
+      refund; line 29, the excess advance PTC repayment, reaches Schedule 2 line 1a → 1040 line
+      17 and increases the tax. Exactly one is ever non-zero, and **both were hard zeros**, so
+      the engine neither credited an under-advanced enrollee nor collected from an over-advanced
+      one.
+
+      **Delivered.** `netPremiumTaxCredit` and `excessAdvancePremiumTaxCreditRepayment` are both
+      in `modeledKinds`, reclassified in the same commit as the `fjs/form1040/core` wiring that
+      runs the form ONCE and hands its two finished figures to the two schedules — the shape
+      `foreignTaxCreditLine` already set. Neither could be reclassified without the other,
+      because the two are one comparison (line 24 against line 25). §36B(b)(3)(A)'s
+      applicable-figure table and the federal poverty line table live in `fjs/tax/params` with
+      their citations.
+
+      **The coarse `advancePremiumTaxCreditAndOtherRepayments` kind was split into three**,
+      because Schedule 2 lines 1b through 1f are Forms 8936 and 4255 and nothing stored
+      distinguishes them from line 1a — modeling the coarse kind would have handed a
+      clean-vehicle-credit repayer a zero while telling them the kind was in scope. This work
+      also found that **a refusal row named the wrong form**: Schedule 2 line 19 is a Form 4255
+      elective-payment-election recapture with no connection to Form 8962, and the row that
+      claimed otherwise was corrected in place rather than deleted.
+
+      **Both the annual and the monthly path are implemented, and the printed line 10 test
+      chooses** — they do not agree, because monthly column (c) is the annual figure divided by
+      twelve AND ROUNDED, and the per-month `min(a, d)` cap does not commute with the annual
+      one. Nine printed conditions REFUSE by name at the form, each naming what is missing and
+      where the amount would have gone; the two a reader will assume away are a missing or zero
+      column B (the SLCSP premium, which the instructions send the taxpayer to Pub. 974 or the
+      HealthCare.gov Tax Tool for) and any dependent at all without the profile's certification
+      that no dependent is required to file. **Form 8962's modified AGI is a THIRD one** —
+      i8962 Worksheet 1-1 adds tax-exempt interest, Form 2555 lines 45 and 50, and the
+      nontaxable part of Social Security — which is TAX-15's no-shared-`magi`-identifier rule
+      applying with full force.
+- [x] **TAX-38** *(M2, T3)*: **One ID, two forms** — see the note above. Both landed; the ID
+      collision is recorded rather than retconned.
+
+      **Form 2441 — the Credit for Child and Dependent Care Expenses**, and the taxable
+      dependent care benefits beside it. TWO functions, because 1040 line 1e sits INSIDE this
+      form's own line 7: `dependentCareBenefits` (Form W-2 box 10 → f2441 line 26 → 1040 line
+      1e) and `dependentCareCredit` (f2441 line 11 → Schedule 3 line 2 → 1040 line 20). **Box 10
+      was stored and read by nothing**, so the zero on 1040 line 1e was a silent understatement
+      of tax for every taxpayer with a dependent care FSA — the third stored-but-unread box this
+      project has found. The credit is **not refundable for 2025**, and the printed form says so
+      twice: line 11 sends it to Schedule 3 Part I, Nonrefundable Credits, and the slot ARPA's
+      2021 Part II line 10 occupied now holds a tax-liability limit.
+
+      **Form 6781 Part I — gains and losses from section 1256 contracts**, marked to market.
+      Box 11 of every stored Form 1099-B becomes a line 1 row; §1256(a)(3) splits the net into a
+      40 percent short-term half (line 8) and a 60 percent long-term half (line 9), which reach
+      `fjs/schedule/d`'s printed lines 4 and 11 — **both documented zeros until this work**. The
+      stored box 11 is cross-checked against box 8 − box 9 + box 10 and neither side is
+      preferred: a disagreement refuses the document, following `vnd.fjs.1095a`'s own line 33
+      precedent. **Nothing joined `modeledKinds` and nothing left the refusal table**: §1256
+      contracts had NO kind at all before this, so a futures trader declared
+      `capitalGainsOrLosses` and every part of Form 6781 the engine cannot do fell through the
+      guard in silence. Two refused kinds now name those parts —
+      `straddleGainsAndLosses` (Parts II and III need per-position records the 1099-B reports
+      only in AGGREGATE) and `netSectionTwelveFiftySixContractsLossCarryback` (§1212(c) carries
+      back three years of returns this engine does not hold) — taking the refused count
+      **141 → 143**, and the vocabulary 195 → 197. **The number going up is not the wrong
+      direction**: adding a refused kind where there was silence raises honesty with it. A
+      disjunct was added to `fjs/return/tripwire`'s existing `capitalGainsOrLosses` row in the
+      same commit — not an eleventh tripwire — so a non-zero 1099-B box 11 is itself proof of
+      that declaration obligation rather than a destination reached only if the filer knew to
+      declare it.
+- [x] **TAX-39** *(M2, T3)*: **Schedule 1 line 17 — the self-employed health insurance
+      deduction, §162(l)** — through **Form 7206**, every printed line 1 through 14 named and
+      computed, reaching 1040 line 10 and also Form 8995 line 1c through §199A(c)(1). Spec:
+      `fjs/schedule/1/todo/self-employed-health-insurance.md`.
+
+      **Delivered.** `selfEmployedHealthInsuranceDeduction` left `unmodeledKindRefusals` for
+      `modeledKinds` (`143 → 142` on the refused count). **What made it computable was not an
+      ordering change** — every figure Form 7206 reads was already in scope where Schedule 1
+      line 17 is built. It was six `vnd.fjs.adjustments` line tags (Form 7206's printed line 1
+      and its five §213(d)(10) age bands, whose limits are now in `fjs/tax/params`) plus one
+      profile certification, `notEligibleForAnySubsidizedEmployerHealthPlanInAnyMonth`
+      (§162(l)(2)(B)). **No dialect was added.**
+
+      **The finding is about remedies, not about this line: Publication 535 does not exist.**
+      Every prior statement in this repository about Schedule 1 line 17 — `fjs/return/scope`'s
+      refusal row and `fjs/form8995`'s docstring quoting it — sent the reader to the *Pub. 535
+      self-employed health insurance deduction worksheet*, which the IRS discontinued after
+      2022. The row had already been repaired **twice**, by Phase 27 and by Phase 28, and both
+      repairs left that first clause untouched because nobody re-read it. **A remedy that names
+      an external source has an expiry the repository cannot see, and the clause least likely to
+      be re-read is the one that has been true longest.** Form 7206 rather than the 1040
+      instructions' three-line worksheet is a decision: p. 95 sends a filer to the form when
+      qualified long-term-care premiums are in play, which this engine models, and the two pages
+      disagree in the multi-business case.
+
+      Line 17 **refuses a return holding both §162(l) premiums and Marketplace coverage**, for
+      Rev. Proc. 2014-41 §2.05's circularity between this deduction and the premium tax credit —
+      which is TAX-37's form, and the one interaction between these four entries.
+
+### Form 461 (TAX-40) — one ID coined WITH its code, not retrofitted
+
+The four entries above were retrofitted after the fact and say so. This one is not: it was
+assigned in the same commit as `fjs/form461`, which is what the section above argues should
+happen from now on. It has no ROADMAP phase either, for the same reason — Tier-B form work
+rather than a planned slice.
+
+- [x] **TAX-40** *(M2, T3)*: **Form 461, the §461(l) excess business loss limitation** — all
+      sixteen printed lines, computed from `fjs/schedule/1` Part I over printed Schedule 1
+      lines 3, 4, 5 and 6 and 1040 line 7a, with printed line 8p as the destination. Spec:
+      `fjs/form461/todo/limitation-on-business-losses.md`.
+
+      **Delivered 2026-08-19, and NO kind was reclassified.** `excessBusinessLossAdjustment`
+      stays in `unmodeledKindRefusals`: the kind names the adjustment on printed line 8p, which
+      exists only when there IS an excess business loss, and that case refuses — the disallowed
+      amount is a §172 net operating loss carryover and `netOperatingLossDeduction` is itself a
+      refused kind with no dialect behind it. Every count is unchanged (modeled 55, refused
+      142, vocabulary 197, tripwires 11, dialects 30 known / 32 dropped).
+
+      **What DID change is `fjs/schedule/f`: a net farm loss computes at printed box 36a.**
+      i1040sf p10 disposes of §465 and §469 in one sentence on the taxpayer's own two stored
+      answers, §461(l) is figured here over the aggregate, and §199A(c)(2)'s outbound
+      carryforward reached a report field for the first time. Box 36b still refuses on §465.
+      **`fjs/schedule/c`'s loss does not move**, and the reason is a dialect rather than a
+      statute: `vnd.fjs.business_expenses` carries no field for printed line 32's at-risk box
+      and none for material participation, so neither §465 nor §469 can be asked of a Schedule
+      C business at all. `fjs/schedule/e/part_i`'s two loss refusals do not move either.
+
+      **Three remedies were corrected for naming a form or a reason that had ceased to be
+      true** — `excessBusinessLossAdjustment`'s, `farmIncomeOrLoss`'s and Schedule C's own line
+      32 message — which is the same failure mode TAX-39's entry above records for Publication
+      535. The TAX-30 body earlier in this document names §461(l) as standing behind Schedule
+      C's §465 refusal; that clause is still TRUE as a statement about the statute's ordering
+      and no longer true as a statement about what this engine cannot compute.
+
+      **The threshold was verified at Rev. Proc. 2024-40 §2.32 rather than taken from the
+      brief**, which is where the $313,000/$626,000 pair and its two per-status traps come
+      from: married filing separately takes the FULL amount (§461(l) has no halving clause) and
+      a qualifying surviving spouse does not file a joint return. The brief also said wages are
+      trade-or-business income for this purpose; i461 says the opposite, in §461(l)(6)'s own
+      words, and printed line 1 is *"Reserved for future use"* because of it.
+
+### Form 4797 (TAX-41) — the SECOND `TAX-40` collision, split by its integrator
+
+`feature/form-4797-impl` coined **`TAX-40`** for Form 4797 on 2026-08-19, on a branch cut from
+`5d5fb7f` — before `feature/form-461`'s own `TAX-40` existed to be found. Both authors were
+right to check and neither could have seen the other: the two IDs were coined the same day, on
+branches with no common descendant, and the registry that resolves it is this file.
+
+**This one IS split rather than recorded, and TAX-38's own note above is why.** That note
+declined the split on a measured cost — *"renumbering 61 citations across fourteen files, six of
+which name both forms, and two live branches are editing those files right now"* — and named who
+should pay it instead: *"the split belongs to whoever integrates them, not to the retrofit that
+found it."* This is that integration, and the cost here is **14 citations across six files**,
+none of which name both forms, on a branch nothing is built on. Form 461 keeps `TAX-40` because
+it is the one already on the trunk; Form 4797, the newcomer, takes `TAX-41`.
+
+So the two collisions are recorded differently and for a stated reason, which is the point: TAX-38
+records the tree's real state because splitting it was unsafe, and TAX-41 splits because it was
+cheap. Neither is retconned — this paragraph is the history.
+
+- [x] **TAX-41** *(M2, T3)*: **Schedule 1 line 4 — other gains or losses, §1231/§1245/§1250**
+      — through **Form 4797**, Parts I, II and III, over a per-asset `disposal` block added to
+      `vnd.fjs.asset_register`. Line 18b reaches Schedule 1 line 4 and 1040 line 8; a net
+      §1231 gain on line 7 reaches Schedule D line 11 and 1040 line 7a; and the unrecaptured
+      §1250 gain reaches Schedule D line 19 through the *Unrecaptured Section 1250 Gain
+      Worksheet*'s lines 1 through 9, which `fjs/schedule/d` carried as a single documented zero
+      until this phase. Spec: `fjs/form4797/todo/sales-of-business-property.md`.
+
+      **Delivered.** `otherGainsOrLosses` left `unmodeledKindRefusals` for `modeledKinds`
+      (`142 → 141` refused, `55 → 56` modeled), and a twelfth tripwire fires on a stored
+      disposal that the return does not declare. `kindVocabulary` stays at 197. **No dialect was
+      added**: the disposal block went on the register because four of the six figures Part III
+      needs are already on the register asset and the only join key a separate document could
+      use is `description`, a free-text field.
+
+      **The finding is an ASYMMETRY, and it is the printed page's rather than this engine's.**
+      §1231(c)'s five-year lookback lives on printed line 8, and the line 7 instruction says
+      *"If line 7 is zero or a loss … skip lines 8 and 9."* So a net §1231 **loss** year
+      is fully computable with no prior-year figure at all, and a net §1231 **gain** year is
+      not — it needs `noNonrecapturedNetSectionOneTwoThreeOneLossesFromPriorYears` on
+      `vnd.fjs.return_profile`, the state the same printed sentence names, and refuses at line 8
+      without it. It is the exact mirror of `fjs/schedule/e/part_i`, where a PROFIT computes and
+      a LOSS refuses because §469 sits on printed line 22.
+
+      **Line 7 = 0 is the third case, and it is the common one.** §1245 caps the recapture at
+      the total gain (line 25b is *"the smaller of line 24 or 25a"*), so an ordinary machine sold
+      for less than it cost has line 32 = 0, line 7 = 0, and the whole gain ordinary on Schedule 1
+      line 4 — no certification, no Schedule D. That is what makes the form worth having under
+      a prior-year blocker.
+
+      **Depreciation is derived allowed OR ALLOWABLE, never transcribed.** i4797 p9's line 22 Step
+      1 recaptures what was allowable whether or not it was claimed, and
+      `fjs/form4562/macrs`'s `macrsColumn` already produces the whole schedule from the unadjusted
+      basis — the same property that let the register omit accumulated depreciation in the
+      first place. `fjs/form4562/macrs` gained `disposalTwentyFourths`, Step 3's SECOND printed
+      decimal column, which `fjs/form4562` now applies in the year of sale: without it every
+      filer who sold something would have deducted a full year of depreciation on it.
+
+      `noDepreciablePropertyDisposedOfDuringTheYear` is **NARROWED, not retired**. Form 4562
+      requires it only when no disposal is recorded, and the dialect refuses a register carrying
+      both. What replaced the blanket precondition is five named refusals, each on a disposal
+      this engine cannot characterize: 15- and 20-year property (the class straddles §1245
+      and §1250, and the two differ by the whole recapture), business use below 100% (the
+      allocation moves a personal part to Schedule D), an asset placed in service and sold inside
+      one tax year (i4562 states the no-depreciation rule for the mid-quarter convention only),
+      a register bound to a stored farm (§1231(b)(3) livestock holding periods and §1252
+      farmland), and a §1231 gain on a return that files no Schedule D.
+
+### Form 2555 (TAX-42) — the THIRD `TAX-40` collision, and the most expensive to split
+
+`feature/form-2555-impl` coined **`TAX-40`** for Form 2555 on 2026-08-19, on a branch cut from
+`5d5fb7f` — the same commit `feature/form-4797-impl` was cut from, and for the same reason:
+neither Form 461's `TAX-40` nor Form 4797's existed on any branch it could see. Three separate
+works therefore coined one ID on one day, on three branches with no common descendant. That is
+not three mistakes; it is one missing registry, consulted three times too late.
+
+**This one is split too, and the cost was measured before the decision rather than after it.**
+It is **88 citations across 23 files** — six times TAX-41's fourteen across six, and half again
+the 61 across fourteen that TAX-38 declined. Eighty-five were renumbered mechanically; the other
+three are this document's own, rewritten by hand into the record you are reading. Three things decided it anyway, and the first is
+the one that matters:
+
+- **Not splitting is not on offer.** TAX-38 could record one ID over two forms because neither
+  entry had been written yet, so one entry could honestly describe both. Here `TAX-40` already
+  carries a written body for Form 461 on the trunk. Keeping the ID would mean either two
+  `- [x] **TAX-40**` entries in this document — which the `uniq -d` command below rejects and
+  `planning-truth-gate.test.js` fails on — or fusing §461(l) and §911 into one entry that
+  shares nothing. TAX-38 *recorded* a collision that had already happened; doing the same here
+  would *manufacture* one.
+- **The size of TAX-38's number was never the deciding fact — its ambiguity was.** Six of those
+  61 citations named both forms, so each had to be read rather than substituted. **None of these
+  88 names Form 461 or Form 4797.** Only three files carry a `TAX-40` from more than one of the
+  three works at all — `.planning/REQUIREMENTS.md`, `CHANGELOG.md` and
+  `fjs/schedule/1/module.f.js` — and in all three the two sets are disjoint paragraphs about
+  disjoint statutes. TAX-38's other reason, *"two live branches are editing those files right
+  now"*, has also expired: this is the integration it named as the payer.
+- **The newcomer renumbers, by the rule TAX-41 set one section ago.** Form 461 keeps `TAX-40`
+  because it was on the trunk first; Form 4797 took `TAX-41` for the same reason; Form 2555,
+  integrated last and built on by nothing, takes **`TAX-42`**.
+
+So the three collisions are now recorded three different ways, each with its reason on the page:
+TAX-38 records the tree's real state because splitting it was unsafe, TAX-41 splits because it
+was cheap, and TAX-42 splits because the alternative had stopped existing. None is retconned —
+the traceability row below states the ID this work coined and who renumbered it, exactly as
+TAX-41's does.
+
+- [x] **TAX-42** *(M2, T3)*: **Form 2555 — the foreign earned income exclusion, §911** — Parts V,
+      VII and VIII computed, reaching Schedule 1 line 8d → 1040 line 8, and repricing 1040 line 16
+      through the **Foreign Earned Income Tax Worksheet** (§911(f)'s stacking rule). Spec:
+      `fjs/form2555/todo/foreign-earned-income.md`.
+
+      **Delivered.** `foreignEarnedIncomeForm2555` — one row naming three printed destinations —
+      splits into FIVE, one modelled and four refused by name, and the split is the finding:
+      the three destinations had three different blockers, so a filer with no housing claim was
+      being refused by a row about a table they never needed. (**This entry read "four, one
+      modelled and three refused" until the integration re-derived it**, while CHANGELOG.md on
+      the same branch said five — the live table holds `foreignEarnedIncomeExclusion` modelled
+      beside `foreignEarnedIncomeBonaFideResidenceTest`, `foreignHousingExclusionOrDeduction`,
+      `foreignEarnedIncomeReceivedInAnotherTaxYear` and `foreignEarnedIncomeCapitalGainExcess`.
+      The refused count moving `142 -> 145` for a split that removes one row and adds four is
+      the arithmetic that gives it away, and nothing gated either sentence.)
+
+      **The two qualifying tests are settled differently, and that asymmetry is the point.**
+      Physical presence (§911(d)(1)(B)) is a COUNT and becomes a profile certification,
+      deliberately narrower than the statute on its tax-home half. Bona fide residence
+      (§911(d)(1)(A)) turns on *intent*, and i2555's own instruction says a taxpayer's words lose
+      to their acts — so it is not certifiable at all and refuses.
+
+      **The stacking rule is implemented rather than approximated**, and it is the requirement's
+      whole risk: taxing only the remaining income under-taxes, silently, in the taxpayer's
+      favour. `fjs/tax/line16`'s level-0a wrapper re-enters its own levels 1-3 with the
+      worksheet's line 3, exactly as the printed page instructs, and refuses the one corner the
+      page sends to a second modified worksheet (a capital gain excess). The alternative minimum
+      tax's own Foreign Earned Income Tax Worksheet refuses where Form 6251 line 6 is positive.
+
+      **Form 8962's structural zero goes live.** Its line 2a add-back was a documented zero *only
+      while this kind stayed refused*; it is now a real term, wired and proven in
+      `fjs/form1040/core` where a form-level proof cannot see it.
+
 ### v2 Traceability
 
 | REQ-ID | Tier | Phase | Persona unblocked |
@@ -1377,7 +1725,15 @@ itemizing, which is complete, the eight MAINT items included — MAINT-01 throug
 | DOC-22, DOC-23, TAX-33, TAX-34 | T3 | 29 - Equity Compensation and AMT | **FAANG employee** — all four delivered. TAX-33 closed with Form 6251 Part III: an ISO spread beside qualified dividends computes end to end |
 | DOC-24, TAX-35 | T3 | 30 - Pass-Through Income | **Startup founder** — DOC-24 delivered; **TAX-35 CLOSED**: Schedule E Part II end to end in Phase 30, Part III with the `vnd.fjs.k1_1041` dialect, and the routing half in three slices — sixteen separately stated boxes across three faces reach 1040 lines 2b/3a/3b and Schedule D lines 5/12 at sixteen different box numbers, with an eighth tripwire so the declaration-gated Schedule D destination is reachable rather than silently skipped |
 
-**25 requirements across 10 phases** — 120 in the document, 95 of them v1's. Each phase is a
+| TAX-36, TAX-37 | T3 | *(none — retrofitted 2026-08-19)* | Tier-B forms — Schedule 3 line 1 under §904(j), and Form 8962 over the new `vnd.fjs.1095a`. Both were hard zeros; both now compute or refuse by name |
+| TAX-38 | T3 | *(none — retrofitted 2026-08-19)* | Tier-B forms — **one ID, two forms**: Form 2441 (1040 line 1e and Schedule 3 line 2) and Form 6781 Part I (Schedule D lines 4 and 11). The collision is recorded in the section above, not retconned |
+| TAX-39 | T3 | *(none — retrofitted 2026-08-19)* | Tier-B forms — Form 7206, §162(l), Schedule 1 line 17. The remedy it replaced named a publication the IRS withdrew in 2022 |
+| TAX-40 | T3 | *(none — coined with its code 2026-08-19)* | Tier-B forms — Form 461, §461(l). No kind reclassified; a net farm loss computes at printed box 36a, and three stale remedies were corrected |
+| TAX-41 | T3 | *(none — coined with its code 2026-08-19, as `TAX-40`, and renumbered by the integrator)* | Tier-B forms — Form 4797 over a per-asset `disposal` block on `vnd.fjs.asset_register`. Schedule 1 line 4 was a documented zero; a §1231 LOSS now computes with no prior-year figure and a §1231 GAIN refuses at printed line 8 without the return-profile certification |
+| TAX-42 | T3 | *(none — coined with its code 2026-08-19, as `TAX-40`, and renumbered by the integrator)* | Tier-B forms — Form 2555, §911, Schedule 1 line 8d and 1040 line 16's Foreign Earned Income Tax Worksheet. One coarse kind became five, and Form 8962's documented structural zero became a live term |
+
+**32 requirements across 10 phases, four retrofitted entries with none, and three coined with
+their own code** — 127 in the document, 95 of them v1's. Each phase is a
 vertical slice that ends with something that works: a persona whose return computes, or a named
 refusal that replaces a silent wrong answer. No phase leaves a layer that only pays off later.
 
@@ -1387,7 +1743,7 @@ refusal that replaces a silent wrong answer. No phase leaves a layer that only p
 > now derived:
 > ```sh
 > sed -n '/^## v1 Requirements/,/^## v2 Requirements/p' .planning/REQUIREMENTS.md | grep -cE '^- \[[ x]\] \*\*[A-Z]+-[0-9]+'   # 95
-> sed -n '/^## v2 Requirements/,/^## v2 (Deferred)/p'   .planning/REQUIREMENTS.md | grep -cE '^- \[[ x]\] \*\*[A-Z]+-[0-9]+'   # 25
+> sed -n '/^## v2 Requirements/,/^## v2 (Deferred)/p'   .planning/REQUIREMENTS.md | grep -cE '^- \[[ x]\] \*\*[A-Z]+-[0-9]+'   # 32
 > grep -oE '^- \[[ x]\] \*\*[A-Z]+-[0-9]+' .planning/REQUIREMENTS.md | grep -oE '[A-Z]+-[0-9]+' | sort | uniq -d              # must be empty
 > ```
 

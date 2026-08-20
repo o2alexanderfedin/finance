@@ -162,7 +162,7 @@ const validateShape = rttiValidate(oneZeroNineNineDivSchema)
  * this way. `box8ForeignCountryOrUsPossession` is deliberately NOT here —
  * it is a country name, not money (see module docstring).
  */
-const moneyBoxFields = /** @type {const} */ ([
+export const moneyBoxFields = /** @type {const} */ ([
     'box1aTotalOrdinaryDividends',
     'box1bQualifiedDividends',
     'box2aTotalCapitalGainDistr',
@@ -204,7 +204,7 @@ const expectedMoneyBoxFieldCount = 17
  * generated+hand-typed pair is still the correct shape — the list being
  * short is not a reason to skip the hand-typed count.
  */
-const stateLocalMoneyFields = /** @type {const} */ ([
+export const stateLocalMoneyFields = /** @type {const} */ ([
     'stateTaxWithheld',
 ])
 

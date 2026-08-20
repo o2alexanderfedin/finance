@@ -144,7 +144,7 @@ const validateShape = rttiValidate(formThirtyNineTwentyTwoSchema)
  * `fjs/document/form3921`'s own list records: a transcriber who entered a
  * total would produce a valid decimal and a wrong answer.
  */
-const moneyBoxFields = /** @type {const} */ ([
+export const moneyBoxFields = /** @type {const} */ ([
     'box3FairMarketValuePerShareOnGrantDate',
     'box4FairMarketValuePerShareOnExerciseDate',
     'box5ExercisePricePaidPerShare',
