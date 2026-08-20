@@ -17,6 +17,47 @@ pinned rerun reproducing it byte for byte. That is what `1.0.0` names.
 
 ## Unreleased
 
+### The Form 1040, on a page you can print
+
+**Phase 35.** The engine returned cited numbers; there was no output a filer could hand to
+anybody. The printed form face built for the demo's step 9 now has a second front door with no
+wizard around it — `demo/form1040.html` — and a print stylesheet behind it.
+
+- **Every printed string was checked against `https://www.irs.gov/pub/irs-pdf/f1040.pdf`,**
+  2025 revision, footer `Form 1040 (2025) Created 9/5/25`, extracted twice by two paths that
+  agreed. The corrections are listed in `demo/steps/09-form1040.js`'s own docstring. The
+  expensive ones were not the ones anybody would have guessed: **the 12a–12d checkbox block was
+  off by one line for its whole length**, **7b** carried a caption from an earlier year's layout,
+  **line 14** read `Add lines 12, 13a, and 13b` where the page prints `12e`, and the page-2 band
+  was labelled `Standard Deduction` where the paper prints `Tax and Credits` down the whole
+  margin from 11b to 24 — `Standard deduction for—` is a note box beside it, not a band name.
+  Eight printed rows were missing outright (**3c, 4c, 5c, 6d, 25, 27b, 27c**, and 12d's
+  unnumbered `Spouse:` continuation) and are now drawn.
+- **The dropped sub-line cross-references were all real.** They had been dropped rather than
+  guessed, which was the right call — and the page does print `from Form 2441, line 26`,
+  `from Form 8839, line 31`, `from Form 8919, line 6`, `from Form 8863, line 8` and
+  `from Form 8839, line 13`.
+- **Twelve of the fourteen arithmetic captions reconstructed from the engine's own operation
+  were word-for-word right.** Reading them off the page is still what makes them checkable.
+- **The coverage guards moved into `renderForm`, not into the wizard step.** Both directions of
+  the printed-row / engine-line comparison and the filing-status comparison run before anything
+  is drawn, so the page a filer prints is the page that refuses to draw a form with a silent hole
+  in it. Verified by mutation, three ways: a row that stops claiming its line, a row that claims
+  one the engine never produces, and a filing status dropped from the printed block. Each draws
+  the stop panel and no form.
+- **No engine-computed line is missing a printed row.** Checked two ways — the runtime guard,
+  which sees only what the fixture computes, and a static sweep of every `1040 line …` rule
+  string in `fjs/form1040/core`, which sees every code path. Everything the newer forms and
+  schedules reach — 461, 2441, 2555, 4797, 6781, 8829, 7206, 4562, 8962, Schedule E, Schedule F —
+  arrives through Schedule 1, 2 or 3 and lands on a line the face already prints.
+- **`@media print`** forces a black-on-white palette rather than inheriting one (a dark-mode
+  reader would otherwise print dark tokens), removes the toolbar, the wizard chrome and the
+  citation panel, and breaks between the two pages rather than after each — `break-after` on the
+  last page ends the job with a blank sheet in the tray.
+- **E-file remains out of scope.** IRS Modernized e-File requires authorization as a provider,
+  which this project does not obtain. Still no PDF, no image, no web font, no network request:
+  the printable page works with the network unplugged, under the same strict CSP.
+
 ### Form 461 — Limitation on Business Losses (§461(l))
 
 **A farm loss computes.** `fjs/form461` is the printed form, all sixteen lines, wired into

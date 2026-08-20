@@ -800,6 +800,49 @@ button.f1040-amt:focus-visible { outline: 2px solid var(--accent); outline-offse
 
 .f1040-detail .note { margin-bottom: 0; }
 
+/* An inline run of the row's own printed checkboxes, set inside the label the
+   way the paper sets them — `Check if: [ ] Schedule D not required [ ] …` —
+   rather than in the amount column, which on the paper holds money. */
+.f1040-checks-inline {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: .2rem .9rem;
+    margin-left: .45rem;
+}
+
+/* A row the paper gives no box of any kind: the `Federal income tax withheld
+   from:` heading at line 25, and the unnumbered continuations. Deliberately
+   distinct from `.f1040-amt-empty`, which is a box WAITING for a figure — the
+   two must not look alike, or a heading reads as a missing amount. */
+.f1040-amt-none { border-left: 1px solid var(--line-strong); }
+
+/* ── The standalone form page (form1040.html) ────────────────────────────── */
+
+.f1040-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: .5rem 1rem;
+    padding: .7rem 1.5rem;
+    border-bottom: 1px solid var(--line);
+    background: var(--panel);
+}
+
+.f1040-back { color: var(--accent); font-weight: 600; text-decoration: none; }
+
+.f1040-back:hover { text-decoration: underline; }
+
+.f1040-toolbar-note { flex: 1; color: var(--ink-faint); font-size: .8rem; }
+
+.f1040-sheet {
+    display: block;
+    max-width: 58rem;
+    margin: 0 auto;
+    padding: 1.2rem 1.5rem 3rem;
+}
+
+.f1040-sheet .f1040 { margin: 0; }
+
 /* ── Narrow screens ──────────────────────────────────────────────────────── */
 
 @media (max-width: 40rem) {
@@ -821,4 +864,77 @@ button.f1040-amt:focus-visible { outline: 2px solid var(--accent); outline-offse
     .f1040-entry { border-right: none; }
     .f1040-band-name { width: 4.5rem; font-size: .6rem; }
     .f1040-row { grid-template-columns: 2.2rem 1fr 7.5rem; }
+}
+
+
+/* ── Print ───────────────────────────────────────────────────────────────────
+ *
+ * Two sheets of Letter paper, black on white, and nothing on them that is not
+ * the form. This block is the difference between a web page about a tax return
+ * and a tax return.
+ *
+ * Three things here are not obvious and each is a defect if omitted:
+ *
+ *   1. **The palette is forced, not inherited.** The `prefers-color-scheme:
+ *      dark` block at the top of this file binds `--ink` to a near-white and
+ *      `--panel` to a near-black. Without the re-binding below, a reader whose
+ *      laptop is in dark mode prints those tokens.
+ *   2. **The page break is `break-before` on the SECOND page**, not
+ *      `break-after` on every page. `break-after` on the last page ends the job
+ *      with a blank sheet in the tray.
+ *   3. **The citation panel does not print.** It is the whole thesis on screen
+ *      and it is wrong on paper: a filed return with a four-column source table
+ *      wedged under line 16 is not a return.
+ */
+
+@media print {
+    :root {
+        --bg: #ffffff;
+        --panel: #ffffff;
+        --ink: #000000;
+        --ink-soft: #000000;
+        --ink-faint: #3a3a3a;
+        --line: #8a8a8a;
+        --line-strong: #000000;
+        --accent: #000000;
+        --accent-soft: #ffffff;
+    }
+
+    @page { size: letter portrait; margin: 0.4in; }
+
+    html, body { background: #fff; color: #000; }
+
+    /* Wizard chrome, from whichever page the reader hit Print on. */
+    .topbar, .steps, .wizard, .skip, .boot-error { display: none; }
+
+    /* The standalone page's one strip of chrome. */
+    .f1040-toolbar { display: none; }
+    .f1040-sheet { max-width: none; margin: 0; padding: 0; }
+
+    .f1040-detail { display: none; }
+
+    .f1040 { font-size: 8.5pt; margin: 0; overflow: visible; }
+
+    .f1040-page {
+        border: 1px solid #000;
+        border-radius: 0;
+        background: #fff;
+        margin: 0;
+        min-width: 0;
+        overflow: visible;
+    }
+
+    .f1040-page + .f1040-page { break-before: page; }
+
+    /* A row split across a sheet boundary loses either its number or its box. */
+    .f1040-row, .f1040-entry, .f1040-check, .f1040-masthead { break-inside: avoid; }
+
+    /* Screen affordances that mean nothing on paper. */
+    button.f1040-amt { cursor: default; }
+    .f1040-amt-open { background: transparent; box-shadow: none; }
+    .f1040-amt-empty, .f1040-amt-check, .f1040-band-name { background: transparent; }
+    .f1040-mast-year, .f1040-check-on .f1040-box { color: #000; }
+    .f1040-status, .f1040-question, .f1040-sign { padding: .3rem .5rem; }
+    .f1040-dollars, .f1040-cents { min-height: 0; padding: .2rem .35rem; }
+    .f1040-n, .f1040-label { padding-top: .2rem; padding-bottom: .2rem; }
 }
