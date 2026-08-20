@@ -680,8 +680,9 @@ so they are scheduled rather than remembered. All are T3 — none blocks the v1 
 measured the engine against four taxpayers: a retiree, a non-profit employee, a FAANG engineer
 and a startup founder. At the time of that survey, one of the four was supported, one computed a *wrong* return, and two refused. **All four now compute** — see the v2 traceability table below. The present-tense sentence stood here until 2026-08-17, after every phase that fixed it had shipped.
 
-**These 25 requirements are counted separately from v1's 95** and do not move v1's completion
-figure. v1 remains what it always was: a 65+ TY2025 return with brokerage, dependents and
+**These 29 requirements are counted separately from v1's 95** and do not move v1's completion
+figure. (This read 25 until 2026-08-19, when TAX-36 through TAX-39 — coined in code and traced
+nowhere — were retrofitted into their own section below.) v1 remains what it always was: a 65+ TY2025 return with brokerage, dependents and
 itemizing, which is complete, the eight MAINT items included — MAINT-01 through MAINT-06 closed on 2026-08-17 and MAINT-07/08 in Phase 18. (This read "apart from the eight open MAINT items" until they were all closed.)
 
 > **Read the ordering constraint before planning any of this.** TAX-19 (computable tripwires)
@@ -1363,6 +1364,167 @@ itemizing, which is complete, the eight MAINT items included — MAINT-01 throug
       filer holding one is told which line this engine cannot fill rather than having the amount
       dropped.
 
+### Tier-B Forms (TAX) — four IDs coined in code, retrofitted here
+
+**Retrofitted 2026-08-19, and recorded as retrofitted**, exactly as DOC-18 and TAX-18 were.
+`TAX-36` through `TAX-39` were coined by four separate pieces of work as code-local handles
+and cited in **21 files** under `fjs/**` — sources and `todo/` specs alike — while the highest
+ID this document traced was `TAX-35`. Nothing could see that:
+`planning-truth-gate.test.js` checked that every requirement here is traced and that every
+traced ID has a body — **never that an ID the code CITES exists at all.** That gate now runs in both directions, and these four entries are what
+makes the new direction green. The IDs are assigned after the fact and the fact is stated,
+because the value of this table is that its history is true, not that it is tidy.
+
+**None of the four has a ROADMAP phase, and inventing one would be the tidy lie.** All four
+landed after every persona in this milestone had closed, as Tier-B form work rather than as a
+planned slice; the `Phase` column below says so instead of pointing at a phase that was never
+written. They are **T3** for the same reason — none of them was blocking anything.
+
+> **`TAX-38` names TWO unrelated forms, and that is the finding this retrofit exists to
+> record.** `feature/form-2441` coined it for Form 2441 on 2026-08-18 22:10; `feature/form-6781`
+> coined it for Form 6781 on 2026-08-19 01:58, on a branch that already contained the first
+> commit. The second author *did* check — the spec at
+> `fjs/form6781/todo/section-1256-contracts-marked-to-market.md` says so — but checked with a
+> grep "across every markdown file in the repo", and Form 2441's claim lived in `.f.js` files a
+> markdown-only grep cannot see. **The registry that would have answered the question is this
+> file**, which is precisely what the new gate forces the next coiner to consult.
+>
+> The entry below therefore describes both works under one ID rather than splitting them.
+> Splitting requires renumbering **61 citations across fourteen files**, six of which name both
+> forms, and two live branches are editing those files right now — so the split belongs to
+> whoever integrates them, not to the retrofit that found it. What is recorded here is the state
+> the tree is actually in.
+
+- [x] **TAX-36** *(M2, T3)*: **Schedule 3 line 1 — the foreign tax credit, under §904(j) and
+      only under §904(j)** → 1040 line 20. `box7ForeignTaxPaid` on `vnd.fjs.1099div` and
+      `box6ForeignTaxPaid` on `vnd.fjs.1099int` had been stored and read by **nothing** since
+      those two dialects shipped, so anyone holding an international index fund had the box
+      dropped in silence.
+
+      **Delivered.** `foreignTaxCredit` moved into `fjs/return/scope`'s `modeledKinds`, in the
+      same commit as the `fjs/schedule/3` line 1 wiring. Spec:
+      `fjs/schedule/3/todo/foreign-tax-credit.md`.
+
+      **§901 allows the credit and §904(a) limits it; computing that limitation is what Form
+      1116 is, and this engine does not model Form 1116.** §904(j)(2) is the exemption that
+      makes a computable line, and its three conditions are CONJUNCTIVE: (A) the entire
+      foreign-source gross income is qualified passive income shown on a payee statement, (B)
+      the creditable foreign taxes do not exceed $300, or $600 on a joint return, and (C) the
+      individual elects. **Exactly one of the three is verifiable here** — (B), against
+      `fjs/tax/params`' own `foreignTaxCreditDeMinimisElection`. (A) is unobservable, because no
+      1099 states how much of its income was foreign-source or which §904(d) category it fell
+      in, and (C) is a choice rather than a fact, and a costly one: §904(j)(1)(C) forbids
+      carrying an electing year's excess taxes back or forward. So (A) and (C) both ride on ONE
+      taxpayer assertion, `section904jElectionAllForeignIncomeIsQualifiedPassiveIncome` on
+      `vnd.fjs.return_profile`, whose name states both halves.
+
+      **Above the ceiling, or without the election, the line REFUSES rather than zeroing**, and
+      carries the taxpayer's own figures — the $847.00 they have and the $300.00 they would have
+      had to be under. Zeroing would silently delete a credit they are owed; computing would
+      claim one whose §904(a) limitation nobody computed. **A small amount is not evidence the
+      conditions hold**: $12.00 of foreign tax is perfectly consistent with a filer who also
+      earned foreign wages, for whom (A) fails at any figure.
+
+      The one hole is already shut: the §904(j)(2)(B) threshold is on the taxpayer's TOTAL
+      creditable foreign taxes, and the only other foreign-tax box in the document set —
+      `box21ForeignTaxesPaidOrAccrued` on `vnd.fjs.k1_1065` — is refused by name at validation
+      whenever it is non-zero, before a return can reach this schedule.
+- [x] **TAX-37** *(M2, T3)*: **Form 8962, the Premium Tax Credit**, over a new `vnd.fjs.1095a`
+      dialect — the twenty-sixth. **One execution, TWO destinations, and neither ships alone**:
+      Form 8962 line 26, the net PTC, reaches Schedule 3 line 9 → 1040 line 31 and increases the
+      refund; line 29, the excess advance PTC repayment, reaches Schedule 2 line 1a → 1040 line
+      17 and increases the tax. Exactly one is ever non-zero, and **both were hard zeros**, so
+      the engine neither credited an under-advanced enrollee nor collected from an over-advanced
+      one.
+
+      **Delivered.** `netPremiumTaxCredit` and `excessAdvancePremiumTaxCreditRepayment` are both
+      in `modeledKinds`, reclassified in the same commit as the `fjs/form1040/core` wiring that
+      runs the form ONCE and hands its two finished figures to the two schedules — the shape
+      `foreignTaxCreditLine` already set. Neither could be reclassified without the other,
+      because the two are one comparison (line 24 against line 25). §36B(b)(3)(A)'s
+      applicable-figure table and the federal poverty line table live in `fjs/tax/params` with
+      their citations.
+
+      **The coarse `advancePremiumTaxCreditAndOtherRepayments` kind was split into three**,
+      because Schedule 2 lines 1b through 1f are Forms 8936 and 4255 and nothing stored
+      distinguishes them from line 1a — modeling the coarse kind would have handed a
+      clean-vehicle-credit repayer a zero while telling them the kind was in scope. This work
+      also found that **a refusal row named the wrong form**: Schedule 2 line 19 is a Form 4255
+      elective-payment-election recapture with no connection to Form 8962, and the row that
+      claimed otherwise was corrected in place rather than deleted.
+
+      **Both the annual and the monthly path are implemented, and the printed line 10 test
+      chooses** — they do not agree, because monthly column (c) is the annual figure divided by
+      twelve AND ROUNDED, and the per-month `min(a, d)` cap does not commute with the annual
+      one. Nine printed conditions REFUSE by name at the form, each naming what is missing and
+      where the amount would have gone; the two a reader will assume away are a missing or zero
+      column B (the SLCSP premium, which the instructions send the taxpayer to Pub. 974 or the
+      HealthCare.gov Tax Tool for) and any dependent at all without the profile's certification
+      that no dependent is required to file. **Form 8962's modified AGI is a THIRD one** —
+      i8962 Worksheet 1-1 adds tax-exempt interest, Form 2555 lines 45 and 50, and the
+      nontaxable part of Social Security — which is TAX-15's no-shared-`magi`-identifier rule
+      applying with full force.
+- [x] **TAX-38** *(M2, T3)*: **One ID, two forms** — see the note above. Both landed; the ID
+      collision is recorded rather than retconned.
+
+      **Form 2441 — the Credit for Child and Dependent Care Expenses**, and the taxable
+      dependent care benefits beside it. TWO functions, because 1040 line 1e sits INSIDE this
+      form's own line 7: `dependentCareBenefits` (Form W-2 box 10 → f2441 line 26 → 1040 line
+      1e) and `dependentCareCredit` (f2441 line 11 → Schedule 3 line 2 → 1040 line 20). **Box 10
+      was stored and read by nothing**, so the zero on 1040 line 1e was a silent understatement
+      of tax for every taxpayer with a dependent care FSA — the third stored-but-unread box this
+      project has found. The credit is **not refundable for 2025**, and the printed form says so
+      twice: line 11 sends it to Schedule 3 Part I, Nonrefundable Credits, and the slot ARPA's
+      2021 Part II line 10 occupied now holds a tax-liability limit.
+
+      **Form 6781 Part I — gains and losses from section 1256 contracts**, marked to market.
+      Box 11 of every stored Form 1099-B becomes a line 1 row; §1256(a)(3) splits the net into a
+      40 percent short-term half (line 8) and a 60 percent long-term half (line 9), which reach
+      `fjs/schedule/d`'s printed lines 4 and 11 — **both documented zeros until this work**. The
+      stored box 11 is cross-checked against box 8 − box 9 + box 10 and neither side is
+      preferred: a disagreement refuses the document, following `vnd.fjs.1095a`'s own line 33
+      precedent. **Nothing joined `modeledKinds` and nothing left the refusal table**: §1256
+      contracts had NO kind at all before this, so a futures trader declared
+      `capitalGainsOrLosses` and every part of Form 6781 the engine cannot do fell through the
+      guard in silence. Two refused kinds now name those parts —
+      `straddleGainsAndLosses` (Parts II and III need per-position records the 1099-B reports
+      only in AGGREGATE) and `netSectionTwelveFiftySixContractsLossCarryback` (§1212(c) carries
+      back three years of returns this engine does not hold) — taking the refused count
+      **141 → 143**, and the vocabulary 195 → 197. **The number going up is not the wrong
+      direction**: adding a refused kind where there was silence raises honesty with it. A
+      disjunct was added to `fjs/return/tripwire`'s existing `capitalGainsOrLosses` row in the
+      same commit — not an eleventh tripwire — so a non-zero 1099-B box 11 is itself proof of
+      that declaration obligation rather than a destination reached only if the filer knew to
+      declare it.
+- [x] **TAX-39** *(M2, T3)*: **Schedule 1 line 17 — the self-employed health insurance
+      deduction, §162(l)** — through **Form 7206**, every printed line 1 through 14 named and
+      computed, reaching 1040 line 10 and also Form 8995 line 1c through §199A(c)(1). Spec:
+      `fjs/schedule/1/todo/self-employed-health-insurance.md`.
+
+      **Delivered.** `selfEmployedHealthInsuranceDeduction` left `unmodeledKindRefusals` for
+      `modeledKinds` (`143 → 142` on the refused count). **What made it computable was not an
+      ordering change** — every figure Form 7206 reads was already in scope where Schedule 1
+      line 17 is built. It was six `vnd.fjs.adjustments` line tags (Form 7206's printed line 1
+      and its five §213(d)(10) age bands, whose limits are now in `fjs/tax/params`) plus one
+      profile certification, `notEligibleForAnySubsidizedEmployerHealthPlanInAnyMonth`
+      (§162(l)(2)(B)). **No dialect was added.**
+
+      **The finding is about remedies, not about this line: Publication 535 does not exist.**
+      Every prior statement in this repository about Schedule 1 line 17 — `fjs/return/scope`'s
+      refusal row and `fjs/form8995`'s docstring quoting it — sent the reader to the *Pub. 535
+      self-employed health insurance deduction worksheet*, which the IRS discontinued after
+      2022. The row had already been repaired **twice**, by Phase 27 and by Phase 28, and both
+      repairs left that first clause untouched because nobody re-read it. **A remedy that names
+      an external source has an expiry the repository cannot see, and the clause least likely to
+      be re-read is the one that has been true longest.** Form 7206 rather than the 1040
+      instructions' three-line worksheet is a decision: p. 95 sends a filer to the form when
+      qualified long-term-care premiums are in play, which this engine models, and the two pages
+      disagree in the multi-business case.
+
+      Line 17 **refuses a return holding both §162(l) premiums and Marketplace coverage**, for
+      Rev. Proc. 2014-41 §2.05's circularity between this deduction and the premium tax credit —
+      which is TAX-37's form, and the one interaction between these four entries.
+
 ### v2 Traceability
 
 | REQ-ID | Tier | Phase | Persona unblocked |
@@ -1379,7 +1541,12 @@ itemizing, which is complete, the eight MAINT items included — MAINT-01 throug
 | DOC-22, DOC-23, TAX-33, TAX-34 | T3 | 29 - Equity Compensation and AMT | **FAANG employee** — all four delivered. TAX-33 closed with Form 6251 Part III: an ISO spread beside qualified dividends computes end to end |
 | DOC-24, TAX-35 | T3 | 30 - Pass-Through Income | **Startup founder** — DOC-24 delivered; **TAX-35 CLOSED**: Schedule E Part II end to end in Phase 30, Part III with the `vnd.fjs.k1_1041` dialect, and the routing half in three slices — sixteen separately stated boxes across three faces reach 1040 lines 2b/3a/3b and Schedule D lines 5/12 at sixteen different box numbers, with an eighth tripwire so the declaration-gated Schedule D destination is reachable rather than silently skipped |
 
-**25 requirements across 10 phases** — 120 in the document, 95 of them v1's. Each phase is a
+| TAX-36, TAX-37 | T3 | *(none — retrofitted 2026-08-19)* | Tier-B forms — Schedule 3 line 1 under §904(j), and Form 8962 over the new `vnd.fjs.1095a`. Both were hard zeros; both now compute or refuse by name |
+| TAX-38 | T3 | *(none — retrofitted 2026-08-19)* | Tier-B forms — **one ID, two forms**: Form 2441 (1040 line 1e and Schedule 3 line 2) and Form 6781 Part I (Schedule D lines 4 and 11). The collision is recorded in the section above, not retconned |
+| TAX-39 | T3 | *(none — retrofitted 2026-08-19)* | Tier-B forms — Form 7206, §162(l), Schedule 1 line 17. The remedy it replaced named a publication the IRS withdrew in 2022 |
+
+**29 requirements across 10 phases and four retrofitted entries with none** — 124 in the
+document, 95 of them v1's. Each phase is a
 vertical slice that ends with something that works: a persona whose return computes, or a named
 refusal that replaces a silent wrong answer. No phase leaves a layer that only pays off later.
 

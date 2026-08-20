@@ -39,9 +39,9 @@ test total (8533) that a bug fix had already halved.
 
 | | |
 |---|---|
-| Requirements | **120 defined, 120 complete, 0 open** |
-| Suite | 2902 tests, 0 fail, `tsc` clean. Wall clock 5-31s and load-dependent — see CAPABILITIES.md; do not quote one number |
-| Project-local proofs | **2823** — the only stable count |
+| Requirements | **124 defined, 124 complete, 0 open** |
+| Suite | 3004 tests, 0 fail, `tsc` clean. Wall clock 5-31s and load-dependent — see CAPABILITIES.md; do not quote one number |
+| Project-local proofs | **2959** — the only stable count |
 | MCP surface | 13 tools, protocol `2025-11-25`, `finance-mcp 1.0.0`, 29 dialects |
 | Refusal partition | 197 kinds: 54 modeled, 143 refused, 10 tripwires |
 
@@ -120,12 +120,12 @@ Next phase: **21 — The Last Mile** (milestone v2). `form1040Report` has **no p
   Phases 16 (deferred), 17 and 18 (planned, zero executed) remain open from v1.
 
 Progress: [████████░░] 80% — **16 of 20 phases**, v1. Milestone v2 adds 10 more (21-30), 0 done.
-  Phase-based, never plan-based. Requirements are **95 in v1 (87 complete)** plus **25 in v2**,
-  120 in the document, counted separately so v2 does not move v1's figure. Every one of those
+  Phase-based, never plan-based. Requirements are **95 in v1 (87 complete)** plus **29 in v2**,
+  124 in the document, counted separately so v2 does not move v1's figure. Every one of those
   counts is derived by a command recorded beside it in REQUIREMENTS.md, not transcribed.
   (Note 14 is skipped and 16 deferred by owner decision, so 16 of the 18 *achievable* v1 phases
   = 89%; the 80% figure is kept because 20 is what ROADMAP declares.)
-Last activity: 2026-08-16
+Last activity: 2026-08-19
 
 > **This block has now been wrong FOUR times, always in the same direction: stale text left
 > under a newer heading.** The fourth was found on 2026-08-16 during a post-merge sweep: it still

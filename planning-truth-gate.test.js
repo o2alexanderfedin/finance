@@ -51,6 +51,30 @@
 // somewhere), while the checkbox-vs-Status comparison is applied only to the
 // table that actually has a Status column.
 //
+// ## The REVERSE direction, and why it was the bigger hole
+//
+// Everything above reads REQUIREMENTS.md and asks whether the document is
+// consistent with itself and with the code's own counts. Nothing asked the
+// opposite question: **does an ID the code CITES exist at all?**
+//
+// It did not, four times. `TAX-36`, `TAX-37`, `TAX-38` and `TAX-39` were
+// coined by four separate pieces of work as code-local handles and cited in
+// 21 files under `fjs/**`, while the highest ID REQUIREMENTS.md traced was
+// `TAX-35`. A reader following `TAX-39` out of `fjs/form7206/module.f.js`
+// landed nowhere.
+//
+// `fjs/form6781/todo/section-1256-contracts-marked-to-market.md` names this
+// gap in its own words -- "nothing checks the reverse direction, that an ID
+// cited in `fjs/**` exists at all, and this is the gap that lets it happen"
+// -- and the same file demonstrates the cost. Its author checked whether
+// `TAX-38` was free with a grep "across every markdown file in the repo".
+// Form 2441 had taken `TAX-38` three and a half hours earlier, in `.f.js`
+// files a markdown-only grep cannot see, on a commit that was already an
+// ancestor of the branch doing the checking. **The registry that would have
+// answered that question is REQUIREMENTS.md, and this check is what forces
+// the question to be asked there.** See TAX-38's own entry, which records the
+// collision rather than tidying it away.
+//
 // ## The count claims
 //
 // `.planning/` also states the served MCP tool count and the document dialect
@@ -194,6 +218,104 @@ const tripwireCountPattern = /(?<![\w-])(\d+) tripwires\b/g
 
 const claimsIn = (text, pattern) => [...text.matchAll(pattern)].map(m => Number(m[1]))
 
+// ── The reverse direction: an ID cited anywhere must have a requirement ────
+
+/**
+ * The ID prefixes REQUIREMENTS.md actually uses. **Hand-typed -- TEN of
+ * them** -- and not derived from the document, for the reason AGENTS.md
+ * states about `Object.keys` over the code under test: a vocabulary read out
+ * of REQUIREMENTS.md would make this check's own coverage a function of the
+ * file it is checking, so deleting every `TAX-*` requirement would silently
+ * stop every `TAX-*` citation from being checked. `theCitationPrefix\
+ * VocabularyIsExactlyWhatRequirementsUses` below asserts the two agree, which
+ * is the `expectedThresholdCount` idiom: the hand-typed side is the
+ * independent one, and a new prefix in the document has to be admitted here
+ * on purpose.
+ *
+ * `DOCC` precedes `DOC` because JavaScript alternation is ordered, and
+ * `DOC|DOCC` would try `DOC` first on `DOCC-01`. It backtracks and gets there
+ * either way; the order makes that not need checking.
+ */
+const requirementPrefixes = [
+    'DOCC', 'MAINT', 'EXACT', 'EXEC', 'PROV', 'TEST', 'TAX', 'DOC', 'MCP', 'SEC',
+]
+
+/** Hand-typed beside the list above, per AGENTS.md. */
+const expectedRequirementPrefixCount = 10
+
+/**
+ * **What counts as a citation**, stated rather than left to the regex: one of
+ * the ten prefixes above, a hyphen, and digits, not glued to a word on either
+ * side.
+ *
+ * The prefix whitelist is what does the real work. `1099-B`, `W-2`, `K-1`,
+ * `SSA-1099`, `SHA-256`, `UTF-8`, `RRB-1099`, and the ~50 fixture account
+ * numbers (`ACC-0001`, `BUS-7206`, `PTR-0003`, `IRA-0002`, ...) are all
+ * ID-shaped and all excluded by their prefix alone. Measured: over the whole
+ * scanned set, an unconstrained `[A-Z]+-[0-9]+` finds 85 tokens with no
+ * requirement behind them; this pattern finds four.
+ *
+ * **The two lookarounds are NOT symmetric, and the asymmetry is load-bearing
+ * rather than an oversight.**
+ *
+ * - Leading `(?<![\w-])` is `toolCountPattern`'s own guard, and it keeps
+ *   `SUBTAX-36` or `nonDOC-19` from reading as citations.
+ * - Trailing `(?![\w])` deliberately does **not** exclude a following hyphen.
+ *   A first draft used `(?![\w-])` for symmetry and dropped two real
+ *   citations: `SEC-02-before-\`import_\`` in `fjs/server/response` (twice)
+ *   and `EXEC-12-style` in `fjs-run-integration.test.js`. Both resolve today,
+ *   so the symmetric version was green and wrong -- a false NEGATIVE, the
+ *   direction a green suite cannot show you. The trailing `\w` guard still
+ *   rejects `TAX-12a`, and nothing in the tree is `PREFIX-<digits><letter>`.
+ */
+const citationPattern = new RegExp(
+    `(?<![\\w-])(?:${requirementPrefixes.join('|')})-[0-9]+(?![\\w])`, 'g')
+
+/** Every distinct requirement ID cited in one document, in first-seen order. */
+const citationsIn = text => [...new Set(text.match(citationPattern) ?? [])]
+
+/** Every file under `dir`, recursively, whose name `keep` accepts. */
+const readTree = (dir, keep) => readdirSync(dir, { withFileTypes: true }).flatMap(entry => {
+    const full = join(dir, entry.name)
+    return entry.isDirectory()
+        ? readTree(full, keep)
+        : keep(entry.name)
+            ? [{ name: full.slice(repoRoot.length), text: readFileSync(full, 'utf8') }]
+            : []
+})
+
+/**
+ * Everything whose requirement citations are a claim about the tree **as it
+ * stands**: all of `fjs/**` (sources and the `todo/` specs beside them), the
+ * root-level gate and integration suites, and -- through
+ * `countedDocuments()` -- `demo/`, `.planning/*.md` and the root `*.md`
+ * files.
+ *
+ * **`CHANGELOG.md` is the one exclusion**, for the reason
+ * `currentPartitionDocuments()` gives about `6 modeled kinds, 44 refused`: a
+ * changelog records what was true on the day it was written, and a check that
+ * demands history be falsified when a requirement is later renamed is a check
+ * that will be deleted. Stated honestly, the exclusion is **not load-bearing
+ * today** -- every one of the eleven IDs CHANGELOG.md names still resolves --
+ * unlike the partition one, which is. It is here so the first rename does not
+ * have to argue with a gate.
+ *
+ * This file is inside its own scanned set. That is deliberate -- its prose
+ * cites real IDs and they should resolve -- and it is why the positive
+ * control below builds its fabricated ID by concatenation instead of writing
+ * the literal.
+ */
+const citingSources = () => [
+    ...readTree(join(repoRoot, 'fjs'), name => name.endsWith('.f.js') || name.endsWith('.md')),
+    ...readdirSync(repoRoot)
+        .filter(name => name.endsWith('.js'))
+        .map(name => ({ name, text: readFileSync(join(repoRoot, name), 'utf8') })),
+    ...countedDocuments().filter(({ name }) => name !== 'CHANGELOG.md'),
+]
+
+/** Measured 2026-08-19: 171. A floor, so a broken walk cannot pass silently. */
+const minimumCitingSourceCount = 150
+
 test('every requirement is traced somewhere, and every traced ID has a body', () => {
     const { body, traced } = parseRequirements()
     assert.ok(body.size > 0, 'no requirements parsed -- the body pattern has drifted')
@@ -223,6 +345,34 @@ test('no requirement is unticked in its body while its table Status says done', 
             && /^(done|complete|verified)$/i.test(statusByRequirement.get(id)))
         .map(([id]) => `${id} (checkbox [ ], Status "${statusByRequirement.get(id)}")`)
     assert.deepEqual(disagreements, [], `checkbox and traceability table disagree: ${disagreements.join('; ')}`)
+})
+
+test('every requirement ID cited in the tree has a body in REQUIREMENTS.md', () => {
+    const { body } = parseRequirements()
+    assert.ok(body.size > 0, 'no requirements parsed -- the body pattern has drifted')
+    const sources = citingSources()
+    assert.ok(
+        sources.length >= minimumCitingSourceCount,
+        `only ${sources.length} files scanned -- the walk has broken, and an empty set passes everything`)
+    const firstCitedIn = new Map()
+    for (const { name, text } of sources) {
+        for (const id of citationsIn(text)) {
+            if (!firstCitedIn.has(id)) { firstCitedIn.set(id, name) }
+        }
+    }
+    const dangling = [...firstCitedIn]
+        .filter(([id]) => !body.has(id))
+        .map(([id, name]) => `${id} (first cited in ${name})`)
+        .sort()
+    assert.deepEqual(dangling, [], `IDs cited with no requirement behind them: ${dangling.join('; ')}`)
+})
+
+test('the hand-typed citation prefixes are exactly the ones REQUIREMENTS.md uses', () => {
+    const { body } = parseRequirements()
+    const used = [...new Set([...body.keys()].map(id => id.slice(0, id.indexOf('-'))))].sort()
+    assert.deepEqual(used, [...requirementPrefixes].sort(),
+        'REQUIREMENTS.md uses a prefix this gate does not scan for, or vice versa')
+    assert.equal(requirementPrefixes.length, expectedRequirementPrefixCount)
 })
 
 test('every documented MCP tool count equals what the server actually serves', () => {
@@ -317,4 +467,44 @@ test('negative control: a historical partition figure is out of the scanned set'
     // And the scoping is doing real work rather than being belt-and-braces:
     // ROADMAP's slash form DOES match, capturing the denominator.
     assert.deepEqual(claimsIn('the 6/44 modeled partition as a `tsc` property', modeledCountPattern), [44])
+})
+
+test('positive control: an ID with no requirement behind it is detected', () => {
+    // Built by concatenation on purpose. This file is inside `citingSources()`,
+    // so a literal `TAX-<two digits that are not a requirement>` written here
+    // would make the gate above redden on its own control -- the exact
+    // self-reference the `FAKE-01` prefix avoids for the checkbox controls.
+    const fabricated = `${'TAX'}-97`
+    assert.deepEqual(citationsIn(`repointed at ${fabricated}, and never written down`), [fabricated])
+    assert.equal(parseRequirements().body.has(fabricated), false)
+})
+
+test('negative control: text that merely LOOKS like an ID is not a citation', () => {
+    // Every one of these appears in the scanned set today, and an
+    // unconstrained `[A-Z]+-[0-9]+` reads all of them as requirement IDs.
+    assert.deepEqual(citationsIn('Form 1099-B box 11, Form W-2 box 10, a K-1, SHA-256, UTF-8'), [])
+    assert.deepEqual(citationsIn('subjects ACC-0001, BUS-7206, PTR-0003, IRA-0002 and NY-99'), [])
+    // A whitelisted prefix glued to a longer word is not a citation either --
+    // the `K-1 dialects` hazard `dialectCountPattern` documents, in ID shape.
+    assert.deepEqual(citationsIn('a SUBTAX-36 and a nonDOC-19 and 1099-DOC-19'), [])
+})
+
+test('negative control: a range in prose reads as its endpoints, and a suffixed ID still reads', () => {
+    // A range is two citations and never a third, invented, one.
+    assert.deepEqual(citationsIn('a grep for TAX-30 through TAX-35'), ['TAX-30', 'TAX-35'])
+    // And the asymmetric trailing guard: both of these are REAL citations in
+    // the tree (`fjs/server/response/module.f.js`, `fjs-run-integration.test.js`)
+    // that a symmetric `(?![\w-])` silently dropped.
+    assert.deepEqual(citationsIn('SEC-02-before-`import_` and EXEC-12-style survival'), ['SEC-02', 'EXEC-12'])
+})
+
+test('negative control: CHANGELOG.md is out of the citing set, and fjs/** is in it', () => {
+    const names = citingSources().map(({ name }) => name)
+    assert.equal(names.includes('CHANGELOG.md'), false,
+        'a changelog must stay free to name a requirement that was later renamed')
+    assert.equal(names.includes('AGENTS.md'), true)
+    assert.equal(names.includes('fjs/return/scope/module.f.js'), true)
+    assert.equal(names.includes('fjs/form6781/todo/section-1256-contracts-marked-to-market.md'), true)
+    assert.equal(names.includes('.planning/REQUIREMENTS.md'), true)
+    assert.equal(names.some(name => name.startsWith('demo/')), true)
 })
