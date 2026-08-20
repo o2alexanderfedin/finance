@@ -1,9 +1,9 @@
 ---
 gsd_state_version: 1.0
-milestone: v3
-milestone_name: File a Real Return
-status: in_progress
-stopped_at: "2026-08-19. Phase 37 (FunctionalScript 0.46.1) closed with the report its upstream author asked for. Then twenty abandoned branches were integrated — they turned out to be ONE linear chain, not twenty independent pieces, and form-2555-impl contained every other: Forms 461/2441/2555/4797/6781/8829, Schedule F, Schedule E Part I, and more. Suite 2523 -> 3241, proof leaves 2489 -> 3196, assertions 7957 -> 10694, requirements 120 -> 127. Nothing left open is fixable in this repository: two upstream notes, both filed upstream (functionalscript#1649, #1650). Milestone v3 phases 33-36 remain, and 34/36 need the owner present."
+milestone: v4
+milestone_name: Verified With the Taxpayer Present
+status: awaiting_owner
+stopped_at: "Milestone v3 CLOSED 2026-08-19. Phase 33 delivered the external validation it existed for: 27/51 matched under TaxCalcBench's strict criterion, both divergences decided against the benchmark, one real engine defect fixed (Form 8959 Part V computed for filers not required to file it). Phases 34, 35 and 36 moved to milestone v4 by owner decision -- none is blocked on engineering, all three need the owner: 34 wants the taxpayer's documents and a second filer, 36 wants a real client session (fixtures would prove the pipe and not the phase), 35 wants a decision on a PDF-writing dependency. Suite 3247/3247, 3202 proof leaves, 127/127 requirements, 34 of 37 phases."
 last_updated: "2026-08-17T21:30:00.000Z"
 last_activity: 2026-08-17
 progress:
