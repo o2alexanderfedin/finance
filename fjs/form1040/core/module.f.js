@@ -94,6 +94,7 @@ import {
 // or below the threshold, which is exactly Form 8995, so that case is delegated
 // to `fjs/form8995` from inside there. One call site, either page.
 import { qualifiedBusinessIncomeDeduction } from '../../form8995a/module.f.js'
+import { farmingIsNotASpecifiedServiceTradeOrBusiness } from '../../schedule/f/module.f.js'
 import { scheduleThree, foreignTaxCreditLine } from '../../schedule/3/module.f.js'
 import { form8812 } from '../../form8812/module.f.js'
 import { form8962 } from '../../form8962/module.f.js'
@@ -127,6 +128,7 @@ import {
 /** @import { BusinessExpenses } from '../../document/business_expenses/module.f.js' */
 /** @import { AssetRegister } from '../../document/asset_register/module.f.js' */
 /** @import { RentalProperty } from '../../document/rental_property/module.f.js' */
+/** @import { Farm } from '../../document/farm/module.f.js' */
 /** @import { ScheduleC } from '../../schedule/c/module.f.js' */
 /** @import { PriorYearCapitalLoss } from '../../document/prior_year_capital_loss/module.f.js' */
 /** @import { Ira } from '../../document/ira/module.f.js' */
@@ -285,6 +287,7 @@ import {
  *   readonly businessExpenseForms: readonly Stored<BusinessExpenses>[],
  *   readonly assetRegisters: readonly Stored<AssetRegister>[],
  *   readonly rentalProperties: readonly Stored<RentalProperty>[],
+ *   readonly farmForms: readonly Stored<Farm>[],
  *   readonly adjustmentForms: readonly Stored<Adjustments>[],
  *   readonly studentLoanInterestForms: readonly Stored<OneZeroNineEightE>[],
  *   readonly tuitionForms: readonly Stored<OneZeroNineEightT>[],
@@ -783,6 +786,7 @@ export const form1040IncomeLines = taxParamSet => inputs => {
         capitalLossCarryoverForms,
         unemploymentForms,
         nonemployeeCompensationForms, businessExpenseForms, assetRegisters, rentalProperties,
+        farmForms,
         adjustmentForms, studentLoanInterestForms,
         iraForms, priorYearIraBasisForms,
         employeeStockPurchaseForms, basisCorrectionForms,
@@ -1292,6 +1296,12 @@ export const form1040IncomeLines = taxParamSet => inputs => {
         // everything else does: one Schedule E execution, whose line 41 IS
         // Schedule 1 line 5.
         rentalProperties,
+        // **`farmForms` is what makes printed Schedule F compute** and reach
+        // Schedule 1 line 6 through printed line 34. It goes in here for the
+        // reason `rentalProperties` does: one Schedule F execution, whose line
+        // 34 is Schedule 1 line 6 AND Schedule SE line 1a, and running the
+        // schedule twice is the only way those two could disagree.
+        farmForms,
         partnershipK1Forms, sCorporationK1Forms, estateTrustK1Forms,
     })
     if (scheduleOnePartIResult.kind === 'error') {
@@ -1394,6 +1404,12 @@ export const form1040IncomeLines = taxParamSet => inputs => {
         // already feeding lines 2a and 2b above.
         interestForms,
         businessNetProfit: scheduleOnePartIResult.scheduleC.partII.line31,
+        // Printed Schedule SE line 1a's own source, "Schedule F, line 34" --
+        // read off the SAME Schedule F execution printed Schedule 1 line 6
+        // came from, never a second one. i1040sf p9 names both destinations in
+        // one sentence, and running the schedule twice is the only way they
+        // could disagree.
+        farmNetProfit: scheduleOnePartIResult.scheduleF.line34,
         businessExpenseForms,
         // ...and printed Schedule SE line 2's OTHER named source, "Schedule
         // K-1 (Form 1065), box 14, code A" -- read off the Schedule E
@@ -1699,13 +1715,57 @@ export const form1040IncomeLines = taxParamSet => inputs => {
     // and the sources, to cite the box it deducted.
     const reitDividendSum = sumBoxOverDocuments(dividendForms)('box5Section199ADividends')(
         div => div.box5Section199ADividends)
+    // ── §199A's trade or business, which is EITHER Schedule C's or Schedule
+    //    F's and never both ──────────────────────────────────────────────────
+    //
+    // `fjs/schedule/f` REFUSES a `vnd.fjs.farm` stored beside a
+    // `vnd.fjs.business_expenses`, on the ground that Form 8995-A figures the
+    // W-2 wage and unadjusted-basis limitations PER BUSINESS while this
+    // function reads ONE record's. So the sum below always has a zero term, and
+    // `firstQualifiedBusinessRecord` always names the one record that exists.
+    //
+    // Writing it as a sum rather than as a branch is deliberate: the day a
+    // phase carries two businesses through §199A, the arithmetic here is
+    // already right and only the refusal has to go.
+    const [firstFarmRecord] = farmForms
+    /**
+     * The three §199A facts and the carryforward, from whichever record the
+     * return has. A farm carries no `specifiedServiceTradeOrBusiness` field at
+     * all -- §199A(d)(2)'s list has no farming on it -- so the constant
+     * `fjs/schedule/f` exports stands in its place.
+     * @type {{ readonly carryforward: string | undefined, readonly specifiedService: string | undefined, readonly w2Wages: string | undefined, readonly unadjustedBasis: string | undefined }}
+     */
+    const qualifiedBusinessFacts = firstBusinessRecord !== undefined
+        ? {
+            carryforward: firstBusinessRecord.value.priorYearQualifiedBusinessLossCarryforward,
+            specifiedService: firstBusinessRecord.value.specifiedServiceTradeOrBusiness,
+            w2Wages: firstBusinessRecord.value.w2Wages,
+            unadjustedBasis: firstBusinessRecord.value.unadjustedBasisOfQualifiedProperty,
+        }
+        : firstFarmRecord !== undefined
+            ? {
+                carryforward: firstFarmRecord.value.priorYearQualifiedBusinessLossCarryforward,
+                specifiedService: farmingIsNotASpecifiedServiceTradeOrBusiness,
+                w2Wages: firstFarmRecord.value.w2Wages,
+                unadjustedBasis: firstFarmRecord.value.unadjustedBasisOfQualifiedProperty,
+            }
+            : {
+                carryforward: undefined,
+                specifiedService: undefined,
+                w2Wages: undefined,
+                unadjustedBasis: undefined,
+            }
     const qbiOutcome = qualifiedBusinessIncomeDeduction(taxParamSet)({
         status,
-        // Schedule C line 31, and the SAME Schedule SE execution line 10
-        // already deducted half of -- §199A(c)(1) reduces qualified business
-        // income by that half, so the two uses are one figure read twice
-        // rather than two figures that could drift.
-        netProfitCents: scheduleOnePartIResult.scheduleC.partII.line31.value,
+        // Schedule C line 31 PLUS Schedule F line 34, and the SAME Schedule SE
+        // execution line 10 already deducted half of -- §199A(c)(1) reduces
+        // qualified business income by that half, so the two uses are one
+        // figure read twice rather than two figures that could drift. A farming
+        // business is a qualified trade or business like any other; leaving
+        // line 34 out would have understated the deduction and so OVERSTATED
+        // the tax for every farmer.
+        netProfitCents: scheduleOnePartIResult.scheduleC.partII.line31.value
+            + scheduleOnePartIResult.scheduleF.line34.value,
         deductibleHalfOfSelfEmploymentTaxCents: scheduleOneStageOne.selfEmployment.lines.line13,
         // Schedule 1 line 17, TAX-39 -- the SAME `fjs/schedule/1` stage-one
         // execution line 15 came from, never a second Form 7206. §199A(c)(1)
@@ -1720,24 +1780,16 @@ export const form1040IncomeLines = taxParamSet => inputs => {
         // `theHealthInsuranceDeductionReachesFormEightNineNineFive` asserts the
         // §199A deduction MOVED rather than only that line 17 did.
         selfEmployedHealthInsuranceDeductionCents: scheduleOneStageOne.line17.value,
-        assertedPriorYearLossCarryforward: firstBusinessRecord === undefined
-            ? undefined
-            : firstBusinessRecord.value.priorYearQualifiedBusinessLossCarryforward,
+        assertedPriorYearLossCarryforward: qualifiedBusinessFacts.carryforward,
         // Form 8995-A's three facts (Phase 31, TAX-32). Read from the SAME
-        // business expenses record the carryforward comes from, and passed
-        // UNCONDITIONALLY: `fjs/form8995a` is what decides whether they are
-        // needed, and it needs them only above §199A(e)(2)'s threshold. A return
-        // with no business record at all passes three `undefined`s and is
-        // untouched, because there is no qualified business income to deduct.
-        assertedSpecifiedService: firstBusinessRecord === undefined
-            ? undefined
-            : firstBusinessRecord.value.specifiedServiceTradeOrBusiness,
-        assertedW2Wages: firstBusinessRecord === undefined
-            ? undefined
-            : firstBusinessRecord.value.w2Wages,
-        assertedUnadjustedBasis: firstBusinessRecord === undefined
-            ? undefined
-            : firstBusinessRecord.value.unadjustedBasisOfQualifiedProperty,
+        // record the carryforward comes from, and passed UNCONDITIONALLY:
+        // `fjs/form8995a` is what decides whether they are needed, and it needs
+        // them only above §199A(e)(2)'s threshold. A return with no business
+        // and no farm passes three `undefined`s and is untouched, because there
+        // is no qualified business income to deduct.
+        assertedSpecifiedService: qualifiedBusinessFacts.specifiedService,
+        assertedW2Wages: qualifiedBusinessFacts.w2Wages,
+        assertedUnadjustedBasis: qualifiedBusinessFacts.unadjustedBasis,
         taxableIncomeBeforeQbiCents: taxableIncomeBeforeQualifiedBusinessIncomeDeduction({
             adjustedGrossIncomeCents: line11b.value,
             deductionCents: line12e.value,
@@ -1802,7 +1854,9 @@ export const form1040IncomeLines = taxParamSet => inputs => {
             sources: [firstReitSource, ...restReitSources],
             rule: 'Form 8995 line 6 (qualified REIT dividends, Form 1099-DIV box 5)',
         }]
-    const line13a = scheduleOnePartIResult.scheduleC.filed || firstReitSource !== undefined
+    const line13a = scheduleOnePartIResult.scheduleC.filed
+        || scheduleOnePartIResult.scheduleF.filed
+        || firstReitSource !== undefined
         ? {
             // Form 8995 line 15 or Form 8995-A line 39, whichever page the
             // router filled -- `deductionCents` is the one figure line 13a
@@ -1815,6 +1869,7 @@ export const form1040IncomeLines = taxParamSet => inputs => {
             // 13b that decide the limitation base.
             sources: unionSources([
                 scheduleOnePartIResult.scheduleC.partII.line31,
+                scheduleOnePartIResult.scheduleF.line34,
                 line11b, line12e, line13b, line3a, line7a, ...reitDividendLines,
             ]),
             rule: '1040 line 13a (qualified business income deduction, Form 8995 line 15 '
@@ -1863,6 +1918,11 @@ export const form1040IncomeLines = taxParamSet => inputs => {
     const amtDepreciationAdjustmentCents = amtDepreciationAdjustmentOf(
         scheduleOnePartIResult.scheduleC)
         + scheduleOnePartIResult.scheduleE.partI.alternativeMinimumTaxAdjustmentCents
+        // And a FARMER's register, for the identical reason. `fjs/schedule/f`
+        // pre-sums its own Form 4562's §56(a)(1) adjustment so that this is one
+        // read of one execution rather than a second Form 4562 whose
+        // mid-quarter convention could differ from the first's.
+        + scheduleOnePartIResult.scheduleF.alternativeMinimumTaxAdjustmentCents
 
     return {
         kind: 'ok',
@@ -3799,6 +3859,7 @@ const inputsOf = profile => w2s => interestForms => dividendForms => brokerageFo
                 businessExpenseForms: [],
                 assetRegisters: [],
                 rentalProperties: [],
+                farmForms: [],
                 adjustmentForms: [],
                 studentLoanInterestForms: [],
                 tuitionForms: [],
@@ -4041,6 +4102,93 @@ const selfEmploymentProfile = {
     ...singleProfile,
     declaredKinds: ['businessIncomeOrLoss', 'federalTaxWithheldOnOther1099'],
 }
+
+/**
+ * **A FARMER, and nothing else.** No wages, so 1040 line 8 is the only thing
+ * feeding line 9 and a figure landing there cannot be mistaken for something
+ * else — {@link selfEmploymentProfile}'s own reasoning, applied to the other
+ * self-employment schedule.
+ *
+ * It declares `farmIncomeOrLoss` because `fjs/return/tripwire`'s eleventh entry
+ * requires it of any return that STORES a `vnd.fjs.farm`, and nothing else: the
+ * self-employment tax, its deductible half and the §199A deduction are all
+ * modeled kinds this engine does not require to be declared, so leaving them out
+ * is what makes the pair of fixtures below differ in ONE fact only.
+ */
+const farmProfile = {
+    ...singleProfile,
+    declaredKinds: /** @type {readonly Kind[]} */ (['farmIncomeOrLoss']),
+}
+
+/**
+ * ONE printed Schedule F: a cash-method farm that materially participated with
+ * all investment at risk, $40,000.00 of raised products on printed line 2 and no
+ * expenses at all.
+ *
+ * `accountNumber` agrees with {@link farmAssetRegisterDocument}'s deliberately —
+ * `fjs/schedule/f` attaches a register to a farm by that string, and a fixture
+ * that quietly disagreed would exercise the unmatched-register path instead of
+ * the wiring.
+ *
+ * `priorYearQualifiedBusinessLossCarryforward` is `'0.00'` because
+ * `fjs/form8995`'s `priorYearCarryforwardIsUnstated` refuses any return with
+ * qualified business income and no assertion — the farm is a qualified trade or
+ * business like any other, so it needs the assertion Schedule C's own record
+ * needs.
+ * @type {(documentHash: string) => Stored<Farm>}
+ */
+const farmDocument = documentHash => ({
+    documentHash,
+    value: {
+        dialect: 'vnd.fjs.farm',
+        recipientTin: '222-22-2222',
+        accountNumber: 'FARM-0001',
+        taxYear: 2025,
+        principalCropOrActivity: 'corn and soybeans',
+        accountingMethod: 'cash',
+        materiallyParticipated: 'yes',
+        investmentAtRisk: 'allAtRisk',
+        salesOfRaisedProductsAndLivestock: '40000.00',
+        cropInsuranceProceedsDeferredFromPriorYear: '0.00',
+        priorYearQualifiedBusinessLossCarryforward: '0.00',
+        entries: [],
+    },
+})
+
+/**
+ * The FARM's asset register: an $84,000.00 grain bin placed in service in May
+ * 2025 at **200% declining balance**, which is the method i4562 p11 lets a
+ * farmer elect OUT of and this fixture does not. 7-year property (i4562 p10 puts
+ * grain bins there), half-year convention.
+ *
+ * A `200DB` asset is what makes the §56(a)(1)(A) adjustment non-zero, which is
+ * the whole point of the leaf that reads it: `fjs/schedule/f`'s own worked case
+ * uses `150DB` and correctly produces no adjustment at all.
+ * @type {(documentHash: string) => Stored<AssetRegister>}
+ */
+const farmAssetRegisterDocument = documentHash => ({
+    documentHash,
+    value: {
+        dialect: 'vnd.fjs.asset_register',
+        recipientTin: '222-22-2222',
+        accountNumber: 'FARM-0001',
+        taxYear: 2025,
+        businessOrActivity: 'Hollow Creek Farm',
+        everyDepreciableAssetIsListed: true,
+        noDepreciablePropertyDisposedOfDuringTheYear: true,
+        priorYearSection179CarryoverIsZero: true,
+        assets: [{
+            description: 'grain bin',
+            datePlacedInService: '2025-05',
+            costOrOtherBasis: '84000.00',
+            businessUsePercentage: '100.00',
+            classification: 'sevenYear',
+            method: '200DB',
+            convention: 'HY',
+            section168kStatus: 'notQualifiedProperty',
+        }],
+    },
+})
 
 /**
  * **A SINGLE WAGE EARNER WHO HOLDS A REIT INDEX FUND** — the §199A(b)(1)(B)
@@ -6337,6 +6485,189 @@ export const proof = {
          * a scale where self-employment tax bites, and the two are separate
          * so a failure localises.
          */
+        /**
+         * ★ **THE SCHEDULE F WIRING LEAF, and it has to prove FOUR
+         * destinations rather than one.** i1040sf p9 names two of them in one
+         * sentence — *"Enter your net profit or loss on line 34 and on Schedule
+         * 1 (Form 1040), line 6 and; Schedule SE (Form 1040), line 1a"* — and
+         * §199A(c)(1) and §32(c)(2)(A)(ii) supply the other two. A leaf that
+         * checked only 1040 line 8 would pass for a wiring that left
+         * self-employment tax at zero, which is an understatement of about
+         * 14.1% of every farm profit.
+         *
+         * A farm and NO wages, so 1040 line 8 is the only thing feeding line 9
+         * and a figure landing there cannot be mistaken for something else.
+         * Every figure hand-computed off the printed pages:
+         *
+         * ```
+         *  Schedule F   2  sales of raised products      40,000.00
+         *              9   gross income                  40,000.00
+         *              33  total expenses                     0.00
+         *              34  net farm profit               40,000.00
+         *  Schedule 1   6  Schedule F line 34            40,000.00
+         *              10  total additional income       40,000.00
+         *  Schedule SE  1a Schedule F line 34            40,000.00
+         *              3   1a + 1b + 2                   40,000.00
+         *              4a  92.35% of 40,000.00           36,940.00
+         *              6   36,940.00                     36,940.00
+         *              10  12.4% of 36,940.00             4,580.56
+         *              11  2.9%  of 36,940.00             1,071.26
+         *              12  4,580.56 + 1,071.26            5,651.82
+         *              13  one half of line 12            2,825.91
+         *  Schedule 1  15  Schedule SE line 13            2,825.91
+         *              26  total adjustments              2,825.91
+         *  1040         8  Schedule 1 line 10            40,000.00
+         *              9  total income                   40,000.00
+         *              10 Schedule 1 line 26              2,825.91
+         *              11a AGI  40,000.00 - 2,825.91     37,174.09
+         *              12e standard deduction, single    15,750.00
+         *              23 Schedule 2 line 4               5,651.82
+         *  Form 8995    1i 40,000.00 - 2,825.91          37,174.09
+         *              5  20% of 37,174.09                7,434.82
+         *              11 37,174.09 - 15,750.00          21,424.09
+         *              14 20% of 21,424.09                4,284.82
+         *              15 the LESSER of 5 and 14          4,284.82
+         *  1040        13a Form 8995 line 15              4,284.82
+         *              14 15,750.00 + 4,284.82           20,034.82
+         *              15 37,174.09 - 20,034.82          17,139.27
+         * ```
+         *
+         * The 92.35% factor is §1402(a)(12)'s, and the two portions round
+         * separately because the printed page prints them on two lines.
+         */
+        theFarmReachesScheduleOneLineSixScheduleSeLineOneAAndFormEightNineNineFive: () => {
+            const base = inputsOf(storedProfile(farmProfile))([])([])([])([])([])([])([])([])([])
+            const { income, tax } = computedLines({
+                ...base,
+                farmForms: [farmDocument('sha256-farm-01')],
+            })
+            // Destination ONE: Schedule 1 line 6 -> 1040 line 8.
+            assertEq(income.line8.value, 4000000n, '1040 line 8 carries Schedule F line 34')
+            assertEq(income.line9.value, 4000000n, 'total income is the farm profit alone')
+            // Destination TWO: Schedule SE line 1a -> Schedule 2 line 4 -> 1040
+            // line 23, and its deductible half -> Schedule 1 line 15 -> line 10.
+            assertEq(tax.line23.value, 565182n, '1040 line 23 = $5,651.82 of self-employment tax')
+            assertEq(income.selfEmployment.lines.line1a, 4000000n,
+                'printed Schedule SE line 1a IS Schedule F line 34')
+            assertEq(income.selfEmployment.lines.line2, 0n,
+                'and printed line 2 is empty: there is no Schedule C and no partnership')
+            assertEq(income.selfEmployment.lines.line12, tax.line23.value,
+                'Schedule 2 line 4 is Schedule SE line 12')
+            assertEq(income.line10.value, 282591n, '1040 line 10 = the deductible half, $2,825.91')
+            assertEq(income.line11a.value, 3717409n, 'AGI = $37,174.09')
+            // Destination THREE: Form 8995 line 1(i) -> 1040 line 13a.
+            assertEq(income.line12e.value, 1575000n, 'the single standard deduction, $15,750.00')
+            assertEq(income.line13a.value, 428482n,
+                '1040 line 13a = $4,284.82, the LESSER of the two 20% components')
+            assertEq(income.line14.value, 2003482n)
+            assertEq(income.line15.value, 1713927n, 'taxable income $17,139.27')
+            // Provenance: 1040 line 8 cites the farm document, by hash and by
+            // the printed field the income came from — the part of the message
+            // a reader can act on, which an erased interpolation would lose.
+            const hashes = income.line8.sources.map(source => source.documentHash)
+            assert(hashes.includes('sha256-farm-01'),
+                ['1040 line 8 must cite the farm document', hashes])
+            const boxes = income.line8.sources.map(source => source.boxPath)
+            assert(boxes.includes('salesOfRaisedProductsAndLivestock'),
+                ['and printed line 2, which is where the income came from', boxes])
+            // …and 1040 line 13a cites it too, which is what says the §199A
+            // deduction was computed from the FARM rather than from nothing.
+            const qbiHashes = income.line13a.sources.map(source => source.documentHash)
+            assert(qbiHashes.includes('sha256-farm-01'),
+                ['1040 line 13a must cite the farm behind the qualified business income', qbiHashes])
+        },
+        /**
+         * ★ **THE CONTROL, and it matters as much as the claim**: the SAME
+         * profile with NO farm document computes zeros on all four
+         * destinations. Without it, every figure above would be evidence only
+         * if something could have made it $0.00 — a wiring that added $40,000
+         * from nowhere would look identical.
+         */
+        theSameProfileWithNoFarmDocumentComputesZeros: () => {
+            const base = inputsOf(storedProfile(farmProfile))([])([])([])([])([])([])([])([])([])
+            const { income, tax } = computedLines(base)
+            assertEq(income.line8.value, 0n, 'no farm means no line 8 income')
+            assertEq(income.line9.value, 0n)
+            assertEq(income.line10.value, 0n, 'and no deductible half of self-employment tax')
+            assertEq(tax.line23.value, 0n, 'and no self-employment tax')
+            assertEq(income.line13a.value, 0n, 'and no §199A deduction')
+            const [line8Source] = income.line8.sources
+            assertEq(line8Source.boxPath, 'declaredKinds', 'the zero still carries profile provenance')
+        },
+        /**
+         * ★ **THE FARM'S ASSET REGISTER REACHES FORM 6251 LINE 2l**, which is
+         * the wiring `fjs/schedule/f`'s own proof cannot make: the AMT
+         * adjustment leaves the schedule as a `bigint` and only this function
+         * adds it to Schedule C's and Schedule E Part I's.
+         *
+         * The same $84,000.00 grain bin `fjs/schedule/f` depreciates, at
+         * `200DB` — Publication 946 Table A-1, 7-year, half-year, year 1,
+         * **14.29%**, hand-typed off the printed table: $12,003.60 regular
+         * against $8,996.40 at 150% DB (Table A-14's **10.71%**), so the
+         * §56(a)(1)(A) adjustment is **$3,007.20**.
+         *
+         * ```
+         *  Schedule F  14  depreciation, Form 4562 line 22  12,003.60
+         *              34  40,000.00 - 12,003.60            27,996.40
+         *  1040         8  Schedule 1 line 10               27,996.40
+         * ```
+         */
+        theFarmRegisterReachesFormSixtyTwoFiftyOneLineTwoL: () => {
+            /** @type {ReturnProfile} */
+            const profile = {
+                ...farmProfile,
+                declaredKinds: ['farmIncomeOrLoss', 'alternativeMinimumTax'],
+            }
+            const base = inputsOf(storedProfile(profile))([])([])([])([])([])([])([])([])([])
+            const { income } = computedLines({
+                ...base,
+                farmForms: [farmDocument('sha256-farm-amt-01')],
+                assetRegisters: [farmAssetRegisterDocument('sha256-farm-amt-register')],
+            })
+            assertEq(income.line8.value, 2799640n, 'line 34 is $40,000.00 less $12,003.60')
+            assertEq(income.amtDepreciationAdjustmentCents, 300720n,
+                'Form 6251 line 2l = $12,003.60 regular less $8,996.40 at 150% DB')
+            // THE CONTROL: the SAME return with no register at all. Without
+            // it, an adjustment of $3,007.20 could have come from anywhere.
+            const { income: without } = computedLines({
+                ...base,
+                farmForms: [farmDocument('sha256-farm-amt-01')],
+            })
+            assertEq(without.line8.value, 4000000n, 'no register, so no depreciation')
+            assertEq(without.amtDepreciationAdjustmentCents, 0n)
+        },
+        /**
+         * A Schedule F refusal must stop the WHOLE report, threaded through
+         * `form1040IncomeLines`' error arm with `unmodeled: []` — never
+         * swallowed into a zero line. The net LOSS is the refusal a real
+         * farmer meets first.
+         */
+        aScheduleFRefusalStopsTheWholeReport: () => {
+            const base = inputsOf(storedProfile(farmProfile))([])([])([])([])([])([])([])([])([])
+            const outcome = form1040IncomeLines(taxParams2025)({
+                ...base,
+                farmForms: [{
+                    documentHash: 'sha256-farm-loss',
+                    value: {
+                        ...farmDocument('x').value,
+                        entries: [{
+                            category: 'feed',
+                            datePaid: '2025-04-15',
+                            description: 'winter hay',
+                            amount: '40000.01',
+                        }],
+                    },
+                }],
+            })
+            assert(outcome.kind === 'error', ['a farm loss must stop the report', outcome])
+            if (outcome.kind !== 'error') {
+                return
+            }
+            assert(outcome.message.includes('§461(l)'), ['the statute', outcome.message])
+            assert(outcome.message.includes('LOSS of 0.01'), ['the size of the loss', outcome.message])
+            assertEq(outcome.unmodeled.length, 0,
+                'a document-data refusal names no scope kind')
+        },
         scheduleCReachesLineEightAndTheWithholdingReachesLineTwentyFiveB: () => {
             const base = inputsOf(storedProfile(selfEmploymentProfile))([])([])([])([])([])([])([])([])([])
             const { income, tax } = computedLines(withBusiness(base)([

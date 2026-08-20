@@ -68,7 +68,7 @@ the form or the facts that would supply it.
 
 **The refusal surface is a partition, checked at `tsc`:** every one of **197 income, deduction,
 credit and payment kinds** is either modeled or carries a refusal naming what is missing —
-**54 modeled, 143 refused**, and `_EveryKindIsEitherModeledOrRefused` fails the build if a kind
+**55 modeled, 142 refused**, and `_EveryKindIsEitherModeledOrRefused` fails the build if a kind
 falls in neither. Re-derive with `modeledKinds.length` / `unmodeledKindRefusals.length` in
 `fjs/return/scope`.
 
@@ -98,6 +98,22 @@ election needs three prior years' returns), and they exist because §1256 contra
 at all** before that wiring: a futures trader fell through the scope guard entirely. Adding a
 refused kind where there was silence is a gain in honesty, not a loss of coverage. 54 + 143 = 197.
 
+It fell a third time, 143 → 142, and the modeled half rose 54 → 55, when Schedule F made
+`farmIncomeOrLoss` computable at Schedule 1 line 6 — and at Schedule SE line 1a, which is the
+half a reclassification could have skipped while looking complete. **A third single kind moved
+across the same partition**, on the same terms, and 55 + 142 = 197. Its two farm neighbours did
+NOT move: `netFarmRentalIncomeForm4835` is Form 4835, a different printed form for a landowner
+who did not materially participate, and `farmIncomeAveragingScheduleJ` is Schedule J, which
+averages farm income over three preceding years this engine does not hold.
+
+**Schedule F and Form 6781 were written on branches whose common ancestor had a refused half of
+141**, and this paragraph is where reading either branch's own figure would have gone wrong: one
+added two rows
+and reclassified nobody, the other reclassified one row and added none, so the two compose to
+`141 + 2 - 1` and the vocabulary keeps Form 6781's 197 rather than returning to 195. The
+arithmetic is stated rather than transcribed because both branches were internally consistent
+and both were superseded the moment they met.
+
 The conditional refusals — the ones that fire on a taxpayer whose kinds are all modeled:
 
 | Refused | Because |
@@ -105,6 +121,10 @@ The conditional refusals — the ones that fire on a taxpayer whose kinds are al
 | A nonqualified Roth distribution (1099-R box 7a code `J` or `T`) | Form 8606 Part III is unbuilt. Part I and **Part II compute**, so a backdoor Roth works. |
 | Qualified disaster distributions (Form 8606 line 15b) | Form 8915-F is unbuilt |
 | A business **loss** | the at-risk determination (Form 6198) needs a multi-year basis history |
+| A farm **loss** | §461(l)'s excess business loss aggregates every trade or business including Form 4797 gains, and §199A(c)(2) carries a negative QBI amount into next year |
+| A farm on the **accrual** method | printed Schedule F line 45's beginning-of-year inventory, and the valuation method the printed footnote to line 49 makes the sign of lines 47-50 depend on |
+| A farm the taxpayer did not **materially participate** in | it is a passive activity, so §1411(c)(1)(A)(ii) makes its income net investment income and Form 8960 line 4b is unbuilt |
+| A farm beside a Schedule C business | Form 8995-A figures its limitations per business and this engine carries one business's W-2 wages and unadjusted basis |
 | A mixed-tax-year document store | 2024 and 2025 W-2s together would silently mis-total |
 | Two businesses, or two K-1s from one entity | netting them is the arithmetic §704(d) exists to stop |
 | Two Schedules SE (both spouses self-employed) | one Schedule SE is computed; two are a phase of their own |
@@ -116,7 +136,7 @@ AMT with capital gains or qualified dividends (Phase 29, `fjs/form6251/part3`), 
 Part II.
 
 **There is also a complementary guard.** Some taxes trigger on a threshold from data already held,
-on a taxpayer who has never heard of the form — so **10 tripwires** refuse when the documents prove
+on a taxpayer who has never heard of the form — so **11 tripwires** refuse when the documents prove
 an obligation was not declared. Without them, a $300,000 W-2 understated tax by ~$900, silently.
 A tripwire that always fires is not a tripwire; each one is proven to stay quiet on a return that
 does not owe the thing.
@@ -125,7 +145,7 @@ does not owe the thing.
 
 ## The measured surface
 
-**13 tools** · protocol `2025-11-25` · server `finance-mcp 1.0.0` · **29 document dialects**
+**13 tools** · protocol `2025-11-25` · server `finance-mcp 1.0.0` · **30 document dialects**
 
 | Group | Tools |
 |---|---|
