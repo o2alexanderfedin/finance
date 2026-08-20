@@ -17,8 +17,20 @@ Executed:
 uri = /Users/<username>/.cas/g0/00/00000000000000000000000000000000000938nkrj2nwvvw
 ```
 
-It is not a URI in the `scheme:` sense at all. **One `cas_get` call tells a client the home
-directory, the account name, and the store layout.**
+It is not a URI in the `scheme:` sense at all. **A `cas_get` that FINDS a blob tells a client the
+home directory, the account name, and the store layout.**
+
+*Corrected 2026-08-20, second review round on #1650. This line read "one `cas_get` call" and that
+was too broad:* an invalid cBase32 hash is rejected before `uri` is computed
+(`fjs/mcp/cas/module.f.mjs:219-220`), and a well-formed hash with no blob behind it answers
+`no such hash` (`:226-227`) — both path-free. The path rides a successful lookup (`:231`, `:271`)
+and the oversized-blob refusal (`:257`).
+
+**The wording narrows; the exposure does not, and P2 stands.** `cas_list` answers *"All stored
+content hashes (cBase32), one per line"* (`:295-303`) to the same client, and `cas_add` returns the
+hash of whatever it just stored — a hash that yields the path is one call away, needing no prior
+knowledge of the store. Worth stating rather than quietly softening: an overstatement that a
+reviewer can puncture is how a real finding gets dismissed.
 
 ## Why this repo cares, and where it is currently mishandled
 
