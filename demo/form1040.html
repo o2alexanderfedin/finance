@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Form 1040 — U.S. Individual Income Tax Return</title>
+<meta name="description" content="The computed return on the printed Form 1040 layout, with nothing else on the page.">
+<link rel="stylesheet" href="demo.css">
+<!-- Inline, so the page makes no request the CSP or an offline laptop could fail. -->
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ctext y='25' x='7' font-size='26' font-family='serif' font-style='italic' fill='%231c5d99'%3E%C6%92%3C/text%3E%3C/svg%3E">
+<!--
+  The same import map `index.html` carries, and it is not optional here.
+
+  `lib/engine.js` imports `functionalscript/...` as a BARE specifier. Without
+  this map the browser cannot resolve it, the module graph never loads, and
+  this page renders white — which is the failure mode a printable page can
+  least afford, because nobody reads a console before reaching for Ctrl-P.
+-->
+<script type="importmap">
+{
+  "imports": {
+    "functionalscript/": "../functionalscript/"
+  }
+}
+</script>
+</head>
+<body class="f1040-standalone">
+
+<!--
+  The one piece of chrome, and `@media print` removes it. Everything else on
+  this page is the form.
+-->
+<div class="f1040-toolbar">
+    <a class="f1040-back" href="./#/form1040">← back to the demo</a>
+    <span class="f1040-toolbar-note">Two pages. Print to Letter, portrait, no scaling.</span>
+    <button id="print" class="nav-button nav-primary" type="button">Print</button>
+</div>
+
+<main id="form" class="f1040-sheet"></main>
+
+<div id="boot-error" class="boot-error" hidden></div>
+
+<script type="module" src="form1040.js"></script>
+<script type="module">
+// A module that fails to load leaves a blank page and a console nobody is
+// looking at. On a page whose whole purpose is to be printed, a blank sheet
+// that says nothing is the worst possible outcome, so the failure goes on
+// screen instead.
+window.addEventListener('error', event => {
+    const box = document.getElementById('boot-error')
+    if (box === null) { return }
+    box.hidden = false
+    box.textContent = `Failed to load: ${event.message}`
+})
+</script>
+
+</body>
+</html>

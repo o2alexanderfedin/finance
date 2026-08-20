@@ -14,10 +14,22 @@
  * screenshot; a citation list without the form face is a database dump. The
  * point is that they are the same object.
  *
+ * ## Two entry points, one form
+ *
+ * {@link renderForm} draws the form face and nothing else: the header block,
+ * both pages, the coverage guards, and the citation panel. {@link render} is
+ * the wizard step — the same form, with the demo's prose around it.
+ * `demo/form1040.html` calls {@link renderForm} directly and gets the form
+ * alone, on a page with no navigation, which is the page you print.
+ *
+ * **The guards live in `renderForm`, not in `render`.** They are what makes
+ * the printed page trustworthy, so the entry point a filer uses must not be
+ * the one that skips them.
+ *
  * ## Two things that are deliberately not hardcoded
  *
  * **The amounts.** Every figure comes from `form1040Report` called on the
- * sample return, in this browser, at render time. Not one of the 56 is typed
+ * sample return, in this browser, at render time. Not one of them is typed
  * in this file: the only digits below are printed line numbers, the printed
  * labels' own cross-references to other forms, and source-link anchors.
  *
@@ -31,36 +43,53 @@
  *
  * ## Where the printed text comes from
  *
- * The line numbers and labels are hand-transcribed. The transcription this
- * repository already verified against `f1040.pdf` — both pages, read in full
- * — is `10-RESEARCH.md`'s line-by-line table, and it is the authority for
- * every line number here and for the content of every label. That includes
- * the three ways the 2025 face differs from 2024, each visible below: lines
- * **11a** and **11b** (AGI stated at the foot of page 1 and restated at the
- * head of page 2, which is where the page break falls), the lettered
- * deduction block ending at **12e**, and **13b** for Schedule 1-A's new
- * deductions.
+ * **Every string below was checked, on 2026-08-19, against the PDF the IRS
+ * publishes at `https://www.irs.gov/pub/irs-pdf/f1040.pdf`** — the 2025
+ * revision, footer `Cat. No. 11320B · Form 1040 (2025) Created 9/5/25`. The
+ * text was extracted twice, by two paths, and the two agreed line for line.
+ * That PDF, not any earlier transcription, is the authority for every line
+ * number, every caption, every checkbox caption and every band name here.
  *
- * **What that table does NOT carry is sub-line cross-references**, and those
- * have been DROPPED rather than reconstructed from memory of an earlier
- * year's form: line 1e reads "from Form 2441" and not "from Form 2441, line
- * 26", and likewise 1f, 1g, 29 and 30. Where the verified table does give the
- * cross-reference — Schedule 1 line 10, Schedule 1 line 26, Schedule 1-A line
- * 38, Schedule 2 lines 3 and 21, Schedule 3 lines 8 and 15 — it is printed.
- * A plausible-looking sub-line number is the most expensive kind of error on
- * a page like this, because it is the one a reader would never think to
- * check.
+ * Before that check the labels came from a table that did not carry sub-line
+ * cross-references, and from the engine's own arithmetic where the caption
+ * was not recorded at all. Both classes of reconstruction were wrong in
+ * places, and the wrong ones were not the ones anybody would have guessed:
  *
- * The remaining reconstructions are the arithmetic captions, taken from the
- * engine's own operation rather than from the page: lines 1z, 9, 11a, 14, 15,
- * 18, 21, 22, 24, 25d, 32, 33, 34 and 37 describe exactly what
- * `form1040/core` computes for them. They are labelled here so the next
- * person to hold the printed form beside this page knows which strings to
- * check first.
+ * - The dropped sub-line references were all real — the page does print
+ *   `from Form 2441, line 26`, `from Form 8839, line 31`, `from Form 8919,
+ *   line 6`, `from Form 8863, line 8` and `from Form 8839, line 13`.
+ * - Twelve of the fourteen reconstructed arithmetic captions turned out to be
+ *   word-for-word right. The two that were not are **line 14**, which prints
+ *   `Add lines 12e, 13a, and 13b` and not `Add lines 12, 13a, and 13b`, and
+ *   **line 37**, whose caption continues past the sentence that was recorded.
+ * - The expensive errors were elsewhere: the **12a–12d checkbox block was
+ *   off by one line** for its whole length, **7b** carried a caption from an
+ *   earlier year's layout, and the page-2 band was labelled `Standard
+ *   Deduction` where the paper prints `Tax and Credits` down the whole
+ *   margin from 11b to 24 — `Standard deduction for—` is a separate note box
+ *   beside it, not the name of the band.
+ *
+ * Eight printed rows were missing outright and are now here: **3c, 4c, 5c,
+ * 6d, 25** (the `Federal income tax withheld from:` heading the a/b/c
+ * sub-lines hang off), **27b, 27c**, and 12d's unnumbered `Spouse:`
+ * continuation.
+ *
+ * ## What this face still does not draw
+ *
+ * Named so that nobody has to discover them by holding the paper up to the
+ * screen. All are blocks the engine computes nothing for:
+ *
+ * - the four-column **Dependents** grid (the return profile carries a count,
+ *   not names and taxpayer identification numbers),
+ * - the **Presidential Election Campaign** and main-home boxes, drawn as the
+ *   question block they are rather than in the paper's right margin,
+ * - the standard-deduction amounts the paper prints in the page-2 margin,
+ *   which are a lookup table for a filer working by hand and would be a
+ *   second, unverified copy of `fjs/tax/deduction` here.
  *
  * @module
  */
-import { el, button, section, table, callout, note } from '../lib/dom.js'
+import { el, button, section, table, callout, note, anchor } from '../lib/dom.js'
 import { sourceFooter } from '../lib/github.js'
 import { inputs, documentLabel } from '../lib/fixtures.js'
 import {
@@ -80,20 +109,25 @@ export const tier = 'must'
  * One printed row of the form face.
  *
  * - `line` names the engine line whose amount belongs in this row's box. A
- *   row with one gets a clickable amount box; a row without gets an empty
- *   ruled box, which on the paper form is exactly what it is.
- * - `check` marks the rows the form prints as a checkbox rather than a money
- *   box — line 6c's lump-sum election, line 7b's "Schedule D not required",
- *   the four dependency and age/blindness boxes at 12a-12d, and the deposit
- *   routing block at 35b-35d. The engine emits no amount for any of them
- *   because there is no amount to emit.
+ *   row with one gets a clickable amount box.
+ * - `boxes` are the row's own printed checkbox captions, which the paper sets
+ *   inline with the caption — `Check if: ☐ Schedule D not required ☐ Includes
+ *   child's capital gain or (loss)`. They are drawn where the paper draws
+ *   them, in the label, not in the amount column.
+ * - `tail` is what stands in the right-hand column when no amount does:
+ *   `'check'` for the rows the paper ends with a single tick box (`…check
+ *   here ☐`), `'none'` for the rows that end with nothing at all — a heading
+ *   like line 25, or an unnumbered continuation. The default is an empty
+ *   ruled box, which is what the paper gives a write-in field and what it
+ *   gives line 38.
  * - `sub` indents the row, the way the printed form indents the `a`/`b` pairs
  *   under a parent line.
  * @typedef {{
  *   readonly n: string,
  *   readonly label: string,
  *   readonly line?: string,
- *   readonly check?: true,
+ *   readonly boxes?: readonly string[],
+ *   readonly tail?: 'check' | 'none',
  *   readonly sub?: true,
  * }} PrintedRow
  */
@@ -117,25 +151,50 @@ const pageOneBands = [
             { n: '1b', label: 'Household employee wages not reported on Form(s) W-2', line: '1b' },
             { n: '1c', label: 'Tip income not reported on line 1a (see instructions)', line: '1c' },
             { n: '1d', label: 'Medicaid waiver payments not reported on Form(s) W-2 (see instructions)', line: '1d' },
-            { n: '1e', label: 'Taxable dependent care benefits from Form 2441', line: '1e' },
-            { n: '1f', label: 'Employer-provided adoption benefits from Form 8839', line: '1f' },
-            { n: '1g', label: 'Wages from Form 8919', line: '1g' },
-            { n: '1h', label: 'Other earned income (see instructions)', line: '1h' },
+            { n: '1e', label: 'Taxable dependent care benefits from Form 2441, line 26', line: '1e' },
+            { n: '1f', label: 'Employer-provided adoption benefits from Form 8839, line 31', line: '1f' },
+            { n: '1g', label: 'Wages from Form 8919, line 6', line: '1g' },
+            { n: '1h', label: 'Other earned income (see instructions). Enter type and amount:', line: '1h' },
             { n: '1i', label: 'Nontaxable combat pay election (see instructions)', line: '1i' },
             { n: '1z', label: 'Add lines 1a through 1h', line: '1z' },
             { n: '2a', label: 'Tax-exempt interest', line: '2a', sub: true },
             { n: '2b', label: 'Taxable interest', line: '2b', sub: true },
             { n: '3a', label: 'Qualified dividends', line: '3a', sub: true },
             { n: '3b', label: 'Ordinary dividends', line: '3b', sub: true },
+            {
+                n: '3c', label: 'Check if your child’s dividends are included in',
+                boxes: ['1 Line 3a', '2 Line 3b'], tail: 'none', sub: true,
+            },
             { n: '4a', label: 'IRA distributions', line: '4a', sub: true },
             { n: '4b', label: 'Taxable amount', line: '4b', sub: true },
+            {
+                n: '4c', label: 'Check if (see instructions)',
+                boxes: ['1 Rollover', '2 QCD', '3'], tail: 'none', sub: true,
+            },
             { n: '5a', label: 'Pensions and annuities', line: '5a', sub: true },
             { n: '5b', label: 'Taxable amount', line: '5b', sub: true },
+            {
+                n: '5c', label: 'Check if (see instructions)',
+                boxes: ['1 Rollover', '2 PSO', '3'], tail: 'none', sub: true,
+            },
             { n: '6a', label: 'Social security benefits', line: '6a', sub: true },
             { n: '6b', label: 'Taxable amount', line: '6b', sub: true },
-            { n: '6c', label: 'If you elect to use the lump-sum election method, check here', check: true, sub: true },
+            {
+                n: '6c',
+                label: 'If you elect to use the lump-sum election method, check here (see instructions)',
+                tail: 'check', sub: true,
+            },
+            {
+                n: '6d',
+                label: 'If you are married filing separately and lived apart from your spouse the entire year (see inst.), check here',
+                tail: 'check', sub: true,
+            },
             { n: '7a', label: 'Capital gain or (loss). Attach Schedule D if required', line: '7a' },
-            { n: '7b', label: 'If not required, check here', check: true, sub: true },
+            {
+                n: '7b', label: 'Check if:',
+                boxes: ['Schedule D not required', 'Includes child’s capital gain or (loss)'],
+                tail: 'none', sub: true,
+            },
             { n: '8', label: 'Additional income from Schedule 1, line 10', line: '8' },
             { n: '9', label: 'Add lines 1z, 2b, 3b, 4b, 5b, 6b, 7a, and 8. This is your total income', line: '9' },
             { n: '10', label: 'Adjustments to income from Schedule 1, line 26', line: '10' },
@@ -147,28 +206,48 @@ const pageOneBands = [
 /**
  * Page 2: the deduction block the 2025 face moved here, then the tax, the
  * credits, the payments, and the refund or the amount owed.
+ *
+ * The first band runs from 11b to 24 under one margin label. That is not a
+ * simplification — `Tax and Credits` is what the paper prints down the whole
+ * of it, and the deduction figures beside lines 13-15 sit in their own note
+ * box headed `Standard deduction for—`, which is a table for a filer working
+ * by hand and not a band name.
  * @type {readonly Band[]}
  */
 const pageTwoBands = [
     {
-        band: 'Standard Deduction',
+        band: 'Tax and Credits',
         rows: [
             { n: '11b', label: 'Amount from line 11a (adjusted gross income)', line: '11b' },
-            { n: '12a', label: 'Check if: Someone can claim you as a dependent', check: true, sub: true },
-            { n: '12b', label: 'Someone can claim your spouse as a dependent', check: true, sub: true },
-            { n: '12c', label: 'Spouse itemizes on a separate return or you were a dual-status alien', check: true, sub: true },
-            { n: '12d', label: 'Age/Blindness: you or your spouse were born before January 2, 1961, or are blind', check: true, sub: true },
+            {
+                n: '12a', label: 'Someone can claim',
+                boxes: ['You as a dependent', 'Your spouse as a dependent'], tail: 'none', sub: true,
+            },
+            {
+                n: '12b', label: '', boxes: ['Spouse itemizes on a separate return'],
+                tail: 'none', sub: true,
+            },
+            {
+                n: '12c', label: '', boxes: ['You were a dual-status alien'],
+                tail: 'none', sub: true,
+            },
+            {
+                n: '12d', label: 'You:',
+                boxes: ['Were born before January 2, 1961', 'Are blind'], tail: 'none', sub: true,
+            },
+            {
+                n: '', label: 'Spouse:',
+                boxes: ['Was born before January 2, 1961', 'Is blind'], tail: 'none', sub: true,
+            },
             { n: '12e', label: 'Standard deduction or itemized deductions (from Schedule A)', line: '12e' },
             { n: '13a', label: 'Qualified business income deduction from Form 8995 or Form 8995-A', line: '13a' },
             { n: '13b', label: 'Additional deductions from Schedule 1-A, line 38', line: '13b' },
-            { n: '14', label: 'Add lines 12, 13a, and 13b', line: '14' },
+            { n: '14', label: 'Add lines 12e, 13a, and 13b', line: '14' },
             { n: '15', label: 'Subtract line 14 from line 11b. If zero or less, enter -0-. This is your taxable income', line: '15' },
-        ],
-    },
-    {
-        band: 'Tax and Credits',
-        rows: [
-            { n: '16', label: 'Tax (see instructions). Check if any from Form(s): 1 8814, 2 4972, 3 other', line: '16' },
+            {
+                n: '16', label: 'Tax (see instructions). Check if any from Form(s):',
+                boxes: ['1 8814', '2 4972', '3'], line: '16',
+            },
             { n: '17', label: 'Amount from Schedule 2, line 3', line: '17' },
             { n: '18', label: 'Add lines 16 and 17', line: '18' },
             { n: '19', label: 'Child tax credit or credit for other dependents from Schedule 8812', line: '19' },
@@ -180,17 +259,28 @@ const pageTwoBands = [
         ],
     },
     {
-        band: 'Payments',
+        band: 'Payments and Refundable Credits',
         rows: [
-            { n: '25a', label: 'Federal income tax withheld from Form(s) W-2', line: '25a', sub: true },
-            { n: '25b', label: 'Federal income tax withheld from Form(s) 1099', line: '25b', sub: true },
-            { n: '25c', label: 'Federal income tax withheld from other forms (see instructions)', line: '25c', sub: true },
+            { n: '25', label: 'Federal income tax withheld from:', tail: 'none' },
+            { n: '25a', label: 'Form(s) W-2', line: '25a', sub: true },
+            { n: '25b', label: 'Form(s) 1099', line: '25b', sub: true },
+            { n: '25c', label: 'Other forms (see instructions)', line: '25c', sub: true },
             { n: '25d', label: 'Add lines 25a through 25c', line: '25d', sub: true },
             { n: '26', label: '2025 estimated tax payments and amount applied from 2024 return', line: '26' },
+            {
+                n: '',
+                label: 'If you made estimated tax payments with your former spouse in 2025, enter their SSN (see instructions):',
+                sub: true,
+            },
             { n: '27a', label: 'Earned income credit (EIC)', line: '27a', sub: true },
-            { n: '28', label: 'Additional child tax credit from Schedule 8812', line: '28', sub: true },
-            { n: '29', label: 'American opportunity credit from Form 8863', line: '29', sub: true },
-            { n: '30', label: 'Refundable adoption credit from Form 8839', line: '30', sub: true },
+            { n: '27b', label: 'Clergy filing Schedule SE (see instructions)', tail: 'check', sub: true },
+            { n: '27c', label: 'If you do not want to claim the EIC, check here', tail: 'check', sub: true },
+            {
+                n: '28', label: 'Additional child tax credit (ACTC) from Schedule 8812.',
+                boxes: ['If you do not want to claim the ACTC, check here'], line: '28', sub: true,
+            },
+            { n: '29', label: 'American opportunity credit from Form 8863, line 8', line: '29', sub: true },
+            { n: '30', label: 'Refundable adoption credit from Form 8839, line 13', line: '30', sub: true },
             { n: '31', label: 'Amount from Schedule 3, line 15', line: '31', sub: true },
             { n: '32', label: 'Add lines 27a, 28, 29, 30, and 31. These are your total other payments and refundable credits', line: '32' },
             { n: '33', label: 'Add lines 25d, 26, and 32. These are your total payments', line: '33' },
@@ -200,17 +290,24 @@ const pageTwoBands = [
         band: 'Refund',
         rows: [
             { n: '34', label: 'If line 33 is more than line 24, subtract line 24 from line 33. This is the amount you overpaid', line: '34' },
-            { n: '35a', label: 'Amount of line 34 you want refunded to you. If Form 8888 is attached, check here', line: '35a' },
-            { n: '35b', label: 'Routing number', check: true, sub: true },
-            { n: '35c', label: 'Type: Checking or Savings', check: true, sub: true },
-            { n: '35d', label: 'Account number', check: true, sub: true },
+            {
+                n: '35a', label: 'Amount of line 34 you want refunded to you.',
+                boxes: ['If Form 8888 is attached, check here'], line: '35a',
+            },
+            { n: '35b', label: 'Routing number', sub: true },
+            { n: '35c', label: 'Type:', boxes: ['Checking', 'Savings'], tail: 'none', sub: true },
+            { n: '35d', label: 'Account number', sub: true },
             { n: '36', label: 'Amount of line 34 you want applied to your 2026 estimated tax', line: '36' },
         ],
     },
     {
         band: 'Amount You Owe',
         rows: [
-            { n: '37', label: 'Subtract line 33 from line 24. This is the amount you owe', line: '37' },
+            {
+                n: '37',
+                label: 'Subtract line 33 from line 24. This is the amount you owe. For details on how to pay, go to www.irs.gov/Payments or see instructions',
+                line: '37',
+            },
             { n: '38', label: 'Estimated tax penalty (see instructions)' },
         ],
     },
@@ -223,12 +320,18 @@ const pageTwoBands = [
  * own `individualFilingStatuses` in BOTH directions — a status the engine
  * knows and this list forgot would otherwise render a form face with a box
  * missing and nothing to say so.
+ *
+ * Two of the five carried a parenthetical the paper does not print. `Married
+ * filing jointly` is followed by `(even if only one had income)`, and
+ * `(MFJ)` appears nowhere on the face; `Married filing separately (MFS)`
+ * continues into the instruction to enter the spouse's identification number
+ * and full name.
  * @type {readonly (readonly [string, string])[]}
  */
 const filingStatusBoxes = [
     ['single', 'Single'],
-    ['marriedFilingJointly', 'Married filing jointly (MFJ)'],
-    ['marriedFilingSeparately', 'Married filing separately (MFS)'],
+    ['marriedFilingJointly', 'Married filing jointly (even if only one had income)'],
+    ['marriedFilingSeparately', 'Married filing separately (MFS). Enter spouse’s SSN above and full name here:'],
     ['headOfHousehold', 'Head of household (HOH)'],
     ['qualifyingSurvivingSpouse', 'Qualifying surviving spouse (QSS)'],
 ]
@@ -294,13 +397,37 @@ const checkBox = (label, on) => {
     return wrap
 }
 
-/** @type {Step['render']} */
-export const render = root => {
+/** A run of unticked printed checkboxes. @type {(labels: readonly string[]) => HTMLElement} */
+const checkRun = labels => {
+    const set = el('span', { class: 'f1040-checks f1040-checks-inline' })
+    for (const label of labels) { set.append(checkBox(label, false)) }
+    return set
+}
+
+/**
+ * What {@link renderForm} produces when it draws a form: the facts the wizard
+ * step's prose states ABOUT the form, so that prose cannot drift from it.
+ * `undefined` instead means a stop panel was drawn and there is no form.
+ * @typedef {{ readonly lineCount: number, readonly line16Method: string }} FormDrawn
+ */
+
+/**
+ * Draws the form face — and nothing else — into `root`.
+ *
+ * This is the whole filable artifact: the masthead, the header block, the
+ * filing-status and digital-asset questions, both pages of numbered lines,
+ * the signature and preparer blocks, and the citation panel that opens under
+ * a clicked amount. `demo/form1040.html` calls exactly this, which is why the
+ * coverage guards are here and not in {@link render}: the page a filer prints
+ * must be the page that refuses to draw a form with a hole in it.
+ * @type {(root: HTMLElement) => FormDrawn | undefined}
+ */
+export const renderForm = root => {
     const outcome = form1040Report(ty2025)(inputs)
 
     if (outcome.kind === 'error') {
         root.append(callout('stop', 'The sample return did not compute, so there is no form to draw.', outcome.message))
-        return
+        return undefined
     }
 
     /** Every computed line, by printed line number. @type {Map<string, ReportLine>} */
@@ -323,14 +450,14 @@ export const render = root => {
             + `Engine lines no printed row claimed: ${missingFromForm.join(', ') || 'none'}. `
             + 'The form is not drawn, because a form face with a silent hole in it is worse '
             + 'than no form face.'))
-        return
+        return undefined
     }
     const statusesKnown = individualFilingStatuses.filter(
         status => !filingStatusBoxes.some(([name]) => name === status))
     if (statusesKnown.length !== 0) {
         root.append(callout('stop', 'The filing-status boxes do not cover the engine\'s filing statuses.',
             `Missing from the printed block: ${statusesKnown.join(', ')}.`))
-        return
+        return undefined
     }
 
     // ── The fixture's header facts ───────────────────────────────────────────
@@ -339,7 +466,7 @@ export const render = root => {
     const secondary = inputs.w2s[1]
     if (primary === undefined) {
         root.append(callout('stop', 'The sample return has no W-2 to name a taxpayer from.', ''))
-        return
+        return undefined
     }
     const you = nameBoxes(primary.value.employeeName)
     const spouse = secondary === undefined ? undefined : nameBoxes(secondary.value.employeeName)
@@ -381,18 +508,27 @@ export const render = root => {
     const printedRow = row => {
         const node = el('div', { class: row.sub === true ? 'f1040-row f1040-row-sub' : 'f1040-row' })
         node.append(el('span', { class: 'f1040-n', text: row.n }))
-        node.append(el('span', { class: 'f1040-label', text: row.label }))
-        if (row.check === true) {
-            // The printed form gives these rows a box to tick, not a box to
-            // write a figure in. Drawing an amount box here — even an empty
-            // one — would invite the reading that a number is missing.
-            const cell = el('span', { class: 'f1040-amt f1040-amt-check' })
-            cell.append(el('span', { class: 'f1040-box' }))
-            node.append(cell)
-            return node
-        }
+        const label = el('span', { class: 'f1040-label' })
+        if (row.label !== '') { label.append(el('span', { text: row.label })) }
+        if (row.boxes !== undefined) { label.append(checkRun(row.boxes)) }
+        node.append(label)
         const found = row.line === undefined ? undefined : byNumber.get(row.line)
         if (found === undefined) {
+            if (row.tail === 'none') {
+                // A heading, or an unnumbered continuation of the row above.
+                // The paper gives these no box at all, and drawing one would
+                // read as a figure the engine failed to supply.
+                node.append(el('span', { class: 'f1040-amt f1040-amt-none' }))
+                return node
+            }
+            if (row.tail === 'check') {
+                // The printed form ends these rows with a box to tick, not a
+                // box to write a figure in.
+                const cell = el('span', { class: 'f1040-amt f1040-amt-check' })
+                cell.append(el('span', { class: 'f1040-box' }))
+                node.append(cell)
+                return node
+            }
             node.append(el('span', { class: 'f1040-amt f1040-amt-empty' }))
             return node
         }
@@ -434,10 +570,25 @@ export const render = root => {
         return node
     }
 
+    /** A block of question text with its own row of checkboxes.
+     * @type {(text: string, labels: readonly string[]) => HTMLElement}
+     */
+    const question = (text, labels) => {
+        const node = el('div', { class: 'f1040-question' })
+        node.append(el('span', { text }))
+        node.append(checkRun(labels))
+        return node
+    }
+
     // ── Page 1 ───────────────────────────────────────────────────────────────
     const form = el('div', { class: 'f1040' })
     const one = el('div', { class: 'f1040-page' })
     one.append(masthead(1))
+    one.append(el('div', {
+        class: 'f1040-question',
+        text: `For the year Jan. 1–Dec. 31, ${profile.taxYear}, or other tax year beginning `
+            + `________, ${profile.taxYear}, ending ________, 20____. See separate instructions.`,
+    }))
 
     const status = el('div', { class: 'f1040-status' })
     status.append(el('span', { class: 'f1040-caption', text: 'Filing Status — check only one box' }))
@@ -453,32 +604,39 @@ export const render = root => {
     who.append(entryBox('Last name', you.last, 2))
     who.append(entryBox('Your social security number', primary.value.recipientTin, 2))
     if (spouse !== undefined && secondary !== undefined) {
-        who.append(entryBox('If joint return, spouse\'s first name and middle initial', spouse.first, 2))
+        who.append(entryBox('If joint return, spouse’s first name and middle initial', spouse.first, 2))
         who.append(entryBox('Last name', spouse.last, 2))
-        who.append(entryBox('Spouse\'s social security number', secondary.value.recipientTin, 2))
+        who.append(entryBox('Spouse’s social security number', secondary.value.recipientTin, 2))
     }
-    who.append(entryBox('Home address (number and street). If you have a P.O. box, see instructions', '', 4))
+    who.append(entryBox('Home address (number and street). If you have a P.O. box, see instructions.', '', 4))
     who.append(entryBox('Apt. no.', '', 2))
-    who.append(entryBox('City, town, or post office. If you have a foreign address, also complete spaces below', '', 4))
+    who.append(entryBox('City, town, or post office. If you have a foreign address, also complete spaces below.', '', 4))
     who.append(entryBox('State', '', 1))
     who.append(entryBox('ZIP code', '', 1))
+    who.append(entryBox('Foreign country name', '', 2))
+    who.append(entryBox('Foreign province/state/county', '', 2))
+    who.append(entryBox('Foreign postal code', '', 2))
     one.append(who)
 
-    const digital = el('div', { class: 'f1040-question' })
-    digital.append(el('span', {
-        text: 'Digital assets: At any time during 2025, did you receive, sell, exchange, or '
-            + 'otherwise dispose of a digital asset (or a financial interest in a digital asset)?',
-    }))
-    const digitalBoxes = el('div', { class: 'f1040-checks' })
-    digitalBoxes.append(checkBox('Yes', false))
-    digitalBoxes.append(checkBox('No', false))
-    digital.append(digitalBoxes)
-    one.append(digital)
+    one.append(question(
+        'Check here if your main home, and your spouse’s if filing a joint return, was in '
+        + `the U.S. for more than half of ${profile.taxYear}.`,
+        ['Check here']))
+    one.append(question(
+        'Presidential Election Campaign — Check here if you, or your spouse if filing jointly, '
+        + 'want $3 to go to this fund. Checking a box below will not change your tax or refund.',
+        ['You', 'Spouse']))
+    one.append(question(
+        `Digital Assets: At any time during ${profile.taxYear}, did you: (a) receive (as a reward, `
+        + 'award, or payment for property or services); or (b) sell, exchange, or otherwise dispose '
+        + 'of a digital asset (or a financial interest in a digital asset)? (See instructions.)',
+        ['Yes', 'No']))
 
     const dependents = el('div', { class: 'f1040-question' })
     dependents.append(el('span', {
         text: `Dependents (see instructions) — the return profile declares ${profile.dependentCount}, `
-            + 'so the grid the form prints here is empty.',
+            + 'and carries no names or taxpayer identification numbers, so the four-column grid the '
+            + 'form prints here is not drawn.',
     }))
     one.append(dependents)
 
@@ -490,28 +648,77 @@ export const render = root => {
     two.append(masthead(2))
     for (const band of pageTwoBands) { two.append(printedBand(band)) }
 
+    const designee = el('div', { class: 'f1040-sign' })
+    designee.append(el('span', { class: 'f1040-caption', text: 'Third Party Designee' }))
+    designee.append(el('span', {
+        text: 'Do you want to allow another person to discuss this return with the IRS? '
+            + 'See instructions.',
+    }))
+    designee.append(checkRun(['Yes. Complete below.', 'No']))
+    const designeeGrid = el('div', { class: 'f1040-grid' })
+    designeeGrid.append(entryBox('Designee’s name', '', 2))
+    designeeGrid.append(entryBox('Phone no.', '', 2))
+    designeeGrid.append(entryBox('Personal identification number (PIN)', '', 2))
+    designee.append(designeeGrid)
+    two.append(designee)
+
     const sign = el('div', { class: 'f1040-sign' })
     sign.append(el('span', { class: 'f1040-caption', text: 'Sign Here' }))
     sign.append(el('span', {
         text: 'Under penalties of perjury, I declare that I have examined this return and '
             + 'accompanying schedules and statements, and to the best of my knowledge and belief, '
-            + 'they are true, correct, and complete.',
+            + 'they are true, correct, and complete. Declaration of preparer (other than taxpayer) '
+            + 'is based on all information of which preparer has any knowledge.',
     }))
     const signGrid = el('div', { class: 'f1040-grid' })
-    signGrid.append(entryBox('Your signature', '', 3))
+    signGrid.append(entryBox('Your signature', '', 2))
     signGrid.append(entryBox('Date', '', 1))
-    signGrid.append(entryBox('Your occupation', '', 2))
-    signGrid.append(entryBox('Spouse\'s signature. If a joint return, BOTH must sign', '', 3))
+    signGrid.append(entryBox('Your occupation', '', 1))
+    signGrid.append(entryBox('If the IRS sent you an Identity Protection PIN, enter it here (see inst.)', '', 2))
+    signGrid.append(entryBox('Spouse’s signature. If a joint return, both must sign.', '', 2))
     signGrid.append(entryBox('Date', '', 1))
-    signGrid.append(entryBox('Spouse\'s occupation', '', 2))
+    signGrid.append(entryBox('Spouse’s occupation', '', 1))
+    signGrid.append(entryBox('If the IRS sent your spouse an Identity Protection PIN, enter it here (see inst.)', '', 2))
+    signGrid.append(entryBox('Phone no.', '', 3))
+    signGrid.append(entryBox('Email address', '', 3))
     sign.append(signGrid)
     two.append(sign)
-    form.append(two)
 
-    // ── The page around the form ─────────────────────────────────────────────
+    const preparer = el('div', { class: 'f1040-sign' })
+    preparer.append(el('span', { class: 'f1040-caption', text: 'Paid Preparer Use Only' }))
+    const preparerGrid = el('div', { class: 'f1040-grid' })
+    preparerGrid.append(entryBox('Preparer’s name', '', 2))
+    preparerGrid.append(entryBox('Preparer’s signature', '', 2))
+    preparerGrid.append(entryBox('Date', '', 1))
+    preparerGrid.append(entryBox('PTIN', '', 1))
+    preparerGrid.append(entryBox('Check if: Self-employed', '', 2))
+    preparerGrid.append(entryBox('Firm’s name', '', 2))
+    preparerGrid.append(entryBox('Phone no.', '', 2))
+    preparerGrid.append(entryBox('Firm’s address', '', 4))
+    preparerGrid.append(entryBox('Firm’s EIN', '', 2))
+    preparer.append(preparerGrid)
+    two.append(preparer)
+
+    form.append(two)
+    root.append(form)
+    return { lineCount: outcome.lines.length, line16Method: outcome.line16Method }
+}
+
+/** @type {Step['render']} */
+export const render = root => {
+    // The form is drawn FIRST, into a detached node, because the prose below
+    // states facts about it — and a stop panel means there are no such facts
+    // to state.
+    const held = el('div')
+    const drawn = renderForm(held)
+    if (drawn === undefined) {
+        root.append(held)
+        return
+    }
+
     const lede = section(
         'Dana and Ray Okafor, married filing jointly, tax year 2025',
-        'The same return step 3 lists as 56 lines, drawn as the form it actually is. Click any amount.')
+        'The same return step 3 lists line by line, drawn as the form it actually is. Click any amount.')
     lede.append(el('p', {
         html: 'The amounts are computed here, now, by <code>form1040Report</code> — the same '
             + 'entry point the server reaches through a stored guest program. Nothing on this '
@@ -521,22 +728,30 @@ export const render = root => {
     }))
     lede.append(callout('info', 'An empty box is structure, never a computed zero.',
         'The boxes with no amount are the rows the printed form carries and the engine emits '
-        + 'nothing for — the routing number, the lump-sum election, the dependency checkboxes, '
-        + 'line 38\'s estimated tax penalty. A computed zero looks different: it is a real 0.00 '
+        + 'nothing for — the routing number, the account number, line 38\'s estimated tax '
+        + 'penalty. A computed zero looks different: it is a real 0.00 '
         + 'in the box, dimmed, and it cites its sources like every other line. That distinction '
         + 'is the one a tax form usually destroys.'))
     lede.append(el('p', {
-        html: `Every amount below is a button. The form has ${outcome.lines.length} filled boxes `
+        html: `Every amount below is a button. The form has ${drawn.lineCount} filled boxes `
             + 'and every one of them opens the documents it was computed from, which is the '
             + 'whole argument: a form face is only worth as much as its ability to answer '
             + '"where did that come from?".',
     }))
+
+    const standalone = el('p')
+    standalone.append(el('span', {
+        text: 'To print it, or to hand it to a preparer, open the form on its own page — no '
+            + 'navigation, no commentary, two sheets of paper: ',
+    }))
+    standalone.append(anchor('./form1040.html', 'the Form 1040 alone ↗'))
+    lede.append(standalone)
     root.append(lede)
-    root.append(form)
+    root.append(held)
 
     const method = el('div', { class: 'figure-row' })
     method.append(el('span', { class: 'kicker', text: 'Line 16 computed by' }))
-    method.append(el('span', { class: 'method', text: outcome.line16Method }))
+    method.append(el('span', { class: 'method', text: drawn.line16Method }))
     root.append(method)
 
     const reading = section('What this layout is, and what it is not')
@@ -552,14 +767,23 @@ export const render = root => {
         html: 'It is <strong>not</strong> a filing-quality reproduction and does not claim to be. '
             + 'The typography is the reader\'s own system font, the margins are not the IRS\'s, '
             + 'and no OMB-approved substitute form was submitted for approval. It is a layout '
-            + 'chosen because it is the one layout that needs no explaining.',
+            + 'chosen because it is the one layout that needs no explaining — good enough to '
+            + 'transcribe from, or to hand to a preparer, and not a substitute for either.',
     }))
+    reading.append(callout('ok', 'Every label was read off the printed page.',
+        'The line numbers, the captions, the checkbox captions and the band names were all '
+        + 'checked against the PDF the IRS publishes, in the 2025 revision, and corrected where '
+        + 'they disagreed. The module\'s own docstring lists what was wrong and what the page '
+        + 'says instead, including the three blocks this face still does not draw.'))
     reading.append(callout('ok', 'The rows are hand-typed on purpose.',
         'Deriving the printed rows from the engine\'s own output would make this page unable to '
         + 'notice a line disappearing — the exact defect AGENTS.md records shipping four times. '
         + 'So the printed line numbers are written out here and compared against the engine\'s '
         + 'in both directions before anything is drawn. Delete a line from the engine and this '
         + 'page refuses to render a form; add one and it says which one it did not expect.'))
+    reading.append(el('p'))
+    reading.append(anchor('https://www.irs.gov/pub/irs-pdf/f1040.pdf',
+        'The printed page every label above was checked against ↗'))
     root.append(reading)
 
     root.append(sourceFooter([

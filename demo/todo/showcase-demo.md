@@ -192,6 +192,8 @@ demo/
   index.html          wizard shell: step nav, Prev/Next, "All" view, import map
   demo.css            one stylesheet, light and dark
   demo.js             router, step registry, keyboard nav
+  form1040.html       the form alone, printable, no wizard chrome
+  form1040.js         browser glue over the step module's `renderForm`
   lib/github.js       SHA-pinned source and proof links
   lib/fixtures.js     the sample return: documents + return profile
   steps/*.js          one ES module per step, each exporting { title, render }
@@ -218,6 +220,35 @@ about any step's internals:
 export const title = 'Line 16'
 export const render = (root) => { /* ... */ }
 ```
+
+### The printable form, on its own page
+
+`demo/form1040.html` is the one page here that is not part of the wizard. It renders the
+Form 1040 face and nothing else — no step header, no lede, no callouts, no Prev/Next —
+because a sheet handed to a preparer, or transcribed from onto the real form, cannot
+carry commentary. It is reachable from step 9 and from nowhere else.
+
+**It is not a second implementation.** `steps/09-form1040.js` exports `renderForm`, which
+draws the face; `render` is that plus the demo's prose. `form1040.js` calls `renderForm`
+and does nothing else. Two consequences worth stating, because both are load-bearing:
+
+- **The coverage guards live in `renderForm`.** Both directions of the printed-row /
+  engine-line comparison, and the filing-status comparison, run before anything is drawn —
+  on the printable page as much as in the wizard. The page a filer trusts must be the page
+  that refuses to draw a form with a silent hole in it, not the one that skips the check.
+- **`form1040.html` carries its own import map.** `lib/engine.js` imports
+  `functionalscript/` as a bare specifier. Without the map the module graph never loads and
+  the page renders white, which is the failure a printable page can least afford.
+
+`demo.css`'s `@media print` block does the rest: Letter portrait, a forced black-on-white
+palette (a dark-mode reader would otherwise print dark tokens), the toolbar and the wizard
+chrome removed, the citation panel removed, and a page break between the two `.f1040-page`
+elements rather than after each — `break-after` on the last one ends the job with a blank
+sheet in the tray.
+
+**E-file is out of scope and will stay out of scope.** IRS Modernized e-File requires
+authorization as an e-file provider, which is not something this project obtains. The
+artifact is a page to print, transcribe from, or hand over.
 
 ### Engine modules the demo imports
 
