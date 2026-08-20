@@ -4,10 +4,10 @@
 Five of the fifty-one diverged on this, each by exactly **$1**. Full context:
 [`.planning/reports/taxcalcbench-33.md`](../../.planning/reports/taxcalcbench-33.md) §5.1.
 
-**Status:** root-caused, specced, **not implemented**. The fix needs a stored tax
-parameter this engine does not have, and adding one touches `TaxParamSet`,
-`taxParamsByYear`, `paramSetHash`'s source order and `fjs/server/finance_tax_params`'s
-hand-typed per-field literals and counts. AGENTS.md asks for the spec first.
+**Status: FIXED**, in the same phase, immediately after this spec was written — which is
+what the spec is for. Kept because it records the reasoning, the two rejected gate sites,
+and what the mutations found. The sections below are written in the present tense of the
+defect; §"As shipped" at the end says what actually landed and where it differed.
 
 ## The defect
 
@@ -150,3 +150,52 @@ The same run turned up a **$1 difference on line 24** in
 `sum(round)` — this project's deliberate, documented whole-dollar convention (AGENTS.md;
 i1040gi p23 reads in its favour). It is not this defect, it is not a bug, and it must not
 be "fixed" while fixing this one.
+
+
+---
+
+## As shipped
+
+Landed as specified, with one deliberate departure and two additions the mutations forced.
+
+**The parameter.** `additionalMedicareTaxEmployerWithholdingThreshold` in `fjs/tax/params`,
+a scalar `AmountWithCitation` of `'200000.00'` cited to §3102(f)(1), added to `TaxParamSet`
+and to `taxParamsByYear[2025]`. **The blast radius was zero** — `tsc` clean and 3241/3241
+still passing with the member added and nothing else changed. The worry above about
+`fjs/server/finance_tax_params`'s hand-typed literals did not materialise; nothing there
+enumerates members, and no proof pins a literal `paramSetHash`.
+
+**The gate site: neither (1) nor (2), but both.** Zeroing the whole of Part V inside
+`form8959` — option (1) — breaks two existing leaves that legitimately test Part V's
+*arithmetic* at a below-threshold wage (`roundingBelowTheOrdinaryRateFloorsAtZero` and
+`anAbsentBoxSixContributesNothingRatherThanANegativeCredit` both read line 19 and line 21
+at $100,000 of box 5). That is real evidence against (1), found by measuring rather than
+by arguing. What shipped keeps Part V a faithful transcription of the printed page and
+adds two derived fields to the `Form8959` record:
+
+```js
+const mustFile = medicareWagesCents > employerThresholdCents || line18 > 0n
+const line24AsFiled = mustFile ? partV.line24 : 0n
+```
+
+`fjs/form1040/core`'s line 25c reads `line24AsFiled`. This answers option (2)'s hazard —
+"a future caller reading `line24` without the gate" — by putting the gated number on the
+record beside the ungated one, so the filing test still lives in exactly one place.
+
+**Two leaves the mutations forced, beyond the four specced.** The `>` → `>=` mutation came
+back **green**: no fixture sat on the boundary, so
+`exactlyTheEmployerThresholdIsStillTheClosedSide` was written for it. Disabling the
+`line18 > 0n` term also came back **green**: nothing reached `mustFile` through that term
+alone, so `selfEmploymentIncomeAloneCanObligeTheFormAndOpenPartV` was written for it —
+$150,000 of wages under the employer trigger with $80,000 of self-employment income
+carrying the total over the status threshold. Both mutations now redden exactly one leaf.
+
+The mutation that drops the wage term did not compile on the first attempt (`TS6133`,
+the orphaned-binding trap), and was re-run as `employerThresholdCents < 0n || line18 > 0n`.
+
+**Watched to fail.** `line24AsFiled` was first defined as `partV.line24` with the leaves
+already written against their final assertions; `npm test` reported 3245 tests, 2 fail —
+the predicted leaf at `50n` against `0n`, plus `everyPrintedLineIsNamed`'s hand-typed field
+count catching the two new keys. Gate applied, suite green. Re-running TaxCalcBench's 51
+cases afterwards flipped **exactly** the five cases this defect caused and nothing else:
+22 matched → 27, 7 diverged → 2.

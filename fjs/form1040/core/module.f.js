@@ -3237,7 +3237,17 @@ const form1040TaxAndPaymentLines = taxParamSet => inputs => income => {
     // `medicareTaxWithheld`'s own sources are what it cites, and they are
     // the profile's when no W-2 carried box 6.
     const line25c = {
-        value: scheduleTwoResult.form8959.line24,
+        // `line24AsFiled`, NOT `line24` (TAX-20, Phase 33). Part V's printed
+        // arithmetic runs for every return carrying a Form W-2 box 6, and
+        // per-pay-period rounding leaves box 6 a few cents either side of
+        // 1.45% of box 5. Form 8959's own floor catches the low side; the
+        // high side used to arrive HERE, as a credit, on a form the filer is
+        // not required to file — five of TaxCalcBench's fifty-one cases, $1
+        // each (`.planning/reports/taxcalcbench-33.md` §5.1). `fjs/form8959`
+        // applies Who Must File and this line reads the result, so Part V
+        // stays a faithful transcription of the printed page and the filing
+        // test lives in exactly one place.
+        value: scheduleTwoResult.form8959.line24AsFiled,
         sources: unionSources([medicareTaxWithheld, medicareWages]),
         // Just `'1040 line 25c'`, the way every other 1040 line in this file
         // is ruled -- NOT "(Form 8959 line 24)". Two reasons, and the second

@@ -1041,22 +1041,50 @@ export const additionalMedicareTaxThreshold = {
 }
 
 /**
- * Form 8959's two rates, in BASIS POINTS (hundredths of one percent): the
- * 0.9% Additional Medicare Tax itself (IRC §3101(b)(2)) and the 1.45%
- * ordinary Medicare tax (IRC §3101(b)(1)) that Form 8959 Part V line 21
- * subtracts back out of Form W-2 box 6. TAX-20, Phase 23 — the rate
- * {@link additionalMedicareTaxThreshold}'s own docstring says this phase
- * adds "beside these thresholds when it adds the form."
+ * The wage at which an EMPLOYER must begin withholding Additional Medicare
+ * Tax — IRC §3102(f)(1), a flat $200,000 "with respect to wages paid to an
+ * individual" in a calendar year, **the same figure for every filing
+ * status**. TAX-20, added by Phase 33.
  *
- * **Basis points, not `ratePercent`, and the reason is arithmetic rather
- * than taste.** Every other rate in this module — `ordinaryBrackets`'
- * 10/12/22/24/32/35/37, `seniorDeduction.phaseoutRatePercent`'s 6,
- * `childTaxCredit.phaseoutRatePercent`'s 5, `actcEarnedIncomeRatePercent`'s
- * 15 — is a whole number of percent, so a `ratePercent: number` field is
- * exact. Neither of these two is: 0.9 and 1.45 are not integers, and
- * storing either as a JavaScript `number` of percent would put a
- * non-terminating binary fraction where this module's whole discipline is
- * exactness (`0.9` and `1.45` are both inexact as IEEE 754 doubles). One
+ * ## Why this is not {@link additionalMedicareTaxThreshold}
+ *
+ * The two numbers coincide at $200,000 for a single filer and are otherwise
+ * different quantities answering different questions:
+ *
+ * - `additionalMedicareTaxThreshold` is §3101(b)(2)'s per-status threshold —
+ *   200,000 / 250,000 MFJ / 125,000 MFS — and it decides how much tax the
+ *   TAXPAYER owes on Form 8959 Parts I-III.
+ * - This one is §3102(f)(1)'s employer trigger. It decides whether an
+ *   employer could lawfully have withheld anything for Part V to reconcile,
+ *   and it does not vary with a filing status the employer does not know.
+ *
+ * Reading `.single` in place of this would be exactly the error
+ * `fjs/return/profile` names in its own comment about `earnedIncome`: *"Two
+ * questions with the same name and different definitions is the error, not
+ * the duplication."* They agree today only because one Act (ACA §9015)
+ * drafted both, and nothing keeps them in step.
+ *
+ * `kind: 'code'`, for the same reason every figure in this group is: §3102(f)
+ * writes $200,000 into the statute and no Revenue Procedure adjusts it, so
+ * inventing a Rev. Proc. number would be the sourcing error this module's
+ * own header exists to prevent.
+ *
+ * A scalar rather than a per-status record, deliberately. The statute has one
+ * number, and a five-entry map would invite a reader to look up a filing
+ * status here — which is the confusion this parameter exists to end.
+ * @type {AmountWithCitation}
+ */
+export const additionalMedicareTaxEmployerWithholdingThreshold = {
+    amount: '200000.00',
+    citation: { kind: 'code', section: '§3102(f)(1)', effectiveDate: '2025-01-01' },
+}
+
+/**
+ * The 0.9% Additional Medicare Tax rate and the 1.45% ordinary Medicare rate
+ * it sits on top of, both in BASIS POINTS.
+ *
+ * The rates are 0.9% and 1.45%, and a percent-as-integer cannot hold the
+ * second one — 1.45 is not a whole number of percent. A basis point, one
  * hundredth of a percent is the coarsest unit that expresses BOTH exactly as
  * integers, so both are stored that way and the consumer multiplies by
  * `basisPoints / 10000`. `fjs/form8959` performs that multiplication through
@@ -3441,6 +3469,8 @@ export const foreignEarnedIncome = {
  *   readonly childTaxCredit: typeof childTaxCredit,
  *   readonly earnedIncomeCredit: typeof earnedIncomeCredit,
  *   readonly additionalMedicareTaxThreshold: typeof additionalMedicareTaxThreshold,
+ *   readonly additionalMedicareTaxEmployerWithholdingThreshold:
+ *       typeof additionalMedicareTaxEmployerWithholdingThreshold,
  *   readonly additionalMedicareTaxRates: typeof additionalMedicareTaxRates,
  *   readonly socialSecurityTaxWithholding: typeof socialSecurityTaxWithholding,
  *   readonly foreignTaxCreditDeMinimisElection: typeof foreignTaxCreditDeMinimisElection,
@@ -3494,6 +3524,7 @@ export const taxParamsByYear = {
         childTaxCredit,
         earnedIncomeCredit,
         additionalMedicareTaxThreshold,
+        additionalMedicareTaxEmployerWithholdingThreshold,
         additionalMedicareTaxRates,
         socialSecurityTaxWithholding,
         foreignTaxCreditDeMinimisElection,

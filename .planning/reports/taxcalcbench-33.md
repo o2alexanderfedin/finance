@@ -13,18 +13,26 @@
 
 | | |
 |---|---|
-| **Matched** — every graded line equals the benchmark's expected output | **22** |
+| **Matched** — every graded line equals the benchmark's expected output | **27** |
 | **Refused** — the engine returned a named refusal instead of a number | **20** |
-| **Diverged** — the engine computed a different number | **7** |
+| **Diverged** — the engine computed a different number | **2** |
 | **Unrunnable** — the case carries a fact no dialect here can receive | **2** |
 | | **51** |
 
-Of the seven divergences there are **two** root causes. One of them is a genuine
-defect in this engine, root-caused to a named function and an IRS line, and it is
-**specced but deliberately not fixed in this branch** — §5.1 says why. The other is a
-defect in **the benchmark**, verified against §32(c)(3)(A) rather than assumed.
+The run found **one** genuine defect in this engine, in `fjs/form8959` — it computed
+Form 8959 Part V for filers not required to file Form 8959 at all, so ordinary
+per-pay-period rounding in Form W-2 box 6 became a phantom $1 credit on 1040 line 25c,
+on five of the fifty-one cases. **It is fixed in this branch**, with the proof watched
+to fail before it passed and three mutations run against the gate. All five cases flip
+to matched, which is the fix's own external check (§5.1).
 
-Nothing in the "matched" column is a coincidence of two wrong answers: 22 cases agree
+**Zero unresolved engine defects remain against this ground truth.** The two divergences
+left have verdicts *against the benchmark*: one is the benchmark applying §152(c)(1)(D)'s
+support test to an EIC qualifying child, which §32(c)(3)(A) removes by name (§5.2), and
+one is a $1 whole-dollar rounding-convention difference that i1040gi p23 reads in this
+engine's favour (§5.3).
+
+Nothing in the "matched" column is a coincidence of two wrong answers: 27 cases agree
 on all twenty graded lines simultaneously, including the tax table's midpoint rule, the
 QDCGT worksheet, EIC, CTC/ACTC, the saver's credit, the premium tax credit and Form 8959.
 
@@ -87,7 +95,7 @@ not the §2.xx the TY2025 procedure uses), Notice 2023-75, Rev. Proc. 2023-23, 8
 (the **2023** HHS poverty guidelines, which are what §36B uses for TY2024), and the 2024
 instructions for Schedule SE, Form 8962 and Form 8863.
 
-**22 members overridden, 16 left at their TY2025 values.** Every one of the sixteen is
+**22 members overridden, 17 left at their TY2025 values.** Every one of the seventeen is
 either statutory and non-indexed (§86(c) base amounts, §213(a)'s 7.5% floor, §3101(b)
 thresholds and rates, §904(j)'s 300/600, §1411's threshold and 3.8%, §1256(a)(3)'s
 60/40, the four dependent-care members) or was **verified identical** for TY2024
@@ -122,8 +130,8 @@ and were neutralised:
   $2,200).
 
 A divergence caused by *logic* that exists only for TY2025 would be **"year-logic
-mismatch — correct for TY2025"**, not an engine bug. In the event, none of the seven
-remaining divergences is of that kind: OBBBA's footprint here turned out to be entirely
+mismatch — correct for TY2025"**, not an engine bug. In the event, none of the divergences
+is of that kind: OBBBA's footprint here turned out to be entirely
 parametric.
 
 ### 2.2 What the benchmark independently confirms about the transcription
@@ -259,10 +267,10 @@ one from §1.1.
 | `hoh-w2-1099g-unemployment-schedulec-loss` | refused | Schedule C line 31 is a loss → line 32 at-risk determination |
 | `hoh-w2-dependent-care-credit-carryover-no-qualifying-person` | matched | |
 | `hoh-w2-dependent-educator-expenses-unemployment` | matched | |
-| `mfj-both-blind-nontaxable-social-security` | **diverged** (25d, 33, 34, 35a) | §5.1 |
+| `mfj-both-blind-nontaxable-social-security` | matched *(after §5.1's fix; diverged before it)* | |
 | `mfj-capital-gains-losses-wash-sale-dependent` | refused | Form 8949 — box 1f accrued market discount requires column (f) code D |
 | `mfj-dependent-claimed-2441-exclusion` | refused | Schedule C line 12 (Depletion) |
-| `mfj-dual-w2-over-65` | **diverged** (25d, 33, 34, 35a) | §5.1 |
+| `mfj-dual-w2-over-65` | matched *(after §5.1's fix; diverged before it)* | |
 | `mfj-multiple-1099int-schedule-b-w2` | matched | |
 | `mfj-multiple-schedule-c-loss-multi-home-office` | refused | Schedule C is filed per business; this engine models one |
 | `mfj-multiple-w2-schedule-c-qbi-income` | refused | Schedule C is filed per business |
@@ -290,9 +298,9 @@ one from §1.1.
 | `single-retirement-1099r-alaska-dividend` | refused | scope refusal — `alaskaPermanentFundDividends` is in the vocabulary, not modeled |
 | `single-schedulec-1099misc-nec-k-loss` | refused | Schedule C line 1 |
 | `single-senior-blind-over-65` | refused | Schedule C line 31 is a loss → line 32 |
-| `single-w2-balance-due-no-state-income-tax` | **diverged** (25d, 33, 37) | §5.1 |
+| `single-w2-balance-due-no-state-income-tax` | matched *(after §5.1's fix; diverged before it)* | |
 | `single-w2-box12-code-a-b-alaska` | matched | |
-| `single-w2-direct-debit-payment` | **diverged** (25d, 33, 37) | §5.1 |
+| `single-w2-direct-debit-payment` | matched *(after §5.1's fix; diverged before it)* | |
 | `single-w2-healthcare-marketplace-1095a` | matched | |
 | `single-w2-minimal-wages-alaska` | matched | |
 | `single-w2-multiple-1099int-dividend` | matched | |
@@ -304,7 +312,7 @@ one from §1.1.
 | `single-w2-schedulec-1099b-capital-loss-carryover` | refused | Schedule C line 31 is a loss → line 32 |
 | `single-w2-student-american-opportunity-credit` | refused | Form 8863 line 8 — §25A(i) age-24 / parent-alive facts |
 | `single-w2-tips-long-employer-name` | matched | |
-| `single-w2-unemployment-1099g` | **diverged** (25d, 33) | §5.1 |
+| `single-w2-unemployment-1099g` | matched *(after §5.1's fix; diverged before it)* | |
 
 ### 4.1 The 20 refusals, grouped by named refusal
 
@@ -335,13 +343,13 @@ transcription → rounding convention → year-logic mismatch → engine bug →
 error. Four divergences that existed at the first run resolved to the first two
 categories and are recorded in §5.4 rather than counted as engine behaviour.
 
-### 5.1 Form 8959 Part V runs for filers who are not required to file Form 8959 — **our bug**
+### 5.1 Form 8959 Part V ran for filers not required to file Form 8959 — **our bug, FIXED**
 
 **Cases (5):** `single-w2-balance-due-no-state-income-tax`, `single-w2-direct-debit-payment`,
 `single-w2-unemployment-1099g`, `mfj-dual-w2-over-65`, `mfj-both-blind-nontaxable-social-security`.
 **Size:** exactly **$1** on line 25d in every one.
 
-**Root cause.** `fjs/form1040/core`'s line 25c is `scheduleTwoResult.form8959.line24`,
+**Root cause.** `fjs/form1040/core`'s line 25c *was* `scheduleTwoResult.form8959.line24`,
 unconditionally, and `fjs/form8959`'s `form8959` computes Part V for every return:
 
 ```js
@@ -378,20 +386,56 @@ below-threshold return *"mentions Form 8959 nowhere in any line's rule"*. It che
 box 5, where line 22 is zero anyway. This is AGENTS.md's own recorded shape: *"several
 assertions checked the wrong thing."*
 
-**Why it is specced and not fixed in this branch.** The correct gate is the printed form's
-own Who-Must-File test, and it needs a value this engine does not store: §3102(f)(1)'s
-flat **$200,000** employer withholding trigger. That figure is not `additionalMedicareTaxThreshold`
-— that member is §1401(b)(2)'s per-status threshold, and reading `.single` to stand in for
-§3102(f)(1) is exactly the error `fjs/return/profile` names in its own comment about
-`earnedIncome`: *"Two questions with the same name and different definitions is the error,
-not the duplication."* They coincide at $200,000 today only because one Act drafted both.
+**The fix, as shipped.** Spec first, per AGENTS.md:
+**`fjs/todo/tax-form8959-part-v-who-must-file.md`**.
 
-Adding a stored parameter changes `TaxParamSet`, `taxParamsByYear`, `paramSetHash`'s
-source order, and `fjs/server/finance_tax_params`'s hand-typed per-field literals and
-counts. AGENTS.md requires a `todo/` spec before that kind of change, and shipping a gate
-that reads a parameter stored for a different statute would be a worse defect than the one
-it fixes. The spec is written: **`fjs/todo/tax-form8959-part-v-who-must-file.md`**, naming
-the parameter, both candidate gate sites, and the proof that must be watched to fail.
+A new stored parameter, `additionalMedicareTaxEmployerWithholdingThreshold` — §3102(f)(1)'s
+flat **$200,000** employer withholding trigger, the same for every filing status. It is
+deliberately **not** `additionalMedicareTaxThreshold`, which is §3101(b)(2)'s per-status
+figure answering a different question; reading `.single` to stand in for §3102(f)(1) would
+be exactly the error `fjs/return/profile` names in its own comment about `earnedIncome`:
+*"Two questions with the same name and different definitions is the error, not the
+duplication."* They coincide at $200,000 today only because one Act (ACA §9015) drafted
+both, and nothing keeps them in step.
+
+`fjs/form8959` then computes the filing test and returns it, leaving Part V's arithmetic a
+faithful transcription of the printed page:
+
+```js
+const mustFile = medicareWagesCents > employerThresholdCents || line18 > 0n
+const line24AsFiled = mustFile ? partV.line24 : 0n
+```
+
+`line18 > 0n` is Who-Must-File bullets three and four; the wage comparison is bullets one
+and two, conservatively — §3102(f)(1) obliges an employer to withhold only on what *it*
+pays above $200,000, so a single Form W-2 above $200,000 implies the total is too, and
+gating on the total can close no gate bullet one would have opened. 1040 line 25c reads
+`line24AsFiled`; `line24` keeps its meaning as the printed arithmetic, so the filing test
+lives in exactly one place.
+
+**Watched to fail.** `line24AsFiled` was first written as `partV.line24` — ungated — and
+the four new leaves added against their final assertions. `npm test` reported **3245 tests,
+3243 pass, 2 fail**: `roundingAboveTheOrdinaryRateIsNotACreditForANonFiler` reporting `50n`
+against `0n`, and `everyPrintedLineIsNamed`'s hand-typed field count catching the two new
+keys — the count idiom doing exactly its job. The gate was then applied and the suite went
+green. The assertions did not move; only the implementation did.
+
+**Three mutations, each biting exactly one predicted leaf.**
+
+| mutation | result |
+|---|---|
+| `>` → `>=` on the wage comparison | **green at first** — no fixture sat on the boundary, so the comparison was load-bearing in production and unmeasured. `exactlyTheEmployerThresholdIsStillTheClosedSide` was written for it; the mutation now reddens exactly that leaf. |
+| drop the wage term | reddens `bulletOneFilesEvenWhenNoTaxIsOwed` — the joint couple with one $210,000 W-2 and one $30,000 W-2, whose $240,000 total is under the $250,000 joint threshold so `line18` is zero, but whose first employer really did withhold on $10,000. This is the leaf that fails if the gate is written against the per-status threshold. (First attempt did not compile — `TS6133`, the orphaned-binding trap AGENTS.md names; re-run as `employerThresholdCents < 0n || line18 > 0n`, which keeps the binding live.) |
+| disable the `line18` term | **green at first** — nothing reached `mustFile` through that term alone. `selfEmploymentIncomeAloneCanObligeTheFormAndOpenPartV` was written for it: $150,000 of wages under the employer trigger, $80,000 of self-employment income carrying the total over the status threshold. The mutation now reddens exactly that leaf. |
+| remove the gate itself (the original defect) | reddens two: `roundingAboveTheOrdinaryRateIsNotACreditForANonFiler` and `exactlyTheEmployerThresholdIsStillTheClosedSide`. |
+
+Two of the four mutations survived on the first attempt, and each survivor was a real
+coverage hole rather than an equivalent mutant. Both are now covered.
+
+**The fix's own external check.** Re-running all 51 benchmark cases afterwards: **exactly
+the five cases in this section flip to matched**, and nothing else moves. 22 → 27 matched,
+7 → 2 diverged. A gate that closed too far would have taken `mfj-multiple-w2s-excess-social-security-tax`'s
+legitimate $725 of Part V withholding with it, and it did not.
 
 ### 5.2 The EIC qualifying-child support test — **the benchmark is wrong**
 
@@ -448,7 +492,7 @@ V withholding on line 25c is correct. Its $1 comes from rounding, not from §5.1
 
 Each of these looked like an engine defect at first and was not. They are recorded because
 "the harness was wrong" is the most likely explanation for a divergence and the discipline
-of chasing it first is what makes the remaining seven credible.
+of chasing it first is what makes the two that survived credible.
 
 | symptom | root cause |
 |---|---|
@@ -495,12 +539,19 @@ independent implementations disagreed on **tax law** rather than on a number, th
 was right and the benchmark was wrong, and it was right about a subsection that exists
 specifically to be counterintuitive.
 
-**Exactly one genuine defect surfaced in 51 cases**, it is worth $1, and it is a
-missing gate rather than a wrong computation. Set against 3,196 proof leaves and this
-project's four historical instances of a proof that mirrored its own bug, that is a good
-result — and the reason it surfaced at all is that the ground truth came from outside.
-No proof in this repository could have found it, because every fixture it would have run
-against has box 6 at exactly 1.45% of box 5.
+**Exactly one genuine defect surfaced in 51 cases**, it was worth $1, it was a missing
+gate rather than a wrong computation, and it is now fixed. Set against 3,196 proof leaves
+and this project's four historical instances of a proof that mirrored its own bug, that is
+a good result — and the reason it surfaced at all is that the ground truth came from
+outside. **No proof in this repository could have found it**, because every fixture it
+would have run against had box 6 at exactly 1.45% of box 5, where the defect is invisible.
+The leaf that came closest, `controlTheSameReturnBelowTheThresholdComputesSilently`,
+asserted the rule *string* rather than the value and passed throughout.
+
+Two of the four mutations run against the fix survived on the first attempt, which is the
+same lesson in miniature: writing the gate is not the same as measuring it, and the
+boundary and the second term of a two-term condition were each unmeasured until a mutation
+said so.
 
 **The refusals are the finding, and they are load-bearing.** Nineteen cases refused, every
 one naming a printed line, the missing fact, and the remedy. Not one produced a plausible
@@ -542,8 +593,20 @@ The harness imports `form1040Report` from `fjs/form1040/core/module.f.js` by abs
 path. It re-validates nothing the engine validates and asserts nothing the engine asserts;
 it maps input, calls once, and compares against the XML.
 
-**Baseline at the time of this run, measured in an rsync'd copy outside the parent
-checkout** (`/tmp/measure-33`, 6,804 module resolutions into that copy's own
-`node_modules` and zero into the parent's, so the typecheck is not the falsely-green one
-AGENTS.md warns about): `tsc` **0 errors**, `npm test` **3241/3241**, **3196**
-project-local proof leaves. This phase changed no `.f.js` file, so all three are unchanged.
+**Measured in an rsync'd copy outside the parent checkout** (`/tmp/measure-33`, 6,804
+module resolutions into that copy's own `node_modules` and zero into the parent's, so the
+typecheck is not the falsely-green one AGENTS.md warns about):
+
+| | before | after |
+|---|---|---|
+| `tsc` errors | 0 | **0** |
+| `npm test` | 3241 / 3241 | **3247 / 3247** |
+| project-local proof leaves | 3196 | **3202** |
+
+The six new leaves are §5.1's five plus the extension of `everyPrintedLineIsNamed`.
+
+One measurement caution learned here and worth repeating: the worktree this ran in had
+**no `node_modules` at all**, so the first `tsc` bound to the parent checkout's and
+reported **1,935 errors** on a tree whose true count is zero — the mirror image of the
+falsely-green trap §6.1 of the 0.46.1 migration report describes. `npm ci` in the worktree
+first, then measure in the copy.

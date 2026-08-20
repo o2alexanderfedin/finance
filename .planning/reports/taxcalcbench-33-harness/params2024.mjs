@@ -510,6 +510,7 @@ export const overridden = [
  * unresolved gap, and nothing in this set is unverified.
  */
 export const leftAtTy2025 = [
+    { member: 'additionalMedicareTaxEmployerWithholdingThreshold', reason: "§3102(f)(1)'s flat $200,000 employer withholding trigger — statutory, never inflation-adjusted, added to the engine by Phase 33's own fix" },
     { member: 'socialSecurityBenefitsWorksheetBaseAmounts', reason: 'unchanged since 1993 — §86(c) fixes 32,000/25,000 and 12,000/9,000 in the statute with no inflation adjustment' },
     { member: 'medicalExpenseFloor', reason: '§213(a)\'s 7.5%-of-AGI floor is statutory and permanent; no annual adjustment exists' },
     { member: 'additionalMedicareTaxThreshold', reason: '§3101(b)(2)\'s 200,000/250,000/125,000 are statutory and expressly NOT indexed for inflation' },
