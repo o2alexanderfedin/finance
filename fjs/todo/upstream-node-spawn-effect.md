@@ -30,6 +30,22 @@ five-operation design (`spawn`/`childWrite`/`childRead`/`childEnd`/`childWait`, 
 at 128 KiB as `readBytes`/`writeBytes` are, `null` for EOF as `Read` already spells it, argv split
 rather than a shell string) is in #1649, with two signature questions left open there deliberately.
 
+**Two further corrections, from review on #1649 (2026-08-19) — both falsify the sketch at the bottom
+of this file, which is kept only as the record of what was first proposed.**
+
+- **`childWait` cannot answer a number.** Node reports `('exit', code, signal)` with `code === null`
+  whenever the child was terminated by a signal, so `IoResult<number>` — and this file's older
+  `IoResult<{ code, stderr }>` — cannot represent a real outcome. Upstream now specifies
+  `ExitStatus = readonly['exited', number] | readonly['signaled', string]`, both tags in the `ok`
+  branch, in `IoError`'s own tagged-pair idiom.
+- **`childWrite` must NOT loop over short writes.** Node's `Writable.write()` performs no short
+  writes: `false` means the whole chunk is already buffered and the caller must await `'drain'`.
+  Looping would resend bytes the child already holds and **duplicate NDJSON frames**. Upstream's own
+  `fjs/effects/node/module.mjs:156-175` (`writeAll`) had documented this — *"no retry needed"* — long
+  before the sketch was written. **The remedy was already in the module being extended; nobody read
+  it.** That is the same defect this repo's anti-pattern table records as *"a note whose remedy is
+  wrong"*.
+
 ## The gap, precisely
 
 `fjs/effects/node` already has one subprocess primitive — `Exec`:
@@ -110,6 +126,11 @@ export type SpawnEnd = readonly ['spawnEnd', (handle: SpawnHandle) => void]; // 
 export type SpawnWait = readonly ['spawnWait', (handle: SpawnHandle) => IoResult<{ readonly code: number; readonly stderr: string }>];
 ```
 
+**This sketch is superseded and two of its five lines are now known wrong** (see the corrections
+above): `spawnEnd -> void` does not type-check, and `spawnWait -> IoResult<{code, stderr}>` cannot
+represent a signalled child. It is kept as the record of the first proposal — #1649 carries the
+design that survived review.
+
 mirroring the existing `Func<...>`-shaped effects (`ReadBytes`/`WriteBytes`'s
 offset-and-size-bounded read/write pair is the closest existing precedent for an
 incremental, handle-based I/O effect) rather than `Exec`'s single blocking call. An
@@ -120,8 +141,7 @@ maintainers have not reviewed it.
 
 ## Upstreaming
 
-Unscheduled — no urgency signal yet beyond this one test file. File the GitHub issue
-against `functionalscript/functionalscript` if/when a second caller in this repo needs the
-same long-lived-subprocess shape (a repeated need is a stronger signal than one test).
-Delete this file once a released FJS version ships a streaming spawn effect and this test
-is rewritten as a pure `.f.js` proof on top of it.
+**Filed** — see the status line at the top. This section previously said "unscheduled … file the
+issue if/when a second caller needs it", which contradicted the header from the day the header was
+written. Delete this file once a released FJS version ships a streaming spawn effect and
+`cas-refresh-cross-process.test.js` is rewritten as a pure `.f.js` proof on top of it.

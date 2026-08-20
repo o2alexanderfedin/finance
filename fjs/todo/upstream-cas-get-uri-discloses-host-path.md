@@ -1,7 +1,8 @@
 # Upstream: `cas_get`'s `uri` field discloses the server's absolute host path
 
 Status: **FILED UPSTREAM** as [functionalscript#1650](https://github.com/functionalscript/functionalscript/pull/1650)
-— `fjs/mcp/todo/cas-get-uri-discloses-host-path.md`, P3. Upstream tracks issues in `todo/` files,
+— `fjs/mcp/todo/cas-get-uri-discloses-host-path.md`, **P2** (raised from P3 on 2026-08-19 by review;
+see below). Upstream tracks issues in `todo/` files,
 so that file is the issue. **It is a design decision on a public protocol surface, not a patch to
 apply, and it belongs to the maintainer** — which is why nothing was changed here or there.
 
@@ -32,12 +33,32 @@ reddened on the `uri` would prove nothing about our rendering — but it means t
 "handled" in a test's parsing, which is the weakest possible place for it. Do not mistake that
 parsing for a fix.
 
-## Exposure is latent, not live
+## Exposure is LIVE, not latent — this section said the opposite and was wrong
 
-stdio is the only transport today, so the client is a local process that could call `os.homedir()`
-itself. Remote transport is on `.planning/REQUIREMENTS.md`'s deferred list; that is where this stops
-being harmless, and it is why #1650 argues the decision belongs BEFORE `remote-url.md` lands rather
-than inside it.
+**Corrected 2026-08-19 after review on #1650.** The claim was: stdio is the only transport, so the
+client is a local process that could call `os.homedir()` itself. **Stdio does not mean same machine,
+same user.** `ssh host npx functionalscript mcp`, a container, and a wrapper running the server under
+a different UID are all ordinary stdio launches in which the client cannot read the server account's
+home directory — and `cas_get` hands it over. Same-user local is the *only* launch where the field
+discloses nothing new, and it is one launch out of several, not the definition of the transport.
+
+Remote transport (on `.planning/REQUIREMENTS.md`'s deferred list) is where even that one harmless
+case disappears — so the argument for deciding BEFORE `remote-url.md` lands stands, but it no longer
+rests on "harmless until then". Priority upstream is now P2.
+
+**The lesson worth keeping:** the false premise was a generalisation from the single launch in front
+of me — one server, started locally, by the same user. A transport is not its most common
+configuration.
+
+## What review changed upstream, besides the priority
+
+`README.md`'s "`uri` is present only when the server was started with a `toUrl` resolver" is **not**
+aspiration — it documents an API that shipped in functionalscript#1102 and was removed by `deb4f122`
+(functionalscript#1159), whose own commit line reads *"remove toUrl"*; no changelog entry records the
+removal, which is why the sentence outlived it by two file moves. So #1650's option 3 is a
+*restoration*, and `deb4f122` created `remote-url.md` in the same commit that removed the resolver —
+superseded pending a design, not judged wrong. Anyone reading that option here should read
+`deb4f122` first.
 
 ## Retirement condition
 
