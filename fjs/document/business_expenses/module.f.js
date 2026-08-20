@@ -225,6 +225,101 @@ const expenseEntry = /** @type {const} */ ({
 })
 
 /**
+ * One Form 8829 Part II operating expense — lines 16 through 22, in either of
+ * the two printed columns.
+ *
+ * **`line` and `column` are free strings, constrained one layer out**, which
+ * is {@link expenseEntry}'s own arrangement and is here for its own reason:
+ * deciding which printed Form 8829 line an expense belongs on is Form 8829
+ * logic, and `fjs/form8829` is where an unrecognized tag is REFUSED by name
+ * rather than silently dropped into a total. `description` mirrors that
+ * entry's too.
+ *
+ * The two columns are not decoration and are not interchangeable. i8829,
+ * *Columns (a) and (b)*: *"Direct expenses benefit only the business part of
+ * your home ... Enter 100% of your direct expenses on the appropriate line in
+ * column (a). Indirect expenses are for keeping up and running your entire
+ * home ... Generally, enter 100% of your indirect expenses on the appropriate
+ * line in column (b)."* Line 24 multiplies only column (b) by line 7's
+ * business percentage; column (a) reaches line 26 whole. Storing one column
+ * would either allocate a direct expense that must not be allocated, or fail
+ * to allocate an indirect one that must be.
+ */
+const businessUseOfHomeExpenseEntry = /** @type {const} */ ({
+    line: string,
+    column: string,
+    description: string,
+    amount: string,
+})
+
+/**
+ * The Form 8829 record — one home, one business. See
+ * `fjs/form8829/todo/expenses-for-business-use-of-your-home.md` for the
+ * argument behind every field, and `fjs/form8829` for what each one unlocks or
+ * refuses.
+ *
+ * **It lives on THIS dialect rather than on a new one**, and the inclusion
+ * rule is this dialect's own: one document is one BUSINESS. Form 8829's
+ * subtitle is *"File only with Schedule C (Form 1040)"* and its line 36 sends
+ * the answer to Schedule C line 30, which is a line this dialect's `entries`
+ * already feed for every other Part II category. A `vnd.fjs.home_office`
+ * dialect would have had the same subject key, the same cardinality and the
+ * same provenance as the record it sat beside.
+ *
+ * `method` is the taxpayer's ELECTION and is a two-value frozen vocabulary
+ * rather than an `option(true)`, for {@link specifiedServiceTradeOrBusinessValues}'
+ * own recorded reason. i8829's *Who cannot use Form 8829* makes the two
+ * mutually exclusive — *"You have elected to use the simplified method for
+ * your home for 2025"* is on the list of situations in which the form may not
+ * be filed at all — so absence has to be *unstated* and refuse, never a
+ * default into either.
+ *
+ * `firstUsedForBusiness` is `YYYY-MM`, and the MONTH is load-bearing rather
+ * than incidental: it is the row of i8829's line 41 table, and the twelve rows
+ * span 2.461% down to 0.107% — a factor of 23 on the same basis.
+ *
+ * `claimingTheStandardDeduction` and
+ * `allGrossIncomeFromTheBusinessUseOfTheHome` are QUALIFIERS whose absence
+ * denies, the direction `grossReceiptsFullyReportedOnForms1099Nec` on this same
+ * dialect already runs in, and both are facts about the RETURN rather than
+ * about the home. That is deliberate and is not a second source of truth:
+ * whether the standard deduction wins is not knowable until Schedule A runs,
+ * which is after the adjusted gross income this business's line 31 feeds, so
+ * there is no earlier answer for this one to duplicate. i8829's *Lines 9, 10,
+ * and 11* makes it decide the whole shape of Part II — a standard-deduction
+ * filer's mortgage interest and real estate taxes arrive on lines 16 and 17 and
+ * never touch Schedule A, an itemizer's go through Pub. 936 and the Line 11
+ * Worksheet first and then split back.
+ *
+ * The four `option(true)` facts at the end are DISQUALIFIERS whose printed
+ * question is answered "yes" by presence, the direction `vnd.fjs.credits`'
+ * three Form 8863 boxes already use. Each names a computation i8829 sends to a
+ * publication or an attached statement, and `fjs/form8829` refuses on each.
+ * **The two directions sit in one record deliberately**, and each field is
+ * named for the fact it asserts rather than for the outcome it produces — that
+ * dialect's own recorded lesson, where a reader who assumed one direction for
+ * all four got three of them backwards.
+ */
+const businessUseOfHomeRecord = /** @type {const} */ ({
+    method: string,
+    claimingTheStandardDeduction: option(true),
+    allGrossIncomeFromTheBusinessUseOfTheHome: option(true),
+    areaUsedForBusiness: number,
+    totalAreaOfHome: number,
+    expenses: array(businessUseOfHomeExpenseEntry),
+    priorYearOperatingExpensesCarryover: option(string),
+    priorYearExcessCasualtyLossesAndDepreciationCarryover: option(string),
+    casualtyLosses: option(string),
+    homeAdjustedBasisOrFairMarketValue: option(string),
+    landIncludedInThatBasis: option(string),
+    firstUsedForBusiness: option(string),
+    daycareFacility: option(true),
+    additionsOrImprovementsPlacedInService: option(true),
+    stoppedUsingTheHomeForBusinessBeforeYearEnd: option(true),
+    aSecondHomeWasUsedForThisBusiness: option(true),
+})
+
+/**
  * rtti schema for a `business_expenses` BLOB. `dialect` is spread first (via
  * `base`) so structural validation reports it as the first failing field on a
  * mismatched blob (DOC-00's discriminant). NO `formRevision` — DOC-10 does not
@@ -249,6 +344,7 @@ export const businessExpensesSchema = /** @type {const} */ ({
     w2Wages: option(string),
     unadjustedBasisOfQualifiedProperty: option(string),
     entries: array(expenseEntry),
+    businessUseOfHome: option(businessUseOfHomeRecord),
 })
 
 /**
@@ -263,6 +359,23 @@ export const businessExpensesSchema = /** @type {const} */ ({
  */
 export const specifiedServiceTradeOrBusinessValues = /** @type {const} */ ([
     'specifiedService', 'notSpecifiedService',
+])
+
+/**
+ * The two ways §280A(c)'s deduction can be figured, and there is no third.
+ * `'actualExpenses'` is Form 8829; `'simplified'` is Rev. Proc. 2013-13's $5
+ * per square foot on the Simplified Method Worksheet in the Instructions for
+ * Schedule C, which `fjs/form8829` refuses by name.
+ *
+ * A frozen two-element vocabulary rather than an `option(true)`, exactly as
+ * {@link specifiedServiceTradeOrBusinessValues} is and for the same reason:
+ * the two produce different deductions of different sizes, so a serializer's
+ * `''` must not be able to fall into either. i8829 makes them alternatives
+ * rather than layers — a taxpayer who elected the simplified method may not
+ * file this form at all.
+ */
+export const businessUseOfHomeMethods = /** @type {const} */ ([
+    'actualExpenses', 'simplified',
 ])
 
 /** @typedef {Ts<typeof businessExpensesSchema>} BusinessExpenses */
@@ -392,6 +505,81 @@ export const checkReferences = r => {
                 + `reads it`)
         }
     }
+    const home = r.businessUseOfHome
+    if (home !== undefined) {
+        // Every money field of the record walks the SAME loop as the entries
+        // above. Membership in this list is what keeps a field out of the four
+        // known stored-but-unread defects' shape
+        // (`fjs/todo/stored-but-unread-field-sweep.md`), and the list is
+        // hand-typed against the schema rather than derived from it —
+        // `Object.keys` over the thing under test is the fourth defect that
+        // file records.
+        for (const [name, value] of /** @type {readonly (readonly [string, string | undefined])[]} */ ([
+            ['businessUseOfHome.priorYearOperatingExpensesCarryover',
+                home.priorYearOperatingExpensesCarryover],
+            ['businessUseOfHome.priorYearExcessCasualtyLossesAndDepreciationCarryover',
+                home.priorYearExcessCasualtyLossesAndDepreciationCarryover],
+            ['businessUseOfHome.casualtyLosses', home.casualtyLosses],
+            ['businessUseOfHome.homeAdjustedBasisOrFairMarketValue',
+                home.homeAdjustedBasisOrFairMarketValue],
+            ['businessUseOfHome.landIncludedInThatBasis', home.landIncludedInThatBasis],
+        ])) {
+            if (value === undefined) {
+                continue
+            }
+            const message = moneyFieldError(name)(value)
+            if (message !== undefined) {
+                return error(message)
+            }
+            if (centsFromString(value) < 0n) {
+                return error(
+                    `${name} ${value} is negative — every Form 8829 amount is a magnitude, and `
+                    + `the printed page carries its own subtractions (lines 15, 28, 39 and 43). `
+                    + `A negative one here would apply a minus sign the form applies again`)
+            }
+        }
+        // Lines 1 and 2. A zero total area makes line 3's division undefined,
+        // and an area used for business larger than the whole home makes line
+        // 7 exceed 100% — which would allocate MORE than the expense to the
+        // business on lines 13 and 24.
+        for (const [name, area] of /** @type {readonly (readonly [string, number])[]} */ ([
+            ['areaUsedForBusiness', home.areaUsedForBusiness],
+            ['totalAreaOfHome', home.totalAreaOfHome],
+        ])) {
+            if (!Number.isInteger(area) || area < 0) {
+                return error(
+                    `businessUseOfHome.${name} must be a non-negative whole number of square `
+                    + `feet: ${area}. i8829's Lines 1 and 2 allow "square feet or any other `
+                    + `reasonable method", so the UNIT is the taxpayer's — but line 3 divides one `
+                    + `by the other and both must be measured the same way`)
+            }
+        }
+        if (home.totalAreaOfHome === 0) {
+            return error(
+                `businessUseOfHome.totalAreaOfHome is zero — Form 8829 line 3 is "Divide line 1 `
+                + `by line 2", and there is no home to divide into`)
+        }
+        if (home.areaUsedForBusiness > home.totalAreaOfHome) {
+            return error(
+                `businessUseOfHome.areaUsedForBusiness (${home.areaUsedForBusiness}) exceeds `
+                + `totalAreaOfHome (${home.totalAreaOfHome}) — Form 8829 line 3 divides the first `
+                + `by the second and line 7 is a percentage of the home, so this would allocate `
+                + `more than 100% of every indirect expense on lines 13 and 24 to the business`)
+        }
+        for (const expense of home.expenses) {
+            const message = moneyFieldError(
+                `businessUseOfHome expense amount for ${expense.description}`)(expense.amount)
+            if (message !== undefined) {
+                return error(message)
+            }
+            if (centsFromString(expense.amount) < 0n) {
+                return error(
+                    `businessUseOfHome expense amount ${expense.amount} for `
+                    + `${expense.description} is negative — a rebate reduces the expense it `
+                    + `relates to before it reaches this record`)
+            }
+        }
+    }
     return ok(r)
 }
 
@@ -436,6 +624,25 @@ const officeExpense = {
     datePaid: '2025-07-01',
     description: 'printer toner',
     amount: '184.99',
+}
+
+/**
+ * The Form 8829 record every leaf below varies ONE fact of — 200 square feet
+ * of a 2,000-square-foot home, which is **10% and not 100%**.
+ * @type {NonNullable<BusinessExpenses['businessUseOfHome']>}
+ */
+const wholeHome = {
+    method: 'actualExpenses',
+    claimingTheStandardDeduction: /** @type {const} */ (true),
+    allGrossIncomeFromTheBusinessUseOfTheHome: /** @type {const} */ (true),
+    areaUsedForBusiness: 200,
+    totalAreaOfHome: 2000,
+    expenses: [
+        { line: '21', column: 'indirect', description: 'utilities', amount: '2400.00' },
+    ],
+    homeAdjustedBasisOrFairMarketValue: '250000.00',
+    landIncludedInThatBasis: '50000.00',
+    firstUsedForBusiness: '2019-06',
 }
 
 export const proof = {
@@ -869,6 +1076,162 @@ export const proof = {
         })
         assert(t === 'ok', ['the storage boundary does not own the category vocabulary', t, v])
         assertEq(v.entries[0]?.category, 'bribes')
+    },
+    // ── TAX-39: the Form 8829 record ────────────────────────────────────────
+    businessUseOfHome: {
+        // The record validates, and every field it carries survives the round
+        // trip — a schema addition whose fields were silently dropped would
+        // pass a bare `t === 'ok'`.
+        theWholeRecordValidatesAndIsReadBack: () => {
+            const [t, v] = validate({ ...minimal, businessUseOfHome: wholeHome })
+            assert(t === 'ok', ['expected ok', v])
+            if (t !== 'ok') {
+                throw ['expected ok', v]
+            }
+            const home = v.businessUseOfHome
+            assert(home !== undefined, 'the record survives validation')
+            if (home === undefined) {
+                throw 'expected a businessUseOfHome record'
+            }
+            assertEq(home.method, 'actualExpenses')
+            assertEq(home.areaUsedForBusiness, 200)
+            assertEq(home.totalAreaOfHome, 2000)
+            assertEq(home.expenses.length, 1)
+            assertEq(home.homeAdjustedBasisOrFairMarketValue, '250000.00')
+            assertEq(home.landIncludedInThatBasis, '50000.00')
+            assertEq(home.firstUsedForBusiness, '2019-06')
+            assertEq(home.claimingTheStandardDeduction, true)
+            assertEq(home.allGrossIncomeFromTheBusinessUseOfTheHome, true)
+        },
+        // **Every money field walks the exactness loop.** Hand-typed as SIX
+        // names, so a field dropped from that loop fails the count even
+        // though the loop itself would happily iterate one fewer — the fourth
+        // defect `fjs/todo/stored-but-unread-field-sweep.md` records.
+        everyMoneyFieldIsCheckedForExactness: () => {
+            /** @type {readonly (readonly [string, (bad: string) => Unknown])[]} */
+            const fields = [
+                ['priorYearOperatingExpensesCarryover',
+                    bad => ({ ...wholeHome, priorYearOperatingExpensesCarryover: bad })],
+                ['priorYearExcessCasualtyLossesAndDepreciationCarryover',
+                    bad => ({
+                        ...wholeHome,
+                        priorYearExcessCasualtyLossesAndDepreciationCarryover: bad,
+                    })],
+                ['casualtyLosses', bad => ({ ...wholeHome, casualtyLosses: bad })],
+                ['homeAdjustedBasisOrFairMarketValue',
+                    bad => ({ ...wholeHome, homeAdjustedBasisOrFairMarketValue: bad })],
+                ['landIncludedInThatBasis',
+                    bad => ({ ...wholeHome, landIncludedInThatBasis: bad })],
+                ['the expense amount',
+                    bad => ({
+                        ...wholeHome,
+                        expenses: [{
+                            line: '21', column: 'indirect', description: 'utilities', amount: bad,
+                        }],
+                    })],
+            ]
+            assertEq(fields.length, 6, 'six money fields on the Form 8829 record')
+            for (const field of fields) {
+                const [name, withAmount] = field
+                // A three-decimal amount is not an exact cent figure.
+                const [inexactT, inexactV] = validate({
+                    ...minimal, businessUseOfHome: withAmount('1.005'),
+                })
+                assertEq(inexactT, 'error', [name, 'an inexact decimal must be refused'])
+                assert(
+                    typeof inexactV === 'string',
+                    [name, 'and it must be a checkReferences message, not a shape error', inexactV])
+                // And a negative one.
+                const [negativeT, negativeV] = validate({
+                    ...minimal, businessUseOfHome: withAmount('-100.00'),
+                })
+                assertEq(negativeT, 'error', [name, 'a negative amount must be refused'])
+                assert(
+                    typeof negativeV === 'string' && negativeV.includes('-100.00'),
+                    [name, 'and the refusal must quote it', negativeV])
+            }
+        },
+        // Lines 1 and 2. Line 3 divides one by the other, so a zero home and
+        // an office bigger than the home are both impossible records.
+        theAreasAreCheckedAgainstLineThreesDivision: () => {
+            const [zeroT, zeroV] = validate({
+                ...minimal, businessUseOfHome: { ...wholeHome, totalAreaOfHome: 0 },
+            })
+            assertEq(zeroT, 'error')
+            assert(
+                typeof zeroV === 'string' && zeroV.includes('Divide line 1 by line 2'),
+                ['the refusal must quote the printed line that needs a divisor', zeroV])
+            const [bigT, bigV] = validate({
+                ...minimal,
+                businessUseOfHome: { ...wholeHome, areaUsedForBusiness: 3000 },
+            })
+            assertEq(bigT, 'error')
+            assert(
+                typeof bigV === 'string' && bigV.includes('more than 100%')
+                && bigV.includes('3000') && bigV.includes('2000'),
+                ['the refusal must quote both areas and name what would go wrong', bigV])
+            const [fractionalT, fractionalV] = validate({
+                ...minimal, businessUseOfHome: { ...wholeHome, areaUsedForBusiness: 200.5 },
+            })
+            assertEq(fractionalT, 'error')
+            assert(
+                typeof fractionalV === 'string' && fractionalV.includes('whole number'),
+                ['a fractional area is refused', fractionalV])
+        },
+        // THE CONTROL for all three area checks: the boundary case — the WHOLE
+        // home used for business — is a legitimate record and must not be
+        // refused. A check written `>=` rather than `>` would refuse it.
+        aHomeUsedEntirelyForBusinessIsAccepted: () => {
+            const [t, v] = validate({
+                ...minimal,
+                businessUseOfHome: { ...wholeHome, areaUsedForBusiness: 2000 },
+            })
+            assert(t === 'ok', ['100% business use is a legitimate record', v])
+        },
+        // DOC-12 in both directions for all six `option(true)` facts on this
+        // record: absence is absence, and a stored `false` is REFUSED
+        // structurally rather than read back as "not asserted". Hand-typed as
+        // six names for the same reason as the money loop above.
+        everyCheckboxOnTheRecordIsOptionTrue: () => {
+            /** @type {readonly string[]} */
+            const flags = [
+                'claimingTheStandardDeduction',
+                'allGrossIncomeFromTheBusinessUseOfTheHome',
+                'daycareFacility',
+                'additionsOrImprovementsPlacedInService',
+                'stoppedUsingTheHomeForBusinessBeforeYearEnd',
+                'aSecondHomeWasUsedForThisBusiness',
+            ]
+            assertEq(flags.length, 6, 'six checkbox facts on the Form 8829 record')
+            for (const flag of flags) {
+                const [falseT] = validate({
+                    ...minimal, businessUseOfHome: { ...wholeHome, [flag]: false },
+                })
+                assertEq(falseT, 'error', [flag, 'a stored false must be refused structurally'])
+                const [trueT, trueV] = validate({
+                    ...minimal, businessUseOfHome: { ...wholeHome, [flag]: true },
+                })
+                assert(trueT === 'ok', [flag, 'and a stored true accepted', trueV])
+            }
+        },
+        // The two-value election vocabulary, exported so `fjs/form8829` reads
+        // one list rather than two.
+        theMethodVocabularyHasExactlyTwoMembers: () => {
+            assertEq(businessUseOfHomeMethods.length, 2)
+            assertEq(businessUseOfHomeMethods[0], 'actualExpenses')
+            assertEq(businessUseOfHomeMethods[1], 'simplified')
+        },
+        // THE CONTROL for the whole record: a business with NO
+        // `businessUseOfHome` at all is the ordinary Schedule C and validates
+        // unchanged, so the addition cannot have broken every stored document.
+        aRecordWithNoHomeOfficeStillValidates: () => {
+            const [t, v] = validate(minimal)
+            assert(t === 'ok', ['expected ok', v])
+            if (t !== 'ok') {
+                throw ['expected ok', v]
+            }
+            assertEq(v.businessUseOfHome, undefined, 'absent, not materialized')
+        },
     },
     // DOC-00, `crossDialect`-style: a fully-valid `vnd.fjs.adjustments` value
     // — the dialect this one is modelled on, and therefore the one whose shape

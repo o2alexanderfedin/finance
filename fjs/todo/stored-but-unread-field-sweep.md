@@ -137,13 +137,46 @@ invisible — the line was never zero, so nothing looked wrong.
   `box10AmountAllocableToIrrWithin5Years`, `box11FirstYearOfDesigRothContrib` — each needs a rule
   the engine does not have (NUA deferral, §402(g) corrective distributions, the five-year Roth
   clock).
-- `vnd.fjs.credits` `overAgeTwelveAndDisabled` — Form 2441 line 2 column (c). **The blocker is
-  not this field, it is the qualifying person's AGE**, which `vnd.fjs.credits` does not store.
-  Absence of the checkbox is ambiguous: it means either "under 13" (qualifying) or "over 12 and
-  not disabled" (NOT qualifying), and only a date of birth separates them. Today
-  `dependentCareCommonFacts` counts every listed person as qualifying.
-  **Direction: understatement of tax** — an over-12, non-disabled person inflates both the
-  §21 credit and the §129 exclusion. Flagged first among the (b) rows for that reason.
+- ~~`vnd.fjs.credits` `overAgeTwelveAndDisabled`~~ — **CLOSED. Wired, and the row above it was
+  wrong twice.** Retained in full because a report that was half right is more useful to the next
+  reader than a deleted one. What it said:
+
+  > The blocker is not this field, it is the qualifying person's AGE, which `vnd.fjs.credits` does
+  > not store. Absence of the checkbox is ambiguous: it means either "under 13" (qualifying) or
+  > "over 12 and not disabled" (NOT qualifying), and only a date of birth separates them. Today
+  > `dependentCareCommonFacts` counts every listed person as qualifying. Direction: understatement
+  > of tax — an over-12, non-disabled person inflates both the §21 credit and the §129 exclusion.
+
+  Both italicised claims are false against the printed page, and each was refuted by a sentence
+  the sweep did not fetch:
+
+  1. **Absence is NOT ambiguous on the form.** i2441 (2025), Part II, Line 2, Column (c), third
+     sentence: *"A person over age 12 at the time the care was provided must be physically or
+     mentally incapable of caring for themselves to be listed on line 2."* Under the CAUTION
+     printed directly above it — *"Don't list a person on line 2 unless they are listed as an
+     eligible person under Qualifying Person(s), earlier."* — the over-12, non-disabled person may
+     not appear on line 2 at all, so an unchecked box on a correctly prepared **paper** Form 2441
+     can only mean "under 13". A date of birth is not what settles it and would not have settled
+     it: column (c)'s test is *"at the time the care was provided"*, and the printed form carries
+     no care date to compare a birthday against — i2441's own *"If the child turned 13 during the
+     year, the child is a qualifying person for the part of the year they were under age 13"* is
+     exactly the case a stored date of birth still cannot answer.
+  2. **The §129 exclusion is not affected at all, let alone independently.** f2441 prints
+     *"To claim the child and dependent care credit, complete lines 27 through 31 below."*
+     between line 26 and line 27. Line 26 — the taxable benefits reaching 1040 line 1e — is built
+     from lines 20-25, whose only ceiling is line 21's flat $5,000/$2,500. The qualifying person
+     count first appears at line 27, on the credit's side of that caption.
+
+  **The understatement was real anyway, for the reason the report reached past.** The ambiguity is
+  a property of the RECORD, not of the form: `vnd.fjs.credits` *"is not a transcribed IRS form"*
+  (its own header's first sentence), so nothing between the taxpayer's care receipts and
+  `fjs/form2441` had ever applied that caution, and an absent `overAgeTwelveAndDisabled` carried
+  "under 13", "over 12 and not disabled" and "nobody asked" at once. `dependentCareCommonFacts`
+  granted a qualifying person in all three. The fix is the shape this dialect already uses for
+  `filerAttainedAgeTwentyFourBeforeTheEndOfTheYear` and `saversCreditEligibility`: a second
+  `option(true)`, `underAgeThirteenWhenTheCareWasProvided`, so each of §21(b)(1)'s two populations
+  is assertable, absence of both is *unstated*, and `fjs/form2441`'s R6 refuses by name. Both
+  present is a contradiction and `fjs/document/credits`' `checkReferences` refuses it.
 - `vnd.fjs.1099g` `box3RefundTaxYear` — the year of the refund in box 2, which is already refused
   by name (the §111 tax-benefit rule needs the prior-year return).
 - `vnd.fjs.1098t` `box9GraduateStudent` — an AOTC eligibility signal; the engine reads the
@@ -237,3 +270,34 @@ one nobody was doing — making a money field's status a thing somebody had to w
 
 It covers MONEY fields only. Dates, checkboxes, identity labels and free text are outside it: all
 seven known defects were money, and a partition including `payerName` would be mostly noise.
+
+## The Form 2441 fix's own mutation log
+
+Gate before: **2,902 pass / 0 fail** (`feature/tier-b-forms` @ `73e9832`). After: **2,911**.
+
+Before any leaf was written, the fix itself was the first observation: adding the refusal with
+the shipped fixtures untouched turned **eight** `fjs/form1040/core` leaves red — every
+end-to-end Form 2441 leaf in the repository — which is the direct measurement that the wrong
+behaviour was live and that those fixtures were in it.
+
+| # | Mutation | Red |
+|---|---|---|
+| M1 | R6 never fires (`length !== 0` -> `length > 1000`) | **5** — 3 form-level, 2 wiring |
+| M2a | `under !== true` -> `under !== true \|\| name.length > 1000` | **0 — a no-op by construction**, recorded rather than re-run silently: `false \|\| false` is `false` and `true \|\| false` is `true`, so the term is unchanged at every input |
+| M2b | the under-13 term is really dropped | **9** |
+| M3 | the over-12-and-disabled term is dropped | **8** |
+| M4 | only the FIRST unstated person is named | **2** |
+| M5 | the both-asserted contradiction refusal never fires | **1** |
+| M6 | `underAgeThirteenWhenTheCareWasProvided` is deleted from the schema | **does not compile** — 5 `tsc` errors across three modules, which is the strongest form of "it is wired" |
+| M7 | the `$6,000` cap interpolation is erased from R6's message | **1** |
+
+**M3 reddens one fewer than M2b, and the arithmetic is why.**
+`theDependentCareCreditIsOrderedAheadOfTheChildTaxCredit` runs on
+`dependentCareWithAChildInputs`, whose single qualifying person asserts §21(b)(1)(A) — so
+dropping the *over-12* term cannot touch it, while dropping the *under-13* term refuses it. The
+prediction was "the same set both ways" and it was wrong, which is the useful direction.
+
+**M2a is the equivalent-mutant case AGENTS.md names**, and it is recorded rather than quietly
+replaced: the written mutation compiled, applied, changed the source, and could not turn red at
+any input. M2b is the semantically-intended edit in a form that keeps the binding live
+(`String(x).length < 1000`), and it bites.

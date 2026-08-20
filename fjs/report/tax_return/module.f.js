@@ -855,6 +855,10 @@ const fixtureFounderProfileHash = 'sha256-tax-return-founder-profile'
 const fixtureFounderNecHash = 'sha256-tax-return-founder-1099nec'
 const fixtureFounderExpensesHash = 'sha256-tax-return-founder-expenses'
 const fixtureFounderRegisterHash = 'sha256-tax-return-founder-asset-register'
+// TAX-39: the SAME business record with a Form 8829 half. A separate
+// fixture rather than a field added to the one above, so the routing leaf
+// that pins $260.00 of business income keeps pinning it.
+const fixtureFounderHomeExpensesHash = 'sha256-tax-return-founder-home-expenses'
 // The Schedule E Part I wiring's own two: a landlord.
 const fixtureLandlordProfileHash = 'sha256-tax-return-landlord-profile'
 const fixtureLandlordPropertyHash = 'sha256-tax-return-landlord-property'
@@ -938,6 +942,7 @@ const subjectFounderProfile = 'tax-return-subject-founder-profile'
 const subjectFounderNec = 'tax-return-subject-founder-1099nec'
 const subjectFounderExpenses = 'tax-return-subject-founder-expenses'
 const subjectFounderRegister = 'tax-return-subject-founder-asset-register'
+const subjectFounderHomeExpenses = 'tax-return-subject-founder-home-expenses'
 const subjectLandlordProfile = 'tax-return-subject-landlord-profile'
 const subjectLandlordProperty = 'tax-return-subject-landlord-property'
 const subjectMarketplaceProfile = 'tax-return-subject-marketplace-profile'
@@ -1314,6 +1319,54 @@ const documentByHash = {
             description: 'search advertising',
             amount: '90.00',
         }],
+    },
+    // TAX-39. **The Form 8829 record rides inside `vnd.fjs.business_expenses`,
+    // and this fixture is the evidence for the design decision that put it
+    // there**: no new dialect means no new `routeDocument` branch, so the
+    // stored program below reaches Schedule C line 30 through a route that
+    // already existed and that {@link
+    // proof.sourceAndTwinDispatchOnTheSameNineteenDialects} already pins.
+    //
+    // Sized so the gross income limitation does NOT bind at this persona's
+    // $260.00 of tentative profit, which is what makes the return computable
+    // at all — 100 square feet of a 1,000-square-foot home is 10%:
+    //
+    //   line 24  $1,200.00 of utilities x 10%            =  $120.00
+    //   line 26  = line 27, and $120.00 <= $260.00 of line 15
+    //   line 28  260.00 - 120.00                         =  $140.00
+    //   line 40  ($50,000.00 - $10,000.00) x 10%         = $4,000.00
+    //   line 42  $4,000.00 x 2.564%                      =  $102.56  <= $140.00
+    //   line 36  120.00 + 102.56                         =  $222.56
+    [fixtureFounderHomeExpensesHash]: {
+        dialect: businessExpensesDialect,
+        recipientTin: '222-22-2222',
+        accountNumber: 'BUS-0001',
+        taxYear: 2025,
+        principalBusiness: 'software consulting',
+        grossReceiptsFullyReportedOnForms1099Nec: true,
+        priorYearQualifiedBusinessLossCarryforward: '0.00',
+        entries: [{
+            category: 'advertising',
+            datePaid: '2025-03-14',
+            description: 'search advertising',
+            amount: '90.00',
+        }],
+        businessUseOfHome: {
+            method: 'actualExpenses',
+            claimingTheStandardDeduction: true,
+            allGrossIncomeFromTheBusinessUseOfTheHome: true,
+            areaUsedForBusiness: 100,
+            totalAreaOfHome: 1000,
+            expenses: [{
+                line: '21',
+                column: 'indirect',
+                description: 'utilities',
+                amount: '1200.00',
+            }],
+            homeAdjustedBasisOrFairMarketValue: '50000.00',
+            landIncludedInThatBasis: '10000.00',
+            firstUsedForBusiness: '2019-06',
+        },
     },
     // ── The routing sweep's own twenty-three documents ──────────────────
     //
@@ -1775,6 +1828,7 @@ const snapshotBySubject = {
     [subjectFounderNec]: fixtureFounderNecHash,
     [subjectFounderExpenses]: fixtureFounderExpensesHash,
     [subjectFounderRegister]: fixtureFounderRegisterHash,
+    [subjectFounderHomeExpenses]: fixtureFounderHomeExpensesHash,
     [subjectLandlordProfile]: fixtureLandlordProfileHash,
     [subjectLandlordProperty]: fixtureLandlordPropertyHash,
     [subjectMarketplaceProfile]: fixtureMarketplaceProfileHash,
@@ -1859,6 +1913,11 @@ const retireeSubjects = [
 /** Phase 27's own three subjects, likewise NOT in sorted order. */
 const founderSubjects = [
     subjectFounderExpenses, subjectFounderNec, subjectFounderProfile,
+]
+
+/** TAX-39: the same persona with the Form 8829 half of the business record. */
+const founderWithHomeOfficeSubjects = [
+    subjectFounderHomeExpenses, subjectFounderNec, subjectFounderProfile,
 ]
 
 /** The same three, plus the Form 4562 wiring's asset register. */
@@ -2518,6 +2577,35 @@ export const proof = {
         const cents = renderedCents(result)
         assertEq(cents('1040 line 1a'), 3000000n, 'the same $30,000.00 of wages')
         assertEq(cents('1040 line 31'), 0n, 'and no premium tax credit at all')
+    },
+    /**
+     * ★ **TAX-39: Form 8829 reaches the RENDERED report through the stored
+     * program.** The leaf below, which carries the same persona without the
+     * home office, is its control: $260.00 against $37.44, a difference of
+     * exactly Form 8829 line 36.
+     *
+     * What it proves that `fjs/form1040/core`'s own leaf cannot: the Form 8829
+     * record survives serialization into a stored BLOB, structural validation
+     * against `vnd.fjs.business_expenses`, and `routeDocument`'s existing
+     * branch — **with no new branch and no new dialect**, which is the design
+     * decision this fixture exists to price. A `vnd.fjs.home_office` would
+     * have needed its own route, its own tag in the source twin and its own
+     * row in the dispatch count.
+     */
+    storedProgramRoutesAFormEightyEightTwentyNineInsideTheBusinessRecord: () => {
+        const result = runTwin(founderWithHomeOfficeSubjects)
+        assert(result.kind === 'ok', ['expected a computed return', result])
+        if (result.kind !== 'ok') {
+            return
+        }
+        const cents = renderedCents(result)
+        // $350.00 of receipts, $90.00 of advertising, $222.56 of Form 8829
+        // line 36. Every figure hand-derived at the fixture above.
+        assertEq(cents('1040 line 8'), 3744n, '$37.44 — $260.00 less Form 8829’s $222.56')
+        assertEq(cents('1040 line 9'), 3744n, 'and it is the whole of total income')
+        assertEq(cents('1040 line 11a'), 3744n, 'AGI = $37.44')
+        assertEq(cents('1040 line 15'), 0n, 'taxable income still floors at zero')
+        assertEq(cents('1040 line 25b'), 4000n, 'the $40.00 of backup withholding is untouched')
     },
     storedProgramRoutesTheTwoBusinessDialectsAndComputesScheduleC: () => {
         const result = runTwin(founderSubjects)
