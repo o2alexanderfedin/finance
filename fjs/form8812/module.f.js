@@ -302,7 +302,10 @@ export const form8812 = taxParamSet => input => {
     //     than zero and not a multiple of $1,000, enter the next multiple of
     //     $1,000." THE STEPPED CLIFF -- see module docstring.
     const excess = line3 > line9 ? line3 - line9 : 0n
-    const line10 = excess === 0n ? 0n : roundUpToNextThousandDollars(excess)
+    // The zero case is `roundUpToNextThousandDollars`'s own first branch and
+    // its `proof` block pins it, so re-checking it here said the same thing
+    // twice (13-REVIEW.md IN-02).
+    const line10 = roundUpToNextThousandDollars(excess)
     // 11. "Multiply line 10 by 5% (0.05)." Reads the STORED, cited
     // `phaseoutRatePercent` (WR-01, 13-REVIEW.md) rather than a hardcoded
     // `5n` — mirroring `fjs/schedule/1a`'s/`fjs/schedule/a`'s own
