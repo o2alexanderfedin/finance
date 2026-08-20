@@ -1,14 +1,14 @@
 {
   "version": "1.0",
-  "timestamp": "2026-08-17T21:30:00.000Z",
+  "timestamp": "2026-08-19T23:20:00.000Z",
   "phase": "none",
-  "phase_name": "milestone-v2-complete-v1.0.0-released",
+  "phase_name": "milestone-v3-closed-v4-awaiting-owner",
   "phase_dir": null,
   "plan": 0,
   "task": 0,
   "total_tasks": 0,
-  "status": "released",
-  "position_note": "All 120 requirements complete, v1.0.0 tagged and pushed. Nothing in flight, no open PRs, no stashes, one worktree, two branches.",
+  "status": "awaiting_owner",
+  "position_note": "Milestone v3 closed by Phase 33's external validation. v4's three phases are all blocked on the owner, not on engineering: 34 needs the taxpayer's documents and a second filer, 35 needs one dependency approval (two owners, AGENTS.md), 36 needs a real client session because fixtures would prove the pipe and not the phase.",
   "git": {
     "branch": "develop",
     "note": "NO SHAs ARE RECORDED HERE ON PURPOSE. The previous version pinned develop=5f75fcd main=66c0873 and both were stale within the hour, because the commit that wrote them moved develop past them. Present-tense git claims are comparisons; run the verify commands.",
@@ -28,23 +28,33 @@
   "suite": {
     "command": "npm test",
     "exit": 0,
-    "measured_on": "fd6702c, the v1.0.0 release point",
-    "tests": "2242/2242",
-    "project_local_proof_leaves": 2218,
+    "measured_on": "2026-08-19",
+    "tests": "3247/3247",
+    "project_local_proof_leaves": 3202,
     "tsc": "clean",
     "gate_command": "npm test 2>&1 | grep -c '^✔ import(\"./fjs/'",
-    "warning": "NEVER gate on npm test's total (AGENTS.md line 127) -- it includes ~2100 vendored submodule proofs and moves with submodule state. The submodule is deliberately de-initialised."
+    "warning": "Wall clock is 5-31s and load-dependent, not a constant. A fast run is not a skipped run."
   },
   "remaining_tasks": [
     {
       "id": 1,
-      "name": "upstream-mjs-migration: 0.44/0.45 dropped the .js emit; migration measured at 288 residual errors, each fixable only by a forbidden construct",
-      "status": "blocked_upstream_with_specified_fix"
+      "name": "Phase 34 - cross-check against a second filer using the owner's own documents",
+      "status": "blocked_on_owner"
+    },
+    {
+      "id": 2,
+      "name": "Phase 35 - fill the official f1040.pdf; blocked on one dependency approval, everything else researched",
+      "status": "blocked_on_owner_decision"
+    },
+    {
+      "id": 3,
+      "name": "Phase 36 - the conversational path with real documents; fixtures would prove the pipe and not the phase",
+      "status": "blocked_on_owner"
     },
     {
       "id": 4,
-      "name": "Three upstream fjs notes re-verified still open against 0.45.0: upstream-mcp-protocol-version-negotiation, upstream-node-spawn-effect, upstream-total-match-dispatch",
-      "status": "open"
+      "name": "functionalscript#1649 (Spawn effect) and #1650 (cas_get uri discloses host path) - filed upstream, not fixable here",
+      "status": "filed_upstream"
     }
   ],
   "blockers": [],
@@ -72,6 +82,6 @@
     }
   ],
   "uncommitted_files": [],
-  "next_action": "Nothing required. The milestone is closed and released. If work resumes, the SIX open fjs/todo/ notes are the candidate list (fjs/todo/ holds nine files; three are satisfied specs kept in their original present tense, each with a corrected status line). NOTE: an earlier version of this field said Phase 17 'never ran' and that a defect deferred to it surfaced 'months later'. Both are false. Phase 17 shipped as PR #84 at 03:26 PDT on 2026-08-17 and Phase 18 as PR #87 at 14:10 PDT; the deferral was written at 21:10 PDT, SEVEN HOURS AFTER the phase it defers to had finished. A deferral aimed at a completed phase is collected by nobody.",
+  "next_action": "Nothing required. Three phases wait on decisions only the owner can take. Phase 35's homework is done: f1040.pdf is a fillable AcroForm (199 widgets, 126 text fields, 73 checkboxes, no XFA), recommended library @cantoo/pdf-lib, and every PDF field carries a name so an unmapped field is detectable rather than silent.",
   "context_notes": "Two failures in this session are worth more than the features. FIRST: `git push` reported success while doing nothing, three times, because an agent run un-isolated in the main checkout left HEAD on its own branch -- caught only because main's TEST COUNT came back 2185 instead of 2242, not by checking a ref. SECOND: the proof suite had been running TWICE for months, recorded as a 'double-counted metric, severity advisory, remedy: de-duplicate'; it was double-RUN, ~53s per invocation, and the documented workaround is exactly why nobody looked again. A workaround that works is the most expensive kind of bug. The through-line across eleven occurrences this session: only a COMPARISON stops a count from drifting -- naming the hazard in a comment failed three separate times, while the two gates added (theHandTypedListNamesEveryModeledKind, dialect_parity) each caught a real omission within a day."
 }
