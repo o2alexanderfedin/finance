@@ -446,8 +446,21 @@ const statusErrorDiffFixture = cas => errorSide => programHash => args => wire =
 /**
  * Asserts `columnB === centsToString(centsFromString(columnC) -
  * centsFromString(columnA))` for every line in a diff result, as a bigint
- * -cents identity — not merely trusted from the implementation (this
- * plan's own acceptance criterion).
+ * -cents identity.
+ *
+ * **This is a consistency check, not independent verification of
+ * correctness**, and the docstring used to claim otherwise — it said "not
+ * merely trusted from the implementation", which is credit it cannot take.
+ * It re-derives its expectation through `centsFromString`, the same primitive
+ * the production path used (with `centsToString`) to build `columnB` at
+ * {@link diffWireRecords}: a defect inside that pair satisfies both sides and
+ * passes. What it does catch is everything between them — a crossed column, a
+ * reversed operand order, a dropped line.
+ *
+ * The independent leg is elsewhere and real: the proofs that hand-type their
+ * expected strings (`assertEq(interest.columnA, '1000.00')` and its
+ * neighbours) take the expectation from outside the module. Phase 15's review
+ * recorded this as IN-02 and required no code change; the wording is the fix.
  * @type {(diff: AmendmentDiffResult) => void}
  */
 const assertColumnBEqualsColumnCMinusColumnA = diff => {
