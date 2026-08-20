@@ -285,24 +285,6 @@ no filled 1040, no PDF, no e-file.
       which is the standing suspect in every number and is NOT part of the engine. **Fifteen of
       the twenty refusals are Schedule C**, which is where this engine's real-world coverage
       stops and it stops loudly. `tsc` 0, **3247/3247**, **3202** leaves.
-- [ ] **Phase 34: Second-Implementation Cross-Check** - Run the owner's own documents through a
-      free commercial filer (FreeTaxUSA / IRS Free File) and through this engine, and diff line by
-      line. Two independent implementations agreeing is what a prior-year return was standing in
-      for.
-- [ ] **Phase 35: A Filable Artifact** — **SCOPE CORRECTED BY THE OWNER 2026-08-19, and the CSS half is done.**
-      A printable face ships at `demo/form1040.html`, and checking it against the fetched `f1040.pdf`
-      found four real transcription errors including a checkbox block off by one for its entire
-      length. **But the owner's point stands: the IRS will not accept a CSS re-creation**, so print
-      fidelity buys comprehension, not filing, and is explicitly NOT worth chasing to the millimetre.
-      **The real filable artifact is the official `f1040.pdf` itself, which is a fillable AcroForm** —
-      verified by decompressing it: 199 widgets, 126 text fields, 73 checkboxes, no XFA. Filling
-      those fields yields a form the IRS accepts on paper, with their layout and their labels, and
-      deletes the entire transcription-risk class this phase just paid for. **It needs PDF-writing,
-      which is a new dependency, which needs every owner's approval** (AGENTS.md) — so the decision
-      is open, not the implementation. Original text:
-      layout, faithful enough to transcribe from or to hand to a preparer. **E-file is out of
-      scope**: IRS MeF requires provider authorization no personal project obtains.
-- [ ] **Phase 36: The Conversational Path** - Documents into chat, "what do I owe for 2025?",
 
 - [x] **Phase 37: FunctionalScript 0.46.1** — **COMPLETE 2026-08-19.** Migrated, suite green, and the report the upstream author asked for is written (`.planning/reports/fjs-0.46.1-migration.md`, PR #100). It deleted more than it added: a `try` carried since 0.41.0, eight `try` sites down to one, three `any`s, and two latent defects it exposed — a missing blob reaching MCP clients as a *policy refusal*, and a stale `try` whose `catch` was catching the proof's own `assert`. The one thing needing upstream became `functionalscript#1645`, merged and released as 0.46.1. Originally requested in
       `todo/update-fjs-0.46.0` (PR #96), who also asks for a structured report on the migration
@@ -1145,9 +1127,9 @@ is deferred, so three phases remain, and two reasons override the numeric defaul
 | 31. Gap Closure — 8995-A, 8606 Part II, OCR island | v2 | 0/0 — no plans were written | Complete (TAX-32, TAX-29, MAINT-01) | 2026-08-17 |
 | 32. Gap Closure — Earned Income Credit | v2 | 0/0 — no plans were written | Complete (TAX-27) | 2026-08-17 |
 | 33. External Validation Without a Filed Return | v3 | 0/0 — no plans written | Complete; 27/20/2, one defect fixed | 2026-08-19 · PR #113 |
-| 34. Second-Implementation Cross-Check | v3 | 0/TBD | Not started | - |
-| 35. A Filable Artifact | v3 | 0/TBD | Not started | - |
-| 36. The Conversational Path | v3 | 0/TBD | Not started | - |
+| 34. Second-Implementation Cross-Check | **v4** | 0/TBD | Not started | - |
+| 35. A Filable Artifact | **v4** | 0/TBD | Not started | - |
+| 36. The Conversational Path | **v4** | 0/TBD | Not started | - |
 | 37. FunctionalScript 0.46.1 | v3 | 0/0 — no plans written | Complete; report in `.planning/reports/` | 2026-08-19 · PR #98/#99/#100 |
 
 > **The nine stale milestone-v2 rows were retro-filled on 2026-08-17, from measurement.** They
@@ -1229,3 +1211,39 @@ is deferred, so three phases remain, and two reasons override the numeric defaul
 *Roadmap created 2026-08-03 from PROJECT.md, REQUIREMENTS.md, todo/plan.md,
 fjs/todo/implement-mcp-server.md, and the research corpus. Milestones are `todo/plan.md`'s
 weeks and keep its names; Week 0 is research's addition.*
+
+**── Milestone v4: Verified With the Taxpayer Present ──**
+
+**Why these three sit here and not in v3.** v3 asked "can this be trusted without a filed return",
+and Phase 33 answered it: 27 of 51 external cases matched under the strict criterion, both
+divergences went against the benchmark, and one real engine defect surfaced and was fixed. That is
+as far as confidence gets **without the owner in the room**. The three below cannot be moved by an
+agent working alone — two need the taxpayer's own documents and consent, and one needs a decision
+about a dependency that only an owner may take. **Deferred by the owner on 2026-08-19, with the
+work that was doable already done.**
+
+- [ ] **Phase 34: Second-Implementation Cross-Check** - Run the owner's own documents through a
+      free commercial filer (FreeTaxUSA / IRS Free File) and through this engine, and diff line by
+      line. Two independent implementations agreeing is what a prior-year return was standing in
+      for.
+
+- [ ] **Phase 35: A Filable Artifact** — **SCOPE CORRECTED BY THE OWNER 2026-08-19, and the CSS half is done.**
+      A printable face ships at `demo/form1040.html`, and checking it against the fetched `f1040.pdf`
+      found four real transcription errors including a checkbox block off by one for its entire
+      length. **But the owner's point stands: the IRS will not accept a CSS re-creation**, so print
+      fidelity buys comprehension, not filing, and is explicitly NOT worth chasing to the millimetre.
+      **The real filable artifact is the official `f1040.pdf` itself, which is a fillable AcroForm** —
+      verified by decompressing it: 199 widgets, 126 text fields, 73 checkboxes, no XFA. Filling
+      those fields yields a form the IRS accepts on paper, with their layout and their labels, and
+      deletes the entire transcription-risk class this phase just paid for. **It needs PDF-writing,
+      which is a new dependency, which needs every owner's approval** (AGENTS.md) — so the decision
+      is open, not the implementation. Original text:
+      layout, faithful enough to transcribe from or to hand to a preparer. **E-file is out of
+      scope**: IRS MeF requires provider authorization no personal project obtains.
+
+- [ ] **Phase 36: The Conversational Path** - Documents into chat, "what do I owe for 2025?",
+
+> **None of these is blocked on engineering.** Phase 34 needs the owner's documents and an account
+> at a second filer; Phase 36 needs a real client session with real documents, and running it on
+> fixtures would prove the pipe is connected while proving nothing the phase exists for; Phase 35's
+> CSS half is shipped and its remaining half is a dependency decision, not a task.
