@@ -261,10 +261,30 @@ require it**, and adds the thing nobody had noticed was missing: **there is no o
 actually file.** The engine returns `{ value, rule, sources }` — numbers with citations. There is
 no filled 1040, no PDF, no e-file.
 
-- [ ] **Phase 33: External Validation Without a Filed Return** - Run TaxCalcBench's 51 public
-      cases, which ship expected outputs. Record per case: matched, refused (and by which named
-      refusal), or diverged. **A divergence is a bug; a refusal is not.** This is the only
-      substitute for criterion 1 that needs nothing from the taxpayer.
+- [x] **Phase 33: External Validation Without a Filed Return** — **COMPLETE 2026-08-19.** All 51
+      of TaxCalcBench's public cases classified against its own 20 graded 1040 lines, under its
+      own *strict* criterion (all twenty must agree): **27 matched, 20 refused, 2 diverged, 2
+      unrunnable**. Full report `.planning/reports/taxcalcbench-33.md`; the harness beside it.
+      **A divergence is a bug; a refusal is not** — and **zero unresolved engine defects remain**.
+      Exactly one genuine defect surfaced and it is **fixed**: `fjs/form8959` computed Part V for
+      filers not required to file Form 8959 at all, so ordinary per-pay-period rounding in Form
+      W-2 box 6 became a phantom $1 credit on 1040 line 25c. The gate now reads a new
+      `additionalMedicareTaxEmployerWithholdingThreshold` — §3102(f)(1)'s flat $200,000, stored
+      separately from §3101(b)(2)'s per-status figure because they are different questions.
+      **Watched to fail** (the leaf reported `50n` against `0n` before the gate existed), and
+      **two of the four mutations survived on the first attempt** — the boundary and the second
+      term of the two-term gate were each unmeasured — so two more leaves were written for them.
+      Re-running all 51 flipped exactly the five affected cases and nothing else. The two
+      divergences left both have verdicts *against the benchmark*: it applies §152(c)(1)(D)'s
+      support test to an EIC qualifying child, which §32(c)(3)(A) removes by name, and a $1
+      whole-dollar difference that is this project's deliberate `round(sum)` convention, which
+      i1040gi p23 reads in favour of. **The first result was a refusal and it was the right
+      one**: `ty24` is Tax Year 2024, and `vnd.fjs.return_profile` refused all 51 at the door
+      with *"no stored tax parameters for taxYear 2024"* — so the harness carries a
+      hand-transcribed TY2024 set (22 members overridden, 17 statutory or verified-identical),
+      which is the standing suspect in every number and is NOT part of the engine. **Fifteen of
+      the twenty refusals are Schedule C**, which is where this engine's real-world coverage
+      stops and it stops loudly. `tsc` 0, **3247/3247**, **3202** leaves.
 - [ ] **Phase 34: Second-Implementation Cross-Check** - Run the owner's own documents through a
       free commercial filer (FreeTaxUSA / IRS Free File) and through this engine, and diff line by
       line. Two independent implementations agreeing is what a prior-year return was standing in
