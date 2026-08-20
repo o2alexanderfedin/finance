@@ -8,8 +8,10 @@ apply, and it belongs to the maintainer** — which is why nothing was changed h
 
 ## What it is, verified by execution against 0.46.1
 
-`fjs/mcp/cas/module.f.mjs:222` computes `const uri = c.url(key)` **unconditionally**, and it reaches
-the metadata object on both success paths and the oversized-blob error text. `FileCas.url` is
+`fjs/mcp/cas/module.f.mjs:222` computes `const uri = c.url(key)` **before the read**, and it reaches
+the metadata object on both success paths (`:231`, `:271`) and the oversized-blob error text
+(`:257`) — but not the two failure paths, which answer before it or without it. See the correction
+below. `FileCas.url` is
 `join(path, toPath(hash))`, `path` is `home`, and the Node runner fills `home` from `os.homedir()`.
 Executed:
 
