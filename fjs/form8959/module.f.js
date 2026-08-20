@@ -360,7 +360,11 @@ export const form8959PartV = taxParamSet => input => {
  * record and for the same reason: the printed page numbers its lines
  * continuously, and a caller reading "line 18" should not first have to know
  * which part it lives in.
- * @typedef {Form8959PartI & Form8959PartII & Form8959PartIII & { readonly line18: bigint } & Form8959PartV} Form8959
+ * `line24AsFiled` is not a printed line. It is Part V line 24 gated by Form
+ * 8959's own **Who Must File** test, and it is what 1040 line 25c reads —
+ * see {@link form8959}'s own note on why line 24 alone is the wrong thing to
+ * carry there.
+ * @typedef {Form8959PartI & Form8959PartII & Form8959PartIII & { readonly line18: bigint, readonly mustFile: boolean, readonly line24AsFiled: bigint } & Form8959PartV} Form8959
  */
 
 /**
@@ -383,9 +387,69 @@ export const form8959 = taxParamSet => input => {
     //     the only line Schedule 2 reads.
     const line18 = partI.line7 + partII.line13 + partIII.line17
     const partV = form8959PartV(taxParamSet)({ medicareTaxWithheldCents, partILine1: partI.line1 })
+    // Form 8959's own **Who Must File** test, and the reason Part V's line 24
+    // is NOT what 1040 line 25c may read (TAX-20, Phase 33).
+    //
+    // ## The defect this exists to close
+    //
+    // Part V's arithmetic above is faithful to the printed page and stays
+    // that way: line 21 is 1.45% of box 5, line 22 is box 6 minus it, floored.
+    // But a Form W-2's box 6 is an accumulation of per-pay-period Medicare
+    // tax, each period rounded to the cent, so it lands a few cents off
+    // exactly 1.45% of box 5 in EITHER direction. The floor above catches the
+    // low side; nothing caught the high side, and there a filer who owes no
+    // Additional Medicare Tax at all was handed the drift as a CREDIT.
+    //
+    // Measured against TaxCalcBench's fifty-one public cases (Phase 33,
+    // `.planning/reports/taxcalcbench-33.md` §5.1): five of them, $1 each. A
+    // single filer with box 5 = $145,000.00 and box 6 = $2,103.00 produced
+    // line 22 = $0.50, which the whole-dollar election rounded UP to $1 on
+    // 1040 line 25c — on a form the filer does not file.
+    //
+    // ## The test, verbatim from the instructions
+    //
+    // *"You must file Form 8959 if one or more of the following applies to
+    // you. — Your Medicare wages and tips on any single Form W-2 (box 5) are
+    // greater than $200,000. — Your RRTA compensation on any single Form W-2
+    // (box 14) is greater than $200,000. — Your total Medicare wages and tips
+    // plus your self-employment income ... are greater than the threshold
+    // amount for your filing status ... — Your total RRTA compensation and
+    // tips ... are greater than the threshold amount for your filing status."*
+    //
+    // There is **no** "you had Additional Medicare Tax withheld" condition.
+    // Withholding alone never obliges the form, which is exactly why the
+    // rounding drift has nowhere to go.
+    //
+    // ## Why these two terms, and why NOT the per-status threshold alone
+    //
+    // - `line18 > 0n` is bullets THREE and FOUR. If wages alone exceed the
+    //   status threshold, Part I line 7 is positive; if wages plus
+    //   self-employment income do, Part II line 13 is. Either way line 18 is.
+    // - `medicareWagesCents > employerThresholdCents` is bullets ONE and TWO,
+    //   conservatively. §3102(f)(1) obliges an employer to withhold only on
+    //   what IT pays above a flat $200,000, so a single Form W-2 above
+    //   $200,000 implies the TOTAL is above $200,000 too — this function sees
+    //   only the total, and gating on it can close no gate that bullet one
+    //   would have opened.
+    //
+    // **Both terms are load-bearing.** Drop the second and a joint couple
+    // with one $210,000 Form W-2 and one $30,000 Form W-2 loses a real
+    // credit: their $240,000 total is under the $250,000 joint threshold so
+    // line 18 is zero, yet the first employer withheld on $10,000 and bullet
+    // one requires the form. `bulletOneFilesEvenWhenNoTaxIsOwed` is the leaf.
+    //
+    // The threshold read here is §3102(f)(1)'s EMPLOYER trigger, a flat
+    // $200,000 for every status — deliberately NOT
+    // `additionalMedicareTaxThreshold`, which is §3101(b)(2)'s per-status
+    // figure and answers a different question. `fjs/tax/params` states at
+    // length why the two must not share a parameter.
+    const employerThresholdCents = centsFromString(
+        taxParamSet.additionalMedicareTaxEmployerWithholdingThreshold.amount)
+    const mustFile = medicareWagesCents > employerThresholdCents || line18 > 0n
+    const line24AsFiled = mustFile ? partV.line24 : 0n
     assert(line18 >= 0n, ['Form 8959 line 18 must never be negative', line18])
     assert(partV.line24 >= 0n, ['Form 8959 line 24 must never be negative', partV.line24])
-    return { ...partI, ...partII, ...partIII, line18, ...partV }
+    return { ...partI, ...partII, ...partIII, line18, ...partV, mustFile, line24AsFiled }
 }
 
 // ── Tests ────────────────────────────────────────────────────────────────────
@@ -752,6 +816,125 @@ export const proof = {
             assertEq(result.line24, 0n, 'line 24 = $0.00 -> 1040 line 25c is untouched')
         },
     },
+    // ── Who Must File, and the ceiling the floor above had no partner for ────
+    //
+    // Phase 33, found by TaxCalcBench and by nothing in this repository: the
+    // floor at line 22 catches per-pay-period rounding that leaves box 6
+    // BELOW 1.45% of box 5, and until now nothing caught rounding that left
+    // it ABOVE. See `form8959`'s own note for the instruction text and why
+    // the gate reads §3102(f)(1)'s flat employer trigger rather than
+    // §3101(b)(2)'s per-status threshold.
+    //
+    // Every fixture below is a $145,000 single filer -- under every one of
+    // Who Must File's four conditions -- except where it says otherwise, and
+    // 1.45% of $145,000.00 is 210,250 cents exactly.
+    whoMustFile: {
+        // THE LEAF THIS PHASE EXISTS FOR, and the exact figures of
+        // TaxCalcBench's `single-w2-balance-due-no-state-income-tax`: box 6
+        // is FIFTY CENTS above the ordinary rate, which is what an employer's
+        // own rounding produces and is not Additional Medicare Tax at all.
+        // Part V still computes its printed arithmetic; what must not happen
+        // is that arithmetic reaching 1040 line 25c.
+        //
+        // Watched to fail: with `line24AsFiled` defined as `partV.line24`
+        // and no gate, this leaf reports 50n against 0n. It is the only one
+        // of the four that does.
+        roundingAboveTheOrdinaryRateIsNotACreditForANonFiler: () => {
+            const result = run('single')(14500000n)(210300n)
+            assertEq(result.line18, 0n, 'no Additional Medicare Tax is owed at $145,000.00')
+            assertEq(result.line21, 210250n, 'line 21 = $2,102.50 = 1.45% of $145,000.00')
+            assertEq(result.line22, 50n, 'line 22 = $0.50 -- the printed arithmetic, unchanged')
+            assertEq(result.line24, 50n, 'line 24 = $0.50 -- also unchanged; Part V stays faithful')
+            assert(!result.mustFile, ['no Who Must File condition applies at $145,000.00', result.mustFile])
+            assertEq(
+                result.line24AsFiled,
+                0n,
+                'nothing reaches 1040 line 25c -- there is no Form 8959 to carry it from',
+            )
+        },
+        // THE CONTROL. A gate that closes on everything proves nothing, so
+        // the same filer with box 6 at EXACTLY the ordinary rate must reach
+        // 1040 line 25c with the same $0.00 -- reached by the arithmetic
+        // rather than by the gate, which is the distinction the leaf above
+        // could not make on its own.
+        theSameFilerAtExactlyTheOrdinaryRateAlsoReachesZero: () => {
+            const result = run('single')(14500000n)(210250n)
+            assertEq(result.line22, 0n, 'line 22 = $0.00 -- box 6 IS 1.45% of box 5')
+            assertEq(result.line24AsFiled, 0n, 'the same $0.00, reached without the gate')
+        },
+        // THE GATE'S OTHER SIDE. $300,000 of box 5 is over every condition,
+        // the employer withheld the whole 0.9% on the excess, and that
+        // withholding must still reach 1040 line 25c untouched. Without this,
+        // a gate that simply returned zero would pass every leaf above.
+        aFilerWhoMustFileStillGetsTheirWithholding: () => {
+            const result = run('single')(30000000n)(525000n)
+            assert(result.mustFile, ['$300,000.00 of box 5 is over the threshold', result.mustFile])
+            assertEq(result.line24, 90000n, 'line 24 = $900.00')
+            assertEq(result.line24AsFiled, 90000n, 'and all $900.00 of it reaches 1040 line 25c')
+        },
+        // THE OTHER TERM OF THE GATE, and it was written because the
+        // mutation that DISABLES it came back green: nothing here reached
+        // `mustFile` through `line18 > 0n` alone. It needs a filer whose W-2
+        // wages stay under $200,000 -- so no employer could withhold and the
+        // first term is closed -- while self-employment income carries the
+        // total over the status threshold, so Part II charges the tax and
+        // Who Must File's THIRD bullet obliges the form. Their box 6 drift is
+        // then a real Part V figure, because they really do file.
+        //   Part I:  $150,000.00 of wages, under the $200,000.00 threshold
+        //   Part II: $80,000.00 of self-employment income leaves $50,000.00
+        //            of head-room, so $30,000.00 is taxed at 0.9% = $270.00
+        //   Part V:  1.45% of $150,000.00 = 217,500 cents; box 6 is 50 over
+        selfEmploymentIncomeAloneCanObligeTheFormAndOpenPartV: () => {
+            const result = form8959(taxParams2025)({
+                status: 'single',
+                medicareWagesCents: 15000000n,
+                medicareTaxWithheldCents: 217550n,
+                selfEmploymentIncomeCents: 8000000n,
+            })
+            assertEq(result.line7, 0n, 'Part I charges nothing -- wages are under the threshold')
+            assertEq(result.line13, 27000n, 'Part II charges $270.00 = 0.9% of $30,000.00')
+            assertEq(result.line18, 27000n, 'line 18 = $270.00, which is what obliges the form')
+            assert(result.mustFile, ['bullet three obliges the form', result.mustFile])
+            assertEq(result.line22, 50n, 'line 22 = $0.50')
+            assertEq(
+                result.line24AsFiled,
+                50n,
+                'and it DOES reach 1040 line 25c -- this filer files Form 8959',
+            )
+        },
+        // THE BOUNDARY. §3102(f)(1) obliges an employer to withhold only on
+        // wages "in excess of" $200,000, and §3101(b)(2) taxes only the
+        // excess over the threshold, so a filer AT exactly $200,000.00 is on
+        // the closed side of both and files nothing. Written because the
+        // `>` -> `>=` mutation on the gate came back GREEN without it: none
+        // of the other three fixtures sits on the boundary, so the comparison
+        // was load-bearing in production and unmeasured by the suite.
+        exactlyTheEmployerThresholdIsStillTheClosedSide: () => {
+            const result = run('single')(20000000n)(290000n + 50n)
+            assertEq(result.line18, 0n, '$200,000.00 is not IN EXCESS OF $200,000.00 -- no tax')
+            assertEq(result.line21, 290000n, 'line 21 = $2,900.00 = 1.45% of $200,000.00')
+            assertEq(result.line22, 50n, 'line 22 = $0.50 of rounding drift, as before')
+            assert(!result.mustFile, ['$200,000.00 exactly obliges no form', result.mustFile])
+            assertEq(result.line24AsFiled, 0n, 'and nothing reaches 1040 line 25c')
+        },
+        // BULLET ONE, and the leaf that fails if the gate is written against
+        // §3101(b)(2)'s per-status threshold instead of §3102(f)(1)'s flat
+        // employer trigger. A joint couple, $210,000 and $30,000: their
+        // $240,000 total is UNDER the $250,000 joint threshold, so line 18 is
+        // zero and no tax is owed -- but the first employer was obliged to
+        // withhold 0.9% on the $10,000 it paid above $200,000, and Who Must
+        // File's first bullet ("any single Form W-2 (box 5) greater than
+        // $200,000") requires the form so that $90.00 can be claimed.
+        //   1.45% of $240,000.00 = 348,000 cents
+        //   0.9% of  $10,000.00 =    9,000 cents
+        bulletOneFilesEvenWhenNoTaxIsOwed: () => {
+            const result = run('marriedFilingJointly')(24000000n)(348000n + 9000n)
+            assertEq(result.line18, 0n, '$240,000.00 is under the $250,000.00 joint threshold -- no tax')
+            assert(result.mustFile, ['a single Form W-2 over $200,000.00 obliges the form', result.mustFile])
+            assertEq(result.line22, 9000n, 'line 22 = $90.00, really withheld by the large employer')
+            assertEq(result.line24AsFiled, 9000n, 'and it reaches 1040 line 25c, gate or no gate')
+        },
+    },
     wholeForm: {
         // Line 18 is Part IV, and it really is the sum of all three parts'
         // tax lines rather than Part I's alone -- so a future non-zero Part
@@ -779,12 +962,26 @@ export const proof = {
         // none missing.
         everyPrintedLineIsNamed: () => {
             const result = run('single')(30000000n)(525000n)
-            const expectedFieldCount = 24
+            // Twenty-four PRINTED lines, plus the two Phase 33 added that are
+            // not printed at all: `mustFile` and `line24AsFiled`. They are
+            // counted separately and named here rather than folded into the
+            // total, because the whole value of this leaf is that a reader
+            // can tell a printed line from a derived one -- and it did its
+            // job when they were added, going red on the count before either
+            // was written down.
+            const expectedPrintedLineCount = 24
+            const expectedDerivedFieldNames = ['mustFile', 'line24AsFiled']
             assertEq(
                 Object.keys(result).length,
-                expectedFieldCount,
-                ['expected exactly 24 named Form 8959 fields (lines 1-24)', Object.keys(result)],
+                expectedPrintedLineCount + expectedDerivedFieldNames.length,
+                ['expected 24 printed Form 8959 lines plus 2 derived fields', Object.keys(result)],
             )
+            for (const name of expectedDerivedFieldNames) {
+                assert(
+                    Object.hasOwn(result, name),
+                    ['expected the derived field to be present', name, Object.keys(result)],
+                )
+            }
         },
     },
 }
