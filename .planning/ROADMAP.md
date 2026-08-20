@@ -1128,7 +1128,7 @@ is deferred, so three phases remain, and two reasons override the numeric defaul
 | 32. Gap Closure — Earned Income Credit | v2 | 0/0 — no plans were written | Complete (TAX-27) | 2026-08-17 |
 | 33. External Validation Without a Filed Return | v3 | 0/0 — no plans written | Complete; 27/20/2, one defect fixed | 2026-08-19 · PR #113 |
 | 34. Second-Implementation Cross-Check | **v4** | 0/TBD | Not started | - |
-| 35. A Filable Artifact | **v4** | 0/TBD | Not started | - |
+| 35. A Filable Artifact (fill the official PDF) | **v4** | 0/TBD | CSS half shipped; PDF half blocked on a dependency decision | - |
 | 36. The Conversational Path | **v4** | 0/TBD | Not started | - |
 | 37. FunctionalScript 0.46.1 | v3 | 0/0 — no plans written | Complete; report in `.planning/reports/` | 2026-08-19 · PR #98/#99/#100 |
 
@@ -1227,19 +1227,51 @@ work that was doable already done.**
       line. Two independent implementations agreeing is what a prior-year return was standing in
       for.
 
-- [ ] **Phase 35: A Filable Artifact** — **SCOPE CORRECTED BY THE OWNER 2026-08-19, and the CSS half is done.**
-      A printable face ships at `demo/form1040.html`, and checking it against the fetched `f1040.pdf`
-      found four real transcription errors including a checkbox block off by one for its entire
-      length. **But the owner's point stands: the IRS will not accept a CSS re-creation**, so print
-      fidelity buys comprehension, not filing, and is explicitly NOT worth chasing to the millimetre.
-      **The real filable artifact is the official `f1040.pdf` itself, which is a fillable AcroForm** —
-      verified by decompressing it: 199 widgets, 126 text fields, 73 checkboxes, no XFA. Filling
-      those fields yields a form the IRS accepts on paper, with their layout and their labels, and
-      deletes the entire transcription-risk class this phase just paid for. **It needs PDF-writing,
-      which is a new dependency, which needs every owner's approval** (AGENTS.md) — so the decision
-      is open, not the implementation. Original text:
-      layout, faithful enough to transcribe from or to hand to a preparer. **E-file is out of
-      scope**: IRS MeF requires provider authorization no personal project obtains.
+- [ ] **Phase 35: A Filable Artifact — fill the official `f1040.pdf`**
+      **Scheduled into v4 on 2026-08-19 with a researched approach; the CSS half already shipped in v3.**
+
+      **What ships today and why it is not enough.** `demo/form1040.html` renders both pages of the
+      form face in pure CSS, every amount from `form1040Report` at render time, every amount a button
+      opening its citation, and two coverage guards that draw a stop panel rather than a form with a
+      hole. **The IRS will not accept it** — a CSS re-creation is not their form. It buys
+      comprehension, not filing, so print fidelity is deliberately NOT chased to the millimetre.
+
+      **The real artifact is their own PDF.** `https://www.irs.gov/pub/irs-pdf/f1040.pdf` is a
+      fillable AcroForm — verified by decompressing it: **199 widgets, 126 text fields, 73 checkboxes,
+      no XFA**. Filling those fields yields a form the IRS accepts on paper, in their layout with
+      their labels, and **deletes the entire transcription-risk class** that v3 paid for: checking
+      the CSS face against the printed page found four real errors, including a checkbox block off by
+      one for its whole length, and cost `10-RESEARCH.md` its standing as a label authority.
+
+      **The library question is answered** (measured 2026-08-19, not recalled). `muhammara` is out —
+      native, Node-only, and the demo executes in a browser under a strict CSP. `pdfjs-dist` reads
+      PDFs, it does not write them. That leaves one API in two copies:
+
+      | | `pdf-lib` | `@cantoo/pdf-lib` |
+      |---|---|---|
+      | version / last release | 1.17.1 · **2021-11-06** | 2.9.1 · **2026-08-18** |
+      | stars / open issues | 8591 · **316** | 344 · 19 |
+      | downloads per week | 9,783,096 | 390,943 |
+      | dependencies | 4 | 7 (three unused HTML ones) |
+
+      **Take `@cantoo/pdf-lib`.** Identical API, so a later move either way is one import line, and
+      the maintenance gap is five years. An abandoned dependency inside code that computes taxes is
+      an unpleasant conversation at exactly the wrong moment. `flatten()` after filling, so different
+      viewers cannot render the same return differently.
+
+      **THE GATE IS NOT TECHNICAL.** `AGENTS.md` forbids adding any dependency, dev included, without
+      **every owner's approval**, and there are two owners. This phase cannot start until that
+      decision is taken — which is why it sits in v4 beside the two phases that need the taxpayer.
+
+      **The work, once approved, is small and mechanically checkable.** The engine already emits
+      `{ value, rule, sources }` with printed line numbers. What is needed is a line-number → field-name
+      table, and **every PDF field carries a name, so an unmapped field is a detectable hole rather
+      than a silent one** — the same two-way guard the CSS face already uses, over a set the PDF
+      itself declares. Success criteria: a filled `f1040.pdf` whose every value came from the engine,
+      a guard proving no engine line lacks a field and no field is filled from nothing, and a proof
+      watched to fail.
+
+      **E-file stays out of scope.** IRS MeF requires provider authorization no personal project obtains.
 
 - [ ] **Phase 36: The Conversational Path** - Documents into chat, "what do I owe for 2025?",
 
