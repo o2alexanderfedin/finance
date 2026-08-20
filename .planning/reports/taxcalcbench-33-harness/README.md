@@ -27,7 +27,7 @@ working directory; both are overridable. `run.mjs` writes `results.json` beside
 
 | file | what it is |
 |---|---|
-| `params2024.mjs` | The hand-transcribed **TY2024** `TaxParamSet` — 22 members overridden from Rev. Proc. 2023-34 and friends, 16 left at TY2025 with a reason each. Exports `overridden` and `leftAtTy2025` so the accounting is machine-readable. |
+| `params2024.mjs` | The hand-transcribed **TY2024** `TaxParamSet` — 22 members overridden from Rev. Proc. 2023-34 and friends, 17 left at TY2025 with a reason each. Exports `overridden` and `leftAtTy2025` so the accounting is machine-readable. |
 | `map.mjs` | The schema mapping: TaxCalcBench's `input.json` → `Form1040Inputs` + `declaredKinds`, plus the `unmappable` list that decides the *unrunnable* bucket. |
 | `run.mjs` | The 51-case loop. Extracts the 20 lines TaxCalcBench's own `tax_return_evaluator.py` grades, compares, and classifies matched / refused / diverged / unrunnable. |
 | `validate.mjs` | Runs every constructed document through its own dialect's `validate`, so nothing rests on a document the engine would have rejected at the door. This caught four harness bugs that looked like engine divergences. |

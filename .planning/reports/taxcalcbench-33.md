@@ -577,21 +577,23 @@ than that transcription.
 
 ## 8. Reproducing this
 
-The benchmark is **not** vendored into this repository, and the harness is **not** part of
-it. No dependency was added; the harness is plain ESM run by `node`, and it opens the one
-`try` this repository forbids in `fjs/**.f.js` only because it lives outside that tree.
+The benchmark is **not** vendored into this repository — it is a 282 MB clone. The harness
+**is**, beside this report, because §2 calls its TY2024 parameter set the standing suspect
+in every number and a suspect that cannot be re-examined is not auditable. It is not part
+of the **engine**: nothing in `fjs/` reads it, no proof covers it, it adds no dependency,
+and it is `@ts-nocheck` for the same reason the root-level gate suites are.
 
 ```sh
-git clone --depth 1 https://github.com/column-tax/tax-calc-bench.git   # outside the checkout
-# harness/  ->  map.mjs (schema mapping), params2024.mjs (the TY2024 set),
-#               run.mjs (the 51-case loop), validate.mjs (dialect validation),
-#               one.mjs (a single case, line by line)
-node run.mjs
+git clone --depth 1 https://github.com/column-tax/tax-calc-bench.git /tmp/bench/tax-calc-bench
+cd .planning/reports/taxcalcbench-33-harness
+BENCH_ROOT=/tmp/bench node run.mjs
 ```
 
-The harness imports `form1040Report` from `fjs/form1040/core/module.f.js` by absolute
-path. It re-validates nothing the engine validates and asserts nothing the engine asserts;
-it maps input, calls once, and compares against the XML.
+See that directory's [README](./taxcalcbench-33-harness/README.md) for what each file is.
+The harness imports `form1040Report` from `fjs/form1040/core/module.f.js` directly. It
+re-validates nothing the engine validates and asserts nothing the engine asserts; it maps
+input, calls once, and compares against the XML. It opens the `try` that `fjs/**.f.js`
+forbids, which is legal because it is not a `.f.js`.
 
 **Measured in an rsync'd copy outside the parent checkout** (`/tmp/measure-33`, 6,804
 module resolutions into that copy's own `node_modules` and zero into the parent's, so the
