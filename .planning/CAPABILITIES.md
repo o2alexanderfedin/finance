@@ -215,12 +215,13 @@ pinned to `node --test *.test.js` and why earlier versions of this file reported
 
 ## Known gaps
 
-Nothing here is an open requirement. `fjs/todo/` holds **seven** files. Three are satisfied specs
-kept in their original present tense, each with a corrected status line on top — deleting them
-would lose the ability to check a spec against the thing that satisfied it. Two are upstream, and
-both are filed upstream. **Two are this repository's own, and both are sized rather than open
-questions** — this section said "nothing left open is fixable in this repository" while `develop`
-carried five files, and the Tier-B forms brought two more with them:
+Nothing here is an open requirement. **Derive the file count — `ls fjs/todo/*.md` — do not read
+one from this paragraph.** It has now been wrong three times in two days, and each time it was
+right when written: five, then seven, then eight, as branches landed and notes retired. Today it is
+**eight**. Three are satisfied specs kept in their original present tense, each with a corrected
+status line on top — deleting them would lose the ability to check a spec against the thing that
+satisfied it. Two are upstream and filed there (`functionalscript#1649`, `#1650`). **Three are this
+repository's own, and all three are sized rather than open questions:**
 
 1. **`tax-return-report-source-route-lines-unexercised.md`** — eight of the stored program's
    twenty-eight route lines are EXECUTED against the real stored bytes; twenty are covered by a
