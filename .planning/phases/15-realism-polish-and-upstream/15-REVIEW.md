@@ -26,7 +26,8 @@ findings:
   warning: 2
   info: 2
   total: 5
-status: issues_found
+status: resolved
+resolved: 2026-08-20 — all five closed; IN-02 fixed on the day of re-verification
 ---
 
 # Phase 15: Code Review Report
@@ -34,7 +35,7 @@ status: issues_found
 **Reviewed:** 2026-08-12T01:49:48Z
 **Depth:** deep
 **Files Reviewed:** 16 (+ `.planning/REQUIREMENTS.md`/`.planning/CAPABILITIES.md` inspected for cross-reference only, per the review's own scope rules excluding `.planning/`)
-**Status:** issues_found
+**Status:** resolved — all five closed, re-verified 2026-08-20 (see the end of this report)
 
 ## Summary
 
@@ -243,3 +244,19 @@ expected-side independence.
 _Reviewed: 2026-08-12T01:49:48Z_
 _Reviewer: Claude (gsd-code-reviewer)_
 _Depth: deep_
+
+---
+
+## Re-verified 2026-08-20 — every finding checked against the code, not against a later document
+
+This report kept `issues_found` long after the code stopped matching it. Each finding below was
+re-checked by reading the current source; a planning document claiming a fix was never accepted as
+evidence for one.
+
+| ID | Disposition | Evidence |
+|---|---|---|
+| CR-01 | **CLOSED** | `fjs/report/amend/module.f.js:190-195` — `namedReportLineFromWire` returns a `Result`, `tryCentsFromString` replaced the throwing form, and the `Result` is threaded through `:225` and `:261-263` into `DiffEffect`'s error channel. Both requested proof leaves exist (`:563-590`, tagged `// CR-01:`) and were observed running. |
+| WR-01 | **CLOSED** | `.planning/REQUIREMENTS.md:109-110` — MCP-09 now names `report`, matching `fjs/guest/check/module.f.js:94`, with a correction note at `:110-118`. |
+| WR-02 | **CLOSED** | `fjs/server/module.f.js:127-129` carries the breaking-shape note on `casRefreshTool`, using the `fjs/schedule/d` Decision-2.5 precedent this report named. |
+| IN-01 | **CLOSED** | `.planning/CAPABILITIES.md:3` is dated and maintained; the stale figures this report flagged are gone entirely. |
+| IN-02 | **FIXED 2026-08-20** | `assertColumnBEqualsColumnCMinusColumnA`'s docstring claimed the check was "not merely trusted from the implementation". It re-derives its expectation through `centsFromString` — the same pair the production path used to build `columnB` — so a defect inside that pair satisfies both sides. The docstring now says consistency check, names what it *does* catch, and points at the hand-typed expectations (`:484-486`) that are genuinely independent. No code change; the wording WAS the defect. |

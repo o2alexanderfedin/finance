@@ -30,7 +30,8 @@ findings:
   warning: 5
   info: 2
   total: 8
-status: findings
+status: partially_resolved
+resolved: 2026-08-20 — 7 of 8 closed; IN-01 stays open as a genuine open question
 ---
 
 # Phase 13: Code Review Report
@@ -38,7 +39,7 @@ status: findings
 **Reviewed:** 2026-08-11T07:04:23Z
 **Depth:** deep (cross-file, arithmetic traced against 13-RESEARCH.md's `[VERIFIED: ...]` transcriptions)
 **Files Reviewed:** 21
-**Status:** findings
+**Status:** partially_resolved — 7 of 8 closed, re-verified 2026-08-20 (see the end of this report)
 
 ## Summary
 
@@ -267,3 +268,22 @@ exists), but it is redundant given the one production call site already excludes
 _Reviewed: 2026-08-11T07:04:23Z_
 _Reviewer: Claude (gsd-code-reviewer)_
 _Depth: deep_
+
+---
+
+## Re-verified 2026-08-20 — every finding checked against the code, not against a later document
+
+This report kept `issues_found` long after the code stopped matching it. Each finding below was
+re-checked by reading the current source; a planning document claiming a fix was never accepted as
+evidence for one.
+
+| ID | Disposition | Evidence |
+|---|---|---|
+| CR-01 | **CLOSED** | `fjs/schedule/a/module.f.js:585` refuses when both SALT elections carry sources, naming both tags, before `line5a` is built; `fjs/form1040/core/module.f.js:1694` propagates it. |
+| WR-01 | **CLOSED** | `fjs/form8812/module.f.js:311` reads the stored `childTaxCredit.phaseoutRatePercent`; `:402-406` read the stored ACTC threshold and rate, both cited to §24(d) at `fjs/tax/params/module.f.js:718-724`. |
+| WR-02 | **CLOSED** | `fjs/schedule/a/module.f.js:599` runs the drift check inside the real computation, and `fjs/form1040/core/module.f.js:1684` feeds it the return's actual documents. |
+| WR-03 | **CLOSED** | `fjs/form1040/core/module.f.js:3125` / `:3344` cite `dependentsSource`; `:1795`'s line 13b cites the filing status and the age/blindness boxes. |
+| WR-04 | **CLOSED** | `fjs/schedule/a/module.f.js:558-564` refuses an unrecognized `lineTag`, naming the tag and the known vocabulary, policed against the hand-typed list at `:218-222`. |
+| WR-05 | **CLOSED** | `fjs/schedule/1a/module.f.js:177` and `fjs/form8812/module.f.js:286` now CALL the named income functions; the inline duplicates are gone. |
+| IN-02 | **FIXED 2026-08-20** | `fjs/form8812/module.f.js` — the caller's `excess === 0n ? 0n :` guard is gone; `roundUpToNextThousandDollars` handles zero in its own first branch and its proof pins it. **Mutated after the edit** (`line10 = excess`) → three leaves red, including `steppedCliff.mfjOneCentOverThresholdCostsTheFullFiftyDollarStep`; restored byte-identically. This report had marked it "no fix required". |
+| IN-01 | **STILL OPEN — manual** | `magi-gate.test.js:67`'s `/[a-zA-Z]*[Mm]agi[a-zA-Z]*/` is unchanged, and **this report's own suggested fix is wrong in both directions**: a leading `\b` would still match `magic`/`Magistrate` (both START at a boundary) while losing camelCase `sharedMagi` (no boundary before `M`). What distinguishes an offending identifier from an English word has to be decided before anything is changed. A note whose remedy is wrong — the pattern this repository already records. |
