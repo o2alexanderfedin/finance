@@ -143,6 +143,69 @@ first, in [`fjs/form4797/todo/`](./fjs/form4797/todo/sales-of-business-property.
   §1211(b)-capped it — and the direction is an over-refusal, never a wrong number. Recorded at
   three sites and pinned by a leaf rather than silently absorbed.
 
+### Form 2555 — Foreign Earned Income (§911), TAX-42
+
+**An expatriate computes.** `foreignEarnedIncomeForm2555` was one
+`fjs/return/scope` row naming three printed destinations — 1040 line 16,
+Schedule 1 line 8d and Schedule 1 line 24j — whose whole remedy read *"requires
+Form 2555 and the Foreign Earned Income Tax Worksheet (no phase yet)"*. Form
+2555 Parts V, VII and VIII now compute, line 45 reaches Schedule 1 line 8d as a
+negative, and §911(f)'s stacking rule reprices 1040 line 16.
+
+- **One coarse row becomes five kinds**, and the split is the finding: the three
+  destinations had three unrelated blockers, so a filer with no housing claim
+  was refused by a sentence about Notice 2025-16's location table.
+  This form's own moves are `197 -> 201` vocabulary, `+1` modeled and `+3`
+  refused — one coarse row out, four in, one of them modeled.
+- **The two qualifying tests are settled differently.** Physical presence
+  (§911(d)(1)(B)) is a COUNT of midnight-to-midnight days and becomes a profile
+  certification, narrowed on its tax-home half to "no abode in the United
+  States" — a bright line where the statute has a weighing of family, economic
+  and personal ties. Bona fide residence (§911(d)(1)(A)) turns on *intent*, and
+  i2555's own instruction says a taxpayer's words lose to their acts; a
+  certification IS words, so it refuses instead.
+- **The stacking rule is implemented, not approximated.** `fjs/tax/line16`'s
+  level-0a wrapper re-enters its own levels 1-3 with the worksheet's line 3,
+  which is what the printed page instructs and what this module's docstring had
+  claimed for four phases while the branch refused. Taxing only the remaining
+  income under-taxes silently and in the taxpayer's favour; the fixture behind
+  `theStackingRuleChangesTheBracket` differs from it by a whole bracket.
+- **Form 8962's documented structural zero goes live.** Its line 2a add-back was
+  a zero *"only while `foreignEarnedIncomeForm2555` is a refused kind"* — a
+  dependency recorded at the site, which is what made it a two-line change
+  rather than a hunt. Five other modified-AGI measures move with it: Schedule
+  8812 line 2b, Schedule 1-A line 2b, Schedule A's SALT worksheet w3b, Form
+  8863's line 3, and §32/§24(d)(3)'s outright bars on the earned income credit
+  and the additional child tax credit.
+- **What still refuses, by name**: bona fide residence, the housing exclusion
+  and deduction (Notice 2025-16's ~200 adjusted location limits have no compact
+  derivation, and line 49's carryover needs a prior-year return), income
+  received in another tax year, a capital gain excess inside the worksheet, the
+  AMT's Part III modifications, Form 7206 line 12's attribution, and the §904(j)
+  election beside a §911 exclusion (§911(d)(6)).
+- **Seventy-six mutations ran and ten real gaps came back.** Eight wirings out
+  of `fjs/form1040/core` were deletable with the whole suite green; a Schedule A
+  add-back had no leaf at all; and gating §911(d)(6) on the §904(j) election was
+  worse than untested — it handed an unelected filer a remedy that lands them in
+  the same refusal. Two further green results were not gaps: one mutation was a
+  no-op, and the worksheet's line 6 floor is an equivalent mutant, now an
+  assertion naming the invariant instead. The log is in
+  `fjs/form2555/todo/foreign-earned-income.md` §7b.
+- **Counts, composed.** Form 4797 above moved modeled `55 -> 56` and refused
+  `142 -> 141` from the SAME starting point this form moved `55 -> 56` and
+  `142 -> 145` from, so neither branch's literal is the answer: the live
+  figures are **57 modeled, 144 refused, 201 in the vocabulary**, and
+  `57 + 144 = 201` is what `theTwoHandTypedCountsSumToTheWholeVocabulary`
+  checks. **Both branches wrote `56` for the modeled constant**, so git merged
+  it clean and one short; the refused constant conflicted and did not. Tripwires
+  stay at Form 4797's 12 and the dialects are unmoved.
+- **The THIRD `TAX-40` collision, and it was renumbered rather than recorded.**
+  Three works coined that ID on 2026-08-19 from three branches cut before any of
+  the others existed. Form 461 keeps it because it reached the trunk first, Form
+  4797 became `TAX-41`, and this work became **`TAX-42`** — 88 citations across
+  23 files, none of which names either other form. The reasoning, and why
+  `TAX-38`'s decision to record rather than split does not transfer, is in
+  REQUIREMENTS.md's own section.
 
 ### Schedule F — Profit or Loss From Farming
 
@@ -262,7 +325,10 @@ large incentive stock option spread beside qualified dividends. It now computes.
   AMT's own 26% — so the printed `min` on line 40 is a clause that never binds.
 - **What still refuses, by name**: Part III required while the regular tax
   completed *neither* preferential worksheet, reachable only when 1040 line 15 is
-  zero or less. Every Form 2555 clause on the page is structurally unreachable.
+  zero or less. (*"Every Form 2555 clause on the page is structurally
+  unreachable"* stood here until TAX-42 made §911 computable; Form 6251 line 7
+  now runs i6251's own Foreign Earned Income Tax Worksheet, and only its Part III
+  arm refuses. See the Form 2555 entry below.)
   There is no 28% collectibles band on this page and its absence is the printed
   form's own decision, not an omission — documented with a proof leaf.
 - Three proof leaves that asserted the removed refusal are **rewritten as

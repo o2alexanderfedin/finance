@@ -3360,6 +3360,49 @@ export const longTermCarePremiumLimits = [
     },
 ]
 
+/**
+ * §911's foreign earned income exclusion — Form 2555 line 37, TAX-42.
+ *
+ * **Two members, and the second has no authority to cite.** Form 2555 line 39
+ * divides the qualifying-day count by *"the number of days in your 2025 tax
+ * year (usually 365)"*, which is a fact about the calendar rather than a
+ * figure any Revenue Procedure or Code section sets — so {@link daysInTaxYear}
+ * is a bare `number` beside a cited {@link AmountWithCitation}, the shape
+ * `TaxParamSet`'s own `taxYear` already uses.
+ *
+ * It is STORED, keyed by the year like everything else in this map, rather
+ * than computed from the year number. A leap-year branch over a year is
+ * precisely the hardcoded-year comparison `year-genericity-gate` forbids, and
+ * `vnd.fjs.rental_property`'s `daysInTheLongestYear = 366` already records
+ * that this project does no calendar arithmetic anywhere.
+ *
+ * ## What is deliberately NOT here
+ *
+ * §911(c)'s housing figures — the 16% base housing amount ($20,800 full year,
+ * $56.99 daily) and the 30% general limitation on housing expenses ($39,000
+ * full year, $106.85 daily), both restated in Notice 2025-16 §2 — are absent
+ * because **nothing reads them**: `foreignHousingExclusionOrDeduction` is a
+ * refused `fjs/return/scope` kind, so Form 2555 Parts VI and IX never run.
+ *
+ * That is a decision rather than an omission, and the reason is worth stating
+ * where the next reader will look for the numbers. Notice 2025-16 §3 raises
+ * the 30% limit for roughly two hundred named locations *"in lieu of the
+ * otherwise applicable limitation of $39,000"*, and that table has **no
+ * compact derivation**: its daily column is its own full-year column over 365,
+ * but the full-year column is survey output under §911(c)(2)(B) and is a
+ * function of nothing stored. Storing the general limit alone, with two
+ * hundred locations silently capped at it, is the partial table AGENTS.md says
+ * to refuse rather than ship. See
+ * `fjs/form2555/todo/foreign-earned-income.md` §3.
+ */
+export const foreignEarnedIncome = {
+    maximumExclusion: /** @type {AmountWithCitation} */ ({
+        amount: '130000.00',
+        citation: { kind: 'revProc', revProc: 'Rev. Proc. 2024-40', section: '§2.39', effectiveDate: '2025-01-01' },
+    }),
+    daysInTaxYear: 365,
+}
+
 
 /**
  * A full tax-year parameter set: every TY2025 parameter this phase
@@ -3423,6 +3466,7 @@ export const longTermCarePremiumLimits = [
  *   readonly dependentCareAssistanceExclusionLimit: typeof dependentCareAssistanceExclusionLimit,
  *   readonly dependentCareDeemedEarnedIncomePerMonth: typeof dependentCareDeemedEarnedIncomePerMonth,
  *   readonly longTermCarePremiumLimits: typeof longTermCarePremiumLimits,
+ *   readonly foreignEarnedIncome: typeof foreignEarnedIncome,
  * }} TaxParamSet
  */
 
@@ -3475,6 +3519,7 @@ export const taxParamsByYear = {
         dependentCareAssistanceExclusionLimit,
         dependentCareDeemedEarnedIncomePerMonth,
         longTermCarePremiumLimits,
+        foreignEarnedIncome,
     },
 }
 
@@ -3639,6 +3684,7 @@ const everyDollarStringField = [
     dependentCareAssistanceExclusionLimit.marriedFilingSeparately.amount,
     dependentCareDeemedEarnedIncomePerMonth.oneQualifyingPerson.amount,
     dependentCareDeemedEarnedIncomePerMonth.twoOrMoreQualifyingPersons.amount,
+    foreignEarnedIncome.maximumExclusion.amount,
 ]
 
 export const proof = {
@@ -3655,6 +3701,48 @@ export const proof = {
     // reason — `longTermCarePremiumLimits` is both the iteration set and the
     // subject, so a deleted band would vanish from the loop in the same
     // instant it vanished from the data.
+    // TAX-42. **Both members hand-typed off the printed page**, not read back
+    // from the object under test: $130,000 is Form 2555 line 37's own caption
+    // ("Maximum foreign earned income exclusion. Enter $130,000") and Rev.
+    // Proc. 2024-40 §2.39 ("the foreign earned income exclusion amount under
+    // § 911(b)(2)(D)(i) is $130,000"); 365 is Form 2555 line 39's "(usually
+    // 365)".
+    foreignEarnedIncomeMatchesThePrintedFormAndTheRevenueProcedure: () => {
+        assertEq(foreignEarnedIncome.maximumExclusion.amount, '130000.00')
+        assertEq(foreignEarnedIncome.daysInTaxYear, 365)
+        const citation = assertRevProcCitation(foreignEarnedIncome.maximumExclusion.citation)
+        assertEq(citation.revProc, 'Rev. Proc. 2024-40')
+        assertEq(citation.section, '§2.39')
+        assertEq(citation.effectiveDate, '2025-01-01')
+    },
+    // Notice 2025-16 §2's own two products, checked against the stored
+    // maximum: "the base housing amount for 2025 is $20,800 ($130,000 x .16)"
+    // and "limited to maximum housing expenses of $39,000 ($130,000 x .30)".
+    //
+    // **Neither figure is stored**, because nothing reads them —
+    // `foreignHousingExclusionOrDeduction` is a refused kind and Form 2555
+    // Parts VI and IX never run. This leaf exists so the day they do, the
+    // maximum they derive from is already pinned to the notice that states
+    // both products: a maximum that drifted would make both wrong at once,
+    // silently, and this is the one place where the notice's own arithmetic
+    // is written down.
+    theNoticeTwentyTwentyFiveSixteenProductsFollowFromTheStoredMaximum: () => {
+        const maximumCents = centsFromString(foreignEarnedIncome.maximumExclusion.amount)
+        assertEq(halfUp(of(maximumCents * 16n)(100n)), 2080000n, 'Notice 2025-16 §2: $20,800')
+        assertEq(halfUp(of(maximumCents * 30n)(100n)), 3900000n, 'Notice 2025-16 §2: $39,000')
+        // ...and the daily rates the printed page prints beside them, which
+        // are those products over the tax year's own day count, half-up to
+        // cents. Form 2555 line 32 prints $56.99 and i2555 p5 prints $106.85.
+        const days = BigInt(foreignEarnedIncome.daysInTaxYear)
+        assertEq(halfUp(of(2080000n)(days)), 5699n, 'Form 2555 line 32: $56.99 a day')
+        assertEq(halfUp(of(3900000n)(days)), 10685n, 'i2555 p5, line 29b: $106.85 a day')
+        // **The printed daily rates do NOT reproduce the printed full-year
+        // figures**, and the form resolves it with an override rather than
+        // hiding it. Stated here because a reader deriving one from the other
+        // would otherwise conclude one of them is a typographical error.
+        assertEq(5699n * days, 2080135n, '$56.99 × 365 = $20,801.35, not $20,800.00')
+        assertEq(10685n * days, 3900025n, '$106.85 × 365 = $39,000.25, not $39,000.00')
+    },
     longTermCarePremiumLimitsMatchThePrintedFormAndTheRevenueProcedure: () => {
         /** @type {Record<LongTermCareAgeBand, string>} */
         const printed = {

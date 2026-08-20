@@ -110,6 +110,7 @@ import { error, ok } from 'functionalscript/fjs/types/result/module.f.mjs'
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { base, mediaTypeOf } from '../../document/base/module.f.js'
 import { moneyFieldError } from '../../document/money_field/module.f.js'
+import { daysInTheLongestYear } from '../../document/rental_property/module.f.js'
 import {
     dialect as oneZeroNineNineIntDialect,
     oneZeroNineNineIntSchema,
@@ -277,7 +278,8 @@ export const kindVocabulary = /** @type {const} */ ([
     // line 1d. Both rows in `fjs/return/scope` are extended to name their
     // Schedule 1 line as well, the way `section1202Gain` names both a
     // 1099-DIV box and a Form 6251 line -- rather than a second declaration
-    // being invented for one taxpayer fact.
+    // being invented for one taxpayer fact. Since TAX-42 the line 8d kind is
+    // `foreignEarnedIncomeExclusion`, and it is MODELED.
     //
     // **Line 8z is a WRITE-IN and is EIGHT kinds, not one.** Its
     // instructions name seven examples and then leave the line open ("any
@@ -359,9 +361,13 @@ export const kindVocabulary = /** @type {const} */ ([
     // kind per printed sub-line. The old remedy said "eleven lettered
     // sub-lines"; the printed form has twelve, 24a through 24k and 24z.
     //
-    // **Line 24j gets no kind here**: the Form 2555 housing deduction is the
-    // same taxpayer fact as line 8d's exclusion, and
-    // `foreignEarnedIncomeForm2555` names it.
+    // **Line 24j gets no kind here**: the Form 2555 housing deduction is
+    // named by `foreignHousingExclusionOrDeduction`, one of Form 2555's four
+    // kinds above. It was `foreignEarnedIncomeForm2555` until TAX-42 split
+    // that row, and the split is exactly why line 24j and line 8d no longer
+    // share one refusal: the deduction is blocked by Notice 2025-16's
+    // underivable table and a prior-year carryover, and the exclusion is not
+    // blocked at all.
     //
     // **Line 24z gets no kind at all**, and this is the one place in this
     // vocabulary where a write-in line does not. Its whole 2025 instruction
@@ -684,7 +690,24 @@ export const kindVocabulary = /** @type {const} */ ([
     'usVirginIslandsTaxAllocation',       // Schedule 3 line 13z -> 31
     'qualifiedFarmlandGainDeferral',      // Schedule 3 line 13z -> 31
     'otherRefundableCreditsNotListed',    // Schedule 3 line 13z -> 31
-    'foreignEarnedIncomeForm2555',          // line 16 wrapper
+    // ── Form 2555's four kinds (TAX-42) ───────────────────────────────────
+    //
+    // `foreignEarnedIncomeForm2555` stood here as ONE kind naming three
+    // printed destinations -- 1040 line 16, Schedule 1 line 8d and Schedule 1
+    // line 24j -- on the stated ground that "one form produces them". That
+    // was right while nothing was modelled and wrong the moment something
+    // was: the three have three unrelated blockers, so a filer with no
+    // housing claim was refused by a sentence about Notice 2025-16's table,
+    // and nothing could be reclassified without reclassifying all of it.
+    //
+    // Split under this vocabulary's own rule -- one kind per fact a taxpayer
+    // can truthfully declare having. See
+    // `fjs/form2555/todo/foreign-earned-income.md` §6.
+    'foreignEarnedIncomeExclusion',         // Schedule 1 line 8d -> 8; line 16 wrapper
+    'foreignEarnedIncomeBonaFideResidenceTest',   // Form 2555 Part II
+    'foreignHousingExclusionOrDeduction',   // Schedule 1 line 24j -> 10
+    'foreignEarnedIncomeReceivedInAnotherTaxYear', // Form 2555 line 45 write-in
+    'foreignEarnedIncomeCapitalGainExcess', // line 16 worksheet footnote
     'childsUnearnedIncomeForm8615',         // line 16 wrapper
     'farmIncomeAveragingScheduleJ',         // line 16 wrapper
     'form8814ChildInterestAndDividends',    // line 16 add-on
@@ -1188,6 +1211,122 @@ export const returnProfileSchema = /** @type {const} */ ({
     // `movingExpensesArmedForcesPermanentChangeOfStation`'s own note says of
     // certifying a permanent change of station while claiming no move.
     notEligibleForAnySubsidizedEmployerHealthPlanInAnyMonth: option(true),
+    // ── TAX-42 (Form 2555, §911): four facts, none on any information return ─
+    //
+    // There is no information return for foreign earned income AT ALL. A
+    // foreign employer issues no Form W-2, and Form 2555 Part IV lines 19
+    // through 23 are the taxpayer's own tally of wages, non-cash lodging,
+    // meals, a car, allowances and reimbursements. So all four arrive the way
+    // a household move's cost does -- stated, because nobody else states them.
+    //
+    // They ride on THIS dialect rather than on `vnd.fjs.adjustments` because
+    // Form 2555 line 45 lands in Schedule 1 **Part I** (line 8d, additional
+    // income), and that dialect is Part II's. See
+    // `fjs/form2555/todo/foreign-earned-income.md` §7.
+    //
+    // §911(d)(1)(B)'s physical presence test, together with §911(d)(3)'s tax
+    // home test, in ONE declaration -- because a taxpayer claiming the
+    // exclusion is making both claims at once and neither is worth anything
+    // alone:
+    //
+    // > "I was physically present in a foreign country or countries for at
+    // > least 330 full days during a period of 12 consecutive months, my tax
+    // > home was in a foreign country throughout my qualifying period, and I
+    // > maintained no abode in the United States during that period."
+    //
+    // **The 330-day half is a COUNT**, which is what makes it certifiable at
+    // all: i2555 p3 defines a full day as "the 24-hour period that starts at
+    // midnight", and on any given midnight-to-midnight day a person either was
+    // or was not inside a foreign country. That is the same kind of fact as
+    // `movingExpensesArmedForcesPermanentChangeOfStation`'s military order --
+    // the taxpayer holds the evidence and nobody else does, because no
+    // information return reports travel.
+    //
+    // **The abode half is deliberately NARROWER than §911(d)(3).** The statute
+    // denies a foreign tax home "for any period for which his abode is within
+    // the United States", and i2555 p2 makes that a weighing of "family,
+    // economic, and personal ties" -- a judgement an ordinary taxpayer is not
+    // competent to make, and the instructions' own offshore-oil-rig example is
+    // a filer with well over 330 days abroad who still fails it. So this field
+    // asks for the bright line underneath instead. A filer who kept a home in
+    // the United States may still qualify under the statute; they cannot make
+    // this declaration and are refused, which is the
+    // `notEligibleForAnySubsidizedEmployerHealthPlanInAnyMonth` trade exactly:
+    // a certification easier to state truthfully than the statute is to
+    // satisfy, so everyone who CAN state it truthfully certainly qualifies.
+    //
+    // **§911(d)(1)(A)'s bona fide residence test gets NO field here**, and
+    // that is the decision this phase turned on rather than an omission. It
+    // depends on "your intention about the length and nature of your stay",
+    // and i2555 p3 continues: "If these conflict, your acts carry more weight
+    // than your words." A certification IS words. An instruction whose own
+    // text discounts them cannot be turned into a checkbox, so
+    // `foreignEarnedIncomeBonaFideResidenceTest` refuses by name instead.
+    //
+    // `option(true)`, DOC-12 -- absent means NOT certified. Check 11 below is
+    // what makes absence bite, because unlike the certifications above this
+    // one sits beside stored AMOUNTS on the same dialect.
+    physicallyPresentInAForeignCountryThreeHundredThirtyFullDaysAndNoUnitedStatesAbode: option(true),
+    // Form 2555 line 31/38, and i2555's line 31 instruction defines it
+    // exactly: "the number of days in your qualifying period that fall within
+    // your 2025 tax year. Your qualifying period is the period during which
+    // you meet the tax home test and either the bona fide residence or
+    // physical presence test."
+    //
+    // **Not the 330 full days and not line 16's 12-month window.** A filer
+    // abroad continuously from 2023 to 2027 enters 365 here while their line
+    // 16 window is a 12-month slice; i2555's own example -- a tax home
+    // established August 14 and held past year end -- enters 140.
+    //
+    // `option(number)` on `vnd.fjs.rental_property`'s precedent, where
+    // `fairRentalDays` and `personalUseDays` are day counts and ABSENT is not
+    // zero. Range-checked in check 11 against that dialect's own
+    // {@link daysInTheLongestYear}, for its reason: this dialect does not know
+    // whether the year it names is a leap year, and 366 is the bound that is
+    // safe in every year. The tighter bound -- the actual length of the tax
+    // year -- is `fjs/tax/params`' `foreignEarnedIncome.daysInTaxYear`, and
+    // `fjs/schedule/1` refuses against THAT, because a parameter set is where
+    // a year's own facts live.
+    foreignEarnedIncomeQualifyingDays: option(number),
+    // Form 2555 line 26 -> line 27, the 2025 foreign earned income itself, a
+    // money box. Already NET of line 25's §119 excludable meals and lodging,
+    // exactly as `fjs/form7206`'s line 1 premiums arrive net of that line's
+    // own printed exclusions: the split cannot be recovered downstream, so it
+    // is enforced where the figure is named.
+    foreignEarnedIncome: option(string),
+    // Form 2555 line 44 -- "Deductions allowed in figuring your adjusted gross
+    // income (Form 1040 or 1040-SR, line 11) that are allocable to the
+    // excluded income", which is §911(d)(6) in its deduction half. A money
+    // box, absent meaning $0, which the printed line permits (it is left blank
+    // by every filer with none).
+    //
+    // Understating it OVERSTATES the exclusion, so it is not a safe field to
+    // omit -- which is why check 11 refuses a stored foreign earned income
+    // that arrives without the certification, and why this field exists at all
+    // rather than being assumed away.
+    foreignEarnedIncomeDeductionsAllocableToExcludedIncome: option(string),
+    // The Foreign Earned Income Tax Worksheet's own line 2b, printed
+    // identically in i1040gi p37 (the 1040 line 16 worksheet) and i6251 p10
+    // (the Form 6251 line 7 one): "the total amount of any itemized deductions
+    // or exclusions you couldn't claim because they are related to excluded
+    // income".
+    //
+    // **A DIFFERENT figure from
+    // `foreignEarnedIncomeDeductionsAllocableToExcludedIncome` above, and the
+    // names say which is which.** That one is Form 2555 line 44 -- deductions
+    // taken in figuring ADJUSTED GROSS INCOME, which reduce the exclusion
+    // itself. This one is below the line: itemized deductions and exclusions,
+    // which reduce the amount the tax worksheet stacks the remaining income on
+    // top of. Folding them into one field would subtract the same dollars
+    // twice on two different lines of two different forms.
+    //
+    // Absent means $0, which the printed line permits -- it is left blank by
+    // every filer with none, and every filer taking the standard deduction has
+    // no itemized deduction to be disallowed. Omitting it OVERSTATES the tax
+    // rather than understating it: worksheet line 2c grows, and line 6 is
+    // increasing in line 2c under a progressive schedule. That is the safe
+    // direction and still not a reason to guess, which is why the field exists.
+    foreignEarnedIncomeItemizedDeductionsAndExclusionsNotClaimed: option(string),
 })
 
 /** @typedef {Ts<typeof returnProfileSchema>} ReturnProfile */
@@ -1208,6 +1347,25 @@ const federalPovertyLineTableNames = [
     'hawaii',
 ]
 
+/**
+ * The five Form 2555 fields this dialect carries, walked in check 11's loop so
+ * the declared-kind pairing is written once rather than five times — the
+ * {@link moneyBoxFields} idiom, and what check 7b's own comment says to do
+ * once a third such field arrives.
+ *
+ * Typed `@type {const}` — not a wider `keyof ReturnProfile` annotation — so
+ * `r[field]` resolves to exactly `string | number | true | undefined` rather
+ * than the union of every field's type, the same device {@link moneyBoxFields}
+ * uses.
+ */
+const formTwoFiveFiveFiveFields = /** @type {const} */ ([
+    'physicallyPresentInAForeignCountryThreeHundredThirtyFullDaysAndNoUnitedStatesAbode',
+    'foreignEarnedIncomeQualifyingDays',
+    'foreignEarnedIncome',
+    'foreignEarnedIncomeDeductionsAllocableToExcludedIncome',
+    'foreignEarnedIncomeItemizedDeductionsAndExclusionsNotClaimed',
+])
+
 /** Structural-only validator: checks the shape, not the semantic refinements below. */
 const validateShape = rttiValidate(returnProfileSchema)
 
@@ -1224,6 +1382,9 @@ const moneyBoxFields = /** @type {const} */ ([
     'line35aRefundRequested',
     'line36AppliedToNextYear',
     'scheduleThreeLine10AmountPaidWithExtensionRequest',
+    'foreignEarnedIncome',
+    'foreignEarnedIncomeDeductionsAllocableToExcludedIncome',
+    'foreignEarnedIncomeItemizedDeductionsAndExclusionsNotClaimed',
 ])
 
 /**
@@ -1316,13 +1477,21 @@ const statusesWithoutSpouseBoxes = ['single', 'headOfHousehold', 'qualifyingSurv
  *    three prints.
  * 11. Every dependent's `ageAtYearEnd` is a whole number in
  *    `0 .. {@link oldestPlausibleDependentAge}`.
+ * 12. Every present Form 2555 field has `'foreignEarnedIncomeExclusion'` declared.
+ * 13. A present `foreignEarnedIncomeQualifyingDays` is a whole count no larger
+ *     than {@link daysInTheLongestYear}.
+ * 14. A present `foreignEarnedIncome` carries both §911(d)(1)(B)'s certification
+ *     and a qualifying-day count.
  *
  * This list enumerated 1–8 only, omitting 7b, 9 and 10, from the day check 7b
  * landed until 2026-08-19 — the same documentation drift the leaf-name sweep
  * has now found nine times. The body is the authority; a reader who trusted
  * this list would have concluded that a present §32 fact and a present
  * poverty-line table were unchecked, which is the direction that costs
- * something.
+ * something. **Checks 12 through 14 were written as 11 through 13 on a branch
+ * that could not see check 11**, and are renumbered here rather than
+ * renumbered around: the numbers are cited from this module's own docstrings
+ * and proof-leaf names, and the citations move with them.
  *
  * Nothing here throws: every refusal is an `error(...)` the caller unwraps, so
  * a hostile blob can never escape `validate` as an exception.
@@ -1502,6 +1671,66 @@ export const checkReferences = r => {
             )
         }
     }
+    // 12 — TAX-42: an amount or a day count with no declared kind is exactly
+    // check 7's failure mode on a different line. All four Form 2555 fields
+    // route through ONE loop rather than four `if`s, which is what check 7b's
+    // own comment says to do the day a third arrives: "make it a loop the way
+    // `moneyBoxFields` is one."
+    for (const field of formTwoFiveFiveFiveFields) {
+        if (r[field] !== undefined && !r.declaredKinds.includes('foreignEarnedIncomeExclusion')) {
+            return error(
+                `${field} is present but declaredKinds does not name `
+                + "'foreignEarnedIncomeExclusion'",
+            )
+        }
+    }
+    // 13 — the day count is a whole number of days that could fall inside a
+    // tax year. Bounded by `vnd.fjs.rental_property`'s own
+    // {@link daysInTheLongestYear}, IMPORTED rather than re-declared: 366 in
+    // every year for that dialect's stated reason, which is this dialect's
+    // reason too. The tighter bound — the actual length of THIS tax year — is
+    // `fjs/tax/params`' `foreignEarnedIncome.daysInTaxYear`, and
+    // `fjs/schedule/1` refuses against that; a parameter set is where a year's
+    // own facts live, and this dialect is not.
+    const qualifyingDays = r.foreignEarnedIncomeQualifyingDays
+    if (
+        qualifyingDays !== undefined
+        && (!Number.isInteger(qualifyingDays)
+            || qualifyingDays < 0
+            || qualifyingDays > daysInTheLongestYear)
+    ) {
+        return error(
+            `foreignEarnedIncomeQualifyingDays must be a whole count of days from 0 to `
+            + `${daysInTheLongestYear}: ${qualifyingDays}`,
+        )
+    }
+    // 14 — §911(a) allows the exclusion only to a "qualified individual", and
+    // §911(b)(2)(A) prorates it by the qualifying period. A stored foreign
+    // earned income without BOTH is an amount this engine could only exclude
+    // by assuming a qualification nobody claimed or a day count nobody
+    // supplied — and assuming 365 days would hand a filer who qualified for
+    // three months the whole $130,000.
+    //
+    // Refused HERE rather than at the form, because both missing facts are
+    // visible on this one document and a refusal at ingest names the document
+    // the taxpayer must fix.
+    if (r.foreignEarnedIncome !== undefined) {
+        if (r.physicallyPresentInAForeignCountryThreeHundredThirtyFullDaysAndNoUnitedStatesAbode === undefined) {
+            return error(
+                'foreignEarnedIncome is present but '
+                + 'physicallyPresentInAForeignCountryThreeHundredThirtyFullDaysAndNoUnitedStatesAbode '
+                + 'is not declared: §911(d)(1)(A) bona fide residence is a refused kind, so the '
+                + 'physical presence test is the only route to the exclusion this engine models',
+            )
+        }
+        if (qualifyingDays === undefined) {
+            return error(
+                'foreignEarnedIncome is present but foreignEarnedIncomeQualifyingDays is absent: '
+                + 'Form 2555 line 38 prorates the exclusion by the qualifying days that fall '
+                + 'within the tax year, and an absent count is not 365',
+            )
+        }
+    }
     return ok(r)
 }
 
@@ -1569,7 +1798,13 @@ const generatedMoneyBoxExactnessProof = Object.fromEntries(
         () => {
             const [t, v] = validate({
                 ...minimal,
-                declaredKinds: ['estimatedTaxPayments', 'amountPaidWithExtensionRequest'],
+                declaredKinds: [
+                    'estimatedTaxPayments',
+                    'amountPaidWithExtensionRequest',
+                    'foreignEarnedIncomeExclusion',
+                ],
+                physicallyPresentInAForeignCountryThreeHundredThirtyFullDaysAndNoUnitedStatesAbode: true,
+                foreignEarnedIncomeQualifyingDays: 365,
                 [field]: '1,234.56',
             })
             assertEq(t, 'error', ['expected a comma-grouped amount in this box to be refused', field, t, v])
@@ -1671,9 +1906,27 @@ const expectedEarnedIncomeCreditFactFieldCount = 10
  * `scheduleThreeLine10AmountPaidWithExtensionRequest`: the FIRST money box on
  * this dialect that is not a 1040 line, and the fourth figure this engine
  * takes from the taxpayer because no information return states it.
+ *
+ * `5 -> 8` is TAX-42's three — Form 2555 lines 26 and 44, and the Foreign
+ * Earned Income Tax Worksheet's own line 2b. The first money boxes here that
+ * are not a 1040 or a schedule line at all, but a form's and a worksheet's.
+ * They are on this dialect for the reason their own comments give: there is no
+ * information return for foreign earned income anywhere.
  * @type {number}
  */
-const expectedMoneyBoxFieldCount = 5
+const expectedMoneyBoxFieldCount = 8
+
+/**
+ * Independently hand-typed: the number of Form 2555 fields
+ * {@link formTwoFiveFiveFiveFields} names today, and therefore the number
+ * check 11's loop walks. Deliberately NOT `formTwoFiveFiveFiveFields.length`,
+ * for {@link expectedMoneyBoxFieldCount}'s reason — a field dropped from that
+ * list would vanish from the loop AND from
+ * `everyFormTwoFiveFiveFiveFieldNeedsTheDeclaredKind`'s own five cases in the
+ * same instant, and neither would notice. This constant is what does.
+ * @type {number}
+ */
+const expectedFormTwoFiveFiveFiveFieldCount = 5
 
 /**
  * Independently hand-typed: the size of the frozen {@link kindVocabulary},
@@ -1771,18 +2024,43 @@ const expectedMoneyBoxFieldCount = 5
  * form which are not. Both join `unmodeledKindRefusals`; nothing joins
  * `modeledKinds`, and nothing is reclassified. Before it, a futures trader
  * had no kind at all to declare and fell through the scope guard entirely.
+ *
+ * **197 -> 201 is TAX-42's**, and it is a SPLIT rather than a widening:
+ * `foreignEarnedIncomeForm2555` named three printed destinations under one
+ * row on the stated ground that "one form produces them", and that was right
+ * while nothing was modelled and wrong the moment something was. It becomes
+ * four — `foreignEarnedIncomeExclusion` (modeled),
+ * `foreignEarnedIncomeBonaFideResidenceTest`,
+ * `foreignHousingExclusionOrDeduction`,
+ * `foreignEarnedIncomeReceivedInAnotherTaxYear` and
+ * `foreignEarnedIncomeCapitalGainExcess` (all refused) — so `197 - 1 + 5`.
+ * The four refusals have four unrelated blockers, and under the old row a
+ * filer with no housing claim was refused by a sentence about a table they
+ * never needed.
+ *
+ * **The last of the four is a CONDITION this engine detects, not a fact a
+ * filer would think to declare** — and that is not new here. `fjs/tax/line16`
+ * has raised `childsUnearnedIncomeForm8615` and `investmentInterestForm4952`
+ * off computed conditions since Phase 10; a kind is a thing the engine can
+ * NAME, and being declarable is what most of them additionally are.
  * @type {number}
  */
-const expectedKindCount = 197
+const expectedKindCount = 201
 
 export const proof = {
     dialectAndMediaType: () => {
         assertEq(dialect, 'vnd.fjs.return_profile')
         assertEq(mediaType, 'application/vnd.fjs.return_profile+json')
     },
-    kindVocabularyIsExactlyOneHundredAndNinetySeven: () => {
+    kindVocabularyIsExactlyTwoHundredAndOne: () => {
         assertEq(kindVocabulary.length, expectedKindCount)
         assertEq(new Set(kindVocabulary).size, kindVocabulary.length)
+    },
+    thereAreExactlyFiveFormTwoFiveFiveFiveFields: () => {
+        assertEq(formTwoFiveFiveFiveFields.length, expectedFormTwoFiveFiveFiveFieldCount)
+        assertEq(
+            new Set(formTwoFiveFiveFiveFields).size, formTwoFiveFiveFiveFields.length,
+            'and each is named once')
     },
     validate: {
         minimalValidates: () => {
@@ -2127,6 +2405,135 @@ export const proof = {
                     section904jElectionAllForeignIncomeIsQualifiedPassiveIncome: false,
                 })
                 assertEq(t, 'error')
+            },
+            // ── TAX-42: Form 2555's four checks ─────────────────────────
+            //
+            // The whole set, on a return that declares the kind and states
+            // every fact — the shape `fjs/form1040/core` actually receives.
+            formTwoFiveFiveFiveFieldsValidateTogether: () => {
+                const [t, v] = validate({
+                    ...minimal,
+                    declaredKinds: ['foreignEarnedIncomeExclusion'],
+                    physicallyPresentInAForeignCountryThreeHundredThirtyFullDaysAndNoUnitedStatesAbode: true,
+                    foreignEarnedIncomeQualifyingDays: 140,
+                    foreignEarnedIncome: '150000.00',
+                    foreignEarnedIncomeDeductionsAllocableToExcludedIncome: '4000.00',
+                    foreignEarnedIncomeItemizedDeductionsAndExclusionsNotClaimed: '1200.00',
+                })
+                assert(t === 'ok', ['a complete Form 2555 profile must validate', t, v])
+                assertEq(v.foreignEarnedIncomeQualifyingDays, 140)
+                assertEq(v.foreignEarnedIncome, '150000.00')
+            },
+            // DOC-12: a structural `false` on the certification is REJECTED,
+            // never read as "not certified" — the discipline every other
+            // checkbox on this dialect follows.
+            thePhysicalPresenceCertificationRejectsAStoredFalse: () => {
+                const [t] = validate({
+                    ...minimal,
+                    declaredKinds: ['foreignEarnedIncomeExclusion'],
+                    physicallyPresentInAForeignCountryThreeHundredThirtyFullDaysAndNoUnitedStatesAbode: false,
+                })
+                assertEq(t, 'error')
+            },
+            // Check 11 — every one of the five, one at a time, so a field
+            // silently dropped from `formTwoFiveFiveFiveFields` reddens here
+            // rather than passing because a NEIGHBOUR is still in the loop.
+            // The `formTwoFiveFiveFiveFieldCount` leaf below is what catches a
+            // field dropped from the LOOP as well as from this list.
+            everyFormTwoFiveFiveFiveFieldNeedsTheDeclaredKind: () => {
+                /** @type {readonly (readonly [string, string | number | true])[]} */
+                const cases = [
+                    ['physicallyPresentInAForeignCountryThreeHundredThirtyFullDaysAndNoUnitedStatesAbode', true],
+                    ['foreignEarnedIncomeQualifyingDays', 365],
+                    ['foreignEarnedIncome', '90000.00'],
+                    ['foreignEarnedIncomeDeductionsAllocableToExcludedIncome', '100.00'],
+                    ['foreignEarnedIncomeItemizedDeductionsAndExclusionsNotClaimed', '100.00'],
+                ]
+                assertEq(cases.length, 5, 'five Form 2555 fields, hand-counted')
+                for (const [field, value] of cases) {
+                    const [t, v] = validate({ ...minimal, [field]: value })
+                    assertEq(t, 'error', ['an unstated kind must refuse this field', field, v])
+                    assert(typeof v === 'string', ['expected a semantic refusal', field, v])
+                    assert(
+                        v.includes(field) && v.includes('foreignEarnedIncomeExclusion'),
+                        ['the refusal must name the field and the kind', field, v])
+                }
+            },
+            // THE CONTROL for the loop above: with the kind declared, each of
+            // the five validates on its own. Without this, a check 11 that
+            // refused unconditionally would pass every assertion above.
+            controlEachFormTwoFiveFiveFiveFieldValidatesWithTheKindDeclared: () => {
+                const base = {
+                    ...minimal,
+                    declaredKinds: ['foreignEarnedIncomeExclusion'],
+                    physicallyPresentInAForeignCountryThreeHundredThirtyFullDaysAndNoUnitedStatesAbode: true,
+                    foreignEarnedIncomeQualifyingDays: 365,
+                }
+                for (const field of [
+                    'foreignEarnedIncomeDeductionsAllocableToExcludedIncome',
+                    'foreignEarnedIncomeItemizedDeductionsAndExclusionsNotClaimed',
+                ]) {
+                    const [t, v] = validate({ ...base, [field]: '100.00' })
+                    assert(t === 'ok', ['the declared kind must admit this field', field, v])
+                }
+                const [t] = validate(base)
+                assertEq(t, 'ok', 'and the certification with a day count alone validates')
+            },
+            // Check 12 — the day count's own boundaries, against
+            // `vnd.fjs.rental_property`'s imported `daysInTheLongestYear`.
+            // 366 is admitted and 367 is not, because this dialect does not
+            // know whether the year it names is a leap year; the TIGHTER bound
+            // is `fjs/form1040/core`'s, against the parameter set.
+            theQualifyingDayCountIsRangeChecked: () => {
+                const base = {
+                    ...minimal,
+                    declaredKinds: ['foreignEarnedIncomeExclusion'],
+                }
+                assertEq(validate({ ...base, foreignEarnedIncomeQualifyingDays: 0 })[0], 'ok')
+                assertEq(validate({ ...base, foreignEarnedIncomeQualifyingDays: 366 })[0], 'ok')
+                assertEq(validate({ ...base, foreignEarnedIncomeQualifyingDays: 367 })[0], 'error')
+                assertEq(validate({ ...base, foreignEarnedIncomeQualifyingDays: -1 })[0], 'error')
+                assertEq(validate({ ...base, foreignEarnedIncomeQualifyingDays: 140.5 })[0], 'error')
+            },
+            // Check 13 — a stored foreign earned income needs BOTH the
+            // certification and a day count. Two separate refusals, each
+            // naming what is missing, because a filer told only "something is
+            // wrong" cannot act.
+            aStoredForeignEarnedIncomeNeedsTheCertificationAndTheDayCount: () => {
+                const declared = {
+                    ...minimal,
+                    declaredKinds: ['foreignEarnedIncomeExclusion'],
+                    foreignEarnedIncome: '90000.00',
+                }
+                const [t1, v1] = validate({ ...declared, foreignEarnedIncomeQualifyingDays: 365 })
+                assertEq(t1, 'error', 'no certification')
+                assert(
+                    typeof v1 === 'string' && v1.includes('physicallyPresent'),
+                    ['the refusal must name the certification', v1])
+                const [t2, v2] = validate({
+                    ...declared,
+                    physicallyPresentInAForeignCountryThreeHundredThirtyFullDaysAndNoUnitedStatesAbode: true,
+                })
+                assertEq(t2, 'error', 'no day count')
+                assert(
+                    typeof v2 === 'string' && v2.includes('foreignEarnedIncomeQualifyingDays'),
+                    ['the refusal must name the missing day count', v2])
+                assert(
+                    typeof v2 === 'string' && v2.includes('is not 365'),
+                    ['and say why an absent count is not a full year', v2])
+            },
+            // THE CONTROL: the certification and a day count WITHOUT an amount
+            // is an ordinary return — a filer who qualified and earned nothing
+            // abroad. Without this, a check 13 that refused the certification
+            // itself would pass every assertion above.
+            controlTheCertificationWithNoAmountValidates: () => {
+                const [t, v] = validate({
+                    ...minimal,
+                    declaredKinds: ['foreignEarnedIncomeExclusion'],
+                    physicallyPresentInAForeignCountryThreeHundredThirtyFullDaysAndNoUnitedStatesAbode: true,
+                    foreignEarnedIncomeQualifyingDays: 200,
+                })
+                assert(t === 'ok', ['qualifying and earning nothing is an ordinary return', t, v])
             },
             eachExtensionAndEstimatedGuardWatchesItsOwnKind: () => {
                 const [t1] = validate({

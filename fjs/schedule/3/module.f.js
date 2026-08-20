@@ -627,14 +627,74 @@ const foreignTaxSources = divForms => intForms => [
  * creditable foreign taxes, full stop. So it is lifted out, run ONCE, and
  * handed to both schedules, the same "one execution, two destinations" shape
  * `form8863` and `form8959` already have.
- * @type {(taxParamSet: TaxParamSet) => (status: IndividualFilingStatus) => (profile: Stored<ReturnProfile>) => (divForms: readonly Stored<OneZeroNineNineDiv>[]) => (intForms: readonly Stored<OneZeroNineNineInt>[]) => ForeignTaxCreditOutcome}
+ * ## §911(d)(6) — the ONE combination this line refuses outright (TAX-42)
+ *
+ * *"No deduction or exclusion from gross income under this subtitle or credit
+ * against the tax imposed by this chapter … shall be allowed to the extent
+ * such deduction, exclusion, or credit is properly allocable to or chargeable
+ * against amounts excluded from gross income under subsection (a)."* i2555 p3
+ * restates it: *"You can't take a credit or deduction for foreign income taxes
+ * paid or accrued on income that is excluded under either of the exclusions."*
+ *
+ * **Two independent reasons, and each alone would be enough.**
+ *
+ * 1. §911(d)(6) needs the foreign tax SPLIT between excluded and non-excluded
+ *    income — Pub. 514's allocation. No stored document states the split, and
+ *    §904(j) offers no shortcut for it.
+ * 2. §904(j) is the ONLY route to this line that this engine computes, and its
+ *    election asserts that *every dollar of my foreign-source gross income is
+ *    qualified passive income under §904(d)(2)(B)*. Foreign EARNED income is
+ *    compensation for personal services — general category, never passive — so
+ *    the election is not truthfully available to a §911 filer at all.
+ *
+ * **It fires whether or not the election was made, and a surviving mutation is
+ * why.** Gating it on `elected` left the whole suite green, and the reason it
+ * did is worse than a missing test: a §911 filer holding a stored foreign tax
+ * and NOT electing would have been sent to *"declare
+ * section904jElectionAllForeignIncomeIsQualifiedPassiveIncome"* — a remedy
+ * that walks them straight into this refusal on their next run. **A remedy
+ * that cannot be followed is worse than no remedy**, so the check reads the
+ * exclusion and the stored tax alone.
+ *
+ * The refusal is message-only rather than an `fjs/return/scope` kind, on
+ * `fjs/schedule/1`'s Rev. Proc. 2014-41 precedent: both halves are separately
+ * modeled kinds and it is their COMBINATION that this engine cannot compute,
+ * which is not a thing a taxpayer declares.
+ * @type {(taxParamSet: TaxParamSet) => (status: IndividualFilingStatus) => (profile: Stored<ReturnProfile>) => (divForms: readonly Stored<OneZeroNineNineDiv>[]) => (intForms: readonly Stored<OneZeroNineNineInt>[]) => (form2555ExclusionCents: bigint) => ForeignTaxCreditOutcome}
  */
-export const foreignTaxCreditLine = taxParamSet => status => profile => divForms => intForms => {
+export const foreignTaxCreditLine = taxParamSet => status => profile => divForms => intForms => form2555ExclusionCents => {
     const rule = 'Schedule 3 line 1 (foreign tax credit, §904(j) election -> 1040 line 20)'
     const sources = foreignTaxSources(divForms)(intForms)
     const total = sumSources(sources)
     const elected
         = profile.value.section904jElectionAllForeignIncomeIsQualifiedPassiveIncome === true
+    // §911(d)(6), checked BEFORE the election's own two refusals and WITHOUT
+    // reading `elected` — see this module's own docstring on the mutation that
+    // established the second half. Both later refusals name a remedy a §911
+    // filer cannot follow: one tells them to make an election that is not
+    // truthfully available to them, and the other sends them to Form 1116 for
+    // a credit §911(d)(6) denies outright.
+    //
+    // Gated on `total > 0n` for the reason the two refusals below are: with no
+    // foreign tax stored there is no credit to deny, and a broker's
+    // zero-filled box 7 must not refuse an ordinary expatriate return.
+    if (total > 0n && form2555ExclusionCents !== 0n) {
+        return {
+            kind: 'error',
+            message: `Schedule 3 line 1: this return excludes `
+                + `${centsToString(form2555ExclusionCents)} of foreign earned income under §911 `
+                + `AND elects §904(j). §911(d)(6) denies any credit "properly allocable to or `
+                + `chargeable against amounts excluded", so the foreign tax would first have to `
+                + `be split between excluded and non-excluded income under Pub. 514 — a split no `
+                + `document this engine holds states. §904(j) is the only route to this line `
+                + `this engine computes, and its election asserts that the ENTIRE foreign-source `
+                + `gross income is qualified PASSIVE income — foreign earned income is `
+                + `compensation for personal services, which is general-category income and `
+                + `never passive, so that election is not truthfully available here either. `
+                + `Refusing rather than crediting a foreign tax paid on income this return `
+                + `already excluded. Nothing reaches 1040 line 20`,
+        }
+    }
     // A present box reading `'0.00'` still CITES its document (DOC-11), and
     // needs no election: there is no credit to elect for. Gating the two
     // refusals on `total > 0n` rather than on the sources being non-empty is
@@ -733,6 +793,7 @@ export const foreignTaxCreditLine = taxParamSet => status => profile => divForms
  *   readonly foreignTaxCreditLine1: ReportLine,
  *   readonly netPremiumTaxCreditLine9: ReportLine,
  *   readonly dependentCareCreditLine2: ReportLine,
+ *   readonly form2555ExclusionCents: bigint,
  * }} ScheduleThreeInput
  */
 
@@ -755,7 +816,7 @@ export const scheduleThree = taxParamSet => input => {
     const {
         profile, status, agiCents, line18Cents, w2Forms, creditForms, tuitionForms,
         aStored1099RProvesADistribution, foreignTaxCreditLine1, netPremiumTaxCreditLine9,
-        dependentCareCreditLine2,
+        dependentCareCreditLine2, form2555ExclusionCents,
     } = input
     const zero = profileDeclaredZeroLine(profile)
     const fromDocuments = documentLine(profile)
@@ -854,6 +915,9 @@ export const scheduleThree = taxParamSet => input => {
         })
     }
     const educationOutcome = form8863(taxParamSet)({
+        // TAX-42: §911's exclusion is a live add-back inside Form 8863's own
+        // modified adjusted gross income (its line 3), not a documented zero.
+        form2555ExclusionCents,
         status,
         agiCents,
         students,
@@ -1079,6 +1143,7 @@ const profileNoDeclaredKinds = { documentHash: 'profile-hash-0001', value: minim
 /** @type {(overrides: Partial<ScheduleThreeInput>) => ScheduleThreeInput} */
 const baseInput = overrides => ({
     profile: profileNoDeclaredKinds,
+    form2555ExclusionCents: 0n,
     // Schedule 3 line 1 as `fjs/form1040/core` hands it in for a return with
     // no foreign tax anywhere: the profile-declared zero
     // {@link foreignTaxCreditLine} itself returns for that case, written out
@@ -1199,11 +1264,13 @@ const profileElectingSection904j = {
     },
 }
 
-/** Runs {@link foreignTaxCreditLine} for TY2025 against a filing status.
+/** Runs {@link foreignTaxCreditLine} for TY2025 against a filing status, with
+ * NO §911 exclusion — the ordinary case every leaf below the TAX-42 block
+ * exercises. The exclusion is supplied explicitly where it matters.
  * @type {(status: IndividualFilingStatus) => (profile: Stored<ReturnProfile>) => (divForms: readonly Stored<OneZeroNineNineDiv>[]) => (intForms: readonly Stored<OneZeroNineNineInt>[]) => ForeignTaxCreditOutcome}
  */
 const foreignCredit = status => profile => divForms => intForms =>
-    foreignTaxCreditLine(taxParams2025)(status)(profile)(divForms)(intForms)
+    foreignTaxCreditLine(taxParams2025)(status)(profile)(divForms)(intForms)(0n)
 
 /** Narrows {@link foreignTaxCreditLine}'s outcome to its computed line.
  * @type {(outcome: ForeignTaxCreditOutcome) => ReportLine}
@@ -1441,6 +1508,74 @@ export const proof = {
     // $600.00) are likewise hand-typed here rather than read from the
     // parameter under test, and the boundary leaves straddle each to the
     // cent. Value and citation by SEPARATE leaves.
+    // ── §911(d)(6): the exclusion and the §904(j) election (TAX-42) ─────────
+    sectionNineOneOneDenialOfTheForeignTaxCredit: {
+        theElectionBesideAnExclusionRefuses: () => {
+            const outcome = foreignTaxCreditLine(taxParams2025)('single')(
+                profileElectingSection904j)(
+                [dividendWithForeignTax('sha256-div-911')('47.00')])([])(13000000n)
+            assert(outcome.kind === 'error', ['expected a refusal', outcome])
+            const message = foreignCreditRefusal(outcome)
+            assert(message.includes('130000.00'), ['naming the exclusion', message])
+            assert(message.includes('§911(d)(6)'), ['and the statute', message])
+            assert(message.includes('passive'), ['and the contradiction in the election', message])
+            assert(
+                message.includes('1040 line 20'),
+                ['and where the amount would have gone', message])
+        },
+        // It fires WHATEVER the amounts are — even far above §904(j)(2)(B)'s
+        // ceiling, and ahead of the refusal that would otherwise send the
+        // filer to Form 1116 for a credit §911(d)(6) denies outright.
+        itFiresAheadOfTheCeilingRefusal: () => {
+            const message = foreignCreditRefusal(foreignTaxCreditLine(taxParams2025)('single')(
+                profileElectingSection904j)(
+                [dividendWithForeignTax('sha256-div-911-big')('5000.00')])([])(1n))
+            assert(message.includes('§911(d)(6)'), ['§911(d)(6) wins over the ceiling', message])
+            assert(
+                !message.includes('Form 1116'),
+                ['and the ceiling refusal must not be the one reported', message])
+        },
+        // **…and ahead of the NOT-ELECTED refusal, which is the arm a
+        // surviving mutation found.** Gating this check on `elected` left the
+        // suite green: a §911 filer who had not elected was sent to declare
+        // the election, and declaring it lands them here. This leaf asserts
+        // the remedy they are given is one they can actually follow.
+        itFiresAheadOfTheNotElectedRefusal: () => {
+            const message = foreignCreditRefusal(foreignTaxCreditLine(taxParams2025)('single')(
+                profileNoDeclaredKinds)(
+                [dividendWithForeignTax('sha256-div-911-unelected')('47.00')])([])(13000000n))
+            assert(message.includes('§911(d)(6)'), ['§911(d)(6) wins', message])
+            assert(
+                !message.includes('Declare section904jElection'),
+                ['and must NOT tell a §911 filer to make an election they cannot make', message])
+        },
+        // THE CONTROLS, both directions. The election alone still credits, and
+        // an exclusion WITHOUT a stored foreign tax is an ordinary return —
+        // only the combination refuses.
+        // THE CONTROL for the leaf above: the same unelected return WITHOUT a
+        // §911 exclusion still gets the ordinary "declare the election"
+        // refusal, so the mutation above measured the ordering rather than the
+        // disappearance of a refusal.
+        controlAnUnelectedReturnWithNoExclusionStillGetsTheElectionRefusal: () => {
+            const message = foreignCreditRefusal(foreignTaxCreditLine(taxParams2025)('single')(
+                profileNoDeclaredKinds)(
+                [dividendWithForeignTax('sha256-div-911-unelected-control')('47.00')])([])(0n))
+            assert(
+                message.includes('Declare section904jElection'),
+                ['the ordinary unelected refusal must survive', message])
+        },
+        controlTheElectionAloneStillCredits: () => {
+            const line = foreignCreditLine(foreignTaxCreditLine(taxParams2025)('single')(
+                profileElectingSection904j)(
+                [dividendWithForeignTax('sha256-div-911-control')('47.00')])([])(0n))
+            assertEq(line.value, 4700n, '$47.00, exactly as without §911')
+        },
+        controlAnExclusionWithNoForeignTaxComputes: () => {
+            const outcome = foreignTaxCreditLine(taxParams2025)('single')(
+                profileElectingSection904j)([])([])(13000000n)
+            assertEq(outcome.kind, 'ok', ['no foreign tax, nothing to deny', outcome])
+        },
+    },
     lineOneForeignTaxCredit: {
         // The motivating taxpayer: one international index fund, $47.00 of
         // foreign tax withheld inside it, and the §904(j) election made.

@@ -321,6 +321,8 @@ const min = a => b => a < b ? a : b
  *   readonly scheduleD19Cents: bigint,
  *   readonly regularPreferentialWorksheet:
  *     RegularPreferentialWorksheet | NoRegularPreferentialWorksheet,
+ *   readonly form2555ExclusionCents: bigint,
+ *   readonly form2555ItemizedDeductionsAndExclusionsNotClaimedCents: bigint,
  * }} Form6251Input
  */
 
@@ -428,6 +430,38 @@ const noRegularPreferentialWorksheetRefusal = {
         + `Refusing rather than substituting a zero: every one of those lines feeds a `
         + `preferential band, so a wrong zero would tax capital gain at 26% or 28% inside the `
         + `alternative minimum tax and OVERSTATE the tax, which is a confident wrong answer.`,
+}
+
+/**
+ * The refusal a §911 exclusion forces on a return whose alternative minimum
+ * taxable income exceeds the exemption AND which reports preferential income.
+ *
+ * A CONSTANT rather than a function, on
+ * {@link noRegularPreferentialWorksheetRefusal}'s own reasoning: there is no
+ * document to name, and what the reader needs is the condition and the way
+ * out, which are the same for every return that hits it.
+ *
+ * **The population it costs is narrow, deliberately.** i6251's worksheet
+ * begins *"If Form 6251, line 6, is zero, don't complete this worksheet"*, and
+ * line 6 is alternative minimum taxable income LESS the exemption — $88,100
+ * single, $137,000 joint for 2025. So an expatriate whose AMTI stays under the
+ * exemption is untouched by this, whatever their preferential income; only a
+ * filer above it, WITH qualified dividends or capital gain, lands here.
+ * @type {Form6251Error}
+ */
+const formTwoFiveFiveFiveWithPartThreeRefusal = {
+    kind: 'error',
+    message: `Form 6251 line 7: this return excludes foreign earned income under §911 and `
+        + `reports qualified dividends or capital gain, and its line 6 is more than zero. `
+        + `i6251's Foreign Earned Income Tax Worksheet then routes line 7 through Part III `
+        + `"with certain modifications" — its lines 20 and 27 read the REGULAR tax's own `
+        + `preferential worksheet, or, where none was completed, line 3 of the Foreign Earned `
+        + `Income Tax Worksheet in the Instructions for Form 1040. This engine has not `
+        + `transcribed those modifications, and the flat 26%/28% bound this module normally `
+        + `leans on does NOT hold once the excluded income is stacked underneath: Part III's `
+        + `line 39 would be figured on the worksheet's line 3 rather than on line 6. Refusing `
+        + `rather than short-circuiting to $0.00 and understating the alternative minimum tax. `
+        + `Nothing reaches Schedule 2 line 2`,
 }
 
 // ── Line 2i: the incentive stock option spread ──────────────────────────────
@@ -565,6 +599,7 @@ export const form6251 = taxParamSet => input => {
         qualifiedDividendsCents, capitalGainDistributionsCents,
         filingScheduleD, scheduleD15Cents, scheduleD16Cents, scheduleD19Cents,
         regularPreferentialWorksheet,
+        form2555ExclusionCents, form2555ItemizedDeductionsAndExclusionsNotClaimedCents,
     } = input
     const { alternativeMinimumTax } = taxParamSet
 
@@ -789,7 +824,35 @@ export const form6251 = taxParamSet => input => {
     //    because this form prints it THREE times -- here and at Part III's
     //    lines 18 and 39 -- and three copies is "one rule, one place" with
     //    three ways to rot.
-    const flatTwentySixTwentyEight = twentySixTwentyEightPercentTax(taxParamSet)(status)(line6)
+    //    **TAX-42: with a §911 exclusion, line 7 is the Foreign Earned Income
+    //    Tax Worksheet's line 6, not this flat figure applied to line 6.**
+    //    i6251 p10 prints its own worksheet for exactly this line, and its
+    //    lines 4 and 5 are the "All others" bullet above applied to two
+    //    DIFFERENT amounts — the excluded income stacked on line 6, less the
+    //    excluded income alone.
+    //
+    //    Its `Before you begin` is what makes the ordering here right: *"If
+    //    Form 6251, line 6, is zero, don't complete this worksheet."* The
+    //    zero-line-6 short circuit above has already returned, so every path
+    //    that reaches this line has a positive line 6.
+    //
+    //    Lines 1 through 3 of that worksheet, in its own numbering:
+    //      1.  Form 6251 line 6
+    //      2a. Form 2555 lines 45 and 50 (line 50 is refused, hence zero)
+    //      2b. itemized deductions or exclusions related to excluded income
+    //      2c. 2a − 2b, floored at zero
+    //      3.  1 + 2c
+    const worksheetLine2a = form2555ExclusionCents
+    const worksheetLine2b = form2555ItemizedDeductionsAndExclusionsNotClaimedCents
+    const worksheetLine2c = max(worksheetLine2a - worksheetLine2b)(0n)
+    const flatOn = twentySixTwentyEightPercentTax(taxParamSet)(status)
+    //    Written as ONE expression rather than an `if`: at a zero line 2c the
+    //    worksheet's line 4 and line 5 differ by exactly `flatOn(line6)`,
+    //    since `flatOn(0n)` is zero — so the general form already IS the
+    //    ordinary answer, and `theWorksheetIsANoOpWithNoExclusion` is the leaf
+    //    that says so rather than a comment claiming it.
+    const flatTwentySixTwentyEight
+        = flatOn(line6 + worksheetLine2c) - flatOn(worksheetLine2c)
 
     // 8. "Alternative minimum tax foreign tax credit." EQUAL to Schedule 3
     //    line 1, and this was a documented zero until TAX-36 made that line
@@ -829,6 +892,22 @@ export const form6251 = taxParamSet => input => {
         || scheduleDLinesFifteenAndSixteenAreBothGains
 
     if (partThreeRequired) {
+        // **TAX-42's one refusal on this form.** With a §911 exclusion in
+        // play, Part III is not the Part III this module computes: i6251 p10's
+        // worksheet line 4 says to put its OWN line 3 on Form 6251 line 12 and
+        // then "see Form 2555, later, to see if you must complete Part III
+        // with certain modifications" — and p13's `Form 2555` notes under Line
+        // 20 and Line 27 redirect both to the regular tax's worksheets, or,
+        // failing those, to line 3 of the 1040 instructions' Foreign Earned
+        // Income Tax Worksheet.
+        //
+        // Every bound below rests on line 39 being `flatOn(line 12)` with line
+        // 12 equal to line 6, and with the exclusion it is neither. So this
+        // refuses BEFORE the bound rather than after it: a bound that no
+        // longer holds would short-circuit to $0.00 and understate the tax.
+        if (worksheetLine2c !== 0n) {
+            return formTwoFiveFiveFiveWithPartThreeRefusal
+        }
         // Part III line 40 is "the SMALLER of line 38 or line 39", and line 39
         // is exactly this flat computation applied to line 12, which is line
         // 6. So Part III's answer can only be LOWER. If the flat figure
@@ -995,6 +1074,8 @@ const beneficiaryK1 = hash => box12 => ({
 const nothing = {
     status: 'single',
     amtDepreciationAdjustmentCents: 0n,
+    form2555ExclusionCents: 0n,
+    form2555ItemizedDeductionsAndExclusionsNotClaimedCents: 0n,
     adjustedGrossIncomeCents: 0n,
     totalDeductionsCents: 0n,
     scheduleOneALine37Cents: 0n,
@@ -1067,6 +1148,122 @@ const expectOk = outcome => {
 const singleStandardDeduction = 1575000n
 
 export const proof = {
+    // ── i6251 p10's Foreign Earned Income Tax Worksheet—Line 7 (TAX-42) ─────
+    //
+    // A single filer with $250,000.00 of adjusted gross income and the
+    // standard deduction, hand-computed against Rev. Proc. 2024-40 §2.11 and
+    // §55(b)(1)'s two rates:
+    //
+    //   line 4 (AMTI) = $234,250.00 taxable income + $15,750.00 added back
+    //                 = $250,000.00
+    //   line 5        = $88,100.00 (below the $626,350.00 phase-out threshold)
+    //   line 6        = $161,900.00
+    //
+    // With a $130,000.00 exclusion the worksheet's line 3 is $291,900.00:
+    //   line 4 = 26%×239,100 = 62,166.00 + 28%×52,800 = 14,784.00 → $76,950.00
+    //   line 5 = 26%×130,000                          →           $33,800.00
+    //   line 6 = 76,950.00 − 33,800.00                →           $43,150.00
+    //
+    // Without it, line 7 is 26% × 161,900.00 = $42,094.00 — so ignoring the
+    // worksheet UNDERSTATES the tentative minimum tax by $1,056.00, in the
+    // taxpayer's favour, which is why it is implemented rather than skipped.
+    foreignEarnedIncomeTaxWorksheetForLineSeven: {
+        theExclusionStacksUnderneathTheAlternativeMinimumTax: () => {
+            const base = wageReturn(25000000n)(singleStandardDeduction)(0n)
+            const without = expectOk(run(base))
+            assertEq(without.line6, 16190000n, '$250,000.00 − $88,100.00')
+            assertEq(without.line7, 4209400n, '26% of $161,900.00')
+            const withExclusion = expectOk(run({ ...base, form2555ExclusionCents: 13000000n }))
+            assertEq(withExclusion.line6, 16190000n, 'line 6 itself does not move')
+            assertEq(withExclusion.line7, 4315000n, '$76,950.00 − $33,800.00')
+            assert(
+                withExclusion.line7 !== without.line7,
+                ['the worksheet must move line 7', withExclusion.line7])
+        },
+        // THE CONTROL, and the one that makes the single-expression form above
+        // safe: with no exclusion the worksheet is `flatOn(line6) − flatOn(0)`,
+        // and `flatOn(0)` is zero, so it IS the ordinary answer rather than a
+        // second code path that happens to agree.
+        theWorksheetIsANoOpWithNoExclusion: () => {
+            const base = wageReturn(25000000n)(singleStandardDeduction)(0n)
+            assertEq(
+                expectOk(run({ ...base, form2555ExclusionCents: 0n })).line7,
+                expectOk(run(base)).line7)
+        },
+        // Worksheet line 2b reduces the stack. $30,000.00 of itemized
+        // deductions related to the excluded income puts line 2c at
+        // $100,000.00 and line 3 at $261,900.00:
+        //   line 4 = 28%×261,900 − 4,782 = 73,332.00 − 4,782.00 = $68,550.00
+        //   line 5 = 26%×100,000                                = $26,000.00
+        //   line 6 = 68,550.00 − 26,000.00                      = $42,550.00
+        lineTwoBReducesTheStack: () => {
+            const result = expectOk(run({
+                ...wageReturn(25000000n)(singleStandardDeduction)(0n),
+                form2555ExclusionCents: 13000000n,
+                form2555ItemizedDeductionsAndExclusionsNotClaimedCents: 3000000n,
+            }))
+            assertEq(result.line7, 4255000n, '$68,550.00 − $26,000.00 = $42,550.00')
+            assert(
+                result.line7 !== 4315000n,
+                ['ignoring line 2b would leave $43,150.00', result.line7])
+        },
+        // The worksheet's own `Before you begin`: "If Form 6251, line 6, is
+        // zero, don't complete this worksheet." A $50,000.00 salary puts AMTI
+        // below the $88,100.00 exemption, so line 6 is zero and the exclusion
+        // — however large — changes nothing. **This is the arm every ordinary
+        // expatriate return takes**, and it is why the refusal below costs so
+        // little.
+        aZeroLineSixIgnoresTheWorksheetEntirely: () => {
+            const result = expectOk(run({
+                ...wageReturn(5000000n)(singleStandardDeduction)(0n),
+                form2555ExclusionCents: 13000000n,
+                qualifiedDividendsCents: 500000n,
+            }))
+            assertEq(result.line6, 0n, '$50,000.00 is below the $88,100.00 exemption')
+            assertEq(result.line7, 0n)
+            assertEq(result.line11, 0n, 'and no alternative minimum tax at all')
+        },
+        // Part III with a §911 exclusion REFUSES: i6251's worksheet routes
+        // line 4 through Part III "with certain modifications" this engine has
+        // not transcribed, and the flat bound the module leans on stops
+        // holding once the excluded income is stacked underneath.
+        partThreeWithAnExclusionRefusesRatherThanBounding: () => {
+            const outcome = run({
+                ...wageReturn(25000000n)(singleStandardDeduction)(0n),
+                form2555ExclusionCents: 13000000n,
+                qualifiedDividendsCents: 500000n,
+                regularPreferentialWorksheet: regularQdcgt(500000n)(22925000n),
+            })
+            assert(outcome.kind === 'error', ['expected a refusal', outcome])
+            assert(
+                outcome.message.includes('Foreign Earned Income Tax Worksheet'),
+                ['the refusal must name the worksheet', outcome.message])
+            assert(
+                outcome.message.includes('Part III'),
+                ['and the part it cannot complete', outcome.message])
+            assert(
+                outcome.message.includes('Schedule 2 line 2'),
+                ['and where the amount would have gone', outcome.message])
+        },
+        // THE CONTROLS, both directions. Preferential income WITHOUT the
+        // exclusion computes, and the exclusion WITHOUT preferential income
+        // computes — only the combination refuses.
+        controlPreferentialIncomeAloneStillComputes: () => {
+            const outcome = run({
+                ...wageReturn(25000000n)(singleStandardDeduction)(0n),
+                qualifiedDividendsCents: 500000n,
+                regularPreferentialWorksheet: regularQdcgt(500000n)(22925000n),
+            })
+            assertEq(outcome.kind, 'ok', ['preferential income alone must compute', outcome])
+        },
+        controlTheExclusionAloneStillComputes: () => {
+            const outcome = run({
+                ...wageReturn(25000000n)(singleStandardDeduction)(0n),
+                form2555ExclusionCents: 13000000n,
+            })
+            assertEq(outcome.kind, 'ok', ['the exclusion alone must compute', outcome])
+        },
+    },
     // THE REGRESSION CONTROL, first on purpose and stated three ways. A return
     // with nothing at all, and an ordinary wage return, and a HIGH-income wage
     // return: none adds a cent of AMT. Criterion 5, at this module.
