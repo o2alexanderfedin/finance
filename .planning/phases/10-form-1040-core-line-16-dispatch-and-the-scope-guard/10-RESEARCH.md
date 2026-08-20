@@ -1,5 +1,27 @@
 # Phase 10: Form 1040 Core, Line-16 Dispatch, and the Scope Guard - Research
 
+> ## ⚠️ ITS LINE LABELS ARE NO LONGER TRUSTED — 2026-08-19
+>
+> This document's line-by-line table was cited elsewhere as "the transcription this repository
+> already verified against `f1040.pdf`". **Phase 35 fetched that PDF and the two disagree.** At
+> minimum the **12a–12d checkbox block is off by one for its entire length** — 12b is "Spouse
+> itemizes on a separate return", 12c is "You were a dual-status alien", 12d is the
+> born-before-January-2-1961 / blind pair — and **line 14 adds lines 12e, 13a and 13b**, not
+> "12, 13a and 13b". Eight printed rows appear here not at all.
+>
+> Whether the error is in this table or in the transcription out of it was not determined, and
+> **that question is exactly why the labels are untrusted rather than corrected**: one of the two
+> is wrong and nothing here says which. `demo/steps/09-form1040.js` now cites the fetched PDF
+> directly and is the current authority for the printed face.
+>
+> **The numbers in this document are unaffected** — the engine's own proofs pin those, and Phase 33
+> checks them against an external benchmark. It is the LABELS that lost their standing.
+>
+> The lesson worth carrying: the module docstring flagged fourteen captions as "reconstructed,
+> check these first". **Twelve were right.** The damage was in a class nobody flagged — a
+> checkbox block everyone assumed was boilerplate.
+
+
 **Researched:** 2026-08-06
 **Domain:** Form 1040 (2025) lines 1a–37; the line-16 four-way method dispatch; the Qualified
 Dividends and Capital Gain Tax Worksheet; the Schedule D Tax Worksheet; the age/blindness standard
