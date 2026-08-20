@@ -1026,6 +1026,37 @@ export const returnProfileSchema = /** @type {const} */ ({
     // because certifying eligibility while claiming nothing is an ordinary
     // return and every other field on this dialect is silent about moving.
     movingExpensesArmedForcesPermanentChangeOfStation: option(true),
+    // Form 4797 line 7's own printed instruction, which names this state in so
+    // many words: "If line 7 is a gain and you didn't have any prior year
+    // section 1231 losses, or they were recaptured in an earlier year, enter
+    // the gain from line 7 as a long-term capital gain on the Schedule D filed
+    // with your return and skip lines 8, 9, 11, and 12."
+    //
+    // §1231(c) recharacterizes a current-year net §1231 gain as ordinary to
+    // the extent of "your net section 1231 losses deducted during the 5
+    // preceding tax years that have not yet been applied against any net
+    // section 1231 gain" (i4797 p6, line 8) — five prior years plus the
+    // running ledger of what has already been applied. `vnd.fjs.prior_year_\
+    // capital_loss` is the precedent for transcribing a prior-year fact and it
+    // is a precedent AGAINST transcribing this one: that dialect stores "ONLY
+    // the four raw prior-year figures, never a pre-computed carryover total",
+    // and line 8 has no raw printed figures behind it — i4797 p7 calls it a
+    // "For recordkeeping purposes" amount. So a checkbox, in
+    // `movingExpensesArmedForcesPermanentChangeOfStation`'s exact shape.
+    //
+    // **It belongs on THIS dialect and not on `vnd.fjs.asset_register`, and
+    // the cardinality is the argument.** §1231 nets across the whole return; a
+    // taxpayer with two businesses files two Forms 4562 (i4562 p1: "File a
+    // separate Form 4562 for each business or activity") and holds two
+    // registers, but exactly ONE Form 4797 and one netting. A per-register
+    // certification would be a return-level fact stored per business, with two
+    // copies free to disagree.
+    //
+    // Read only by `fjs/form4797`, which REFUSES at printed line 8 without it
+    // — and only when line 7 is a GAIN, because the printed page skips lines 8
+    // and 9 entirely for a loss. See
+    // `fjs/form4797/todo/sales-of-business-property.md` §4.
+    noNonrecapturedNetSectionOneTwoThreeOneLossesFromPriorYears: option(true),
     // §904(j)(2)(C)'s ELECTION and §904(j)(2)(A)'s ASSERTION, in one field,
     // and the name states both because the taxpayer is making both claims at
     // once: "every dollar of my foreign-source gross income is qualified
@@ -2248,6 +2279,38 @@ export const proof = {
             const [t, v] = validate({ ...minimal })
             assert(t === 'ok', ['expected ok', t, v])
             assertEq(v.movingExpensesArmedForcesPermanentChangeOfStation, undefined)
+        },
+    },
+    // Form 4797 line 7's "you didn't have any prior year section 1231 losses"
+    // certification, the same three-leaf shape.
+    sectionTwelveThirtyOneLookbackCertification: {
+        certificationValidates: () => {
+            const [t, v] = validate({
+                ...minimal,
+                noNonrecapturedNetSectionOneTwoThreeOneLossesFromPriorYears: true,
+            })
+            assert(t === 'ok', ['expected ok', t, v])
+            assertEq(v.noNonrecapturedNetSectionOneTwoThreeOneLossesFromPriorYears, true)
+        },
+        // DOC-12. A stored `false` would read as "I DID have prior year §1231
+        // losses, and here is nothing about how much" — a denial with no
+        // amount behind it, which is worse than silence because a reader would
+        // act on it.
+        falseRejected: () => {
+            const [t] = validate({
+                ...minimal,
+                noNonrecapturedNetSectionOneTwoThreeOneLossesFromPriorYears: false,
+            })
+            assertEq(t, 'error')
+        },
+        // THE CONTROL: absence is the ordinary case, and it is what makes
+        // `fjs/form4797` refuse a GAIN year rather than this dialect refusing
+        // the document. A return with no business property disposals says
+        // nothing here and validates.
+        absentValidates: () => {
+            const [t, v] = validate({ ...minimal })
+            assert(t === 'ok', ['expected ok', t, v])
+            assertEq(v.noNonrecapturedNetSectionOneTwoThreeOneLossesFromPriorYears, undefined)
         },
     },
     // TAX-39 (Form 7206): §162(l)(2)(B)'s employer-plan disqualifier, the same

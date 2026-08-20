@@ -75,6 +75,7 @@ import { deductionChoice } from '../../tax/deduction/module.f.js'
 import { individualFilingStatuses, taxParamsByYear } from '../../tax/params/module.f.js'
 import { scheduleD } from '../../schedule/d/module.f.js'
 import { form6781 } from '../../form6781/module.f.js'
+import { formFortySevenNinetySeven } from '../../form4797/module.f.js'
 import { scheduleOneA } from '../../schedule/1a/module.f.js'
 import { scheduleA } from '../../schedule/a/module.f.js'
 import {
@@ -743,6 +744,7 @@ const storedFilingStatusNamed = status =>
  *   readonly specifiedPrivateActivityBondInterest: ReportLine,
  *   readonly disqualifiedPassiveIncomeCents: bigint,
  *   readonly qualifiedBusinessLossCarryforward: ReportLine,
+ *   readonly formFortySevenNinetySevenGainCents: bigint,
  *   readonly dependentCareLine31Cents: bigint,
  *   readonly dependentCareApplicable: boolean,
  *   readonly dependentCare: Form2441Common,
@@ -898,11 +900,48 @@ export const form1040IncomeLines = taxParamSet => inputs => {
             sources: form6781Outcome.sources,
         }
         : undefined
+    // TAX-41: Form 4797. It runs HERE, and BEFORE Schedule D and Schedule 1,
+    // because its three answers go to three different places — line 18b to
+    // Schedule 1 line 4, a §1231 gain to Schedule D line 11, and the
+    // unrecaptured §1250 gain to Schedule D line 19's worksheet — and running
+    // it once per destination is the only way they could disagree. It is the
+    // same argument printed Schedule F line 34's two destinations already
+    // forced for `fjs/schedule/f`.
+    //
+    // **NOT gated on `filingScheduleD`**, unlike Form 6781: a return with an
+    // ordinary Form 4797 (a §1231 loss, or a fully-recaptured §1245 gain)
+    // files no Schedule D at all and still owes Schedule 1 line 4. The form
+    // makes that judgment itself, on the printed line 7 instruction, and
+    // REFUSES a §1231 gain that has no Schedule D to land on — which is why
+    // the gate cannot live here.
+    const form4797Outcome = formFortySevenNinetySeven({
+        profile, assetRegisters, farmForms,
+    })
+    if (form4797Outcome.kind === 'error') {
+        return { kind: 'error', message: form4797Outcome.message, unmodeled: [] }
+    }
+    // Narrowed a second, fully explicit way, never relying on `tsc` to carry
+    // the negation of the `if` above — `sectionTwelveFiftySix`'s idiom.
+    const form4797Ok = form4797Outcome.kind === 'ok' ? form4797Outcome : undefined
+    const formFortySevenNinetySevenEntries = form4797Ok === undefined ? undefined : {
+        partOneGainCents: form4797Ok.longTermCapitalGainCents,
+        unrecapturedSectionTwelveFiftyGainCents: form4797Ok.unrecapturedSectionTwelveFiftyGainCents,
+        lineEightCents: form4797Ok.line8Cents,
+        sources: form4797Ok.sources,
+    }
+    const otherGainsOrLosses = form4797Ok === undefined ? undefined : {
+        filed: form4797Ok.filed,
+        lineEighteenBCents: form4797Ok.line18bCents,
+        sources: form4797Ok.sources,
+    }
     /** @type {ScheduleDOutcome | undefined} */
     const scheduleDOutcome = filingScheduleD
         ? scheduleD({
             status, brokerageForms, dividendForms,
             ...(sectionTwelveFiftySix === undefined ? {} : { sectionTwelveFiftySix }),
+            ...(formFortySevenNinetySevenEntries === undefined
+                ? {}
+                : { formFortySevenNinetySeven: formFortySevenNinetySevenEntries }),
             basisCorrections: basisCorrectionForms,
             employeeStockPurchaseForms,
             // TAX-35: printed Schedule D lines 5 and 12 read the separately
@@ -1297,6 +1336,15 @@ export const form1040IncomeLines = taxParamSet => inputs => {
         // capital losses are not trade-or-business deductions, and capital
         // gains not attributable to a trade or business come back out on line
         // 10), which is why only its VALUE crosses this boundary.
+        //
+        // **"The whole of it" is an admission as of TAX-41**, not a
+        // determination: printed Form 4797 line 7's §1231 gain reaches this very
+        // figure through Schedule D line 11 and IS attributable to a trade or
+        // business, and Part II removes it anyway because Schedule D carries no
+        // §1231 share to remove instead. `fjs/form461`'s docstring argues the
+        // direction — an over-refusal, never a wrong number — and
+        // `formFortySevenNinetySevenGainCents` below is the only figure on this
+        // record that could ever supply the split.
         form1040Line7aCents: line7a.value,
         // **Line 13 of the Schedule C inside Part I is this commit's** (Form
         // 4562): `vnd.fjs.asset_register` reaches Schedule C line 13 through
@@ -1322,6 +1370,10 @@ export const form1040IncomeLines = taxParamSet => inputs => {
         // schedule twice is the only way those two could disagree.
         farmForms,
         partnershipK1Forms, sCorporationK1Forms, estateTrustK1Forms,
+        // Printed Form 4797 line 18b's own destination: "Enter here and on
+        // Schedule 1 (Form 1040), Part I, line 4." Read off the SAME Form 4797
+        // execution Schedule D lines 11 and 19 came from, never a second one.
+        ...(otherGainsOrLosses === undefined ? {} : { otherGainsOrLosses }),
     })
     if (scheduleOnePartIResult.kind === 'error') {
         return { kind: 'error', message: scheduleOnePartIResult.message, unmodeled: [] }
@@ -2020,6 +2072,14 @@ export const form1040IncomeLines = taxParamSet => inputs => {
         kind: 'ok',
         disqualifiedPassiveIncomeCents,
         qualifiedBusinessLossCarryforward,
+        // Printed Form 4797 line 7 when it is a GAIN, carried out for
+        // Publication 596 Worksheet 1 line 6 — a THIRD reader of the one Form
+        // 4797 execution, beside Schedule 1 line 4 and Schedule D lines 11 and
+        // 19. Running the form again for it is the only way the four could
+        // disagree, which is the argument Schedule F line 34's own two
+        // destinations already forced.
+        formFortySevenNinetySevenGainCents:
+            form4797Ok === undefined ? 0n : form4797Ok.longTermCapitalGainCents,
         amtDepreciationAdjustmentCents,
         // Printed Schedule E line 26, carried out for Form 8960 line 4a. It
         // travels as a whole `ReportLine` rather than as cents because
@@ -3069,6 +3129,12 @@ const form1040TaxAndPaymentLines = taxParamSet => inputs => income => {
             line2bCents: income.line2b.value,
             line3bCents: income.line3b.value,
             line7aCents: income.line7a.value,
+            // Publication 596 Worksheet 1 line 6, live as of TAX-41: the
+            // §1231 gain is SUBTRACTED from capital gain net income, because
+            // it is business gain and arrives on 1040 line 7a through Schedule
+            // D line 11 exactly as a stock sale does. Read off the SAME Form
+            // 4797 execution Schedule D and Schedule 1 line 4 came from.
+            formFortySevenNinetySevenGainCents: income.formFortySevenNinetySevenGainCents,
             disqualifiedPassiveIncomeCents: income.disqualifiedPassiveIncomeCents,
         })
         : undefined
@@ -3426,7 +3492,7 @@ const expectedIncomeLineCount = 31
  * so the `Exclude<>` below is what turns forgetting one of them into a
  * compile error rather than a crash on a missing `.sources` — which is
  * exactly what it did when this phase first added them.
- * @type {readonly Exclude<keyof Form1040IncomeLines, 'kind' | 'filingScheduleD' | 'scheduleD15Cents' | 'scheduleD16Cents' | 'scheduleD18Cents' | 'scheduleD19Cents' | 'selfEmployment' | 'specifiedPrivateActivityBondInterest' | 'itemizing' | 'scheduleALine7Cents' | 'scheduleOneALine37Cents' | 'disqualifiedPassiveIncomeCents' | 'dependentCareLine31Cents' | 'dependentCareApplicable' | 'dependentCare' | 'amtDepreciationAdjustmentCents' | 'rentalRealEstateAndRoyaltyIncome'>[]}
+ * @type {readonly Exclude<keyof Form1040IncomeLines, 'kind' | 'filingScheduleD' | 'scheduleD15Cents' | 'scheduleD16Cents' | 'scheduleD18Cents' | 'scheduleD19Cents' | 'selfEmployment' | 'specifiedPrivateActivityBondInterest' | 'itemizing' | 'scheduleALine7Cents' | 'scheduleOneALine37Cents' | 'disqualifiedPassiveIncomeCents' | 'formFortySevenNinetySevenGainCents' | 'dependentCareLine31Cents' | 'dependentCareApplicable' | 'dependentCare' | 'amtDepreciationAdjustmentCents' | 'rentalRealEstateAndRoyaltyIncome'>[]}
  */
 const incomeLineFieldNames = /** @type {const} */ ([
     'line1a', 'line1b', 'line1c', 'line1d', 'line1e', 'line1f', 'line1g', 'line1h', 'line1i', 'line1z',
@@ -5947,6 +6013,242 @@ const childInputs = foreignTax => inputsOf(storedProfile({
 }])([])(foreignTax === undefined ? [] : [
     dividendDocument('sha256-ftc-div')({ box7ForeignTaxPaid: foreignTax }),
 ])([])([])([])([])([])([])
+
+
+/**
+ * ONE printed Schedule E Part I column with NO expense entries — the base the
+ * Form 4797 wiring leaves are differentials against.
+ *
+ * Deliberately not {@link rentalPropertyDocument}: that fixture's four
+ * expenses would sit between printed Schedule E line 18 and 1040 line 8, and
+ * the whole point of these leaves is that the only thing moving line 8 is the
+ * depreciation and the Form 4797 line 18b beside it.
+ *
+ * `accountNumber` agrees with {@link disposalRegisterDocument}'s, because
+ * `fjs/schedule/e/part_i` attaches a register to a property by that string and
+ * a fixture that quietly disagreed would exercise the unmatched-register path
+ * instead of the wiring — and `fjs/schedule/c` REFUSES a register nothing
+ * claims, so the disagreement would not even be silent.
+ * @type {Stored<RentalProperty>}
+ */
+const bareRentalPropertyDocument = {
+    documentHash: 'sha256-4797-rental',
+    value: {
+        dialect: 'vnd.fjs.rental_property',
+        recipientTin: '222-22-2222',
+        accountNumber: 'RENT-0001',
+        taxYear: 2025,
+        propertyType: 'singleFamilyResidence',
+        physicalAddress: '18 Alder Street, Wells, ME 04090',
+        fairRentalDays: 365,
+        personalUseDays: 0,
+        rentsReceived: '24000.00',
+        entries: [],
+    },
+}
+
+/**
+ * The kitchen appliances of {@link bareRentalPropertyDocument}, sold in
+ * September 2025 for more than their adjusted basis — a §1245 gain that the
+ * recapture cap swallows entirely, so printed Form 4797 line 7 is exactly zero
+ * and no Schedule D is involved.
+ * @type {AssetRegister['assets'][number]}
+ */
+const disposedAppliances = {
+    description: 'kitchen appliances',
+    datePlacedInService: '2022-06',
+    costOrOtherBasis: '10001.00',
+    businessUsePercentage: '100.00',
+    classification: 'fiveYear',
+    method: '200DB',
+    convention: 'HY',
+    section168kStatus: 'electedOut',
+    disposal: {
+        dateAcquired: '2022-05-01',
+        dateSold: '2025-09-12',
+        grossSalesPrice: '3500.00',
+        expenseOfSale: '0.00',
+    },
+}
+
+/**
+ * The BUILDING, sold in October 2025 at a gain — §1250 property, whose line
+ * 26g is zero and whose unrecaptured §1250 gain is not.
+ * @type {AssetRegister['assets'][number]}
+ */
+const disposedDuplex = {
+    description: 'rental duplex',
+    datePlacedInService: '2019-04',
+    costOrOtherBasis: '200555.00',
+    businessUsePercentage: '100.00',
+    classification: 'residentialRental',
+    method: 'SL',
+    convention: 'MM',
+    section168kStatus: 'electedOut',
+    disposal: {
+        dateAcquired: '2019-03-15',
+        dateSold: '2025-10-07',
+        grossSalesPrice: '250000.00',
+        expenseOfSale: '6000.00',
+    },
+}
+
+/** The register {@link bareRentalPropertyDocument} claims, around one asset.
+ * @type {(asset: AssetRegister['assets'][number]) => Stored<AssetRegister>} */
+const disposalRegisterDocument = asset => ({
+    documentHash: 'sha256-4797-register',
+    value: {
+        dialect: 'vnd.fjs.asset_register',
+        recipientTin: '222-22-2222',
+        accountNumber: 'RENT-0001',
+        taxYear: 2025,
+        businessOrActivity: '18 Alder Street rental',
+        everyDepreciableAssetIsListed: /** @type {const} */ (true),
+        priorYearSection179CarryoverIsZero: /** @type {const} */ (true),
+        // The NARROWED certification, and the fixture has to swing with it:
+        // the dialect refuses a register carrying both it and a disposal
+        // block, and `fjs/form4562` refuses a register carrying NEITHER. So
+        // exactly one of the two states is legal at a time, which is the whole
+        // content of the narrowing expressed as a fixture.
+        ...(asset.disposal === undefined
+            ? { noDepreciablePropertyDisposedOfDuringTheYear: /** @type {const} */ (true) }
+            : {}),
+        assets: [asset],
+    },
+})
+
+/**
+ * A whole return: $30,000.00 of wages, the bare rental above, and one register
+ * around one asset. The two parameters are exactly the two profile facts
+ * Form 4797 reads.
+ * @type {(declaredKinds: readonly Kind[]) => (certified: boolean) => (asset: AssetRegister['assets'][number]) => Form1040Outcome}
+ */
+const runFourSevenNineSeven = declaredKinds => certified => asset => {
+    /** @type {ReturnProfile} */
+    const profile = {
+        ...singleProfile,
+        declaredKinds,
+        ...(certified
+            ? {
+                noNonrecapturedNetSectionOneTwoThreeOneLossesFromPriorYears:
+                    /** @type {const} */ (true),
+            }
+            : {}),
+    }
+    const base = inputsOf(storedProfile(profile))([
+        w2Document('sha256-4797-w2')('30000.00'),
+    ])([])([])([])([])([])([])([])([])
+    return form1040Report(taxParams2025)({
+        ...base,
+        rentalProperties: [bareRentalPropertyDocument],
+        assetRegisters: [disposalRegisterDocument(asset)],
+    })
+}
+
+/** Every printed 1040 line of a computed return, by rule prefix.
+ * @type {(outcome: Form1040Outcome) => (rulePrefix: string) => bigint} */
+const reportedCents = outcome => rulePrefix => {
+    assert(outcome.kind === 'ok', ['expected a computed return', outcome])
+    if (outcome.kind !== 'ok') {
+        throw ['expected a computed return', outcome]
+    }
+    return lineRuled(outcome.lines)(rulePrefix).value
+}
+
+
+/**
+ * A shop building in a Schedule C business's register, sold at a gain in
+ * August 2025 — §1250 property, so line 26g is zero, printed Form 4797 line
+ * 18b is zero and the WHOLE gain is §1231. That is the shape the earned
+ * income credit's Worksheet 1 line 6 turns on.
+ *
+ * 39-year nonresidential real, straight line, mid-month, placed in service May
+ * 2020, cost $30,000.00, sold for $45,000.00 with no selling expense.
+ * @type {AssetRegister['assets'][number]}
+ */
+const soldShop = {
+    description: 'shop building',
+    datePlacedInService: '2020-05',
+    costOrOtherBasis: '30000.00',
+    businessUsePercentage: '100.00',
+    classification: 'nonresidentialReal',
+    method: 'SL',
+    convention: 'MM',
+    section168kStatus: 'electedOut',
+    disposal: {
+        dateAcquired: '2020-04-30',
+        dateSold: '2025-08-19',
+        grossSalesPrice: '45000.00',
+        expenseOfSale: '0.00',
+    },
+}
+
+/** The register the Schedule C business claims, around {@link soldShop}.
+ * @type {(asset: AssetRegister['assets'][number]) => Stored<AssetRegister>} */
+const shopRegisterDocument = asset => ({
+    documentHash: 'sha256-eic-4797-register',
+    value: {
+        dialect: 'vnd.fjs.asset_register',
+        recipientTin: '222-22-2222',
+        accountNumber: 'BUS-0001',
+        taxYear: 2025,
+        businessOrActivity: 'software consulting',
+        everyDepreciableAssetIsListed: /** @type {const} */ (true),
+        priorYearSection179CarryoverIsZero: /** @type {const} */ (true),
+        ...(asset.disposal === undefined
+            ? { noDepreciablePropertyDisposedOfDuringTheYear: /** @type {const} */ (true) }
+            : {}),
+        assets: [asset],
+    },
+})
+
+/**
+ * A §32 filer with one qualifying child, $25,000.00 of wages and a small
+ * consulting business — the shape the earned income credit's Worksheet 1 line
+ * 6 is decided on. `brokerageForms` is a parameter so the CONTROL can put the
+ * identical amount on 1040 line 7a as an ordinary long-term STOCK gain, which
+ * the worksheet does NOT subtract.
+ * @type {(asset: AssetRegister['assets'][number]) => (brokerageForms: readonly Stored<OneZeroNineNineB>[]) => Form1040Outcome}
+ */
+const earnedIncomeCreditWithBusinessProperty = asset => brokerageForms => {
+    /** @type {ReturnProfile} */
+    const profile = {
+        ...singleProfile,
+        declaredKinds: [
+            'wages', 'businessIncomeOrLoss', 'otherGainsOrLosses', 'capitalGainsOrLosses',
+            'unrecaptured1250Gain', 'selfEmploymentTax', 'deductiblePartOfSelfEmploymentTax',
+            'qualifiedBusinessIncomeDeduction', 'earnedIncomeCredit',
+        ],
+        dependentCount: 1,
+        dependents: [{
+            relationship: 'daughter',
+            ssnValidForEmployment: true,
+            ageAtYearEnd: 9,
+            livedWithTaxpayer: true,
+            earnedIncomeCreditRelationship: 'child',
+            earnedIncomeCreditUnitedStatesResidency:
+                'sharedTheTaxpayersUnitedStatesAbodeForMoreThanHalfTheYear',
+            earnedIncomeCreditJointReturn: 'didNotFileAJointReturn',
+        }],
+        filerSocialSecurityNumber: 'validForEmployment',
+        filerQualifyingChildOfAnotherTaxpayer: 'isNotAnotherTaxpayersQualifyingChild',
+        // Printed Form 4797 line 7's own certification. Without it the return
+        // refuses at printed line 8 — which is `fjs/form4797`'s subject, not
+        // this leaf's, and the refusal is what confirmed the $19,038.45 gain
+        // hand-derived above before either leaf was green.
+        noNonrecapturedNetSectionOneTwoThreeOneLossesFromPriorYears: /** @type {const} */ (true),
+    }
+    const base = withBusiness(
+        inputsOf(storedProfile(profile))([
+            w2Document('sha256-eic-4797-w2')('25000.00'),
+        ])([])([])(brokerageForms)([])([])([])([])([]),
+    )([nonemployeeCompensationDocument('sha256-eic-4797-nec')('2000.00')('0.00')])(
+        [businessExpensesDocument('sha256-eic-4797-expenses')('0.00')])
+    return form1040Report(taxParams2025)({
+        ...base,
+        assetRegisters: [shopRegisterDocument(asset)],
+    })
+}
 
 export const proof = {
     unionSources: {
@@ -8918,6 +9220,99 @@ export const proof = {
         // dependents array — so a hand-derivation of any §32 return with a
         // qualifying child has to account for it. A figure adjusted until the
         // suite went green would have hidden that.
+        /**
+         * ★ **THE §1231 GAIN REACHES PUBLICATION 596 WORKSHEET 1 LINE 6**, and
+         * this leaf exists because a mutation zeroing that argument survived
+         * the whole suite. `fjs/schedule/eic`'s own leaves prove the
+         * subtraction; only this one can say whether `form1040IncomeLines`
+         * ever hands the figure over.
+         *
+         * A single filer with one qualifying child, $25,000.00 of wages, a
+         * $2,000.00 consulting business, and the shop building that business
+         * sold:
+         *
+         * ```
+         *   39-year nonresidential real, S/L, mid-month, month 5:
+         *     y1 1.603%, y2..y6 2.564%      basis $30,000.00 = 3,000,000 cents
+         *   y1  1.603% x 3,000,000 =  48,090
+         *   y2..y5 (four years) 2.564% x 3,000,000 = 76,920 each = 307,680
+         *   y6  76,920 x 15/24 = 48,075        (sold August, MM disposal decimal)
+         *
+         *   4562 line 22 (this year alone)                       48,075
+         *   4797 line 22 (all six years)                        403,845
+         *        line 23  3,000,000 - 403,845                 2,596,155
+         *        line 24  4,500,000 - 2,596,155               1,903,845
+         *        line 26g §1250 recapture, post-1986 S/L               0
+         *        line 18b                                              0   <- nothing ordinary
+         *        line  7                                       1,903,845   <- all §1231
+         *   Sch C  line  7 gross receipts                        200,000
+         *          line 13 Form 4562 line 22                     -48,075
+         *          line 31                                       151,925
+         *   Sch 1  line  3                                       151,925
+         *          line  4 Form 4797 line 18b                           0
+         *   1040   line  8                                       151,925
+         *          line 7a Schedule D line 16                   1,903,845
+         *
+         *   Pub 596 Worksheet 1  line 5  1040 line 7a           1,903,845
+         *                        line 6  Form 4797 line 7       1,903,845
+         *                        line 7  the difference                 0
+         * ```
+         *
+         * $19,038.45 is well over §32(i)(1)'s $11,950.00, so WITHOUT the
+         * subtraction this filer loses the earned income credit outright. The
+         * credit's exact amount is `fjs/schedule/eic`'s own subject, proven
+         * there against the printed 2025 EIC Table at hand-typed values; what
+         * only this leaf can establish is that it is not ZERO.
+         */
+        aSectionTwelveThirtyOneGainDoesNotDisqualifyTheEarnedIncomeCredit: () => {
+            const outcome = earnedIncomeCreditWithBusinessProperty(soldShop)([])
+            assert(outcome.kind === 'ok', ['expected a computed return', outcome])
+            if (outcome.kind !== 'ok') {
+                return
+            }
+            const at = lineRuled(outcome.lines)
+            assertEq(at('1040 line 8').value, 151925n, 'Schedule C line 31; Schedule 1 line 4 is zero')
+            assertEq(at('1040 line 7a').value, 1903845n, 'the §1231 gain, through Schedule D')
+            assert(
+                at('1040 line 27a').value > 0n,
+                ['a §1231 gain is business gain, not disqualified investment income',
+                    at('1040 line 27a').value])
+        },
+        /**
+         * ★ **THE CONTROL, and it is the same amount on the same printed
+         * line.** Replace the shop's disposal with an ordinary long-term STOCK
+         * gain of exactly $19,038.45 — 1040 line 7a is identical, the wages
+         * and the business are identical — and the credit is **zero**, because
+         * Worksheet 1 line 6 subtracts a Form 4797 gain and nothing else.
+         *
+         * The two returns differ in adjusted gross income by $288.45, and only
+         * that: with the shop still held, printed Schedule C line 13 takes a
+         * whole year of depreciation (2.564% of $30,000.00 = $769.20) rather
+         * than the 15/24 of it the year of sale allows ($480.75). That is far
+         * too small a difference to move a filer across §32's phaseout, so the
+         * cliff between these two leaves is the disqualified-income test and
+         * nothing else.
+         */
+        theSameAmountAsAStockGainDoesDisqualifyIt: () => {
+            const outcome = earnedIncomeCreditWithBusinessProperty(
+                { ...soldShop, disposal: undefined })([
+                    brokerageDocument('sha256-eic-4797-stock')({
+                        box1dProceeds: '19038.45',
+                        box1eCostOrOtherBasis: '0.00',
+                        box2LongTermGainOrLoss: true,
+                        box12BasisReportedToIrs: true,
+                    }),
+                ])
+            assert(outcome.kind === 'ok', ['expected a computed return', outcome])
+            if (outcome.kind !== 'ok') {
+                return
+            }
+            const at = lineRuled(outcome.lines)
+            assertEq(at('1040 line 7a').value, 1903845n, 'the SAME figure on the SAME printed line')
+            assertEq(at('1040 line 8').value, 123080n, '$2,000.00 less a WHOLE year of depreciation')
+            assertEq(at('1040 line 27a').value, 0n,
+                '§32(i)(1) denies the credit outright above $11,950.00 of disqualified income')
+        },
         theEarnedIncomeCreditComputesEndToEndAndIsRefunded: () => {
             const outcome = form1040Report(taxParams2025)(inputsOf(storedProfile({
                 ...singleProfile,
@@ -11285,6 +11680,181 @@ export const proof = {
             }).line47
             assertEq(crossCheck, 717600n, 'independent sdtw(...) call must reach the SAME figure')
             assertEq(line16, crossCheck, 'the wiring must feed the SAME facts an independent sdtw call would')
+        },
+    },
+    // ── TAX-41: Form 4797, end to end through form1040Report ────────────
+    //
+    // **A form-level proof cannot prove a wiring.** `fjs/form4797`'s own proofs
+    // establish every printed line from Publication 946's tables; `fjs/schedule/d`'s
+    // establish that line 11 and the Unrecaptured Section 1250 Gain Worksheet
+    // receive what they are handed. Neither can say whether
+    // `form1040IncomeLines` ever CALLS the form — and the two leaves below are
+    // the only place in this repository where that is observable.
+    salesOfBusinessPropertyReachTheReturn: {
+        /**
+         * ★ **THE ORDINARY CASE: a fully-recaptured §1245 disposal reaches
+         * 1040 line 8 and NEEDS NO SCHEDULE D.** The profile deliberately does
+         * not declare `capitalGainsOrLosses`, which is what makes this a
+         * statement about Form 4797's line 7 = 0 branch rather than about
+         * Schedule D.
+         *
+         * Single filer, $30,000.00 of wages, one rental let all year at
+         * $24,000.00 with no other expenses, and one register whose kitchen
+         * appliances were sold during the year.
+         *
+         * ```
+         *   Publication 946 Table A-1, 5-year, half-year: 20.00 32.00 19.20 11.52
+         *   basis $10,001.00 = 1,000,100 cents, placed in service June 2022
+         *   y1  20.00% x 1,000,100 = 200,020
+         *   y2  32.00% x 1,000,100 = 320,032
+         *   y3  19.20% x 1,000,100 = 192,019.2  -> 192,019
+         *   y4  11.52% x 1,000,100 x 0.5 = 57,605.76 -> 57,606   (sold, HY)
+         *
+         *   4562 line 22 (this year alone)                            57,606
+         *   4797 line 22 (all four years)                            769,677
+         *        line 21  1,000,100 + 0                            1,000,100
+         *        line 23  1,000,100 - 769,677                         230,423
+         *        line 24    350,000 - 230,423                         119,577
+         *        line 25b min(119,577, 769,677)                       119,577
+         *        line 32  119,577 - 119,577                                 0
+         *        line  7                                                    0   <- no Schedule D
+         *        line 18b                                            119,577
+         *
+         *   Sch E  line 18  = 4562 line 22                             57,606
+         *          line 21  = 2,400,000 - 57,606                    2,342,394
+         *   Sch 1  line  4  = 4797 line 18b                           119,577
+         *          line  5  = Sch E line 26                         2,342,394
+         *          line 10                                          2,461,971
+         *   1040   line  8                                          2,461,971
+         *          line  9  3,000,000 + 2,461,971                   5,461,971
+         *          line 11  no adjustments                          5,461,971
+         *          line 7a  no Schedule D                                   0
+         * ```
+         *
+         * Every figure typed from the paper, not read back off the code.
+         */
+        aFullyRecapturedDisposalReachesLineEightWithNoScheduleD: () => {
+            const outcome = runFourSevenNineSeven(
+                ['wages', 'rentalRealEstateAndRoyalties', 'otherGainsOrLosses'])(
+                false)(disposedAppliances)
+            const cents = reportedCents(outcome)
+            assertEq(cents('1040 line 1a'), 3000000n, 'wages')
+            assertEq(cents('1040 line 8'), 2461971n,
+                'Schedule 1 line 10: Form 4797 line 18b plus the rental profit')
+            assertEq(cents('1040 line 9'), 5461971n, 'total income')
+            assertEq(cents('1040 line 11'), 5461971n, 'AGI, no adjustments')
+            assertEq(cents('1040 line 7a'), 0n,
+                'no Schedule D — a fully-recaptured §1245 gain never leaves Part II')
+        },
+        /**
+         * ★ **THE CONTROL, and it is what makes the leaf above a statement
+         * about the DISPOSAL.** The identical return with the disposal removed
+         * — the same register, the same appliances, still owned — computes
+         * $0.00 on Schedule 1 line 4, and printed Schedule E line 18 grows
+         * from $576.06 to $1,152.12 because the year-of-sale half is no longer
+         * taken.
+         *
+         * ```
+         *   4562 line 22 with no disposal   11.52% x 1,000,100 = 115,211.52 -> 115,212
+         *   Sch E line 21  2,400,000 - 115,212                            2,284,788
+         *   1040 line  8   Sch 1 line 4 is zero                           2,284,788
+         *          line  9  3,000,000 + 2,284,788                         5,284,788
+         * ```
+         *
+         * The Schedule E figure moving is the half a 1040-line-8 assertion
+         * alone would miss: it proves Step 3's DISPOSAL decimal is applied to
+         * Form 4562 as well as to Form 4797, which is the change that stops a
+         * filer deducting a whole year of depreciation on a machine sold in
+         * September.
+         *
+         * The control register also has to CERTIFY
+         * `noDepreciablePropertyDisposedOfDuringTheYear`, and that is not
+         * fixture housekeeping — it is the narrowing itself, observed. A
+         * register carrying neither a disposal block nor the certification
+         * refuses at Form 4562, and one carrying both refuses at the dialect,
+         * so exactly one of the two states is legal at a time.
+         */
+        theSameRegisterWithNoDisposalComputesZeroAndAWholeYearOfDepreciation: () => {
+            const outcome = runFourSevenNineSeven(
+                ['wages', 'rentalRealEstateAndRoyalties', 'otherGainsOrLosses'])(
+                false)({ ...disposedAppliances, disposal: undefined })
+            const cents = reportedCents(outcome)
+            assertEq(cents('1040 line 8'), 2284788n,
+                'no Form 4797, and a WHOLE year of depreciation on Schedule E line 18')
+            assertEq(cents('1040 line 9'), 5284788n)
+        },
+        /**
+         * ★ **THE §1231 GAIN AND THE 25% RATE, end to end.** Selling the
+         * building itself: printed Form 4797 line 7 is a §1231 gain that
+         * reaches 1040 line 7a through Schedule D line 11, and the
+         * unrecaptured §1250 gain inside it reaches Schedule D line 19 —
+         * which is observable ONLY as the line 16 METHOD, because line 19 is
+         * what forces the Schedule D Tax Worksheet over the Qualified
+         * Dividends and Capital Gain Tax Worksheet.
+         *
+         * ```
+         *   Table A-6, 27.5-year mid-month, month 4: y1 2.576%, y2..y7 3.636%
+         *   basis $200,555.00 = 20,055,500 cents, placed in service April 2019
+         *   4562 line 22 (this year alone, sold in October: 19/24)      577,298
+         *   4797 line 22 (all seven years)                            4,740,018
+         *        line 23  20,655,500 - 4,740,018                     15,915,482
+         *        line 24  25,000,000 - 15,915,482                     9,084,518
+         *        line 26g i4797 p10 excludes post-1986 S/L real property       0
+         *        line 32  9,084,518 - 0                               9,084,518
+         *        line  7                                              9,084,518
+         *        line 18b                                                     0
+         *   Sch D  line 11 = 4797 line 7                              9,084,518
+         *          line 19 = min(4,740,018, 9,084,518) - 0            4,740,018
+         *   Sch E  line 21  2,400,000 - 577,298                       1,822,702
+         *   1040   line 7a  Schedule D line 16                        9,084,518
+         *          line  8  Sch 1 line 4 (0) + line 5 (1,822,702)     1,822,702
+         *          line  9  3,000,000 + 9,084,518 + 1,822,702        13,907,220
+         * ```
+         *
+         * The `line16Method` assertion is the load-bearing one: with line 19
+         * at zero the two worksheets are algebraically identical, so no
+         * ordinary figure can tell them apart — `fjs/tax/line16`'s own
+         * docstring says exactly that — and the method is the only observable
+         * that changes.
+         */
+        aSectionTwelveThirtyOneGainReachesLineSevenAAndForcesTheScheduleDTaxWorksheet: () => {
+            const outcome = runFourSevenNineSeven([
+                'wages', 'rentalRealEstateAndRoyalties', 'otherGainsOrLosses',
+                'capitalGainsOrLosses', 'unrecaptured1250Gain',
+            ])(true)(disposedDuplex)
+            const cents = reportedCents(outcome)
+            assertEq(cents('1040 line 7a'), 9084518n,
+                'the §1231 gain, through Schedule D lines 11 and 16')
+            assertEq(cents('1040 line 8'), 1822702n,
+                'Schedule 1 line 4 is ZERO here — the whole gain is capital, not ordinary')
+            assertEq(cents('1040 line 9'), 13907220n)
+            assert(outcome.kind === 'ok', ['expected a computed return', outcome])
+            if (outcome.kind !== 'ok') {
+                return
+            }
+            assertEq(outcome.line16Method, 'scheduleDTaxWorksheet',
+                'unrecaptured §1250 gain on Schedule D line 19 forces the SDTW over the QDCGT')
+        },
+        /**
+         * ★ **THE REFUSAL, through the whole engine.** The identical return
+         * WITHOUT the §1231 certification refuses at printed line 8 — proving
+         * the certification is read where the form runs rather than only where
+         * the form is unit-tested, and that the refusal reaches the caller
+         * instead of being swallowed into a zero.
+         */
+        theSameGainWithoutTheCertificationRefusesThroughTheWholeEngine: () => {
+            const outcome = runFourSevenNineSeven([
+                'wages', 'rentalRealEstateAndRoyalties', 'otherGainsOrLosses',
+                'capitalGainsOrLosses', 'unrecaptured1250Gain',
+            ])(false)(disposedDuplex)
+            assert(outcome.kind === 'error', ['expected a refusal', outcome])
+            if (outcome.kind !== 'error') {
+                return
+            }
+            assert(outcome.message.includes('Form 4797 line 8'),
+                ['the refusal must name the printed line', outcome.message])
+            assert(outcome.message.includes('5 preceding tax years'),
+                ['and quote the definition', outcome.message])
         },
     },
     // ── TAX-38: Form 6781 Part I, end to end through form1040Report ─────

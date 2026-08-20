@@ -42,7 +42,7 @@ Register level:
 | `accountNumber` | — | one register is one **business or activity**, the same cardinality decision `vnd.fjs.business_expenses` makes; the value is the business identifier it must MATCH |
 | `businessOrActivity` | f4562 page 1 header, *"Business or activity to which this form relates"* | a separate Form 4562 is filed per business or activity (i4562 p1: *"File a separate Form 4562 for each business or activity on your return for which Form 4562 is required"*) |
 | `everyDepreciableAssetIsListed` | i4562 p11, mid-quarter convention | the convention turns on an **aggregate** of the whole year's additions; see §5 |
-| `noDepreciablePropertyDisposedOfDuringTheYear` | i4562 p11 Step 3 (disposal column), f4562 line 19 col (g) | a disposal needs the disposal decimal AND §1245/§1250 recapture on Form 4797, which this engine does not model |
+| `noDepreciablePropertyDisposedOfDuringTheYear` | i4562 p11 Step 3 (disposal column), f4562 line 19 col (g) | a disposal needs the disposal decimal AND §1245/§1250 recapture on Form 4797, which this engine does not model — **SUPERSEDED**, see below |
 | `priorYearSection179CarryoverIsZero` | f4562 line 10, *"Carryover of disallowed deduction from line 13 of your 2024 Form 4562"* | a prior-year figure; see §4 |
 | `assets` | f4562 lines 6, 19, 20, 26, 27 | the register itself |
 
@@ -265,6 +265,24 @@ for property placed in service before 1999, a `200DB` asset that old is
   [../../schedule/e/todo/schedule-e-part-i-rental-and-royalties.md](../../schedule/e/todo/schedule-e-part-i-rental-and-royalties.md).
   Left in place rather than rewritten: this file records what the Form 4562
   phase decided with what it had, and the note is the correction.
+- **`noDepreciablePropertyDisposedOfDuringTheYear` is NARROWED, not retired.**
+
+  **SUPERSEDED.** Both halves of its reason now exist: `fjs/form4562/macrs`'s
+  `disposalTwentyFourths` is i4562 p11 Step 3's second printed decimal column,
+  and `fjs/form4797` is the §1245/§1250 recapture. A register may now carry a
+  per-asset `disposal` block, and `fjs/form4562` requires the certification only
+  when NO asset carries one — the shape `everyDepreciableAssetIsListed` already
+  had. A register carrying both refuses at the dialect.
+
+  It is a NARROWING rather than a retirement because five disposals still cannot
+  be characterized and each refuses by name: 15- and 20-year property (the class
+  straddles §1245 and §1250), business use below 100%, an asset placed in
+  service and sold inside one tax year, a register bound to a farm, and a §1231
+  gain with no return-profile certification of the five-year lookback. See
+  [../../form4797/todo/sales-of-business-property.md](../../form4797/todo/sales-of-business-property.md).
+
+  Left in place above rather than rewritten: this file records what the Form
+  4562 phase decided with what it had, and this note is the correction.
 - **`carAndTruck` (Schedule C line 9) stays REFUSED, with a corrected remedy.**
   A vehicle is listed property, and Part V refuses.
 - The two Schedule K-1 §179 boxes and Schedule E line 28(i) stay refused: a

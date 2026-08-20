@@ -96,8 +96,17 @@
  *   November machine flips the answer for every other asset in it, in either
  *   direction, and nothing in the data says so.
  * - `noDepreciablePropertyDisposedOfDuringTheYear`. A disposal needs Step 3's
- *   disposal decimal AND §1245/§1250 recapture on Form 4797, which this engine
- *   does not model.
+ *   disposal decimal AND §1245/§1250 recapture on Form 4797.
+ *
+ *   **NARROWED.** Both exist now: `fjs/form4562/macrs`'s
+ *   `disposalTwentyFourths` is Step 3's second printed column, and
+ *   `fjs/form4797` is the recapture. So a register may now RECORD a disposal,
+ *   in the per-asset {@link registeredAsset} `disposal` block, and Form 4562
+ *   requires this certification only when NO asset carries one — the shape
+ *   `everyDepreciableAssetIsListed` already has, required exactly when the
+ *   facts make it load-bearing. The two cannot both be true, and
+ *   {@link checkReferences} refuses the contradiction by name. See
+ *   [../../form4797/todo/sales-of-business-property.md](../../form4797/todo/sales-of-business-property.md).
  * - `priorYearSection179CarryoverIsZero`. Form 4562 line 10 is *"Carryover of
  *   disallowed deduction from line 13 of your 2024 Form 4562"* — a prior-year
  *   figure. It is a CHECKBOX rather than an amount because a non-zero
@@ -150,6 +159,46 @@ export const sectionOneSixtyEightKStatusValues = /** @type {const} */ ([
 ])
 
 /**
+ * The end of one asset's history: the four facts Form 4797 needs that Form
+ * 4562 never asked for.
+ *
+ * A NESTED optional block rather than four sibling `option(string)` fields, so
+ * that "all four or none" is a STRUCTURAL property of the schema instead of a
+ * cross-field check that can be forgotten. Contrast `section168kStatus` and
+ * `specialDepreciationAllowanceClaimed`, which genuinely are two independent
+ * fields whose agreement {@link checkReferences} has to assert.
+ *
+ * - `dateAcquired` — f4797 line 19 column (b) / line 2 column (b), *"Date
+ *   acquired (mo., day, yr.)"*. **It is not `datePlacedInService`**, in two
+ *   ways that both matter. It carries a DAY, because i4797 p6 measures the
+ *   holding period to the day (*"begin counting on the day after you received
+ *   the property and include the day you disposed of it"*) and the holding
+ *   period decides which printed Part the disposal is reported in. And
+ *   acquisition is not placing in service: property bought in December and
+ *   put to work in January has a holding period that starts in December.
+ *   It lives HERE rather than on the asset because an asset still held needs
+ *   no acquisition day, and requiring one would invalidate every register in
+ *   existence.
+ * - `dateSold` — f4797 line 19 column (c), *"Date sold (mo., day, yr.)"*. Its
+ *   MONTH is also Step 3's disposal decimal (i4562 p11), and its YEAR must be
+ *   this register's own tax year.
+ * - `grossSalesPrice` — f4797 line 20. i4797 p9: *"The gross sales price
+ *   includes money, the FMV of other property received, and any existing
+ *   mortgage or other debt the buyer assumes or takes the property subject
+ *   to."*
+ * - `expenseOfSale` — the second half of f4797 line 21, *"Cost or other basis
+ *   plus expense of sale"*. Stored separately from the cost, which the asset
+ *   already carries, because they are two facts about two different events
+ *   and only their sum appears on the printed line.
+ */
+const assetDisposal = /** @type {const} */ ({
+    dateAcquired: string,
+    dateSold: string,
+    grossSalesPrice: string,
+    expenseOfSale: string,
+})
+
+/**
  * One depreciable asset. Every field is a printed Form 4562 column; see this
  * module's docstring and the spec for the citation behind each.
  *
@@ -171,6 +220,7 @@ const registeredAsset = /** @type {const} */ ({
     specialDepreciationAllowanceClaimed: option(string),
     section179ElectedCost: option(string),
     listedProperty: option(true),
+    disposal: option(assetDisposal),
 })
 
 /**
@@ -213,6 +263,61 @@ const validateShape = rttiValidate(assetRegisterSchema)
  * @type {RegExp}
  */
 const monthAndYear = /^(\d{4})-(\d{2})$/
+
+/**
+ * `YYYY-MM-DD` — month, day and year, for the two Form 4797 columns that
+ * genuinely read a day. See {@link assetDisposal}.
+ * @type {RegExp}
+ */
+const monthDayAndYear = /^(\d{4})-(\d{2})-(\d{2})$/
+
+/**
+ * The number of days in one month, under the Gregorian leap rule. Written out
+ * because a `2025-02-30` is a transcription error and a date this engine
+ * ORDERS rather than subtracts would carry it silently to the right answer,
+ * which is the worst outcome: right today, and unexplainable the first time it
+ * is wrong.
+ * @type {(year: number) => (month: number) => number}
+ */
+const daysInMonth = year => month => {
+    if (month === 2) {
+        return year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0) ? 29 : 28
+    }
+    return month === 4 || month === 6 || month === 9 || month === 11 ? 30 : 31
+}
+
+/**
+ * Checks one `YYYY-MM-DD` field, returning the refusal message or `undefined`.
+ * @type {(where: string) => (field: string) => (value: string) => string | undefined}
+ */
+const fullDateError = where => field => value => {
+    const m = monthDayAndYear.exec(value)
+    if (m === null) {
+        return `${field} ${JSON.stringify(value)} for ${where} is not a YYYY-MM-DD date. Form 4797 `
+            + `lines 2 and 19 print columns (b) and (c) as "(mo., day, yr.)", and the DAY is load `
+            + `bearing: i4797 measures the holding period by "counting on the day after you `
+            + `received the property and includ[ing] the day you disposed of it", and the holding `
+            + `period decides whether the disposal is reported in Part I, Part II or Part III`
+    }
+    const [, yearText, monthText, dayText] = m
+    assert(yearText !== undefined && monthText !== undefined && dayText !== undefined,
+        ['a matched full date has three groups', value])
+    if (yearText === undefined || monthText === undefined || dayText === undefined) {
+        throw ['a matched full date has three groups', value]
+    }
+    const year = Number(yearText)
+    const month = Number(monthText)
+    const day = Number(dayText)
+    if (month < 1 || month > 12) {
+        return `${field} ${value} for ${where} names month ${monthText}, which is not a month`
+    }
+    const last = daysInMonth(year)(month)
+    if (day < 1 || day > last) {
+        return `${field} ${value} for ${where} names day ${dayText}, and ${monthText}/${yearText} `
+            + `has ${last} days`
+    }
+    return undefined
+}
 
 /**
  * The first year MACRS applies to. i4562 p9: *"MACRS is used to depreciate any
@@ -265,6 +370,12 @@ export const fullBusinessUseHundredths = 10000n
  *    `section168kStatus` is `allowanceClaimed`, and does not exceed the
  *    business-use share of the cost. A claimed allowance with no status, or a
  *    status with no amount, is a half-recorded election.
+ * 8. A `disposal` block, if present, carries two real `YYYY-MM-DD` dates and
+ *    two exact non-negative money fields; the sale falls in the register's own
+ *    `taxYear`; the property was not acquired after it was placed in service,
+ *    nor sold before it; and the register does not ALSO certify
+ *    `noDepreciablePropertyDisposedOfDuringTheYear`, which the block
+ *    contradicts.
  * @type {(r: AssetRegister) => Result<AssetRegister, AssetRegisterError>}
  */
 export const checkReferences = r => {
@@ -432,6 +543,73 @@ export const checkReferences = r => {
                 + `property" — an allowance larger than the basis would leave a NEGATIVE basis for `
                 + `depreciation and a negative deduction in every later year`)
         }
+        const disposal = asset.disposal
+        if (disposal !== undefined) {
+            if (r.noDepreciablePropertyDisposedOfDuringTheYear === true) {
+                return error(
+                    `${where} carries a disposal block and the register also certifies `
+                    + `noDepreciablePropertyDisposedOfDuringTheYear. The two contradict each `
+                    + `other, and nothing in the document says which is the mistake. The `
+                    + `certification means what it says — that nothing was disposed of — so a `
+                    + `register recording a sale must not carry it. Remove the certification, or `
+                    + `remove the disposal`)
+            }
+            for (const [field, value] of /** @type {readonly (readonly [string, string])[]} */ ([
+                ['disposal.dateAcquired', disposal.dateAcquired],
+                ['disposal.dateSold', disposal.dateSold],
+            ])) {
+                const message = fullDateError(where)(field)(value)
+                if (message !== undefined) {
+                    return error(message)
+                }
+            }
+            // Both dates are now `YYYY-MM-DD` and zero-padded, so LEXICOGRAPHIC
+            // order IS chronological order and the three comparisons below need
+            // no calendar arithmetic at all.
+            if (disposal.dateSold.slice(0, 4) !== String(r.taxYear)) {
+                return error(
+                    `disposal.dateSold ${disposal.dateSold} for ${where} is not in the register’s `
+                    + `own tax year ${r.taxYear}. One register is one business for one year, and `
+                    + `Form 4797 reports the dispositions of THAT year: a sale in another year `
+                    + `belongs on that year’s return, where its Part I netting and its §1231 `
+                    + `character are decided against that year’s other dispositions`)
+            }
+            if (disposal.dateAcquired.slice(0, 7) > asset.datePlacedInService) {
+                return error(
+                    `disposal.dateAcquired ${disposal.dateAcquired} for ${where} is after `
+                    + `datePlacedInService ${asset.datePlacedInService}. Depreciation "starts when `
+                    + `you first use the property in your business" (i4562 p1), which cannot `
+                    + `precede owning it. The two are different printed columns — f4562 column `
+                    + `(b) is "Month and year placed in service" and f4797 line 19 column (b) is `
+                    + `"Date acquired" — and property bought in December and put to work in `
+                    + `January is the ordinary case, so they are not cross-checked for equality; `
+                    + `only this order is impossible`)
+            }
+            if (disposal.dateSold.slice(0, 7) < asset.datePlacedInService) {
+                return error(
+                    `disposal.dateSold ${disposal.dateSold} for ${where} is before `
+                    + `datePlacedInService ${asset.datePlacedInService}. An asset cannot be sold `
+                    + `in a month before the one it was placed in service in; Step 3’s disposal `
+                    + `decimal would take a fraction of a recovery year that had not begun`)
+            }
+            for (const [field, value] of /** @type {readonly (readonly [string, string])[]} */ ([
+                ['disposal.grossSalesPrice', disposal.grossSalesPrice],
+                ['disposal.expenseOfSale', disposal.expenseOfSale],
+            ])) {
+                const message = moneyFieldError(`${field} for ${where}`)(value)
+                if (message !== undefined) {
+                    return error(message)
+                }
+                if (centsFromString(value) < 0n) {
+                    return error(
+                        `${field} ${value} for ${where} is negative. Form 4797 line 20 is a gross `
+                        + `sales PRICE and line 21’s second term is an EXPENSE of sale; a `
+                        + `negative price is not a price, and a negative expense would INCREASE `
+                        + `the gain line 25a recaptures as ordinary income. A sale that realized `
+                        + `nothing is 0.00, which is accepted`)
+                }
+            }
+        }
     }
     return ok(r)
 }
@@ -493,7 +671,22 @@ export const depreciableAssets = register => register.assets.map(asset => {
     if (convention === undefined) { throw ['a validated convention is one of the three', asset.convention] }
     const claimed = asset.specialDepreciationAllowanceClaimed
     const elected = asset.section179ElectedCost
+    const disposal = asset.disposal
     return {
+        // The disposal's own month and year are split out here, beside
+        // `placedInServiceMonth`, because Step 3's disposal decimal reads the
+        // month SOLD and the recovery year reads the year sold — two numbers a
+        // form module must not have to re-parse a string for. The two full
+        // dates travel as strings because the only thing anything does with
+        // them is COMPARE them, and `YYYY-MM-DD` compares correctly as text.
+        disposal: disposal === undefined ? undefined : {
+            acquiredDate: disposal.dateAcquired,
+            soldDate: disposal.dateSold,
+            soldYear: Number(disposal.dateSold.slice(0, 4)),
+            soldMonth: Number(disposal.dateSold.slice(5, 7)),
+            grossSalesPriceCents: centsFromString(disposal.grossSalesPrice),
+            expenseOfSaleCents: centsFromString(disposal.expenseOfSale),
+        },
         description: asset.description,
         placedInServiceYear: Number(yearText),
         placedInServiceMonth: Number(monthText),
@@ -545,6 +738,35 @@ export const priorYearServer = /** @type {RegisteredAsset} */ ({
     section168kStatus: 'allowanceClaimed',
     specialDepreciationAllowanceClaimed: '16000.00',
 })
+
+
+/**
+ * The disposal block every leaf below varies one field of: acquired 14
+ * February 2023, sold 3 November 2025 for $4,250.75 with $125.00 of selling
+ * expense. **Every field is distinctive** — a different month on each side of
+ * the sale, a price whose cents are non-zero, and an expense that is not a
+ * round hundred — so a helper reading one field for another produces a visibly
+ * wrong number rather than a plausible one.
+ */
+const soldDisposal = /** @type {const} */ ({
+    dateAcquired: '2023-02-14',
+    dateSold: '2025-11-03',
+    grossSalesPrice: '4250.75',
+    expenseOfSale: '125.00',
+})
+
+/** {@link priorYearServer} without its §168(k) allowance, sold during the year. @type {RegisteredAsset} */
+const soldServer = {
+    description: 'rack server',
+    datePlacedInService: '2023-03',
+    costOrOtherBasis: '20000.00',
+    businessUsePercentage: '100.00',
+    classification: 'fiveYear',
+    method: '200DB',
+    convention: 'HY',
+    section168kStatus: 'electedOut',
+    disposal: soldDisposal,
+}
 
 /** Rebuilds `minimalAssetRegister` around one asset. @type {(asset: RegisteredAsset) => AssetRegister} */
 const withAsset = asset => ({ ...minimalAssetRegister, assets: [asset] })
@@ -728,6 +950,166 @@ export const proof = {
         overPreciseBusinessUseIsRefused: () => {
             assert(expectRefusal(validate(withAsset({ ...officeFurniture, businessUsePercentage: '33.333' })))
                 .includes('two decimal places'), 'three decimals')
+        },
+    },
+    disposal: {
+        // THE CONTROL FIRST, because every refusal below is a departure from
+        // it: an ordinary sale of an asset the register already holds
+        // validates, and the four facts travel out of the dialect as the
+        // `bigint`s and `number`s `fjs/form4797` takes.
+        anOrdinaryDisposalValidatesAndTravels: () => {
+            const [t, v] = validate(withAsset(soldServer))
+            assert(t === 'ok', ['expected ok', t, v])
+            const [asset] = depreciableAssets(v)
+            assert(asset !== undefined, 'expected one extracted asset')
+            if (asset === undefined) { return }
+            const disposal = asset.disposal
+            assert(disposal !== undefined, ['the disposal must travel out of the dialect', asset])
+            if (disposal === undefined) { return }
+            assertEq(disposal.acquiredDate, '2023-02-14')
+            assertEq(disposal.soldDate, '2025-11-03')
+            // The month and the year are split out because Step 3's disposal
+            // decimal reads the MONTH and the recovery year reads the YEAR;
+            // both are asserted, because a helper that read one for the other
+            // would still produce plausible numbers.
+            assertEq(disposal.soldYear, 2025)
+            assertEq(disposal.soldMonth, 11)
+            assertEq(disposal.grossSalesPriceCents, 425075n, '$4,250.75')
+            assertEq(disposal.expenseOfSaleCents, 12500n, '$125.00')
+        },
+        // An asset with no disposal carries `undefined` rather than a
+        // zero-valued block — the distinction printed Form 4797 turns on.
+        anAssetStillHeldCarriesNoDisposal: () => {
+            const [t, v] = validate(withAsset(priorYearServer))
+            assert(t === 'ok', ['expected ok', t, v])
+            const [asset] = depreciableAssets(v)
+            assert(asset !== undefined, 'expected one extracted asset')
+            if (asset === undefined) { return }
+            assertEq(asset.disposal, undefined)
+        },
+        // The register asserts nothing was disposed of AND records a disposal.
+        // Nothing in the document says which is the mistake.
+        aDisposalBesideTheCertificationIsRefused: () => {
+            const message = expectRefusal(validate({
+                ...withAsset(soldServer),
+                noDepreciablePropertyDisposedOfDuringTheYear: true,
+            }))
+            assert(message.includes('contradict'),
+                ['the refusal must say the two disagree', message])
+            assert(message.includes('noDepreciablePropertyDisposedOfDuringTheYear'),
+                ['and name the certification', message])
+        },
+        // Form 4797 lines 2 and 19 print columns (b) and (c) as "(mo., day,
+        // yr.)" and the DAY decides which printed Part the disposal lands in,
+        // so a `YYYY-MM` here is refused rather than read as the first of the
+        // month.
+        aMonthAndYearWithNoDayIsRefused: () => {
+            const message = expectRefusal(validate(withAsset({
+                ...soldServer, disposal: { ...soldDisposal, dateSold: '2025-11' },
+            })))
+            assert(message.includes('YYYY-MM-DD'), ['the refusal must name the shape', message])
+            assert(message.includes('holding period'),
+                ['and say what the day decides', message])
+        },
+        // A day the month does not have. Only the ORDER of these dates is ever
+        // used, so `2025-02-30` would sort correctly and produce a plausible
+        // answer — which is exactly why it is checked.
+        aDayTheMonthDoesNotHaveIsRefused: () => {
+            const message = expectRefusal(validate(withAsset({
+                ...soldServer, disposal: { ...soldDisposal, dateSold: '2025-02-30' },
+            })))
+            assert(message.includes('28 days'),
+                ['the refusal must say how many days the month has', message])
+        },
+        // THE CONTROL FOR THE LEAP RULE, in both directions: 2024 has a 29th
+        // of February and 2025 does not. A `daysInMonth` that returned 28 or
+        // 29 unconditionally would pass one of these two and fail the other.
+        theLeapDayIsAcceptedInALeapYearAndRefusedOtherwise: () => {
+            assertEq(validate(withAsset({
+                ...soldServer,
+                datePlacedInService: '2023-02',
+                disposal: { ...soldDisposal, dateAcquired: '2024-02-29' },
+            }))[0], 'error', 'acquired after placed in service')
+            assertEq(validate({
+                ...minimalAssetRegister,
+                taxYear: 2024,
+                assets: [{
+                    ...soldServer,
+                    // Placed in service in March 2024 rather than March 2023,
+                    // because the acquisition cannot precede the service date
+                    // and the leaf above already checks that rule.
+                    datePlacedInService: '2024-03',
+                    disposal: { ...soldDisposal, dateAcquired: '2024-02-29', dateSold: '2024-12-01' },
+                }],
+            })[0], 'ok', '2024 HAS a 29th of February')
+            assert(expectRefusal(validate(withAsset({
+                ...soldServer,
+                disposal: { ...soldDisposal, dateSold: '2025-02-29' },
+            }))).includes('28 days'), '2025 does not')
+        },
+        // One register is one business for ONE year, and Form 4797 reports
+        // that year's dispositions: a sale in another year belongs on that
+        // year's return, where its §1231 character is decided against that
+        // year's other dispositions.
+        aSaleOutsideTheRegistersTaxYearIsRefused: () => {
+            const message = expectRefusal(validate(withAsset({
+                ...soldServer, disposal: { ...soldDisposal, dateSold: '2024-11-03' },
+            })))
+            assert(message.includes('2025'), ['the refusal must quote the register’s year', message])
+            assert(message.includes('§1231'),
+                ['and say why the year matters', message])
+        },
+        // Acquiring an asset AFTER placing it in service is not a thing that
+        // can happen. The reverse — bought in December, put to work in
+        // January — is the ORDINARY case and must not be refused, which is
+        // the second half of this leaf.
+        acquisitionAfterPlacingInServiceIsRefusedAndBeforeIsNot: () => {
+            const message = expectRefusal(validate(withAsset({
+                ...soldServer, disposal: { ...soldDisposal, dateAcquired: '2023-04-01' },
+            })))
+            assert(message.includes('Date acquired'),
+                ['the refusal must name the printed column', message])
+            // THE CONTROL: acquired in the month BEFORE, and in the same
+            // month, both validate.
+            assertEq(validate(withAsset({
+                ...soldServer, disposal: { ...soldDisposal, dateAcquired: '2023-02-28' },
+            }))[0], 'ok', 'the same month is fine')
+            assertEq(validate(withAsset({
+                ...soldServer, disposal: { ...soldDisposal, dateAcquired: '2022-12-30' },
+            }))[0], 'ok', 'and an earlier one is the ordinary case')
+        },
+        // Selling in a month before the one it was placed in service in would
+        // take a fraction of a recovery year that had not begun.
+        aSaleBeforeThePlacedInServiceMonthIsRefused: () => {
+            const message = expectRefusal(validate(withAsset({
+                ...soldServer,
+                datePlacedInService: '2025-06',
+                disposal: {
+                    ...soldDisposal, dateAcquired: '2025-05-01', dateSold: '2025-04-30',
+                },
+            })))
+            assert(message.includes('Step 3'),
+                ['the refusal must name the decimal it would take', message])
+        },
+        // A negative expense of sale would INCREASE the gain line 25a
+        // recaptures as ordinary income; a negative price is not a price.
+        negativeDisposalMoneyIsRefused: () => {
+            assert(expectRefusal(validate(withAsset({
+                ...soldServer, disposal: { ...soldDisposal, grossSalesPrice: '-1.00' },
+            }))).includes('negative'), 'a negative price')
+            assert(expectRefusal(validate(withAsset({
+                ...soldServer, disposal: { ...soldDisposal, expenseOfSale: '-1.00' },
+            }))).includes('INCREASE'),
+                'a negative expense, and the refusal must name the direction')
+        },
+        // THE CONTROL: a sale that realized NOTHING is 0.00 and is accepted —
+        // an abandoned machine is a real disposal, and refusing it would send
+        // the taxpayer looking for a price that does not exist.
+        aSaleForNothingIsAccepted: () => {
+            assertEq(validate(withAsset({
+                ...soldServer,
+                disposal: { ...soldDisposal, grossSalesPrice: '0.00', expenseOfSale: '0.00' },
+            }))[0], 'ok')
         },
     },
     sectionOneSixtyEightK: {

@@ -63,6 +63,86 @@ pinned rerun reproducing it byte for byte. That is what `1.0.0` names.
   and no Schedule C had the whole of Schedule SE line 13 subtracted from a zero qualified-business
   -income base. And the guest program's SOURCE text was unproven for any field the function twin
   renders correctly — hardcoding `'0.00'` there left the whole suite green.
+### Form 4797 — Sales of Business Property (TAX-41)
+
+**A proprietor who sold a machine computes.** `otherGainsOrLosses` was an
+`fjs/return/scope` refusal and Schedule 1 line 4 was a documented zero. Printed Form 4797 Parts I,
+II and III now compute over a per-asset `disposal` block added to `vnd.fjs.asset_register`, and the
+form's three answers reach three printed destinations: line 18b to Schedule 1 line 4, a net §1231
+gain to Schedule D line 11, and the unrecaptured §1250 gain to Schedule D line 19. Spec, written
+first, in [`fjs/form4797/todo/`](./fjs/form4797/todo/sales-of-business-property.md).
+
+- **No new dialect.** Four of the six figures Part III needs are already on the register asset, and
+  the only join key a separate document could use is `description`, a free-text field with no
+  uniqueness rule. Form 4562 also has to KNOW about the disposal — i4562 p11 gives the year of sale
+  a part-year deduction and strikes a same-year disposal from the mid-quarter aggregate — so a
+  disposal stored anywhere Form 4562 cannot see it would leave printed Schedule C line 13 and
+  Schedule E line 18 overstated for every filer who sold something.
+- **The §1231 asymmetry is the printed page's, not this engine's.** §1231(c)'s five-year lookback
+  lives on printed line 8, and the line 7 instruction says *"If line 7 is zero or a loss … skip
+  lines 8 and 9."* So a net §1231 **loss** year is fully computable with no prior-year figure at
+  all, and a net §1231 **gain** year needs `vnd.fjs.return_profile`'s new
+  `noNonrecapturedNetSectionOneTwoThreeOneLossesFromPriorYears` — the state the same printed
+  sentence names — and refuses at printed line 8 without it. It is the exact mirror of
+  `fjs/schedule/e/part_i`, where a PROFIT computes and a LOSS refuses because §469 sits on printed
+  line 22.
+- **Line 7 = 0 is the third case, and it is the common one.** §1245 caps the recapture at the total
+  gain, so an ordinary machine sold for less than it cost has line 32 = 0 and line 7 = 0 — the whole
+  gain ordinary on Schedule 1 line 4, no certification, no Schedule D. That is what makes the form
+  worth having under a prior-year blocker.
+- **Depreciation is derived allowed OR ALLOWABLE, never transcribed.** i4797 p9 recaptures what was
+  allowable whether or not it was claimed, and `fjs/form4562/macrs`'s `macrsColumn` already produces
+  the whole schedule from the unadjusted basis — the same property that let the register omit
+  accumulated depreciation in the first place. There is no "asset predates the register" case: the
+  register refuses pre-1987 property by name, so every asset it can hold has a column from recovery
+  year 1.
+- **`fjs/form4562/macrs` gained `disposalTwentyFourths`**, i4562 p11 Step 3's SECOND printed decimal
+  column, checked against all seventeen printed rows. `fjs/form4562` applies it in the year of sale;
+  without it every filer who sold something would deduct a whole year of depreciation on it.
+- **`fjs/schedule/d` can accept unrecaptured §1250 gain, and now does.** The *Unrecaptured Section
+  1250 Gain Worksheet*'s lines 1 through 9 were one documented zero commented *"entirely about real
+  property/depreciation recapture this project has no document type for"*. That sentence stopped
+  being true; the block now computes, with the line 7 cap and the line 8 subtraction where the other
+  summands are. Line 19 forces the Schedule D Tax Worksheet over the QDCGT, which is the only
+  observable difference between the two — so the wiring proof asserts the METHOD.
+- **`noDepreciablePropertyDisposedOfDuringTheYear` is NARROWED, not retired.** Form 4562 requires it
+  only when no disposal is recorded, and the dialect refuses a register carrying both. Five
+  disposals still cannot be characterized and each refuses by name: 15- and 20-year property (the
+  class straddles §1245 and §1250, and post-1986 the two differ by the WHOLE recapture), business
+  use below 100%, an asset placed in service and sold inside one tax year, a register bound to a
+  stored farm (§1231(b)(3) livestock holding periods, §1252 farmland), and a §1231 gain on a return
+  that files no Schedule D.
+- **Counts.** modeled `55 → 56`, refused `142 → 141`, tripwires `11 → 12` (a stored disposal on an
+  undeclared return), vocabulary unchanged at 197, dialects unchanged at 32 classified / 30 served /
+  29 dispatched.
+- **The earned income credit was WRONG, and no mutation found it.** Publication 596 Worksheet 1
+  line 6 subtracts the Form 4797 line 7 gain from capital gain net income — a §1231 gain is business
+  gain, not investment income, and it arrives on 1040 line 7a through Schedule D line 11 exactly as
+  a stock sale does. That line had been a documented zero because Form 4797 did not exist. Leaving
+  it out OVERSTATES §32(i) disqualified income, and §32(i)(1) is a cliff at $11,950.00 — so the
+  consequence was the credit denied outright to a working parent who sold a machine. Found by
+  grepping for what this phase INVALIDATED rather than for what it touched; two Schedule K-1 box
+  remedies naming the same retired refusal were corrected in the same pass. §10 of the spec.
+- **Six mutations survived and every one produced a leaf**: the §168(k) allowance inside the
+  recapture base (every fixture in the repository said `electedOut`), the §1250 worksheet's line 7
+  cap and its line 8, the same-year refusal (which had no proof at all), the ROUNDING ORDER of the
+  disposal decimal, the provenance path in every citation, and the earned income credit's new input
+  never being handed over. One equivalent mutant is recorded at its site; four did not compile and
+  were re-run in compiling form. The full log is §9 of the spec.
+- **It composes with Form 461, and the two branches could not see each other.** Both coined
+  `TAX-40` on 2026-08-19; Form 461 was on the trunk first, so Form 4797 became **TAX-41** when the
+  two were integrated — the split `TAX-38`'s own note in REQUIREMENTS.md said belongs to whoever
+  integrates. The composition is real, not clerical: printed Schedule 1 line 4 is formed before
+  `fjs/schedule/1` calls `form461`, and printed Form 461 line 4 reads it. Nothing in Form 461 Part
+  II removes it — a §1231 gain or loss IS attributable to a trade or business — so line 18b moves
+  printed Form 461 line 14 cent for cent, where 1040 line 7a still cancels. **What Form 4797 did
+  falsify is the reason line 7a cancels.** Form 461 removed the whole of it on the stated ground
+  that "every capital transaction this engine can hold is an investment transaction"; a net §1231
+  gain reaches 1040 line 7a through Schedule D line 11 and is not. The arm is deliberately left
+  unconditional — printed Schedule D carries no §1231 share to remove instead, having netted and
+  §1211(b)-capped it — and the direction is an over-refusal, never a wrong number. Recorded at
+  three sites and pinned by a leaf rather than silently absorbed.
+
 
 ### Schedule F — Profit or Loss From Farming
 

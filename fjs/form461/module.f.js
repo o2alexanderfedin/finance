@@ -78,11 +78,31 @@
  * of the total deductions from your trades or businesses. So any such amounts
  * included here in line 3 should be added back on line 11"*, and *"any capital
  * gains not attributable to your trade or business that are included here in
- * line 3 should be added back on line 10."* Every capital transaction this engine
- * can hold is an investment transaction — `vnd.fjs.1099b`, `vnd.fjs.1099div` box
- * 2a, or a Schedule K-1 slice whose §1231 half `fjs/schedule/e` refuses whole —
- * and Form 4797 is unmodeled, so there is no trade-or-business capital gain for
- * i461's *"lesser of"* cap to bite on.
+ * line 3 should be added back on line 10."*
+ *
+ * **This was a determination when it was written and is an ADMISSION now, and
+ * Form 4797 is what changed it.** Until TAX-41 every capital transaction this
+ * engine could hold was an investment transaction — `vnd.fjs.1099b`,
+ * `vnd.fjs.1099div` box 2a, or a Schedule K-1 slice whose §1231 half
+ * `fjs/schedule/e` refuses whole — so there was no trade-or-business capital
+ * gain for i461's *"lesser of"* cap to bite on. `fjs/form4797` now sends a net
+ * §1231 gain to printed Schedule D line 11 and so into 1040 line 7a, which IS a
+ * gain attributable to a trade or business, and printed line 10 removes it
+ * anyway.
+ *
+ * It stays that way for a stated reason rather than by omission: splitting it
+ * needs the §1231 SHARE of 1040 line 7a, and printed Schedule D does not carry
+ * one — it nets that gain against investment losses and caps the result at
+ * §1211(b)'s $3,000, so *"any such amounts included here in line 3"* is not a
+ * subtraction this module's caller can perform. The safety argument is the one
+ * printed just below for Schedule 1 line 5, and it runs the same way: removing a
+ * gain can only make line 14 SMALLER and the limitation MORE likely to bind, so
+ * a return that COMPUTES here computes under either reading and one that refuses
+ * may be refusing where a hand-figured Form 461 would have allowed. An
+ * over-refusal, never a wrong number. `fjs/schedule/1`'s
+ * `formFourSevenNineSevenLineFourMovesLineFourteenAndLineThreeStillCancels`
+ * pins both halves of the contrast, and printed line 4 below is the term that
+ * does not cancel.
  *
  * **Schedule 1 line 5 comes out in full too, and that is an admission rather than
  * a determination.** i461's *Trade or business* note: *"If you own an interest in
@@ -274,9 +294,12 @@ export const form461 = taxParamSet => input => {
     //    loss, which Part II removes again in full — see the docstring.
     const line3 = form1040Line7aCents
     // 4. "Enter amount from Schedule 1 (Form 1040), line 4." Other gains and
-    //    losses, Form 4797. A documented zero in this engine, and passed in
-    //    rather than written as `0n` here so that the day Form 4797 exists this
-    //    line is already wired.
+    //    losses, Form 4797 line 18b. **Live as of TAX-41** — it was a documented
+    //    zero when this module was written, threaded rather than written as `0n`
+    //    against exactly that day, and `fjs/schedule/1` forms printed line 4
+    //    before it calls this function. Nothing in Part II removes it: a §1231
+    //    gain or loss IS attributable to a trade or business, which is what
+    //    §1231 property means.
     const line4 = scheduleOneLine4Cents
     // 5. "Enter amount from Schedule 1 (Form 1040), line 5." Schedule E line 41.
     const line5 = scheduleOneLine5Cents
