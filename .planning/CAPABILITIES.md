@@ -235,12 +235,17 @@ repository's own, and all three are sized rather than open questions:**
    an opaque `Nominal` host handle, which is the precedent), so the old "wait for a second caller"
    deferral is retired. Filed as `functionalscript#1649`. The note's own sketch does not type-check
    at 0.46.1 — every operation must return a `Result` — and the corrected five-operation design is
-   in the issue.
+   in the issue. Review (2026-08-19) falsified two more of its lines: `childWait` cannot answer a
+   number, because Node reports `code === null` for a signalled child, and `childWrite` must not
+   loop over short writes, because Node's `Writable.write()` never performs one — the remedy was
+   already written in `fjs/effects/node/module.mjs`'s own `writeAll` comment.
 4. **`upstream-cas-get-uri-discloses-host-path.md`** — `cas_get` puts the blob's **absolute host
    path** in its `uri` field, unconditionally: one call reveals the home directory, the account name
    and the store layout. Verified by execution. A design decision on a public protocol surface, so
-   it is filed as `functionalscript#1650` and left to the maintainer. Latent rather than live —
-   stdio is the only transport today, and a local client could read `os.homedir()` itself.
+   it is filed as `functionalscript#1650` and left to the maintainer. **Live, not latent** — this
+   entry said "latent" until 2026-08-19, on the premise that stdio implies a same-user local client
+   that could read `os.homedir()` itself. It does not: `ssh host … mcp`, a container and a
+   different-UID wrapper are ordinary stdio launches where the client cannot. Raised to P2 upstream.
 
 **The dependency question is closed.** `functionalscript` is at **^0.46.1**. This section read
 "pinned at 0.43.1 because 0.44/0.45 dropped the `.js` emit" until 2026-08-19, which was true when
