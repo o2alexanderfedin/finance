@@ -448,9 +448,20 @@ export const churchEmployeeIncomeLine5a = () => ({
  * shareholder no matter how large their share — see {@link
  * scheduleSelfEmploymentPartI}'s own line 2 comment.
  * `farmNetProfitCents` is **Schedule F line 34**, which printed line 1a names
- * in its own caption. It is `0n` for every return with no farm, and it can only
- * be zero or positive: `fjs/schedule/f` REFUSES a net farm loss, so the
- * negative half of "net farm profit or (loss)" cannot reach this line.
+ * in its own caption. It is `0n` for every return with no farm, and **it CAN be
+ * negative** as of the Form 461 phase: `fjs/schedule/f` computes a net farm loss
+ * at printed box 36a, so the parenthesised half of "net farm profit or (loss)"
+ * reaches this line for real.
+ *
+ * Nothing here needed changing for it, and the printed page is why. Line 4a is
+ * *"If line 3 is more than zero, multiply line 3 by 92.35%. **Otherwise, enter
+ * amount from line 3**"* — the §1402(a)(12) factor is applied only to a positive
+ * amount — and line 4c's *"if less than $400, stop; you don't owe
+ * self-employment tax"* is implemented at line 6, which zeroes below the floor.
+ * A negative line 1a therefore falls out at line 6 with no self-employment tax
+ * and no negative deduction on line 13. `aFarmLossOwesNoSelfEmploymentTax` is
+ * the leaf that pins it, because "no change was needed" is a claim, not an
+ * observation.
  * @typedef {{
  *   readonly netProfitCents: bigint,
  *   readonly farmNetProfitCents: bigint,
@@ -712,6 +723,44 @@ const printedNetEarningsFactorBasisPoints = 9235n
 const printedMinimumNetEarningsCents = 40000n
 
 export const proof = {
+    /**
+     * ★ **A NET FARM LOSS ON PRINTED LINE 1a OWES NO SELF-EMPLOYMENT TAX**, and
+     * no line of this form needed changing for it — which is a claim, so here is
+     * the observation.
+     *
+     * `fjs/schedule/f` refused every net farm loss until the Form 461 phase, so
+     * printed line 1a could only be zero or positive and this module's own
+     * docstring said so. It can be negative now. A $50,000.00 farm loss against
+     * $10,000.00 of Schedule C profit: line 3 is -$40,000.00, line 4a takes the
+     * printed "otherwise, enter amount from line 3" branch rather than the
+     * 92.35% one, line 4c is below the $400 floor, and line 6 zeroes.
+     */
+    aFarmLossOwesNoSelfEmploymentTax: () => {
+        const result = scheduleSelfEmploymentPartI(taxParams2025)({
+            netProfitCents: 1000000n,
+            farmNetProfitCents: -5000000n,
+            partnershipSelfEmploymentEarningsCents: 0n,
+            socialSecurityWagesCents: 0n,
+        })
+        assertEq(result.line1a, -5000000n, 'printed line 1a carries the farm LOSS')
+        assertEq(result.line3, -4000000n, '$10,000.00 - $50,000.00 = -$40,000.00')
+        assertEq(result.line4a, -4000000n,
+            'the 92.35% factor is NOT applied: "otherwise, enter amount from line 3"')
+        assertEq(result.line6, 0n, 'below the $400 floor, so line 6 is zero')
+        assertEq(result.line12, 0n, 'no self-employment tax')
+        assertEq(result.line13, 0n, 'and no negative deduction on Schedule 1 line 15')
+        // THE CONTROL: the same farm figure POSITIVE takes the 92.35% branch and
+        // owes tax, so this leaf is not merely observing that everything is zero.
+        const profit = scheduleSelfEmploymentPartI(taxParams2025)({
+            netProfitCents: 1000000n,
+            farmNetProfitCents: 5000000n,
+            partnershipSelfEmploymentEarningsCents: 0n,
+            socialSecurityWagesCents: 0n,
+        })
+        assertEq(profit.line3, 6000000n, '$60,000.00')
+        assertEq(profit.line4a, 5541000n, '6,000,000 x 0.9235 = $55,410.00')
+        assert(profit.line12 > 0n, ['a profit owes self-employment tax', profit.line12])
+    },
     partnershipShare: {
         /**
          * **Printed line 2 has TWO sources and line 3 adds them**, and the two

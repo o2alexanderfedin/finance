@@ -17,6 +17,53 @@ pinned rerun reproducing it byte for byte. That is what `1.0.0` names.
 
 ## Unreleased
 
+### Form 461 — Limitation on Business Losses (§461(l))
+
+**A farm loss computes.** `fjs/form461` is the printed form, all sixteen lines, wired into
+`fjs/schedule/1` Part I where printed line 8p belongs. Spec, written first, in
+[`fjs/form461/todo/`](./fjs/form461/todo/limitation-on-business-losses.md).
+
+- **The threshold is $313,000 ($626,000 on a joint return)**, read at **Rev. Proc. 2024-40
+  §2.32** rather than taken from the form, and cross-checked against printed line 15 and i461's
+  *Threshold amount*. **Only `marriedFilingJointly` takes the doubled figure.** Married filing
+  separately takes the FULL $313,000 — §461(l) has no halving clause, unlike §1211(b)'s capital
+  loss allowance twenty lines away in `fjs/schedule/d` — and a qualifying surviving spouse takes
+  $313,000 too, because both the printed line and §461(l)(3)(A)(ii)(II) name the joint RETURN.
+- **Wages are not on this form.** i461: excess losses are figured *"without regard to any
+  deductions, gross income, or gains attributable to any trade or business of performing services
+  of an employee"* — §461(l)(6) — which is why printed line 1 reads *"Reserved for future use"*
+  where the 2018-2020 revisions put Form 1040 line 1 and then removed it again on line 11. The
+  brief this work was written against said the opposite. Nothing in the module reads a Form W-2.
+- **A loss fully allowed computes; a BINDING limitation refuses**, which is `fjs/form8829`'s
+  asymmetry reached the same way. The disallowed amount is a §172 net operating loss carryover,
+  and `netOperatingLossDeduction` is itself an `fjs/return/scope` refusal with no dialect behind
+  it. `fjs/schedule/d`'s uncapped capital loss looks like a counter-precedent and is not: every
+  other outbound carryforward this engine creates has a modeled INBOUND counterpart, and this one
+  alone does not.
+- **Printed Schedule F line 34 now computes a LOSS at printed box 36a.** i1040sf p10 disposes of
+  §465 and §469 in one sentence on the taxpayer's own two answers; §461(l) is figured on Form 461
+  over the aggregate, which is where i461's *Ordering Rules* put it. Box 36b still refuses, on
+  §465 and Form 6198 alone. **`fjs/schedule/c`'s loss does not move**, and the reason is a
+  dialect rather than a statute: `vnd.fjs.business_expenses` carries no field for printed line
+  32's at-risk box and none for material participation, so neither §465 nor §469 can even be
+  asked of a Schedule C business. `fjs/schedule/e/part_i`'s two loss refusals do not move either.
+- **§199A(c)(2)'s outbound carryforward acquired a home**, which Schedule F's own docstring had
+  said it did not have. Form 8995 printed line 16 always computed it and nothing read it; the
+  zero floor sat on printed line 2 where the paper floors line 4, and the figure reached no report
+  field. Both are fixed, so a farmer can transcribe it into next year's
+  `priorYearQualifiedBusinessLossCarryforward` — the inbound field that has existed since Phase
+  28. Above §199A(e)(2)'s threshold `fjs/form8995a` refuses instead, having no such printed line.
+- **No kind was reclassified.** `excessBusinessLossAdjustment` stays refused: an excess business
+  loss still cannot be produced, and what changed is the REASON, which its remedy now states.
+  Three remedies were corrected for naming a form or a reason that had ceased to be true, and a
+  hand-typed leaf looks each row up by kind and asserts both what it must say and what it must no
+  longer say.
+- **Two defects the work uncovered, each found by mutation rather than by reading.** Moving the
+  §199A floor exposed a §199A(c)(1) wiring bug: a general partner with Schedule K-1 box 14 code A
+  and no Schedule C had the whole of Schedule SE line 13 subtracted from a zero qualified-business
+  -income base. And the guest program's SOURCE text was unproven for any field the function twin
+  renders correctly — hardcoding `'0.00'` there left the whole suite green.
+
 ### Schedule F — Profit or Loss From Farming
 
 **A farmer computes.** `farmIncomeOrLoss` was an `fjs/return/scope` refusal whose whole remedy

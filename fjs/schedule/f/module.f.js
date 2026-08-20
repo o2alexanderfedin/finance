@@ -28,44 +28,62 @@
  * | 23 pension and profit-sharing | REFUSES by name | nothing distinguishes an employee's from the proprietor's |
  * | 11, 13, 15-22, 24a-32 | ✔ | `vnd.fjs.farm` entries, one category per printed line |
  * | 33 total expenses | ✔ | a plain sum; printed line 32f cannot go negative here |
- * | 34 net farm profit | ✔ **any profit, and a break-even zero**; REFUSES a loss | see below |
+ * | 34 net farm profit | ✔ **any profit, any break-even zero, and a LOSS at printed box 36a**; REFUSES a loss at box 36b | see below |
  * | 35 | reserved | the printed face says *"Reserved for future use"* |
- * | 36a/36b at risk | never reached | it exists only for a loss, which refuses |
+ * | 36a/36b at risk | ✔ **read**, and it decides whether a loss computes | 36a computes, 36b refuses on §465 |
  * | Part III (37-50) | REFUSES by name | beginning and ending INVENTORY, and a valuation method |
  *
- * ## The net-loss decision
+ * ## The net-loss decision, and where it stands after the Form 461 phase
  *
- * **A net loss on line 34 is REFUSED by name. A profit, and a break-even zero,
- * compute.** This is `fjs/schedule/c` line 31's decision and
- * `fjs/schedule/e/part_i`'s, reached from a printed page that says the same
- * thing — i1040sf p9, *"If line 33 is more than line 9, don't enter your loss on
+ * **A net loss on line 34 COMPUTES at printed box 36a. It REFUSES at printed box
+ * 36b, on §465 alone.** A profit and a break-even zero compute as they always
+ * did. i1040sf p9: *"If line 33 is more than line 9, don't enter your loss on
  * line 34 until you have applied the at-risk rules and the passive activity loss
  * rules […] You may also be required to file Form 461, which limits the
- * allowable loss."*
+ * allowable loss."* Three things stood in the way of that sentence and two of
+ * them are gone.
  *
- * **The binding statute is §461(l), and NOT §461(j).** §461(j)'s excess FARM
- * loss is the provision a farm-shaped reading reaches for, and §461(l)(1)'s
- * flush text disapplies it for any noncorporate taxpayer in a year §461(l)
- * applies — which 2025 is (i1040sf p1, Reminders). The two have different
- * thresholds and different carryover consequences, so naming the wrong one
- * would send a filer to the wrong form.
+ * **§465 and §469 are disposed of by i1040sf p10, in one sentence, on the
+ * taxpayer's own two answers**: *"If all your investment amounts are at risk in
+ * this activity, check box 36a. If you also checked the 'Yes' box on line E,
+ * your remaining loss is your loss. The at-risk rules and the passive activity
+ * loss rules don't apply."* `vnd.fjs.farm` stores both answers, which is exactly
+ * what `vnd.fjs.business_expenses` does not — it carries no field for Schedule
+ * C's printed line 32 at-risk box and none for material participation, so
+ * `fjs/schedule/c`'s loss still refuses and this one does not. That difference
+ * between two dialects is the whole reason one schedule moved and the other
+ * could not. At box 36b, {@link netFarmLossRefusal} still refuses, and its
+ * ground is §465 and Form 6198 alone.
  *
- * **§469 never appears in the loss refusal, and that is because of a refusal
- * that fires earlier.** {@link noMaterialParticipationRefusal} turns away every
- * farm that answered "No" on printed line E, so a farm that reaches printed line
- * 34 at all is non-passive by the taxpayer's own assertion. What is left is
- * §465 — named only when printed box 36b is checked, which is what i1040sf p10
- * says: *"If all your investment amounts are at risk in this activity, check box
- * 36a. If you also checked the 'Yes' box on line E, your remaining loss is your
- * loss. The at-risk rules and the passive activity loss rules don't apply."*
+ * **§461(l) is computed now**, by `fjs/form461`, called from `fjs/schedule/1`
+ * Part I after every schedule has produced its own printed line — which is
+ * exactly i461's *Ordering Rules*: *"First, apply the at-risk rules; next, apply
+ * the passive activity loss rules; and then apply the excess business loss
+ * rules."* This schedule does not ask it, and could not: §461(l)(3)(A) measures
+ * the AGGREGATE of every trade or business on the return, which one Schedule F
+ * cannot see. A loss the limitation actually BINDS on still refuses, from
+ * `fjs/form461`, because the disallowed amount is a §172 net operating loss
+ * carryover this engine cannot hand to next year.
  *
- * A THIRD blocker holds even at 36a, and it is not a limitation on the loss but
- * a consequence of it: §199A(c)(2) makes a negative qualified business income
- * amount *"a loss from a qualified trade or business in the succeeding taxable
- * year"*, which is next year's Form 8995 line 3. This engine holds one tax year.
- * `vnd.fjs.business_expenses` carries
- * `priorYearQualifiedBusinessLossCarryforward` because of the INBOUND direction
- * of that rule; the outbound direction has no home at all.
+ * **The binding statute is §461(l), and NOT §461(j)**, and that reading is what
+ * made the aggregate the right question to ask. §461(j)'s excess FARM loss is
+ * the provision a farm-shaped reading reaches for, and §461(l)(1)'s flush text
+ * disapplies it for any noncorporate taxpayer in a year §461(l) applies — which
+ * 2025 is (i1040sf p1, Reminders). The two have different thresholds and
+ * different carryover consequences.
+ *
+ * **§199A(c)(2) was the third blocker, and it is gone for a reason worth
+ * recording, because this docstring got it wrong.** It said the outbound
+ * direction of that rule *"has no home at all"*. It has one: Form 8995 printed
+ * line 16, *"Total qualified business (loss) carryforward"*, which
+ * `fjs/form8995` has computed since Phase 28 and nothing read. Two things were
+ * genuinely missing and the Form 461 phase supplied both — the zero-floor sat on
+ * printed line 2 where the paper floors line 4, so a loss would have been
+ * swallowed before reaching line 16; and line 16 reached no report field, so the
+ * farmer could not transcribe it into next year's
+ * `priorYearQualifiedBusinessLossCarryforward`. Above §199A(e)(2)'s threshold
+ * `fjs/form8995a` refuses instead, because Form 8995-A has no such printed line
+ * here.
  *
  * ## Printed line E answering "No" refuses, and the ground is §1411
  *
@@ -574,43 +592,56 @@ export const agriculturePaymentsWithoutAFarmRefusal = documentHash => box => amo
 })
 
 /**
- * Printed line 34 is a LOSS. §461(l), §465 when box 36b is checked, and
- * §199A(c)(2) — see this module's docstring.
+ * **Printed line 34 is a LOSS and printed box 36b is checked.** §465 alone, and
+ * it is the ONLY thing that still stops a farm loss here.
+ *
+ * This function refused EVERY net farm loss until the Form 461 phase, on three
+ * grounds in one message: §465 when box 36b was checked, §461(l) always, and
+ * §199A(c)(2) always. Two of the three are gone and the third is unchanged:
+ *
+ * - **§461(l) is computed now.** `fjs/form461` aggregates the trade-or-business
+ *   income and deductions of the whole return, and `fjs/schedule/1` Part I calls
+ *   it. The old message said this engine *"cannot form the aggregate the
+ *   threshold is compared against"* because it *"models no Form 4797 and
+ *   computes Schedule 1 line 4 as a documented zero"* — that is exactly what
+ *   printed Form 461 line 4 wants, and a documented zero for a line whose kind
+ *   (`otherGainsOrLosses`) the scope guard refuses is a KNOWN zero rather than a
+ *   missing figure. A loss that §461(l) actually LIMITS still refuses, from
+ *   `fjs/form461` itself, where the threshold is.
+ * - **§199A(c)(2)'s outbound carryforward has a home now.** Form 8995 printed
+ *   line 16 computes it and `fjs/report/tax_return` prints it, so the farmer can
+ *   transcribe it into next year's `priorYearQualifiedBusinessLossCarryforward`
+ *   — the inbound field that has existed since Phase 28. Above §199A(e)(2)'s
+ *   threshold `fjs/form8995a` refuses instead, because that page has no such
+ *   printed line.
+ * - **§465 is unchanged**, and printed box 36b is the taxpayer's own answer to
+ *   it. i1040sf p10: *"the at-risk rules apply to your loss. Be sure to attach
+ *   Form 6198 to your return."*
+ *
+ * §469 never appears here at all, for the reason it never did:
+ * {@link noMaterialParticipationRefusal} has already turned away every farm that
+ * answered "No" on printed line E, so a farm reaching this line is non-passive
+ * by the taxpayer's own assertion, and i1040sf p10 then says in one sentence
+ * that neither §465 nor §469 applies at box 36a.
  * @type {(farm: Farm) => (lossCents: bigint) => ScheduleFRefusal}
  */
-export const netFarmLossRefusal = farm => lossCents => {
-    const atRisk = farm.investmentAtRisk === 'someNotAtRisk'
-        ? `You checked printed box 36b, "Some investment is not at risk", so §465 applies BEFORE `
-            + `anything else: i1040sf p10 says "the at-risk rules apply to your loss. Be sure to `
-            + `attach Form 6198 to your return." The amount you are at risk for is a multi-year `
-            + `history of contributions, borrowings and prior deductions that no document here `
-            + `carries. `
-        : `You checked printed box 36a, "All investment is at risk", so §465 does NOT limit this `
-            + `loss and neither does §469 — i1040sf p10: "If you also checked the Yes box on line `
-            + `E, your remaining loss is your loss. The at-risk rules and the passive activity loss `
-            + `rules don't apply." Two limitations remain anyway. `
-    return {
-        kind: 'error',
-        message: `Schedule F line 34 for ${farmLabel(farm)} is a LOSS of `
-            + `${centsToString(-lossCents)}, and this engine refuses it. ${atRisk}`
-            + `§461(l) is the first: i1040sf p9 defines an excess business loss as the amount by `
-            + `which the deductions from ALL of your trades or businesses exceed their gross income `
-            + `and gains plus $313,000 ($626,000 on a joint return), it says "Business gains and `
-            + `losses reported on Form 4797 and Form 8949 are included", and this engine models no `
-            + `Form 4797 and computes Schedule 1 line 4 as a documented zero — so it cannot form `
-            + `the aggregate the threshold is compared against. **It is §461(l) and NOT §461(j)**: `
-            + `§461(j)'s excess FARM loss is the provision a farm-shaped reading reaches for, and `
-            + `§461(l)(1) disapplies it for a noncorporate taxpayer in any year §461(l) applies, `
-            + `which 2025 is. §199A(c)(2) is the second, and it is a consequence rather than a `
-            + `limitation: a negative qualified business income amount is "a loss from a qualified `
-            + `trade or business in the SUCCEEDING taxable year", which is next year's Form 8995 `
-            + `line 3, and this engine holds one tax year. So the arithmetic loss is an UPPER BOUND `
-            + `on the deductible loss, never the deductible loss, and letting it reach Schedule 1 `
-            + `line 6 would understate the tax while moving adjusted gross income and every figure `
-            + `that depends on it. A PROFIT computes, and so does a break-even zero (Form 461, no `
-            + `phase yet)`,
-    }
-}
+export const netFarmLossRefusal = farm => lossCents => ({
+    kind: 'error',
+    message: `Schedule F line 34 for ${farmLabel(farm)} is a LOSS of `
+        + `${centsToString(-lossCents)}, and you checked printed box 36b, "Some investment is not `
+        + `at risk", so §465 applies BEFORE anything else: i1040sf p10 says "the at-risk rules `
+        + `apply to your loss. Be sure to attach Form 6198 to your return." The amount you are at `
+        + `risk for is a multi-year history of contributions, borrowings and prior deductions `
+        + `that no document here carries, so the arithmetic loss is an UPPER BOUND on the `
+        + `deductible loss and letting it reach Schedule 1 line 6 would understate the tax while `
+        + `moving adjusted gross income and every figure that depends on it. Checking printed box `
+        + `36a instead — "All investment is at risk" — COMPUTES: i1040sf p10 says "If you also `
+        + `checked the Yes box on line E, your remaining loss is your loss. The at-risk rules and `
+        + `the passive activity loss rules don't apply", and the §461(l) limitation that stands `
+        + `behind them is computed on Form 461 (fjs/form461). A PROFIT computes, a break-even `
+        + `zero computes, and so does a loss at box 36a (Form 6198 and the §465 at-risk rules, no `
+        + `phase yet)`,
+})
 
 // ── The whole schedule ───────────────────────────────────────────────────────
 
@@ -1002,7 +1033,13 @@ export const scheduleF = input => {
     ])
     // 34. "Net farm profit or (loss). Subtract line 33 from line 9."
     const line34Value = line9.value - line33.value
-    if (line34Value < 0n) {
+    // A net loss reaches printed line 36, and only box 36b stops it. See
+    // {@link netFarmLossRefusal} for what the other two grounds were and where
+    // each one went. §461(l) is NOT asked here: it is a limitation on the
+    // AGGREGATE of every trade or business on the return, which this schedule
+    // cannot see, and `fjs/schedule/1` Part I asks it once on Form 461 after
+    // every schedule has produced its own line.
+    if (line34Value < 0n && farm.investmentAtRisk === 'someNotAtRisk') {
         return netFarmLossRefusal(farm)(line34Value)
     }
     return {
@@ -1467,45 +1504,18 @@ export const proof = {
     // ── The refusals, each with its control ──────────────────────────────────
     refusals: {
         /**
-         * ★ **THE ASYMMETRY.** A net LOSS refuses naming §461(l), Form 461 and
-         * the printed thresholds; the SAME farm one cent the other side of
-         * break-even computes. $142,600.00 against $142,600.01 is a one-cent
-         * loss.
+         * ★ **THE ASYMMETRY, and it MOVED with the Form 461 phase.** Printed
+         * box 36b refuses a net loss on §465; printed box 36a COMPUTES one.
+         * The same farm, one cent past break-even, decided by one stored
+         * answer — which is the only thing printed line 36 is read for, and
+         * without this leaf the field would be stored and unread (the
+         * `box13StatutoryEmployee` defect).
+         *
+         * Until this phase BOTH boxes refused, on §465 (36b only), §461(l)
+         * (always) and §199A(c)(2) (always). `fjs/form461` computes the second
+         * and `fjs/report/tax_return` records the third, so only §465 is left.
          */
-        aNetFarmLossRefusesNamingSectionFourSixtyOneL: () => {
-            const message = refusal(run({
-                farmForms: [farmDocument({
-                    entries: [entryOf('feed')('142600.01')],
-                })('sha256-farm-a')],
-            }))
-            assert(message.includes('§461(l)'), ['the statute that binds', message])
-            assert(message.includes('NOT §461(j)'), ['and the one that does not', message])
-            assert(message.includes('Form 461'), ['the form the filer needs', message])
-            assert(message.includes('$313,000'), ['the printed single threshold', message])
-            assert(message.includes('$626,000'), ['and the joint one', message])
-            assert(message.includes('§199A(c)(2)'), ['the independent second blocker', message])
-            assert(message.includes('LOSS of 0.01'), ['the SIZE of the loss', message])
-            assert(message.includes('line 34'), ['the printed line', message])
-            assert(message.includes('FARM-0001'), ['which farm', message])
-            assert(message.includes('corn and soybeans'), ['and printed line A', message])
-            // At box 36a the message says §465 does NOT limit the loss.
-            assert(message.includes('box 36a'), ['the printed box that was checked', message])
-            assert(!message.includes('Form 6198'), ['36a needs no Form 6198', message])
-            // THE CONTROL, one cent the other way.
-            const evenOutcome = ok(run({
-                farmForms: [farmDocument({
-                    entries: [entryOf('feed')('142600.00')],
-                })('sha256-farm-a')],
-            }))
-            assertEq(evenOutcome.line34.value, 0n, 'break-even computes')
-        },
-        /**
-         * ★ **PRINTED BOX 36b NAMES §465 AND FORM 6198, and 36a does not.**
-         * This is the only thing printed line 36 is read for, and without this
-         * leaf the field would be stored and unread — the
-         * `box13StatutoryEmployee` defect.
-         */
-        printedBoxThirtySixBNamesSectionFourSixtyFive: () => {
+        printedBoxThirtySixBRefusesOnSectionFourSixtyFiveAndThirtySixAComputes: () => {
             const notAtRisk = refusal(run({
                 farmForms: [farmDocument({
                     investmentAtRisk: 'someNotAtRisk',
@@ -1514,20 +1524,58 @@ export const proof = {
             }))
             assert(notAtRisk.includes('§465'), ['the at-risk statute', notAtRisk])
             assert(notAtRisk.includes('Form 6198'), ['the form to attach', notAtRisk])
-            assert(notAtRisk.includes('box 36b'), ['the printed box', notAtRisk])
-            assert(notAtRisk.includes('multi-year history'), ['why it cannot be computed', notAtRisk])
-            const atRisk = refusal(run({
+            assert(notAtRisk.includes('box 36b'), ['the printed box that was checked', notAtRisk])
+            assert(notAtRisk.includes('multi-year history'),
+                ['why it cannot be computed', notAtRisk])
+            assert(notAtRisk.includes('LOSS of 0.01'), ['the SIZE of the loss', notAtRisk])
+            assert(notAtRisk.includes('line 34'), ['the printed line', notAtRisk])
+            assert(notAtRisk.includes('FARM-0001'), ['which farm', notAtRisk])
+            assert(notAtRisk.includes('corn and soybeans'), ['and printed line A', notAtRisk])
+            // It must say what to do, and box 36a is the answer -- the remedy
+            // that names a form which had ceased to be missing is the failure
+            // this half exists to prevent.
+            assert(notAtRisk.includes('box 36a'), ['and the box that computes', notAtRisk])
+            assert(notAtRisk.includes('fjs/form461'),
+                ['§461(l) is COMPUTED now and must not be named as a blocker', notAtRisk])
+            // **THE CONTROL, and it is the whole point of the phase**: the
+            // identical farm at box 36a computes a NEGATIVE line 34.
+            const atRisk = ok(run({
                 farmForms: [farmDocument({
                     entries: [entryOf('feed')('142600.01')],
                 })('sha256-farm-a')],
             }))
-            // The two messages must DIFFER, which is the property a per-arm
-            // assertion alone cannot check.
-            assert(notAtRisk !== atRisk, ['printed line 36 must change the message'])
-            assert(!atRisk.includes('§465 applies'), ['36a does not apply §465', atRisk])
-            // Both still name §461(l): it binds whichever box is checked.
-            assert(atRisk.includes('§461(l)'), [atRisk])
-            assert(notAtRisk.includes('§461(l)'), [notAtRisk])
+            assertEq(atRisk.line34.value, -1n, 'one cent of loss, computed, at box 36a')
+            assertEq(atRisk.filed, true)
+            // And the second control, one cent the other way: break-even is not
+            // a loss and never reaches printed line 36 at all.
+            const evenOutcome = ok(run({
+                farmForms: [farmDocument({
+                    entries: [entryOf('feed')('142600.00')],
+                })('sha256-farm-a')],
+            }))
+            assertEq(evenOutcome.line34.value, 0n, 'break-even computes')
+        },
+        /**
+         * ★ **A REAL farm loss at box 36a, and its citations.** $142,600.00 of
+         * raised products against $192,600.00 of feed is a $50,000.00 loss on
+         * printed line 34, and the line must carry BOTH the receipt and the
+         * expense that produced it — a computed loss that cited nothing would
+         * be indistinguishable from a documented zero.
+         */
+        aFiftyThousandDollarFarmLossComputesAtBoxThirtySixA: () => {
+            const result = ok(run({
+                farmForms: [farmDocument({
+                    entries: [entryOf('feed')('192600.00')],
+                })('sha256-farm-a')],
+            }))
+            assertEq(result.line9.value, 14260000n, 'printed line 9, gross income')
+            assertEq(result.line33.value, 19260000n, 'printed line 33, total expenses')
+            assertEq(result.line34.value, -5000000n, '$50,000.00 of loss -> Schedule 1 line 6')
+            const boxes = result.line34.sources.map(source => source.boxPath)
+            assert(boxes.includes('salesOfRaisedProductsAndLivestock'),
+                ['the receipt behind the loss', boxes])
+            assert(boxes.includes('entries[category=feed]'),
+                ['and the expense that created it', boxes])
         },
         /**
          * ★ **PRINTED LINE E ANSWERING "No" REFUSES A PROFIT.** The ground is

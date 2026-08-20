@@ -742,6 +742,7 @@ const storedFilingStatusNamed = status =>
  *   readonly selfEmployment: SelfEmploymentOutcome,
  *   readonly specifiedPrivateActivityBondInterest: ReportLine,
  *   readonly disqualifiedPassiveIncomeCents: bigint,
+ *   readonly qualifiedBusinessLossCarryforward: ReportLine,
  *   readonly dependentCareLine31Cents: bigint,
  *   readonly dependentCareApplicable: boolean,
  *   readonly dependentCare: Form2441Common,
@@ -1276,9 +1277,27 @@ export const form1040IncomeLines = taxParamSet => inputs => {
     // stage-1 guard immediately below and like the Schedule D and Schedule A
     // guards above: `unmodeled: []`, since this names no `fjs/return/scope`
     // kind.
-    const scheduleOnePartIResult = scheduleOnePartI({
+    const scheduleOnePartIResult = scheduleOnePartI(taxParamSet)({
         profile, unemploymentForms, nonemployeeCompensationForms, businessExpenseForms,
         w2Forms: w2s,
+        // **Printed Schedule 1 line 8p is Form 461 line 16**, and Part I owns
+        // it for the reason it owns lines 3, 5 and 6: a Schedule 1 line reaches
+        // 1040 line 8 through Schedule 1's own total, never by a side channel.
+        // Two things go in for it and nothing comes back out but the line.
+        //
+        // `status` is the filing status printed Form 461 line 15 reads --
+        // $313,000, or $626,000 on a JOINT return only. It is narrowed once,
+        // above, and passed rather than re-derived from the profile here.
+        status,
+        // `form1040Line7aCents` is printed Form 461 line 3, the capital gain or
+        // loss. It is computed above, before this call, because the Social
+        // Security Benefits Worksheet already needed it there -- so Form 461's
+        // dependency on it costs nothing and creates no new ordering
+        // constraint. Form 461 Part II removes the whole of it again (i461:
+        // capital losses are not trade-or-business deductions, and capital
+        // gains not attributable to a trade or business come back out on line
+        // 10), which is why only its VALUE crosses this boundary.
+        form1040Line7aCents: line7a.value,
         // **Line 13 of the Schedule C inside Part I is this commit's** (Form
         // 4562): `vnd.fjs.asset_register` reaches Schedule C line 13 through
         // Form 4562 line 22, and its alternative-minimum-tax adjustment
@@ -1755,6 +1774,33 @@ export const form1040IncomeLines = taxParamSet => inputs => {
                 w2Wages: undefined,
                 unadjustedBasis: undefined,
             }
+    // **§199A(c)(1)'s two reductions apply only where there is a trade or
+    // business for them to reduce**, and this gate was invisible until
+    // `fjs/form8995` stopped flooring `qualifiedBusinessIncome` at zero (the
+    // Form 461 phase). Schedule SE line 13 is the deductible half of the WHOLE
+    // return's self-employment tax, and a general partner's box 14 code A
+    // reaches it through `fjs/schedule/e` with no Schedule C and no Schedule F
+    // anywhere on the return. Passing it ungated then made qualified business
+    // income NEGATIVE for a partner with no proprietorship at all — invisible
+    // while the floor clamped it to zero, and the moment the floor moved to its
+    // printed line it became a §199A(c)(2) carryforward that partner does not
+    // have, plus a `priorYearCarryforwardIsUnstated` refusal on two returns
+    // that had computed for two phases.
+    //
+    // So both reductions are zero with neither schedule filed, which is exactly
+    // what they were worth before: line 13a is `declaredZero` in that case
+    // unless there are REIT dividends, and the REIT component is not reduced by
+    // either term.
+    //
+    // What this does NOT fix, and is pre-existing: a return with BOTH a
+    // Schedule C and a partnership K-1 carrying self-employment earnings
+    // reduces the proprietorship's qualified business income by the whole of
+    // Schedule SE line 13, including the partner's share. That OVERSTATES the
+    // reduction and so overstates the tax, which is the safe direction, and
+    // fixing it needs a per-activity split of Schedule SE this engine does not
+    // carry.
+    const hasAQualifiedTradeOrBusiness = scheduleOnePartIResult.scheduleC.filed
+        || scheduleOnePartIResult.scheduleF.filed
     const qbiOutcome = qualifiedBusinessIncomeDeduction(taxParamSet)({
         status,
         // Schedule C line 31 PLUS Schedule F line 34, and the SAME Schedule SE
@@ -1766,7 +1812,9 @@ export const form1040IncomeLines = taxParamSet => inputs => {
         // the tax for every farmer.
         netProfitCents: scheduleOnePartIResult.scheduleC.partII.line31.value
             + scheduleOnePartIResult.scheduleF.line34.value,
-        deductibleHalfOfSelfEmploymentTaxCents: scheduleOneStageOne.selfEmployment.lines.line13,
+        deductibleHalfOfSelfEmploymentTaxCents: hasAQualifiedTradeOrBusiness
+            ? scheduleOneStageOne.selfEmployment.lines.line13
+            : 0n,
         // Schedule 1 line 17, TAX-39 -- the SAME `fjs/schedule/1` stage-one
         // execution line 15 came from, never a second Form 7206. §199A(c)(1)
         // reduces qualified business income by the self-employed health
@@ -1779,7 +1827,9 @@ export const form1040IncomeLines = taxParamSet => inputs => {
         // premium, with the whole suite green, which is why
         // `theHealthInsuranceDeductionReachesFormEightNineNineFive` asserts the
         // §199A deduction MOVED rather than only that line 17 did.
-        selfEmployedHealthInsuranceDeductionCents: scheduleOneStageOne.line17.value,
+        selfEmployedHealthInsuranceDeductionCents: hasAQualifiedTradeOrBusiness
+            ? scheduleOneStageOne.line17.value
+            : 0n,
         assertedPriorYearLossCarryforward: qualifiedBusinessFacts.carryforward,
         // Form 8995-A's three facts (Phase 31, TAX-32). Read from the SAME
         // record the carryforward comes from, and passed UNCONDITIONALLY:
@@ -1924,9 +1974,52 @@ export const form1040IncomeLines = taxParamSet => inputs => {
         // mid-quarter convention could differ from the first's.
         + scheduleOnePartIResult.scheduleF.alternativeMinimumTaxAdjustmentCents
 
+    // **Form 8995 printed line 16 — §199A(c)(2)'s carryforward to 2026 — and it
+    // is on this record because the REPORT has to print it.** *"Total qualified
+    // business (loss) carryforward. Add lines 2 and 3. If greater than zero,
+    // enter -0-."*
+    //
+    // It is not a `ReportLine` and it is not in `orderedLines`, because that
+    // list is Form 1040 lines 1a through 37 and this is a line of a different
+    // form — the same reason `disqualifiedPassiveIncomeCents` above travels as a
+    // bare `bigint`. It rides out to `fjs/report/tax_return` beside
+    // `line16Method`, which is on the report for the same kind of reason: a
+    // figure the return produces that no 1040 line carries, and without which
+    // the report cannot be acted on.
+    //
+    // **Nothing in this engine READS it, and that is the point.** This year's
+    // deduction is already zero when it is non-zero. What it does is give the
+    // outbound half of §199A(c)(2) a home, so a farmer whose printed Schedule F
+    // line 34 is a loss can transcribe it into next year's
+    // `priorYearQualifiedBusinessLossCarryforward` — the inbound field that has
+    // existed since Phase 28 and had nothing to receive. Until this phase
+    // `fjs/schedule/f`'s loss refusal named that gap ("the outbound direction
+    // has no home at all") as a blocker, and this is the home.
+    //
+    // The comprehensive path cannot produce one: `fjs/form8995a` refuses a
+    // qualified business LOSS above §199A(e)(2)'s threshold precisely because it
+    // has no line to print it on.
+    //
+    // It is a whole `ReportLine` rather than a bare `bigint`, unlike
+    // `disqualifiedPassiveIncomeCents` above and for the opposite reason: a
+    // printed line of a real form must cite the documents behind it, and the
+    // farmer reading this figure has to be able to see which business record it
+    // came from. `rentalRealEstateAndRoyaltyIncome` on this same record is the
+    // precedent — a `ReportLine` that no `orderedLines` entry carries, because
+    // that list is Form 1040 lines 1a through 37 and this is not one of them.
+    const qualifiedBusinessLossCarryforward = {
+        value: qbiOutcome.simplified === undefined ? 0n : qbiOutcome.simplified.line16,
+        sources: unionSources([
+            scheduleOnePartIResult.scheduleC.partII.line31,
+            scheduleOnePartIResult.scheduleF.line34,
+        ]),
+        rule: 'Form 8995 line 16 (total qualified business (loss) carryforward '
+            + '-> next year’s priorYearQualifiedBusinessLossCarryforward)',
+    }
     return {
         kind: 'ok',
         disqualifiedPassiveIncomeCents,
+        qualifiedBusinessLossCarryforward,
         amtDepreciationAdjustmentCents,
         // Printed Schedule E line 26, carried out for Form 8960 line 4a. It
         // travels as a whole `ReportLine` rather than as cents because
@@ -2110,6 +2203,7 @@ export const form1040IncomeLines = taxParamSet => inputs => {
  *   readonly kind: 'ok',
  *   readonly lines: readonly ReportLine[],
  *   readonly line16Method: Line16Method,
+ *   readonly qualifiedBusinessLossCarryforward: ReportLine,
  * } | {
  *   readonly kind: 'error',
  *   readonly message: string,
@@ -3135,6 +3229,8 @@ const computeForm1040 = taxParamSet => inputs => {
         kind: 'ok',
         lines: orderedLines(income)(rest.tax),
         line16Method: rest.line16Method,
+        // Form 8995 line 16, out to the report -- see `form1040IncomeLines`.
+        qualifiedBusinessLossCarryforward: income.qualifiedBusinessLossCarryforward,
     }
 }
 
@@ -3269,6 +3365,10 @@ export const form1040Report = taxParamSet => inputs => {
         kind: 'ok',
         lines: applyWholeDollarElection(profile.value.wholeDollarElection === true)(computed.lines),
         line16Method: computed.line16Method,
+        // NOT subject to the whole-dollar election: i1040gi p23's rounding is
+        // about the amounts entered on the RETURN, and this figure is entered on
+        // next year's business record rather than on any line of this one.
+        qualifiedBusinessLossCarryforward: computed.qualifiedBusinessLossCarryforward,
     }
 }
 
@@ -6639,8 +6739,9 @@ export const proof = {
         /**
          * A Schedule F refusal must stop the WHOLE report, threaded through
          * `form1040IncomeLines`' error arm with `unmodeled: []` — never
-         * swallowed into a zero line. The net LOSS is the refusal a real
-         * farmer meets first.
+         * swallowed into a zero line. **The refusal is now §465's**, at printed
+         * box 36b: until the Form 461 phase every net farm loss refused here,
+         * and §461(l) is computed now.
          */
         aScheduleFRefusalStopsTheWholeReport: () => {
             const base = inputsOf(storedProfile(farmProfile))([])([])([])([])([])([])([])([])([])
@@ -6650,6 +6751,7 @@ export const proof = {
                     documentHash: 'sha256-farm-loss',
                     value: {
                         ...farmDocument('x').value,
+                        investmentAtRisk: 'someNotAtRisk',
                         entries: [{
                             category: 'feed',
                             datePaid: '2025-04-15',
@@ -6663,10 +6765,266 @@ export const proof = {
             if (outcome.kind !== 'error') {
                 return
             }
-            assert(outcome.message.includes('§461(l)'), ['the statute', outcome.message])
+            assert(outcome.message.includes('§465'), ['the statute', outcome.message])
             assert(outcome.message.includes('LOSS of 0.01'), ['the size of the loss', outcome.message])
             assertEq(outcome.unmodeled.length, 0,
                 'a document-data refusal names no scope kind')
+        },
+        /**
+         * ★ **THE WHOLE §461(l) CHAIN, end to end, and no form-level proof can
+         * see any of it.** A $50,000.00 farm loss at printed box 36a with
+         * printed line E "Yes":
+         *
+         * ```
+         *  Schedule F  2   raised products                        40,000.00
+         *  Schedule F  22  feed                                   90,000.00
+         *  Schedule F  34  = 9 - 33                              -50,000.00
+         *  Schedule 1  6   Schedule F line 34                    -50,000.00
+         *  Form 461    6   Schedule 1 line 6                     -50,000.00
+         *  Form 461    9   combine 1-8                           -50,000.00
+         *  Form 461    14  = 9 + 13                              -50,000.00
+         *  Form 461    15  single threshold                      313,000.00
+         *  Form 461    16  = 14 + 15                             263,000.00   >= 0, allowed
+         *  Schedule 1  8p  = 0 (no excess business loss)               0.00
+         *  Schedule 1  10  = 6 + 9                               -50,000.00
+         *  1040        8   Schedule 1 line 10                    -50,000.00
+         *  Form 8995   2   qualified business income (a LOSS)    -50,000.00
+         *  Form 8995   16  carried to 2026                       -50,000.00
+         *  1040        13a = Form 8995 line 15                         0.00
+         * ```
+         *
+         * Every figure hand-typed. Three separate wirings meet here and none of
+         * them exists inside any one form: Schedule F line 34 reaching Schedule
+         * 1 line 6, Form 461 reading that line and clearing it, and Form 8995
+         * line 16 recording what §199A(c)(2) hands to 2026.
+         */
+        aFarmLossUnderTheThresholdReachesLineEightAndCarriesItsQbiLossForward: () => {
+            const base = inputsOf(storedProfile(farmProfile))([])([])([])([])([])([])([])([])([])
+            const { income } = computedLines({
+                ...base,
+                farmForms: [{
+                    documentHash: 'sha256-farm-loss-50k',
+                    value: {
+                        ...farmDocument('x').value,
+                        entries: [{
+                            category: 'feed',
+                            datePaid: '2025-04-15',
+                            description: 'winter hay',
+                            amount: '90000.00',
+                        }],
+                    },
+                }],
+            })
+            assertEq(income.line8.value, -5000000n,
+                '1040 line 8 = Schedule 1 line 10 = the whole $50,000.00 farm loss')
+            assertEq(income.line11a.value, -5000000n, 'and it moves adjusted gross income')
+            assertEq(income.line13a.value, 0n, 'a loss earns no §199A deduction')
+            assertEq(income.qualifiedBusinessLossCarryforward.value, -5000000n,
+                'Form 8995 line 16 hands the whole loss to 2026')
+            assert(
+                income.qualifiedBusinessLossCarryforward.rule.includes('Form 8995 line 16'),
+                ['the printed line must name itself',
+                    income.qualifiedBusinessLossCarryforward.rule])
+            assert(
+                income.qualifiedBusinessLossCarryforward.rule.includes(
+                    'priorYearQualifiedBusinessLossCarryforward'),
+                ['and the field it is transcribed into next year',
+                    income.qualifiedBusinessLossCarryforward.rule])
+            const carryforwardHashes = income.qualifiedBusinessLossCarryforward.sources.map(
+                source => source.documentHash)
+            assert(carryforwardHashes.includes('sha256-farm-loss-50k'),
+                ['the carryforward must cite the farm behind it', carryforwardHashes])
+        },
+        /**
+         * ★ **THE TAXPAYER §461(l) WAS WRITTEN FOR: WAGES BESIDE A BUSINESS
+         * LOSS.** $80,000.00 of Form W-2 box 1 and a $50,000.00 farm loss.
+         *
+         * This is the case the whole limitation exists to reach, and it is the
+         * one where getting printed Form 461 line 1 wrong would show. Wages are
+         * NOT trade-or-business income for §461(l) — i461's *Definitions*
+         * excludes *"any trade or business of performing services of an
+         * employee"*, §461(l)(6), which is why the printed line 1 that carried
+         * Form 1040 line 1 in the 2018-2020 revisions now reads "Reserved for
+         * future use". Read the other way, this filer's line 14 would be
+         * $30,000.00 rather than -$50,000.00 and no wage earner with a side
+         * business could ever reach the threshold.
+         *
+         * It does not change the outcome HERE — $50,000.00 is far under
+         * $313,000.00 either way — and that is the point of asserting the
+         * arithmetic rather than only the verdict:
+         *
+         * ```
+         *  1040         1a Form W-2 box 1                       80,000.00
+         *  Schedule 1   6 Schedule F line 34                   -50,000.00
+         *  Form 461    14 the trade-or-business net            -50,000.00   (NOT +30,000.00)
+         *  Form 461    16 = 14 + 15                            263,000.00
+         *  1040         8 Schedule 1 line 10                   -50,000.00
+         *              9 = 1a + 8                               30,000.00
+         *             11a adjusted gross income                 30,000.00
+         *             12e the single standard deduction         15,750.00
+         *             13a a loss earns no §199A deduction            0.00
+         *             15 = 11a - 14                             14,250.00
+         *  Form 8995   16 carried to 2026                      -50,000.00
+         * ```
+         *
+         * The counterfactual below — the same W-2 with the farm withheld — is
+         * what makes the $50,000.00 a statement about the LOSS rather than four
+         * unrelated figures.
+         */
+        wagesBesideAFarmLossAreNotTradeOrBusinessIncomeForSectionFourSixtyOneL: () => {
+            const base = inputsOf(storedProfile({
+                ...farmProfile,
+                declaredKinds: /** @type {readonly Kind[]} */ (['wages', 'farmIncomeOrLoss']),
+            }))([w2Document('sha256-w2-farm-wages')('80000.00')])([])([])([])([])([])([])([])([])
+            const lossFarm = {
+                documentHash: 'sha256-farm-loss-wages',
+                value: {
+                    ...farmDocument('x').value,
+                    entries: [{
+                        category: 'feed',
+                        datePaid: '2025-04-15',
+                        description: 'winter hay',
+                        amount: '90000.00',
+                    }],
+                },
+            }
+            const { income } = computedLines({ ...base, farmForms: [lossFarm] })
+            assertEq(income.line1a.value, 8000000n, '$80,000.00 of wages')
+            assertEq(income.line8.value, -5000000n, 'and a $50,000.00 farm loss on line 8')
+            assertEq(income.line9.value, 3000000n, 'total income $30,000.00')
+            assertEq(income.line11a.value, 3000000n, 'adjusted gross income $30,000.00')
+            assertEq(income.line12e.value, 1575000n, 'the single standard deduction')
+            assertEq(income.line13a.value, 0n, 'a qualified business LOSS earns no deduction')
+            assertEq(income.line15.value, 1425000n, '$30,000.00 - $15,750.00 = $14,250.00')
+            assertEq(income.qualifiedBusinessLossCarryforward.value, -5000000n,
+                'and the whole loss goes to 2026 on Form 8995 line 16')
+            // **THE COUNTERFACTUAL**: the same W-2 with no farm at all. AGI is
+            // $80,000.00, so the farm moved it by exactly $50,000.00 — and
+            // nothing goes to 2026.
+            const { income: withoutTheFarm } = computedLines(base)
+            assertEq(withoutTheFarm.line11a.value, 8000000n, 'wages alone')
+            assertEq(withoutTheFarm.line11a.value - income.line11a.value, 5000000n,
+                'the farm loss moved adjusted gross income by exactly $50,000.00')
+            assertEq(withoutTheFarm.qualifiedBusinessLossCarryforward.value, 0n)
+        },
+        /**
+         * ★ **THE FIXTURE THAT MAKES THE WAGES QUESTION LOAD-BEARING**, and
+         * without it nothing in this repository could tell the two readings
+         * apart. $400,000.00 of Form W-2 box 1 and a $350,000.00 farm loss:
+         *
+         * ```
+         *                              wages EXCLUDED      wages INCLUDED
+         *  Form 461  14                   -350,000.00          +50,000.00
+         *  Form 461  15                    313,000.00          313,000.00
+         *  Form 461  16                    -37,000.00         363,000.00
+         *  verdict                            REFUSES            computes
+         * ```
+         *
+         * `fjs/form461` has no wage input at all, so this cannot be mutated
+         * directly — which is exactly why the guard has to be an OUTCOME. The
+         * day anyone threads Form 1040 line 1 into printed Form 461 line 1
+         * (where the 2018-2020 revisions had it), this leaf reddens.
+         *
+         * The taxpayer is real, not contrived: i461's *Who Must File* threshold
+         * and §461(l)'s legislative purpose are both about a high wage earner
+         * sheltering salary with a business loss.
+         */
+        aLargeWageEarnerWithALargeFarmLossIsRefusedByFormFourSixtyOne: () => {
+            const base = inputsOf(storedProfile({
+                ...farmProfile,
+                declaredKinds: /** @type {readonly Kind[]} */ (['wages', 'farmIncomeOrLoss']),
+            }))([w2Document('sha256-w2-big-wages')('400000.00')])([])([])([])([])([])([])([])([])
+            /** @type {(amount: string) => Form1040IncomeLines | Form1040Error} */
+            const withFeed = amount => form1040IncomeLines(taxParams2025)({
+                ...base,
+                farmForms: [{
+                    documentHash: 'sha256-farm-loss-big',
+                    value: {
+                        ...farmDocument('x').value,
+                        entries: [{
+                            category: 'feed',
+                            datePaid: '2025-04-15',
+                            description: 'winter hay',
+                            amount,
+                        }],
+                    },
+                }],
+            })
+            const outcome = withFeed('390000.00')
+            assert(outcome.kind === 'error',
+                ['a $350,000.00 business loss is over §461(l)\'s threshold', outcome])
+            if (outcome.kind !== 'error') {
+                return
+            }
+            assert(outcome.message.includes('Form 461 line 16 is -37000.00'),
+                ['line 16, with the wages EXCLUDED from line 14', outcome.message])
+            assert(outcome.message.includes('-350000.00'),
+                ['printed line 14 is the farm loss alone, not the loss net of wages',
+                    outcome.message])
+            // **THE CONTROL**: the same $400,000.00 wage earner with a
+            // $313,000.00 loss — exactly the threshold — computes, and the
+            // whole loss reaches 1040 line 8. So the refusal above is about the
+            // SIZE of the loss and not about the wages being there.
+            const exactly = withFeed('353000.00')
+            assert(exactly.kind === 'ok', ['exactly at the threshold computes', exactly])
+            if (exactly.kind !== 'ok') {
+                return
+            }
+            assertEq(exactly.line1a.value, 40000000n, '$400,000.00 of wages')
+            assertEq(exactly.line8.value, -31300000n, 'and the whole $313,000.00 loss')
+            assertEq(exactly.line11a.value, 8700000n, 'adjusted gross income $87,000.00')
+        },
+        /**
+         * ★ **AND ONE CENT PAST §461(l)'s THRESHOLD, THE WHOLE REPORT STOPS.**
+         * The same farm with $353,000.01 of feed against $40,000.00 of raised
+         * products is a $313,000.01 loss — one cent more than the printed line
+         * 15 threshold — so Form 461 line 16 is -$0.01 and refuses.
+         *
+         * The refusal arrives through `fjs/schedule/1` Part I's error arm, with
+         * `unmodeled: []`, which is the wiring: a form-level `fjs/form461` proof
+         * can see the arithmetic but not that Schedule 1 calls it, and not that
+         * Schedule 1's refusal reaches the report.
+         */
+        aFarmLossOverTheThresholdStopsTheReportFromInsideScheduleOne: () => {
+            const base = inputsOf(storedProfile(farmProfile))([])([])([])([])([])([])([])([])([])
+            /** @type {(amount: string) => Form1040IncomeLines | Form1040Error} */
+            const withFeed = amount => form1040IncomeLines(taxParams2025)({
+                ...base,
+                farmForms: [{
+                    documentHash: 'sha256-farm-loss-over',
+                    value: {
+                        ...farmDocument('x').value,
+                        entries: [{
+                            category: 'feed',
+                            datePaid: '2025-04-15',
+                            description: 'winter hay',
+                            amount,
+                        }],
+                    },
+                }],
+            })
+            const outcome = withFeed('353000.01')
+            assert(outcome.kind === 'error', ['§461(l) must stop the report', outcome])
+            if (outcome.kind !== 'error') {
+                return
+            }
+            assert(outcome.message.includes('Form 461 line 16 is -0.01'),
+                ['the printed line and its sign', outcome.message])
+            assert(outcome.message.includes('313000.00'), ['the threshold', outcome.message])
+            assert(outcome.message.includes('Form 172'),
+                ['and where the disallowed amount goes next year', outcome.message])
+            assertEq(outcome.unmodeled.length, 0, 'a document-data refusal names no scope kind')
+            // **THE CONTROL, one cent the other side**: $313,000.00 of loss is
+            // exactly the threshold, line 16 is exactly zero, and the whole
+            // loss reaches 1040 line 8. Without this half, a Form 461 that
+            // refused every farm loss would pass the leaf above.
+            const exactly = withFeed('353000.00')
+            assert(exactly.kind === 'ok', ['exactly at the threshold computes', exactly])
+            if (exactly.kind !== 'ok') {
+                return
+            }
+            assertEq(exactly.line8.value, -31300000n,
+                'the whole $313,000.00 loss reaches 1040 line 8')
         },
         scheduleCReachesLineEightAndTheWithholdingReachesLineTwentyFiveB: () => {
             const base = inputsOf(storedProfile(selfEmploymentProfile))([])([])([])([])([])([])([])([])([])

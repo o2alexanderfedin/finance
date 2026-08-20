@@ -916,7 +916,7 @@ export const unmodeledKindRefusals = /** @type {const} */ ([
     // return or other schedules"), so seven rows name the examples and
     // `otherIncomeNotListed` is the residual that says, in its own remedy,
     // that no single form closes it.
-    { kind: 'netOperatingLossDeduction', line: 'Schedule 1 line 8a -> 1040 line 8', label: 'a net operating loss deduction from an earlier year', remedy: 'requires Form 172 and the earlier year’s loss: an NOL is carried forward from a return this engine does not hold, since it models one tax year (no phase yet)' },
+    { kind: 'netOperatingLossDeduction', line: 'Schedule 1 line 8a -> 1040 line 8', label: 'a net operating loss deduction from an earlier year', remedy: 'requires Form 172 and the earlier year’s loss: an NOL is carried forward from a return this engine does not hold, since it models one tax year. This row is load-bearing on a SECOND refusal beside it: fjs/form461 will not compute a BINDING §461(l) limitation precisely because the disallowed amount comes back as this deduction, and there is nothing here to receive it. Every other outbound carryforward this engine creates has a modeled inbound counterpart — vnd.fjs.prior_year_capital_loss for Schedule D line 21, printed Form 8829 lines 25 and 31, priorYearQualifiedBusinessLossCarryforward for Form 8995 line 3 — and this one alone does not (no phase yet)' },
     { kind: 'gamblingWinnings', line: 'Schedule 1 line 8b -> 1040 line 8', label: 'gambling winnings not attributable to a trade or business', remedy: 'requires a Form W-2G dialect, which does not exist here. The losses that offset them are Schedule A line 16 and are capped at the winnings, so a winnings figure without a losses figure would overstate tax for anyone who itemizes (no phase yet)' },
     { kind: 'cancellationOfDebt', line: 'Schedule 1 line 8c -> 1040 line 8', label: 'cancellation of debt', remedy: 'requires a Form 1099-C dialect and the Pub. 4681 exclusion determination — insolvency, bankruptcy or qualified principal residence indebtedness — without which a box 2 amount that is not taxable at all would be taxed in full (no phase yet)' },
     { kind: 'form8853MsaAndLongTermCareIncome', line: 'Schedule 1 line 8e -> 1040 line 8', label: 'taxable Archer MSA, Medicare Advantage MSA and long-term care insurance income', remedy: 'requires Form 8853 lines 8, 12 and 26, which this engine does not compute and no dialect reports (no phase yet)' },
@@ -930,7 +930,7 @@ export const unmodeledKindRefusals = /** @type {const} */ ([
     { kind: 'olympicAndParalympicMedals', line: 'Schedule 1 line 8m -> 1040 line 8', label: 'the value of Olympic and Paralympic medals and USOC prize money', remedy: 'requires a Form 1099-MISC dialect (box 3). The §74(d) nontaxable offset is Schedule 1 line 24c and is its own kind, and it needs adjusted gross income figured INCLUDING this amount (no phase yet)' },
     { kind: 'section951Inclusion', line: 'Schedule 1 line 8n -> 1040 line 8', label: 'a section 951(a) subpart F inclusion', remedy: 'requires Forms 5471, Schedule I lines 1a through 1h and line 2, and no dialect models a controlled foreign corporation return (no phase yet)' },
     { kind: 'section951AInclusion', line: 'Schedule 1 line 8o -> 1040 line 8', label: 'a section 951A(a) global intangible low-taxed income inclusion', remedy: 'requires Form 8992 Part II line 5, and no dialect models it (no phase yet)' },
-    { kind: 'excessBusinessLossAdjustment', line: 'Schedule 1 line 8p -> 1040 line 8', label: 'the section 461(l) excess business loss adjustment', remedy: 'requires Form 461 line 16, which limits an aggregate trade-or-business loss across every business the taxpayer has — this engine models one Schedule C and does not aggregate (no phase yet)' },
+    { kind: 'excessBusinessLossAdjustment', line: 'Schedule 1 line 8p -> 1040 line 8', label: 'the section 461(l) excess business loss adjustment', remedy: 'Form 461 IS modeled (fjs/form461), and this remedy said the opposite until that phase. fjs/schedule/1 Part I forms the trade-or-business aggregate across printed Schedule 1 lines 3, 4, 5 and 6 and 1040 line 7a, and both Schedule C and Schedule F reach it. What is refused is having an excess business loss AT ALL. Printed line 16 is negative only when your trade-or-business deductions exceed their gross income by more than $313,000 ($626,000 on a JOINT return, and NOT for a qualifying surviving spouse — Rev. Proc. 2024-40 §2.32), and i461 then treats the disallowed amount as a net operating loss carryover to the succeeding year on Form 172. This engine holds one tax year and models no NOL in either direction — Schedule 1 line 8a is the netOperatingLossDeduction kind, refused beside this one — so a return that computed the add-back would be right for 2025 and would silently destroy the carryover it created. A business loss the limitation does NOT reach computes today, in full, with printed line 8p at zero because Form 461 said so (Form 172 and the §172 net operating loss, no phase yet)' },
     { kind: 'ableAccountDistributions', line: 'Schedule 1 line 8q -> 1040 line 8', label: 'taxable distributions from an ABLE account', remedy: 'requires Form 1099-QA and the designated beneficiary’s qualified disability expenses for the year, neither of which any dialect models (no phase yet)' },
     { kind: 'scholarshipAndFellowshipGrants', line: 'Schedule 1 line 8r -> 1040 line 8', label: 'scholarship and fellowship grants not reported on Form W-2', remedy: '`vnd.fjs.1098t` box 5 records scholarships or grants and `fjs/schedule/3` already reads it, but the TAXABLE part is what was not spent on tuition and course-related expenses — room, board and travel — and no document reports what the money was spent on, nor whether the taxpayer was a degree candidate (no phase yet)' },
     { kind: 'nonqualifiedDeferredCompensationPension', line: 'Schedule 1 line 8t -> 1040 line 8', label: 'a pension or annuity from a nonqualified deferred compensation plan or a nongovernmental section 457 plan', remedy: 'the amount is Form W-2 box 11, which `vnd.fjs.w2` STORES as `box11NonqualifiedPlans` and no computation reads. What is missing is not the figure but a decision: box 11 amounts are already inside box 1, which `fjs/form1040/core` puts on 1040 line 1a in full, so carrying one here without removing it there double-counts it — and removing it changes earned income, and with it the earned income credit (no phase yet)' },
@@ -1473,9 +1473,16 @@ export const modeledKindDeclarationRemedies = /** @type {const} */ ([
             + 'printed footnote to line 49 names) decides the sign of lines 47 through 50. '
             + 'Printed line E answering "No" refuses even on a PROFIT, because §1411(c)(1)(A)(ii) '
             + 'makes a passive farm\u2019s income net investment income and Form 8960 line 4b is a '
-            + 'structural zero here. A net LOSS on printed line 34 refuses under §461(l) and Form '
-            + '461 — NOT §461(j), which §461(l)(1) disapplies — and additionally under §465 and '
-            + 'Form 6198 when printed box 36b says some investment is not at risk. A '
+            + 'structural zero here. A net LOSS on printed line 34 COMPUTES at printed box 36a, '
+            + 'as of the Form 461 phase — i1040sf p10 disposes of both §465 and §469 in one '
+            + 'sentence when box 36a and printed line E are both answered your way, and §461(l) '
+            + 'is figured on Form 461 (fjs/form461) from Schedule 1 Part I. This remedy sent a '
+            + 'farmer to §461(l) and Form 461 as blockers until then, which is exactly the clause '
+            + 'that rots when the form it names gets built. What still refuses is printed box 36b '
+            + '("Some investment is not at risk"), on §465 and Form 6198, and an excess business '
+            + 'loss LARGE enough for §461(l) to bind, which fjs/form461 refuses because the '
+            + 'disallowed amount is a §172 net operating loss carryover this engine cannot hand '
+            + 'to next year. A '
             + 'vnd.fjs.business_expenses record stored beside the farm refuses too, because '
             + 'Form 8995-A figures its limitations per business and this engine carries one',
     },
@@ -4732,6 +4739,58 @@ export const proof = {
                     'ok',
                     ['declaring a declaration-required kind must compute', entry.kind],
                 )
+            }
+        },
+        /**
+         * ★ **THE THREE REMEDIES THE FORM 461 PHASE CORRECTED**, each looked up
+         * BY KIND and asserted against hand-typed phrases — never by iterating
+         * the table, which is the code under test.
+         *
+         * This repository has repeatedly shipped a remedy naming a form or a
+         * reason that had ceased to be true, and the two here were both:
+         * `excessBusinessLossAdjustment` said Form 461 was needed and that "this
+         * engine models one Schedule C and does not aggregate" (Schedule F had
+         * been modeled for a phase); `farmIncomeOrLoss` said a net farm loss
+         * "refuses under §461(l) and Form 461" (it computes at printed box 36a
+         * now). The third, `netOperatingLossDeduction`, is UNCHANGED in
+         * substance but is now load-bearing on `fjs/form461`'s own refusal, and
+         * says so.
+         *
+         * A remedy is a sentence a filer acts on. If it names a missing form
+         * that exists, they go looking for something that is already there.
+         */
+        theRemediesTheFormFourSixtyOnePhaseCorrected: () => {
+            /** @type {readonly (readonly [string, readonly string[], readonly string[]])[]} */
+            const expectations = [
+                ['excessBusinessLossAdjustment',
+                    ['Form 461 IS modeled', 'fjs/form461', 'Form 172',
+                        'netOperatingLossDeduction', '$313,000', '$626,000',
+                        'Rev. Proc. 2024-40 §2.32'],
+                    ['does not aggregate', 'requires Form 461 line 16']],
+                ['farmIncomeOrLoss',
+                    ['COMPUTES at printed box 36a', 'fjs/form461', 'box 36b', 'Form 6198'],
+                    ['refuses under §461(l) and Form 461']],
+                ['netOperatingLossDeduction',
+                    ['fjs/form461', 'BINDING §461(l)',
+                        'priorYearQualifiedBusinessLossCarryforward'],
+                    []],
+            ]
+            assertEq(expectations.length, 3, 'three rows, hand-typed')
+            for (const [kind, mustSay, mustNotSay] of expectations) {
+                const unmodeled = unmodeledKindRefusals.find(row => row.kind === kind)
+                const modeled = modeledKindDeclarationRemedies.find(row => row.kind === kind)
+                const remedy = unmodeled !== undefined
+                    ? unmodeled.remedy
+                    : modeled !== undefined ? modeled.remedy : undefined
+                assert(remedy !== undefined, ['every named kind must still have a row', kind])
+                if (remedy === undefined) { throw ['no row', kind] }
+                for (const phrase of mustSay) {
+                    assert(remedy.includes(phrase), ['the remedy must say this', kind, phrase])
+                }
+                for (const phrase of mustNotSay) {
+                    assertEq(remedy.includes(phrase), false,
+                        ['the remedy must NOT still say this', kind, phrase])
+                }
             }
         },
         everyKindIsDescribableThroughTheTripwireArm: () => {

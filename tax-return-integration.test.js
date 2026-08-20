@@ -479,6 +479,22 @@ test(
             assert.equal(returnResult.taxYear, 2025)
             assert.equal(returnResult.line16Method, 'taxTable')
             assert.equal(returnResult.lines.length, 56)
+            // Form 8995 printed line 16 — §199A(c)(2)'s carryforward to the
+            // succeeding year — rides beside `line16Method` rather than inside
+            // `lines`, because `lines` is Form 1040 lines 1a through 37 and
+            // this is a line of a different form. This fixture has no trade or
+            // business at all, so it is "0.00"; the SHAPE is what matters here,
+            // because the value's own rendering is what the in-module leaf
+            // `everyResultFieldIsRenderedFromTheOutcomeInTheSourceText` pins.
+            // Without this, the source text could stop emitting the field
+            // entirely and the real-process run would not notice.
+            assert.ok(
+                returnResult.qualifiedBusinessLossCarryforward !== undefined,
+                'the rendered result must carry the §199A(c)(2) carryforward')
+            assert.equal(returnResult.qualifiedBusinessLossCarryforward.value, '0.00')
+            assert.ok(
+                returnResult.qualifiedBusinessLossCarryforward.rule.includes('Form 8995 line 16'),
+                'and it must name its own printed line')
             const centsAt = rule => {
                 const line = returnResult.lines.find(candidate => candidate.rule === rule)
                 assert.ok(line !== undefined, `expected the return to carry ${rule}`)

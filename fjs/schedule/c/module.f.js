@@ -67,7 +67,16 @@
  *   income, on Form 8582.
  * - **§461(l), the excess business loss limitation.** Above an indexed
  *   threshold the excess is disallowed for the year and becomes a net
- *   operating loss carryforward, on Form 461.
+ *   operating loss carryforward, on Form 461. **This one is gone**: `fjs/form461`
+ *   computes it, from `fjs/schedule/1` Part I, over the whole return's
+ *   trade-or-business aggregate — and it refuses only where the limitation
+ *   actually binds. It is named here because {@link atRiskDeterminationLine32}
+ *   must not go on telling a filer that a modeled form is missing; the two that
+ *   remain are §465 and §469, and BOTH are unaskable here for the same reason:
+ *   `vnd.fjs.business_expenses` carries no field for printed line 32's at-risk
+ *   box and none for material participation. `vnd.fjs.farm` carries both, which
+ *   is exactly why Schedule F's loss computes at printed box 36a and this one
+ *   does not.
  *
  * So the arithmetic loss is an UPPER BOUND on the deductible loss, never the
  * deductible loss itself. Letting it flow to Schedule 1 line 3 would deduct
@@ -755,13 +764,18 @@ export const atRiskDeterminationLine32 = lossCents => ({
         + `instruction is "if a loss, you must go to line 32" — the at-risk determination, `
         + `which this engine cannot make. §465 basis in the activity is a multi-year history no `
         + `document here holds; checking box 32b requires Form 6198 and the loss "may be `
-        + `limited". Two further limitations stand behind it: §469 makes a loss passive, and `
-        + `deductible only on Form 8582, for a proprietor who does not materially participate, `
-        + `and §461(l) disallows an excess business loss on Form 461 and carries it forward. So `
-        + `the arithmetic loss is an UPPER BOUND on the deductible loss, never the deductible `
-        + `loss itself, and letting it reach Schedule 1 line 3 would understate the tax while `
-        + `moving adjusted gross income and every figure that depends on it. A PROFIT computes; `
-        + `a loss refuses (Schedule SE and the at-risk rules, no phase yet)`,
+        + `limited". **vnd.fjs.business_expenses carries no field for printed line 32 at all**, `
+        + `and none for material participation either, so neither §465 nor §469 can even be `
+        + `asked of this business — where vnd.fjs.farm stores both answers and Schedule F's own `
+        + `loss therefore computes at its printed box 36a. §469 is the second: it makes a loss `
+        + `passive, and deductible only on Form 8582, for a proprietor who does not materially `
+        + `participate. **§461(l) is NOT among the blockers any more**: fjs/form461 computes the `
+        + `excess business loss limitation over the whole return from Schedule 1 Part I, and it `
+        + `refuses only when the limitation actually BINDS. So the arithmetic loss is an UPPER `
+        + `BOUND on the deductible loss, never the deductible loss itself, and letting it reach `
+        + `Schedule 1 line 3 would understate the tax while moving adjusted gross income and `
+        + `every figure that depends on it. A PROFIT computes; a loss refuses (Form 6198, the `
+        + `§465 at-risk rules and Form 8582, no phase yet)`,
 })
 
 /**
@@ -1937,12 +1951,26 @@ export const proof = {
             assert(result.message.includes('line 32'), ['must name the printed line', result.message])
             assert(result.message.includes('Form 6198'), ['must name the at-risk form', result.message])
             assert(result.message.includes('§465'), ['must name the at-risk section', result.message])
-            // The two limitations BEHIND the at-risk rules, each asserted
-            // separately: a refusal that named only Form 6198 would tell a
-            // reader that solving the at-risk question is enough, and it is
-            // not.
+            // The limitation BEHIND the at-risk rules that is still real:
+            // a refusal that named only Form 6198 would tell a reader that
+            // solving the at-risk question is enough, and it is not.
             assert(result.message.includes('Form 8582'), ['must name the passive-activity form', result.message])
-            assert(result.message.includes('Form 461'), ['must name the excess-business-loss form', result.message])
+            // **AND §461(l) MUST NOT BE NAMED AS A BLOCKER.** It was, until the
+            // Form 461 phase, and `fjs/form461` computes it now — a remedy that
+            // goes on naming a form which has ceased to be missing is the
+            // failure mode this repository has hit repeatedly. The message must
+            // say so out loud rather than merely omit it, so a reader who
+            // remembers the old text learns what changed.
+            assert(result.message.includes('§461(l) is NOT among the blockers'),
+                ['§461(l) is computed now and must be named as computed', result.message])
+            assert(result.message.includes('fjs/form461'),
+                ['and the module that computes it', result.message])
+            // The two facts `vnd.fjs.business_expenses` does not carry, which
+            // are the real reason this loss cannot compute where a FARM's can.
+            assert(result.message.includes('no field for printed line 32'),
+                ['the missing at-risk answer', result.message])
+            assert(result.message.includes('material participation'),
+                ['and the missing §469 answer', result.message])
             // …and it must say which DIRECTION the error would go, which is
             // the part a reader weighing whether to override it needs.
             assert(

@@ -242,6 +242,7 @@ import { ok } from 'functionalscript/fjs/types/result/module.f.mjs'
  *   readonly kind: 'ok',
  *   readonly taxYear: number,
  *   readonly line16Method: string,
+ *   readonly qualifiedBusinessLossCarryforward: RenderedLine,
  *   readonly lines: readonly RenderedLine[],
  * } | {
  *   readonly kind: 'error',
@@ -503,6 +504,11 @@ export const taxReturnReportSource = [
     '            kind: \'ok\',',
     '            taxYear: profile.value.taxYear,',
     '            line16Method: outcome.line16Method,',
+    '            qualifiedBusinessLossCarryforward: {',
+    '                rule: outcome.qualifiedBusinessLossCarryforward.rule,',
+    '                value: ctx.centsToString(outcome.qualifiedBusinessLossCarryforward.value),',
+    '                sources: outcome.qualifiedBusinessLossCarryforward.sources,',
+    '            },',
     '            lines: outcome.lines.map(line => ({',
     '                rule: line.rule,',
     '                value: ctx.centsToString(line.value),',
@@ -764,6 +770,11 @@ const renderReturn = ctx => acc => {
         kind: 'ok',
         taxYear: profile.value.taxYear,
         line16Method: outcome.line16Method,
+        qualifiedBusinessLossCarryforward: {
+            rule: outcome.qualifiedBusinessLossCarryforward.rule,
+            value: ctx.centsToString(outcome.qualifiedBusinessLossCarryforward.value),
+            sources: outcome.qualifiedBusinessLossCarryforward.sources,
+        },
         lines: outcome.lines.map(line => ({
             rule: line.rule,
             value: ctx.centsToString(line.value),
@@ -874,6 +885,9 @@ const fixtureLandlordPropertyHash = 'sha256-tax-return-landlord-property'
 // The Schedule F wiring's own two: a farmer.
 const fixtureFarmerProfileHash = 'sha256-tax-return-farmer-profile'
 const fixtureFarmerFarmHash = 'sha256-tax-return-farmer-farm'
+
+/** The Form 461 phase's own document: the SAME farm with a losing year. */
+const fixtureFarmerLossFarmHash = 'sha256-tax-return-farmer-loss-farm'
 const fixtureMarketplaceProfileHash = 'sha256-tax-return-marketplace-profile'
 const fixtureMarketplaceW2Hash = 'sha256-tax-return-marketplace-w2'
 const fixtureMarketplaceStatementHash = 'sha256-tax-return-marketplace-1095a'
@@ -959,6 +973,7 @@ const subjectLandlordProfile = 'tax-return-subject-landlord-profile'
 const subjectLandlordProperty = 'tax-return-subject-landlord-property'
 const subjectFarmerProfile = 'tax-return-subject-farmer-profile'
 const subjectFarmerFarm = 'tax-return-subject-farmer-farm'
+const subjectFarmerLossFarm = 'tax-return-subject-farmer-loss-farm'
 const subjectMarketplaceProfile = 'tax-return-subject-marketplace-profile'
 const subjectMarketplaceW2 = 'tax-return-subject-marketplace-w2'
 const subjectMarketplaceStatement = 'tax-return-subject-marketplace-1095a'
@@ -1812,6 +1827,32 @@ const documentByHash = {
         priorYearQualifiedBusinessLossCarryforward: '0.00',
         entries: [],
     },
+    // **The Form 461 wiring's own document**: the same farm, $90,000.00 of feed
+    // against $40,000.00 of raised products, printed box 36a checked. It exists
+    // because nothing else in this fixture set can make Form 8995 printed line
+    // 16 -- §199A(c)(2)'s carryforward to 2026 -- anything but zero, and a
+    // rendering that hardcoded `'0.00'` for it would otherwise pass every leaf
+    // here. (It does: that exact mutation survived the whole suite before this
+    // fixture existed.)
+    [fixtureFarmerLossFarmHash]: {
+        dialect: farmDialect,
+        recipientTin: '222-22-2222',
+        accountNumber: 'FARM-0001',
+        taxYear: 2025,
+        principalCropOrActivity: 'corn and soybeans',
+        accountingMethod: 'cash',
+        materiallyParticipated: 'yes',
+        investmentAtRisk: 'allAtRisk',
+        salesOfRaisedProductsAndLivestock: '40000.00',
+        cropInsuranceProceedsDeferredFromPriorYear: '0.00',
+        priorYearQualifiedBusinessLossCarryforward: '0.00',
+        entries: [{
+            category: 'feed',
+            datePaid: '2025-04-15',
+            description: 'winter hay',
+            amount: '90000.00',
+        }],
+    },
     // The Form 4562 wiring's own document. It exists for exactly the reason
     // the 1095-A fixture above does: deleting the twin's
     // `vnd.fjs.asset_register` route branch has to redden something, and
@@ -1874,6 +1915,7 @@ const snapshotBySubject = {
     [subjectLandlordProperty]: fixtureLandlordPropertyHash,
     [subjectFarmerProfile]: fixtureFarmerProfileHash,
     [subjectFarmerFarm]: fixtureFarmerFarmHash,
+    [subjectFarmerLossFarm]: fixtureFarmerLossFarmHash,
     [subjectMarketplaceProfile]: fixtureMarketplaceProfileHash,
     [subjectMarketplaceW2]: fixtureMarketplaceW2Hash,
     [subjectMarketplaceStatement]: fixtureMarketplaceStatementHash,
@@ -2797,6 +2839,67 @@ export const proof = {
         assertEq(cents('1040 line 23'), 565182n,
             '$5,651.82 of self-employment tax — the destination a 1040-line-8 assertion misses')
     },
+    /**
+     * ★ **THE §461(l) CHAIN THROUGH THE STORED PROGRAM, and the field no line
+     * of the 1040 carries.** The same farmer with a losing year: $40,000.00 of
+     * raised products against $90,000.00 of feed.
+     *
+     * ```
+     *  Schedule F  34  = 9 - 33                      -50,000.00
+     *  Schedule 1   6  Schedule F line 34            -50,000.00
+     *  Form 461    14  the trade-or-business net     -50,000.00
+     *  Form 461    15  single threshold              313,000.00
+     *  Form 461    16  = 14 + 15                     263,000.00   allowed in full
+     *  Schedule 1  8p  no excess business loss             0.00
+     *  1040         8  Schedule 1 line 10            -50,000.00
+     *  Form 8995   16  carried to 2026               -50,000.00
+     * ```
+     *
+     * The last line is the one this leaf exists for.
+     * `qualifiedBusinessLossCarryforward` rides beside `line16Method` rather
+     * than inside `lines`, because `lines` is Form 1040 lines 1a through 37 and
+     * this is a line of a different form — so no assertion over `lines` can see
+     * it, and rendering it as a hardcoded `'0.00'` survived the entire suite
+     * until this fixture existed. It is the only route §199A(c)(2)'s outbound
+     * carryforward has out of this engine, and next year's
+     * `priorYearQualifiedBusinessLossCarryforward` is what receives it.
+     */
+    storedProgramCarriesTheFarmLossAndItsQbiCarryforward: () => {
+        const result = runTwin([subjectFarmerProfile, subjectFarmerLossFarm])
+        assert(result.kind === 'ok', ['expected a computed return', result])
+        if (result.kind !== 'ok') {
+            return
+        }
+        const cents = renderedCents(result)
+        assertEq(cents('1040 line 8'), -5000000n, 'the whole $50,000.00 farm loss')
+        assertEq(cents('1040 line 11a'), -5000000n, 'and it moves adjusted gross income')
+        assertEq(
+            cents('1040 line 13a (qualified business income deduction, Form 8995 line 15 '
+                + 'or Form 8995-A line 39)'), 0n, 'a loss earns no §199A deduction')
+        assertEq(cents('1040 line 23'), 0n, 'and no self-employment tax')
+        assertEq(
+            centsFromString(result.qualifiedBusinessLossCarryforward.value), -5000000n,
+            'Form 8995 line 16 hands the whole loss to 2026')
+        assert(
+            result.qualifiedBusinessLossCarryforward.rule.includes('Form 8995 line 16'),
+            ['the printed line must name itself',
+                result.qualifiedBusinessLossCarryforward.rule])
+        assert(
+            result.qualifiedBusinessLossCarryforward.sources.length > 0,
+            ['and cite the farm behind it',
+                result.qualifiedBusinessLossCarryforward.sources])
+        // THE CONTROL, from the profitable farm above: the SAME field is
+        // "0.00" when the year was a profit, so this leaf is a statement about
+        // the loss rather than about the field always being filled.
+        const profitable = runTwin(farmerSubjects)
+        assert(profitable.kind === 'ok', ['expected a computed return', profitable])
+        if (profitable.kind !== 'ok') {
+            return
+        }
+        assertEq(
+            centsFromString(profitable.qualifiedBusinessLossCarryforward.value), 0n,
+            'a profitable farm hands nothing to 2026')
+    },
     // THE CONTROL: the SAME filer with the farm withheld. Everything goes to
     // zero and the return still computes, so the leaf above is evidence about
     // the DOCUMENT rather than about the profile.
@@ -3368,5 +3471,42 @@ export const proof = {
         assert(
             taxReturnReportSource.includes('ctx.form1040Report('),
             'the stored program must call the engine through ctx')
+    },
+    /**
+     * The OTHER mechanical half, and it was missing until the Form 461 phase
+     * found it the hard way. `runTwin` executes the FUNCTION twin; the source
+     * TEXT is executed only by `tax-return-integration.test.js`, in a real
+     * process. So a value rendered correctly by the twin and hardcoded in the
+     * source passes every leaf in this module — measured, not supposed:
+     * replacing the source's
+     * `ctx.centsToString(outcome.qualifiedBusinessLossCarryforward.value)` with
+     * a literal `'0.00'` left the whole suite green, while the identical
+     * mutation to the twin reddened
+     * {@link storedProgramCarriesTheFarmLossAndItsQbiCarryforward} at once.
+     *
+     * Every result field is therefore named here, hand-typed, and each must be
+     * rendered from `outcome` in the source rather than written as a constant.
+     * `taxYear` is the one exception and is asserted separately: it comes from
+     * the profile, not from the engine's outcome.
+     */
+    everyResultFieldIsRenderedFromTheOutcomeInTheSourceText: () => {
+        /** @type {readonly string[]} */
+        const renderedFromTheOutcome = [
+            'line16Method: outcome.line16Method',
+            'ctx.centsToString(outcome.qualifiedBusinessLossCarryforward.value)',
+            'outcome.qualifiedBusinessLossCarryforward.rule',
+            'outcome.qualifiedBusinessLossCarryforward.sources',
+            'outcome.lines.map',
+            'ctx.centsToString(line.value)',
+        ]
+        assertEq(renderedFromTheOutcome.length, 6, 'six hand-typed renderings')
+        for (const expression of renderedFromTheOutcome) {
+            assert(
+                taxReturnReportSource.includes(expression),
+                ['the stored program source must render this from the outcome', expression])
+        }
+        assert(
+            taxReturnReportSource.includes('taxYear: profile.value.taxYear'),
+            'the tax year comes from the profile, not from the outcome')
     },
 }
