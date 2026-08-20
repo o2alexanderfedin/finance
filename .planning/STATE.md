@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v3
 milestone_name: File a Real Return
 status: in_progress
-stopped_at: "Milestone v3 opened 2026-08-17. Phase 14 was MOVED into it and REFRAMED: its acceptance criterion required a filed return, which is the artifact this system exists to produce -- circular, and unsatisfiable for its own owner. v3 replaces it with external ground truth that needs nothing from the taxpayer (TaxCalcBench 51 cases, a second-implementation cross-check) plus the thing nobody had noticed was missing -- there is no filable output at all; the engine returns cited numbers, not a form. Public copy published at o2alexanderfedin/finance by owner decision."
+stopped_at: "2026-08-19. Phase 37 (FunctionalScript 0.46.1) closed with the report its upstream author asked for. Then twenty abandoned branches were integrated — they turned out to be ONE linear chain, not twenty independent pieces, and form-2555-impl contained every other: Forms 461/2441/2555/4797/6781/8829, Schedule F, Schedule E Part I, and more. Suite 2523 -> 3241, proof leaves 2489 -> 3196, assertions 7957 -> 10694, requirements 120 -> 127. Nothing left open is fixable in this repository: two upstream notes, both filed upstream (functionalscript#1649, #1650). Milestone v3 phases 33-36 remain, and 34/36 need the owner present."
 last_updated: "2026-08-17T21:30:00.000Z"
 last_activity: 2026-08-17
 progress:
   total_phases: 37
-  completed_phases: 32
+  completed_phases: 33
   total_plans: 89
   completed_plans: 85
-  percent: 86
+  percent: 89
 ---
 
 # Project State
