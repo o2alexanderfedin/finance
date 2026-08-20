@@ -100,7 +100,7 @@ const validateShape = rttiValidate(ssa1099Schema)
  * `box4Description` are deliberately NOT here — they are free text, never
  * parsed or computed on.
  */
-const moneyBoxFields = /** @type {const} */ ([
+export const moneyBoxFields = /** @type {const} */ ([
     'box3BenefitsPaid',
     'box4BenefitsRepaid',
     'box5NetBenefits',

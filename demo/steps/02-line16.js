@@ -45,6 +45,9 @@ const neutral = {
     form4952Line4gCents: 0n,
     form4952Line4eCents: 0n,
     filingForm2555: false,
+    form2555Line45Cents: 0n,
+    form2555Line50Cents: 0n,
+    form2555ItemizedDeductionsAndExclusionsNotClaimedCents: 0n,
     form8615Applies: false,
     scheduleJElected: false,
 }
@@ -259,9 +262,12 @@ export const render = root => {
 
     live.append(controls)
 
-    // The Schedule D toggle now COMPUTES (Plan 12.1-04); the other three
-    // toggles select the level-0 WRAPPER branches, which still refuse —
-    // no kind for Form 2555, Form 8615, or Schedule J is in scope.
+    // The Schedule D toggle COMPUTES (Plan 12.1-04) and so does Form 2555's
+    // (TAX-42): its wrapper now runs the Foreign Earned Income Tax Worksheet
+    // rather than refusing, and the toggle below supplies a $60,000.00
+    // exclusion so the stacking rule is visible on screen. The other two
+    // toggles still select refusing level-0 wrappers — Form 8615 and
+    // Schedule J are not in scope.
     const toggles = el('div', { class: 'checks' })
     /** @type {readonly {
      *   readonly label: string,
@@ -276,7 +282,9 @@ export const render = root => {
                 scheduleD18Cents: centsFromString('1000.00'),
             }
             : { filingScheduleD: false, scheduleD15Cents: 0n, scheduleD16Cents: 0n, scheduleD18Cents: 0n } },
-        { label: 'Form 2555 — foreign earned income', apply: on => ({ filingForm2555: on }) },
+        { label: 'Form 2555 — foreign earned income ($60,000 excluded)', apply: on => on
+            ? { filingForm2555: true, form2555Line45Cents: centsFromString('60000.00') }
+            : { filingForm2555: false, form2555Line45Cents: 0n } },
         { label: 'Form 8615 — child\'s unearned income', apply: on => ({ form8615Applies: on }) },
         { label: 'Schedule J — farm income averaging', apply: on => ({ scheduleJElected: on }) },
     ]

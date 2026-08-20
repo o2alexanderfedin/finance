@@ -29,9 +29,24 @@
  *   holds no prior-year return, so it cannot decide that question. Storing the
  *   box and ignoring it would understate income for anyone who itemized last
  *   year; guessing would be worse.
- * - **Boxes 5, 6, 7 and 9** (RTAA payments, taxable grants, agriculture
- *   payments, market gain) each land on Schedule 1 line 8's collapsed
- *   "other income" or on a Schedule F this engine does not model.
+ * - **Boxes 5 and 6** (RTAA payments, taxable grants) each land on one of
+ *   Schedule 1 line 8's twenty-three lettered sub-lines, and no computation
+ *   carries an amount there.
+ * - **Boxes 7 and 9 (agriculture payments and market gain) are READ as of the
+ *   Schedule F phase**, and they were refused here until it. Both reach printed
+ *   Schedule F line 4a: i1040sf p3 routes a Form 1099-G or CCC-1099-G "For
+ *   other agricultural program payments" to line 4a, and i1040sf p4 puts
+ *   "Market gain from the repayment of a secured Commodity Credit Corporation
+ *   (CCC) loan for less than the original loan amount" in that same line's own
+ *   list. Box 9 leaves line 4b again under the §77 election.
+ *
+ *   **The refusal did not simply go — it MOVED**, to
+ *   `fjs/schedule/f`'s `agriculturePaymentsWithoutAFarmRefusal`. A Form 1099-G
+ *   carrying either box with no `vnd.fjs.farm` stored beside it still refuses,
+ *   because without a Schedule F the amount reaches no printed line at all and
+ *   dropping it would understate income in silence. Deleting the refusal
+ *   outright rather than relocating it is the shape this file's own
+ *   `unmodeledMoneyBoxes` exists to prevent.
  *
  * **Refusing a present-but-unmodeled box is the same discipline
  * `fjs/return/scope` applies at the return level**, applied here at the
@@ -132,7 +147,7 @@ const validateShape = rttiValidate(oneZeroNineNineGSchema)
  * `box3RefundTaxYear` (a year) and `box8TradeOrBusinessIncome` (a checkbox)
  * are deliberately absent — they are not dollar amounts.
  */
-const moneyBoxFields = /** @type {const} */ ([
+export const moneyBoxFields = /** @type {const} */ ([
     'box1UnemploymentCompensation',
     'box2StateOrLocalIncomeTaxRefunds',
     'box4FederalIncomeTaxWithheld',
@@ -149,7 +164,7 @@ const moneyBoxFields = /** @type {const} */ ([
  * proof walk the identical list — `fjs/document/w2`'s `stateLocalMoneyFields`
  * precedent, and AGENTS.md's "one rule, one place".
  */
-const stateMoneyFields = /** @type {const} */ ([
+export const stateMoneyFields = /** @type {const} */ ([
     'stateIncomeTaxWithheld',
 ])
 
@@ -170,10 +185,13 @@ const stateMoneyFields = /** @type {const} */ ([
  */
 const unmodeledMoneyBoxes = /** @type {const} */ ([
     ['box2StateOrLocalIncomeTaxRefunds', 'Schedule 1 line 1 (taxable state/local income tax refunds), which depends on whether the taxpayer itemized in the PRIOR year — this engine models one tax year and holds no prior-year return'],
-    ['box5RtaaPayments', "Schedule 1 line 8's collapsed other-income block, which no dialect can attribute an amount to"],
-    ['box6TaxableGrants', "Schedule 1 line 8's collapsed other-income block, which no dialect can attribute an amount to"],
-    ['box7AgriculturePayments', 'Schedule F line 4b (taxable agricultural program payments), which this engine does not model'],
-    ['box9MarketGain', "Schedule 1 line 8's collapsed other-income block, which no dialect can attribute an amount to"],
+    // These three named "Schedule 1 line 8's collapsed other-income block,
+    // which no dialect can attribute an amount to" until 2026-08-18, when that
+    // block was split into twenty-eight kinds and the sentence stopped being
+    // true: line 8z's RTAA payments now have a kind of their own, and this
+    // dialect is the thing that would attribute the amount to it.
+    ['box5RtaaPayments', 'Schedule 1 line 8z as a reemployment trade adjustment assistance payment (the `reemploymentTradeAdjustmentAssistance` kind), which no computation carries there yet'],
+    ['box6TaxableGrants', 'Schedule 1 line 8z as other income the printed line does not name (the `otherIncomeNotListed` kind), which is a WRITE-IN no form closes'],
 ])
 
 /**
@@ -327,8 +345,14 @@ const perUnmodeledBoxZeroAccepted = Object.fromEntries(unmodeledMoneyBoxes.map((
 const expectedMoneyBoxCount = 7
 /** The number of money fields on one boxes-10a-through-11 row, hand-typed likewise. */
 const expectedStateMoneyFieldCount = 1
-/** The number of refused-when-non-zero boxes, hand-typed so a REMOVAL is caught. */
-const expectedUnmodeledBoxCount = 5
+/**
+ * The number of refused-when-non-zero boxes, hand-typed so a REMOVAL is caught
+ * — and it caught this one. **Five until the Schedule F phase, three after
+ * it**: boxes 7 and 9 became READ when printed Schedule F line 4a arrived, and
+ * dropping them from {@link unmodeledMoneyBoxes} reddened this leaf by name
+ * rather than silently generating two fewer refusal proofs.
+ */
+const expectedUnmodeledBoxCount = 3
 
 export const proof = {
     ...perMoneyBoxRejection,

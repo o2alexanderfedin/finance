@@ -158,9 +158,9 @@ import { taxParamsByYear } from '../tax/params/module.f.js'
  *
  * Its add-back list, per that instruction, every term permanently zero in
  * this engine and named rather than omitted:
- * - Form 2555's foreign earned income exclusion (§911) —
- *   `foreignEarnedIncomeForm2555` is a refused `fjs/return/scope` kind, so a
- *   return that has one produces no Form 1040 at all.
+ * - Form 2555's foreign earned income exclusion (§911) — **LIVE as of
+ *   TAX-42**. `foreignEarnedIncomeExclusion` is a modeled kind, and this
+ *   sentence used to say a return with one "produces no Form 1040 at all".
  * - Form 4563's exclusion for bona fide residents of American Samoa (§931) —
  *   no dialect models it.
  * - The §933 exclusion for income from Puerto Rico — no dialect models it.
@@ -174,10 +174,10 @@ import { taxParamsByYear } from '../tax/params/module.f.js'
  * rather than on the underlying rules being one rule. The student loan
  * measure is not even the same SHAPE, starting from total income rather than
  * from adjusted gross income.
- * @type {(agiCents: bigint) => bigint}
+ * @type {(agiCents: bigint) => (form2555ExclusionCents: bigint) => bigint}
  */
-export const educationCreditPhaseoutIncome = agiCents => {
-    const form2555ForeignEarnedIncomeExclusion = 0n
+export const educationCreditPhaseoutIncome = agiCents => form2555ExclusionCents => {
+    const form2555ForeignEarnedIncomeExclusion = form2555ExclusionCents
     const form4563AmericanSamoaExclusion = 0n
     const section933PuertoRicoExclusion = 0n
     return agiCents
@@ -239,6 +239,7 @@ export const educationCreditPhaseoutIncome = agiCents => {
  *   readonly line18Cents: bigint,
  *   readonly earlierScheduleThreeCreditsCents: bigint,
  *   readonly filerAttainedAgeTwentyFour: boolean,
+ *   readonly form2555ExclusionCents: bigint,
  * }} Form8863Input
  */
 
@@ -321,7 +322,7 @@ const allZero = students => ({
 export const form8863 = taxParamSet => input => {
     const {
         status, agiCents, students, line18Cents, earlierScheduleThreeCreditsCents,
-        filerAttainedAgeTwentyFour,
+        filerAttainedAgeTwentyFour, form2555ExclusionCents,
     } = input
     const { americanOpportunity, lifetimeLearning } = taxParamSet.educationCredits
 
@@ -475,7 +476,7 @@ export const form8863 = taxParamSet => input => {
     const line2 = centsFromString(taxParamSet.educationCredits.phaseoutCeiling[status].amount)
     // 3. Modified adjusted gross income, through its OWN named function
     //    (TAX-15) rather than a bare `agiCents` here.
-    const line3 = educationCreditPhaseoutIncome(agiCents)
+    const line3 = educationCreditPhaseoutIncome(agiCents)(form2555ExclusionCents)
     // 4. "Subtract line 3 from line 2. If zero or less, STOP; you can't take
     //    any education credit." A whole-form stop, not merely a Part I one --
     //    lines 13/14/15 repeat the identical comparison, so line 15 is
@@ -604,6 +605,7 @@ const baseInput = overrides => ({
     line18Cents: 100000000n,        // ample, so the credit limit never binds
     earlierScheduleThreeCreditsCents: 0n,
     filerAttainedAgeTwentyFour: true,
+    form2555ExclusionCents: 0n,
     ...overrides,
 })
 
@@ -1122,12 +1124,59 @@ export const proof = {
         lineThreeEqualsTheNamedFunctionForEveryFixture: () => {
             for (const agi of [0n, 4000000n, 8000000n, 8500000n, 8999999n]) {
                 const result = okResult(compute(baseInput({ agiCents: agi })))
-                assertEq(result.line3, educationCreditPhaseoutIncome(agi))
+                assertEq(result.line3, educationCreditPhaseoutIncome(agi)(0n))
             }
         },
-        theNamedFunctionEqualsBareAdjustedGrossIncomeToday: () => {
-            assertEq(educationCreditPhaseoutIncome(0n), 0n)
-            assertEq(educationCreditPhaseoutIncome(12345600n), 12345600n)
+        theNamedFunctionEqualsBareAdjustedGrossIncomeWithNoExclusion: () => {
+            assertEq(educationCreditPhaseoutIncome(0n)(0n), 0n)
+            assertEq(educationCreditPhaseoutIncome(12345600n)(0n), 12345600n)
+        },
+        // **TAX-42: §911's exclusion is a LIVE add-back**, and it can cost the
+        // whole credit. i8863's line 3 instruction is the modified AGI a
+        // §911 filer must add their exclusion back into; a single filer at
+        // $40,000.00 of adjusted gross income is far below the $80,000.00
+        // phase-out floor, and the same filer with a $130,000.00 exclusion is
+        // above the $90,000.00 ceiling and takes NOTHING.
+        theExclusionAddsBackAndCanCostTheWholeCredit: () => {
+            // $40,000.00 of adjusted gross income is far below the $80,000.00
+            // phase-out floor; adding back a $130,000.00 exclusion puts
+            // modified AGI at $170,000.00, past the $90,000.00 ceiling, and
+            // line 4's printed STOP takes the whole credit.
+            //
+            // The printed stop returns the all-zero form, so `line3` reads
+            // $0.00 rather than $170,000.00 — that is `allZero`'s shape and
+            // not a missing add-back, which is why this leaf asserts the
+            // OUTCOME and the leaf below asserts the arithmetic on a fixture
+            // that survives the stop.
+            const withExclusion = okResult(compute(baseInput({
+                form2555ExclusionCents: 13000000n,
+            })))
+            assertEq(withExclusion.line19, 0n, 'the credit is gone entirely')
+        },
+        // The same add-back where it REDUCES rather than kills: a $45,000.00
+        // exclusion puts modified AGI at $85,000.00, halfway through the
+        // $80,000-$90,000 phase-out range, so line 3 is visible and the credit
+        // survives at less than the control's.
+        theExclusionAddsBackInsideThePhaseOutRange: () => {
+            const withExclusion = okResult(compute(baseInput({
+                form2555ExclusionCents: 4500000n,
+            })))
+            assertEq(
+                withExclusion.line3, 8500000n,
+                '$40,000.00 + $45,000.00 = $85,000.00 of modified AGI')
+            const without = okResult(compute(baseInput({})))
+            assert(
+                withExclusion.line19 > 0n && withExclusion.line19 < without.line19,
+                ['the add-back must reduce the credit without erasing it',
+                    withExclusion.line19, without.line19])
+        },
+        // THE CONTROL: the identical fixture without the exclusion takes a
+        // real credit, so the leaf above measures the add-back rather than
+        // some other refusal.
+        controlTheSameFilerWithNoExclusionTakesTheCredit: () => {
+            const without = okResult(compute(baseInput({})))
+            assertEq(without.line3, 4000000n, 'bare adjusted gross income')
+            assert(without.line19 > 0n, ['the control must take a credit', without.line19])
         },
     },
 

@@ -74,6 +74,9 @@ import { dialect as formThirtyNineTwentyOneDialect, formThirtyNineTwentyOneSchem
 import { dialect as formThirtyNineTwentyTwoDialect, formThirtyNineTwentyTwoSchema } from '../../document/form3922/module.f.js'
 import { dialect as basisCorrectionDialect, basisCorrectionSchema } from '../../document/basis_correction/module.f.js'
 import { dialect as oneZeroNineFiveADialect, oneZeroNineFiveASchema } from '../../document/1095a/module.f.js'
+import { dialect as assetRegisterDialect, assetRegisterSchema } from '../../document/asset_register/module.f.js'
+import { dialect as rentalPropertyDialect, rentalPropertySchema } from '../../document/rental_property/module.f.js'
+import { dialect as farmDialect, farmSchema } from '../../document/farm/module.f.js'
 import { dialect as k1PartnershipDialect, k1PartnershipSchema } from '../../document/k1_1065/module.f.js'
 import { dialect as k1SCorporationDialect, k1SCorporationSchema } from '../../document/k1_1120s/module.f.js'
 import { dialect as k1EstateTrustDialect, k1EstateTrustSchema } from '../../document/k1_1041/module.f.js'
@@ -134,6 +137,28 @@ const dialectSchemas = {
     // the column is `columnB` or `slcsp` is exactly the guess this tool
     // exists to make unnecessary.
     [oneZeroNineFiveADialect]: oneZeroNineFiveASchema,
+    // `vnd.fjs.asset_register`. An agent filing for any sole proprietor who
+    // owns equipment has to author a per-asset register, and guessing whether
+    // the field is `convention` or `applicableConvention` -- or that
+    // `section168kStatus` exists at all -- is exactly the guess this tool
+    // exists to make unnecessary. Registered in the SAME commit as
+    // `fjs/media/dialects`'s entry.
+    [assetRegisterDialect]: assetRegisterSchema,
+    // `vnd.fjs.rental_property`. An agent filing for a landlord has to author
+    // one document per printed Schedule E Part I column, and guessing whether
+    // the field is `fairRentalDays` or `daysRented` -- or that a royalty must
+    // OMIT the address and the day counts rather than zero them -- is exactly
+    // the guess this tool exists to make unnecessary. Registered in the SAME
+    // commit as `fjs/media/dialects`'s entry.
+    [rentalPropertyDialect]: rentalPropertySchema,
+    // `vnd.fjs.farm`. An agent filing for a farmer has to author printed Part
+    // I's fourteen amounts and printed Part II's twenty-five expense
+    // categories, and guessing whether the field is `accountingMethod` or
+    // `method` -- or that printed line 6d must be stated as `"0.00"` rather
+    // than omitted -- is exactly the guess this tool exists to make
+    // unnecessary. Registered in the SAME commit as `fjs/media/dialects`'s
+    // entry.
+    [farmDialect]: farmSchema,
 }
 
 /**
@@ -210,13 +235,21 @@ export const knownDialects = /** @type {readonly string[]} */ (Object.keys(diale
  * mistake: a caller handed the 1065 schema would write a program reading this
  * face's box 1 interest income as ordinary business income.
  *
+ * The Form 4562 wiring registers the TWENTY-EIGHTH, `vnd.fjs.asset_register`,
+ * moving the count from 27 to 28, and it gained its own `*Resolves` leaf below.
+ *
+ * The Schedule E Part I wiring registers the TWENTY-NINTH,
+ * `vnd.fjs.rental_property`, moving the count from 28 to 29, and it gained its
+ * own `*Resolves` leaf below. The Schedule F wiring registers the THIRTIETH,
+ * `vnd.fjs.farm`, the same way.
+ *
  * **`fjs/server/dialect_parity` is now what keeps this count and
  * `fjs/media/dialects`'s in step.** Raising one of the two hand-typed counts
  * without registering the dialect in BOTH places reddens that gate by name —
  * which is the check the two paragraphs of prose above turned out not to be.
  * @type {number}
  */
-const expectedKnownDialectCount = 27
+const expectedKnownDialectCount = 30
 
 /**
  * `finance_schema(dialect)`: the MCP tool. Looks `dialect` up in
@@ -467,6 +500,34 @@ export const proof = {
         assertEq(
             JSON.stringify(JSON.parse(textOf(result))),
             JSON.stringify(toJsonSchema(oneZeroNineFiveASchema)),
+        )
+    },
+    // TWENTY-EIGHTH, registered in the same commit as the Form 4562 wiring.
+    assetRegisterResolves: () => {
+        const result = call('vnd.fjs.asset_register')
+        assertEq(result.isError, undefined)
+        assertEq(
+            JSON.stringify(JSON.parse(textOf(result))),
+            JSON.stringify(toJsonSchema(assetRegisterSchema)),
+        )
+    },
+    // TWENTY-NINTH, registered in the same commit as the Schedule E Part I
+    // wiring.
+    rentalPropertyResolves: () => {
+        const result = call('vnd.fjs.rental_property')
+        assertEq(result.isError, undefined)
+        assertEq(
+            JSON.stringify(JSON.parse(textOf(result))),
+            JSON.stringify(toJsonSchema(rentalPropertySchema)),
+        )
+    },
+    // THIRTIETH, registered in the same commit as the Schedule F wiring.
+    farmResolves: () => {
+        const result = call('vnd.fjs.farm')
+        assertEq(result.isError, undefined)
+        assertEq(
+            JSON.stringify(JSON.parse(textOf(result))),
+            JSON.stringify(toJsonSchema(farmSchema)),
         )
     },
     basisCorrectionResolves: () => {

@@ -627,14 +627,74 @@ const foreignTaxSources = divForms => intForms => [
  * creditable foreign taxes, full stop. So it is lifted out, run ONCE, and
  * handed to both schedules, the same "one execution, two destinations" shape
  * `form8863` and `form8959` already have.
- * @type {(taxParamSet: TaxParamSet) => (status: IndividualFilingStatus) => (profile: Stored<ReturnProfile>) => (divForms: readonly Stored<OneZeroNineNineDiv>[]) => (intForms: readonly Stored<OneZeroNineNineInt>[]) => ForeignTaxCreditOutcome}
+ * ## §911(d)(6) — the ONE combination this line refuses outright (TAX-42)
+ *
+ * *"No deduction or exclusion from gross income under this subtitle or credit
+ * against the tax imposed by this chapter … shall be allowed to the extent
+ * such deduction, exclusion, or credit is properly allocable to or chargeable
+ * against amounts excluded from gross income under subsection (a)."* i2555 p3
+ * restates it: *"You can't take a credit or deduction for foreign income taxes
+ * paid or accrued on income that is excluded under either of the exclusions."*
+ *
+ * **Two independent reasons, and each alone would be enough.**
+ *
+ * 1. §911(d)(6) needs the foreign tax SPLIT between excluded and non-excluded
+ *    income — Pub. 514's allocation. No stored document states the split, and
+ *    §904(j) offers no shortcut for it.
+ * 2. §904(j) is the ONLY route to this line that this engine computes, and its
+ *    election asserts that *every dollar of my foreign-source gross income is
+ *    qualified passive income under §904(d)(2)(B)*. Foreign EARNED income is
+ *    compensation for personal services — general category, never passive — so
+ *    the election is not truthfully available to a §911 filer at all.
+ *
+ * **It fires whether or not the election was made, and a surviving mutation is
+ * why.** Gating it on `elected` left the whole suite green, and the reason it
+ * did is worse than a missing test: a §911 filer holding a stored foreign tax
+ * and NOT electing would have been sent to *"declare
+ * section904jElectionAllForeignIncomeIsQualifiedPassiveIncome"* — a remedy
+ * that walks them straight into this refusal on their next run. **A remedy
+ * that cannot be followed is worse than no remedy**, so the check reads the
+ * exclusion and the stored tax alone.
+ *
+ * The refusal is message-only rather than an `fjs/return/scope` kind, on
+ * `fjs/schedule/1`'s Rev. Proc. 2014-41 precedent: both halves are separately
+ * modeled kinds and it is their COMBINATION that this engine cannot compute,
+ * which is not a thing a taxpayer declares.
+ * @type {(taxParamSet: TaxParamSet) => (status: IndividualFilingStatus) => (profile: Stored<ReturnProfile>) => (divForms: readonly Stored<OneZeroNineNineDiv>[]) => (intForms: readonly Stored<OneZeroNineNineInt>[]) => (form2555ExclusionCents: bigint) => ForeignTaxCreditOutcome}
  */
-export const foreignTaxCreditLine = taxParamSet => status => profile => divForms => intForms => {
+export const foreignTaxCreditLine = taxParamSet => status => profile => divForms => intForms => form2555ExclusionCents => {
     const rule = 'Schedule 3 line 1 (foreign tax credit, §904(j) election -> 1040 line 20)'
     const sources = foreignTaxSources(divForms)(intForms)
     const total = sumSources(sources)
     const elected
         = profile.value.section904jElectionAllForeignIncomeIsQualifiedPassiveIncome === true
+    // §911(d)(6), checked BEFORE the election's own two refusals and WITHOUT
+    // reading `elected` — see this module's own docstring on the mutation that
+    // established the second half. Both later refusals name a remedy a §911
+    // filer cannot follow: one tells them to make an election that is not
+    // truthfully available to them, and the other sends them to Form 1116 for
+    // a credit §911(d)(6) denies outright.
+    //
+    // Gated on `total > 0n` for the reason the two refusals below are: with no
+    // foreign tax stored there is no credit to deny, and a broker's
+    // zero-filled box 7 must not refuse an ordinary expatriate return.
+    if (total > 0n && form2555ExclusionCents !== 0n) {
+        return {
+            kind: 'error',
+            message: `Schedule 3 line 1: this return excludes `
+                + `${centsToString(form2555ExclusionCents)} of foreign earned income under §911 `
+                + `AND elects §904(j). §911(d)(6) denies any credit "properly allocable to or `
+                + `chargeable against amounts excluded", so the foreign tax would first have to `
+                + `be split between excluded and non-excluded income under Pub. 514 — a split no `
+                + `document this engine holds states. §904(j) is the only route to this line `
+                + `this engine computes, and its election asserts that the ENTIRE foreign-source `
+                + `gross income is qualified PASSIVE income — foreign earned income is `
+                + `compensation for personal services, which is general-category income and `
+                + `never passive, so that election is not truthfully available here either. `
+                + `Refusing rather than crediting a foreign tax paid on income this return `
+                + `already excluded. Nothing reaches 1040 line 20`,
+        }
+    }
     // A present box reading `'0.00'` still CITES its document (DOC-11), and
     // needs no election: there is no credit to elect for. Gating the two
     // refusals on `total > 0n` rather than on the sources being non-empty is
@@ -731,6 +791,9 @@ export const foreignTaxCreditLine = taxParamSet => status => profile => divForms
  *   readonly tuitionForms: readonly Stored<OneZeroNineEightT>[],
  *   readonly aStored1099RProvesADistribution: boolean,
  *   readonly foreignTaxCreditLine1: ReportLine,
+ *   readonly netPremiumTaxCreditLine9: ReportLine,
+ *   readonly dependentCareCreditLine2: ReportLine,
+ *   readonly form2555ExclusionCents: bigint,
  * }} ScheduleThreeInput
  */
 
@@ -752,7 +815,8 @@ const sumSources = sources => sources.reduce((total, s) => total + centsFromStri
 export const scheduleThree = taxParamSet => input => {
     const {
         profile, status, agiCents, line18Cents, w2Forms, creditForms, tuitionForms,
-        aStored1099RProvesADistribution, foreignTaxCreditLine1,
+        aStored1099RProvesADistribution, foreignTaxCreditLine1, netPremiumTaxCreditLine9,
+        dependentCareCreditLine2, form2555ExclusionCents,
     } = input
     const zero = profileDeclaredZeroLine(profile)
     const fromDocuments = documentLine(profile)
@@ -851,18 +915,22 @@ export const scheduleThree = taxParamSet => input => {
         })
     }
     const educationOutcome = form8863(taxParamSet)({
+        // TAX-42: §911's exclusion is a live add-back inside Form 8863's own
+        // modified adjusted gross income (its line 3), not a documented zero.
+        form2555ExclusionCents,
         status,
         agiCents,
         students,
         line18Cents,
         // The Credit Limit Worksheet's line 2: Schedule 3 lines 1 and 2 and
-        // Schedule R. **Line 1 is REAL as of TAX-36** -- §26's ordering puts
-        // the foreign tax credit ahead of the education credits, so a
-        // §904(j) credit reduces what line 3 may claim, and a wiring that
-        // left this `0n` would overstate the education credit by exactly the
-        // foreign tax. Line 2 and Schedule R remain refused
-        // `fjs/return/scope` kinds and therefore documented zeros.
-        earlierScheduleThreeCreditsCents: foreignTaxCreditLine1.value,
+        // Schedule R. **Line 1 is REAL as of TAX-36 and line 2 as of TAX-38**
+        // -- §26's ordering puts the foreign tax credit and the dependent care
+        // credit ahead of the education credits, so both reduce what line 3
+        // may claim, and a wiring that left either `0n` would overstate the
+        // education credit by exactly that amount. Schedule R remains a
+        // refused `fjs/return/scope` kind and therefore a documented zero.
+        earlierScheduleThreeCreditsCents:
+            foreignTaxCreditLine1.value + dependentCareCreditLine2.value,
         filerAttainedAgeTwentyFour: creditForms.some(
             form => form.value.filerAttainedAgeTwentyFourBeforeTheEndOfTheYear === true),
     })
@@ -949,13 +1017,14 @@ export const scheduleThree = taxParamSet => input => {
         line18Cents,
         // The Credit Limit Worksheet's line 2: Schedule 3 lines 1, 2, 3, 6d,
         // 6l and 6m plus Forms 5695/8910/8936. Lines 1 and 3 are both real in
-        // this engine as of TAX-36, and both belong here -- which is the
-        // whole of §26's ordering among these credits, expressed as the
-        // printed worksheet expresses it. Dropping line 1 from this sum would
-        // overstate the saver's credit by exactly the foreign tax credit,
-        // which is why `fjs/form1040/core` drives a fixture carrying all
-        // three.
-        earlierScheduleThreeCreditsCents: foreignTaxCreditLine1.value + line3.value,
+        // this engine as of TAX-36 and line 2 as of TAX-38, and all three
+        // belong here -- which is the whole of §26's ordering among these
+        // credits, expressed as the printed worksheet expresses it. Dropping
+        // line 1 from this sum would overstate the saver's credit by exactly
+        // the foreign tax credit, which is why `fjs/form1040/core` drives a
+        // fixture carrying all three.
+        earlierScheduleThreeCreditsCents:
+            foreignTaxCreditLine1.value + dependentCareCreditLine2.value + line3.value,
         aStored1099RProvesADistribution,
     })
     if (saversOutcome.kind === 'error') {
@@ -970,7 +1039,17 @@ export const scheduleThree = taxParamSet => input => {
     //    is REPLACED, not supplemented -- on a return carrying 1099-DIV box 7
     //    or 1099-INT box 6 this line cites those boxes and not `declaredKinds`.
     const line1 = foreignTaxCreditLine1
-    const line2 = zero('Schedule 3 line 2 (credit for child and dependent care expenses, Form 2441)')
+    // 2. The credit for child and dependent care expenses, computed by
+    //    `fjs/form2441`'s Part II before this module ran — the same ONE
+    //    execution whose Part III already produced 1040 line 1e. The hard zero
+    //    is REPLACED, not supplemented, exactly as line 1's was: on a return
+    //    carrying dependent care expenses this line cites the documents behind
+    //    them and not `declaredKinds`.
+    //
+    //    NONREFUNDABLE, which is why it sits here in Part I. Form 2441 line 10
+    //    already capped it at the tax remaining after Schedule 3 line 1, so
+    //    line 8 cannot exceed the tax on 1040 line 18.
+    const line2 = dependentCareCreditLine2
     const line5a = zero('Schedule 3 line 5a (residential clean energy credit, Form 5695)')
     const line5b = zero('Schedule 3 line 5b (energy-efficient home improvement credit, Form 5695)')
     // 6a-6z. "Other nonrefundable credits" -- a collapsed stand-in for
@@ -987,7 +1066,22 @@ export const scheduleThree = taxParamSet => input => {
     ])
 
     // ── Part II: Other Payments and Refundable Credits ──────────────────
-    const line9 = zero('Schedule 3 line 9 (net premium tax credit, Form 8962)')
+    // 9. "Net premium tax credit. Attach Form 8962." ALREADY COMPUTED by
+    //    `fjs/form8962` and handed in, never recomputed here -- the SAME
+    //    execution produced Schedule 2 line 1a's excess advance repayment,
+    //    and the two are the mutually exclusive arms of one comparison (Form
+    //    8962 lines 24 and 25). Taking it as an INPUT is what makes "one
+    //    execution" true rather than aspirational, exactly as
+    //    `foreignTaxCreditLine1` above already is.
+    //
+    //    REFUNDABLE, which is why it sits here in Part II rather than among
+    //    Part I's nonrefundable credits: it is paid out whether or not there
+    //    is any tax to offset, and line 15 carries it to 1040 line 31.
+    //
+    //    For a return holding no Form 1095-A this is a profile-declared zero
+    //    built by `fjs/form1040/core`, so an ordinary return's Part II is
+    //    byte-for-byte what it was before Form 8962 existed.
+    const line9 = netPremiumTaxCreditLine9
     // 10. The amount paid with a Form 4868 request for an automatic extension
     //     of time to file, off the return profile's own box. There is no
     //     information return for it -- the taxpayer holds a cheque stub, not a
@@ -1049,6 +1143,7 @@ const profileNoDeclaredKinds = { documentHash: 'profile-hash-0001', value: minim
 /** @type {(overrides: Partial<ScheduleThreeInput>) => ScheduleThreeInput} */
 const baseInput = overrides => ({
     profile: profileNoDeclaredKinds,
+    form2555ExclusionCents: 0n,
     // Schedule 3 line 1 as `fjs/form1040/core` hands it in for a return with
     // no foreign tax anywhere: the profile-declared zero
     // {@link foreignTaxCreditLine} itself returns for that case, written out
@@ -1062,6 +1157,33 @@ const baseInput = overrides => ({
             value: '[]',
         }],
         rule: 'Schedule 3 line 1 (foreign tax credit, §904(j) election -> 1040 line 20)',
+    },
+    // Schedule 3 line 9 as `fjs/form1040/core` hands it in for a return
+    // holding no Form 1095-A: the profile-declared zero that file builds for
+    // that case, written out here rather than produced by calling anything,
+    // so this fixture is not made by code under test.
+    netPremiumTaxCreditLine9: {
+        value: 0n,
+        sources: [{
+            documentHash: 'profile-hash-0001',
+            boxPath: 'declaredKinds',
+            value: '[]',
+        }],
+        rule: 'Schedule 3 line 9 (net premium tax credit, Form 8962 line 26 -> 1040 line 31)',
+    },
+    // Schedule 3 line 2 as `fjs/form1040/core` hands it in for a return with
+    // no dependent care anywhere: the profile-declared zero that file builds
+    // for that case, written out here rather than produced by calling
+    // anything, so this fixture is not made by code under test.
+    dependentCareCreditLine2: {
+        value: 0n,
+        sources: [{
+            documentHash: 'profile-hash-0001',
+            boxPath: 'declaredKinds',
+            value: '[]',
+        }],
+        rule: 'Schedule 3 line 2 (credit for child and dependent care expenses, '
+            + 'Form 2441 line 11 -> 1040 line 20)',
     },
     status: 'single',
     agiCents: 2000000n,          // $20,000.00 -- inside the saver's credit 50% band
@@ -1142,11 +1264,13 @@ const profileElectingSection904j = {
     },
 }
 
-/** Runs {@link foreignTaxCreditLine} for TY2025 against a filing status.
+/** Runs {@link foreignTaxCreditLine} for TY2025 against a filing status, with
+ * NO §911 exclusion — the ordinary case every leaf below the TAX-42 block
+ * exercises. The exclusion is supplied explicitly where it matters.
  * @type {(status: IndividualFilingStatus) => (profile: Stored<ReturnProfile>) => (divForms: readonly Stored<OneZeroNineNineDiv>[]) => (intForms: readonly Stored<OneZeroNineNineInt>[]) => ForeignTaxCreditOutcome}
  */
 const foreignCredit = status => profile => divForms => intForms =>
-    foreignTaxCreditLine(taxParams2025)(status)(profile)(divForms)(intForms)
+    foreignTaxCreditLine(taxParams2025)(status)(profile)(divForms)(intForms)(0n)
 
 /** Narrows {@link foreignTaxCreditLine}'s outcome to its computed line.
  * @type {(outcome: ForeignTaxCreditOutcome) => ReportLine}
@@ -1384,6 +1508,74 @@ export const proof = {
     // $600.00) are likewise hand-typed here rather than read from the
     // parameter under test, and the boundary leaves straddle each to the
     // cent. Value and citation by SEPARATE leaves.
+    // ── §911(d)(6): the exclusion and the §904(j) election (TAX-42) ─────────
+    sectionNineOneOneDenialOfTheForeignTaxCredit: {
+        theElectionBesideAnExclusionRefuses: () => {
+            const outcome = foreignTaxCreditLine(taxParams2025)('single')(
+                profileElectingSection904j)(
+                [dividendWithForeignTax('sha256-div-911')('47.00')])([])(13000000n)
+            assert(outcome.kind === 'error', ['expected a refusal', outcome])
+            const message = foreignCreditRefusal(outcome)
+            assert(message.includes('130000.00'), ['naming the exclusion', message])
+            assert(message.includes('§911(d)(6)'), ['and the statute', message])
+            assert(message.includes('passive'), ['and the contradiction in the election', message])
+            assert(
+                message.includes('1040 line 20'),
+                ['and where the amount would have gone', message])
+        },
+        // It fires WHATEVER the amounts are — even far above §904(j)(2)(B)'s
+        // ceiling, and ahead of the refusal that would otherwise send the
+        // filer to Form 1116 for a credit §911(d)(6) denies outright.
+        itFiresAheadOfTheCeilingRefusal: () => {
+            const message = foreignCreditRefusal(foreignTaxCreditLine(taxParams2025)('single')(
+                profileElectingSection904j)(
+                [dividendWithForeignTax('sha256-div-911-big')('5000.00')])([])(1n))
+            assert(message.includes('§911(d)(6)'), ['§911(d)(6) wins over the ceiling', message])
+            assert(
+                !message.includes('Form 1116'),
+                ['and the ceiling refusal must not be the one reported', message])
+        },
+        // **…and ahead of the NOT-ELECTED refusal, which is the arm a
+        // surviving mutation found.** Gating this check on `elected` left the
+        // suite green: a §911 filer who had not elected was sent to declare
+        // the election, and declaring it lands them here. This leaf asserts
+        // the remedy they are given is one they can actually follow.
+        itFiresAheadOfTheNotElectedRefusal: () => {
+            const message = foreignCreditRefusal(foreignTaxCreditLine(taxParams2025)('single')(
+                profileNoDeclaredKinds)(
+                [dividendWithForeignTax('sha256-div-911-unelected')('47.00')])([])(13000000n))
+            assert(message.includes('§911(d)(6)'), ['§911(d)(6) wins', message])
+            assert(
+                !message.includes('Declare section904jElection'),
+                ['and must NOT tell a §911 filer to make an election they cannot make', message])
+        },
+        // THE CONTROLS, both directions. The election alone still credits, and
+        // an exclusion WITHOUT a stored foreign tax is an ordinary return —
+        // only the combination refuses.
+        // THE CONTROL for the leaf above: the same unelected return WITHOUT a
+        // §911 exclusion still gets the ordinary "declare the election"
+        // refusal, so the mutation above measured the ordering rather than the
+        // disappearance of a refusal.
+        controlAnUnelectedReturnWithNoExclusionStillGetsTheElectionRefusal: () => {
+            const message = foreignCreditRefusal(foreignTaxCreditLine(taxParams2025)('single')(
+                profileNoDeclaredKinds)(
+                [dividendWithForeignTax('sha256-div-911-unelected-control')('47.00')])([])(0n))
+            assert(
+                message.includes('Declare section904jElection'),
+                ['the ordinary unelected refusal must survive', message])
+        },
+        controlTheElectionAloneStillCredits: () => {
+            const line = foreignCreditLine(foreignTaxCreditLine(taxParams2025)('single')(
+                profileElectingSection904j)(
+                [dividendWithForeignTax('sha256-div-911-control')('47.00')])([])(0n))
+            assertEq(line.value, 4700n, '$47.00, exactly as without §911')
+        },
+        controlAnExclusionWithNoForeignTaxComputes: () => {
+            const outcome = foreignTaxCreditLine(taxParams2025)('single')(
+                profileElectingSection904j)([])([])(13000000n)
+            assertEq(outcome.kind, 'ok', ['no foreign tax, nothing to deny', outcome])
+        },
+    },
     lineOneForeignTaxCredit: {
         // The motivating taxpayer: one international index fund, $47.00 of
         // foreign tax withheld inside it, and the §904(j) election made.
@@ -2172,6 +2364,98 @@ export const proof = {
                 'Form 8880\'s Credit Limit Worksheet line 2 is the $100.00 foreign tax credit')
             assertEq(result.line4.value, 95000n, 'so it gets $950.00, not $1,000.00')
             assertEq(result.line8.value, 105000n, '$100.00 + $950.00 = the whole $1,050.00 tax')
+        },
+
+        // TAX-38: line 2 joins line 1 ahead of BOTH later credits, and §26
+        // says so. $1,050.00 of tax, a $100.00 dependent care credit on line 2
+        // and a saver's credit that wanted $1,000.00: Form 8880's Credit Limit
+        // Worksheet line 2 must be that $100.00, so the saver's credit gets
+        // $950.00.
+        //
+        // The identical shape as `theForeignTaxCreditIsOrderedBeforeTheSavers
+        // Credit` above, and deliberately so: line 2 was a hard zero in that
+        // worksheet's sum until this phase, and a wiring that added the line
+        // to Part I without adding it to the two worksheets would leave 1040
+        // line 20 exceeding the tax on line 18.
+        theDependentCareCreditIsOrderedBeforeTheSaversCredit: () => {
+            const result = okResult(compute(baseInput({
+                agiCents: 2000000n,
+                line18Cents: 105000n,
+                dependentCareCreditLine2: {
+                    value: 10000n,
+                    sources: [{
+                        documentHash: 'sha256-2441-w2',
+                        boxPath: 'box10DependentCareBenefits',
+                        value: '8000.00',
+                    }],
+                    rule: 'Schedule 3 line 2 (credit for child and dependent care expenses, '
+                        + 'Form 2441 line 11 -> 1040 line 20)',
+                },
+                creditForms: [creditsDocument({
+                    retirementContributions: [{
+                        contributionTag: 'iraContribution',
+                        datePaid: '2025-07-15',
+                        description: 'traditional IRA contribution',
+                        amount: '2000.00',
+                        individual: 'taxpayer',
+                    }],
+                    saversCreditEligibility: [{
+                        individual: 'taxpayer',
+                        attainedAgeEighteen: true,
+                        noTestingPeriodDistributions: true,
+                    }],
+                })],
+            })))
+            assertEq(result.line2.value, 10000n, 'the $100.00 dependent care credit is on line 2')
+            assertEq(result.form8880.line10, 100000n, 'the saver\'s credit WANTED $1,000.00')
+            assertEq(
+                result.form8880.creditLimitWorksheet.w2, 10000n,
+                'Form 8880\'s Credit Limit Worksheet line 2 is that $100.00')
+            assertEq(result.line4.value, 95000n, 'so it gets $950.00, not $1,000.00')
+            assertEq(
+                result.line8.value, 105000n,
+                '$100.00 + $950.00 = the whole $1,050.00 tax, and never more than it')
+        },
+        // The same ordering one credit earlier: line 2 also reduces what the
+        // EDUCATION credit may claim, through Form 8863's own Credit Limit
+        // Worksheet. Two leaves rather than one, because the two worksheets
+        // are two separate sums in this module and adding line 2 to one of
+        // them is exactly the half-finished wiring worth catching.
+        theDependentCareCreditIsOrderedBeforeTheEducationCredits: () => {
+            const result = okResult(compute(baseInput({
+                agiCents: 2000000n,
+                line18Cents: 150000n,
+                dependentCareCreditLine2: {
+                    value: 50000n,
+                    sources: [{
+                        documentHash: 'sha256-2441-w2',
+                        boxPath: 'box10DependentCareBenefits',
+                        value: '8000.00',
+                    }],
+                    rule: 'Schedule 3 line 2 (credit for child and dependent care expenses, '
+                        + 'Form 2441 line 11 -> 1040 line 20)',
+                },
+                tuitionForms: [tuitionDocument({
+                    box1PaymentsReceivedForQualifiedTuition: '9000.00',
+                })],
+                creditForms: [creditsDocument({
+                    educationStudents: [{
+                        studentTin: '333-33-3333',
+                        studentName: 'A. Student',
+                        credit: 'americanOpportunity',
+                        enrolledAtLeastHalfTimeInADegreeProgram: true,
+                    }],
+                    filerAttainedAgeTwentyFourBeforeTheEndOfTheYear: true,
+                })],
+            })))
+            assertEq(result.line2.value, 50000n, '$500.00 of dependent care credit')
+            assertEq(
+                result.form8863.creditLimitWorksheet.c5, 50000n,
+                'Form 8863\'s Credit Limit Worksheet subtracts that $500.00')
+            assertEq(
+                result.line3.value, 100000n,
+                'so the education credit is capped at $1,000.00 rather than the $1,500.00 tax')
+            assertEq(result.line8.value, 150000n, 'and 1040 line 20 is exactly the tax')
         },
 
         // The education credits come out of the liability BEFORE the saver's

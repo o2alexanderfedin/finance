@@ -192,3 +192,36 @@ interaction with the PTC (Pub. 974) — that last one is safe only while
 `selfEmployedHealthInsuranceDeduction` is itself a refused kind, and this file is where
 that dependency is written down. If that kind is ever modeled, §162(l)/§36B become
 circular and this module must refuse or iterate.
+
+## What was reclassified, and what was not
+
+`kindVocabulary` moves 115 -> 117, `modeledKinds` 47 -> 49, `unmodeledKindRefusals` 68 -> 68.
+
+**The coarse `advancePremiumTaxCreditAndOtherRepayments` is SPLIT into three**, the way
+`scheduleTwoTaxes` was split in Phase 23 and `rentalRealEstateRoyaltiesPartnershipsSCorps` in
+Phase 30. Schedule 2 line 1's lettered sub-lines are three unrelated things a taxpayer can
+truthfully declare having, and Form 8962 reaches exactly one of them:
+
+| new kind | printed line | status |
+|---|---|---|
+| `excessAdvancePremiumTaxCreditRepayment` | Schedule 2 line 1a | **modeled** — Form 8962 line 29 |
+| `cleanVehicleCreditRepayment` | Schedule 2 lines 1b, 1c | refused — Form 8936 Schedule A |
+| `electivePaymentElectionRecapture` | Schedule 2 lines 1d-1f **and line 19** | refused — Form 4255 |
+
+Splitting rather than simply reclassifying the coarse kind is not tidiness. **Nothing stored
+distinguishes line 1a from lines 1b-1f**, so a coarse kind that became modeled would have handed
+a taxpayer who transferred a clean vehicle credit to a dealer a silent zero for a repayment they
+owe, while telling them the kind was in scope. The engine has no observable fact to refuse on,
+which is precisely the difference from `foreignTaxCredit`, whose un-modelable sub-case IS
+observable (a stored foreign-tax box above the §904(j)(2)(B) ceiling) and refuses at the line.
+
+`netPremiumTaxCredit` is reclassified unchanged.
+
+**`premiumTaxCreditReconciliation` is LEFT REFUSED with a corrected remedy**, per the finding at
+the top of this file. Form 8962 arriving does not make Form 4255's net EPE recapture computable,
+and its `line`/`label`/`remedy` are corrected to say what Schedule 2 line 19 actually is. The
+kind's NAME remains wrong; renaming a member of the frozen vocabulary invalidates every stored
+profile declaring it, and that is a decision to take on purpose rather than as a side effect of
+wiring a form. The old remedy also named "Forms 8936 and 3800" for the line 1 sub-lines — **Form
+3800 is the general business credit; the recapture is Form 4255**, which the printed Schedule 2
+names at all four of its own lines. Corrected.

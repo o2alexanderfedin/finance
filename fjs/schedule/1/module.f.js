@@ -117,6 +117,29 @@
  * {@link ScheduleOnePartIIExceptStudentLoanInterest} carries the whole
  * `SelfEmploymentOutcome`, and `fjs/form1040/core` threads it onward.
  *
+ * ## Line 17, the self-employed health insurance deduction (TAX-39)
+ *
+ * `fjs/form7206` line 14, restated under this schedule's printed number. The
+ * fourth Part II line to stop being a documented zero, and the one whose
+ * arrival changed the least about this file: **it needed no ordering change at
+ * all.** Every figure Form 7206 reads — the premiums off `vnd.fjs.adjustments`,
+ * Schedule C line 31, Schedule SE line 13 and line 16 — is already bound at
+ * the statement where the hard zero stood. What it needed was six `lineTag`s
+ * and one `vnd.fjs.return_profile` certification.
+ *
+ * That is worth stating because the row's `fjs/return/scope` remedy had said
+ * for two phases that its blocker was net self-employment earnings, and that
+ * had been false since Phase 28 computed them. See
+ * `fjs/schedule/1/todo/self-employed-health-insurance.md`, which also records
+ * why this line does NOT share a root cause with `fjs/form2441`'s
+ * self-employment refusal — that one IS an ordering problem and is not
+ * retired here.
+ *
+ * **Line 17 is inside the Social Security worksheet's "lines 11 through 20"
+ * range**, so it moves taxable benefits exactly as line 15 does, and it
+ * reduces §199A qualified business income through `fjs/form8995`. Five
+ * refusals guard it; the todo file lists each and what would retire it.
+ *
  * **The Social Security Benefits Worksheet subtracts line 15**, because its
  * own line 6 asks for "lines 11 through 20", and 15 is inside that range.
  * That was true before and cost nothing while the line was zero; it is a live
@@ -188,7 +211,10 @@ import { centsFromString, centsToString } from '../../exact/module.f.js'
 import { form8889PartI } from '../../form8889/module.f.js'
 import { movingExpenses, movingExpensesLine4W2Box12Codes } from '../../form3903/module.f.js'
 import { scheduleC } from '../c/module.f.js'
+import { form7206, longTermCareCapCents } from '../../form7206/module.f.js'
 import { scheduleE } from '../e/module.f.js'
+import { scheduleF } from '../f/module.f.js'
+import { form461 } from '../../form461/module.f.js'
 import {
     scheduleSelfEmploymentPartI,
     socialSecurityWagesAlreadyTaxed,
@@ -204,16 +230,22 @@ import { taxParamsByYear } from '../../tax/params/module.f.js'
 /** @import { OneZeroNineEightE } from '../../document/1098e/module.f.js' */
 /** @import { Adjustments } from '../../document/adjustments/module.f.js' */
 /** @import { BusinessExpenses } from '../../document/business_expenses/module.f.js' */
+/** @import { AssetRegister } from '../../document/asset_register/module.f.js' */
+/** @import { RentalProperty } from '../../document/rental_property/module.f.js' */
+/** @import { Farm } from '../../document/farm/module.f.js' */
 /** @import { OneZeroNineNineNec } from '../../document/1099nec/module.f.js' */
 /** @import { ScheduleC } from '../c/module.f.js' */
 /** @import { ScheduleE } from '../e/module.f.js' */
+/** @import { ScheduleF } from '../f/module.f.js' */
+/** @import { Form461 } from '../../form461/module.f.js' */
 /** @import { K1Partnership } from '../../document/k1_1065/module.f.js' */
 /** @import { K1SCorporation } from '../../document/k1_1120s/module.f.js' */
 /** @import { K1EstateTrust } from '../../document/k1_1041/module.f.js' */
 /** @import { SelfEmploymentOutcome } from '../se/module.f.js' */
 /** @import { W2 } from '../../document/w2/module.f.js' */
 /** @import { ReportLine, Source } from '../../report/line/module.f.js' */
-/** @import { TaxParamSet, IndividualFilingStatus } from '../../tax/params/module.f.js' */
+/** @import { TaxParamSet, IndividualFilingStatus, LongTermCareAgeBand } from '../../tax/params/module.f.js' */
+/** @import { LongTermCareCoveredPerson } from '../../form7206/module.f.js' */
 /** @import { HsaCoverageType } from '../../form8889/module.f.js' */
 
 // ── Inputs ───────────────────────────────────────────────────────────────────
@@ -279,7 +311,123 @@ export const adjustmentLineTags = /** @type {const} */ ([
     // unknown could change the answer rather than assuming either age.
     ['traditionalIraContributionAgeFiftyOrOver', 'Schedule 1 line 20'],
     ['studentLoanInterest', 'Schedule 1 line 21'],
+    // ── Line 17's SIX tags: Form 7206's printed lines 1 and 2 (TAX-39) ──────
+    //
+    // **Six tags for one printed line, and the split is the printed form's
+    // own.** Form 7206 line 1 is uncapped and line 2 is capped PER COVERED
+    // PERSON by §213(d)(10)'s age-banded limit, so a single "health insurance
+    // premiums" tag could not be capped at all: the two halves are added on
+    // line 3 only after the second has been capped, and nothing downstream
+    // could recover the split from one figure. This is the
+    // `movingExpensesTransportationAndStorage`/`…TravelAndLodging` shape one
+    // block up, at five bands instead of two.
+    //
+    // **`MedicalDentalVision` names what line 1 admits and what it does NOT.**
+    // The caption is "the total amount paid in 2025 for health insurance
+    // coverage established under your business … for you, your spouse, and
+    // your dependents", and the 2025 Instructions for Form 7206 gloss it as
+    // "medical, dental, and vision insurance and qualified long-term care
+    // insurance" — the long-term-care half being line 2's, never this tag's.
+    //
+    // **MEDICARE PREMIUMS BELONG UNDER THIS TAG.** CCA 201228037
+    // (POSTU-109706-12, UILC 162.07-31): "All Medicare Parts are insurance
+    // that constitutes medical care under section 162(l)", and so "all
+    // Medicare premiums are similar to other health insurance premiums and can
+    // be used to compute the deduction under section 162(l)". Restated on the
+    // 2025 Instructions for Form 7206, p. 1: "Medicare premiums you
+    // voluntarily pay to obtain insurance in your name that is similar to
+    // qualifying private health insurance can be used to figure the
+    // deduction." The CCA is not precedential on its face and is the only IRS
+    // authority on point; the current instructions are what this engine
+    // actually follows, and they say the same thing for the taxpayer's own
+    // premiums. This is stated HERE rather than left to a reader's memory
+    // because a self-employed retiree who omits Medicare is the single most
+    // common way this deduction is understated.
+    //
+    // **Three amounts the taxpayer must NOT tag with any of these six**, all
+    // three printed as exclusions on line 1's own face:
+    //
+    // - amounts for any month of employer-subsidized eligibility — §162(l)(2)(B),
+    //   which `vnd.fjs.return_profile`'s
+    //   `notEligibleForAnySubsidizedEmployerHealthPlanInAnyMonth` certifies
+    //   away for the WHOLE year and which
+    //   {@link scheduleOnePartIIExceptStudentLoanInterest} refuses without;
+    // - "any amounts paid, not to exceed $3,000, from retirement plan
+    //   distributions that were nontaxable because you are a retired public
+    //   safety officer" (§402(l)) — a fact about a Form 1099-R distribution
+    //   that no dialect here records, so like this vocabulary's own
+    //   `…ExcludingMeals` it can only be enforced where the figure is NAMED,
+    //   which is here;
+    // - payments for qualified long-term care insurance, which are line 2's
+    //   and belong on one of the five band tags below.
+    ['selfEmployedHealthInsuranceMedicalDentalVision', 'Schedule 1 line 17'],
+    // **FIVE tags, one per §213(d)(10) band, and each is an ASSERTION about
+    // the covered person's "age at the end of the tax year"** (Form 7206 line
+    // 2(b)). NO DOCUMENT IN THIS REPOSITORY CARRIES A BIRTH DATE — the same
+    // fact `traditionalIraContributionAgeFiftyOrOver` records above, and the
+    // reason `form4972LumpSumDistribution` is refused — so the band is the
+    // taxpayer's to state, on the same document and by the same mechanism.
+    //
+    // The band names are `fjs/tax/params`' own `LongTermCareAgeBand` values,
+    // suffixed onto one stem, and
+    // `theLongTermCareTagsCoverEveryStoredAgeBandExactlyOnce` pins the two
+    // lists against each other: a band added to the parameter table with no
+    // tag here would be a cap no taxpayer could ever reach, and a tag with no
+    // band would panic inside `fjs/form7206` instead of refusing at ingest.
+    ['selfEmployedLongTermCareAgeFortyOrYounger', 'Schedule 1 line 17'],
+    ['selfEmployedLongTermCareAgeFortyOneToFifty', 'Schedule 1 line 17'],
+    ['selfEmployedLongTermCareAgeFiftyOneToSixty', 'Schedule 1 line 17'],
+    ['selfEmployedLongTermCareAgeSixtyOneToSeventy', 'Schedule 1 line 17'],
+    ['selfEmployedLongTermCareAgeSeventyOneOrOlder', 'Schedule 1 line 17'],
 ])
+
+/**
+ * The one {@link adjustmentLineTags} entry that feeds Form 7206 line 1 — the
+ * uncapped half of the §162(l) premium. Named once so the filter and the
+ * citation cannot come apart from the tag.
+ * @type {string}
+ */
+const medicalDentalVisionTag = 'selfEmployedHealthInsuranceMedicalDentalVision'
+
+/**
+ * The five {@link adjustmentLineTags} entries that feed Form 7206 line 2,
+ * paired with the {@link LongTermCareAgeBand} each one asserts.
+ *
+ * A hand-written pairing rather than a name derived by string concatenation:
+ * a derived name would make the tag vocabulary a function of the parameter
+ * table, and neither list could then notice the other losing an entry —
+ * AGENTS.md's fourth shipped defect, in its "iterate a collection derived from
+ * the thing under test" form.
+ * @type {readonly (readonly [string, LongTermCareAgeBand])[]}
+ */
+const longTermCareTagBands = [
+    ['selfEmployedLongTermCareAgeFortyOrYounger', 'ageFortyOrYounger'],
+    ['selfEmployedLongTermCareAgeFortyOneToFifty', 'ageFortyOneToFifty'],
+    ['selfEmployedLongTermCareAgeFiftyOneToSixty', 'ageFiftyOneToSixty'],
+    ['selfEmployedLongTermCareAgeSixtyOneToSeventy', 'ageSixtyOneToSeventy'],
+    ['selfEmployedLongTermCareAgeSeventyOneOrOlder', 'ageSeventyOneOrOlder'],
+]
+
+/**
+ * Where a Schedule 1 line 17 refusal says the amount would have gone.
+ *
+ * Written once and interpolated into all five of that line's refusals, for
+ * AGENTS.md's recorded reason: Phase 20's `${destination}` mutation survived
+ * five refusal proofs because every one of them asserted the box name and the
+ * phrase "cannot compute", and not one asserted WHERE the amount would have
+ * landed -- the only part of the message a reader can act on.
+ * @type {string}
+ */
+const line17Destination = 'Schedule 1 line 17 -> line 26 -> 1040 line 10 (and so adjusted gross '
+    + 'income), nor Form 8995 line 1c through §199A(c)(1)'
+
+/** Every tag that feeds Schedule 1 line 17, line 1's and line 2's alike.
+ * @type {readonly string[]}
+ */
+const selfEmployedHealthInsuranceTags = [
+    medicalDentalVisionTag,
+    ...longTermCareTagBands.map(([tag]) => tag),
+]
 
 /**
  * The two {@link adjustmentLineTags} entries that feed Schedule 1 line 20 —
@@ -465,10 +613,13 @@ const earlyWithdrawalPenaltyLine = profile => forms => {
  *   readonly kind: 'ok',
  *   readonly line1: ReportLine, readonly line2a: ReportLine, readonly line3: ReportLine,
  *   readonly line4: ReportLine, readonly line5: ReportLine, readonly line6: ReportLine,
- *   readonly line7: ReportLine, readonly line8: ReportLine, readonly line9: ReportLine,
+ *   readonly line7: ReportLine, readonly line8: ReportLine, readonly line8p: ReportLine,
+ *   readonly line9: ReportLine,
  *   readonly line10: ReportLine,
  *   readonly scheduleC: ScheduleC,
  *   readonly scheduleE: ScheduleE,
+ *   readonly scheduleF: ScheduleF,
+ *   readonly form461: Form461,
  * }} ScheduleOnePartI
  */
 
@@ -481,10 +632,39 @@ const earlyWithdrawalPenaltyLine = profile => forms => {
  *   readonly nonemployeeCompensationForms: readonly Stored<OneZeroNineNineNec>[],
  *   readonly businessExpenseForms: readonly Stored<BusinessExpenses>[],
  *   readonly w2Forms: readonly Stored<W2>[],
+ *   readonly assetRegisters: readonly Stored<AssetRegister>[],
+ *   readonly rentalProperties: readonly Stored<RentalProperty>[],
+ *   readonly farmForms: readonly Stored<Farm>[],
  *   readonly partnershipK1Forms: readonly Stored<K1Partnership>[],
  *   readonly sCorporationK1Forms: readonly Stored<K1SCorporation>[],
  *   readonly estateTrustK1Forms: readonly Stored<K1EstateTrust>[],
+ *   readonly status: IndividualFilingStatus,
+ *   readonly form1040Line7aCents: bigint,
+ *   readonly otherGainsOrLosses?: OtherGainsOrLosses,
+ *   readonly form2555Line45Cents: bigint,
  * }} ScheduleOnePartIInput
+ */
+
+/**
+ * Form 4797 line 18b, as printed Schedule 1 line 4 receives it — TAX-41.
+ *
+ * **A NUMBER, not a document**, the shape `fjs/schedule/d`'s
+ * `SectionTwelveFiftySixEntries` set: printed Form 4797 line 18b says "Enter
+ * here and on Schedule 1 (Form 1040), Part I, line 4", so this schedule copies
+ * a figure another form computed rather than reading an asset register. It
+ * runs in `fjs/form1040/core` because its other two answers go to Schedule D,
+ * and running the form twice is the only way the three could disagree.
+ *
+ * `filed` distinguishes "no Form 4797" from "a Form 4797 whose line 18b came
+ * to zero": the first must print as a profile-declared zero citing no
+ * document, and the second as a computed zero citing the register.
+ *
+ * OPTIONAL, because a return with no disposals has no Form 4797 at all.
+ * @typedef {{
+ *   readonly filed: boolean,
+ *   readonly lineEighteenBCents: bigint,
+ *   readonly sources: readonly Source[],
+ * }} OtherGainsOrLosses
  */
 
 /**
@@ -518,23 +698,47 @@ const earlyWithdrawalPenaltyLine = profile => forms => {
  * tax-year parameter at all, and so is this. See `fjs/schedule/c`'s own
  * {@link scheduleC} docstring for why keeping an unread argument "for
  * symmetry" is the thing not to do.
- * @type {(input: ScheduleOnePartIInput) => ScheduleOnePartIOutcome}
+ * @type {(taxParamSet: TaxParamSet) => (input: ScheduleOnePartIInput) => ScheduleOnePartIOutcome}
  */
-export const scheduleOnePartI = input => {
+export const scheduleOnePartI = taxParamSet => input => {
     const {
         profile, unemploymentForms, nonemployeeCompensationForms, businessExpenseForms, w2Forms,
+        assetRegisters, rentalProperties, farmForms,
         partnershipK1Forms, sCorporationK1Forms, estateTrustK1Forms,
+        status, form1040Line7aCents, form2555Line45Cents,
     } = input
     const zero = profileDeclaredZeroLine(profile)
+    // `rentalProperties` and `farmForms` reach MORE than one schedule each, and
+    // neither is a leak. Schedule C needs both only to know which asset
+    // registers are NOT its own: a register whose account number names a rental
+    // property is Schedule E Part I's and one whose account number names a farm
+    // is Schedule F's, and Schedule C must neither depreciate them nor refuse
+    // them.
     const scheduleCOutcome = scheduleC({
-        profile, nonemployeeCompensationForms, businessExpenseForms, w2Forms,
+        profile, nonemployeeCompensationForms, businessExpenseForms, w2Forms, assetRegisters,
+        rentalProperties, farmForms,
     })
     if (scheduleCOutcome.kind === 'error') {
         return scheduleCOutcome
     }
-    const scheduleEOutcome = scheduleE({ profile, partnershipK1Forms, sCorporationK1Forms, estateTrustK1Forms })
+    const scheduleEOutcome = scheduleE({
+        profile, rentalProperties, assetRegisters,
+        partnershipK1Forms, sCorporationK1Forms, estateTrustK1Forms,
+    })
     if (scheduleEOutcome.kind === 'error') {
         return scheduleEOutcome
+    }
+    // `businessExpenseForms` and `unemploymentForms` both reach Schedule F, and
+    // neither is a leak. The first is what `fjs/schedule/f` refuses a farm
+    // BESIDE a Schedule C business on -- §199A and §461(l) both aggregate
+    // across trades or businesses and this engine carries one business's facts.
+    // The second is where printed Schedule F line 4a comes from: Form 1099-G
+    // box 7 and box 9, which `vnd.fjs.1099g` refused by name until this phase.
+    const scheduleFOutcome = scheduleF({
+        profile, farmForms, businessExpenseForms, unemploymentForms, assetRegisters,
+    })
+    if (scheduleFOutcome.kind === 'error') {
+        return scheduleFOutcome
     }
     const line1 = zero('Schedule 1 line 1 (taxable state/local income tax refunds)')
     const line2a = zero('Schedule 1 line 2a (alimony received)')
@@ -545,7 +749,21 @@ export const scheduleOnePartI = input => {
         ...scheduleCOutcome.partII.line31,
         rule: 'Schedule 1 line 3 (business income/loss, Schedule C line 31)',
     }
-    const line4 = zero('Schedule 1 line 4 (other gains/losses, Form 4797/4684)')
+    // 4. "Other gains or (losses). Attach Form 4797." -- Form 4797's own line
+    //    18b, restated under this schedule's printed number and never
+    //    recomputed here, exactly as line 3 restates Schedule C line 31.
+    //    TAX-41. Form 4684 remains unmodeled, and `otherGainsOrLosses`' remedy
+    //    in `fjs/return/scope` still names it.
+    //
+    //    A return with no disposals leaves this a profile-declared zero, which
+    //    is the SAME zero it was before this phase and is why `filed` is a
+    //    field rather than a test on the amount: a Form 4797 whose line 18b
+    //    nets to zero is a filed form and must cite the register.
+    const otherGains = input.otherGainsOrLosses
+    const line4Rule = 'Schedule 1 line 4 (other gains/losses, Form 4797 line 18b)'
+    const line4 = otherGains === undefined || !otherGains.filed
+        ? zero(line4Rule)
+        : documentLine(profile)(line4Rule)(otherGains.lineEighteenBCents)(otherGains.sources)
     // 5. "Rental real estate, royalties, partnerships, S corporations,
     //    trusts, etc. Attach Schedule E." -- Schedule E's own line 41,
     //    restated under this schedule's printed number and never recomputed
@@ -557,23 +775,154 @@ export const scheduleOnePartI = input => {
         ...scheduleEOutcome.parts.line41,
         rule: 'Schedule 1 line 5 (rental real estate, royalties, partnerships, S corporations, Schedule E line 41)',
     }
-    const line6 = zero('Schedule 1 line 6 (farm income/loss, Schedule F)')
+    // 6. "Farm income or (loss). Attach Schedule F." -- Schedule F's own line
+    //    34, restated under this schedule's printed number and never recomputed
+    //    here, exactly as line 3 restates Schedule C line 31 and line 5
+    //    Schedule E line 41. i1040sf p9: "Enter your net profit or loss on line
+    //    34 and on Schedule 1 (Form 1040), line 6 and; Schedule SE (Form 1040),
+    //    line 1a" -- BOTH printed destinations, and the second is
+    //    `fjs/schedule/se` line 1a, wired in this same phase.
+    const line6 = {
+        ...scheduleFOutcome.line34,
+        rule: 'Schedule 1 line 6 (farm income/loss, Schedule F line 34)',
+    }
     const line7 = unemploymentCompensationLine(profile)(unemploymentForms)
-    // 8. "Other income" -- a collapsed stand-in for 8a-8z (26 sub-lines);
-    //    see this module's own docstring, "The 26/11 sub-line collapses".
-    const line8 = zero('Schedule 1 line 8 (other income, 8a-8z collapsed -- none separately reachable)')
-    // 9. "Total other income. Add lines 8a through 8z" -- the SAME total,
-    //    restated as its own printed line.
-    const line9 = { ...line8, rule: 'Schedule 1 line 9 (total other income)' }
+    // 8. "Other income" -- twenty-three printed sub-lines, 8a through 8v and
+    //    8z (the "26" this comment carried until 2026-08-18 counted letters
+    //    the form does not print); see this module's own docstring, "The 26/11
+    //    sub-line collapses".
+    //
+    //    **TWO of the twenty-three are now separately reachable**, and they
+    //    arrive by different routes. Line 8d is Form 2555's foreign earned
+    //    income exclusion (TAX-42), computed by the caller and handed in; line
+    //    8p is Form 461's excess business loss adjustment (TAX-40), computed
+    //    below out of lines this function already holds. 8d is folded into the
+    //    collapse line itself, because it is the only term left in it; 8p is
+    //    its own `documentLine`, and printed line 9 adds the two.
+    //
+    //    i2555 p7 states 8d's sign in words: "Enter the amount from line 45 on
+    //    Schedule 1 (Form 1040), line 8d. Reduce the other items of additional
+    //    income by the NEGATIVE amount on line 8d". So the exclusion enters
+    //    here NEGATED -- an exclusion that arrived positive would ADD
+    //    $130,000 to income, which is the sign error this comment exists to
+    //    make visible at the site.
+    //
+    //    The line is a `documentLine`, not a `zero(...)` supplemented by an
+    //    amount: a return with no exclusion cites `declaredKinds` exactly as
+    //    it always did, and a return with one cites the profile box the
+    //    figure came from and does not mention `declaredKinds` at all.
+    const line8 = form2555Line45Cents === 0n
+        ? zero('Schedule 1 line 8 (other income, 8a-8z; 8d and 8p are the only ones this engine '
+            + 'computes)')
+        : documentLine(profile)(
+            'Schedule 1 line 8 (other income; 8d, the Form 2555 line 45 foreign earned income '
+            + 'exclusion, entered as a negative)')(
+            -form2555Line45Cents)([{
+                documentHash: profile.documentHash,
+                boxPath: 'foreignEarnedIncome',
+                value: profile.value.foreignEarnedIncome ?? '',
+            }])
+    // **8p -- the §461(l) excess business loss adjustment, and the SECOND of
+    // the two sub-lines that have come out of the 8a-8z collapse.** i461 line
+    // 16: "enter the amount from line 16 as a positive number on Schedule 1
+    // (Form 1040), line 8p."
+    //
+    // Form 461 is computed HERE rather than in `fjs/form1040/core`, for the
+    // reason lines 3, 5 and 6 are restated here rather than reaching 1040 line
+    // 8 by a side channel: printed line 8p is a Schedule 1 line, and the total
+    // it belongs to is line 9's. i461's *Ordering Rules* put §461(l) after the
+    // at-risk and passive rules, which is exactly where this sits -- every
+    // schedule above has already produced its own line, each having asked §465
+    // and §469 on its own printed page.
+    //
+    // `form1040Line7aCents` is the one figure this function cannot compute for
+    // itself: printed Form 461 line 3 is 1040 line 7a, and Schedule D runs in
+    // `fjs/form1040/core`. It arrives as a bare `bigint` because Form 461 reads
+    // only its value; the `Source`s behind it are already cited on 1040 line 7a
+    // itself, and citing them a second time would put a brokerage statement
+    // under a Schedule 1 line that is zero.
+    //
+    // **It is arithmetically INERT today, and that is a property of the printed
+    // form rather than of this wiring.** Discovered by mutating it to `0n` and
+    // watching the whole suite stay green: printed line 3 adds it to line 9, and
+    // printed lines 10/11 remove exactly it again, so printed line 14 —
+    // `line9 + line13` — cancels it to the cent at every input. `fjs/form461`'s
+    // Part II arm for it is unconditional (`attributableToATradeOrBusiness:
+    // false`). `theCapitalGainOrLossReachesPrintedFormFourSixtyOneLineThree` is
+    // what keeps the pass-through observable.
+    //
+    // **THE DAY THIS COMMENT PREDICTED HAS ARRIVED, and the term still
+    // cancels.** It read "the day Form 4797 exists and a §1231 gain can be a
+    // trade-or-business gain, that arm becomes conditional and this term stops
+    // cancelling". Form 4797 exists as of TAX-41 and a net §1231 gain on its
+    // printed line 7 does reach 1040 line 7a through Schedule D line 11, so the
+    // premise is now false — and the arm has deliberately NOT been made
+    // conditional. Making it conditional needs the §1231 SHARE of 1040 line 7a,
+    // and printed Schedule D does not carry one: it nets that gain against
+    // investment losses and caps the result at §1211(b)'s $3,000, so i461's "any
+    // such amounts included here in line 3" is not a subtraction a caller can
+    // perform from outside. Left unconditional, printed line 10 removes a
+    // trade-or-business gain it should have kept, which makes printed line 14
+    // SMALLER and §461(l) MORE likely to bind: an over-refusal, never a wrong
+    // number, which is the same one-directional admission `fjs/form461`'s
+    // docstring already makes about Schedule 1 line 5 and now makes about this.
+    //
+    // **Printed line 4 is the term that does NOT cancel.** Form 4797 line 18b
+    // arrives on Schedule 1 line 4, no Part II arm touches it, and it moves
+    // printed line 14 cent for cent.
+    // {@link proof.formFourSixtyOne.formFourSevenNineSevenLineFourMovesLineFourteenAndLineThreeStillCancels}
+    // is the leaf that proves the two are treated differently, and that Form 461
+    // reads the COMPUTED line 4 rather than the caller's figure.
+    //
+    // **The value is always zero on a return that computes**, and that is not a
+    // structural zero: `fjs/form461` REFUSES a binding limitation (its own
+    // docstring says why), so reaching this line at all means printed Form 461
+    // line 16 was at or above zero and the whole business loss is allowed. The
+    // line is separate rather than folded back into the collapse because a
+    // reader has to be able to tell "Form 461 was computed and allowed
+    // everything" from "no sub-line of line 8 is modeled".
+    const form461Outcome = form461(taxParamSet)({
+        status,
+        scheduleOneLine3Cents: line3.value,
+        form1040Line7aCents,
+        scheduleOneLine4Cents: line4.value,
+        scheduleOneLine5Cents: line5.value,
+        scheduleOneLine6Cents: line6.value,
+    })
+    if (form461Outcome.kind === 'error') {
+        return form461Outcome
+    }
+    // **This ternary's non-zero arm is unreachable today, and that is worth
+    // writing down rather than simplifying away.** `fjs/form461` returns its
+    // error arm on exactly `line16 < 0n`, so by the time execution is here line
+    // 16 is at or above zero and `excessBusinessLossCents` is always `0n` —
+    // mutating the whole expression to `form461Outcome.line16 * 0n` leaves the
+    // entire suite green, which is an equivalent mutant in AGENTS.md's sense: a
+    // neighbouring operation (the refusal two lines up) already enforces what
+    // this token enforces. It is written as the printed rule anyway — i461:
+    // "enter the amount from line 16 as a POSITIVE number on Schedule 1 (Form
+    // 1040), line 8p" — so that the day Form 172 is modeled and a binding
+    // limitation may compute, this line is already correct and only the refusal
+    // has to go. The same argument `fjs/form1040/core` makes for writing §199A's
+    // two business terms as a sum rather than a branch.
+    const excessBusinessLossCents = form461Outcome.line16 < 0n ? -form461Outcome.line16 : 0n
+    const line8p = documentLine(profile)(
+        'Schedule 1 line 8p (excess business loss adjustment, Form 461 line 16)')(
+        excessBusinessLossCents)(unionSources([line3, line5, line6]))
+    // 9. "Total other income. Add lines 8a through 8z" -- line 8's collapse
+    //    (8d and nothing else) plus 8p.
+    const line9 = totalLine('Schedule 1 line 9 (total other income)')([line8, line8p])
     // 10. "Combine lines 1 through 7 and 9." -> 1040 line 8.
     const line10 = totalLine('Schedule 1 line 10 (total additional income -> 1040 line 8)')([
         line1, line2a, line3, line4, line5, line6, line7, line9,
     ])
     return {
         kind: 'ok',
-        line1, line2a, line3, line4, line5, line6, line7, line8, line9, line10,
+        line1, line2a, line3, line4, line5, line6, line7, line8, line8p, line9, line10,
         scheduleC: scheduleCOutcome,
         scheduleE: scheduleEOutcome,
+        scheduleF: scheduleFOutcome,
+        form461: form461Outcome,
     }
 }
 
@@ -610,12 +959,18 @@ export const scheduleOnePartI = input => {
  * field, the proprietor's `recipientTin`, which decides whose Forms W-2
  * consume the §1402(b)(1) wage base; `fjs/schedule/se`'s own docstring
  * carries that argument.
+ *
+ * `farmNetProfit` is **Schedule F's own line 34**, which printed Schedule SE
+ * line 1a asks for by that name — passed in the same way and for the same
+ * reason. i1040sf p9 gives line 34 two printed destinations and this is the
+ * second of them; the first is printed Schedule 1 line 6, up in Part I.
  * @typedef {{
  *   readonly profile: Stored<ReturnProfile>,
  *   readonly status: IndividualFilingStatus,
  *   readonly adjustmentForms: readonly Stored<Adjustments>[],
  *   readonly w2Forms: readonly Stored<W2>[],
  *   readonly businessNetProfit: ReportLine,
+ *   readonly farmNetProfit: ReportLine,
  *   readonly businessExpenseForms: readonly Stored<BusinessExpenses>[],
  *   readonly passThrough: PassThroughSelfEmployment,
  *   readonly interestForms: readonly Stored<OneZeroNineNineInt>[],
@@ -624,6 +979,8 @@ export const scheduleOnePartI = input => {
  *   readonly taxExemptInterestCents: bigint,
  *   readonly mfsLivedWithSpouseAtAnyTimeInYear: boolean,
  *   readonly iraDistributionReceived: boolean,
+ *   readonly marketplaceCoverageStored: boolean,
+ *   readonly form2555ExclusionCents: bigint,
  * }} ScheduleOnePartIIStageOneInput
  */
 
@@ -1095,8 +1452,10 @@ export const iraDeductionWorksheet = taxParamSet => input => {
  */
 export const scheduleOnePartIIExceptStudentLoanInterest = taxParamSet => input => {
     const {
-        profile, status, adjustmentForms, w2Forms, businessNetProfit, businessExpenseForms,
-        passThrough, interestForms, totalIncomeExceptTaxableSocialSecurityLine,
+        profile, status, adjustmentForms, w2Forms, businessNetProfit, farmNetProfit,
+        businessExpenseForms,
+        passThrough, interestForms, marketplaceCoverageStored, form2555ExclusionCents,
+        totalIncomeExceptTaxableSocialSecurityLine,
         socialSecurityBenefitsCents, taxExemptInterestCents, mfsLivedWithSpouseAtAnyTimeInYear,
         iraDistributionReceived,
     } = input
@@ -1381,6 +1740,7 @@ export const scheduleOnePartIIExceptStudentLoanInterest = taxParamSet => input =
         wages.cents)(wages.sources)
     const selfEmploymentLines = scheduleSelfEmploymentPartI(taxParamSet)({
         netProfitCents: businessNetProfit.value,
+        farmNetProfitCents: farmNetProfit.value,
         partnershipSelfEmploymentEarningsCents: passThrough.earningsCents,
         socialSecurityWagesCents: wages.cents,
     })
@@ -1397,18 +1757,236 @@ export const scheduleOnePartIIExceptStudentLoanInterest = taxParamSet => input =
     //     is the leaf that pins it rather than leaving it to be noticed.
     const line15 = {
         value: selfEmploymentLines.line13,
-        sources: unionSources([businessNetProfit, socialSecurityWages]),
+        sources: unionSources([businessNetProfit, farmNetProfit, socialSecurityWages]),
         rule: 'Schedule 1 line 15 (deductible part of self-employment tax, Schedule SE line 13)',
     }
     const line16 = zero('Schedule 1 line 16 (SEP/SIMPLE/qualified plans)')
-    const line17 = zero('Schedule 1 line 17 (self-employed health insurance deduction)')
+
+    // ── Line 17: the self-employed health insurance deduction (TAX-39) ──────
+    //
+    // `fjs/form7206` computes the printed form; everything here is the
+    // question of whether this engine may hand it figures at all. See
+    // `fjs/schedule/1/todo/self-employed-health-insurance.md` for the full
+    // record of these five refusals and what each would take to retire.
+    //
+    // **This line needed NO ordering change, and that is the phase's finding.**
+    // Every input Form 7206 reads -- the premiums, Schedule C line 31, Schedule
+    // SE line 13 and Schedule 1 line 16 -- is already in scope at exactly this
+    // point, three statements after line 15 was built from the same
+    // `selfEmploymentLines`. The remedy this row carried for two phases said
+    // its blocker was net self-employment earnings; that stopped being true at
+    // Phase 28, and the real blocker was DATA (no dialect recorded a premium)
+    // rather than order. Contrast `fjs/form2441`'s refusal, which IS an
+    // ordering one and is NOT retired by this phase -- the two look alike
+    // because both remedies named Schedule SE, and they are not alike.
+    const healthInsuranceEntries = entries.filter(entry =>
+        selfEmployedHealthInsuranceTags.includes(entry.value.lineTag))
+    const healthInsuranceSources = healthInsuranceEntries.map(entry => ({
+        documentHash: entry.documentHash,
+        boxPath: `entries[lineTag=${entry.value.lineTag},individual=${entry.value.individual}]`,
+        value: entry.value.amount,
+    }))
+    // `fjs/form8880`'s `creditCouldMatter` discipline, exactly as line 20
+    // applies it below: a return claiming no premium reaches none of the five
+    // refusals here. Refusing a return for an unanswerable question about a
+    // deduction it is not claiming is not honesty, it is an engine that does
+    // not work.
+    const premiumsCouldMatter = healthInsuranceEntries.length !== 0
+    // Form 7206 line 2 is figured "separately ... for each person covered", and
+    // this dialect's `individual` is the only identity it has. One person has
+    // ONE age at the end of the year, so two different band tags attributed to
+    // the same person is a contradiction rather than two people.
+    /** @type {readonly ('taxpayer' | 'spouse')[]} */
+    const coveredIndividuals = ['taxpayer', 'spouse']
+    /** @type {LongTermCareCoveredPerson[]} */
+    const longTermCarePersons = []
+    for (const who of coveredIndividuals) {
+        const bandsAsserted = longTermCareTagBands.filter(([tag]) =>
+            healthInsuranceEntries.some(entry =>
+                entry.value.individual === who && entry.value.lineTag === tag))
+        const [firstBand, ...otherBands] = bandsAsserted
+        const secondBand = otherBands[0]
+        if (firstBand !== undefined && secondBand !== undefined) {
+            return {
+                kind: 'error',
+                message: `Schedule 1 line 17: the adjustments document attributes long-term care `
+                    + `premiums to the ${who} under ${bandsAsserted.length} different age bands `
+                    + `(${bandsAsserted.map(([tag]) => tag).join(' and ')}). Form 7206 line 2(b) `
+                    + `caps each covered person by "the person's age at the end of the tax year", `
+                    + `and one person has one age -- the first two bands here carry caps of `
+                    + `${centsToString(longTermCareCapCents(taxParamSet)(firstBand[1]))} and `
+                    + `${centsToString(longTermCareCapCents(taxParamSet)(secondBand[1]))}, so the `
+                    + `choice changes the deduction. Refusing rather than picking one`,
+            }
+        }
+        if (firstBand !== undefined) {
+            longTermCarePersons.push({
+                ageBand: firstBand[1],
+                premiumsCents: healthInsuranceEntries
+                    .filter(entry =>
+                        entry.value.individual === who && entry.value.lineTag === firstBand[0])
+                    .reduce((sum, entry) => sum + centsFromString(entry.value.amount), 0n),
+            })
+        }
+    }
+    // R1 -- §162(l)(2)(B). The one fact on this whole line that no information
+    // return reports and that no stored amount implies. See
+    // `vnd.fjs.return_profile`'s own field comment for why the certification is
+    // whole-year while the statute is month-by-month.
+    if (
+        premiumsCouldMatter
+        && profile.value.notEligibleForAnySubsidizedEmployerHealthPlanInAnyMonth !== true
+    ) {
+        return {
+            kind: 'error',
+            message: 'Schedule 1 line 17: this return stores self-employed health insurance '
+                + 'premiums, and \u00a7162(l)(2)(B) denies the deduction "for any calendar month for '
+                + 'which the taxpayer is eligible to participate in any subsidized health plan '
+                + 'maintained by any employer of the taxpayer or of the spouse of, or any '
+                + 'dependent, or individual described in subparagraph (D) of paragraph (1) with '
+                + 'respect to, the taxpayer". Form 7206 line 1 restates it as an exclusion from '
+                + 'the premiums themselves. Eligibility is not enrolment and appears on no '
+                + 'information return: no Form W-2 box says whether an employer OFFERED a '
+                + 'subsidized plan. This return profile does not carry '
+                + 'notEligibleForAnySubsidizedEmployerHealthPlanInAnyMonth, so this engine cannot '
+                + 'tell a fully deductible premium from one that is entirely disallowed. Refusing '
+                + 'rather than assuming the answer that happens to favour the taxpayer'
+                + `. Nothing reaches ${line17Destination}`,
+        }
+    }
+    // R2 -- Rev. Proc. 2014-41 §2.05's circular relationship. See this module's
+    // own todo file; the short version is that there is no convergent method
+    // to implement, because the Revenue Procedure does not give one.
+    if (premiumsCouldMatter && marketplaceCoverageStored) {
+        return {
+            kind: 'error',
+            message: 'Schedule 1 line 17: this return stores BOTH self-employed health insurance '
+                + 'premiums and a Form 1095-A. Rev. Proc. 2014-41 \u00a72.05: "the amount of the '
+                + '\u00a7 162(l) deduction is based on the amount of the \u00a7 36B premium tax credit, and '
+                + 'the amount of the credit is based on the amount of the deduction \u2013 a circular '
+                + 'relationship." This engine computes Form 8962 from an adjusted gross income '
+                + 'that already contains this line, which is the right ONE-WAY order and is not '
+                + 'enough: \u00a75.03(2) caps the deduction at the specified premiums NOT paid through '
+                + 'advance credit payments, so the credit moves the deduction back. \u00a75.01(6) gives '
+                + 'the iterative method no iteration bound and an explicit escape hatch for the '
+                + 'case where changes between iterations always exceed $1, so there is no '
+                + 'convergent method to implement. Nothing stored says whether these premiums are '
+                + 'the \u00a73 "specified premiums" of the Marketplace plan or unrelated coverage, and '
+                + 'the two answers differ by the whole credit. Refusing rather than computing one '
+                + 'arm and ignoring the feedback'
+                + `. Nothing reaches ${line17Destination}`,
+        }
+    }
+    // R2b -- Form 7206 line 12, §911(d)(6) (TAX-42). The printed line reads
+    // "Enter any amount from Form 2555, line 45, ATTRIBUTABLE TO THE AMOUNT
+    // ENTERED ON LINE 4 OR 11 ABOVE", and that attribution is the problem: it
+    // is not the whole exclusion, it is the part of it that belongs to the one
+    // trade or business the insurance plan is established under. Nothing
+    // stored says how the exclusion divides between a foreign business, a
+    // domestic one, and foreign WAGES, and the three shares reduce line 13 by
+    // three different amounts.
+    //
+    // `fjs/form7206` keeps line 12 as a structural zero and this is the layer
+    // that stops a return reaching it with a non-zero exclusion -- the same
+    // division of labour line 11's S-corporation refusal already uses.
+    if (premiumsCouldMatter && form2555ExclusionCents !== 0n) {
+        return {
+            kind: 'error',
+            message: `Schedule 1 line 17: this return stores self-employed health insurance `
+                + `premiums and excludes ${centsToString(form2555ExclusionCents)} of foreign `
+                + `earned income under §911. Form 7206 line 12 asks for the part of Form 2555 `
+                + `line 45 "attributable to the amount entered on line 4 or 11" -- the net profit `
+                + `of the one trade or business the insurance plan is established under -- and `
+                + `subtracts it from the ceiling on line 13. Nothing stored says how the `
+                + `exclusion divides between that business, any other, and foreign wages, and `
+                + `§911(d)(6) denies "any deduction ... properly allocable to or chargeable `
+                + `against amounts excluded". Entering zero would claim the whole ceiling for `
+                + `income this return already excluded. Refusing rather than attributing it by `
+                + `guess (no phase yet). Nothing reaches ${line17Destination}`,
+        }
+    }
+    // R3/R4 -- Form 7206 line 4 is "your net profit ... from the TRADE OR
+    // BUSINESS UNDER WHICH THE INSURANCE PLAN IS ESTABLISHED", and the form's
+    // own header note says "Use a separate Form 7206 for each trade or
+    // business under which an insurance plan is established". Which one it is
+    // is a fact `vnd.fjs.adjustments` does not carry.
+    const scheduleCProfitCents = businessNetProfit.value > 0n ? businessNetProfit.value : 0n
+    const partnershipProfitCents = passThrough.earningsCents > 0n ? passThrough.earningsCents : 0n
+    if (premiumsCouldMatter && scheduleCProfitCents > 0n && partnershipProfitCents > 0n) {
+        return {
+            kind: 'error',
+            message: `Schedule 1 line 17: this return carries self-employment earnings from TWO `
+                + `sources -- ${centsToString(scheduleCProfitCents)} of Schedule C net profit and `
+                + `${centsToString(partnershipProfitCents)} of Schedule K-1 (Form 1065) box 14 `
+                + `code A -- and nothing stored says which trade or business the insurance plan is `
+                + `established under. Form 7206 line 4 asks for that one business's profit, line 5 `
+                + `for the total of all of them, and line 7 prorates Schedule 1 line 15 by line 4 `
+                + `divided by line 5; the form's header note says "Use a separate Form 7206 for `
+                + `each trade or business under which an insurance plan is established". Choosing `
+                + `either source changes both the ceiling and the proration. Refusing rather than `
+                + `guessing (no phase yet). Nothing reaches ${line17Destination}`,
+        }
+    }
+    if (premiumsCouldMatter && scheduleCProfitCents === 0n && partnershipProfitCents === 0n) {
+        return {
+            kind: 'error',
+            message: 'Schedule 1 line 17: this return stores self-employed health insurance '
+                + 'premiums and no self-employment net profit at all -- no Schedule C profit and '
+                + 'no Schedule K-1 (Form 1065) box 14 code A earnings. Form 7206 line 13 would '
+                + 'then be zero and the deduction would be zero, which is right for a taxpayer '
+                + 'with no trade or business and WRONG for the two this engine does not model: an '
+                + 'S-corporation more-than-2% shareholder, whose ceiling is line 11\u2019s Medicare '
+                + 'wages from box 5 of Form W-2 and whose premiums \u00a7162(l)(5) and Rev. Rul. 91-26 '
+                + 'require the corporation to have paid or reimbursed and reported as wages; and a '
+                + 'Schedule F farmer, whose line 34 is a farmIncomeOrLoss refusal here. Reporting '
+                + 'a zero would understate the deduction and overstate the tax. Refusing rather '
+                + `than reporting a zero that looks computed (no phase yet). Nothing reaches `
+                + `${line17Destination}`,
+        }
+    }
+    const line17Lines = form7206(taxParamSet)({
+        // Form 7206 line 1. UNCAPPED, and separate from line 2 by
+        // construction: `fjs/form7206` takes the two halves apart precisely so
+        // a caller cannot put long-term care in this one.
+        medicalDentalVisionPremiumsCents: healthInsuranceEntries
+            .filter(entry => entry.value.lineTag === medicalDentalVisionTag)
+            .reduce((sum, entry) => sum + centsFromString(entry.value.amount), 0n),
+        longTermCarePersons,
+        // Lines 4 and 5. Exactly one of the two sources is non-zero here -- the
+        // two refusals above are what makes that true -- so line 4 equals line
+        // 5 and line 6 is 1. The proration `fjs/form7206` implements is
+        // therefore the identity on every return this engine computes today,
+        // and it lives there rather than being assumed away here because the
+        // day a second business becomes computable is the day it stops being
+        // the identity.
+        planBusinessNetProfitCents: scheduleCProfitCents + partnershipProfitCents,
+        allBusinessNetProfitsCents: scheduleCProfitCents + partnershipProfitCents,
+        // Line 7's subject: Schedule 1 line 15 IN FULL. Handing over a
+        // pre-prorated figure would prorate it twice.
+        deductiblePartOfSelfEmploymentTaxCents: line15.value,
+        // Line 9. `selfEmployedRetirementPlans` is still a refused
+        // `fjs/return/scope` kind, so line 16 is a documented zero and the part
+        // of it attributable to this business is zero too. NAMED rather than
+        // omitted: when Pub. 560's worksheet arrives, this is the term it
+        // fills, and it is read off `line16` rather than written as `0n` so
+        // that wiring is a one-line change instead of a search.
+        retirementPlanDeductionForPlanBusinessCents: line16.value,
+        // Line 11. Zero on every return that reaches here, because the refusal
+        // above stops an S-corporation-only return before this call.
+        sCorporationMedicareWagesCents: 0n,
+    })
+    const line17 = documentLine(profile)(
+        'Schedule 1 line 17 (self-employed health insurance deduction, Form 7206 line 14)')(
+        line17Lines.line14)(healthInsuranceSources)
     const line18 = earlyWithdrawalPenaltyLine(profile)(interestForms)
     const line19a = zero('Schedule 1 line 19a (alimony paid)')
     // 22. "Reserved for future use" -- the form's own inert line.
     const line22 = zero('Schedule 1 line 22 (reserved for future use)')
     const line23 = zero('Schedule 1 line 23 (Archer MSA deduction)')
-    // 24. "Other adjustments" -- a collapsed stand-in for 24a-24z (11
-    //     sub-lines); see this module's own docstring.
+    // 24. "Other adjustments" -- a collapsed stand-in for 24a-24z (12 printed
+    //     sub-lines, 24a through 24k and 24z, of which the instructions say to
+    //     leave 24z blank; this comment said 11 until 2026-08-18); see this
+    //     module's own docstring.
     const line24 = zero('Schedule 1 line 24 (other adjustments, 24a-24z collapsed -- none separately reachable)')
     // 25. "Total other adjustments. Add lines 24a through 24z" -- the SAME
     //     total, restated as its own printed line.
@@ -1981,7 +2559,8 @@ export const scheduleOnePartII = taxParamSet => input => {
  *   readonly kind: 'ok',
  *   readonly line1: ReportLine, readonly line2a: ReportLine, readonly line3: ReportLine,
  *   readonly line4: ReportLine, readonly line5: ReportLine, readonly line6: ReportLine,
- *   readonly line7: ReportLine, readonly line8: ReportLine, readonly line9: ReportLine,
+ *   readonly line7: ReportLine, readonly line8: ReportLine, readonly line8p: ReportLine,
+ *   readonly line9: ReportLine,
  *   readonly line10: ReportLine,
  *   readonly line11: ReportLine, readonly line12: ReportLine, readonly line13: ReportLine,
  *   readonly line14: ReportLine, readonly line15: ReportLine, readonly line16: ReportLine,
@@ -2001,6 +2580,9 @@ export const scheduleOnePartII = taxParamSet => input => {
  *   readonly unemploymentForms: readonly Stored<OneZeroNineNineG>[],
  *   readonly nonemployeeCompensationForms: readonly Stored<OneZeroNineNineNec>[],
  *   readonly businessExpenseForms: readonly Stored<BusinessExpenses>[],
+ *   readonly assetRegisters: readonly Stored<AssetRegister>[],
+ *   readonly rentalProperties: readonly Stored<RentalProperty>[],
+ *   readonly farmForms: readonly Stored<Farm>[],
  *   readonly partnershipK1Forms: readonly Stored<K1Partnership>[],
  *   readonly sCorporationK1Forms: readonly Stored<K1SCorporation>[],
  *   readonly estateTrustK1Forms: readonly Stored<K1EstateTrust>[],
@@ -2014,6 +2596,8 @@ export const scheduleOnePartII = taxParamSet => input => {
  *   readonly taxExemptInterestCents: bigint,
  *   readonly mfsLivedWithSpouseAtAnyTimeInYear: boolean,
  *   readonly iraDistributionReceived: boolean,
+ *   readonly marketplaceCoverageStored: boolean,
+ *   readonly form1040Line7aCents: bigint,
  * }} ScheduleOneInput
  */
 
@@ -2028,20 +2612,27 @@ export const scheduleOnePartII = taxParamSet => input => {
 export const scheduleOne = taxParamSet => input => {
     const {
         profile, status, unemploymentForms, nonemployeeCompensationForms, businessExpenseForms,
+        assetRegisters, rentalProperties, farmForms,
         partnershipK1Forms, sCorporationK1Forms, estateTrustK1Forms,
         adjustmentForms, studentLoanInterestForms, w2Forms, interestForms, totalIncomeLine,
         totalIncomeExceptTaxableSocialSecurityLine, socialSecurityBenefitsCents,
         taxExemptInterestCents, mfsLivedWithSpouseAtAnyTimeInYear, iraDistributionReceived,
+        marketplaceCoverageStored, form1040Line7aCents,
     } = input
-    const partI = scheduleOnePartI({
+    const partI = scheduleOnePartI(taxParamSet)({
+        form2555Line45Cents: 0n,
         profile, unemploymentForms, nonemployeeCompensationForms, businessExpenseForms, w2Forms,
+        assetRegisters, rentalProperties, farmForms,
         partnershipK1Forms, sCorporationK1Forms, estateTrustK1Forms,
+        // Printed Form 461 lines 15 and 3 -- see {@link scheduleOnePartI}.
+        status, form1040Line7aCents,
     })
     if (partI.kind === 'error') {
         return partI
     }
     const stageOne = scheduleOnePartIIExceptStudentLoanInterest(taxParamSet)({
-        profile, status, adjustmentForms, w2Forms, interestForms,
+        form2555ExclusionCents: 0n,
+        profile, status, adjustmentForms, w2Forms, interestForms, marketplaceCoverageStored,
         // Schedule 1 line 20's four income-interaction inputs, threaded
         // straight through: §219(g)(3)(A) reads adjusted gross income "after
         // application of section 86", so stage 1 runs the Social Security
@@ -2053,6 +2644,7 @@ export const scheduleOne = taxParamSet => input => {
         // so that is the line handed over -- never Part I's line 3, which is
         // the same figure under a different printed number.
         businessNetProfit: partI.scheduleC.partII.line31,
+        farmNetProfit: partI.scheduleF.line34,
         businessExpenseForms,
         // ...and the SAME printed line names "Schedule K-1 (Form 1065), box
         // 14, code A" beside it. Read off the Schedule E execution Part I
@@ -2073,7 +2665,7 @@ export const scheduleOne = taxParamSet => input => {
         kind: 'ok',
         line1: partI.line1, line2a: partI.line2a, line3: partI.line3, line4: partI.line4,
         line5: partI.line5, line6: partI.line6, line7: partI.line7, line8: partI.line8,
-        line9: partI.line9, line10: partI.line10,
+        line8p: partI.line8p, line9: partI.line9, line10: partI.line10,
         line11: partII.line11, line12: partII.line12, line13: partII.line13,
         line14: partII.line14, line15: partII.line15, line16: partII.line16,
         line17: partII.line17, line18: partII.line18, line19a: partII.line19a,
@@ -2402,16 +2994,19 @@ const iraContributionEntry = amount => ({
  */
 const stageOneForMovingAndIra = entries =>
     scheduleOnePartIIExceptStudentLoanInterest(taxParams2025)({
+        form2555ExclusionCents: 0n,
         profile: profileCertifiedForMoving,
         status: 'single',
         adjustmentForms: [adjustmentsDoc(entries)([])],
         w2Forms: [iraW2Doc('sha256-ira-w2')('48000.00')(true)],
         interestForms: [],
+        marketplaceCoverageStored: false,
         totalIncomeExceptTaxableSocialSecurityLine: totalIncomeOf(4800000n),
         socialSecurityBenefitsCents: 4000000n,
         taxExemptInterestCents: 0n,
         mfsLivedWithSpouseAtAnyTimeInYear: false,
         iraDistributionReceived: false,
+        farmNetProfit: noBusinessNetProfit(profileCertifiedForMoving),
         businessNetProfit: noBusinessNetProfit(profileCertifiedForMoving),
         businessExpenseForms: [],
         passThrough: noPassThrough,
@@ -2435,7 +3030,13 @@ const movingPartII = profile => entries => w2Forms =>
  * @type {(profile: Stored<ReturnProfile>) => (unemploymentForms: readonly Stored<OneZeroNineNineG>[]) => (nonemployeeCompensationForms: readonly Stored<OneZeroNineNineNec>[]) => (businessExpenseForms: readonly Stored<BusinessExpenses>[]) => ScheduleOnePartIOutcome}
  */
 const partIOf = profile => unemploymentForms => nonemployeeCompensationForms => businessExpenseForms =>
-    scheduleOnePartI({
+    scheduleOnePartI(taxParams2025)({
+        status: 'single',
+        form1040Line7aCents: 0n,
+        form2555Line45Cents: 0n,
+        assetRegisters: [],
+        rentalProperties: [],
+        farmForms: [],
         profile, unemploymentForms, nonemployeeCompensationForms, businessExpenseForms,
         w2Forms: [],
         partnershipK1Forms: [],
@@ -2490,6 +3091,10 @@ const noSocialSecurityInteraction = {
     taxExemptInterestCents: 0n,
     mfsLivedWithSpouseAtAnyTimeInYear: false,
     iraDistributionReceived: false,
+    // TAX-39: no Form 1095-A. Schedule 1 line 17 refuses a return holding both
+    // §162(l) premiums and Marketplace coverage (Rev. Proc. 2014-41 §2.05's
+    // circularity), and every fixture sharing this base predates that line.
+    marketplaceCoverageStored: false,
 }
 
 /** A $0 "total income except taxable Social Security benefits" line, for the
@@ -2546,6 +3151,9 @@ const noBusinessNetProfit = profile => {
         nonemployeeCompensationForms: [],
         businessExpenseForms: [],
         w2Forms: [],
+        assetRegisters: [],
+        rentalProperties: [],
+        farmForms: [],
     })
     assert(outcome.kind === 'ok', ['an empty Schedule C cannot refuse', outcome])
     return outcome.partII.line31
@@ -2566,9 +3174,11 @@ const refusal = outcome => {
  */
 const partIIOf = profile => status => adjustmentForms => studentLoanInterestForms => w2Forms => totalIncomeCents => {
     const stageOne = scheduleOnePartIIExceptStudentLoanInterest(taxParams2025)({
+        form2555ExclusionCents: 0n,
         profile, status, adjustmentForms, w2Forms, interestForms: [],
         ...noSocialSecurityInteraction,
         totalIncomeExceptTaxableSocialSecurityLine: totalIncomeOf(totalIncomeCents),
+        farmNetProfit: noBusinessNetProfit(profile),
         businessNetProfit: noBusinessNetProfit(profile),
         businessExpenseForms: [],
         passThrough: noPassThrough,
@@ -2598,6 +3208,7 @@ const emptyPartII = () => partIIOf(profileNoDeclaredKinds)('single')([])([])([])
  */
 const stageOneWithInterest = interestForms =>
     scheduleOnePartIIExceptStudentLoanInterest(taxParams2025)({
+        form2555ExclusionCents: 0n,
         profile: profileNoDeclaredKinds,
         status: 'single',
         adjustmentForms: [],
@@ -2605,6 +3216,7 @@ const stageOneWithInterest = interestForms =>
         interestForms,
         ...noSocialSecurityInteraction,
         totalIncomeExceptTaxableSocialSecurityLine: noOtherIncomeLine,
+        farmNetProfit: noBusinessNetProfit(profileNoDeclaredKinds),
         businessNetProfit: noBusinessNetProfit(profileNoDeclaredKinds),
         businessExpenseForms: [],
         passThrough: noPassThrough,
@@ -2696,16 +3308,19 @@ const stageOneForIra = fixture => {
             rule: '1040 line 9 less line 6b (total income except taxable Social Security benefits)',
         }
     return scheduleOnePartIIExceptStudentLoanInterest(taxParams2025)({
+        form2555ExclusionCents: 0n,
         profile: profileNoDeclaredKinds,
         status,
         adjustmentForms: entries.length === 0 ? [] : [adjustmentsDoc(entries)([])],
         w2Forms,
         interestForms: [],
+        marketplaceCoverageStored: false,
         totalIncomeExceptTaxableSocialSecurityLine,
         socialSecurityBenefitsCents: centsFromString(socialSecurityBenefits),
         taxExemptInterestCents: 0n,
         mfsLivedWithSpouseAtAnyTimeInYear,
         iraDistributionReceived,
+        farmNetProfit: noBusinessNetProfit(profileNoDeclaredKinds),
         businessNetProfit: noBusinessNetProfit(profileNoDeclaredKinds),
         businessExpenseForms: [],
         passThrough: noPassThrough,
@@ -2744,7 +3359,13 @@ const lineTwentyOf = fixture => okStageOne(stageOneForIra(fixture)).line20.value
  */
 const stageOneWithBusiness = profile => status => nonemployeeCompensationForms =>
     businessExpenseForms => w2Forms => {
-        const partI = okPartI(scheduleOnePartI({
+        const partI = okPartI(scheduleOnePartI(taxParams2025)({
+            status: 'single',
+            form1040Line7aCents: 0n,
+            form2555Line45Cents: 0n,
+            assetRegisters: [],
+            rentalProperties: [],
+            farmForms: [],
             profile,
             unemploymentForms: [],
             nonemployeeCompensationForms,
@@ -2755,10 +3376,12 @@ const stageOneWithBusiness = profile => status => nonemployeeCompensationForms =
             estateTrustK1Forms: [],
         }))
         return scheduleOnePartIIExceptStudentLoanInterest(taxParams2025)({
+            form2555ExclusionCents: 0n,
             profile, status, adjustmentForms: [], w2Forms, interestForms: [],
             ...noSocialSecurityInteraction,
             totalIncomeExceptTaxableSocialSecurityLine: noOtherIncomeLine,
             businessNetProfit: partI.scheduleC.partII.line31,
+            farmNetProfit: partI.scheduleF.line34,
             businessExpenseForms,
             passThrough: passThroughOf(partI.scheduleE),
         })
@@ -2772,7 +3395,13 @@ const stageOneWithBusiness = profile => status => nonemployeeCompensationForms =
  */
 const stageOneWithPassThrough = profile => status => partnershipK1Forms =>
     businessExpenseForms => w2Forms => {
-        const partI = okPartI(scheduleOnePartI({
+        const partI = okPartI(scheduleOnePartI(taxParams2025)({
+            status: 'single',
+            form1040Line7aCents: 0n,
+            form2555Line45Cents: 0n,
+            assetRegisters: [],
+            rentalProperties: [],
+            farmForms: [],
             profile,
             unemploymentForms: [],
             nonemployeeCompensationForms: [],
@@ -2783,10 +3412,12 @@ const stageOneWithPassThrough = profile => status => partnershipK1Forms =>
             estateTrustK1Forms: [],
         }))
         return scheduleOnePartIIExceptStudentLoanInterest(taxParams2025)({
+            form2555ExclusionCents: 0n,
             profile, status, adjustmentForms: [], w2Forms, interestForms: [],
             ...noSocialSecurityInteraction,
             totalIncomeExceptTaxableSocialSecurityLine: noOtherIncomeLine,
             businessNetProfit: partI.scheduleC.partII.line31,
+            farmNetProfit: partI.scheduleF.line34,
             businessExpenseForms,
             passThrough: passThroughOf(partI.scheduleE),
         })
@@ -2823,13 +3454,638 @@ const w2WithSocialSecurityWages = documentHash => recipientTin => amount => ({
  * for the leaves that compute it — but it is no longer a line NO phase has
  * claimed, and leaving it here would make this list say something false while
  * passing.
+ * **Line 17 left this list at TAX-39.** It is still a documented zero on a
+ * return that stores no premium — `lineSeventeenIsADocumentedZeroWithoutAny`
+ * `PremiumEntry` asserts exactly that, as the control for the leaves that
+ * compute it — but a line this schedule now claims cannot also be a line no
+ * phase has claimed, and leaving it here would make the list say something
+ * false while passing.
  * @type {readonly string[]} */
 const partIILinesStillDocumentedZero = [
-    'line12', 'line16', 'line17', 'line18', 'line19a',
+    'line12', 'line16', 'line18', 'line19a',
     'line20', 'line22', 'line23', 'line24', 'line25',
 ]
 
+// ── TAX-39's fixtures: Schedule 1 line 17 ────────────────────────────────────
+
+/**
+ * A profile carrying §162(l)(2)(B)'s certification — the ONE fact this line
+ * needs that no information return reports. Every "computes" leaf below uses
+ * it and `theUncertifiedReturnRefusesNamingTheField` is the control that
+ * removes it.
+ * @type {Stored<ReturnProfile>}
+ */
+const profileCertifiedForHealthInsurance = {
+    documentHash: 'profile-hash-7206',
+    value: {
+        ...minimalProfileValue,
+        notEligibleForAnySubsidizedEmployerHealthPlanInAnyMonth: true,
+    },
+}
+
+/** @type {(lineTag: string) => (amount: string) => (individual: string) => Adjustments['entries'][number]} */
+const premiumEntry = lineTag => amount => individual => ({
+    lineTag,
+    datePaid: '2025-07-01',
+    description: 'health coverage premium',
+    amount,
+    individual,
+})
+
+/**
+ * Stage 1 for a return with a Schedule C business AND a `vnd.fjs.adjustments`
+ * record — `stageOneWithBusiness` widened by the two inputs line 17 needs.
+ * Schedule C and Schedule E are run FIRST here, exactly as `scheduleOne` and
+ * `fjs/form1040/core` run them, so `businessNetProfit` is a real line 31.
+ * @type {(profile: Stored<ReturnProfile>) => (nonemployeeCompensationForms: readonly Stored<OneZeroNineNineNec>[]) => (partnershipK1Forms: readonly Stored<K1Partnership>[]) => (entries: readonly Adjustments['entries'][number][]) => (marketplaceCoverageStored: boolean) => (form2555ExclusionCents: bigint) => ScheduleOnePartIIStageOneOutcome}
+ */
+const stageOneForHealthInsurance = profile => nonemployeeCompensationForms =>
+    partnershipK1Forms => entries => marketplaceCoverageStored =>
+        form2555ExclusionCents => {
+            // `fjs/schedule/c` refuses a Form 1099-NEC with no business
+            // record, so the two travel together — supplied here rather than
+            // by each leaf, since no leaf below is about that refusal.
+            const businessExpenseForms = nonemployeeCompensationForms.length === 0
+                ? []
+                : [businessDoc([])]
+            const partI = okPartI(scheduleOnePartI(taxParams2025)({
+                status: 'single',
+                form1040Line7aCents: 0n,
+                form2555Line45Cents: 0n,
+                assetRegisters: [],
+                rentalProperties: [],
+                farmForms: [],
+                profile,
+                unemploymentForms: [],
+                nonemployeeCompensationForms,
+                businessExpenseForms,
+                w2Forms: [],
+                partnershipK1Forms,
+                sCorporationK1Forms: [],
+                estateTrustK1Forms: [],
+            }))
+            // The status comes off the PROFILE, never a literal: a
+            // `spouse`-attributed premium is refused on any status but
+            // married-filing-jointly, and a fixture that hardcoded 'single'
+            // could never reach Form 7206 line 2's second covered person.
+            const status = profile.value.filingStatus === 'marriedFilingJointly'
+                ? /** @type {IndividualFilingStatus} */ ('marriedFilingJointly')
+                : /** @type {IndividualFilingStatus} */ ('single')
+            return scheduleOnePartIIExceptStudentLoanInterest(taxParams2025)({
+                form2555ExclusionCents,
+                profile,
+                status,
+                adjustmentForms: entries.length === 0 ? [] : [adjustmentsDoc(entries)([])],
+                w2Forms: [],
+                interestForms: [],
+                ...noSocialSecurityInteraction,
+                marketplaceCoverageStored,
+                totalIncomeExceptTaxableSocialSecurityLine: noOtherIncomeLine,
+                businessNetProfit: partI.scheduleC.partII.line31,
+                farmNetProfit: partI.scheduleF.line34,
+                businessExpenseForms,
+                passThrough: passThroughOf(partI.scheduleE),
+            })
+        }
+
+/** The ordinary shape: a sole proprietor, no Marketplace coverage, certified.
+ * @type {(netProfit: string) => (entries: readonly Adjustments['entries'][number][]) => ScheduleOnePartIIStageOneOutcome}
+ */
+const soleProprietorWithPremiums = netProfit => entries =>
+    stageOneForHealthInsurance(profileCertifiedForHealthInsurance)(
+        [nonemployeeCompensationDoc(netProfit)])([])(entries)(false)(0n)
+
 export const proof = {
+    // ── Schedule 1 line 8d: the §911 exclusion (TAX-42) ─────────────────────
+    //
+    // **A form-level proof cannot prove a wiring.** `fjs/form2555`'s own
+    // fourteen leaves prove its arithmetic against `bigint`s and could not
+    // notice this schedule entering line 45 with the wrong SIGN, at the wrong
+    // printed line, or citing the wrong box. i2555 p7 states the sign in
+    // words: *"Enter the amount from line 45 on Schedule 1 (Form 1040), line
+    // 8d. Reduce the other items of additional income by the NEGATIVE amount
+    // on line 8d."*
+    lineEightD: {
+        theExclusionEntersLineEightAsANegativeAndReachesLineTen: () => {
+            const partI = okPartI(scheduleOnePartI(taxParams2025)({
+                status: 'single',
+                form1040Line7aCents: 0n,
+                form2555Line45Cents: 13000000n,
+                profile: profileNoDeclaredKinds,
+                unemploymentForms: [],
+                nonemployeeCompensationForms: [],
+                businessExpenseForms: [],
+                w2Forms: [],
+                assetRegisters: [],
+                rentalProperties: [],
+                farmForms: [],
+                partnershipK1Forms: [],
+                sCorporationK1Forms: [],
+                estateTrustK1Forms: [],
+            }))
+            assertEq(partI.line8.value, -13000000n, 'NEGATIVE $130,000.00, never positive')
+            assertEq(partI.line9.value, -13000000n, 'line 9 adds 8d to Form 461\'s 8p, which is zero here')
+            assertEq(partI.line10.value, -13000000n, 'and line 10 carries it to 1040 line 8')
+            assert(
+                partI.line8.rule.includes('Form 2555 line 45'),
+                ['the line must name where the figure came from', partI.line8.rule])
+            const [first] = partI.line8.sources
+            assert(first !== undefined, 'the line must cite something')
+            assertEq(first.boxPath, 'foreignEarnedIncome',
+                'and cite the profile box, not declaredKinds')
+        },
+        // The exclusion NETS against other Part I income rather than replacing
+        // it — the half a sign error would leave looking plausible. $4,554.00
+        // of unemployment beside a $130,000.00 exclusion is −$125,446.00, and
+        // a positive line 8d would have given +$134,554.00.
+        theExclusionNetsAgainstOtherAdditionalIncome: () => {
+            const partI = okPartI(scheduleOnePartI(taxParams2025)({
+                status: 'single',
+                form1040Line7aCents: 0n,
+                form2555Line45Cents: 13000000n,
+                profile: profileNoDeclaredKinds,
+                unemploymentForms: [unemploymentA],
+                nonemployeeCompensationForms: [],
+                businessExpenseForms: [],
+                w2Forms: [],
+                assetRegisters: [],
+                rentalProperties: [],
+                farmForms: [],
+                partnershipK1Forms: [],
+                sCorporationK1Forms: [],
+                estateTrustK1Forms: [],
+            }))
+            assertEq(partI.line7.value, 455400n, '$4,554.00 of unemployment')
+            assertEq(partI.line10.value, -12544600n, '$4,554.00 − $130,000.00')
+            assert(
+                partI.line10.value !== 13455400n,
+                ['a positive line 8d would have ADDED the exclusion', partI.line10.value])
+        },
+        // THE CONTROL: with no exclusion, line 8 is the profile-declared zero
+        // it has always been, citing `declaredKinds` and naming no form.
+        controlNoExclusionLeavesLineEightAProfileDeclaredZero: () => {
+            const partI = partIWithoutBusiness(profileNoDeclaredKinds)([])
+            assertEq(partI.line8.value, 0n)
+            const [first] = partI.line8.sources
+            assert(first !== undefined, 'the zero still cites the profile')
+            assertEq(first.boxPath, 'declaredKinds')
+            assert(
+                !partI.line8.rule.includes('Form 2555'),
+                ['a return with no exclusion must not name Form 2555', partI.line8.rule])
+        },
+    },
+    // ── Schedule 1 line 17: the §162(l) deduction (TAX-39) ──────────────────
+    //
+    // **A form-level proof cannot prove a wiring.** `fjs/form7206`'s own
+    // eighteen leaves prove its arithmetic against `bigint`s and would not
+    // notice this schedule handing it an empty entry list, the wrong Schedule
+    // 1 line for its line 7, or long-term care premiums routed into its
+    // uncapped line 1. These leaves drive the real stage-1 entry point over
+    // real stored documents, which is the only place that shows.
+    //
+    // Every expected figure is computed on paper from the printed captions.
+    // The Schedule SE arithmetic behind Schedule 1 line 15 is worked once here
+    // and reused, and it is cross-checkable against this file's own
+    // independently-verified `line 13 = $3,532.39` for a $50,000.00 profit:
+    //
+    //   $50,000.00 profit -> SE line 4a = 0.9235 x 5,000,000 =  4,617,500
+    //                        line 10 = 0.124 x 4,617,500     =    572,570
+    //                        line 11 = 0.029 x 4,617,500     =    133,908  (half-up)
+    //                        line 12                          =    706,478
+    //                        line 13 = 50% of line 12         =    353,239  -> Sch 1 line 15
+    //
+    //    $5,000.00 profit -> SE line 4a = 0.9235 x   500,000 =    461,750
+    //                        line 10 = 0.124 x   461,750     =     57,257
+    //                        line 11 = 0.029 x   461,750     =     13,391  (half-up)
+    //                        line 12                          =     70,648
+    //                        line 13                          =     35,324  -> Sch 1 line 15
+    selfEmployedHealthInsurance: {
+        // The ordinary return. $50,000.00 of Schedule C profit, $9,600.00 of
+        // medical premiums, certified.
+        //
+        //   Form 7206 line 3  =  9,600.00
+        //   line 4 = line 5   = 50,000.00, so line 6 = 1
+        //   line 7            =  3,532.39      (the whole Schedule 1 line 15)
+        //   line 8 = line 13  = 46,467.61
+        //   line 14 = min(9,600.00, 46,467.61) = 9,600.00
+        aSoleProprietorsPremiumReachesLineSeventeenWhole: () => {
+            const stageOne = okStageOne(soleProprietorWithPremiums('50000.00')([
+                premiumEntry('selfEmployedHealthInsuranceMedicalDentalVision')('9600.00')(
+                    'taxpayer'),
+            ]))
+            assertEq(stageOne.line15.value, 353239n, 'Schedule 1 line 15 = $3,532.39')
+            assertEq(stageOne.line17.value, 960000n, 'Schedule 1 line 17 = $9,600.00')
+            // The hard zero is REPLACED, not supplemented: on a return with a
+            // real entry the sources name the entry rather than `declaredKinds`.
+            const paths = stageOne.line17.sources.map(source => source.boxPath)
+            assert(
+                paths.includes(
+                    'entries[lineTag=selfEmployedHealthInsuranceMedicalDentalVision,'
+                    + 'individual=taxpayer]'),
+                ['line 17 must cite the entry it read', paths])
+            assert(
+                !paths.includes('declaredKinds'),
+                ['and must not still be citing the profile', paths])
+            assert(
+                stageOne.line17.rule.includes('Form 7206 line 14'),
+                ['line 17 must name the form line it implements', stageOne.line17.rule])
+        },
+        // **THE CONTROL, and the regression property.** A return with a
+        // business and NO premium entry is byte-identical to what it was before
+        // this phase: a documented zero citing the profile's own
+        // `declaredKinds` box, and no refusal anywhere.
+        lineSeventeenIsADocumentedZeroWithoutAnyPremiumEntry: () => {
+            const stageOne = okStageOne(soleProprietorWithPremiums('50000.00')([]))
+            assertEq(stageOne.line17.value, 0n)
+            assertEq(stageOne.line17.sources.length, 1, 'exactly the profile citation')
+            const [only] = stageOne.line17.sources
+            assert(only !== undefined, 'one source')
+            if (only === undefined) { throw 'expected a source' }
+            assertEq(only.boxPath, 'declaredKinds')
+            assertEq(only.documentHash, profileCertifiedForHealthInsurance.documentHash)
+        },
+        // A return with NO business and no premium is untouched too — the
+        // wider regression control, since most returns are this one.
+        aReturnWithNoBusinessAndNoPremiumIsUntouched: () => {
+            const stageOne = okStageOne(stageOneForHealthInsurance(profileNoDeclaredKinds)(
+                [])([])([])(false)(0n))
+            assertEq(stageOne.line17.value, 0n)
+            assertEq(stageOne.line17.sources.length, 1)
+            assertEq(stageOne.line15.value, 0n, 'and line 15 is still zero as well')
+        },
+        // **§162(l)(2)(A)'s ceiling BINDING, which is the whole point of lines
+        // 4-13 and which the leaf above cannot see.** $5,000.00 of profit
+        // against the same $9,600.00 premium: line 13 = 5,000.00 - 353.24 =
+        // 4,646.76, and line 14 takes it instead of line 3.
+        theEarnedIncomeCeilingCutsTheDeductionOnASmallBusiness: () => {
+            const stageOne = okStageOne(soleProprietorWithPremiums('5000.00')([
+                premiumEntry('selfEmployedHealthInsuranceMedicalDentalVision')('9600.00')(
+                    'taxpayer'),
+            ]))
+            assertEq(stageOne.line15.value, 35324n, 'Schedule 1 line 15 = $353.24')
+            assertEq(stageOne.line17.value, 464676n, '$5,000.00 - $353.24 = $4,646.76')
+            assert(
+                stageOne.line17.value < 960000n,
+                ['the ceiling must actually bind here', stageOne.line17.value])
+        },
+        // **The §164(f) subtraction is REAL and this is what proves the right
+        // figure feeds Form 7206 line 7.** Same business, same premium, and
+        // the deduction is exactly Schedule 1 line 15 short of the profit.
+        // Handing line 7 anything but the full line 15 changes this identity.
+        theCeilingIsShortOfTheProfitByExactlyScheduleOneLineFifteen: () => {
+            const stageOne = okStageOne(soleProprietorWithPremiums('5000.00')([
+                premiumEntry('selfEmployedHealthInsuranceMedicalDentalVision')('9600.00')(
+                    'taxpayer'),
+            ]))
+            assertEq(
+                500000n - stageOne.line17.value, stageOne.line15.value,
+                'Form 7206 line 8 is line 4 less the whole of Schedule 1 line 15')
+        },
+        // Long-term care: §213(d)(10)'s cap applied through the tag, and the
+        // capped half ADDED to the uncapped one on Form 7206 line 3.
+        //
+        //   line 1 = 9,600.00 (uncapped)
+        //   line 2 = min(2,400.00, 1,800.00) = 1,800.00   band 51-60
+        //   line 3 = 11,400.00, and the $46,467.61 ceiling does not bind
+        longTermCarePremiumsAreCappedByBandAndAddedToTheMedicalHalf: () => {
+            const stageOne = okStageOne(soleProprietorWithPremiums('50000.00')([
+                premiumEntry('selfEmployedHealthInsuranceMedicalDentalVision')('9600.00')(
+                    'taxpayer'),
+                premiumEntry('selfEmployedLongTermCareAgeFiftyOneToSixty')('2400.00')('taxpayer'),
+            ]))
+            assertEq(stageOne.line17.value, 1140000n, '$9,600.00 + $1,800.00 = $11,400.00')
+            assert(
+                stageOne.line17.value !== 1200000n,
+                ['an UNCAPPED long-term care premium would have given $12,000.00',
+                    stageOne.line17.value])
+        },
+        // The band tag decides which cap, and a different band is a different
+        // answer. Without this leaf every band tag could route to the same cap.
+        // **A recorded property of this code, found by a mutation that did NOT
+        // bite where it was predicted to.** Rewriting Form 7206 line 2 to cap
+        // the running SUM rather than each covered person leaves the
+        // two-DIFFERENT-bands fixtures green: the accumulated $1,800.00 plus a
+        // second $3,000.00 is $4,800.00, which is still under the 61-70 band's
+        // $4,810.00 cap, so the wrong rule returns the right answer. Only two
+        // people in the SAME band separate the two rules
+        // (`twoPeopleInTheSameBandEachGetTheirOwnCap`, in `fjs/form7206`), and
+        // that is why both leaves exist rather than one.
+        adifferentBandTagSelectsADifferentCap: () => {
+            const younger = okStageOne(soleProprietorWithPremiums('50000.00')([
+                premiumEntry('selfEmployedLongTermCareAgeFortyOrYounger')('2400.00')('taxpayer'),
+            ]))
+            const older = okStageOne(soleProprietorWithPremiums('50000.00')([
+                premiumEntry('selfEmployedLongTermCareAgeSeventyOneOrOlder')('2400.00')('taxpayer'),
+            ]))
+            assertEq(younger.line17.value, 48000n, '$480.00, the age-40-or-younger cap')
+            assertEq(older.line17.value, 240000n, 'the whole $2,400.00, under a $6,020.00 cap')
+        },
+        // A long-term care premium tagged for the SPOUSE on a joint return is
+        // a second covered person with a second cap — Form 7206 line 2's own
+        // "figure separately ... for each person" through this schedule's
+        // `individual` field, which is the only identity it has.
+        aSpousesLongTermCarePremiumIsASecondCoveredPerson: () => {
+            const joint = {
+                documentHash: 'profile-hash-7206-joint',
+                value: {
+                    ...profileCertifiedForHealthInsurance.value,
+                    filingStatus: 'marriedFilingJointly',
+                },
+            }
+            const stageOne = okStageOne(stageOneForHealthInsurance(joint)(
+                [nonemployeeCompensationDoc('50000.00')])([])([
+                    premiumEntry('selfEmployedLongTermCareAgeFiftyOneToSixty')('2400.00')(
+                        'taxpayer'),
+                    premiumEntry('selfEmployedLongTermCareAgeFiftyOneToSixty')('2400.00')('spouse'),
+                ])(false)(0n))
+            assertEq(stageOne.line17.value, 360000n, 'two $1,800.00 caps, not one')
+        },
+        // **The wiring INSIDE this schedule.** Line 17 is inside the Social
+        // Security worksheet's printed "lines 11 through 20" range and inside
+        // line 26's total, and a line that computed correctly but reached
+        // neither would leave every leaf above green and the return wrong.
+        //
+        // **The line 26 half of this leaf was added after a mutation exposed
+        // the name as a promise the body did not keep.** Dropping line 17 from
+        // `scheduleOnePartII`'s line 26 summands reddened only the
+        // `fjs/form1040/core` and `fjs/report/tax_return` leaves — nothing at
+        // THIS layer noticed, because stage 1 has no line 26 and the two
+        // worksheet totals are computed by different functions. A leaf whose
+        // name claims more than its assertions is the same defect as a stale
+        // docstring, and it is caught the same way: by mutating.
+        lineSeventeenReachesLineTwentySixAndBothWorksheetTotals: () => {
+            const withPremium = okStageOne(soleProprietorWithPremiums('50000.00')([
+                premiumEntry('selfEmployedHealthInsuranceMedicalDentalVision')('9600.00')(
+                    'taxpayer'),
+            ]))
+            const without = okStageOne(soleProprietorWithPremiums('50000.00')([]))
+            assertEq(
+                socialSecurityWorksheetAdjustmentsTotal(withPremium)
+                    - socialSecurityWorksheetAdjustmentsTotal(without),
+                960000n,
+                'the Social Security worksheet\u2019s line 6 must move by the whole deduction')
+            assertEq(
+                studentLoanInterestWorksheetOtherAdjustments(withPremium)
+                    - studentLoanInterestWorksheetOtherAdjustments(without),
+                960000n,
+                'and so must the student loan interest worksheet\u2019s other-adjustments total')
+            // …and printed line 26 itself, through stage 2, which is the line
+            // 1040 line 10 actually reads.
+            /** @type {(stageOne: ScheduleOnePartIIExceptStudentLoanInterest) => bigint} */
+            const lineTwentySixOf = stageOne => {
+                const partII = scheduleOnePartII(taxParams2025)({
+                    profile: profileCertifiedForHealthInsurance,
+                    status: 'single',
+                    exceptStudentLoanInterest: stageOne,
+                    adjustmentForms: [],
+                    studentLoanInterestForms: [],
+                    totalIncomeLine: totalIncomeOf(5000000n),
+                })
+                return okPartII(partII).line26.value
+            }
+            assertEq(
+                lineTwentySixOf(withPremium) - lineTwentySixOf(without), 960000n,
+                'and printed line 26, the figure 1040 line 10 restates')
+        },
+        // The tag vocabulary and the stored parameter table must name the same
+        // five bands. Two independent lists, compared — a band added to
+        // `fjs/tax/params` with no tag here would be a cap no taxpayer could
+        // reach, and a tag with no band would panic inside `fjs/form7206`
+        // instead of refusing at ingest.
+        theLongTermCareTagsCoverEveryStoredAgeBandExactlyOnce: () => {
+            const stored = taxParams2025.longTermCarePremiumLimits.map(limit => limit.band)
+            assertEq(longTermCareTagBands.length, 5, 'five tags, hand-counted')
+            assertEq(stored.length, 5, 'and five stored bands')
+            for (const [tag, band] of longTermCareTagBands) {
+                assert(stored.includes(band), ['a tag naming a band no parameter stores', tag, band])
+                assert(
+                    adjustmentLineTagNames.includes(tag),
+                    ['every line 17 tag must be in the accepted vocabulary', tag])
+            }
+            for (const band of stored) {
+                assert(
+                    longTermCareTagBands.some(([, named]) => named === band),
+                    ['a stored band no tag can reach', band])
+            }
+        },
+        // ── The five refusals, each with its control ────────────────────────
+        //
+        // R1 — §162(l)(2)(B). The SAME return that computes above, with the
+        // certification removed. The message must name the field that unlocks
+        // it and where the amount would have gone; asserting only that it
+        // refused would pass for any of the other four.
+        theUncertifiedReturnRefusesNamingTheFieldAndTheDestination: () => {
+            const result = refusal(stageOneForHealthInsurance(profileNoDeclaredKinds)(
+                [nonemployeeCompensationDoc('50000.00')])([])([
+                    premiumEntry('selfEmployedHealthInsuranceMedicalDentalVision')('9600.00')(
+                        'taxpayer'),
+                ])(false)(0n))
+            assert(
+                result.message.includes(
+                    'notEligibleForAnySubsidizedEmployerHealthPlanInAnyMonth'),
+                ['the refusal must name the field that unlocks it', result.message])
+            assert(
+                result.message.includes('162(l)(2)(B)'),
+                ['and the provision behind it', result.message])
+            assert(
+                result.message.includes('Schedule 1 line 17 -> line 26 -> 1040 line 10'),
+                ['and WHERE the amount would have gone', result.message])
+        },
+        // R2 — Rev. Proc. 2014-41's circularity. Same certified return, plus a
+        // Form 1095-A.
+        premiumsBesideMarketplaceCoverageRefuseNamingTheCircularity: () => {
+            const result = refusal(stageOneForHealthInsurance(
+                profileCertifiedForHealthInsurance)(
+                [nonemployeeCompensationDoc('50000.00')])([])([
+                    premiumEntry('selfEmployedHealthInsuranceMedicalDentalVision')('9600.00')(
+                        'taxpayer'),
+                ])(true)(0n))
+            assert(
+                result.message.includes('Rev. Proc. 2014-41'),
+                ['the refusal must name the governing guidance', result.message])
+            assert(
+                result.message.includes('1095-A') && result.message.includes('circular'),
+                ['and the document and the shape of the problem', result.message])
+            assert(
+                result.message.includes('Schedule 1 line 17 -> line 26 -> 1040 line 10'),
+                ['and where the amount would have gone', result.message])
+        },
+        // R2b — §911(d)(6), Form 7206 line 12 (TAX-42). Same certified return,
+        // plus a §911 exclusion.
+        premiumsBesideAForeignEarnedIncomeExclusionRefuseNamingTheAttribution: () => {
+            const result = refusal(stageOneForHealthInsurance(
+                profileCertifiedForHealthInsurance)(
+                [nonemployeeCompensationDoc('50000.00')])([])([
+                    premiumEntry('selfEmployedHealthInsuranceMedicalDentalVision')('9600.00')(
+                        'taxpayer'),
+                ])(false)(6000000n))
+            assert(
+                result.message.includes('60000.00'),
+                ['the refusal must name the exclusion', result.message])
+            assert(
+                result.message.includes('Form 7206 line 12'),
+                ['and the printed line it cannot fill in', result.message])
+            assert(
+                result.message.includes('attributable to'),
+                ['and the printed word that is the whole problem', result.message])
+            assert(
+                result.message.includes('§911(d)(6)'),
+                ['and the statute behind it', result.message])
+            assert(
+                result.message.includes('Schedule 1 line 17 -> line 26 -> 1040 line 10'),
+                ['and where the amount would have gone', result.message])
+        },
+        // THE CONTROL for R2b: a §911 exclusion with NO premium entry is an
+        // ordinary expatriate return and must still compute — the whole point
+        // of TAX-42. Without this leaf a refusal that fired on every exclusion
+        // would pass the one above and take the phase's own persona with it.
+        aForeignEarnedIncomeExclusionWithNoPremiumEntryStillComputes: () => {
+            const stageOne = okStageOne(stageOneForHealthInsurance(
+                profileCertifiedForHealthInsurance)(
+                [nonemployeeCompensationDoc('50000.00')])([])([])(false)(6000000n))
+            assertEq(stageOne.line17.value, 0n, 'nothing was claimed, so nothing refuses')
+        },
+        // THE CONTROL for R2: Marketplace coverage with NO premium entry is an
+        // ordinary return and must still compute. Without this leaf a refusal
+        // that fired on every Form 1095-A would pass the one above.
+        marketplaceCoverageWithNoPremiumEntryStillComputes: () => {
+            const stageOne = okStageOne(stageOneForHealthInsurance(
+                profileCertifiedForHealthInsurance)(
+                [nonemployeeCompensationDoc('50000.00')])([])([])(true)(0n))
+            assertEq(stageOne.line17.value, 0n, 'nothing was claimed, so nothing refuses')
+        },
+        // R3 — two sources of self-employment earnings and no fact saying
+        // which trade or business the plan is under. Form 7206's own header
+        // note is what makes this a refusal rather than a sum.
+        twoBusinessesRefuseBecauseNothingSaysWhichOneThePlanIsUnder: () => {
+            const result = refusal(stageOneForHealthInsurance(
+                profileCertifiedForHealthInsurance)(
+                [nonemployeeCompensationDoc('50000.00')])([partnershipK1Doc('80000.00')])([
+                    premiumEntry('selfEmployedHealthInsuranceMedicalDentalVision')('9600.00')(
+                        'taxpayer'),
+                ])(false)(0n))
+            assert(
+                result.message.includes('TWO sources'),
+                ['the refusal must say what is ambiguous', result.message])
+            assert(
+                result.message.includes('Form 7206 line 4')
+                && result.message.includes('line 5'),
+                ['and the two printed lines that disagree', result.message])
+            // The two figures must both be PRINTED, so a reader can see which
+            // pair of businesses the engine could not choose between.
+            assert(
+                result.message.includes('50000.00') && result.message.includes('80000.00'),
+                ['and both amounts', result.message])
+        },
+        // THE CONTROL for R3: each source ALONE computes. A partnership K-1 is
+        // as good a §162(l) business as a Schedule C, and a refusal that fired
+        // on either alone would pass the leaf above.
+        eitherSourceOfSelfEmploymentEarningsAloneComputes: () => {
+            const scheduleC = okStageOne(soleProprietorWithPremiums('50000.00')([
+                premiumEntry('selfEmployedHealthInsuranceMedicalDentalVision')('900.00')(
+                    'taxpayer'),
+            ]))
+            const k1 = okStageOne(stageOneForHealthInsurance(
+                profileCertifiedForHealthInsurance)([])([partnershipK1Doc('80000.00')])([
+                    premiumEntry('selfEmployedHealthInsuranceMedicalDentalVision')('900.00')(
+                        'taxpayer'),
+                ])(false)(0n))
+            assertEq(scheduleC.line17.value, 90000n, '$900.00 off a Schedule C')
+            assertEq(k1.line17.value, 90000n, 'and $900.00 off a partnership K-1')
+        },
+        // R4 — premiums with no self-employment net profit at all. The zero
+        // this engine would otherwise report is right for a taxpayer with no
+        // trade or business and wrong for the two it does not model.
+        premiumsWithNoSelfEmploymentAtAllRefuseRatherThanReportingAZero: () => {
+            const result = refusal(stageOneForHealthInsurance(
+                profileCertifiedForHealthInsurance)([])([])([
+                    premiumEntry('selfEmployedHealthInsuranceMedicalDentalVision')('9600.00')(
+                        'taxpayer'),
+                ])(false)(0n))
+            assert(
+                result.message.includes('S-corporation') && result.message.includes('line 11'),
+                ['the refusal must name the path it cannot compute', result.message])
+            assert(
+                result.message.includes('Rev. Rul. 91-26'),
+                ['and the authority behind it', result.message])
+            assert(
+                result.message.includes('Schedule F'),
+                ['and the other unmodeled trade or business', result.message])
+        },
+        // R5 — one person, two age bands. Form 7206 line 2(b) caps by "the
+        // person's age at the end of the tax year", and one person has one age.
+        twoAgeBandsForOnePersonRefuseNamingBothCaps: () => {
+            const result = refusal(soleProprietorWithPremiums('50000.00')([
+                premiumEntry('selfEmployedLongTermCareAgeFiftyOneToSixty')('1000.00')('taxpayer'),
+                premiumEntry('selfEmployedLongTermCareAgeSixtyOneToSeventy')('1000.00')('taxpayer'),
+            ]))
+            assert(
+                result.message.includes('taxpayer') && result.message.includes('age bands'),
+                ['the refusal must name whose bands disagree', result.message])
+            // The two CAPS are what makes the ambiguity worth refusing, and
+            // printing them is the part a reader can act on.
+            assert(
+                result.message.includes('1800.00') && result.message.includes('4810.00'),
+                ['and both caps the choice would select between', result.message])
+        },
+        // THE CONTROL for R5: two people in two DIFFERENT bands is not a
+        // contradiction, it is the ordinary married couple. Without it, a check
+        // that refused any two distinct bands anywhere would pass the leaf above.
+        twoPeopleInTwoDifferentBandsIsNotAContradiction: () => {
+            const joint = {
+                documentHash: 'profile-hash-7206-joint-b',
+                value: {
+                    ...profileCertifiedForHealthInsurance.value,
+                    filingStatus: 'marriedFilingJointly',
+                },
+            }
+            const stageOne = okStageOne(stageOneForHealthInsurance(joint)(
+                [nonemployeeCompensationDoc('50000.00')])([])([
+                    premiumEntry('selfEmployedLongTermCareAgeFiftyOneToSixty')('5000.00')(
+                        'taxpayer'),
+                    premiumEntry('selfEmployedLongTermCareAgeSixtyOneToSeventy')('5000.00')(
+                        'spouse'),
+                ])(false)(0n))
+            assertEq(stageOne.line17.value, 661000n, '$1,800.00 + $4,810.00 = $6,610.00')
+        },
+        // The tag vocabulary is CLOSED, and a near-miss tag is refused by name
+        // rather than silently contributing nothing to the deduction.
+        aMisspeltPremiumTagIsRefusedByNameRatherThanDropped: () => {
+            const result = refusal(soleProprietorWithPremiums('50000.00')([
+                premiumEntry('selfEmployedHealthInsurance')('9600.00')('taxpayer'),
+            ]))
+            assert(
+                result.message.includes("'selfEmployedHealthInsurance'"),
+                ['the unrecognized tag must be named', result.message])
+            assert(
+                result.message.includes('selfEmployedHealthInsuranceMedicalDentalVision'),
+                ['and the vocabulary must list the one that was meant', result.message])
+        },
+        // A premium paid in the FOLLOWING calendar year belongs on the
+        // following year's return. §162(l) has no designation rule of the kind
+        // §223 and §219(f)(3) have, so none of these six tags is on
+        // `followingYearContributionTags` — asserted here rather than left to
+        // be noticed, because the omission is invisible.
+        aPremiumPaidInTheFollowingYearIsRefused: () => {
+            const result = refusal(soleProprietorWithPremiums('50000.00')([{
+                lineTag: 'selfEmployedHealthInsuranceMedicalDentalVision',
+                datePaid: '2026-01-15',
+                description: 'January premium',
+                amount: '800.00',
+                individual: 'taxpayer',
+            }]))
+            assert(
+                result.message.includes('2026-01-15'),
+                ['the refusal must name the date', result.message])
+            for (const [tag] of longTermCareTagBands) {
+                assert(
+                    !followingYearContributionTags.includes(tag),
+                    ['no §162(l) tag may be designated for the prior year', tag])
+            }
+            assert(!followingYearContributionTags.includes(medicalDentalVisionTag))
+        },
+    },
+
     // ── Part I: unemployment compensation (1099-G box 1), Phase 20 ──────────
 
     /**
@@ -2985,7 +4241,13 @@ export const proof = {
         //   Sch 1 line 5                                      $80,000.00
         //   Sch 1 line 10     (nothing else on Part I)        $80,000.00
         lineFiveIsScheduleELineFortyOneAndReachesLineTen: () => {
-            const withK1 = okPartI(scheduleOnePartI({
+            const withK1 = okPartI(scheduleOnePartI(taxParams2025)({
+                status: 'single',
+                form1040Line7aCents: 0n,
+                form2555Line45Cents: 0n,
+                assetRegisters: [],
+                rentalProperties: [],
+                farmForms: [],
                 profile: profileNoDeclaredKinds,
                 unemploymentForms: [],
                 nonemployeeCompensationForms: [],
@@ -3018,7 +4280,13 @@ export const proof = {
         //   line 5  Schedule E line 41                       $80,000.00
         //   line 10 260.00 + 80,000.00                       $80,260.00
         linesThreeAndFiveAreDistinctAndBothReachTheTotal: () => {
-            const partI = okPartI(scheduleOnePartI({
+            const partI = okPartI(scheduleOnePartI(taxParams2025)({
+                status: 'single',
+                form1040Line7aCents: 0n,
+                form2555Line45Cents: 0n,
+                assetRegisters: [],
+                rentalProperties: [],
+                farmForms: [],
                 profile: profileNoDeclaredKinds,
                 unemploymentForms: [],
                 nonemployeeCompensationForms: [nonemployeeCompensationDoc('350.00')],
@@ -3036,7 +4304,13 @@ export const proof = {
         // swallowed, exactly as Schedule C's does. A LOSS is the refusal most
         // likely to be met in practice.
         aScheduleERefusalPropagatesOutOfPartOne: () => {
-            const result = refusal(scheduleOnePartI({
+            const result = refusal(scheduleOnePartI(taxParams2025)({
+                status: 'single',
+                form1040Line7aCents: 0n,
+                form2555Line45Cents: 0n,
+                assetRegisters: [],
+                rentalProperties: [],
+                farmForms: [],
                 profile: profileNoDeclaredKinds,
                 unemploymentForms: [],
                 nonemployeeCompensationForms: [],
@@ -3142,7 +4416,13 @@ export const proof = {
          *     8,026,000 x 9,235 = 74,120,110,000; / 10,000 = 7,412,011 exactly
          */
         oneProprietorWhoIsAlsoAPartnerAddsBothToLineTwo: () => {
-            const partI = okPartI(scheduleOnePartI({
+            const partI = okPartI(scheduleOnePartI(taxParams2025)({
+                status: 'single',
+                form1040Line7aCents: 0n,
+                form2555Line45Cents: 0n,
+                assetRegisters: [],
+                rentalProperties: [],
+                farmForms: [],
                 profile: profileNoDeclaredKinds,
                 unemploymentForms: [],
                 nonemployeeCompensationForms: [nonemployeeCompensationDoc('350.00')],
@@ -3153,6 +4433,7 @@ export const proof = {
                 estateTrustK1Forms: [],
             }))
             const stageOne = okStageOne(scheduleOnePartIIExceptStudentLoanInterest(taxParams2025)({
+                form2555ExclusionCents: 0n,
                 profile: profileNoDeclaredKinds,
                 interestForms: [],
                 ...noSocialSecurityInteraction,
@@ -3161,6 +4442,7 @@ export const proof = {
                 adjustmentForms: [],
                 w2Forms: [],
                 businessNetProfit: partI.scheduleC.partII.line31,
+                farmNetProfit: partI.scheduleF.line34,
                 businessExpenseForms: [businessDoc([advertisingEntry('90.00')])],
                 passThrough: passThroughOf(partI.scheduleE),
             }))
@@ -4208,7 +5490,13 @@ export const proof = {
         },
         // §219(f)(1)/§401(c)(2) earned income — three missing facts at once.
         selfEmploymentAlongsideAContributionRefuses: () => {
-            const partI = okPartI(scheduleOnePartI({
+            const partI = okPartI(scheduleOnePartI(taxParams2025)({
+                status: 'single',
+                form1040Line7aCents: 0n,
+                form2555Line45Cents: 0n,
+                assetRegisters: [],
+                rentalProperties: [],
+                farmForms: [],
                 profile: profileNoDeclaredKinds,
                 unemploymentForms: [],
                 nonemployeeCompensationForms: [nonemployeeCompensationDoc('40000.00')],
@@ -4219,6 +5507,7 @@ export const proof = {
                 estateTrustK1Forms: [],
             }))
             const result = refusal(scheduleOnePartIIExceptStudentLoanInterest(taxParams2025)({
+                form2555ExclusionCents: 0n,
                 profile: profileNoDeclaredKinds,
                 status: 'single',
                 adjustmentForms: [adjustmentsDoc(
@@ -4228,6 +5517,7 @@ export const proof = {
                 ...noSocialSecurityInteraction,
                 totalIncomeExceptTaxableSocialSecurityLine: noOtherIncomeLine,
                 businessNetProfit: partI.scheduleC.partII.line31,
+                farmNetProfit: partI.scheduleF.line34,
                 businessExpenseForms: [businessDoc([advertisingEntry('1000.00')])],
                 passThrough: noPassThrough,
             }))
@@ -4480,6 +5770,7 @@ export const proof = {
     },
     theTwoAdjustmentTotalsAreSeparateRulesThatHappenToAgree: () => {
         const stageOne = okStageOne(scheduleOnePartIIExceptStudentLoanInterest(taxParams2025)({
+            form2555ExclusionCents: 0n,
             profile: profileNoDeclaredKinds,
             interestForms: [],
             ...noSocialSecurityInteraction,
@@ -4491,7 +5782,8 @@ export const proof = {
                 hsaEntry('700.00')('taxpayer'),
             ])([fullYearCoverage('taxpayer')('selfOnly')])],
             w2Forms: [],
-            businessNetProfit: noBusinessNetProfit(profileNoDeclaredKinds),
+            farmNetProfit: noBusinessNetProfit(profileNoDeclaredKinds),
+        businessNetProfit: noBusinessNetProfit(profileNoDeclaredKinds),
             businessExpenseForms: [],
         }))
         assertEq(socialSecurityWorksheetAdjustmentsTotal(stageOne), 100000n, 'lines 11-20, 23, 25')
@@ -4958,7 +6250,9 @@ export const proof = {
         // still be documented zeros, so a line quietly re-pointed at a
         // document is caught by name. Derived from the printed form, never
         // from the returned object.
-        assertEq(partIILinesStillDocumentedZero.length, 10, 'sixteen Part II lines, less 11/13/14/15/21/26')
+        assertEq(
+            partIILinesStillDocumentedZero.length, 9,
+            'sixteen Part II lines, less 11/13/14/15/17/21/26')
         /** @type {Record<string, ReportLine>} */
         const byName = {
             line12: result.line12,
@@ -4988,6 +6282,10 @@ export const proof = {
         const staged = okPartII(partIIOf(profileNoDeclaredKinds)('single')(adjustmentForms)(
             studentLoanInterestForms)([])(9250000n))
         const composed = scheduleOne(taxParams2025)({
+            form1040Line7aCents: 0n,
+            assetRegisters: [],
+            rentalProperties: [],
+            farmForms: [],
             profile: profileNoDeclaredKinds,
             interestForms: [],
             ...noSocialSecurityInteraction,
@@ -5019,6 +6317,10 @@ export const proof = {
     // than being swallowed by the composition.
     aStageOneRefusalPropagatesThroughTheComposedForm: () => {
         const composed = scheduleOne(taxParams2025)({
+            form1040Line7aCents: 0n,
+            assetRegisters: [],
+            rentalProperties: [],
+            farmForms: [],
             profile: profileNoDeclaredKinds,
             interestForms: [],
             ...noSocialSecurityInteraction,
@@ -5087,11 +6389,186 @@ export const proof = {
         },
     },
 
+    // ── Printed line 8p, and printed Form 461 behind it ────────────────────
+    formFourSixtyOne: {
+        /**
+         * ★ **PRINTED LINE 8p IS ZERO BECAUSE FORM 461 SAID SO**, not because
+         * no sub-line of line 8 is modeled. The empty return computes a whole
+         * Form 461 whose line 16 is the bare threshold, and line 8p cites the
+         * three Schedule 1 lines the aggregate was formed from.
+         */
+        anEmptyReturnComputesFormFourSixtyOneAndLineEightPIsZero: () => {
+            const partI = partIWithoutBusiness(profileNoDeclaredKinds)([])
+            assertEq(partI.line8p.value, 0n, 'no excess business loss')
+            assert(partI.line8p.rule.includes('Form 461 line 16'),
+                ['line 8p must name the form it came from', partI.line8p.rule])
+            assertEq(partI.form461.line14, 0n, 'nothing on lines 1-8')
+            assertEq(partI.form461.line15, 31300000n, 'the single threshold')
+            assertEq(partI.form461.line16, 31300000n)
+            assertEq(partI.form461.filed, false, 'and the form is not filed')
+            assertEq(partI.line9.value, 0n, 'line 9 = the 8a-8z collapse plus 8p')
+        },
+        /**
+         * ★ **1040 LINE 7a REACHES PRINTED FORM 461 LINE 3.** This is the one
+         * wiring on this schedule that nothing else can observe: printed line 3
+         * is added on printed line 9 and removed again on printed lines 10 and
+         * 11, so it cancels to the cent in printed line 14 at every input —
+         * mutating the argument to `0n` leaves the whole suite green. See the
+         * comment at the call site for why it is threaded anyway.
+         *
+         * A $3,000.00 capital LOSS, i461: *"Losses from sales or exchanges of
+         * capital assets are not included in the calculation of the total
+         * deductions from your trades or businesses."*
+         */
+        theCapitalGainOrLossReachesPrintedFormFourSixtyOneLineThree: () => {
+            const partI = okPartI(scheduleOnePartI(taxParams2025)({
+                form2555Line45Cents: 0n,
+                status: 'single',
+                form1040Line7aCents: -300000n,
+                assetRegisters: [],
+                rentalProperties: [],
+                farmForms: [],
+                profile: profileNoDeclaredKinds,
+                unemploymentForms: [],
+                nonemployeeCompensationForms: [],
+                businessExpenseForms: [],
+                w2Forms: [],
+                partnershipK1Forms: [],
+                sCorporationK1Forms: [],
+                estateTrustK1Forms: [],
+            }))
+            assertEq(partI.form461.line3, -300000n, '1040 line 7a, on printed line 3')
+            assertEq(partI.form461.line9, -300000n, 'and into printed line 9')
+            assertEq(partI.form461.line11, 300000n, 'removed on printed line 11, POSITIVE')
+            assertEq(partI.form461.line14, 0n, 'so the trade-or-business net is untouched')
+            // The joint threshold reaches printed line 15 from the STATUS this
+            // schedule hands over, which is the second wiring here.
+            const joint = okPartI(scheduleOnePartI(taxParams2025)({
+                form2555Line45Cents: 0n,
+                status: 'marriedFilingJointly',
+                form1040Line7aCents: 0n,
+                assetRegisters: [],
+                rentalProperties: [],
+                farmForms: [],
+                profile: profileNoDeclaredKinds,
+                unemploymentForms: [],
+                nonemployeeCompensationForms: [],
+                businessExpenseForms: [],
+                w2Forms: [],
+                partnershipK1Forms: [],
+                sCorporationK1Forms: [],
+                estateTrustK1Forms: [],
+            }))
+            assertEq(joint.form461.line15, 62600000n,
+                'a JOINT return reaches printed line 15 with $626,000.00')
+        },
+        /**
+         * ★ **THE TWO PHASES COMPOSE, AND THEY DO NOT TREAT THEIR TWO TERMS
+         * THE SAME.** Form 461 (TAX-40) and Form 4797 (TAX-41) were written on
+         * branches neither of which could see the other, and they meet exactly
+         * here: printed Schedule 1 line 4 is Form 4797 line 18b, and printed
+         * Form 461 line 4 is printed Schedule 1 line 4.
+         *
+         * Three claims, and each is a separate way the composition could have
+         * been wrong:
+         *
+         * 1. **The ORDER.** Line 4 is formed before `form461` is called, and
+         *    Form 461 reads the COMPUTED line rather than the caller's figure —
+         *    which is why the unfiled case below is checked. A wiring that read
+         *    `otherGainsOrLosses.lineEighteenBCents` directly would agree with
+         *    this leaf on every other fixture and disagree on that one.
+         * 2. **Line 4 survives Part II.** No `partTwoAdjustment` arm names it,
+         *    because Form 4797 amounts ARE attributable to a trade or business —
+         *    §1231 property is property used IN one. So it moves printed line 14
+         *    cent for cent, in both directions.
+         * 3. **Line 3 still cancels**, at the same magnitude. That contrast is
+         *    the finding rather than a detail: see the call site's comment for
+         *    why the capital arm was left unconditional even though Form 4797
+         *    has made its stated premise false.
+         */
+        formFourSevenNineSevenLineFourMovesLineFourteenAndLineThreeStillCancels: () => {
+            /** @type {Source} */
+            const registerSource = {
+                documentHash: 'sha256-4797-composed',
+                boxPath: 'assets[0].disposal.grossSalesPrice',
+                value: '50000.00',
+            }
+            /** @type {(filed: boolean) => (cents: bigint) => ScheduleOnePartI} */
+            const withLineFour = filed => cents => okPartI(scheduleOnePartI(taxParams2025)({
+                form2555Line45Cents: 0n,
+                status: 'single',
+                form1040Line7aCents: 0n,
+                otherGainsOrLosses: {
+                    filed,
+                    lineEighteenBCents: cents,
+                    sources: [registerSource],
+                },
+                assetRegisters: [],
+                rentalProperties: [],
+                farmForms: [],
+                profile: profileNoDeclaredKinds,
+                unemploymentForms: [],
+                nonemployeeCompensationForms: [],
+                businessExpenseForms: [],
+                w2Forms: [],
+                partnershipK1Forms: [],
+                sCorporationK1Forms: [],
+                estateTrustK1Forms: [],
+            }))
+            // 1. The order, and the two states `filed` distinguishes.
+            const gain = withLineFour(true)(5000000n)
+            assertEq(gain.line4.value, 5000000n, 'Form 4797 line 18b, on printed Schedule 1 line 4')
+            assertEq(gain.form461.line4, 5000000n, 'and on printed Form 461 line 4')
+            const unfiled = withLineFour(false)(5000000n)
+            assertEq(unfiled.line4.value, 0n, 'no Form 4797 leaves line 4 a declared zero')
+            assertEq(
+                unfiled.form461.line4, 0n,
+                'and Form 461 reads the COMPUTED line 4, never the caller\'s figure')
+            // 2. Part II leaves it alone, so it reaches printed line 14 whole.
+            assertEq(gain.form461.line9, 5000000n, 'printed line 9 combines lines 1 through 8')
+            assertEq(gain.form461.line10, 0n, 'no Part II arm removes a Form 4797 amount')
+            assertEq(gain.form461.line11, 0n)
+            assertEq(gain.form461.line14, 5000000n, 'so it moves the trade-or-business net')
+            const loss = withLineFour(true)(-5000000n)
+            assertEq(loss.form461.line14, -5000000n, 'and an ORDINARY loss moves it the other way')
+            assertEq(
+                loss.form461.line16, 31300000n - 5000000n,
+                'toward the threshold, which is what §461(l) measures')
+            // 3. ★ THE CONTROL: the SAME magnitude on printed line 3 cancels.
+            const capital = okPartI(scheduleOnePartI(taxParams2025)({
+                form2555Line45Cents: 0n,
+                status: 'single',
+                form1040Line7aCents: 5000000n,
+                assetRegisters: [],
+                rentalProperties: [],
+                farmForms: [],
+                profile: profileNoDeclaredKinds,
+                unemploymentForms: [],
+                nonemployeeCompensationForms: [],
+                businessExpenseForms: [],
+                w2Forms: [],
+                partnershipK1Forms: [],
+                sCorporationK1Forms: [],
+                estateTrustK1Forms: [],
+            }))
+            assertEq(capital.form461.line3, 5000000n, '1040 line 7a, on printed line 3')
+            assertEq(capital.form461.line10, 5000000n, 'Part II removes the whole of it')
+            assertEq(
+                capital.form461.line14, 0n,
+                'so the capital term cancels where the Form 4797 term did not')
+            assertEq(capital.form461.line16, 31300000n, 'and the threshold is all that is left')
+        },
+    },
+
     // Every printed line is named -- a hand-typed count-guard so a line
     // silently dropped from `scheduleOne`'s return object is caught (AGENTS.md's
     // "hand-typed count" mutation-gate idiom).
     everyPrintedLineIsNamed: () => {
         const composed = scheduleOne(taxParams2025)({
+            form1040Line7aCents: 0n,
+            assetRegisters: [],
+            rentalProperties: [],
+            farmForms: [],
             profile: profileNoDeclaredKinds,
             interestForms: [],
             ...noSocialSecurityInteraction,
@@ -5109,11 +6586,14 @@ export const proof = {
             totalIncomeLine: totalIncomeOf(0n),
         })
         assert(composed.kind === 'ok', ['expected a computed schedule', composed])
-        const expectedFieldCount = 27
+        // 26 printed lines, plus line 8p -- the one lettered sub-line of the
+        // 8a-8z group that has its own computation (Form 461 line 16, the
+        // §461(l) excess business loss adjustment) -- plus the kind tag.
+        const expectedFieldCount = 28
         assertEq(
             Object.keys(composed).length,
             expectedFieldCount,
-            'expected exactly 26 named Schedule 1 fields plus the kind tag',
+            'expected exactly 26 named Schedule 1 fields, plus line 8p, plus the kind tag',
         )
     },
     // This module computes a schedule, not a stored document -- no

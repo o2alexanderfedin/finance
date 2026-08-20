@@ -66,11 +66,70 @@ Two figures worth knowing, both computed by the engine on real fixtures:
 The engine **refuses rather than guessing** wherever it cannot compute honestly. Each refusal names
 the form or the facts that would supply it.
 
-**The refusal surface is a partition, checked at `tsc`:** every one of **114 income, deduction,
+**The refusal surface is a partition, checked at `tsc`:** every one of **201 income, deduction,
 credit and payment kinds** is either modeled or carries a refusal naming what is missing —
-**38 modeled, 76 refused**, and `_EveryKindIsEitherModeledOrRefused` fails the build if a kind
+**57 modeled, 144 refused**, and `_EveryKindIsEitherModeledOrRefused` fails the build if a kind
 falls in neither. Re-derive with `modeledKinds.length` / `unmodeledKindRefusals.length` in
 `fjs/return/scope`.
+
+The refused half jumped 65 → 143 on 2026-08-18, when the last six coarse kinds — each naming a
+printed line that collapsed many unrelated facts — became 84 per-fact kinds read off the 2025
+printed forms and instructions. **Nothing was reclassified in that change**: the modeled count
+did not move, and a taxpayer who is refused now gets told which document, form or determination
+is missing rather than that a whole lettered block is unmodeled.
+
+It then fell 143 → 142, and the modeled half rose 52 → 53, when Form 7206 made
+`selfEmployedHealthInsuranceDeduction` computable at Schedule 1 line 17. **One kind, moved across
+the partition** — the two moves are independent, so the vocabulary is still the 195 the split
+left.
+
+It fell again, 142 → 141, and the modeled half rose 53 → 54, when Schedule E Part I made
+`rentalRealEstateAndRoyalties` computable at Schedule 1 line 5. **A second single kind moved
+across the same partition**, on the same terms and for the same reason: the wiring landed first
+and the reclassification rode with it. Neither reclassification invented or retired a kind.
+
+Then it rose 141 → 143 and the **vocabulary itself grew, 195 → 197**, when Form 6781 Part I
+wired Form 1099-B box 11 onto Schedule D lines 4 and 11 under §1256(a)(3)'s 60/40 split. This is
+the opposite move from the two above and worth distinguishing: **nothing was reclassified**, and
+the modeled half did not change. The two new kinds — `straddleGainsAndLosses` and
+`netSectionTwelveFiftySixContractsLossCarryback` — name the parts of Form 6781 that remain
+uncomputable (Parts II and III need per-position records no information return carries; the box D
+election needs three prior years' returns), and they exist because §1256 contracts had **no kind
+at all** before that wiring: a futures trader fell through the scope guard entirely. Adding a
+refused kind where there was silence is a gain in honesty, not a loss of coverage. 54 + 143 = 197.
+
+It fell a third time, 143 → 142, and the modeled half rose 54 → 55, when Schedule F made
+`farmIncomeOrLoss` computable at Schedule 1 line 6 — and at Schedule SE line 1a, which is the
+half a reclassification could have skipped while looking complete. **A third single kind moved
+across the same partition**, on the same terms, and 55 + 142 = 197. Its two farm neighbours did
+NOT move: `netFarmRentalIncomeForm4835` is Form 4835, a different printed form for a landowner
+who did not materially participate, and `farmIncomeAveragingScheduleJ` is Schedule J, which
+averages farm income over three preceding years this engine does not hold.
+
+**Schedule F and Form 6781 were written on branches whose common ancestor had a refused half of
+141**, and this paragraph is where reading either branch's own figure would have gone wrong: one
+added two rows
+and reclassified nobody, the other reclassified one row and added none, so the two compose to
+`141 + 2 - 1` and the vocabulary keeps Form 6781's 197 rather than returning to 195. The
+arithmetic is stated rather than transcribed because both branches were internally consistent
+and both were superseded the moment they met.
+
+**TAX-42 is the first SPLIT of a still-refused row, and it moves every figure at once**:
+`197 -> 201` vocabulary, `55 -> 56` modeled, `142 -> 145` refused. `foreignEarnedIncomeForm2555`
+named three printed destinations under one row — 1040 line 16, Schedule 1 line 8d and Schedule 1
+line 24j — on the ground that one form produces them. That was right while nothing was modelled
+and wrong the moment something was, because the three had three unrelated blockers: a filer with
+no housing claim was being refused by a sentence about Notice 2025-16's location table.
+
+It becomes five. `foreignEarnedIncomeExclusion` is MODELED — Form 2555 Parts V, VII and VIII, the
+qualifying-day proration, Schedule 1 line 8d, and §911(f)'s Foreign Earned Income Tax Worksheet at
+1040 line 16. Four refuse, each naming its own blocker:
+`foreignEarnedIncomeBonaFideResidenceTest` (§911(d)(1)(A) turns on intent, which no certification
+can carry), `foreignHousingExclusionOrDeduction` (Notice 2025-16's table has no compact
+derivation, and line 49 needs a prior-year return), `foreignEarnedIncomeReceivedInAnotherTaxYear`
+(a prior-year return again) and `foreignEarnedIncomeCapitalGainExcess` (the worksheet's own
+footnote sends the filer to a second, modified copy of the preferential worksheet). `56 + 145 =
+201`, and `197 - 1 + 5 = 201`.
 
 The conditional refusals — the ones that fire on a taxpayer whose kinds are all modeled:
 
@@ -79,6 +138,10 @@ The conditional refusals — the ones that fire on a taxpayer whose kinds are al
 | A nonqualified Roth distribution (1099-R box 7a code `J` or `T`) | Form 8606 Part III is unbuilt. Part I and **Part II compute**, so a backdoor Roth works. |
 | Qualified disaster distributions (Form 8606 line 15b) | Form 8915-F is unbuilt |
 | A business **loss** | the at-risk determination (Form 6198) needs a multi-year basis history |
+| A farm **loss** | §461(l)'s excess business loss aggregates every trade or business including Form 4797 gains, and §199A(c)(2) carries a negative QBI amount into next year |
+| A farm on the **accrual** method | printed Schedule F line 45's beginning-of-year inventory, and the valuation method the printed footnote to line 49 makes the sign of lines 47-50 depend on |
+| A farm the taxpayer did not **materially participate** in | it is a passive activity, so §1411(c)(1)(A)(ii) makes its income net investment income and Form 8960 line 4b is unbuilt |
+| A farm beside a Schedule C business | Form 8995-A figures its limitations per business and this engine carries one business's W-2 wages and unadjusted basis |
 | A mixed-tax-year document store | 2024 and 2025 W-2s together would silently mis-total |
 | Two businesses, or two K-1s from one entity | netting them is the arithmetic §704(d) exists to stop |
 | Two Schedules SE (both spouses self-employed) | one Schedule SE is computed; two are a phase of their own |
@@ -90,7 +153,7 @@ AMT with capital gains or qualified dividends (Phase 29, `fjs/form6251/part3`), 
 Part II.
 
 **There is also a complementary guard.** Some taxes trigger on a threshold from data already held,
-on a taxpayer who has never heard of the form — so **8 tripwires** refuse when the documents prove
+on a taxpayer who has never heard of the form — so **12 tripwires** refuse when the documents prove
 an obligation was not declared. Without them, a $300,000 W-2 understated tax by ~$900, silently.
 A tripwire that always fires is not a tripwire; each one is proven to stay quiet on a return that
 does not owe the thing.
@@ -99,7 +162,7 @@ does not owe the thing.
 
 ## The measured surface
 
-**13 tools** · protocol `2025-11-25` · server `finance-mcp 1.0.0` · **27 document dialects**
+**13 tools** · protocol `2025-11-25` · server `finance-mcp 1.0.0` · **30 document dialects**
 
 | Group | Tools |
 |---|---|
@@ -120,15 +183,19 @@ surface. **Only 2025 exists** — `finance_tax_params` with any other year refus
 
 ## Health
 
-- `npm test`: **2253 / 2253**, exit 0 (`tsc` runs first and is clean). **Wall clock is 5-31s and
+- `npm test`: **3241 / 3241**, exit 0 (`tsc` runs first and is clean). **Wall clock is 5-31s and
   is not a stable figure** — measured 31s, 4.9s, 12.5s and 11.9s across four runs on 2026-08-17
   with no code change between them. It is dominated by three tests that spawn real `node`
   subprocesses (`EXEC-14/PROV-09` alone ranged 3.5s-29.3s), so it tracks machine load, not the
-  suite. The 2220 proof leaves are milliseconds each. Was 2242
-  before the two standing gates below were added.
-- **2220 project-local proof leaves** — the only stable count:
+  suite. The 3196 proof leaves are milliseconds each. This pair read 2253/2220 until
+  2026-08-19, then 2902/2863 — figures from before the Tier-B forms landed, and stale on
+  `develop` and on every feature branch alike, which is what an ungated number does. **They were
+  still 2902/2863 on BOTH parents of this integration**: Form 461, Form 4797 and Form 2555 each
+  added leaves and none of the three touched this block, which is the same failure the line
+  above describes and a reason to read it as a measurement rather than a fact.
+- **3196 project-local proof leaves** — the only stable count:
   `npm test 2>&1 | grep -c '^✔ import("./fjs/'`
-- Requirements: **120 defined, 120 complete, 0 open**
+- Requirements: **127 defined, 127 complete, 0 open**
 
 **Two standing gates now compare the documents to the code**, because this file had been wrong
 about the version, the dialect count, the test total and four separate refusals at once:
@@ -148,18 +215,27 @@ pinned to `node --test *.test.js` and why earlier versions of this file reported
 
 ## Known gaps
 
-Nothing here is an open requirement, and **nothing left open is fixable in this repository.**
-`fjs/todo/` holds five files. Three are satisfied specs kept in their original present tense, each
-with a corrected status line on top — deleting them would lose the ability to check a spec against
-the thing that satisfied it. The other two are upstream, and both are filed upstream:
+Nothing here is an open requirement. `fjs/todo/` holds **seven** files. Three are satisfied specs
+kept in their original present tense, each with a corrected status line on top — deleting them
+would lose the ability to check a spec against the thing that satisfied it. Two are upstream, and
+both are filed upstream. **Two are this repository's own, and both are sized rather than open
+questions** — this section said "nothing left open is fixable in this repository" while `develop`
+carried five files, and the Tier-B forms brought two more with them:
 
-1. **`upstream-node-spawn-effect.md`** — `fjs/effects/node` has an `Exec` effect but no long-lived
+1. **`tax-return-report-source-route-lines-unexercised.md`** — eight of the stored program's
+   twenty-eight route lines are EXECUTED against the real stored bytes; twenty are covered by a
+   `String.includes` of the dialect tag, which cannot see a line that is present and wrong. The
+   note carries the recipe and the measured cost per remaining line.
+2. **`stored-but-unread-field-sweep.md`** — the standing gate over the stored-but-unread money
+   box: `fjs/document/unread_registry` names every field a document stores and no form reads,
+   and the note carries the partition.
+3. **`upstream-node-spawn-effect.md`** — `fjs/effects/node` has an `Exec` effect but no long-lived
    `Spawn`. 0.46's error channel makes the shape expressible (`CreateServer`/`Listen` already thread
    an opaque `Nominal` host handle, which is the precedent), so the old "wait for a second caller"
    deferral is retired. Filed as `functionalscript#1649`. The note's own sketch does not type-check
    at 0.46.1 — every operation must return a `Result` — and the corrected five-operation design is
    in the issue.
-2. **`upstream-cas-get-uri-discloses-host-path.md`** — `cas_get` puts the blob's **absolute host
+4. **`upstream-cas-get-uri-discloses-host-path.md`** — `cas_get` puts the blob's **absolute host
    path** in its `uri` field, unconditionally: one call reveals the home directory, the account name
    and the store layout. Verified by execution. A design decision on a public protocol surface, so
    it is filed as `functionalscript#1650` and left to the maintainer. Latent rather than live —

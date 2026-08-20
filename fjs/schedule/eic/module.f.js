@@ -40,7 +40,7 @@
  * | Printed input | This engine |
  * |---|---|
  * | Step 5 line 1 — 1040 line 1z | LIVE. Equals line 1a, since `householdEmployeeWages` through `nontaxableCombatPayElection` (lines 1b-1i) are all `fjs/return/scope` refusals |
- * | Step 5 line 2 — Medicaid waiver payments on Schedule 1 line 8s | zero: `otherIncome` refuses, and so does `medicaidWaiverPayments` |
+ * | Step 5 line 2 — Medicaid waiver payments on Schedule 1 line 8s | zero: `medicaidWaiverPayments` refuses, and as of the 2026-08-18 split its refusal row names Schedule 1 line 8s outright rather than a coarse `otherIncome` naming the whole block |
  * | Step 5 line 4 — nontaxable combat pay elected in | zero: `nontaxableCombatPayElection` refuses |
  * | Worksheet B line 1a — Schedule SE Part I line 3 | LIVE |
  * | Worksheet B line 1b — Schedule SE lines 4b and 5a | zero: `selfEmploymentOptionalMethods` and `churchEmployeeIncome` refuse |
@@ -122,31 +122,36 @@
  * | 1 — 1040 line 2b | (A) interest includible in gross income | COMPUTED, 1099-INT boxes 1 and 3 |
  * | 2 — 1040 line 2a, plus Form 8814 line 1b | (B) tax-exempt interest | COMPUTED, 1099-INT box 8. Form 8814 is `form8814ChildInterestAndDividends`, a scope refusal |
  * | 3 — 1040 line 3b | (A) dividends includible in gross income | COMPUTED, 1099-DIV box 1a |
- * | 4 — Schedule 1 line 8z from Form 8814 | (A) | zero: `otherIncome` refuses, and so does Form 8814 |
- * | 5-7 — 1040 line 7a floored at zero, less Form 4797 line 7 | (D) capital gain net income, §1222(9) | COMPUTED, floored. Form 4797 is `otherGainsOrLosses`, a scope refusal |
+ * | 4 — Schedule 1 line 8z from Form 8814 | (A) | zero: `otherIncomeNotListed` (line 8z's residual kind, 2026-08-18) refuses, and so does Form 8814 |
+ * | 5-7 — 1040 line 7a floored at zero, less Form 4797 line 7 | (D) capital gain net income, §1222(9) | COMPUTED, floored, and the SUBTRACTION is live as of TAX-41: `otherGainsOrLosses` is modeled and `fjs/form4797`'s §1231 gain arrives on 1040 line 7a through Schedule D line 11 |
  * | 8-10 — Schedule E line 23b royalties, less line 20 | (C) net rent and royalty | see {@link rentAndRoyaltyRefusal} |
  * | 11-13 — passive income less passive losses | (E) net passive income | COMPUTED, see {@link disqualifiedPassiveIncomeCents} |
  *
- * **(C), net rent and royalty income, is the one that REFUSES.** Two gates
- * make a non-zero (C) unreachable through a whole report, and this module
- * refuses on the first of them by name rather than relying on either:
+ * **(C), net rent and royalty income, is the one that REFUSES**, and
+ * {@link rentAndRoyaltyRefusal} is now the ONLY gate rather than the second of
+ * two. That correction is worth writing down rather than quietly editing:
  *
- * - A profile DECLARING `rentalRealEstateAndRoyalties` (Schedule E Part I,
- *   which is where printed line 23b lives), `remicResidualInterest` or
- *   `netFarmRentalIncomeForm4835` is refused whole by `fjs/return/scope`
- *   before any line is computed. {@link rentAndRoyaltyRefusal} says the same
- *   thing one layer in, so a direct caller of this module gets a §32 answer
- *   rather than silence.
- * - A stored Schedule K-1 carrying rent or a royalty is refused at DOCUMENT
- *   VALIDATION: `vnd.fjs.k1_1065`'s `unmodeledMoneyBoxes` refuses a non-zero
- *   `box2NetRentalRealEstateIncome` and `box7Royalties`, `vnd.fjs.k1_1120s`
- *   its `box2NetRentalRealEstateIncome` and `box6Royalties`, and
- *   `vnd.fjs.k1_1041` its `box7NetRentalRealEstateIncome` and
- *   `box8OtherRentalIncome`. So the amount cannot enter through a document
- *   either.
+ * - Until printed Schedule E Part I shipped, a profile declaring
+ *   `rentalRealEstateAndRoyalties` was refused whole by `fjs/return/scope`
+ *   before any line was computed, and this refusal was described here as the
+ *   belt to that brace. **The kind is MODELED now** — `fjs/schedule/e/part_i`
+ *   computes a profitable rental and a royalty — so a return declaring it
+ *   reaches this module, and {@link rentAndRoyaltyRefusal} is what stops the
+ *   earned income credit being computed against a §32(i)(2)(C) component this
+ *   engine cannot form. The refusal is DELIBERATELY left standing in the same
+ *   change that built two of its three inputs: printed lines 23b and 20 now
+ *   exist, and the §32 worksheet's *net rent* is neither of them and is not
+ *   printed line 26 either.
+ * - A stored Schedule K-1 carrying rent or a royalty is still refused at
+ *   DOCUMENT VALIDATION: `vnd.fjs.k1_1065`'s `unmodeledMoneyBoxes` refuses a
+ *   non-zero `box2NetRentalRealEstateIncome` and `box7Royalties`,
+ *   `vnd.fjs.k1_1120s` its `box2NetRentalRealEstateIncome` and
+ *   `box6Royalties`, and `vnd.fjs.k1_1041` its `box7NetRentalRealEstateIncome`
+ *   and `box8OtherRentalIncome`. So a K-1's rent cannot enter through a
+ *   document either.
  *
- * What remains outside both gates is a taxpayer with rent who declares
- * nothing and stores nothing — which is TAX-16's boundary, the reason
+ * What remains outside both is a taxpayer with rent who declares nothing and
+ * stores nothing — which is TAX-16's boundary, the reason
  * `vnd.fjs.return_profile` exists at all, and not a §32 question.
  *
  * **(E), net passive income, is COMPUTED and is not assumed to be zero.**
@@ -192,9 +197,32 @@
  * nobody can review — and because §32(c)(3) has nine clauses and this file
  * checks eight.
  *
- * §32(c)(1)(C)'s Form 2555 exclusion needs no check here:
- * `foreignEarnedIncomeForm2555` is already an `fjs/return/scope` refusal, so
- * a filer claiming §911 cannot reach this module.
+ * ## §32(c)(1)(C)'s Form 2555 bar is a real check now (TAX-42)
+ *
+ * This paragraph read *"needs no check here: `foreignEarnedIncomeForm2555` is
+ * already an `fjs/return/scope` refusal, so a filer claiming §911 cannot reach
+ * this module"* until TAX-42 made the exclusion computable. **That premise is
+ * now false**, and the statute is checked instead:
+ *
+ * > §32(c)(1)(C), *Exception for individual claiming benefits under section
+ * > 911*: *"The term 'eligible individual' does not include any individual who
+ * > claims the benefits of section 911 (relating to citizens or residents
+ * > living abroad) for the taxable year."*
+ *
+ * **The statute disqualifies the PERSON, not the credit**, and that is why
+ * this reads the exclusion rather than a declared kind: "claims the benefits
+ * of section 911" is an act, and a stored Form 2555 that excludes nothing is
+ * not one.
+ *
+ * i2555 p3 repeats it flatly: *"You can't take the earned income credit if you
+ * claim either of the exclusions or the housing deduction."*
+ *
+ * **It is a DETERMINATION, not a refusal**, and that distinction is the whole
+ * reason it belongs in the denial block rather than beside the four refusals
+ * above. §32 answers zero — exactly, and for a stated reason — rather than
+ * this engine being unable to tell. Refusing here would send a filer who is
+ * simply not entitled to the credit off to find a document that does not
+ * exist.
  *
  * @module
  */
@@ -263,7 +291,9 @@ import { taxParamsByYear } from '../../tax/params/module.f.js'
  *   readonly line2bCents: bigint,
  *   readonly line3bCents: bigint,
  *   readonly line7aCents: bigint,
+ *   readonly formFortySevenNinetySevenGainCents: bigint,
  *   readonly disqualifiedPassiveIncomeCents: bigint,
+ *   readonly form2555ExclusionCents: bigint,
  * }} EarnedIncomeCreditInput
  */
 
@@ -320,22 +350,30 @@ const rentAndRoyaltyKinds = [
  * §32(i)(2)(C)'s refusal — the one disqualified-income component that is not
  * computable, named for what is missing rather than for the schedule.
  *
- * Reached by a DIRECT caller of this module. Through a whole report
- * `fjs/return/scope` refuses these three kinds first, which is why this
- * refusal is checked rather than assumed: a component that is silently zero
+ * `fjs/return/scope` used to refuse all three kinds before a report reached
+ * this module, and this refusal was written as the check that would survive
+ * that upstream refusal being lifted. **It has been**, for
+ * `rentalRealEstateAndRoyalties`, and this function is now the only thing
+ * standing between a landlord and an earned income credit computed against a
+ * disqualified-income component that does not exist. Written down as evidence
+ * that the reasoning was worth the trouble: "a component that is silently zero
  * because something upstream happens to refuse is a component nobody can see
- * go wrong when the upstream refusal is lifted.
+ * go wrong when the upstream refusal is lifted".
  * @type {(kind: string) => EarnedIncomeCreditRefusal}
  */
 export const rentAndRoyaltyRefusal = kind => ({
     kind: 'error',
     message: `1040 line 27a: the return declares ${kind}, so §32(i)(2)(C) — the excess of gross `
         + 'income from rents or royalties not derived in the ordinary course of a trade or '
-        + 'business over the deductions allocable to it — is not computable. That figure comes '
-        + 'off Schedule E Part I lines 4, 20 and 23b, which this engine does not model, and '
-        + '§32(i)(1) denies the earned income credit OUTRIGHT above $11,950 of disqualified '
-        + 'income. Refusing rather than under-approximating the disqualifier and granting the '
-        + 'credit to someone ineligible',
+        + 'business over the deductions allocable to it — is not computable. Printed Schedule E '
+        + 'Part I lines 4, 20 and 23b now COMPUTE (fjs/schedule/e/part_i), and this component '
+        + 'is still not one of them: the §32 worksheet asks for the NET rent as well as the '
+        + 'royalty, and "not derived in the ordinary course of a trade or business" is a '
+        + 'determination about each property that no line of Part I makes — printed line 26 is '
+        + 'the whole of Part I, trade-or-business rents included, and is not the figure §32 '
+        + 'wants. §32(i)(1) denies the earned income credit OUTRIGHT above $11,950 of '
+        + 'disqualified income, so refusing beats under-approximating the disqualifier and '
+        + 'granting the credit to someone ineligible',
 })
 
 /**
@@ -529,14 +567,43 @@ export const earnedIncomeCreditEarnedIncome = input =>
  * the gains ... over the losses"*, and a net loss is no excess. 1040 line 7a
  * genuinely can be negative — Schedule D allows a $3,000 capital loss
  * deduction — so this floor is a live branch rather than a defensive one.
+ *
+ * **Line 6 SUBTRACTS the Form 4797 gain, and that line stopped being a
+ * documented zero with TAX-41.** Publication 596 Worksheet 1, line 6: *"Enter
+ * any gain from Form 4797, line 7. If the amount on that line is a loss, enter
+ * -0-. (But, if you completed lines 8 and 9 of Form 4797, enter the amount from
+ * line 9 instead.)"*, and line 7: *"Subtract line 6 of this worksheet from line
+ * 5 of this worksheet. (If the result is less than zero, enter -0-.)"*
+ *
+ * The subtraction is what keeps a §1231 gain OUT of disqualified income: it is
+ * business gain, not investment income, and it arrives on 1040 line 7a through
+ * Schedule D line 11 exactly as a stock sale does. Omitting it OVERSTATES the
+ * disqualifier and denies the credit to a working parent who sold a machine —
+ * the direction that costs a taxpayer money, on the one credit in this engine
+ * whose whole purpose is to reach low-income filers.
+ *
+ * The parenthetical about line 9 needs no branch here: `fjs/form4797` line 8 is
+ * a structural zero in every return this engine computes, so its line 9 equals
+ * its line 7 whenever line 7 is a gain, and `longTermCapitalGainCents` — which
+ * is what this input carries — is already `0n` when line 7 is a loss. Both
+ * floors are therefore satisfied by the caller, and the `max` below is written
+ * anyway because this function's contract is the printed line, not its caller's
+ * habits.
  * @type {(input: EarnedIncomeCreditInput) => bigint}
  */
-export const earnedIncomeCreditInvestmentIncome = input =>
-    input.line2bCents
-    + input.line2aCents
-    + input.line3bCents
-    + (input.line7aCents > 0n ? input.line7aCents : 0n)
-    + input.disqualifiedPassiveIncomeCents
+export const earnedIncomeCreditInvestmentIncome = input => {
+    // Worksheet 1 lines 5, 6 and 7, in printed order.
+    const line5 = input.line7aCents > 0n ? input.line7aCents : 0n
+    const line6 = input.formFortySevenNinetySevenGainCents > 0n
+        ? input.formFortySevenNinetySevenGainCents
+        : 0n
+    const line7 = line5 - line6 > 0n ? line5 - line6 : 0n
+    return input.line2bCents
+        + input.line2aCents
+        + input.line3bCents
+        + line7
+        + input.disqualifiedPassiveIncomeCents
+}
 
 // ── §32(c)(3) the qualifying-child test ──────────────────────────────────────
 
@@ -652,7 +719,7 @@ export const earnedIncomeCreditTierFor = count =>
  * @type {(taxParamSet: TaxParamSet) => (input: EarnedIncomeCreditInput) => EarnedIncomeCreditOutcome}
  */
 export const earnedIncomeCredit = taxParamSet => input => {
-    const { profile } = input
+    const { profile, form2555ExclusionCents } = input
     const params = taxParamSet.earnedIncomeCredit
     // Step 1 — §32(d)(1), and §32(c)(1)(D) through line 12c.
     if (profile.filingStatus === 'marriedFilingSeparately') {
@@ -724,8 +791,16 @@ export const earnedIncomeCredit = taxParamSet => input => {
     // Every DETERMINATION that denies the credit lands here, as a computed
     // zero. §32(i)(1) is checked before the table because it denies the credit
     // outright rather than reducing it.
+    //
+    // **§32(c)(1)(C) joined this list in TAX-42** — see this module's own
+    // docstring. It reads the EXCLUSION, not a declared kind: a stored Form
+    // 2555 that excludes nothing (no qualifying days, or no foreign earned
+    // income) is not a filer who "claims the benefits of section 911", and
+    // barring that filer's credit would be a wrong answer costing up to
+    // $8,046.
     if (
-        filerSsn !== 'validForEmployment'
+        form2555ExclusionCents !== 0n
+        || filerSsn !== 'validForEmployment'
         || (joint && spouseSsn !== 'validForEmployment')
         || otherTaxpayersChild !== 'isNotAnotherTaxpayersQualifyingChild'
         || investmentIncomeCents > centsFromString(params.investmentIncomeLimit.amount)
@@ -884,7 +959,9 @@ const wageEarner = profile => wagesCents => ({
     scheduleSeLine13Cents: 0n,
     adjustedGrossIncomeCents: wagesCents,
     line2aCents: 0n, line2bCents: 0n, line3bCents: 0n, line7aCents: 0n,
+    formFortySevenNinetySevenGainCents: 0n,
     disqualifiedPassiveIncomeCents: 0n,
+    form2555ExclusionCents: 0n,
 })
 
 /** The computed credit, or a throw naming the refusal that was not expected.
@@ -906,6 +983,39 @@ const refusalOf = input => {
 }
 
 export const proof = {
+    // ── §32(c)(1)(C), the Form 2555 bar (TAX-42) ────────────────────────────
+    //
+    // "The term 'eligible individual' does not include any individual who
+    // claims the benefits of section 911." A DETERMINATION, so the credit is a
+    // computed $0.00 rather than a refusal — and the fixture is a filer who
+    // would otherwise take a real credit, so the leaf measures the bar rather
+    // than a coincidence.
+    sectionThirtyTwoFormTwoFiveFiveFiveBar: {
+        anElectionToExcludeUnderSectionNineOneOneDeniesTheCredit: () => {
+            const base = wageEarner(oneChildProfile)(2000000n)
+            assert(creditOf(base) > 0n, ['the control must take a real credit', creditOf(base)])
+            assertEq(
+                creditOf({ ...base, form2555ExclusionCents: 13000000n }), 0n,
+                '§32(c)(1)(C) makes the filer not an eligible individual at all')
+        },
+        // THE CONTROL that matters more than the one above: a STORED Form 2555
+        // that excludes NOTHING is not an election to exclude "any amount", so
+        // the credit survives. Reading a declared kind instead of the amount
+        // would cost this filer up to $8,046.
+        aStoredFormThatExcludesNothingIsNotAnElection: () => {
+            const base = wageEarner(oneChildProfile)(2000000n)
+            assertEq(
+                creditOf({ ...base, form2555ExclusionCents: 0n }), creditOf(base),
+                'a zero exclusion changes nothing')
+        },
+        // ONE CENT of exclusion is still claiming the benefits of §911. Paired
+        // with the leaf above, this is what pins `!== 0n` rather than a
+        // threshold the statute does not have.
+        oneCentOfExclusionIsStillAnyAmount: () => {
+            const base = wageEarner(oneChildProfile)(2000000n)
+            assertEq(creditOf({ ...base, form2555ExclusionCents: 1n }), 0n)
+        },
+    },
     // ── The table rule, at the discontinuities it actually has ──────────────
     //
     // Every expected figure below is hand-derived from §32(a) and Rev. Proc.
@@ -1124,6 +1234,92 @@ export const proof = {
     },
     // ── §32(i), the disqualified-income test ────────────────────────────────
     investmentIncome: {
+        /**
+         * ★ **WORKSHEET 1 LINE 6 SUBTRACTS THE FORM 4797 GAIN**, and it became
+         * live with TAX-41 — printed Form 4797 line 7's §1231 gain arrives on
+         * 1040 line 7a through Schedule D line 11 exactly as a stock sale does,
+         * and it is NOT investment income.
+         *
+         * Publication 596 Worksheet 1, line 6: *"Enter any gain from Form 4797,
+         * line 7. If the amount on that line is a loss, enter -0-."* Line 7:
+         * *"Subtract line 6 of this worksheet from line 5 of this worksheet.
+         * (If the result is less than zero, enter -0-.)"*
+         *
+         * $11,950.00 is the TY2025 limit and §32(i)(1) denies the credit only
+         * when the aggregate *"exceeds"* it, so these three cases sit one cent
+         * apart around it on purpose:
+         *
+         * ```
+         *   line 7a          $11,950.01     worksheet line 5   1,195,001
+         *   Form 4797 line 7 $     0.01     worksheet line 6           1
+         *   worksheet line 7                                   1,195,000  <- allowed
+         * ```
+         *
+         * Without the subtraction the same filer is at $11,950.01 and loses
+         * the whole credit. **That is the direction that costs a taxpayer
+         * money**, on the one credit in this engine whose whole purpose is to
+         * reach low-income filers.
+         */
+        theFormFortySevenNinetySevenGainIsSubtracted: () => {
+            const base = wageEarner(oneChildProfile)(1000000n)
+            // THE CONTROL FIRST: $11,950.01 of capital gain net income with no
+            // Form 4797 exceeds the limit and denies the credit.
+            assertEq(creditOf({ ...base, line7aCents: 1195001n }), 0n)
+            // One cent of it is a §1231 gain, so worksheet line 7 is
+            // $11,950.00 and the credit stands.
+            assertEq(
+                creditOf({
+                    ...base, line7aCents: 1195001n, formFortySevenNinetySevenGainCents: 1n,
+                }),
+                340900n,
+                'the §1231 cent comes out, and the aggregate no longer exceeds the limit')
+            // And a cent LESS of §1231 gain leaves it over the limit again —
+            // so this pair is about the subtraction rather than about the
+            // presence of a Form 4797.
+            assertEq(
+                creditOf({
+                    ...base, line7aCents: 1195002n, formFortySevenNinetySevenGainCents: 1n,
+                }),
+                0n)
+        },
+        /**
+         * Worksheet 1 line 7's own floor: *"If the result is less than zero,
+         * enter -0-."* A §1231 gain LARGER than 1040 line 7a is ordinary — a
+         * capital loss elsewhere on Schedule D can net line 7a below the
+         * §1231 gain that fed it — and the difference must not become a
+         * NEGATIVE component that lets other investment income in under the
+         * limit.
+         *
+         * $11,950.01 of tax-exempt interest alone denies the credit; adding a
+         * line 7a of $1.00 against a Form 4797 gain of $100.00 must not
+         * rescue it by contributing $-99.00.
+         */
+        theCapitalGainComponentFloorsAtZeroRatherThanGoingNegative: () => {
+            const base = { ...wageEarner(oneChildProfile)(1000000n), line2bCents: 1195001n }
+            assertEq(creditOf(base), 0n, 'the control: over the limit on interest alone')
+            assertEq(
+                creditOf({
+                    ...base, line7aCents: 100n, formFortySevenNinetySevenGainCents: 10000n,
+                }),
+                0n,
+                'a $-99.00 component would have brought it back under')
+        },
+        /**
+         * A §1231 LOSS contributes nothing, in either direction. Printed Form
+         * 4797 line 7 as a loss reaches Schedule 1 line 4 rather than Schedule
+         * D, so it is never inside 1040 line 7a — and the worksheet's own
+         * *"If the amount on that line is a loss, enter -0-"* is what stops it
+         * being subtracted anyway. The caller already floors it, and this leaf
+         * pins the function's own contract rather than the caller's habits.
+         */
+        aSectionTwelveThirtyOneLossIsNotSubtracted: () => {
+            const base = { ...wageEarner(oneChildProfile)(1000000n), line7aCents: 1195000n }
+            assertEq(creditOf(base), 340900n, 'exactly at the limit, allowed')
+            assertEq(
+                creditOf({ ...base, formFortySevenNinetySevenGainCents: -500000n }),
+                340900n,
+                'a negative line 6 must not INCREASE the aggregate')
+        },
         // $11,950 exactly is ALLOWED -- §32(i)(1) denies the credit only when
         // the aggregate "exceeds" the limit -- and one cent more is not.
         limitIsExclusiveToTheCent: () => {
@@ -1195,6 +1391,11 @@ export const proof = {
         // §32(i)(2)(C) refuses by name, for each of the three declarable kinds
         // that could carry rent or royalty income.
         rentAndRoyaltyRefusesByName: () => {
+            // `rentalRealEstateAndRoyalties` is a MODELED kind now, so this
+            // loop is the whole of what stops the earned income credit being
+            // computed for a landlord — `fjs/return/scope` no longer refuses
+            // it first, and this leaf is therefore load-bearing in a way it
+            // was not when it was written.
             for (const kind of ['rentalRealEstateAndRoyalties', 'remicResidualInterest', 'netFarmRentalIncomeForm4835']) {
                 const message = refusalOf(wageEarner({
                     ...oneChildProfile, declaredKinds: ['wages', 'earnedIncomeCredit', kind],
