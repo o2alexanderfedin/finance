@@ -261,10 +261,26 @@ require it**, and adds the thing nobody had noticed was missing: **there is no o
 actually file.** The engine returns `{ value, rule, sources }` — numbers with citations. There is
 no filled 1040, no PDF, no e-file.
 
-- [ ] **Phase 33: External Validation Without a Filed Return** - Run TaxCalcBench's 51 public
-      cases, which ship expected outputs. Record per case: matched, refused (and by which named
-      refusal), or diverged. **A divergence is a bug; a refusal is not.** This is the only
-      substitute for criterion 1 that needs nothing from the taxpayer.
+- [x] **Phase 33: External Validation Without a Filed Return** — **COMPLETE 2026-08-19.** All 51
+      of TaxCalcBench's public cases classified against its own 20 graded 1040 lines, under its
+      own *strict* criterion (all twenty must agree): **22 matched, 19 refused, 7 diverged, 3
+      unrunnable**. Full report `.planning/reports/taxcalcbench-33.md`. **A divergence is a bug;
+      a refusal is not**, and the seven diverge for only two reasons. One is a genuine defect
+      here — `fjs/form8959` computes Part V for filers not required to file Form 8959 at all, so
+      ordinary per-pay-period rounding in Form W-2 box 6 becomes a phantom $1 credit on 1040 line
+      25c — root-caused, worth $1, and **specced rather than fixed** because the correct gate
+      needs §3102(f)(1)'s flat $200,000 stored as its own parameter, which is a `TaxParamSet`
+      change AGENTS.md wants a spec for first: `fjs/todo/tax-form8959-part-v-who-must-file.md`.
+      The other is **the benchmark's** error — it applies §152(c)(1)(D)'s support test to an EIC
+      qualifying child, which §32(c)(3)(A) removes by name. A third difference ($1 on line 24) is
+      this project's deliberate `round(sum)` convention, which i1040gi p23 reads in favour of.
+      **The first result was a refusal and it was the right one**: `ty24` is Tax Year 2024, and
+      `vnd.fjs.return_profile` refused all 51 at the door with *"no stored tax parameters for
+      taxYear 2024"* — so the harness carries a hand-transcribed TY2024 set (22 members
+      overridden, 16 statutory or verified-identical), which is the standing suspect in every
+      number and is NOT part of the engine. **Fifteen of the nineteen refusals are Schedule C**,
+      which is where this engine's real-world coverage stops and it stops loudly. No `.f.js` file
+      changed; suite unmoved at 3241/3241 and 3196 leaves.
 - [ ] **Phase 34: Second-Implementation Cross-Check** - Run the owner's own documents through a
       free commercial filer (FreeTaxUSA / IRS Free File) and through this engine, and diff line by
       line. Two independent implementations agreeing is what a prior-year return was standing in
