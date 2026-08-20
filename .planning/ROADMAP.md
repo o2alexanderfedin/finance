@@ -289,7 +289,17 @@ no filled 1040, no PDF, no e-file.
       free commercial filer (FreeTaxUSA / IRS Free File) and through this engine, and diff line by
       line. Two independent implementations agreeing is what a prior-year return was standing in
       for.
-- [ ] **Phase 35: A Filable Artifact** - Render the computed return onto the printed Form 1040
+- [ ] **Phase 35: A Filable Artifact** — **SCOPE CORRECTED BY THE OWNER 2026-08-19, and the CSS half is done.**
+      A printable face ships at `demo/form1040.html`, and checking it against the fetched `f1040.pdf`
+      found four real transcription errors including a checkbox block off by one for its entire
+      length. **But the owner's point stands: the IRS will not accept a CSS re-creation**, so print
+      fidelity buys comprehension, not filing, and is explicitly NOT worth chasing to the millimetre.
+      **The real filable artifact is the official `f1040.pdf` itself, which is a fillable AcroForm** —
+      verified by decompressing it: 199 widgets, 126 text fields, 73 checkboxes, no XFA. Filling
+      those fields yields a form the IRS accepts on paper, with their layout and their labels, and
+      deletes the entire transcription-risk class this phase just paid for. **It needs PDF-writing,
+      which is a new dependency, which needs every owner's approval** (AGENTS.md) — so the decision
+      is open, not the implementation. Original text:
       layout, faithful enough to transcribe from or to hand to a preparer. **E-file is out of
       scope**: IRS MeF requires provider authorization no personal project obtains.
 - [ ] **Phase 36: The Conversational Path** - Documents into chat, "what do I owe for 2025?",
@@ -1134,7 +1144,7 @@ is deferred, so three phases remain, and two reasons override the numeric defaul
 | 30. Pass-Through Income | v2 | 0/0 — no plans were written | Complete (DOC-24 and Schedule E Part II here; **TAX-35 closed 2026-08-17** — Part III via `vnd.fjs.k1_1041`, and sixteen K-1 boxes routed across three faces) | 2026-08-16 · PR #80 `0df734d` |
 | 31. Gap Closure — 8995-A, 8606 Part II, OCR island | v2 | 0/0 — no plans were written | Complete (TAX-32, TAX-29, MAINT-01) | 2026-08-17 |
 | 32. Gap Closure — Earned Income Credit | v2 | 0/0 — no plans were written | Complete (TAX-27) | 2026-08-17 |
-| 33. External Validation Without a Filed Return | v3 | 0/TBD | Not started | - |
+| 33. External Validation Without a Filed Return | v3 | 0/0 — no plans written | Complete; 27/20/2, one defect fixed | 2026-08-19 · PR #113 |
 | 34. Second-Implementation Cross-Check | v3 | 0/TBD | Not started | - |
 | 35. A Filable Artifact | v3 | 0/TBD | Not started | - |
 | 36. The Conversational Path | v3 | 0/TBD | Not started | - |
