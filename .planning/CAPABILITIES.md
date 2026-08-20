@@ -240,8 +240,10 @@ repository's own, and all three are sized rather than open questions:**
    loop over short writes, because Node's `Writable.write()` never performs one — the remedy was
    already written in `fjs/effects/node/module.mjs`'s own `writeAll` comment.
 4. **`upstream-cas-get-uri-discloses-host-path.md`** — `cas_get` puts the blob's **absolute host
-   path** in its `uri` field, unconditionally: one call reveals the home directory, the account name
-   and the store layout. Verified by execution. A design decision on a public protocol surface, so
+   path** in its `uri` field whenever it FINDS the blob: that reveals the home directory, the
+   account name and the store layout. Verified by execution. (This entry said "unconditionally: one
+   call" until 2026-08-20; the two failure paths are path-free, and a reviewer said so. The
+   exposure is unchanged — `cas_list` hands any client a hash that works.) A design decision on a public protocol surface, so
    it is filed as `functionalscript#1650` and left to the maintainer. **Live, not latent** — this
    entry said "latent" until 2026-08-19, on the premise that stdio implies a same-user local client
    that could read `os.homedir()` itself. It does not: `ssh host … mcp`, a container and a
