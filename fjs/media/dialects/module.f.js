@@ -415,9 +415,9 @@ const fixtures = {
     },
     [w2Dialect]: {
         dialect: w2Dialect,
-        payerTin: '11-1111111',
-        recipientTin: '222-22-2222',
-        accountNumber: '',
+        employerEIN: '11-1111111',
+        employeeSSN: '222-22-2222',
+        controlNumber: '',
         taxYear: 2025,
         formRevision: '2025',
     },

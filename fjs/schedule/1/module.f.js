@@ -2877,7 +2877,7 @@ const w2WithEmployerHsa = {
     documentHash: 'sha256-w2-a',
     value: {
         dialect: 'vnd.fjs.w2',
-        payerTin: '11-1111111', recipientTin: '222-22-2222', accountNumber: '',
+        employerEIN: '11-1111111', employeeSSN: '222-22-2222', controlNumber: '',
         taxYear: 2025, formRevision: '2025',
         box12: [{ code: 'DD', amount: '14500.00' }, { code: 'W', amount: '1000.00' }],
     },
@@ -2946,7 +2946,7 @@ const w2WithMovingReimbursement = amount => ({
     documentHash: 'sha256-w2-p',
     value: {
         dialect: 'vnd.fjs.w2',
-        payerTin: '11-1111111', recipientTin: '222-22-2222', accountNumber: '',
+        employerEIN: '11-1111111', employeeSSN: '222-22-2222', controlNumber: '',
         taxYear: 2025, formRevision: '2025',
         box12: [
             { code: 'DD', amount: '14500.00' },
@@ -2964,7 +2964,7 @@ const w2WithoutMovingReimbursement = {
     documentHash: 'sha256-w2-no-p',
     value: {
         dialect: 'vnd.fjs.w2',
-        payerTin: '11-1111111', recipientTin: '222-22-2222', accountNumber: '',
+        employerEIN: '11-1111111', employeeSSN: '222-22-2222', controlNumber: '',
         taxYear: 2025, formRevision: '2025',
         box12: notMovingReimbursementBoxes,
     },
@@ -3254,7 +3254,7 @@ const iraW2Doc = documentHash => box1 => coveredByWorkplacePlan => ({
     documentHash,
     value: {
         dialect: 'vnd.fjs.w2',
-        payerTin: '11-1111111', recipientTin: '222-22-2222', accountNumber: '',
+        employerEIN: '11-1111111', employeeSSN: '222-22-2222', controlNumber: '',
         taxYear: 2025, formRevision: '2025',
         box1WagesTipsOtherCompensation: box1,
         ...(coveredByWorkplacePlan ? { box13RetirementPlan: /** @type {true} */ (true) } : {}),
@@ -3432,7 +3432,7 @@ const w2WithSocialSecurityWages = documentHash => recipientTin => amount => ({
     documentHash,
     value: {
         dialect: 'vnd.fjs.w2',
-        payerTin: '11-1111111', recipientTin, accountNumber: 'ACC-W2',
+        employerEIN: '11-1111111', employeeSSN: recipientTin, controlNumber: 'ACC-W2',
         taxYear: 2025, formRevision: '2025',
         box1WagesTipsOtherCompensation: amount,
         box3SocialSecurityWages: amount,
@@ -5885,7 +5885,7 @@ export const proof = {
                 documentHash: 'sha256-w2-p-lower',
                 value: {
                     dialect: 'vnd.fjs.w2',
-                    payerTin: '11-1111111', recipientTin: '222-22-2222', accountNumber: '',
+                    employerEIN: '11-1111111', employeeSSN: '222-22-2222', controlNumber: '',
                     taxYear: 2025, formRevision: '2025',
                     box12: [{ code: ' p ', amount: '2000.00' }],
                 },
@@ -5900,7 +5900,7 @@ export const proof = {
                 documentHash: 'sha256-w2-p-second',
                 value: {
                     dialect: 'vnd.fjs.w2',
-                    payerTin: '33-3333333', recipientTin: '222-22-2222', accountNumber: '',
+                    employerEIN: '33-3333333', employeeSSN: '222-22-2222', controlNumber: '',
                     taxYear: 2025, formRevision: '2025',
                     box12: [{ code: 'P', amount: '136.90' }],
                 },

@@ -100,20 +100,38 @@ const stateLocalEntry = /** @type {const} */ ({
  * structural validation reports it as the first failing field on a
  * mismatched blob (DOC-00's discriminant).
  *
- * The identity fields keep the family's names rather than the W-2's own —
- * `payerTin` is the employer's EIN (box b) and `recipientTin` the
- * employee's SSN (box a) — because `fjs/document/subject`'s `formSubject`
- * keys on those names for every dialect. A W-2-specific spelling here would
- * mean a W-2-specific subject derivation, and DOC-01's whole point is that
- * one convention covers the family. `accountNumber` is the control number
- * (box d), which is frequently blank; the key is always present, the value
- * may be `''`.
+ * The identity fields are the W-2's own, transcribed from the printed face
+ * (`irs.gov/pub/irs-pdf/fw2.pdf`, read directly rather than recalled):
+ *
+ * - `employerEIN` — box **b**, captioned "Employer identification number
+ *   (EIN)". It plays {@link subjectKey}'s `payer` role.
+ * - `employeeSSN` — box **a**, captioned "Employee's social security
+ *   number". It plays the `recipient` role.
+ * - `controlNumber` — box **d**, captioned "Control number". It plays the
+ *   `account` role, and is frequently blank: the key is always present, the
+ *   value may be `''`.
+ *
+ * **They were `payerTin`/`recipientTin`/`accountNumber`, and the reason is
+ * worth keeping rather than deleting.** `fjs/document/subject`'s
+ * `formSubject` keyed every dialect's subject on those three field NAMES, so
+ * a W-2-specific spelling would have meant a W-2-specific subject derivation
+ * — and DOC-01's whole point was that one convention covered the family.
+ * **FORM-KEY-01 removed the premise**: a dialect declares which of its OWN
+ * fields play the five roles, so the names follow the paper while the roles
+ * stay put. **Not one of the words "payer", "recipient" or "account number"
+ * appears anywhere on a W-2**, which is what made the old names a convention
+ * rather than a transcription.
+ *
+ * The subject a stored W-2 derives is byte-identical to the one it derived
+ * under the old names: the declaration moved, the values did not.
+ * {@link proof}.theEmployerAndTheEmployeeAreNotTransposed pins the parties by
+ * TIN FORMAT.
  */
 export const w2Schema = /** @type {const} */ ({
     ...base(dialect),
-    payerTin: string,
-    recipientTin: string,
-    accountNumber: string,
+    employerEIN: string,
+    employeeSSN: string,
+    controlNumber: string,
     taxYear: number,
     formRevision: string,
     corrected: option(true),
@@ -143,7 +161,7 @@ export const w2Schema = /** @type {const} */ ({
  * shared set of field names.
  * @type {SubjectKey}
  */
-export const subjectKey = { formType: 'dialect', taxYear: 'taxYear', payer: 'payerTin', recipient: 'recipientTin', account: 'accountNumber' }
+export const subjectKey = { formType: 'dialect', taxYear: 'taxYear', payer: 'employerEIN', recipient: 'employeeSSN', account: 'controlNumber' }
 
 /** @typedef {Ts<typeof w2Schema>} W2 */
 
@@ -262,9 +280,9 @@ export const validate = value => {
 /** @type {W2} */
 const minimal = {
     dialect,
-    payerTin: '11-1111111',
-    recipientTin: '222-22-2222',
-    accountNumber: '',
+    employerEIN: '11-1111111',
+    employeeSSN: '222-22-2222',
+    controlNumber: '',
     taxYear: 2025,
     formRevision: '2025',
 }
@@ -339,13 +357,52 @@ export const proof = {
         assertEq(dialect, 'vnd.fjs.w2')
         assertEq(mediaType, 'application/vnd.fjs.w2+json')
     },
+
+    /**
+     * **The three printed identity boxes, asserted rather than described.**
+     * `employerEIN` is box b and plays {@link subjectKey}'s `payer` role,
+     * `employeeSSN` is box a and plays its `recipient` role, `controlNumber`
+     * is box d and plays its `account` role. Nothing else in this module
+     * would notice the first two being transposed: the schema types all three
+     * as `string`, `checkReferences` constrains none of them, and a
+     * transposed pair still derives a perfectly well-formed subject — for the
+     * WRONG employee.
+     *
+     * This dialect is where that matters most in the whole tree.
+     * `fjs/schedule/se` matches `employeeSSN` against the business record's
+     * proprietor to decide whose §1402(b)(1) wage base a W-2 consumes, and
+     * `fjs/schedule/3` line 11 groups box 4 readings by `employeeSSN` and
+     * counts employers by `employerEIN` — so a transposition would give one
+     * spouse the other's wage base and turn two employers into one employee.
+     *
+     * The fixture uses two visibly different TIN FORMATS — an employer
+     * identification number (`NN-NNNNNNN`) and a social security number
+     * (`NNN-NN-NNNN`) — so the swap is visible in the assertion itself. The
+     * empty `controlNumber` is asserted alongside because box d is
+     * frequently blank on a real W-2, and "present and empty" is a different
+     * state from "absent" (DOC-11).
+     */
+    theEmployerAndTheEmployeeAreNotTransposed: () => {
+        const [t, v] = validate(minimal)
+        assert(t === 'ok', ['expected ok', t, v])
+        if (t !== 'ok') {
+            throw ['expected ok', t, v]
+        }
+        assertEq(v.employerEIN, '11-1111111', 'employerEIN holds box b, in an EIN format')
+        assertEq(v.employeeSSN, '222-22-2222', 'employeeSSN holds box a, in an SSN format')
+        assertEq(v.controlNumber, '', 'box d is frequently blank, and present-and-empty is not absent')
+        assert(
+            v.employerEIN !== v.employeeSSN,
+            ['a W-2 always has two distinct parties', v.employerEIN, v.employeeSSN],
+        )
+    },
     validate: {
         // A blank control number is a real W-2: the key is present, the
         // value is empty, and nothing else is supplied.
         minimalValidates: () => {
             const [t, v] = validate(minimal)
             assert(t === 'ok', ['expected ok', t, v])
-            assertEq(v.accountNumber, '')
+            assertEq(v.controlNumber, '')
         },
         fullyPopulatedValidates: () => {
             const [t, v] = validate({

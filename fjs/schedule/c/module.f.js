@@ -1489,7 +1489,7 @@ const secondRegisterDoc = {
 /** @type {W2} */
 const bareW2Value = {
     dialect: 'vnd.fjs.w2',
-    payerTin: '11-1111111', recipientTin: '222-22-2222', accountNumber: '',
+    employerEIN: '11-1111111', employeeSSN: '222-22-2222', controlNumber: '',
     taxYear: 2025, formRevision: '2025',
 }
 

@@ -602,11 +602,11 @@ export const renderForm = root => {
     const who = el('div', { class: 'f1040-grid' })
     who.append(entryBox('Your first name and middle initial', you.first, 2))
     who.append(entryBox('Last name', you.last, 2))
-    who.append(entryBox('Your social security number', primary.value.recipientTin, 2))
+    who.append(entryBox('Your social security number', primary.value.employeeSSN, 2))
     if (spouse !== undefined && secondary !== undefined) {
         who.append(entryBox('If joint return, spouse’s first name and middle initial', spouse.first, 2))
         who.append(entryBox('Last name', spouse.last, 2))
-        who.append(entryBox('Spouse’s social security number', secondary.value.recipientTin, 2))
+        who.append(entryBox('Spouse’s social security number', secondary.value.employeeSSN, 2))
     }
     who.append(entryBox('Home address (number and street). If you have a P.O. box, see instructions.', '', 4))
     who.append(entryBox('Apt. no.', '', 2))

@@ -324,30 +324,40 @@ export const proof = {
     // The reason the declaration exists at all, asserted rather than
     // described: a dialect whose printed form names its parties differently
     // gets the SAME subject encoding out of fields `formSubject`'s parameter
-    // list cannot even spell. Nothing in this repo declares these names yet
-    // -- that is the next step -- so this leaf is what makes that step a
-    // rename rather than a redesign.
+    // list cannot even spell. When this leaf was written NOTHING in the repo
+    // declared such names and the comment here said so; FORM-KEY-02 has since
+    // spent the freedom on `vnd.fjs.w2` and seven others, so the names below
+    // are now the real ones rather than a hypothetical.
+    //
+    // The fixture is still WRITTEN OUT rather than imported from
+    // `fjs/document/w2`. This module must stay dialect-independent -- it
+    // imports no dialect and later dialect modules depend on it, never the
+    // reverse -- and hand-typing the expected string is the same independence
+    // AGENTS.md requires of any expected value.
     declaredSubjectReadsTheDeclarationRatherThanAssumingFieldNames: () => {
         /** @type {SubjectKey} */
         const key = {
             formType: 'dialect',
             taxYear: 'taxYear',
-            payer: 'employerEin',
-            recipient: 'employeeSsn',
+            payer: 'employerEIN',
+            recipient: 'employeeSSN',
             account: 'controlNumber',
         }
         const stored = {
             dialect: 'vnd.fjs.w2',
-            employerEin: '11-1111111',
-            employeeSsn: '222-22-2222',
+            employerEIN: '11-1111111',
+            employeeSSN: '222-22-2222',
             controlNumber: 'ACC-0001',
             taxYear: 2024,
-            // The names the CURRENT schema uses are present too, holding
+            // The names this dialect USED to use are present too, holding
             // values that would produce a different string -- so a
             // `declaredSubject` that ignored its declaration and reached for
             // `payerTin`/`recipientTin`/`accountNumber` would not merely fail
             // to find them, it would find the WRONG ones and still return a
-            // string. That is the failure this fixture is shaped to catch.
+            // string. That is the failure this fixture is shaped to catch,
+            // and it is a LIVE hazard now rather than a hypothetical one:
+            // every stored W-2 written before FORM-KEY-02 carries exactly
+            // these three keys.
             payerTin: '99-9999999',
             recipientTin: '888-88-8888',
             accountNumber: 'WRONG',

@@ -451,14 +451,14 @@ const boxFourReadings = forms => forms.flatMap(form => {
  * place".
  * @type {(reading: BoxFourReading) => string}
  */
-const employeeOf = reading => reading.form.value.recipientTin
+const employeeOf = reading => reading.form.value.employeeSSN
 
 /**
  * The EMPLOYER a reading belongs to — box b, the employer's EIN. §6413(c)(1)
  * counts these, never documents.
  * @type {(reading: BoxFourReading) => string}
  */
-const employerOf = reading => reading.form.value.payerTin
+const employerOf = reading => reading.form.value.employerEIN
 
 /**
  * Line 11, excess Social Security tax withheld: what §31(b) allows as a
@@ -1340,9 +1340,9 @@ const w2WithBox12 = code => amount => ({
     documentHash: 'sha256-w2-0001',
     value: {
         dialect: 'vnd.fjs.w2',
-        payerTin: '11-1111111',
-        recipientTin: '222-22-2222',
-        accountNumber: '',
+        employerEIN: '11-1111111',
+        employeeSSN: '222-22-2222',
+        controlNumber: '',
         taxYear: 2025,
         formRevision: '2025',
         box12: [{ code, amount }],
@@ -1375,9 +1375,9 @@ const w2WithSocialSecurity = hash => payerTin => recipientTin => wages => tax =>
     documentHash: hash,
     value: {
         dialect: 'vnd.fjs.w2',
-        payerTin,
-        recipientTin,
-        accountNumber: '',
+        employerEIN: payerTin,
+        employeeSSN: recipientTin,
+        controlNumber: '',
         taxYear: 2025,
         formRevision: '2025',
         box3SocialSecurityWages: wages,
@@ -2067,9 +2067,9 @@ export const proof = {
                     documentHash: 'sha256-w2-0002',
                     value: {
                         dialect: 'vnd.fjs.w2',
-                        payerTin: '11-1111111',
-                        recipientTin: '222-22-2222',
-                        accountNumber: '',
+                        employerEIN: '11-1111111',
+                        employeeSSN: '222-22-2222',
+                        controlNumber: '',
                         taxYear: 2025,
                         formRevision: '2025',
                         box12: [

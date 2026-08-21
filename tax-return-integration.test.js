@@ -299,9 +299,9 @@ test(
             }
             const w2A = {
                 dialect: w2Dialect,
-                payerTin: '11-1111111',
-                recipientTin,
-                accountNumber: 'ACC-W2-A',
+                employerEIN: '11-1111111',
+                employeeSSN: recipientTin,
+                controlNumber: 'ACC-W2-A',
                 taxYear: 2025,
                 formRevision: '2025',
                 box1WagesTipsOtherCompensation: '35937.00',
@@ -309,9 +309,9 @@ test(
             }
             const w2B = {
                 dialect: w2Dialect,
-                payerTin: '44-4444444',
-                recipientTin,
-                accountNumber: 'ACC-W2-B',
+                employerEIN: '44-4444444',
+                employeeSSN: recipientTin,
+                controlNumber: 'ACC-W2-B',
                 taxYear: 2025,
                 formRevision: '2025',
                 box1WagesTipsOtherCompensation: '9568.00',
@@ -832,9 +832,9 @@ test(
             // "I will not compute this". So `fjs_run` itself succeeds.
             const w2PriorYear = {
                 dialect: w2Dialect,
-                payerTin: '66-6666666',
-                recipientTin,
-                accountNumber: 'ACC-W2-PRIOR',
+                employerEIN: '66-6666666',
+                employeeSSN: recipientTin,
+                controlNumber: 'ACC-W2-PRIOR',
                 taxYear: 2024,
                 formRevision: '2024',
                 box1WagesTipsOtherCompensation: '80000.00',
