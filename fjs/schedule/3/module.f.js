@@ -419,7 +419,7 @@ const socialSecurityWithholdingMaximum = taxParamSet => halfUp(of(
  * string it reported.
  *
  * The pair exists because line 11 needs the box AND the form: the amount is
- * summed, while `recipientTin` and `payerTin` decide which sums are allowed to
+ * summed, while `employeeSSN` and `employerEIN` decide which sums are allowed to
  * happen at all. Building it with `flatMap` over an `undefined` check keeps
  * the narrowing the compiler already did — no second lookup, so no
  * `T | undefined` to cast away.
@@ -492,7 +492,7 @@ const employerOf = reading => reading.form.value.employerEIN
  * **3. The base is per EMPLOYEE, so a joint return gets two of them.**
  * §6413(c)(1) is written about "an employee", and a married couple filing
  * jointly are two. One shared cap would understate the refund by up to the
- * whole maximum. The grouping key is the W-2's own `recipientTin` — box a, the
+ * whole maximum. The grouping key is the W-2's own `employeeSSN` — box a, the
  * employee's SSN — and NOT the return profile, which carries no TIN at all.
  * That is also why this line needs no answer to "which spouse does this W-2
  * belong to", the question `fjs/form8880` refuses a joint return for being
@@ -1358,10 +1358,10 @@ const w2WithBox12 = code => amount => ({
  * - `hash`, because the citation contract is ONE source per contributing
  *   document, and a fixture reusing one hash could not tell "two documents
  *   summed" from "one document counted twice".
- * - `payerTin`, because §6413(c)(1) counts EMPLOYERS, and two forms from one
- *   EIN are one employer.
- * - `recipientTin`, because the wage base is per EMPLOYEE, and a joint return
- *   has two.
+ * - `employerEIN` (box b), because §6413(c)(1) counts EMPLOYERS, and two
+ *   forms from one EIN are one employer.
+ * - `employeeSSN` (box a), because the wage base is per EMPLOYEE, and a joint
+ *   return has two.
  * - `wages` (box 3) is always present and always equals `tax / 6.2%` to the
  *   cent, so that a mutation transposing the box READ produces a wrong number
  *   rather than the same one. A fixture that left box 3 out would make that
