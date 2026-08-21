@@ -71,9 +71,9 @@ added to it, because no new money string is added.
     maximumPerEmployee = socialSecurityWageBase x 620 basis points
                        = $176,100.00 x 6.2% = $10,918.20
 
-    for each PERSON p (grouped by the W-2's own `recipientTin`):
+    for each PERSON p (grouped by the W-2's own `employeeSSN`):
         forms(p)    = every stored W-2 for p carrying box 4
-        employers(p)= the DISTINCT `payerTin`s among forms(p)
+        employers(p)= the DISTINCT `employerEIN`s among forms(p)
         withheld(p) = SUM box4SocialSecurityTaxWithheld over forms(p)
         excess(p)   = employers(p) >= 2 ? max(0, withheld(p) - maximum) : 0
 
@@ -96,7 +96,7 @@ Reg. §31.6413(a)-1, and claiming it here would be claiming a refund twice.
 **The base is per EMPLOYEE, so a joint return computes it twice.** §6413(c)(1)
 is written about "an employee". A married couple filing jointly get one wage
 base each; one shared cap would understate the refund by up to $10,918.20. The
-grouping key is the W-2's own `recipientTin` (box a, the employee's SSN) and
+grouping key is the W-2's own `employeeSSN` (box a, the employee's SSN) and
 **not** the return profile, which carries no TIN at all — which is also why
 this needs no "which spouse does this W-2 belong to" answer, the question
 `fjs/form8880` refuses a joint return for being unable to answer.

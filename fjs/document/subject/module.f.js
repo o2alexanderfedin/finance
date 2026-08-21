@@ -16,12 +16,34 @@
  *   a named place to change that nothing read.
  * - Each **extracted form** — the structured data a dialect parses out of an
  *   artifact (e.g. a single 1099-INT) — gets its own subject, keyed on the
- *   business identity of that form: `(payerTin, recipientTin,
- *   accountNumber, taxYear, formType)` ({@link formSubject}). Two different
+ *   business identity of that form: five ROLES, in a fixed order —
+ *   `(formType, taxYear, payer, recipient, account)`. Two different
  *   scans of the same paper form resolve to the same form subject even
  *   though they resolve to two different artifact subjects (see
  *   `T-05-01-02` in this plan's threat model — an accepted consequence of
  *   content-hash-based artifact identity, not a defect).
+ *
+ *   **A role is not a field name.** Until FORM-KEY-01 it was: every dialect
+ *   spelled the payer `payerTin`, the recipient `recipientTin` and the
+ *   account `accountNumber`, and {@link formSubject} read those five
+ *   properties off the document. The argument for it was that one convention
+ *   should cover the whole family, and that a dialect-specific spelling would
+ *   mean a dialect-specific subject derivation. **That argument is obsolete,
+ *   and the reason it is worth stating rather than deleting is that it was
+ *   sound about the goal and wrong about the mechanism.** One convention no
+ *   longer requires one spelling: a dialect declares which of ITS OWN fields
+ *   play the five roles ({@link SubjectKey}), and {@link declaredSubject}
+ *   reads the declaration. So `vnd.fjs.w2` may call box b `employerEIN` and
+ *   box a `employeeSSN` — the words "payer" and "recipient" appear nowhere on
+ *   a W-2 — while the derivation stays single and shared.
+ *
+ *   **The encoding did not move.** Both functions emit the same five values
+ *   in the same order, so every subject stored under the old names is
+ *   byte-identical to the one derived under the new ones — which, given that
+ *   a subject cannot be renamed and `fjs/cas` has no delete, is the whole
+ *   claim FORM-KEY-02's renames rest on. `goldenEncodedSubjectValue` and
+ *   `declaredSubjectMatchesTheGoldenLiteral` pin the same hand-typed literal
+ *   through the two functions for exactly that reason.
  *
  * Human-readable labels (a payer's display name, a filename) live inside
  * snapshots, never in subjects — a subject is an opaque, stable key.
@@ -36,11 +58,21 @@ import { assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { stringify as jsonText } from '../../json/module.f.js'
 
 /**
- * The five fields that key an extracted form's identity, per DOC-01. Not
- * imported from any dialect module — Plan 05-02's `vnd.fjs.1099int` dialect
- * does not exist yet at this wave, and this module must stay
- * dialect-independent so later dialect plans depend on it, never the
- * reverse.
+ * The five VALUES that key an extracted form's identity, per DOC-01, named
+ * by their roles. Not imported from any dialect module — Plan 05-02's
+ * `vnd.fjs.1099int` dialect does not exist yet at this wave, and this module
+ * must stay dialect-independent so later dialect plans depend on it, never
+ * the reverse.
+ *
+ * **`payerTin`/`recipientTin`/`accountNumber` are this parameter object's
+ * property names, and since FORM-KEY-01 they are nothing more than that.**
+ * They were once the field names every dialect's schema was required to use,
+ * which is what made a rename impossible; today a dialect names its own
+ * fields whatever its printed form calls them and declares the mapping in a
+ * {@link SubjectKey}. These three spellings survive here because
+ * {@link formSubject} is a pinned encoding that stored subjects depend on —
+ * renaming its parameters would change nothing it emits and cost the
+ * cross-check `declaredSubject`'s proofs run against it.
  *
  * `taxYear` is a plain JS `number` (a 4-digit calendar year) — this is not
  * money, so ordinary numeric handling is fine here; it does not route
@@ -57,10 +89,16 @@ import { stringify as jsonText } from '../../json/module.f.js'
 
 /**
  * The subject for an extracted form instance: deterministically derived
- * from its business key `(payerTin, recipientTin, accountNumber, taxYear,
- * formType)` (DOC-01), independent of which artifact/scan produced it and
- * independent of object identity (two distinct object literals carrying the
- * same five values yield the identical, `===`-equal subject string).
+ * from the five business-key VALUES (DOC-01), independent of which
+ * artifact/scan produced it and independent of object identity (two distinct
+ * object literals carrying the same five values yield the identical,
+ * `===`-equal subject string).
+ *
+ * This function takes the values already extracted, so it knows nothing
+ * about which field of which dialect each came from. {@link declaredSubject}
+ * is the one that reads a document, through the dialect's own
+ * {@link SubjectKey}; the two agree by construction and are pinned against
+ * the same hand-typed literals.
  *
  * Encoded via `JSON.stringify` on a fixed-order array of the five values
  * (`[formType, String(taxYear), payerTin, recipientTin, accountNumber]`)
@@ -84,11 +122,13 @@ export const formSubject = ({ payerTin, recipientTin, accountNumber, taxYear, fo
  * {@link formSubject} above takes the five VALUES already extracted. Every
  * caller therefore had to know, per dialect, which field name carried each
  * role — and every one of them spelled it `payerTin`/`recipientTin`/
- * `accountNumber`/`taxYear`/`dialect`, because today they happen to agree.
- * That agreement is an accident of twenty-eight schemas having been written
- * from one template, not a property anything checks: a dialect whose printed
- * form calls the payer an *employer* or the recipient a *student* cannot say
- * so without silently changing what every caller reads.
+ * `accountNumber`/`taxYear`/`dialect`, because when this was written they all
+ * agreed. That agreement was an accident of twenty-eight schemas having been
+ * written from one template, not a property anything checked: a dialect whose
+ * printed form calls the payer an *employer* or the recipient a *student*
+ * could not say so without silently changing what every caller read.
+ * FORM-KEY-02 has since spent that freedom on eleven dialects, so the
+ * agreement is gone and nothing broke — which is the point.
  *
  * So the dialect declares the mapping instead. The values are FIELD NAMES on
  * that dialect's own schema, never values and never other dialects' names,

@@ -31,9 +31,13 @@
  * - **`category` is a free string.** Enumerating what Publication 502 does
  *   and does not allow is deduction logic; this phase stores and reads.
  *
- * The subject convention: `formSubject` keys on `(payerTin, recipientTin,
- * accountNumber, taxYear, formType)` for every dialect (DOC-01), and this
- * record has no payer and no account. Both are `''`, which makes exactly one
+ * The subject convention: a subject is keyed on five ROLES —
+ * `(formType, taxYear, payer, recipient, account)` (DOC-01) — which each
+ * dialect maps onto its own fields via {@link subjectKey} (FORM-KEY-01).
+ * This dialect keeps the spellings `recipientTin`/`taxYear` because it
+ * transcribes a fact off the taxpayer's own return and has no printed form
+ * to take names from; it has no payer and no account, so those roles are
+ * omitted. Both are `''`, which makes exactly one
  * such subject per taxpayer per tax year — the right cardinality, since this
  * is one running record rather than one document per expense. Revising it
  * means a new revision under that subject, which is what Evo is for.
