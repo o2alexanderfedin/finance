@@ -124,17 +124,21 @@ const monthlyCoverageEntry = /** @type {const} */ ({
  * structural validation reports it as the first failing field on a mismatched
  * blob (DOC-00's discriminant).
  *
- * `recipientTin` carries the printed line 5 (recipient's SSN) under this
- * repo's established name for a payee identifier, so the field a caller looks
- * for is the field every other dialect already spells that way. There is no
- * `payerTin`: a Marketplace is not a payer and the form prints no TIN for it.
+ * `recipientSsn` is the printed Part II line 5, which reads **"Recipient's
+ * SSN"** and not "TIN" — the neighbouring lines (4 "Recipient's name", 6
+ * "Recipient's date of birth", 7-9 the spouse's three) fix the party beyond
+ * doubt. The field carried this repo's cross-dialect `recipientTin` until
+ * FORM-KEY-01 gave every dialect its own {@link subjectKey} declaration; a
+ * caller reads the ROLE now rather than guessing the name, so the name is
+ * free to say what the paper says. There is no payer field at all: a
+ * Marketplace is not a payer and the form prints no TIN for it.
  */
 export const oneZeroNineFiveASchema = /** @type {const} */ ({
     ...base(dialect),
     marketplaceIdentifier: string,
     marketplaceAssignedPolicyNumber: string,
     policyIssuerName: string,
-    recipientTin: string,
+    recipientSsn: string,
     taxYear: number,
     formRevision: string,
     sourceArtifactHash: string,
@@ -165,7 +169,7 @@ export const oneZeroNineFiveASchema = /** @type {const} */ ({
  * `accountNumber: ''` this dialect's subject has carried since DOC-01.
  * @type {SubjectKey}
  */
-export const subjectKey = { formType: 'dialect', taxYear: 'taxYear', recipient: 'recipientTin' }
+export const subjectKey = { formType: 'dialect', taxYear: 'taxYear', recipient: 'recipientSsn' }
 
 /** @typedef {Ts<typeof oneZeroNineFiveASchema>} OneZeroNineFiveA */
 
@@ -356,7 +360,7 @@ const minimal = {
     marketplaceIdentifier: '99',
     marketplaceAssignedPolicyNumber: 'POLICY-0001',
     policyIssuerName: 'Some Health Plan, Inc.',
-    recipientTin: '222-22-2222',
+    recipientSsn: '222-22-2222',
     taxYear: 2025,
     formRevision: '2025',
     sourceArtifactHash: sharedSourceArtifactHash,

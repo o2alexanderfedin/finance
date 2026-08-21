@@ -1376,7 +1376,7 @@ const documentByHash = {
         marketplaceIdentifier: '99',
         marketplaceAssignedPolicyNumber: 'POLICY-TWIN-0001',
         policyIssuerName: 'Some Health Plan, Inc.',
-        recipientTin: '222-22-2222',
+        recipientSsn: '222-22-2222',
         taxYear: 2025,
         formRevision: '2025',
         sourceArtifactHash: 'deadbeef00112233445566778899aabbccddeeff0011223344556677889900',

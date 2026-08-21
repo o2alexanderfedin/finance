@@ -44,7 +44,7 @@ import { fieldsOf, askedFields, labelOf } from '../../fjs/document/form_model/mo
 import { storeView } from '../../fjs/guest/store_view/module.f.js'
 import { taxReturnReport } from '../../fjs/report/tax_return/module.f.js'
 import { taxGuestCtx } from '../../fjs/guest/tax/module.f.js'
-import { formSubject } from '../../fjs/document/subject/module.f.js'
+import { formSubject, declaredSubject } from '../../fjs/document/subject/module.f.js'
 import { ok } from 'functionalscript/fjs/types/result/module.f.mjs'
 import { vecToCBase32 } from 'functionalscript/fjs/basen/cbase32/module.f.mjs'
 import { vec8 } from 'functionalscript/fjs/types/bit_vec/module.f.mjs'
@@ -57,7 +57,7 @@ export {
     // return, and nothing it needs to KNOW about how a return is computed.
     documentDialects, enterableDialects, dialectNamed,
     fieldsOf, askedFields, labelOf,
-    storeView, taxReturnReport, taxGuestCtx, formSubject,
+    storeView, taxReturnReport, taxGuestCtx, formSubject, declaredSubject,
     toJsonSchema,
     interpret, stepBudget, checkSpecifiers, programFileName, casOpNames, guestCtx,
     do_, step, pure, ok,
