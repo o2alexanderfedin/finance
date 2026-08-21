@@ -1011,7 +1011,7 @@ const estateTrustCodedBoxes = /** @type {const} */ ([
  */
 export const beneficiaryRow = document => {
     const k1 = document.value
-    const entityName = k1.payerName ?? `estate or trust ${k1.payerTin}`
+    const entityName = k1.payerName ?? `estate or trust ${k1.estateOrTrustEIN}`
     const swept = codedBoxSweep(entityName)('E')(estateTrustCodedBoxes)(
         field => field === 'box9DirectlyApportionedDeductions' ? k1.box9DirectlyApportionedDeductions
             : field === 'box11FinalYearDeductions' ? k1.box11FinalYearDeductions
@@ -1044,8 +1044,8 @@ export const beneficiaryRow = document => {
         row: {
             documentHash: document.documentHash,
             entityName,
-            employerIdentificationNumber: k1.payerTin,
-            recipientTin: k1.recipientTin,
+            employerIdentificationNumber: k1.estateOrTrustEIN,
+            recipientTin: k1.beneficiaryIdentifyingNumber,
             ordinaryBusinessIncomeCents,
             ordinaryBusinessIncomePrinted: k1.box6OrdinaryBusinessIncome,
             boxPath: 'box6OrdinaryBusinessIncome',
@@ -1512,8 +1512,8 @@ const estateTrustDoc = overrides => ({
     documentHash: 'sha256-k1-1041-a',
     value: {
         dialect: 'vnd.fjs.k1_1041',
-        payerTin: '66-6666666',
-        recipientTin: '222-22-2222',
+        estateOrTrustEIN: '66-6666666',
+        beneficiaryIdentifyingNumber: '222-22-2222',
         taxYear: 2025,
         formRevision: '2025',
         payerName: 'Northwind Family Trust',

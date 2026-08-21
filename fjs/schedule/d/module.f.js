@@ -818,8 +818,8 @@ const estateTrustGainK1 = hash => boxes => ({
     documentHash: hash,
     value: {
         dialect: 'vnd.fjs.k1_1041',
-        payerTin: '66-6666666',
-        recipientTin: '222-22-2222',
+        estateOrTrustEIN: '66-6666666',
+        beneficiaryIdentifyingNumber: '222-22-2222',
         taxYear: 2025,
         formRevision: '2025',
         boxHDomesticBeneficiary: /** @type {const} */ (true),

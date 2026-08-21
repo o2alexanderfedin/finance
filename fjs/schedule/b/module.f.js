@@ -354,7 +354,7 @@ export const scheduleB = inputs => {
             { boxPath: 'k1_1120s.box4InterestIncome', read: k1 => k1.box4InterestIncome },
         ])(sCorporationK1Forms),
         ...payerRows(
-            k1 => ({ payer: k1.payerName ?? `estate or trust ${k1.payerTin}`, payerTin: k1.payerTin }))([
+            k1 => ({ payer: k1.payerName ?? `estate or trust ${k1.estateOrTrustEIN}`, payerTin: k1.estateOrTrustEIN }))([
             { boxPath: 'k1_1041.box1InterestIncome', read: k1 => k1.box1InterestIncome },
         ])(estateTrustK1Forms),
     ]
@@ -377,7 +377,7 @@ export const scheduleB = inputs => {
             { boxPath: 'k1_1120s.box5aOrdinaryDividends', read: k1 => k1.box5aOrdinaryDividends },
         ])(sCorporationK1Forms),
         ...payerRows(
-            k1 => ({ payer: k1.payerName ?? `estate or trust ${k1.payerTin}`, payerTin: k1.payerTin }))([
+            k1 => ({ payer: k1.payerName ?? `estate or trust ${k1.estateOrTrustEIN}`, payerTin: k1.estateOrTrustEIN }))([
             { boxPath: 'k1_1041.box2aOrdinaryDividends', read: k1 => k1.box2aOrdinaryDividends },
         ])(estateTrustK1Forms),
     ]
@@ -557,8 +557,8 @@ const estateTrustK1 = boxes => hash => ({
     documentHash: hash,
     value: {
         dialect: 'vnd.fjs.k1_1041',
-        payerTin: '66-6666666',
-        recipientTin: '222-22-2222',
+        estateOrTrustEIN: '66-6666666',
+        beneficiaryIdentifyingNumber: '222-22-2222',
         taxYear: 2025,
         formRevision: '2025',
         boxHDomesticBeneficiary: true,

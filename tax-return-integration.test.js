@@ -356,8 +356,8 @@ test(
             }
             const k1EstateTrust = {
                 dialect: k1EstateTrustDialect,
-                payerTin: '88-8888888',
-                recipientTin,
+                estateOrTrustEIN: '88-8888888',
+                beneficiaryIdentifyingNumber: recipientTin,
                 taxYear: 2025,
                 formRevision: '2025',
                 boxHDomesticBeneficiary: true,

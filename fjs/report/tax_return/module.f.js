@@ -1565,8 +1565,8 @@ const documentByHash = {
     // No `accountNumber`: the Schedule K-1 (Form 1041) face has no such box.
     [fixtureSweepEstateTrustK1Hash]: {
         dialect: k1EstateTrustDialect,
-        payerTin: '66-6666666',
-        recipientTin: '222-22-2222',
+        estateOrTrustEIN: '66-6666666',
+        beneficiaryIdentifyingNumber: '222-22-2222',
         taxYear: 2025,
         formRevision: '2025',
         boxHDomesticBeneficiary: true,

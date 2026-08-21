@@ -4989,8 +4989,8 @@ const beneficiaryBusinessIncomeK1 = documentHash => overrides => ({
     documentHash,
     value: {
         dialect: 'vnd.fjs.k1_1041',
-        payerTin: '66-6666666',
-        recipientTin: '222-22-2222',
+        estateOrTrustEIN: '66-6666666',
+        beneficiaryIdentifyingNumber: '222-22-2222',
         taxYear: 2025,
         formRevision: '2025',
         payerName: 'The Harrow Family Trust',
@@ -5095,8 +5095,8 @@ const estateTrustPortfolioK1 = documentHash => boxes => ({
     documentHash,
     value: {
         dialect: 'vnd.fjs.k1_1041',
-        payerTin: '66-6666666',
-        recipientTin: '222-22-2222',
+        estateOrTrustEIN: '66-6666666',
+        beneficiaryIdentifyingNumber: '222-22-2222',
         taxYear: 2025,
         formRevision: '2025',
         payerName: 'The Harrow Family Trust',
@@ -6109,8 +6109,8 @@ const estateTrustAmtK1 = documentHash => box12 => ({
     documentHash,
     value: {
         dialect: 'vnd.fjs.k1_1041',
-        payerTin: '66-6666666',
-        recipientTin: '222-22-2222',
+        estateOrTrustEIN: '66-6666666',
+        beneficiaryIdentifyingNumber: '222-22-2222',
         taxYear: 2025,
         formRevision: '2025',
         payerName: 'The Harrow Family Trust',
