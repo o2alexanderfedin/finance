@@ -6,24 +6,79 @@
  * Everything else is restraint.
  */
 
+/*
+ * ## The palette is measured, not chosen
+ *
+ * Every pair below was computed against WCAG's contrast formula before being
+ * written down, in both schemes. What that found, on a page that looked fine:
+ *
+ * - `--ink-faint` was 3.31:1 in light and 4.06:1 in dark — under the 4.5:1
+ *   normal-text floor in both.
+ * - Control borders were **1.80:1**. WCAG 1.4.11 asks 3:1 for the boundary of
+ *   an interactive component, so the inputs on the hand-entry page were, for a
+ *   reader with low contrast sensitivity, invisible boxes.
+ * - Success and failure were distinguished by GREEN versus RED and by nothing
+ *   else. That is the single most common way to make a status invisible: red
+ *   and green are the pair deuteranopia and protanopia collapse, and together
+ *   those affect roughly one man in twelve.
+ *
+ * So `--ok` is now a **blue** and `--stop` a **vermillion**, from the
+ * Okabe–Ito colour-blind-safe set and darkened until each cleared AAA on its
+ * own background. Blue against orange survives every common form of colour
+ * vision deficiency, including tritanopia, where green-against-red does not.
+ *
+ * **And no status depends on hue at all.** Each message carries a `✓` or `✕`
+ * glyph and a different border weight, so the meaning survives a monochrome
+ * screen, a printout, and a reader who sees no colour whatsoever. Colour is
+ * the third cue here, never the only one.
+ */
 :root {
     --bg: #fbfbfa;
     --panel: #ffffff;
     --ink: #1b1b1a;
     --ink-soft: #5c5c58;
-    --ink-faint: #8b8b85;
+    /* was #8b8b85 — 3.31:1, under the floor. Now 5.83:1. */
+    --ink-faint: #63635e;
     --line: #e3e1dc;
     --line-strong: #cbc8c1;
+    /* The boundary of an interactive control: 4.62:1, over WCAG 1.4.11's 3:1. */
+    --control-line: #6b7684;
     --accent: #1c5d99;
     --accent-soft: #e8f0f8;
-    --ok: #2b6b45;
-    --ok-soft: #e6f2ea;
-    --warn: #9a5b12;
+    /* Okabe–Ito blue, darkened: 7.26:1 on white, 6.34:1 on its own tint. */
+    --ok: #005b8f;
+    --ok-soft: #e7f1f8;
+    --warn: #8f5a00;
     --warn-soft: #fbf0e0;
-    --stop: #a02c2c;
-    --stop-soft: #f8e9e9;
+    /* Okabe–Ito vermillion, darkened: 7.52:1 on white, 6.73:1 on its tint. */
+    --stop: #8f3b00;
+    --stop-soft: #fdf0e8;
+    --focus: #005b8f;
     --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
     --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+/*
+ * A visible keyboard focus ring, on everything focusable, in both schemes.
+ * `:focus-visible` rather than `:focus` so a mouse click does not draw it —
+ * the reason authors remove focus styling in the first place, and removing it
+ * is what strands a keyboard-only user with no idea where they are.
+ */
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+    outline: 3px solid var(--focus);
+    outline-offset: 2px;
+    border-radius: 2px;
+}
+
+/* A reader who has asked the OS for more contrast gets it. */
+@media (prefers-contrast: more) {
+    :root {
+        --ink-soft: var(--ink);
+        --ink-faint: var(--ink);
+        --line: var(--ink-soft);
+        --line-strong: var(--ink);
+        --control-line: var(--ink);
+    }
 }
 
 @media (prefers-color-scheme: dark) {
@@ -32,17 +87,23 @@
         --panel: #1e2024;
         --ink: #e8e6e1;
         --ink-soft: #a9a69f;
-        --ink-faint: #7b786f;
+        /* was #7b786f — 4.06:1, under the floor. Now 5.91:1. */
+        --ink-faint: #97948b;
         --line: #303338;
         --line-strong: #454a51;
+        /* 4.42:1 against the panel, over 1.4.11's 3:1. */
+        --control-line: #7c8694;
         --accent: #6ba7de;
         --accent-soft: #1c2a38;
-        --ok: #79c495;
-        --ok-soft: #1a2a20;
+        /* The same blue/vermillion pairing, lightened for a dark ground:
+           7.76:1 and 7.68:1 on their own tints. Not green and red. */
+        --ok: #7fb9e6;
+        --ok-soft: #14232e;
         --warn: #d8a45e;
         --warn-soft: #2c2317;
-        --stop: #e08585;
+        --stop: #eda269;
         --stop-soft: #2e1c1c;
+        --focus: #7fb9e6;
     }
 }
 
@@ -940,23 +1001,24 @@ button.f1040-amt:focus-visible { outline: 2px solid var(--accent); outline-offse
 }
 
 /* ── Hand entry ──────────────────────────────────────────────────────────────
-   The accountant-facing page. Deliberately plain: a form that looks like a
-   form. Every rule here is layout or legibility — nothing conveys meaning that
-   the text does not already say, because a colour is not evidence. */
+   The accountant-facing page. Every colour here is a token from the block at
+   the top of this file, so the contrast measured there is the contrast on
+   screen, in both schemes — and a hard-coded hex, which is what this section
+   used to carry, cannot quietly reintroduce a failing pair. */
 
-.entry-page { max-width: 60rem; margin: 0 auto; padding: 1.5rem; }
+.entry-page { max-width: 60rem; margin: 0 auto; padding: 1.5rem; color: var(--ink); }
 .entry-header h1 { margin-bottom: .25rem; }
 .entry-lede { max-width: 46rem; }
 .entry-privacy {
     max-width: 46rem;
     padding: .6rem .8rem;
-    border-left: 3px solid #1c5d99;
-    background: #f4f8fc;
+    border-left: 4px solid var(--accent);
+    background: var(--accent-soft);
 }
 .entry-section {
     margin: 2rem 0;
     padding-top: 1rem;
-    border-top: 1px solid #d8dde3;
+    border-top: 1px solid var(--line-strong);
 }
 .entry-form {
     display: grid;
@@ -965,22 +1027,37 @@ button.f1040-amt:focus-visible { outline: 2px solid var(--accent); outline-offse
     margin: 1rem 0;
 }
 .entry-field { display: flex; flex-direction: column; gap: .2rem; font-size: .92rem; }
-.entry-label { color: #33404d; }
-.entry-required { color: #a4342a; text-decoration: none; margin-left: .15rem; }
+.entry-label { color: var(--ink); }
+
+/* A required field is marked by a word as well as a glyph: an asterisk alone
+   is a convention a first-time reader has to already know, and a screen reader
+   announces it as "star". */
+.entry-required { color: var(--stop); text-decoration: none; margin-left: .2rem; font-weight: 700; }
+.entry-required::after { content: " required"; font-size: .78rem; font-weight: 400; }
+
 .entry-field input, .entry-field select {
-    padding: .35rem .45rem;
-    border: 1px solid #b9c2cc;
+    padding: .4rem .5rem;
+    /* 4.62:1 in light, 4.42:1 in dark. The old #b9c2cc was 1.80:1 — a control
+       whose boundary a low-contrast reader could not find. */
+    border: 1px solid var(--control-line);
     border-radius: 3px;
+    background: var(--panel);
+    color: var(--ink);
     font: inherit;
 }
-.entry-field input[type="checkbox"] { align-self: flex-start; }
+.entry-field input[type="checkbox"] {
+    align-self: flex-start;
+    width: 1.15rem;
+    height: 1.15rem;
+    accent-color: var(--accent);
+}
 .entry-rows {
     grid-column: 1 / -1;
-    border: 1px solid #d8dde3;
+    border: 1px solid var(--line-strong);
     border-radius: 4px;
     padding: .6rem .8rem;
 }
-.entry-rows legend { font-size: .92rem; color: #33404d; padding: 0 .3rem; }
+.entry-rows legend { font-size: .92rem; color: var(--ink); padding: 0 .3rem; }
 .entry-row {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
@@ -988,16 +1065,35 @@ button.f1040-amt:focus-visible { outline: 2px solid var(--accent); outline-offse
     padding: .3rem 0;
 }
 .entry-add-row { margin-top: .5rem; font-size: .85rem; }
-.entry-message { padding: .5rem .7rem; border-radius: 3px; max-width: 46rem; }
-.entry-message-ok { background: #eef7ee; border-left: 3px solid #2f7d32; }
-.entry-message-error { background: #fdf0ee; border-left: 3px solid #a4342a; }
-.entry-empty { color: #6b757f; font-style: italic; }
+
+/* A status carries THREE cues: a glyph the page writes into the text, a border
+   weight, and a colour. Any two can be lost — a monochrome screen, a printout,
+   a reader with no colour vision — and the message still reads. */
+.entry-message {
+    padding: .5rem .7rem .5rem .8rem;
+    border-radius: 3px;
+    max-width: 46rem;
+    font-weight: 500;
+}
+.entry-message-ok {
+    background: var(--ok-soft);
+    color: var(--ok);
+    border-left: 4px solid var(--ok);
+}
+.entry-message-error {
+    background: var(--stop-soft);
+    color: var(--stop);
+    border-left: 8px double var(--stop);
+}
+.entry-empty { color: var(--ink-faint); font-style: italic; }
 .entry-table { border-collapse: collapse; width: 100%; margin: .8rem 0; font-size: .9rem; }
 .entry-table th, .entry-table td {
     text-align: left;
     padding: .35rem .5rem;
-    border-bottom: 1px solid #e4e8ec;
+    border-bottom: 1px solid var(--line-strong);
     vertical-align: top;
+    color: var(--ink);
 }
+.entry-table th { font-weight: 700; }
 .entry-amount { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.entry-hash { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .82rem; color: #4a5560; }
+.entry-hash { font-family: var(--mono); font-size: .82rem; color: var(--ink-soft); }
