@@ -4363,8 +4363,8 @@ const socialSecurityDocument = documentHash => box5NetBenefits => ({
     value: {
         dialect: ssa1099Dialect,
         payerTin: '',
-        recipientTin: '222-22-2222',
-        accountNumber: 'CLAIM-0001',
+        beneficiarySSN: '222-22-2222',
+        claimNumber: 'CLAIM-0001',
         taxYear: 2025,
         formRevision: '2025',
         box5NetBenefits,

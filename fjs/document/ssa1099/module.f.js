@@ -19,18 +19,28 @@
  *
  * Deliberate deviations from the family's usual field conventions, each
  * with its own rationale:
- * - **`payerTin` is ALWAYS stored as `''`.** SSA-1099 prints no payer TIN
- *   anywhere — the "payer" is universally the Social Security
- *   Administration, and Pub 915's sample shows no TIN box for it at all.
- *   This is a deliberate deviation, not an oversight: do not invent a fake
- *   SSA EIN to fill this field, which would misrepresent what is actually
- *   printed on the form. Mirrors this project's already-established
- *   `accountNumber: string` (always-present, may-be-empty) convention.
- * - **`accountNumber` maps to Box 8, the Claim Number.** Pub 915 directs
- *   using this number for any SSA correspondence ("be sure to use the claim
- *   number shown in box 8"), making it functionally this form's per-account
- *   identifier — the natural fit for the subject-key convention's
- *   `accountNumber` slot.
+ * - **`payerTin` is ALWAYS stored as `''`, and it is the ONE field here that
+ *   FORM-KEY-02 did not rename — because there is no box to rename it to.**
+ *   SSA-1099 prints no payer TIN anywhere: the "payer" is universally the
+ *   Social Security Administration, and Pub 915's sample shows no TIN box for
+ *   it at all. This is a deliberate deviation, not an oversight: do not invent
+ *   a fake SSA EIN to fill this field, which would misrepresent what is
+ *   actually printed on the form. It keeps DOC-01's ROLE name precisely
+ *   because it transcribes nothing, which is the same reason `vnd.fjs.k1_1065`
+ *   and `vnd.fjs.k1_1120s` keep their `accountNumber`s. {@link checkReferences}
+ *   refuses any non-empty value, so the name cannot start meaning something.
+ * - **`claimNumber` IS Box 8, and is named for it.** Pub 915 directs using
+ *   this number for any SSA correspondence ("be sure to use the claim number
+ *   shown in box 8"), making it functionally this form's per-account
+ *   identifier — so it plays {@link subjectKey}'s `account` ROLE while
+ *   carrying the printed caption's own word. It was called `accountNumber`
+ *   until FORM-KEY-02, when a dialect stopped having to spell the five roles
+ *   with five shared field names; the box has always said *Claim Number*.
+ * - **`beneficiarySSN` IS Box 2**, captioned *"Beneficiary's Social Security
+ *   Number"* in the same Pub 915 sample. It was `recipientTin`, which is not
+ *   a phrase this form prints anywhere: the SSA calls the person a
+ *   BENEFICIARY, and the number an SSN rather than the general TIN — a
+ *   beneficiary of Social Security necessarily has one.
  * - **Box 7 (Address) is NOT modeled**, mirroring the W-2 box 9/14 omission
  *   precedent: it is PII with no computational use.
  * - **`corrected: option(true)` is kept for structural consistency with
@@ -74,8 +84,8 @@ export const mediaType = mediaTypeOf(dialect)
 export const ssa1099Schema = /** @type {const} */ ({
     ...base(dialect),
     payerTin: string,
-    recipientTin: string,
-    accountNumber: string,
+    beneficiarySSN: string,
+    claimNumber: string,
     taxYear: number,
     formRevision: string,
     corrected: option(true),
@@ -95,7 +105,7 @@ export const ssa1099Schema = /** @type {const} */ ({
  * shared set of field names.
  * @type {SubjectKey}
  */
-export const subjectKey = { formType: 'dialect', taxYear: 'taxYear', payer: 'payerTin', recipient: 'recipientTin', account: 'accountNumber' }
+export const subjectKey = { formType: 'dialect', taxYear: 'taxYear', payer: 'payerTin', recipient: 'beneficiarySSN', account: 'claimNumber' }
 
 /** @typedef {Ts<typeof ssa1099Schema>} Ssa1099 */
 
@@ -182,8 +192,8 @@ export const validate = value => {
 const minimal = {
     dialect,
     payerTin: '',
-    recipientTin: '222-22-2222',
-    accountNumber: 'CLAIM-0001',
+    beneficiarySSN: '222-22-2222',
+    claimNumber: 'CLAIM-0001',
     taxYear: 2025,
     formRevision: '2025',
 }
@@ -228,6 +238,33 @@ export const proof = {
     dialectAndMediaType: () => {
         assertEq(dialect, 'vnd.fjs.ssa1099')
         assertEq(mediaType, 'application/vnd.fjs.ssa1099+json')
+    },
+
+    /**
+     * **The two printed identifiers, asserted rather than described.**
+     * `beneficiarySSN` is box 2 and plays {@link subjectKey}'s `recipient`
+     * role; `claimNumber` is box 8 and plays its `account` role. Nothing else
+     * in this module would notice the two being transposed: the schema types
+     * both as `string`, `checkReferences` constrains neither, and a
+     * transposed pair still derives a perfectly well-formed subject — for the
+     * WRONG beneficiary.
+     *
+     * The two are also the reason `payerTin` stays: it is asserted here to be
+     * EMPTY alongside them, so the three-way shape of this form's identity —
+     * no payer, an SSN, a claim number — is pinned in one leaf rather than
+     * split between a docstring and a refusal proof. The neighbouring
+     * `validate.payerTinEmptyStringRoundTrips` and its control keep the
+     * REFUSAL covered; this leaf keeps the LAYOUT covered.
+     */
+    theBeneficiaryAndTheClaimNumberAreNotTransposed: () => {
+        const [t, v] = validate(minimal)
+        assert(t === 'ok', ['expected ok', t, v])
+        if (t !== 'ok') {
+            throw ['expected ok', t, v]
+        }
+        assertEq(v.beneficiarySSN, '222-22-2222', 'beneficiarySSN holds box 2, in an SSN format')
+        assertEq(v.claimNumber, 'CLAIM-0001', 'claimNumber holds box 8, which is not a TIN at all')
+        assertEq(v.payerTin, '', 'SSA-1099 prints no payer TIN, so the payer role is empty')
     },
     validate: {
         fullyPopulatedValidates: () => {

@@ -1498,8 +1498,8 @@ const documentByHash = {
     [fixtureSweepSocialSecurityHash]: {
         dialect: ssa1099Dialect,
         payerTin: '',
-        recipientTin: '222-22-2222',
-        accountNumber: 'CLAIM-SWEEP',
+        beneficiarySSN: '222-22-2222',
+        claimNumber: 'CLAIM-SWEEP',
         taxYear: 2025,
         formRevision: '2025',
         box5NetBenefits: '12000.00',
@@ -1528,8 +1528,8 @@ const documentByHash = {
     [fixtureSweepSocialSecurityWithholdingHash]: {
         dialect: ssa1099Dialect,
         payerTin: '',
-        recipientTin: '222-22-2222',
-        accountNumber: 'CLAIM-SWEEP-W4V',
+        beneficiarySSN: '222-22-2222',
+        claimNumber: 'CLAIM-SWEEP-W4V',
         taxYear: 2025,
         formRevision: '2025',
         box5NetBenefits: '9000.00',
