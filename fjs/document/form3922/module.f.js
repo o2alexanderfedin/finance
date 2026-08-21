@@ -79,8 +79,13 @@
  * The printed boxes are "CORPORATION'S federal identification number" and
  * "EMPLOYEE'S identification number". The naming follows this family's
  * convention for the reason `fjs/document/form3921`'s own header states in
- * full: `fjs/document/subject`'s `formSubject` keys every stored document on
- * `(payerTin, recipientTin, accountNumber, taxYear, formType)`.
+ * full: `fjs/document/subject`'s `formSubject` KEYED every stored document on
+ * the five shared field names `(payerTin, recipientTin, accountNumber,
+ * taxYear, formType)`, so a dialect that spelled its parties differently had
+ * no subject at all. FORM-KEY-01 ended that — a dialect declares its own role
+ * mapping now ({@link subjectKey}) — and `vnd.fjs.1098e`, `vnd.fjs.1098t` and
+ * `vnd.fjs.1095a` have since taken their printed names. This dialect has not;
+ * `corporationEin`/`employeeTin` is available and simply not done yet.
  *
  * @module
  */
