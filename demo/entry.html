@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Enter documents — Form 1040</title>
+<meta name="description" content="Type a return's source documents by hand and compute the return. Everything stays in this browser.">
+<link rel="stylesheet" href="demo.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ctext y='25' x='7' font-size='26' font-family='serif' font-style='italic' fill='%231c5d99'%3E%C6%92%3C/text%3E%3C/svg%3E">
+<!--
+  The same import map every page here carries. `lib/engine.js` imports
+  `functionalscript/...` as a bare specifier; without this the module graph
+  never loads and the page renders white.
+-->
+<script type="importmap">
+{
+  "imports": {
+    "functionalscript/": "../functionalscript/"
+  }
+}
+</script>
+</head>
+<body class="entry-page">
+
+<header class="entry-header">
+    <h1>Enter documents</h1>
+    <p class="entry-lede">
+        Type a return's source documents. The boxes below are generated from each dialect's own
+        schema — the same one the validator uses — so this page cannot ask for a box the engine
+        does not know, or omit one it does.
+    </p>
+    <p class="entry-privacy">
+        <strong>Nothing leaves this browser.</strong> Documents are stored in IndexedDB on this
+        machine. There is no upload, no server, and no network request on this page.
+    </p>
+    <a class="f1040-back" href="./">← the walkthrough demo</a>
+</header>
+
+<main class="entry-main">
+
+    <section class="entry-section">
+        <h2>1 — Add a document</h2>
+        <label class="entry-field">
+            <span class="entry-label">Document type</span>
+            <select id="dialect"></select>
+        </label>
+        <div id="form-host"></div>
+        <button id="save" class="nav-button nav-primary" type="button">Store document</button>
+        <p id="message" class="entry-message" hidden></p>
+    </section>
+
+    <section class="entry-section">
+        <h2>2 — Stored documents</h2>
+        <div id="documents"></div>
+        <button id="clear" class="nav-button" type="button">Empty the store</button>
+    </section>
+
+    <section class="entry-section">
+        <h2>3 — Compute the return</h2>
+        <button id="compute" class="nav-button nav-primary" type="button">Compute</button>
+        <div id="result"></div>
+    </section>
+
+</main>
+
+<div id="boot-error" class="boot-error" hidden></div>
+
+<script type="module" src="entry.js"></script>
+<script type="module">
+// A module that fails to load leaves a blank page and a console nobody reads.
+window.addEventListener('error', event => {
+    const box = document.getElementById('boot-error')
+    if (box === null) { return }
+    box.hidden = false
+    box.textContent = `Failed to load: ${event.message}`
+})
+</script>
+
+</body>
+</html>

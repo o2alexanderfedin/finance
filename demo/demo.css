@@ -938,3 +938,66 @@ button.f1040-amt:focus-visible { outline: 2px solid var(--accent); outline-offse
     .f1040-dollars, .f1040-cents { min-height: 0; padding: .2rem .35rem; }
     .f1040-n, .f1040-label { padding-top: .2rem; padding-bottom: .2rem; }
 }
+
+/* ── Hand entry ──────────────────────────────────────────────────────────────
+   The accountant-facing page. Deliberately plain: a form that looks like a
+   form. Every rule here is layout or legibility — nothing conveys meaning that
+   the text does not already say, because a colour is not evidence. */
+
+.entry-page { max-width: 60rem; margin: 0 auto; padding: 1.5rem; }
+.entry-header h1 { margin-bottom: .25rem; }
+.entry-lede { max-width: 46rem; }
+.entry-privacy {
+    max-width: 46rem;
+    padding: .6rem .8rem;
+    border-left: 3px solid #1c5d99;
+    background: #f4f8fc;
+}
+.entry-section {
+    margin: 2rem 0;
+    padding-top: 1rem;
+    border-top: 1px solid #d8dde3;
+}
+.entry-form {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr));
+    gap: .6rem 1.2rem;
+    margin: 1rem 0;
+}
+.entry-field { display: flex; flex-direction: column; gap: .2rem; font-size: .92rem; }
+.entry-label { color: #33404d; }
+.entry-required { color: #a4342a; text-decoration: none; margin-left: .15rem; }
+.entry-field input, .entry-field select {
+    padding: .35rem .45rem;
+    border: 1px solid #b9c2cc;
+    border-radius: 3px;
+    font: inherit;
+}
+.entry-field input[type="checkbox"] { align-self: flex-start; }
+.entry-rows {
+    grid-column: 1 / -1;
+    border: 1px solid #d8dde3;
+    border-radius: 4px;
+    padding: .6rem .8rem;
+}
+.entry-rows legend { font-size: .92rem; color: #33404d; padding: 0 .3rem; }
+.entry-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+    gap: .4rem 1rem;
+    padding: .3rem 0;
+}
+.entry-add-row { margin-top: .5rem; font-size: .85rem; }
+.entry-message { padding: .5rem .7rem; border-radius: 3px; max-width: 46rem; }
+.entry-message-ok { background: #eef7ee; border-left: 3px solid #2f7d32; }
+.entry-message-error { background: #fdf0ee; border-left: 3px solid #a4342a; }
+.entry-empty { color: #6b757f; font-style: italic; }
+.entry-table { border-collapse: collapse; width: 100%; margin: .8rem 0; font-size: .9rem; }
+.entry-table th, .entry-table td {
+    text-align: left;
+    padding: .35rem .5rem;
+    border-bottom: 1px solid #e4e8ec;
+    vertical-align: top;
+}
+.entry-amount { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.entry-hash { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .82rem; color: #4a5560; }
