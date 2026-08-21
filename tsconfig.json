@@ -49,5 +49,11 @@
     "skipLibCheck": true,
   },
 
-  "exclude": ["node_modules"],
+  // `ui-tests` is a SEPARATE npm package with its own dependency and its own
+  // `tsc` (see its tsconfig.json). Leaving it in this program made the root
+  // build depend on `ui-tests/node_modules` being installed — green on a
+  // machine where it was and red in CI, where it is not, which is exactly how
+  // it was found: the Pages deploy failed on twenty TS2307/TS7031 errors while
+  // the same command passed locally. A falsely-green `tsc`, again.
+  "exclude": ["node_modules", "ui-tests"],
 }
