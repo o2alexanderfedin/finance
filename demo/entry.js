@@ -239,9 +239,18 @@ const clearButton = required('clear', HTMLButtonElement)
 
 const database = await openDatabase()
 
-/** @type {(text: string) => (kind: 'ok' | 'error') => void} */
+/**
+ * Says something, in three cues rather than one.
+ *
+ * The glyph is written into the TEXT, not drawn in CSS, so it survives a
+ * monochrome screen, a printout, and a reader who sees no colour at all — and
+ * a screen reader announces it. `role="status"` makes the box a live region,
+ * so a confirmation or a refusal is spoken when it appears rather than only
+ * when someone happens to move focus onto it.
+ * @type {(text: string) => (kind: 'ok' | 'error') => void}
+ */
 const say = text => kind => {
-    messageBox.textContent = text
+    messageBox.textContent = text === '' ? '' : `${kind === 'ok' ? '✓' : '✕'} ${text}`
     messageBox.className = `entry-message entry-message-${kind}`
     messageBox.hidden = text === ''
 }
