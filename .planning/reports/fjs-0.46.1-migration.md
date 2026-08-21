@@ -334,8 +334,9 @@ correct about the mechanism and wrong about the thing being protected. The diffe
 
 The same mechanism, with the decision made once and stored in CAS instead of re-made on every step.
 That is the clearest statement of the thesis this project has produced, and we got it by reading
-your type declarations. It is recorded in `fjs/todo/upstream-mjs-migration.md`, and it is the reason
-that note calls the analogy a finding rather than a metaphor.
+your type declarations. It was recorded in `fjs/todo/upstream-mjs-migration.md`, which called the analogy a finding rather
+than a metaphor; that note was retired by `1924cef` once its three conditions were met, and this
+report is where the observation now lives.
 
 ### 5.2 `partialMatch` is the wrong eliminator for a whitelist
 
@@ -676,6 +677,7 @@ it is worth deciding upstream whether that is intended for a remote transport.
   `.d.mts`-only package plus a legacy specifier makes `tsc` bind to an ancestor `node_modules` and
   report a **falsely green 0**.
 
-`fjs/todo/upstream-mjs-migration.md` holds the full running record — six stages, per-pass counts,
-and the reasoning as it was made rather than as it reads afterwards. This report is the summary it
-retires on.
+`fjs/todo/upstream-mjs-migration.md` held the full running record — six stages, per-pass counts,
+and the reasoning as it was made rather than as it reads afterwards. **It was retired by `1924cef`
+when all three of its conditions were met, so this report is now the only account**; the running
+record is recoverable from that commit's parent if the per-pass detail is ever wanted.

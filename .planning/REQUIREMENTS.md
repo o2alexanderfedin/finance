@@ -642,7 +642,9 @@ so they are scheduled rather than remembered. All are T3 — none blocks the v1 
       forbidden by AGENTS.md**.
 
       **Resolved by decision rather than left open:** stay on 0.43.1, and the upstream change that
-      unblocks the bump is specified in `fjs/todo/upstream-mjs-migration.md` (one
+      unblocks the bump was specified in `fjs/todo/upstream-mjs-migration.md` — retired by `1924cef`
+      once its conditions were met; the surviving account is
+      `.planning/reports/fjs-0.46.1-migration.md` (one
       `export type { … }` per relocated type, beside the `import type` already there), with its
       retirement condition. Half-doing the migration would have traded a working build for 288
       errors and a forbidden construct at each one.

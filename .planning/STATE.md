@@ -4,8 +4,8 @@ milestone: v4
 milestone_name: Verified With the Taxpayer Present
 status: awaiting_owner
 stopped_at: "Milestone v3 CLOSED 2026-08-19. Phase 33 delivered the external validation it existed for: 27/51 matched under TaxCalcBench's strict criterion, both divergences decided against the benchmark, one real engine defect fixed (Form 8959 Part V computed for filers not required to file it). Phases 34, 35 and 36 moved to milestone v4 by owner decision -- none is blocked on engineering, all three need the owner: 34 wants the taxpayer's documents and a second filer, 36 wants a real client session (fixtures would prove the pipe and not the phase), 35 wants a decision on a PDF-writing dependency. Suite 3247/3247, 3202 proof leaves, 127/127 requirements, 34 of 37 phases."
-last_updated: "2026-08-17T21:30:00.000Z"
-last_activity: 2026-08-17
+last_updated: "2026-08-20T18:40:00.000Z"
+last_activity: 2026-08-20
 progress:
   total_phases: 37
   completed_phases: 34
@@ -22,7 +22,12 @@ See: .planning/PROJECT.md (updated 2026-08-03)
 
 **Core value:** The report is a program, not an answer — the agent emits FunctionalScript;
 the server executes it as a pure function of `(documents, tax-year parameters) → report`.
-**Current focus:** Between phases — Phase 15 shipped, Phase 16 awaiting an owner decision
+**Current focus:** Milestone v4, all three phases blocked on the owner — 34 wants the taxpayer's
+documents and a second filer, 35 wants one dependency approval, 36 wants a real client session.
+Nothing is in flight. *(This line read "Phase 15 shipped, Phase 16 awaiting an owner decision"
+until 2026-08-20 — two milestones stale, while `last_updated` said 2026-08-17 and the `stopped_at`
+field directly above it narrated events of 2026-08-19. A timestamp older than the text it stamps
+is the cheapest possible tell, and nothing was watching for it.)*
 
 ## Current Position
 
