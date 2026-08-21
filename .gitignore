@@ -159,3 +159,10 @@ vite.config.ts.timestamp-*
 
 # Generated demo exports (print-to-PDF of the live demo) — an artifact, not source
 demo-outputs/
+
+# The UI-automation package is a separate npm package (AGENTS.md's dependency
+# rule, satisfied by keeping the browser driver out of the shipped one). Its
+# install and its run artifacts are not source.
+ui-tests/node_modules/
+ui-tests/test-results/
+ui-tests/playwright-report/

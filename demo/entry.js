@@ -250,10 +250,18 @@ for (const { dialect } of enterableDialects) {
     picker.append(new Option(dialect, dialect))
 }
 
-/** @type {() => void} */
-const showForm = () => {
+/**
+ * Draws the form for the selected dialect and NOTHING else.
+ *
+ * It used to clear the message too, which meant the save handler — which
+ * redraws the form after a successful store — wiped the confirmation it had
+ * just written, so "Stored as …" never appeared. Found by the browser
+ * automation on its first run (`ui-tests/entry.spec.js`), which is precisely
+ * the class of defect no proof in this repository can reach.
+ * @type {() => void}
+ */
+const renderForm = () => {
     formHost.replaceChildren(drawForm(picker.value))
-    say('')('ok')
 }
 
 /** @type {() => Promise<void>} */
@@ -307,10 +315,10 @@ saveButton.addEventListener('click', async () => {
         .filter(([hash, r]) => r.subject === subject && !superseded.has(hash))
         .map(([hash]) => hash)
     await evoAdd(database)({ subject, snapshot, parents })
+    renderForm()
     say(parents.length === 0
         ? `Stored as ${shortAddress(snapshot)}.`
         : `Stored as ${shortAddress(snapshot)}, amending the previous entry for this subject.`)('ok')
-    showForm()
     await refreshDocuments()
 })
 
@@ -362,6 +370,11 @@ clearButton.addEventListener('click', async () => {
     await refreshDocuments()
 })
 
-picker.addEventListener('change', showForm)
-showForm()
+// Changing the document type discards whatever the last action said: the
+// message was about a different form.
+picker.addEventListener('change', () => {
+    renderForm()
+    say('')('ok')
+})
+renderForm()
 await refreshDocuments()
