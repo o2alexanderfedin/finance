@@ -931,7 +931,7 @@ const w2WithBox12 = documentHash => box12 => ({
     documentHash,
     value: {
         dialect: 'vnd.fjs.w2',
-        payerTin: '11-1111111', recipientTin: '222-22-2222', accountNumber: 'ACC-W2',
+        employerEIN: '11-1111111', employeeSSN: '222-22-2222', controlNumber: 'ACC-W2',
         taxYear: 2025, formRevision: '2025',
         box12,
     },
@@ -946,7 +946,7 @@ const w2WithNoBoxTwelve = {
     documentHash: 'sha256-w2-nobox12',
     value: {
         dialect: 'vnd.fjs.w2',
-        payerTin: '11-1111111', recipientTin: '222-22-2222', accountNumber: 'ACC-W2',
+        employerEIN: '11-1111111', employeeSSN: '222-22-2222', controlNumber: 'ACC-W2',
         taxYear: 2025, formRevision: '2025',
         box1WagesTipsOtherCompensation: '52000.00',
     },
@@ -960,8 +960,8 @@ const isoForm = hash => exercisePrice => fairMarketValue => shares => ({
     documentHash: hash,
     value: {
         dialect: 'vnd.fjs.form3921',
-        payerTin: '11-1111111',
-        recipientTin: '222-22-2222',
+        transferorTin: '11-1111111',
+        employeeTin: '222-22-2222',
         accountNumber: 'ACC-0001',
         taxYear: 2025,
         formRevision: 'April 2025',
@@ -981,8 +981,8 @@ const beneficiaryK1 = hash => box12 => ({
     documentHash: hash,
     value: {
         dialect: 'vnd.fjs.k1_1041',
-        payerTin: '66-6666666',
-        recipientTin: '222-22-2222',
+        estateOrTrustEIN: '66-6666666',
+        beneficiaryIdentifyingNumber: '222-22-2222',
         taxYear: 2025,
         formRevision: '2025',
         payerName: 'The Harrow Family Trust',

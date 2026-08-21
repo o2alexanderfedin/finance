@@ -758,9 +758,9 @@ const expectedTripwireCount = 12
 /** A W-2 carrying nothing but the fields its schema requires. @type {W2} */
 const bareW2 = {
     dialect: w2Dialect,
-    payerTin: '11-1111111',
-    recipientTin: '222-22-2222',
-    accountNumber: '',
+    employerEIN: '11-1111111',
+    employeeSSN: '222-22-2222',
+    controlNumber: '',
     taxYear: 2025,
     formRevision: '2025',
 }
@@ -852,7 +852,7 @@ const bare1099B = {
 /** A cash-method farm with a real printed line 2. @type {Farm} */
 const farm = {
     dialect: 'vnd.fjs.farm',
-    recipientTin: '222-22-2222',
+    proprietorSsn: '222-22-2222',
     accountNumber: 'FARM-0001',
     taxYear: 2025,
     principalCropOrActivity: 'corn and soybeans',
@@ -881,8 +881,8 @@ const rentalProperty = {
 /** A partnership Schedule K-1 with a real box 1 share. @type {K1Partnership} */
 const partnershipK1 = {
     dialect: k1PartnershipDialect,
-    payerTin: '33-3333333',
-    recipientTin: '222-22-2222',
+    partnershipEIN: '33-3333333',
+    partnerTin: '222-22-2222',
     accountNumber: 'PTR-0001',
     taxYear: 2025,
     formRevision: '2025',
@@ -895,8 +895,8 @@ const partnershipK1 = {
 /** An S-corporation Schedule K-1 with the same box 1 share. @type {K1SCorporation} */
 const sCorporationK1 = {
     dialect: k1SCorporationDialect,
-    payerTin: '44-4444444',
-    recipientTin: '222-22-2222',
+    corporationEIN: '44-4444444',
+    shareholderIdentifyingNumber: '222-22-2222',
     accountNumber: 'SHR-0001',
     taxYear: 2025,
     formRevision: '2025',
@@ -913,8 +913,8 @@ const sCorporationK1 = {
  */
 const estateTrustK1 = {
     dialect: 'vnd.fjs.k1_1041',
-    payerTin: '66-6666666',
-    recipientTin: '222-22-2222',
+    estateOrTrustEIN: '66-6666666',
+    beneficiaryIdentifyingNumber: '222-22-2222',
     taxYear: 2025,
     formRevision: '2025',
     boxHDomesticBeneficiary: true,
@@ -941,8 +941,8 @@ const estateTrustK1 = {
  */
 const partnershipK1NoBusinessIncome = {
     dialect: k1PartnershipDialect,
-    payerTin: '33-3333333',
-    recipientTin: '222-22-2222',
+    partnershipEIN: '33-3333333',
+    partnerTin: '222-22-2222',
     accountNumber: 'PTR-0004',
     taxYear: 2025,
     formRevision: '2025',
@@ -953,8 +953,8 @@ const partnershipK1NoBusinessIncome = {
 /** @type {K1SCorporation} */
 const sCorporationK1NoBusinessIncome = {
     dialect: k1SCorporationDialect,
-    payerTin: '44-4444444',
-    recipientTin: '222-22-2222',
+    corporationEIN: '44-4444444',
+    shareholderIdentifyingNumber: '222-22-2222',
     accountNumber: 'SHR-0004',
     taxYear: 2025,
     formRevision: '2025',
@@ -964,8 +964,8 @@ const sCorporationK1NoBusinessIncome = {
 /** @type {K1EstateTrust} */
 const estateTrustK1NoBusinessIncome = {
     dialect: 'vnd.fjs.k1_1041',
-    payerTin: '66-6666666',
-    recipientTin: '222-22-2222',
+    estateOrTrustEIN: '66-6666666',
+    beneficiaryIdentifyingNumber: '222-22-2222',
     taxYear: 2025,
     formRevision: '2025',
     boxHDomesticBeneficiary: true,
@@ -977,8 +977,8 @@ const estateTrustK1NoBusinessIncome = {
  */
 const isoExercise = {
     dialect: formThirtyNineTwentyOneDialect,
-    payerTin: '66-6666666',
-    recipientTin: '222-22-2222',
+    transferorTin: '66-6666666',
+    employeeTin: '222-22-2222',
     accountNumber: '',
     taxYear: 2025,
     formRevision: 'April 2025',
@@ -1369,8 +1369,8 @@ export const proof = {
             /** @type {FormThirtyNineTwentyOne} */
             const bare = {
                 dialect: formThirtyNineTwentyOneDialect,
-                payerTin: '66-6666666',
-                recipientTin: '222-22-2222',
+                transferorTin: '66-6666666',
+                employeeTin: '222-22-2222',
                 accountNumber: '',
                 taxYear: 2025,
                 formRevision: 'April 2025',

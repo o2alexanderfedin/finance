@@ -1043,7 +1043,7 @@ const farmDocument = accountNumber => ({
     documentHash: 'sha256-farm',
     value: {
         dialect: 'vnd.fjs.farm',
-        recipientTin: '222-22-2222',
+        proprietorSsn: '222-22-2222',
         accountNumber,
         taxYear: 2025,
         principalCropOrActivity: 'corn and soybeans',

@@ -33,30 +33,47 @@
  * $1,000). Enter it on Form 6251, line 2i."* `fjs/form6251` performs that
  * multiplication; this dialect only stores what it reads.
  *
- * ## `payerTin` is the TRANSFEROR and `recipientTin` is the EMPLOYEE
+ * ## `transferorTin` is the TRANSFEROR and `employeeTin` is the EMPLOYEE
  *
- * The printed boxes are "TRANSFEROR'S TIN" and "EMPLOYEE'S TIN", and this
- * family's convention — stated at length in `fjs/document/1098t`'s own header
- * and inherited from `fjs/document/1098e`'s naming INVERSION — is that
- * `payerTin` holds the printed FILER's TIN and `recipientTin` holds the TIN of
- * the person the form is about. A `transferorTin`/`employeeTin` pair of its
- * own was rejected for the reason 1098-T records: `fjs/document/subject`'s
- * `formSubject` keys every stored document on
- * `(payerTin, recipientTin, accountNumber, taxYear, formType)`, and a dialect
- * whose identity fields are named something else has no subject at all.
+ * The printed boxes are **"TRANSFEROR'S TIN"** and **"EMPLOYEE'S TIN"**, and
+ * since FORM-KEY-02 those are what the fields are called. `accountNumber`
+ * keeps its name, because the printed "Account number (see instructions)"
+ * box was already spelled the way the field was.
+ *
+ * **They were `payerTin`/`recipientTin`, and why is worth keeping rather
+ * than deleting.** `fjs/document/subject`'s `formSubject` keyed every stored
+ * document on the five shared field NAMES `(payerTin, recipientTin,
+ * accountNumber, taxYear, formType)`, so a dialect whose identity fields
+ * were named anything else had no subject at all — a
+ * `transferorTin`/`employeeTin` pair was rejected on exactly that ground.
+ * **FORM-KEY-01 removed the premise.** A dialect now declares which of its
+ * OWN fields play the five roles ({@link subjectKey}), so the names are free
+ * to follow the paper while the roles stay put: `transferorTin` plays the
+ * PAYER role, because the corporation is the party that filed this form, and
+ * `employeeTin` plays the RECIPIENT role, because the employee is who it is
+ * about. `vnd.fjs.1098e`, `vnd.fjs.1098t` and `vnd.fjs.1095a` spent the same
+ * freedom first (`lenderTin`/`borrowerTin`, `filerEin`/`studentTin`,
+ * `recipientSsn`).
+ *
+ * **The subject a stored Form 3921 derives is byte-identical to the one it
+ * derived under the old names**: the declaration moved, the values did not.
+ * {@link proof}.theTransferorAndTheEmployeeAreNotTransposed pins the two
+ * parties by TIN FORMAT, because a transposition of these two fields is
+ * exactly the defect AGENTS.md's own sweep found in a 1099-INT box mapping —
+ * silent, and invisible to every proof that does not name the parties.
  *
  * **The 1098-T hazard does NOT carry over, and that is worth stating rather
- * than leaving to be rediscovered.** On a 1098-T, `recipientTin` is the
- * STUDENT, who is frequently a dependent rather than the filer, and
- * `fjs/form8863` must match each form to a claimed student by that TIN or it
- * attributes one child's tuition to another. Here, `recipientTin` is the
- * EMPLOYEE, who on a joint return may be either spouse — and it does not
- * matter which, because a joint return computes ONE Form 6251 over ONE
- * alternative minimum taxable income and §56(b)(3) makes no per-spouse
- * distinction. So `fjs/form6251` sums every stored Form 3921's spread without
- * scoping by `recipientTin`, which is the opposite of what Form 8863 does with
- * this same field. {@link proof}.theEmployeeMayBeEitherSpouse is the leaf that
- * records the case.
+ * than leaving to be rediscovered.** On a 1098-T, the recipient role is the
+ * STUDENT — spelled `studentTin` there — who is frequently a dependent rather
+ * than the filer, and `fjs/form8863` must match each form to a claimed student
+ * by that TIN or it attributes one child's tuition to another. Here,
+ * `employeeTin` is the EMPLOYEE, who on a joint return may be either spouse —
+ * and it does not matter which, because a joint return computes ONE Form 6251
+ * over ONE alternative minimum taxable income and §56(b)(3) makes no
+ * per-spouse distinction. So `fjs/form6251` sums every stored Form 3921's
+ * spread without scoping by `employeeTin`, which is the opposite of what Form
+ * 8863 does with the field playing the same role.
+ * {@link proof}.theEmployeeMayBeEitherSpouse is the leaf that records the case.
  *
  * ## Box 6 is an identity, not an amount
  *
@@ -114,6 +131,7 @@ import { shareCountError } from '../share_count/module.f.js'
 /** @import { Result } from 'functionalscript/fjs/types/result/types.js' */
 /** @import { Ts, Unknown } from 'functionalscript/fjs/types/rtti/ts/types.js' */
 /** @import { ValidationError } from 'functionalscript/fjs/types/rtti/common/types.js' */
+/** @import { SubjectKey } from '../subject/module.f.js' */
 
 /**
  * Format tag: names the dialect of this BLOB. The media type it is served
@@ -139,8 +157,8 @@ export const mediaType = mediaTypeOf(dialect)
  */
 export const formThirtyNineTwentyOneSchema = /** @type {const} */ ({
     ...base(dialect),
-    payerTin: string,
-    recipientTin: string,
+    transferorTin: string,
+    employeeTin: string,
     accountNumber: string,
     taxYear: number,
     formRevision: string,
@@ -156,6 +174,15 @@ export const formThirtyNineTwentyOneSchema = /** @type {const} */ ({
     payerName: option(string),
     recipientName: option(string),
 })
+
+/**
+ * FORM-KEY-01 -- which of THIS dialect's OWN fields play the five roles a
+ * form subject is keyed on. See `fjs/document/subject`'s {@link SubjectKey}
+ * for why the dialect declares this instead of every caller assuming one
+ * shared set of field names.
+ * @type {SubjectKey}
+ */
+export const subjectKey = { formType: 'dialect', taxYear: 'taxYear', payer: 'transferorTin', recipient: 'employeeTin', account: 'accountNumber' }
 
 /** @typedef {Ts<typeof formThirtyNineTwentyOneSchema>} FormThirtyNineTwentyOne */
 
@@ -282,8 +309,8 @@ const sharedSourceArtifactHash = 'deadbeef00112233445566778899aabbccddeeff001122
 /** @type {FormThirtyNineTwentyOne} */
 const minimal = {
     dialect,
-    payerTin: '11-1111111',
-    recipientTin: '222-22-2222',
+    transferorTin: '11-1111111',
+    employeeTin: '222-22-2222',
     accountNumber: 'ACC-0001',
     taxYear: 2025,
     formRevision: 'April 2025',
@@ -425,7 +452,7 @@ export const proof = {
     /**
      * The identity question this dialect had to answer, recorded as a fixture
      * rather than only as prose (see this module's own docstring): the EMPLOYEE
-     * may be either spouse on a joint return, and `recipientTin` therefore need
+     * may be either spouse on a joint return, and `employeeTin` therefore need
      * not be the filer's own. Unlike `vnd.fjs.1098t`, nothing downstream scopes
      * by this field — so this leaf pins that the dialect ACCEPTS a
      * non-filer TIN, and `fjs/form6251`'s own summation leaf pins that it does
@@ -433,14 +460,53 @@ export const proof = {
      */
     theEmployeeMayBeEitherSpouse: () => {
         const filersOwnTin = '222-22-2222'
-        const [t, v] = validate({ ...minimal, recipientTin: '444-44-4444', box5NumberOfSharesTransferred: '10' })
+        const [t, v] = validate({ ...minimal, employeeTin: '444-44-4444', box5NumberOfSharesTransferred: '10' })
         assert(t === 'ok', ['a spouse\'s Form 3921 must be storable', t, v])
         if (t !== 'ok') {
             throw ['expected ok', t, v]
         }
         assert(
-            v.recipientTin !== filersOwnTin,
-            ['this fixture is deliberately a spouse\'s form, not the filer\'s', v.recipientTin])
+            v.employeeTin !== filersOwnTin,
+            ['this fixture is deliberately a spouse\'s form, not the filer\'s', v.employeeTin])
+    },
+
+    /**
+     * **The two parties, asserted rather than described.** `transferorTin` is
+     * the printed "TRANSFEROR'S TIN" — the corporation, which plays
+     * {@link subjectKey}'s `payer` role — and `employeeTin` is the printed
+     * "EMPLOYEE'S TIN", which plays its `recipient` role. Nothing else in
+     * this module would notice the two being transposed: the schema types
+     * both as `string`, the neighbouring leaf overrides `employeeTin` before
+     * reading it, and a transposed pair still derives a perfectly
+     * well-formed subject — for the WRONG business identity.
+     *
+     * The fixture uses two visibly different TIN FORMATS — an employer
+     * identification number (`NN-NNNNNNN`) for the corporation and a social
+     * security number (`NNN-NN-NNNN`) for the employee — so a transposition
+     * is visible in the assertion itself rather than requiring a reader to
+     * remember which arbitrary digits went where. The same idiom
+     * `vnd.fjs.1098e` uses for its lender and borrower.
+     */
+    theTransferorAndTheEmployeeAreNotTransposed: () => {
+        const [t, v] = validate(publishedExample)
+        assert(t === 'ok', ['expected ok', t, v])
+        if (t !== 'ok') {
+            throw ['expected ok', t, v]
+        }
+        assertEq(
+            v.transferorTin,
+            '11-1111111',
+            'transferorTin holds the printed TRANSFEROR\'S TIN — the corporation, in an EIN format',
+        )
+        assertEq(
+            v.employeeTin,
+            '222-22-2222',
+            'employeeTin holds the printed EMPLOYEE\'S TIN — the person, in an SSN format',
+        )
+        assert(
+            v.transferorTin !== v.employeeTin,
+            ['a Form 3921 always has two distinct parties', v.transferorTin, v.employeeTin],
+        )
     },
 
     /** DOC-12's checkbox convention: `false` is structurally rejected. */

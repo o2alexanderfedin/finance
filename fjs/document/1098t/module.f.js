@@ -48,32 +48,52 @@
  * one Schedule 1 line 21 already uses: `fjs/form8863` reads **both**, and the
  * report says which figure came from which.
  *
- * ## `recipientTin` is the STUDENT, and the student is NOT necessarily the
+ * ## `studentTin` is the STUDENT, and the student is NOT necessarily the
  * taxpayer — a sharper trap than the 1098-E's
  *
  * `fjs/document/1098e` records a naming INVERSION: the printed form calls the
- * lender the "RECIPIENT" and the taxpayer the "BORROWER", so this family's
- * `recipientTin` convention puts the taxpayer's TIN where the printed form
- * says the lender's goes. This form has the same shape — the printed FILER is
- * the institution, so `payerTin` holds the FILER'S TIN and `recipientTin`
- * holds the STUDENT'S TIN — but it carries an extra hazard that the 1098-E
- * does not:
+ * lender the "RECIPIENT" and the taxpayer the "BORROWER". This form has the
+ * same shape — the printed FILER is the institution and the printed STUDENT
+ * is the person whose expenses are at issue — but it carries an extra hazard
+ * the 1098-E does not:
  *
- * **On every other dialect in this tree, `recipientTin` is the taxpayer. Here
+ * **On every other dialect in this tree the recipient IS the taxpayer. Here
  * it may be a dependent.** §25A(f)(1)(A) allows the credit for expenses of
  * the taxpayer, the taxpayer's spouse, OR a dependent, and a parent claiming
  * a credit for a child's tuition holds a 1098-T whose student is the child.
- * Any code that assumes `recipientTin` identifies the filer would attribute a
- * parent's credit to nobody and a child's to a return that is not being
- * filed. `fjs/form8863` therefore matches a 1098-T to a `vnd.fjs.credits`
- * student entry BY `recipientTin`, and never assumes the taxpayer.
- * `theStudentIsTheRecipientTinAndNeedNotBeTheFiler` pins it.
+ * Any code that read this field as the filer's would attribute a parent's
+ * credit to nobody and a child's to a return that is not being filed.
+ * `fjs/form8863` therefore matches a 1098-T to a `vnd.fjs.credits` student
+ * entry BY `studentTin` — the SAME name that dialect already gives its own
+ * field, which is how the match reads as a match — and never assumes the
+ * taxpayer. `theStudentIsTheStudentTinAndNeedNotBeTheFiler` pins it.
  *
- * The alternative — a `studentTin` field of its own — was rejected for
- * `fjs/document/1098e`'s reason: DOC-01's `formSubject` keys every subject on
- * `(payerTin, recipientTin, accountNumber, taxYear, formType)`, and one
+ * A `studentTin` of its own was rejected once, for `fjs/document/1098e`'s
+ * reason: DOC-01's `formSubject` keyed every subject on the five shared field
+ * NAMES `(payerTin, recipientTin, accountNumber, taxYear, formType)`, so one
  * dialect that spelled its parties differently would key a subject by the
- * wrong party. The CONVENTION wins and the hazard is written down here.
+ * wrong party. **FORM-KEY-01 removed that premise** — a dialect declares
+ * which of its OWN fields play the five roles ({@link subjectKey}) — so the
+ * three identity fields now read off the paper:
+ *
+ * - `filerEin` — printed **"FILER'S employer identification no."**, and note
+ *   that the box does NOT say "FILER'S TIN": an educational institution or
+ *   insurer files with an EIN, exactly the pattern `vnd.fjs.w2` box b already
+ *   has. It plays the PAYER role, because the filer is who issued the form.
+ * - `studentTin` — printed **"STUDENT'S TIN"**, above "STUDENT'S name". It
+ *   plays the RECIPIENT role, and the hazard above is precisely that this
+ *   role is not the taxpayer here.
+ * - `serviceProviderAccountNumber` — printed **"Service Provider/Acct. No.
+ *   (see instr.)"**, bottom left. It plays the ACCOUNT role.
+ *
+ * **The subject a stored 1098-T derives is byte-identical to the one it
+ * derived under the old names**: the declaration moved, the values did not.
+ *
+ * Source read directly rather than recalled:
+ * `https://www.irs.gov/pub/irs-pdf/f1098t.pdf` — "Form 1098-T Created
+ * 10/8/25", the 2026 revision, Copy A. Its left column reads "FILER'S name",
+ * then "FILER'S employer identification no." beside "STUDENT'S TIN", then
+ * "STUDENT'S name".
  *
  * ## Boxes 4 and 6 are STORED, and REFUSED one layer out
  *
@@ -112,11 +132,12 @@ import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { base, mediaTypeOf } from '../base/module.f.js'
 import { formRevisionError } from '../form_revision/module.f.js'
 import { moneyFieldError } from '../money_field/module.f.js'
-import { formSubject } from '../subject/module.f.js'
+import { declaredSubject } from '../subject/module.f.js'
 
 /** @import { Result } from 'functionalscript/fjs/types/result/types.js' */
 /** @import { Ts, Unknown } from 'functionalscript/fjs/types/rtti/ts/types.js' */
 /** @import { ValidationError } from 'functionalscript/fjs/types/rtti/common/types.js' */
+/** @import { SubjectKey } from '../subject/module.f.js' */
 
 /**
  * Format tag: names the dialect of this BLOB. The media type it is served
@@ -131,10 +152,12 @@ export const mediaType = mediaTypeOf(dialect)
  * structural validation reports it as the first failing field on a mismatched
  * blob, matching every other document dialect in this tree.
  *
- * `payerTin` is the printed form's **FILER'S TIN** (the educational
- * institution or insurer) and `recipientTin` is its **STUDENT'S TIN**, which
- * may be a dependent's rather than the taxpayer's — see this module's own
- * docstring, "`recipientTin` is the STUDENT".
+ * `filerEin` is the printed form's **FILER'S employer identification no.**
+ * (the educational institution or insurer — the printed box says EIN, not
+ * TIN) and `studentTin` is its **STUDENT'S TIN**, which may be a dependent's
+ * rather than the taxpayer's — see this module's own docstring, "`studentTin`
+ * is the STUDENT". `serviceProviderAccountNumber` is the bottom-left
+ * "Service Provider/Acct. No. (see instr.)".
  *
  * **Boxes 2 and 3 have no field.** The printed 2025 form reserves both for
  * future use with no box to fill, exactly as Schedule 1's line 22 is
@@ -143,9 +166,9 @@ export const mediaType = mediaTypeOf(dialect)
  */
 export const oneZeroNineEightTSchema = /** @type {const} */ ({
     ...base(dialect),
-    payerTin: string,
-    recipientTin: string,
-    accountNumber: string,
+    filerEin: string,
+    studentTin: string,
+    serviceProviderAccountNumber: string,
     taxYear: number,
     formRevision: string,
     corrected: option(true),
@@ -160,6 +183,15 @@ export const oneZeroNineEightTSchema = /** @type {const} */ ({
     payerName: option(string),
     recipientName: option(string),
 })
+
+/**
+ * FORM-KEY-01 -- which of THIS dialect's OWN fields play the five roles a
+ * form subject is keyed on. See `fjs/document/subject`'s {@link SubjectKey}
+ * for why the dialect declares this instead of every caller assuming one
+ * shared set of field names.
+ * @type {SubjectKey}
+ */
+export const subjectKey = { formType: 'dialect', taxYear: 'taxYear', payer: 'filerEin', recipient: 'studentTin', account: 'serviceProviderAccountNumber' }
 
 /** @typedef {Ts<typeof oneZeroNineEightTSchema>} OneZeroNineEightT */
 
@@ -237,9 +269,9 @@ export const validate = value => {
 /** @type {OneZeroNineEightT} */
 const minimal = {
     dialect,
-    payerTin: '11-1111111',
-    recipientTin: '333-33-3333',
-    accountNumber: 'STU-0001',
+    filerEin: '11-1111111',
+    studentTin: '333-33-3333',
+    serviceProviderAccountNumber: 'STU-0001',
     taxYear: 2025,
     formRevision: '2025',
 }
@@ -307,46 +339,51 @@ export const proof = {
     },
 
     /**
-     * **The student is `recipientTin`, and this fixture makes the point that
-     * the student need not be the filer.** The two TINs use visibly different
-     * formats — an employer identification number (`NN-NNNNNNN`) for the
-     * institution and a social security number (`NNN-NN-NNNN`) for the
-     * student — so a transposition is visible in the assertion itself.
+     * **The student is `studentTin`, and this fixture makes the point that
+     * the student need not be the filer.** The two identifiers use visibly
+     * different formats — an employer identification number (`NN-NNNNNNN`)
+     * for the institution and a social security number (`NNN-NN-NNNN`) for
+     * the student — so a transposition is visible in the assertion itself.
      *
      * The third assertion is the one this dialect exists to make: a parent
      * filing a return whose own TIN is `222-22-2222` holds a 1098-T whose
-     * `recipientTin` is the CHILD'S. On every other dialect in this tree
-     * those two would be the same string.
+     * `studentTin` is the CHILD'S. On every other dialect in this tree the
+     * recipient role and the filer would be the same string.
      */
-    theStudentIsTheRecipientTinAndNeedNotBeTheFiler: () => {
+    theStudentIsTheStudentTinAndNeedNotBeTheFiler: () => {
         const [t, v] = validate(withTuition)
         assert(t === 'ok', ['expected ok', t, v])
         assertEq(
-            v.recipientTin,
+            v.studentTin,
             '333-33-3333',
-            'recipientTin holds the printed STUDENT\'S TIN, in an SSN format',
+            'studentTin holds the printed STUDENT\'S TIN, in an SSN format',
         )
         assertEq(
-            v.payerTin,
+            v.filerEin,
             '11-1111111',
-            'payerTin holds the printed FILER\'S TIN — the institution, in an EIN format',
+            'filerEin holds the printed FILER\'S employer identification no. — the institution, in an EIN format',
         )
         const filersOwnTin = '222-22-2222'
         assert(
-            v.recipientTin !== filersOwnTin,
+            v.studentTin !== filersOwnTin,
             [
                 'a 1098-T\'s student may be a dependent rather than the person filing the return',
-                v.recipientTin,
+                v.studentTin,
             ],
         )
     },
 
     /**
-     * **The cardinality argument, run through the real `formSubject`.** A
+     * **The cardinality argument, run through the real derivation.** A
      * student who attends two institutions in one year holds two 1098-Ts,
      * and a household with two students in college holds two more. Both
      * must be distinct subjects, or one would silently overwrite the other
      * and a credit would be computed on half the expenses.
+     *
+     * It runs through `declaredSubject(subjectKey)` — THIS dialect's own
+     * declaration — rather than through `formSubject`'s five field names.
+     * Under the old names the two were the same call; they are not any more,
+     * and the declaration is the one a stored document is actually keyed by.
      *
      * The fourth case is the control: the same form, corrected, is the SAME
      * subject — which is what makes a corrected 1098-T a revision rather than
@@ -355,24 +392,18 @@ export const proof = {
      */
     twoInstitutionsAndTwoStudentsAreFourSubjects: () => {
         /** @type {(r: OneZeroNineEightT) => string} */
-        const subjectOf = r => formSubject({
-            payerTin: r.payerTin,
-            recipientTin: r.recipientTin,
-            accountNumber: r.accountNumber,
-            taxYear: r.taxYear,
-            formType: r.dialect,
-        })
+        const subjectOf = r => declaredSubject(subjectKey)(r)
         const first = subjectOf(withTuition)
         const secondInstitution = subjectOf({
             ...withTuition,
-            payerTin: '44-4444444',
-            accountNumber: 'STU-0002',
+            filerEin: '44-4444444',
+            serviceProviderAccountNumber: 'STU-0002',
         })
         assert(
             first !== secondInstitution,
             ['two institutions must be two subjects', first, secondInstitution],
         )
-        const secondStudent = subjectOf({ ...withTuition, recipientTin: '555-55-5555' })
+        const secondStudent = subjectOf({ ...withTuition, studentTin: '555-55-5555' })
         assert(
             first !== secondStudent,
             ['two students must be two subjects', first, secondStudent],

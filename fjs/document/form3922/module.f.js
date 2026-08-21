@@ -74,13 +74,40 @@
  * changes the engine's behaviour, and the direction it changes it in is
  * "stop", which is the only honest direction available.
  *
- * ## `payerTin` is the CORPORATION and `recipientTin` is the EMPLOYEE
+ * ## `corporationTin` is the CORPORATION and `employeeTin` is the EMPLOYEE
  *
- * The printed boxes are "CORPORATION'S federal identification number" and
- * "EMPLOYEE'S identification number". The naming follows this family's
- * convention for the reason `fjs/document/form3921`'s own header states in
- * full: `fjs/document/subject`'s `formSubject` keys every stored document on
- * `(payerTin, recipientTin, accountNumber, taxYear, formType)`.
+ * The printed boxes are **"CORPORATION'S federal identification number"** and
+ * **"EMPLOYEE'S identification number"**, and since FORM-KEY-02 those are
+ * what the fields are called. `accountNumber` keeps its name — the printed
+ * "Account number (see instructions)" box was already spelled the way the
+ * field was.
+ *
+ * **`corporationTin`, not `corporationEin`, and the difference is the box
+ * caption rather than a preference.** `vnd.fjs.1098t` spells its filing party
+ * `filerEin` because that form's box literally reads "FILER'S employer
+ * identification no."; this one reads *federal* identification number, which
+ * is the general term a TIN covers. Transcribing the caption is the whole
+ * rule, so where the paper is less specific, so is the field.
+ *
+ * **They were `payerTin`/`recipientTin`, and why is worth keeping rather than
+ * deleting.** `fjs/document/subject`'s `formSubject` KEYED every stored
+ * document on the five shared field names `(payerTin, recipientTin,
+ * accountNumber, taxYear, formType)`, so a dialect that spelled its parties
+ * differently had no subject at all. **FORM-KEY-01 ended that** — a dialect
+ * declares its own role mapping now ({@link subjectKey}) — so the names are
+ * free to follow the paper while the roles stay put: `corporationTin` plays
+ * the PAYER role, because the corporation is the party that filed this form,
+ * and `employeeTin` plays the RECIPIENT role, because the employee is who it
+ * is about. `vnd.fjs.1098e`, `vnd.fjs.1098t`, `vnd.fjs.1095a` and the sibling
+ * `vnd.fjs.form3921` (`transferorTin`/`employeeTin`) spent the same freedom
+ * first.
+ *
+ * **The subject a stored Form 3922 derives is byte-identical to the one it
+ * derived under the old names**: the declaration moved, the values did not.
+ * {@link proof}.theCorporationAndTheEmployeeAreNotTransposed pins the two
+ * parties by TIN FORMAT, because a transposition of these two fields is
+ * exactly the defect AGENTS.md's own sweep found in a 1099-INT box mapping —
+ * silent, and invisible to every proof that does not name the parties.
  *
  * @module
  */
@@ -97,6 +124,7 @@ import { shareCountError } from '../share_count/module.f.js'
 /** @import { Result } from 'functionalscript/fjs/types/result/types.js' */
 /** @import { Ts, Unknown } from 'functionalscript/fjs/types/rtti/ts/types.js' */
 /** @import { ValidationError } from 'functionalscript/fjs/types/rtti/common/types.js' */
+/** @import { SubjectKey } from '../subject/module.f.js' */
 
 /**
  * Format tag: names the dialect of this BLOB. The media type it is served
@@ -114,8 +142,8 @@ export const mediaType = mediaTypeOf(dialect)
  */
 export const formThirtyNineTwentyTwoSchema = /** @type {const} */ ({
     ...base(dialect),
-    payerTin: string,
-    recipientTin: string,
+    corporationTin: string,
+    employeeTin: string,
     accountNumber: string,
     taxYear: number,
     formRevision: string,
@@ -132,6 +160,15 @@ export const formThirtyNineTwentyTwoSchema = /** @type {const} */ ({
     payerName: option(string),
     recipientName: option(string),
 })
+
+/**
+ * FORM-KEY-01 -- which of THIS dialect's OWN fields play the five roles a
+ * form subject is keyed on. See `fjs/document/subject`'s {@link SubjectKey}
+ * for why the dialect declares this instead of every caller assuming one
+ * shared set of field names.
+ * @type {SubjectKey}
+ */
+export const subjectKey = { formType: 'dialect', taxYear: 'taxYear', payer: 'corporationTin', recipient: 'employeeTin', account: 'accountNumber' }
 
 /** @typedef {Ts<typeof formThirtyNineTwentyTwoSchema>} FormThirtyNineTwentyTwo */
 
@@ -237,8 +274,8 @@ const sharedSourceArtifactHash = 'deadbeef00112233445566778899aabbccddeeff001122
 /** @type {FormThirtyNineTwentyTwo} */
 const minimal = {
     dialect,
-    payerTin: '11-1111111',
-    recipientTin: '222-22-2222',
+    corporationTin: '11-1111111',
+    employeeTin: '222-22-2222',
     accountNumber: 'ACC-0001',
     taxYear: 2025,
     formRevision: 'April 2025',
@@ -302,6 +339,45 @@ export const proof = {
 
     minimalValidates: () => {
         assertEq(validate(minimal)[0], 'ok')
+    },
+
+    /**
+     * **The two parties, asserted rather than described.** `corporationTin`
+     * is the printed "CORPORATION'S federal identification number" — the
+     * filer, which plays {@link subjectKey}'s `payer` role — and
+     * `employeeTin` is the printed "EMPLOYEE'S identification number", which
+     * plays its `recipient` role. Nothing else in this module would notice
+     * the two being transposed: the schema types both as `string`, and a
+     * transposed pair still derives a perfectly well-formed subject — for the
+     * WRONG business identity.
+     *
+     * The fixture uses two visibly different TIN FORMATS — an employer
+     * identification number (`NN-NNNNNNN`) for the corporation and a social
+     * security number (`NNN-NN-NNNN`) for the employee — so a transposition
+     * is visible in the assertion itself rather than requiring a reader to
+     * remember which arbitrary digits went where. The same idiom
+     * `vnd.fjs.form3921` uses for its transferor and employee.
+     */
+    theCorporationAndTheEmployeeAreNotTransposed: () => {
+        const [t, v] = validate(lookbackPlanTransfer)
+        assert(t === 'ok', ['expected ok', t, v])
+        if (t !== 'ok') {
+            throw ['expected ok', t, v]
+        }
+        assertEq(
+            v.corporationTin,
+            '11-1111111',
+            'corporationTin holds the printed CORPORATION\'S federal identification number, in an EIN format',
+        )
+        assertEq(
+            v.employeeTin,
+            '222-22-2222',
+            'employeeTin holds the printed EMPLOYEE\'S identification number, in an SSN format',
+        )
+        assert(
+            v.corporationTin !== v.employeeTin,
+            ['a Form 3922 always has two distinct parties', v.corporationTin, v.employeeTin],
+        )
     },
 
     /**
@@ -412,16 +488,19 @@ export const proof = {
      * `vnd.fjs.form3921` — the sibling dialect, and therefore the one whose
      * shape is most nearly compatible — fails THIS dialect's `validate`, and
      * the failure's path is exactly `['dialect']`. The two forms genuinely do
-     * share `payerTin`/`recipientTin`/`taxYear`/`formRevision`/
-     * `sourceArtifactHash` and both carry a `box1DateOptionGranted`, so
-     * nothing but the discriminant separates them.
+     * share `accountNumber`/`taxYear`/`formRevision`/`sourceArtifactHash`,
+     * both carry a `box1DateOptionGranted`, and both name a filing party and
+     * an employee — `transferorTin`/`employeeTin` on the sibling,
+     * `corporationTin`/`employeeTin` here, each transcribed from its own
+     * paper since FORM-KEY-02 — so nothing but the discriminant separates
+     * them.
      */
     crossDialect: {
         formThirtyNineTwentyOneShapeRejected: () => {
             const [t, v] = validate({
                 dialect: 'vnd.fjs.form3921',
-                payerTin: '11-1111111',
-                recipientTin: '222-22-2222',
+                transferorTin: '11-1111111',
+                employeeTin: '222-22-2222',
                 accountNumber: 'ACC-0001',
                 taxYear: 2025,
                 formRevision: 'April 2025',

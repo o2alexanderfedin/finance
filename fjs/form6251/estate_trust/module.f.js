@@ -222,8 +222,8 @@ const k1 = documentHash => box12 => ({
     documentHash,
     value: {
         dialect: 'vnd.fjs.k1_1041',
-        payerTin: '66-6666666',
-        recipientTin: '222-22-2222',
+        estateOrTrustEIN: '66-6666666',
+        beneficiaryIdentifyingNumber: '222-22-2222',
         taxYear: 2025,
         formRevision: '2025',
         payerName: 'The Harrow Family Trust',
@@ -402,8 +402,8 @@ export const proof = {
             documentHash: 'sha256-k1-none',
             value: {
                 dialect: 'vnd.fjs.k1_1041',
-                payerTin: '66-6666666',
-                recipientTin: '222-22-2222',
+                estateOrTrustEIN: '66-6666666',
+                beneficiaryIdentifyingNumber: '222-22-2222',
                 taxYear: 2025,
                 formRevision: '2025',
                 boxHDomesticBeneficiary: true,

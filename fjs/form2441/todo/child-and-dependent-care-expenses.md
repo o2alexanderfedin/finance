@@ -80,7 +80,7 @@ Handing the combined figure to line 5 would treat a stay-at-home spouse as havin
 working spouse's whole income — which is precisely the population §21(d) exists for, and it
 would grant the full credit to every couple entitled to none of it. So MFJ refuses, and the
 refusal names the remedy: attribute earned income per spouse. The raw material for the W-2
-half already exists (`vnd.fjs.w2`'s `recipientTin` against `vnd.fjs.return_profile`'s
+half already exists (`vnd.fjs.w2`'s `employeeSSN` against `vnd.fjs.return_profile`'s
 `filerSocialSecurityNumber` / `spouseSocialSecurityNumber`, both already stored for §32);
 the Schedule SE half does not, and is the real work.
 

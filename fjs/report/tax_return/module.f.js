@@ -1058,9 +1058,9 @@ const documentByHash = {
     },
     [fixtureW2AHash]: {
         dialect: w2Dialect,
-        payerTin: '11-1111111',
-        recipientTin: '222-22-2222',
-        accountNumber: 'ACC-W2-A',
+        employerEIN: '11-1111111',
+        employeeSSN: '222-22-2222',
+        controlNumber: 'ACC-W2-A',
         taxYear: 2025,
         formRevision: '2025',
         box1WagesTipsOtherCompensation: '35937.00',
@@ -1068,9 +1068,9 @@ const documentByHash = {
     },
     [fixtureW2BHash]: {
         dialect: w2Dialect,
-        payerTin: '44-4444444',
-        recipientTin: '222-22-2222',
-        accountNumber: 'ACC-W2-B',
+        employerEIN: '44-4444444',
+        employeeSSN: '222-22-2222',
+        controlNumber: 'ACC-W2-B',
         taxYear: 2025,
         formRevision: '2025',
         box1WagesTipsOtherCompensation: '9568.00',
@@ -1099,9 +1099,9 @@ const documentByHash = {
     // coincide.
     [fixtureW2PriorYearHash]: {
         dialect: w2Dialect,
-        payerTin: '66-6666666',
-        recipientTin: '222-22-2222',
-        accountNumber: 'ACC-W2-PRIOR',
+        employerEIN: '66-6666666',
+        employeeSSN: '222-22-2222',
+        controlNumber: 'ACC-W2-PRIOR',
         taxYear: 2024,
         formRevision: '2024',
         box1WagesTipsOtherCompensation: '80000.00',
@@ -1139,9 +1139,9 @@ const documentByHash = {
     // box, so it contributes nothing to any hand-typed figure.
     [fixtureW2NoYearHash]: {
         dialect: w2Dialect,
-        payerTin: '77-7777777',
-        recipientTin: '222-22-2222',
-        accountNumber: 'ACC-W2-NO-YEAR',
+        employerEIN: '77-7777777',
+        employeeSSN: '222-22-2222',
+        controlNumber: 'ACC-W2-NO-YEAR',
         formRevision: '2025',
     },
     // An UNROUTED dialect for the wrong year: pins the deliberate narrowing
@@ -1171,9 +1171,9 @@ const documentByHash = {
     },
     [fixtureCreditsW2Hash]: {
         dialect: w2Dialect,
-        payerTin: '11-1111111',
-        recipientTin: '222-22-2222',
-        accountNumber: 'ACC-W2-C',
+        employerEIN: '11-1111111',
+        employeeSSN: '222-22-2222',
+        controlNumber: 'ACC-W2-C',
         taxYear: 2025,
         formRevision: '2025',
         box1WagesTipsOtherCompensation: '39000.00',
@@ -1181,9 +1181,9 @@ const documentByHash = {
     },
     [fixtureCreditsTuitionHash]: {
         dialect: oneZeroNineEightTDialect,
-        payerTin: '66-6666666',
-        recipientTin: '222-22-2222',
-        accountNumber: 'STU-0001',
+        filerEin: '66-6666666',
+        studentTin: '222-22-2222',
+        serviceProviderAccountNumber: 'STU-0001',
         taxYear: 2025,
         formRevision: '2025',
         box1PaymentsReceivedForQualifiedTuition: '9000.00',
@@ -1353,9 +1353,9 @@ const documentByHash = {
     },
     [fixtureExpatriateW2Hash]: {
         dialect: w2Dialect,
-        payerTin: '11-1111111',
-        recipientTin: '222-22-2222',
-        accountNumber: 'ACC-W2-2555',
+        employerEIN: '11-1111111',
+        employeeSSN: '222-22-2222',
+        controlNumber: 'ACC-W2-2555',
         taxYear: 2025,
         formRevision: '2025',
         box1WagesTipsOtherCompensation: '90000.00',
@@ -1363,9 +1363,9 @@ const documentByHash = {
     },
     [fixtureMarketplaceW2Hash]: {
         dialect: w2Dialect,
-        payerTin: '11-1111111',
-        recipientTin: '222-22-2222',
-        accountNumber: 'ACC-W2-ACA',
+        employerEIN: '11-1111111',
+        employeeSSN: '222-22-2222',
+        controlNumber: 'ACC-W2-ACA',
         taxYear: 2025,
         formRevision: '2025',
         box1WagesTipsOtherCompensation: '30000.00',
@@ -1376,7 +1376,7 @@ const documentByHash = {
         marketplaceIdentifier: '99',
         marketplaceAssignedPolicyNumber: 'POLICY-TWIN-0001',
         policyIssuerName: 'Some Health Plan, Inc.',
-        recipientTin: '222-22-2222',
+        recipientSsn: '222-22-2222',
         taxYear: 2025,
         formRevision: '2025',
         sourceArtifactHash: 'deadbeef00112233445566778899aabbccddeeff0011223344556677889900',
@@ -1498,8 +1498,8 @@ const documentByHash = {
     [fixtureSweepSocialSecurityHash]: {
         dialect: ssa1099Dialect,
         payerTin: '',
-        recipientTin: '222-22-2222',
-        accountNumber: 'CLAIM-SWEEP',
+        beneficiarySSN: '222-22-2222',
+        claimNumber: 'CLAIM-SWEEP',
         taxYear: 2025,
         formRevision: '2025',
         box5NetBenefits: '12000.00',
@@ -1528,8 +1528,8 @@ const documentByHash = {
     [fixtureSweepSocialSecurityWithholdingHash]: {
         dialect: ssa1099Dialect,
         payerTin: '',
-        recipientTin: '222-22-2222',
-        accountNumber: 'CLAIM-SWEEP-W4V',
+        beneficiarySSN: '222-22-2222',
+        claimNumber: 'CLAIM-SWEEP-W4V',
         taxYear: 2025,
         formRevision: '2025',
         box5NetBenefits: '9000.00',
@@ -1543,8 +1543,8 @@ const documentByHash = {
     // each leaf a proof about a declaration rather than about routing.
     [fixtureSweepPartnershipK1Hash]: {
         dialect: k1PartnershipDialect,
-        payerTin: '33-3333333',
-        recipientTin: '222-22-2222',
+        partnershipEIN: '33-3333333',
+        partnerTin: '222-22-2222',
         accountNumber: 'PTR-SWEEP',
         taxYear: 2025,
         formRevision: '2025',
@@ -1554,8 +1554,8 @@ const documentByHash = {
     },
     [fixtureSweepSCorporationK1Hash]: {
         dialect: k1SCorporationDialect,
-        payerTin: '44-4444444',
-        recipientTin: '222-22-2222',
+        corporationEIN: '44-4444444',
+        shareholderIdentifyingNumber: '222-22-2222',
         accountNumber: 'SHR-SWEEP',
         taxYear: 2025,
         formRevision: '2025',
@@ -1565,8 +1565,8 @@ const documentByHash = {
     // No `accountNumber`: the Schedule K-1 (Form 1041) face has no such box.
     [fixtureSweepEstateTrustK1Hash]: {
         dialect: k1EstateTrustDialect,
-        payerTin: '66-6666666',
-        recipientTin: '222-22-2222',
+        estateOrTrustEIN: '66-6666666',
+        beneficiaryIdentifyingNumber: '222-22-2222',
         taxYear: 2025,
         formRevision: '2025',
         boxHDomesticBeneficiary: true,
@@ -1660,8 +1660,8 @@ const documentByHash = {
     // any printed line: its only reader is a refusal. See the leaf.
     [fixtureSweepEsppHash]: {
         dialect: formThirtyNineTwentyTwoDialect,
-        payerTin: '11-1111111',
-        recipientTin: '222-22-2222',
+        corporationTin: '11-1111111',
+        employeeTin: '222-22-2222',
         accountNumber: 'ACC-SWEEP-ESPP',
         taxYear: 2025,
         formRevision: 'April 2025',
@@ -1737,8 +1737,8 @@ const documentByHash = {
     },
     [fixtureSweepStudentLoanHash]: {
         dialect: oneZeroNineEightEDialect,
-        payerTin: '55-5555555',
-        recipientTin: '222-22-2222',
+        lenderTin: '55-5555555',
+        borrowerTin: '222-22-2222',
         accountNumber: 'LOAN-SWEEP',
         taxYear: 2025,
         formRevision: '2025',
@@ -1818,8 +1818,8 @@ const documentByHash = {
     },
     [fixtureSweepIsoHash]: {
         dialect: formThirtyNineTwentyOneDialect,
-        payerTin: '11-1111111',
-        recipientTin: '222-22-2222',
+        transferorTin: '11-1111111',
+        employeeTin: '222-22-2222',
         accountNumber: 'ACC-SWEEP-ISO',
         taxYear: 2025,
         formRevision: 'April 2025',
@@ -1872,7 +1872,7 @@ const documentByHash = {
     },
     [fixtureFarmerFarmHash]: {
         dialect: farmDialect,
-        recipientTin: '222-22-2222',
+        proprietorSsn: '222-22-2222',
         accountNumber: 'FARM-0001',
         taxYear: 2025,
         principalCropOrActivity: 'corn and soybeans',
@@ -1893,7 +1893,7 @@ const documentByHash = {
     // fixture existed.)
     [fixtureFarmerLossFarmHash]: {
         dialect: farmDialect,
-        recipientTin: '222-22-2222',
+        proprietorSsn: '222-22-2222',
         accountNumber: 'FARM-0001',
         taxYear: 2025,
         principalCropOrActivity: 'corn and soybeans',

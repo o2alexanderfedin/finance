@@ -128,8 +128,8 @@ const proofW2 = {
     dialect: 'vnd.fjs.w2',
     taxYear: 2025,
     employerName: 'Acme',
-    payerTin: '11-1111111',
-    recipientTin: '222-22-2222',
+    employerEIN: '11-1111111',
+    employeeSSN: '222-22-2222',
     box1WagesTipsOtherCompensation: '60000.00',
     box2FederalIncomeTaxWithheld: '5000.00',
 }

@@ -711,9 +711,9 @@ const w2Fixture = rows => hash => ({
     documentHash: hash,
     value: {
         dialect: 'vnd.fjs.w2',
-        payerTin: '11-1111111',
-        recipientTin: '222-22-2222',
-        accountNumber: '',
+        employerEIN: '11-1111111',
+        employeeSSN: '222-22-2222',
+        controlNumber: '',
         taxYear: 2025,
         formRevision: '2025',
         box15Through20: rows,

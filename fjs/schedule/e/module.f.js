@@ -809,7 +809,7 @@ const codedBoxSweep = entityName => entityType => boxes => rowsOf => {
  */
 export const partnershipRow = document => {
     const k1 = document.value
-    const entityName = k1.payerName ?? `partnership ${k1.payerTin}`
+    const entityName = k1.payerName ?? `partnership ${k1.partnershipEIN}`
     const zRow = codedRow(k1.box20OtherInformation)('Z')
     if (zRow !== undefined) {
         return section199AInformationRefusal(entityName)('box 20')('Z')
@@ -860,8 +860,8 @@ export const partnershipRow = document => {
             documentHash: document.documentHash,
             entityType: 'P',
             entityName,
-            employerIdentificationNumber: k1.payerTin,
-            recipientTin: k1.recipientTin,
+            employerIdentificationNumber: k1.partnershipEIN,
+            recipientTin: k1.partnerTin,
             ordinaryBusinessIncomeCents,
             ordinaryBusinessIncomePrinted: k1.box1OrdinaryBusinessIncome,
             boxPath: 'box1OrdinaryBusinessIncome',
@@ -887,7 +887,7 @@ export const partnershipRow = document => {
  */
 export const sCorporationRow = document => {
     const k1 = document.value
-    const entityName = k1.payerName ?? `S corporation ${k1.payerTin}`
+    const entityName = k1.payerName ?? `S corporation ${k1.corporationEIN}`
     const vRow = codedRow(k1.box17OtherInformation)('V')
     if (vRow !== undefined) {
         return section199AInformationRefusal(entityName)('box 17')('V')
@@ -927,8 +927,8 @@ export const sCorporationRow = document => {
             documentHash: document.documentHash,
             entityType: 'S',
             entityName,
-            employerIdentificationNumber: k1.payerTin,
-            recipientTin: k1.recipientTin,
+            employerIdentificationNumber: k1.corporationEIN,
+            recipientTin: k1.shareholderIdentifyingNumber,
             ordinaryBusinessIncomeCents,
             ordinaryBusinessIncomePrinted: k1.box1OrdinaryBusinessIncome,
             boxPath: 'box1OrdinaryBusinessIncome',
@@ -1011,7 +1011,7 @@ const estateTrustCodedBoxes = /** @type {const} */ ([
  */
 export const beneficiaryRow = document => {
     const k1 = document.value
-    const entityName = k1.payerName ?? `estate or trust ${k1.payerTin}`
+    const entityName = k1.payerName ?? `estate or trust ${k1.estateOrTrustEIN}`
     const swept = codedBoxSweep(entityName)('E')(estateTrustCodedBoxes)(
         field => field === 'box9DirectlyApportionedDeductions' ? k1.box9DirectlyApportionedDeductions
             : field === 'box11FinalYearDeductions' ? k1.box11FinalYearDeductions
@@ -1044,8 +1044,8 @@ export const beneficiaryRow = document => {
         row: {
             documentHash: document.documentHash,
             entityName,
-            employerIdentificationNumber: k1.payerTin,
-            recipientTin: k1.recipientTin,
+            employerIdentificationNumber: k1.estateOrTrustEIN,
+            recipientTin: k1.beneficiaryIdentifyingNumber,
             ordinaryBusinessIncomeCents,
             ordinaryBusinessIncomePrinted: k1.box6OrdinaryBusinessIncome,
             boxPath: 'box6OrdinaryBusinessIncome',
@@ -1466,8 +1466,8 @@ const partnershipDoc = overrides => ({
     documentHash: 'sha256-k1-1065-a',
     value: {
         dialect: 'vnd.fjs.k1_1065',
-        payerTin: '33-3333333',
-        recipientTin: '222-22-2222',
+        partnershipEIN: '33-3333333',
+        partnerTin: '222-22-2222',
         accountNumber: 'PTR-0001',
         taxYear: 2025,
         formRevision: '2025',
@@ -1489,8 +1489,8 @@ const sCorporationDoc = overrides => ({
     documentHash: 'sha256-k1-1120s-a',
     value: {
         dialect: 'vnd.fjs.k1_1120s',
-        payerTin: '44-4444444',
-        recipientTin: '222-22-2222',
+        corporationEIN: '44-4444444',
+        shareholderIdentifyingNumber: '222-22-2222',
         accountNumber: 'SHR-0001',
         taxYear: 2025,
         formRevision: '2025',
@@ -1512,8 +1512,8 @@ const estateTrustDoc = overrides => ({
     documentHash: 'sha256-k1-1041-a',
     value: {
         dialect: 'vnd.fjs.k1_1041',
-        payerTin: '66-6666666',
-        recipientTin: '222-22-2222',
+        estateOrTrustEIN: '66-6666666',
+        beneficiaryIdentifyingNumber: '222-22-2222',
         taxYear: 2025,
         formRevision: '2025',
         payerName: 'Northwind Family Trust',
@@ -2251,7 +2251,7 @@ export const proof = {
                     partnershipDoc({}),
                     {
                         ...partnershipDoc({
-                            payerTin: '55-5555555',
+                            partnershipEIN: '55-5555555',
                             payerName: 'Southwind Capital LP',
                             box1OrdinaryBusinessIncome: '12000.00',
                             box14SelfEmploymentEarnings: [{ code: 'A', amount: '12000.00' }],

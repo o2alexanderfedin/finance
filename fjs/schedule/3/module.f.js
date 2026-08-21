@@ -419,7 +419,7 @@ const socialSecurityWithholdingMaximum = taxParamSet => halfUp(of(
  * string it reported.
  *
  * The pair exists because line 11 needs the box AND the form: the amount is
- * summed, while `recipientTin` and `payerTin` decide which sums are allowed to
+ * summed, while `employeeSSN` and `employerEIN` decide which sums are allowed to
  * happen at all. Building it with `flatMap` over an `undefined` check keeps
  * the narrowing the compiler already did — no second lookup, so no
  * `T | undefined` to cast away.
@@ -451,14 +451,14 @@ const boxFourReadings = forms => forms.flatMap(form => {
  * place".
  * @type {(reading: BoxFourReading) => string}
  */
-const employeeOf = reading => reading.form.value.recipientTin
+const employeeOf = reading => reading.form.value.employeeSSN
 
 /**
  * The EMPLOYER a reading belongs to — box b, the employer's EIN. §6413(c)(1)
  * counts these, never documents.
  * @type {(reading: BoxFourReading) => string}
  */
-const employerOf = reading => reading.form.value.payerTin
+const employerOf = reading => reading.form.value.employerEIN
 
 /**
  * Line 11, excess Social Security tax withheld: what §31(b) allows as a
@@ -492,7 +492,7 @@ const employerOf = reading => reading.form.value.payerTin
  * **3. The base is per EMPLOYEE, so a joint return gets two of them.**
  * §6413(c)(1) is written about "an employee", and a married couple filing
  * jointly are two. One shared cap would understate the refund by up to the
- * whole maximum. The grouping key is the W-2's own `recipientTin` — box a, the
+ * whole maximum. The grouping key is the W-2's own `employeeSSN` — box a, the
  * employee's SSN — and NOT the return profile, which carries no TIN at all.
  * That is also why this line needs no answer to "which spouse does this W-2
  * belong to", the question `fjs/form8880` refuses a joint return for being
@@ -850,7 +850,7 @@ export const scheduleThree = taxParamSet => input => {
                     + `Form 8863 offers`,
             }
         }
-        const matching = tuitionForms.filter(form => form.value.recipientTin === stored.value.studentTin)
+        const matching = tuitionForms.filter(form => form.value.studentTin === stored.value.studentTin)
         /** @type {readonly Source[]} */
         const boxOneSources = matching.flatMap(form => {
             const printed = form.value.box1PaymentsReceivedForQualifiedTuition
@@ -1325,9 +1325,9 @@ const tuitionDocument = overrides => ({
     documentHash: 'sha256-1098t-0001',
     value: {
         dialect: 'vnd.fjs.1098t',
-        payerTin: '11-1111111',
-        recipientTin: '333-33-3333',
-        accountNumber: 'STU-0001',
+        filerEin: '11-1111111',
+        studentTin: '333-33-3333',
+        serviceProviderAccountNumber: 'STU-0001',
         taxYear: 2025,
         formRevision: '2025',
         ...overrides,
@@ -1340,9 +1340,9 @@ const w2WithBox12 = code => amount => ({
     documentHash: 'sha256-w2-0001',
     value: {
         dialect: 'vnd.fjs.w2',
-        payerTin: '11-1111111',
-        recipientTin: '222-22-2222',
-        accountNumber: '',
+        employerEIN: '11-1111111',
+        employeeSSN: '222-22-2222',
+        controlNumber: '',
         taxYear: 2025,
         formRevision: '2025',
         box12: [{ code, amount }],
@@ -1358,10 +1358,10 @@ const w2WithBox12 = code => amount => ({
  * - `hash`, because the citation contract is ONE source per contributing
  *   document, and a fixture reusing one hash could not tell "two documents
  *   summed" from "one document counted twice".
- * - `payerTin`, because §6413(c)(1) counts EMPLOYERS, and two forms from one
- *   EIN are one employer.
- * - `recipientTin`, because the wage base is per EMPLOYEE, and a joint return
- *   has two.
+ * - `employerEIN` (box b), because §6413(c)(1) counts EMPLOYERS, and two
+ *   forms from one EIN are one employer.
+ * - `employeeSSN` (box a), because the wage base is per EMPLOYEE, and a joint
+ *   return has two.
  * - `wages` (box 3) is always present and always equals `tax / 6.2%` to the
  *   cent, so that a mutation transposing the box READ produces a wrong number
  *   rather than the same one. A fixture that left box 3 out would make that
@@ -1369,15 +1369,15 @@ const w2WithBox12 = code => amount => ({
  * - `tax` is `undefined` for the "this employer reported no box 4" case,
  *   which is a different fact from a reported `'0.00'` and is cited
  *   differently.
- * @type {(hash: string) => (payerTin: string) => (recipientTin: string) => (wages: string) => (tax: string | undefined) => Stored<W2>}
+ * @type {(hash: string) => (employerEIN: string) => (employeeSSN: string) => (wages: string) => (tax: string | undefined) => Stored<W2>}
  */
-const w2WithSocialSecurity = hash => payerTin => recipientTin => wages => tax => ({
+const w2WithSocialSecurity = hash => employerEIN => employeeSSN => wages => tax => ({
     documentHash: hash,
     value: {
         dialect: 'vnd.fjs.w2',
-        payerTin,
-        recipientTin,
-        accountNumber: '',
+        employerEIN,
+        employeeSSN,
+        controlNumber: '',
         taxYear: 2025,
         formRevision: '2025',
         box3SocialSecurityWages: wages,
@@ -2067,9 +2067,9 @@ export const proof = {
                     documentHash: 'sha256-w2-0002',
                     value: {
                         dialect: 'vnd.fjs.w2',
-                        payerTin: '11-1111111',
-                        recipientTin: '222-22-2222',
-                        accountNumber: '',
+                        employerEIN: '11-1111111',
+                        employeeSSN: '222-22-2222',
+                        controlNumber: '',
                         taxYear: 2025,
                         formRevision: '2025',
                         box12: [
@@ -2226,7 +2226,7 @@ export const proof = {
             const result = okResult(compute(baseInput({
                 agiCents: 4000000n,
                 tuitionForms: [tuitionDocument({
-                    recipientTin: '555-55-5555',
+                    studentTin: '555-55-5555',
                     box1PaymentsReceivedForQualifiedTuition: '9000.00',
                 })],
                 creditForms: [creditsDocument({

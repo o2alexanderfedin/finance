@@ -370,7 +370,7 @@ const sharedRefusal = taxParamSet => input => {
                 + 'earned income as each spouse’s would grant the whole credit to every '
                 + 'couple with a non-working spouse — which is exactly the population '
                 + '§21(d)’s limitation exists for. Refusing. The unlock is per-spouse '
-                + 'earned income: vnd.fjs.w2’s recipientTin against the return '
+                + 'earned income: vnd.fjs.w2’s employeeSSN (box a) against the return '
                 + 'profile’s filerSocialSecurityNumber and spouseSocialSecurityNumber '
                 + `covers the wage half, and Schedule SE attribution is the rest. Nothing reaches ${destination}`,
         }
@@ -1356,7 +1356,7 @@ export const proof = {
                 taxLiabilityLimitCents: 500000n,
             }))
             assert(
-                message.includes('line 5') && message.includes('recipientTin'),
+                message.includes('line 5') && message.includes('employeeSSN'),
                 ['the refusal must name the printed line and the route to unlocking it', message])
             assertNamesBothDestinations(message)
         },

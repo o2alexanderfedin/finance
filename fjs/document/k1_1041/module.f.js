@@ -114,6 +114,7 @@ import { codedEntry, codedBoxError, materialParticipationValues, materialPartici
 /** @import { Result } from 'functionalscript/fjs/types/result/types.js' */
 /** @import { Ts, Unknown } from 'functionalscript/fjs/types/rtti/ts/types.js' */
 /** @import { ValidationError } from 'functionalscript/fjs/types/rtti/common/types.js' */
+/** @import { SubjectKey } from '../subject/module.f.js' */
 
 /**
  * Format tag: names the dialect of this BLOB. The media type it is served
@@ -128,19 +129,36 @@ export const mediaType = mediaTypeOf(dialect)
  * beneficiary) and Part III (the beneficiary's share), transcribed from the
  * printed 2025 `f1041sk1.pdf` face in the form's own order.
  *
- * `payerTin` is the ESTATE's or TRUST's employer identification number (printed
- * box A) and `recipientTin` the BENEFICIARY's identifying number (printed box
- * F) — the same two names every information-return dialect in this tree uses,
- * so a cross-document TIN match reads one field name on every document.
+ * `estateOrTrustEIN` is printed box A, captioned **"Estate's or trust's
+ * employer identification number"**, and `beneficiaryIdentifyingNumber` is
+ * printed box F, captioned **"Beneficiary's identifying number"**. They were
+ * `payerTin`/`recipientTin` until FORM-KEY-02, on the reasoning that one set
+ * of names on every dialect makes a cross-document TIN match read as one
+ * field name — but **the words "Payer" and "Recipient" appear NOWHERE on
+ * either page of this face**, so unlike the 1099 series those two names had
+ * no printed backing at all here. Verified against the printed 2025
+ * `f1041sk1.pdf`: a case-insensitive search for either word over both pages
+ * returns zero hits. FORM-KEY-01 made the names free to follow the paper —
+ * {@link subjectKey} declares which of THIS dialect's fields play the payer
+ * and recipient ROLES — so they do.
+ *
+ * The two names are long because the captions are. `beneficiaryIdentifyingNumber`
+ * rather than `beneficiaryTin` because the printed box does not say TIN, and
+ * `estateOrTrustEIN` rather than `estateEin` because the box names both
+ * entity kinds and a Schedule K-1 (Form 1041) is issued by either.
  *
  * **There is no `accountNumber`**, and its absence is a transcription fact
- * rather than an oversight: this printed face has no such box. `vnd.fjs.k1_1065`
- * and `vnd.fjs.k1_1120s` both carry one because their own faces do.
+ * rather than an oversight: this printed face has no such box. Its Part I and
+ * Part II items are A–G only — A the EIN, B the name, C the fiduciary, D the
+ * Form 1041-T checkbox, E the final-1041 checkbox, F the beneficiary's
+ * identifying number, G the beneficiary's name. `vnd.fjs.k1_1065` and
+ * `vnd.fjs.k1_1120s` both carry an `accountNumber` because their own faces
+ * do.
  */
 export const k1EstateTrustSchema = /** @type {const} */ ({
     ...base(dialect),
-    payerTin: string,
-    recipientTin: string,
+    estateOrTrustEIN: string,
+    beneficiaryIdentifyingNumber: string,
     taxYear: number,
     formRevision: string,
     // The two printed checkboxes above Part III's caption.
@@ -180,6 +198,20 @@ export const k1EstateTrustSchema = /** @type {const} */ ({
     box13CreditsAndCreditRecapture: option(array(codedEntry)),
     box14OtherInformation: option(array(codedEntry)),
 })
+
+/**
+ * FORM-KEY-01 -- which of THIS dialect's OWN fields play the five roles a
+ * form subject is keyed on. See `fjs/document/subject`'s {@link SubjectKey}
+ * for why the dialect declares this instead of every caller assuming one
+ * shared set of field names.
+ *
+ * No account role: this dialect has no such field, and an omitted role
+ * derives the empty string -- exactly the `accountNumber: ''` this dialect's
+ * subject has carried since DOC-01. The `payer` role IS declared: it is
+ * `estateOrTrustEIN`, printed box A.
+ * @type {SubjectKey}
+ */
+export const subjectKey = { formType: 'dialect', taxYear: 'taxYear', payer: 'estateOrTrustEIN', recipient: 'beneficiaryIdentifyingNumber' }
 
 /** @typedef {Ts<typeof k1EstateTrustSchema>} K1EstateTrust */
 
@@ -371,8 +403,8 @@ export const validate = value => {
  */
 const minimal = {
     dialect,
-    payerTin: '66-6666666',
-    recipientTin: '222-22-2222',
+    estateOrTrustEIN: '66-6666666',
+    beneficiaryIdentifyingNumber: '222-22-2222',
     taxYear: 2025,
     formRevision: '2025',
     boxHDomesticBeneficiary: true,
@@ -390,8 +422,8 @@ const minimal = {
  */
 const beneficiaryWithNoDetermination = {
     dialect,
-    payerTin: '66-6666666',
-    recipientTin: '222-22-2222',
+    estateOrTrustEIN: '66-6666666',
+    beneficiaryIdentifyingNumber: '222-22-2222',
     taxYear: 2025,
     formRevision: '2025',
     boxHDomesticBeneficiary: true,
@@ -579,6 +611,46 @@ export const proof = {
     },
 
     /**
+     * **The two parties, asserted rather than described.**
+     * `estateOrTrustEIN` is printed box A and plays {@link subjectKey}'s
+     * `payer` role; `beneficiaryIdentifyingNumber` is printed box F and plays
+     * its `recipient` role. Nothing else in this module would notice the two
+     * being transposed: the schema types both as `string`, and a transposed
+     * pair still derives a perfectly well-formed subject — for the WRONG
+     * business identity, which on this dialect means one beneficiary's share
+     * of one estate filed under another's.
+     *
+     * The fixture uses two visibly different TIN FORMATS — an employer
+     * identification number (`NN-NNNNNNN`) for the estate or trust and a
+     * social security number (`NNN-NN-NNNN`) for the beneficiary — so a
+     * transposition is visible in the assertion itself. It is also the
+     * distinction the printed captions draw: box A says *employer
+     * identification number* and box F says only *identifying number*,
+     * because a beneficiary is usually a person.
+     */
+    theEstateAndTheBeneficiaryAreNotTransposed: () => {
+        const [t, v] = validate(minimal)
+        assert(t === 'ok', ['expected ok', t, v])
+        if (t !== 'ok') {
+            throw ['expected ok', t, v]
+        }
+        assertEq(
+            v.estateOrTrustEIN,
+            '66-6666666',
+            'estateOrTrustEIN holds printed box A — the fiduciary entity, in an EIN format',
+        )
+        assertEq(
+            v.beneficiaryIdentifyingNumber,
+            '222-22-2222',
+            'beneficiaryIdentifyingNumber holds printed box F — the person, in an SSN format',
+        )
+        assert(
+            v.estateOrTrustEIN !== v.beneficiaryIdentifyingNumber,
+            ['a Schedule K-1 always has two distinct parties', v.estateOrTrustEIN, v.beneficiaryIdentifyingNumber],
+        )
+    },
+
+    /**
      * Generated coverage cannot see a box REMOVED from a list — the loop
      * simply generates one fewer leaf and stays green. The hand-typed counts
      * are the independent side of that pair.
@@ -702,8 +774,8 @@ export const proof = {
         aForeignBeneficiaryIsRefusedNamingTheOtherReturn: () => {
             const [t, v] = validate({
                 dialect,
-                payerTin: '66-6666666',
-                recipientTin: '222-22-2222',
+                estateOrTrustEIN: '66-6666666',
+                beneficiaryIdentifyingNumber: '222-22-2222',
                 taxYear: 2025,
                 formRevision: '2025',
                 boxHForeignBeneficiary: true,
@@ -725,8 +797,8 @@ export const proof = {
             assertEq(domestic, 'ok')
             const [neither, v] = validate({
                 dialect,
-                payerTin: '66-6666666',
-                recipientTin: '222-22-2222',
+                estateOrTrustEIN: '66-6666666',
+                beneficiaryIdentifyingNumber: '222-22-2222',
                 taxYear: 2025,
                 formRevision: '2025',
                 materialParticipation: 'materiallyParticipated',
@@ -854,8 +926,8 @@ export const proof = {
         aPartnershipK1IsRejectedByTheEstateTrustDialect: () => {
             const [t, v] = validate({
                 dialect: 'vnd.fjs.k1_1065',
-                payerTin: '33-3333333',
-                recipientTin: '222-22-2222',
+                partnershipEIN: '33-3333333',
+                partnerTin: '222-22-2222',
                 accountNumber: 'PTR-0001',
                 taxYear: 2025,
                 formRevision: '2025',
@@ -877,8 +949,8 @@ export const proof = {
         anSCorporationK1IsRejectedByTheEstateTrustDialect: () => {
             const [t, v] = validate({
                 dialect: 'vnd.fjs.k1_1120s',
-                payerTin: '44-4444444',
-                recipientTin: '222-22-2222',
+                corporationEIN: '44-4444444',
+                shareholderIdentifyingNumber: '222-22-2222',
                 accountNumber: 'SHR-0001',
                 taxYear: 2025,
                 formRevision: '2025',

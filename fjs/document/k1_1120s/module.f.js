@@ -93,6 +93,7 @@ import { codedEntry, codedBoxError, materialParticipationValues, materialPartici
 /** @import { Result } from 'functionalscript/fjs/types/result/types.js' */
 /** @import { Ts, Unknown } from 'functionalscript/fjs/types/rtti/ts/types.js' */
 /** @import { ValidationError } from 'functionalscript/fjs/types/rtti/common/types.js' */
+/** @import { SubjectKey } from '../subject/module.f.js' */
 
 /**
  * Format tag: names the dialect of this BLOB. The media type it is served
@@ -107,14 +108,35 @@ export const mediaType = mediaTypeOf(dialect)
  * shareholder) and Part III (the shareholder's share), transcribed from the
  * printed 2025 `f1120ssk.pdf` face in the form's own order.
  *
- * `payerTin` is the CORPORATION's employer identification number (printed box
- * A) and `recipientTin` the SHAREHOLDER's (printed box D) — the same two names
- * every information-return dialect in this tree uses.
+ * `corporationEIN` is printed box A, captioned **"Corporation's employer
+ * identification number"**, and `shareholderIdentifyingNumber` is printed box
+ * **E**, captioned **"Shareholder's identifying number"**.
+ *
+ * **This docstring said box D, and box D is something else entirely.** On the
+ * 2025 face, Part I runs A (the EIN), B (name and address) and C (the IRS
+ * center), then **D is "Corporation's total number of shares"** — a count with
+ * a beginning-of-year and an end-of-year line, not an identity at all — and
+ * Part II opens at E. The letter was wrong here from the beginning and is
+ * corrected against `f1120ssk.pdf` read directly rather than recalled.
+ *
+ * They were `payerTin`/`recipientTin` until FORM-KEY-02, on the reasoning that
+ * one set of names on every dialect makes a cross-document match read one
+ * field name — but **"Payer" and "Recipient" appear NOWHERE on this face**: a
+ * case-insensitive search over the whole page returns zero hits for either.
+ * FORM-KEY-01 made the names free to follow the paper while {@link subjectKey}
+ * keeps the ROLES right, so they do.
+ *
+ * **`accountNumber` is UNCHANGED, and there is nothing on the paper to rename
+ * it to.** A search for "account" over this entire face returns ZERO hits —
+ * fewer even than `vnd.fjs.k1_1065`, whose page at least prints a *capital
+ * account analysis*. The field is DOC-01's account ROLE, carrying whatever
+ * identifier the shareholder's statement uses, and it keeps a role name
+ * because no printed caption exists to take.
  */
 export const k1SCorporationSchema = /** @type {const} */ ({
     ...base(dialect),
-    payerTin: string,
-    recipientTin: string,
+    corporationEIN: string,
+    shareholderIdentifyingNumber: string,
     accountNumber: string,
     taxYear: number,
     formRevision: string,
@@ -150,6 +172,15 @@ export const k1SCorporationSchema = /** @type {const} */ ({
     box18MoreThanOneActivityForAtRiskPurposes: option(true),
     box19MoreThanOneActivityForPassiveActivityPurposes: option(true),
 })
+
+/**
+ * FORM-KEY-01 -- which of THIS dialect's OWN fields play the five roles a
+ * form subject is keyed on. See `fjs/document/subject`'s {@link SubjectKey}
+ * for why the dialect declares this instead of every caller assuming one
+ * shared set of field names.
+ * @type {SubjectKey}
+ */
+export const subjectKey = { formType: 'dialect', taxYear: 'taxYear', payer: 'corporationEIN', recipient: 'shareholderIdentifyingNumber', account: 'accountNumber' }
 
 /** @typedef {Ts<typeof k1SCorporationSchema>} K1SCorporation */
 
@@ -302,8 +333,8 @@ export const validate = value => {
  */
 const minimal = {
     dialect,
-    payerTin: '44-4444444',
-    recipientTin: '222-22-2222',
+    corporationEIN: '44-4444444',
+    shareholderIdentifyingNumber: '222-22-2222',
     accountNumber: 'SHR-0001',
     taxYear: 2025,
     formRevision: '2025',
@@ -321,8 +352,8 @@ const minimal = {
  */
 const minimalWithNoDetermination = {
     dialect,
-    payerTin: '44-4444444',
-    recipientTin: '222-22-2222',
+    corporationEIN: '44-4444444',
+    shareholderIdentifyingNumber: '222-22-2222',
     accountNumber: 'SHR-0001',
     taxYear: 2025,
     formRevision: '2025',
@@ -476,6 +507,45 @@ export const proof = {
     dialectAndMediaType: () => {
         assertEq(dialect, 'vnd.fjs.k1_1120s')
         assertEq(mediaType, 'application/vnd.fjs.k1_1120s+json')
+    },
+
+    /**
+     * **The two parties, asserted rather than described.** `corporationEIN`
+     * is printed box A and plays {@link subjectKey}'s `payer` role;
+     * `shareholderIdentifyingNumber` is printed box E and plays its
+     * `recipient` role. Nothing else in this module would notice the two
+     * being transposed: the schema types both as `string`, and a transposed
+     * pair still derives a perfectly well-formed subject — for the WRONG
+     * business identity.
+     *
+     * The fixture uses two visibly different TIN FORMATS — an employer
+     * identification number (`NN-NNNNNNN`) for the corporation and a social
+     * security number (`NNN-NN-NNNN`) for the shareholder — so a
+     * transposition is visible in the assertion itself. It is also the
+     * distinction the printed captions draw: box A says *employer
+     * identification number* and box E says only *identifying number*,
+     * because a shareholder is usually a person.
+     */
+    theCorporationAndTheShareholderAreNotTransposed: () => {
+        const [t, v] = validate(minimal)
+        assert(t === 'ok', ['expected ok', t, v])
+        if (t !== 'ok') {
+            throw ['expected ok', t, v]
+        }
+        assertEq(
+            v.corporationEIN,
+            '44-4444444',
+            'corporationEIN holds printed box A — the entity, in an EIN format',
+        )
+        assertEq(
+            v.shareholderIdentifyingNumber,
+            '222-22-2222',
+            'shareholderIdentifyingNumber holds printed box E — the person, in an SSN format',
+        )
+        assert(
+            v.corporationEIN !== v.shareholderIdentifyingNumber,
+            ['a Schedule K-1 always has two distinct parties', v.corporationEIN, v.shareholderIdentifyingNumber],
+        )
     },
 
     boxListsAreCovered: () => {
@@ -703,8 +773,8 @@ export const proof = {
         aPartnershipK1IsRejectedByTheSCorporationDialect: () => {
             const [t, v] = validate({
                 dialect: 'vnd.fjs.k1_1065',
-                payerTin: '33-3333333',
-                recipientTin: '222-22-2222',
+                partnershipEIN: '33-3333333',
+                partnerTin: '222-22-2222',
                 accountNumber: 'PTR-0001',
                 taxYear: 2025,
                 formRevision: '2025',

@@ -1014,8 +1014,8 @@ const employeeStockPurchaseForm = {
     documentHash: 'doc-espp',
     value: {
         dialect: 'vnd.fjs.form3922',
-        payerTin: '11-1111111',
-        recipientTin: '222-22-2222',
+        corporationTin: '11-1111111',
+        employeeTin: '222-22-2222',
         accountNumber: 'ACC-0001',
         taxYear: 2025,
         formRevision: 'April 2025',

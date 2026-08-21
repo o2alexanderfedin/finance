@@ -545,7 +545,7 @@ export const isoSpread = exercisePriceCents => fairMarketValueCents => shares =>
  * missing box 5 is not an exercise of zero shares, and treating it as one
  * would silently drop a preference item the employer told the IRS about.
  *
- * Summed across every stored form WITHOUT scoping by `recipientTin`, which is
+ * Summed across every stored form WITHOUT scoping by `employeeTin`, which is
  * the opposite of what `fjs/form8863` does with that same field on a
  * `vnd.fjs.1098t`. A joint return computes ONE Form 6251 over ONE alternative
  * minimum taxable income and §56(b)(3) makes no per-spouse distinction, so
@@ -1031,8 +1031,8 @@ const isoForm = hash => exercisePrice => fairMarketValue => shares => ({
     documentHash: hash,
     value: {
         dialect: 'vnd.fjs.form3921',
-        payerTin: '11-1111111',
-        recipientTin: '222-22-2222',
+        transferorTin: '11-1111111',
+        employeeTin: '222-22-2222',
         accountNumber: 'ACC-0001',
         taxYear: 2025,
         formRevision: 'April 2025',
@@ -1054,8 +1054,8 @@ const beneficiaryK1 = hash => box12 => ({
     documentHash: hash,
     value: {
         dialect: 'vnd.fjs.k1_1041',
-        payerTin: '66-6666666',
-        recipientTin: '222-22-2222',
+        estateOrTrustEIN: '66-6666666',
+        beneficiaryIdentifyingNumber: '222-22-2222',
         taxYear: 2025,
         formRevision: '2025',
         payerName: 'The Harrow Family Trust',
@@ -1802,7 +1802,7 @@ export const proof = {
                 150000n)
         },
         // Both spouses' exercises land on the ONE Form 6251 a joint return
-        // files -- summed WITHOUT scoping by `recipientTin`, which is the
+        // files -- summed WITHOUT scoping by `employeeTin`, which is the
         // opposite of what `fjs/form8863` does with the same field. Two forms
         // with two different employee TINs.
         bothSpousesExercisesLandOnOneForm: () => {
@@ -1810,7 +1810,7 @@ export const proof = {
             const spouseForm = isoForm('doc-spouse-b')('10.00')('25.00')('200')
             const spouse = {
                 ...spouseForm,
-                value: { ...spouseForm.value, recipientTin: '444-44-4444' },
+                value: { ...spouseForm.value, employeeTin: '444-44-4444' },
             }
             const result = expectOk(run({
                 ...nothing, status: 'marriedFilingJointly',
@@ -1818,7 +1818,7 @@ export const proof = {
             }))
             assertEq(result.line2i, 450000n, '$1,500.00 + $3,000.00 = $4,500.00')
             assert(
-                taxpayer.value.recipientTin !== spouse.value.recipientTin,
+                taxpayer.value.employeeTin !== spouse.value.employeeTin,
                 'this fixture is deliberately two different employees')
         },
         // THE SAME-YEAR DISPOSITION REFUSAL, and its control. A stored Form

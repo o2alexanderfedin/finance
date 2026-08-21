@@ -29,9 +29,12 @@
  *   Schedule A's own instructions) do and do not allow is deduction
  *   logic; this dialect stores and reads.
  *
- * The subject convention: `formSubject` keys on `(payerTin, recipientTin,
- * accountNumber, taxYear, formType)` for every dialect (DOC-01), and this
- * record has no payer and no account. Both are `''`, which makes exactly
+ * The subject convention: a subject is keyed on five ROLES —
+ * `(formType, taxYear, payer, recipient, account)` (DOC-01) — which each
+ * dialect maps onto its own fields via {@link subjectKey} (FORM-KEY-01).
+ * This dialect keeps the spellings `recipientTin`/`taxYear` because it
+ * transcribes a fact off the taxpayer's own return and has no printed form
+ * to take names from; it has no payer and no account. Both are `''`, which makes exactly
  * one such subject per taxpayer per tax year — the right cardinality,
  * since this is one running record rather than one document per expense.
  * Revising it means a new revision under that subject, which is what Evo
@@ -50,6 +53,7 @@ import { dialect as medicalExpensesDialect, medicalExpensesSchema } from '../med
 /** @import { Result } from 'functionalscript/fjs/types/result/types.js' */
 /** @import { Ts, Unknown } from 'functionalscript/fjs/types/rtti/ts/types.js' */
 /** @import { ValidationError } from 'functionalscript/fjs/types/rtti/common/types.js' */
+/** @import { SubjectKey } from '../subject/module.f.js' */
 
 /**
  * Format tag: names the dialect of this BLOB. The media type it is served
@@ -85,6 +89,19 @@ export const itemizedDeductionsSchema = /** @type {const} */ ({
     corrected: option(true),
     entries: array(itemizedEntry),
 })
+
+/**
+ * FORM-KEY-01 -- which of THIS dialect's OWN fields play the five roles a
+ * form subject is keyed on. See `fjs/document/subject`'s {@link SubjectKey}
+ * for why the dialect declares this instead of every caller assuming one
+ * shared set of field names.
+ *
+ * No payer and no account role: this dialect has no such field, and an omitted role
+ * derives the empty string -- exactly the `payerTin: ''` /
+ * `accountNumber: ''` this dialect's subject has carried since DOC-01.
+ * @type {SubjectKey}
+ */
+export const subjectKey = { formType: 'dialect', taxYear: 'taxYear', recipient: 'recipientTin' }
 
 /** @typedef {Ts<typeof itemizedDeductionsSchema>} ItemizedDeductions */
 
