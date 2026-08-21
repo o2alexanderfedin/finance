@@ -44,7 +44,7 @@ import { formSubject } from '../../document/subject/module.f.js'
  *     readonly subject: string,
  *     readonly parents: readonly string[],
  *     readonly snapshot: string,
- *     readonly archived?: true,
+ *     readonly archived?: true | undefined,
  * }} StoredRevision
  */
 
