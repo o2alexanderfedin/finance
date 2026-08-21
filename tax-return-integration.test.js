@@ -335,8 +335,8 @@ test(
             // two faces cannot be absorbed by the sum.
             const k1Partnership = {
                 dialect: k1PartnershipDialect,
-                payerTin: '33-3333333',
-                recipientTin,
+                partnershipEIN: '33-3333333',
+                partnerTin: recipientTin,
                 accountNumber: 'ACC-K1-1065',
                 taxYear: 2025,
                 formRevision: '2025',

@@ -1543,8 +1543,8 @@ const documentByHash = {
     // each leaf a proof about a declaration rather than about routing.
     [fixtureSweepPartnershipK1Hash]: {
         dialect: k1PartnershipDialect,
-        payerTin: '33-3333333',
-        recipientTin: '222-22-2222',
+        partnershipEIN: '33-3333333',
+        partnerTin: '222-22-2222',
         accountNumber: 'PTR-SWEEP',
         taxYear: 2025,
         formRevision: '2025',

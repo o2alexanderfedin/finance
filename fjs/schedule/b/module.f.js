@@ -346,7 +346,7 @@ export const scheduleB = inputs => {
             },
         ])(interestForms),
         ...payerRows(
-            k1 => ({ payer: k1.payerName ?? `partnership ${k1.payerTin}`, payerTin: k1.payerTin }))([
+            k1 => ({ payer: k1.payerName ?? `partnership ${k1.partnershipEIN}`, payerTin: k1.partnershipEIN }))([
             { boxPath: 'k1_1065.box5InterestIncome', read: k1 => k1.box5InterestIncome },
         ])(partnershipK1Forms),
         ...payerRows(
@@ -365,7 +365,7 @@ export const scheduleB = inputs => {
             { boxPath: 'box1aTotalOrdinaryDividends', read: form => form.box1aTotalOrdinaryDividends },
         ])(dividendForms),
         ...payerRows(
-            k1 => ({ payer: k1.payerName ?? `partnership ${k1.payerTin}`, payerTin: k1.payerTin }))([
+            k1 => ({ payer: k1.payerName ?? `partnership ${k1.partnershipEIN}`, payerTin: k1.partnershipEIN }))([
             { boxPath: 'k1_1065.box6aOrdinaryDividends', read: k1 => k1.box6aOrdinaryDividends },
             // Box 6c is a SECOND partnership summand, never a slice of 6a —
             // see the module docstring. The partnership face is the only one
@@ -522,8 +522,8 @@ const partnershipK1 = boxes => hash => ({
     documentHash: hash,
     value: {
         dialect: 'vnd.fjs.k1_1065',
-        payerTin: '33-3333333',
-        recipientTin: '222-22-2222',
+        partnershipEIN: '33-3333333',
+        partnerTin: '222-22-2222',
         accountNumber: 'PTR-0001',
         taxYear: 2025,
         formRevision: '2025',

@@ -509,8 +509,8 @@ const fixtures = {
     },
     [k1PartnershipDialect]: {
         dialect: k1PartnershipDialect,
-        payerTin: '33-3333333',
-        recipientTin: '222-22-2222',
+        partnershipEIN: '33-3333333',
+        partnerTin: '222-22-2222',
         accountNumber: 'PTR-0001',
         taxYear: 2025,
         formRevision: '2025',

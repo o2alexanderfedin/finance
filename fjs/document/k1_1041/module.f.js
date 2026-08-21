@@ -926,8 +926,8 @@ export const proof = {
         aPartnershipK1IsRejectedByTheEstateTrustDialect: () => {
             const [t, v] = validate({
                 dialect: 'vnd.fjs.k1_1065',
-                payerTin: '33-3333333',
-                recipientTin: '222-22-2222',
+                partnershipEIN: '33-3333333',
+                partnerTin: '222-22-2222',
                 accountNumber: 'PTR-0001',
                 taxYear: 2025,
                 formRevision: '2025',

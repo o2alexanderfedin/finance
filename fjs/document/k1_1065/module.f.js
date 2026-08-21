@@ -167,16 +167,30 @@ export const mediaType = mediaTypeOf(dialect)
  * as the first failing field on a mismatched blob, matching every other
  * document dialect in this tree.
  *
- * `payerTin` is the PARTNERSHIP's employer identification number (printed box
- * A) and `recipientTin` the PARTNER's (printed box E) — the same two names
- * every information-return dialect here uses, so a cross-document TIN match
- * (`fjs/schedule/se`'s wage-base attribution, for one) reads the same field
- * name on every document rather than a per-dialect spelling.
+ * `partnershipEIN` is printed box A, captioned **"Partnership's employer
+ * identification number"**, and `partnerTin` is printed box E, captioned
+ * **"Partner's SSN or TIN (Do not use TIN of a disregarded entity. See
+ * instructions.)"**. They were `payerTin`/`recipientTin` until FORM-KEY-02,
+ * on the reasoning that one set of names on every dialect lets a
+ * cross-document TIN match (`fjs/schedule/se`'s wage-base attribution, for
+ * one) read the same field name everywhere — but **"Payer" and "Recipient"
+ * do not appear anywhere on this face**, so those two names were the tree's
+ * convention rather than a transcription. FORM-KEY-01 made the names free to
+ * follow the paper while {@link subjectKey} keeps the ROLES right, so they
+ * do.
+ *
+ * **`accountNumber` is UNCHANGED, and its name is the one thing here that is
+ * not transcribed.** There is no account-number box on this face: a search
+ * for "account" over the whole page finds only item L, *"Partner's Capital
+ * Account Analysis"*, which is a money analysis and not an identifier. The
+ * field is DOC-01's account ROLE, carrying whatever identifier the partner's
+ * statement uses, and it keeps a role name because there is no printed
+ * caption to rename it to. `vnd.fjs.k1_1041` has no such field at all.
  */
 export const k1PartnershipSchema = /** @type {const} */ ({
     ...base(dialect),
-    payerTin: string,
-    recipientTin: string,
+    partnershipEIN: string,
+    partnerTin: string,
     accountNumber: string,
     taxYear: number,
     formRevision: string,
@@ -230,7 +244,7 @@ export const k1PartnershipSchema = /** @type {const} */ ({
  * shared set of field names.
  * @type {SubjectKey}
  */
-export const subjectKey = { formType: 'dialect', taxYear: 'taxYear', payer: 'payerTin', recipient: 'recipientTin', account: 'accountNumber' }
+export const subjectKey = { formType: 'dialect', taxYear: 'taxYear', payer: 'partnershipEIN', recipient: 'partnerTin', account: 'accountNumber' }
 
 /** @typedef {Ts<typeof k1PartnershipSchema>} K1Partnership */
 
@@ -438,8 +452,8 @@ export const validate = value => {
  */
 const minimal = {
     dialect,
-    payerTin: '33-3333333',
-    recipientTin: '222-22-2222',
+    partnershipEIN: '33-3333333',
+    partnerTin: '222-22-2222',
     accountNumber: 'PTR-0001',
     taxYear: 2025,
     formRevision: '2025',
@@ -459,8 +473,8 @@ const minimal = {
  */
 const limitedPartner = {
     dialect,
-    payerTin: '33-3333333',
-    recipientTin: '222-22-2222',
+    partnershipEIN: '33-3333333',
+    partnerTin: '222-22-2222',
     accountNumber: 'PTR-0001',
     taxYear: 2025,
     formRevision: '2025',
@@ -472,8 +486,8 @@ const limitedPartner = {
  */
 const generalPartnerWithNoDetermination = {
     dialect,
-    payerTin: '33-3333333',
-    recipientTin: '222-22-2222',
+    partnershipEIN: '33-3333333',
+    partnerTin: '222-22-2222',
     accountNumber: 'PTR-0001',
     taxYear: 2025,
     formRevision: '2025',
@@ -652,6 +666,49 @@ export const proof = {
     dialectAndMediaType: () => {
         assertEq(dialect, 'vnd.fjs.k1_1065')
         assertEq(mediaType, 'application/vnd.fjs.k1_1065+json')
+    },
+
+    /**
+     * **The two parties, asserted rather than described.** `partnershipEIN`
+     * is printed box A and plays {@link subjectKey}'s `payer` role;
+     * `partnerTin` is printed box E and plays its `recipient` role. Nothing
+     * else in this module would notice the two being transposed: the schema
+     * types both as `string`, and a transposed pair still derives a perfectly
+     * well-formed subject — for the WRONG business identity.
+     *
+     * The fixture uses two visibly different TIN FORMATS — an employer
+     * identification number (`NN-NNNNNNN`) for the partnership and a social
+     * security number (`NNN-NN-NNNN`) for the partner — so a transposition is
+     * visible in the assertion itself. It is also the distinction the printed
+     * captions draw: box A says *employer identification number*, box E says
+     * *SSN or TIN*, because a partner is usually a person.
+     *
+     * This one is load-bearing beyond the dialect: `fjs/schedule/se` matches
+     * a proprietor to their own documents by TIN, and `fjs/schedule/b` and
+     * `fjs/schedule/e` both print the PARTNERSHIP's number as the issuer of a
+     * line. A transposition would name the partner as the issuer of their own
+     * K-1 in an auditor-facing citation.
+     */
+    thePartnershipAndThePartnerAreNotTransposed: () => {
+        const [t, v] = validate(minimal)
+        assert(t === 'ok', ['expected ok', t, v])
+        if (t !== 'ok') {
+            throw ['expected ok', t, v]
+        }
+        assertEq(
+            v.partnershipEIN,
+            '33-3333333',
+            'partnershipEIN holds printed box A — the entity, in an EIN format',
+        )
+        assertEq(
+            v.partnerTin,
+            '222-22-2222',
+            'partnerTin holds printed box E — the person, in an SSN format',
+        )
+        assert(
+            v.partnershipEIN !== v.partnerTin,
+            ['a Schedule K-1 always has two distinct parties', v.partnershipEIN, v.partnerTin],
+        )
     },
 
     /**
