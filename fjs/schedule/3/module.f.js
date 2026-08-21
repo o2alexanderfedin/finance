@@ -1369,14 +1369,14 @@ const w2WithBox12 = code => amount => ({
  * - `tax` is `undefined` for the "this employer reported no box 4" case,
  *   which is a different fact from a reported `'0.00'` and is cited
  *   differently.
- * @type {(hash: string) => (payerTin: string) => (recipientTin: string) => (wages: string) => (tax: string | undefined) => Stored<W2>}
+ * @type {(hash: string) => (employerEIN: string) => (employeeSSN: string) => (wages: string) => (tax: string | undefined) => Stored<W2>}
  */
-const w2WithSocialSecurity = hash => payerTin => recipientTin => wages => tax => ({
+const w2WithSocialSecurity = hash => employerEIN => employeeSSN => wages => tax => ({
     documentHash: hash,
     value: {
         dialect: 'vnd.fjs.w2',
-        employerEIN: payerTin,
-        employeeSSN: recipientTin,
+        employerEIN,
+        employeeSSN,
         controlNumber: '',
         taxYear: 2025,
         formRevision: '2025',

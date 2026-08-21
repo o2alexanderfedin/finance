@@ -3426,13 +3426,13 @@ const stageOneWithPassThrough = profile => status => partnershipK1Forms =>
 /**
  * A Form W-2 carrying box 3 Social Security wages for a named recipient — the
  * box Schedule SE line 8a reads, and NOT box 5, which is Form 8959's.
- * @type {(documentHash: string) => (recipientTin: string) => (amount: string) => Stored<W2>}
+ * @type {(documentHash: string) => (employeeSSN: string) => (amount: string) => Stored<W2>}
  */
-const w2WithSocialSecurityWages = documentHash => recipientTin => amount => ({
+const w2WithSocialSecurityWages = documentHash => employeeSSN => amount => ({
     documentHash,
     value: {
         dialect: 'vnd.fjs.w2',
-        employerEIN: '11-1111111', employeeSSN: recipientTin, controlNumber: 'ACC-W2',
+        employerEIN: '11-1111111', employeeSSN, controlNumber: 'ACC-W2',
         taxYear: 2025, formRevision: '2025',
         box1WagesTipsOtherCompensation: amount,
         box3SocialSecurityWages: amount,
