@@ -24,6 +24,15 @@
 - If you find a bug or a gap in FunctionalScript, tell the user so they can fix it and release a new FJS version. A local workaround is fine — it should not block progress — but it must never be *silent*: whenever you work around an FJS bug or gap, also write a todo file recording it, named `fjs/todo/upstream-<short-name>.md`. State what is missing or broken, the workaround in place here, and what the upstream fix should look like. These are the candidates to upstream and delete once a new FJS version ships (see [./todo/plan.md](./todo/plan.md) Week 5).
 - **No third-party tools or libraries without approval from all owners.** Nothing may be added to `dependencies` or `devDependencies` until every repo owner has approved it. This is a hard stop, not a preference — propose it and wait. Do not add it, do not add it "temporarily", and do not vendor the code to sidestep the rule. What is already in [./package.json](./package.json) is the approved set, by definition; adding to it is the thing that needs approval.
 
+  **One approved exception exists, and its shape is the point.** Browser automation for the
+  hand-entry page needs a driver, and no fjs capability substitutes for a real browser — a
+  hand-written DOM shim tests the shim. Approved by the owner on 2026-08-20 *"as a separate npm
+  package"*, and that is how it lives: [`ui-tests/`](./ui-tests) is its own `package.json` with
+  its own `devDependencies`, and the shipped `finance` package gains nothing. Nothing under
+  `fjs/` may import from it, `npm test` does not run it, and deleting the directory leaves the
+  engine untouched. A dependency the product does not ship is a different question from one it
+  does, and this is the form an answer of "yes" should take.
+
   This rarely binds in practice, because the rules above already point elsewhere: a missing generic capability is a reason to release a new fjs version, and a missing app-specific one is a reason to write it here. Adding a third-party parser or helper would also break the purity model. If a dependency still looks necessary, that is a signal worth raising explicitly rather than resolving in a commit.
 
 ## Design discipline
