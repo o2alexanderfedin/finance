@@ -83,9 +83,11 @@
  * the five shared field names `(payerTin, recipientTin, accountNumber,
  * taxYear, formType)`, so a dialect that spelled its parties differently had
  * no subject at all. FORM-KEY-01 ended that — a dialect declares its own role
- * mapping now ({@link subjectKey}) — and `vnd.fjs.1098e`, `vnd.fjs.1098t` and
- * `vnd.fjs.1095a` have since taken their printed names. This dialect has not;
- * `corporationEin`/`employeeTin` is available and simply not done yet.
+ * mapping now ({@link subjectKey}) — and `vnd.fjs.1098e`, `vnd.fjs.1098t`,
+ * `vnd.fjs.1095a` and now the sibling `vnd.fjs.form3921`
+ * (`transferorTin`/`employeeTin`) have since taken their printed names. This
+ * dialect has not; `corporationTin`/`employeeTin` is available and simply not
+ * done yet.
  *
  * @module
  */
@@ -427,16 +429,17 @@ export const proof = {
      * `vnd.fjs.form3921` — the sibling dialect, and therefore the one whose
      * shape is most nearly compatible — fails THIS dialect's `validate`, and
      * the failure's path is exactly `['dialect']`. The two forms genuinely do
-     * share `payerTin`/`recipientTin`/`taxYear`/`formRevision`/
-     * `sourceArtifactHash` and both carry a `box1DateOptionGranted`, so
-     * nothing but the discriminant separates them.
+     * share `accountNumber`/`taxYear`/`formRevision`/`sourceArtifactHash`,
+     * both carry a `box1DateOptionGranted`, and both name a filing party and
+     * an employee — spelled `transferorTin`/`employeeTin` on the sibling
+     * since FORM-KEY-02 — so nothing but the discriminant separates them.
      */
     crossDialect: {
         formThirtyNineTwentyOneShapeRejected: () => {
             const [t, v] = validate({
                 dialect: 'vnd.fjs.form3921',
-                payerTin: '11-1111111',
-                recipientTin: '222-22-2222',
+                transferorTin: '11-1111111',
+                employeeTin: '222-22-2222',
                 accountNumber: 'ACC-0001',
                 taxYear: 2025,
                 formRevision: 'April 2025',

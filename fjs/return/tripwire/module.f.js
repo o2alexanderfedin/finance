@@ -977,8 +977,8 @@ const estateTrustK1NoBusinessIncome = {
  */
 const isoExercise = {
     dialect: formThirtyNineTwentyOneDialect,
-    payerTin: '66-6666666',
-    recipientTin: '222-22-2222',
+    transferorTin: '66-6666666',
+    employeeTin: '222-22-2222',
     accountNumber: '',
     taxYear: 2025,
     formRevision: 'April 2025',
@@ -1369,8 +1369,8 @@ export const proof = {
             /** @type {FormThirtyNineTwentyOne} */
             const bare = {
                 dialect: formThirtyNineTwentyOneDialect,
-                payerTin: '66-6666666',
-                recipientTin: '222-22-2222',
+                transferorTin: '66-6666666',
+                employeeTin: '222-22-2222',
                 accountNumber: '',
                 taxYear: 2025,
                 formRevision: 'April 2025',
