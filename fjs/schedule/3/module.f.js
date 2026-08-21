@@ -850,7 +850,7 @@ export const scheduleThree = taxParamSet => input => {
                     + `Form 8863 offers`,
             }
         }
-        const matching = tuitionForms.filter(form => form.value.recipientTin === stored.value.studentTin)
+        const matching = tuitionForms.filter(form => form.value.studentTin === stored.value.studentTin)
         /** @type {readonly Source[]} */
         const boxOneSources = matching.flatMap(form => {
             const printed = form.value.box1PaymentsReceivedForQualifiedTuition
@@ -1325,9 +1325,9 @@ const tuitionDocument = overrides => ({
     documentHash: 'sha256-1098t-0001',
     value: {
         dialect: 'vnd.fjs.1098t',
-        payerTin: '11-1111111',
-        recipientTin: '333-33-3333',
-        accountNumber: 'STU-0001',
+        filerEin: '11-1111111',
+        studentTin: '333-33-3333',
+        serviceProviderAccountNumber: 'STU-0001',
         taxYear: 2025,
         formRevision: '2025',
         ...overrides,
@@ -2226,7 +2226,7 @@ export const proof = {
             const result = okResult(compute(baseInput({
                 agiCents: 4000000n,
                 tuitionForms: [tuitionDocument({
-                    recipientTin: '555-55-5555',
+                    studentTin: '555-55-5555',
                     box1PaymentsReceivedForQualifiedTuition: '9000.00',
                 })],
                 creditForms: [creditsDocument({

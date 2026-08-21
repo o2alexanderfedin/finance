@@ -237,8 +237,10 @@ const saversCreditEligibilityEntry = /** @type {const} */ ({
  * One student whose education expenses this return claims — Form 8863 Part
  * III, one instance per student.
  *
- * `studentTin` is what a stored `vnd.fjs.1098t`'s `recipientTin` is matched
- * against, and it is deliberately not assumed to be the taxpayer's:
+ * `studentTin` is what a stored `vnd.fjs.1098t`'s own `studentTin` is matched
+ * against — the two carry the same name since FORM-KEY-01, which is how the
+ * match reads as a match — and it is deliberately not assumed to be the
+ * taxpayer's:
  * §25A(f)(1)(A) reaches a dependent's expenses, so a parent's return carries
  * a student entry keyed by the child's TIN. `fjs/document/1098t`'s own header
  * records that hazard in full.

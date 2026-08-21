@@ -5495,9 +5495,9 @@ const phaseTwentyFiveOneZeroNineEightT = {
     documentHash: 'sha256-p25-1098t',
     value: {
         dialect: 'vnd.fjs.1098t',
-        payerTin: '66-6666666',
-        recipientTin: '222-22-2222',
-        accountNumber: 'STU-0001',
+        filerEin: '66-6666666',
+        studentTin: '222-22-2222',
+        serviceProviderAccountNumber: 'STU-0001',
         taxYear: 2025,
         formRevision: '2025',
         box1PaymentsReceivedForQualifiedTuition: '9000.00',

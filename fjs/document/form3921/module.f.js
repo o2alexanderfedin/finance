@@ -36,27 +36,34 @@
  * ## `payerTin` is the TRANSFEROR and `recipientTin` is the EMPLOYEE
  *
  * The printed boxes are "TRANSFEROR'S TIN" and "EMPLOYEE'S TIN", and this
- * family's convention — stated at length in `fjs/document/1098t`'s own header
- * and inherited from `fjs/document/1098e`'s naming INVERSION — is that
- * `payerTin` holds the printed FILER's TIN and `recipientTin` holds the TIN of
- * the person the form is about. A `transferorTin`/`employeeTin` pair of its
- * own was rejected for the reason 1098-T records: `fjs/document/subject`'s
- * `formSubject` keys every stored document on
- * `(payerTin, recipientTin, accountNumber, taxYear, formType)`, and a dialect
- * whose identity fields are named something else has no subject at all.
+ * family's convention is that `payerTin` holds the printed FILER's TIN and
+ * `recipientTin` holds the TIN of the person the form is about. A
+ * `transferorTin`/`employeeTin` pair of its own was rejected because
+ * `fjs/document/subject`'s `formSubject` keyed every stored document on the
+ * five shared field NAMES `(payerTin, recipientTin, accountNumber, taxYear,
+ * formType)`, so a dialect whose identity fields were named something else
+ * had no subject at all.
+ *
+ * **That reason has since expired, and this dialect has not yet spent the
+ * freedom.** FORM-KEY-01 gave every dialect a {@link subjectKey} declaring
+ * which of its OWN fields play the five roles, and `vnd.fjs.1098e`,
+ * `vnd.fjs.1098t` and `vnd.fjs.1095a` have taken their printed names since
+ * (`lenderTin`/`borrowerTin`, `filerEin`/`studentTin`, `recipientSsn`). The
+ * printed names here would be `transferorTin`/`employeeTin`; keeping
+ * `payerTin`/`recipientTin` is now a not-yet, not an impossibility.
  *
  * **The 1098-T hazard does NOT carry over, and that is worth stating rather
- * than leaving to be rediscovered.** On a 1098-T, `recipientTin` is the
- * STUDENT, who is frequently a dependent rather than the filer, and
- * `fjs/form8863` must match each form to a claimed student by that TIN or it
- * attributes one child's tuition to another. Here, `recipientTin` is the
- * EMPLOYEE, who on a joint return may be either spouse — and it does not
- * matter which, because a joint return computes ONE Form 6251 over ONE
- * alternative minimum taxable income and §56(b)(3) makes no per-spouse
- * distinction. So `fjs/form6251` sums every stored Form 3921's spread without
- * scoping by `recipientTin`, which is the opposite of what Form 8863 does with
- * this same field. {@link proof}.theEmployeeMayBeEitherSpouse is the leaf that
- * records the case.
+ * than leaving to be rediscovered.** On a 1098-T, the recipient role is the
+ * STUDENT — spelled `studentTin` there — who is frequently a dependent rather
+ * than the filer, and `fjs/form8863` must match each form to a claimed student
+ * by that TIN or it attributes one child's tuition to another. Here,
+ * `recipientTin` is the EMPLOYEE, who on a joint return may be either spouse —
+ * and it does not matter which, because a joint return computes ONE Form 6251
+ * over ONE alternative minimum taxable income and §56(b)(3) makes no
+ * per-spouse distinction. So `fjs/form6251` sums every stored Form 3921's
+ * spread without scoping by `recipientTin`, which is the opposite of what Form
+ * 8863 does with the field playing the same role.
+ * {@link proof}.theEmployeeMayBeEitherSpouse is the leaf that records the case.
  *
  * ## Box 6 is an identity, not an amount
  *

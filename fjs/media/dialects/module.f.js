@@ -464,9 +464,9 @@ const fixtures = {
     },
     [oneZeroNineEightTDialect]: {
         dialect: oneZeroNineEightTDialect,
-        payerTin: '11-1111111',
-        recipientTin: '333-33-3333',
-        accountNumber: 'STU-0001',
+        filerEin: '11-1111111',
+        studentTin: '333-33-3333',
+        serviceProviderAccountNumber: 'STU-0001',
         taxYear: 2025,
         formRevision: '2025',
     },
