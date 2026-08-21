@@ -1,0 +1,14 @@
+{
+  "name": "finance-ui-tests",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Browser automation for the finance demo. A SEPARATE package on purpose: the shipped `finance` package must not gain a browser driver, its download, or its transitive tree. Nothing here is imported by the engine.",
+  "scripts": {
+    "test": "playwright test",
+    "install-browser": "playwright install chromium"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.56.0"
+  }
+}
