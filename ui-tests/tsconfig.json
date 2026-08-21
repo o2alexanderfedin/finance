@@ -1,0 +1,25 @@
+{
+  // This package type-checks itself, with its own dependency resolvable.
+  // The root program deliberately excludes this directory: a root build must
+  // not require an install that only this package needs.
+  "compilerOptions": {
+    "target": "esnext",
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "allowJs": true,
+    "checkJs": true,
+    "noEmit": true,
+    "strict": true,
+    "exactOptionalPropertyTypes": true,
+    "noUncheckedIndexedAccess": true,
+    // Playwright's own `types.d.ts` references `Buffer`, `stream` and
+    // `child_process`, so type-checking anything that imports it needs
+    // `@types/node`. It is a devDependency of THIS package only: the root
+    // repository still has none, which is why its gate suites carry
+    // `@ts-nocheck`, and that arrangement is unchanged.
+    "types": ["node"],
+    "lib": ["esnext", "dom"]
+  },
+  "include": ["*.js"],
+  "exclude": ["node_modules"]
+}
