@@ -47,6 +47,34 @@
  *    `deductibleMeals`, `businessUseOfHome`, `contractLabor`, `officeExpense`,
  *    `advertising` and `travel` have no Schedule F line.
  *
+ * ## `proprietorSsn` is the printed header, and printed line D is NOT it
+ *
+ * The face's unlettered header prints two boxes side by side: **"Name of
+ * proprietor"** and **"Social security number (SSN)"**. The second is what
+ * this dialect's `proprietorSsn` carries, and it plays {@link subjectKey}'s
+ * `recipient` role. It was `recipientTin` until FORM-KEY-02 -- a name this
+ * face does not use anywhere: a case-insensitive search over the whole page
+ * finds zero occurrences of "payer" or "recipient", which is what made the old
+ * name a convention rather than a transcription.
+ *
+ * **Printed line D is the other identity box, and it is deliberately absent.**
+ * D is *"Employer ID number (EIN) (see instr.)"* -- the farm's number, not the
+ * farmer's -- and it is dropped for the reason the next section gives. So the
+ * rename cannot be read as "line D finally got a field": nothing here
+ * transcribes line D, before or after.
+ *
+ * **`accountNumber` is UNCHANGED, and this is the one place in this branch
+ * where that costs something to explain.** There is no account-number box on a
+ * Schedule F; the only "account" on the whole face is line C's *Accounting
+ * method*, which is not one. The field is DOC-01's account ROLE, and it is
+ * load-bearing rather than decorative: {@link checkReferences} refuses an
+ * empty one, because it is what a `vnd.fjs.asset_register` must MATCH for its
+ * Form 4562 line 22 to reach printed line 14. Renaming it to something like
+ * `farmIdentifier` would have been an invention -- a name for a thing the
+ * paper does not print -- and would have broken the one word that is shared
+ * with the register on the other side of the join. So it keeps the role name,
+ * exactly as `vnd.fjs.k1_1065` and `vnd.fjs.k1_1120s` keep theirs.
+ *
  * ## Printed lines B, D, F and G are deliberately absent
  *
  * The six-digit principal agricultural activity code, the employer
@@ -159,7 +187,7 @@ const expenseEntry = /** @type {const} */ ({
  */
 export const farmSchema = /** @type {const} */ ({
     ...base(dialect),
-    recipientTin: string,
+    proprietorSsn: string,
     accountNumber: string,
     taxYear: number,
     corrected: option(true),
@@ -213,7 +241,7 @@ export const farmSchema = /** @type {const} */ ({
  * `accountNumber: ''` this dialect's subject has carried since DOC-01.
  * @type {SubjectKey}
  */
-export const subjectKey = { formType: 'dialect', taxYear: 'taxYear', recipient: 'recipientTin', account: 'accountNumber' }
+export const subjectKey = { formType: 'dialect', taxYear: 'taxYear', recipient: 'proprietorSsn', account: 'accountNumber' }
 
 /** @typedef {Ts<typeof farmSchema>} Farm */
 /** @typedef {Farm['entries'][number]} FarmExpenseEntry */
@@ -450,7 +478,7 @@ export const validate = value => {
  */
 export const minimalFarm = {
     dialect,
-    recipientTin: '222-22-2222',
+    proprietorSsn: '222-22-2222',
     accountNumber: 'FARM-0001',
     taxYear: 2025,
     principalCropOrActivity: 'corn and soybeans',
@@ -474,6 +502,44 @@ export const proof = {
     dialectAndMediaType: () => {
         assertEq(dialect, 'vnd.fjs.farm')
         assertEq(mediaType, 'application/vnd.fjs.farm+json')
+    },
+
+    /**
+     * **The two identity fields, asserted rather than described.**
+     * `proprietorSsn` is the printed header's "Social security number (SSN)"
+     * and plays {@link subjectKey}'s `recipient` role; `accountNumber` is the
+     * `account` role and has no printed counterpart at all. Nothing else in
+     * this module would notice the two being transposed: the schema types
+     * both as `string`, and a transposed pair still derives a well-formed
+     * subject — for the WRONG farm, under an `accountNumber` no
+     * `vnd.fjs.asset_register` could match.
+     *
+     * The two are asserted by FORMAT rather than merely by value: an SSN
+     * (`NNN-NN-NNNN`) for the person and a plain farm identifier for the
+     * account, so a swap is visible in the assertion itself. The neighbouring
+     * `checkReferences` leaf pins that an empty `accountNumber` REFUSES; this
+     * one pins which field it is.
+     */
+    theProprietorAndTheFarmIdentifierAreNotTransposed: () => {
+        const [t, v] = validate(minimalFarm)
+        assert(t === 'ok', ['expected ok', t, v])
+        if (t !== 'ok') {
+            throw ['expected ok', t, v]
+        }
+        assertEq(
+            v.proprietorSsn,
+            '222-22-2222',
+            'proprietorSsn holds the printed header SSN — the person, in an SSN format',
+        )
+        assertEq(
+            v.accountNumber,
+            'FARM-0001',
+            'accountNumber identifies the FARM, and is what an asset register must match',
+        )
+        assert(
+            v.proprietorSsn !== v.accountNumber,
+            ['the person and the farm are two different identifiers', v.proprietorSsn, v.accountNumber],
+        )
     },
     // Three printed two-box questions, hand-typed off the printed face: line C
     // "Cash / Accrual", line E "Yes / No", line 36 "a All investment is at

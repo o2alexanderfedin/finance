@@ -852,7 +852,7 @@ const bare1099B = {
 /** A cash-method farm with a real printed line 2. @type {Farm} */
 const farm = {
     dialect: 'vnd.fjs.farm',
-    recipientTin: '222-22-2222',
+    proprietorSsn: '222-22-2222',
     accountNumber: 'FARM-0001',
     taxYear: 2025,
     principalCropOrActivity: 'corn and soybeans',
