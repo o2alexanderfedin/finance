@@ -294,9 +294,9 @@ no filled 1040, no PDF, no e-file.
       forbidden construct. Three causes: `rtti/validate` restructured into `parse`/`common`/`data`
       (60), types relocated into `types.d.ts` (93), and the new error-carrying Effect system
       `Effect<O, T, E>` (the rest, 243 of them inside `fjs/server/fjs_run` alone). Closes MAINT-06's
-      intent, open since Phase 18. Full analysis in `fjs/todo/upstream-mjs-migration.md`.
-      answer end to end with citing hashes, no code touched. This is Phase 14's criterion 2,
-      unchanged and still wanted.
+      intent, open since Phase 18. Full analysis: `.planning/reports/fjs-0.46.1-migration.md`
+      (`fjs/todo/upstream-mjs-migration.md` was the running record and was retired by `1924cef`
+      once all three of its conditions were met; the report is what it retires into).
 
 > **Phase 14 is retired into this milestone, not deleted.** Its criteria 3, 4 and 5 were already
 > moved to Phase 19 on 2026-08-12 because they were pure engineering and did not need the
@@ -1071,6 +1071,35 @@ All five are closed with fixtures that assert the wrong answer beside the right 
 ### Phase 30: Pass-Through Income
 **Requirements**: DOC-24 (K-1, two dialects — 1065 and 1120-S box numbering differs), TAX-35 (Schedule E) · **Tier**: T3
 
+> **The seven sections below carry no prose of their own, deliberately.** Each phase's record is
+> its entry in the phase list above; duplicating it here would create a second source of truth for
+> the same fact, which this file has been bitten by before. They exist because **anything that
+> reads `### Phase N` sections could not see these phases at all** — `gsd-sdk query
+> roadmap.analyze` reported 31 phases ending at 30 while the list above carries 38 entries, so the
+> three phases of the CURRENT milestone were invisible to the tooling meant to audit them. Found by
+> `/gsd-audit-milestone` on 2026-08-20.
+
+### Phase 31: Gap Closure — Form 8995-A, Form 8606 Part II, and the OCR island
+**Requirements**: TAX-32, TAX-29, MAINT-01 · **Tier**: T3 · **Status**: complete 2026-08-17 · record: the phase list above
+
+### Phase 32: Gap Closure — the Earned Income Credit
+**Requirements**: TAX-27 · **Tier**: T3 · **Status**: complete 2026-08-17 · record: the phase list above
+
+### Phase 33: External Validation Without a Filed Return
+**Requirements**: none mapped · **Tier**: T1 · **Status**: complete 2026-08-19 · record: `.planning/reports/taxcalcbench-33.md`
+
+### Phase 34: Second-Implementation Cross-Check
+**Requirements**: none mapped · **Tier**: T1 · **Status**: not started — milestone v4, blocked on the owner's documents and an account at a second filer
+
+### Phase 35: A Filable Artifact — fill the official `f1040.pdf`
+**Requirements**: none mapped · **Tier**: T1 · **Status**: not started — milestone v4, blocked on one dependency approval (`@cantoo/pdf-lib`); research complete in the phase list above
+
+### Phase 36: The Conversational Path
+**Requirements**: none mapped · **Tier**: T1 · **Status**: not started — milestone v4, blocked on a real client session with real documents
+
+### Phase 37: FunctionalScript 0.46.1
+**Requirements**: MAINT-06 (intent) · **Tier**: T3 · **Status**: complete 2026-08-19 · record: `.planning/reports/fjs-0.46.1-migration.md`
+
 ---
 
 ## Progress
@@ -1274,6 +1303,8 @@ work that was doable already done.**
       **E-file stays out of scope.** IRS MeF requires provider authorization no personal project obtains.
 
 - [ ] **Phase 36: The Conversational Path** - Documents into chat, "what do I owe for 2025?",
+      answer end to end with citing hashes, no code touched. This is Phase 14's criterion 2,
+      unchanged and still wanted.
 
 > **None of these is blocked on engineering.** Phase 34 needs the owner's documents and an account
 > at a second filer; Phase 36 needs a real client session with real documents, and running it on

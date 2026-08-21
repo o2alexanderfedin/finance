@@ -118,10 +118,28 @@
  *
  * ## One boundary that remains a boundary
  *
- * **No re-validation.** A document's bytes are handed to the engine as
- * parsed, because `cas_add`/`evo_add` already validated them against their
- * dialect and `fjs/form1040/core`'s own `Stored<T>` docstring is explicit
- * that nothing there re-validates either (AGENTS.md: one rule, one place).
+ * **No re-validation, and no validation upstream of it either — this is a
+ * TRUST boundary, not a checked one.** A document's bytes are handed to the
+ * engine as parsed. `fjs/form1040/core`'s `Stored<T>` docstring is explicit
+ * that nothing there re-validates, and the same is true here: `route` below
+ * dispatches on `doc.dialect` and stores the value, with no schema or
+ * money-exactness check anywhere on the path.
+ *
+ * **This paragraph claimed the opposite until 2026-08-20**, saying
+ * `cas_add`/`evo_add` "already validated them against their dialect". They do
+ * not. Upstream's `cas_add` classifies with `detect([revisionDialect,
+ * lockDialect, noteDialect])` — three upstream dialects, none of them ours —
+ * and `detectFinance` (`fjs/media/dialects`), which does carry the per-dialect
+ * checks, reaches production at exactly one site: `cas_refresh`'s read-only
+ * count report (`fjs/server/module.f.js:170`). Nothing on the WRITE path
+ * validates a finance document at all.
+ *
+ * What holds today is that every producer calls its dialect's own `validate`
+ * before storing — `tax-return-integration.test.js:373-384` does exactly that
+ * for its seeds. That is a convention among callers, not an enforced
+ * invariant, and calling it one was the defect. Recorded as
+ * `fjs/todo/no-dialect-validation-on-the-write-path.md`; found by
+ * `/gsd-audit-milestone` on 2026-08-20.
  *
  * ## The two document-set refusals
  *
