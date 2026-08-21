@@ -50,6 +50,7 @@ import { dialect as medicalExpensesDialect, medicalExpensesSchema } from '../med
 /** @import { Result } from 'functionalscript/fjs/types/result/types.js' */
 /** @import { Ts, Unknown } from 'functionalscript/fjs/types/rtti/ts/types.js' */
 /** @import { ValidationError } from 'functionalscript/fjs/types/rtti/common/types.js' */
+/** @import { SubjectKey } from '../subject/module.f.js' */
 
 /**
  * Format tag: names the dialect of this BLOB. The media type it is served
@@ -85,6 +86,19 @@ export const itemizedDeductionsSchema = /** @type {const} */ ({
     corrected: option(true),
     entries: array(itemizedEntry),
 })
+
+/**
+ * FORM-KEY-01 -- which of THIS dialect's OWN fields play the five roles a
+ * form subject is keyed on. See `fjs/document/subject`'s {@link SubjectKey}
+ * for why the dialect declares this instead of every caller assuming one
+ * shared set of field names.
+ *
+ * No payer and no account role: this dialect has no such field, and an omitted role
+ * derives the empty string -- exactly the `payerTin: ''` /
+ * `accountNumber: ''` this dialect's subject has carried since DOC-01.
+ * @type {SubjectKey}
+ */
+export const subjectKey = { formType: 'dialect', taxYear: 'taxYear', recipient: 'recipientTin' }
 
 /** @typedef {Ts<typeof itemizedDeductionsSchema>} ItemizedDeductions */
 

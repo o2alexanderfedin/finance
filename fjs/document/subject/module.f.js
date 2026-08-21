@@ -77,6 +77,100 @@ import { stringify as jsonText } from '../../json/module.f.js'
 export const formSubject = ({ payerTin, recipientTin, accountNumber, taxYear, formType }) =>
     jsonText([formType, String(taxYear), payerTin, recipientTin, accountNumber])
 
+/**
+ * FORM-KEY-01 — a dialect's own declaration of which of ITS fields play the
+ * five roles a form subject is keyed on.
+ *
+ * {@link formSubject} above takes the five VALUES already extracted. Every
+ * caller therefore had to know, per dialect, which field name carried each
+ * role — and every one of them spelled it `payerTin`/`recipientTin`/
+ * `accountNumber`/`taxYear`/`dialect`, because today they happen to agree.
+ * That agreement is an accident of twenty-eight schemas having been written
+ * from one template, not a property anything checks: a dialect whose printed
+ * form calls the payer an *employer* or the recipient a *student* cannot say
+ * so without silently changing what every caller reads.
+ *
+ * So the dialect declares the mapping instead. The values are FIELD NAMES on
+ * that dialect's own schema, never values and never other dialects' names,
+ * which is what keeps this module dialect-independent (it still imports no
+ * dialect).
+ *
+ * `payer` and `account` are OPTIONAL roles: several dialects
+ * (`medical_expenses`, `prior_year_capital_loss`, `ira`, ...) transcribe a
+ * fact off the taxpayer's own return and have neither a payer nor an account
+ * number. Those dialects have carried `payerTin: ''` and `accountNumber: ''`
+ * into `formSubject` since DOC-01, and an omitted role here reproduces
+ * exactly that — see `declaredSubject`.
+ *
+ * They are optional PROPERTIES rather than `string | undefined` ones on
+ * purpose: with `exactOptionalPropertyTypes`, deleting a role from a
+ * declaration must still TYPECHECK, or the mutation that proves the role
+ * tally is load-bearing could never be run (AGENTS.md: "a mutation must still
+ * typecheck"). For the same reason the values are plain `string`, not
+ * `keyof typeof someSchema` — a `keyof` type would turn every mis-typed name
+ * into a compile error, which sounds stronger and is in fact weaker: it makes
+ * the runtime two-way proof unwatchable, and a proof nobody has seen fail is
+ * decoration.
+ *
+ * @typedef {{
+ *   readonly formType: string,
+ *   readonly taxYear: string,
+ *   readonly payer?: string,
+ *   readonly recipient: string,
+ *   readonly account?: string,
+ * }} SubjectKey
+ */
+
+/**
+ * Reads one role off a document: an omitted role is the empty string (the
+ * `payerTin: ''` / `accountNumber: ''` convention DOC-01 already uses for
+ * payerless, accountless dialects), a string field is itself, and a numeric
+ * field — `taxYear` — is `String(...)`d exactly as {@link formSubject} does.
+ *
+ * A named field that is missing, or holds neither a string nor a number, is a
+ * PANIC rather than a `Result`: the declaration is source code in the same
+ * module as the schema it describes, so this cannot be a runtime input error,
+ * only a bug — and the two-way proof in `fjs/document/registry` is what stops
+ * it reaching here.
+ *
+ * @type {(document: { readonly [k: string]: unknown }) => (name: string | undefined) => string}
+ */
+const roleText = document => name => {
+    if (name === undefined) {
+        return ''
+    }
+    const value = document[name]
+    if (typeof value === 'string') {
+        return value
+    }
+    if (typeof value === 'number') {
+        return String(value)
+    }
+    throw ['a subjectKey names a field that is not a string or a number', name, value]
+}
+
+/**
+ * The subject for a document, derived through the DIALECT'S OWN
+ * {@link SubjectKey} declaration instead of through five field names assumed
+ * to be shared.
+ *
+ * **The encoding is deliberately unchanged.** The array handed to `jsonText`
+ * is the same five values in the same fixed order as {@link formSubject}'s
+ * (`[formType, String(taxYear), payer, recipient, account]`), so for every
+ * document stored to date this returns the byte-identical subject string.
+ * That is not a hope: `goldenEncodedSubjectValue` pins `formSubject`'s
+ * literal, `declaredSubjectMatchesTheGoldenLiteral` pins the SAME literal
+ * through this function, and the payerless case is pinned separately because
+ * it is the one whose `''` substitution could fork a stored history without
+ * any keyed dialect noticing.
+ *
+ * @type {(key: SubjectKey) => (document: { readonly [k: string]: unknown }) => string}
+ */
+export const declaredSubject = key => document => {
+    const text = roleText(document)
+    return jsonText([text(key.formType), text(key.taxYear), text(key.payer), text(key.recipient), text(key.account)])
+}
+
 // ── Tests ────────────────────────────────────────────────────────────────────
 
 /** @type {FormKey} */
@@ -157,5 +251,110 @@ export const proof = {
         assertEq(naiveColonJoin(a), naiveColonJoin(b))
         // The proof: formSubject does NOT collide on the same two tuples.
         assertEq(formSubject(a) === formSubject(b), false)
+    },
+    // ── FORM-KEY-01: the declaration-driven derivation ───────────────────
+    //
+    // The whole point of `declaredSubject` is that it must produce the
+    // BYTE-IDENTICAL string `formSubject` already produces, for every
+    // document already stored. A subject cannot be renamed and `fjs/cas` has
+    // no delete (see this module's header), so a one-character drift here is
+    // not a refactor, it is a permanent parallel history for every dialect at
+    // once.
+    //
+    // So each leaf pins a HAND-TYPED golden literal — the same device, and
+    // for `1099int` literally the same literal, as `goldenEncodedSubjectValue`
+    // above. The second `assertEq` against `formSubject` is a cross-check
+    // against an independent (and deliberately untouched) implementation, not
+    // the primary assertion: on its own it would stay green if BOTH functions
+    // drifted together.
+    declaredSubjectMatchesTheGoldenLiteral: () => {
+        /** @type {SubjectKey} */
+        const key = {
+            formType: 'dialect',
+            taxYear: 'taxYear',
+            payer: 'payerTin',
+            recipient: 'recipientTin',
+            account: 'accountNumber',
+        }
+        const stored = {
+            dialect: 'vnd.fjs.1099int',
+            payerTin: '11-1111111',
+            recipientTin: '222-22-2222',
+            accountNumber: 'ACC-0001',
+            taxYear: 2024,
+            box1InterestIncome: '100.00',
+        }
+        assertEq(
+            declaredSubject(key)(stored),
+            '["vnd.fjs.1099int","2024","11-1111111","222-22-2222","ACC-0001"]',
+        )
+        assertEq(declaredSubject(key)(stored), formSubject(baseline))
+    },
+    // The payerless, accountless case, pinned SEPARATELY because it is the
+    // one an all-roles-present fixture cannot see: `medical_expenses`,
+    // `prior_year_capital_loss`, `ira` and friends have carried
+    // `payerTin: ''` / `accountNumber: ''` into `formSubject` since DOC-01,
+    // and an omitted role must reproduce that empty string exactly. Anything
+    // else -- a dropped array slot, a `null`, the string `"undefined"` --
+    // forks the stored history of ten dialects while every keyed dialect's
+    // proof stays green.
+    declaredSubjectMatchesAPayerlessDialectsStoredSubject: () => {
+        /** @type {SubjectKey} */
+        const key = { formType: 'dialect', taxYear: 'taxYear', recipient: 'recipientTin' }
+        const stored = {
+            dialect: 'vnd.fjs.medical_expenses',
+            recipientTin: '222-22-2222',
+            taxYear: 2025,
+        }
+        assertEq(
+            declaredSubject(key)(stored),
+            '["vnd.fjs.medical_expenses","2025","","222-22-2222",""]',
+        )
+        assertEq(
+            declaredSubject(key)(stored),
+            formSubject({
+                payerTin: '',
+                recipientTin: '222-22-2222',
+                accountNumber: '',
+                taxYear: 2025,
+                formType: 'vnd.fjs.medical_expenses',
+            }),
+        )
+    },
+    // The reason the declaration exists at all, asserted rather than
+    // described: a dialect whose printed form names its parties differently
+    // gets the SAME subject encoding out of fields `formSubject`'s parameter
+    // list cannot even spell. Nothing in this repo declares these names yet
+    // -- that is the next step -- so this leaf is what makes that step a
+    // rename rather than a redesign.
+    declaredSubjectReadsTheDeclarationRatherThanAssumingFieldNames: () => {
+        /** @type {SubjectKey} */
+        const key = {
+            formType: 'dialect',
+            taxYear: 'taxYear',
+            payer: 'employerEin',
+            recipient: 'employeeSsn',
+            account: 'controlNumber',
+        }
+        const stored = {
+            dialect: 'vnd.fjs.w2',
+            employerEin: '11-1111111',
+            employeeSsn: '222-22-2222',
+            controlNumber: 'ACC-0001',
+            taxYear: 2024,
+            // The names the CURRENT schema uses are present too, holding
+            // values that would produce a different string -- so a
+            // `declaredSubject` that ignored its declaration and reached for
+            // `payerTin`/`recipientTin`/`accountNumber` would not merely fail
+            // to find them, it would find the WRONG ones and still return a
+            // string. That is the failure this fixture is shaped to catch.
+            payerTin: '99-9999999',
+            recipientTin: '888-88-8888',
+            accountNumber: 'WRONG',
+        }
+        assertEq(
+            declaredSubject(key)(stored),
+            '["vnd.fjs.w2","2024","11-1111111","222-22-2222","ACC-0001"]',
+        )
     },
 }
