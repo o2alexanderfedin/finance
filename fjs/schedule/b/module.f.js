@@ -350,7 +350,7 @@ export const scheduleB = inputs => {
             { boxPath: 'k1_1065.box5InterestIncome', read: k1 => k1.box5InterestIncome },
         ])(partnershipK1Forms),
         ...payerRows(
-            k1 => ({ payer: k1.payerName ?? `S corporation ${k1.payerTin}`, payerTin: k1.payerTin }))([
+            k1 => ({ payer: k1.payerName ?? `S corporation ${k1.corporationEIN}`, payerTin: k1.corporationEIN }))([
             { boxPath: 'k1_1120s.box4InterestIncome', read: k1 => k1.box4InterestIncome },
         ])(sCorporationK1Forms),
         ...payerRows(
@@ -373,7 +373,7 @@ export const scheduleB = inputs => {
             { boxPath: 'k1_1065.box6cDividendEquivalents', read: k1 => k1.box6cDividendEquivalents },
         ])(partnershipK1Forms),
         ...payerRows(
-            k1 => ({ payer: k1.payerName ?? `S corporation ${k1.payerTin}`, payerTin: k1.payerTin }))([
+            k1 => ({ payer: k1.payerName ?? `S corporation ${k1.corporationEIN}`, payerTin: k1.corporationEIN }))([
             { boxPath: 'k1_1120s.box5aOrdinaryDividends', read: k1 => k1.box5aOrdinaryDividends },
         ])(sCorporationK1Forms),
         ...payerRows(
@@ -540,8 +540,8 @@ const sCorporationK1 = boxes => hash => ({
     documentHash: hash,
     value: {
         dialect: 'vnd.fjs.k1_1120s',
-        payerTin: '44-4444444',
-        recipientTin: '222-22-2222',
+        corporationEIN: '44-4444444',
+        shareholderIdentifyingNumber: '222-22-2222',
         accountNumber: 'SHR-0001',
         taxYear: 2025,
         formRevision: '2025',

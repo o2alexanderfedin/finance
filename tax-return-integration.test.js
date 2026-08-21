@@ -346,8 +346,8 @@ test(
             }
             const k1SCorporation = {
                 dialect: k1SCorporationDialect,
-                payerTin: '77-7777777',
-                recipientTin,
+                corporationEIN: '77-7777777',
+                shareholderIdentifyingNumber: recipientTin,
                 accountNumber: 'ACC-K1-1120S',
                 taxYear: 2025,
                 formRevision: '2025',

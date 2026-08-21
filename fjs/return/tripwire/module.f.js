@@ -895,8 +895,8 @@ const partnershipK1 = {
 /** An S-corporation Schedule K-1 with the same box 1 share. @type {K1SCorporation} */
 const sCorporationK1 = {
     dialect: k1SCorporationDialect,
-    payerTin: '44-4444444',
-    recipientTin: '222-22-2222',
+    corporationEIN: '44-4444444',
+    shareholderIdentifyingNumber: '222-22-2222',
     accountNumber: 'SHR-0001',
     taxYear: 2025,
     formRevision: '2025',
@@ -953,8 +953,8 @@ const partnershipK1NoBusinessIncome = {
 /** @type {K1SCorporation} */
 const sCorporationK1NoBusinessIncome = {
     dialect: k1SCorporationDialect,
-    payerTin: '44-4444444',
-    recipientTin: '222-22-2222',
+    corporationEIN: '44-4444444',
+    shareholderIdentifyingNumber: '222-22-2222',
     accountNumber: 'SHR-0004',
     taxYear: 2025,
     formRevision: '2025',

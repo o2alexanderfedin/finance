@@ -949,8 +949,8 @@ export const proof = {
         anSCorporationK1IsRejectedByTheEstateTrustDialect: () => {
             const [t, v] = validate({
                 dialect: 'vnd.fjs.k1_1120s',
-                payerTin: '44-4444444',
-                recipientTin: '222-22-2222',
+                corporationEIN: '44-4444444',
+                shareholderIdentifyingNumber: '222-22-2222',
                 accountNumber: 'SHR-0001',
                 taxYear: 2025,
                 formRevision: '2025',

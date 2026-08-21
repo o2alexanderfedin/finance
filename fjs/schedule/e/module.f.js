@@ -887,7 +887,7 @@ export const partnershipRow = document => {
  */
 export const sCorporationRow = document => {
     const k1 = document.value
-    const entityName = k1.payerName ?? `S corporation ${k1.payerTin}`
+    const entityName = k1.payerName ?? `S corporation ${k1.corporationEIN}`
     const vRow = codedRow(k1.box17OtherInformation)('V')
     if (vRow !== undefined) {
         return section199AInformationRefusal(entityName)('box 17')('V')
@@ -927,8 +927,8 @@ export const sCorporationRow = document => {
             documentHash: document.documentHash,
             entityType: 'S',
             entityName,
-            employerIdentificationNumber: k1.payerTin,
-            recipientTin: k1.recipientTin,
+            employerIdentificationNumber: k1.corporationEIN,
+            recipientTin: k1.shareholderIdentifyingNumber,
             ordinaryBusinessIncomeCents,
             ordinaryBusinessIncomePrinted: k1.box1OrdinaryBusinessIncome,
             boxPath: 'box1OrdinaryBusinessIncome',
@@ -1489,8 +1489,8 @@ const sCorporationDoc = overrides => ({
     documentHash: 'sha256-k1-1120s-a',
     value: {
         dialect: 'vnd.fjs.k1_1120s',
-        payerTin: '44-4444444',
-        recipientTin: '222-22-2222',
+        corporationEIN: '44-4444444',
+        shareholderIdentifyingNumber: '222-22-2222',
         accountNumber: 'SHR-0001',
         taxYear: 2025,
         formRevision: '2025',
