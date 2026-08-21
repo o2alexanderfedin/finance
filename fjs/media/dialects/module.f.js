@@ -456,8 +456,8 @@ const fixtures = {
     },
     [oneZeroNineEightEDialect]: {
         dialect: oneZeroNineEightEDialect,
-        payerTin: '11-1111111',
-        recipientTin: '222-22-2222',
+        lenderTin: '11-1111111',
+        borrowerTin: '222-22-2222',
         accountNumber: 'LOAN-0001',
         taxYear: 2025,
         formRevision: '2025',

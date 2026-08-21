@@ -23,7 +23,7 @@
  * - **The cardinality differs.** `vnd.fjs.adjustments` has an empty
  *   `payerTin`, which under DOC-01's `formSubject` makes exactly ONE subject
  *   per taxpayer per year. A borrower whose loans were sold mid-year holds
- *   two 1098-Es from two servicers — two subjects, keyed by two payer TINs,
+ *   two 1098-Es from two servicers — two subjects, keyed by two lender TINs,
  *   the shape every transcribed dialect here already has.
  * - **The provenance would contradict itself.** One document cannot both be
  *   "supported by the taxpayer's own records" and be a copy of what a lender
@@ -48,25 +48,50 @@
  * true, and it is why the question "which dialect does student loan interest
  * belong to?" has the answer "both, for different halves of it."
  *
- * ## The naming inversion, which is a real trap
+ * ## The naming inversion this dialect USED to carry
  *
- * **On the printed 1098-E, the "RECIPIENT" is the LENDER and the taxpayer is
- * the "BORROWER".** Every other dialect in this tree uses `recipientTin` for
- * the TAXPAYER, because on a 1099 or a W-2 the taxpayer is who received the
- * money. Keeping that convention here means `recipientTin` holds the printed
- * form's **BORROWER'S TIN**, and `payerTin` holds the printed form's
- * **RECIPIENT'S/LENDER'S TIN** — the opposite of what the box labels say.
+ * **On the printed 1098-E the "RECIPIENT" is the LENDER and the taxpayer is
+ * the "BORROWER".** Every other dialect in this tree spells the taxpayer
+ * `recipientTin`, because on a 1099 or a W-2 the taxpayer is who received the
+ * money — so keeping that convention here meant `recipientTin` held the
+ * printed **BORROWER'S TIN** and `payerTin` held the printed
+ * **RECIPIENT'S/LENDER'S TIN**, the exact opposite of what the box labels
+ * say. The inversion was written down right here, in the one place a
+ * transcriber would read it, and it was a trap all the same: a reader who
+ * knew the convention and a reader who knew the form disagreed about what
+ * `recipientTin` meant, and nothing on the page said which of them was
+ * transcribing.
  *
- * The alternative — following the printed labels — would have put the
- * taxpayer's own TIN in `payerTin` on exactly one dialect out of twelve, and
- * DOC-01's `formSubject` keys every subject on `(payerTin, recipientTin,
- * …)`; one inverted dialect would silently key a subject by the wrong party
- * and collapse every borrower's forms together. So the CONVENTION wins and
- * the inversion is written down here, where a transcriber will read it,
- * rather than left to be discovered. `theBorrowerIsTheRecipientTinNotThePayerTin`
- * pins it, because a transposition of these two fields is exactly the defect
+ * It was kept because DOC-01's `formSubject` keyed every subject on the five
+ * field NAMES `(payerTin, recipientTin, accountNumber, taxYear, formType)`,
+ * so one dialect following the printed labels would have keyed its subjects
+ * by the wrong party and collapsed every borrower's forms together.
+ * **FORM-KEY-01 removed that premise.** A dialect now declares which of its
+ * OWN fields play the five roles ({@link subjectKey}), so the names are free
+ * to follow the paper while the roles stay right:
+ *
+ * - `lenderTin` — printed **"RECIPIENT'S TIN"**, under
+ *   **"RECIPIENT'S/LENDER'S name"**. It plays the PAYER role, because the
+ *   lender is the party that issued this form.
+ * - `borrowerTin` — printed **"BORROWER'S TIN"**, above **"BORROWER'S
+ *   name"**. It plays the RECIPIENT role: the taxpayer, exactly as on every
+ *   other dialect here.
+ * - `accountNumber` — printed "Account number (see instructions)", bottom
+ *   left. Unchanged, because the form's own words for it were already the
+ *   field's.
+ *
+ * **The subject a stored 1098-E derives is byte-identical to the one it
+ * derived under the old names**: the declaration moved, the values did not.
+ * `theBorrowerIsTheBorrowerTinNotTheLenderTin` pins the two parties by TIN
+ * FORMAT, because a transposition of these two fields is exactly the defect
  * AGENTS.md's own sweep found in a 1099-INT box mapping — silent, and
  * invisible to every proof that does not name the parties.
+ *
+ * Source read directly rather than recalled:
+ * `https://www.irs.gov/pub/irs-pdf/f1098e.pdf` — "Form 1098-E Created
+ * 9/30/25", the 2026 revision, Copy A. Its left column reads, top to bottom:
+ * "RECIPIENT'S/LENDER'S name", "RECIPIENT'S TIN", "BORROWER'S TIN",
+ * "BORROWER'S name"; box 1 is "Student loan interest received by lender".
  *
  * ## Box 2 is stored, and REFUSED one layer out
  *
@@ -95,7 +120,7 @@ import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { base, mediaTypeOf } from '../base/module.f.js'
 import { formRevisionError } from '../form_revision/module.f.js'
 import { moneyFieldError } from '../money_field/module.f.js'
-import { formSubject } from '../subject/module.f.js'
+import { declaredSubject } from '../subject/module.f.js'
 
 /** @import { Result } from 'functionalscript/fjs/types/result/types.js' */
 /** @import { Ts, Unknown } from 'functionalscript/fjs/types/rtti/ts/types.js' */
@@ -115,14 +140,15 @@ export const mediaType = mediaTypeOf(dialect)
  * structural validation reports it as the first failing field on a mismatched
  * blob, matching every other document dialect in this tree.
  *
- * `payerTin` is the printed form's **RECIPIENT'S/LENDER'S TIN** and
- * `recipientTin` is its **BORROWER'S TIN** — see this module's own docstring,
- * "The naming inversion, which is a real trap".
+ * `lenderTin` is the printed form's **RECIPIENT'S TIN** and `borrowerTin` is
+ * its **BORROWER'S TIN**, each spelled as the paper spells the party — see
+ * this module's own docstring, "The naming inversion this dialect USED to
+ * carry", for what they were called before FORM-KEY-01 and why.
  */
 export const oneZeroNineEightESchema = /** @type {const} */ ({
     ...base(dialect),
-    payerTin: string,
-    recipientTin: string,
+    lenderTin: string,
+    borrowerTin: string,
     accountNumber: string,
     taxYear: number,
     formRevision: string,
@@ -140,7 +166,7 @@ export const oneZeroNineEightESchema = /** @type {const} */ ({
  * shared set of field names.
  * @type {SubjectKey}
  */
-export const subjectKey = { formType: 'dialect', taxYear: 'taxYear', payer: 'payerTin', recipient: 'recipientTin', account: 'accountNumber' }
+export const subjectKey = { formType: 'dialect', taxYear: 'taxYear', payer: 'lenderTin', recipient: 'borrowerTin', account: 'accountNumber' }
 
 /** @typedef {Ts<typeof oneZeroNineEightESchema>} OneZeroNineEightE */
 
@@ -217,8 +243,8 @@ export const validate = value => {
 /** @type {OneZeroNineEightE} */
 const minimal = {
     dialect,
-    payerTin: '11-1111111',
-    recipientTin: '222-22-2222',
+    lenderTin: '11-1111111',
+    borrowerTin: '222-22-2222',
     accountNumber: 'LOAN-0001',
     taxYear: 2025,
     formRevision: '2025',
@@ -275,12 +301,13 @@ export const proof = {
     },
 
     /**
-     * **The naming inversion, asserted rather than described.** On the
-     * printed form the taxpayer is the BORROWER and the lender is the
-     * RECIPIENT; in this dialect the taxpayer is `recipientTin` and the
-     * lender is `payerTin`, because DOC-01's `formSubject` keys every subject
-     * on those two field NAMES and one inverted dialect would key a subject
-     * by the wrong party.
+     * **The two parties, asserted rather than described.** On the printed
+     * form the taxpayer is the BORROWER and the lender is the RECIPIENT, and
+     * since FORM-KEY-01 the fields say exactly that: `borrowerTin` is the
+     * taxpayer and `lenderTin` is the servicer. The ROLES are the other way
+     * round — the lender plays {@link subjectKey}'s `payer`, because it is
+     * the party that issued the form — and this leaf is what stops the two
+     * from being transposed while the declaration still looks plausible.
      *
      * The fixture uses two visibly different TIN FORMATS — an employer
      * identification number (`NN-NNNNNNN`) for the lender and a social
@@ -288,33 +315,39 @@ export const proof = {
      * of the two fields is visible in the assertion itself rather than
      * requiring a reader to remember which arbitrary digits went where.
      */
-    theBorrowerIsTheRecipientTinNotThePayerTin: () => {
+    theBorrowerIsTheBorrowerTinNotTheLenderTin: () => {
         const [t, v] = validate(withInterest)
         assert(t === 'ok', ['expected ok', t, v])
         assertEq(
-            v.recipientTin,
+            v.borrowerTin,
             '222-22-2222',
-            'recipientTin holds the printed BORROWER\'S TIN — the taxpayer, in an SSN format',
+            'borrowerTin holds the printed BORROWER\'S TIN — the taxpayer, in an SSN format',
         )
         assertEq(
-            v.payerTin,
+            v.lenderTin,
             '11-1111111',
-            'payerTin holds the printed RECIPIENT\'S/LENDER\'S TIN — the servicer, in an EIN format',
+            'lenderTin holds the printed RECIPIENT\'S TIN — the servicer, in an EIN format',
         )
         assert(
-            v.payerTin !== v.recipientTin,
-            ['a 1098-E always has two distinct parties', v.payerTin, v.recipientTin],
+            v.lenderTin !== v.borrowerTin,
+            ['a 1098-E always has two distinct parties', v.lenderTin, v.borrowerTin],
         )
     },
 
     /**
-     * **The cardinality argument, run through the real `formSubject` rather
+     * **The cardinality argument, run through the real derivation rather
      * than asserted in prose.** This module's header claims that a borrower
      * whose loans were sold mid-year holds two 1098-Es that are two SUBJECTS,
      * and that this is why the figure cannot live in a record whose empty
      * `payerTin` admits exactly one subject per taxpayer per year. That claim
      * is only true if DOC-01's key actually separates them, so it is checked
      * here against `fjs/document/subject`'s own function.
+     *
+     * It runs through `declaredSubject(subjectKey)` — THIS dialect's own
+     * declaration — rather than through `formSubject`'s five field names.
+     * Under the old names the two were the same call; they are not any more,
+     * and the declaration is the one a stored document is actually keyed by,
+     * so it is the one whose behaviour this leaf must pin.
      *
      * The third case is the control: two forms from ONE servicer for ONE
      * borrower under ONE account are the SAME subject — which is what makes a
@@ -323,17 +356,11 @@ export const proof = {
      */
     twoServicersForOneBorrowerAreTwoSubjects: () => {
         /** @type {(r: OneZeroNineEightE) => string} */
-        const subjectOf = r => formSubject({
-            payerTin: r.payerTin,
-            recipientTin: r.recipientTin,
-            accountNumber: r.accountNumber,
-            taxYear: r.taxYear,
-            formType: r.dialect,
-        })
+        const subjectOf = r => declaredSubject(subjectKey)(r)
         const firstServicer = subjectOf(withInterest)
         const secondServicer = subjectOf({
             ...withInterest,
-            payerTin: '33-3333333',
+            lenderTin: '33-3333333',
             accountNumber: 'LOAN-0002',
             box1StudentLoanInterestReceived: '412.08',
         })
@@ -342,8 +369,8 @@ export const proof = {
             ['two servicers must be two subjects', firstServicer, secondServicer],
         )
         // A second borrower at the SAME servicer is also a distinct subject —
-        // the half a key that ignored `recipientTin` would get wrong.
-        const otherBorrower = subjectOf({ ...withInterest, recipientTin: '444-44-4444' })
+        // the half a key that ignored `borrowerTin` would get wrong.
+        const otherBorrower = subjectOf({ ...withInterest, borrowerTin: '444-44-4444' })
         assert(
             firstServicer !== otherBorrower,
             ['two borrowers must be two subjects', firstServicer, otherBorrower],

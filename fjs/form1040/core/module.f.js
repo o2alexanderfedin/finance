@@ -5343,8 +5343,8 @@ const phaseTwentyFourOneZeroNineEightE = {
     documentHash: 'sha256-p24-1098e',
     value: {
         dialect: oneZeroNineEightEDialect,
-        payerTin: '55-5555555',
-        recipientTin: '222-22-2222',
+        lenderTin: '55-5555555',
+        borrowerTin: '222-22-2222',
         accountNumber: 'LOAN-0001',
         taxYear: 2025,
         formRevision: '2025',

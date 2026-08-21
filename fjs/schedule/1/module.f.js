@@ -2814,7 +2814,7 @@ const oneZeroNineEightEDoc = amount => ({
     documentHash: 'sha256-1098e-a',
     value: {
         dialect: 'vnd.fjs.1098e',
-        payerTin: '55-5555555', recipientTin: '222-22-2222', accountNumber: 'LOAN-0001',
+        lenderTin: '55-5555555', borrowerTin: '222-22-2222', accountNumber: 'LOAN-0001',
         taxYear: 2025, formRevision: '2025',
         box1StudentLoanInterestReceived: amount,
     },
