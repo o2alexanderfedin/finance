@@ -1660,8 +1660,8 @@ const documentByHash = {
     // any printed line: its only reader is a refusal. See the leaf.
     [fixtureSweepEsppHash]: {
         dialect: formThirtyNineTwentyTwoDialect,
-        payerTin: '11-1111111',
-        recipientTin: '222-22-2222',
+        corporationTin: '11-1111111',
+        employeeTin: '222-22-2222',
         accountNumber: 'ACC-SWEEP-ESPP',
         taxYear: 2025,
         formRevision: 'April 2025',
