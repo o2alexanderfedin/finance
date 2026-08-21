@@ -99,9 +99,14 @@
  * a second), so a spouse's $176,100 of wages must NOT consume the proprietor's
  * base — that would shelter the proprietor's earnings behind somebody else's
  * ceiling and understate the tax. {@link socialSecurityWagesAlreadyTaxed}
- * therefore matches on `recipientTin`, which `vnd.fjs.w2` and
- * `vnd.fjs.business_expenses` both carry, rather than summing every stored
- * W-2. On a return with no business record there is no proprietor at all, so
+ * therefore matches a W-2's `employeeSSN` — box a — against the business
+ * record's `recipientTin`, rather than summing every stored W-2. **The two
+ * sides spell it differently on purpose since FORM-KEY-02**: a W-2's box a is
+ * captioned "Employee's social security number" and `vnd.fjs.business_expenses`
+ * transcribes no printed form at all, so it keeps DOC-01's role name. Two
+ * names for one comparison is what a cross-dialect match looks like once each
+ * dialect says what its own paper says; do not "fix" it by renaming either
+ * side. On a return with no business record there is no proprietor at all, so
  * the total is $0.00 — and the self-employment tax is $0.00 with it, so
  * nothing depends on the choice.
  *
@@ -219,8 +224,8 @@ export const netEarningsFactorBasisPoints = taxParamSet => {
  *
  * Box 3 and box 7, and only from Forms W-2 issued to the PROPRIETOR — see
  * this module's own docstring, "The wage base is shared, and whose wages
- * share it", for why box 5 would be wrong and why `recipientTin` is the
- * filter. Railroad retirement (tier 1) compensation is not summed because
+ * share it", for why box 5 would be wrong and why a W-2's `employeeSSN` (box
+ * a) is the filter. Railroad retirement (tier 1) compensation is not summed because
  * `vnd.fjs.w2` has no box-14 field for it: structurally unreachable rather
  * than merely unmodelled, the identical position `fjs/form8959`'s Part III
  * takes about the same missing box.
@@ -236,7 +241,7 @@ export const socialSecurityWagesAlreadyTaxed = w2Forms => proprietorTin => {
     if (proprietorTin === undefined) {
         return { cents: 0n, sources: [] }
     }
-    const own = w2Forms.filter(form => form.value.recipientTin === proprietorTin)
+    const own = w2Forms.filter(form => form.value.employeeSSN === proprietorTin)
     /** @type {readonly Source[]} */
     const sources = own.flatMap(form => [
         ...(form.value.box3SocialSecurityWages === undefined
@@ -265,8 +270,9 @@ export const socialSecurityWagesAlreadyTaxed = w2Forms => proprietorTin => {
  * rather than a silent choice.
  *
  * The Social Security wage base is per PERSON. On a joint return two people's
- * Forms W-2 legitimately sit beside one Schedule C, and matching on
- * `recipientTin` is exactly right. On any other status every document belongs
+ * Forms W-2 legitimately sit beside one Schedule C, and matching a W-2's
+ * `employeeSSN` against the business record's `recipientTin` is exactly
+ * right. On any other status every document belongs
  * to the same filer, so a W-2 issued to a different TIN is one of two things,
  * and they move the tax in OPPOSITE directions:
  *
@@ -287,7 +293,7 @@ export const wagesAttributionRefusal = status => w2Forms => proprietorTin => {
         return { kind: 'ok' }
     }
     const foreign = w2Forms.find(form =>
-        form.value.recipientTin !== proprietorTin
+        form.value.employeeSSN !== proprietorTin
         && form.value.box3SocialSecurityWages !== undefined
         && centsFromString(form.value.box3SocialSecurityWages) > 0n)
     if (foreign === undefined) {
@@ -297,7 +303,7 @@ export const wagesAttributionRefusal = status => w2Forms => proprietorTin => {
         kind: 'error',
         message: `Schedule SE line 8a: a stored Form W-2 reports `
             + `${foreign.value.box3SocialSecurityWages} of Social Security wages for recipient `
-            + `'${foreign.value.recipientTin}', while the business expenses record names `
+            + `'${foreign.value.employeeSSN}', while the business expenses record names `
             + `'${proprietorTin}' as the proprietor, and this return is not a joint one. `
             + `§1402(b)(1)'s contribution and benefit base is shared between W-2 wages and `
             + `self-employment earnings PER PERSON, so this engine has to know whose wages these `
@@ -320,7 +326,7 @@ export const wagesAttributionRefusal = status => w2Forms => proprietorTin => {
  * Before Phase 30 the case could not arise, because the only source of
  * self-employment income was a `vnd.fjs.business_expenses` record and
  * `fjs/schedule/c` refuses a second one. A partnership Schedule K-1 is a
- * SECOND source, and it carries its own `recipientTin` — so a joint return may
+ * SECOND source, and it carries its own `partnerTin` — so a joint return may
  * now legitimately hold one spouse's Schedule C and the other spouse's K-1.
  *
  * **Merging them is not an approximation.** §1402(b)(1)'s contribution and
@@ -683,16 +689,16 @@ const runWithPartnershipShare = netProfitCents => partnershipSelfEmploymentEarni
 /** @type {W2} */
 const bareW2Value = {
     dialect: 'vnd.fjs.w2',
-    payerTin: '11-1111111', recipientTin: '222-22-2222', accountNumber: '',
+    employerEIN: '11-1111111', employeeSSN: '222-22-2222', controlNumber: '',
     taxYear: 2025, formRevision: '2025',
 }
 
-/** @type {(hash: string) => (recipientTin: string) => (box3: string | undefined) => Stored<W2>} */
-const w2Doc = hash => recipientTin => box3 => ({
+/** @type {(hash: string) => (employeeSSN: string) => (box3: string | undefined) => Stored<W2>} */
+const w2Doc = hash => employeeSSN => box3 => ({
     documentHash: hash,
     value: {
         ...bareW2Value,
-        recipientTin,
+        employeeSSN,
         ...(box3 === undefined ? {} : { box3SocialSecurityWages: box3 }),
     },
 })

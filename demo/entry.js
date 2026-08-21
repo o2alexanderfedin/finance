@@ -40,12 +40,13 @@
  */
 import {
     enterableDialects, dialectNamed, fieldsOf, askedFields, toJsonSchema,
-    storeView, taxReturnReport, taxGuestCtx, ty2025, formSubject,
+    storeView, taxReturnReport, taxGuestCtx, ty2025, formSubject, declaredSubject,
     interpret, individualFilingStatuses, kindVocabulary, money, shortAddress,
 } from './lib/engine.js'
 import { openDatabase, casAdd, evoAdd, readAll, clearAll } from './lib/store.js'
 
 /** @import { FieldModel } from '../fjs/document/form_model/module.f.js' */
+/** @import { SubjectKey } from '../fjs/document/subject/module.f.js' */
 /** @import { Unknown as JsonUnknown } from 'functionalscript/fjs/media/json/types.js' */
 
 /** @type {<T extends HTMLElement>(id: string, kind: new () => T) => T} */
@@ -212,18 +213,32 @@ const readForm = form => dialect => {
  * form for the same payer and year therefore lands on the SAME subject, which
  * is what makes a correction an amendment rather than a second document
  * counted twice.
- * @type {(value: Record<string, JsonUnknown>) => string}
+ *
+ * **The key comes from the DIALECT, not from this page** (FORM-KEY-01). This
+ * read `payerTin`/`recipientTin`/`accountNumber` by name until the printed
+ * forms took their names back, and that was the same cross-dialect assumption
+ * `SubjectKey` exists to remove: a dialect whose paper calls the recipient a
+ * *student*, a *borrower* or simply an SSN renames the field, and a page
+ * still reading the old name derives a subject keyed on `''` — silently
+ * forking that document's history away from the server's, with nothing red
+ * anywhere. Reading the declared ROLE cannot go stale that way.
+ *
+ * `key` is `undefined` for the one enterable dialect that has no business key,
+ * `vnd.fjs.return_profile`: a return has exactly one filer, so DOC-01's
+ * five-tuple is `(dialect, year, '', '', '')` and there is nothing to declare.
+ * @type {(key: SubjectKey | undefined) => (value: Record<string, JsonUnknown>) => string}
  */
-const subjectOf = value => {
-    const text = (/** @type {string} */ key) =>
-        typeof value[key] === 'string' ? value[key] : ''
-    return formSubject({
-        payerTin: text('payerTin'),
-        recipientTin: text('recipientTin'),
-        accountNumber: text('accountNumber'),
-        taxYear: typeof value['taxYear'] === 'number' ? value['taxYear'] : 0,
-        formType: text('dialect'),
-    })
+const subjectOf = key => value => {
+    if (key === undefined) {
+        return formSubject({
+            payerTin: '',
+            recipientTin: '',
+            accountNumber: '',
+            taxYear: typeof value['taxYear'] === 'number' ? value['taxYear'] : 0,
+            formType: typeof value['dialect'] === 'string' ? value['dialect'] : '',
+        })
+    }
+    return declaredSubject(key)(value)
 }
 
 // ── The page ─────────────────────────────────────────────────────────────────
@@ -316,7 +331,7 @@ saveButton.addEventListener('click', async () => {
         say(typeof refusal === 'string' ? refusal : JSON.stringify(refusal))('error')
         return
     }
-    const subject = subjectOf(value)
+    const subject = subjectOf(entry.subjectKey)(value)
     const snapshot = await casAdd(database)(value)
     const { revisions } = await readAll(database)
     const superseded = new Set([...revisions.values()].flatMap(r => [...r.parents]))

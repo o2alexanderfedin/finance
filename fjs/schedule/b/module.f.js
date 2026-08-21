@@ -346,15 +346,15 @@ export const scheduleB = inputs => {
             },
         ])(interestForms),
         ...payerRows(
-            k1 => ({ payer: k1.payerName ?? `partnership ${k1.payerTin}`, payerTin: k1.payerTin }))([
+            k1 => ({ payer: k1.payerName ?? `partnership ${k1.partnershipEIN}`, payerTin: k1.partnershipEIN }))([
             { boxPath: 'k1_1065.box5InterestIncome', read: k1 => k1.box5InterestIncome },
         ])(partnershipK1Forms),
         ...payerRows(
-            k1 => ({ payer: k1.payerName ?? `S corporation ${k1.payerTin}`, payerTin: k1.payerTin }))([
+            k1 => ({ payer: k1.payerName ?? `S corporation ${k1.corporationEIN}`, payerTin: k1.corporationEIN }))([
             { boxPath: 'k1_1120s.box4InterestIncome', read: k1 => k1.box4InterestIncome },
         ])(sCorporationK1Forms),
         ...payerRows(
-            k1 => ({ payer: k1.payerName ?? `estate or trust ${k1.payerTin}`, payerTin: k1.payerTin }))([
+            k1 => ({ payer: k1.payerName ?? `estate or trust ${k1.estateOrTrustEIN}`, payerTin: k1.estateOrTrustEIN }))([
             { boxPath: 'k1_1041.box1InterestIncome', read: k1 => k1.box1InterestIncome },
         ])(estateTrustK1Forms),
     ]
@@ -365,7 +365,7 @@ export const scheduleB = inputs => {
             { boxPath: 'box1aTotalOrdinaryDividends', read: form => form.box1aTotalOrdinaryDividends },
         ])(dividendForms),
         ...payerRows(
-            k1 => ({ payer: k1.payerName ?? `partnership ${k1.payerTin}`, payerTin: k1.payerTin }))([
+            k1 => ({ payer: k1.payerName ?? `partnership ${k1.partnershipEIN}`, payerTin: k1.partnershipEIN }))([
             { boxPath: 'k1_1065.box6aOrdinaryDividends', read: k1 => k1.box6aOrdinaryDividends },
             // Box 6c is a SECOND partnership summand, never a slice of 6a —
             // see the module docstring. The partnership face is the only one
@@ -373,11 +373,11 @@ export const scheduleB = inputs => {
             { boxPath: 'k1_1065.box6cDividendEquivalents', read: k1 => k1.box6cDividendEquivalents },
         ])(partnershipK1Forms),
         ...payerRows(
-            k1 => ({ payer: k1.payerName ?? `S corporation ${k1.payerTin}`, payerTin: k1.payerTin }))([
+            k1 => ({ payer: k1.payerName ?? `S corporation ${k1.corporationEIN}`, payerTin: k1.corporationEIN }))([
             { boxPath: 'k1_1120s.box5aOrdinaryDividends', read: k1 => k1.box5aOrdinaryDividends },
         ])(sCorporationK1Forms),
         ...payerRows(
-            k1 => ({ payer: k1.payerName ?? `estate or trust ${k1.payerTin}`, payerTin: k1.payerTin }))([
+            k1 => ({ payer: k1.payerName ?? `estate or trust ${k1.estateOrTrustEIN}`, payerTin: k1.estateOrTrustEIN }))([
             { boxPath: 'k1_1041.box2aOrdinaryDividends', read: k1 => k1.box2aOrdinaryDividends },
         ])(estateTrustK1Forms),
     ]
@@ -522,8 +522,8 @@ const partnershipK1 = boxes => hash => ({
     documentHash: hash,
     value: {
         dialect: 'vnd.fjs.k1_1065',
-        payerTin: '33-3333333',
-        recipientTin: '222-22-2222',
+        partnershipEIN: '33-3333333',
+        partnerTin: '222-22-2222',
         accountNumber: 'PTR-0001',
         taxYear: 2025,
         formRevision: '2025',
@@ -540,8 +540,8 @@ const sCorporationK1 = boxes => hash => ({
     documentHash: hash,
     value: {
         dialect: 'vnd.fjs.k1_1120s',
-        payerTin: '44-4444444',
-        recipientTin: '222-22-2222',
+        corporationEIN: '44-4444444',
+        shareholderIdentifyingNumber: '222-22-2222',
         accountNumber: 'SHR-0001',
         taxYear: 2025,
         formRevision: '2025',
@@ -557,8 +557,8 @@ const estateTrustK1 = boxes => hash => ({
     documentHash: hash,
     value: {
         dialect: 'vnd.fjs.k1_1041',
-        payerTin: '66-6666666',
-        recipientTin: '222-22-2222',
+        estateOrTrustEIN: '66-6666666',
+        beneficiaryIdentifyingNumber: '222-22-2222',
         taxYear: 2025,
         formRevision: '2025',
         boxHDomesticBeneficiary: true,

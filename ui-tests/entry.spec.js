@@ -26,9 +26,9 @@ const profile = {
 const w2 = {
     taxYear: '2025',
     formRevision: '2025',
-    payerTin: '11-1111111',
-    recipientTin: '222-22-2222',
-    accountNumber: 'ACC-0001',
+    employerEIN: '11-1111111',
+    employeeSSN: '222-22-2222',
+    controlNumber: 'ACC-0001',
     employerName: 'Acme',
     box1WagesTipsOtherCompensation: '60000.00',
     box2FederalIncomeTaxWithheld: '5000.00',

@@ -783,8 +783,8 @@ const partnershipGainK1 = hash => boxes => ({
     documentHash: hash,
     value: {
         dialect: 'vnd.fjs.k1_1065',
-        payerTin: '33-3333333',
-        recipientTin: '222-22-2222',
+        partnershipEIN: '33-3333333',
+        partnerTin: '222-22-2222',
         accountNumber: 'PTR-0003',
         taxYear: 2025,
         formRevision: '2025',
@@ -801,8 +801,8 @@ const sCorporationGainK1 = hash => boxes => ({
     documentHash: hash,
     value: {
         dialect: 'vnd.fjs.k1_1120s',
-        payerTin: '44-4444444',
-        recipientTin: '222-22-2222',
+        corporationEIN: '44-4444444',
+        shareholderIdentifyingNumber: '222-22-2222',
         accountNumber: 'SHR-0003',
         taxYear: 2025,
         formRevision: '2025',
@@ -818,8 +818,8 @@ const estateTrustGainK1 = hash => boxes => ({
     documentHash: hash,
     value: {
         dialect: 'vnd.fjs.k1_1041',
-        payerTin: '66-6666666',
-        recipientTin: '222-22-2222',
+        estateOrTrustEIN: '66-6666666',
+        beneficiaryIdentifyingNumber: '222-22-2222',
         taxYear: 2025,
         formRevision: '2025',
         boxHDomesticBeneficiary: /** @type {const} */ (true),

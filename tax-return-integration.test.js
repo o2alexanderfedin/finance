@@ -284,7 +284,12 @@ test(
             // face's capital-gain boxes (trip `capitalGainsOrLosses`) are
             // deliberately avoided — either would turn this into a refusal
             // leg instead of a computed return.
-            const recipientTin = '222-22-2222'
+            // The taxpayer's own SSN. Every dialect below carries it, and since
+            // FORM-KEY-02 they spell it differently — `employeeSSN` on a W-2,
+            // `partnerTin` on a partnership K-1, `recipientTin` where no printed
+            // form disagrees — so the LOCAL is named for the person rather than
+            // for any one form's box.
+            const taxpayerSsn = '222-22-2222'
             const profileDocument = {
                 dialect: returnProfileDialect,
                 taxYear: 2025,
@@ -299,9 +304,9 @@ test(
             }
             const w2A = {
                 dialect: w2Dialect,
-                payerTin: '11-1111111',
-                recipientTin,
-                accountNumber: 'ACC-W2-A',
+                employerEIN: '11-1111111',
+                employeeSSN: taxpayerSsn,
+                controlNumber: 'ACC-W2-A',
                 taxYear: 2025,
                 formRevision: '2025',
                 box1WagesTipsOtherCompensation: '35937.00',
@@ -309,9 +314,9 @@ test(
             }
             const w2B = {
                 dialect: w2Dialect,
-                payerTin: '44-4444444',
-                recipientTin,
-                accountNumber: 'ACC-W2-B',
+                employerEIN: '44-4444444',
+                employeeSSN: taxpayerSsn,
+                controlNumber: 'ACC-W2-B',
                 taxYear: 2025,
                 formRevision: '2025',
                 box1WagesTipsOtherCompensation: '9568.00',
@@ -320,7 +325,7 @@ test(
             const oneZeroNineNineG = {
                 dialect: oneZeroNineNineGDialect,
                 payerTin: '55-5555555',
-                recipientTin,
+                recipientTin: taxpayerSsn,
                 accountNumber: 'ACC-1099G',
                 taxYear: 2025,
                 formRevision: '2025',
@@ -335,8 +340,8 @@ test(
             // two faces cannot be absorbed by the sum.
             const k1Partnership = {
                 dialect: k1PartnershipDialect,
-                payerTin: '33-3333333',
-                recipientTin,
+                partnershipEIN: '33-3333333',
+                partnerTin: taxpayerSsn,
                 accountNumber: 'ACC-K1-1065',
                 taxYear: 2025,
                 formRevision: '2025',
@@ -346,8 +351,8 @@ test(
             }
             const k1SCorporation = {
                 dialect: k1SCorporationDialect,
-                payerTin: '77-7777777',
-                recipientTin,
+                corporationEIN: '77-7777777',
+                shareholderIdentifyingNumber: taxpayerSsn,
                 accountNumber: 'ACC-K1-1120S',
                 taxYear: 2025,
                 formRevision: '2025',
@@ -356,8 +361,8 @@ test(
             }
             const k1EstateTrust = {
                 dialect: k1EstateTrustDialect,
-                payerTin: '88-8888888',
-                recipientTin,
+                estateOrTrustEIN: '88-8888888',
+                beneficiaryIdentifyingNumber: taxpayerSsn,
                 taxYear: 2025,
                 formRevision: '2025',
                 boxHDomesticBeneficiary: true,
@@ -727,7 +732,7 @@ test(
             const bankInterest = {
                 dialect: oneZeroNineNineIntDialect,
                 payerTin: '10-1010101',
-                recipientTin,
+                recipientTin: taxpayerSsn,
                 accountNumber: 'ACC-1099INT',
                 taxYear: 2025,
                 formRevision: '2025',
@@ -742,7 +747,7 @@ test(
             const bankDividend = {
                 dialect: oneZeroNineNineDivDialect,
                 payerTin: '12-1212121',
-                recipientTin,
+                recipientTin: taxpayerSsn,
                 accountNumber: 'ACC-1099DIV',
                 taxYear: 2025,
                 formRevision: '2025',
@@ -832,9 +837,9 @@ test(
             // "I will not compute this". So `fjs_run` itself succeeds.
             const w2PriorYear = {
                 dialect: w2Dialect,
-                payerTin: '66-6666666',
-                recipientTin,
-                accountNumber: 'ACC-W2-PRIOR',
+                employerEIN: '66-6666666',
+                employeeSSN: taxpayerSsn,
+                controlNumber: 'ACC-W2-PRIOR',
                 taxYear: 2024,
                 formRevision: '2024',
                 box1WagesTipsOtherCompensation: '80000.00',

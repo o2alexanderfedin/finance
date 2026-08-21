@@ -166,6 +166,7 @@ import { moneyFieldError } from '../money_field/module.f.js'
 /** @import { Result } from 'functionalscript/fjs/types/result/types.js' */
 /** @import { Ts, Unknown } from 'functionalscript/fjs/types/rtti/ts/types.js' */
 /** @import { ValidationError } from 'functionalscript/fjs/types/rtti/common/types.js' */
+/** @import { SubjectKey } from '../subject/module.f.js' */
 
 /**
  * Format tag: names the dialect of this BLOB. The media type it is served
@@ -236,8 +237,10 @@ const saversCreditEligibilityEntry = /** @type {const} */ ({
  * One student whose education expenses this return claims — Form 8863 Part
  * III, one instance per student.
  *
- * `studentTin` is what a stored `vnd.fjs.1098t`'s `recipientTin` is matched
- * against, and it is deliberately not assumed to be the taxpayer's:
+ * `studentTin` is what a stored `vnd.fjs.1098t`'s own `studentTin` is matched
+ * against — the two carry the same name since FORM-KEY-01, which is how the
+ * match reads as a match — and it is deliberately not assumed to be the
+ * taxpayer's:
  * §25A(f)(1)(A) reaches a dependent's expenses, so a parent's return carries
  * a student entry keyed by the child's TIN. `fjs/document/1098t`'s own header
  * records that hazard in full.
@@ -455,6 +458,19 @@ export const creditsSchema = /** @type {const} */ ({
     // year's Form 2441 at all.
     dependentCarePriorYearExpensesPaidThisYear: option(string),
 })
+
+/**
+ * FORM-KEY-01 -- which of THIS dialect's OWN fields play the five roles a
+ * form subject is keyed on. See `fjs/document/subject`'s {@link SubjectKey}
+ * for why the dialect declares this instead of every caller assuming one
+ * shared set of field names.
+ *
+ * No payer and no account role: this dialect has no such field, and an omitted role
+ * derives the empty string -- exactly the `payerTin: ''` /
+ * `accountNumber: ''` this dialect's subject has carried since DOC-01.
+ * @type {SubjectKey}
+ */
+export const subjectKey = { formType: 'dialect', taxYear: 'taxYear', recipient: 'recipientTin' }
 
 /** @typedef {Ts<typeof creditsSchema>} Credits */
 

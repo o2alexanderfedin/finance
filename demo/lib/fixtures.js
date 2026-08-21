@@ -52,9 +52,9 @@ export const returnProfile = store(returnProfileValue)
 /** Dana's W-2. @type {W2} */
 const w2DanaValue = {
     dialect: 'vnd.fjs.w2',
-    payerTin: '11-1111111',
-    recipientTin: '222-22-2222',
-    accountNumber: 'W2-DANA-2025',
+    employerEIN: '11-1111111',
+    employeeSSN: '222-22-2222',
+    controlNumber: 'W2-DANA-2025',
     taxYear: 2025,
     formRevision: '2025',
     employerName: 'Northwind Traders',
@@ -68,9 +68,9 @@ export const w2Dana = store(w2DanaValue)
 /** Ray's W-2. @type {W2} */
 const w2RayValue = {
     dialect: 'vnd.fjs.w2',
-    payerTin: '33-3333333',
-    recipientTin: '444-44-4444',
-    accountNumber: 'W2-RAY-2025',
+    employerEIN: '33-3333333',
+    employeeSSN: '444-44-4444',
+    controlNumber: 'W2-RAY-2025',
     taxYear: 2025,
     formRevision: '2025',
     employerName: 'Cascade Public Library',

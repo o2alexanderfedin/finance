@@ -77,6 +77,7 @@ import { centsFromString, centsToString } from '../../exact/module.f.js'
 /** @import { Result } from 'functionalscript/fjs/types/result/types.js' */
 /** @import { Ts, Unknown } from 'functionalscript/fjs/types/rtti/ts/types.js' */
 /** @import { ValidationError } from 'functionalscript/fjs/types/rtti/common/types.js' */
+/** @import { SubjectKey } from '../subject/module.f.js' */
 
 /**
  * Format tag: names the dialect of this BLOB. The media type it is served
@@ -123,17 +124,21 @@ const monthlyCoverageEntry = /** @type {const} */ ({
  * structural validation reports it as the first failing field on a mismatched
  * blob (DOC-00's discriminant).
  *
- * `recipientTin` carries the printed line 5 (recipient's SSN) under this
- * repo's established name for a payee identifier, so the field a caller looks
- * for is the field every other dialect already spells that way. There is no
- * `payerTin`: a Marketplace is not a payer and the form prints no TIN for it.
+ * `recipientSsn` is the printed Part II line 5, which reads **"Recipient's
+ * SSN"** and not "TIN" — the neighbouring lines (4 "Recipient's name", 6
+ * "Recipient's date of birth", 7-9 the spouse's three) fix the party beyond
+ * doubt. The field carried this repo's cross-dialect `recipientTin` until
+ * FORM-KEY-01 gave every dialect its own {@link subjectKey} declaration; a
+ * caller reads the ROLE now rather than guessing the name, so the name is
+ * free to say what the paper says. There is no payer field at all: a
+ * Marketplace is not a payer and the form prints no TIN for it.
  */
 export const oneZeroNineFiveASchema = /** @type {const} */ ({
     ...base(dialect),
     marketplaceIdentifier: string,
     marketplaceAssignedPolicyNumber: string,
     policyIssuerName: string,
-    recipientTin: string,
+    recipientSsn: string,
     taxYear: number,
     formRevision: string,
     sourceArtifactHash: string,
@@ -152,6 +157,19 @@ export const oneZeroNineFiveASchema = /** @type {const} */ ({
     line33AnnualSlcspPremium: option(string),
     line33AnnualAdvancePaymentOfPtc: option(string),
 })
+
+/**
+ * FORM-KEY-01 -- which of THIS dialect's OWN fields play the five roles a
+ * form subject is keyed on. See `fjs/document/subject`'s {@link SubjectKey}
+ * for why the dialect declares this instead of every caller assuming one
+ * shared set of field names.
+ *
+ * No payer and no account role: this dialect has no such field, and an omitted role
+ * derives the empty string -- exactly the `payerTin: ''` /
+ * `accountNumber: ''` this dialect's subject has carried since DOC-01.
+ * @type {SubjectKey}
+ */
+export const subjectKey = { formType: 'dialect', taxYear: 'taxYear', recipient: 'recipientSsn' }
 
 /** @typedef {Ts<typeof oneZeroNineFiveASchema>} OneZeroNineFiveA */
 
@@ -342,7 +360,7 @@ const minimal = {
     marketplaceIdentifier: '99',
     marketplaceAssignedPolicyNumber: 'POLICY-0001',
     policyIssuerName: 'Some Health Plan, Inc.',
-    recipientTin: '222-22-2222',
+    recipientSsn: '222-22-2222',
     taxYear: 2025,
     formRevision: '2025',
     sourceArtifactHash: sharedSourceArtifactHash,
