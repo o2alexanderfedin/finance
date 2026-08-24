@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v4
 milestone_name: Verified With the Taxpayer Present
 status: awaiting_owner
-stopped_at: "Milestone v3 CLOSED 2026-08-19. Phase 33 delivered the external validation it existed for: 27/51 matched under TaxCalcBench's strict criterion, both divergences decided against the benchmark, one real engine defect fixed (Form 8959 Part V computed for filers not required to file it). Phases 34, 35 and 36 moved to milestone v4 by owner decision -- none is blocked on engineering, all three need the owner: 34 wants the taxpayer's documents and a second filer, 36 wants a real client session (fixtures would prove the pipe and not the phase), 35 wants a decision on a PDF-writing dependency. Suite 3247/3247, 3202 proof leaves, 127/127 requirements, 34 of 37 phases."
-last_updated: "2026-08-20T18:40:00.000Z"
-last_activity: 2026-08-20
+stopped_at: "The accountant demo shipped 2026-08-21 as five merged PRs (#124-#128) and IS NOT IN THIS PLANNING SYSTEM -- no requirement ID, no roadmap row, no phase directory; a grep of .planning/ for entry.html, IndexedDB, ui-tests, form_model, subjectKey and FORM-KEY returns nothing. What shipped: hand entry in the browser with forms GENERATED from each dialect's own rtti, IndexedDB as CAS+Evo with the engine staying client-side, 31 Playwright tests in a separate npm package, a measured colour-blind-safe palette, and per-dialect subjectKey with identity fields renamed to what the printed form calls them. Upstream functionalscript#1649 (the spawn effect note) was approved and merged by sergey-shandar 2026-08-21 after six review rounds, 15 findings, three answered with a remedy different from the one proposed. Milestone v4's three phases are unchanged and still blocked on the owner: 34 wants the taxpayer's documents and a second filer, 35 wants a PDF-dependency decision, 36 wants a real client session. Measured on 53afa02 2026-08-23: suite 3290/3290, 3242 proof leaves, 31 browser tests, coverage 99.18/93.18/99.45, 127/127 requirements, 34 of 37 roadmap phases."
+last_updated: "2026-08-24T02:13:35.000Z"
+last_activity: 2026-08-23
 progress:
   total_phases: 37
   completed_phases: 34
@@ -22,25 +22,58 @@ See: .planning/PROJECT.md (updated 2026-08-03)
 
 **Core value:** The report is a program, not an answer — the agent emits FunctionalScript;
 the server executes it as a pure function of `(documents, tax-year parameters) → report`.
-**Current focus:** Milestone v4, all three phases blocked on the owner — 34 wants the taxpayer's
-documents and a second filer, 35 wants one dependency approval, 36 wants a real client session.
-Nothing is in flight. *(This line read "Phase 15 shipped, Phase 16 awaiting an owner decision"
-until 2026-08-20 — two milestones stale, while `last_updated` said 2026-08-17 and the `stopped_at`
-field directly above it narrated events of 2026-08-19. A timestamp older than the text it stamps
-is the cheapest possible tell, and nothing was watching for it.)*
+**Current focus:** **The accountant demo** — give a working accountant a page they can feed real
+documents to and get tax output back. That accountant has many clients, which is the route to real
+data at volume. Filing the owner's own return is LATER, not the driver; Sergey is a partner, not an
+audience — he authors FunctionalScript, the language this code is written in, and separately wants
+to do his own taxes with this software.
+
+Milestone v4's three roadmap phases remain blocked on the owner — 34 wants the taxpayer's documents
+and a second filer, 35 wants one dependency approval, 36 wants a real client session. **But the
+demo work below is not one of them, and is not in the roadmap at all** (see "Shipped outside the
+ledger"). Nothing is in flight.
+
+*(This line read "Phase 15 shipped, Phase 16 awaiting an owner decision" until 2026-08-20 — two
+milestones stale, while `last_updated` said 2026-08-17 and the `stopped_at` field directly above it
+narrated events of 2026-08-19. A timestamp older than the text it stamps is the cheapest possible
+tell, and nothing was watching for it. It then read "Milestone v4, all three phases blocked on the
+owner … nothing is in flight" until 2026-08-23 — technically true of the ROADMAP and materially
+false about the project, because five PRs of product work had shipped in the meantime and no
+planning file mentioned any of it. **"Nothing is in flight" is the most dangerous sentence in this
+file: it is what a stale document says whether or not it is true.**)*
 
 ## Current Position
 
-Phase: **none — milestone v2 is closed and v1.0.0 is released.**
+Phase: **none open in the roadmap.** Milestone v4 is the current milestone; its three phases (34,
+35, 36) are all blocked on the owner. Work has nevertheless been shipping — see below.
 
 **Do not quote a number from this block.** Every figure below is stamped with what it was measured
 on; anything present-tense is a command, not a constant. This block has now been found stale
-**five** times, always the same way: correct frontmatter above, superseded prose below. The fifth
+**six** times, always the same way: correct frontmatter above, superseded prose below. The fifth
 was found on 2026-08-17 during a post-release resume — the frontmatter read `status: released` and
 `percent: 100` while this text six lines under it still read "107 complete, 13 open" and quoted a
 test total (8533) that a bug fix had already halved.
 
-**Measured on `fd6702c`, the v1.0.0 release point:**
+**The sixth was found on 2026-08-23** and is a new species. The frontmatter said `milestone: v4`
+while this very line said *"milestone v2 is closed and v1.0.0 is released"* — but the expensive part
+was not the phrasing. Five PRs of product work (#124–#128) had merged two days earlier and **no
+file in `.planning/` mentioned any of them**, so every number here was stale *and* the feature they
+belonged to had no record at all. The previous five failures were numbers going out of date. This
+one was a whole capability that the planning system could not see.
+
+**Measured on `53afa02` (main), 2026-08-23 — the current figures:**
+
+| | |
+|---|---|
+| Requirements | **127 defined, 127 complete, 0 open** — unchanged; the demo work has no IDs |
+| Suite | **3290 tests, 3290 pass, 0 fail**, `tsc` clean |
+| Project-local proofs | **3242** |
+| Browser tests | **31**, `ui-tests` package, Playwright/chromium — invisible to `npm test` |
+| Engine coverage | 99.18 lines / 93.18 branches / 99.45 functions, gated in CI |
+| Dialects | **30 registered, 29 enterable** (`vnd.fjs.ocr` is not hand-enterable), **28 declare a `subjectKey`** |
+| Roadmap phases | 34 of 37 — the demo work is none of them |
+
+**Measured on `fd6702c`, the v1.0.0 release point — kept for comparison, not for quoting:**
 
 | | |
 |---|---|
@@ -58,6 +91,50 @@ grep -cE '^- \[ \] \*\*[A-Z]+-[0-9]+' .planning/REQUIREMENTS.md   # open
 npm test 2>&1 | grep -c '^✔ import("./fjs/'                    # proofs
 git log --oneline -1 -- .planning/STATE.md                     # who wrote this last
 ```
+
+## Shipped outside the ledger — the accountant demo, 2026-08-21
+
+**This section exists because nothing else records this work.** Five PRs merged on 2026-08-21 and
+none of them has a requirement ID, a roadmap row, or a phase directory. The check that found it:
+
+```sh
+grep -rl 'entry.html\|IndexedDB\|ui-tests\|form_model\|subjectKey\|FORM-KEY' .planning/   # was empty
+```
+
+| PR | What shipped |
+|---|---|
+| #124 | Hand-enter documents in the browser. The form is **generated from each dialect's own rtti schema**, so form and validator cannot drift; `fjs/document/form_model` derives the field list, `fjs/document/registry` carries the 30 dialects. Storage is IndexedDB used as CAS + Evo (`demo/lib/store.js`); the engine runs client-side and **no network call exists on the path**. `fjs/guest/store_view` serves the four guest operations, so the browser runs the same guest program `fjs_run` executes. |
+| #125 | Browser automation as a **separate npm package** (`ui-tests/`) — the owner's approval on 2026-08-20 was explicitly "as a separate npm package", so the shipped `finance` package carries no browser driver. 31 tests, plus a coverage floor asserted on the two files no proof can reach. |
+| #126 | The root `tsc` was type-checking `ui-tests/`, which made the local build falsely green and CI red. |
+| #127 | A **measured** colour-blind-safe palette — Okabe–Ito, WCAG 1.4.3 and 1.4.11 read from `getComputedStyle` on the live page in both schemes, and a test that strips colour entirely and asserts success and refusal still differ by their text. |
+| #128 | **FORM-KEY-01/02.** Each dialect declares its own `subjectKey`, so `formSubject` no longer assumes every form spells its identity fields identically; eleven of them then renamed those fields to what the printed form actually calls them (W-2 box b is `employerEIN`, not `payerTin`). Subject strings are byte-identical: the declaration moved, the values did not. |
+
+**Eleven were renamed, not twenty-two.** The workflow's own summary claimed twenty-two; measuring
+every `subjectKey` in the tree gives eleven (`w2`, `1095a`, `1098e`, `1098t`, `farm`, `form3921`,
+`form3922`, `k1_1041`, `k1_1065`, `k1_1120s`, `ssa1099`). The other eleven in its list are the 1099s — whose
+printed face really does say PAYER'S TIN and RECIPIENT'S TIN — and internal dialects that transcribe
+no form at all and so have no caption to defer to. **The outcome was right and the report was
+wrong**, which is the more dangerous of the two failures: merging on the strength of that summary
+would have recorded eleven renames that never happened.
+
+One residual is filed honestly at `fjs/document/todo/subject-key-roles-are-unpinned.md`: a
+`subjectKey` is pinned to fields that EXIST, never to the RIGHT ones, so a role naming a real-but-wrong
+field passes every check. Found by mutation during the branch's own verification.
+
+**Upstream: `functionalscript#1649` was approved and merged by sergey-shandar on 2026-08-21**, after
+six review rounds and 15 findings — every one verified against the source before being accepted, and
+three answered with a remedy *different* from the one proposed (the `childReadAny` EOF rule, the
+loser-preservation rule that needed no cancellable waiter, and the listener unsubscribe that had to
+cover the winner's sibling as well as the loser's pair). The Deno `--allow-run` question was handed
+back as a spec obligation rather than a unilateral change to his CI posture, and he merged it in
+that form.
+
+**What this costs, stated plainly:** `REQUIREMENTS.md` reads 127/127 complete, which is true and now
+*understates* the system. The ledger describes the engine; the accountant-facing product it has
+acquired is invisible to it. Giving the five PRs above requirement IDs and roadmap rows is the
+cheapest open task in the project and the one blocking an honest answer to "what is done?".
+
+## Earlier milestones
 
 All ten v2 phases shipped 2026-08-16/17 as PRs #71–#82, plus post-milestone gap-closure work
 committed under `31-*` and `32-*` prefixes. **All four personas from
