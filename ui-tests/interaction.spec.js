@@ -33,7 +33,7 @@
  *
  * @module
  */
-import { test, expect } from '@playwright/test'
+import { test, expect } from './demo-mode.js'
 
 /**
  * Watches for the failures that leave a page blank or a handler dead. An
