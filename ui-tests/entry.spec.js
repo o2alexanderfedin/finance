@@ -13,7 +13,7 @@
  *
  * @module
  */
-import { test, expect } from '@playwright/test'
+import { test, expect } from './demo-mode.js'
 
 /** The two documents every computing test needs. Values are IRS-reserved test ranges. */
 const profile = {

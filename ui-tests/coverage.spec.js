@@ -19,7 +19,7 @@
  *
  * @module
  */
-import { test, expect } from '@playwright/test'
+import { test, expect } from './demo-mode.js'
 
 /** The files this run must exercise, with the floor each must clear. */
 const floors = [

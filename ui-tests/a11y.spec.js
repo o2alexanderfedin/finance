@@ -22,7 +22,7 @@
  *
  * @module
  */
-import { test, expect } from '@playwright/test'
+import { test, expect } from './demo-mode.js'
 
 /** @type {(css: string) => readonly [number, number, number]} */
 const parseRgb = css => {
