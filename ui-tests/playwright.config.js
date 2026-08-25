@@ -60,6 +60,14 @@ const port = 8123
 const demoMode = process.env.DEMO === '1' || process.env.DEMO === 'true'
 
 /**
+ * Desktop Chrome without the two settings that pin the page to a fixed box.
+ * Everything else about the device — user agent, browser name — is kept, so
+ * demo mode differs from the real run only in how big the picture is.
+ */
+const { viewport: _viewport, deviceScaleFactor: _scale, ...desktopChromeWindowed }
+    = devices['Desktop Chrome']
+
+/**
  * Milliseconds Playwright pauses before each action in demo mode.
  *
  * **One full second, deliberately.** The point of demo mode is that a person
@@ -68,9 +76,15 @@ const demoMode = process.env.DEMO === '1' || process.env.DEMO === 'true'
  * the click has to guess what the app just did. Faster is available for a
  * second viewing — `DEMO_SLOW_MO=400` — and slower for presenting to a room.
  *
- * (A very low value like `40` is a verification trick, not a demo setting: it
- * runs the whole suite under demo's headed, single-worker configuration to
- * prove nothing breaks there, without the wait a real demo pace implies.)
+ * **`DEMO_SLOW_MO=0` is not a supported demo pace, and it is not merely
+ * pointless — it is flaky.** Three tests fail at zero and pass at 250, all
+ * three storing a document: the entry page hashes and writes to IndexedDB
+ * *after* the click returns, and at machine speed the next action arrives
+ * before that write settles. A headed browser is slower to render than a
+ * headless one, which widens the window enough to lose the write. Zero was
+ * used during development to run the whole suite under demo's configuration
+ * quickly; it proved the configuration sound and then produced three failures
+ * that had nothing to do with the app.
  */
 const slowMo = (() => {
     const asked = Number(process.env.DEMO_SLOW_MO ?? '1000')
@@ -114,9 +128,24 @@ export default defineConfig({
         baseURL: `http://localhost:${port}`,
         trace: 'retain-on-failure',
         headless: !demoMode,
-        launchOptions: demoMode ? { slowMo } : {},
+        // `--start-maximized` opens the window at the full screen. It is only
+        // half the job: see the `viewport` override below, without which the
+        // page would render into a 1280x720 letterbox inside a maximized
+        // window — a bigger frame around the same small page.
+        launchOptions: demoMode ? { slowMo, args: ['--start-maximized'] } : {},
     },
-    projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
+    projects: [{
+        name: 'chromium',
+        // `devices['Desktop Chrome']` pins viewport to 1280x720, which is
+        // exactly right for a repeatable headless run and exactly wrong for a
+        // watched one: the page would render into a letterbox inside a
+        // maximized window. `viewport: null` means "fill the window".
+        //
+        // Its `deviceScaleFactor` has to go with it — Playwright refuses the
+        // pair outright ("deviceScaleFactor option is not supported with null
+        // viewport"), which is how this was found: every test failed in 4ms.
+        use: demoMode ? { ...desktopChromeWindowed, viewport: null } : devices['Desktop Chrome'],
+    }],
     webServer: {
         command: `sh ../demo/serve.sh ${port}`,
         url: `http://localhost:${port}/demo/entry.html`,

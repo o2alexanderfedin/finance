@@ -27,7 +27,7 @@
  *
  * @module
  */
-import { test, expect } from '@playwright/test'
+import { test, expect } from './demo-mode.js'
 
 /** Every step's route id, in the order the shell registers them. */
 const steps = [
