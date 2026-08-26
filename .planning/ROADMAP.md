@@ -1241,7 +1241,7 @@ is deferred, so three phases remain, and two reasons override the numeric defaul
 fjs/todo/implement-mcp-server.md, and the research corpus. Milestones are `todo/plan.md`'s
 weeks and keep its names; Week 0 is research's addition.*
 
-**── Milestone v4: Verified With the Taxpayer Present ──**
+## Milestone v4: Verified With the Taxpayer Present
 
 **Why these three sit here and not in v3.** v3 asked "can this be trusted without a filed return",
 and Phase 33 answered it: 27 of 51 external cases matched under the strict criterion, both
@@ -1250,6 +1250,20 @@ as far as confidence gets **without the owner in the room**. The three below can
 agent working alone — two need the taxpayer's own documents and consent, and one needs a decision
 about a dependency that only an owner may take. **Deferred by the owner on 2026-08-19, with the
 work that was doable already done.**
+
+### Written after the fact — the accountant demo, shipped outside this roadmap
+
+**Ten PRs (#124-#133) merged between 2026-08-21 and 2026-08-25 and none of them is a phase here.**
+They are the accountant-facing product: hand entry in the browser with every form *generated* from
+its dialect's own rtti schema, IndexedDB used as CAS + Evo with the engine staying client-side, a
+separate `ui-tests` npm package now at 46 browser checks plus a paced walkthrough, a measured
+colour-blind-safe palette, form-accurate identity fields, and acronym-aware labels.
+
+**No phase number is invented for them**, on the same ruling the four Tier-B requirements got on
+2026-08-19: a roadmap row written after the fact to make the ledger look regular is the tidy lie.
+What the work *does* now have is a requirement entry where it coined one — `FORM-KEY-01` and
+`FORM-KEY-02`, registered 2026-08-25 in REQUIREMENTS.md's v3 section. The rest coined no IDs, and
+whether it becomes a `UI-*` category is a scope decision for the owner rather than an agent.
 
 - [ ] **Phase 34: Second-Implementation Cross-Check** - Run the owner's own documents through a
       free commercial filer (FreeTaxUSA / IRS Free File) and through this engine, and diff line by

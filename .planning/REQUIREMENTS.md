@@ -1735,7 +1735,7 @@ TAX-41's does.
 | TAX-42 | T3 | *(none — coined with its code 2026-08-19, as `TAX-40`, and renumbered by the integrator)* | Tier-B forms — Form 2555, §911, Schedule 1 line 8d and 1040 line 16's Foreign Earned Income Tax Worksheet. One coarse kind became five, and Form 8962's documented structural zero became a live term |
 
 **32 requirements across 10 phases, four retrofitted entries with none, and three coined with
-their own code** — 127 in the document, 95 of them v1's. Each phase is a
+their own code** — 129 in the document, 95 of them v1's and two v3's. Each phase is a
 vertical slice that ends with something that works: a persona whose return computes, or a named
 refusal that replaces a silent wrong answer. No phase leaves a layer that only pays off later.
 
@@ -1744,10 +1744,63 @@ refusal that replaces a silent wrong answer. No phase leaves a layer that only p
 > re-derivation command below, which is the entire argument for having one. Both figures here are
 > now derived:
 > ```sh
-> sed -n '/^## v1 Requirements/,/^## v2 Requirements/p' .planning/REQUIREMENTS.md | grep -cE '^- \[[ x]\] \*\*[A-Z]+-[0-9]+'   # 95
-> sed -n '/^## v2 Requirements/,/^## v2 (Deferred)/p'   .planning/REQUIREMENTS.md | grep -cE '^- \[[ x]\] \*\*[A-Z]+-[0-9]+'   # 32
-> grep -oE '^- \[[ x]\] \*\*[A-Z]+-[0-9]+' .planning/REQUIREMENTS.md | grep -oE '[A-Z]+-[0-9]+' | sort | uniq -d              # must be empty
+> ID='[A-Z]+(-[A-Z]+)*-[0-9]+'   # a prefix may carry a hyphen since FORM-KEY
+> sed -n '/^## v1 Requirements/,/^## v2 Requirements/p'    .planning/REQUIREMENTS.md | grep -cE "^- \[[ x]\] \*\*$ID"   # 95
+> sed -n '/^## v2 Requirements/,/^## v3 Requirements/p'    .planning/REQUIREMENTS.md | grep -cE "^- \[[ x]\] \*\*$ID"   # 32
+> sed -n '/^## v3 Requirements/,/^## v2 (Deferred)/p'      .planning/REQUIREMENTS.md | grep -cE "^- \[[ x]\] \*\*$ID"   # 2
+> grep -oE "^- \[[ x]\] \*\*$ID" .planning/REQUIREMENTS.md | grep -oE "$ID" | sort | uniq -d                            # must be empty
 > ```
+
+---
+
+## v3 Requirements — Form-Accurate Identity Fields (FORM-KEY)
+
+**Two IDs coined in code on 2026-08-21 and registered here on 2026-08-25.** Same admission as the
+Tier-B retrofit above, and a worse instance of it: `FORM-KEY-01` and `FORM-KEY-02` were cited **65
+times across 36 files** under `fjs/**` before this document had heard of either.
+
+**What is new is why nothing caught it.** The Tier-B retrofit added a check that every ID the code
+cites has a requirement behind it, and that check was green the whole time. It scans for ten
+hand-typed prefixes, and `FORM-KEY` is not one of them; the test that guards *that* list compares
+it against this document, where the prefix was equally absent. **Both sides agreed with each other
+and both were wrong** — a prefix that exists only in the code is invisible to a check that asks the
+code and the document whether they match. `planning-truth-gate.test.js` now classifies **every**
+ID-shaped prefix in the tree as a requirement or as a declared non-requirement, which is the one
+direction neither existing check could look. `FORM-KEY` is also the first prefix here to carry a
+hyphen, and the three patterns that parse this file could not read it until they were widened —
+registering these two was never a matter of typing two lines.
+
+**Neither has a ROADMAP phase, and inventing one would be the tidy lie** — the same ruling the four
+Tier-B IDs got, for the same reason. Both landed inside the accountant demo (PR #128), which
+shipped outside the roadmap entirely. They are **T3** because nothing was blocked on them: no
+subject string changed by a single byte.
+
+- [x] **FORM-KEY-01** *(T3)*: **Each dialect declares which of its own fields play the subject
+      roles.** DOC-01 fixes the Evo subject as `(formType, taxYear, payer, recipient, account)`,
+      and `formSubject` used to read those five off field names it assumed every dialect shared —
+      `payerTin`, `recipientTin`, `accountNumber`. That assumption is a claim about thirty separate
+      printed forms, and it was never true of all of them. **28 dialect modules now export a
+      `subjectKey`** naming their own fields for the five roles, so the mapping is each form's
+      statement about itself rather than a convention imposed on it.
+
+      One residual is filed rather than hidden: `fjs/document/todo/subject-key-roles-are-unpinned.md`
+      records that the roles are not yet pinned by a type.
+
+- [x] **FORM-KEY-02** *(T3)*: **Identity fields are named what the printed form calls them.**
+      With FORM-KEY-01 in place, **eleven** dialects renamed their identity fields to the caption
+      on the page — a W-2's box b is `employerEIN` and its box a is `employeeSSN`, and the words
+      *payer* and *recipient* appear nowhere on that form. **Eleven, not twenty-two**: the other
+      eleven in the original claim are the 1099s, whose printed faces really do say PAYER'S TIN and
+      RECIPIENT'S TIN, and internal dialects that transcribe no form and so have no caption to
+      defer to. **Subject strings are byte-identical across the rename** — the declaration moved,
+      the values did not, and `goldenEncodedSubjectValue` is what says so.
+
+### v3 Traceability
+
+| REQ-ID | Tier | Phase | Delivered |
+|--------|------|-------|-----------|
+| FORM-KEY-01 | T3 | *(none — shipped outside the roadmap 2026-08-21, registered 2026-08-25)* | Complete — 28 dialect modules declare a `subjectKey`; `formSubject` no longer assumes a shared spelling |
+| FORM-KEY-02 | T3 | *(none — shipped outside the roadmap 2026-08-21, registered 2026-08-25)* | Complete — eleven dialect modules renamed to the printed caption, subject strings byte-identical |
 
 ---
 

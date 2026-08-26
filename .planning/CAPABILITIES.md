@@ -195,7 +195,8 @@ surface. **Only 2025 exists** — `finance_tax_params` with any other year refus
   above describes and a reason to read it as a measurement rather than a fact.
 - **3196 project-local proof leaves** — the only stable count:
   `npm test 2>&1 | grep -c '^✔ import("./fjs/'`
-- Requirements: **127 defined, 127 complete, 0 open**
+- Requirements: **129 defined, 129 complete, 0 open** — 127 until 2026-08-25, when `FORM-KEY-01`
+  and `FORM-KEY-02` were registered. Both had been cited in the code since 2026-08-21.
 
 **Two standing gates now compare the documents to the code**, because this file had been wrong
 about the version, the dialect count, the test total and four separate refusals at once:
