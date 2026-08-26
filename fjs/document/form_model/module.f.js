@@ -92,10 +92,15 @@ const isDigit = c => c >= '0' && c <= '9'
  * An underscore is already a boundary and becomes the space itself.
  * @type {(previous: string) => (current: string) => boolean}
  */
-const needsSpace = previous => current =>
-    (isLower(previous) && isUpper(current))
-    || (isDigit(previous) && !isDigit(current))
-    || (!isDigit(previous) && isDigit(current))
+/**
+ * The end of the run of characters of `name`'s kind that starts at `from`.
+ * @type {(kind: (c: string) => boolean) => (name: string) => (from: number) => number}
+ */
+const runEnd = kind => name => from => {
+    let end = from
+    while (end < name.length && kind(name[end] ?? '')) { end += 1 }
+    return end
+}
 
 /**
  * A property name as a human label, derived rather than tabulated. Read the
@@ -104,16 +109,43 @@ const needsSpace = previous => current =>
  * @type {(name: string) => string}
  */
 export const labelOf = name => {
-    const spaced = [...name].reduce(
-        (acc, c) => {
-            const previous = acc.slice(-1)
-            if (c === '_') { return acc === '' ? acc : `${acc} ` }
-            if (previous === '' || previous === ' ') { return `${acc}${c}` }
-            return needsSpace(previous)(c) ? `${acc} ${c.toLowerCase()}` : `${acc}${c.toLowerCase()}`
-        },
-        '')
-    const first = spaced.slice(0, 1)
-    return `${first.toUpperCase()}${spaced.slice(1)}`
+    /** @type {string[]} */
+    const words = []
+    let i = 0
+    while (i < name.length) {
+        const c = name[i] ?? ''
+        if (c === '_') { i += 1; continue }
+        if (isDigit(c)) {
+            const end = runEnd(isDigit)(name)(i)
+            words.push(name.slice(i, end))
+            i = end
+            continue
+        }
+        if (isUpper(c)) {
+            const end = runEnd(isUpper)(name)(i)
+            // TWO OR MORE capitals in a row is an acronym, and an acronym is
+            // a word — `EIN`, not `e i n`. Splitting it per letter was the
+            // old behaviour and it turned `employerEIN`, a name chosen to
+            // match the printed W-2, into "Employer e i n".
+            if (end - i >= 2) {
+                // `HTTPServer`: the last capital of a run that is followed by
+                // lowercase belongs to the NEXT word, not to the acronym.
+                const acronymEnd = end < name.length && isLower(name[end] ?? '') ? end - 1 : end
+                words.push(name.slice(i, acronymEnd))
+                i = acronymEnd
+                continue
+            }
+            const wordEnd = runEnd(isLower)(name)(i + 1)
+            words.push(name.slice(i, wordEnd).toLowerCase())
+            i = wordEnd
+            continue
+        }
+        const end = runEnd(isLower)(name)(i)
+        words.push(name.slice(i, end))
+        i = end
+    }
+    const joined = words.join(' ')
+    return `${joined.slice(0, 1).toUpperCase()}${joined.slice(1)}`
 }
 
 /**
@@ -216,6 +248,27 @@ export const proof = {
         },
         underscoreBecomesTheSpace: () => {
             assertEq(labelOf('spouseBornBeforeJan2_1961'), 'Spouse born before jan 2 1961')
+        },
+        // An acronym is one word. These are the identity fields FORM-KEY-02
+        // renamed to match the printed forms, so the rule is proven on the
+        // names that motivated it.
+        consecutiveCapitalsAreAnAcronym: () => {
+            assertEq(labelOf('employerEIN'), 'Employer EIN')
+            assertEq(labelOf('employeeSSN'), 'Employee SSN')
+            assertEq(labelOf('estateOrTrustEIN'), 'Estate or trust EIN')
+            assertEq(labelOf('partnershipEIN'), 'Partnership EIN')
+        },
+        // A SINGLE capital is not an acronym: `filerEin` is written as a word
+        // in its schema and must read as one, or the rule would be guessing
+        // at intent the name does not carry.
+        oneCapitalIsAWordNotAnAcronym: () => {
+            assertEq(labelOf('filerEin'), 'Filer ein')
+            assertEq(labelOf('recipientSsn'), 'Recipient ssn')
+        },
+        // The trailing capital of a run belongs to the word that follows it.
+        aRunFollowedByLowercaseSplits: () => {
+            assertEq(labelOf('einNumber'), 'Ein number')
+            assertEq(labelOf('EINNumber'), 'EIN number')
         },
         plainCamelCase: () => {
             assertEq(labelOf('taxYear'), 'Tax year')
