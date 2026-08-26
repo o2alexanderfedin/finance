@@ -87,8 +87,8 @@ const { viewport: _viewport, deviceScaleFactor: _scale, ...desktopChromeWindowed
  * that had nothing to do with the app.
  */
 const slowMo = (() => {
-    const asked = Number(process.env.DEMO_SLOW_MO ?? '1000')
-    return Number.isFinite(asked) && asked >= 0 ? asked : 1000
+    const asked = Number(process.env.DEMO_SLOW_MO ?? '1500')
+    return Number.isFinite(asked) && asked >= 0 ? asked : 1500
 })()
 
 // Playwright loads this config once in the runner and again in every worker,
@@ -100,6 +100,10 @@ if (demoMode && process.env.TEST_WORKER_INDEX === undefined) {
 
 export default defineConfig({
     testDir: '.',
+    // The walkthrough is a demo, not a check: slow by design, and a bad
+    // citizen in a suite that answers "is it broken?" in seconds. `npm test`
+    // never sees it; `npm run demo` runs it and nothing else.
+    testIgnore: demoMode ? [] : ['walkthrough.spec.js'],
     // A failure here is a real failure. Retrying would turn a genuinely flaky
     // wiring bug — the kind this suite exists to find — into a green run with
     // a note nobody reads.
