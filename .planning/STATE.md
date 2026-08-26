@@ -103,17 +103,21 @@ file in `.planning/` mentioned any of them**, so every number here was stale *an
 belonged to had no record at all. The previous five failures were numbers going out of date. This
 one was a whole capability that the planning system could not see.
 
-**Measured on `53afa02` (main), 2026-08-23 — the current figures:**
+**Measured on `b8fe2e5`, 2026-08-25 — the current figures:**
 
 | | |
 |---|---|
-| Requirements | **127 defined, 127 complete, 0 open** — unchanged; the demo work has no IDs |
-| Suite | **3290 tests, 3290 pass, 0 fail**, `tsc` clean |
-| Project-local proofs | **3242** |
-| Browser tests | **31**, `ui-tests` package, Playwright/chromium — invisible to `npm test` |
-| Engine coverage | 99.18 lines / 93.18 branches / 99.45 functions, gated in CI |
+| Requirements | **129 defined, 129 complete, 0 open** — `FORM-KEY-01/02` registered 2026-08-25; the rest of the demo still has no IDs |
+| Suite | **3294 tests, 3294 pass, 0 fail**, `tsc` clean |
+| Project-local proofs | **3245** |
+| Browser tests | **46**, `ui-tests` package, Playwright/chromium — invisible to `npm test`; the paced walkthrough is excluded from those 46 in turn |
+| Engine coverage | 99.18 lines / 93.16 branches / 99.45 functions, gated in CI |
 | Dialects | **30 registered, 29 enterable** (`vnd.fjs.ocr` is not hand-enterable), **28 declare a `subjectKey`** |
 | Roadmap phases | 34 of 37 — the demo work is none of them |
+
+*(Branches read 93.18 on `53afa02` two days earlier. The 0.02 is PR #132's acronym fix in
+`fjs/document/form_model`, not this change — which is why it was re-measured rather than carried
+forward on the reasoning that a docs-and-tests commit cannot move engine coverage.)*
 
 **Measured on `fd6702c`, the v1.0.0 release point — kept for comparison, not for quoting:**
 
