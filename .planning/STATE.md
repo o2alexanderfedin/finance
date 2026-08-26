@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v4
 milestone_name: Verified With the Taxpayer Present
-status: awaiting_owner
-stopped_at: "The accountant demo shipped 2026-08-21 as five merged PRs (#124-#128) and IS NOT IN THIS PLANNING SYSTEM -- no requirement ID, no roadmap row, no phase directory; a grep of .planning/ for entry.html, IndexedDB, ui-tests, form_model, subjectKey and FORM-KEY returns nothing. What shipped: hand entry in the browser with forms GENERATED from each dialect's own rtti, IndexedDB as CAS+Evo with the engine staying client-side, 31 Playwright tests in a separate npm package, a measured colour-blind-safe palette, and per-dialect subjectKey with identity fields renamed to what the printed form calls them. Upstream functionalscript#1649 (the spawn effect note) was approved and merged by sergey-shandar 2026-08-21 after six review rounds, 15 findings, three answered with a remedy different from the one proposed. Milestone v4's three phases are unchanged and still blocked on the owner: 34 wants the taxpayer's documents and a second filer, 35 wants a PDF-dependency decision, 36 wants a real client session. Measured on 53afa02 2026-08-23: suite 3290/3290, 3242 proof leaves, 31 browser tests, coverage 99.18/93.18/99.45, 127/127 requirements, 34 of 37 roadmap phases."
+status: paused
+stopped_at: The accountant demo has shipped ten PRs (124-133) with no requirement ID, no roadmap row and no phase directory; milestone v4's phases 34, 35 and 36 stay blocked on the owner. Nothing is in flight.
 last_updated: "2026-08-24T02:13:35.000Z"
-last_activity: 2026-08-23
+last_activity: 2026-08-25
 progress:
   total_phases: 37
   completed_phases: 34
-  total_plans: 89
-  completed_plans: 85
+  total_plans: 88
+  completed_plans: 88
   percent: 92
 ---
 
@@ -42,6 +42,48 @@ false about the project, because five PRs of product work had shipped in the mea
 planning file mentioned any of it. **"Nothing is in flight" is the most dangerous sentence in this
 file: it is what a stale document says whether or not it is true.**)*
 
+## Session
+
+Status: paused — awaiting owner decisions on phases 34, 35 and 36
+Stopped at: The accountant demo has shipped ten PRs (124-133) with no requirement ID, no roadmap row and no phase directory; milestone v4's phases 34, 35 and 36 stay blocked on the owner. Nothing is in flight.
+Progress: [█████████░] 92%
+Last activity: 2026-08-25
+
+*(92% is 34 of 37 roadmap phases, milestone v4. The percentage on that line is the one
+field here a tool overwrites — see below.)*
+
+**These four lines are written for the tool, and they must stay the first of their kind in this
+file.** `gsd-sdk` rebuilds the frontmatter above out of *this body* on every write —
+`buildStateFrontmatter` in `~/.claude/get-shit-done/bin/lib/state.cjs` takes the **first**
+`Status:`, `Stopped at:`, `Progress:` and `Last activity:` line it can find, and until 2026-08-25
+the first of each lived in the archival block 150 lines below. So every `gsd-*` command quietly
+restamped the header with Phase 18's state from 2026-08-19: `status: verifying` (from the word
+*VERIFICATION* in a 2026-08-14 sentence), `stopped_at: Phase 18 planned, zero plans executed`, and
+`last_activity` walking **backwards**. It was caught and hand-reverted twice before anyone went
+looking for the cause; the cause was never a hook — hooks only read this file. Put another
+`Status:`, `Stopped at:`, `Progress:` or `Last activity:` line above these and the damage resumes.
+
+**`completed_phases` is a different quantity than its name suggests, and this was already
+established** — `v4-MILESTONE-AUDIT.md` F-02, 2026-08-20: it counts phase directories holding a
+SUMMARY, and phases 1-33 largely shipped without a directory at all. That audit's ruling was
+**"should not be reconciled"**, and it stands. Two things are new. The audit read **17**; the tool
+now writes **16**, because its rule tightened from *has a SUMMARY* to *has plans and at least as
+many summaries as plans* — of 18 directories, 17 satisfy the first and 16 the second. And the
+divergence is no longer a reading to interpret but an **overwrite to recognise**: a sync puts
+`16 of 38` and `percent: 42` straight over the measured `34 of 37` and `92`. The roadmap is the
+ledger; the directory listing is not:
+
+```sh
+grep -cE '^- \[x\] \*\*Phase [0-9]+' .planning/ROADMAP.md   # 34 complete — Phase 12 is listed twice
+grep -cE '^- \[ \] \*\*Phase [0-9]+' .planning/ROADMAP.md   # 3 open — 34, 35, 36
+grep -cE '^### Phase [0-9]+' .planning/ROADMAP.md            # 38 headings, 37 phases: 12 and 12.1
+find .planning/phases -name '*-PLAN.md' | wc -l              # 88 — here the tool is right
+```
+
+**If this file ever reads `42%`, a tool wrote it and no one measured anything.** The plan counts
+were the reverse case and are now corrected: the header claimed `89` planned and `85` done, disk
+says **88 and 88**, and disk is checkable.
+
 ## Current Position
 
 Phase: **none open in the roadmap.** Milestone v4 is the current milestone; its three phases (34,
@@ -61,17 +103,21 @@ file in `.planning/` mentioned any of them**, so every number here was stale *an
 belonged to had no record at all. The previous five failures were numbers going out of date. This
 one was a whole capability that the planning system could not see.
 
-**Measured on `53afa02` (main), 2026-08-23 — the current figures:**
+**Measured on `b8fe2e5`, 2026-08-25 — the current figures:**
 
 | | |
 |---|---|
-| Requirements | **127 defined, 127 complete, 0 open** — unchanged; the demo work has no IDs |
-| Suite | **3290 tests, 3290 pass, 0 fail**, `tsc` clean |
-| Project-local proofs | **3242** |
-| Browser tests | **31**, `ui-tests` package, Playwright/chromium — invisible to `npm test` |
-| Engine coverage | 99.18 lines / 93.18 branches / 99.45 functions, gated in CI |
+| Requirements | **129 defined, 129 complete, 0 open** — `FORM-KEY-01/02` registered 2026-08-25; the rest of the demo still has no IDs |
+| Suite | **3294 tests, 3294 pass, 0 fail**, `tsc` clean |
+| Project-local proofs | **3245** |
+| Browser tests | **46**, `ui-tests` package, Playwright/chromium — invisible to `npm test`; the paced walkthrough is excluded from those 46 in turn |
+| Engine coverage | 99.18 lines / 93.16 branches / 99.45 functions, gated in CI |
 | Dialects | **30 registered, 29 enterable** (`vnd.fjs.ocr` is not hand-enterable), **28 declare a `subjectKey`** |
 | Roadmap phases | 34 of 37 — the demo work is none of them |
+
+*(Branches read 93.18 on `53afa02` two days earlier. The 0.02 is PR #132's acronym fix in
+`fjs/document/form_model`, not this change — which is why it was re-measured rather than carried
+forward on the reasoning that a docs-and-tests commit cannot move engine coverage.)*
 
 **Measured on `fd6702c`, the v1.0.0 release point — kept for comparison, not for quoting:**
 
@@ -129,10 +175,24 @@ cover the winner's sibling as well as the loser's pair). The Deno `--allow-run` 
 back as a spec obligation rather than a unilateral change to his CI posture, and he merged it in
 that form.
 
-**What this costs, stated plainly:** `REQUIREMENTS.md` reads 127/127 complete, which is true and now
-*understates* the system. The ledger describes the engine; the accountant-facing product it has
-acquired is invisible to it. Giving the five PRs above requirement IDs and roadmap rows is the
-cheapest open task in the project and the one blocking an honest answer to "what is done?".
+**What this costs, stated plainly:** the ledger describes the engine; the accountant-facing
+product it has acquired is largely invisible to it.
+
+**Closed on 2026-08-25, in part.** `FORM-KEY-01` and `FORM-KEY-02` are registered — the two IDs
+the code had actually coined, cited 65 times across 36 files while `REQUIREMENTS.md` had never
+heard of them. The reason nobody noticed is now itself a check: the citation gate scanned ten
+hand-typed prefixes and the test guarding that list compared it against `REQUIREMENTS.md`, where
+the prefix was equally absent, so **both sides agreed and both were wrong**. A prefix living only
+in the code was invisible to a check that asks the code and the document whether they match.
+`planning-truth-gate.test.js` now classifies every ID-shaped prefix in the tree as a requirement
+or as a declared non-requirement, and the count is 129/129.
+
+**Still open, and it is a scope question rather than a bookkeeping one.** The rest of the demo —
+browser hand entry, generated forms, the client-side store, the `ui-tests` package, the measured
+palette, demo mode — coined no IDs at all, so there is nothing to retrofit and something to
+*decide*: whether these become a requirement category of their own (a `UI-*` block) or stay
+product work the requirement set deliberately does not cover. That is the owner's call, not an
+agent's, and it is the same call `v4-MILESTONE-AUDIT.md` F-01 left open for phases 34-36.
 
 ## Earlier milestones
 
