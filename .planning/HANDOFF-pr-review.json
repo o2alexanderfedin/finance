@@ -1,0 +1,77 @@
+{
+  "version": "1.0",
+  "timestamp": "2026-08-26T18:34:06.571Z",
+  "phase": "none",
+  "phase_name": "pr-review-loop-functionalscript",
+  "phase_dir": null,
+  "plan": 0,
+  "task": 0,
+  "total_tasks": 0,
+  "status": "paused",
+  "position_note": "This is NOT finance milestone work. This session ran a recurring review loop over sergey-shandar's open PRs in functionalscript/functionalscript. The finance milestone state in .planning/.continue-here.md and .planning/HANDOFF.json is UNTOUCHED and still current — it was deliberately not overwritten, because this session did no milestone work and that file records a valid awaiting-owner state for a different work stream.",
+  "repo_under_review": "functionalscript/functionalscript",
+  "scratch_clone": "/private/tmp/claude-501/-Volumes-ProjectsSSD-Projects-jobs4alex-sergey-shandar-finance/b1e397e6-4119-461b-b039-1424aa0dc170/scratchpad/fs1686",
+  "loop": {
+    "prompt": "Review Sergey's PRs. Be very reasonable. In case of problems - comment. If okay - approve. Be brief and focused in comments. If approved - say just that, do not write an article on that. You must use subagents for reviews.",
+    "skip_rule": "For each open PR compare its head SHA against the marker '<!-- reviewed-head: SHA -->' in my most recent review. APPROVED + marker == head => skip entirely. COMMENTED + marker == head => stay silent unless something material changed outside the diff (left draft, became mergeable, CI flipped). Otherwise review the delta and post.",
+    "reviews_api_must_paginate": "gh api repos/OWNER/REPO/pulls/N/reviews --paginate --jq '[.[]|select(.user.login==\"o2alexanderfedin\")]|last|\"\\(.state) \\(.body)\"' — without --paginate a stale review is returned silently and produces a false 'changed'.",
+    "drafts": "Review draft PRs too — the old skip-drafts rule was overridden. The marker check still applies to drafts.",
+    "posting": "Re-read the head SHA immediately before posting; end every posted body with the exact line '<!-- reviewed-head: FULL_CURRENT_HEAD_SHA -->'."
+  },
+  "pr_state_at_pause": [
+    {"pr": 1724, "head": "0b9c85eac3b7550e45ab52364566a30a99675fca", "draft": false, "last_review": null, "marker": null, "action": "NEW — never reviewed"},
+    {"pr": 1723, "head": "f7475a3d6d3f22d2f16489f44ae405eab3a2b576", "draft": false, "last_review": "COMMENTED", "marker": "8f39350e41a07a315ddb2e29d3e583c358591336", "action": "head moved — review delta"},
+    {"pr": 1722, "head": "e12bbcbf97262d8746d5ca40a6b27897f433b4ef", "draft": false, "last_review": "COMMENTED", "marker": "e12bbcbf97262d8746d5ca40a6b27897f433b4ef", "action": "silent — marker == head"},
+    {"pr": 1721, "head": "cccbb5ccd6e2106e75c6c33172fd7bdac19c6c2a", "draft": false, "last_review": "COMMENTED", "marker": "cccbb5ccd6e2106e75c6c33172fd7bdac19c6c2a", "action": "silent — marker == head"},
+    {"pr": 1720, "head": "30c725954a0a5f9514f2271dac872fab1eb5277f", "draft": false, "last_review": "APPROVED", "marker": "739e54ecddad28aae5d3d3b5e4d0b01756656b91", "action": "head moved past approval — review delta"},
+    {"pr": 1719, "head": "022141db3984f2de136256c8996c07e444bea07c", "draft": false, "last_review": "COMMENTED", "marker": "d9335b42a8fc3f37eb641f1cfc57dc1e7b4db11a", "action": "head moved — review delta; 7 findings still open"},
+    {"pr": 1717, "head": "6dc219c83410ecbb73ba5cdd909f51d9d636644e", "draft": false, "last_review": "APPROVED", "marker": "6dc219c83410ecbb73ba5cdd909f51d9d636644e", "action": "skip — unchanged since approval"},
+    {"pr": 1716, "head": "aa3e29d640dab98ccb4bf9100e186df1ca741f30", "draft": false, "last_review": "APPROVED", "marker": "758d2d7007c8af2d4fad42e8926a484c87868504", "action": "head moved past approval — review delta"},
+    {"pr": 1709, "head": "da2e90863472ad7974f3a9a6e7540d5639856d15", "draft": true, "last_review": "COMMENTED", "marker": "fb01c968f4453d25cba076505a6f09a4e5cfe4f7", "action": "head moved — review delta; two old findings may still stand"}
+  ],
+  "merged_this_session": [1708, 1710, 1711, 1712, 1713, 1714, 1715, 1699],
+  "open_findings": {
+    "1719": [
+      "ESLint rule names no-inline-type-cast / no-unknown-jsdoc-tag do not exist anywhere; todo/eslint.md:101 describes them in prose and names none",
+      "Neither count reproduces: '169 @template uses' measures 191 in *.f.mjs / 227 tree-wide; '1318 of 3772 JSDoc type bodies' measures 1346 of 3297",
+      "edag-spec.md described as already generating Rust; it is Status: open with 8 unchecked tasks, 0 checked",
+      "inline-type-casts.md listed as 'stands unchanged'; its header says 'implemented — 273 of 357 removed or converted; 84 remain'",
+      "Three sibling issues omitted: checked-const-pin.md (IS the epic's open question 3), identity-aware-parse.md (P2, validate exponential in sharing depth), excluded-string-values.md",
+      "Line 1040 'Nothing past stage 2 starts without fjs/fsc/todo/47.md' — stage 3 is tokenizer recognition plus binding resolution and needs no meta-programming; stage 4 is where 47 is cited. Line 878 has stage 10 'can start as soon as stage 5' under a list headed 'Ordered.'",
+      "spec/todo/3370-type-inference.md untouched on three counts: line 6 still says 'named by an ordinary expression'; its ### Related is an h3 among ## siblings; it is an enum Type bit-set lattice never mentioning RTTI or subset, so labelling it stage 6 leaves the reconciliation unowned",
+      "Introduced by the PR: line 1055 says 'Open question 6 is where the two meet' but ce74196de inserted a new question 6 and pushed that to 7"
+    ],
+    "1723": [
+      "js128-not-js caveat is wrong at the pinned nixpkgs commit — spidermonkey/common.nix:173-178 has an unconditional preFixup symlinking plain js; the code block it 'corrects' was already right",
+      "Task 1 points at fjs/ci/nix/module.f.mjs, which only serializes; declarations live in fjs/ci/node/module.f.mjs:105 and are aggregated at fjs/ci/module.f.mjs:45",
+      "'The only runner for those operations' overlooks fjs/effects/node/virtual/module.f.mjs — a complete node:-free runner for that exact operation set, which weakens the argument about writing a second host runner from scratch"
+    ],
+    "1722": [
+      "BLOCKING: PR body has no Changelog: section at all",
+      "BLOCKING: re-anchoring instruction wrong — from a subdirectory file ../types/object resolves to nonexistent fjs/rtti/types/object; correct form is ../../types/object. Also undercounts 51 vs actual 58 escaping imports in 16 files (misses 7 single-../ escapes in root files)",
+      "'All 49 references' is actually 64 import lines in 30 files",
+      "types/list 33 / types/object 31 / types/result 28 do not reproduce under any counting tried",
+      "'Historical changelog/ entries… leave them' mis-covers changelog/unreleased/ — 7 of 16 are unreleased",
+      "Live epic todo/rtti-type-system.md (#1719, 32 rtti path references) is not acknowledged by either PR"
+    ],
+    "1721": [
+      "PR body Changelog: bullet does not match the entry file (body adds 'the' and 'combinator')"
+    ],
+    "1717": [
+      "Changelog: none is glued to the tail of a prose sentence inside ### Testing rather than being its own section"
+    ]
+  },
+  "blockers": [
+    {"description": "Machine sleep repeatedly killed subagents mid-run (~8 deaths in one hour). Root cause identified: agents died inside long advisor() calls.", "type": "external", "workaround": "Brief every review subagent with an explicit 'do NOT call an advisor, do NOT spawn sub-agents' rule, and order the checks by priority with 'report as soon as you have answers to the first N'."},
+    {"description": "PR heads move every few minutes; several moved twice during a single review.", "type": "external", "workaround": "Tell the agent not to chase heads — finish measurements, re-read head once with gh pr view before reporting, and state which SHA the findings are against."}
+  ],
+  "human_actions_pending": [],
+  "decisions": [
+    {"decision": "Did NOT overwrite .planning/.continue-here.md or .planning/HANDOFF.json", "rationale": "They record a still-valid awaiting-owner state for the finance milestone, a different work stream this session did not touch. Overwriting would destroy live state to record unrelated work.", "phase": "none"},
+    {"decision": "Disagreed with a subagent's APPROVE on #1719 and posted COMMENT instead", "rationale": "Two big findings were fixed well, but seven factual errors remained in a document whose entire purpose is to be an accurate map. For an epic, a wrong citation is the defect, not a nit.", "phase": "none"},
+    {"decision": "Narrow, priority-ordered subagent briefs instead of broad ones", "rationale": "Broad briefs died to machine sleep before reaching a substantive conclusion. Narrow ones reach a verdict in the first third of the work.", "phase": "none"}
+  ],
+  "uncommitted_files": [],
+  "next_action": "Run the loop: list open PRs, compare each head against its reviewed-head marker (reviews API WITH --paginate), and dispatch one narrow subagent per changed PR. #1724 is new and unreviewed; #1720, #1716, #1719, #1723 and #1709 all moved past their markers; #1722 and #1721 are silent; #1717 is unchanged since approval.",
+  "context_notes": "Standing method that produced every real finding this session: never read-and-agree. Reproduce the claim, and for any proof change run the mutation on BOTH base and head — a mutation killed at base but surviving at head is the headline finding. For docs-only PRs the analysis IS the deliverable, so every citation, count and line range gets verified against the tree. Two traps hit repeatedly: git log --all sweeps fetched PR refs so 'already used' claims must be checked against origin/main; and stale .d.mts/.d.ts shadow sources, so purge them (pruning node_modules, which may be a symlink into the shared clone) before any tsc probe."
+}
