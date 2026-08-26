@@ -1241,7 +1241,7 @@ is deferred, so three phases remain, and two reasons override the numeric defaul
 fjs/todo/implement-mcp-server.md, and the research corpus. Milestones are `todo/plan.md`'s
 weeks and keep its names; Week 0 is research's addition.*
 
-**── Milestone v4: Verified With the Taxpayer Present ──**
+## Milestone v4: Verified With the Taxpayer Present
 
 **Why these three sit here and not in v3.** v3 asked "can this be trusted without a filed return",
 and Phase 33 answered it: 27 of 51 external cases matched under the strict criterion, both

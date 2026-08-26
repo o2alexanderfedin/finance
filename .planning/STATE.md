@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v4
 milestone_name: Verified With the Taxpayer Present
-status: awaiting_owner
-stopped_at: "The accountant demo shipped 2026-08-21 as five merged PRs (#124-#128) and IS NOT IN THIS PLANNING SYSTEM -- no requirement ID, no roadmap row, no phase directory; a grep of .planning/ for entry.html, IndexedDB, ui-tests, form_model, subjectKey and FORM-KEY returns nothing. What shipped: hand entry in the browser with forms GENERATED from each dialect's own rtti, IndexedDB as CAS+Evo with the engine staying client-side, 31 Playwright tests in a separate npm package, a measured colour-blind-safe palette, and per-dialect subjectKey with identity fields renamed to what the printed form calls them. Upstream functionalscript#1649 (the spawn effect note) was approved and merged by sergey-shandar 2026-08-21 after six review rounds, 15 findings, three answered with a remedy different from the one proposed. Milestone v4's three phases are unchanged and still blocked on the owner: 34 wants the taxpayer's documents and a second filer, 35 wants a PDF-dependency decision, 36 wants a real client session. Measured on 53afa02 2026-08-23: suite 3290/3290, 3242 proof leaves, 31 browser tests, coverage 99.18/93.18/99.45, 127/127 requirements, 34 of 37 roadmap phases."
+status: paused
+stopped_at: The accountant demo has shipped ten PRs (124-133) with no requirement ID, no roadmap row and no phase directory; milestone v4's phases 34, 35 and 36 stay blocked on the owner. Nothing is in flight.
 last_updated: "2026-08-24T02:13:35.000Z"
-last_activity: 2026-08-23
+last_activity: 2026-08-25
 progress:
   total_phases: 37
   completed_phases: 34
-  total_plans: 89
-  completed_plans: 85
+  total_plans: 88
+  completed_plans: 88
   percent: 92
 ---
 
@@ -41,6 +41,48 @@ owner … nothing is in flight" until 2026-08-23 — technically true of the ROA
 false about the project, because five PRs of product work had shipped in the meantime and no
 planning file mentioned any of it. **"Nothing is in flight" is the most dangerous sentence in this
 file: it is what a stale document says whether or not it is true.**)*
+
+## Session
+
+Status: paused — awaiting owner decisions on phases 34, 35 and 36
+Stopped at: The accountant demo has shipped ten PRs (124-133) with no requirement ID, no roadmap row and no phase directory; milestone v4's phases 34, 35 and 36 stay blocked on the owner. Nothing is in flight.
+Progress: [█████████░] 92%
+Last activity: 2026-08-25
+
+*(92% is 34 of 37 roadmap phases, milestone v4. The percentage on that line is the one
+field here a tool overwrites — see below.)*
+
+**These four lines are written for the tool, and they must stay the first of their kind in this
+file.** `gsd-sdk` rebuilds the frontmatter above out of *this body* on every write —
+`buildStateFrontmatter` in `~/.claude/get-shit-done/bin/lib/state.cjs` takes the **first**
+`Status:`, `Stopped at:`, `Progress:` and `Last activity:` line it can find, and until 2026-08-25
+the first of each lived in the archival block 150 lines below. So every `gsd-*` command quietly
+restamped the header with Phase 18's state from 2026-08-19: `status: verifying` (from the word
+*VERIFICATION* in a 2026-08-14 sentence), `stopped_at: Phase 18 planned, zero plans executed`, and
+`last_activity` walking **backwards**. It was caught and hand-reverted twice before anyone went
+looking for the cause; the cause was never a hook — hooks only read this file. Put another
+`Status:`, `Stopped at:`, `Progress:` or `Last activity:` line above these and the damage resumes.
+
+**`completed_phases` is a different quantity than its name suggests, and this was already
+established** — `v4-MILESTONE-AUDIT.md` F-02, 2026-08-20: it counts phase directories holding a
+SUMMARY, and phases 1-33 largely shipped without a directory at all. That audit's ruling was
+**"should not be reconciled"**, and it stands. Two things are new. The audit read **17**; the tool
+now writes **16**, because its rule tightened from *has a SUMMARY* to *has plans and at least as
+many summaries as plans* — of 18 directories, 17 satisfy the first and 16 the second. And the
+divergence is no longer a reading to interpret but an **overwrite to recognise**: a sync puts
+`16 of 38` and `percent: 42` straight over the measured `34 of 37` and `92`. The roadmap is the
+ledger; the directory listing is not:
+
+```sh
+grep -cE '^- \[x\] \*\*Phase [0-9]+' .planning/ROADMAP.md   # 34 complete — Phase 12 is listed twice
+grep -cE '^- \[ \] \*\*Phase [0-9]+' .planning/ROADMAP.md   # 3 open — 34, 35, 36
+grep -cE '^### Phase [0-9]+' .planning/ROADMAP.md            # 38 headings, 37 phases: 12 and 12.1
+find .planning/phases -name '*-PLAN.md' | wc -l              # 88 — here the tool is right
+```
+
+**If this file ever reads `42%`, a tool wrote it and no one measured anything.** The plan counts
+were the reverse case and are now corrected: the header claimed `89` planned and `85` done, disk
+says **88 and 88**, and disk is checkable.
 
 ## Current Position
 
