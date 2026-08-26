@@ -7,11 +7,11 @@ stopped_at: The accountant demo has shipped ten PRs (124-133) with no requiremen
 last_updated: "2026-08-24T02:13:35.000Z"
 last_activity: 2026-08-25
 progress:
-  total_phases: 37
+  total_phases: 38
   completed_phases: 34
   total_plans: 88
   completed_plans: 88
-  percent: 92
+  percent: 89
 ---
 
 # Project State
@@ -46,43 +46,60 @@ file: it is what a stale document says whether or not it is true.**)*
 
 Status: paused — awaiting owner decisions on phases 34, 35 and 36
 Stopped at: The accountant demo has shipped ten PRs (124-133) with no requirement ID, no roadmap row and no phase directory; milestone v4's phases 34, 35 and 36 stay blocked on the owner. Nothing is in flight.
-Progress: [█████████░] 92%
+Progress: [█████████░] 89%
 Last activity: 2026-08-25
 
-*(92% is 34 of 37 roadmap phases, milestone v4. The percentage on that line is the one
-field here a tool overwrites — see below.)*
+*(89% is 34 of 38 roadmap phases, milestone v4.)*
 
 **These four lines are written for the tool, and they must stay the first of their kind in this
 file.** `gsd-sdk` rebuilds the frontmatter above out of *this body* on every write —
-`buildStateFrontmatter` in `~/.claude/get-shit-done/bin/lib/state.cjs` takes the **first**
-`Status:`, `Stopped at:`, `Progress:` and `Last activity:` line it can find, and until 2026-08-25
-the first of each lived in the archival block 150 lines below. So every `gsd-*` command quietly
-restamped the header with Phase 18's state from 2026-08-19: `status: verifying` (from the word
-*VERIFICATION* in a 2026-08-14 sentence), `stopped_at: Phase 18 planned, zero plans executed`, and
-`last_activity` walking **backwards**. It was caught and hand-reverted twice before anyone went
-looking for the cause; the cause was never a hook — hooks only read this file. Put another
-`Status:`, `Stopped at:`, `Progress:` or `Last activity:` line above these and the damage resumes.
+`buildStateFrontmatter` takes the **first** `Status:`, `Stopped at:`, `Progress:` and
+`Last activity:` line it can find, and until 2026-08-25 the first of each lived in the archival
+block 150 lines below. So every `gsd-*` command quietly restamped the header with Phase 18's state
+from 2026-08-19: `status: verifying` (from the word *VERIFICATION* in a 2026-08-14 sentence),
+`stopped_at: Phase 18 planned, zero plans executed`, and `last_activity` walking **backwards**. It
+was caught and hand-reverted twice before anyone went looking for the cause; the cause was never a
+hook — hooks only read this file. Put another `Status:`, `Stopped at:`, `Progress:` or
+`Last activity:` line above these and the damage resumes.
 
-**`completed_phases` is a different quantity than its name suggests, and this was already
-established** — `v4-MILESTONE-AUDIT.md` F-02, 2026-08-20: it counts phase directories holding a
-SUMMARY, and phases 1-33 largely shipped without a directory at all. That audit's ruling was
-**"should not be reconciled"**, and it stands. Two things are new. The audit read **17**; the tool
-now writes **16**, because its rule tightened from *has a SUMMARY* to *has plans and at least as
-many summaries as plans* — of 18 directories, 17 satisfy the first and 16 the second. And the
-divergence is no longer a reading to interpret but an **overwrite to recognise**: a sync puts
-`16 of 38` and `percent: 42` straight over the measured `34 of 37` and `92`. The roadmap is the
-ledger; the directory listing is not:
+**The tool was repaired on 2026-08-25 and this section is now a record, not a warning.** Five
+defects in `~/.claude/get-shit-done/bin/lib/` were reproduced and fixed, with 17 regression tests
+at `~/.claude/tests/gsd-state.test.cjs` and the diffs kept under
+`~/.claude/gsd-local-patches/state-md-corruption/`. Two of the five were silent data loss: a body
+write matched the frontmatter key of the same name case-insensitively — `Progress` hit `progress:`,
+the parent of a nested block, and **deleted `total_phases` by consuming the following line** —
+while `Status` edited the header and left the body stale so the next resync copied the stale body
+back. Run the tests after any GSD update; a reapplied patch that lost a hunk is the expected way
+this returns.
+
+**`completed_phases` used to be a different quantity than its name suggests, and now is not.**
+`v4-MILESTONE-AUDIT.md` F-02 (2026-08-20) ruled that the divergence "should not be reconciled",
+because the field counted phase directories holding a SUMMARY and phases 1-33 largely shipped
+without a directory at all — 16 of 38 against a measured 34. **That ruling is discharged.** The
+field now reads the roadmap's checkbox ledger, which is what the audit said the truth was, so
+there is no longer a second number to refuse to reconcile.
+
+**Two of this file's own figures were wrong, and the repaired tool is what found them.**
+
+| | said | is | why |
+|---|---|---|---|
+| `total_phases` | 37 | **38** | `12` and `12.1` are two phases, not one — `12.1` has its own roadmap row *and* its own phase directory |
+| `percent` | 92 | **89** | 34 of 38, not 34 of 37 |
+
+The claim "Phase 12 is listed twice" that produced the 37 was an artifact of the command used to
+check it: `grep -oE 'Phase [0-9]+'` reads `Phase 12.1` as `12`, so a distinct phase looked like a
+duplicate row. Counted with the decimal, there are **no duplicate rows at all**:
 
 ```sh
-grep -cE '^- \[x\] \*\*Phase [0-9]+' .planning/ROADMAP.md   # 34 complete — Phase 12 is listed twice
-grep -cE '^- \[ \] \*\*Phase [0-9]+' .planning/ROADMAP.md   # 3 open — 34, 35, 36
-grep -cE '^### Phase [0-9]+' .planning/ROADMAP.md            # 38 headings, 37 phases: 12 and 12.1
-find .planning/phases -name '*-PLAN.md' | wc -l              # 88 — here the tool is right
+ID='\*\*Phase [0-9]+(\.[0-9]+)?'
+grep -oE "^- \[x\] $ID" .planning/ROADMAP.md | grep -oE '[0-9.]+$' | sort -uV | wc -l   # 34 complete
+grep -oE "^- \[ \] $ID" .planning/ROADMAP.md | grep -oE '[0-9.]+$' | sort -uV | wc -l   # 3 open — 34, 35, 36
+grep -oE "^- \[.\] $ID" .planning/ROADMAP.md | grep -oE '[0-9.]+$' | sort -uV | wc -l   # 38 total, incl. moved Phase 14
+find .planning/phases -name '*-PLAN.md' | wc -l                                       # 88 — here the tool was always right
 ```
 
-**If this file ever reads `42%`, a tool wrote it and no one measured anything.** The plan counts
-were the reverse case and are now corrected: the header claimed `89` planned and `85` done, disk
-says **88 and 88**, and disk is checkable.
+The plan counts were the reverse case and were corrected on 2026-08-25: the header claimed `89`
+planned and `85` done against **88 and 88** on disk, and disk is checkable.
 
 ## Current Position
 
@@ -113,7 +130,7 @@ one was a whole capability that the planning system could not see.
 | Browser tests | **46**, `ui-tests` package, Playwright/chromium — invisible to `npm test`; the paced walkthrough is excluded from those 46 in turn |
 | Engine coverage | 99.18 lines / 93.16 branches / 99.45 functions, gated in CI |
 | Dialects | **30 registered, 29 enterable** (`vnd.fjs.ocr` is not hand-enterable), **28 declare a `subjectKey`** |
-| Roadmap phases | 34 of 37 — the demo work is none of them |
+| Roadmap phases | **34 of 38** — the demo work is none of them; `12.1` is its own phase |
 
 *(Branches read 93.18 on `53afa02` two days earlier. The 0.02 is PR #132's acronym fix in
 `fjs/document/form_model`, not this change — which is why it was re-measured rather than carried
