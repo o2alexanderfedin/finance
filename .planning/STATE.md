@@ -171,10 +171,24 @@ cover the winner's sibling as well as the loser's pair). The Deno `--allow-run` 
 back as a spec obligation rather than a unilateral change to his CI posture, and he merged it in
 that form.
 
-**What this costs, stated plainly:** `REQUIREMENTS.md` reads 127/127 complete, which is true and now
-*understates* the system. The ledger describes the engine; the accountant-facing product it has
-acquired is invisible to it. Giving the five PRs above requirement IDs and roadmap rows is the
-cheapest open task in the project and the one blocking an honest answer to "what is done?".
+**What this costs, stated plainly:** the ledger describes the engine; the accountant-facing
+product it has acquired is largely invisible to it.
+
+**Closed on 2026-08-25, in part.** `FORM-KEY-01` and `FORM-KEY-02` are registered — the two IDs
+the code had actually coined, cited 65 times across 36 files while `REQUIREMENTS.md` had never
+heard of them. The reason nobody noticed is now itself a check: the citation gate scanned ten
+hand-typed prefixes and the test guarding that list compared it against `REQUIREMENTS.md`, where
+the prefix was equally absent, so **both sides agreed and both were wrong**. A prefix living only
+in the code was invisible to a check that asks the code and the document whether they match.
+`planning-truth-gate.test.js` now classifies every ID-shaped prefix in the tree as a requirement
+or as a declared non-requirement, and the count is 129/129.
+
+**Still open, and it is a scope question rather than a bookkeeping one.** The rest of the demo —
+browser hand entry, generated forms, the client-side store, the `ui-tests` package, the measured
+palette, demo mode — coined no IDs at all, so there is nothing to retrofit and something to
+*decide*: whether these become a requirement category of their own (a `UI-*` block) or stay
+product work the requirement set deliberately does not cover. That is the owner's call, not an
+agent's, and it is the same call `v4-MILESTONE-AUDIT.md` F-01 left open for phases 34-36.
 
 ## Earlier milestones
 

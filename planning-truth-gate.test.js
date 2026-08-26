@@ -101,14 +101,29 @@ const repoRoot = fileURLToPath(new URL('.', import.meta.url))
 const planningDir = join(repoRoot, '.planning')
 const requirementsPath = join(planningDir, 'REQUIREMENTS.md')
 
-/** `- [x] **MAINT-07** *(T3)*: ...` -- the body statement of a requirement. */
-const bodyPattern = /^- \[([x ])\] \*\*([A-Z]+-[0-9]+)\*\*/
+/**
+ * `- [x] **MAINT-07** *(T3)*: ...` -- the body statement of a requirement.
+ *
+ * `(?:-[A-Z]+)*` admits a **hyphenated prefix**. Every ID here was one word
+ * until `FORM-KEY-01` and `FORM-KEY-02` were coined in code on 2026-08-21;
+ * this pattern could not have parsed them, so registering them was not a
+ * matter of typing two lines into REQUIREMENTS.md -- the parser had to learn
+ * the shape first.
+ */
+const bodyPattern = /^- \[([x ])\] \*\*([A-Z]+(?:-[A-Z]+)*-[0-9]+)\*\*/
 
 /** `| MAINT-07 | T3 | Phase 18 ... | Complete | Verified |` -- one ID per row. */
-const singleRowPattern = /^\| *([A-Z]+-[0-9]+) *\|/
+const singleRowPattern = /^\| *([A-Z]+(?:-[A-Z]+)*-[0-9]+) *\|/
 
 /** `| DOC-22, DOC-23, TAX-33, TAX-34 | T3 | 29 - ... |` -- the v2 grouped form. */
-const groupedRowPattern = /^\| *((?:[A-Z]+-[0-9]+)(?:, *[A-Z]+-[0-9]+)+) *\|/
+const groupedRowPattern = /^\| *((?:[A-Z]+(?:-[A-Z]+)*-[0-9]+)(?:, *[A-Z]+(?:-[A-Z]+)*-[0-9]+)+) *\|/
+
+/**
+ * `FORM-KEY-01` splits at its LAST hyphen, not its first. Every other prefix
+ * in this file is a single word and would not notice the difference; this one
+ * is why the distinction is written down.
+ */
+const prefixOf = token => token.slice(0, token.lastIndexOf('-'))
 
 /**
  * The only value in the Status column that means "not done". Everything else
@@ -237,11 +252,15 @@ const claimsIn = (text, pattern) => [...text.matchAll(pattern)].map(m => Number(
  * either way; the order makes that not need checking.
  */
 const requirementPrefixes = [
-    'DOCC', 'MAINT', 'EXACT', 'EXEC', 'PROV', 'TEST', 'TAX', 'DOC', 'MCP', 'SEC',
+    'DOCC', 'FORM-KEY', 'MAINT', 'EXACT', 'EXEC', 'PROV', 'TEST', 'TAX', 'DOC', 'MCP', 'SEC',
 ]
 
-/** Hand-typed beside the list above, per AGENTS.md. */
-const expectedRequirementPrefixCount = 10
+/**
+ * Hand-typed beside the list above, per AGENTS.md. **Ten until 2026-08-25**,
+ * when `FORM-KEY` was admitted -- the first hyphenated prefix, and the first
+ * that had been cited 65 times before this list heard of it.
+ */
+const expectedRequirementPrefixCount = 11
 
 /**
  * **What counts as a citation**, stated rather than left to the regex: one of
@@ -439,10 +458,79 @@ test('every requirement ID cited in the tree has a body in REQUIREMENTS.md', () 
 
 test('the hand-typed citation prefixes are exactly the ones REQUIREMENTS.md uses', () => {
     const { body } = parseRequirements()
-    const used = [...new Set([...body.keys()].map(id => id.slice(0, id.indexOf('-'))))].sort()
+    const used = [...new Set([...body.keys()].map(prefixOf))].sort()
     assert.deepEqual(used, [...requirementPrefixes].sort(),
         'REQUIREMENTS.md uses a prefix this gate does not scan for, or vice versa')
     assert.equal(requirementPrefixes.length, expectedRequirementPrefixCount)
+})
+
+/**
+ * ID-shaped tokens this tree uses for something OTHER than a requirement.
+ * **Hand-typed, and keyed on the PREFIX rather than the token**, so a new
+ * fixture account number (`ACC-0009`) needs no edit here while a genuinely new
+ * prefix has to be admitted on purpose -- the same bargain
+ * `requirementPrefixes` strikes, applied to the other side of the line.
+ *
+ * Five groups, none of them a claim about this project's scope:
+ *
+ * - **Printed forms and IRS tables** -- `W-2`, `K-1`, `SSA-1099`, `RRB-1099`,
+ *   `CCC-1099-G`, and Publication 946's Table `A-14`.
+ * - **Standards** -- `SHA-256`, `UTF-8`, `PDF-1.7`.
+ * - **Finding IDs inside phase reports** -- `F-02` and `I-01` in
+ *   `v4-MILESTONE-AUDIT.md`, `C-3` in `13-VALIDATION.md`, `IN-02` in
+ *   `13-REVIEW.md`, `CR-01` and `WR-05` in the schedule reviews, and `T-13-06`
+ *   naming a test case.
+ * - **Fixture identifiers** -- the account, policy, loan and share numbers
+ *   invented for test documents, which is most of this list.
+ * - **This gate's own controls** -- `FAKE` and `SUBTAX`, assembled by
+ *   concatenation elsewhere in this file so they do not read as citations, and
+ *   declared here because the literals still occur in the scanned text.
+ *
+ * **Why this list exists.** `FORM-KEY-01` and `FORM-KEY-02` were coined in
+ * code on 2026-08-21 and cited 65 times across 36 files while REQUIREMENTS.md
+ * had never heard of them, and **neither existing check could see it**.
+ * `citationPattern` scans for the ten known prefixes only, so the citations
+ * were never read; and the vocabulary test above compares that whitelist
+ * against REQUIREMENTS.md, where the prefix was equally absent. **Both sides
+ * agreed with each other, and both were wrong.** A prefix that lives only in
+ * the code is invisible to a check that asks the code and the document whether
+ * they match -- which is the hole this test closes, in the one direction the
+ * other two cannot look.
+ */
+const nonRequirementPrefixes = [
+    'A', 'ACC', 'ACC-CONSOLIDATED', 'ACC-SWEEP', 'ACC-UNRELATED', 'BUS', 'C', 'CCC', 'CD',
+    'CLAIM', 'CLIENT', 'CR', 'EDD', 'F', 'FAKE', 'FARM', 'I', 'IN', 'IRA', 'K', 'LOAN', 'NY',
+    'PDF', 'PENSION', 'PLAN', 'POLICY', 'POLICY-TWIN', 'POSTU', 'PTR', 'RENT', 'ROTH', 'ROY',
+    'RRB', 'SAV', 'SHA', 'SHR', 'SSA', 'STU', 'SUBTAX', 'T', 'TRE', 'UTF', 'W', 'WR',
+]
+
+/** Hand-typed beside the list above, per AGENTS.md. */
+const expectedNonRequirementPrefixCount = 44
+
+/**
+ * Every ID-shaped token, whatever its prefix -- deliberately unconstrained,
+ * because a constrained pattern is exactly what missed `FORM-KEY`.
+ */
+const idShapedPattern = /(?<![\w-])[A-Z][A-Z-]*-[0-9]+(?![\w])/g
+
+test('every ID-shaped prefix in the tree is a requirement prefix or a declared non-requirement', () => {
+    const sources = citingSources()
+    assert.ok(
+        sources.length >= minimumCitingSourceCount,
+        `only ${sources.length} files scanned -- the walk has broken, and an empty set passes everything`)
+    const classified = new Set([...requirementPrefixes, ...nonRequirementPrefixes])
+    const firstSeen = new Map()
+    for (const { name, text } of sources) {
+        for (const token of text.match(idShapedPattern) ?? []) {
+            const prefix = prefixOf(token)
+            if (classified.has(prefix) || firstSeen.has(prefix)) { continue }
+            firstSeen.set(prefix, `${token} in ${name}`)
+        }
+    }
+    const unknown = [...firstSeen].map(([prefix, where]) => `${prefix} (first seen as ${where})`).sort()
+    assert.deepEqual(unknown, [],
+        `ID-shaped prefixes that are neither a requirement nor declared not to be: ${unknown.join('; ')}`)
+    assert.equal(nonRequirementPrefixes.length, expectedNonRequirementPrefixCount)
 })
 
 test('every documented MCP tool count equals what the server actually serves', () => {
