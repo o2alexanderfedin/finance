@@ -1071,13 +1071,21 @@ All five are closed with fixtures that assert the wrong answer beside the right 
 ### Phase 30: Pass-Through Income
 **Requirements**: DOC-24 (K-1, two dialects — 1065 and 1120-S box numbering differs), TAX-35 (Schedule E) · **Tier**: T3
 
-> **The seven sections below carry no prose of their own, deliberately.** Each phase's record is
+> **The eleven sections below carry no prose of their own, deliberately.** Each phase's record is
 > its entry in the phase list above; duplicating it here would create a second source of truth for
 > the same fact, which this file has been bitten by before. They exist because **anything that
-> reads `### Phase N` sections could not see these phases at all** — `gsd-sdk query
-> roadmap.analyze` reported 31 phases ending at 30 while the list above carries 38 entries, so the
-> three phases of the CURRENT milestone were invisible to the tooling meant to audit them. Found by
-> `/gsd-audit-milestone` on 2026-08-20.
+> reads `### Phase N` sections could not see these phases at all** — on 2026-08-20 `gsd-sdk query
+> roadmap.analyze` reported 31 phases ending at 30 against a list of 38 entries, so the three
+> phases of what was then the current milestone were invisible to the tooling meant to audit them.
+> Found by `/gsd-audit-milestone` that day.
+>
+> **The defect is still live, and re-measured on 2026-08-27** rather than assumed fixed: with
+> STATE.md at v5, `roadmap.analyze` reports `phase_count: 0` and lists all seven v5 phases as
+> missing details. It scopes its read to the current milestone's slice, and the `### Phase N`
+> headers do not live there. Against a checkout with no STATE.md the same file reports 42 phases,
+> so the entries parse — the scoping is what blinds it. Duplicating the headers inside each
+> milestone section would satisfy the tool and create exactly the second source of truth this note
+> opens by refusing, so it stays unfixed here and belongs upstream in the SDK.
 
 ### Phase 31: Gap Closure — Form 8995-A, Form 8606 Part II, and the OCR island
 **Requirements**: TAX-32, TAX-29, MAINT-01 · **Tier**: T3 · **Status**: complete 2026-08-17 · record: the phase list above
@@ -1089,16 +1097,28 @@ All five are closed with fixtures that assert the wrong answer beside the right 
 **Requirements**: none mapped · **Tier**: T1 · **Status**: complete 2026-08-19 · record: `.planning/reports/taxcalcbench-33.md`
 
 ### Phase 34: Second-Implementation Cross-Check
-**Requirements**: none mapped · **Tier**: T1 · **Status**: not started — milestone v4, blocked on the owner's documents and an account at a second filer
+**Requirements**: none mapped · **Tier**: T1 · **Status**: not started — milestone v5, blocked on the owner's documents and an account at a second filer
 
 ### Phase 35: A Filable Artifact — fill the official `f1040.pdf`
-**Requirements**: none mapped · **Tier**: T1 · **Status**: not started — milestone v4, blocked on one dependency approval (`@cantoo/pdf-lib`); research complete in the phase list above
+**Requirements**: none mapped · **Tier**: T1 · **Status**: not started — milestone v5, blocked on one dependency approval (`@cantoo/pdf-lib`); research complete in the phase list above
 
 ### Phase 36: The Conversational Path
-**Requirements**: none mapped · **Tier**: T1 · **Status**: not started — milestone v4, blocked on a real client session with real documents
+**Requirements**: none mapped · **Tier**: T1 · **Status**: not started — milestone v5, blocked on a real client session with real documents
 
 ### Phase 37: FunctionalScript 0.46.1
 **Requirements**: MAINT-06 (intent) · **Tier**: T3 · **Status**: complete 2026-08-19 · record: `.planning/reports/fjs-0.46.1-migration.md`
+
+### Phase 38: Take FunctionalScript 0.47.0
+**Requirements**: MAINT-09 · **Tier**: T3 · **Status**: not started — milestone v5
+
+### Phase 39: Retire the Protocol-Version Gap
+**Requirements**: MAINT-10 · **Tier**: T3 · **Status**: not started — milestone v5
+
+### Phase 40: Validation on the Write Path
+**Requirements**: DOC-25 · **Tier**: T3 · **Status**: not started — milestone v5, after Phase 38
+
+### Phase 41: New Capabilities and the Migration Report
+**Requirements**: MAINT-11, MAINT-12, MAINT-13 · **Tier**: T3 · **Status**: not started — milestone v5
 
 ---
 
@@ -1156,10 +1176,14 @@ is deferred, so three phases remain, and two reasons override the numeric defaul
 | 31. Gap Closure — 8995-A, 8606 Part II, OCR island | v2 | 0/0 — no plans were written | Complete (TAX-32, TAX-29, MAINT-01) | 2026-08-17 |
 | 32. Gap Closure — Earned Income Credit | v2 | 0/0 — no plans were written | Complete (TAX-27) | 2026-08-17 |
 | 33. External Validation Without a Filed Return | v3 | 0/0 — no plans written | Complete; 27/20/2, one defect fixed | 2026-08-19 · PR #113 |
-| 34. Second-Implementation Cross-Check | **v4** | 0/TBD | Not started | - |
-| 35. A Filable Artifact (fill the official PDF) | **v4** | 0/TBD | CSS half shipped; PDF half blocked on a dependency decision | - |
-| 36. The Conversational Path | **v4** | 0/TBD | Not started | - |
+| 34. Second-Implementation Cross-Check | **v5** | 0/TBD | Not started | - |
+| 35. A Filable Artifact (fill the official PDF) | **v5** | 0/TBD | CSS half shipped; PDF half blocked on a dependency decision | - |
+| 36. The Conversational Path | **v5** | 0/TBD | Not started | - |
 | 37. FunctionalScript 0.46.1 | v3 | 0/0 — no plans written | Complete; report in `.planning/reports/` | 2026-08-19 · PR #98/#99/#100 |
+| 38. Take FunctionalScript 0.47.0 | **v5** | 0/TBD | Not started; measured green in a worktree 2026-08-27 (`tsc` 0, 3294/3294, ui-tests 46/46) | - |
+| 39. Retire the Protocol-Version Gap | **v5** | 0/TBD | Not started; needs 38 | - |
+| 40. Validation on the Write Path | **v5** | 0/TBD | Not started; needs 38 | - |
+| 41. New Capabilities and the Migration Report | **v5** | 0/TBD | Not started; last of the four | - |
 
 > **The nine stale milestone-v2 rows were retro-filled on 2026-08-17, from measurement.** They
 > had read `0/TBD | Not started` for work that was in `develop`: phases 21 through 29 all
@@ -1265,6 +1289,149 @@ What the work *does* now have is a requirement entry where it coined one — `FO
 `FORM-KEY-02`, registered 2026-08-25 in REQUIREMENTS.md's v3 section. The rest coined no IDs, and
 whether it becomes a `UI-*` category is a scope decision for the owner rather than an agent.
 
+**The three ledger rows for Phases 34, 35 and 36 now sit under Milestone v5 below**, carried
+forward at their original numbers with their bodies unchanged. They moved on 2026-08-27 when v5
+opened; nothing else in this section moved with them, and the note below still describes them.
+
+> **None of these is blocked on engineering.** Phase 34 needs the owner's documents and an account
+> at a second filer; Phase 36 needs a real client session with real documents, and running it on
+> fixtures would prove the pipe is connected while proving nothing the phase exists for; Phase 35's
+> CSS half is shipped and its remaining half is a dependency decision, not a task.
+
+## Milestone v5: A Current Engine and a Filable Return
+
+**Why these seven sit together.** Four are the consumer's side of one release. `functionalscript`
+0.47.0 shipped 2026-08-27T05:57Z carrying 40 changelog entries, 15 of them BREAKING, across 143
+changed files, and **exactly two of them reach this repository**. Taking it is not maintenance for
+its own sake: the vocabulary that would let a dialect state what it accepts — `open`, `rest` —
+arrives with 0.47.0, and it decides nothing while **nothing checks a stored document against its
+dialect at all**. That hole is the second half of the milestone, and the two halves are one piece
+of work. Three more phases carry forward from v4 unchanged — the second-implementation
+cross-check, the filable `f1040.pdf`, and the conversational path. **They keep their original
+numbers.** 240 phase files, plus citations throughout REQUIREMENTS.md and this file, address them
+as 34, 35 and 36; renumbering them into a tidy v5 sequence is the same lie the v4 section above
+already refused for the accountant demo.
+
+**Execution order: 38 → 39 → 40 → 41, then 34, 35 and 36 whenever the owner unblocks them.**
+
+**Phase 40 comes after 38, not before it**, because the write-path check is written in 0.47.0's
+`rest`/`open` vocabulary — running it first means writing it once against 0.46.1 and again after.
+And **the open-versus-closed question is only meaningful once 40 lands**: with nothing validating
+on write, closing every dialect would be nearly free and nearly pointless — it would bite
+`cas_refresh`'s read-only count report and the producers that already validate voluntarily, and
+nothing else. DOC-25 states the ordering plainly, and it is the reverse of the obvious one:
+**close the hole first, then choose.** Phase 39 also needs 38 and nothing needs 39: both the
+negotiation it retires and the two-entry `protocolVersions` list its proof requires arrive with
+0.47.0, and Phase 40 does not wait on it. The four are **T3**. The three carried forward are **T1
+and none of them is blocked on engineering**, so they are not scheduled against the four above and
+do not gate them; they run when the owner is in the room.
+
+- [ ] **Phase 38: Take FunctionalScript 0.47.0** - MAINT-09. `^0.46.1` does not admit 0.47.0 — a
+      caret on a `0.x` version pins the minor — so this is an explicit bump, not a refresh. The two
+      breaking changes that reach here are `#1732`, which makes a bare `Struct` or `Tuple` schema
+      **closed** and requires `dialectEntry` to take a schema with a stated rest, and `#1654`, which
+      replaces `McpConfig.protocolVersion` with a non-empty latest-first `protocolVersions`.
+      **Measured in a throwaway worktree on 2026-08-27, before this phase was written** — the
+      numbers below are observations that mainline must reproduce, not targets:
+
+      1. `package.json` names 0.47.0 explicitly and `tsc` reports **0** errors, from **63 errors in
+         3 files** with the bump alone.
+      2. `node --test` reports **3294/3294**, from **3286/3294** with the bump alone — all 8
+         failures sharing one root cause — and `ui-tests` reports **46/46**.
+      3. **`open()` is stated where each schema is DEFINED, not where it is registered**, and the
+         criterion is a measurement rather than a diff size. Wrapping at the `dialectEntry(...)`
+         call site satisfies the new signature and passes criteria 1 and 2 in full — it was
+         measured doing exactly that — while leaving every schema *export* closed for
+         `rttiValidate`, `toJsonSchema`, `fjs/server/finance_schema` and the demo's generated
+         forms. Upstream's `revisionSchema` is `open(...)` at its own definition under a docstring
+         reading "Do not drop the wrapper."
+
+         What decides it: **`toJsonSchema` over all 31 dialect schemas is byte-identical to
+         0.46.1's output.** The call-site form moves 47 containers, each gaining an
+         `additionalProperties`; the definition form moves none. 31 top-level and 32 nested
+         container schemas state `open`, and three const objects that resemble schemas —
+         `soldDisposal`, `sharedKeyFields`, `earnedIncomeCreditVocabularies` — are left alone as
+         fixtures and spread helpers.
+
+         **This criterion originally read "3 source files, +50 −49".** That was the call-site
+         measurement, written before anyone read how upstream wraps its own dialect, and a diff
+         size is not evidence of preserved behaviour — the smaller diff was the one that changed
+         what the server serves. Corrected 2026-08-27 with the schema comparison that settles it.
+
+      3a. **`open(c)` is a thunk, so a schema stops being a plain object**, and seventeen sites
+         here introspect one. `tsc` catches exactly one of them: `Object.keys(thunk)` is `[]` and
+         `'box1' in thunk` is `false`, both legal on any object, so
+         `assert(!('boxG' in k1SCorporationSchema))` would keep passing while testing nothing —
+         a vacuous proof, this repo's most expensive recorded defect class. All seventeen read
+         through a `declaredMembers` helper, and removing it reddens them.
+      4. **No schema is left closed and none acquires a `rest`.** A dialect that narrows in this
+         phase is a scope error: the open-versus-closed decision belongs to Phase 40, and taking it
+         here would be taking it blind.
+
+- [ ] **Phase 39: Retire the Protocol-Version Gap** - MAINT-10. 0.47.0's `initialize` echoes the
+      client's requested revision when the server supports it and counter-proposes the latest
+      supported one otherwise, so the gap `fjs/server/module.f.js` documents no longer exists. Three
+      things go with it, and one of them is a proof.
+
+      1. The docstring at lines 14-20 of `fjs/server/module.f.js`, headed "The protocol-version pin
+         is a known upstream gap, not a design choice", is gone, and `grep -rn
+         "upstream-mcp-protocol-version-negotiation" fjs` returns nothing — lines 23, 310 and 495
+         cite a note already deleted in `7244f81`, the same dangling-prose class as the submodule
+         text corrected in PR #137.
+      2. `proof.session.initializeIgnoresRequestedProtocolVersion` runs against a `protocolVersions`
+         list of **at least two** entries and tells an echo from a pin. **It passes today for the
+         wrong reason**: one entry makes the counter-proposal equal the old unconditional pin, so
+         the assertion survives the very change it was written to detect.
+      3. That proof is watched to fail — restoring the unconditional pin, or shortening the list to
+         one entry, reddens it.
+      4. Whether `financeConfig` advertises more than one revision now that it can is decided, and
+         the reason is written beside the config rather than in this roadmap.
+
+- [ ] **Phase 40: Validation on the Write Path** - DOC-25. Verified by reading production code and
+      recorded in `fjs/todo/no-dialect-validation-on-the-write-path.md`: no step between
+      `evo_add`/`cas_add` and a stored program's `route` checks a blob against its dialect. Upstream
+      `cas_add` classifies against three upstream dialects, none of them a finance one, and
+      `detectFinance` — which does carry the per-dialect semantic checks — reaches production at
+      exactly one **read-only** site.
+
+      1. A malformed `vnd.fjs.w2` is refused at store time. Today it is stored, routed, and computed
+         from, and a test asserts that it is refused rather than that a producer declined to store
+         it.
+      2. The check runs on the write path itself. Every producer calling its dialect's own
+         `validate` before storing is **a convention among callers, not an enforced invariant** — so
+         the proof stores a bad blob *without* going through any producer.
+      3. That refusal is watched to fail: removing the check reddens it.
+      4. The open-versus-closed question is decided here, now that it decides something, and the
+         decision is written where the schemas are, naming what closing costs once the hole is shut.
+
+- [ ] **Phase 41: New Capabilities and the Migration Report** - MAINT-11, MAINT-12, MAINT-13. The
+      capabilities and the report the release owes its consumer, plus the rule change the migration
+      argued for.
+
+      1. `demo/serve.sh` serves the demo out of `fjs web [root] [port]` and no longer invokes
+         `python3 -m http.server` — the functionalscript-only dependency rule reaching the one place
+         it had not.
+      2. Every other capability adopted is admitted **because it deletes something**: `path.escapes`
+         answering whether a `..` climbs above a root, which `parse` cannot; `toolResultStep` and
+         `memoryRun` in place of hand-rolled wiring in `fjs/server`. A capability that adds code
+         without removing any is not adopted here.
+      3. `.planning/reports/fjs-0.47.0-migration.md` exists in the shape of
+         `.planning/reports/fjs-0.46.1-migration.md`, which Sergey asked for by name in
+         `todo/update-fjs-0.46.0` (PR #96). **It records where the migration cost nothing as well as
+         where it cost** — a report that lists only breakage overstates the release — and it carries
+         the two findings already known: that a `git diff --stat` of 143 files predicted almost
+         nothing about the blast radius, and that Phase 39's proof was a check surviving the change
+         it guards against.
+      4. The standing authority granted on 2026-08-27 — that a gap in `functionalscript` may be
+         requested upstream directly — is written where this project's gap-handling rule lives, as
+         an **extension** of it: a gap still gets its `fjs/todo/upstream-*.md` record, nothing goes
+         silent, and that record is what the upstream request is written from.
+         `functionalscript#1645`, filed during the 0.46 migration, is named as the precedent.
+
+**Carried forward from v4 at their original numbers, bodies unchanged.** The three below map no
+requirement, which was already true in v4 and stays true; see REQUIREMENTS.md's v2 Tier-B ruling
+for why a phase without an ID is preferable to an ID invented to give it one.
+
 - [ ] **Phase 34: Second-Implementation Cross-Check** - Run the owner's own documents through a
       free commercial filer (FreeTaxUSA / IRS Free File) and through this engine, and diff line by
       line. Two independent implementations agreeing is what a prior-year return was standing in
@@ -1319,8 +1486,3 @@ whether it becomes a `UI-*` category is a scope decision for the owner rather th
 - [ ] **Phase 36: The Conversational Path** - Documents into chat, "what do I owe for 2025?",
       answer end to end with citing hashes, no code touched. This is Phase 14's criterion 2,
       unchanged and still wanted.
-
-> **None of these is blocked on engineering.** Phase 34 needs the owner's documents and an account
-> at a second filer; Phase 36 needs a real client session with real documents, and running it on
-> fixtures would prove the pipe is connected while proving nothing the phase exists for; Phase 35's
-> CSS half is shipped and its remaining half is a dependency decision, not a task.

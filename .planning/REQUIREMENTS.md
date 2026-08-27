@@ -1804,6 +1804,123 @@ subject string changed by a single byte.
 
 ---
 
+## v5 Requirements — A Current Engine and a Filable Return (MAINT, DOC)
+
+**Six IDs coined here on 2026-08-27, before any of the code exists** — the opposite of the
+Tier-B and `FORM-KEY` retrofits above, and recorded as such so the contrast is on the page.
+`functionalscript` 0.47.0 shipped 2026-08-27T05:57Z, and the upgrade was measured in a
+throwaway worktree before this section was written: the numbers below are observations, not
+targets.
+
+**Phases 34, 35 and 36 carry forward from v4 at their original numbers.** They map no
+requirement — that was already true in v4 and stays true; see this document's v2 Tier-B
+ruling for why a phase without an ID is preferable to an ID invented to give it one.
+
+- [ ] **MAINT-09** *(T3)*: **Take `functionalscript` 0.47.0.** The release carries 40
+      changelog entries, 15 of them marked BREAKING, across 143 changed files. Exactly two
+      reach this repository: `#1732`, which makes a bare `Struct` or `Tuple` schema **closed**
+      and requires `dialectEntry` to take a schema with a stated rest, and `#1654`, which
+      replaces `McpConfig.protocolVersion` with a non-empty latest-first `protocolVersions`.
+
+      **The whole compatibility fix is behaviour-preserving**: `open(c)` is documented
+      upstream as exactly the old bare form, so 31 dialect registrations and 5 nested
+      JSON-RPC response schemas state what they already relied on. Measured in a worktree on
+      2026-08-27: `tsc` **0** (from 63 errors in 3 files), `node --test` **3294/3294** (from
+      3286/3294 with the bump alone, all 8 failures sharing one root cause), `ui-tests`
+      **46/46**. Diff: 3 source files, +50 −49.
+
+      `^0.46.1` does not admit 0.47.0 — a caret on a `0.x` version pins the minor — so this
+      is an explicit bump, not a refresh.
+
+- [ ] **MAINT-10** *(T3)*: **Retire the MCP protocol-version negotiation gap.**
+      `fjs/server/module.f.js` documents its pinned version under the heading "The
+      protocol-version pin is a known upstream gap, not a design choice". **0.47.0 closes
+      that gap**: `initialize` echoes the client's requested revision when the server
+      supports it and counter-proposes the latest supported one otherwise.
+
+      Three things go with it. The docstring at lines 14–20 describes a gap that no longer
+      exists. Three lines (23, 310, 495) cite
+      `fjs/todo/upstream-mcp-protocol-version-negotiation.md`, a note already deleted in
+      `7244f81` — the same dangling-prose class as the submodule text corrected in PR #137.
+      And `proof.session.initializeIgnoresRequestedProtocolVersion` **still passes under
+      0.47.0 for the wrong reason**: `protocolVersions` holds one entry, so the
+      counter-proposal happens to equal the old unconditional pin, and the assertion survives
+      the very change it was written to detect. It needs a two-entry list before it can tell
+      the two behaviours apart.
+
+      Whether `financeConfig` should advertise more than one revision now that it can is
+      part of this requirement, not a separate one.
+
+- [ ] **DOC-25** *(T3)*: **A finance document is validated against its dialect on the write
+      path.** `fjs/todo/no-dialect-validation-on-the-write-path.md` records, verified by
+      reading production code, that no step between `evo_add`/`cas_add` and the stored
+      program's `route` checks a blob against its dialect: upstream `cas_add` classifies
+      against three upstream dialects, none of them a finance one, and `detectFinance` — which
+      does carry the per-dialect semantic checks — reaches production at exactly one
+      **read-only** site. A malformed `vnd.fjs.w2` is stored, routed, and computed from.
+
+      It has not bitten because every producer calls its dialect's own `validate` before
+      storing. **That is a convention among callers, not an enforced invariant.**
+
+      This requirement is what makes MAINT-09's open-versus-closed question decide anything.
+      With nothing validating on write, closing the dialects would be nearly free and nearly
+      pointless — it would bite only `cas_refresh`'s read-only count report and the producers
+      already validating voluntarily. **The honest ordering is the reverse of the obvious
+      one: close the hole first, then choose.**
+
+- [ ] **MAINT-11** *(T3)*: **Adopt the 0.47.0 capabilities that remove code here.** Each is
+      admitted on the ground that it deletes something, not that it is new: `fjs web [root]
+      [port]`, a hardened static server, lets `demo/serve.sh` drop `python3 -m http.server`
+      and serve the demo out of fjs itself — which is the functionalscript-only dependency
+      rule reaching the one place it had not; `path.escapes` answers whether a `..` climbs
+      above a root, which `parse` cannot; `toolResultStep` and `memoryRun` each remove
+      hand-rolled wiring in `fjs/server`.
+
+      `rest(c, r)` — a stated rest rather than the all-or-nothing of open versus closed — is
+      listed here as available, and is the tool DOC-25 may want.
+
+- [ ] **MAINT-12** *(T3)*: **A consumer-side migration report for 0.47.0**, in the shape of
+      `.planning/reports/fjs-0.46.1-migration.md`. Sergey asked for the 0.46 one explicitly
+      in `todo/update-fjs-0.46.0` (PR #96): *"an extensive, structured report on the migration
+      … whether you learned anything new and how you adapted to the project, as well as what
+      the main challenges were."* It is the consumer's side of a release, and the thing a
+      library author cannot see from where the library is authored.
+
+      **It must record what this migration actually cost, including where it cost nothing** —
+      a report that only lists breakage overstates the release. Two findings already belong
+      in it: that a `git diff --stat` of 143 files predicted almost nothing about the blast
+      radius, and that the failing proof in MAINT-10 is a check surviving the change it
+      guards against.
+
+- [ ] **MAINT-13** *(T3)*: **An fjs gap may be taken upstream directly.** Standing authority
+      granted by the owner on 2026-08-27: when this project reaches a gap in
+      `functionalscript`, requesting the change or the new feature in that repository is an
+      available move, not only the local workaround plus an `fjs/todo/upstream-*.md` note.
+
+      This **extends** the existing rule rather than replacing it — a gap still gets its
+      record, so nothing goes silent, and the record is what the upstream request is written
+      from. It is the AGENTS.md ownership model (fjs is something this project owns and
+      releases, not merely depends on) made actionable. `functionalscript#1645`, filed during
+      the 0.46 migration, is the precedent this formalises.
+
+### v5 Traceability
+
+| REQ-ID | Tier | Phase | Delivered |
+|--------|------|-------|-----------|
+| MAINT-09 | T3 | 38. Take FunctionalScript 0.47.0 | Pending |
+| MAINT-10 | T3 | 39. Retire the Protocol-Version Gap | Pending |
+| DOC-25 | T3 | 40. Validation on the Write Path | Pending |
+| MAINT-11 | T3 | 41. New Capabilities and the Migration Report | Pending |
+| MAINT-12 | T3 | 41. New Capabilities and the Migration Report | Pending |
+| MAINT-13 | T3 | 41. New Capabilities and the Migration Report | Pending |
+
+**Phases 34, 35 and 36 map no requirement** and are listed here so the absence is deliberate
+rather than an omission: 34 (Second-Implementation Cross-Check), 35 (A Filable Artifact —
+fill the official `f1040.pdf`), 36 (The Conversational Path). All three are **T1** and all
+three are blocked on the owner.
+
+---
+
 ## v2 (Deferred)
 
 - **Remote transport** — HTTPS + OAuth + tenancy, which is what ChatGPT support requires.
