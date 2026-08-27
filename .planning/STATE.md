@@ -2,11 +2,12 @@
 gsd_state_version: 1.0
 milestone: v5
 milestone_name: A Current Engine and a Filable Return
-status: planning
-last_updated: "2026-08-27T07:20:32.491Z"
+status: paused
+stopped_at: The accountant demo has shipped ten PRs (124-133) with no requirement ID, no roadmap row and no phase directory; milestone v4's phases 34, 35 and 36 stay blocked on the owner. Nothing is in flight.
+last_updated: "2026-08-27T07:37:22.853Z"
 last_activity: 2026-08-27
 progress:
-  total_phases: 0
+  total_phases: 7
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -45,8 +46,8 @@ file: it is what a stale document says whether or not it is true.**)*
 
 Status: paused — awaiting owner decisions on phases 34, 35 and 36
 Stopped at: The accountant demo has shipped ten PRs (124-133) with no requirement ID, no roadmap row and no phase directory; milestone v4's phases 34, 35 and 36 stay blocked on the owner. Nothing is in flight.
-Progress: [█████████░] 89%
-Last activity: 2026-08-25
+Progress: [██████████] 100%
+Last activity: 2026-08-27
 
 *(89% is 34 of 38 roadmap phases, milestone v4.)*
 
@@ -756,6 +757,7 @@ consumed. These are session-independent lessons; they belong somewhere permanent
 
 | Pattern | What happened | Severity | Prevention |
 |---------|---------------|----------|------------|
+| **GSD milestone scoping is inert here** — found 2026-08-27 | `gsd-sdk query state.sync`, run right after milestone v5 opened, wrote **`total_phases: 18, completed_phases: 16, percent: 100`** for a milestone with **7 phases and none started**. `getMilestonePhaseFilter` calls `extractCurrentMilestone`, whose `hasVersionedMilestones` test is `/^#{1,3}\s+.*v\d+\.\d+/mi` — it requires a **minor version**. This project has named milestones `v1`…`v5` with no minor since the first one, so no heading ever matches, the scope silently falls back to the entire 129,456-byte file, and every milestone-relative figure computed from it is meaningless. Same root cause as the `roadmap.analyze` blindness recorded in ROADMAP.md's phase-list note. | **blocking** | **Do not run `state.sync` in this repo** until either GSD accepts `vN` or the headings gain a minor. It fails *upward* — 100% for a milestone at 0% — which is the direction nobody checks. The progress block was corrected by hand to 7/0/0%. Note GSD accepts bare `v5` in `state.milestone-switch` and rejects it for scoping: the inconsistency is inside one tool. |
 | **Vacuous proof** | A proof that is green and *permanently unable to fail*. Happened **twice in Phase 15**: 15-02's year-genericity gate regex could not match its own required positive control (`[A-Za-z_$][\w$]*[Yy]ear` needs ≥5 chars, so a bare `year` never matched); 15-03's never-executes proof called a decomposed helper instead of the composed export, so mutating `fjsCheck` to *actually run the guest program* left the unit suite green at 3110/3110. | **blocking** | Mutate the **production body** the proof guards and watch that specific leaf go red, then restore byte-identical. Mutating the fixture is not the same test. AGENTS.md already requires this; both failures came from skipping it. |
 | **Trusting a plan's own literals** | Plan text contained values that could not produce their own stated expectations. 15-04's plan used `'100000'`/`'150000'` where `centsFromString` has no implied cents scaling, so its own expected columns were unreachable. 15-06's hand-typed dialect count predated 15-02 adding a dialect. | **blocking** | Verify each literal against the function that will consume it *before* implementing. **Every one of Phase 15's six plans contained at least one real defect.** |
 | **Grepping for a runtime surface** | The MCP tool count was reported wrong three times (7, then 8, then 12; the answer is **13**) because finance-local `toolEntry(` declarations miss the upstream `casToolRegistry`/`evoToolRegistry` spread into `financeMcpHandlers`. This produced a *false headline claim* — "no document-write tool is registered" — when `evo_add` has always been there. | **blocking** | Start `node index.js` and ask it (`initialize` → `notifications/initialized` → `tools/list`). `cas-refresh-cross-process.test.js` has the spawn-and-speak pattern to copy. Never derive an advertised surface from source. |
