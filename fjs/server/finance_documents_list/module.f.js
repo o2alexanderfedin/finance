@@ -33,12 +33,17 @@
  * and would conflate "not one of ours" with "structurally invalid" — a
  * well-formed document naming an unregistered dialect string is neither.
  * Instead, {@link documentIdentitySchema} is a LOCAL, deliberately loose
- * identity-peek schema: rtti permits properties a schema does not mention
- * (verified against `fjs/server/module.f.js`'s own comment to the same
- * effect), so any real document — which always carries a required
- * `dialect: string` and `taxYear: number` under every existing dialect's own
- * schema — validates against this loose schema trivially, and every other
- * field is simply ignored.
+ * identity-peek schema, and it says so with `open`: any real document — which
+ * always carries a required `dialect: string` and `taxYear: number` under
+ * every existing dialect's own schema, plus that dialect's form-specific
+ * fields — validates against it trivially, and every other field is simply
+ * ignored. Until `functionalscript` 0.47.0 the looseness came free; this
+ * paragraph read "rtti permits properties a schema does not mention (verified
+ * against `fjs/server/module.f.js`'s own comment to the same effect)", and it
+ * did. 0.47.0 reverses the default and `fjs/server`'s comment was corrected
+ * with it, leaving this echo of it stating the exact opposite of the truth
+ * over a schema that had gone closed. `open` is what the old sentence was
+ * relying on, said out loud — see {@link documentIdentitySchema} itself.
  *
  * ## The `'unknown'` sentinel — a deliberate, arbitrary-but-recorded pick
  *
@@ -77,7 +82,7 @@
  *
  * @module
  */
-import { number, option, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
+import { number, open, option, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
 import { validate as rttiValidate } from 'functionalscript/fjs/types/rtti/validate/module.f.mjs'
 import { step, catchStep, mapStep, foldStep, pureOk } from 'functionalscript/fjs/effects/module.f.mjs'
 import { empty, nonEmpty } from 'functionalscript/fjs/effects/list/module.f.mjs'
@@ -107,8 +112,19 @@ import { parse, stringify as jsonText } from '../../json/module.f.js'
  * A LOCAL, deliberately loose identity-peek schema — see the module header's
  * "No dialect-registry validation" section for why this never imports
  * `finance_schema`'s own lookup map.
+ *
+ * **`open` is what makes it loose, and dropping it silently breaks every
+ * normal document.** Since functionalscript 0.47.0 (upstream #1732) a bare
+ * struct is CLOSED, so the bare form admits a document carrying `dialect`
+ * and `taxYear` and NOTHING ELSE — which no stored document is, every
+ * dialect's own schema requiring form-specific fields beyond those two. The
+ * bare form therefore reports every real document as `'unknown'` with no
+ * `taxYear`, and the failure is invisible: it arrives as a well-formed row,
+ * not an error. This schema is READ against a wire format that grows fields
+ * by design, which is precisely the case upstream's own `open` docstring
+ * names.
  */
-const documentIdentitySchema = /** @type {const} */ ({ dialect: option(string), taxYear: option(number) })
+const documentIdentitySchema = open(/** @type {const} */ ({ dialect: option(string), taxYear: option(number) }))
 
 /**
  * The shape of one `finance_documents_list` response entry — see the module
@@ -406,6 +422,22 @@ export const proof = {
             assertEq(findSubject(archived)('subjectKnown'), undefined)
             assertEq(findSubject(archived)('subjectUnknownDialect'), undefined)
             assertEq(findSubject(archived)('subjectNoDialectField'), undefined)
+        },
+        // A NORMAL stored document -- one carrying form-specific fields
+        // beyond the two {@link documentIdentitySchema} names -- is reported
+        // with its REAL dialect and taxYear. This is the case every other
+        // leaf here missed: `subjectKnown` has carried
+        // `box1InterestIncome` since this fixture was written, but nothing
+        // asserted what its row said, so a closed identity schema would
+        // silently report every real document as 'unknown' with no taxYear
+        // and the suite would stay green. Both literals are hand-typed
+        // against the fixture blob, never read back from it.
+        realDocumentWithFormFieldsKeepsItsIdentity: () => {
+            const { active } = buildFixture()
+            const entry = findSubject(active)('subjectKnown')
+            assert(entry !== undefined, active)
+            assertEq(entry.dialect, 'vnd.fjs.1099int')
+            assertEq(entry.taxYear, 2025)
         },
         // An unregistered dialect tag is carried through verbatim -- never
         // hidden, never coerced to the 'unknown' sentinel.
