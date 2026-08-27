@@ -1338,10 +1338,32 @@ do not gate them; they run when the owner is in the room.
          3 files** with the bump alone.
       2. `node --test` reports **3294/3294**, from **3286/3294** with the bump alone — all 8
          failures sharing one root cause — and `ui-tests` reports **46/46**.
-      3. The fix is behaviour-preserving and its size says so: the diff is **3 source files, +50
-         −49**, stating `open()` on **31 dialect registrations and 5 nested JSON-RPC response
-         schemas**. Upstream documents `open(c)` as exactly the old bare form, so each of those 36
-         states what it already relied on.
+      3. **`open()` is stated where each schema is DEFINED, not where it is registered**, and the
+         criterion is a measurement rather than a diff size. Wrapping at the `dialectEntry(...)`
+         call site satisfies the new signature and passes criteria 1 and 2 in full — it was
+         measured doing exactly that — while leaving every schema *export* closed for
+         `rttiValidate`, `toJsonSchema`, `fjs/server/finance_schema` and the demo's generated
+         forms. Upstream's `revisionSchema` is `open(...)` at its own definition under a docstring
+         reading "Do not drop the wrapper."
+
+         What decides it: **`toJsonSchema` over all 31 dialect schemas is byte-identical to
+         0.46.1's output.** The call-site form moves 47 containers, each gaining an
+         `additionalProperties`; the definition form moves none. 31 top-level and 32 nested
+         container schemas state `open`, and three const objects that resemble schemas —
+         `soldDisposal`, `sharedKeyFields`, `earnedIncomeCreditVocabularies` — are left alone as
+         fixtures and spread helpers.
+
+         **This criterion originally read "3 source files, +50 −49".** That was the call-site
+         measurement, written before anyone read how upstream wraps its own dialect, and a diff
+         size is not evidence of preserved behaviour — the smaller diff was the one that changed
+         what the server serves. Corrected 2026-08-27 with the schema comparison that settles it.
+
+      3a. **`open(c)` is a thunk, so a schema stops being a plain object**, and seventeen sites
+         here introspect one. `tsc` catches exactly one of them: `Object.keys(thunk)` is `[]` and
+         `'box1' in thunk` is `false`, both legal on any object, so
+         `assert(!('boxG' in k1SCorporationSchema))` would keep passing while testing nothing —
+         a vacuous proof, this repo's most expensive recorded defect class. All seventeen read
+         through a `declaredMembers` helper, and removing it reddens them.
       4. **No schema is left closed and none acquires a `rest`.** A dialect that narrows in this
          phase is a scope error: the open-versus-closed decision belongs to Phase 40, and taking it
          here would be taking it blind.
