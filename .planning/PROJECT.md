@@ -28,6 +28,32 @@ in CAS alongside the result it produced. Reproducibility, traceability, cost-fre
 over hypothetical inputs, and reports beyond the 1040 all follow from that one property —
 a new report is a new program, not new engine code.
 
+## Current Milestone: v5 A Current Engine and a Filable Return
+
+**Goal:** Take `functionalscript` 0.47.0, close the write-path hole that leaves a stored
+document unchecked against its own dialect, and finish the three verification phases v4
+could not move without the owner in the room.
+
+**Target features:**
+- `functionalscript` 0.47.0 taken — 31 dialect registrations and 5 JSON-RPC response
+  schemas state `open()`, `McpConfig` carries `protocolVersions`
+- The MCP protocol-version gap retired: 0.47.0 negotiates, so the prose that calls it a
+  known upstream gap, the three references to a note deleted in `7244f81`, and the proof
+  that now passes for the wrong reason all go
+- A finance document is validated against its dialect **on the write path**, which is what
+  makes the open-versus-closed choice decide anything at all
+- 0.47.0's new capabilities adopted where they remove code here: `fjs web` in place of
+  `python3 -m http.server`, `path.escapes`, `toolResultStep`, `memoryRun`
+- A consumer-side migration report for Sergey, in the shape of
+  `.planning/reports/fjs-0.46.1-migration.md`
+- Phases 34, 35 and 36 carried forward from v4 at their original numbers — the
+  second-implementation cross-check, the filable `f1040.pdf`, and the conversational path
+
+**Carried forward deliberately.** Phases 34–36 keep their numbers rather than being
+renumbered into a v5 sequence: 240 phase files, plus citations throughout REQUIREMENTS.md
+and ROADMAP.md, address them by number. Renumbering to make the ledger look regular is the
+same tidy lie the v4 section already refused for the accountant demo.
+
 ## Requirements
 
 ### Validated
@@ -417,6 +443,7 @@ supersede rather than overwrite.
 | New formats use the `vnd.fjs.<name>` dialect convention | One naming rule for every format we add, matching `vnd.fjs.revision`, so media types derive mechanically as `application/vnd.fjs.<name>+json` (AGENTS.md `## File conventions`) | — Pending |
 | No third-party `dependencies`/`devDependencies` without approval from all owners | Keeps the dependency surface a deliberate, owner-level decision rather than an implementation detail settled in a commit. Reinforces the purity model and the "release a new fjs version instead" rule, but stands on its own as governance — the decision belongs to the owners, not to whoever is writing the commit (AGENTS.md `## Requirements`) | — Standing |
 | FJS gaps may be worked around locally, but never silently | A workaround must not block progress, and must not be forgotten either; each one gets an `fjs/todo/upstream-*.md` file recording the gap, the local workaround, and the intended upstream fix — which doubles as the Week 5 upstreaming queue (AGENTS.md `## Requirements`) | — Standing |
+| An fjs gap may go **upstream directly**, not only into a local `todo` | Extends the row above rather than replacing it. The owner granted standing authority on 2026-08-27 to request changes and new features in the `functionalscript` repository itself when a gap is reached, rather than working around it here. This is the ownership model AGENTS.md already states — fjs is something this project owns and releases, not merely depends on — made actionable: the local workaround stops being the only move available. A gap still gets its `fjs/todo/upstream-*.md` record either way, so nothing goes silent | — Standing |
 | Defer PDF parsing; store raw bytes in v1 | No PDF library in fjs; writing one would dominate v1 and blocks nothing else — storage and versioning can be proven end-to-end without it | — Pending |
 | Defer what-if to v2 | v1 must first compute one real 1040 correctly; scenarios are worthless on top of an unverified engine. Revisited after PR #1: with agent-authored programs, a scenario may need no feature work at all — the deferral now covers only shipping it as a named, tested capability | — Pending |
 | Generic helpers written to be upstreamable into fjs | AGENTS.md policy: anything reusable and non-app-specific belongs in its own file/directory so it can move into FunctionalScript later. Affects where parsers and numeric utilities live from day one | — Pending |
@@ -533,7 +560,11 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-08-03 — reconciled with `todo/plan.md` and
+*Last updated: 2026-08-27 — milestone v5 opened (`/gsd-new-milestone`): the 0.47.0 upgrade, the
+write-path validation hole, and phases 34-36 carried forward from v4 at their original numbers.
+Recorded the owner's standing authority to take an fjs gap upstream directly.*
+
+*Previously updated: 2026-08-03 — reconciled with `todo/plan.md` and
 `fjs/todo/implement-mcp-server.md` after PR #1 merged (`78f8f55`). Corrected the execution
 boundary: the `OperationMap` whitelist governs effects only, and `import()` runs outside
 it. Recorded OCR-by-vision, which supersedes the PDF-parsing deferral in practice.*

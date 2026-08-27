@@ -1,17 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v4
-milestone_name: Verified With the Taxpayer Present
-status: paused
-stopped_at: The accountant demo has shipped ten PRs (124-133) with no requirement ID, no roadmap row and no phase directory; milestone v4's phases 34, 35 and 36 stay blocked on the owner. Nothing is in flight.
-last_updated: "2026-08-24T02:13:35.000Z"
-last_activity: 2026-08-25
+milestone: v5
+milestone_name: A Current Engine and a Filable Return
+status: planning
+last_updated: "2026-08-27T07:20:32.491Z"
+last_activity: 2026-08-27
 progress:
-  total_phases: 38
-  completed_phases: 34
-  total_plans: 88
-  completed_plans: 88
-  percent: 89
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -103,57 +102,10 @@ planned and `85` done against **88 and 88** on disk, and disk is checkable.
 
 ## Current Position
 
-Phase: **none open in the roadmap.** Milestone v4 is the current milestone; its three phases (34,
-35, 36) are all blocked on the owner. Work has nevertheless been shipping — see below.
-
-**Do not quote a number from this block.** Every figure below is stamped with what it was measured
-on; anything present-tense is a command, not a constant. This block has now been found stale
-**six** times, always the same way: correct frontmatter above, superseded prose below. The fifth
-was found on 2026-08-17 during a post-release resume — the frontmatter read `status: released` and
-`percent: 100` while this text six lines under it still read "107 complete, 13 open" and quoted a
-test total (8533) that a bug fix had already halved.
-
-**The sixth was found on 2026-08-23** and is a new species. The frontmatter said `milestone: v4`
-while this very line said *"milestone v2 is closed and v1.0.0 is released"* — but the expensive part
-was not the phrasing. Five PRs of product work (#124–#128) had merged two days earlier and **no
-file in `.planning/` mentioned any of them**, so every number here was stale *and* the feature they
-belonged to had no record at all. The previous five failures were numbers going out of date. This
-one was a whole capability that the planning system could not see.
-
-**Measured on `b8fe2e5`, 2026-08-25 — the current figures:**
-
-| | |
-|---|---|
-| Requirements | **129 defined, 129 complete, 0 open** — `FORM-KEY-01/02` registered 2026-08-25; the rest of the demo still has no IDs |
-| Suite | **3294 tests, 3294 pass, 0 fail**, `tsc` clean |
-| Project-local proofs | **3245** |
-| Browser tests | **46**, `ui-tests` package, Playwright/chromium — invisible to `npm test`; the paced walkthrough is excluded from those 46 in turn |
-| Engine coverage | 99.18 lines / 93.16 branches / 99.45 functions, gated in CI |
-| Dialects | **30 registered, 29 enterable** (`vnd.fjs.ocr` is not hand-enterable), **28 declare a `subjectKey`** |
-| Roadmap phases | **34 of 38** — the demo work is none of them; `12.1` is its own phase |
-
-*(Branches read 93.18 on `53afa02` two days earlier. The 0.02 is PR #132's acronym fix in
-`fjs/document/form_model`, not this change — which is why it was re-measured rather than carried
-forward on the reasoning that a docs-and-tests commit cannot move engine coverage.)*
-
-**Measured on `fd6702c`, the v1.0.0 release point — kept for comparison, not for quoting:**
-
-| | |
-|---|---|
-| Requirements | **127 defined, 127 complete, 0 open** |
-| Suite | 3241 tests, 0 fail, `tsc` clean. Wall clock 5-31s and load-dependent — see CAPABILITIES.md; do not quote one number |
-| Project-local proofs | **3196** — the only stable count |
-| MCP surface | 13 tools, protocol `2025-11-25`, `finance-mcp 1.0.0`, 30 dialects |
-| Refusal partition | 201 kinds: 57 modeled, 144 refused, 12 tripwires |
-
-Re-derive instead of reading:
-
-```sh
-grep -cE '^- \[x\] \*\*[A-Z]+-[0-9]+' .planning/REQUIREMENTS.md   # complete
-grep -cE '^- \[ \] \*\*[A-Z]+-[0-9]+' .planning/REQUIREMENTS.md   # open
-npm test 2>&1 | grep -c '^✔ import("./fjs/'                    # proofs
-git log --oneline -1 -- .planning/STATE.md                     # who wrote this last
-```
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-08-27 — Milestone v5 started
 
 ## Shipped outside the ledger — the accountant demo, 2026-08-21
 
