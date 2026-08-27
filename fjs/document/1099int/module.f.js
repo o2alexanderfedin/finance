@@ -67,7 +67,7 @@
  *
  * @module
  */
-import { number, option, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
+import { number, open, option, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
 import { validate as rttiValidate } from 'functionalscript/fjs/types/rtti/validate/module.f.mjs'
 import { error, ok } from 'functionalscript/fjs/types/result/module.f.mjs'
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
@@ -96,7 +96,7 @@ export const mediaType = mediaTypeOf(dialect)
  * mismatched blob (DOC-00's criterion-1 discriminant) — see Task 3's
  * cross-dialect proof.
  */
-export const oneZeroNineNineIntSchema = /** @type {const} */ ({
+export const oneZeroNineNineIntSchema = open({
     ...base(dialect),
     payerTin: string,
     recipientTin: string,
@@ -230,7 +230,7 @@ export const checkReferences = r => {
  *
  * Success Criterion 1 (structural-only rejection): dialect discrimination
  * here happens exclusively through `validateShape`'s exact-literal match on
- * `oneZeroNineNineIntSchema.dialect` — an ALREADY-PARSED value's `dialect`
+ * `oneZeroNineNineIntSchema`'s `dialect` member — an ALREADY-PARSED value's `dialect`
  * field is compared as a schema constant, the same machinery that checks
  * every other field. Neither this function, `checkReferences`, nor any
  * other code in this file or `fjs/document/ocr/module.f.js` ever inspects

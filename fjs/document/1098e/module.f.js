@@ -113,7 +113,7 @@
  *
  * @module
  */
-import { number, option, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
+import { number, open, option, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
 import { validate as rttiValidate } from 'functionalscript/fjs/types/rtti/validate/module.f.mjs'
 import { error, ok } from 'functionalscript/fjs/types/result/module.f.mjs'
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
@@ -145,7 +145,7 @@ export const mediaType = mediaTypeOf(dialect)
  * this module's own docstring, "The naming inversion this dialect USED to
  * carry", for what they were called before FORM-KEY-01 and why.
  */
-export const oneZeroNineEightESchema = /** @type {const} */ ({
+export const oneZeroNineEightESchema = open({
     ...base(dialect),
     lenderTin: string,
     borrowerTin: string,

@@ -117,7 +117,7 @@
  *
  * @module
  */
-import { array, number, option, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
+import { array, number, open, option, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
 import { validate as rttiValidate } from 'functionalscript/fjs/types/rtti/validate/module.f.mjs'
 import { error, ok } from 'functionalscript/fjs/types/result/module.f.mjs'
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
@@ -192,7 +192,7 @@ export const sectionOneSixtyEightKStatusValues = /** @type {const} */ ([
  *   already carries, because they are two facts about two different events
  *   and only their sum appears on the printed line.
  */
-const assetDisposal = /** @type {const} */ ({
+const assetDisposal = open({
     dateAcquired: string,
     dateSold: string,
     grossSalesPrice: string,
@@ -209,7 +209,7 @@ const assetDisposal = /** @type {const} */ ({
  * has no enum, and an unrecognized value must be REFUSED by name and quoted
  * rather than coerced.
  */
-const registeredAsset = /** @type {const} */ ({
+const registeredAsset = open({
     description: string,
     datePlacedInService: string,
     costOrOtherBasis: string,
@@ -230,7 +230,7 @@ const registeredAsset = /** @type {const} */ ({
  * mismatched blob (DOC-00's discriminant). NO `formRevision` and NO `payerTin`
  * — see this module's docstring.
  */
-export const assetRegisterSchema = /** @type {const} */ ({
+export const assetRegisterSchema = open({
     ...base(dialect),
     recipientTin: string,
     accountNumber: string,

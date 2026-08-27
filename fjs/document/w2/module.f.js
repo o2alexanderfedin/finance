@@ -49,7 +49,7 @@
  *
  * @module
  */
-import { array, number, option, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
+import { array, number, open, option, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
 import { validate as rttiValidate } from 'functionalscript/fjs/types/rtti/validate/module.f.mjs'
 import { error, ok } from 'functionalscript/fjs/types/result/module.f.mjs'
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
@@ -75,7 +75,7 @@ export const mediaType = mediaTypeOf(dialect)
  * code letter(s) as printed (`D`, `DD`, `W`, …) and is never interpreted
  * here — this phase stores and reads.
  */
-const box12Entry = /** @type {const} */ ({
+const box12Entry = open({
     code: string,
     amount: string,
 })
@@ -85,7 +85,7 @@ const box12Entry = /** @type {const} */ ({
  * beside it. Every field but `state` is absent-able, because the printed
  * form routinely leaves the locality half blank (DOC-11).
  */
-const stateLocalEntry = /** @type {const} */ ({
+const stateLocalEntry = open({
     state: string,
     employerStateIdNumber: option(string),
     stateWagesTipsEtc: option(string),
@@ -127,7 +127,7 @@ const stateLocalEntry = /** @type {const} */ ({
  * {@link proof}.theEmployerAndTheEmployeeAreNotTransposed pins the parties by
  * TIN FORMAT.
  */
-export const w2Schema = /** @type {const} */ ({
+export const w2Schema = open({
     ...base(dialect),
     employerEIN: string,
     employeeSSN: string,

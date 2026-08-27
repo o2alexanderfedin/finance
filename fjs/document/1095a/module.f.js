@@ -64,7 +64,7 @@
  *
  * @module
  */
-import { array, number, option, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
+import { array, number, open, option, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
 import { validate as rttiValidate } from 'functionalscript/fjs/types/rtti/validate/module.f.mjs'
 import { error, ok } from 'functionalscript/fjs/types/result/module.f.mjs'
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
@@ -93,7 +93,7 @@ export const mediaType = mediaTypeOf(dialect)
  * because the printed form itself says a date of birth appears in column C
  * *"only if an SSN isn't entered in column B"*.
  */
-const coveredIndividualEntry = /** @type {const} */ ({
+const coveredIndividualEntry = open({
     name: string,
     ssn: option(string),
     dateOfBirth: option(string),
@@ -112,7 +112,7 @@ const coveredIndividualEntry = /** @type {const} */ ({
  * order, so a comparison of "is every month present" is arithmetic on 1..12
  * rather than a lookup against a hand-typed list of English month names.
  */
-const monthlyCoverageEntry = /** @type {const} */ ({
+const monthlyCoverageEntry = open({
     month: number,
     columnAEnrollmentPremiums: option(string),
     columnBSlcspPremium: option(string),
@@ -133,7 +133,7 @@ const monthlyCoverageEntry = /** @type {const} */ ({
  * free to say what the paper says. There is no payer field at all: a
  * Marketplace is not a payer and the form prints no TIN for it.
  */
-export const oneZeroNineFiveASchema = /** @type {const} */ ({
+export const oneZeroNineFiveASchema = open({
     ...base(dialect),
     marketplaceIdentifier: string,
     marketplaceAssignedPolicyNumber: string,

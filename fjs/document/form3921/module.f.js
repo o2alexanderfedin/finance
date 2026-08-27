@@ -118,7 +118,7 @@
  *
  * @module
  */
-import { number, option, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
+import { number, open, option, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
 import { validate as rttiValidate } from 'functionalscript/fjs/types/rtti/validate/module.f.mjs'
 import { error, ok } from 'functionalscript/fjs/types/result/module.f.mjs'
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
@@ -155,7 +155,7 @@ export const mediaType = mediaTypeOf(dialect)
  * artefact, the same precedent every existing dialect follows for "2nd TIN
  * not." — while CORRECTED is, under DOC-12's `option(true)` convention.
  */
-export const formThirtyNineTwentyOneSchema = /** @type {const} */ ({
+export const formThirtyNineTwentyOneSchema = open({
     ...base(dialect),
     transferorTin: string,
     employeeTin: string,

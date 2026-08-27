@@ -44,7 +44,7 @@
  *
  * @module
  */
-import { array, number, option, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
+import { array, number, open, option, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
 import { validate as rttiValidate } from 'functionalscript/fjs/types/rtti/validate/module.f.mjs'
 import { error, ok } from 'functionalscript/fjs/types/result/module.f.mjs'
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
@@ -70,7 +70,7 @@ export const mediaType = mediaTypeOf(dialect)
  * the care was received — so it is required, and checked against the
  * document's `taxYear` below.
  */
-const expenseEntry = /** @type {const} */ ({
+const expenseEntry = open({
     datePaid: string,
     provider: string,
     category: string,
@@ -83,7 +83,7 @@ const expenseEntry = /** @type {const} */ ({
  * `base`) so structural validation reports it as the first failing field on
  * a mismatched blob (DOC-00's discriminant).
  */
-export const medicalExpensesSchema = /** @type {const} */ ({
+export const medicalExpensesSchema = open({
     ...base(dialect),
     recipientTin: string,
     taxYear: number,

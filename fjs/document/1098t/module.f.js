@@ -125,7 +125,7 @@
  *
  * @module
  */
-import { number, option, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
+import { number, open, option, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
 import { validate as rttiValidate } from 'functionalscript/fjs/types/rtti/validate/module.f.mjs'
 import { error, ok } from 'functionalscript/fjs/types/result/module.f.mjs'
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
@@ -133,6 +133,7 @@ import { base, mediaTypeOf } from '../base/module.f.js'
 import { formRevisionError } from '../form_revision/module.f.js'
 import { moneyFieldError } from '../money_field/module.f.js'
 import { declaredSubject } from '../subject/module.f.js'
+import { declaredMembers } from '../../document/base/module.f.js'
 
 /** @import { Result } from 'functionalscript/fjs/types/result/types.js' */
 /** @import { Ts, Unknown } from 'functionalscript/fjs/types/rtti/ts/types.js' */
@@ -164,7 +165,7 @@ export const mediaType = mediaTypeOf(dialect)
  * reserved; a field for either would be a place to put data the form cannot
  * carry.
  */
-export const oneZeroNineEightTSchema = /** @type {const} */ ({
+export const oneZeroNineEightTSchema = open({
     ...base(dialect),
     filerEin: string,
     studentTin: string,
@@ -514,8 +515,8 @@ export const proof = {
      * form cannot carry, and nothing downstream would ever read it.
      */
     reservedBoxesTwoAndThreeHaveNoField: () => {
-        assertEq(Object.keys(oneZeroNineEightTSchema).includes('box2'), false)
-        assertEq(Object.keys(oneZeroNineEightTSchema).includes('box3'), false)
+        assertEq(Object.keys(declaredMembers(oneZeroNineEightTSchema)).includes('box2'), false)
+        assertEq(Object.keys(declaredMembers(oneZeroNineEightTSchema)).includes('box3'), false)
         const [t, v] = validate(minimal)
         assert(t === 'ok', ['expected ok', t, v])
         assertEq(Object.keys(v).includes('box2'), false)

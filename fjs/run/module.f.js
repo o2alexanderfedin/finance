@@ -49,11 +49,11 @@
  *
  * @module
  */
-import { array, boolean, number, option, or, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
+import { array, boolean, number, open, option, or, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
 import { validate as rttiValidate } from 'functionalscript/fjs/types/rtti/validate/module.f.mjs'
 import { error, ok } from 'functionalscript/fjs/types/result/module.f.mjs'
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
-import { base, mediaTypeOf } from '../document/base/module.f.js'
+import { base, declaredMembers, mediaTypeOf } from '../document/base/module.f.js'
 import { casOpNames } from '../guest/module.f.js'
 
 /** @import { Result } from 'functionalscript/fjs/types/result/types.js' */
@@ -76,7 +76,7 @@ export const mediaType = mediaTypeOf(dialect)
  * four commands (`fjs/guest`'s `CasOp`) takes a single string argument —
  * matching the actual shape observed reads carry, not a wider placeholder.
  */
-const inputEntry = /** @type {const} */ ({
+const inputEntry = open({
     command: string,
     payload: array(string),
 })
@@ -107,7 +107,7 @@ const inputEntry = /** @type {const} */ ({
  * - `resultHash`/`error` — `option`, cross-field-constrained by `status` in
  *   `checkReferences` below (RTTI alone cannot express "present iff X").
  */
-export const runSchema = /** @type {const} */ ({
+export const runSchema = open({
     ...base(dialect),
     programHash: string,
     args: array(string),
@@ -241,7 +241,7 @@ export const proof = {
     // is `runSchema`'s first key, the property `checkReferences.wrongDialectRejected`-
     // style proofs across every other dialect depend on.
     runSchemaSpreadsDialectFirst: () => {
-        assertEq(Object.keys(runSchema)[0], 'dialect')
+        assertEq(Object.keys(declaredMembers(runSchema))[0], 'dialect')
     },
     validate: {
         fullyPopulatedOkValidates: () => {

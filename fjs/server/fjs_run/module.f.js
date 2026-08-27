@@ -121,7 +121,7 @@ import { collectRead, fileCas } from 'functionalscript/fjs/cas/module.f.mjs'
 import { cBase32ToVec, vecToCBase32 } from 'functionalscript/fjs/basen/cbase32/module.f.mjs'
 import { utf8ToString, tryUtf8 } from 'functionalscript/fjs/text/module.f.mjs'
 import { unwrap } from 'functionalscript/fjs/types/result/module.f.mjs'
-import { option, array, number, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
+import { array, number, open, option, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
 import { toolEntry, okResult, errorResult } from 'functionalscript/fjs/protocol/mcp/module.f.mjs'
 import { sha256 } from 'functionalscript/fjs/crypto/sha2/module.f.mjs'
 import { initEvo, evo } from 'functionalscript/fjs/cas/evo/module.f.mjs'
@@ -545,7 +545,7 @@ const handleRunOutcome = cas => programHash => programArgs => pinned => pinField
  * `pinned: false`). `toolEntry`'s own RTTI check rejects a call missing
  * `taxYear` or supplying a non-number before the handler ever runs.
  */
-export const fjsRunInputSchema = /** @type {const} */ ({
+export const fjsRunInputSchema = open({
     hash: string,
     args: option(array(string)),
     taxYear: number,

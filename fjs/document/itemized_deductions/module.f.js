@@ -42,7 +42,7 @@
  *
  * @module
  */
-import { array, number, option, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
+import { array, number, open, option, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
 import { validate as rttiValidate } from 'functionalscript/fjs/types/rtti/validate/module.f.mjs'
 import { error, ok } from 'functionalscript/fjs/types/result/module.f.mjs'
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
@@ -70,7 +70,7 @@ export const mediaType = mediaTypeOf(dialect)
  * docstring for why. There is NO `reimbursed`-equivalent field; this
  * dialect has no analog to `medical_expenses`'s reimbursement concept.
  */
-const itemizedEntry = /** @type {const} */ ({
+const itemizedEntry = open({
     lineTag: string,
     provider: string,
     amount: string,
@@ -82,7 +82,7 @@ const itemizedEntry = /** @type {const} */ ({
  * field on a mismatched blob (DOC-00's discriminant). NO `formRevision`
  * — DOC-10 does not apply; there is no printed form.
  */
-export const itemizedDeductionsSchema = /** @type {const} */ ({
+export const itemizedDeductionsSchema = open({
     ...base(dialect),
     recipientTin: string,
     taxYear: number,

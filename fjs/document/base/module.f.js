@@ -33,6 +33,8 @@
  */
 import { assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
 
+/** @import { ConstObject, Rest, Type } from 'functionalscript/fjs/types/rtti/types.js' */
+
 /**
  * Returns `{ dialect }`, with `dialect`'s literal string type preserved in
  * the return type rather than widened to plain `string` — required so that
@@ -43,6 +45,30 @@ import { assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
  * @type {<D extends string>(dialect: D) => { readonly dialect: D }}
  */
 export const base = dialect => ({ dialect })
+
+/**
+ * The members a container schema **declares**, read out of the wrapper that
+ * states its rest.
+ *
+ * Since `functionalscript` 0.47.0 a bare `Struct` is **closed** — it admits the
+ * members it names and no others — so every dialect schema here says `open(...)`
+ * to keep the acceptance it had at 0.46.1 and to stay readable by a client
+ * written against an older revision. `open(c)` is a *thunk* returning
+ * `['rest', c, unknown]`, so a schema is no longer the plain object it used to
+ * be, and **the ways this repo introspects one all break silently**:
+ * `Object.keys(schema)` answers `[]`, and `'box1' in schema` answers `false`.
+ *
+ * Silently is the word that matters. `tsc` catches `schema.someField` and
+ * catches nothing else, because `Object.keys` and `in` are legal on any object.
+ * A proof asserting a field is ABSENT — `assert(!('boxG' in declaredMembers(k1SCorporationSchema)))`
+ * — would therefore keep passing while testing nothing at all, which is this
+ * project's most expensive recorded defect (STATE.md, "Vacuous proof"). Reading
+ * through this helper is what makes the unwrapping explicit at each site instead
+ * of a property access that happens to still compile.
+ *
+ * @type {<C extends ConstObject>(schema: Rest<C, Type>) => C}
+ */
+export const declaredMembers = schema => schema()[1]
 
 /**
  * The media type a dialect tag derives, mechanically:

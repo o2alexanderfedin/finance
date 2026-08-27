@@ -1,7 +1,7 @@
 /**
  * `fjs/media/dialects` — DOC-16's local adoption of the dialect registry
  * `functionalscript/fjs/media/module.f.mjs` already ships, at the pinned
- * `functionalscript@0.43.1`: `dialectEntry(type, extraValidate)` and
+ * `functionalscript@0.47.0`: `dialectEntry(type, extraValidate)` and
  * `detect(dialects)(bytes)`, "a list of dialect decoders that falls through
  * when none match" — DOC-16's own criterion verbatim.
  *
@@ -15,17 +15,36 @@
  *
  * ```javascript
  * // node_modules/functionalscript/fjs/media/revision/module.f.mjs, verbatim
- * import { dialectEntry } from '../module.f.js'
- * const isValidRevision = (r) => { const [tag] = checkReferences(r); return tag === 'ok' }
+ * import { dialectEntry } from '../module.f.mjs'
+ * const isValidRevision = r => {
+ *     const [tag] = checkReferences(r)
+ *     return tag === 'ok'
+ * }
  * export const revisionDialect = dialectEntry(revisionSchema, isValidRevision)
  * ```
  *
- * Every finance document dialect module already exports a `schema` object
- * with a direct string `dialect` member (spread first, via `base()`) and a
- * `checkReferences` returning `Result<T, ...Error>` — the exact shape
- * `dialectEntry` requires, the identical shape `revisionSchema`/
- * `checkReferences` above has. Each is wrapped here the same one-line way:
+ * **That block says `verbatim` and now is.** It previously compressed
+ * `isValidRevision` onto one line and named `../module.f.js`, neither of which
+ * upstream ever wrote — a quotation that claims to be exact is worth checking
+ * against its source, and this one was wrong on both counts before anyone did.
+ *
+ * Every finance document dialect module exports a schema built with
+ * **`open(...)`**, carrying a direct string `dialect` member (spread first, via
+ * `base()`) and a `checkReferences` returning `Result<T, ...Error>` — the exact
+ * shape `dialectEntry` requires, the identical shape `revisionSchema`/
+ * `checkReferences` above has. Each is registered here the same one-line way:
  * `dialectEntry(schema, v => checkReferences(v)[0] === 'ok')`.
+ *
+ * **The `open` goes at the schema's own definition, not here.** Since 0.47.0 a
+ * bare `Struct` is closed, and `dialectEntry` takes a schema that states a rest;
+ * wrapping at this call site would satisfy that signature while leaving every
+ * schema *export* closed for its other consumers — `validate`, `toJsonSchema`,
+ * the demo's generated forms — which is a silent narrowing rather than the
+ * upgrade it looks like. Upstream's `revisionSchema` is `open(...)` at its own
+ * definition for the same reason, under a docstring that says "Do not drop the
+ * wrapper." What says this is right here is that all 31 served JSON Schemas are
+ * byte-identical across the upgrade; wrapping at the call site instead moved 47
+ * of them.
  *
  * `fjs/document/ocr` is the ONE exception: it has no `checkReferences` at
  * all (structural-only — see its own module header), so it registers with
