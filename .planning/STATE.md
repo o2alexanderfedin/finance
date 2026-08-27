@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v5
 milestone_name: A Current Engine and a Filable Return
 status: planning
-stopped_at: Milestone v5 is open — requirements MAINT-09..13 and DOC-25 are defined and its seven-phase roadmap is written. Phases 38, 39, 40 and 41 are available and wait on nothing; 34, 35 and 36 carry forward from v4 still blocked on the owner.
-last_updated: "2026-08-27T07:37:22.853Z"
+stopped_at: Milestone v5 is open — requirements MAINT-09..13 and DOC-25 are defined and its seven-phase roadmap is written. Only Phase 38 is unblocked; 39 and 40 both need 0.47.0 in place and unlock when 38 lands, 41 follows both; 34, 35 and 36 carry forward from v4 still blocked on the owner.
+last_updated: "2026-08-27T09:11:52.000Z"
 last_activity: 2026-08-27
 progress:
   total_phases: 7
@@ -44,8 +44,8 @@ file: it is what a stale document says whether or not it is true.**)*
 
 ## Session
 
-Status: planning — milestone v5 is open and phases 38-41 are available
-Stopped at: Milestone v5 is open — requirements MAINT-09..13 and DOC-25 are defined and its seven-phase roadmap is written. Phases 38, 39, 40 and 41 are available and wait on nothing; 34, 35 and 36 carry forward from v4 still blocked on the owner.
+Status: planning — milestone v5 is open and Phase 38 is the only phase unblocked
+Stopped at: Milestone v5 is open — requirements MAINT-09..13 and DOC-25 are defined and its seven-phase roadmap is written. Only Phase 38 is unblocked; 39 and 40 both need 0.47.0 in place and unlock when 38 lands, 41 follows both; 34, 35 and 36 carry forward from v4 still blocked on the owner.
 Progress: [░░░░░░░░░░] 0%
 Last activity: 2026-08-27
 
@@ -110,9 +110,14 @@ planned and `85` done against **88 and 88** on disk, and disk is checkable.
 
 ## Current Position
 
-Phase: none started. Milestone v5's roadmap is written — 38, 39, 40 and 41 are available now, and
-34, 35 and 36 wait on the owner.
+Phase: none started. Milestone v5's roadmap is written — **38 is the only phase available now**;
+39 and 40 unlock when it lands, 41 after both, and 34, 35 and 36 wait on the owner.
 Plan: —
+
+*(These two lines read "38, 39, 40 and 41 are available now" until 2026-08-27, contradicting the
+roadmap's own order — `38 → (39 ∥ 40) → 41`, with both successors written in 0.47.0's `rest`/`open`
+vocabulary. An executor taking this file as the handoff would have started a dependent phase
+against 0.46.1 and written it twice.)*
 
 *(This block deliberately carries no `Status:`, `Stopped at:` or `Progress:` line. Those names
 belong to `## Session` above, which is the only block the tool reads: `stateExtractField` scopes to
