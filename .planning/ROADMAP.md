@@ -1344,14 +1344,16 @@ do not gate them; they run when the owner is in the room.
          both halves; the second is what the first cannot see:
 
          ```sh
-         # on 0.46.1 first, then on the migrated tree
-         npm test 2>&1 | grep -o '^✔ import("\./fjs/[^ ]*' | sort -u > leaves.txt
+         # the same command in each tree: on 0.46.1 first, then on the migrated tree
+         npm test 2>&1 | grep -o '^✔ import("\./fjs/[^ ]*' | sort -u > baseline-leaves.txt
+         npm test 2>&1 | grep -o '^✔ import("\./fjs/[^ ]*' | sort -u > result-leaves.txt
          comm -23 baseline-leaves.txt result-leaves.txt   # must be EMPTY — the set only grows
          # a name kept is not a proof kept: for every proof module this phase touches
          grep -cE '\bassert(Eq|NotNullish)?\(' <file>     # before vs after; a drop is a regression
          ```
 
-         **Measured across the bump: nothing lost, one leaf gained** —
+         **Measured across the bump on `feature/fjs-0.47.0` (PR #139), 2026-08-27 — not in the
+         throwaway worktree above: nothing lost, one leaf gained** —
          `proof.financeDocumentsListTool.realDocumentWithFormFieldsKeepsItsIdentity` in
          `fjs/server/finance_documents_list`, carrying the set from **3245** on 0.46.1 at this
          branch point to **3246**. No touched module's assertion count fell:
