@@ -2,8 +2,8 @@
 gsd_state_version: 1.0
 milestone: v5
 milestone_name: A Current Engine and a Filable Return
-status: paused
-stopped_at: The accountant demo has shipped ten PRs (124-133) with no requirement ID, no roadmap row and no phase directory; milestone v4's phases 34, 35 and 36 stay blocked on the owner. Nothing is in flight.
+status: planning
+stopped_at: Milestone v5 is open — requirements MAINT-09..13 and DOC-25 are defined and its seven-phase roadmap is written. Phases 38, 39, 40 and 41 are available and wait on nothing; 34, 35 and 36 carry forward from v4 still blocked on the owner.
 last_updated: "2026-08-27T07:37:22.853Z"
 last_activity: 2026-08-27
 progress:
@@ -44,12 +44,19 @@ file: it is what a stale document says whether or not it is true.**)*
 
 ## Session
 
-Status: paused — awaiting owner decisions on phases 34, 35 and 36
-Stopped at: The accountant demo has shipped ten PRs (124-133) with no requirement ID, no roadmap row and no phase directory; milestone v4's phases 34, 35 and 36 stay blocked on the owner. Nothing is in flight.
-Progress: [██████████] 100%
+Status: planning — milestone v5 is open and phases 38-41 are available
+Stopped at: Milestone v5 is open — requirements MAINT-09..13 and DOC-25 are defined and its seven-phase roadmap is written. Phases 38, 39, 40 and 41 are available and wait on nothing; 34, 35 and 36 carry forward from v4 still blocked on the owner.
+Progress: [░░░░░░░░░░] 0%
 Last activity: 2026-08-27
 
-*(89% is 34 of 38 roadmap phases, milestone v4.)*
+*(0% is 0 of milestone v5's 7 phases. The `89%` this line carried was v4's 34 of 38, and the
+`100%` that briefly replaced it was written by `state.sync` — see "GSD milestone scoping is inert
+here" in Recurring Patterns — whose hand-correction fixed the frontmatter to `7 / 0 / 0%` and
+missed this line. **The body line is not what the header is built from**: `buildStateFrontmatter`
+reads `Progress:` only as a fallback, `if (progressPercent === null && progressRaw)`, and
+`computeProgressPercent` returns null only when there is neither phase nor plan data. It is
+corrected here because a line reading 100% beside a milestone with nothing started is false to a
+reader, which is the failure this file exists to catch.)*
 
 **These four lines are written for the tool, and they must stay the first of their kind in this
 file.** `gsd-sdk` rebuilds the frontmatter above out of *this body* on every write —
@@ -103,10 +110,16 @@ planned and `85` done against **88 and 88** on disk, and disk is checkable.
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: none started. Milestone v5's roadmap is written — 38, 39, 40 and 41 are available now, and
+34, 35 and 36 wait on the owner.
 Plan: —
-Status: Defining requirements
-Last activity: 2026-08-27 — Milestone v5 started
+
+*(This block deliberately carries no `Status:`, `Stopped at:` or `Progress:` line. Those names
+belong to `## Session` above, which is the only block the tool reads: `stateExtractField` scopes to
+`## Session` whenever that heading exists and never looks here. A second `Status:` under this
+heading is not a second opinion, it is a line that silently does nothing — it read "Defining
+requirements" from 2026-08-27 while the header it was meant to correct still said `paused` from
+milestone v4.)*
 
 ## Shipped outside the ledger — the accountant demo, 2026-08-21
 

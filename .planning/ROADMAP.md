@@ -1312,7 +1312,10 @@ numbers.** 240 phase files, plus citations throughout REQUIREMENTS.md and this f
 as 34, 35 and 36; renumbering them into a tidy v5 sequence is the same lie the v4 section above
 already refused for the accountant demo.
 
-**Execution order: 38 → 39 → 40 → 41, then 34, 35 and 36 whenever the owner unblocks them.**
+**Execution order: `38 → (39 ∥ 40) → 41`, then 34, 35 and 36 whenever the owner unblocks them.**
+39 and 40 are independent successors of 38 and neither waits on the other, so an executor holding
+39 does not hold 40. The Progress table below states the same dependency in each row — "needs 38",
+both times — and the paragraph after this one gives the reasons.
 
 **Phase 40 comes after 38, not before it**, because the write-path check is written in 0.47.0's
 `rest`/`open` vocabulary — running it first means writing it once against 0.46.1 and again after.
@@ -1336,8 +1339,18 @@ do not gate them; they run when the owner is in the room.
 
       1. `package.json` names 0.47.0 explicitly and `tsc` reports **0** errors, from **63 errors in
          3 files** with the bump alone.
-      2. `node --test` reports **3294/3294**, from **3286/3294** with the bump alone — all 8
-         failures sharing one root cause — and `ui-tests` reports **46/46**.
+      2. **`npm test` is green**, and **no project-local proof leaf is lost**:
+         `npm test 2>&1 | grep -c '^✔ import("./fjs/'` reports **3245 or more**, against
+         **3245** measured on 0.46.1 at this branch point. `ui-tests` reports **46/46**. With
+         the bump alone 8 leaves failed, all sharing one root cause.
+
+         **This criterion read "`node --test` reports 3294/3294" until 2026-08-27**, which
+         AGENTS.md forbids twice over (the "Never gate a phase on `npm test`'s total" rule):
+         bare `node --test` uses default discovery and skips the `tsc` gate that `npm test`
+         runs first, so the count could be taken over a tree that does not typecheck; and the
+         total is not a phase gate. **It was already 3294/3294 on 0.46.1** — the criterion was
+         satisfied by an empty diff before the phase began, exactly the Phase 7 "total > 134"
+         defect AGENTS.md records.
       3. **`open()` is stated where each schema is DEFINED, not where it is registered**, and the
          criterion is a measurement rather than a diff size. Wrapping at the `dialectEntry(...)`
          call site satisfies the new signature and passes criteria 1 and 2 in full — it was
