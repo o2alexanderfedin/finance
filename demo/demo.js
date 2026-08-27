@@ -76,9 +76,10 @@ const badgeText = required('badge-text', HTMLElement)
 // commit — the only honest way to put a figure on a page that outlives it.
 //
 // The count is the project-local one, never `npm test`'s total: that total
-// includes the vendored functionalscript proofs and so depends on whether the
-// submodule is checked out (the same commit reports 494 without it and 2730
-// with it, both correct, neither comparable). See lib/github.js.
+// includes the vendored functionalscript proofs, and until the submodule was
+// removed on 2026-08-18 it also moved with whether that submodule was checked
+// out (one commit reported 494 without it and 2730 with it, both correct,
+// neither comparable). See lib/github.js.
 badge.href = releaseUrl
 badge.title = `${release} — released from ${shortSha}`
 badgeText.textContent = `${release} · ${proofCount} proofs`
