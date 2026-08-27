@@ -103,6 +103,11 @@
 >   against. `.github/workflows/pages.yml` copies it beside `demo/` and
 >   `fjs/`. This is the spec's own stated fallback, reached for a reason the
 >   spec did not anticipate.
+>
+>   **Superseded on 2026-08-18:** the submodule was removed from the repository
+>   outright, so the body text below — "`functionalscript` is already a git
+>   submodule at the repo root" — describes a layout that no longer exists.
+>   node_modules is not the fallback any more; it is the only source.
 > - **`tsc` type-checks `demo/` too**, which the spec did not account for.
 >   `npm test` is `tsc && node --test`, so the first working version turned the
 >   suite RED with 103 type errors — real ones: a filing status left as a bare
