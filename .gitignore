@@ -166,3 +166,8 @@ demo-outputs/
 ui-tests/node_modules/
 ui-tests/test-results/
 ui-tests/playwright-report/
+
+# Console logs and page snapshots written by the Playwright MCP server while
+# it drives the demo. Same category as the line above: a run artifact, and one
+# that carries session timestamps, so it would churn on every browsing session.
+.playwright-mcp/
