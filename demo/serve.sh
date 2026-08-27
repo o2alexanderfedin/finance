@@ -9,8 +9,9 @@
 # The demo imports the engine directly: `demo/index.html` resolves `../fjs/...`
 # and, through its import map, `../functionalscript/...`. Both must sit BESIDE
 # `demo/` for those to resolve, and in this working tree neither does — the
-# repository root has `fjs/` but its `functionalscript` submodule is not
-# checked out, and `npm ci` puts that package under `node_modules/` instead.
+# repository root has `fjs/`, and `functionalscript` is an npm dependency that
+# `npm ci` puts under `node_modules/`. It WAS a git submodule at the root until
+# 2026-08-18; both comments here said so long after it was removed.
 #
 # So this stages the three side by side, using SYMLINKS rather than copies:
 # editing a step module and reloading the page shows the change immediately,
@@ -26,8 +27,9 @@ repo="$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)"
 site="${TMPDIR:-/tmp}/finance-showcase-site"
 
 # `functionalscript` resolves from node_modules, which is where the 2220 proofs
-# resolve it from too — the submodule at the repository root is deliberately
-# left alone, because entering it is a documented foot-gun in this project.
+# resolve it from too. There is no longer a submodule to resolve it from: the
+# one at the repository root was removed on 2026-08-18, so node_modules is not
+# a preference between two sources but the only source.
 if [ ! -d "$repo/node_modules/functionalscript" ]; then
     echo "error: $repo/node_modules/functionalscript is missing." >&2
     echo "       run 'npm ci' in $repo first." >&2

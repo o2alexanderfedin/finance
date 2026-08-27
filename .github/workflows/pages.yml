@@ -53,9 +53,10 @@
 # must sit BESIDE `demo/` in the published tree, so the site root is a staging
 # directory containing all three rather than `demo/` itself.
 #
-# `functionalscript` is a git submodule that this repository does not check
-# out — `npm ci` installs the same package from `package.json`, which is where
-# the engine resolves it from under test. Staging `node_modules/functionalscript`
+# `functionalscript` is an ordinary npm dependency. It WAS a git submodule
+# until 2026-08-18, when that submodule was removed; `npm ci` installs the
+# package from `package.json`, which is where the engine resolves it from under
+# test. Staging `node_modules/functionalscript`
 # therefore publishes THE EXACT DEPENDENCY THE SUITE RAN AGAINST, and adds
 # nothing new: no bundler, no transpiler, no second copy of anything.
 
