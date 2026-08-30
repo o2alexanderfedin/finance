@@ -1822,12 +1822,22 @@ ruling for why a phase without an ID is preferable to an ID invented to give it 
       and requires `dialectEntry` to take a schema with a stated rest, and `#1654`, which
       replaces `McpConfig.protocolVersion` with a non-empty latest-first `protocolVersions`.
 
-      **The whole compatibility fix is behaviour-preserving**: `open(c)` is documented
-      upstream as exactly the old bare form, so 31 dialect registrations and 5 nested
-      JSON-RPC response schemas state what they already relied on. Measured in a worktree on
-      2026-08-27: `tsc` **0** (from 63 errors in 3 files), `node --test` **3294/3294** (from
-      3286/3294 with the bump alone, all 8 failures sharing one root cause), `ui-tests`
-      **46/46**. Diff: 3 source files, +50 −49.
+      **The whole compatibility fix is behaviour-preserving**, and what establishes that is
+      what the server serves, not the size of the diff: `open(c)` is documented upstream as
+      exactly the old bare form, so 31 dialect registrations and 5 nested JSON-RPC response
+      schemas state what they already relied on, and **`toJsonSchema` over all 31 dialect
+      schemas is byte-identical to 0.46.1's output**. That holds only when `open()` is stated
+      where each schema is **defined**; wrapping at the `dialectEntry(...)` call site instead
+      moves 47 containers, each gaining an `additionalProperties`. Measured in a worktree on
+      2026-08-27: `tsc` **0** (from 63 errors in 3 files), `npm test` green with no
+      project-local proof leaf lost (8 leaves failed with the bump alone, all sharing one root
+      cause), `ui-tests` **46/46**.
+
+      *(This paragraph ended "Diff: 3 source files, +50 −49" until 2026-08-27. That was the
+      call-site experiment ROADMAP.md rejects precisely because it changes the schemas the
+      application serves — so it was being offered as evidence for the one claim it disproves.
+      The `node --test` total quoted alongside it went at the same time, under the AGENTS.md
+      rule that no phase is gated on the suite total.)*
 
       `^0.46.1` does not admit 0.47.0 — a caret on a `0.x` version pins the minor — so this
       is an explicit bump, not a refresh.
@@ -1905,14 +1915,24 @@ ruling for why a phase without an ID is preferable to an ID invented to give it 
 
 ### v5 Traceability
 
-| REQ-ID | Tier | Phase | Delivered |
-|--------|------|-------|-----------|
-| MAINT-09 | T3 | 38. Take FunctionalScript 0.47.0 | Pending |
-| MAINT-10 | T3 | 39. Retire the Protocol-Version Gap | Pending |
-| DOC-25 | T3 | 40. Validation on the Write Path | Pending |
-| MAINT-11 | T3 | 41. New Capabilities and the Migration Report | Pending |
-| MAINT-12 | T3 | 41. New Capabilities and the Migration Report | Pending |
-| MAINT-13 | T3 | 41. New Capabilities and the Migration Report | Pending |
+| REQ-ID | Tier | Phase | Milestone | Status |
+|--------|------|-------|-----------|--------|
+| MAINT-09 | T3 | 38. Take FunctionalScript 0.47.0 | v5 | Pending |
+| MAINT-10 | T3 | 39. Retire the Protocol-Version Gap | v5 | Pending |
+| DOC-25 | T3 | 40. Validation on the Write Path | v5 | Pending |
+| MAINT-11 | T3 | 41. New Capabilities and the Migration Report | v5 | Pending |
+| MAINT-12 | T3 | 41. New Capabilities and the Migration Report | v5 | Pending |
+| MAINT-13 | T3 | 41. New Capabilities and the Migration Report | v5 | Pending |
+
+**Five columns, not four, because the gate reads the fifth.** `parseRequirements` in
+`planning-truth-gate.test.js` takes a row's status from `columns[5]`, the shape of the `##
+Traceability` table at the end of this file. This table was written in the four-column form the v2
+and v3 sections use, which puts `Pending` in `columns[4]` and leaves the parsed status **empty** —
+so the two checks that compare a checkbox against its row (`no requirement is ticked in its body
+while its table Status says Pending`, and its converse) matched nothing here and would have gone on
+matching nothing after all six were ticked. The v2 and v3 tables above have the same dead spot; they
+are left as they are because their requirements are closed and re-shaping a settled ledger to satisfy
+a parser is the tidier lie. A live milestone gets the shape that is actually checked.
 
 **Phases 34, 35 and 36 map no requirement** and are listed here so the absence is deliberate
 rather than an omission: 34 (Second-Implementation Cross-Check), 35 (A Filable Artifact —
