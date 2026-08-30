@@ -65,7 +65,7 @@ import { evoToolRegistry } from 'functionalscript/fjs/mcp/evo/module.f.mjs'
 import { emptyState, virtual } from 'functionalscript/fjs/effects/node/virtual/module.f.mjs'
 import { fromVec } from 'functionalscript/fjs/types/uint8array/module.f.mjs'
 import { utf8 } from 'functionalscript/fjs/text/module.f.mjs'
-import { array, option, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
+import { array, open, option, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
 import { validate as rttiValidate } from 'functionalscript/fjs/types/rtti/validate/module.f.mjs'
 import { assert, assertEq, assertNotNullish } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { dialect as revisionDialect } from 'functionalscript/fjs/media/revision/module.f.mjs'
@@ -253,7 +253,7 @@ export const financeMcpHandlers = home => cacheKey => fromRegistry([
 export const financeConfig = {
     serverInfo: { name: 'finance-mcp', version: '1.0.0' },
     capabilities: { tools: {} },
-    protocolVersion: '2025-11-25',
+    protocolVersions: ['2025-11-25'],
 }
 
 // ── Server ──────────────────────────────────────────────────────────────────────
@@ -441,9 +441,18 @@ const responsesOf = state => state.stdout
  * leaf declare the response shape it depends on, so a server change that
  * altered that shape fails at the decode rather than somewhere downstream.
  *
- * rtti permits properties a schema does not mention — verified — so each
- * schema below names only what its own leaf reads, and a full JSON-RPC
- * envelope validates against a partial one.
+ * **Each schema below states `open`, and that is now load-bearing.** Every one
+ * names only what its own leaf reads, so a full JSON-RPC envelope has to
+ * validate against a partial schema. Until `functionalscript` 0.47.0 that came
+ * free — this paragraph read "rtti permits properties a schema does not mention
+ * — verified", and it did. 0.47.0 reverses the default: a bare struct is closed,
+ * so every one of these would have started rejecting the very responses it was
+ * written to read. `open` is what the old sentence was relying on, said out loud.
+ *
+ * The nesting is not decoration either. `open` states the rest of ONE container,
+ * so `result` and each element of `tools`/`content` need their own — the eight
+ * proofs in `proof.session` and `proof.casRefresh` failed at exactly those paths
+ * (`['result','serverInfo']`, `['result','tools','0']`) until they had it.
  * @type {<T>(validator: (value: Unknown) => Result<T, ValidationError>) => (value: Unknown | undefined) => T}
  */
 const decoder = validator => value => {
@@ -456,26 +465,26 @@ const decoder = validator => value => {
 }
 
 /** Every response carries this, whatever else it carries. */
-const envelopeSchema = /** @type {const} */ ({ jsonrpc: string })
+const envelopeSchema = open({ jsonrpc: string })
 
 /** What `initializeIgnoresRequestedProtocolVersion` reads. */
-const initResultSchema = /** @type {const} */ ({
-    result: { protocolVersion: string, serverInfo: { name: string } },
+const initResultSchema = open({
+    result: open({ protocolVersion: string, serverInfo: open({ name: string }) }),
 })
 
 /** What `toolsListEnumeratesComposedRegistry` reads. */
-const toolsListResultSchema = /** @type {const} */ ({
-    result: { tools: array({ name: string }) },
+const toolsListResultSchema = open({
+    result: open({ tools: array(open({ name: string })) }),
 })
 
 /** What the `tools/call` leaves read, here and in the DOC-14 proof below. */
-const callResultSchema = /** @type {const} */ ({
-    result: { content: array({ type: string, text: string }) },
+const callResultSchema = open({
+    result: open({ content: array(open({ type: string, text: string })) }),
 })
 
 /** What `weekOneConvergence`'s `fjs_run` leaf reads — same as {@link callResultSchema} plus the optional `isError` flag a failed tool call carries. */
-const callResultWithIsErrorSchema = /** @type {const} */ ({
-    result: { content: array({ type: string, text: string }), isError: option(true) },
+const callResultWithIsErrorSchema = open({
+    result: open({ content: array(open({ type: string, text: string })), isError: option(true) }),
 })
 
 const asEnvelope = decoder(rttiValidate(envelopeSchema))

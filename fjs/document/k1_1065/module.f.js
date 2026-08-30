@@ -135,7 +135,7 @@
  *
  * @module
  */
-import { array, number, option, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
+import { array, number, open, option, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
 import { validate as rttiValidate } from 'functionalscript/fjs/types/rtti/validate/module.f.mjs'
 import { error, ok } from 'functionalscript/fjs/types/result/module.f.mjs'
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
@@ -144,6 +144,7 @@ import { base, mediaTypeOf } from '../base/module.f.js'
 import { formRevisionError } from '../form_revision/module.f.js'
 import { moneyFieldError } from '../money_field/module.f.js'
 import { codedEntry, codedBoxError, materialParticipationValues, materialParticipationError } from '../k1_common/module.f.js'
+import { declaredMembers } from '../../document/base/module.f.js'
 
 /** @import { Result } from 'functionalscript/fjs/types/result/types.js' */
 /** @import { Ts, Unknown } from 'functionalscript/fjs/types/rtti/ts/types.js' */
@@ -187,7 +188,7 @@ export const mediaType = mediaTypeOf(dialect)
  * statement uses, and it keeps a role name because there is no printed
  * caption to rename it to. `vnd.fjs.k1_1041` has no such field at all.
  */
-export const k1PartnershipSchema = /** @type {const} */ ({
+export const k1PartnershipSchema = open({
     ...base(dialect),
     partnershipEIN: string,
     partnerTin: string,
@@ -758,7 +759,7 @@ export const proof = {
             assertEq(inCoded, kind === 'coded', ['box is on the wrong list', field])
             // The schema must actually carry it, so a box named here and
             // absent from `k1PartnershipSchema` cannot pass.
-            assert(field in k1PartnershipSchema, ['the schema is missing a printed box', field])
+            assert(field in declaredMembers(k1PartnershipSchema), ['the schema is missing a printed box', field])
         }
         // ...and in the other direction: nothing in the code is missing from
         // the hand-typed table.

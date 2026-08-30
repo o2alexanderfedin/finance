@@ -50,7 +50,7 @@ import { errorSummary } from 'functionalscript/fjs/effects/node/module.f.mjs'
 import { emptyState, virtual } from 'functionalscript/fjs/effects/node/virtual/module.f.mjs'
 import { sha256 } from 'functionalscript/fjs/crypto/sha2/module.f.mjs'
 import { error, ok } from 'functionalscript/fjs/types/result/module.f.mjs'
-import { array, record, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
+import { array, open, record, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
 import { validate as rttiValidate } from 'functionalscript/fjs/types/rtti/validate/module.f.mjs'
 import { assert, assertEq, assertNotNullish } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { dialect as runDialect, validate as validateRun } from '../../run/module.f.js'
@@ -77,13 +77,13 @@ import { centsFromString, centsToString, tryCentsFromString } from '../../exact/
 // proof exhibits it (`value` is a decimal-dollar string, via
 // `centsToString`, not a raw cents integer).
 
-const wireSourceSchema = /** @type {const} */ ({
+const wireSourceSchema = open({
     documentHash: string,
     boxPath: string,
     value: string,
 })
 
-const wireLineSchema = /** @type {const} */ ({
+const wireLineSchema = open({
     value: string,
     sources: array(wireSourceSchema),
     rule: string,

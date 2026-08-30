@@ -111,7 +111,7 @@
  *
  * @module
  */
-import { number, option, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
+import { number, open, option, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
 import { validate as rttiValidate } from 'functionalscript/fjs/types/rtti/validate/module.f.mjs'
 import { error, ok } from 'functionalscript/fjs/types/result/module.f.mjs'
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
@@ -140,7 +140,7 @@ export const mediaType = mediaTypeOf(dialect)
  * blob. `sourceArtifactHash` is a required `string` (DOC-13), for the reason
  * `vnd.fjs.1099b`'s own header gives.
  */
-export const formThirtyNineTwentyTwoSchema = /** @type {const} */ ({
+export const formThirtyNineTwentyTwoSchema = open({
     ...base(dialect),
     corporationTin: string,
     employeeTin: string,

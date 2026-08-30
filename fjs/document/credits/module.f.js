@@ -156,7 +156,7 @@
  *
  * @module
  */
-import { array, number, option, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
+import { array, number, open, option, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
 import { validate as rttiValidate } from 'functionalscript/fjs/types/rtti/validate/module.f.mjs'
 import { error, ok } from 'functionalscript/fjs/types/result/module.f.mjs'
 import { assert, assertEq, assertNotNullish } from 'functionalscript/fjs/asserts/module.f.mjs'
@@ -213,7 +213,7 @@ export const educationCreditElections = /** @type {const} */ ([
  * `description` mirrors that dialect's own, so a refusal or a citation can
  * name something a reader recognizes on their own records.
  */
-const retirementContributionEntry = /** @type {const} */ ({
+const retirementContributionEntry = open({
     contributionTag: string,
     datePaid: string,
     description: string,
@@ -226,7 +226,7 @@ const retirementContributionEntry = /** @type {const} */ ({
  * "The Form 8880 eligibility record", for why the record's PRESENCE is the
  * assertion and why the dependent test is deliberately not a field here.
  */
-const saversCreditEligibilityEntry = /** @type {const} */ ({
+const saversCreditEligibilityEntry = open({
     individual: string,
     attainedAgeEighteen: option(true),
     wasAFullTimeStudent: option(true),
@@ -245,7 +245,7 @@ const saversCreditEligibilityEntry = /** @type {const} */ ({
  * a student entry keyed by the child's TIN. `fjs/document/1098t`'s own header
  * records that hazard in full.
  */
-const educationStudentEntry = /** @type {const} */ ({
+const educationStudentEntry = open({
     studentTin: string,
     studentName: string,
     credit: string,
@@ -279,7 +279,7 @@ const educationStudentEntry = /** @type {const} */ ({
  * requires an answer and a transcription that drops a printed box is a
  * transcription a reader cannot check against the page.
  */
-const dependentCareProviderEntry = /** @type {const} */ ({
+const dependentCareProviderEntry = open({
     name: string,
     address: string,
     identifyingNumber: string,
@@ -363,7 +363,7 @@ const dependentCareProviderEntry = /** @type {const} */ ({
  * belongs here rather than in `fjs/form2441` because it is a property of the
  * stored record and not of any computation.
  */
-const dependentCareQualifyingPersonEntry = /** @type {const} */ ({
+const dependentCareQualifyingPersonEntry = open({
     name: string,
     tin: string,
     overAgeTwelveAndDisabled: option(true),
@@ -381,7 +381,7 @@ const dependentCareQualifyingPersonEntry = /** @type {const} */ ({
  * credits supplies only that credit's data, and a record with neither is a
  * real (if pointless) state rather than a validation failure.
  */
-export const creditsSchema = /** @type {const} */ ({
+export const creditsSchema = open({
     ...base(dialect),
     recipientTin: string,
     taxYear: number,

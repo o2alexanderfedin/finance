@@ -188,7 +188,7 @@
  *
  * @module
  */
-import { array, number, option, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
+import { array, number, open, option, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
 import { validate as rttiValidate } from 'functionalscript/fjs/types/rtti/validate/module.f.mjs'
 import { error, ok } from 'functionalscript/fjs/types/result/module.f.mjs'
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
@@ -218,7 +218,7 @@ export const mediaType = mediaTypeOf(dialect)
  * what the payment was, so a refusal can name something a reader recognizes on
  * their own records rather than only "some entry".
  */
-const expenseEntry = /** @type {const} */ ({
+const expenseEntry = open({
     category: string,
     datePaid: string,
     description: string,
@@ -246,7 +246,7 @@ const expenseEntry = /** @type {const} */ ({
  * would either allocate a direct expense that must not be allocated, or fail
  * to allocate an indirect one that must be.
  */
-const businessUseOfHomeExpenseEntry = /** @type {const} */ ({
+const businessUseOfHomeExpenseEntry = open({
     line: string,
     column: string,
     description: string,
@@ -301,7 +301,7 @@ const businessUseOfHomeExpenseEntry = /** @type {const} */ ({
  * dialect's own recorded lesson, where a reader who assumed one direction for
  * all four got three of them backwards.
  */
-const businessUseOfHomeRecord = /** @type {const} */ ({
+const businessUseOfHomeRecord = open({
     method: string,
     claimingTheStandardDeduction: option(true),
     allGrossIncomeFromTheBusinessUseOfTheHome: option(true),
@@ -331,7 +331,7 @@ const businessUseOfHomeRecord = /** @type {const} */ ({
  * record from another's — see this module's docstring, "One document is one
  * BUSINESS".
  */
-export const businessExpensesSchema = /** @type {const} */ ({
+export const businessExpensesSchema = open({
     ...base(dialect),
     recipientTin: string,
     accountNumber: string,

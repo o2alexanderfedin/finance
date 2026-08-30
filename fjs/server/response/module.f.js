@@ -162,7 +162,7 @@ export const sizeGuard = guardBytes => previewBytes => (content, hash) => {
 const harnessConfig = {
     serverInfo: { name: 'size-guard-proof-harness', version: '0.0.0' },
     capabilities: { tools: {} },
-    protocolVersion: 'size-guard-proof',
+    protocolVersions: ['size-guard-proof'],
 }
 
 /** UTF-8 bytes of `s` as a plain array — the virtual stdin byte stream, same helper `fjs/server/module.f.js` uses. @type {(s: string) => readonly number[]} */

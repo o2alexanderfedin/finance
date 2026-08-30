@@ -55,7 +55,7 @@
  *
  * @module
  */
-import { number, option, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
+import { number, open, option, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
 import { validate as rttiValidate } from 'functionalscript/fjs/types/rtti/validate/module.f.mjs'
 import { error, ok } from 'functionalscript/fjs/types/result/module.f.mjs'
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
@@ -81,7 +81,7 @@ export const mediaType = mediaTypeOf(dialect)
  * so structural validation reports it as the first failing field on a
  * mismatched blob (DOC-00's discriminant).
  */
-export const ssa1099Schema = /** @type {const} */ ({
+export const ssa1099Schema = open({
     ...base(dialect),
     payerTin: string,
     beneficiarySSN: string,

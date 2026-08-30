@@ -21,7 +21,7 @@
  *
  * @module
  */
-import { array, record, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
+import { array, open, record, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
 import { validate as rttiValidate } from 'functionalscript/fjs/types/rtti/validate/module.f.mjs'
 import { assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { base, mediaTypeOf } from '../base/module.f.js'
@@ -41,7 +41,7 @@ export const mediaType = mediaTypeOf(dialect)
  * structural validation reports it as the first failing field on a
  * mismatched blob (DOC-00's criterion-1 discriminant).
  */
-export const ocrSchema = /** @type {const} */ ({
+export const ocrSchema = open({
     ...base(dialect),
     pages: array(string),
     fields: record(string),

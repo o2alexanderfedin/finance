@@ -104,7 +104,7 @@
  *
  * @module
  */
-import { array, number, option, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
+import { array, number, open, option, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
 import { validate as rttiValidate } from 'functionalscript/fjs/types/rtti/validate/module.f.mjs'
 import { error, ok } from 'functionalscript/fjs/types/result/module.f.mjs'
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
@@ -736,7 +736,7 @@ export const kindVocabulary = /** @type {const} */ ([
  * helpfully materializes every key as `false` cannot smuggle a false
  * assertion in as a true one.
  */
-const dependentEntrySchema = /** @type {const} */ ({
+const dependentEntrySchema = open({
     relationship: string,
     ssnValidForEmployment: option(true),
     ageAtYearEnd: number,
@@ -969,7 +969,7 @@ export const earnedIncomeCreditFactError = field => stated => {
  * mismatched blob — DOC-00's criterion-1 discriminant, proven by
  * `proof.crossDialect` below.
  */
-export const returnProfileSchema = /** @type {const} */ ({
+export const returnProfileSchema = open({
     ...base(dialect),
     taxYear: number,
     filingStatus: string,
@@ -1740,7 +1740,7 @@ export const checkReferences = r => {
  * {@link checkReferences}.
  *
  * Dialect discrimination happens exclusively through `validateShape`'s
- * exact-literal match on `returnProfileSchema.dialect` — an already-parsed
+ * exact-literal match on `returnProfileSchema`'s `dialect` member — an already-parsed
  * value's `dialect` field compared as a schema constant, the same machinery
  * every other field goes through. Nothing in this file inspects serialized
  * JSON text to decide a dialect; `proof.crossDialect` is the runtime evidence.
