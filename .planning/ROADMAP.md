@@ -1312,7 +1312,10 @@ numbers.** 240 phase files, plus citations throughout REQUIREMENTS.md and this f
 as 34, 35 and 36; renumbering them into a tidy v5 sequence is the same lie the v4 section above
 already refused for the accountant demo.
 
-**Execution order: 38 → 39 → 40 → 41, then 34, 35 and 36 whenever the owner unblocks them.**
+**Execution order: `38 → (39 ∥ 40) → 41`, then 34, 35 and 36 whenever the owner unblocks them.**
+39 and 40 are independent successors of 38 and neither waits on the other, so an executor holding
+39 does not hold 40. The Progress table below states the same dependency in each row — "needs 38",
+both times — and the paragraph after this one gives the reasons.
 
 **Phase 40 comes after 38, not before it**, because the write-path check is written in 0.47.0's
 `rest`/`open` vocabulary — running it first means writing it once against 0.46.1 and again after.
@@ -1336,8 +1339,43 @@ do not gate them; they run when the owner is in the room.
 
       1. `package.json` names 0.47.0 explicitly and `tsc` reports **0** errors, from **63 errors in
          3 files** with the bump alone.
-      2. `node --test` reports **3294/3294**, from **3286/3294** with the bump alone — all 8
-         failures sharing one root cause — and `ui-tests` reports **46/46**.
+      2. **`npm test` is green**, and **no project-local proof leaf is lost** — settled by
+         comparing leaf-name SETS, not totals, with the recipe AGENTS.md already documents. Run
+         both halves; the second is what the first cannot see:
+
+         ```sh
+         # the same command in each tree: on 0.46.1 first, then on the migrated tree
+         npm test 2>&1 | grep -o '^✔ import("\./fjs/[^ ]*' | sort -u > baseline-leaves.txt
+         npm test 2>&1 | grep -o '^✔ import("\./fjs/[^ ]*' | sort -u > result-leaves.txt
+         comm -23 baseline-leaves.txt result-leaves.txt   # must be EMPTY — the set only grows
+         # a name kept is not a proof kept: for every proof module this phase touches
+         grep -cE '\bassert(Eq|NotNullish)?\(' <file>     # before vs after; a drop is a regression
+         ```
+
+         **Measured across the bump on `feature/fjs-0.47.0` (PR #139), 2026-08-27 — not in the
+         throwaway worktree above: nothing lost, one leaf gained** —
+         `proof.financeDocumentsListTool.realDocumentWithFormFieldsKeepsItsIdentity` in
+         `fjs/server/finance_documents_list`, carrying the set from **3245** on 0.46.1 at this
+         branch point to **3246**. No touched module's assertion count fell:
+         `fjs/document/base` **5 → 6**, `fjs/server/finance_documents_list` **39 → 42**. Raw and
+         `sort -u` counts agree on both trees. `ui-tests` reports **46/46**. With the bump alone
+         8 leaves failed, all sharing one root cause. Those figures are observations; the gate is
+         the empty `comm` and the assertion counts.
+
+         **This criterion read "`node --test` reports 3294/3294" until 2026-08-27**, which
+         AGENTS.md forbids twice over (the "Never gate a phase on `npm test`'s total" rule):
+         bare `node --test` uses default discovery and skips the `tsc` gate that `npm test`
+         runs first, so the count could be taken over a tree that does not typecheck; and the
+         total is not a phase gate. **It was already 3294/3294 on 0.46.1** — the criterion was
+         satisfied by an empty diff before the phase began, exactly the Phase 7 "total > 134"
+         defect AGENTS.md records.
+
+         **Its replacement, "`grep -c` reports 3245 or more", was corrected again the same day.**
+         Neither of its numbers was stale — 3245 is what this branch point measures — but a
+         cardinality floor equal to the baseline stays green while a proof is deleted and an
+         unrelated one added, so it could not establish the very guarantee it was written under.
+         **A count is not a set**, and this repo has already paid once for a proof that survived
+         the change it was meant to detect.
       3. **`open()` is stated where each schema is DEFINED, not where it is registered**, and the
          criterion is a measurement rather than a diff size. Wrapping at the `dialectEntry(...)`
          call site satisfies the new signature and passes criteria 1 and 2 in full — it was
