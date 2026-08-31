@@ -424,11 +424,33 @@ export const proof = {
                 'operation not permitted: fetch; permitted: casRead, evoList, evoHead, evoRevision')
         },
     },
+    // The permitted half of the same question. Every refusal leaf here
+    // names the four permitted commands, and only `casRead` had ever been
+    // dispatched — so nothing pinned that the other three reach their OWN
+    // handler rather than some shared one. A map whose four entries all
+    // resolved to the same function would satisfy "not refused" while
+    // quietly conflating the commands, which is why each row asserts the
+    // handler's own tagged answer and not merely an `ok`.
+    everyPermittedNameDispatchesToItsOwnHandler: () => {
+        const permitted = ['casRead', 'evoList', 'evoHead', 'evoRevision']
+        assertEq(permitted.length, 4, 'the four names refusalMessage prints as permitted')
+        for (const name of permitted) {
+            const result = interpret(probeMap)(probeDo(name)('argument'))
+            assertEq(result[0], 'ok', name)
+            const [value, reads] = result[1]
+            assertEq(value, `${name}:argument`, ['each name answers with its own handler', name])
+            assertEq(JSON.stringify(reads), JSON.stringify([[name, ['argument']]]),
+                ['and is recorded under its own name', name])
+        }
+    },
     // EXEC-04: the two-step escalation chased to its logical end, not just a
     // single refused dispatch. Installing a getter for a denied command is
     // itself refused before the getter function ever runs, so the map gains
     // no own property from the attempt, and a following dispatch of the
     // target command is still refused with its own message.
+    //
+    // The getter body below is deliberately the one function in this module
+    // no run reaches: that it is never entered IS the security property.
     twoStepDefineGetterEscalation: () => {
         const install = interpret(probeMap)(probeDo('__defineGetter__')('fetch', () => 'exfiltrated'))
         assertEq(install[0], 'error')

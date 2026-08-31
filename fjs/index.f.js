@@ -1,9 +1,10 @@
 import { exitStep } from 'functionalscript/fjs/effects/node/module.f.mjs'
-import { emptyState, virtual } from 'functionalscript/fjs/effects/node/virtual/module.f.mjs'
+import { defaultNodeProgramOptions, emptyState, virtual } from 'functionalscript/fjs/effects/node/virtual/module.f.mjs'
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { financeMcpServer } from './server/module.f.js'
 
-/** @import { NodeProgram, NodeProgramOptions } from 'functionalscript/fjs/effects/node/types.js' */
+/** @import { NodeProgram } from 'functionalscript/fjs/effects/node/types.js' */
+/** @import { State } from 'functionalscript/fjs/effects/node/virtual/types.js' */
 
 /**
  * `options.args[0]` is the CAS/Evo store home path an invoker supplies —
@@ -38,25 +39,18 @@ export const main = options => exitStep(financeMcpServer(options.args[0] ?? '.')
  * because a `virtual` run records the paths it touched.
  */
 /**
- * `NodeProgramOptions` minus the one field under test. Ten fields are required
- * and nine of them are inert here: this module's only decision is which store
- * home reaches `financeMcpServer`, so everything else is filled with the
- * emptiest legal value and `args` is supplied per leaf.
- * @type {(args: readonly string[]) => NodeProgramOptions}
+ * Runs `main` under the in-memory Node with an empty stdin.
+ *
+ * The options come from upstream's own `defaultNodeProgramOptions` with
+ * only `args` overridden, which is the spelling its docstring asks for.
+ * A hand-written literal here would have to fill all ten fields, nine of
+ * which this module never reads — and the two test-context stubs such a
+ * literal needs are functions no run ever calls, so it also left this
+ * file permanently short of full function coverage for fields that are
+ * pure filler.
+ * @type {(args: readonly string[]) => readonly [State, unknown]}
  */
-const optionsWith = args => ({
-    args,
-    env: {},
-    home: '/home',
-    std: { stdout: { isTTY: false }, stderr: { isTTY: false } },
-    testContext: { test: () => Promise.resolve() },
-    bunTestContext: { test: () => Promise.resolve() },
-    engine: 'node',
-    inlineTestContext: false,
-})
-
-/** Runs `main` under the in-memory Node with an empty stdin. */
-const run = (/** @type {readonly string[]} */ args) => virtual({ ...emptyState, stdin: [] })(main(optionsWith(args)))
+const run = args => virtual({ ...emptyState, stdin: [] })(main({ ...defaultNodeProgramOptions, args }))
 
 export const proof = {
     /** An invoker's own path is used — the `claude mcp add` case. */
