@@ -1183,10 +1183,11 @@ is deferred, so three phases remain, and two reasons override the numeric defaul
 | 35. A Filable Artifact (fill the official PDF) | **v5** | 0/TBD | CSS half shipped; PDF half blocked on a dependency decision | - |
 | 36. The Conversational Path | **v5** | 0/TBD | Not started | - |
 | 37. FunctionalScript 0.46.1 | v3 | 0/0 — no plans written | Complete; report in `.planning/reports/` | 2026-08-19 · PR #98/#99/#100 |
-| 38. Take FunctionalScript 0.47.0 | **v5** | 0/TBD | Not started; measured green in a worktree 2026-08-27 (`tsc` 0, 3294/3294, ui-tests 46/46) | - |
-| 39. Retire the Protocol-Version Gap | **v5** | 0/TBD | Not started; needs 38 | - |
-| 40. Validation on the Write Path | **v5** | 0/TBD | Not started; needs 38 | - |
-| 41. New Capabilities and the Migration Report | **v5** | 0/TBD | Not started; last of the four | - |
+| 38. Take FunctionalScript 0.47.0 | v5 | 0/0 — no plans written | Complete (MAINT-09); superseded four days later by 0.48.0 in Phase 42 | 2026-08-27 · PR #139 |
+| 39. Retire the Protocol-Version Gap | **v6** | 0/0 — no plans written | Complete (MAINT-10); three dangling citations removed, and the proof that could not have failed replaced by one that watches the negotiation | 2026-08-31 · PR #145 |
+| 40. Validation on the Write Path | **v6** | 0/0 — no plans written | Complete (DOC-25); `cas_add` now refuses content that declares a finance dialect and does not satisfy it | 2026-08-31 · PR #146 |
+| 41. New Capabilities and the Migration Report | **v6** | 0/0 — no plans written | Complete (MAINT-11 partial / MAINT-12 / MAINT-13); the `fjs web` half of MAINT-11 is blocked upstream on a 131072-byte ceiling, filed in `fjs/todo/` | 2026-08-31 · PR #147 |
+| 42. Take FunctionalScript 0.48.0 | **v6** | 0/0 — no plans written | Complete; 140 rtti sites and 459 `option` calls rewritten, all 30 served schemas byte-identical | 2026-08-31 · PR #144 |
 
 > **The nine stale milestone-v2 rows were retro-filled on 2026-08-17, from measurement.** They
 > had read `0/TBD | Not started` for work that was in `develop`: phases 21 through 29 all
