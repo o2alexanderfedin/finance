@@ -3303,9 +3303,7 @@ export const proof = {
                     outcome.kind === 'error',
                     ['a kind this split added must refuse on its own', kind, outcome])
                 const row = unmodeledKindRefusals.find(r => r.kind === kind)
-                if (row === undefined) {
-                    throw ['a kind this split added must carry a refusal row', kind]
-                }
+                assert(row !== undefined, ['a kind this split added must carry a refusal row', kind])
                 // The three fields a reader can act on. AGENTS.md's own
                 // Phase 20 finding is why the LINE is asserted and not only
                 // the label: erasing a destination survived an entire suite
@@ -3373,9 +3371,7 @@ export const proof = {
                 'four printed sub-lines are named by a REFUSED kind that already existed, hand-counted')
             for (const [kind, printedLine] of absorbed) {
                 const row = unmodeledKindRefusals.find(r => r.kind === kind)
-                if (row === undefined) {
-                    throw ['a kind that absorbed a printed sub-line must still refuse', kind]
-                }
+                assert(row !== undefined, ['a kind that absorbed a printed sub-line must still refuse', kind])
                 assert(
                     row.line.includes(printedLine),
                     ['the absorbing row must name the printed sub-line it took on', kind, printedLine, row.line])
@@ -3411,9 +3407,7 @@ export const proof = {
             // rows legitimately share, so it is checked for presence only — the
             // uniqueness assertion above would be false of it by design.
             const form8978Row = unmodeledKindRefusals.find(r => r.kind === 'form8978')
-            if (form8978Row === undefined) {
-                throw ['form8978 must still refuse']
-            }
+            assert(form8978Row !== undefined, ['form8978 must still refuse'])
             assert(
                 form8978Row.line.includes('Schedule 2 line 17z'),
                 ['Form 8978\u2019s negative adjustment also lands on the Schedule 2 write-in line',
@@ -3453,9 +3447,7 @@ export const proof = {
             assertEq(residuals.length, 3, 'three write-in lines carry a residual kind, hand-counted')
             for (const [kind, printedLine] of residuals) {
                 const row = unmodeledKindRefusals.find(r => r.kind === kind)
-                if (row === undefined) {
-                    throw ['a write-in line must keep its residual kind', kind]
-                }
+                assert(row !== undefined, ['a write-in line must keep its residual kind', kind])
                 assert(
                     row.line.startsWith(`${printedLine} `),
                     ['a residual kind must name its own write-in line', kind, printedLine, row.line])

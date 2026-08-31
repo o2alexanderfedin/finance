@@ -380,7 +380,6 @@ export const form461 = taxParamSet => input => {
 /** TY2025's parameter set, narrowed exactly ONCE at module scope. */
 const params2025 = taxParamsByYear[2025]
 assert(params2025 !== undefined, 'TY2025 parameters must exist')
-if (params2025 === undefined) { throw 'expected TY2025 parameters' }
 
 /** Every Part I input at zero, so each leaf below states only what it varies.
  * @type {Form461Input}
@@ -399,7 +398,6 @@ const allZero = {
  */
 const expectOk = outcome => {
     assert(outcome.kind === 'ok', ['expected Form 461 to compute', outcome])
-    if (outcome.kind !== 'ok') { throw 'expected the ok arm' }
     return outcome
 }
 
@@ -408,7 +406,6 @@ const expectOk = outcome => {
  */
 const expectRefusal = outcome => {
     assert(outcome.kind === 'error', ['expected Form 461 to refuse', outcome])
-    if (outcome.kind !== 'error') { throw 'expected the error arm' }
     return outcome.message
 }
 

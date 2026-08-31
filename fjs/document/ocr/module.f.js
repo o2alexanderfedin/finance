@@ -69,9 +69,7 @@ export const proof = {
     populatedRoundTrips: () => {
         const value = { dialect, pages: ['page 1 text'], fields: { 'Box 1 Interest income': '1,234.56' } }
         const [t, v] = validate(value)
-        if (t !== 'ok') {
-            throw ['expected ok', t, v]
-        }
+        assert(t === 'ok', ['expected ok', t, v])
         assertEq(v.fields['Box 1 Interest income'], '1,234.56')
         assertEq(v.pages[0], 'page 1 text')
     },

@@ -612,14 +612,12 @@ const baseInput = overrides => ({
 /** @type {(outcome: Form8863Outcome) => Form8863Result} */
 const okResult = outcome => {
     assert(outcome.kind === 'ok', ['expected a computed Form 8863', outcome])
-    if (outcome.kind !== 'ok') { throw ['unreachable', outcome] }
     return outcome
 }
 
 /** @type {(outcome: Form8863Outcome) => Form8863Refusal} */
 const refusal = outcome => {
     assert(outcome.kind === 'error', ['expected a refusal', outcome])
-    if (outcome.kind !== 'error') { throw ['unreachable', outcome] }
     return outcome
 }
 

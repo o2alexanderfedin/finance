@@ -458,9 +458,7 @@ const responsesOf = state => state.stdout
 const decoder = validator => value => {
     assert(value !== undefined, 'expected a JSON-RPC response, got none')
     const [t, v] = validator(value)
-    if (t === 'error') {
-        throw ['unexpected JSON-RPC response shape', v]
-    }
+    assert(t !== 'error', ['unexpected JSON-RPC response shape', v])
     return v
 }
 

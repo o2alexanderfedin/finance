@@ -456,7 +456,6 @@ const baseInput = overrides => ({
  */
 const expectOk = outcome => {
     assert(outcome.kind === 'ok', ['expected an ok outcome', outcome])
-    if (outcome.kind !== 'ok') { throw ['unreachable', outcome] }
     return outcome
 }
 

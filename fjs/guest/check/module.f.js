@@ -125,9 +125,7 @@ const placeJsModuleFixture = root => path => fn => {
     /** @type {(dir: Dir, segments: readonly string[]) => Dir} */
     const place = (dir, segments) => {
         const [first, ...rest] = segments
-        if (first === undefined) {
-            throw new Error('expected a non-empty path')
-        }
+        assert(first !== undefined, new Error('expected a non-empty path'))
         if (rest.length === 0) {
             return { ...dir, [first]: fn }
         }

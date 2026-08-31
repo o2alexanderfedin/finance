@@ -671,10 +671,8 @@ export const depreciableAssets = register => register.assets.map(asset => {
         ['a validated datePlacedInService is YYYY-MM', asset.datePlacedInService])
     const method = macrsMethods.find(candidate => candidate === asset.method)
     assert(method !== undefined, ['a validated method is one of the three', asset.method])
-    if (method === undefined) { throw ['a validated method is one of the three', asset.method] }
     const convention = macrsConventions.find(candidate => candidate === asset.convention)
     assert(convention !== undefined, ['a validated convention is one of the three', asset.convention])
-    if (convention === undefined) { throw ['a validated convention is one of the three', asset.convention] }
     const claimed = asset.specialDepreciationAllowanceClaimed
     const elected = asset.section179ElectedCost
     const disposal = asset.disposal
@@ -780,9 +778,7 @@ const withAsset = asset => ({ ...minimalAssetRegister, assets: [asset] })
 /** Unwraps a refusal message, throwing when the value validated instead. @type {(r: Result<AssetRegister, AssetRegisterError>) => string} */
 const expectRefusal = ([t, v]) => {
     assert(t === 'error', ['expected a refusal', t, v])
-    if (t !== 'error') { throw ['expected a refusal', t, v] }
     assert(typeof v === 'string', ['expected a SEMANTIC refusal, not a structural one', v])
-    if (typeof v !== 'string') { throw ['expected a semantic refusal', v] }
     return v
 }
 
@@ -968,10 +964,8 @@ export const proof = {
             assert(t === 'ok', ['expected ok', t, v])
             const [asset] = depreciableAssets(v)
             assert(asset !== undefined, 'expected one extracted asset')
-            if (asset === undefined) { return }
             const disposal = asset.disposal
             assert(disposal !== undefined, ['the disposal must travel out of the dialect', asset])
-            if (disposal === undefined) { return }
             assertEq(disposal.acquiredDate, '2023-02-14')
             assertEq(disposal.soldDate, '2025-11-03')
             // The month and the year are split out because Step 3's disposal
@@ -990,7 +984,6 @@ export const proof = {
             assert(t === 'ok', ['expected ok', t, v])
             const [asset] = depreciableAssets(v)
             assert(asset !== undefined, 'expected one extracted asset')
-            if (asset === undefined) { return }
             assertEq(asset.disposal, undefined)
         },
         // The register asserts nothing was disposed of AND records a disposal.

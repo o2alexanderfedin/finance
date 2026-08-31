@@ -10730,9 +10730,7 @@ export const proof = {
                 wholeReportOutcome.kind === 'error',
                 ['expected the whole report to refuse today, via the absent-basis mechanism', wholeReportOutcome],
             )
-            if (wholeReportOutcome.kind !== 'error') {
-                throw ['expected error', wholeReportOutcome]
-            }
+            assert(wholeReportOutcome.kind === 'error', ['expected error', wholeReportOutcome])
             assertEq(
                 wholeReportOutcome.unmodeled.length,
                 0,
@@ -11231,9 +11229,7 @@ export const proof = {
                 outcome.kind === 'error',
                 ['expected the whole report to refuse, never a silently-wrong ACTC', outcome],
             )
-            if (outcome.kind !== 'error') {
-                throw ['expected error', outcome]
-            }
+            assert(outcome.kind === 'error', ['expected error', outcome])
             assert(
                 outcome.message.includes('Part II-B'),
                 ['expected the refusal to name Part II-B', outcome.message],
@@ -12909,9 +12905,7 @@ export const proof = {
             assert(
                 cited !== undefined,
                 'line 31 must cite the profile box the extension payment was read from')
-            if (cited === undefined) {
-                throw ['unreachable', outcome]
-            }
+            assert(cited !== undefined, ['unreachable', outcome])
             assertEq(cited.documentHash, profileHash)
             assertEq(cited.value, '1250.00', 'the raw stored string, never re-formatted')
         },

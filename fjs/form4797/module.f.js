@@ -1005,14 +1005,12 @@ const serverRack = {
 /** @type {(outcome: Form4797Outcome) => Form4797Ok} */
 const expectOk = outcome => {
     assert(outcome.kind === 'ok', ['expected Form 4797 to compute', outcome])
-    if (outcome.kind !== 'ok') { throw ['expected ok', outcome] }
     return outcome
 }
 
 /** @type {(outcome: Form4797Outcome) => string} */
 const expectRefusal = outcome => {
     assert(outcome.kind === 'error', ['expected Form 4797 to refuse', outcome])
-    if (outcome.kind !== 'error') { throw ['expected error', outcome] }
     // Every refusal must say WHERE the amount would have gone, and the three
     // destinations are what a reader can act on. AGENTS.md records a
     // verification sweep in which erasing a destination from an interpolation
@@ -1166,7 +1164,6 @@ export const proof = {
         assertEq(f.partIIIProperties.length, 1)
         const [property] = f.partIIIProperties
         assert(property !== undefined, 'expected one Part III property')
-        if (property === undefined) { return }
         assertEq(property.line22DepreciationCents, 1250361n, 'line 22')
         assertEq(property.line21CostPlusExpenseOfSaleCents, 2025100n, 'line 21')
         assertEq(property.line23AdjustedBasisCents, 774739n, 'line 23')
@@ -1218,7 +1215,6 @@ export const proof = {
         assertEq(f.partIIIProperties.length, 1, 'a GAIN, so Part III')
         const [property] = f.partIIIProperties
         assert(property !== undefined, 'expected one Part III property')
-        if (property === undefined) { return }
         assertEq(property.line22DepreciationCents, 1823629n,
             'the claimed allowance PLUS four years of MACRS')
         // The two halves, hand-typed separately, so a leaf asserting only the
@@ -1276,7 +1272,6 @@ export const proof = {
         const f = expectOk(overOneRegister([trailer]))
         const [property] = f.partIIIProperties
         assert(property !== undefined, 'expected one Part III property')
-        if (property === undefined) { return }
         assertEq(property.line22DepreciationCents, 412452n, 'line 22')
         assertEq(property.line23AdjustedBasisCents, 397648n, 'line 23')
         assertEq(property.line24TotalGainCents, 552352n, 'line 24')
@@ -1310,7 +1305,6 @@ export const proof = {
         assertEq(f.line2Rows.length, 1)
         const [row] = f.line2Rows
         assert(row !== undefined, 'expected one Part I row')
-        if (row === undefined) { return }
         assertEq(row.depreciationAllowedCents, 439350n, 'column (e)')
         assertEq(row.costPlusExpenseOfSaleCents, 600000n, 'column (f)')
         assertEq(row.gainOrLossCents, -110650n, 'column (g)')
@@ -1346,7 +1340,6 @@ export const proof = {
         const f = expectOk(overOneRegister([duplex]))
         const [property] = f.partIIIProperties
         assert(property !== undefined, 'expected one Part III property')
-        if (property === undefined) { return }
         assertEq(property.line22DepreciationCents, 4740018n, 'line 22')
         assertEq(property.line23AdjustedBasisCents, 15915482n, 'line 23')
         assertEq(property.line24TotalGainCents, 9084518n, 'line 24')
@@ -1387,7 +1380,6 @@ export const proof = {
         assertEq(f.line10Rows.length, 1)
         const [row] = f.line10Rows
         assert(row !== undefined, 'expected one Part II row')
-        if (row === undefined) { return }
         assertEq(row.depreciationAllowedCents, 432000n, 'column (e)')
         assertEq(row.gainOrLossCents, 132000n, 'column (g) — a GAIN, and still Part II')
         assertEq(f.line7Cents, 0n)
@@ -1478,7 +1470,6 @@ export const proof = {
         for (const [index, [documentHash, boxPath, value]] of expected.entries()) {
             const source = f.sources[index]
             assert(source !== undefined, ['expected a citation at', index])
-            if (source === undefined) { return }
             assertEq(source.documentHash, documentHash, `citation ${index} document`)
             assertEq(source.boxPath, boxPath, `citation ${index} path`)
             assertEq(source.value, value, `citation ${index} value`)

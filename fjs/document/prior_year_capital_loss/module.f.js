@@ -326,9 +326,7 @@ export const proof = {
     presentButInvalidFieldRefusesNamingTheField: () => {
         const [t, v] = validate({ ...minimal, priorYearScheduleDLine7: 'approx. -10000' })
         assert(t === 'error', ['expected error', t, v])
-        if (typeof v !== 'string') {
-            throw ['expected a semantic string error naming the field, not a structural ValidationError', v]
-        }
+        assert(typeof v === 'string', ['expected a semantic string error naming the field, not a structural ValidationError', v])
         assert(
             v.includes('priorYearScheduleDLine7'),
             ['expected the refusal to name the exact broken field', v],

@@ -970,7 +970,6 @@ export const scheduleF = input => {
     const expenseLine = category => {
         const row = farmExpenseLines.find(candidate => candidate.category === category)
         assert(row !== undefined, ['every expense line has a printed row', category])
-        if (row === undefined) { throw ['every expense line has a printed row', category] }
         const sources = farm.entries
             .filter(entry => entry.category === category)
             .map(entry => ({
@@ -1138,14 +1137,12 @@ const run = input => scheduleF({
 /** @type {(outcome: ScheduleFOutcome) => ScheduleF} */
 const ok = outcome => {
     assert(outcome.kind === 'ok', ['expected a computed Schedule F', outcome])
-    if (outcome.kind !== 'ok') { throw ['expected a computed Schedule F', outcome] }
     return outcome
 }
 
 /** @type {(outcome: ScheduleFOutcome) => string} */
 const refusal = outcome => {
     assert(outcome.kind === 'error', ['expected a refusal', outcome])
-    if (outcome.kind !== 'error') { throw ['expected a refusal', outcome] }
     return outcome.message
 }
 

@@ -660,7 +660,6 @@ export const scheduleEPartIColumn = profile => registers => document => {
     const expenseLine = category => {
         const row = rentalExpenseLines.find(candidate => candidate.category === category)
         assert(row !== undefined, ['every expense line has a printed row', category])
-        if (row === undefined) { throw ['every expense line has a printed row', category] }
         const sources = property.entries
             .filter(entry => entry.category === category)
             .map(entry => ({
@@ -913,14 +912,12 @@ const run = input => scheduleEPartI({
 /** @type {(outcome: ScheduleEPartIOutcome) => ScheduleEPartI} */
 const ok = outcome => {
     assert(outcome.kind === 'ok', ['expected a computed Part I', outcome])
-    if (outcome.kind !== 'ok') { throw ['expected a computed Part I', outcome] }
     return outcome
 }
 
 /** @type {(outcome: ScheduleEPartIOutcome) => string} */
 const refusal = outcome => {
     assert(outcome.kind === 'error', ['expected a refusal', outcome])
-    if (outcome.kind !== 'error') { throw ['expected a refusal', outcome] }
     return outcome.message
 }
 

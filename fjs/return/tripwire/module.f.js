@@ -1670,9 +1670,6 @@ export const proof = {
             })
             assert(outcome.kind === 'error',
                 ['a stored disposal must refuse when undeclared', outcome])
-            if (outcome.kind !== 'error') {
-                return
-            }
             assertEq(outcome.unmodeled.length, 1,
                 ['expected exactly one required kind', outcome.unmodeled])
             assertEq(
