@@ -11,17 +11,23 @@
  * confusion MCP-03 exists to prevent. `financeConfig` below is a distinct
  * `McpConfig`, pinned to `2025-11-25` per MCP-03.
  *
- * ## The protocol-version pin is a known upstream gap, not a design choice
+ * ## The protocol revision is negotiated upstream, and we advertise one
  *
- * `mcpStep`'s `initialize` handler validates the client's params and then
- * unconditionally returns the configured `protocolVersion` — it does not
- * negotiate against, or even inspect, what the client asked for
- * (`functionalscript/fjs/protocol/mcp/module.f.mjs`). Whatever string we pin
- * here is what every client is told, regardless of its own request. That gap
- * belongs in fjs's `initialize` handler (a generic protocol capability, not
- * app-specific glue — see AGENTS.md), and is recorded in
- * `fjs/todo/upstream-mcp-protocol-version-negotiation.md`. Do not wrap or
- * replace `mcpStep` here to work around it.
+ * This section read "a known upstream gap, not a design choice" until 2026-08-31,
+ * and told the reader not to wrap or replace `mcpStep` to work around it. **The
+ * gap closed in fjs 0.47.0 and this file did not notice for four days.**
+ * `mcpStep`'s `initialize` handler now calls `_negotiateVersion(supported,
+ * requested)`, which echoes the client's revision when `supported` contains it
+ * and answers with the latest supported one otherwise
+ * (`functionalscript/fjs/protocol/mcp/module.f.mjs`). The instruction not to
+ * work around it stands, for the better reason that there is nothing to work
+ * around.
+ *
+ * {@link financeConfig} advertises **exactly one** revision, so in practice
+ * every client is still told `2025-11-25` — see the note there for why that is
+ * a decision rather than the old pin surviving under a new name, and
+ * {@link proof} `session.negotiatesTheProtocolRevision` for the leaf that can
+ * tell those two apart.
  *
  * ## Registry composition — the full Week 1 registry
  *
@@ -253,6 +259,11 @@ export const financeMcpHandlers = home => cacheKey => fromRegistry([
 export const financeConfig = {
     serverInfo: { name: 'finance-mcp', version: '1.0.0' },
     capabilities: { tools: {} },
+    // ONE revision, now that 0.47.0's `_negotiateVersion` means the list could
+    // hold several. The software is not published, so there is no client on an
+    // older revision to serve and a second entry would advertise a compatibility
+    // this project has never had to keep. Adding one is cheap and reversible;
+    // claiming support for a revision nothing is tested against is not.
     protocolVersions: ['2025-11-25'],
 }
 
@@ -304,10 +315,14 @@ const toBytes = s => [...fromVec(utf8(s))]
 
 /**
  * The `protocolVersion` the simulated client asks for in `initialize` —
- * deliberately **not** `financeConfig.protocolVersion` (`2025-11-25`). The
- * whole point of `proof.session` is observing, empirically, that `mcpStep`
- * still answers with our pinned version regardless of this request (see
- * `fjs/todo/upstream-mcp-protocol-version-negotiation.md`).
+ * deliberately **not** one `financeConfig` advertises. Against the shipped
+ * single-entry list `_negotiateVersion` therefore counter-proposes
+ * `2025-11-25`, which is what the rest of `proof.session` reads.
+ *
+ * That is also why this constant cannot demonstrate negotiation: with one
+ * advertised revision the counter-proposal equals the old unconditional pin,
+ * so the answer is the same either way. `negotiatesTheProtocolRevision` builds
+ * its own two-entry config for that.
  */
 const requestedProtocolVersion = '2025-06-18'
 
@@ -485,6 +500,51 @@ const callResultWithIsErrorSchema = open({
     result: open({ content: array(open({ type: string, text: string })), isError: or(option, true) }),
 })
 
+/**
+ * A two-entry `McpConfig`, built here and shipped nowhere.
+ *
+ * {@link financeConfig} advertises one revision, and with one entry
+ * `_negotiateVersion` returns that entry for every request — the same answer
+ * the unconditional pin it replaced gave. A list whose answer can differ from
+ * its latest is the only thing that tells the two apart, so the proof builds
+ * one rather than widening what the server advertises (see the note beside
+ * `financeConfig` for why that stays at one).
+ *
+ * `2025-06-18` is a real MCP revision and is deliberately NOT first: the
+ * decisive case asks for it by name, and a server that pinned instead of
+ * negotiating would answer `2025-11-25`.
+ * @type {McpConfig}
+ */
+const twoRevisionConfig = {
+    ...financeConfig,
+    protocolVersions: ['2025-11-25', '2025-06-18'],
+}
+
+/**
+ * The revision `initialize` answers with, for an advertised list and a client
+ * request. Drives the real `mcpStep` over the virtual interpreter rather than
+ * calling `_negotiateVersion` — that function is upstream's and not exported,
+ * and reading it directly would prove something about a reimplementation of
+ * the handler instead of about the handler.
+ * @type {(config: McpConfig) => (requested: string) => string}
+ */
+const negotiatedWith = config => requested => {
+    const server = step(
+        initEvo(fileCas(sha256)('/')),
+        cacheKey => step(
+            create(uninitializedState),
+            sessionKey => stdioTransport(mcpStep(config)(financeMcpHandlers('/')(cacheKey))(sessionKey)),
+        ),
+    )
+    const request = {
+        ...initializeRequest,
+        params: { ...initializeRequest.params, protocolVersion: requested },
+    }
+    const [state] = virtual({ ...emptyState, stdin: toBytes(JSON.stringify(request) + '\n') })(server)
+    const [initResponse] = responsesOf(state)
+    return asInitResult(initResponse).result.protocolVersion
+}
+
 const asEnvelope = decoder(rttiValidate(envelopeSchema))
 const asInitResult = decoder(rttiValidate(initResultSchema))
 const asToolsListResult = decoder(rttiValidate(toolsListResultSchema))
@@ -499,10 +559,9 @@ export const proof = {
     financeMcpServer: () => { financeMcpServer('/') },
     // Full-session proof (MCP-05): initialize -> notifications/initialized ->
     // tools/list -> tools/call, driven against financeMcpServer through the
-    // virtual Node interpreter. See fjs/todo/upstream-mcp-protocol-version-negotiation.md
-    // for the non-negotiation gap this proof demonstrates empirically. A
-    // virtual harness proves the pieces speak correctly to each other; it
-    // cannot prove a real client will call a tool — that is Plan 03's job.
+    // virtual Node interpreter. A virtual harness proves the pieces speak
+    // correctly to each other; it cannot prove a real client will call a tool
+    // — that is Plan 03's job.
     session: {
         // Every stdout line across the whole session is valid JSON-RPC, and
         // exactly one per request (the notification gets none) — the
@@ -520,15 +579,48 @@ export const proof = {
         stderrIsEmpty: () => {
             assertEq(runSession().stderr, '')
         },
-        // Empirical, proof-backed non-negotiation: the client asked for
-        // `requestedProtocolVersion` ('2025-06-18'), but the response still
-        // carries our pinned '2025-11-25' and our own server identity —
-        // mcpStep never inspects what the client requested.
-        initializeIgnoresRequestedProtocolVersion: () => {
+        // The session answers with our own server identity, and — against the
+        // shipped single-entry list — with `2025-11-25` whatever was asked.
+        // This leaf was named `initializeIgnoresRequestedProtocolVersion` and
+        // read as proof that `mcpStep` never inspected the request. **It was
+        // never that proof.** With one advertised revision the counter-proposal
+        // equals the unconditional pin, so the assertion survived the exact
+        // change it was written to detect — 0.47.0 added negotiation and this
+        // leaf stayed green without being touched. It now says only what it can
+        // see; `negotiatesTheProtocolRevision` is where the behaviour is shown.
+        initializeAnswersWithOurIdentityAndAdvertisedRevision: () => {
             const [initResponse] = responsesOf(runSession())
             const init = asInitResult(initResponse)
             assertEq(init.result.protocolVersion, '2025-11-25')
             assertEq(init.result.serverInfo.name, 'finance-mcp')
+        },
+        // MAINT-10. The revision is NEGOTIATED, not pinned: a revision the
+        // server advertises comes back as asked, and one it does not comes back
+        // as the latest advertised. Row 1 is what fails under a pin.
+        negotiatesTheProtocolRevision: () => {
+            /** @type {readonly (readonly [string, string, string])[]} */
+            const cases = [
+                ['a supported NON-latest revision is echoed, not replaced by the latest',
+                    '2025-06-18', '2025-06-18'],
+                ['the latest is echoed when it is what was asked for',
+                    '2025-11-25', '2025-11-25'],
+                ['an unsupported revision is answered with the latest supported one',
+                    '2024-11-05', '2025-11-25'],
+            ]
+            assertEq(cases.length, 3, 'echo, echo-the-latest, and counter-propose are the whole of _negotiateVersion')
+            for (const [label, requested, expected] of cases) {
+                assertEq(negotiatedWith(twoRevisionConfig)(requested), expected, label)
+            }
+        },
+        // Why the leaf above needs a config of its own, stated as an assertion
+        // rather than as a comment: over the SHIPPED list every request is
+        // answered with the single advertised revision, so no request
+        // distinguishes negotiating from pinning.
+        theShippedConfigAdvertisesExactlyOneRevision: () => {
+            assertEq(financeConfig.protocolVersions.length, 1)
+            assertEq(financeConfig.protocolVersions[0], '2025-11-25')
+            assertEq(negotiatedWith(financeConfig)('2025-06-18'), '2025-11-25')
+            assertEq(negotiatedWith(financeConfig)('2025-11-25'), '2025-11-25')
         },
         // All seven registries composed: tools/list enumerates a non-empty
         // set that includes evo_list and cas_refresh (DOC-14), plus

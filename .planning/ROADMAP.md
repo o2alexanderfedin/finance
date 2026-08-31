@@ -1112,7 +1112,7 @@ All five are closed with fixtures that assert the wrong answer beside the right 
 **Requirements**: MAINT-09 · **Tier**: T3 · **Status**: complete — milestone v5, shipped in PR #139 (merge `14e6868`, 2026-08-30)
 
 ### Phase 39: Retire the Protocol-Version Gap
-**Requirements**: MAINT-10 · **Tier**: T3 · **Status**: not started — carried forward to milestone v6 at this number
+**Requirements**: MAINT-10 · **Tier**: T3 · **Status**: complete — milestone v6, 2026-08-31
 
 ### Phase 40: Validation on the Write Path
 **Requirements**: DOC-25 · **Tier**: T3 · **Status**: not started — carried forward to milestone v6 at this number
@@ -1121,7 +1121,7 @@ All five are closed with fixtures that assert the wrong answer beside the right 
 **Requirements**: MAINT-11, MAINT-12, MAINT-13 · **Tier**: T3 · **Status**: not started — carried forward to milestone v6 at this number
 
 ### Phase 42: Take FunctionalScript 0.48.0
-**Requirements**: MAINT-14 · **Tier**: T3 · **Status**: not started — milestone v6
+**Requirements**: MAINT-14 · **Tier**: T3 · **Status**: complete — milestone v6, shipped in PR #144 (merge `80b5e1e`)
 
 ---
 
@@ -1409,16 +1409,17 @@ do not gate them; they run when the owner is in the room.
          phase is a scope error: the open-versus-closed decision belongs to Phase 40, and taking it
          here would be taking it blind.
 
-- [ ] **Phase 39: Retire the Protocol-Version Gap** - MAINT-10. 0.47.0's `initialize` echoes the
+- [x] **Phase 39: Retire the Protocol-Version Gap** - MAINT-10. 0.47.0's `initialize` echoes the
       client's requested revision when the server supports it and counter-proposes the latest
       supported one otherwise, so the gap `fjs/server/module.f.js` documents no longer exists. Three
       things go with it, and one of them is a proof.
 
       1. The docstring at lines 14-20 of `fjs/server/module.f.js`, headed "The protocol-version pin
          is a known upstream gap, not a design choice", is gone, and `grep -rn
-         "upstream-mcp-protocol-version-negotiation" fjs` returns nothing — lines 23, 310 and 495
-         cite a note already deleted in `7244f81`, the same dangling-prose class as the submodule
-         text corrected in PR #137.
+         "upstream-mcp-protocol-version-negotiation" fjs` returns nothing — lines 23, 310 and 502
+         (this criterion said 495; the third citation was a line comment at 502, and the figure was
+         never re-measured after the file grew) cite a note already deleted in `7244f81`, the same
+         dangling-prose class as the submodule text corrected in PR #137.
       2. `proof.session.initializeIgnoresRequestedProtocolVersion` runs against a `protocolVersions`
          list of **at least two** entries and tells an echo from a pin. **It passes today for the
          wrong reason**: one entry makes the counter-proposal equal the old unconditional pin, so
@@ -1549,7 +1550,7 @@ would mean reading it twice. 39 no longer needs anything from 42 on the negotiat
 0.47.0 already shipped `_negotiateVersion` and this repository simply never noticed — but its
 proof is rewritten against whatever 0.48.0's `mcp` surface is, so it follows.
 
-- [ ] **Phase 42: Take FunctionalScript 0.48.0** - MAINT-14. `^0.47.0` does not admit 0.48.0
+- [x] **Phase 42: Take FunctionalScript 0.48.0** - MAINT-14. `^0.47.0` does not admit 0.48.0
       — a caret on a `0.x` pins the minor — so this is an explicit bump. **Measured against
       `0fcb088` on 2026-08-30, before this phase was written**; the numbers are observations
       mainline must reproduce, not targets. 235 changed files upstream, 15 added, 7 removed;
