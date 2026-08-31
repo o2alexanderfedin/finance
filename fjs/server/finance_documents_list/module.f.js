@@ -89,7 +89,7 @@ import { empty, nonEmpty } from 'functionalscript/fjs/effects/list/module.f.mjs'
 import { collectRead, fileCas } from 'functionalscript/fjs/cas/module.f.mjs'
 import { cBase32ToVec, vecToCBase32 } from 'functionalscript/fjs/basen/cbase32/module.f.mjs'
 import { utf8ToString, tryUtf8 } from 'functionalscript/fjs/text/module.f.mjs'
-import { toolEntry, okResult, errorResult } from 'functionalscript/fjs/protocol/mcp/module.f.mjs'
+import { toolEntry, toolResultStep } from 'functionalscript/fjs/protocol/mcp/module.f.mjs'
 import { errorSummary } from 'functionalscript/fjs/effects/node/module.f.mjs'
 import { initEvo, evo as evoOf } from 'functionalscript/fjs/cas/evo/module.f.mjs'
 import { sha256 } from 'functionalscript/fjs/crypto/sha2/module.f.mjs'
@@ -218,7 +218,10 @@ export const financeDocumentsListTool = evo => cas => {
         '(subject, head) pair -- a subject with concurrent heads yields ' +
         'one row per head, all sharing the same subject.',
         { archived: or(option, true) },
-        ({ archived }) => catchStep(mapStep(
+        // `toolResultStep` (MAINT-11) states the value and error renderers in one
+        // call; it is what deleted the `mapStep`/`catchStep` sandwich that used
+        // to wrap this fold on both sides.
+        ({ archived }) => toolResultStep(
             step(
                 evo.list(archived),
                 subjects => foldStep(
@@ -237,11 +240,11 @@ export const financeDocumentsListTool = evo => cas => {
                     ),
                 ),
             ),
-            list => okResult(jsonText(list)),
-        // An MCP handler answers `never`: a runner that cannot dispatch
-        // `evo.list`/`evo.head` becomes a JSON-RPC error response here rather
-        // than a failure the transport has to carry.
-        ), e => pureOk(errorResult(`finance_documents_list failed: ${errorSummary(e)}`))),
+            jsonText,
+            // An MCP handler answers `never`: a runner that cannot dispatch
+            // `evo.list`/`evo.head` becomes a JSON-RPC error response here
+            // rather than a failure the transport has to carry.
+            e => `finance_documents_list failed: ${errorSummary(e)}`),
     )
 }
 
@@ -315,6 +318,13 @@ const findSubject = entries => subject => entries.find(entry => entry.subject ==
  *   readonly archived: readonly DocumentListEntry[],
  * }}
  */
+/**
+ * Well-formed cBase32 that names a blob nothing ever wrote — the read failure
+ * `entryFor` recovers from, as distinct from a blob that is present and does
+ * not parse.
+ */
+const absentSnapshotHash = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+
 const buildFixture = () => {
     const home = '/'
     const cas = fileCas(sha256)(home)
@@ -396,9 +406,20 @@ const buildFixture = () => {
         e.add({ parents: [], subject: 'subjectConcurrent', snapshot: concurrentHashB }))
     assert(concurrentAddB[0] === 'ok', ['expected the second concurrent add to succeed', concurrentAddB])
 
+    // (7) A revision whose snapshot hash is well-formed cBase32 but names a
+    // blob that was never written. This is the ONLY case that reaches
+    // `entryFor`'s `catchStep` recovery: (5)'s broken blob is present and
+    // fails to PARSE, which the decode arm answers, while an absent blob
+    // fails to READ. Until this fixture existed the recovery had no coverage
+    // at all, so the "skip this pair, never crash" behaviour the module
+    // header promises was a claim rather than a demonstrated property.
+    const [state17, absentAdd] = virtual(state16)(
+        e.add({ parents: [], subject: 'subjectAbsentSnapshot', snapshot: absentSnapshotHash }))
+    assert(absentAdd[0] === 'ok', ['expected the absent-snapshot add to succeed', absentAdd])
+
     return {
-        active: listThrough(state16)(cas)(e)({}),
-        archived: listThrough(state16)(cas)(e)({ archived: true }),
+        active: listThrough(state17)(cas)(e)({}),
+        archived: listThrough(state17)(cas)(e)({ archived: true }),
     }
 }
 
@@ -476,6 +497,25 @@ export const proof = {
             const { active, archived } = buildFixture()
             assertEq(findSubject(active)('subjectBrokenSnapshot'), undefined)
             assertEq(findSubject(archived)('subjectBrokenSnapshot'), undefined)
+        },
+        /**
+         * The OTHER way a snapshot fails, and the one `entryFor`'s `catchStep`
+         * recovery exists for: the blob is not there to read at all, rather
+         * than present and unparseable. The leaf above cannot reach that arm —
+         * its blob reads fine and fails to decode.
+         *
+         * Both must skip rather than crash, and both must leave every other
+         * subject in the listing: `foldStep` short-circuits on the first error
+         * since 0.46.0, so a failure escaping the per-pair recovery would drop
+         * the remaining documents rather than this one row. That is what the
+         * second half asserts.
+         */
+        absentSnapshotSkippedAndTheRestSurvive: () => {
+            const { active, archived } = buildFixture()
+            assertEq(findSubject(active)('subjectAbsentSnapshot'), undefined)
+            assertEq(findSubject(archived)('subjectAbsentSnapshot'), undefined)
+            assert(findSubject(active)('subjectKnown') !== undefined, active)
+            assert(findSubject(active)('subjectConcurrent') !== undefined, active)
         },
         // Every entry in a non-empty result carries subject/dialect/hash,
         // and taxYear is either a number or genuinely absent -- never
