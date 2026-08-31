@@ -352,7 +352,10 @@ export const proof = {
     // no import of any kind inside it — Success Criterion 2's shape.
     reportShapedProgramRuns: () => {
         /** @type {Report<string>} */
-        const report = ctx => args => ctx.casRead(args[0] ?? '')
+        // `assertNotNullish` rather than `args[0] ?? ''`: the fixture is
+        // always called with a hash, and reading a missing one as the empty
+        // string would have this leaf assert against a read nobody asked for.
+        const report = ctx => args => ctx.casRead(assertNotNullish(args[0], ['a hash is always supplied', args]))
         const [t, v] = interpret(hostMap)(report(guestCtx)(['abc']))
         assert(t === 'ok', ['expected ok', t, v])
         assertEq(v[0], 'casRead:abc')

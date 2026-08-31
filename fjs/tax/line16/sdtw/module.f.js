@@ -587,4 +587,65 @@ export const proof = {
         assert(sdtwResult.line47 !== 0n, ['the shared cents value must be non-trivial, not a vacuous 0 === 0', sdtwResult.line47])
         assertEq(sdtwResult.line47, 1352100n, 'the shared figure is $13,521.00, independently confirmed above')
     },
+    // Six of the printed forks on the top half of the page have only
+    // ever been walked on one side. Every fixture above enters Form 4952
+    // lines 4g and 4e as zero and Schedule D lines 15 and 16 as the same
+    // gain, so line 5 never has a positive difference to carry, line 7
+    // never picks line 15 over line 16, line 8 never picks line 3 over
+    // line 4, line 9 never floors, and lines 12 and 35 never pick line 9
+    // over the Schedule D amount they are capped against. Each row here
+    // is the split-dispatch fixture with the smallest override that
+    // swings ONE named fork to its other side; the expected figure is
+    // that line's printed instruction applied by hand to the row's own
+    // inputs, never read back off the implementation.
+    everyTopHalfForkIsWalkedOnBothSides: () => {
+        /** @type {readonly (readonly [string, Partial<SdtwInput>, (r: Sdtw) => bigint, bigint])[]} */
+        const cases = [
+            // "Subtract line 4 from line 3": $500.00 - $200.00.
+            ['line 5 carries the difference when 4g is the larger',
+                { form4952Line4gCents: 50000n, form4952Line4eCents: 20000n }, r => r.line5, 30000n],
+            // "Enter the smaller of line 15 or line 16 of Schedule D."
+            ['line 7 takes Schedule D line 15 when that is the smaller',
+                { scheduleD15Cents: 8000000n }, r => r.line7, 8000000n],
+            // "Enter the smaller of line 3 or line 4": $200.00 against $500.00.
+            ['line 8 takes line 3 when 4g is the smaller',
+                { form4952Line4gCents: 20000n, form4952Line4eCents: 50000n }, r => r.line8, 20000n],
+            // "Subtract line 8 from line 7. If zero or less, enter -0-":
+            // line 7 is $1,000.00 and line 8 is $5,000.00, so the floor bites.
+            ['line 9 floors at zero when line 8 exceeds line 7',
+                {
+                    scheduleD15Cents: 100000n, scheduleD16Cents: 100000n,
+                    form4952Line4gCents: 500000n, form4952Line4eCents: 500000n,
+                }, r => r.line9, 0n],
+            // "Enter the smaller of line 9 or line 11": $10,000.00 against
+            // the $50,000.00 Schedule D lines 18/19 total.
+            ['line 12 takes line 9 when the Schedule D 18/19 total is larger',
+                { scheduleD15Cents: 1000000n, scheduleD19Cents: 5000000n }, r => r.line12, 1000000n],
+            // "Enter the smaller of line 9 or Schedule D line 19" — the
+            // same two amounts, on the far side of the §1250 gate, which a
+            // non-zero Schedule D line 19 also opens for the first time.
+            ['line 35 takes line 9 when it is under Schedule D line 19',
+                { scheduleD15Cents: 1000000n, scheduleD19Cents: 5000000n }, r => r.line35, 1000000n],
+        ]
+        assertEq(cases.length, 6, 'one row per fork the fixtures above leave half-walked')
+        for (const [label, overrides, pick, expected] of cases) {
+            assertEq(pick(sdtw(taxParams2025)({ ...splitDispatchInput, ...overrides })), expected, label)
+        }
+    },
+    // Line 47's clamp has only ever been seen choosing line 45, because
+    // every fixture above has gain to price at a preferential rate. Strip
+    // the gain and the worksheet degenerates: lines 22 through 43 all fall
+    // to zero, line 45 collapses to line 44 alone, and lines 44 and 46
+    // price the SAME amount — line 1 — so the clamp meets an exact tie and
+    // takes line 46. That the two sides meet rather than merely come close
+    // is the property worth pinning: it is what makes routing a return
+    // with no preferential income through this worksheet harmless.
+    withNoPreferentialIncomeTheClampMeetsItsTieAndTakesLineFortySix: () => {
+        const r = sdtw(taxParams2025)({ ...splitDispatchInput, scheduleD15Cents: 0n, scheduleD16Cents: 0n })
+        assertEq(r.line22, 0n, 'nothing is taxed at 0%')
+        assertEq(r.line31 + r.line34 + r.line40 + r.line43, 0n, 'and nothing at 15%, 20%, 25% or 28%')
+        assertEq(r.line21, r.line1, 'line 21 is the whole of taxable income')
+        assertEq(r.line45, r.line46, 'so the two sides of the clamp meet exactly')
+        assertEq(r.line47, r.line46, 'and line 47 takes line 46')
+    },
 }

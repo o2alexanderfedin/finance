@@ -4468,9 +4468,6 @@ const inputsOf = profile => w2s => interestForms => dividendForms => brokerageFo
  */
 const expectIncomeOk = outcome => {
     assert(outcome.kind === 'ok', ['expected the income lines to compute', outcome])
-    if (outcome.kind !== 'ok') {
-        throw ['expected ok', outcome]
-    }
     return outcome
 }
 
@@ -4483,9 +4480,6 @@ const expectIncomeOk = outcome => {
  */
 const expectScheduleAOk = outcome => {
     assert(outcome.kind === 'ok', ['expected scheduleA(...) to compute, not refuse', outcome])
-    if (outcome.kind !== 'ok') {
-        throw ['expected ok', outcome]
-    }
     return outcome
 }
 
@@ -6563,9 +6557,6 @@ const runFourSevenNineSeven = declaredKinds => certified => asset => {
  * @type {(outcome: Form1040Outcome) => (rulePrefix: string) => bigint} */
 const reportedCents = outcome => rulePrefix => {
     assert(outcome.kind === 'ok', ['expected a computed return', outcome])
-    if (outcome.kind !== 'ok') {
-        throw ['expected a computed return', outcome]
-    }
     return lineRuled(outcome.lines)(rulePrefix).value
 }
 
@@ -7478,9 +7469,6 @@ export const proof = {
                 }],
             })
             assert(outcome.kind === 'error', ['a farm loss must stop the report', outcome])
-            if (outcome.kind !== 'error') {
-                return
-            }
             assert(outcome.message.includes('§465'), ['the statute', outcome.message])
             assert(outcome.message.includes('LOSS of 0.01'), ['the size of the loss', outcome.message])
             assertEq(outcome.unmodeled.length, 0,
@@ -7669,9 +7657,6 @@ export const proof = {
             const outcome = withFeed('390000.00')
             assert(outcome.kind === 'error',
                 ['a $350,000.00 business loss is over §461(l)\'s threshold', outcome])
-            if (outcome.kind !== 'error') {
-                return
-            }
             assert(outcome.message.includes('Form 461 line 16 is -37000.00'),
                 ['line 16, with the wages EXCLUDED from line 14', outcome.message])
             assert(outcome.message.includes('-350000.00'),
@@ -7683,9 +7668,6 @@ export const proof = {
             // SIZE of the loss and not about the wages being there.
             const exactly = withFeed('353000.00')
             assert(exactly.kind === 'ok', ['exactly at the threshold computes', exactly])
-            if (exactly.kind !== 'ok') {
-                return
-            }
             assertEq(exactly.line1a.value, 40000000n, '$400,000.00 of wages')
             assertEq(exactly.line8.value, -31300000n, 'and the whole $313,000.00 loss')
             assertEq(exactly.line11a.value, 8700000n, 'adjusted gross income $87,000.00')
@@ -7721,9 +7703,6 @@ export const proof = {
             })
             const outcome = withFeed('353000.01')
             assert(outcome.kind === 'error', ['§461(l) must stop the report', outcome])
-            if (outcome.kind !== 'error') {
-                return
-            }
             assert(outcome.message.includes('Form 461 line 16 is -0.01'),
                 ['the printed line and its sign', outcome.message])
             assert(outcome.message.includes('313000.00'), ['the threshold', outcome.message])
@@ -7736,9 +7715,6 @@ export const proof = {
             // refused every farm loss would pass the leaf above.
             const exactly = withFeed('353000.00')
             assert(exactly.kind === 'ok', ['exactly at the threshold computes', exactly])
-            if (exactly.kind !== 'ok') {
-                return
-            }
             assertEq(exactly.line8.value, -31300000n,
                 'the whole $313,000.00 loss reaches 1040 line 8')
         },
@@ -7811,9 +7787,6 @@ export const proof = {
                 nonemployeeCompensationDocument('sha256-1099nec-01')('50.00')('0.00'),
             ])([businessExpensesDocument('sha256-business-01')('90.00')]))
             assert(outcome.kind === 'error', ['a Schedule C refusal must stop the report', outcome])
-            if (outcome.kind !== 'error') {
-                return
-            }
             assertEq(outcome.unmodeled.length, 0, 'a document-data-sufficiency refusal names no scope kind')
             assert(
                 outcome.message.includes('line 32') && outcome.message.includes('§465'),
@@ -7954,9 +7927,6 @@ export const proof = {
                 nonemployeeCompensationDocument('sha256-1099nec-01')('500.00')('0.00'),
             ])([homeOfficeBusinessDocument]))
             assert(outcome.kind === 'error', ['expected the limitation refusal', outcome])
-            if (outcome.kind !== 'error') {
-                throw ['expected error', outcome]
-            }
             assert(
                 outcome.message.includes('Form 8829 line 27')
                 && outcome.message.includes('line 43'),
@@ -8448,9 +8418,6 @@ export const proof = {
                 nonemployeeCompensationDocument('sha256-1099nec-01')('300000.00')('0.00'),
             ])([withoutAssertion]))
             assert(outcome.kind === 'error', ['expected a refusal', outcome])
-            if (outcome.kind !== 'error') {
-                return
-            }
             assertEq(outcome.unmodeled.length, 0, 'a document-data-sufficiency refusal names no kind')
             assert(
                 outcome.message.includes('specifiedServiceTradeOrBusiness'),
@@ -8499,9 +8466,6 @@ export const proof = {
                 nonemployeeCompensationDocument('sha256-1099nec-01')('48000.00')('0.00'),
             ])([withoutAssertion]))
             assert(outcome.kind === 'error', ['expected a refusal', outcome])
-            if (outcome.kind !== 'error') {
-                return
-            }
             assert(
                 outcome.message.includes('priorYearQualifiedBusinessLossCarryforward'),
                 ['must name the field that fixes it', outcome.message])
@@ -9453,9 +9417,6 @@ export const proof = {
                     w2Document('sha256-w2-01')('60000.00'),
                 ])([])([])([])([])([])([])([])([]))
             assert(outcome.kind === 'ok', ['expected the 65+ declared profile to compute now', outcome])
-            if (outcome.kind !== 'ok') {
-                throw ['expected ok', outcome]
-            }
             assertEq(
                 outcome.lines.length,
                 expectedWholeReportLineCount,
@@ -9681,9 +9642,6 @@ export const proof = {
         aSectionTwelveThirtyOneGainDoesNotDisqualifyTheEarnedIncomeCredit: () => {
             const outcome = earnedIncomeCreditWithBusinessProperty(soldShop)([])
             assert(outcome.kind === 'ok', ['expected a computed return', outcome])
-            if (outcome.kind !== 'ok') {
-                return
-            }
             const at = lineRuled(outcome.lines)
             assertEq(at('1040 line 8').value, 151925n, 'Schedule C line 31; Schedule 1 line 4 is zero')
             assertEq(at('1040 line 7a').value, 1903845n, 'the §1231 gain, through Schedule D')
@@ -9718,9 +9676,6 @@ export const proof = {
                     }),
                 ])
             assert(outcome.kind === 'ok', ['expected a computed return', outcome])
-            if (outcome.kind !== 'ok') {
-                return
-            }
             const at = lineRuled(outcome.lines)
             assertEq(at('1040 line 7a').value, 1903845n, 'the SAME figure on the SAME printed line')
             assertEq(at('1040 line 8').value, 123080n, '$2,000.00 less a WHOLE year of depreciation')
@@ -9997,9 +9952,6 @@ export const proof = {
                     declaredKinds: ['wages', 'federalTaxWithheldOnW2'],
                 }))([w2WithMedicareWages('sha256-w2-faang')('300000.00')])([])([])([])([])([])([])([])([]))
             assert(outcome.kind === 'error', ['a $300,000 box 5 must refuse the whole return', outcome])
-            if (outcome.kind !== 'error') {
-                return
-            }
             assertEq(outcome.unmodeled.length, 1, ['expected exactly one required kind', outcome.unmodeled])
             assertEq(outcome.unmodeled[0], 'additionalMedicareTax', ['expected Schedule 2 line 11 named', outcome.unmodeled])
             assert(
@@ -10032,9 +9984,6 @@ export const proof = {
                     declaredKinds: ['wages', 'federalTaxWithheldOnW2'],
                 }))([w2WithMedicareWages('sha256-w2-ordinary')('150000.00')])([])([])([])([])([])([])([])([]))
             assert(outcome.kind === 'ok', ['a box 5 below the threshold must compute', outcome])
-            if (outcome.kind !== 'ok') {
-                return
-            }
             assertEq(outcome.lines.length, expectedWholeReportLineCount)
             assertEq(lineRuled(outcome.lines)('1040 line 1a').value, 15000000n, '$150,000.00, hand-typed')
             for (const line of outcome.lines) {
@@ -10069,9 +10018,6 @@ export const proof = {
                 inputsOf(storedProfile(declaringCapitalGainsOrLossesProfile))(
                     [w2WithMedicareWages('sha256-w2-race')('300000.00')])([])([])([absentBasisForm])([])([])([])([])([]))
             assert(racedOutcome.kind === 'error', ['expected a refusal', racedOutcome])
-            if (racedOutcome.kind !== 'error') {
-                return
-            }
             assertEq(
                 racedOutcome.unmodeled[0],
                 'additionalMedicareTax',
@@ -10090,9 +10036,6 @@ export const proof = {
             const unracedOutcome = form1040Report(taxParams2025)(
                 inputsOf(storedProfile(declaringCapitalGainsOrLossesProfile))([])([])([])([absentBasisForm])([])([])([])([])([]))
             assert(unracedOutcome.kind === 'error', ['expected the absent-basis refusal', unracedOutcome])
-            if (unracedOutcome.kind !== 'error') {
-                return
-            }
             assertEq(unracedOutcome.unmodeled.length, 0, ['the absent-basis arm names no kind', unracedOutcome.unmodeled])
             assert(
                 unracedOutcome.message.includes('box1eCostOrOtherBasis is genuinely absent'),
@@ -10111,9 +10054,6 @@ export const proof = {
                     declaredKinds: ['wages', 'unreportedTips'],
                 }))([w2WithMedicareWages('sha256-w2-both')('300000.00')])([])([])([])([])([])([])([])([]))
             assert(outcome.kind === 'error', ['expected a refusal', outcome])
-            if (outcome.kind !== 'error') {
-                return
-            }
             assert(
                 outcome.message.includes('this return declares'),
                 ['the declared-scope guard runs first', outcome.message])
@@ -10171,9 +10111,6 @@ export const proof = {
                     },
                 }])([])([])([])([])([])([])([])([]))
             assert(outcome.kind === 'ok', ['a declared $300,000 box 5 must COMPUTE, not refuse', outcome])
-            if (outcome.kind !== 'ok') {
-                return
-            }
             assertEq(outcome.lines.length, expectedWholeReportLineCount)
             const at = lineRuled(outcome.lines)
             assertEq(at('1040 line 1a').value, 30000000n, '$300,000.00')
@@ -10199,9 +10136,6 @@ export const proof = {
                     declaredKinds: ['wages', 'additionalMedicareTax'],
                 }))([w2WithMedicareBoxes('sha256-w2-through-sch2')('300000.00')('5250.00')])([])([])([])([])([])([])([])([]))
             assert(outcome.kind === 'ok', ['expected the return to compute', outcome])
-            if (outcome.kind !== 'ok') {
-                return
-            }
             const line23 = lineRuled(outcome.lines)('1040 line 23')
             assertEq(line23.value, 90000n, '$900.00')
             const boxes = line23.sources.map(source => source.boxPath)
@@ -10248,9 +10182,6 @@ export const proof = {
             const withoutCodeA = wagesReturn([{ code: 'D', amount: '1000.00' }])
             assert(withCodeA.kind === 'ok', ['expected the return to compute', withCodeA])
             assert(withoutCodeA.kind === 'ok', ['expected the control to compute', withoutCodeA])
-            if (withCodeA.kind !== 'ok' || withoutCodeA.kind !== 'ok') {
-                return
-            }
             assertEq(lineRuled(withCodeA.lines)('1040 line 23').value, 12540n,
                 '$125.40 of uncollected social security tax on tips, Schedule 2 line 13')
             assertEq(lineRuled(withoutCodeA.lines)('1040 line 23').value, 0n,
@@ -10274,9 +10205,6 @@ export const proof = {
                     },
                 }])([])([])([])([])([])([])([])([]))
             assert(outcome.kind === 'ok', ['expected the return to compute', outcome])
-            if (outcome.kind !== 'ok') {
-                return
-            }
             const line23 = lineRuled(outcome.lines)('1040 line 23')
             assertEq(line23.value, 1125n, '$11.25 of uncollected Medicare tax on group-term life insurance')
             const cited = line23.sources.filter(source => source.boxPath === 'box12[code=N]')
@@ -10323,9 +10251,6 @@ export const proof = {
                 w2WithMedicareBoxes('sha256-w2-mfj-b')('150000.00')('2175.00'),
             ])
             assert(outcome.kind === 'ok', ['expected the joint return to compute', outcome])
-            if (outcome.kind !== 'ok') {
-                return
-            }
             const at = lineRuled(outcome.lines)
             assertEq(at('1040 line 16').value, 5013400n, '$50,134.00, hand-computed over MFJ\'s brackets')
             assertEq(at('1040 line 23').value, 45000n, '$450.00 — 0.9% of the $50,000 over $250,000')
@@ -10341,9 +10266,6 @@ export const proof = {
                 w2Document('sha256-w2-mfj-control-b')('150000.00'),
             ])
             assert(control.kind === 'ok', ['expected the control return to compute', control])
-            if (control.kind !== 'ok') {
-                return
-            }
             const controlAt = lineRuled(control.lines)
             assertEq(controlAt('1040 line 16').value, 5013400n, 'the same $50,134.00 of ordinary tax')
             assertEq(controlAt('1040 line 23').value, 0n, '$0.00 — no Medicare wages were supplied')
@@ -10386,9 +10308,6 @@ export const proof = {
                     value: { ...w2.value, box2FederalIncomeTaxWithheld: '30000.00' },
                 }])([])([])([])([])([])([])([])([]))
             assert(outcome.kind === 'ok', ['an ordinary wage earner must still compute', outcome])
-            if (outcome.kind !== 'ok') {
-                return
-            }
             const at = lineRuled(outcome.lines)
             // Box 6 here is EXACTLY 1.45% of box 5 ($150,000 x 0.0145 =
             // $2,175.00), which is what an employer under the threshold
@@ -10415,9 +10334,6 @@ export const proof = {
                         declaredKinds: ['wages', 'additionalMedicareTax'],
                     }))([w2WithMedicareWages('sha256-w2-boundary')(boxFive)])([])([])([])([])([])([])([])([]))
                 assert(outcome.kind === 'ok', ['the boundary probe must compute', boxFive, outcome])
-                if (outcome.kind !== 'ok') {
-                    return -1n
-                }
                 return lineRuled(outcome.lines)('1040 line 23').value
             }
             assertEq(lineTwentyThreeAt('200000.00'), 0n, 'exactly AT the threshold is not "in excess of" it')
@@ -10441,9 +10357,6 @@ export const proof = {
                 }))([])([interestDocument('sha256-int-niit')({ box1InterestIncome: '300000.00' })])(
                     [])([])([])([])([])([])([]))
             assert(outcome.kind === 'ok', ['expected the investor\'s return to compute', outcome])
-            if (outcome.kind !== 'ok') {
-                return
-            }
             const at = lineRuled(outcome.lines)
             assertEq(at('1040 line 2b').value, 30000000n, '$300,000.00 of taxable interest')
             assertEq(at('1040 line 11b').value, 30000000n, '$300,000.00 of AGI')
@@ -10479,9 +10392,6 @@ export const proof = {
                         box7bIraSepSimple: true,
                     })])([])([])([])([]))
             assert(outcome.kind === 'ok', ['expected the retiree\'s return to compute', outcome])
-            if (outcome.kind !== 'ok') {
-                return
-            }
             const at = lineRuled(outcome.lines)
             assertEq(at('1040 line 2a').value, 5000000n, '$50,000.00 of tax-exempt interest, reported')
             assertEq(at('1040 line 2b').value, 0n, '$0.00 of TAXABLE interest')
@@ -10510,9 +10420,6 @@ export const proof = {
                     }))([])([interestDocument('sha256-int-qss')({ box1InterestIncome: '240000.00' })])(
                         [])([])([])([])([])([])([]))
                 assert(outcome.kind === 'ok', ['expected the return to compute', filingStatus, outcome])
-                if (outcome.kind !== 'ok') {
-                    return -1n
-                }
                 return lineRuled(outcome.lines)('1040 line 23').value
             }
             assertEq(lineTwentyThreeFor('qualifyingSurvivingSpouse'), 0n, '$240,000 is below §1411(b)(1)\'s $250,000')
@@ -10536,9 +10443,6 @@ export const proof = {
                     [interestDocument('sha256-int-both-taxes')({ box1InterestIncome: '100000.00' })])(
                     [])([])([])([])([])([])([]))
             assert(outcome.kind === 'ok', ['expected the return to compute', outcome])
-            if (outcome.kind !== 'ok') {
-                return
-            }
             const at = lineRuled(outcome.lines)
             assertEq(at('1040 line 11b').value, 40000000n, '$400,000.00 of AGI')
             assertEq(at('1040 line 23').value, 470000n, '$4,700.00 = $900.00 + $3,800.00')
@@ -10713,9 +10617,6 @@ export const proof = {
             const inputs = inputsOf(storedProfile(declaringCapitalGainsOrLossesProfile))([])([])([])([brokerageForm])([])([])([])([])([])
             const outcome = form1040IncomeLines(taxParams2025)(inputs)
             assert(outcome.kind === 'ok', ['expected the income lines to compute in isolation', outcome])
-            if (outcome.kind !== 'ok') {
-                throw ['expected ok', outcome]
-            }
             assertEq(outcome.filingScheduleD, true, 'the declared kind must select Schedule D')
             const independentScheduleD = scheduleD({
                 status: 'single',
@@ -10723,9 +10624,6 @@ export const proof = {
                 dividendForms: [],
             })
             assert(independentScheduleD.kind === 'ok', ['expected Schedule D to compute', independentScheduleD])
-            if (independentScheduleD.kind !== 'ok') {
-                throw ['expected ok', independentScheduleD]
-            }
             assertEq(outcome.line7a.value, independentScheduleD.line7aCapitalGainOrLoss)
             assertEq(outcome.scheduleD15Cents, independentScheduleD.line15)
             assertEq(outcome.scheduleD16Cents, independentScheduleD.line16)
@@ -10777,18 +10675,12 @@ export const proof = {
                 [dividendForm])([brokerageForm])([])([])([])([])([])
             const outcome = form1040IncomeLines(taxParams2025)(inputs)
             assert(outcome.kind === 'ok', ['expected the income lines to compute in isolation', outcome])
-            if (outcome.kind !== 'ok') {
-                throw ['expected ok', outcome]
-            }
             const independentScheduleD = scheduleD({
                 status: 'single',
                 brokerageForms: [brokerageForm],
                 dividendForms: [dividendForm],
             })
             assert(independentScheduleD.kind === 'ok', ['expected Schedule D to compute', independentScheduleD])
-            if (independentScheduleD.kind !== 'ok') {
-                throw ['expected ok', independentScheduleD]
-            }
             // Hand-typed and independent of the code under test — the
             // fixture's own $500.00 box 2d and $300.00 box 2b, never
             // derived from `outcome` or `independentScheduleD`.
@@ -10838,9 +10730,7 @@ export const proof = {
                 wholeReportOutcome.kind === 'error',
                 ['expected the whole report to refuse today, via the absent-basis mechanism', wholeReportOutcome],
             )
-            if (wholeReportOutcome.kind !== 'error') {
-                throw ['expected error', wholeReportOutcome]
-            }
+            assert(wholeReportOutcome.kind === 'error', ['expected error', wholeReportOutcome])
             assertEq(
                 wholeReportOutcome.unmodeled.length,
                 0,
@@ -10902,9 +10792,6 @@ export const proof = {
                 ([])([])([])([brokerageForm])([])([])([])([])([carryoverDoc])
             const outcome = form1040IncomeLines(taxParams2025)(inputs)
             assert(outcome.kind === 'ok', ['expected the income lines to compute', outcome])
-            if (outcome.kind !== 'ok') {
-                throw ['expected ok', outcome]
-            }
             assertEq(outcome.filingScheduleD, true, 'the declared kind must select Schedule D')
             const independentScheduleD = scheduleD({
                 status: 'single',
@@ -10913,9 +10800,6 @@ export const proof = {
                 priorYearCapitalLossCarryover: carryoverDoc,
             })
             assert(independentScheduleD.kind === 'ok', ['expected Schedule D to compute', independentScheduleD])
-            if (independentScheduleD.kind !== 'ok') {
-                throw ['expected ok', independentScheduleD]
-            }
             // The reachable-path assertion this criterion requires — the
             // SAME independently hand-computed figure Plan 15-02's own
             // worked example and this plan's Task 1 both establish, read
@@ -11119,10 +11003,7 @@ export const proof = {
             const outcome = form1040IncomeLines(taxParams2025)(
                 inputsOf(storedProfile({ ...singleProfile, iraDeductionDeclared: true }))(
                     [])([])([])([])([])([])([])([])([]))
-            assertEq(outcome.kind, 'error', ['expected the IRA-deduction refusal', outcome])
-            if (outcome.kind !== 'error') {
-                throw ['expected error', outcome]
-            }
+            assert(outcome.kind === 'error', ['expected the IRA-deduction refusal', outcome])
             assert(
                 outcome.message.includes('Pub. 590-A Worksheet 1-1'),
                 ['expected the refusal to name Pub. 590-A Worksheet 1-1', outcome.message],
@@ -11177,9 +11058,6 @@ export const proof = {
                 declaredKinds: ['wages', 'taxableInterest', 'iraDistributions', 'pensionsAndAnnuities'],
             }))([])([])([])([])([iraForm, pensionForm])([])([])([])([]))
             assert(outcome.kind === 'ok', ['expected both kinds to compute now', outcome])
-            if (outcome.kind !== 'ok') {
-                throw ['expected ok', outcome]
-            }
             assertEq(lineRuled(outcome.lines)('1040 line 4a').value, 500000n, '$5,000.00 IRA gross distribution')
             assertEq(lineRuled(outcome.lines)('1040 line 4b').value, 400000n, '$4,000.00 IRA taxable amount')
             assertEq(lineRuled(outcome.lines)('1040 line 5a').value, 300000n, '$3,000.00 pension gross distribution')
@@ -11257,9 +11135,6 @@ export const proof = {
                 declaredKinds: ['wages', 'taxableInterest', 'seniorAndOtherScheduleOneADeductions'],
             }))([w2Form])([])([])([])([])([])([])([])([]))
             assert(outcome.kind === 'ok', ['expected the kind to compute now', outcome])
-            if (outcome.kind !== 'ok') {
-                throw ['expected ok', outcome]
-            }
             assertEq(
                 lineRuled(outcome.lines)('1040 line 13b').value, 570000n,
                 '$5,700.00, Schedule 1-A\'s own $80,000 AGI fixture',
@@ -11354,9 +11229,7 @@ export const proof = {
                 outcome.kind === 'error',
                 ['expected the whole report to refuse, never a silently-wrong ACTC', outcome],
             )
-            if (outcome.kind !== 'error') {
-                throw ['expected error', outcome]
-            }
+            assert(outcome.kind === 'error', ['expected error', outcome])
             assert(
                 outcome.message.includes('Part II-B'),
                 ['expected the refusal to name Part II-B', outcome.message],
@@ -11389,9 +11262,6 @@ export const proof = {
             const outcome = form1040Report(taxParams2025)(
                 inputsOf(storedProfile(profile))([w2Form])([])([])([])([])([])([])([])([]))
             assert(outcome.kind === 'ok', ['expected the kind to compute now', outcome])
-            if (outcome.kind !== 'ok') {
-                throw ['expected ok', outcome]
-            }
             assertEq(
                 lineRuled(outcome.lines)('1040 line 19').value, 440000n,
                 '$4,400.00 -- two qualifying children x $2,200.00, same fixture Task 1\'s own leaf pinned',
@@ -11464,9 +11334,6 @@ export const proof = {
                 [iraForm, pensionForm])([ssaForm])([])([])([])
             const outcome = form1040Report(taxParams2025)(inputs)
             assert(outcome.kind === 'ok', ['expected the 65+ retirement/SS return to compute', outcome])
-            if (outcome.kind !== 'ok') {
-                throw ['expected ok', outcome]
-            }
             // Hand-computed from the worksheet's own printed arithmetic
             // (13-RESEARCH.md §2): line1=$30,000.00, line2=$15,000.00,
             // line3=$40,500.00 (1z $20,000.00 + 2b $500.00 + 4b $8,000.00 +
@@ -11536,9 +11403,6 @@ export const proof = {
             const inputs = inputsOf(storedProfile(profile))([])([])([])([])([iraForm])([ssaForm])([])([])([])
             const outcome = form1040Report(taxParams2025)(inputs)
             assert(outcome.kind === 'error', ['expected the IRA-deduction refusal', outcome])
-            if (outcome.kind !== 'error') {
-                throw ['expected error', outcome]
-            }
             assert(
                 outcome.message.includes('Pub. 590-A'),
                 ['expected the refusal to name Pub. 590-A', outcome.message],
@@ -11571,9 +11435,6 @@ export const proof = {
             const inputs = inputsOf(storedProfile(profile))([w2Form])([])([])([])([])([])([])([])([])
             const outcome = form1040Report(taxParams2025)(inputs)
             assert(outcome.kind === 'ok', ['expected the 65+ senior-deduction return to compute', outcome])
-            if (outcome.kind !== 'ok') {
-                throw ['expected ok', outcome]
-            }
 
             const line11b = lineRuled(outcome.lines)('1040 line 11b').value
             assertEq(line11b, 10000000n, '$100,000.00 AGI -- wages alone')
@@ -11631,9 +11492,6 @@ export const proof = {
             const inputs = inputsOf(storedProfile(profile))([w2Form])([])([])([])([])([])([])([])([])
             const outcome = form1040Report(taxParams2025)(inputs)
             assert(outcome.kind === 'ok', ['expected the MFS return to compute', outcome])
-            if (outcome.kind !== 'ok') {
-                throw ['expected ok', outcome]
-            }
             const line13b = lineRuled(outcome.lines)('1040 line 13b').value
             assertEq(
                 line13b, 0n,
@@ -11669,9 +11527,6 @@ export const proof = {
             const inputs = inputsOf(storedProfile(profile))([w2Form])([])([])([])([])([])([itemizedForm])([])([])
             const outcome = form1040Report(taxParams2025)(inputs)
             assert(outcome.kind === 'ok', ['expected the itemizing return to compute', outcome])
-            if (outcome.kind !== 'ok') {
-                throw ['expected ok', outcome]
-            }
 
             const line11b = lineRuled(outcome.lines)('1040 line 11b').value
             assertEq(line11b, 9000000n, '$90,000.00 AGI -- wages alone')
@@ -11740,9 +11595,6 @@ export const proof = {
             const inputs = inputsOf(storedProfile(profile))([w2Form])([])([])([])([])([])([itemizedForm])([])([])
             const outcome = form1040Report(taxParams2025)(inputs)
             assert(outcome.kind === 'ok', ['expected the standard-still-wins return to compute', outcome])
-            if (outcome.kind !== 'ok') {
-                throw ['expected ok', outcome]
-            }
 
             const line12e = lineRuled(outcome.lines)('1040 line 12e')
             assertEq(
@@ -11885,9 +11737,6 @@ export const proof = {
             const outcome = form1040Report(taxParams2025)(
                 inputsOf(storedProfile(profile))([w2Form])([])([])([])([])([])([])([])([]))
             assert(outcome.kind === 'ok', ['expected the dependents return to compute', outcome])
-            if (outcome.kind !== 'ok') {
-                throw ['expected ok', outcome]
-            }
 
             const line11b = lineRuled(outcome.lines)('1040 line 11b').value
             assertEq(line11b, 2000000n, '$20,000.00 AGI -- wages alone')
@@ -11969,9 +11818,6 @@ export const proof = {
                 declaredKinds: ['wages', 'childTaxCreditOrOtherDependents', 'additionalChildTaxCredit'],
             }))([w2Document('sha256-t10-wave4-cliff-at')('400000.00')])([])([])([])([])([])([])([])([]))
             assert(atThreshold.kind === 'ok', ['expected the at-threshold return to compute', atThreshold])
-            if (atThreshold.kind !== 'ok') {
-                throw ['expected ok', atThreshold]
-            }
             assertEq(
                 lineRuled(atThreshold.lines)('1040 line 19').value, 220000n,
                 '$2,200.00 -- one qualifying child, no phase-out yet at exactly $400,000.00 AGI',
@@ -11987,9 +11833,6 @@ export const proof = {
                 declaredKinds: ['wages', 'childTaxCreditOrOtherDependents', 'additionalChildTaxCredit'],
             }))([w2Document('sha256-t10-wave4-cliff-over')('400000.01')])([])([])([])([])([])([])([])([]))
             assert(overThreshold.kind === 'ok', ['expected the over-threshold return to compute', overThreshold])
-            if (overThreshold.kind !== 'ok') {
-                throw ['expected ok', overThreshold]
-            }
             assertEq(
                 lineRuled(overThreshold.lines)('1040 line 19').value, 215000n,
                 '$2,150.00 -- $0.01 of excess rounds UP to a full $1,000.00 step, costing $50.00 immediately',
@@ -12063,9 +11906,6 @@ export const proof = {
 
             const outcome = form1040Report(taxParams2025)(inputs)
             assert(outcome.kind === 'ok', ['expected the full chain to compute', outcome])
-            if (outcome.kind !== 'ok') {
-                throw ['expected ok', outcome]
-            }
             // The method tag, not merely the value — the 2a-before-2c
             // ordering (12.1-CONTEXT.md's own "Specific Ideas" note) is
             // only observable through this tag when the two worksheets
@@ -12248,9 +12088,6 @@ export const proof = {
                 'Schedule 1 line 4 is ZERO here — the whole gain is capital, not ordinary')
             assertEq(cents('1040 line 9'), 13907220n)
             assert(outcome.kind === 'ok', ['expected a computed return', outcome])
-            if (outcome.kind !== 'ok') {
-                return
-            }
             assertEq(outcome.line16Method, 'scheduleDTaxWorksheet',
                 'unrecaptured §1250 gain on Schedule D line 19 forces the SDTW over the QDCGT')
         },
@@ -12267,9 +12104,6 @@ export const proof = {
                 'capitalGainsOrLosses', 'unrecaptured1250Gain',
             ])(false)(disposedDuplex)
             assert(outcome.kind === 'error', ['expected a refusal', outcome])
-            if (outcome.kind !== 'error') {
-                return
-            }
             assert(outcome.message.includes('Form 4797 line 8'),
                 ['the refusal must name the printed line', outcome.message])
             assert(outcome.message.includes('5 preceding tax years'),
@@ -12322,9 +12156,6 @@ export const proof = {
             ])([])([])([brokerageForm])([])([])([])([])([])
             const outcome = form1040Report(taxParams2025)(inputs)
             assert(outcome.kind === 'ok', ['expected the full chain to compute', outcome])
-            if (outcome.kind !== 'ok') {
-                throw ['expected ok', outcome]
-            }
             assertEq(
                 lineRuled(outcome.lines)('1040 line 7a').value, 4300000n,
                 '$43,000.00 — box 11, split 60/40 and recombined by Schedule D')
@@ -12386,9 +12217,6 @@ export const proof = {
             ])([])([])([brokerageForm])([])([])([])([])([])
             const outcome = form1040Report(taxParams2025)(inputs)
             assert(outcome.kind === 'ok', ['expected the loss chain to compute', outcome])
-            if (outcome.kind !== 'ok') {
-                throw ['expected ok', outcome]
-            }
             assertEq(
                 lineRuled(outcome.lines)('1040 line 7a').value, -300000n,
                 '$-3,000.00 — the cap, not the $-37,000.00 loss')
@@ -12435,9 +12263,6 @@ export const proof = {
             ])([])([])([brokerageForm])([])([])([])([])([])
             const outcome = form1040Report(taxParams2025)(inputs)
             assert(outcome.kind === 'ok', ['both paths must compute together', outcome])
-            if (outcome.kind !== 'ok') {
-                throw ['expected ok', outcome]
-            }
             assertEq(
                 lineRuled(outcome.lines)('1040 line 7a').value, 700000n,
                 '$7,000.00 = $5,000.00 of stock gain + $2,000.00 of section 1256 aggregate')
@@ -12461,12 +12286,8 @@ export const proof = {
                 inputsOf(storedProfile(declaringCapitalGainsOrLossesProfile))([
                     w2Document('sha256-w2-1256-both')('30000.00'),
                 ])([])([])([stockOnly])([])([])([])([])([]))
-            assert(
-                stockOnlyOutcome.kind === 'ok',
+            assert( stockOnlyOutcome.kind === 'ok',
                 ['the stock-only control must compute', stockOnlyOutcome])
-            if (stockOnlyOutcome.kind !== 'ok') {
-                throw ['expected ok', stockOnlyOutcome]
-            }
             assertEq(
                 lineRuled(stockOnlyOutcome.lines)('1040 line 7a').value, 500000n,
                 '$5,000.00 — the stock sale ALONE, unchanged by this work')
@@ -12489,9 +12310,6 @@ export const proof = {
                     w2Document('sha256-w2-1256-drift')('30000.00'),
                 ])([])([])([brokerageForm])([])([])([])([])([]))
             assert(outcome.kind === 'error', ['a contradicted aggregate must refuse', outcome])
-            if (outcome.kind !== 'error') {
-                throw ['expected error', outcome]
-            }
             assertEq(outcome.unmodeled.length, 0, 'a document-sufficiency refusal names no kind')
             assert(outcome.message.includes('sha256-b-1256-drift'), [outcome.message])
             assert(outcome.message.includes('Form 6781 line 1'), [outcome.message])
@@ -12516,9 +12334,6 @@ export const proof = {
                     w2Document('sha256-w2-1256-undeclared')('30000.00'),
                 ])([])([])([brokerageForm])([])([])([])([])([]))
             assert(outcome.kind === 'error', ['an undeclared box 11 must refuse', outcome])
-            if (outcome.kind !== 'error') {
-                throw ['expected error', outcome]
-            }
             assert(
                 outcome.unmodeled.includes('capitalGainsOrLosses'),
                 ['the tripwire must name the kind to declare', outcome.unmodeled])
@@ -12546,9 +12361,6 @@ export const proof = {
                     w2Document('sha256-w2-1256-control')('30000.00'),
                 ])([])([])([brokerageForm])([])([])([])([])([]))
             assert(outcome.kind === 'ok', ['an ordinary undeclared sale must still compute', outcome])
-            if (outcome.kind !== 'ok') {
-                throw ['expected ok', outcome]
-            }
             // The stock gain reaches NOTHING, because no Schedule D runs —
             // which is the pre-existing, deliberate Decision 1.6 behaviour
             // this work must not have changed.
@@ -12573,12 +12385,8 @@ export const proof = {
                         ...singleProfile,
                         declaredKinds: /** @type {readonly Kind[]} */ (['wages', kind]),
                     }))([w2Document('sha256-w2-1256-kind')('30000.00')])([])([])([])([])([])([])([])([]))
-                assert(
-                    outcome.kind === 'error',
+                assert( outcome.kind === 'error',
                     ['a declared unmodeled kind must refuse', kind, outcome])
-                if (outcome.kind !== 'error') {
-                    throw ['expected error', kind]
-                }
                 assert(
                     outcome.unmodeled.some(named => named === kind),
                     [kind, outcome.unmodeled])
@@ -12604,9 +12412,6 @@ export const proof = {
                     box11AggregateProfitOrLoss: '5000.00',
                 })])([])([])([])([])([]))
             assert(outcome.kind === 'ok', ['Part I alone must be a complete return', outcome])
-            if (outcome.kind !== 'ok') {
-                throw ['expected ok', outcome]
-            }
             assertEq(lineRuled(outcome.lines)('1040 line 7a').value, 500000n, '$5,000.00')
         },
     },
@@ -12655,9 +12460,6 @@ export const proof = {
                 [iraForm])([ssaForm])([itemizedForm])([])([])
             const outcome = form1040Report(taxParams2025)(inputs)
             assert(outcome.kind === 'ok', ['expected all five slices to compose without refusal', outcome])
-            if (outcome.kind !== 'ok') {
-                throw ['expected ok', outcome]
-            }
 
             // Slice 1 (Wave 1, TAX-10) — 1z ($40,000.00 wages) + 4b
             // ($8,000.00 taxable IRA distribution) feed the SSB
@@ -12860,9 +12662,6 @@ export const proof = {
         theStudentWithAFourOhOneKayGetsBothCreditsThroughScheduleThree: () => {
             const outcome = form1040Report(taxParams2025)(phaseTwentyFiveInputs)
             assert(outcome.kind === 'ok', ['expected the student return to compute', outcome])
-            if (outcome.kind !== 'ok') {
-                throw ['expected ok', outcome]
-            }
             /** @type {(rule: string) => bigint} */
             const cents = rule => lineRuled(outcome.lines)(rule).value
             assertEq(cents('1040 line 1a'), 3900000n, '$39,000.00 of wages')
@@ -12885,9 +12684,6 @@ export const proof = {
         theRefundableAndNonrefundableHalvesLandOnTwoDifferentLines: () => {
             const outcome = form1040Report(taxParams2025)(phaseTwentyFiveInputs)
             assert(outcome.kind === 'ok', ['expected the student return to compute', outcome])
-            if (outcome.kind !== 'ok') {
-                throw ['expected ok', outcome]
-            }
             const line20 = lineRuled(outcome.lines)('1040 line 20')
             const line29 = lineRuled(outcome.lines)('1040 line 29')
             assertEq(line29.value, 100000n, '40% of $2,500.00 is refundable')
@@ -12912,9 +12708,6 @@ export const proof = {
         onlyTheDeferralCodesReachFormEightyEightyLineTwo: () => {
             const outcome = form1040Report(taxParams2025)(phaseTwentyFiveInputs)
             assert(outcome.kind === 'ok', ['expected the student return to compute', outcome])
-            if (outcome.kind !== 'ok') {
-                throw ['expected ok', outcome]
-            }
             // An independent `scheduleThree(...)` call over the SAME inputs
             // must reach the identical figures — the cross-check idiom this
             // file already uses for `form8812` and `scheduleD`.
@@ -12973,9 +12766,6 @@ export const proof = {
                 },
             })
             assert(crossCheck.kind === 'ok', ['expected the cross-check to compute', crossCheck])
-            if (crossCheck.kind !== 'ok') {
-                throw ['expected ok', crossCheck]
-            }
             assertEq(
                 crossCheck.form8880.columns[0]?.line2,
                 200000n,
@@ -13025,9 +12815,6 @@ export const proof = {
         scheduleThreeCreditsAreOrderedBeforeTheChildTaxCredit: () => {
             const outcome = form1040Report(taxParams2025)(phaseTwentyFiveWithDependentInputs)
             assert(outcome.kind === 'ok', ['expected the return to compute', outcome])
-            if (outcome.kind !== 'ok') {
-                throw ['expected ok', outcome]
-            }
             /** @type {(rule: string) => bigint} */
             const cents = rule => lineRuled(outcome.lines)(rule).value
             assertEq(cents('1040 line 18'), 255500n, 'the same $2,555.00 of tax')
@@ -13056,9 +12843,6 @@ export const proof = {
                 }))([phaseTwentyFiveW2])([])([])([])([])([])([])([])([]),
             })
             assert(outcome.kind === 'ok', ['expected the control return to compute', outcome])
-            if (outcome.kind !== 'ok') {
-                throw ['expected ok', outcome]
-            }
             /** @type {(rule: string) => bigint} */
             const cents = rule => lineRuled(outcome.lines)(rule).value
             assertEq(cents('1040 line 18'), 255500n, 'the same $2,555.00 of tax')
@@ -13095,9 +12879,6 @@ export const proof = {
                 scheduleThreeLine10AmountPaidWithExtensionRequest: '1250.00',
             }))([])([])([])([])([])([])([])([])([]))
             assert(outcome.kind === 'ok', ['expected the extension return to compute', outcome])
-            if (outcome.kind !== 'ok') {
-                throw ['expected ok', outcome]
-            }
             /** @type {(rule: string) => bigint} */
             const cents = rule => lineRuled(outcome.lines)(rule).value
             assertEq(cents('1040 line 24'), 0n, 'no income, no tax')
@@ -13119,17 +12900,12 @@ export const proof = {
                 scheduleThreeLine10AmountPaidWithExtensionRequest: '1250.00',
             }))([])([])([])([])([])([])([])([])([]))
             assert(outcome.kind === 'ok', ['expected the extension return to compute', outcome])
-            if (outcome.kind !== 'ok') {
-                throw ['expected ok', outcome]
-            }
             const cited = lineRuled(outcome.lines)('1040 line 31').sources.find(
                 source => source.boxPath === 'scheduleThreeLine10AmountPaidWithExtensionRequest')
             assert(
                 cited !== undefined,
                 'line 31 must cite the profile box the extension payment was read from')
-            if (cited === undefined) {
-                throw ['unreachable', outcome]
-            }
+            assert(cited !== undefined, ['unreachable', outcome])
             assertEq(cited.documentHash, profileHash)
             assertEq(cited.value, '1250.00', 'the raw stored string, never re-formatted')
         },
@@ -13160,9 +12936,6 @@ export const proof = {
             const with4868 = form1040Report(taxParams2025)(wageReturn('1250.00'))
             assert(without.kind === 'ok', ['expected the plain wage return to compute', without])
             assert(with4868.kind === 'ok', ['expected the extension return to compute', with4868])
-            if (without.kind !== 'ok' || with4868.kind !== 'ok') {
-                throw ['expected ok', without, with4868]
-            }
             /** @type {(outcome: { readonly lines: readonly ReportLine[] }) => (rule: string) => bigint} */
             const cents = report => rule => lineRuled(report.lines)(rule).value
             // Unmoved: the payment is not income, not a deduction and not a
@@ -13208,9 +12981,6 @@ export const proof = {
             const without = form1040Report(taxParams2025)(foreignTaxInputs(undefined))
             assert(withCredit.kind === 'ok', ['expected the §904(j) return to compute', withCredit])
             assert(without.kind === 'ok', ['expected the control return to compute', without])
-            if (withCredit.kind !== 'ok' || without.kind !== 'ok') {
-                throw ['expected ok', withCredit, without]
-            }
             /** @type {(report: { readonly lines: readonly ReportLine[] }) => (rule: string) => bigint} */
             const cents = report => rule => lineRuled(report.lines)(rule).value
             assertEq(cents(without)('1040 line 20'), 0n, 'no credit without the 1099-DIV')
@@ -13237,15 +13007,9 @@ export const proof = {
         lineTwentyCitesTheNineteenNinetyNineDivBoxSeven: () => {
             const outcome = form1040Report(taxParams2025)(foreignTaxInputs('250.00'))
             assert(outcome.kind === 'ok', ['expected the §904(j) return to compute', outcome])
-            if (outcome.kind !== 'ok') {
-                throw ['expected ok', outcome]
-            }
             const cited = lineRuled(outcome.lines)('1040 line 20').sources.find(
                 source => source.boxPath === 'box7ForeignTaxPaid')
             assert(cited !== undefined, 'line 20 must cite the box the foreign tax came from')
-            if (cited === undefined) {
-                throw ['unreachable', outcome]
-            }
             assertEq(cited.documentHash, 'sha256-ftc-div')
             assertEq(cited.value, '250.00', 'the raw stored string, never re-formatted')
         },
@@ -13256,9 +13020,6 @@ export const proof = {
             const outcome = form1040Report(taxParams2025)(
                 foreignTaxInputsFor(singleProfileDeclaringForeignTaxCredit)('250.00'))
             assert(outcome.kind === 'error', ['expected a refusal', outcome])
-            if (outcome.kind !== 'error') {
-                throw ['expected error', outcome]
-            }
             assert(outcome.message.includes('250.00'), ['naming the amount', outcome.message])
             assert(
                 outcome.message.includes('sha256-ftc-div'),
@@ -13278,9 +13039,6 @@ export const proof = {
         aboveTheCeilingTheWholeReturnRefuses: () => {
             const outcome = form1040Report(taxParams2025)(foreignTaxInputs('300.01'))
             assert(outcome.kind === 'error', ['expected a refusal', outcome])
-            if (outcome.kind !== 'error') {
-                throw ['expected error', outcome]
-            }
             assert(outcome.message.includes('300.01'), ['naming the total', outcome.message])
             assert(outcome.message.includes('300.00'), ['and the ceiling', outcome.message])
             assert(outcome.message.includes('Form 1116'), [outcome.message])
@@ -13291,9 +13049,6 @@ export const proof = {
         threeHundredExactlyStillComputesEndToEnd: () => {
             const outcome = form1040Report(taxParams2025)(foreignTaxInputs('300.00'))
             assert(outcome.kind === 'ok', ['$300.00 exactly must still compute', outcome])
-            if (outcome.kind !== 'ok') {
-                throw ['expected ok', outcome]
-            }
             assertEq(lineRuled(outcome.lines)('1040 line 20').value, 30000n, '$300.00')
         },
         // **Schedule 8812's Credit Limit Worksheet A**, which subtracts
@@ -13312,9 +13067,6 @@ export const proof = {
             const without = form1040Report(taxParams2025)(childInputs(undefined))
             assert(withCredit.kind === 'ok', ['expected the child return to compute', withCredit])
             assert(without.kind === 'ok', ['expected the control to compute', without])
-            if (withCredit.kind !== 'ok' || without.kind !== 'ok') {
-                throw ['expected ok', withCredit, without]
-            }
             /** @type {(report: { readonly lines: readonly ReportLine[] }) => (rule: string) => bigint} */
             const cents = report => rule => lineRuled(report.lines)(rule).value
             // The premise, asserted rather than assumed: the child tax credit
@@ -13385,9 +13137,6 @@ export const proof = {
             const withExclusion = form1040Report(taxParams2025)(expatriateReturn('60000.00'))
             assert(without.kind === 'ok', ['expected the control return to compute', without])
             assert(withExclusion.kind === 'ok', ['expected the §911 return to compute', withExclusion])
-            if (without.kind !== 'ok' || withExclusion.kind !== 'ok') {
-                throw ['expected ok', without, withExclusion]
-            }
             /** @type {(report: { readonly lines: readonly ReportLine[] }) => (rule: string) => bigint} */
             const cents = report => rule => lineRuled(report.lines)(rule).value
             assertEq(cents(without)('1040 line 8'), 0n, 'no Schedule 1 Part I figure without it')
@@ -13428,9 +13177,6 @@ export const proof = {
         theStackingRuleRepricesLineSixteenEndToEnd: () => {
             const outcome = form1040Report(taxParams2025)(expatriateReturn('60000.00'))
             assert(outcome.kind === 'ok', ['expected the §911 return to compute', outcome])
-            if (outcome.kind !== 'ok') {
-                throw ['expected ok', outcome]
-            }
             assertEq(outcome.line16Method, 'foreignEarnedIncomeTaxWorksheet')
             const line16 = lineRuled(outcome.lines)('1040 line 16')
             assertEq(line16.value, 313500n, '$11,255.00 − $8,120.00 = $3,135.00')
@@ -13449,9 +13195,6 @@ export const proof = {
         controlTheSameTaxableIncomeWithNoExclusionPaysTheTaxTableFigure: () => {
             const outcome = form1040Report(taxParams2025)(expatriateReturnWithWages('30000.00'))
             assert(outcome.kind === 'ok', ['expected the control return to compute', outcome])
-            if (outcome.kind !== 'ok') {
-                throw ['expected ok', outcome]
-            }
             assertEq(
                 lineRuled(outcome.lines)('1040 line 15').value, 1425000n,
                 '$30,000.00 − $15,750.00 = $14,250.00, the same taxable income')
@@ -13469,9 +13212,6 @@ export const proof = {
                 expatriateReturnWith('90000.00')(0)('60000.00'))
             assert(plain.kind === 'ok', ['expected the plain return to compute', plain])
             assert(zeroDays.kind === 'ok', ['expected the zero-day return to compute', zeroDays])
-            if (plain.kind !== 'ok' || zeroDays.kind !== 'ok') {
-                throw ['expected ok', plain, zeroDays]
-            }
             assertEq(zeroDays.line16Method, plain.line16Method, 'the wrapper must not select')
             assertEq(zeroDays.line16Method, 'taxTable')
             assertEq(zeroDays.lines.length, plain.lines.length)
@@ -13502,9 +13242,6 @@ export const proof = {
                 marketplaceExpatriateReturn('40000.00')('12000.00'))
             assert(plain.kind === 'ok', ['expected the plain marketplace return to compute', plain])
             assert(withExclusion.kind === 'ok', ['expected the §911 return to compute', withExclusion])
-            if (plain.kind !== 'ok' || withExclusion.kind !== 'ok') {
-                throw ['expected ok', plain, withExclusion]
-            }
             /** @type {(report: { readonly lines: readonly ReportLine[] }) => (rule: string) => bigint} */
             const cents = report => rule => lineRuled(report.lines)(rule).value
             // The exclusion really did move adjusted gross income, or the
@@ -13535,9 +13272,6 @@ export const proof = {
             const plain = form1040Report(taxParams2025)(marketplaceWageReturnAt('40000.00'))
             assert(lower.kind === 'ok', ['expected the lower-income return to compute', lower])
             assert(plain.kind === 'ok', ['expected the plain return to compute', plain])
-            if (lower.kind !== 'ok' || plain.kind !== 'ok') {
-                throw ['expected ok', lower, plain]
-            }
             /** @type {(report: { readonly lines: readonly ReportLine[] }) => (rule: string) => bigint} */
             const cents = report => rule => lineRuled(report.lines)(rule).value
             assertEq(cents(lower)('1040 line 11'), 2800000n, 'the same $28,000.00')
@@ -13574,9 +13308,6 @@ export const proof = {
             const without = form1040Report(taxParams2025)(expatriateReturn('60000.00'))
             assert(outcome.kind === 'ok', ['expected the §911(d)(6) return to compute', outcome])
             assert(without.kind === 'ok', ['expected the control return to compute', without])
-            if (outcome.kind !== 'ok' || without.kind !== 'ok') {
-                throw ['expected ok', outcome, without]
-            }
             /** @type {(report: { readonly lines: readonly ReportLine[] }) => (rule: string) => bigint} */
             const cents = report => rule => lineRuled(report.lines)(rule).value
             assertEq(cents(without)('1040 line 8'), -6000000n, 'the whole $60,000.00 excluded')
@@ -13602,9 +13333,6 @@ export const proof = {
             const outcome = form1040Report(taxParams2025)(expatriateReturnWithLineTwoB(
                 '60000.00')('20000.00'))
             assert(outcome.kind === 'ok', ['expected the return to compute', outcome])
-            if (outcome.kind !== 'ok') {
-                throw ['expected ok', outcome]
-            }
             const cents = lineRuled(outcome.lines)
             assertEq(
                 cents('1040 line 15').value, 1425000n,
@@ -13629,9 +13357,6 @@ export const proof = {
                 itemizingExpatriateReturn('480000.00')(undefined))
             assert(withExclusion.kind === 'ok', ['expected the §911 return to compute', withExclusion])
             assert(plain.kind === 'ok', ['expected the control return to compute', plain])
-            if (withExclusion.kind !== 'ok' || plain.kind !== 'ok') {
-                throw ['expected ok', withExclusion, plain]
-            }
             /** @type {(report: { readonly lines: readonly ReportLine[] }) => (rule: string) => bigint} */
             const cents = report => rule => lineRuled(report.lines)(rule).value
             assertEq(cents(plain)('1040 line 11'), 48000000n, '$480,000.00 both ways')
@@ -13652,9 +13377,6 @@ export const proof = {
                 seniorExpatriateReturn('80000.00')(undefined))
             assert(withExclusion.kind === 'ok', ['expected the §911 return to compute', withExclusion])
             assert(plain.kind === 'ok', ['expected the control return to compute', plain])
-            if (withExclusion.kind !== 'ok' || plain.kind !== 'ok') {
-                throw ['expected ok', withExclusion, plain]
-            }
             /** @type {(report: { readonly lines: readonly ReportLine[] }) => (rule: string) => bigint} */
             const cents = report => rule => lineRuled(report.lines)(rule).value
             assertEq(cents(plain)('1040 line 11'), 8000000n, '$80,000.00 both ways')
@@ -13675,9 +13397,6 @@ export const proof = {
                 parentExpatriateReturn('200000.00')(undefined))
             assert(withExclusion.kind === 'ok', ['expected the §911 return to compute', withExclusion])
             assert(plain.kind === 'ok', ['expected the control return to compute', plain])
-            if (withExclusion.kind !== 'ok' || plain.kind !== 'ok') {
-                throw ['expected ok', withExclusion, plain]
-            }
             /** @type {(report: { readonly lines: readonly ReportLine[] }) => (rule: string) => bigint} */
             const cents = report => rule => lineRuled(report.lines)(rule).value
             assertEq(cents(plain)('1040 line 11'), 20000000n, '$200,000.00 both ways')
@@ -13694,9 +13413,6 @@ export const proof = {
                 earnedIncomeCreditExpatriateReturn(undefined))
             assert(withExclusion.kind === 'ok', ['expected the §911 return to compute', withExclusion])
             assert(plain.kind === 'ok', ['expected the control return to compute', plain])
-            if (withExclusion.kind !== 'ok' || plain.kind !== 'ok') {
-                throw ['expected ok', withExclusion, plain]
-            }
             /** @type {(report: { readonly lines: readonly ReportLine[] }) => (rule: string) => bigint} */
             const cents = report => rule => lineRuled(report.lines)(rule).value
             assertEq(cents(plain)('1040 line 27a'), 406000n, '$4,060.00 of earned income credit')
@@ -13714,9 +13430,6 @@ export const proof = {
                 studentExpatriateReturn('85000.00')(undefined))
             assert(withExclusion.kind === 'ok', ['expected the §911 return to compute', withExclusion])
             assert(plain.kind === 'ok', ['expected the control return to compute', plain])
-            if (withExclusion.kind !== 'ok' || plain.kind !== 'ok') {
-                throw ['expected ok', withExclusion, plain]
-            }
             /** @type {(report: { readonly lines: readonly ReportLine[] }) => (rule: string) => bigint} */
             const cents = report => rule => lineRuled(report.lines)(rule).value
             assertEq(cents(plain)('1040 line 11'), 8500000n, '$85,000.00 both ways')
@@ -13748,9 +13461,6 @@ export const proof = {
             const outcome = form1040Report(taxParams2025)(
                 incentiveStockOptionExpatriateReturn('60000.00'))
             assert(outcome.kind === 'ok', ['expected the §911 AMT return to compute', outcome])
-            if (outcome.kind !== 'ok') {
-                throw ['expected ok', outcome]
-            }
             const cents = lineRuled(outcome.lines)
             assertEq(cents('1040 line 16').value, 2894700n, '$37,067.00 − $8,120.00')
             assertEq(cents('1040 line 17').value, 28667100n, '$315,618.00 − $28,947.00')
@@ -13767,9 +13477,6 @@ export const proof = {
             const outcome = form1040Report(taxParams2025)(
                 expatriateReturnWith('90000.00')(366)('60000.00'))
             assert(outcome.kind === 'error', ['366 days in a 365-day year must refuse', outcome])
-            if (outcome.kind !== 'error') {
-                throw ['expected error', outcome]
-            }
             assert(outcome.message.includes('366'), ['naming the stated count', outcome.message])
             assert(outcome.message.includes('365'), ['and the year’s own', outcome.message])
             assert(
@@ -13797,9 +13504,6 @@ export const proof = {
                 marketplaceWageReturn([storedMarketplaceStatement('400.00')]))
             assert(withoutCoverage.kind === 'ok', ['expected the plain wage return to compute', withoutCoverage])
             assert(withCoverage.kind === 'ok', ['expected the marketplace return to compute', withCoverage])
-            if (withoutCoverage.kind !== 'ok' || withCoverage.kind !== 'ok') {
-                throw ['expected ok', withoutCoverage, withCoverage]
-            }
             /** @type {(report: { readonly lines: readonly ReportLine[] }) => (rule: string) => bigint} */
             const cents = report => rule => lineRuled(report.lines)(rule).value
             // Unmoved: a refundable credit is not income, not a deduction and
@@ -13839,9 +13543,6 @@ export const proof = {
                 marketplaceWageReturn([storedMarketplaceStatement('900.00')]))
             assert(withoutCoverage.kind === 'ok', ['expected the plain wage return to compute', withoutCoverage])
             assert(withCoverage.kind === 'ok', ['expected the marketplace return to compute', withCoverage])
-            if (withoutCoverage.kind !== 'ok' || withCoverage.kind !== 'ok') {
-                throw ['expected ok', withoutCoverage, withCoverage]
-            }
             /** @type {(report: { readonly lines: readonly ReportLine[] }) => (rule: string) => bigint} */
             const cents = report => rule => lineRuled(report.lines)(rule).value
             for (const rule of ['1040 line 9', '1040 line 11', '1040 line 15', '1040 line 16']) {
@@ -13877,9 +13578,6 @@ export const proof = {
                 const outcome = form1040Report(taxParams2025)(
                     marketplaceWageReturn([storedMarketplaceStatement(advance)]))
                 assert(outcome.kind === 'ok', ['expected the marketplace return to compute', advance, outcome])
-                if (outcome.kind !== 'ok') {
-                    throw ['expected ok', outcome]
-                }
                 const credit = lineRuled(outcome.lines)('1040 line 31').value
                 const repayment = lineRuled(outcome.lines)('1040 line 17').value
                 assert(
@@ -13896,9 +13594,6 @@ export const proof = {
         aReturnWithNoFormTenNinetyFiveAIsUntouched: () => {
             const outcome = form1040Report(taxParams2025)(marketplaceWageReturn([]))
             assert(outcome.kind === 'ok', ['expected the plain wage return to compute', outcome])
-            if (outcome.kind !== 'ok') {
-                throw ['expected ok', outcome]
-            }
             assertEq(lineRuled(outcome.lines)('1040 line 17').value, 0n)
             assertEq(lineRuled(outcome.lines)('1040 line 31').value, 0n)
             for (const line of outcome.lines) {
@@ -13915,18 +13610,11 @@ export const proof = {
             const outcome = form1040Report(taxParams2025)(
                 marketplaceWageReturn([storedMarketplaceStatement('400.00')]))
             assert(outcome.kind === 'ok', ['expected the marketplace return to compute', outcome])
-            if (outcome.kind !== 'ok') {
-                throw ['expected ok', outcome]
-            }
             const sources = lineRuled(outcome.lines)('1040 line 31').sources
             const slcsp = sources.find(
                 source => source.boxPath === 'monthlyCoverage[month=7].columnBSlcspPremium')
-            assert(
-                slcsp !== undefined,
+            assert( slcsp !== undefined,
                 ['line 31 must cite the July SLCSP premium the credit was computed from', sources])
-            if (slcsp === undefined) {
-                throw ['unreachable', outcome]
-            }
             assertEq(slcsp.documentHash, 'sha256-1095a-e2e')
             assertEq(slcsp.value, '850.00', 'the raw stored string, never re-formatted')
             assert(
@@ -13953,9 +13641,6 @@ export const proof = {
             const outcome = form1040Report(taxParams2025)(
                 marketplaceWageReturn([storedMarketplaceStatement('900.00')]))
             assert(outcome.kind === 'ok', ['expected the marketplace return to compute', outcome])
-            if (outcome.kind !== 'ok') {
-                throw ['expected ok', outcome]
-            }
             const sources = lineRuled(outcome.lines)('1040 line 17').sources
             assert(
                 sources.some(source => source.boxPath === 'monthlyCoverage[month=12].columnAEnrollmentPremiums'),
@@ -13979,12 +13664,8 @@ export const proof = {
                         : row),
                 },
             }]))
-            assert(
-                outcome.kind === 'error',
+            assert( outcome.kind === 'error',
                 ['a month with enrollment premiums and no SLCSP premium must refuse the RETURN', outcome])
-            if (outcome.kind !== 'error') {
-                throw ['expected error', outcome]
-            }
             assert(
                 outcome.message.includes('month 5'),
                 ['the refusal must reach the caller verbatim, naming the month', outcome.message])
@@ -14008,9 +13689,6 @@ export const proof = {
                 }),
             })
             assert(outcome.kind === 'error', ['expected the return to refuse', outcome])
-            if (outcome.kind !== 'error') {
-                throw ['expected error', outcome]
-            }
             assert(
                 outcome.message.includes('federalPovertyLineTable'),
                 ['the refusal must name the profile field that would unlock it', outcome.message])
@@ -14034,9 +13712,6 @@ export const proof = {
                 },
             }]))
             assert(outcome.kind === 'ok', ['expected the part-year return to compute', outcome])
-            if (outcome.kind !== 'ok') {
-                throw ['expected ok', outcome]
-            }
             assertEq(
                 lineRuled(outcome.lines)('1040 line 31').value,
                 240000n,
@@ -14079,9 +13754,6 @@ export const proof = {
                 })],
             })
             assert(outcome.kind === 'ok', ['expected the marketplace return to compute', outcome])
-            if (outcome.kind !== 'ok') {
-                throw ['expected ok', outcome]
-            }
             /** @type {(rule: string) => bigint} */
             const cents = rule => lineRuled(outcome.lines)(rule).value
             assertEq(cents('1040 line 2a'), 500000n, '$5,000.00 of tax-exempt interest')
@@ -14102,9 +13774,6 @@ export const proof = {
             const outcome = form1040Report(taxParams2025)(
                 marketplaceWageReturn([storedMarketplaceStatement('900.00')]))
             assert(outcome.kind === 'ok', ['expected the marketplace return to compute', outcome])
-            if (outcome.kind !== 'ok') {
-                throw ['expected ok', outcome]
-            }
             // 1040 line 17 IS Schedule 2 line 3, which is line 1z plus line 2
             // (the AMT). With no AMT, line 17 is line 1z exactly.
             assertEq(
@@ -14118,9 +13787,6 @@ export const proof = {
         theNonProfitEmployeeReturnDeductsAllThreeAdjustmentsThroughLineTen: () => {
             const outcome = form1040Report(taxParams2025)(phaseTwentyFourInputs)
             assert(outcome.kind === 'ok', ['expected the non-profit employee return to compute', outcome])
-            if (outcome.kind !== 'ok') {
-                throw ['expected ok', outcome]
-            }
             // Hand-computed from the printed forms, independently of the code
             // under test:
             //
@@ -14172,9 +13838,6 @@ export const proof = {
             })
             assert(withAdjustments.kind === 'ok', ['expected ok', withAdjustments])
             assert(without.kind === 'ok', ['expected ok', without])
-            if (withAdjustments.kind !== 'ok' || without.kind !== 'ok') {
-                throw ['expected two computed returns', withAdjustments, without]
-            }
             const taxableWith = lineRuled(withAdjustments.lines)('1040 line 15').value
             const taxableWithout = lineRuled(without.lines)('1040 line 15').value
             assertEq(taxableWithout - taxableWith, 414263n,
@@ -14188,9 +13851,6 @@ export const proof = {
         lineTenCitesEveryDocumentTheAdjustmentsCameFrom: () => {
             const outcome = form1040Report(taxParams2025)(phaseTwentyFourInputs)
             assert(outcome.kind === 'ok', ['expected ok', outcome])
-            if (outcome.kind !== 'ok') {
-                throw ['expected ok', outcome]
-            }
             const sources = lineRuled(outcome.lines)('1040 line 10').sources
             const hashes = sources.map(source => source.documentHash)
             assert(hashes.includes('sha256-p24-adjustments'),
@@ -14260,9 +13920,6 @@ export const proof = {
             })
             assert(withAdjustment.kind === 'ok', ['expected ok', withAdjustment])
             assert(without.kind === 'ok', ['expected ok', without])
-            if (withAdjustment.kind !== 'ok' || without.kind !== 'ok') {
-                throw ['expected two computed returns', withAdjustment, without]
-            }
             const sixBWith = lineRuled(withAdjustment.lines)('1040 line 6b').value
             const sixBWithout = lineRuled(without.lines)('1040 line 6b').value
             assertEq(sixBWith, 1215000n, '$12,150.00, hand-computed from the worksheet with line 6 = $2,000.00')
@@ -14299,9 +13956,6 @@ export const proof = {
         thePhaseOutBitesThroughTheFullEntryPoint: () => {
             const outcome = form1040Report(taxParams2025)(phaseOutInputs)
             assert(outcome.kind === 'ok', ['expected the phased-out return to compute', outcome])
-            if (outcome.kind !== 'ok') {
-                throw ['expected ok', outcome]
-            }
             assertEq(lineRuled(outcome.lines)('1040 line 9').value, 9500000n, '$95,000.00 total income')
             assertEq(lineRuled(outcome.lines)('1040 line 10').value, 66600n,
                 '$666.00 — the phased-out remainder of a $2,000.00 deduction')
@@ -14339,10 +13993,7 @@ export const proof = {
                     },
                 }],
             })
-            assertEq(outcome.kind, 'error')
-            if (outcome.kind !== 'error') {
-                throw ['expected a refusal', outcome]
-            }
+            assert(outcome.kind === 'error', ['expected a refusal', outcome])
             assert(outcome.message.includes('alimonyPaid'),
                 ['the refusal must name the tag it could not compute', outcome.message])
             // A document-data-sufficiency refusal, never a scope one: it
@@ -14379,9 +14030,6 @@ export const proof = {
         movingExpensesReachTheReturnThroughTheFullEntryPoint: () => {
             const outcome = form1040Report(taxParams2025)(formThreeNineZeroThreeInputs('2000.00'))
             assert(outcome.kind === 'ok', ['expected the PCS return to compute', outcome])
-            if (outcome.kind !== 'ok') {
-                throw ['expected ok', outcome]
-            }
             assertEq(lineRuled(outcome.lines)('1040 line 1a').value, 5200000n, '$52,000.00 of wages')
             assertEq(lineRuled(outcome.lines)('1040 line 9').value, 5200000n, '$52,000.00 total income')
             assertEq(lineRuled(outcome.lines)('1040 line 10').value, 413690n,
@@ -14410,9 +14058,6 @@ export const proof = {
             })
             assert(withMove.kind === 'ok', ['expected ok', withMove])
             assert(without.kind === 'ok', ['expected ok', without])
-            if (withMove.kind !== 'ok' || without.kind !== 'ok') {
-                throw ['expected two computed returns', withMove, without]
-            }
             assertEq(
                 lineRuled(without.lines)('1040 line 15').value
                     - lineRuled(withMove.lines)('1040 line 15').value,
@@ -14435,9 +14080,6 @@ export const proof = {
             })
             assert(reimbursed.kind === 'ok', ['expected ok', reimbursed])
             assert(unreimbursed.kind === 'ok', ['expected ok', unreimbursed])
-            if (reimbursed.kind !== 'ok' || unreimbursed.kind !== 'ok') {
-                throw ['expected two computed returns', reimbursed, unreimbursed]
-            }
             assertEq(lineRuled(unreimbursed.lines)('1040 line 10').value, 613690n,
                 '$6,136.90 deducted in full when nothing was reimbursed')
             assertEq(
@@ -14452,9 +14094,6 @@ export const proof = {
         lineTenCitesTheMovingEntriesAndTheCodePBox: () => {
             const outcome = form1040Report(taxParams2025)(formThreeNineZeroThreeInputs('2000.00'))
             assert(outcome.kind === 'ok', ['expected ok', outcome])
-            if (outcome.kind !== 'ok') {
-                throw ['expected ok', outcome]
-            }
             const sources = lineRuled(outcome.lines)('1040 line 10').sources
             const hashes = sources.map(source => source.documentHash)
             assert(hashes.includes('sha256-p3903-adjustments'),
@@ -14492,9 +14131,6 @@ export const proof = {
                 }),
             })
             assert(outcome.kind === 'error', ['an uncertified move must refuse', outcome])
-            if (outcome.kind !== 'error') {
-                throw ['expected a refusal', outcome]
-            }
             assert(
                 outcome.message.includes('movingExpensesArmedForcesPermanentChangeOfStation'),
                 ['name the field that would fix it', outcome.message])
@@ -14521,9 +14157,6 @@ export const proof = {
         anOverReimbursedMoveRefusesTheWholeReturnNamingLineOneH: () => {
             const outcome = form1040Report(taxParams2025)(formThreeNineZeroThreeInputs('9000.00'))
             assert(outcome.kind === 'error', ['an over-reimbursed move must refuse', outcome])
-            if (outcome.kind !== 'error') {
-                throw ['expected a refusal', outcome]
-            }
             assert(outcome.message.includes('$2863.10'),
                 ['name the excess amount', outcome.message])
             assert(outcome.message.includes('line 1h'),
@@ -14542,9 +14175,6 @@ export const proof = {
             const exactly = form1040Report(taxParams2025)(
                 formThreeNineZeroThreeInputs('6136.90'))
             assert(exactly.kind === 'ok', ['a perfectly reimbursed move computes', exactly])
-            if (exactly.kind !== 'ok') {
-                throw ['expected ok', exactly]
-            }
             assertEq(lineRuled(exactly.lines)('1040 line 10').value, 0n,
                 'a zero deduction, and the return is complete')
             assertEq(lineRuled(exactly.lines)('1040 line 15').value, 3625000n,
@@ -14589,9 +14219,6 @@ export const proof = {
             })
             assert(withMove.kind === 'ok', ['expected ok', withMove])
             assert(without.kind === 'ok', ['expected ok', without])
-            if (withMove.kind !== 'ok' || without.kind !== 'ok') {
-                throw ['expected two computed returns', withMove, without]
-            }
             const sixBWith = lineRuled(withMove.lines)('1040 line 6b').value
             const sixBWithout = lineRuled(without.lines)('1040 line 6b').value
             assertEq(sixBWith, 1215000n,
@@ -14654,9 +14281,6 @@ export const proof = {
         theCoveredContributorsDeductionReachesLineTenAndAgi: () => {
             const outcome = form1040Report(taxParams2025)(iraPhaseOutInputs)
             assert(outcome.kind === 'ok', ['expected the IRA contributor’s return to compute', outcome])
-            if (outcome.kind !== 'ok') {
-                throw ['expected ok', outcome]
-            }
             /** @type {(rule: string) => bigint} */
             const cents = rule => lineRuled(outcome.lines)(rule).value
             assertEq(cents('1040 line 1a'), 8200000n, '$82,000.00 of wages')
@@ -14692,9 +14316,6 @@ export const proof = {
             })
             assert(withContribution.kind === 'ok', ['expected ok', withContribution])
             assert(without.kind === 'ok', ['expected ok', without])
-            if (withContribution.kind !== 'ok' || without.kind !== 'ok') {
-                throw ['expected two computed returns', withContribution, without]
-            }
             assertEq(
                 lineRuled(without.lines)('1040 line 15').value
                     - lineRuled(withContribution.lines)('1040 line 15').value,
@@ -14727,9 +14348,6 @@ export const proof = {
             })
             assert(withBenefits.kind === 'ok', ['expected ok', withBenefits])
             assert(without.kind === 'ok', ['expected ok', without])
-            if (withBenefits.kind !== 'ok' || without.kind !== 'ok') {
-                throw ['expected two computed returns', withBenefits, without]
-            }
             assertEq(lineRuled(withBenefits.lines)('1040 line 6a').value, 3000000n, '$30,000.00 of benefits')
             assertEq(lineRuled(withBenefits.lines)('1040 line 6b').value, 2550000n,
                 '$25,500.00 taxable — the 85%-of-gross cap')
@@ -14763,9 +14381,6 @@ export const proof = {
             })
             assert(withContribution.kind === 'ok', ['expected ok', withContribution])
             assert(without.kind === 'ok', ['expected ok', without])
-            if (withContribution.kind !== 'ok' || without.kind !== 'ok') {
-                throw ['expected two computed returns', withContribution, without]
-            }
             const sixBWith = lineRuled(withContribution.lines)('1040 line 6b').value
             const sixBWithout = lineRuled(without.lines)('1040 line 6b').value
             assertEq(sixBWith, 300000n, '$3,000.00, hand-computed with worksheet line 6 = $3,000.00')
@@ -14807,9 +14422,6 @@ export const proof = {
             })
             assert(withInterest.kind === 'ok', ['expected ok', withInterest])
             assert(without.kind === 'ok', ['expected ok', without])
-            if (withInterest.kind !== 'ok' || without.kind !== 'ok') {
-                throw ['expected two computed returns', withInterest, without]
-            }
             assertEq(lineRuled(withInterest.lines)('1040 line 2a').value, 2800000n,
                 '$28,000.00 of tax-exempt interest, which is NOT in taxable income')
             assertEq(lineRuled(withInterest.lines)('1040 line 10').value, 688000n,
@@ -14822,10 +14434,7 @@ export const proof = {
         // named special case, through the full entry point.
         aContributionBesideAnIraDistributionStopsTheWholeReturn: () => {
             const outcome = form1040Report(taxParams2025)(iraContributionAndDistributionInputs)
-            assertEq(outcome.kind, 'error')
-            if (outcome.kind !== 'error') {
-                throw ['expected a refusal', outcome]
-            }
+            assert(outcome.kind === 'error', ['expected a refusal', outcome])
             assert(outcome.message.includes('590-B'),
                 ['the refusal must name the worksheet it would need', outcome.message])
             assertEq(outcome.unmodeled.length, 0, 'a document-data-sufficiency refusal, not a scope one')
@@ -14853,9 +14462,6 @@ export const proof = {
             })
             assert(livedTogether.kind === 'ok', ['expected ok', livedTogether])
             assert(livedApart.kind === 'ok', ['expected ok', livedApart])
-            if (livedTogether.kind !== 'ok' || livedApart.kind !== 'ok') {
-                throw ['expected two computed returns', livedTogether, livedApart]
-            }
             assertEq(lineRuled(livedTogether.lines)('1040 line 10').value, 280000n,
                 '$2,800.00 — §219(g)(3)(B)(iii)’s $0.00 applicable dollar amount')
             assertEq(lineRuled(livedApart.lines)('1040 line 10').value, 300000n,
@@ -14868,9 +14474,6 @@ export const proof = {
         lineTenCitesTheContributionTheCoverageBoxAndTheCompensationBox: () => {
             const outcome = form1040Report(taxParams2025)(iraPhaseOutInputs)
             assert(outcome.kind === 'ok', ['expected ok', outcome])
-            if (outcome.kind !== 'ok') {
-                throw ['expected ok', outcome]
-            }
             const sources = lineRuled(outcome.lines)('1040 line 10').sources
             const hashes = sources.map(source => source.documentHash)
             assert(hashes.includes('sha256-p33-ira'),
@@ -14899,10 +14502,7 @@ export const proof = {
                     iraAdjustmentsDocument('sha256-p33-ira')('traditionalIraContribution')('7000.00'),
                 ],
             })
-            assertEq(outcome.kind, 'error')
-            if (outcome.kind !== 'error') {
-                throw ['expected a refusal', outcome]
-            }
+            assert(outcome.kind === 'error', ['expected a refusal', outcome])
             assert(outcome.message.includes('$4900.00'),
                 ['the refusal must name the under-50 figure, $4,900.00', outcome.message])
             assert(outcome.message.includes('$5600.00'),
@@ -14932,20 +14532,14 @@ export const proof = {
                     declaredKinds: ['wages', 'iraDeduction'],
                 }),
             })
-            assertEq(outcome.kind, 'ok', 'the kind is in `modeledKinds` now')
-            if (outcome.kind !== 'ok') {
-                throw ['expected a computed return', outcome]
-            }
+            assert(outcome.kind === 'ok', 'the kind is in `modeledKinds` now')
             // ...and declaring it changed nothing about the number, which is
             // what `declaredKinds` gating refusals rather than computation
             // means. Compared against the SAME return without the
             // declaration, not against a hand-typed figure, because the
             // property under test is the equality itself.
             const undeclared = form1040Report(taxParams2025)(iraPhaseOutInputs)
-            assertEq(undeclared.kind, 'ok', 'the control must compute too')
-            if (undeclared.kind !== 'ok') {
-                throw ['expected a computed control', undeclared]
-            }
+            assert(undeclared.kind === 'ok', 'the control must compute too')
             assertEq(
                 JSON.stringify(outcome.lines.map(line => line.value.toString())),
                 JSON.stringify(undeclared.lines.map(line => line.value.toString())),
@@ -15099,10 +14693,8 @@ export const proof = {
                 [iraDistribution])([ssaForm])([])([])([])
             const without = form1040Report(taxParams2025)(base)
             const with_ = form1040Report(taxParams2025)({ ...base, iraForms: [record] })
-            assert(without.kind === 'ok' && with_.kind === 'ok', ['expected both to compute'])
-            if (without.kind !== 'ok' || with_.kind !== 'ok') {
-                return
-            }
+            assert(without.kind === 'ok' && with_.kind === 'ok',
+                ['expected both to compute'])
             assertEq(lineRuled(without.lines)('1040 line 4b').value, 4000000n, '$40,000.00')
             assertEq(lineRuled(without.lines)('1040 line 6b').value, 2235000n, '$22,350.00')
             assertEq(lineRuled(with_.lines)('1040 line 4b').value, 2000000n, '$20,000.00')
@@ -15228,10 +14820,7 @@ export const proof = {
                     [iraDistribution])([])([])([])([]),
                 iraForms: [record],
             })
-            assertEq(outcome.kind, 'error')
-            if (outcome.kind !== 'error') {
-                throw ['expected a refusal', outcome]
-            }
+            assert(outcome.kind === 'error', ['expected a refusal', outcome])
             assert(outcome.message.includes('line-12d'), ['name the contradiction', outcome.message])
             assertEq(outcome.unmodeled.length, 0, 'a data-sufficiency refusal names no scope kind')
             assertEq(Object.hasOwn(outcome, 'lines'), false, 'no partial return is constructible')
@@ -15307,9 +14896,6 @@ export const proof = {
                 }],
             })
             assert(outcome.kind === 'ok', ['expected the Phase 21 fixture to compute', outcome])
-            if (outcome.kind !== 'ok') {
-                return
-            }
             assertEq(lineRuled(outcome.lines)('1040 line 1a').value, 4550500n, '$45,505.00')
             assertEq(lineRuled(outcome.lines)('1040 line 34').value, 553500n, '$5,535.00')
             // …and this phase genuinely did nothing: line 4a and line 4b are
@@ -15389,9 +14975,6 @@ export const proof = {
                 [])([])([])([conversionForm])([])([])([])([])
             const outcome = form1040Report(taxParams2025)({ ...base, iraForms: [record] })
             assert(outcome.kind === 'ok', ['a backdoor Roth must COMPUTE', outcome])
-            if (outcome.kind !== 'ok') {
-                return
-            }
             assertEq(lineRuled(outcome.lines)('1040 line 4a').value, 700000n, '$7,000.00 gross')
             assertEq(
                 lineRuled(outcome.lines)('1040 line 4b').value, 0n,
@@ -15404,9 +14987,6 @@ export const proof = {
             // the $7,000.00 the record removes.
             const without = form1040Report(taxParams2025)(base)
             assert(without.kind === 'ok', ['expected the bare return to compute', without])
-            if (without.kind !== 'ok') {
-                return
-            }
             assertEq(
                 lineRuled(without.lines)('1040 line 4b').value, 700000n,
                 'taxed in full without the assertion')
@@ -15434,10 +15014,7 @@ export const proof = {
             const profile = { ...singleProfile, declaredKinds: ['iraDistributions'] }
             const outcome = form1040Report(taxParams2025)(
                 inputsOf(storedProfile(profile))([])([])([])([])([rothForm])([])([])([])([]))
-            assertEq(outcome.kind, 'error', 'it must no longer compute silently')
-            if (outcome.kind !== 'error') {
-                return
-            }
+            assert(outcome.kind === 'error', 'it must no longer compute silently')
             assert(outcome.message.includes('code J'), ['name the code', outcome.message])
             assert(outcome.message.includes('Part III'), ['name the part', outcome.message])
             // A document-data-sufficiency refusal, never a scope one.
@@ -15468,9 +15045,6 @@ export const proof = {
                 inputsOf(storedProfile(profile))([w2Document('sha256-31-q-w2')('40000.00')])(
                     [])([])([])([qualified])([])([])([])([]))
             assert(outcome.kind === 'ok', ['a qualified Roth distribution must compute', outcome])
-            if (outcome.kind !== 'ok') {
-                return
-            }
             assertEq(
                 lineRuled(outcome.lines)('1040 line 4a').value, 2000000n,
                 '$20,000.00 — an IRA distribution, on the IRA line')
@@ -15498,9 +15072,6 @@ export const proof = {
             const outcome = form1040Report(taxParams2025)(
                 inputsOf(storedProfile(profile))([])([])([])([])([designated])([])([])([])([]))
             assert(outcome.kind === 'ok', ['a designated Roth account is an ordinary pension', outcome])
-            if (outcome.kind !== 'ok') {
-                return
-            }
             assertEq(lineRuled(outcome.lines)('1040 line 5a').value, 2000000n, 'still a pension')
             assertEq(lineRuled(outcome.lines)('1040 line 5b').value, 2000000n, 'and still taxable')
             assertEq(lineRuled(outcome.lines)('1040 line 4a').value, 0n, 'NOT an IRA distribution')
@@ -15595,9 +15166,6 @@ export const proof = {
                 }],
             })
             assert(outcome.kind === 'ok', ['expected the exercise-and-hold return to compute', outcome])
-            if (outcome.kind !== 'ok') {
-                return
-            }
             const at = lineRuled(outcome.lines)
             assertEq(at('1040 line 1a').value, 13000000n, '$130,000.00 of wages')
             assertEq(at('1040 line 12e').value, 1775000n, '$15,750.00 + $2,000.00 aged')
@@ -15661,9 +15229,6 @@ export const proof = {
                 rentalProperties: [rentalPropertyDocument('sha256-rental-property')],
             })
             assert(withRental.kind === 'ok', ['expected the rental return to compute', withRental])
-            if (withRental.kind !== 'ok') {
-                return
-            }
             const at = lineRuled(withRental.lines)
             assertEq(at('1040 line 1a').value, 6000000n, '$60,000.00 of wages')
             assertEq(at('1040 line 8').value, 1000450n, 'Schedule E line 26 -> Schedule 1 line 5')
@@ -15685,9 +15250,6 @@ export const proof = {
             // nowhere, or one that refused every return, would look identical.
             const without = form1040Report(taxParams2025)(base)
             assert(without.kind === 'ok', ['expected the property-less return to compute', without])
-            if (without.kind !== 'ok') {
-                return
-            }
             assertEq(lineRuled(without.lines)('1040 line 8').value, 0n,
                 'no rental property, so printed line 26 is a documented zero')
             assertEq(lineRuled(without.lines)('1040 line 9').value, 6000000n,
@@ -15755,9 +15317,6 @@ export const proof = {
             const without = form1040Report(taxParams2025)(base)
             assert(withRental.kind === 'ok', ['expected the rental return to compute', withRental])
             assert(without.kind === 'ok', ['expected the control return to compute', without])
-            if (withRental.kind !== 'ok' || without.kind !== 'ok') {
-                return
-            }
             const at = lineRuled(withRental.lines)
             const withoutAt = lineRuled(without.lines)
             assertEq(at('1040 line 8').value, 805000n, 'Schedule E line 26 = $8,050.00')
@@ -15845,9 +15404,6 @@ export const proof = {
             const without = form1040Report(taxParams2025)(base)
             assert(withBeneficiary.kind === 'ok', ['expected the beneficiary return to compute', withBeneficiary])
             assert(without.kind === 'ok', ['expected the control return to compute', without])
-            if (withBeneficiary.kind !== 'ok' || without.kind !== 'ok') {
-                return
-            }
             const at = lineRuled(withBeneficiary.lines)
             const withoutAt = lineRuled(without.lines)
             // The income really did arrive: same 1040 line 8 and same AGI as
@@ -15894,9 +15450,6 @@ export const proof = {
                 }),
             ]))
             assert(outcome.kind === 'error', ['a passive beneficiary share must refuse', outcome])
-            if (outcome.kind !== 'error') {
-                return
-            }
             assert(outcome.message.includes('Form 8960 line 4a'),
                 ['the refusal must name where the amount would have gone', outcome.message])
             assert(outcome.message.includes('§1411(c)(6)'),
@@ -15931,9 +15484,6 @@ export const proof = {
                 }),
             ]))
             assert(outcome.kind === 'error', ['a box 14 item must refuse', outcome])
-            if (outcome.kind !== 'error') {
-                return
-            }
             assert(outcome.message.includes('box 14'),
                 ['the refusal must name the box', outcome.message])
         },
@@ -15982,9 +15532,6 @@ export const proof = {
                 }],
             })
             assert(outcome.kind === 'ok', ['an undeclared net investment income tax must still compute', outcome])
-            if (outcome.kind !== 'ok') {
-                return
-            }
             const at = lineRuled(outcome.lines)
             assert(!profile.declaredKinds.includes('netInvestmentIncomeTax'),
                 'the fixture must not declare the tax it is about to owe')
@@ -16025,9 +15572,6 @@ export const proof = {
             const electedOut = exerciseAndHoldWithRentalRegister('electedOut')
             assert(adjusted.kind === 'ok', ['expected the adjusted return to compute', adjusted])
             assert(electedOut.kind === 'ok', ['expected the elected-out return to compute', electedOut])
-            if (adjusted.kind !== 'ok' || electedOut.kind !== 'ok') {
-                return
-            }
             const adjustedAt = lineRuled(adjusted.lines)
             const electedOutAt = lineRuled(electedOut.lines)
             // The regular tax half: printed Schedule E line 18 is $2,000.00, so
@@ -16091,9 +15635,6 @@ export const proof = {
             const electedOut = exerciseAndHoldWithAssetRegister('electedOut')
             assert(adjusted.kind === 'ok', ['expected the adjusted return to compute', adjusted])
             assert(electedOut.kind === 'ok', ['expected the elected-out return to compute', electedOut])
-            if (adjusted.kind !== 'ok' || electedOut.kind !== 'ok') {
-                return
-            }
             const adjustedAt = lineRuled(adjusted.lines)
             const electedOutAt = lineRuled(electedOut.lines)
             // The regular tax half: Schedule C line 13 is $2,000.00 of
@@ -16153,9 +15694,6 @@ export const proof = {
             })
             assert(without.kind === 'ok', ['expected the register-less return to compute', without])
             assert(withRegister.kind === 'ok', ['expected the register return to compute', withRegister])
-            if (without.kind !== 'ok' || withRegister.kind !== 'ok') {
-                return
-            }
             assertEq(lineRuled(without.lines)('1040 line 8').value, 300000n,
                 'the whole $3,000.00 of receipts, undepreciated')
             const hashes = lineRuled(without.lines)('1040 line 8').sources
@@ -16196,9 +15734,6 @@ export const proof = {
                 estateTrustAmtK1('sha256-2j-k1')([{ code: 'A', amount: '10000.00' }]),
             ])
             assert(outcome.kind === 'ok', ['expected the beneficiary return to compute', outcome])
-            if (outcome.kind !== 'ok') {
-                return
-            }
             const at = lineRuled(outcome.lines)
             assertEq(at('1040 line 16').value, 1913900n, '$19,139.00 of regular tax, unchanged')
             assertEq(at('1040 line 17').value, 29527900n, '$295,279.00 of alternative minimum tax')
@@ -16209,9 +15744,6 @@ export const proof = {
             // alone would be satisfied by a coincidence; this pair cannot be.
             const without = exerciseAndHoldWith([])
             assert(without.kind === 'ok', ['expected the control return to compute', without])
-            if (without.kind !== 'ok') {
-                return
-            }
             const controlAt = lineRuled(without.lines)
             assertEq(controlAt('1040 line 17').value, 29247900n, '$292,479.00 without the K-1')
             assertEq(
@@ -16234,9 +15766,6 @@ export const proof = {
                 estateTrustAmtK1('sha256-2j-k1-neg')([{ code: 'A', amount: '-10000.00' }]),
             ])
             assert(outcome.kind === 'ok', ['expected the negative-adjustment return to compute', outcome])
-            if (outcome.kind !== 'ok') {
-                return
-            }
             assertEq(
                 lineRuled(outcome.lines)('1040 line 17').value, 28967900n,
                 '$289,679.00 -- BELOW the $292,479.00 the same return owes with no K-1')
@@ -16251,9 +15780,6 @@ export const proof = {
                 estateTrustAmtK1('sha256-2j-k1')([{ code: 'A', amount: '10000.00' }]),
             ])
             assert(outcome.kind === 'ok', ['expected the beneficiary return to compute', outcome])
-            if (outcome.kind !== 'ok') {
-                return
-            }
             const seventeen = lineRuled(outcome.lines)('1040 line 17')
             const hashes = seventeen.sources.map(source => source.documentHash)
             assert(hashes.includes('sha256-2j-k1'), ['1040 line 17 must cite the Schedule K-1', hashes])
@@ -16278,9 +15804,6 @@ export const proof = {
                 estateTrustAmtK1('sha256-2j-k1-j')([{ code: 'J', amount: '10000.00' }]),
             ])
             assert(outcome.kind === 'error', ['expected the return to refuse', outcome])
-            if (outcome.kind !== 'error') {
-                return
-            }
             assert(outcome.message.includes('box 12'), ['name the printed box', outcome.message])
             assert(outcome.message.includes('J'), ['name the code', outcome.message])
             // And the refusal is not the whole story: the SAME return with
@@ -16409,12 +15932,8 @@ export const proof = {
             })
             // THE CRITERION, first: this return COMPUTES. Before TAX-33 the
             // identical inputs produced a refusal naming Part III.
-            assert(
-                outcome.kind === 'ok',
+            assert( outcome.kind === 'ok',
                 ['an ISO spread beside qualified dividends must COMPUTE', outcome])
-            if (outcome.kind !== 'ok') {
-                return
-            }
             const at = lineRuled(outcome.lines)
             assertEq(at('1040 line 1a').value, 25000000n, '$250,000.00 of wages')
             assertEq(at('1040 line 3a').value, 2000000n, '$20,000.00 of qualified dividends')
@@ -16622,12 +16141,8 @@ export const proof = {
                 inputsOf(storedProfile(profile))([
                     w2Document('sha256-33-sdtw-w2')('215750.00'),
                 ])([interestForm])([dividendForm])([brokerageForm])([])([])([])([])([]))
-            assert(
-                outcome.kind === 'ok',
+            assert( outcome.kind === 'ok',
                 ['the Schedule D arm of Part III must compute end to end', outcome])
-            if (outcome.kind !== 'ok') {
-                return
-            }
             const at = lineRuled(outcome.lines)
             assertEq(
                 outcome.line16Method, 'scheduleDTaxWorksheet',
@@ -16766,9 +16281,6 @@ export const proof = {
                 }],
             })
             assert(outcome.kind === 'ok', ['expected ok', outcome])
-            if (outcome.kind !== 'ok') {
-                return
-            }
             const seventeen = lineRuled(outcome.lines)('1040 line 17').value
             assertEq(seventeen, rightAnswer, 'line 2a read 1040 line 12e')
             assert(
@@ -16809,9 +16321,6 @@ export const proof = {
                 }],
             })
             assert(outcome.kind === 'error', ['an undeclared ISO exercise must refuse', outcome])
-            if (outcome.kind !== 'error') {
-                return
-            }
             assertEq(outcome.unmodeled[0], 'alternativeMinimumTax', outcome.unmodeled)
             assert(outcome.message.includes('Form 6251'), [outcome.message])
             assert(outcome.message.includes('never received'), [outcome.message])
@@ -16834,9 +16343,6 @@ export const proof = {
                 ])([])([])([])([])([])([])([])([]),
             })
             assert(outcome.kind === 'ok', ['expected ok', outcome])
-            if (outcome.kind !== 'ok') {
-                return
-            }
             const at = lineRuled(outcome.lines)
             assertEq(at('1040 line 16').value, 1913900n, 'the same $19,139.00 of regular tax')
             assertEq(at('1040 line 17').value, 0n, 'no alternative minimum tax')
@@ -16923,9 +16429,6 @@ export const proof = {
             })
             const uncorrected = form1040Report(taxParams2025)(returnWith([]))
             assert(uncorrected.kind === 'ok', ['the uncorrected return must COMPUTE, not refuse', uncorrected])
-            if (uncorrected.kind !== 'ok') {
-                return
-            }
             const corrected = form1040Report(taxParams2025)(returnWith([{
                 documentHash: 'sha256-29-rsu-fix',
                 value: {
@@ -16940,9 +16443,6 @@ export const proof = {
                 },
             }]))
             assert(corrected.kind === 'ok', ['expected ok', corrected])
-            if (corrected.kind !== 'ok') {
-                return
-            }
             const before = lineRuled(uncorrected.lines)
             const after = lineRuled(corrected.lines)
             // The wages are identical, which is the point: the $150,000.00 is
@@ -17032,9 +16532,6 @@ export const proof = {
                 employeeStockPurchaseForms: [transfer],
             })
             assert(outcome.kind === 'error', ['an ESPP transfer plus a sale must refuse', outcome])
-            if (outcome.kind !== 'error') {
-                return
-            }
             assert(outcome.message.includes('sha256-29-espp-3922'), [outcome.message])
             assert(outcome.message.includes('§423(a)(1)'), ['gap 2', outcome.message])
             assert(outcome.message.includes('Form W-2 box'), ['gap 3', outcome.message])
@@ -17074,9 +16571,6 @@ export const proof = {
                 }],
             })
             assert(outcome.kind === 'error', ['expected a refusal', outcome])
-            if (outcome.kind !== 'error') {
-                return
-            }
             assert(outcome.message.includes('sha256-29-orphan-fix'), [outcome.message])
             assert(
                 outcome.message.includes('capitalGainsOrLosses'),
@@ -17127,9 +16621,6 @@ export const proof = {
             const without = form1040Report(taxParams2025)(selfEmployedWithHealthPremiums([]))
             assert(withPremium.kind === 'ok', ['expected this return to compute', withPremium])
             assert(without.kind === 'ok', ['and the control too', without])
-            if (withPremium.kind !== 'ok' || without.kind !== 'ok') {
-                throw ['expected ok', withPremium, without]
-            }
             const paid = lineRuled(withPremium.lines)
             const none = lineRuled(without.lines)
             // Schedule 1 line 15 is unaffected: §164(f)'s half does not depend
@@ -17167,9 +16658,6 @@ export const proof = {
                 selfEmployedWithWagesAndHealthPremiums([]))
             assert(withPremium.kind === 'ok', ['expected this return to compute', withPremium])
             assert(without.kind === 'ok', ['and the control too', without])
-            if (withPremium.kind !== 'ok' || without.kind !== 'ok') {
-                throw ['expected ok', withPremium, without]
-            }
             const paid = lineRuled(withPremium.lines)
             const none = lineRuled(without.lines)
             assertEq(none('1040 line 13a').value, 929352n, '20% of $46,467.61')
@@ -17196,9 +16684,6 @@ export const proof = {
             const without = form1040Report(taxParams2025)(
                 selfEmployedWithWagesAndHealthPremiums([]))
             assert(withPremium.kind === 'ok' && without.kind === 'ok', 'both compute')
-            if (withPremium.kind !== 'ok' || without.kind !== 'ok') {
-                throw ['expected ok', withPremium, without]
-            }
             const paid = lineRuled(withPremium.lines)
             const none = lineRuled(without.lines)
             assert(
@@ -17224,9 +16709,6 @@ export const proof = {
             ]))
             const without = form1040Report(taxParams2025)(selfEmployedWithHealthPremiums([]))
             assert(outcome.kind === 'ok' && without.kind === 'ok', 'both compute')
-            if (outcome.kind !== 'ok' || without.kind !== 'ok') {
-                throw ['expected ok', outcome, without]
-            }
             assertEq(
                 lineRuled(outcome.lines)('1040 line 10').value
                     - lineRuled(without.lines)('1040 line 10').value,
@@ -17253,9 +16735,6 @@ export const proof = {
                 marketplaceStatements: [storedMarketplaceStatement('300.00')],
             })
             assert(outcome.kind === 'error', ['expected the circularity refusal', outcome])
-            if (outcome.kind !== 'error') {
-                throw ['expected error', outcome]
-            }
             assert(
                 outcome.message.includes('Rev. Proc. 2014-41'),
                 ['the refusal must reach the report naming the guidance', outcome.message])
@@ -17302,9 +16781,6 @@ export const proof = {
                 }),
             })
             assert(outcome.kind === 'error', ['expected the §162(l)(2)(B) refusal', outcome])
-            if (outcome.kind !== 'error') {
-                throw ['expected error', outcome]
-            }
             assert(
                 outcome.message.includes(
                     'notEligibleForAnySubsidizedEmployerHealthPlanInAnyMonth'),
@@ -17329,9 +16805,6 @@ export const proof = {
             ]))
             const without = form1040Report(taxParams2025)(selfEmployedWithHealthPremiums([]))
             assert(outcome.kind === 'ok' && without.kind === 'ok', 'both compute')
-            if (outcome.kind !== 'ok' || without.kind !== 'ok') {
-                throw ['expected ok', outcome, without]
-            }
             const independent = form7206(taxParams2025)({
                 medicalDentalVisionPremiumsCents: 960000n,
                 longTermCarePersons: [
@@ -17357,9 +16830,6 @@ export const proof = {
         boxTenReachesLineOneEAndTheCreditReachesLineTwenty: () => {
             const outcome = form1040Report(taxParams2025)(dependentCareInputs)
             assert(outcome.kind === 'ok', ['expected this return to compute', outcome])
-            if (outcome.kind !== 'ok') {
-                throw ['expected ok', outcome]
-            }
             const line = lineRuled(outcome.lines)
             assertEq(line('1040 line 1a').value, 4000000n, '$40,000.00 of box 1 wages')
             assertEq(
@@ -17386,9 +16856,6 @@ export const proof = {
         lineOneECitesTheBoxItCameFrom: () => {
             const outcome = form1040Report(taxParams2025)(dependentCareInputs)
             assert(outcome.kind === 'ok', ['expected this return to compute', outcome])
-            if (outcome.kind !== 'ok') {
-                throw ['expected ok', outcome]
-            }
             const line1e = lineRuled(outcome.lines)('1040 line 1e')
             const source = assertNotNullish(line1e.sources[0], 'line 1e must cite something')
             assertEq(source.documentHash, 'sha256-2441-w2')
@@ -17420,9 +16887,6 @@ export const proof = {
             const without = form1040Report(taxParams2025)(dependentCareWithoutBenefitsInputs)
             assert(withBenefits.kind === 'ok', ['expected the benefits return to compute', withBenefits])
             assert(without.kind === 'ok', ['expected the control to compute', without])
-            if (withBenefits.kind !== 'ok' || without.kind !== 'ok') {
-                throw ['expected both to compute', withBenefits, without]
-            }
             assertEq(
                 lineRuled(without.lines)('1040 line 1e').value,
                 0n,
@@ -17445,9 +16909,6 @@ export const proof = {
         theTaxableBenefitsJoinEarnedIncomeForPartTwoButNotPartThree: () => {
             const outcome = form1040Report(taxParams2025)(dependentCareInputs)
             assert(outcome.kind === 'ok', ['expected this return to compute', outcome])
-            if (outcome.kind !== 'ok') {
-                throw ['expected ok', outcome]
-            }
             assertEq(
                 lineRuled(outcome.lines)('1040 line 20').value,
                 21000n,
@@ -17466,9 +16927,6 @@ export const proof = {
                 }),
             })
             assert(outcome.kind === 'error', ['expected a tripwire refusal', outcome])
-            if (outcome.kind !== 'error') {
-                throw ['expected error', outcome]
-            }
             assert(
                 outcome.message.includes('box 10') && outcome.message.includes('1040 line 1e'),
                 ['the refusal must name the box and where its amount goes', outcome.message])
@@ -17491,9 +16949,6 @@ export const proof = {
                     declaredKinds: ['wages'],
                 }))([w2Document('sha256-2441-plain')('40000.00')])([])([])([])([])([])([])([])([]))
             assert(outcome.kind === 'ok', ['expected an ordinary return to compute', outcome])
-            if (outcome.kind !== 'ok') {
-                throw ['expected ok', outcome]
-            }
             const line1e = lineRuled(outcome.lines)('1040 line 1e')
             assertEq(line1e.value, 0n)
             assertEq(
@@ -17529,9 +16984,6 @@ export const proof = {
                 }),
             })
             assert(outcome.kind === 'error', ['expected the Form 2441 refusal', outcome])
-            if (outcome.kind !== 'error') {
-                throw ['expected error', outcome]
-            }
             assert(
                 outcome.message.includes('Form 2441 line 5')
                 && outcome.message.includes('spouseSocialSecurityNumber'),
@@ -17565,9 +17017,6 @@ export const proof = {
                 ],
             })
             assert(outcome.kind === 'error', ['expected the ordering refusal', outcome])
-            if (outcome.kind !== 'error') {
-                throw ['expected error', outcome]
-            }
             assert(
                 outcome.message.includes('Schedule SE line 3')
                 && outcome.message.includes('Schedule 1 line 15'),
@@ -17607,9 +17056,6 @@ export const proof = {
         aBindingLimitationWithoutTheCertificationRefusesTheWholeReturn: () => {
             const credits = dependentCareBindingEarnedIncomeInputs.creditForms[0]
             assert(credits !== undefined, 'the fixture carries a credits record')
-            if (credits === undefined) {
-                throw 'expected a credits record'
-            }
             const { dependentCareFilerWasNeitherAStudentNorDisabled: _dropped, ...withoutIt }
                 = credits.value
             const outcome = form1040Report(taxParams2025)({
@@ -17617,9 +17063,6 @@ export const proof = {
                 creditForms: [{ ...credits, value: withoutIt }],
             })
             assert(outcome.kind === 'error', ['expected the §21(d)(2) refusal', outcome])
-            if (outcome.kind !== 'error') {
-                throw ['expected error', outcome]
-            }
             assert(
                 outcome.message.includes('dependentCareFilerWasNeitherAStudentNorDisabled'),
                 ['the refusal must name the field that unlocks it', outcome.message])
@@ -17643,14 +17086,8 @@ export const proof = {
         aQualifyingPersonWithNoAgeAssertionRefusesTheWholeReturn: () => {
             const credits = dependentCareInputs.creditForms[0]
             assert(credits !== undefined, 'the fixture carries a credits record')
-            if (credits === undefined) {
-                throw 'expected a credits record'
-            }
             const persons = credits.value.dependentCareQualifyingPersons
             assert(persons !== undefined, 'the fixture carries qualifying persons')
-            if (persons === undefined) {
-                throw 'expected qualifying persons'
-            }
             assertEq(persons.length, 2, 'two of them, hand-typed against the fixture above')
             const outcome = form1040Report(taxParams2025)({
                 ...dependentCareInputs,
@@ -17670,9 +17107,6 @@ export const proof = {
                 }],
             })
             assert(outcome.kind === 'error', ['expected the line 2 column (c) refusal', outcome])
-            if (outcome.kind !== 'error') {
-                throw ['expected error', outcome]
-            }
             // BOTH names, so a filter that stopped at the first person fails
             // here, and the field that unlocks it.
             assert(
@@ -17694,14 +17128,8 @@ export const proof = {
         bothQualifyingPersonPopulationsAreAdmitted: () => {
             const credits = dependentCareInputs.creditForms[0]
             assert(credits !== undefined, 'the fixture carries a credits record')
-            if (credits === undefined) {
-                throw 'expected a credits record'
-            }
             const persons = credits.value.dependentCareQualifyingPersons
             assert(persons !== undefined, 'the fixture carries qualifying persons')
-            if (persons === undefined) {
-                throw 'expected qualifying persons'
-            }
             // Hand-typed: which fixture person asserts which population, and
             // which name must therefore survive when the other is stripped.
             /** @type {readonly (readonly [string, string])[]} */
@@ -17714,9 +17142,6 @@ export const proof = {
                 const [stripped, survivor] = one
                 const target = persons.find(person => person.name === stripped)
                 assert(target !== undefined, ['fixture person missing', stripped])
-                if (target === undefined) {
-                    throw ['fixture person missing', stripped]
-                }
                 const {
                     overAgeTwelveAndDisabled: _over,
                     underAgeThirteenWhenTheCareWasProvided: _under,
@@ -17734,9 +17159,6 @@ export const proof = {
                     }],
                 })
                 assert(outcome.kind === 'error', ['expected a refusal', stripped, outcome])
-                if (outcome.kind !== 'error') {
-                    throw ['expected error', stripped]
-                }
                 assert(
                     outcome.message.includes(stripped),
                     ['the stripped person must be named', stripped, outcome.message])
@@ -17755,9 +17177,6 @@ export const proof = {
         theDependentCareCreditIsOrderedAheadOfTheChildTaxCredit: () => {
             const outcome = form1040Report(taxParams2025)(dependentCareWithAChildInputs)
             assert(outcome.kind === 'ok', ['expected this return to compute', outcome])
-            if (outcome.kind !== 'ok') {
-                throw ['expected ok', outcome]
-            }
             const line = lineRuled(outcome.lines)
             assertEq(line('1040 line 1e').value, 0n, 'no box 10, so nothing is taxable')
             assertEq(
@@ -17795,9 +17214,6 @@ export const proof = {
         theTaxableBenefitsAreEarnedIncomeForLineFourWhereItBinds: () => {
             const outcome = form1040Report(taxParams2025)(dependentCareBindingEarnedIncomeInputs)
             assert(outcome.kind === 'ok', ['expected this return to compute', outcome])
-            if (outcome.kind !== 'ok') {
-                throw ['expected ok', outcome]
-            }
             const line = lineRuled(outcome.lines)
             assertEq(line('1040 line 1a').value, 100000n, '$1,000.00 of wages')
             assertEq(line('1040 line 1e').value, 700000n, '$7,000.00 of taxable benefits')
@@ -17821,9 +17237,6 @@ export const proof = {
         anIndependentFormTwentyFourFortyOneCallReachesTheSameTwoFigures: () => {
             const outcome = form1040Report(taxParams2025)(dependentCareInputs)
             assert(outcome.kind === 'ok', ['expected this return to compute', outcome])
-            if (outcome.kind !== 'ok') {
-                throw ['expected ok', outcome]
-            }
             /** @type {Form2441Common} */
             const common = {
                 status: 'single',
@@ -17851,9 +17264,6 @@ export const proof = {
                 soleProprietorshipOrPartnershipBenefitsCents: 0n,
             })
             assert(partThree.kind === 'ok', ['expected Part III to compute', partThree])
-            if (partThree.kind !== 'ok') {
-                throw ['expected ok', partThree]
-            }
             assertEq(
                 partThree.line26TaxableBenefitsCents,
                 lineRuled(outcome.lines)('1040 line 1e').value,
@@ -17867,9 +17277,6 @@ export const proof = {
                 taxLiabilityLimitCents: lineRuled(outcome.lines)('1040 line 18').value,
             })
             assert(partTwo.kind === 'ok', ['expected Part II to compute', partTwo])
-            if (partTwo.kind !== 'ok') {
-                throw ['expected ok', partTwo]
-            }
             assertEq(
                 partTwo.line11CreditCents,
                 lineRuled(outcome.lines)('1040 line 20').value,

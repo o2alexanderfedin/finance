@@ -1035,9 +1035,6 @@ const employeeStockPurchaseForm = {
  */
 const expectOk = outcome => {
     assert(outcome.kind === 'ok', ['expected ok', outcome])
-    if (outcome.kind !== 'ok') {
-        throw ['expected ok', outcome]
-    }
     return outcome
 }
 
@@ -1072,9 +1069,6 @@ export const proof = {
             })
             const outcome = form8949(over([categoryADoc, categoryEDoc]))
             assert(outcome.kind === 'ok', ['expected ok', outcome])
-            if (outcome.kind !== 'ok') {
-                throw ['expected ok', outcome]
-            }
             assertEq(outcome.categoryA.value, 200000n, 'Category A: $5,000.00 - $3,000.00 = $2,000.00')
             assertEq(outcome.categoryA.sources.length, 2)
             assertEq(outcome.categoryE.value, 500000n, 'Category E: $9,000.00 - $4,000.00 = $5,000.00')
@@ -1094,9 +1088,6 @@ export const proof = {
             })
             const outcome = form8949(over([doc]))
             assert(outcome.kind === 'ok', ['expected ok', outcome])
-            if (outcome.kind !== 'ok') {
-                throw ['expected ok', outcome]
-            }
             assertEq(outcome.categoryB.value, 50000n, '$2,000.00 - $1,500.00 = $500.00')
         },
         // Category D: long-term, basis reported to the IRS.
@@ -1109,9 +1100,6 @@ export const proof = {
             })
             const outcome = form8949(over([doc]))
             assert(outcome.kind === 'ok', ['expected ok', outcome])
-            if (outcome.kind !== 'ok') {
-                throw ['expected ok', outcome]
-            }
             assertEq(outcome.categoryD.value, 800000n, '$20,000.00 - $12,000.00 = $8,000.00')
         },
         // A loss (basis exceeds proceeds) must accumulate as a NEGATIVE
@@ -1126,9 +1114,6 @@ export const proof = {
             })
             const outcome = form8949(over([doc]))
             assert(outcome.kind === 'ok', ['expected ok', outcome])
-            if (outcome.kind !== 'ok') {
-                throw ['expected ok', outcome]
-            }
             assertEq(outcome.categoryA.value, -300000n, '$1,000.00 - $4,000.00 = -$3,000.00')
         },
         // Multiple documents landing in the SAME category sum correctly, and
@@ -1148,9 +1133,6 @@ export const proof = {
             })
             const outcome = form8949(over([docOne, docTwo]))
             assert(outcome.kind === 'ok', ['expected ok', outcome])
-            if (outcome.kind !== 'ok') {
-                throw ['expected ok', outcome]
-            }
             assertEq(outcome.categoryA.value, 190000n, '$400.00 + $1,500.00 = $1,900.00')
             assertEq(outcome.categoryA.sources.length, 4)
             assertEq(outcome.categoryA.sources[0]?.documentHash, 'doc-multi-1')
@@ -1164,10 +1146,7 @@ export const proof = {
     absentBasisRefusal: {
         genuinelyAbsentBasisRefusesRatherThanComputingAGain: () => {
             const outcome = form8949(over([absentBasisFixture]))
-            assertEq(outcome.kind, 'error', ['expected a refusal, not a computed gain', outcome])
-            if (outcome.kind !== 'error') {
-                throw ['expected error', outcome]
-            }
+            assert(outcome.kind === 'error', ['expected a refusal, not a computed gain', outcome])
             assert(
                 outcome.message.includes('doc-absent-basis'),
                 ['expected the refusal to name the document', outcome.message],
@@ -1190,9 +1169,6 @@ export const proof = {
             })
             const outcome = form8949(over([withBasis]))
             assert(outcome.kind === 'ok', ['expected ok when basis is present', outcome])
-            if (outcome.kind !== 'ok') {
-                throw ['expected ok', outcome]
-            }
             assertEq(outcome.categoryE.value, 400000n, '$10,000.00 - $6,000.00 = $4,000.00')
         },
     },
@@ -1207,10 +1183,7 @@ export const proof = {
                 box2LongTermGainOrLoss: true,
             })
             const outcome = form8949(over([doc]))
-            assertEq(outcome.kind, 'error', ['expected a refusal when box1f is present', outcome])
-            if (outcome.kind !== 'error') {
-                throw ['expected error', outcome]
-            }
+            assert(outcome.kind === 'error', ['expected a refusal when box1f is present', outcome])
             assert(
                 outcome.message.includes('box1fAccruedMarketDiscount'),
                 ['expected the refusal to name box1f', outcome.message],
@@ -1225,10 +1198,7 @@ export const proof = {
                 box12BasisReportedToIrs: true,
             })
             const outcome = form8949(over([doc]))
-            assertEq(outcome.kind, 'error', ['expected a refusal when box1g is present', outcome])
-            if (outcome.kind !== 'error') {
-                throw ['expected error', outcome]
-            }
+            assert(outcome.kind === 'error', ['expected a refusal when box1g is present', outcome])
             assert(
                 outcome.message.includes('box1gWashSaleLossDisallowed'),
                 ['expected the refusal to name box1g', outcome.message],
@@ -1245,10 +1215,7 @@ export const proof = {
                 // Neither box2ShortTermGainOrLoss nor box2LongTermGainOrLoss set.
             })
             const outcome = form8949(over([doc]))
-            assertEq(outcome.kind, 'error', ['expected a refusal when holding period is undecided', outcome])
-            if (outcome.kind !== 'error') {
-                throw ['expected error', outcome]
-            }
+            assert(outcome.kind === 'error', ['expected a refusal when holding period is undecided', outcome])
             assert(
                 outcome.message.includes(doc.documentHash),
                 ['expected the refusal to name the document', outcome.message],
@@ -1307,9 +1274,6 @@ export const proof = {
         })
         const outcome = form8949(over([noSaleDoc, realDoc]))
         assert(outcome.kind === 'ok', ['expected ok — the no-sale document must not trigger a refusal', outcome])
-        if (outcome.kind !== 'ok') {
-            throw ['expected ok', outcome]
-        }
         assertEq(outcome.categoryA.value, 60000n, 'only the real sale contributes: $1,000.00 - $400.00 = $600.00')
         assertEq(outcome.categoryA.sources.length, 2, 'the no-sale document cites nothing')
     },
@@ -1341,9 +1305,6 @@ export const proof = {
             // this proof, never by form8949 itself.
             const outcome = form8949(over([doc]))
             assert(outcome.kind === 'ok', ['expected ok', outcome])
-            if (outcome.kind !== 'ok') {
-                throw ['expected ok', outcome]
-            }
             assertEq(outcome.categoryA.value, 200000n)
         },
         // Documented, not asserted as a runtime refusal: a fixture where
@@ -1663,10 +1624,7 @@ export const proof = {
                 ],
                 employeeStockPurchaseForms: [],
             })
-            assertEq(outcome.kind, 'error', ['expected a refusal', outcome])
-            if (outcome.kind !== 'error') {
-                throw ['expected error', outcome]
-            }
+            assert(outcome.kind === 'error', ['expected a refusal', outcome])
             assert(
                 outcome.message.includes('box12BasisReportedToIrs'),
                 ['the refusal must name the contradicting checkbox', outcome.message])
@@ -1746,10 +1704,7 @@ export const proof = {
                 basisCorrections: [basisCorrection('fix-orphan')('doc-that-is-not-here')('1.00')],
                 employeeStockPurchaseForms: [],
             })
-            assertEq(outcome.kind, 'error', ['expected a refusal', outcome])
-            if (outcome.kind !== 'error') {
-                throw ['expected error', outcome]
-            }
+            assert(outcome.kind === 'error', ['expected a refusal', outcome])
             assert(
                 outcome.message.includes('doc-that-is-not-here'),
                 ['the refusal must name the document that is missing', outcome.message])
@@ -1772,10 +1727,7 @@ export const proof = {
                 ],
                 employeeStockPurchaseForms: [],
             })
-            assertEq(outcome.kind, 'error', ['expected a refusal', outcome])
-            if (outcome.kind !== 'error') {
-                throw ['expected error', outcome]
-            }
+            assert(outcome.kind === 'error', ['expected a refusal', outcome])
             assert(
                 outcome.message.includes('doc-twice'),
                 ['the refusal must name the document two corrections fight over', outcome.message])
@@ -1787,10 +1739,7 @@ export const proof = {
                 basisCorrections: [basisCorrection('fix-no-sale')('doc-no-sale')('1000.00')],
                 employeeStockPurchaseForms: [],
             })
-            assertEq(outcome.kind, 'error', ['expected a refusal', outcome])
-            if (outcome.kind !== 'error') {
-                throw ['expected error', outcome]
-            }
+            assert(outcome.kind === 'error', ['expected a refusal', outcome])
             assert(
                 outcome.message.includes('no sale'),
                 ['the refusal must say there is no row for the correction to land on', outcome.message])
@@ -1813,10 +1762,7 @@ export const proof = {
                 basisCorrections: [],
                 employeeStockPurchaseForms: [employeeStockPurchaseForm],
             })
-            assertEq(outcome.kind, 'error', ['expected a refusal', outcome])
-            if (outcome.kind !== 'error') {
-                throw ['expected error', outcome]
-            }
+            assert(outcome.kind === 'error', ['expected a refusal', outcome])
             assert(outcome.message.includes('doc-espp'), ['name the Form 3922', outcome.message])
             // Each of the three gaps asserted SEPARATELY, so erasing any one
             // reddens this leaf and says which went missing -- the discipline
@@ -1866,10 +1812,7 @@ export const proof = {
             box2LongTermGainOrLoss: true,
         })
         const dOutcome = form8949(over([withBox1f]))
-        assertEq(dOutcome.kind, 'error')
-        if (dOutcome.kind !== 'error') {
-            throw ['expected error', dOutcome]
-        }
+        assert(dOutcome.kind === 'error', ['expected error', dOutcome])
         assert(dOutcome.message.includes('code D'), ['name the code', dOutcome.message])
         assert(
             dOutcome.message.includes('interest income'),
@@ -1886,10 +1829,7 @@ export const proof = {
             box12BasisReportedToIrs: true,
         })
         const wOutcome = form8949(over([withBox1g]))
-        assertEq(wOutcome.kind, 'error')
-        if (wOutcome.kind !== 'error') {
-            throw ['expected error', wOutcome]
-        }
+        assert(wOutcome.kind === 'error', ['expected error', wOutcome])
         assert(wOutcome.message.includes('code W'), ['name the code', wOutcome.message])
         assert(
             wOutcome.message.includes(dispositionReason('W')),

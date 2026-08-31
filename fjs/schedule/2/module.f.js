@@ -998,9 +998,6 @@ const beneficiaryK1 = hash => box12 => ({
 const run = input => {
     const outcome = scheduleTwo(taxParams2025)(input)
     assert(outcome.kind === 'ok', ['expected ok', outcome])
-    if (outcome.kind !== 'ok') {
-        throw ['expected ok', outcome]
-    }
     return outcome
 }
 
@@ -1300,9 +1297,6 @@ export const proof = {
             assertEq(cited.length, 1, 'one contributing entry, one source')
             const [source] = cited
             assert(source !== undefined, 'expected the source')
-            if (source === undefined) {
-                return
-            }
             assertEq(source.value, '75000.00', 'the RAW printed amount, not the computed tax')
             // The CONTROL: a return with no K-1 cites no such box, so the
             // citation is not appearing unconditionally.
@@ -1386,10 +1380,7 @@ export const proof = {
                 isoExerciseForms: [isoForm('doc-iso-sold-2')('5.00')('105.00')('10000')],
                 aStoredNineteenNineBReportsASale: true,
             })
-            assertEq(outcome.kind, 'error', ['expected the refusal to propagate', outcome])
-            if (outcome.kind !== 'error') {
-                throw ['expected error', outcome]
-            }
+            assert(outcome.kind === 'error', ['expected the refusal to propagate', outcome])
             assert(
                 outcome.message.includes('doc-iso-sold-2'),
                 ['the propagated refusal must still name the document', outcome.message])

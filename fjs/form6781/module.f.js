@@ -500,18 +500,12 @@ const sectionTwelveFiftySixDocument = documentHash => box8 => box9 => box10 => b
 /** @type {(outcome: Form6781Outcome) => Form6781Ok} */
 const expectOk = outcome => {
     assert(outcome.kind === 'ok', ['expected Form 6781 Part I to compute', outcome])
-    if (outcome.kind !== 'ok') {
-        throw ['expected ok', outcome]
-    }
     return outcome
 }
 
 /** @type {(outcome: Form6781Outcome) => string} */
 const expectRefusal = outcome => {
     assert(outcome.kind === 'error', ['expected Form 6781 to refuse', outcome])
-    if (outcome.kind !== 'error') {
-        throw ['expected error', outcome]
-    }
     return outcome.message
 }
 
@@ -545,9 +539,6 @@ export const proof = {
         const [eight, nine, ten] = aggregateComponents
         assert(eight !== undefined && nine !== undefined && ten !== undefined,
             ['the component table lost a row', aggregateComponents])
-        if (eight === undefined || nine === undefined || ten === undefined) {
-            throw ['the component table lost a row', aggregateComponents]
-        }
         assertEq(eight[0], 'box8ProfitOrLossRealized')
         assertEq(eight[1], 1n, 'box 8 is realized profit this year: it goes IN')
         assertEq(nine[0], 'box9UnrealizedProfitOrLossPriorYearEnd')

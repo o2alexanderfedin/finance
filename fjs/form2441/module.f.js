@@ -307,12 +307,8 @@ export const dependentCareCreditPercent = taxParamSet => adjustedGrossIncomeCent
     const band = taxParamSet.dependentCareCreditPercentage.bands.find(
         candidate => candidate.adjustedGrossIncomeCeiling === undefined
             || adjustedGrossIncomeCents <= centsFromString(candidate.adjustedGrossIncomeCeiling))
-    assert(
-        band !== undefined,
+    assert( band !== undefined,
         ['Form 2441 line 8’s last printed row is open-topped', adjustedGrossIncomeCents])
-    if (band === undefined) {
-        throw ['no dependent care percentage band', adjustedGrossIncomeCents]
-    }
     return band.percent
 }
 
@@ -794,9 +790,6 @@ export const form2441Credit = taxParamSet => input => {
 
 const taxParams2025 = taxParamsByYear[2025]
 assert(taxParams2025 !== undefined, 'expected TY2025 parameters to be present in taxParamsByYear')
-if (taxParams2025 === undefined) {
-    throw 'expected TY2025 parameters'
-}
 
 /**
  * A head-of-household filer — the paradigm single-parent Form 2441 filer, and
@@ -842,27 +835,18 @@ const creditOf = common => ({
 /** @type {(outcome: Form2441BenefitsOutcome) => Form2441BenefitsResult} */
 const expectBenefitsOk = outcome => {
     assert(outcome.kind === 'ok', ['expected Form 2441 Part III to compute, not refuse', outcome])
-    if (outcome.kind !== 'ok') {
-        throw ['expected ok', outcome]
-    }
     return outcome
 }
 
 /** @type {(outcome: Form2441CreditOutcome) => Form2441CreditResult} */
 const expectCreditOk = outcome => {
     assert(outcome.kind === 'ok', ['expected Form 2441 Part II to compute, not refuse', outcome])
-    if (outcome.kind !== 'ok') {
-        throw ['expected ok', outcome]
-    }
     return outcome
 }
 
 /** @type {(outcome: Form2441BenefitsOutcome | Form2441CreditOutcome) => string} */
 const expectRefusal = outcome => {
     assert(outcome.kind === 'error', ['expected Form 2441 to refuse', outcome])
-    if (outcome.kind !== 'error') {
-        throw ['expected error', outcome]
-    }
     return outcome.message
 }
 

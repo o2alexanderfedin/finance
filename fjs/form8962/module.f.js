@@ -311,12 +311,8 @@ export const applicableFigureTenThousandths = taxParamSet => percent => {
     const tier = taxParamSet.premiumTaxCreditApplicablePercentage.tiers.find(
         candidate => percent >= candidate.floorPercent
             && (candidate.ceilingPercent === undefined || percent < candidate.ceilingPercent))
-    assert(
-        tier !== undefined,
+    assert( tier !== undefined,
         ['§36B(b)(3)(A)(iii)’s tiers cover every percentage from zero upwards', percent])
-    if (tier === undefined) {
-        throw ['no applicable-percentage tier', percent]
-    }
     const ceiling = tier.ceilingPercent
     if (ceiling === undefined || tier.initialHundredthsOfPercent === tier.finalHundredthsOfPercent) {
         return tier.initialHundredthsOfPercent
@@ -756,9 +752,6 @@ export const form8962 = taxParamSet => input => {
 
 const taxParams2025 = taxParamsByYear[2025]
 assert(taxParams2025 !== undefined, 'expected TY2025 parameters to be present in taxParamsByYear')
-if (taxParams2025 === undefined) {
-    throw 'expected TY2025 parameters'
-}
 
 /** @type {(statement: OneZeroNineFiveA) => Stored<OneZeroNineFiveA>} */
 const stored = statement => ({ documentHash: 'sha256-1095a-01', value: statement })
@@ -808,18 +801,12 @@ const singleFilerWith = agi => statement => ({
 /** @type {(outcome: Form8962Outcome) => Form8962Result} */
 const expectOk = outcome => {
     assert(outcome.kind === 'ok', ['expected Form 8962 to compute, not refuse', outcome])
-    if (outcome.kind !== 'ok') {
-        throw ['expected ok', outcome]
-    }
     return outcome
 }
 
 /** @type {(outcome: Form8962Outcome) => string} */
 const expectRefusal = outcome => {
     assert(outcome.kind === 'error', ['expected Form 8962 to refuse', outcome])
-    if (outcome.kind !== 'error') {
-        throw ['expected error', outcome]
-    }
     return outcome.message
 }
 

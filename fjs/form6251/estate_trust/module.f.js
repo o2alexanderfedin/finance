@@ -239,9 +239,6 @@ const k1 = documentHash => box12 => ({
  */
 const expectCents = outcome => {
     assert(outcome.kind === 'ok', ['expected line 2j to compute', outcome])
-    if (outcome.kind !== 'ok') {
-        throw ['expected line 2j to compute', outcome]
-    }
     return outcome.cents
 }
 
@@ -251,9 +248,6 @@ const expectCents = outcome => {
  */
 const expectRefusal = outcome => {
     assert(outcome.kind === 'error', ['expected a refusal', outcome])
-    if (outcome.kind !== 'error') {
-        throw ['expected a refusal', outcome]
-    }
     return outcome.message
 }
 
@@ -272,9 +266,6 @@ export const proof = {
         assertEq(sources.length, 1, 'one contributing entry, one source')
         const [source] = sources
         assert(source !== undefined, 'expected the source')
-        if (source === undefined) {
-            return
-        }
         assertEq(source.documentHash, 'sha256-k1-a')
         assertEq(source.boxPath, 'k1_1041.box12[code=A]')
         // The RAW printed value, never the summed cents -- the wire
@@ -320,9 +311,6 @@ export const proof = {
         assertEq(sources.length, 1)
         const [source] = sources
         assert(source !== undefined, 'expected the source')
-        if (source === undefined) {
-            return
-        }
         assertEq(source.value, '-3000.00', 'the sign is part of what the box printed')
     },
     /**
@@ -385,9 +373,6 @@ export const proof = {
         const [source] = estateTrustAmtAdjustmentSources(
             [k1('sha256-k1-lower')([{ code: ' a ', amount: '700.00' }])])
         assert(source !== undefined, 'expected the source')
-        if (source === undefined) {
-            return
-        }
         assertEq(source.boxPath, 'k1_1041.box12[code=A]')
     },
     /** No box 12 at all, an empty box 12, and no documents: a clean zero. */

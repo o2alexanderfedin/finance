@@ -819,13 +819,8 @@ export const proof = {
         },
         wrongDialectRejected: () => {
             const [t, v] = validate({ ...minimal, dialect: 'vnd.fjs.adjustments' })
-            assertEq(t, 'error')
-            if (t !== 'error') {
-                throw ['expected error', t, v]
-            }
-            if (typeof v === 'string') {
-                throw ['expected a structural ValidationError', v]
-            }
+            assert(t === 'error', ['expected error', t, v])
+            assert(typeof v !== 'string', ['expected a structural ValidationError', v])
             assertEq(v.path[0], 'dialect')
         },
         correctedFalseRejected: () => {
@@ -1205,9 +1200,6 @@ export const proof = {
                 dependentCareFilerWasNeitherAStudentNorDisabled: true,
             })
             assert(t === 'ok', ['expected ok', t, v])
-            if (t !== 'ok') {
-                throw ['expected ok', v]
-            }
             const provider = assertNotNullish(v.dependentCareProviders?.[0], 'the provider')
             assertEq(provider.amountPaid, '7200.00', 'the raw stored decimal, never re-formatted')
             assertEq(provider.householdEmployee, undefined, 'column (d) was not answered')
@@ -1375,9 +1367,6 @@ export const proof = {
         theStudentOrDisabledCertificationIsOptionTrue: () => {
             const [absentT, absentV] = validate(minimal)
             assert(absentT === 'ok', ['expected ok', absentV])
-            if (absentT !== 'ok') {
-                throw ['expected ok', absentV]
-            }
             assert(
                 !('dependentCareFilerWasNeitherAStudentNorDisabled' in absentV),
                 ['an absent certification must stay absent', absentV])
@@ -1396,13 +1385,8 @@ export const proof = {
                 taxYear: 2025,
                 entries: [],
             })
-            assertEq(t, 'error')
-            if (t !== 'error') {
-                throw ['expected error', t, v]
-            }
-            if (typeof v === 'string') {
-                throw ['expected a structural ValidationError, got a checkReferences string', v]
-            }
+            assert(t === 'error', ['expected error', t, v])
+            assert(typeof v !== 'string', ['expected a structural ValidationError, got a checkReferences string', v])
             assertEq(v.path.length, 1)
             assertEq(v.path[0], 'dialect')
         },

@@ -693,13 +693,8 @@ export const proof = {
         },
         wrongDialectRejected: () => {
             const [t, v] = validate({ ...minimal, dialect: 'vnd.fjs.adjustments' })
-            assertEq(t, 'error')
-            if (t !== 'error') {
-                throw ['expected error', t, v]
-            }
-            if (typeof v === 'string') {
-                throw ['expected a structural ValidationError', v]
-            }
+            assert(t === 'error', ['expected error', t, v])
+            assert(typeof v !== 'string', ['expected a structural ValidationError', v])
             assertEq(v.path[0], 'dialect')
         },
         correctedFalseRejected: () => {
@@ -1099,14 +1094,8 @@ export const proof = {
         theWholeRecordValidatesAndIsReadBack: () => {
             const [t, v] = validate({ ...minimal, businessUseOfHome: wholeHome })
             assert(t === 'ok', ['expected ok', v])
-            if (t !== 'ok') {
-                throw ['expected ok', v]
-            }
             const home = v.businessUseOfHome
             assert(home !== undefined, 'the record survives validation')
-            if (home === undefined) {
-                throw 'expected a businessUseOfHome record'
-            }
             assertEq(home.method, 'actualExpenses')
             assertEq(home.areaUsedForBusiness, 200)
             assertEq(home.totalAreaOfHome, 2000)
@@ -1241,9 +1230,6 @@ export const proof = {
         aRecordWithNoHomeOfficeStillValidates: () => {
             const [t, v] = validate(minimal)
             assert(t === 'ok', ['expected ok', v])
-            if (t !== 'ok') {
-                throw ['expected ok', v]
-            }
             assertEq(v.businessUseOfHome, undefined, 'absent, not materialized')
         },
     },
@@ -1259,13 +1245,8 @@ export const proof = {
                 taxYear: 2025,
                 entries: [],
             })
-            assertEq(t, 'error')
-            if (t !== 'error') {
-                throw ['expected error', t, v]
-            }
-            if (typeof v === 'string') {
-                throw ['expected a structural ValidationError, got a checkReferences string', v]
-            }
+            assert(t === 'error', ['expected error', t, v])
+            assert(typeof v !== 'string', ['expected a structural ValidationError, got a checkReferences string', v])
             assertEq(v.path.length, 1)
             assertEq(v.path[0], 'dialect')
         },

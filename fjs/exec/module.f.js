@@ -165,6 +165,19 @@ const readDo = do_('casRead')
 const evoHeadDo = do_('evoHead')
 
 /**
+ * `do_` narrowed to `evoList`, for the whole-vocabulary dispatch proof below
+ * — same under-constraining reason as `readDo`.
+ * @type {(a: string) => Effect<EvoList, string, never>}
+ */
+const evoListDo = do_('evoList')
+
+/**
+ * `do_` narrowed to `evoRevision`, for the same proof and the same reason.
+ * @type {(a: string) => Effect<EvoRevision, string, never>}
+ */
+const evoRevisionDo = do_('evoRevision')
+
+/**
  * Builds a chain of exactly `remaining` `casRead` dispatches followed by a
  * `Pure` completion — the fixed-length sibling of `forever` below, used to
  * pin `interpret`'s step-budget boundary at an EXACT dispatch count rather
@@ -424,11 +437,59 @@ export const proof = {
                 'operation not permitted: fetch; permitted: casRead, evoList, evoHead, evoRevision')
         },
     },
+    // The same question at the TYPED vocabulary. `map` is the fixture every
+    // other leaf interprets against, and only `casRead` and `evoHead` had
+    // ever been dispatched through it — so `evoList` and `evoRevision` were
+    // declared, named in every refusal message's permitted list, and never
+    // once shown to answer anything. The declaration ORDER is asserted in
+    // the same breath, because that order is what a refusal message prints.
+    everyTypedCommandReachesItsOwnHandler: () => {
+        /** @type {readonly (readonly [string, (a: string) => Effect<TestOp, string, never>])[]} */
+        const commands = [
+            ['casRead', readDo],
+            ['evoList', evoListDo],
+            ['evoHead', evoHeadDo],
+            ['evoRevision', evoRevisionDo],
+        ]
+        assertEq(commands.length, 4, 'the four commands the frozen vocabulary declares')
+        assertEq(JSON.stringify(Object.keys(map)), JSON.stringify(commands.map(([name]) => name)),
+            'declared in the order a refusal message reads them back')
+        for (const [command, dispatch] of commands) {
+            const result = interpret(map)(dispatch('subject'))
+            assertEq(result[0], 'ok', command)
+            const [value, reads] = result[1]
+            assertEq(value, `${command}:subject`, ['each command answers with its own handler', command])
+            assertEq(JSON.stringify(reads), JSON.stringify([[command, ['subject']]]),
+                ['and is recorded under its own name', command])
+        }
+    },
+    // The permitted half of the same question. Every refusal leaf here
+    // names the four permitted commands, and only `casRead` had ever been
+    // dispatched — so nothing pinned that the other three reach their OWN
+    // handler rather than some shared one. A map whose four entries all
+    // resolved to the same function would satisfy "not refused" while
+    // quietly conflating the commands, which is why each row asserts the
+    // handler's own tagged answer and not merely an `ok`.
+    everyPermittedNameDispatchesToItsOwnHandler: () => {
+        const permitted = ['casRead', 'evoList', 'evoHead', 'evoRevision']
+        assertEq(permitted.length, 4, 'the four names refusalMessage prints as permitted')
+        for (const name of permitted) {
+            const result = interpret(probeMap)(probeDo(name)('argument'))
+            assertEq(result[0], 'ok', name)
+            const [value, reads] = result[1]
+            assertEq(value, `${name}:argument`, ['each name answers with its own handler', name])
+            assertEq(JSON.stringify(reads), JSON.stringify([[name, ['argument']]]),
+                ['and is recorded under its own name', name])
+        }
+    },
     // EXEC-04: the two-step escalation chased to its logical end, not just a
     // single refused dispatch. Installing a getter for a denied command is
     // itself refused before the getter function ever runs, so the map gains
     // no own property from the attempt, and a following dispatch of the
     // target command is still refused with its own message.
+    //
+    // The getter body below is deliberately the one function in this module
+    // no run reaches: that it is never entered IS the security property.
     twoStepDefineGetterEscalation: () => {
         const install = interpret(probeMap)(probeDo('__defineGetter__')('fetch', () => 'exfiltrated'))
         assertEq(install[0], 'error')

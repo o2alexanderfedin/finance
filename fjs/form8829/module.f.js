@@ -586,12 +586,8 @@ export const form8829 = input => {
         }
     }
     const [, firstYearText, firstMonthText] = parsed
-    assert(
-        firstYearText !== undefined && firstMonthText !== undefined,
+    assert( firstYearText !== undefined && firstMonthText !== undefined,
         ['a matched YYYY-MM has both groups', first])
-    if (firstYearText === undefined || firstMonthText === undefined) {
-        throw ['a matched YYYY-MM has both groups', first]
-    }
     const firstYear = Number(firstYearText)
     if (firstYear > taxYear) {
         return {
@@ -773,18 +769,12 @@ const inputOf = record => line29Cents => ({
 /** @type {(outcome: Form8829Outcome) => Form8829Result} */
 const expectOk = outcome => {
     assert(outcome.kind === 'ok', ['expected Form 8829 to compute, not refuse', outcome])
-    if (outcome.kind !== 'ok') {
-        throw ['expected ok', outcome]
-    }
     return outcome
 }
 
 /** @type {(outcome: Form8829Outcome) => string} */
 const expectRefusal = outcome => {
     assert(outcome.kind === 'error', ['expected Form 8829 to refuse', outcome])
-    if (outcome.kind !== 'error') {
-        throw ['expected error', outcome]
-    }
     return outcome.message
 }
 
@@ -950,9 +940,6 @@ export const proof = {
                 // FAIL rather than shrink this loop's coverage.
                 assert(shipped !== undefined, ['no shipped percentage for month', key])
                 assert(expected !== undefined && other !== undefined, ['hand-typed row short', key])
-                if (shipped === undefined || expected === undefined || other === undefined) {
-                    throw ['month missing', key]
-                }
                 assertEq(shipped, BigInt(expected), ['this module ships i8829’s printed row', key])
                 if (expected === other) {
                     agreements += 1

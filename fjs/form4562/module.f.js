@@ -293,7 +293,6 @@ export const businessUseShareCents = asset => halfUp(multiply(ofInt(asset.costOr
 export const applicableConvention = classification => midQuarter => {
     const spec = macrsClassifications[classification]
     assert(spec !== undefined, ['unknown MACRS classification', classification])
-    if (spec === undefined) { throw ['unknown MACRS classification', classification] }
     return spec.midMonth ? 'MM' : midQuarter ? 'MQ' : 'HY'
 }
 
@@ -404,9 +403,6 @@ export const assetDeductionCents = taxYear => asset => {
 export const depreciationAllowedOrAllowableCents = asset => {
     const disposal = asset.disposal
     assert(disposal !== undefined, ['only a disposed asset has a cumulative figure', asset.description])
-    if (disposal === undefined) {
-        throw ['only a disposed asset has a cumulative figure', asset.description]
-    }
     const basis = basisForDepreciationCents(asset)
     const finalRecoveryYear = disposal.soldYear - asset.placedInServiceYear + 1
     let total = asset.specialDepreciationAllowanceClaimedCents + asset.section179ElectedCostCents
@@ -728,14 +724,12 @@ export const formFortyFiveSixtyTwo = input => {
 /** Unwraps a computed form, throwing the refusal if there was one. @type {(outcome: Form4562Outcome) => Form4562Lines} */
 const expectLines = outcome => {
     assert(outcome.kind === 'ok', ['expected Form 4562 to compute', outcome])
-    if (outcome.kind !== 'ok') { throw ['expected Form 4562 to compute', outcome] }
     return outcome
 }
 
 /** Unwraps a refusal, throwing the computed form if there was not one. @type {(outcome: Form4562Outcome) => string} */
 const expectRefusal = outcome => {
     assert(outcome.kind === 'error', ['expected a refusal', outcome])
-    if (outcome.kind !== 'error') { throw ['expected a refusal', outcome] }
     return outcome.message
 }
 

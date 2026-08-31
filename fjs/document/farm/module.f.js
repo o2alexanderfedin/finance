@@ -523,9 +523,6 @@ export const proof = {
     theProprietorAndTheFarmIdentifierAreNotTransposed: () => {
         const [t, v] = validate(minimalFarm)
         assert(t === 'ok', ['expected ok', t, v])
-        if (t !== 'ok') {
-            throw ['expected ok', t, v]
-        }
         assertEq(
             v.proprietorSsn,
             '222-22-2222',

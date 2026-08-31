@@ -61,7 +61,7 @@ import { import_, mkdir, writeUtf8File, readUtf8File, errorSummary } from 'funct
 import { error, ok } from 'functionalscript/fjs/types/result/module.f.mjs'
 import { join } from 'functionalscript/fjs/path/module.f.mjs'
 import { emptyState, virtual } from 'functionalscript/fjs/effects/node/virtual/module.f.mjs'
-import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
+import { assert, assertEq, assertNotNullish } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { guestCtx } from '../module.f.js'
 import { interpret } from '../../exec/module.f.js'
 
@@ -394,7 +394,7 @@ const cleanSource = 'export const report = ctx => args => ctx.casRead(args[0])'
  * so the proof exercises a real entry point rather than an empty object.
  * @type {Report<string>}
  */
-const guestReport = ctx => args => ctx.casRead(args[0] ?? '')
+const guestReport = ctx => args => ctx.casRead(assertNotNullish(args[0], 'the fixture report is always called with a hash'))
 
 /** A host map for the frozen vocabulary, so a loaded program can be RUN. */
 /** @type {OperationMap<CasOp, Result<string, string>>} */
@@ -674,5 +674,72 @@ export const proof = {
                 loadProgram([])(programFileName('ABSENT'))(cleanSource))
             assertEq(result[0], 'error')
         },
+    },
+    // ── The scanner's own edge cases ────────────────────────────────────
+    //
+    // Everything above feeds `checkSpecifiers` well-formed JavaScript. The
+    // scanner also has to answer for text that simply stops — a comment or
+    // a quote that runs off the end of the source — and each of those is a
+    // separate "cannot read it" path inside the trivia skip and the quoted
+    // reader. All must refuse: the gate's whole design is that anything it
+    // cannot read as a plain quoted specifier fails closed.
+    unterminatedTriviaAndQuotesAreRefusedNotPassed: () => {
+        /** @type {readonly (readonly [string, string])[]} */
+        const cases = [
+            ['a line comment with no closing newline', `import //nothing follows`],
+            ['a block comment that is never closed', `import /* nothing closes this`],
+            ['a quote that is never closed', `import 'node:fs`],
+            ['a quote that is never closed after from', `import fs from "node:fs`],
+        ]
+        assertEq(cases.length, 4, 'line comment, block comment, and a quote after each keyword')
+        for (const [label, source] of cases) {
+            assertEq(checkSpecifiers([])(source)[0], 'error', label)
+        }
+    },
+    // An `import` followed by a BINDING names no specifier — the `from`
+    // that follows carries it — so the scanner has to recognise every
+    // character a binding can start with. Only a lowercase name and a
+    // brace were ever tried; a binding may equally start with `*`, `_`,
+    // `$`, or a capital, and misreading any of those as "not a binding"
+    // would refuse an import whose specifier the very next `from` states
+    // plainly. Each row therefore pairs the binding with a specifier that
+    // IS on the allow-list, so a passing row means the scanner read the
+    // binding, walked on to the `from`, and checked what it found there.
+    everyBindingStartIsRecognised: () => {
+        /** @type {readonly (readonly [string, string])[]} */
+        const cases = [
+            ['a namespace import', `import * as everything from 'permitted'`],
+            ['an underscore name', `import _ from 'permitted'`],
+            ['a dollar name', `import $ from 'permitted'`],
+            ['a capitalised name', `import Component from 'permitted'`],
+            ['a lowercase name', `import fs from 'permitted'`],
+            ['a brace list', `import { a, b } from 'permitted'`],
+        ]
+        assertEq(cases.length, 6, 'the six shapes a binding can start with')
+        for (const [label, source] of cases) {
+            assertEq(checkSpecifiers(['permitted'])(source)[0], 'ok', label)
+            // ...and the same binding buys nothing when the specifier is not
+            // permitted, so a passing row above is the `from` being checked
+            // rather than the whole statement being waved through.
+            assertEq(checkSpecifiers([])(source)[0], 'error', label)
+        }
+    },
+    // The four frozen commands each reach their own host handler. Only
+    // `casRead` had ever been dispatched through this map, so nothing
+    // pinned that a loaded program can actually reach the other three.
+    everyFrozenCommandReachesItsOwnHostHandler: () => {
+        /** @type {readonly (readonly [Report<string>, string])[]} */
+        const cases = [
+            [ctx => args => ctx.casRead(assertNotNullish(args[0])), 'casRead'],
+            [ctx => args => ctx.evoList(assertNotNullish(args[0])), 'evoList'],
+            [ctx => args => ctx.evoHead(assertNotNullish(args[0])), 'evoHead'],
+            [ctx => args => ctx.evoRevision(assertNotNullish(args[0])), 'evoRevision'],
+        ]
+        assertEq(cases.length, 4, 'the frozen vocabulary is exactly four commands')
+        for (const [report, name] of cases) {
+            const [t, v] = interpret(hostMap)(report(guestCtx)(['subject']))
+            assert(t === 'ok', [name, t, v])
+            assertEq(v[0], `${name}:subject`, ['each command reaches its own handler', name])
+        }
     },
 }

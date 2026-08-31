@@ -551,9 +551,6 @@ export const proof = {
             const row = moneyFieldDisposition.find(
                 ([rowDialect, rowField]) => rowDialect === dialect && rowField === field)
             assert(row !== undefined, ['a pinned money field left the registry', dialect, field])
-            if (row === undefined) {
-                continue
-            }
             assertEq(
                 row[2], expected,
                 ['a money field this project has already paid for changed disposition',

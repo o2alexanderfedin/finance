@@ -324,13 +324,20 @@ export const proof = {
         // the same two-way check one level down.
         rowsCarryTheirOwnFields: () => {
             const box12 = named(fieldsOf(toJsonSchema(w2Schema)))('box12')
-            const names = (box12.fields ?? []).map(f => f.name)
+            // `fields` is optional on a FieldModel because only a `rows`
+            // field has one; asserting it is present is the narrowing, and
+            // it says something the `?? []` spelling quietly gave up on —
+            // a box12 that came back WITHOUT its row fields would have made
+            // both checks below pass over an empty list.
+            const rowFields = box12.fields
+            assert(rowFields !== undefined, ['box12 is a rows field and must carry its row', box12])
+            const names = rowFields.map(f => f.name)
             assertEq(names.length, 2)
             assert(names.includes('code'), ['box12 row must carry code', names])
             assert(names.includes('amount'), ['box12 row must carry amount', names])
             // Both are required INSIDE the row, which is a different question
             // from box12 itself being optional on the W-2.
-            for (const f of box12.fields ?? []) {
+            for (const f of rowFields) {
                 assert(f.required, ['a box 12 row needs both members', f.name])
             }
         },
@@ -360,5 +367,31 @@ export const proof = {
             assertEq(fieldsOf({ type: 'object' }).length, 0)
             assertEq(fieldsOf('not a schema at all').length, 0)
         },
+    },
+    // Every schema this repo ships states a `required` list, so the arm
+    // that answers "no list at all" — every property optional — has never
+    // been walked. It is reachable through the exported entry point with a
+    // hand-written node, and worth pinning: the fallback has to be the
+    // empty list, because reading a MISSING `required` as "all of them"
+    // would silently turn an optional box into one the form demands.
+    aNodeWithNoRequiredListMakesEveryFieldOptional: () => {
+        /** @type {readonly (readonly [string, JsonUnknown, boolean])[]} */
+        const cases = [
+            ['no required key at all',
+                { type: 'object', properties: { alpha: { type: 'string' }, beta: { type: 'number' } } }, false],
+            ['an empty required list',
+                { type: 'object', required: [], properties: { alpha: { type: 'string' }, beta: { type: 'number' } } }, false],
+            ['both names listed',
+                {
+                    type: 'object', required: ['alpha', 'beta'],
+                    properties: { alpha: { type: 'string' }, beta: { type: 'number' } },
+                }, true],
+        ]
+        assertEq(cases.length, 3, 'absent, empty, and populated')
+        for (const [label, node, required] of cases) {
+            const fields = fieldsOf(node)
+            assertEq(fields.length, 2, label)
+            for (const f of fields) { assertEq(f.required, required, [label, f.name]) }
+        }
     },
 }

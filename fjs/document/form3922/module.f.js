@@ -361,9 +361,6 @@ export const proof = {
     theCorporationAndTheEmployeeAreNotTransposed: () => {
         const [t, v] = validate(lookbackPlanTransfer)
         assert(t === 'ok', ['expected ok', t, v])
-        if (t !== 'ok') {
-            throw ['expected ok', t, v]
-        }
         assertEq(
             v.corporationTin,
             '11-1111111',
@@ -392,9 +389,6 @@ export const proof = {
     everyBoxADispositionNeedsRoundTripsVerbatim: () => {
         const [t, v] = validate(lookbackPlanTransfer)
         assert(t === 'ok', ['expected ok', t, v])
-        if (t !== 'ok') {
-            throw ['expected ok', t, v]
-        }
         // §423(a)(1)'s two holding-period endpoints.
         assertEq(v.box1DateOptionGranted, '01/01/2025')
         assertEq(v.box2DateOptionExercised, '06/30/2025')
@@ -422,9 +416,6 @@ export const proof = {
         const { box8ExercisePricePerShareAsIfExercisedOnGrantDate, ...fixedPricePlan } = lookbackPlanTransfer
         const [t, v] = validate(fixedPricePlan)
         assert(t === 'ok', ['a fixed-price plan prints no box 8', t, v])
-        if (t !== 'ok') {
-            throw ['expected ok', t, v]
-        }
         assertEq(v.box8ExercisePricePerShareAsIfExercisedOnGrantDate, undefined)
         assert(
             !('box8ExercisePricePerShareAsIfExercisedOnGrantDate' in v),
@@ -436,9 +427,6 @@ export const proof = {
     blankBoxesOmittedValidatesAndReadsBackAbsent: () => {
         const [t, v] = validate(minimal)
         assert(t === 'ok', ['expected ok', t, v])
-        if (t !== 'ok') {
-            throw ['expected ok', t, v]
-        }
         assertEq(v.box3FairMarketValuePerShareOnGrantDate, undefined)
         assertEq(v.box6NumberOfSharesTransferred, undefined)
         assertEq(v.corrected, undefined)
@@ -462,13 +450,8 @@ export const proof = {
         sourceArtifactHashRequired: () => {
             const { sourceArtifactHash, ...withoutHash } = minimal
             const [t, v] = validate(withoutHash)
-            assertEq(t, 'error')
-            if (t !== 'error') {
-                throw ['expected error', t, v]
-            }
-            if (typeof v === 'string') {
-                throw ['expected a structural ValidationError, not a semantic string', v]
-            }
+            assert(t === 'error', ['expected error', t, v])
+            assert(typeof v !== 'string', ['expected a structural ValidationError, not a semantic string', v])
             assert(v.path.includes('sourceArtifactHash'), ['expected the field named', v])
         },
         // The three date fields are free text and are NOT exactness-checked.
@@ -507,13 +490,8 @@ export const proof = {
                 sourceArtifactHash: sharedSourceArtifactHash,
                 box1DateOptionGranted: '01/03/2024',
             })
-            assertEq(t, 'error')
-            if (t !== 'error') {
-                throw ['expected error', t, v]
-            }
-            if (typeof v === 'string') {
-                throw ['expected a structural ValidationError, got a checkReferences string', v]
-            }
+            assert(t === 'error', ['expected error', t, v])
+            assert(typeof v !== 'string', ['expected a structural ValidationError, got a checkReferences string', v])
             assertEq(v.path.length, 1)
             assertEq(v.path[0], 'dialect')
         },

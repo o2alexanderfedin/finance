@@ -38,7 +38,7 @@
  *
  * @module
  */
-import { assert } from 'functionalscript/fjs/asserts/module.f.mjs'
+import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
 
 /**
  * Renders a bare thrown value as the text a proof asserts against.
@@ -80,40 +80,45 @@ export const refuses = call => check => {
 
 // ── Tests ────────────────────────────────────────────────────────────────────
 
+/**
+ * The text `call` refused with.
+ *
+ * `refuses` hands its message to a callback rather than returning it, so
+ * that a leaf which stops refusing runs zero assertions and still fails.
+ * Every leaf below wants the message itself, and threading a `let` through
+ * a fresh callback five times spelled the same three lines five ways — and
+ * left the two `throw:` leaves defining callbacks that, by the very
+ * property they prove, no run can reach.
+ * @type {(call: () => unknown) => string}
+ */
+const refusalTextOf = call => {
+    let seen = ''
+    refuses(call)(message => { seen = message })
+    return seen
+}
+
 export const proof = {
     // A string message reaches `check` unchanged.
-    stringRefusalReachesCheck: () => {
-        let seen = ''
-        refuses(() => { throw 'plain refusal' })(message => { seen = message })
-        assert(seen === 'plain refusal', seen)
-    },
+    stringRefusalReachesCheck: () =>
+        assertEq(refusalTextOf(() => { throw 'plain refusal' }), 'plain refusal'),
     // An array message is joined with one space — the rendering every call
-    // site assumed before this module existed, pinned here so it cannot
-    // drift under them.
-    arrayRefusalIsJoinedWithSingleSpaces: () => {
-        let seen = ''
-        refuses(() => { throw ['sentence', 'label', 42n] })(message => { seen = message })
-        assert(seen === 'sentence label 42', seen)
-    },
+    // site already assumed.
+    arrayRefusalIsJoinedWithSpaces: () =>
+        assertEq(refusalTextOf(() => { throw ['sentence', 'label', 42n] }), 'sentence label 42'),
     // `assert`'s own throw is the shape this exists to read.
-    readsAssertsOwnThrow: () => {
-        let seen = ''
-        refuses(() => assert(false, ['nope', 'because', 1n]))(message => { seen = message })
-        assert(seen === 'nope because 1', seen)
-    },
+    readsAssertsOwnThrow: () =>
+        assertEq(refusalTextOf(() => assert(false, ['nope', 'because', 1n])), 'nope because 1'),
     throw: {
         // The control the second half exists for: a call that does NOT
-        // refuse must fail the leaf, not pass it silently.
-        aCallThatSucceedsIsItselfARefusal: () => {
-            refuses(() => 'no refusal here')(() => {
-                assert(false, 'check must not run when the call did not throw')
-            })
-        },
+        // refuse must fail the leaf, not pass it silently. What throws here
+        // is `refuses`' own trailing `assert(threw, …)`, reached because
+        // the `catch` never ran.
+        aCallThatSucceedsIsItselfARefusal: () => refusalTextOf(() => 'no refusal here'),
         // A thrown `Error` is not a bare value, and this codebase never
         // produces one — reading it is refused rather than rendered, so a
         // proof cannot quietly start asserting against `String(error)`.
-        anErrorInstanceIsNotABareThrownValue: () => {
-            refuses(() => { throw new Error('not bare') })(() => undefined)
-        },
+        // What throws here is `refusalText`'s own assert, inside the
+        // `catch`, before any message reaches the check.
+        anErrorInstanceIsNotABareThrownValue: () => refusalTextOf(() => { throw new Error('not bare') }),
     },
 }

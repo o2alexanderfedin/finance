@@ -2321,7 +2321,7 @@ export const proof = {
                 }],
             })
             assert(outcome.kind === 'ok', ['a rental register is not Schedule C\'s', outcome])
-            if (outcome.kind !== 'ok') { throw ['a rental register is not Schedule C\'s', outcome] }
+            assert(outcome.kind === 'ok', ['a rental register is not Schedule C\'s', outcome])
             assertEq(outcome.filed, false, 'no business, so no Schedule C is filed')
             assertEq(outcome.form4562, undefined, 'and no Form 4562 is computed here')
             assertEq(outcome.partII.line13.value, 0n, 'Schedule C line 13 stays a documented zero')
@@ -2697,9 +2697,6 @@ export const proof = {
             }))
             const [source, ...rest] = outcome.partII.line30.sources
             assert(source !== undefined, ['line 30 must cite a source', outcome.partII.line30])
-            if (source === undefined) {
-                throw 'expected a source'
-            }
             assertEq(rest.length, 0, 'one home, one source')
             assertEq(source.documentHash, 'sha256-business-home')
             assertEq(source.boxPath, 'businessUseOfHome -> Form 8829 line 36')

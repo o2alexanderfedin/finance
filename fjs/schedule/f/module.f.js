@@ -970,7 +970,6 @@ export const scheduleF = input => {
     const expenseLine = category => {
         const row = farmExpenseLines.find(candidate => candidate.category === category)
         assert(row !== undefined, ['every expense line has a printed row', category])
-        if (row === undefined) { throw ['every expense line has a printed row', category] }
         const sources = farm.entries
             .filter(entry => entry.category === category)
             .map(entry => ({
@@ -1138,14 +1137,12 @@ const run = input => scheduleF({
 /** @type {(outcome: ScheduleFOutcome) => ScheduleF} */
 const ok = outcome => {
     assert(outcome.kind === 'ok', ['expected a computed Schedule F', outcome])
-    if (outcome.kind !== 'ok') { throw ['expected a computed Schedule F', outcome] }
     return outcome
 }
 
 /** @type {(outcome: ScheduleFOutcome) => string} */
 const refusal = outcome => {
     assert(outcome.kind === 'error', ['expected a refusal', outcome])
-    if (outcome.kind !== 'error') { throw ['expected a refusal', outcome] }
     return outcome.message
 }
 
@@ -1205,7 +1202,7 @@ export const proof = {
         const lineOf = category => {
             const row = farmExpenseLines.find(candidate => candidate.category === category)
             assert(row !== undefined, ['expected the row', category])
-            if (row === undefined) { throw ['expected the row', category] }
+            assert(row !== undefined, ['expected the row', category])
             return row.printedLine
         }
         assertEq(lineOf('carAndTruck'), '10')
@@ -1473,7 +1470,7 @@ export const proof = {
         const register = grainBinRegister('sha256-register-a')
         const [asset] = register.value.assets
         assert(asset !== undefined, ['expected the asset'])
-        if (asset === undefined) { throw ['expected the asset'] }
+        assert(asset !== undefined, ['expected the asset'])
         const result = ok(run({
             farmForms: [farmDocument({})('sha256-farm-a')],
             assetRegisters: [{
@@ -1799,7 +1796,7 @@ export const proof = {
             const register = grainBinRegister('sha256-register-a')
             const [asset] = register.value.assets
             assert(asset !== undefined, ['expected the asset'])
-            if (asset === undefined) { throw ['expected the asset'] }
+            assert(asset !== undefined, ['expected the asset'])
             const message = refusal(run({
                 farmForms: [farmDocument({})('sha256-farm-a')],
                 assetRegisters: [{

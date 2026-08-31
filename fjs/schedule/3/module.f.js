@@ -1277,7 +1277,6 @@ const foreignCredit = status => profile => divForms => intForms =>
  */
 const foreignCreditLine = outcome => {
     assert(outcome.kind === 'ok', ['expected a computed Schedule 3 line 1', outcome])
-    if (outcome.kind !== 'ok') { throw ['unreachable', outcome] }
     return outcome.line
 }
 
@@ -1286,21 +1285,18 @@ const foreignCreditLine = outcome => {
  */
 const foreignCreditRefusal = outcome => {
     assert(outcome.kind === 'error', ['expected a refusal', outcome])
-    if (outcome.kind !== 'error') { throw ['unreachable', outcome] }
     return outcome.message
 }
 
 /** @type {(outcome: ScheduleThreeOutcome) => ScheduleThree} */
 const okResult = outcome => {
     assert(outcome.kind === 'ok', ['expected a computed Schedule 3', outcome])
-    if (outcome.kind !== 'ok') { throw ['unreachable', outcome] }
     return outcome
 }
 
 /** @type {(outcome: ScheduleThreeOutcome) => ScheduleThreeRefusal} */
 const refusal = outcome => {
     assert(outcome.kind === 'error', ['expected a refusal', outcome])
-    if (outcome.kind !== 'error') { throw ['unreachable', outcome] }
     return outcome
 }
 

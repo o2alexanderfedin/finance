@@ -256,4 +256,32 @@ export const proof = {
         assertEq(result.shortTermCarryoverCents, 600000n, '$6,000.00 short-term carryover, via the document link')
         assertEq(result.longTermCarryoverCents, 0n)
     },
+    // Lines 3 and 4 exist to answer a question every fixture above
+    // answers the same way: how much of the prior year's $3,000 capital
+    // loss deduction actually reduced tax? When prior-year taxable income
+    // was itself negative the answer is "none of it", line 3 floors at
+    // zero, line 4 follows it down, and the full loss carries forward
+    // instead of being consumed by a deduction that bought nothing.
+    //
+    // The two rows are the same prior year but for line 1's sign, so the
+    // $3,000.00 difference between the carryovers is attributable to that
+    // and nothing else.
+    aDeductionTakenAgainstNegativeTaxableIncomeIsRestoredToTheCarryover: () => {
+        /** @type {readonly (readonly [string, bigint, bigint])[]} */
+        const cases = [
+            ['taxable income of $20,000.00 absorbs the whole $3,000.00 deduction', 2000000n, 600000n],
+            ['taxable income of -$5,000.00 absorbs none of it', -500000n, 900000n],
+        ]
+        assertEq(cases.length, 2, 'one row either side of line 3’s floor')
+        for (const [label, priorYearFormLine15Cents, expected] of cases) {
+            const result = capitalLossCarryoverWorksheet({
+                priorYearFormLine15Cents,
+                priorYearScheduleDLine7Cents: -1000000n,
+                priorYearScheduleDLine15Cents: 100000n,
+                priorYearScheduleDLine21Cents: -300000n,
+            })
+            assertEq(result.shortTermCarryoverCents, expected, label)
+            assertEq(result.longTermCarryoverCents, 0n, label)
+        }
+    },
 }

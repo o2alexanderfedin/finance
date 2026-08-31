@@ -634,4 +634,33 @@ export const proof = {
         assertEq(r.line24, 18409450n, 'line 24 = $184,094.50, cent-exact')
         assertEq(r.line25, 10101850n, 'line 25 = $101,018.50 — Form 1040 line 16')
     },
+    // Lines 5, 10 and 17 each have a side no fixture above reaches,
+    // because every one of them has taxable income comfortably above the
+    // qualified dividends and Schedule D gain it is pricing. Turn that
+    // around — $30,000.00 of qualified dividends against $10,000.00 of
+    // taxable income, which happens whenever deductions pull line 15
+    // below line 3a — and all three swing at once: line 5's floor bites
+    // (line 4 exceeds line 1), line 10 takes line 1 rather than line 4,
+    // and line 17 takes line 16 rather than line 12.
+    //
+    // The end of the worksheet is the part worth pinning: every dollar of
+    // taxable income is preferential and sits inside the MFJ 0% band, so
+    // lines 18, 21 and 22 are each zero and line 25 is $0.00 — the whole
+    // return is taxed at nothing, and the clamp reaches that by choosing
+    // line 23 over a line 24 that is decidedly not zero.
+    qualifiedDividendsAboveTaxableIncomeSwingLinesFiveTenAndSeventeen: () => {
+        /** @type {QdcgtInput} */
+        const dividendsExceedTaxableIncome = { ...splitDispatchInput, line1Cents: 1000000n }
+        const r = qdcgt(taxParams2025)(dividendsExceedTaxableIncome)
+        assertEq(r.line4, 3000000n, 'line 4 = $30,000.00, above line 1')
+        assertEq(r.line5, 0n, 'line 5 floors at zero: line 4 exceeds line 1')
+        assertEq(r.line10, 1000000n, 'line 10 takes line 1, the smaller of 1 and 4')
+        assertEq(r.line12, 0n, 'line 12 = line 10 - line 11')
+        assertEq(r.line16, 0n, 'line 16 floors: line 15 reaches line 14')
+        assertEq(r.line17, 0n, 'line 17 takes line 16')
+        assertEq(r.line18 + r.line21 + r.line22, 0n, 'nothing is priced at 15%, at 20%, or as ordinary income')
+        assertEq(r.line23, 0n, 'so line 23 is zero')
+        assert(r.line24 > 0n, ['line 24 prices the whole $10,000.00 as ordinary income', r.line24])
+        assertEq(r.line25, 0n, 'and the clamp takes line 23 — the entire return sits in the 0% band')
+    },
 }

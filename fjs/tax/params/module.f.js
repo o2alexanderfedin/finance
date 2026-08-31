@@ -3810,18 +3810,18 @@ export const proof = {
     theLongTermCareBandsPartitionEveryAgeWithNoGapAndNoOverlap: () => {
         const [first, ...rest] = longTermCarePremiumLimits
         assert(first !== undefined, 'five bands')
-        if (first === undefined) { throw 'expected a first band' }
+        assert(first !== undefined, 'expected a first band')
         assertEq(first.minimumAgeExclusive, undefined, 'the first band is open below')
         assertEq(rest.length, 4, 'four bands follow the first')
         const last = longTermCarePremiumLimits[longTermCarePremiumLimits.length - 1]
         assert(last !== undefined, 'a last band')
-        if (last === undefined) { throw 'expected a last band' }
+        assert(last !== undefined, 'expected a last band')
         assertEq(last.maximumAge, undefined, 'and the last is open above')
         for (let index = 1; index < longTermCarePremiumLimits.length; index += 1) {
             const previous = longTermCarePremiumLimits[index - 1]
             const current = longTermCarePremiumLimits[index]
             assert(previous !== undefined && current !== undefined, ['a pair', index])
-            if (previous === undefined || current === undefined) { throw 'expected a pair' }
+            assert(previous !== undefined || current === undefined, 'expected a pair')
             assertEq(
                 current.minimumAgeExclusive, previous.maximumAge,
                 `band ${current.band} must start exactly where ${previous.band} ends`)
@@ -4997,9 +4997,6 @@ export const proof = {
                     jointCeiling !== undefined && hohCeiling !== undefined && singleCeiling !== undefined,
                     ['every one of the three printed rows must carry a ceiling', row],
                 )
-                if (jointCeiling === undefined || hohCeiling === undefined || singleCeiling === undefined) {
-                    throw ['unreachable', row]
-                }
                 assertEq(
                     4n * centsFromString(hohCeiling),
                     3n * centsFromString(jointCeiling),

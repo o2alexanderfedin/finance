@@ -74,6 +74,13 @@ export const tryParse = scale => s => {
     const m = decimalPattern.exec(s)
     if (m === null) { return error('not a decimal number: ' + s) }
     const [, sign, intPart, fracPart] = m
+    // Unreachable, and deliberately kept: `(\d+)` is not optional, so a
+    // match always carries an integer part. It is here because
+    // `noUncheckedIndexedAccess` types every destructured group as
+    // `string | undefined` and both ways out — a cast and a non-null
+    // assertion — are banned outright (AGENTS.md). No input can walk
+    // its taken side, so it is the one branch in this module a proof
+    // cannot reach.
     if (intPart === undefined) { return error('not a decimal number: ' + s) }
     const frac = fracPart ?? ''
     if (frac.length > scale) { return error('more than ' + scale + ' fractional digits: ' + s) }
@@ -155,5 +162,22 @@ export const proof = {
         overPrecision: () => parse(2)('1234.567'),
         garbage: () => parse(2)('abc'),
         emptyString: () => parse(2)(''),
+    },
+    // Scale 0 — whole units, no decimal point at all — is a legal scale
+    // that nothing in this repo happens to ask for, so both functions
+    // carry a `scale === 0` case that no fixture above walks: `tryParse`
+    // pads the fractional part to the empty string and must read it as
+    // zero rather than call `BigInt('')`, and `format` must emit the
+    // digits bare rather than splice in a point with nothing after it.
+    scaleZeroIsWholeUnitsWithNoPoint: () => {
+        /** @type {readonly (readonly [string, bigint])[]} */
+        const cases = [['0', 0n], ['7', 7n], ['-7', -7n], ['12345', 12345n], ['-12345', -12345n]]
+        assertEq(cases.length, 5, 'zero, both signs small, both signs multi-digit')
+        for (const [text, cents] of cases) {
+            assertEq(unwrap(tryParse(0)(text)), cents, ['parse at scale 0', text])
+            assertEq(format(0)(cents), text, ['format at scale 0', text])
+        }
+        // ...and a fractional digit is one digit too many at this scale.
+        assertEq(tryParse(0)('1.5')[0], 'error', 'scale 0 admits no fractional digits')
     },
 }

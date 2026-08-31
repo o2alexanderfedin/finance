@@ -262,9 +262,6 @@ const tenTo = n => 10n ** BigInt(n)
 export const macrsColumn = classification => method => month => convention => {
     const spec = macrsClassifications[classification]
     assert(spec !== undefined, ['unknown MACRS classification', classification])
-    if (spec === undefined) {
-        throw ['unknown MACRS classification', classification]
-    }
     const unit = 100n * tenTo(spec.printedDecimals)
     const recovery24 = spec.recoveryTwentyFourths
     const first24 = conventionTwentyFourths(convention)(month)
@@ -318,9 +315,6 @@ export const macrsColumn = classification => method => month => convention => {
 export const macrsRate = classification => method => month => convention => recoveryYear => {
     const spec = macrsClassifications[classification]
     assert(spec !== undefined, ['unknown MACRS classification', classification])
-    if (spec === undefined) {
-        throw ['unknown MACRS classification', classification]
-    }
     const column = macrsColumn(classification)(method)(month)(convention)
     const units = recoveryYear >= 1 ? column[recoveryYear - 1] : undefined
     return of(units === undefined ? 0n : units)(100n * tenTo(spec.printedDecimals))
@@ -371,9 +365,6 @@ export const macrsDisposalDeductionCents
 const printed = classification => column => {
     const spec = macrsClassifications[classification]
     assert(spec !== undefined, ['unknown MACRS classification', classification])
-    if (spec === undefined) {
-        throw ['unknown MACRS classification', classification]
-    }
     const unit = tenTo(spec.printedDecimals)
     return column.map(v => {
         const whole = v / unit
@@ -524,16 +515,16 @@ export const proof = {
             for (const [name, years] of printedYears) {
                 const spec = macrsClassifications[name]
                 assert(spec !== undefined, ['missing classification', name])
-                if (spec === undefined) { throw ['missing classification', name] }
+                assert(spec !== undefined, ['missing classification', name])
                 assertEq(spec.recoveryTwentyFourths, BigInt(years) * 24n, name)
             }
             const residential = macrsClassifications['residentialRental']
             assert(residential !== undefined, 'residentialRental must exist')
-            if (residential === undefined) { throw 'residentialRental must exist' }
+            assert(residential !== undefined, 'residentialRental must exist')
             assertEq(residential.recoveryTwentyFourths, 660n, '27.5 years is 660 twenty-fourths')
             const nonresidential = macrsClassifications['nonresidentialReal']
             assert(nonresidential !== undefined, 'nonresidentialReal must exist')
-            if (nonresidential === undefined) { throw 'nonresidentialReal must exist' }
+            assert(nonresidential !== undefined, 'nonresidentialReal must exist')
             assertEq(nonresidential.recoveryTwentyFourths, 936n, '39 years is 936 twenty-fourths')
         },
     },
@@ -715,7 +706,7 @@ export const proof = {
             for (const [table, columns] of Object.entries(publication946AppendixA)) {
                 const conv = appendixAConventions[table]
                 assert(conv !== undefined, ['every table names its convention', table])
-                if (conv === undefined) { throw ['every table names its convention', table] }
+                assert(conv !== undefined, ['every table names its convention', table])
                 for (const [classification, row] of Object.entries(columns)) {
                     const expected = row.split(' ')
                     const method = classification === 'fifteenYear' || classification === 'twentyYear'

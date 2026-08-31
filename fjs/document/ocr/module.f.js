@@ -23,7 +23,7 @@
  */
 import { array, open, record, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
 import { validate as rttiValidate } from 'functionalscript/fjs/types/rtti/validate/module.f.mjs'
-import { assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
+import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { base, mediaTypeOf } from '../base/module.f.js'
 
 /** @import { Ts } from 'functionalscript/fjs/types/rtti/ts/types.js' */
@@ -69,18 +69,13 @@ export const proof = {
     populatedRoundTrips: () => {
         const value = { dialect, pages: ['page 1 text'], fields: { 'Box 1 Interest income': '1,234.56' } }
         const [t, v] = validate(value)
-        if (t !== 'ok') {
-            throw ['expected ok', t, v]
-        }
+        assert(t === 'ok', ['expected ok', t, v])
         assertEq(v.fields['Box 1 Interest income'], '1,234.56')
         assertEq(v.pages[0], 'page 1 text')
     },
     wrongDialectRejected: () => {
         const [t, v] = validate({ dialect: 'vnd.fjs.wrong', pages: [], fields: {} })
-        assertEq(t, 'error')
-        if (t !== 'error') {
-            throw ['expected error', t, v]
-        }
+        assert(t === 'error', ['expected error', t, v])
         assertEq(v.path[0], 'dialect')
     },
 }

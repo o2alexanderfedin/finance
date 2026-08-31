@@ -255,9 +255,6 @@ export const movingExpenses = input => {
  */
 const expectLines = outcome => {
     assert(outcome.kind === 'ok', ['expected Form 3903 to compute', outcome])
-    if (outcome.kind !== 'ok') {
-        throw ['expected Form 3903 to compute', outcome]
-    }
     return outcome
 }
 
@@ -267,9 +264,6 @@ const expectLines = outcome => {
  */
 const expectRefusal = outcome => {
     assert(outcome.kind === 'error', ['expected a refusal', outcome])
-    if (outcome.kind !== 'error') {
-        throw ['expected a refusal', outcome]
-    }
     return outcome.message
 }
 

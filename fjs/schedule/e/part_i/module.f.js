@@ -660,7 +660,6 @@ export const scheduleEPartIColumn = profile => registers => document => {
     const expenseLine = category => {
         const row = rentalExpenseLines.find(candidate => candidate.category === category)
         assert(row !== undefined, ['every expense line has a printed row', category])
-        if (row === undefined) { throw ['every expense line has a printed row', category] }
         const sources = property.entries
             .filter(entry => entry.category === category)
             .map(entry => ({
@@ -913,14 +912,12 @@ const run = input => scheduleEPartI({
 /** @type {(outcome: ScheduleEPartIOutcome) => ScheduleEPartI} */
 const ok = outcome => {
     assert(outcome.kind === 'ok', ['expected a computed Part I', outcome])
-    if (outcome.kind !== 'ok') { throw ['expected a computed Part I', outcome] }
     return outcome
 }
 
 /** @type {(outcome: ScheduleEPartIOutcome) => string} */
 const refusal = outcome => {
     assert(outcome.kind === 'error', ['expected a refusal', outcome])
-    if (outcome.kind !== 'error') { throw ['expected a refusal', outcome] }
     return outcome.message
 }
 
@@ -970,7 +967,7 @@ export const proof = {
         const lineOf = category => {
             const row = rentalExpenseLines.find(candidate => candidate.category === category)
             assert(row !== undefined, ['expected the row', category])
-            if (row === undefined) { throw ['expected the row', category] }
+            assert(row !== undefined, ['expected the row', category])
             return row.printedLine
         }
         assertEq(lineOf('advertising'), 5)
@@ -1481,7 +1478,7 @@ export const proof = {
             const register = buildingRegister('sha256-register-a')
             const [asset] = register.value.assets
             assert(asset !== undefined, ['expected the asset'])
-            if (asset === undefined) { throw ['expected the asset'] }
+            assert(asset !== undefined, ['expected the asset'])
             const message = refusal(run({
                 rentalProperties: [propertyDocument({})('sha256-rental-a')],
                 assetRegisters: [{

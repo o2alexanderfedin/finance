@@ -1685,11 +1685,11 @@ export const proof = {
                 taxableIncomeBeforeQbiCents: 19730000n,
             })
             assert(outcome.kind === 'ok', ['at the threshold it computes', outcome])
-            if (outcome.kind !== 'ok') { throw 'expected the ok arm' }
+            assert(outcome.kind === 'ok', 'expected the ok arm')
             assertEq(outcome.deductionCents, 0n, 'a loss earns no deduction')
             const simplified = outcome.simplified
             assert(simplified !== undefined, 'and it went down the Form 8995 path')
-            if (simplified === undefined) { throw 'expected the simplified form' }
+            assert(simplified !== undefined, 'expected the simplified form')
             assertEq(simplified.line2, -4000000n, 'printed line 2 carries the loss')
             assertEq(simplified.line16, -4000000n, 'and printed line 16 hands it to 2026')
         },

@@ -156,7 +156,7 @@ import { stringify as jsonText } from '../../json/module.f.js'
 /** @import { Mkdir, WriteFile, Import } from 'functionalscript/fjs/effects/node/types.js' */
 /** @import { Cas, FileCasOperation } from 'functionalscript/fjs/cas/types.js' */
 /** @import { Evo } from 'functionalscript/fjs/cas/evo/types.js' */
-/** @import { ToolEntry, ToolsCallResult } from 'functionalscript/fjs/protocol/mcp/types.js' */
+/** @import { ToolEntry, TextContent, ToolsCallResult } from 'functionalscript/fjs/protocol/mcp/types.js' */
 /** @import { Vec } from 'functionalscript/fjs/types/bit_vec/types.js' */
 /** @import { CasOp, Report } from '../../guest/module.f.js' */
 /** @import { TaxReport } from '../../guest/tax/module.f.js' */
@@ -684,9 +684,7 @@ export const placeJsModuleFixture = root => path => fn => {
     /** @type {(dir: Dir, segments: readonly string[]) => Dir} */
     const place = (dir, segments) => {
         const [first, ...rest] = segments
-        if (first === undefined) {
-            throw new Error('expected a non-empty path')
-        }
+        assert(first !== undefined, new Error('expected a non-empty path'))
         if (rest.length === 0) {
             return { ...dir, [first]: fn }
         }
@@ -896,6 +894,25 @@ const assertSessionSurvivesAFollowingCall = home => cas => e => state => goodHas
     assertEq(followUp.isError, undefined)
 }
 
+/**
+ * The one text content item a `tools/call` result is expected to carry.
+ *
+ * Nineteen leaves below read `callResult.content[0].text`, and
+ * `noUncheckedIndexedAccess` plus the content union make that two
+ * narrowings, not one. Spelling them as assertions rather than as an
+ * `if (first === undefined || first.type !== 'text') throw` guard matters
+ * for more than brevity: the guard's false arm is unreachable in every
+ * leaf that reaches it — the call already succeeded — so it was nineteen
+ * permanently half-covered branches. `assert` narrows through
+ * `asserts v` and throws the same bare value, leaving none.
+ * @type {(callResult: ToolsCallResult) => TextContent}
+ */
+const firstTextContent = callResult => {
+    const first = assertNotNullish(callResult.content[0], ['expected a content item', callResult])
+    assert(first.type === 'text', ['expected a text content item', callResult])
+    return first
+}
+
 export const proof = {
     // ── Task 1: executeRun ──────────────────────────────────────────────
     executeRun: {
@@ -1094,9 +1111,6 @@ export const proof = {
                             basisCorrectionForms: [], marketplaceStatements: [],
                         })
                         assert(outcome.kind === 'ok', ['expected the engine to compute', outcome])
-                        if (outcome.kind !== 'ok') {
-                            return ctx.pure('')
-                        }
                         const deduction = assertNotNullish(
                             outcome.lines.find(line => line.rule === '1040 line 12e'),
                             'expected line 12e')
@@ -1158,10 +1172,7 @@ export const proof = {
                 const [state3b, outcome] = runExecuteRunViaFixture(home)(taxParamsFixture)(cas)(e)(programHash)(programSource)(adversarialReport)([])(undefined)(state3)
                 const [state4, callResult] = virtualOrPanic(state3b)(handleRunOutcome(cas)(programHash)([])(false)({})({ taxYear: 2025, paramSetHash: 'sha256-paramset1' })(outcome))
                 assertEq(callResult.isError, undefined)
-                const first = callResult.content[0]
-                if (first === undefined || first.type !== 'text') {
-                    throw ['expected a text content item', callResult]
-                }
+                const first = firstTextContent(callResult)
                 const parsed = /** @type {{ readonly resultHash: string, readonly runHash: string, readonly preview: string, readonly truncated: boolean }} */ (JSON.parse(first.text))
 
                 const runHashVec = cBase32ToVec(parsed.runHash)
@@ -1205,10 +1216,7 @@ export const proof = {
                 const [state1b, outcome] = runExecuteRunViaFixture(home)(taxParamsFixture)(cas)(e)(programHash)(programSource)(trivialReport)([])(undefined)(state1)
                 const [state2, callResult] = virtualOrPanic(state1b)(handleRunOutcome(cas)(programHash)([])(false)({})({ taxYear: 2025, paramSetHash: 'sha256-paramset1' })(outcome))
                 assertEq(callResult.isError, undefined)
-                const first = callResult.content[0]
-                if (first === undefined || first.type !== 'text') {
-                    throw ['expected a text content item', callResult]
-                }
+                const first = firstTextContent(callResult)
                 const parsed = /** @type {{ readonly resultHash: string, readonly runHash: string, readonly preview: string, readonly truncated: boolean }} */ (JSON.parse(first.text))
 
                 const [, hashesAfter] = virtualOrPanic(state2)(cas.list())
@@ -1254,10 +1262,7 @@ export const proof = {
                 const [state1b, outcome] = runExecuteRunViaFixture(home)(taxParamsFixture)(cas)(e)(programHash)(programSource)(objectReport)([])(undefined)(state1)
                 const [state2, callResult] = virtualOrPanic(state1b)(handleRunOutcome(cas)(programHash)([])(false)({})({ taxYear: 2025, paramSetHash: 'sha256-paramset1' })(outcome))
                 assertEq(callResult.isError, undefined)
-                const first = callResult.content[0]
-                if (first === undefined || first.type !== 'text') {
-                    throw ['expected a text content item', callResult]
-                }
+                const first = firstTextContent(callResult)
                 const parsed = /** @type {{ readonly resultHash: string }} */ (JSON.parse(first.text))
                 const resultHashVec = cBase32ToVec(parsed.resultHash)
                 assert(resultHashVec !== null, 'expected a decodable resultHash')
@@ -1296,10 +1301,7 @@ export const proof = {
                 assert(expected > 0, ['the fixture must have numeric literals to count', expected])
 
                 const [, callResult] = virtualOrPanic(state1b)(handleRunOutcome(cas)(programHash)([])(false)({})({ taxYear: 2025, paramSetHash: 'sha256-paramset1' })(outcome))
-                const first = callResult.content[0]
-                if (first === undefined || first.type !== 'text') {
-                    throw ['expected a text content item', callResult]
-                }
+                const first = firstTextContent(callResult)
                 const parsed = /** @type {{ readonly literalCount: number }} */ (JSON.parse(first.text))
                 assertEq(parsed.literalCount, expected)
             },
@@ -1318,10 +1320,7 @@ export const proof = {
 
                 const [state1b, outcome] = runExecuteRunViaFixture(home)(taxParamsFixture)(cas)(e)(programHash)(programSource)(stringReport)([])(undefined)(state1)
                 const [state2, callResult] = virtualOrPanic(state1b)(handleRunOutcome(cas)(programHash)([])(false)({})({ taxYear: 2025, paramSetHash: 'sha256-paramset1' })(outcome))
-                const first = callResult.content[0]
-                if (first === undefined || first.type !== 'text') {
-                    throw ['expected a text content item', callResult]
-                }
+                const first = firstTextContent(callResult)
                 const parsed = /** @type {{ readonly resultHash: string }} */ (JSON.parse(first.text))
                 const [, resultRead] = virtual(state2)(collectRead(cas.read(/** @type {Vec} */ (assertNotNullish(cBase32ToVec(parsed.resultHash), 'decodable resultHash')))))
                 assert(resultRead[0] === 'ok', ['expected the result to read back', resultRead])
@@ -1344,10 +1343,7 @@ export const proof = {
                 const [state1b, outcome] = runExecuteRunViaFixture(home)(taxParamsFixture)(cas)(e)(programHash)(programSource)(bigintReport)([])(undefined)(state1)
                 const [state2, callResult] = virtualOrPanic(state1b)(handleRunOutcome(cas)(programHash)([])(false)({})({ taxYear: 2025, paramSetHash: 'sha256-paramset1' })(outcome))
                 assertEq(callResult.isError, true)
-                const first = callResult.content[0]
-                if (first === undefined || first.type !== 'text') {
-                    throw ['expected a text content item', callResult]
-                }
+                const first = firstTextContent(callResult)
                 assert(first.text.includes('not representable as JSON'), first.text)
                 // The record exists, says `error`, and validates.
                 const runHash = assertNotNullish(
@@ -1386,10 +1382,7 @@ export const proof = {
                 const [state1b, outcome] = runExecuteRunViaFixture(home)(taxParamsFixture)(cas)(e)(programHash)(programSource)(tinyReport)([])(undefined)(state1)
                 const [state2, callResult] = virtualOrPanic(state1b)(handleRunOutcome(cas)(programHash)([])(false)({})({ taxYear: 2025, paramSetHash: 'sha256-paramset1' })(outcome))
                 assertEq(callResult.isError, undefined)
-                const first = callResult.content[0]
-                if (first === undefined || first.type !== 'text') {
-                    throw ['expected a text content item', callResult]
-                }
+                const first = firstTextContent(callResult)
                 const parsed = /** @type {Record<string, unknown>} */ (JSON.parse(first.text))
                 assertEq(
                     JSON.stringify(Object.keys(parsed).sort()),
@@ -1432,10 +1425,7 @@ export const proof = {
                 const [state1, callResult] = virtualOrPanic(state0)(
                     fjsRunTool(home)(cas)(e).handle({ hash: 'not-a-real-hash', taxYear: 2025 }))
                 assertEq(callResult.isError, true)
-                const first = callResult.content[0]
-                if (first === undefined || first.type !== 'text') {
-                    throw ['expected a text content item', callResult]
-                }
+                const first = firstTextContent(callResult)
                 const match = /run record: (\S+)\)/.exec(first.text)
                 assert(match !== null, ['expected the error text to name a run record hash', first.text])
                 const runHash = assertNotNullish(match[1], 'expected the run record hash capture group to be present')
@@ -1482,10 +1472,7 @@ export const proof = {
                 const [state1, callResult] = virtualOrPanic(state0)(
                     fjsRunTool(home)(cas)(e).handle({ hash: 'not-a-real-hash', taxYear: 2025, subject: 'someSubject' }))
                 assertEq(callResult.isError, true)
-                const first = callResult.content[0]
-                if (first === undefined || first.type !== 'text') {
-                    throw ['expected a text content item', callResult]
-                }
+                const first = firstTextContent(callResult)
                 const match = /run record: (\S+)\)/.exec(first.text)
                 assert(match !== null, ['expected the error text to name a run record hash', first.text])
                 const runHash = assertNotNullish(match[1], 'expected the run record hash capture group to be present')
@@ -1540,10 +1527,7 @@ export const proof = {
                 const pinFields = /** @type {{ readonly subject?: string, readonly parents?: readonly string[] }} */ ({ subject: 'pinnedSubject', parents: ['pinnedParent'] })
                 const [state2, callResult] = virtualOrPanic(state1b)(handleRunOutcome(cas)(programHash)([])(true)(pinFields)({ taxYear: 2025, paramSetHash: 'sha256-paramset1' })(outcome))
                 assertEq(callResult.isError, undefined)
-                const first = callResult.content[0]
-                if (first === undefined || first.type !== 'text') {
-                    throw ['expected a text content item', callResult]
-                }
+                const first = firstTextContent(callResult)
                 const parsed = /** @type {{ readonly runHash: string }} */ (JSON.parse(first.text))
                 const runHashVec = cBase32ToVec(parsed.runHash)
                 assert(runHashVec !== null, 'expected a decodable runHash')
@@ -1587,10 +1571,7 @@ export const proof = {
                 const [state1, callResult] = virtualOrPanic(emptyState)(
                     handleRunOutcome(cas)('program-hash-error-arm-inputs')([])(false)({})({ taxYear: 2025, paramSetHash: 'sha256-paramset1' })(outcome))
                 assertEq(callResult.isError, true)
-                const first = callResult.content[0]
-                if (first === undefined || first.type !== 'text') {
-                    throw ['expected a text content item', callResult]
-                }
+                const first = firstTextContent(callResult)
                 const match = /run record: (\S+)\)/.exec(first.text)
                 assert(match !== null, ['expected the error text to name a run record hash', first.text])
                 const runHash = assertNotNullish(match[1], 'expected the run record hash capture group to be present')
@@ -1623,10 +1604,7 @@ export const proof = {
                 const distinctiveArgs = ['distinctive-arg-alpha', 'distinctive-arg-beta']
                 const [state2, callResult] = virtualOrPanic(state1b)(handleRunOutcome(cas)(programHash)(distinctiveArgs)(false)({})({ taxYear: 2025, paramSetHash: 'sha256-paramset1' })(outcome))
                 assertEq(callResult.isError, undefined)
-                const first = callResult.content[0]
-                if (first === undefined || first.type !== 'text') {
-                    throw ['expected a text content item', callResult]
-                }
+                const first = firstTextContent(callResult)
                 const parsed = /** @type {{ readonly runHash: string }} */ (JSON.parse(first.text))
                 const runHashVec = cBase32ToVec(parsed.runHash)
                 assert(runHashVec !== null, 'expected a decodable runHash')
@@ -1682,10 +1660,7 @@ export const proof = {
                 const [state2b, outcome] = runExecuteRunViaModuleFixture(home)(taxParamsFixture)(cas)(e)(escapingHash)(programSource)(escapingModule)([])(undefined)(state2)
                 const [state3, callResult] = virtualOrPanic(state2b)(handleRunOutcome(cas)(escapingHash)([])(false)({})({ taxYear: 2025, paramSetHash: 'sha256-paramset1' })(outcome))
                 assertEq(callResult.isError, true)
-                const first = callResult.content[0]
-                if (first === undefined || first.type !== 'text') {
-                    throw ['expected a text content item', callResult]
-                }
+                const first = firstTextContent(callResult)
                 assert(first.text.includes('fetch'), ['expected the refused operation to be named', first.text])
                 assertPersistedErrorRunRecord(cas)(state3)(first.text)
 
@@ -1711,10 +1686,7 @@ export const proof = {
                 const [state2, callResult] = virtualOrPanic(state1)(
                     fjsRunTool(home)(cas)(e).handle({ hash: missingHash, taxYear: 2025 }))
                 assertEq(callResult.isError, true)
-                const first = callResult.content[0]
-                if (first === undefined || first.type !== 'text') {
-                    throw ['expected a text content item', callResult]
-                }
+                const first = firstTextContent(callResult)
                 assert(first.text.includes(missingHash), ['expected the missing hash to be named', first.text])
                 assertPersistedErrorRunRecord(cas)(state2)(first.text)
 
@@ -1757,10 +1729,7 @@ export const proof = {
                 const [state3, callResult] = virtualOrPanic(state2)(
                     fjsRunTool(home)(cas)(e).handle({ hash: unimportableHash, taxYear: 2025 }))
                 assertEq(callResult.isError, true)
-                const first = callResult.content[0]
-                if (first === undefined || first.type !== 'text') {
-                    throw ['expected a text content item', callResult]
-                }
+                const first = firstTextContent(callResult)
                 assert(first.text.includes('import failed'), ['expected an import failure to be named', first.text])
                 assertPersistedErrorRunRecord(cas)(state3)(first.text)
 
@@ -1784,10 +1753,7 @@ export const proof = {
             const [, callResult] = virtualOrPanic(state0)(
                 fjsRunTool(home)(cas)(e).handle({ hash: 'not-a-real-hash' }))
             assertEq(callResult.isError, true)
-            const first = callResult.content[0]
-            if (first === undefined || first.type !== 'text') {
-                throw ['expected a text content item', callResult]
-            }
+            const first = firstTextContent(callResult)
             assert(first.text.includes('invalid arguments'), ['expected toolEntry\'s own RTTI refusal', first.text])
         },
         // An unknown `taxYear` is refused by name, before executeRun is
@@ -1801,10 +1767,7 @@ export const proof = {
             const [, callResult] = virtualOrPanic(state0)(
                 fjsRunTool(home)(cas)(e).handle({ hash: 'not-a-real-hash', taxYear: 1999 }))
             assertEq(callResult.isError, true)
-            const first = callResult.content[0]
-            if (first === undefined || first.type !== 'text') {
-                throw ['expected a text content item', callResult]
-            }
+            const first = firstTextContent(callResult)
             assert(first.text.includes('1999'), ['expected the offending year to be named', first.text])
             assert(first.text.includes('2025'), ['expected the known set to be named', first.text])
         },
@@ -1831,10 +1794,7 @@ export const proof = {
 
             const [state2, callResult] = virtualOrPanic(state1b)(handleRunOutcome(cas)(programHash)([])(false)({})({ taxYear: 2025, paramSetHash: 'sha256-paramset1' })(outcome))
             assertEq(callResult.isError, true)
-            const first = callResult.content[0]
-            if (first === undefined || first.type !== 'text') {
-                throw ['expected a text content item', callResult]
-            }
+            const first = firstTextContent(callResult)
             assert(first.text.includes('zero observed reads'), ['expected the zero-read refusal named', first.text])
             assertPersistedErrorRunRecord(cas)(state2)(first.text)
         },
@@ -2055,10 +2015,7 @@ export const proof = {
             // for a zero-read refusal.
             const [state8, callResult] = virtualOrPanic(state7)(handleRunOutcome(cas)(adversaryHash)([])(false)({})({ taxYear: 2025, paramSetHash: 'sha256-paramset1' })(outcome2))
             assertEq(callResult.isError, true)
-            const first = callResult.content[0]
-            if (first === undefined || first.type !== 'text') {
-                throw ['expected a text content item', callResult]
-            }
+            const first = firstTextContent(callResult)
             assertPersistedErrorRunRecord(cas)(state8)(first.text)
         },
     },

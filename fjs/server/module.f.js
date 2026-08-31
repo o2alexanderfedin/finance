@@ -86,7 +86,7 @@ import { validate as validateRun } from '../run/module.f.js'
 import { dialect as oneZeroNineNineIntDialect, validate as validateOneZeroNineNineInt } from '../document/1099int/module.f.js'
 import { parse as jsonParse, stringify as jsonText } from '../json/module.f.js'
 
-/** @import { McpConfig, McpHandlers, ToolEntry } from 'functionalscript/fjs/protocol/mcp/types.js' */
+/** @import { McpConfig, McpHandlers, ToolEntry, ToolsCallResult } from 'functionalscript/fjs/protocol/mcp/types.js' */
 /** @import { Effect, Operation } from 'functionalscript/fjs/effects/types.js' */
 /** @import { MemOp, Key } from 'functionalscript/fjs/effects/memory/types.js' */
 /** @import { Read, Write, Mkdir, WriteFile, Import, IoChannel, NodeOp } from 'functionalscript/fjs/effects/node/types.js' */
@@ -458,9 +458,7 @@ const responsesOf = state => state.stdout
 const decoder = validator => value => {
     assert(value !== undefined, 'expected a JSON-RPC response, got none')
     const [t, v] = validator(value)
-    if (t === 'error') {
-        throw ['unexpected JSON-RPC response shape', v]
-    }
+    assert(t !== 'error', ['unexpected JSON-RPC response shape', v])
     return v
 }
 
@@ -964,5 +962,43 @@ export const proof = {
                 assertEq(runRecord.status, 'error')
             }
         },
+    },
+    // Two of the served tools reach the store, and each wraps its whole
+    // effect in a `catchStep` so a store that cannot be read becomes a
+    // JSON-RPC error RESULT — `isError: true`, with a text item naming the
+    // failure — rather than a failure the transport has to carry, which
+    // would drop the connection and leave the agent nothing to report.
+    // Neither `catchStep` had ever been entered by a proof: every leaf
+    // above drives these tools against a store that works.
+    //
+    // Both rows call the tool entry's own `handle` directly. Going through
+    // the transport would prove the same thing with three layers in the
+    // way, and the claim here is about the handler's answer.
+    storeFailuresBecomeErrorResultsNotTransportFailures: () => {
+        // The cache is built against a store that WORKS, so the refresh row
+        // below fails at its own `cas.list()` rather than at the rebuild.
+        const [seeded, cacheKey] = virtualOrPanic(emptyState)(initEvo(fileCas(sha256)('/good')))
+        // `.cas` present but not a directory. `fileCas.list` forgives a
+        // MISSING store — a fresh one has none — and refuses an unreadable
+        // one, and it is the second that this row is about.
+        const unreadable = { ...seeded, root: { ...seeded.root, blocked: { '.cas': [] } } }
+        /** @type {readonly (readonly [string, () => ToolsCallResult, string])[]} */
+        const cases = [
+            ['cas_refresh over a store whose .cas cannot be read',
+                () => virtualOrPanic(unreadable)(casRefreshTool(fileCas(sha256)('/blocked'))(cacheKey).handle({}))[1],
+                'cas_refresh failed'],
+            // A legal cBase32 address with nothing stored behind it.
+            ['fjs_check on a hash with no program behind it',
+                () => virtualOrPanic(emptyState)(fjsCheckTool('/check')(fileCas(sha256)('/check')).handle({ hash: 'aaaaaaaa' }))[1],
+                'program not found'],
+        ]
+        assertEq(cases.length, 2, 'the two served tools whose store access can fail')
+        for (const [label, call, fragment] of cases) {
+            const result = call()
+            assertEq(result.isError, true, label)
+            const first = assertNotNullish(result.content[0], [label, result])
+            assert(first.type === 'text', [label, result])
+            assert(first.text.includes(fragment), [label, first.text])
+        }
     },
 }

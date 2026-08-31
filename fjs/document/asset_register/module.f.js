@@ -316,9 +316,6 @@ const fullDateError = where => field => value => {
     const [, yearText, monthText, dayText] = m
     assert(yearText !== undefined && monthText !== undefined && dayText !== undefined,
         ['a matched full date has three groups', value])
-    if (yearText === undefined || monthText === undefined || dayText === undefined) {
-        throw ['a matched full date has three groups', value]
-    }
     const year = Number(yearText)
     const month = Number(monthText)
     const day = Number(dayText)
@@ -412,10 +409,8 @@ export const checkReferences = r => {
                 + `month, so a day here would suggest a precision the computation does not have`)
         }
         const [, yearText, monthText] = m
-        assert(yearText !== undefined && monthText !== undefined, ['a matched date has both groups', asset.datePlacedInService])
-        if (yearText === undefined || monthText === undefined) {
-            throw ['a matched date has both groups', asset.datePlacedInService]
-        }
+        assert(yearText !== undefined && monthText !== undefined,
+            ['a matched date has both groups', asset.datePlacedInService])
         const month = Number(monthText)
         if (month < 1 || month > 12) {
             return error(
@@ -674,15 +669,10 @@ export const depreciableAssets = register => register.assets.map(asset => {
     const [yearText, monthText] = asset.datePlacedInService.split('-')
     assert(yearText !== undefined && monthText !== undefined,
         ['a validated datePlacedInService is YYYY-MM', asset.datePlacedInService])
-    if (yearText === undefined || monthText === undefined) {
-        throw ['a validated datePlacedInService is YYYY-MM', asset.datePlacedInService]
-    }
     const method = macrsMethods.find(candidate => candidate === asset.method)
     assert(method !== undefined, ['a validated method is one of the three', asset.method])
-    if (method === undefined) { throw ['a validated method is one of the three', asset.method] }
     const convention = macrsConventions.find(candidate => candidate === asset.convention)
     assert(convention !== undefined, ['a validated convention is one of the three', asset.convention])
-    if (convention === undefined) { throw ['a validated convention is one of the three', asset.convention] }
     const claimed = asset.specialDepreciationAllowanceClaimed
     const elected = asset.section179ElectedCost
     const disposal = asset.disposal
@@ -788,9 +778,7 @@ const withAsset = asset => ({ ...minimalAssetRegister, assets: [asset] })
 /** Unwraps a refusal message, throwing when the value validated instead. @type {(r: Result<AssetRegister, AssetRegisterError>) => string} */
 const expectRefusal = ([t, v]) => {
     assert(t === 'error', ['expected a refusal', t, v])
-    if (t !== 'error') { throw ['expected a refusal', t, v] }
     assert(typeof v === 'string', ['expected a SEMANTIC refusal, not a structural one', v])
-    if (typeof v !== 'string') { throw ['expected a semantic refusal', v] }
     return v
 }
 
@@ -826,8 +814,8 @@ export const proof = {
         wrongDialectRejected: () => {
             const [t, v] = validate({ ...minimalAssetRegister, dialect: 'vnd.fjs.business_expenses' })
             assertEq(t, 'error')
-            if (t !== 'error') { throw ['expected error', t, v] }
-            if (typeof v === 'string') { throw ['expected a structural ValidationError', v] }
+            assert(t === 'error', ['expected error', t, v])
+            assert(typeof v !== 'string', ['expected a structural ValidationError', v])
             assertEq(v.path[0], 'dialect')
         },
         // DOC-12's checkbox convention: a materialized `false` is structurally
@@ -976,10 +964,8 @@ export const proof = {
             assert(t === 'ok', ['expected ok', t, v])
             const [asset] = depreciableAssets(v)
             assert(asset !== undefined, 'expected one extracted asset')
-            if (asset === undefined) { return }
             const disposal = asset.disposal
             assert(disposal !== undefined, ['the disposal must travel out of the dialect', asset])
-            if (disposal === undefined) { return }
             assertEq(disposal.acquiredDate, '2023-02-14')
             assertEq(disposal.soldDate, '2025-11-03')
             // The month and the year are split out because Step 3's disposal
@@ -998,7 +984,6 @@ export const proof = {
             assert(t === 'ok', ['expected ok', t, v])
             const [asset] = depreciableAssets(v)
             assert(asset !== undefined, 'expected one extracted asset')
-            if (asset === undefined) { return }
             assertEq(asset.disposal, undefined)
         },
         // The register asserts nothing was disposed of AND records a disposal.

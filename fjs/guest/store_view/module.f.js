@@ -211,7 +211,6 @@ export const proof = {
             const ctx = taxGuestCtx(assertNotNullish(taxParamsByYear['2025'], 'TY2025 parameters'))
             const [tag, value] = interpret(storeView(proofStore))(taxReturnReport(ctx)([]))
             assert(tag === 'ok', ['the program must run to completion', tag, value])
-            if (tag !== 'ok') { return }
             const result = value[0]
             assertEq(result.kind, 'ok')
             if (result.kind !== 'ok') { return }
