@@ -1380,10 +1380,7 @@ export const proof = {
                 isoExerciseForms: [isoForm('doc-iso-sold-2')('5.00')('105.00')('10000')],
                 aStoredNineteenNineBReportsASale: true,
             })
-            assertEq(outcome.kind, 'error', ['expected the refusal to propagate', outcome])
-            if (outcome.kind !== 'error') {
-                throw ['expected error', outcome]
-            }
+            assert(outcome.kind === 'error', ['expected the refusal to propagate', outcome])
             assert(
                 outcome.message.includes('doc-iso-sold-2'),
                 ['the propagated refusal must still name the document', outcome.message])

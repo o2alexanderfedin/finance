@@ -217,12 +217,8 @@ import { centsFromString } from '../exact/module.f.js'
  */
 export const longTermCareCapCents = taxParamSet => band => {
     const limit = taxParamSet.longTermCarePremiumLimits.find(entry => entry.band === band)
-    assert(
-        limit !== undefined,
+    assert( limit !== undefined,
         ['§213(d)(10) stores no long-term care premium limit for this age band', band])
-    if (limit === undefined) {
-        throw ['no long-term care limit for band', band]
-    }
     return centsFromString(limit.amount)
 }
 

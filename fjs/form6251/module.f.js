@@ -1776,10 +1776,7 @@ export const proof = {
                     ...nothing,
                     isoExerciseForms: [{ ...base, value: { ...base.value, ...overrides } }],
                 })
-                assertEq(outcome.kind, 'error', ['expected a refusal', overrides, outcome])
-                if (outcome.kind !== 'error') {
-                    throw ['expected error', outcome]
-                }
+                assert(outcome.kind === 'error', ['expected a refusal', overrides, outcome])
                 assert(outcome.message.includes('doc-partial'), ['name the document', outcome.message])
                 assert(
                     outcome.message.includes('box5NumberOfSharesTransferred'),
@@ -1827,10 +1824,7 @@ export const proof = {
                 isoExerciseForms: [isoForm('doc-iso-sold')('10.00')('25.00')('100')],
                 aStoredNineteenNineBReportsASale: true,
             })
-            assertEq(outcome.kind, 'error', ['expected a refusal', outcome])
-            if (outcome.kind !== 'error') {
-                throw ['expected error', outcome]
-            }
+            assert(outcome.kind === 'error', ['expected a refusal', outcome])
             assert(outcome.message.includes('doc-iso-sold'), ['name the form', outcome.message])
             // The three things a reader can act on, each asserted separately.
             assert(
@@ -2297,10 +2291,7 @@ export const proof = {
                 qualifiedDividendsCents: 2000000n,
                 isoExerciseForms: [isoForm('doc-iso-no-worksheet')('5.00')('105.00')('10000')],
             })
-            assertEq(outcome.kind, 'error', ['expected a refusal', outcome])
-            if (outcome.kind !== 'error') {
-                throw ['expected error', outcome]
-            }
+            assert(outcome.kind === 'error', ['expected a refusal', outcome])
             // The four things a reader can act on, each asserted separately --
             // and none of them a string the OTHER refusals on this module share,
             // so this leaf cannot pass against the wrong refusal.

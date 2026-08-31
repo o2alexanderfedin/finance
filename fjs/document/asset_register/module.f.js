@@ -316,9 +316,6 @@ const fullDateError = where => field => value => {
     const [, yearText, monthText, dayText] = m
     assert(yearText !== undefined && monthText !== undefined && dayText !== undefined,
         ['a matched full date has three groups', value])
-    if (yearText === undefined || monthText === undefined || dayText === undefined) {
-        throw ['a matched full date has three groups', value]
-    }
     const year = Number(yearText)
     const month = Number(monthText)
     const day = Number(dayText)
@@ -412,10 +409,8 @@ export const checkReferences = r => {
                 + `month, so a day here would suggest a precision the computation does not have`)
         }
         const [, yearText, monthText] = m
-        assert(yearText !== undefined && monthText !== undefined, ['a matched date has both groups', asset.datePlacedInService])
-        if (yearText === undefined || monthText === undefined) {
-            throw ['a matched date has both groups', asset.datePlacedInService]
-        }
+        assert(yearText !== undefined && monthText !== undefined,
+            ['a matched date has both groups', asset.datePlacedInService])
         const month = Number(monthText)
         if (month < 1 || month > 12) {
             return error(
@@ -674,9 +669,6 @@ export const depreciableAssets = register => register.assets.map(asset => {
     const [yearText, monthText] = asset.datePlacedInService.split('-')
     assert(yearText !== undefined && monthText !== undefined,
         ['a validated datePlacedInService is YYYY-MM', asset.datePlacedInService])
-    if (yearText === undefined || monthText === undefined) {
-        throw ['a validated datePlacedInService is YYYY-MM', asset.datePlacedInService]
-    }
     const method = macrsMethods.find(candidate => candidate === asset.method)
     assert(method !== undefined, ['a validated method is one of the three', asset.method])
     if (method === undefined) { throw ['a validated method is one of the three', asset.method] }

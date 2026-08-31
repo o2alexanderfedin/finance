@@ -1091,10 +1091,7 @@ export const proof = {
                 brokerageForms: [absentBasisDoc],
                 dividendForms: [],
             })
-            assertEq(outcome.kind, 'error', ['expected the refusal to propagate', outcome])
-            if (outcome.kind !== 'error') {
-                throw ['expected error', outcome]
-            }
+            assert(outcome.kind === 'error', ['expected the refusal to propagate', outcome])
             assert(
                 outcome.message.includes('doc-absent-basis'),
                 ['expected the propagated refusal to still name the document', outcome.message],
@@ -1416,10 +1413,7 @@ export const proof = {
                     },
                 }],
             })
-            assertEq(outcome.kind, 'error', ['expected the refusal to propagate', outcome])
-            if (outcome.kind !== 'error') {
-                throw ['expected error', outcome]
-            }
+            assert(outcome.kind === 'error', ['expected the refusal to propagate', outcome])
             assert(outcome.message.includes('doc-nowhere'), [outcome.message])
         },
     },

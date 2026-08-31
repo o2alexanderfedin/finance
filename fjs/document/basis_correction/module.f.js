@@ -263,10 +263,7 @@ const rsuSameDaySale = {
  */
 const assertRequired = field => blob => {
     const [t, v] = validate(blob)
-    assertEq(t, 'error', ['omitting this field must fail', field])
-    if (t !== 'error') {
-        throw ['expected error', field]
-    }
+    assert(t === 'error', ['omitting this field must fail', field])
     assert(typeof v !== 'string', ['expected a structural ValidationError, not a semantic string', field, v])
     assert(v.path.includes(field), ['the ValidationError must name the field', field, v])
 }

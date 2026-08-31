@@ -311,12 +311,8 @@ export const applicableFigureTenThousandths = taxParamSet => percent => {
     const tier = taxParamSet.premiumTaxCreditApplicablePercentage.tiers.find(
         candidate => percent >= candidate.floorPercent
             && (candidate.ceilingPercent === undefined || percent < candidate.ceilingPercent))
-    assert(
-        tier !== undefined,
+    assert( tier !== undefined,
         ['§36B(b)(3)(A)(iii)’s tiers cover every percentage from zero upwards', percent])
-    if (tier === undefined) {
-        throw ['no applicable-percentage tier', percent]
-    }
     const ceiling = tier.ceilingPercent
     if (ceiling === undefined || tier.initialHundredthsOfPercent === tier.finalHundredthsOfPercent) {
         return tier.initialHundredthsOfPercent

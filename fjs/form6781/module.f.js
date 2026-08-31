@@ -539,9 +539,6 @@ export const proof = {
         const [eight, nine, ten] = aggregateComponents
         assert(eight !== undefined && nine !== undefined && ten !== undefined,
             ['the component table lost a row', aggregateComponents])
-        if (eight === undefined || nine === undefined || ten === undefined) {
-            throw ['the component table lost a row', aggregateComponents]
-        }
         assertEq(eight[0], 'box8ProfitOrLossRealized')
         assertEq(eight[1], 1n, 'box 8 is realized profit this year: it goes IN')
         assertEq(nine[0], 'box9UnrealizedProfitOrLossPriorYearEnd')

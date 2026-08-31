@@ -586,12 +586,8 @@ export const form8829 = input => {
         }
     }
     const [, firstYearText, firstMonthText] = parsed
-    assert(
-        firstYearText !== undefined && firstMonthText !== undefined,
+    assert( firstYearText !== undefined && firstMonthText !== undefined,
         ['a matched YYYY-MM has both groups', first])
-    if (firstYearText === undefined || firstMonthText === undefined) {
-        throw ['a matched YYYY-MM has both groups', first]
-    }
     const firstYear = Number(firstYearText)
     if (firstYear > taxYear) {
         return {

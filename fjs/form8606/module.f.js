@@ -2000,10 +2000,8 @@ export const proof = {
             }))
             const hers = ok.partIByRecipientTin[recipient]
             const his = ok.partIByRecipientTin[spouseTin]
-            assert(hers !== undefined && his !== undefined, ['expected two Part Is', ok])
-            if (hers === undefined || his === undefined) {
-                return
-            }
+            assert(hers !== undefined && his !== undefined,
+                ['expected two Part Is', ok])
             assertEq(hers.line7, 5000000n, 'HER distributions only')
             assertEq(hers.line9, 20000000n)
             assertEq(hers.line10Thousandths, 100n, '0.100')
@@ -2728,10 +2726,8 @@ export const proof = {
             const withGift = withGifts([twentyThousandGift])
             const partIWithout = without.partIByRecipientTin[recipient]
             const partIWith = withGift.partIByRecipientTin[recipient]
-            assert(partIWithout !== undefined && partIWith !== undefined, ['expected both'])
-            if (partIWithout === undefined || partIWith === undefined) {
-                return
-            }
+            assert(partIWithout !== undefined && partIWith !== undefined,
+                ['expected both'])
             assertEq(partIWithout.line7, 5000000n, '$50,000.00')
             assertEq(partIWithout.line10Thousandths, 100n, '0.100')
             assertEq(partIWithout.line14, 1500000n, '$15,000.00')

@@ -307,12 +307,8 @@ export const dependentCareCreditPercent = taxParamSet => adjustedGrossIncomeCent
     const band = taxParamSet.dependentCareCreditPercentage.bands.find(
         candidate => candidate.adjustedGrossIncomeCeiling === undefined
             || adjustedGrossIncomeCents <= centsFromString(candidate.adjustedGrossIncomeCeiling))
-    assert(
-        band !== undefined,
+    assert( band !== undefined,
         ['Form 2441 line 8’s last printed row is open-topped', adjustedGrossIncomeCents])
-    if (band === undefined) {
-        throw ['no dependent care percentage band', adjustedGrossIncomeCents]
-    }
     return band.percent
 }
 

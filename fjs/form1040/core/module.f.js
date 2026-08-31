@@ -7657,9 +7657,6 @@ export const proof = {
             const outcome = withFeed('390000.00')
             assert(outcome.kind === 'error',
                 ['a $350,000.00 business loss is over §461(l)\'s threshold', outcome])
-            if (outcome.kind !== 'error') {
-                return
-            }
             assert(outcome.message.includes('Form 461 line 16 is -37000.00'),
                 ['line 16, with the wages EXCLUDED from line 14', outcome.message])
             assert(outcome.message.includes('-350000.00'),
@@ -11011,10 +11008,7 @@ export const proof = {
             const outcome = form1040IncomeLines(taxParams2025)(
                 inputsOf(storedProfile({ ...singleProfile, iraDeductionDeclared: true }))(
                     [])([])([])([])([])([])([])([])([]))
-            assertEq(outcome.kind, 'error', ['expected the IRA-deduction refusal', outcome])
-            if (outcome.kind !== 'error') {
-                throw ['expected error', outcome]
-            }
+            assert(outcome.kind === 'error', ['expected the IRA-deduction refusal', outcome])
             assert(
                 outcome.message.includes('Pub. 590-A Worksheet 1-1'),
                 ['expected the refusal to name Pub. 590-A Worksheet 1-1', outcome.message],
@@ -12299,12 +12293,8 @@ export const proof = {
                 inputsOf(storedProfile(declaringCapitalGainsOrLossesProfile))([
                     w2Document('sha256-w2-1256-both')('30000.00'),
                 ])([])([])([stockOnly])([])([])([])([])([]))
-            assert(
-                stockOnlyOutcome.kind === 'ok',
+            assert( stockOnlyOutcome.kind === 'ok',
                 ['the stock-only control must compute', stockOnlyOutcome])
-            if (stockOnlyOutcome.kind !== 'ok') {
-                throw ['expected ok', stockOnlyOutcome]
-            }
             assertEq(
                 lineRuled(stockOnlyOutcome.lines)('1040 line 7a').value, 500000n,
                 '$5,000.00 — the stock sale ALONE, unchanged by this work')
@@ -12402,12 +12392,8 @@ export const proof = {
                         ...singleProfile,
                         declaredKinds: /** @type {readonly Kind[]} */ (['wages', kind]),
                     }))([w2Document('sha256-w2-1256-kind')('30000.00')])([])([])([])([])([])([])([])([]))
-                assert(
-                    outcome.kind === 'error',
+                assert( outcome.kind === 'error',
                     ['a declared unmodeled kind must refuse', kind, outcome])
-                if (outcome.kind !== 'error') {
-                    throw ['expected error', kind]
-                }
                 assert(
                     outcome.unmodeled.some(named => named === kind),
                     [kind, outcome.unmodeled])
@@ -13681,12 +13667,8 @@ export const proof = {
             const sources = lineRuled(outcome.lines)('1040 line 31').sources
             const slcsp = sources.find(
                 source => source.boxPath === 'monthlyCoverage[month=7].columnBSlcspPremium')
-            assert(
-                slcsp !== undefined,
+            assert( slcsp !== undefined,
                 ['line 31 must cite the July SLCSP premium the credit was computed from', sources])
-            if (slcsp === undefined) {
-                throw ['unreachable', outcome]
-            }
             assertEq(slcsp.documentHash, 'sha256-1095a-e2e')
             assertEq(slcsp.value, '850.00', 'the raw stored string, never re-formatted')
             assert(
@@ -13736,12 +13718,8 @@ export const proof = {
                         : row),
                 },
             }]))
-            assert(
-                outcome.kind === 'error',
+            assert( outcome.kind === 'error',
                 ['a month with enrollment premiums and no SLCSP premium must refuse the RETURN', outcome])
-            if (outcome.kind !== 'error') {
-                throw ['expected error', outcome]
-            }
             assert(
                 outcome.message.includes('month 5'),
                 ['the refusal must reach the caller verbatim, naming the month', outcome.message])
@@ -14075,10 +14053,7 @@ export const proof = {
                     },
                 }],
             })
-            assertEq(outcome.kind, 'error')
-            if (outcome.kind !== 'error') {
-                throw ['expected a refusal', outcome]
-            }
+            assert(outcome.kind === 'error', ['expected a refusal', outcome])
             assert(outcome.message.includes('alimonyPaid'),
                 ['the refusal must name the tag it could not compute', outcome.message])
             // A document-data-sufficiency refusal, never a scope one: it
@@ -14540,10 +14515,7 @@ export const proof = {
         // named special case, through the full entry point.
         aContributionBesideAnIraDistributionStopsTheWholeReturn: () => {
             const outcome = form1040Report(taxParams2025)(iraContributionAndDistributionInputs)
-            assertEq(outcome.kind, 'error')
-            if (outcome.kind !== 'error') {
-                throw ['expected a refusal', outcome]
-            }
+            assert(outcome.kind === 'error', ['expected a refusal', outcome])
             assert(outcome.message.includes('590-B'),
                 ['the refusal must name the worksheet it would need', outcome.message])
             assertEq(outcome.unmodeled.length, 0, 'a document-data-sufficiency refusal, not a scope one')
@@ -14614,10 +14586,7 @@ export const proof = {
                     iraAdjustmentsDocument('sha256-p33-ira')('traditionalIraContribution')('7000.00'),
                 ],
             })
-            assertEq(outcome.kind, 'error')
-            if (outcome.kind !== 'error') {
-                throw ['expected a refusal', outcome]
-            }
+            assert(outcome.kind === 'error', ['expected a refusal', outcome])
             assert(outcome.message.includes('$4900.00'),
                 ['the refusal must name the under-50 figure, $4,900.00', outcome.message])
             assert(outcome.message.includes('$5600.00'),
@@ -14647,20 +14616,14 @@ export const proof = {
                     declaredKinds: ['wages', 'iraDeduction'],
                 }),
             })
-            assertEq(outcome.kind, 'ok', 'the kind is in `modeledKinds` now')
-            if (outcome.kind !== 'ok') {
-                throw ['expected a computed return', outcome]
-            }
+            assert(outcome.kind === 'ok', 'the kind is in `modeledKinds` now')
             // ...and declaring it changed nothing about the number, which is
             // what `declaredKinds` gating refusals rather than computation
             // means. Compared against the SAME return without the
             // declaration, not against a hand-typed figure, because the
             // property under test is the equality itself.
             const undeclared = form1040Report(taxParams2025)(iraPhaseOutInputs)
-            assertEq(undeclared.kind, 'ok', 'the control must compute too')
-            if (undeclared.kind !== 'ok') {
-                throw ['expected a computed control', undeclared]
-            }
+            assert(undeclared.kind === 'ok', 'the control must compute too')
             assertEq(
                 JSON.stringify(outcome.lines.map(line => line.value.toString())),
                 JSON.stringify(undeclared.lines.map(line => line.value.toString())),
@@ -14814,10 +14777,8 @@ export const proof = {
                 [iraDistribution])([ssaForm])([])([])([])
             const without = form1040Report(taxParams2025)(base)
             const with_ = form1040Report(taxParams2025)({ ...base, iraForms: [record] })
-            assert(without.kind === 'ok' && with_.kind === 'ok', ['expected both to compute'])
-            if (without.kind !== 'ok' || with_.kind !== 'ok') {
-                return
-            }
+            assert(without.kind === 'ok' && with_.kind === 'ok',
+                ['expected both to compute'])
             assertEq(lineRuled(without.lines)('1040 line 4b').value, 4000000n, '$40,000.00')
             assertEq(lineRuled(without.lines)('1040 line 6b').value, 2235000n, '$22,350.00')
             assertEq(lineRuled(with_.lines)('1040 line 4b').value, 2000000n, '$20,000.00')
@@ -14943,10 +14904,7 @@ export const proof = {
                     [iraDistribution])([])([])([])([]),
                 iraForms: [record],
             })
-            assertEq(outcome.kind, 'error')
-            if (outcome.kind !== 'error') {
-                throw ['expected a refusal', outcome]
-            }
+            assert(outcome.kind === 'error', ['expected a refusal', outcome])
             assert(outcome.message.includes('line-12d'), ['name the contradiction', outcome.message])
             assertEq(outcome.unmodeled.length, 0, 'a data-sufficiency refusal names no scope kind')
             assertEq(Object.hasOwn(outcome, 'lines'), false, 'no partial return is constructible')
@@ -15140,10 +15098,7 @@ export const proof = {
             const profile = { ...singleProfile, declaredKinds: ['iraDistributions'] }
             const outcome = form1040Report(taxParams2025)(
                 inputsOf(storedProfile(profile))([])([])([])([])([rothForm])([])([])([])([]))
-            assertEq(outcome.kind, 'error', 'it must no longer compute silently')
-            if (outcome.kind !== 'error') {
-                return
-            }
+            assert(outcome.kind === 'error', 'it must no longer compute silently')
             assert(outcome.message.includes('code J'), ['name the code', outcome.message])
             assert(outcome.message.includes('Part III'), ['name the part', outcome.message])
             // A document-data-sufficiency refusal, never a scope one.
@@ -16076,12 +16031,8 @@ export const proof = {
             })
             // THE CRITERION, first: this return COMPUTES. Before TAX-33 the
             // identical inputs produced a refusal naming Part III.
-            assert(
-                outcome.kind === 'ok',
+            assert( outcome.kind === 'ok',
                 ['an ISO spread beside qualified dividends must COMPUTE', outcome])
-            if (outcome.kind !== 'ok') {
-                return
-            }
             const at = lineRuled(outcome.lines)
             assertEq(at('1040 line 1a').value, 25000000n, '$250,000.00 of wages')
             assertEq(at('1040 line 3a').value, 2000000n, '$20,000.00 of qualified dividends')
@@ -16289,12 +16240,8 @@ export const proof = {
                 inputsOf(storedProfile(profile))([
                     w2Document('sha256-33-sdtw-w2')('215750.00'),
                 ])([interestForm])([dividendForm])([brokerageForm])([])([])([])([])([]))
-            assert(
-                outcome.kind === 'ok',
+            assert( outcome.kind === 'ok',
                 ['the Schedule D arm of Part III must compute end to end', outcome])
-            if (outcome.kind !== 'ok') {
-                return
-            }
             const at = lineRuled(outcome.lines)
             assertEq(
                 outcome.line16Method, 'scheduleDTaxWorksheet',
