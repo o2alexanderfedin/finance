@@ -66,7 +66,7 @@
  *
  * @module
  */
-import { array, number, option, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
+import { array, number, open, option, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
 import { validate as rttiValidate } from 'functionalscript/fjs/types/rtti/validate/module.f.mjs'
 import { error, ok } from 'functionalscript/fjs/types/result/module.f.mjs'
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
@@ -114,7 +114,7 @@ export const propertyTypeValues = /** @type {const} */ ([
  * One expense the taxpayer asserts they paid or incurred for this property.
  * `vnd.fjs.business_expenses`' entry shape, field for field.
  */
-const expenseEntry = /** @type {const} */ ({
+const expenseEntry = open({
     category: string,
     datePaid: string,
     description: string,
@@ -131,7 +131,7 @@ const expenseEntry = /** @type {const} */ ({
  * and a materialized `0` there would assert "rented at fair rental value for
  * no days", which is a different claim about a different kind of property.
  */
-export const rentalPropertySchema = /** @type {const} */ ({
+export const rentalPropertySchema = open({
     ...base(dialect),
     recipientTin: string,
     accountNumber: string,

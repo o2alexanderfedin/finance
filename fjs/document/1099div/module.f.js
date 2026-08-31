@@ -75,7 +75,7 @@
  *
  * @module
  */
-import { array, number, option, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
+import { array, number, open, option, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
 import { validate as rttiValidate } from 'functionalscript/fjs/types/rtti/validate/module.f.mjs'
 import { error, ok } from 'functionalscript/fjs/types/result/module.f.mjs'
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
@@ -106,7 +106,7 @@ export const mediaType = mediaTypeOf(dialect)
  * omission. Every field but `state` is absent-able, because the printed
  * form routinely leaves the rest blank (DOC-11).
  */
-const stateEntry = /** @type {const} */ ({
+const stateEntry = open({
     state: string,
     stateIdNumber: option(string),
     stateTaxWithheld: option(string),
@@ -117,7 +117,7 @@ const stateEntry = /** @type {const} */ ({
  * so structural validation reports it as the first failing field on a
  * mismatched blob (DOC-00's discriminant).
  */
-export const oneZeroNineNineDivSchema = /** @type {const} */ ({
+export const oneZeroNineNineDivSchema = open({
     ...base(dialect),
     payerTin: string,
     recipientTin: string,

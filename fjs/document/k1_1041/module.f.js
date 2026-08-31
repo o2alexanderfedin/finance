@@ -101,7 +101,7 @@
  *
  * @module
  */
-import { array, number, option, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
+import { array, number, open, option, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
 import { validate as rttiValidate } from 'functionalscript/fjs/types/rtti/validate/module.f.mjs'
 import { error, ok } from 'functionalscript/fjs/types/result/module.f.mjs'
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
@@ -110,6 +110,7 @@ import { base, mediaTypeOf } from '../base/module.f.js'
 import { formRevisionError } from '../form_revision/module.f.js'
 import { moneyFieldError } from '../money_field/module.f.js'
 import { codedEntry, codedBoxError, materialParticipationValues, materialParticipationError } from '../k1_common/module.f.js'
+import { declaredMembers } from '../../document/base/module.f.js'
 
 /** @import { Result } from 'functionalscript/fjs/types/result/types.js' */
 /** @import { Ts, Unknown } from 'functionalscript/fjs/types/rtti/ts/types.js' */
@@ -155,7 +156,7 @@ export const mediaType = mediaTypeOf(dialect)
  * `vnd.fjs.k1_1120s` both carry an `accountNumber` because their own faces
  * do.
  */
-export const k1EstateTrustSchema = /** @type {const} */ ({
+export const k1EstateTrustSchema = open({
     ...base(dialect),
     estateOrTrustEIN: string,
     beneficiaryIdentifyingNumber: string,
@@ -688,7 +689,7 @@ export const proof = {
             assertEq(inCoded, kind === 'coded', ['box is on the wrong list', field])
             // The schema must actually carry it, so a box named here and absent
             // from `k1EstateTrustSchema` cannot pass.
-            assert(field in k1EstateTrustSchema, ['the schema is missing a printed box', field])
+            assert(field in declaredMembers(k1EstateTrustSchema), ['the schema is missing a printed box', field])
         }
         // ...and in the other direction: nothing in the code is missing from
         // the hand-typed table.
@@ -733,16 +734,16 @@ export const proof = {
     theCollidingBoxNumbersMeanDifferentThings: () => {
         assertEq(collidingBoxNumbers.length, expectedCollidingBoxCount)
         for (const [box, own, partnership] of collidingBoxNumbers) {
-            assert(own in k1EstateTrustSchema, ['this face must carry its own field', box, own])
+            assert(own in declaredMembers(k1EstateTrustSchema), ['this face must carry its own field', box, own])
             assert(
-                !(partnership in k1EstateTrustSchema),
+                !(partnership in declaredMembers(k1EstateTrustSchema)),
                 ['this face must NOT carry the 1065 meaning of the same box number', box, partnership])
         }
         // Box 1 is the costliest collision and is asserted on its own: the
         // 1065's box 1 is the ordinary business income Schedule E Part II
         // computes from, while THIS box 1 is interest income for 1040 line 2b.
-        assert('box1InterestIncome' in k1EstateTrustSchema)
-        assert(!('box1OrdinaryBusinessIncome' in k1EstateTrustSchema))
+        assert('box1InterestIncome' in declaredMembers(k1EstateTrustSchema))
+        assert(!('box1OrdinaryBusinessIncome' in declaredMembers(k1EstateTrustSchema)))
     },
 
     minimalValidates: () => {

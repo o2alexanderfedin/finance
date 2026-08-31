@@ -111,13 +111,14 @@
  *
  * @module
  */
-import { number, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
+import { number, open, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
 import { validate as rttiValidate } from 'functionalscript/fjs/types/rtti/validate/module.f.mjs'
 import { error, ok } from 'functionalscript/fjs/types/result/module.f.mjs'
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { base, mediaTypeOf } from '../base/module.f.js'
 import { moneyFieldError } from '../money_field/module.f.js'
 import { centsFromString } from '../../exact/module.f.js'
+import { declaredMembers } from '../../document/base/module.f.js'
 
 /** @import { Result } from 'functionalscript/fjs/types/result/types.js' */
 /** @import { Ts, Unknown } from 'functionalscript/fjs/types/rtti/ts/types.js' */
@@ -147,7 +148,7 @@ export const mediaType = mediaTypeOf(dialect)
  * the run's year by the same mixed-year guard every other dialect passes
  * through in `fjs/report/tax_return`.
  */
-export const basisCorrectionSchema = /** @type {const} */ ({
+export const basisCorrectionSchema = open({
     ...base(dialect),
     recipientTin: string,
     taxYear: number,
@@ -377,7 +378,7 @@ export const proof = {
         // otherwise be uncovered, and a field quietly made `option` would take
         // its own leaf with it.
         thereAreExactlyFiveOfThem: () => {
-            assertEq(Object.keys(basisCorrectionSchema).length, 6, 'five required fields plus `dialect`')
+            assertEq(Object.keys(declaredMembers(basisCorrectionSchema)).length, 6, 'five required fields plus `dialect`')
         },
     },
 

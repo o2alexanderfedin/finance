@@ -106,7 +106,7 @@
  *
  * @module
  */
-import { array, number, option, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
+import { array, number, open, option, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
 import { validate as rttiValidate } from 'functionalscript/fjs/types/rtti/validate/module.f.mjs'
 import { error, ok } from 'functionalscript/fjs/types/result/module.f.mjs'
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
@@ -153,7 +153,7 @@ export const hsaCoverageTypes = /** @type {const} */ (['selfOnly', 'family'])
  * payment was, so a refusal or a citation can name something a reader
  * recognizes on their own records.
  */
-const adjustmentEntry = /** @type {const} */ ({
+const adjustmentEntry = open({
     lineTag: string,
     datePaid: string,
     description: string,
@@ -172,7 +172,7 @@ const adjustmentEntry = /** @type {const} */ ({
  * are the two whose ABSENCE and PRESENCE respectively make the deduction
  * uncomputable rather than zero — see this module's docstring.
  */
-const hsaCoverageEntry = /** @type {const} */ ({
+const hsaCoverageEntry = open({
     individual: string,
     coverageType: string,
     hadHighDeductibleCoverageAllYear: option(true),
@@ -186,7 +186,7 @@ const hsaCoverageEntry = /** @type {const} */ ({
  * mismatched blob (DOC-00's discriminant). NO `formRevision` — DOC-10 does
  * not apply; there is no printed form.
  */
-export const adjustmentsSchema = /** @type {const} */ ({
+export const adjustmentsSchema = open({
     ...base(dialect),
     recipientTin: string,
     taxYear: number,

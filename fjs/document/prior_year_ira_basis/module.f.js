@@ -83,7 +83,7 @@
  *
  * @module
  */
-import { number, option, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
+import { number, open, option, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
 import { validate as rttiValidate } from 'functionalscript/fjs/types/rtti/validate/module.f.mjs'
 import { error, ok } from 'functionalscript/fjs/types/result/module.f.mjs'
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
@@ -110,7 +110,7 @@ export const mediaType = mediaTypeOf(dialect)
  * on a mismatched blob (DOC-00's discriminant). The one money field is
  * REQUIRED `string`, never `option` — see this module's own docstring.
  */
-export const priorYearIraBasisSchema = /** @type {const} */ ({
+export const priorYearIraBasisSchema = open({
     ...base(dialect),
     recipientTin: string,
     taxYear: number,

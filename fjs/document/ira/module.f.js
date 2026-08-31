@@ -165,13 +165,14 @@
  *
  * @module
  */
-import { array, number, option, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
+import { array, number, open, option, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
 import { validate as rttiValidate } from 'functionalscript/fjs/types/rtti/validate/module.f.mjs'
 import { error, ok } from 'functionalscript/fjs/types/result/module.f.mjs'
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { base, mediaTypeOf } from '../base/module.f.js'
 import { moneyFieldError } from '../money_field/module.f.js'
 import { centsFromString } from '../../exact/module.f.js'
+import { declaredMembers } from '../../document/base/module.f.js'
 
 /** @import { Result } from 'functionalscript/fjs/types/result/types.js' */
 /** @import { Ts, Unknown } from 'functionalscript/fjs/types/rtti/ts/types.js' */
@@ -191,7 +192,7 @@ export const mediaType = mediaTypeOf(dialect)
  * module's own docstring, "Each QCD names the distribution it came out of",
  * for why `payerTin`/`accountNumber` are here rather than a bare total.
  */
-const qualifiedCharitableDistributionEntry = /** @type {const} */ ({
+const qualifiedCharitableDistributionEntry = open({
     payerTin: string,
     accountNumber: string,
     charity: string,
@@ -210,7 +211,7 @@ const qualifiedCharitableDistributionEntry = /** @type {const} */ ({
  * carrying both are all real states, and so — pointlessly but legitimately —
  * is a record carrying neither.
  */
-export const iraSchema = /** @type {const} */ ({
+export const iraSchema = open({
     ...base(dialect),
     recipientTin: string,
     taxYear: number,
@@ -690,7 +691,7 @@ export const proof = {
     noBirthDateAndNoSecondAgeCheckboxOnThisDialect: () => {
         const [t, v] = validate(minimal)
         assert(t === 'ok', ['expected ok', t, v])
-        const keys = Object.keys(iraSchema)
+        const keys = Object.keys(declaredMembers(iraSchema))
         assertEq(keys.some(key => key.toLowerCase().includes('birth')), false)
         assertEq(keys.includes('taxpayerBornBeforeJan2_1961'), false)
         assertEq(keys.includes('dateOfBirth'), false)

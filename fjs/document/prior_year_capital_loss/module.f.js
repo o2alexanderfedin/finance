@@ -82,7 +82,7 @@
  *
  * @module
  */
-import { number, option, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
+import { number, open, option, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
 import { validate as rttiValidate } from 'functionalscript/fjs/types/rtti/validate/module.f.mjs'
 import { error, ok } from 'functionalscript/fjs/types/result/module.f.mjs'
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
@@ -111,7 +111,7 @@ export const mediaType = mediaTypeOf(dialect)
  * case is handled by the caller never constructing this document at all,
  * never by a field inside it being optional.
  */
-export const priorYearCapitalLossSchema = /** @type {const} */ ({
+export const priorYearCapitalLossSchema = open({
     ...base(dialect),
     recipientTin: string,
     taxYear: number,

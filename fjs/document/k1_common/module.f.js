@@ -25,7 +25,7 @@
  * @module
  */
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
-import { option, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
+import { open, option, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
 import { moneyFieldError } from '../money_field/module.f.js'
 
 /**
@@ -41,7 +41,7 @@ import { moneyFieldError } from '../money_field/module.f.js'
  * one names no item at all, and no consumer could route it or refuse it by
  * name.
  */
-export const codedEntry = /** @type {const} */ ({
+export const codedEntry = open({
     code: string,
     amount: option(string),
 })

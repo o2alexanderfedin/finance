@@ -57,7 +57,7 @@
  *
  * ## An absent amount REFUSES
  *
- * `codedEntry.amount` is optional because a coded row routinely prints `STMT`
+ * `codedEntry`'s `amount` member is optional because a coded row routinely prints `STMT`
  * when the figure lives on an attached statement. A code A row with no amount
  * is therefore not an adjustment of zero — it is an adjustment this engine has
  * not been given. Skipping it would silently drop a preference item the

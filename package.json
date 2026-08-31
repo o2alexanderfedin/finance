@@ -22,7 +22,7 @@
     "test:ui": "npm --prefix ui-tests test"
   },
   "dependencies": {
-    "functionalscript": "^0.46.1"
+    "functionalscript": "^0.47.0"
   },
   "devDependencies": {
     "typescript": "^7.0.2"

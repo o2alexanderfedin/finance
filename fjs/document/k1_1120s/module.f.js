@@ -80,7 +80,7 @@
  *
  * @module
  */
-import { array, number, option, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
+import { array, number, open, option, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
 import { validate as rttiValidate } from 'functionalscript/fjs/types/rtti/validate/module.f.mjs'
 import { error, ok } from 'functionalscript/fjs/types/result/module.f.mjs'
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
@@ -89,6 +89,7 @@ import { base, mediaTypeOf } from '../base/module.f.js'
 import { formRevisionError } from '../form_revision/module.f.js'
 import { moneyFieldError } from '../money_field/module.f.js'
 import { codedEntry, codedBoxError, materialParticipationValues, materialParticipationError } from '../k1_common/module.f.js'
+import { declaredMembers } from '../../document/base/module.f.js'
 
 /** @import { Result } from 'functionalscript/fjs/types/result/types.js' */
 /** @import { Ts, Unknown } from 'functionalscript/fjs/types/rtti/ts/types.js' */
@@ -133,7 +134,7 @@ export const mediaType = mediaTypeOf(dialect)
  * identifier the shareholder's statement uses, and it keeps a role name
  * because no printed caption exists to take.
  */
-export const k1SCorporationSchema = /** @type {const} */ ({
+export const k1SCorporationSchema = open({
     ...base(dialect),
     corporationEIN: string,
     shareholderIdentifyingNumber: string,
@@ -581,7 +582,7 @@ export const proof = {
                 ['every printed Part III box must be declared exactly once', field])
             assertEq(inMoney, kind === 'money', ['box is on the wrong list', field])
             assertEq(inCoded, kind === 'coded', ['box is on the wrong list', field])
-            assert(field in k1SCorporationSchema, ['the schema is missing a printed box', field])
+            assert(field in declaredMembers(k1SCorporationSchema), ['the schema is missing a printed box', field])
         }
         for (const field of [...money, ...coded]) {
             assert(
@@ -647,7 +648,7 @@ export const proof = {
         // collision that would cost the most.
         assert(!coded.includes('box14SelfEmploymentEarnings'), 'box 14 is not a coded box on the 1120-S face')
         assert(
-            k1SCorporationSchema.box14ScheduleK3Attached !== undefined,
+            declaredMembers(k1SCorporationSchema).box14ScheduleK3Attached !== undefined,
             'box 14 is the Schedule K-3 checkbox on the 1120-S face')
     },
 
@@ -666,9 +667,9 @@ export const proof = {
      * from the schema, which is where it is real, not from the stored blob.
      */
     thereIsNoPartnerTypeAndNoSelfEmploymentBox: () => {
-        assert(!('boxGGeneralPartnerOrLlcMemberManager' in k1SCorporationSchema), 'no box G here')
-        assert(!('boxGLimitedPartnerOrOtherLlcMember' in k1SCorporationSchema), 'no box G here')
-        assert(!('box14SelfEmploymentEarnings' in k1SCorporationSchema), 'no self-employment box here')
+        assert(!('boxGGeneralPartnerOrLlcMemberManager' in declaredMembers(k1SCorporationSchema)), 'no box G here')
+        assert(!('boxGLimitedPartnerOrOtherLlcMember' in declaredMembers(k1SCorporationSchema)), 'no box G here')
+        assert(!('box14SelfEmploymentEarnings' in declaredMembers(k1SCorporationSchema)), 'no self-employment box here')
         // ...and nothing here reads one even if a blob supplies it: the
         // engine's only self-employment reader for a K-1 is
         // `fjs/schedule/e`'s partnership arm, which this dialect never

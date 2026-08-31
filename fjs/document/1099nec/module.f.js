@@ -76,7 +76,7 @@
  *
  * @module
  */
-import { array, number, option, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
+import { array, number, open, option, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
 import { validate as rttiValidate } from 'functionalscript/fjs/types/rtti/validate/module.f.mjs'
 import { error, ok } from 'functionalscript/fjs/types/result/module.f.mjs'
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
@@ -110,7 +110,7 @@ export const mediaType = mediaTypeOf(dialect)
  * one shape: keeping the numbers in the names is what stops a transcriber
  * carrying a W-2 habit into this form.
  */
-const stateEntry = /** @type {const} */ ({
+const stateEntry = open({
     state: string,
     box5StateTaxWithheld: option(string),
     box6StatePayerStateNumber: option(string),
@@ -122,7 +122,7 @@ const stateEntry = /** @type {const} */ ({
  * structural validation reports it as the first failing field on a mismatched
  * blob, matching every other document dialect in this tree.
  */
-export const oneZeroNineNineNecSchema = /** @type {const} */ ({
+export const oneZeroNineNineNecSchema = open({
     ...base(dialect),
     payerTin: string,
     recipientTin: string,
