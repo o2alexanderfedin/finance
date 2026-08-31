@@ -1842,7 +1842,7 @@ ruling for why a phase without an ID is preferable to an ID invented to give it 
       `^0.46.1` does not admit 0.47.0 — a caret on a `0.x` version pins the minor — so this
       is an explicit bump, not a refresh.
 
-- [ ] **MAINT-10** *(T3)*: **Retire the MCP protocol-version negotiation gap.**
+- [x] **MAINT-10** *(T3)*: **Retire the MCP protocol-version negotiation gap.**
       `fjs/server/module.f.js` documents its pinned version under the heading "The
       protocol-version pin is a known upstream gap, not a design choice". **0.47.0 closes
       that gap**: `initialize` echoes the client's requested revision when the server
@@ -2224,7 +2224,7 @@ two breaking changes below are mechanical and their cost only grows as this repo
 does, and MAINT-11's capability adoption would otherwise be written against a release that
 was already superseded before the phase started.
 
-- [ ] **MAINT-14** *(T3)*: **Take `functionalscript` 0.48.0.** 235 changed files upstream,
+- [x] **MAINT-14** *(T3)*: **Take `functionalscript` 0.48.0.** 235 changed files upstream,
       15 added, 7 removed. Of the 50 upstream modules this repository imports, 28 changed
       and 5 moved. Exactly two changes reach this code, and both are wide but mechanical:
 
@@ -2280,8 +2280,8 @@ written against: 0.47.0 is superseded, so each phase reads 0.48.0's behaviour be
 
 | REQ-ID | Tier | Phase | Milestone | Status |
 |--------|------|-------|-----------|--------|
-| MAINT-14 | T3 | 42. Take FunctionalScript 0.48.0 | v6 | Pending |
-| MAINT-10 | T3 | 39. Retire the Protocol-Version Gap | v6 | Pending |
+| MAINT-14 | T3 | 42. Take FunctionalScript 0.48.0 | v6 | Complete |
+| MAINT-10 | T3 | 39. Retire the Protocol-Version Gap | v6 | Complete |
 | DOC-25 | T3 | 40. Validation on the Write Path | v6 | Pending |
 | MAINT-11 | T3 | 41. New Capabilities and the Migration Report | v6 | Pending |
 | MAINT-12 | T3 | 41. New Capabilities and the Migration Report | v6 | Pending |

@@ -671,8 +671,9 @@ None yet.
 - **RESOLVED (Phase 2): the protocol-version pin works.** A real `claude -p` client issued an
   actual `tools/call` (`mcp__finance-mcp__evo_list` -> non-error `tool_result`) against the
   registered server, so the documented silent-failure mode did not occur and `2026-07-28` stays a
-  recorded fallback rather than a needed change. The underlying gap remains real and is filed in
-  `fjs/todo/upstream-mcp-protocol-version-negotiation.md`.
+  recorded fallback rather than a needed change. **Superseded (Phase 39, 2026-08-31):** the gap
+  closed upstream in fjs 0.47.0 — `_negotiateVersion` echoes a supported revision and
+  counter-proposes the latest otherwise — and the note it was filed in was deleted in `7244f81`.
 
 - **NEW: `node --test <source-file>` reports a FAKE PASS.** Emergent Testing only registers when
   root `all.test.js` is imported. Verified by injecting a proof leaf that throws: `npm test` gave
