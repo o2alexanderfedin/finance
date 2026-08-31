@@ -491,7 +491,7 @@ export const proof = {
         const wireB = { interest: { value: '1500.00', sources: [{ documentHash: 'sha256-doc-after', boxPath: 'box1InterestIncome', value: '1500.00' }], rule: '1040 line 2b' } }
         const [, result] = virtual(emptyState)(runOkDiffFixture(cas)('sha256-program1')([])(wireA)('sha256-program1')([])(wireB)(false))
         assertEq(result[0], 'ok')
-        if (result[0] !== 'ok') { throw ['expected ok', result] }
+        assert(result[0] === 'ok', ['expected ok', result])
         const diff = result[1]
         const interest = assertNotNullish(diff['interest'], 'expected an interest line in the diff')
         assertEq(interest.columnA, '1000.00')
@@ -511,7 +511,7 @@ export const proof = {
             const wire = { interest: { value: '10.00', sources: [{ documentHash: 'sha256-doc', boxPath: 'box1InterestIncome', value: '10.00' }], rule: '1040 line 2b' } }
             const [, result] = virtual(emptyState)(runOkDiffFixture(cas)('sha256-programA')([])(wire)('sha256-programB')([])(wire)(false))
             assertEq(result[0], 'error')
-            if (result[0] !== 'error') { throw ['expected error', result] }
+            assert(result[0] === 'error', ['expected error', result])
             assert(result[1].includes('sha256-programA'), result[1])
             assert(result[1].includes('sha256-programB'), result[1])
         },
@@ -533,7 +533,7 @@ export const proof = {
             const wire = { interest: { value: '10.00', sources: [{ documentHash: 'sha256-doc', boxPath: 'box1InterestIncome', value: '10.00' }], rule: '1040 line 2b' } }
             const [, result] = virtual(emptyState)(runOkDiffFixture(cas)('sha256-programA')(['2024'])(wire)('sha256-programA')(['2025'])(wire)(false))
             assertEq(result[0], 'error')
-            if (result[0] !== 'error') { throw ['expected error', result] }
+            assert(result[0] === 'error', ['expected error', result])
             assert(result[1].includes('2024'), result[1])
             assert(result[1].includes('2025'), result[1])
         },
@@ -553,7 +553,7 @@ export const proof = {
             const wire = { interest: { value: '10.00', sources: [{ documentHash: 'sha256-doc', boxPath: 'box1InterestIncome', value: '10.00' }], rule: '1040 line 2b' } }
             const [, result] = virtual(emptyState)(statusErrorDiffFixture(cas)('a')('sha256-programA')([])(wire)('refused: no such subject'))
             assertEq(result[0], 'error')
-            if (result[0] !== 'error') { throw ['expected error', result] }
+            assert(result[0] === 'error', ['expected error', result])
             assert(result[1].includes('refused: no such subject'), result[1])
         },
         // Run B failed -> refused, naming side B and its error message.
@@ -563,7 +563,7 @@ export const proof = {
             const wire = { interest: { value: '10.00', sources: [{ documentHash: 'sha256-doc', boxPath: 'box1InterestIncome', value: '10.00' }], rule: '1040 line 2b' } }
             const [, result] = virtual(emptyState)(statusErrorDiffFixture(cas)('b')('sha256-programA')([])(wire)('refused: no such subject'))
             assertEq(result[0], 'error')
-            if (result[0] !== 'error') { throw ['expected error', result] }
+            assert(result[0] === 'error', ['expected error', result])
             assert(result[1].includes('refused: no such subject'), result[1])
         },
     },
@@ -584,7 +584,7 @@ export const proof = {
             const wireB = { interest: { value: '10.00', sources: [{ documentHash: 'sha256-doc', boxPath: 'box1InterestIncome', value: '10.00' }], rule: '1040 line 2b' } }
             const [, result] = virtual(emptyState)(runOkDiffFixture(cas)('sha256-programA')([])(wireA)('sha256-programA')([])(wireB)(false))
             assertEq(result[0], 'error')
-            if (result[0] !== 'error') { throw ['expected error, not a thrown value', result] }
+            assert(result[0] === 'error', ['expected error, not a thrown value', result])
             assert(result[1].includes('interest'), result[1])
             assert(result[1].includes('no sources'), result[1])
         },
@@ -597,7 +597,7 @@ export const proof = {
             const wireB = { interest: { value: '10.00', sources: [{ documentHash: 'sha256-doc', boxPath: 'box1InterestIncome', value: '10.00' }], rule: '1040 line 2b' } }
             const [, result] = virtual(emptyState)(runOkDiffFixture(cas)('sha256-programA')([])(wireA)('sha256-programA')([])(wireB)(false))
             assertEq(result[0], 'error')
-            if (result[0] !== 'error') { throw ['expected error, not a thrown value', result] }
+            assert(result[0] === 'error', ['expected error, not a thrown value', result])
             assert(result[1].includes('interest'), result[1])
             assert(result[1].includes('not-a-number'), result[1])
         },
@@ -615,7 +615,7 @@ export const proof = {
             const wire = { interest: { value: '1.39', sources: [{ documentHash: 'sha256-doc', boxPath: 'box1InterestIncome', value: '1.39' }], rule: '1040 line 2b' } }
             const [, result] = virtual(emptyState)(runOkDiffFixture(cas)('sha256-programA')([])(wire)('sha256-programA')([])(wire)(true))
             assertEq(result[0], 'ok')
-            if (result[0] !== 'ok') { throw ['expected ok', result] }
+            assert(result[0] === 'ok', ['expected ok', result])
             const interest = assertNotNullish(result[1]['interest'], 'expected an interest line')
             assertEq(interest.columnA, '1.00')
             assertEq(interest.columnC, '1.00')
@@ -629,7 +629,7 @@ export const proof = {
             const wire = { interest: { value: '2.50', sources: [{ documentHash: 'sha256-doc', boxPath: 'box1InterestIncome', value: '2.50' }], rule: '1040 line 2b' } }
             const [, result] = virtual(emptyState)(runOkDiffFixture(cas)('sha256-programA')([])(wire)('sha256-programA')([])(wire)(true))
             assertEq(result[0], 'ok')
-            if (result[0] !== 'ok') { throw ['expected ok', result] }
+            assert(result[0] === 'ok', ['expected ok', result])
             const interest = assertNotNullish(result[1]['interest'], 'expected an interest line')
             assertEq(interest.columnA, '3.00')
             assertEq(interest.columnC, '3.00')
@@ -642,7 +642,7 @@ export const proof = {
             const wire = { interest: { value: '1.39', sources: [{ documentHash: 'sha256-doc', boxPath: 'box1InterestIncome', value: '1.39' }], rule: '1040 line 2b' } }
             const [, result] = virtual(emptyState)(runOkDiffFixture(cas)('sha256-programA')([])(wire)('sha256-programA')([])(wire)(false))
             assertEq(result[0], 'ok')
-            if (result[0] !== 'ok') { throw ['expected ok', result] }
+            assert(result[0] === 'ok', ['expected ok', result])
             const interest = assertNotNullish(result[1]['interest'], 'expected an interest line')
             assertEq(interest.columnA, '1.39')
             assertEq(interest.columnC, '1.39')
@@ -659,7 +659,7 @@ export const proof = {
         const wireB = { newDeduction: { value: '250.00', sources: [{ documentHash: 'sha256-doc-new', boxPath: 'box5StateAndLocalTaxes', value: '250.00' }], rule: 'schedule a line 5a' } }
         const [, result] = virtual(emptyState)(runOkDiffFixture(cas)('sha256-programA')([])(wireA)('sha256-programA')([])(wireB)(false))
         assertEq(result[0], 'ok')
-        if (result[0] !== 'ok') { throw ['expected ok', result] }
+        assert(result[0] === 'ok', ['expected ok', result])
         const diff = result[1]
         const newDeduction = assertNotNullish(diff['newDeduction'], 'expected the new line to appear in the diff')
         assertEq(newDeduction.columnA, '0.00')

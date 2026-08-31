@@ -818,8 +818,8 @@ export const proof = {
         wrongDialectRejected: () => {
             const [t, v] = validate({ ...minimalAssetRegister, dialect: 'vnd.fjs.business_expenses' })
             assertEq(t, 'error')
-            if (t !== 'error') { throw ['expected error', t, v] }
-            if (typeof v === 'string') { throw ['expected a structural ValidationError', v] }
+            assert(t === 'error', ['expected error', t, v])
+            assert(typeof v !== 'string', ['expected a structural ValidationError', v])
             assertEq(v.path[0], 'dialect')
         },
         // DOC-12's checkbox convention: a materialized `false` is structurally

@@ -2321,7 +2321,7 @@ export const proof = {
                 }],
             })
             assert(outcome.kind === 'ok', ['a rental register is not Schedule C\'s', outcome])
-            if (outcome.kind !== 'ok') { throw ['a rental register is not Schedule C\'s', outcome] }
+            assert(outcome.kind === 'ok', ['a rental register is not Schedule C\'s', outcome])
             assertEq(outcome.filed, false, 'no business, so no Schedule C is filed')
             assertEq(outcome.form4562, undefined, 'and no Form 4562 is computed here')
             assertEq(outcome.partII.line13.value, 0n, 'Schedule C line 13 stays a documented zero')

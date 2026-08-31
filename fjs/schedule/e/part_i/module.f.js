@@ -970,7 +970,7 @@ export const proof = {
         const lineOf = category => {
             const row = rentalExpenseLines.find(candidate => candidate.category === category)
             assert(row !== undefined, ['expected the row', category])
-            if (row === undefined) { throw ['expected the row', category] }
+            assert(row !== undefined, ['expected the row', category])
             return row.printedLine
         }
         assertEq(lineOf('advertising'), 5)
@@ -1481,7 +1481,7 @@ export const proof = {
             const register = buildingRegister('sha256-register-a')
             const [asset] = register.value.assets
             assert(asset !== undefined, ['expected the asset'])
-            if (asset === undefined) { throw ['expected the asset'] }
+            assert(asset !== undefined, ['expected the asset'])
             const message = refusal(run({
                 rentalProperties: [propertyDocument({})('sha256-rental-a')],
                 assetRegisters: [{

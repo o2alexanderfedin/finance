@@ -940,9 +940,6 @@ export const proof = {
                 // FAIL rather than shrink this loop's coverage.
                 assert(shipped !== undefined, ['no shipped percentage for month', key])
                 assert(expected !== undefined && other !== undefined, ['hand-typed row short', key])
-                if (shipped === undefined || expected === undefined || other === undefined) {
-                    throw ['month missing', key]
-                }
                 assertEq(shipped, BigInt(expected), ['this module ships i8829’s printed row', key])
                 if (expected === other) {
                     agreements += 1

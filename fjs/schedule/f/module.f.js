@@ -1205,7 +1205,7 @@ export const proof = {
         const lineOf = category => {
             const row = farmExpenseLines.find(candidate => candidate.category === category)
             assert(row !== undefined, ['expected the row', category])
-            if (row === undefined) { throw ['expected the row', category] }
+            assert(row !== undefined, ['expected the row', category])
             return row.printedLine
         }
         assertEq(lineOf('carAndTruck'), '10')
@@ -1473,7 +1473,7 @@ export const proof = {
         const register = grainBinRegister('sha256-register-a')
         const [asset] = register.value.assets
         assert(asset !== undefined, ['expected the asset'])
-        if (asset === undefined) { throw ['expected the asset'] }
+        assert(asset !== undefined, ['expected the asset'])
         const result = ok(run({
             farmForms: [farmDocument({})('sha256-farm-a')],
             assetRegisters: [{
@@ -1799,7 +1799,7 @@ export const proof = {
             const register = grainBinRegister('sha256-register-a')
             const [asset] = register.value.assets
             assert(asset !== undefined, ['expected the asset'])
-            if (asset === undefined) { throw ['expected the asset'] }
+            assert(asset !== undefined, ['expected the asset'])
             const message = refusal(run({
                 farmForms: [farmDocument({})('sha256-farm-a')],
                 assetRegisters: [{

@@ -515,16 +515,16 @@ export const proof = {
             for (const [name, years] of printedYears) {
                 const spec = macrsClassifications[name]
                 assert(spec !== undefined, ['missing classification', name])
-                if (spec === undefined) { throw ['missing classification', name] }
+                assert(spec !== undefined, ['missing classification', name])
                 assertEq(spec.recoveryTwentyFourths, BigInt(years) * 24n, name)
             }
             const residential = macrsClassifications['residentialRental']
             assert(residential !== undefined, 'residentialRental must exist')
-            if (residential === undefined) { throw 'residentialRental must exist' }
+            assert(residential !== undefined, 'residentialRental must exist')
             assertEq(residential.recoveryTwentyFourths, 660n, '27.5 years is 660 twenty-fourths')
             const nonresidential = macrsClassifications['nonresidentialReal']
             assert(nonresidential !== undefined, 'nonresidentialReal must exist')
-            if (nonresidential === undefined) { throw 'nonresidentialReal must exist' }
+            assert(nonresidential !== undefined, 'nonresidentialReal must exist')
             assertEq(nonresidential.recoveryTwentyFourths, 936n, '39 years is 936 twenty-fourths')
         },
     },
@@ -706,7 +706,7 @@ export const proof = {
             for (const [table, columns] of Object.entries(publication946AppendixA)) {
                 const conv = appendixAConventions[table]
                 assert(conv !== undefined, ['every table names its convention', table])
-                if (conv === undefined) { throw ['every table names its convention', table] }
+                assert(conv !== undefined, ['every table names its convention', table])
                 for (const [classification, row] of Object.entries(columns)) {
                     const expected = row.split(' ')
                     const method = classification === 'fifteenYear' || classification === 'twentyYear'

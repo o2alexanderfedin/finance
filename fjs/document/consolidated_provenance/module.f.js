@@ -108,9 +108,6 @@ export const proof = {
             sourceArtifactHash: sharedSourceArtifactHash,
         })
         assert(tB === 'ok', ['expected the 1099-B section to validate', tB, bInstance])
-        if (tDiv !== 'ok' || tB !== 'ok') {
-            throw ['expected both sections to validate ok', tDiv, tB]
-        }
 
         // Two distinct Evo subjects for the SAME artifact — because
         // formType (each dialect's own tag) is part of formSubject's key.

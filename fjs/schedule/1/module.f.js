@@ -3700,7 +3700,7 @@ export const proof = {
             assertEq(stageOne.line17.sources.length, 1, 'exactly the profile citation')
             const [only] = stageOne.line17.sources
             assert(only !== undefined, 'one source')
-            if (only === undefined) { throw 'expected a source' }
+            assert(only !== undefined, 'expected a source')
             assertEq(only.boxPath, 'declaredKinds')
             assertEq(only.documentHash, profileCertifiedForHealthInsurance.documentHash)
         },

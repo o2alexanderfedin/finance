@@ -4892,7 +4892,7 @@ export const proof = {
                     ? unmodeled.remedy
                     : modeled !== undefined ? modeled.remedy : undefined
                 assert(remedy !== undefined, ['every named kind must still have a row', kind])
-                if (remedy === undefined) { throw ['no row', kind] }
+                assert(remedy !== undefined, ['no row', kind])
                 for (const phrase of mustSay) {
                     assert(remedy.includes(phrase), ['the remedy must say this', kind, phrase])
                 }
