@@ -1,7 +1,7 @@
 # Nothing validates a finance document against its dialect on the write path
 
 **Priority:** P2 — a correctness hole, not a crash; found by `/gsd-audit-milestone` 2026-08-20
-**Status:** open
+**Status:** RESOLVED 2026-08-31 (DOC-25, Phase 40) — see "How it was closed" at the end
 
 ## What is true today, verified by reading production code
 
@@ -60,3 +60,30 @@ document-set problems, so this is one more refusal in a place that has them.
 - [ ] Implement, with a proof watched to fail: a malformed box must produce a refusal naming the
       document and the box, not a computed number.
 - [ ] A negative control: a well-formed document still computes, unchanged.
+
+
+## How it was closed — 2026-08-31, DOC-25, Phase 40
+
+**Option 1, the write boundary**, not Option 2 as this note preferred. The note's own
+parenthesis is the reason: the write path is a public protocol surface. A refusal at `route`
+arrives after the bytes are stored and addressable, so the store accumulates documents it will
+never accept, and `fjs_run`'s run record — where that refusal would land — is not where an agent
+that just called `cas_add` is looking.
+
+`fjs/server/write_validation` wraps the `cas_add` entry and consults the claimed dialect's own
+`match`, the same predicate `detect` uses, so the check cannot drift from classification. An
+earlier attempt compared `detectFinance(bytes).mime_type` against the payload's tag and refused
+every document including valid ones — `detect` answers `application/vnd.fjs.w2+json` where the
+payload says `vnd.fjs.w2`. That is recorded in the module, because the fix is not obvious from
+the outside.
+
+- `evo_add` is NOT wrapped: its `snapshot` is a hash, not content, so no document bytes enter
+  through it. `cas_add` is the only tool that writes them.
+- Content that claims no known dialect is stored unexamined — the cost this note named for
+  Option 1, paid deliberately, since the CAS holds programs and notes as well as documents.
+- Watched to fail: a compiling mutation that makes the check never refuse reddens three leaves,
+  including the end-to-end one that drives the real MCP tool.
+
+**The open-versus-closed question this made live is decided in `fjs/document/base`**: the schemas
+stay `open`, so a MISSPELLED OPTIONAL BOX is still silently ignored while a missing REQUIRED field
+is refused. Both halves were checked empirically, not assumed.

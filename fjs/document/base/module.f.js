@@ -29,6 +29,39 @@
  * 1099-DIV, etc.) needs to widen this base, that is the signal worth
  * revisiting this decision, not something to pre-guess now.
  *
+ * ## Open, not closed — decided 2026-08-31 (DOC-25, Phase 40)
+ *
+ * Every dialect schema here says `open(...)`, so a document may carry members
+ * it does not declare. Until DOC-25 that was inherited rather than chosen:
+ * nothing validated a document on the write path, so `open` versus closed
+ * decided nothing a caller could observe. `fjs/server/write_validation` now
+ * refuses, at `cas_add`, a payload that claims a dialect it does not satisfy —
+ * which makes the question live, and this is the answer.
+ *
+ * **They stay open, and the cost is named rather than hidden: a MISSPELLED
+ * OPTIONAL BOX IS SILENTLY IGNORED.** `box1WagesTips` instead of
+ * `box1WagesTipsOtherCompensation` is not a declared member, `open` admits it
+ * as an extra, and the return computes as though that money were never
+ * reported. A required field cannot be lost this way — its absence is refused
+ * — so the exposure is exactly the optional money boxes, which is most of
+ * them.
+ *
+ * Closing them would catch that typo at the write boundary. It is not done
+ * because of what closing costs, which is larger and less visible: a client
+ * written against a LATER build — one that has learned a new box — is refused
+ * outright by an older server, with nothing stored and no partial result. The
+ * project has no published clients today, so that cost is hypothetical while
+ * the typo is not; the reason it still wins is that `open` degrades (one box
+ * unread, the rest computed, the citation trail showing the gap) where closed
+ * fails whole. A refusal that discards a correct document is worse than a
+ * computation that visibly omits one line.
+ *
+ * **What to do instead, if the typo case ever bites:** a warning on the write
+ * path listing undeclared members, which catches the misspelling without
+ * refusing the document. That is not built here — DOC-25 asked for a refusal
+ * and got one, and inventing a second mechanism alongside it would be scope
+ * this phase did not argue for.
+ *
  * @module
  */
 import { assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
