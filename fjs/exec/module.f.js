@@ -165,6 +165,19 @@ const readDo = do_('casRead')
 const evoHeadDo = do_('evoHead')
 
 /**
+ * `do_` narrowed to `evoList`, for the whole-vocabulary dispatch proof below
+ * — same under-constraining reason as `readDo`.
+ * @type {(a: string) => Effect<EvoList, string, never>}
+ */
+const evoListDo = do_('evoList')
+
+/**
+ * `do_` narrowed to `evoRevision`, for the same proof and the same reason.
+ * @type {(a: string) => Effect<EvoRevision, string, never>}
+ */
+const evoRevisionDo = do_('evoRevision')
+
+/**
  * Builds a chain of exactly `remaining` `casRead` dispatches followed by a
  * `Pure` completion — the fixed-length sibling of `forever` below, used to
  * pin `interpret`'s step-budget boundary at an EXACT dispatch count rather
@@ -423,6 +436,32 @@ export const proof = {
                 result[1],
                 'operation not permitted: fetch; permitted: casRead, evoList, evoHead, evoRevision')
         },
+    },
+    // The same question at the TYPED vocabulary. `map` is the fixture every
+    // other leaf interprets against, and only `casRead` and `evoHead` had
+    // ever been dispatched through it — so `evoList` and `evoRevision` were
+    // declared, named in every refusal message's permitted list, and never
+    // once shown to answer anything. The declaration ORDER is asserted in
+    // the same breath, because that order is what a refusal message prints.
+    everyTypedCommandReachesItsOwnHandler: () => {
+        /** @type {readonly (readonly [string, (a: string) => Effect<TestOp, string, never>])[]} */
+        const commands = [
+            ['casRead', readDo],
+            ['evoList', evoListDo],
+            ['evoHead', evoHeadDo],
+            ['evoRevision', evoRevisionDo],
+        ]
+        assertEq(commands.length, 4, 'the four commands the frozen vocabulary declares')
+        assertEq(JSON.stringify(Object.keys(map)), JSON.stringify(commands.map(([name]) => name)),
+            'declared in the order a refusal message reads them back')
+        for (const [command, dispatch] of commands) {
+            const result = interpret(map)(dispatch('subject'))
+            assertEq(result[0], 'ok', command)
+            const [value, reads] = result[1]
+            assertEq(value, `${command}:subject`, ['each command answers with its own handler', command])
+            assertEq(JSON.stringify(reads), JSON.stringify([[command, ['subject']]]),
+                ['and is recorded under its own name', command])
+        }
     },
     // The permitted half of the same question. Every refusal leaf here
     // names the four permitted commands, and only `casRead` had ever been
