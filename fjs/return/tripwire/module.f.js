@@ -829,7 +829,7 @@ const registerWithADisposal = {
 const registerWithNoDisposal = {
     ...registerWithADisposal,
     noDepreciablePropertyDisposedOfDuringTheYear: true,
-    assets: registerWithADisposal.assets.map(asset => ({ ...asset, disposal: undefined })),
+    assets: registerWithADisposal.assets.map(({ disposal: _disposal, ...rest }) => rest),
 }
 
 /**
@@ -1506,17 +1506,24 @@ export const proof = {
         // written against `rentsReceived` alone would miss every royalty
         // record, and nothing else here would notice.
         aRoyaltyFiresItThroughPrintedLineFour: () => {
+            // The four rental-only fields are OMITTED, not spread as
+            // `undefined`: a royalty record does not carry them at all, and a
+            // key present with an `undefined` value is the other of the two
+            // states DOC-11 exists to keep apart.
+            const {
+                physicalAddress: _physicalAddress,
+                fairRentalDays: _fairRentalDays,
+                personalUseDays: _personalUseDays,
+                rentsReceived: _rentsReceived,
+                ...royaltyBase
+            } = rentalProperty
             const outcome = classify('single')(['wages'])({
                 ...noDocuments,
                 rentalProperties: [{
                     value: {
-                        ...rentalProperty,
+                        ...royaltyBase,
                         accountNumber: 'ROY-0001',
                         propertyType: 'royalties',
-                        physicalAddress: undefined,
-                        fairRentalDays: undefined,
-                        personalUseDays: undefined,
-                        rentsReceived: undefined,
                         royaltiesReceived: '3200.00',
                     },
                 }],
@@ -1615,13 +1622,17 @@ export const proof = {
                 'otherIncome',
             ]
             assertEq(fields.length, 10, 'hand-counted off the predicate')
+            // The fixture's one printed income line is OMITTED rather than
+            // spread as `undefined`, so the field under test is the only
+            // income on the form — a present key holding `undefined` is a
+            // different stored document from one that never carried the box.
+            const { salesOfRaisedProductsAndLivestock: _salesOfRaisedProductsAndLivestock, ...farmWithoutSales } = farm
             for (const field of fields) {
                 const outcome = classify('single')(['wages'])({
                     ...noDocuments,
                     farmForms: [{
                         value: {
-                            ...farm,
-                            salesOfRaisedProductsAndLivestock: undefined,
+                            ...farmWithoutSales,
                             cropInsuranceProceedsDeferredFromPriorYear: '0.00',
                             [field]: '1000.00',
                         },
@@ -2107,11 +2118,18 @@ export const proof = {
         anAbsentOrZeroBoxOneNeverFires: () => {
             const none = classify('single')(['wages'])(noDocuments)
             assertEq(none.kind, 'ok', ['no K-1 must not fire', none])
+            // The two boxes are OMITTED rather than spread as `undefined`, for
+            // the reason {@link partnershipK1NoBusinessIncome} gives: a spread
+            // of `undefined` leaves the KEY present, and this leaf is about
+            // the absent state.
+            const {
+                box1OrdinaryBusinessIncome: _box1OrdinaryBusinessIncome,
+                box14SelfEmploymentEarnings: _box14SelfEmploymentEarnings,
+                ...partnershipK1WithNoBoxOne
+            } = partnershipK1
             const absent = classify('single')(['wages'])({
                 ...noDocuments,
-                partnershipK1Forms: [{
-                    value: { ...partnershipK1, box1OrdinaryBusinessIncome: undefined, box14SelfEmploymentEarnings: undefined },
-                }],
+                partnershipK1Forms: [{ value: partnershipK1WithNoBoxOne }],
             })
             assertEq(absent.kind, 'ok', ['an absent box 1 must not fire', absent])
             const zero = classify('single')(['wages'])({

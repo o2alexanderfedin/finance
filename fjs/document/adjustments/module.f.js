@@ -106,16 +106,16 @@
  *
  * @module
  */
-import { array, number, open, option, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
-import { validate as rttiValidate } from 'functionalscript/fjs/types/rtti/validate/module.f.mjs'
+import { array, number, open, option, or, string } from 'functionalscript/fjs/rtti/module.f.mjs'
+import { validate as rttiValidate } from 'functionalscript/fjs/rtti/validate/module.f.mjs'
 import { error, ok } from 'functionalscript/fjs/types/result/module.f.mjs'
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { base, mediaTypeOf } from '../base/module.f.js'
 import { moneyFieldError } from '../money_field/module.f.js'
 
 /** @import { Result } from 'functionalscript/fjs/types/result/types.js' */
-/** @import { Ts, Unknown } from 'functionalscript/fjs/types/rtti/ts/types.js' */
-/** @import { ValidationError } from 'functionalscript/fjs/types/rtti/common/types.js' */
+/** @import { Ts, Unknown } from 'functionalscript/fjs/rtti/ts/types.js' */
+/** @import { ValidationError } from 'functionalscript/fjs/rtti/common/types.js' */
 /** @import { SubjectKey } from '../subject/module.f.js' */
 
 /**
@@ -164,7 +164,7 @@ const adjustmentEntry = open({
 /**
  * One person's HSA coverage facts — Form 8889 line 1's coverage checkbox and
  * the three yes/no facts its Part I arithmetic branches on. All three
- * booleans follow DOC-12's checkbox convention (`option(true)`, so absence is
+ * booleans follow DOC-12's checkbox convention (`or(option, true)`, so absence is
  * the only way to say "no"), extended to a taxpayer-asserted fact exactly as
  * `vnd.fjs.return_profile`'s own `dependents` array already does.
  *
@@ -175,9 +175,9 @@ const adjustmentEntry = open({
 const hsaCoverageEntry = open({
     individual: string,
     coverageType: string,
-    hadHighDeductibleCoverageAllYear: option(true),
-    eligibleForCatchUpContribution: option(true),
-    madeQualifiedHsaFundingDistribution: option(true),
+    hadHighDeductibleCoverageAllYear: or(option, true),
+    eligibleForCatchUpContribution: or(option, true),
+    madeQualifiedHsaFundingDistribution: or(option, true),
 })
 
 /**
@@ -190,9 +190,9 @@ export const adjustmentsSchema = open({
     ...base(dialect),
     recipientTin: string,
     taxYear: number,
-    corrected: option(true),
+    corrected: or(option, true),
     entries: array(adjustmentEntry),
-    hsaCoverage: option(array(hsaCoverageEntry)),
+    hsaCoverage: or(option, array(hsaCoverageEntry)),
 })
 
 /**
@@ -502,7 +502,7 @@ export const proof = {
             assert(t === 'ok', ['expected ok', t, v])
             assertEq(v.hsaCoverage?.length, 2)
         },
-        // DOC-12: the three yes/no facts are `option(true)`, so a stored
+        // DOC-12: the three yes/no facts are `or(option, true)`, so a stored
         // `false` is structurally rejected and absence is the only way to say
         // "no". Asserted on the one whose absence is load-bearing —
         // `fjs/form8889` REFUSES rather than computes when it is absent.

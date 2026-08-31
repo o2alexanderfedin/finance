@@ -86,7 +86,7 @@
  *
  * ## Boxes 1, 2 — dates, as free text, and what that costs
  *
- * `box1DateOptionGranted` and `box2DateOptionExercised` are `option(string)`
+ * `box1DateOptionGranted` and `box2DateOptionExercised` are `or(option, string)`
  * with no format check, following `vnd.fjs.1099b`'s own
  * `box1bDateAcquired`/`box1cDateSoldOrDisposed` precedent: this project has no
  * date primitive, and inventing one inside a dialect would be a second,
@@ -118,8 +118,8 @@
  *
  * @module
  */
-import { number, open, option, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
-import { validate as rttiValidate } from 'functionalscript/fjs/types/rtti/validate/module.f.mjs'
+import { number, open, option, or, string } from 'functionalscript/fjs/rtti/module.f.mjs'
+import { validate as rttiValidate } from 'functionalscript/fjs/rtti/validate/module.f.mjs'
 import { error, ok } from 'functionalscript/fjs/types/result/module.f.mjs'
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { isHash } from 'functionalscript/fjs/media/revision/module.f.mjs'
@@ -129,8 +129,8 @@ import { moneyFieldError } from '../money_field/module.f.js'
 import { shareCountError } from '../share_count/module.f.js'
 
 /** @import { Result } from 'functionalscript/fjs/types/result/types.js' */
-/** @import { Ts, Unknown } from 'functionalscript/fjs/types/rtti/ts/types.js' */
-/** @import { ValidationError } from 'functionalscript/fjs/types/rtti/common/types.js' */
+/** @import { Ts, Unknown } from 'functionalscript/fjs/rtti/ts/types.js' */
+/** @import { ValidationError } from 'functionalscript/fjs/rtti/common/types.js' */
 /** @import { SubjectKey } from '../subject/module.f.js' */
 
 /**
@@ -153,7 +153,7 @@ export const mediaType = mediaTypeOf(dialect)
  *
  * The printed form's VOID checkbox is not modeled — it is a filer-copy
  * artefact, the same precedent every existing dialect follows for "2nd TIN
- * not." — while CORRECTED is, under DOC-12's `option(true)` convention.
+ * not." — while CORRECTED is, under DOC-12's `or(option, true)` convention.
  */
 export const formThirtyNineTwentyOneSchema = open({
     ...base(dialect),
@@ -162,17 +162,17 @@ export const formThirtyNineTwentyOneSchema = open({
     accountNumber: string,
     taxYear: number,
     formRevision: string,
-    corrected: option(true),
+    corrected: or(option, true),
     sourceArtifactHash: string,
-    box1DateOptionGranted: option(string),
-    box2DateOptionExercised: option(string),
-    box3ExercisePricePerShare: option(string),
-    box4FairMarketValuePerShareOnExerciseDate: option(string),
-    box5NumberOfSharesTransferred: option(string),
-    box6CorporationName: option(string),
-    box6CorporationTin: option(string),
-    payerName: option(string),
-    recipientName: option(string),
+    box1DateOptionGranted: or(option, string),
+    box2DateOptionExercised: or(option, string),
+    box3ExercisePricePerShare: or(option, string),
+    box4FairMarketValuePerShareOnExerciseDate: or(option, string),
+    box5NumberOfSharesTransferred: or(option, string),
+    box6CorporationName: or(option, string),
+    box6CorporationTin: or(option, string),
+    payerName: or(option, string),
+    recipientName: or(option, string),
 })
 
 /**

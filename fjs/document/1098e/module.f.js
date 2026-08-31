@@ -113,8 +113,8 @@
  *
  * @module
  */
-import { number, open, option, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
-import { validate as rttiValidate } from 'functionalscript/fjs/types/rtti/validate/module.f.mjs'
+import { number, open, option, or, string } from 'functionalscript/fjs/rtti/module.f.mjs'
+import { validate as rttiValidate } from 'functionalscript/fjs/rtti/validate/module.f.mjs'
 import { error, ok } from 'functionalscript/fjs/types/result/module.f.mjs'
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { base, mediaTypeOf } from '../base/module.f.js'
@@ -123,8 +123,8 @@ import { moneyFieldError } from '../money_field/module.f.js'
 import { declaredSubject } from '../subject/module.f.js'
 
 /** @import { Result } from 'functionalscript/fjs/types/result/types.js' */
-/** @import { Ts, Unknown } from 'functionalscript/fjs/types/rtti/ts/types.js' */
-/** @import { ValidationError } from 'functionalscript/fjs/types/rtti/common/types.js' */
+/** @import { Ts, Unknown } from 'functionalscript/fjs/rtti/ts/types.js' */
+/** @import { ValidationError } from 'functionalscript/fjs/rtti/common/types.js' */
 /** @import { SubjectKey } from '../subject/module.f.js' */
 
 /**
@@ -152,11 +152,11 @@ export const oneZeroNineEightESchema = open({
     accountNumber: string,
     taxYear: number,
     formRevision: string,
-    corrected: option(true),
-    box1StudentLoanInterestReceived: option(string),
-    box2ExcludesOriginationFeesAndCapitalizedInterest: option(true),
-    payerName: option(string),
-    recipientName: option(string),
+    corrected: or(option, true),
+    box1StudentLoanInterestReceived: or(option, string),
+    box2ExcludesOriginationFeesAndCapitalizedInterest: or(option, true),
+    payerName: or(option, string),
+    recipientName: or(option, string),
 })
 
 /**
@@ -181,7 +181,7 @@ const validateShape = rttiValidate(oneZeroNineEightESchema)
  * exactly `string | undefined`.
  *
  * `box2ExcludesOriginationFeesAndCapitalizedInterest` is deliberately absent:
- * it is a checkbox, not a dollar amount, and follows DOC-12's `option(true)`
+ * it is a checkbox, not a dollar amount, and follows DOC-12's `or(option, true)`
  * convention instead.
  */
 export const moneyBoxFields = /** @type {const} */ ([

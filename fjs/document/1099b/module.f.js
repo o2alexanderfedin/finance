@@ -44,8 +44,8 @@
  * instructions: **"If box 5 is checked, box 1e may be blank"** — most
  * commonly because the security is noncovered (purchased before the IRS's
  * basis-reporting regime began covering that security type) and the broker
- * genuinely has no basis figure to report. Box 1e (`option(string)`, money)
- * and box 12 "Check if basis reported to IRS" (`option(true)`, checkbox) are
+ * genuinely has no basis figure to report. Box 1e (`or(option, string)`, money)
+ * and box 12 "Check if basis reported to IRS" (`or(option, true)`, checkbox) are
  * modeled as two INDEPENDENT fields — never one derived from the other's
  * absence — because a present, non-blank box 1e can still be UNREPORTED to
  * the IRS (box 12 unchecked), which is a distinct fact from box 1e being
@@ -82,13 +82,13 @@
  *   primitive in this project; may be blank if box 5 is checked, or if
  *   securities were acquired on a variety of dates), `box1cDateSoldOrDisposed`
  *   (free text), `cusipNumber`, and `applicableCheckboxOnForm8949` stay plain
- *   `option(string)` with NO numeric-exactness check — none of them is
+ *   `or(option, string)` with NO numeric-exactness check — none of them is
  *   money.
  * - **No locality boxes exist on 1099-B** — boxes 14-16 are state-only
  *   (`state`, `stateIdNumber`, `stateTaxWithheld`), the identical shape to
  *   `vnd.fjs.1099div`'s repeating group, not `1099r`'s fuller state+local
  *   group.
- * - Every checkbox is `option(true)` — DOC-12 — for `corrected`,
+ * - Every checkbox is `or(option, true)` — DOC-12 — for `corrected`,
  *   `fatcaFilingRequirement`, `box2ShortTermGainOrLoss`,
  *   `box2LongTermGainOrLoss`, `box2Ordinary`, `box3CollectiblesProceeds`,
  *   `box3QofProceeds`, `box5NoncoveredSecurity`,
@@ -105,8 +105,8 @@
  *
  * @module
  */
-import { array, number, open, option, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
-import { validate as rttiValidate } from 'functionalscript/fjs/types/rtti/validate/module.f.mjs'
+import { array, number, open, option, or, string } from 'functionalscript/fjs/rtti/module.f.mjs'
+import { validate as rttiValidate } from 'functionalscript/fjs/rtti/validate/module.f.mjs'
 import { error, ok } from 'functionalscript/fjs/types/result/module.f.mjs'
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { isHash } from 'functionalscript/fjs/media/revision/module.f.mjs'
@@ -116,8 +116,8 @@ import { moneyFieldError } from '../money_field/module.f.js'
 import { centsFromString } from '../../exact/module.f.js'
 
 /** @import { Result } from 'functionalscript/fjs/types/result/types.js' */
-/** @import { Ts, Unknown } from 'functionalscript/fjs/types/rtti/ts/types.js' */
-/** @import { ValidationError } from 'functionalscript/fjs/types/rtti/common/types.js' */
+/** @import { Ts, Unknown } from 'functionalscript/fjs/rtti/ts/types.js' */
+/** @import { ValidationError } from 'functionalscript/fjs/rtti/common/types.js' */
 /** @import { SubjectKey } from '../subject/module.f.js' */
 
 /**
@@ -137,8 +137,8 @@ export const mediaType = mediaTypeOf(dialect)
  */
 const stateEntry = open({
     state: string,
-    stateIdNumber: option(string),
-    stateTaxWithheld: option(string),
+    stateIdNumber: or(option, string),
+    stateTaxWithheld: or(option, string),
 })
 
 /**
@@ -153,37 +153,37 @@ export const oneZeroNineNineBSchema = open({
     accountNumber: string,
     taxYear: number,
     formRevision: string,
-    corrected: option(true),
+    corrected: or(option, true),
     sourceArtifactHash: string,
-    cusipNumber: option(string),
-    fatcaFilingRequirement: option(true),
-    applicableCheckboxOnForm8949: option(string),
-    box1aDescriptionOfProperty: option(string),
-    box1bDateAcquired: option(string),
-    box1cDateSoldOrDisposed: option(string),
-    box1dProceeds: option(string),
-    box1eCostOrOtherBasis: option(string),
-    box1fAccruedMarketDiscount: option(string),
-    box1gWashSaleLossDisallowed: option(string),
-    box2ShortTermGainOrLoss: option(true),
-    box2LongTermGainOrLoss: option(true),
-    box2Ordinary: option(true),
-    box3CollectiblesProceeds: option(true),
-    box3QofProceeds: option(true),
-    box4FederalIncomeTaxWithheld: option(string),
-    box5NoncoveredSecurity: option(true),
-    box6ReportedToIrsGrossProceeds: option(true),
-    box6ReportedToIrsNetProceeds: option(true),
-    box7LossNotAllowedBasedOnAmountIn1d: option(true),
-    box8ProfitOrLossRealized: option(string),
-    box9UnrealizedProfitOrLossPriorYearEnd: option(string),
-    box10UnrealizedProfitOrLossCurrentYearEnd: option(string),
-    box11AggregateProfitOrLoss: option(string),
-    box12BasisReportedToIrs: option(true),
-    box13Bartering: option(string),
-    stateLocal: option(array(stateEntry)),
-    payerName: option(string),
-    recipientName: option(string),
+    cusipNumber: or(option, string),
+    fatcaFilingRequirement: or(option, true),
+    applicableCheckboxOnForm8949: or(option, string),
+    box1aDescriptionOfProperty: or(option, string),
+    box1bDateAcquired: or(option, string),
+    box1cDateSoldOrDisposed: or(option, string),
+    box1dProceeds: or(option, string),
+    box1eCostOrOtherBasis: or(option, string),
+    box1fAccruedMarketDiscount: or(option, string),
+    box1gWashSaleLossDisallowed: or(option, string),
+    box2ShortTermGainOrLoss: or(option, true),
+    box2LongTermGainOrLoss: or(option, true),
+    box2Ordinary: or(option, true),
+    box3CollectiblesProceeds: or(option, true),
+    box3QofProceeds: or(option, true),
+    box4FederalIncomeTaxWithheld: or(option, string),
+    box5NoncoveredSecurity: or(option, true),
+    box6ReportedToIrsGrossProceeds: or(option, true),
+    box6ReportedToIrsNetProceeds: or(option, true),
+    box7LossNotAllowedBasedOnAmountIn1d: or(option, true),
+    box8ProfitOrLossRealized: or(option, string),
+    box9UnrealizedProfitOrLossPriorYearEnd: or(option, string),
+    box10UnrealizedProfitOrLossCurrentYearEnd: or(option, string),
+    box11AggregateProfitOrLoss: or(option, string),
+    box12BasisReportedToIrs: or(option, true),
+    box13Bartering: or(option, string),
+    stateLocal: or(option, array(stateEntry)),
+    payerName: or(option, string),
+    recipientName: or(option, string),
 })
 
 /**
@@ -343,7 +343,7 @@ const minimal = {
 
 /**
  * A money box's name could be quietly dropped from {@link moneyBoxFields}
- * without anyone noticing — the field stays `option(string)` structurally,
+ * without anyone noticing — the field stays `or(option, string)` structurally,
  * so a comma-grouped amount in a dropped box would then validate as ok. One
  * generated leaf per NAMED scalar box supplies a comma-grouped value to that
  * box alone and asserts `validate` refuses, built by mapping
@@ -456,7 +456,7 @@ export const proof = {
             assertEq(v.corrected, undefined)
             assertEq(v.stateLocal, undefined)
         },
-        // DOC-12: `false` is not a member of `option(true)` for any of the
+        // DOC-12: `false` is not a member of `or(option, true)` for any of the
         // twelve checkbox fields — rejected structurally, never accepted as
         // "not checked".
         falseFlagsRejected: () => {

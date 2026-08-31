@@ -122,7 +122,7 @@ narrower than the statute
 
 The profile field is
 `physicallyPresentInAForeignCountryThreeHundredThirtyFullDaysAndNoUnitedStatesAbode`,
-`option(true)`, DOC-12's shape.
+`or(option, true)`, DOC-12's shape.
 
 §911(d)(1)(B) is *"present in a foreign country or countries during at least 330
 full days during such period of 12 consecutive months"*. i2555 p3 defines the
@@ -209,9 +209,9 @@ supply it.
 
 Days already exist here as plain integer counts:
 `vnd.fjs.rental_property`'s `fairRentalDays` / `personalUseDays` are
-`option(number)` with a table-driven range check, and `daysInTheLongestYear = 366`
+`or(option, number)` with a table-driven range check, and `daysInTheLongestYear = 366`
 is a named constant there because that dialect does not know leap years. This
-field follows that shape exactly — `option(number)`, range-checked `0 …
+field follows that shape exactly — `or(option, number)`, range-checked `0 …
 daysInTheLongestYear` in `checkReferences`, absent meaning *unstated* rather
 than zero.
 
@@ -556,17 +556,17 @@ Counts move `55 → 56` modeled, `142 → 145` unmodeled, `197 → 201` vocabula
 
 ## 7. What a filer must supply, and where it lives
 
-Five fields on `vnd.fjs.return_profile`, all `option(...)`, none of them on any
+Five fields on `vnd.fjs.return_profile`, all `or(option, ...)`, none of them on any
 information return — the `movingExpensesArmedForcesPermanentChangeOfStation` /
 `line26EstimatedTaxPayments` precedent:
 
 | Field | Form 2555 line | Type |
 |---|---|---|
-| `physicallyPresentInAForeignCountryThreeHundredThirtyFullDaysAndNoUnitedStatesAbode` | Part III, §1b | `option(true)` |
-| `foreignEarnedIncomeQualifyingDays` | line 31 / 38 | `option(number)` |
-| `foreignEarnedIncome` | line 26 → 27 | `option(string)`, money |
-| `foreignEarnedIncomeDeductionsAllocableToExcludedIncome` | line 44 | `option(string)`, money |
-| `foreignEarnedIncomeItemizedDeductionsAndExclusionsNotClaimed` | both worksheets' line 2b | `option(string)`, money |
+| `physicallyPresentInAForeignCountryThreeHundredThirtyFullDaysAndNoUnitedStatesAbode` | Part III, §1b | `or(option, true)` |
+| `foreignEarnedIncomeQualifyingDays` | line 31 / 38 | `or(option, number)` |
+| `foreignEarnedIncome` | line 26 → 27 | `or(option, string)`, money |
+| `foreignEarnedIncomeDeductionsAllocableToExcludedIncome` | line 44 | `or(option, string)`, money |
+| `foreignEarnedIncomeItemizedDeductionsAndExclusionsNotClaimed` | both worksheets' line 2b | `or(option, string)`, money |
 
 **Why a profile field and not a dialect.** There is no information return for
 foreign earned income at all: a foreign employer issues no Form W-2, and Part IV

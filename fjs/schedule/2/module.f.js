@@ -194,7 +194,6 @@ import { taxParamsByYear } from '../../tax/params/module.f.js'
 /** @import { FormThirtyNineTwentyOne } from '../../document/form3921/module.f.js' */
 /** @import { W2 } from '../../document/w2/module.f.js' */
 /** @import { K1EstateTrust } from '../../document/k1_1041/module.f.js' */
-/** @import { CodedEntry } from '../../document/k1_common/module.f.js' */
 /** @import { SelfEmploymentOutcome } from '../se/module.f.js' */
 
 // ── Inputs ───────────────────────────────────────────────────────────────────
@@ -975,7 +974,7 @@ const isoForm = hash => exercisePrice => fairMarketValue => shares => ({
 /**
  * A stored beneficiary's Schedule K-1 (Form 1041) carrying exactly the box 12
  * rows given — the document Form 6251 line 2j reads.
- * @type {(hash: string) => (box12: readonly CodedEntry[]) => Stored<K1EstateTrust>}
+ * @type {(hash: string) => (box12: NonNullable<K1EstateTrust['box12AlternativeMinimumTaxItems']>) => Stored<K1EstateTrust>}
  */
 const beneficiaryK1 = hash => box12 => ({
     documentHash: hash,

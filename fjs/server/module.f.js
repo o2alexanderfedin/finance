@@ -65,8 +65,8 @@ import { evoToolRegistry } from 'functionalscript/fjs/mcp/evo/module.f.mjs'
 import { emptyState, virtual } from 'functionalscript/fjs/effects/node/virtual/module.f.mjs'
 import { fromVec } from 'functionalscript/fjs/types/uint8array/module.f.mjs'
 import { utf8 } from 'functionalscript/fjs/text/module.f.mjs'
-import { array, open, option, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
-import { validate as rttiValidate } from 'functionalscript/fjs/types/rtti/validate/module.f.mjs'
+import { array, open, option, or, string } from 'functionalscript/fjs/rtti/module.f.mjs'
+import { validate as rttiValidate } from 'functionalscript/fjs/rtti/validate/module.f.mjs'
 import { assert, assertEq, assertNotNullish } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { dialect as revisionDialect } from 'functionalscript/fjs/media/revision/module.f.mjs'
 import { cBase32ToVec, vecToCBase32 } from 'functionalscript/fjs/basen/cbase32/module.f.mjs'
@@ -96,7 +96,7 @@ import { parse as jsonParse, stringify as jsonText } from '../json/module.f.js'
 /** @import { Cas } from 'functionalscript/fjs/cas/types.js' */
 /** @import { Unknown } from 'functionalscript/fjs/media/json/types.js' */
 /** @import { Result } from 'functionalscript/fjs/types/result/types.js' */
-/** @import { ValidationError } from 'functionalscript/fjs/types/rtti/common/types.js' */
+/** @import { ValidationError } from 'functionalscript/fjs/rtti/common/types.js' */
 /** @import { Vec } from 'functionalscript/fjs/types/bit_vec/types.js' */
 /** @import { Report, CasOp } from '../guest/module.f.js' */
 /** @import { State } from 'functionalscript/fjs/effects/node/virtual/types.js' */
@@ -482,7 +482,7 @@ const callResultSchema = open({
 
 /** What `weekOneConvergence`'s `fjs_run` leaf reads — same as {@link callResultSchema} plus the optional `isError` flag a failed tool call carries. */
 const callResultWithIsErrorSchema = open({
-    result: open({ content: array(open({ type: string, text: string })), isError: option(true) }),
+    result: open({ content: array(open({ type: string, text: string })), isError: or(option, true) }),
 })
 
 const asEnvelope = decoder(rttiValidate(envelopeSchema))

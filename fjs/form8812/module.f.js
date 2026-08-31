@@ -120,7 +120,7 @@ import { taxParamsByYear } from '../tax/params/module.f.js'
 /**
  * One dependent entry as this module sees it — mirrors
  * `vnd.fjs.return_profile`'s own `dependents` array element shape (13-08),
- * already normalized from that schema's `option(true)` boolean-shaped
+ * already normalized from that schema's `or(option, true)` boolean-shaped
  * fields to definite booleans by the caller (the same `=== true`
  * normalization `fjs/schedule/b` performs on `hadForeignFinancialAccount`
  * before this module's own kind of consumer ever sees it). This module

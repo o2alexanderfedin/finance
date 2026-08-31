@@ -54,7 +54,7 @@
  * Two checkbox facts are read and decide the return:
  *
  * - **Box G**, printed as a pair — *"General partner or LLC member-manager"*
- *   and *"Limited partner or other LLC member"*. It is DOC-12's `option(true)`
+ *   and *"Limited partner or other LLC member"*. It is DOC-12's `or(option, true)`
  *   convention twice, and {@link checkReferences} refuses a blob that ticks
  *   both or neither, because §1402(a)(13) and §469(h)(2) both turn on it and
  *   this engine may not assume which side a partner is on. See "Box G is a
@@ -135,8 +135,8 @@
  *
  * @module
  */
-import { array, number, open, option, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
-import { validate as rttiValidate } from 'functionalscript/fjs/types/rtti/validate/module.f.mjs'
+import { array, number, open, option, or, string } from 'functionalscript/fjs/rtti/module.f.mjs'
+import { validate as rttiValidate } from 'functionalscript/fjs/rtti/validate/module.f.mjs'
 import { error, ok } from 'functionalscript/fjs/types/result/module.f.mjs'
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { centsFromString } from '../../exact/module.f.js'
@@ -147,8 +147,8 @@ import { codedEntry, codedBoxError, materialParticipationValues, materialPartici
 import { declaredMembers } from '../../document/base/module.f.js'
 
 /** @import { Result } from 'functionalscript/fjs/types/result/types.js' */
-/** @import { Ts, Unknown } from 'functionalscript/fjs/types/rtti/ts/types.js' */
-/** @import { ValidationError } from 'functionalscript/fjs/types/rtti/common/types.js' */
+/** @import { Ts, Unknown } from 'functionalscript/fjs/rtti/ts/types.js' */
+/** @import { ValidationError } from 'functionalscript/fjs/rtti/common/types.js' */
 /** @import { SubjectKey } from '../subject/module.f.js' */
 
 /**
@@ -195,47 +195,47 @@ export const k1PartnershipSchema = open({
     accountNumber: string,
     taxYear: number,
     formRevision: string,
-    corrected: option(true),
-    payerName: option(string),
-    recipientName: option(string),
+    corrected: or(option, true),
+    payerName: or(option, string),
+    recipientName: or(option, string),
     // Part II, box G — a printed PAIR of checkboxes, exactly one of which the
     // partnership ticks. See this module's own docstring.
-    boxGGeneralPartnerOrLlcMemberManager: option(true),
-    boxGLimitedPartnerOrOtherLlcMember: option(true),
+    boxGGeneralPartnerOrLlcMemberManager: or(option, true),
+    boxGLimitedPartnerOrOtherLlcMember: or(option, true),
     // The one field that is not a printed box.
-    materialParticipation: option(string),
+    materialParticipation: or(option, string),
     // Part III, boxes 1-10 and 12 and 21: the fixed-caption boxes.
-    box1OrdinaryBusinessIncome: option(string),
-    box2NetRentalRealEstateIncome: option(string),
-    box3OtherNetRentalIncome: option(string),
-    box4aGuaranteedPaymentsForServices: option(string),
-    box4bGuaranteedPaymentsForCapital: option(string),
-    box4cTotalGuaranteedPayments: option(string),
-    box5InterestIncome: option(string),
-    box6aOrdinaryDividends: option(string),
-    box6bQualifiedDividends: option(string),
-    box6cDividendEquivalents: option(string),
-    box7Royalties: option(string),
-    box8NetShortTermCapitalGain: option(string),
-    box9aNetLongTermCapitalGain: option(string),
-    box9bCollectiblesTwentyEightPercentGain: option(string),
-    box9cUnrecapturedSection1250Gain: option(string),
-    box10NetSection1231Gain: option(string),
-    box12Section179Deduction: option(string),
-    box21ForeignTaxesPaidOrAccrued: option(string),
+    box1OrdinaryBusinessIncome: or(option, string),
+    box2NetRentalRealEstateIncome: or(option, string),
+    box3OtherNetRentalIncome: or(option, string),
+    box4aGuaranteedPaymentsForServices: or(option, string),
+    box4bGuaranteedPaymentsForCapital: or(option, string),
+    box4cTotalGuaranteedPayments: or(option, string),
+    box5InterestIncome: or(option, string),
+    box6aOrdinaryDividends: or(option, string),
+    box6bQualifiedDividends: or(option, string),
+    box6cDividendEquivalents: or(option, string),
+    box7Royalties: or(option, string),
+    box8NetShortTermCapitalGain: or(option, string),
+    box9aNetLongTermCapitalGain: or(option, string),
+    box9bCollectiblesTwentyEightPercentGain: or(option, string),
+    box9cUnrecapturedSection1250Gain: or(option, string),
+    box10NetSection1231Gain: or(option, string),
+    box12Section179Deduction: or(option, string),
+    box21ForeignTaxesPaidOrAccrued: or(option, string),
     // Part III, the CODED boxes — a code letter and an amount, repeated.
-    box11OtherIncome: option(array(codedEntry)),
-    box13OtherDeductions: option(array(codedEntry)),
-    box14SelfEmploymentEarnings: option(array(codedEntry)),
-    box15Credits: option(array(codedEntry)),
-    box17AlternativeMinimumTaxItems: option(array(codedEntry)),
-    box18TaxExemptIncomeAndNondeductibleExpenses: option(array(codedEntry)),
-    box19Distributions: option(array(codedEntry)),
-    box20OtherInformation: option(array(codedEntry)),
+    box11OtherIncome: or(option, array(codedEntry)),
+    box13OtherDeductions: or(option, array(codedEntry)),
+    box14SelfEmploymentEarnings: or(option, array(codedEntry)),
+    box15Credits: or(option, array(codedEntry)),
+    box17AlternativeMinimumTaxItems: or(option, array(codedEntry)),
+    box18TaxExemptIncomeAndNondeductibleExpenses: or(option, array(codedEntry)),
+    box19Distributions: or(option, array(codedEntry)),
+    box20OtherInformation: or(option, array(codedEntry)),
     // Part III, the checkbox-only boxes.
-    box16ScheduleK3Attached: option(true),
-    box22MoreThanOneActivityForAtRiskPurposes: option(true),
-    box23MoreThanOneActivityForPassiveActivityPurposes: option(true),
+    box16ScheduleK3Attached: or(option, true),
+    box22MoreThanOneActivityForAtRiskPurposes: or(option, true),
+    box23MoreThanOneActivityForPassiveActivityPurposes: or(option, true),
 })
 
 /**
@@ -813,10 +813,11 @@ export const proof = {
          * arrives incomplete, and the one a default would silently paper over.
          */
         neitherPartnerTypeIsRefused: () => {
-            const [t, v] = validate({
-                ...limitedPartner,
-                boxGLimitedPartnerOrOtherLlcMember: undefined,
-            })
+            // Box G unticked is the key ABSENT, not present holding `undefined`:
+            // since 0.48.0 the schema reads `or(option, true)`, and a present
+            // `undefined` is refused by rtti before this leaf's own gate runs.
+            const { boxGLimitedPartnerOrOtherLlcMember: _dropped, ...neither } = limitedPartner
+            const [t, v] = validate(neither)
             assertEq(t, 'error')
             assert(typeof v === 'string' && v.includes('box G'), [v])
             assert(typeof v === 'string' && v.includes('neither'), [v])

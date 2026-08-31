@@ -58,7 +58,7 @@ above line 3 — the deemed rule provably cannot move any printed line. So:
 The certification field is new: `filerWasNeitherAStudentNorDisabledInAnyMonth` on
 `vnd.fjs.credits`' dependent-care block. It is a certification in the exact shape of Form
 8962's `noDependentIsRequiredToFileAnIncomeTaxReturn` and Form 3903's §217(g) checkbox —
-`option(true)`, DOC-12, absent means NOT certified.
+`or(option, true)`, DOC-12, absent means NOT certified.
 
 ### 2b. The harder half of §21(d): a joint return needs TWO earned incomes, and this engine has ONE
 
@@ -134,7 +134,7 @@ none of them is exactly today's record.
 
 ### 4. Box 10 of the W-2 — **stored, and read by nothing**
 
-`fjs/document/w2/module.f.js` line 127 declares `box10DependentCareBenefits: option(string)`
+`fjs/document/w2/module.f.js` line 127 declares `box10DependentCareBenefits: or(option, string)`
 and line 160 lists it in `moneyBoxFields`, so the dialect validates its exactness. A
 repo-wide grep for the identifier returns **exactly those two lines**. No form, schedule,
 report, demo or proof has ever read it.

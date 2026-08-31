@@ -49,7 +49,7 @@
  *
  * Field-shape notes:
  * - **Box 7a is a LIST of distribution codes
- *   (`box7aDistributionCodes: option(array(string))`), never a
+ *   (`box7aDistributionCodes: or(option, array(string))`), never a
  *   `(code, amount)` pair-list.** Unlike W-2 box 12, there is no per-code
  *   amount printed beside a 1099-R distribution code — IRS convention
  *   allows up to two codes in the one printed box (e.g. a normal
@@ -87,16 +87,16 @@
  *   exact-decimal rule, which does not apply to a percentage value. Box 11
  *   (1st year of desig. Roth contrib.) is a year, and box 13 (Date of
  *   payment) is a free-text date — this project has no date primitive yet —
- *   so both stay plain `option(string)` with no numeric-exactness check
+ *   so both stay plain `or(option, string)` with no numeric-exactness check
  *   this phase.
- * - Every checkbox is `option(true)` — DOC-12 — for `corrected`,
+ * - Every checkbox is `or(option, true)` — DOC-12 — for `corrected`,
  *   `box2bTaxableAmountNotDetermined`, `box2bTotalDistribution`,
  *   `box7bIraSepSimple`, `box7cTrumpAccount`, `box12FatcaFilingRequirement`.
  *
  * @module
  */
-import { array, number, open, option, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
-import { validate as rttiValidate } from 'functionalscript/fjs/types/rtti/validate/module.f.mjs'
+import { array, number, open, option, or, string } from 'functionalscript/fjs/rtti/module.f.mjs'
+import { validate as rttiValidate } from 'functionalscript/fjs/rtti/validate/module.f.mjs'
 import { error, ok } from 'functionalscript/fjs/types/result/module.f.mjs'
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { base, mediaTypeOf } from '../base/module.f.js'
@@ -104,8 +104,8 @@ import { formRevisionError } from '../form_revision/module.f.js'
 import { moneyFieldError } from '../money_field/module.f.js'
 
 /** @import { Result } from 'functionalscript/fjs/types/result/types.js' */
-/** @import { Ts, Unknown } from 'functionalscript/fjs/types/rtti/ts/types.js' */
-/** @import { ValidationError } from 'functionalscript/fjs/types/rtti/common/types.js' */
+/** @import { Ts, Unknown } from 'functionalscript/fjs/rtti/ts/types.js' */
+/** @import { ValidationError } from 'functionalscript/fjs/rtti/common/types.js' */
 /** @import { SubjectKey } from '../subject/module.f.js' */
 
 /**
@@ -124,12 +124,12 @@ export const mediaType = mediaTypeOf(dialect)
  */
 const stateLocalEntry = open({
     state: string,
-    payerStateNo: option(string),
-    stateTaxWithheld: option(string),
-    stateDistribution: option(string),
-    localTaxWithheld: option(string),
-    localityName: option(string),
-    localDistribution: option(string),
+    payerStateNo: or(option, string),
+    stateTaxWithheld: or(option, string),
+    stateDistribution: or(option, string),
+    localTaxWithheld: or(option, string),
+    localityName: or(option, string),
+    localDistribution: or(option, string),
 })
 
 /**
@@ -144,30 +144,30 @@ export const oneZeroNineNineRSchema = open({
     accountNumber: string,
     taxYear: number,
     formRevision: string,
-    corrected: option(true),
-    box1GrossDistribution: option(string),
-    box2aTaxableAmount: option(string),
-    box2bTaxableAmountNotDetermined: option(true),
-    box2bTotalDistribution: option(true),
-    box3CapitalGain: option(string),
-    box4FederalIncomeTaxWithheld: option(string),
-    box5EmployeeContribOrInsurancePremiums: option(string),
-    box6NuaInEmployerSecurities: option(string),
-    box7aDistributionCodes: option(array(string)),
-    box7bIraSepSimple: option(true),
-    box7cTrumpAccount: option(true),
-    box7dEarningsOnExcessContrib: option(string),
-    box8aOther: option(string),
-    box8bPercentageOfAnnuityContract: option(string),
-    box9aPercentageOfTotalDistribution: option(string),
-    box9bTotalEmployeeContrib: option(string),
-    box10AmountAllocableToIrrWithin5Years: option(string),
-    box11FirstYearOfDesigRothContrib: option(string),
-    box12FatcaFilingRequirement: option(true),
-    box13DateOfPayment: option(string),
-    stateLocal: option(array(stateLocalEntry)),
-    payerName: option(string),
-    recipientName: option(string),
+    corrected: or(option, true),
+    box1GrossDistribution: or(option, string),
+    box2aTaxableAmount: or(option, string),
+    box2bTaxableAmountNotDetermined: or(option, true),
+    box2bTotalDistribution: or(option, true),
+    box3CapitalGain: or(option, string),
+    box4FederalIncomeTaxWithheld: or(option, string),
+    box5EmployeeContribOrInsurancePremiums: or(option, string),
+    box6NuaInEmployerSecurities: or(option, string),
+    box7aDistributionCodes: or(option, array(string)),
+    box7bIraSepSimple: or(option, true),
+    box7cTrumpAccount: or(option, true),
+    box7dEarningsOnExcessContrib: or(option, string),
+    box8aOther: or(option, string),
+    box8bPercentageOfAnnuityContract: or(option, string),
+    box9aPercentageOfTotalDistribution: or(option, string),
+    box9bTotalEmployeeContrib: or(option, string),
+    box10AmountAllocableToIrrWithin5Years: or(option, string),
+    box11FirstYearOfDesigRothContrib: or(option, string),
+    box12FatcaFilingRequirement: or(option, true),
+    box13DateOfPayment: or(option, string),
+    stateLocal: or(option, array(stateLocalEntry)),
+    payerName: or(option, string),
+    recipientName: or(option, string),
 })
 
 /**
@@ -299,7 +299,7 @@ const minimal = {
 /**
  * T-11-01-01: a money box's name could be quietly dropped from
  * {@link moneyBoxFields} without anyone noticing — the field stays
- * `option(string)` structurally, so a comma-grouped amount in a dropped box
+ * `or(option, string)` structurally, so a comma-grouped amount in a dropped box
  * would then validate as ok. One generated leaf per NAMED scalar box
  * supplies a comma-grouped value to that box alone and asserts `validate`
  * refuses, built by mapping {@link moneyBoxFields} itself into `[field,
@@ -411,7 +411,7 @@ export const proof = {
             assertEq(v.box7aDistributionCodes, undefined)
             assertEq(v.stateLocal, undefined)
         },
-        // DOC-12: `false` is not a member of `option(true)` for any of the
+        // DOC-12: `false` is not a member of `or(option, true)` for any of the
         // six checkbox fields — rejected structurally, never accepted as
         // "not checked".
         falseFlagsRejected: () => {

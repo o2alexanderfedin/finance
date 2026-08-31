@@ -125,8 +125,8 @@
  *
  * @module
  */
-import { number, open, option, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
-import { validate as rttiValidate } from 'functionalscript/fjs/types/rtti/validate/module.f.mjs'
+import { number, open, option, or, string } from 'functionalscript/fjs/rtti/module.f.mjs'
+import { validate as rttiValidate } from 'functionalscript/fjs/rtti/validate/module.f.mjs'
 import { error, ok } from 'functionalscript/fjs/types/result/module.f.mjs'
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { base, mediaTypeOf } from '../base/module.f.js'
@@ -136,8 +136,8 @@ import { declaredSubject } from '../subject/module.f.js'
 import { declaredMembers } from '../../document/base/module.f.js'
 
 /** @import { Result } from 'functionalscript/fjs/types/result/types.js' */
-/** @import { Ts, Unknown } from 'functionalscript/fjs/types/rtti/ts/types.js' */
-/** @import { ValidationError } from 'functionalscript/fjs/types/rtti/common/types.js' */
+/** @import { Ts, Unknown } from 'functionalscript/fjs/rtti/ts/types.js' */
+/** @import { ValidationError } from 'functionalscript/fjs/rtti/common/types.js' */
 /** @import { SubjectKey } from '../subject/module.f.js' */
 
 /**
@@ -172,17 +172,17 @@ export const oneZeroNineEightTSchema = open({
     serviceProviderAccountNumber: string,
     taxYear: number,
     formRevision: string,
-    corrected: option(true),
-    box1PaymentsReceivedForQualifiedTuition: option(string),
-    box4AdjustmentsForAPriorYear: option(string),
-    box5ScholarshipsOrGrants: option(string),
-    box6AdjustmentsToScholarshipsForAPriorYear: option(string),
-    box7IncludesAmountsForAnAcademicPeriodBeginningInTheFollowingYear: option(true),
-    box8AtLeastHalfTimeStudent: option(true),
-    box9GraduateStudent: option(true),
-    box10InsuranceContractReimbursementOrRefund: option(string),
-    payerName: option(string),
-    recipientName: option(string),
+    corrected: or(option, true),
+    box1PaymentsReceivedForQualifiedTuition: or(option, string),
+    box4AdjustmentsForAPriorYear: or(option, string),
+    box5ScholarshipsOrGrants: or(option, string),
+    box6AdjustmentsToScholarshipsForAPriorYear: or(option, string),
+    box7IncludesAmountsForAnAcademicPeriodBeginningInTheFollowingYear: or(option, true),
+    box8AtLeastHalfTimeStudent: or(option, true),
+    box9GraduateStudent: or(option, true),
+    box10InsuranceContractReimbursementOrRefund: or(option, string),
+    payerName: or(option, string),
+    recipientName: or(option, string),
 })
 
 /**
@@ -206,7 +206,7 @@ const validateShape = rttiValidate(oneZeroNineEightTSchema)
  * `string | undefined`.
  *
  * The three checkbox fields are deliberately absent: they are checkboxes, not
- * dollar amounts, and follow DOC-12's `option(true)` convention instead.
+ * dollar amounts, and follow DOC-12's `or(option, true)` convention instead.
  */
 export const moneyBoxFields = /** @type {const} */ ([
     'box1PaymentsReceivedForQualifiedTuition',

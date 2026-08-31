@@ -32,7 +32,7 @@
  * **The caller now exists, and the field it gates on is named.**
  * `fjs/schedule/1` reads
  * `movingExpensesArmedForcesPermanentChangeOfStation` — Form 3903's own
- * pre-line checkbox, stored as `option(true)` like every other certification
+ * pre-line checkbox, stored as `or(option, true)` like every other certification
  * on that dialect — and REFUSES rather than computing when a moving expense or
  * a box 12 code P reimbursement reaches line 14 without it. This paragraph
  * originally pointed at `fjs/return/profile`'s `movingExpensesArmedForces`

@@ -182,7 +182,7 @@ import { taxParamsByYear } from '../tax/params/module.f.js'
 
 /**
  * One person's §25B(c) answers, as `fjs/document/credits`' eligibility record
- * supplies them, already normalized from `option(true)` to definite booleans
+ * supplies them, already normalized from `or(option, true)` to definite booleans
  * by the caller — the same `=== true` normalization `fjs/form8812` expects of
  * its own `dependents` array.
  *

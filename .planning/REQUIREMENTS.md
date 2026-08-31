@@ -1825,7 +1825,7 @@ ruling for why a phase without an ID is preferable to an ID invented to give it 
       **The whole compatibility fix is behaviour-preserving**, and what establishes that is
       what the server serves, not the size of the diff: `open(c)` is documented upstream as
       exactly the old bare form, so 31 dialect registrations and 5 nested JSON-RPC response
-      schemas state what they already relied on, and **`toJsonSchema` over all 31 dialect
+      schemas state what they already relied on, and **`toJsonSchema` over all 30 dialect
       schemas is byte-identical to 0.46.1's output**. That holds only when `open()` is stated
       where each schema is **defined**; wrapping at the `dialectEntry(...)` call site instead
       moves 47 containers, each gaining an `additionalProperties`. Measured in a worktree on
@@ -2236,7 +2236,11 @@ was already superseded before the phase started.
       **`option` is no longer a function.** 0.47.0 defines `option = t => or(t, undefined)`,
       called as `option(string)`. 0.48.0 defines `option = type0('option')`, a tag used as
       `or(option, string)` — upstream's own `revisionSchema` now reads
-      `archived: or(option, true)`. **596 call sites across 59 files** here.
+      `archived: or(option, true)`. **459 call sites across 34 files** here — the
+      "596 across 59" this section first carried counted prose alongside code. Measured
+      on the pre-transform tree: 562 occurrences in `.js` (459 calls, 102 docstring
+      mentions, and one HTML `<option>` builder that is not rtti at all), plus 36 in
+      markdown. Code is rewritten; the 138 prose mentions are corrected as prose.
 
       **The guard is what the server serves, not that it compiles.** v5's Phase 38 proved
       that a rewrite can typecheck, pass, and still change every schema the application

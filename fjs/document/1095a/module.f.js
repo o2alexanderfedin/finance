@@ -51,7 +51,7 @@
  *   precedent: they are transcribed as printed and no computation here reads
  *   them. Nothing in Form 8962 does either — Part III's twelve rows already
  *   say which months were covered.
- * - Every checkbox is `option(true)` (DOC-12): `corrected` and `voidBox`.
+ * - Every checkbox is `or(option, true)` (DOC-12): `corrected` and `voidBox`.
  *
  * ## The scope line this module does not cross
  *
@@ -64,8 +64,8 @@
  *
  * @module
  */
-import { array, number, open, option, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
-import { validate as rttiValidate } from 'functionalscript/fjs/types/rtti/validate/module.f.mjs'
+import { array, number, open, option, or, string } from 'functionalscript/fjs/rtti/module.f.mjs'
+import { validate as rttiValidate } from 'functionalscript/fjs/rtti/validate/module.f.mjs'
 import { error, ok } from 'functionalscript/fjs/types/result/module.f.mjs'
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { isHash } from 'functionalscript/fjs/media/revision/module.f.mjs'
@@ -75,8 +75,8 @@ import { moneyFieldError } from '../money_field/module.f.js'
 import { centsFromString, centsToString } from '../../exact/module.f.js'
 
 /** @import { Result } from 'functionalscript/fjs/types/result/types.js' */
-/** @import { Ts, Unknown } from 'functionalscript/fjs/types/rtti/ts/types.js' */
-/** @import { ValidationError } from 'functionalscript/fjs/types/rtti/common/types.js' */
+/** @import { Ts, Unknown } from 'functionalscript/fjs/rtti/ts/types.js' */
+/** @import { ValidationError } from 'functionalscript/fjs/rtti/common/types.js' */
 /** @import { SubjectKey } from '../subject/module.f.js' */
 
 /**
@@ -95,10 +95,10 @@ export const mediaType = mediaTypeOf(dialect)
  */
 const coveredIndividualEntry = open({
     name: string,
-    ssn: option(string),
-    dateOfBirth: option(string),
-    coverageStartDate: option(string),
-    coverageTerminationDate: option(string),
+    ssn: or(option, string),
+    dateOfBirth: or(option, string),
+    coverageStartDate: or(option, string),
+    coverageTerminationDate: or(option, string),
 })
 
 /**
@@ -114,9 +114,9 @@ const coveredIndividualEntry = open({
  */
 const monthlyCoverageEntry = open({
     month: number,
-    columnAEnrollmentPremiums: option(string),
-    columnBSlcspPremium: option(string),
-    columnCAdvancePaymentOfPtc: option(string),
+    columnAEnrollmentPremiums: or(option, string),
+    columnBSlcspPremium: or(option, string),
+    columnCAdvancePaymentOfPtc: or(option, string),
 })
 
 /**
@@ -142,20 +142,20 @@ export const oneZeroNineFiveASchema = open({
     taxYear: number,
     formRevision: string,
     sourceArtifactHash: string,
-    corrected: option(true),
-    voidBox: option(true),
-    recipientName: option(string),
-    recipientDateOfBirth: option(string),
-    recipientSpouseName: option(string),
-    recipientSpouseTin: option(string),
-    recipientSpouseDateOfBirth: option(string),
-    policyStartDate: option(string),
-    policyTerminationDate: option(string),
+    corrected: or(option, true),
+    voidBox: or(option, true),
+    recipientName: or(option, string),
+    recipientDateOfBirth: or(option, string),
+    recipientSpouseName: or(option, string),
+    recipientSpouseTin: or(option, string),
+    recipientSpouseDateOfBirth: or(option, string),
+    policyStartDate: or(option, string),
+    policyTerminationDate: or(option, string),
     coveredIndividuals: array(coveredIndividualEntry),
     monthlyCoverage: array(monthlyCoverageEntry),
-    line33AnnualEnrollmentPremiums: option(string),
-    line33AnnualSlcspPremium: option(string),
-    line33AnnualAdvancePaymentOfPtc: option(string),
+    line33AnnualEnrollmentPremiums: or(option, string),
+    line33AnnualSlcspPremium: or(option, string),
+    line33AnnualAdvancePaymentOfPtc: or(option, string),
 })
 
 /**
@@ -385,7 +385,7 @@ const twelveUniformMonths = columnA => columnB => columnC =>
 /**
  * T-1095A-01: a money box's name could be quietly dropped from
  * {@link moneyBoxFields} without anyone noticing — the field stays
- * `option(string)` structurally, so a comma-grouped amount in a dropped box
+ * `or(option, string)` structurally, so a comma-grouped amount in a dropped box
  * would then validate as ok. One generated leaf per NAMED scalar box supplies
  * a comma-grouped value to that box alone and asserts `validate` refuses,
  * built by mapping {@link moneyBoxFields} itself into `[field, assertion]`
@@ -497,7 +497,7 @@ export const proof = {
             assertEq(v.line33AnnualEnrollmentPremiums, undefined)
             assertEq(v.monthlyCoverage.length, 0)
         },
-        // DOC-12: `false` is not a member of `option(true)` for either
+        // DOC-12: `false` is not a member of `or(option, true)` for either
         // checkbox — rejected structurally, never accepted as "not checked".
         falseFlagsRejected: () => {
             assertEq(validate({ ...minimal, corrected: false })[0], 'error')

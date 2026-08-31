@@ -43,7 +43,7 @@
  *   beneficiary of Social Security necessarily has one.
  * - **Box 7 (Address) is NOT modeled**, mirroring the W-2 box 9/14 omission
  *   precedent: it is PII with no computational use.
- * - **`corrected: option(true)` is kept for structural consistency with
+ * - **`corrected: or(option, true)` is kept for structural consistency with
  *   every other dialect, but with LOW confidence it is ever populated.**
  *   The Pub 915 Appendix sample shows no CORRECTED box (unlike RRB-1099,
  *   which Pub 915 explicitly says the RRB marks "CORRECTED" and replaces) —
@@ -55,8 +55,8 @@
  *
  * @module
  */
-import { number, open, option, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
-import { validate as rttiValidate } from 'functionalscript/fjs/types/rtti/validate/module.f.mjs'
+import { number, open, option, or, string } from 'functionalscript/fjs/rtti/module.f.mjs'
+import { validate as rttiValidate } from 'functionalscript/fjs/rtti/validate/module.f.mjs'
 import { error, ok } from 'functionalscript/fjs/types/result/module.f.mjs'
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { base, mediaTypeOf } from '../base/module.f.js'
@@ -64,8 +64,8 @@ import { formRevisionError } from '../form_revision/module.f.js'
 import { moneyFieldError } from '../money_field/module.f.js'
 
 /** @import { Result } from 'functionalscript/fjs/types/result/types.js' */
-/** @import { Ts, Unknown } from 'functionalscript/fjs/types/rtti/ts/types.js' */
-/** @import { ValidationError } from 'functionalscript/fjs/types/rtti/common/types.js' */
+/** @import { Ts, Unknown } from 'functionalscript/fjs/rtti/ts/types.js' */
+/** @import { ValidationError } from 'functionalscript/fjs/rtti/common/types.js' */
 /** @import { SubjectKey } from '../subject/module.f.js' */
 
 /**
@@ -88,14 +88,14 @@ export const ssa1099Schema = open({
     claimNumber: string,
     taxYear: number,
     formRevision: string,
-    corrected: option(true),
-    box3BenefitsPaid: option(string),
-    box3Description: option(string),
-    box4BenefitsRepaid: option(string),
-    box4Description: option(string),
-    box5NetBenefits: option(string),
-    box6VoluntaryFederalIncomeTaxWithheld: option(string),
-    recipientName: option(string),
+    corrected: or(option, true),
+    box3BenefitsPaid: or(option, string),
+    box3Description: or(option, string),
+    box4BenefitsRepaid: or(option, string),
+    box4Description: or(option, string),
+    box5NetBenefits: or(option, string),
+    box6VoluntaryFederalIncomeTaxWithheld: or(option, string),
+    recipientName: or(option, string),
 })
 
 /**
@@ -139,7 +139,7 @@ export const moneyBoxFields = /** @type {const} */ ([
  * is non-empty (DOC-10), and every PRESENT money box is an exact decimal
  * within safe magnitude. Absent boxes are skipped, never defaulted
  * (DOC-11). `box3Description`/`box4Description`/`recipientName` are plain
- * optional strings, never validated beyond structural `option(string)` —
+ * optional strings, never validated beyond structural `or(option, string)` —
  * they are never computed on.
  * @type {(r: Ssa1099) => Result<Ssa1099, Ssa1099Error>}
  */
@@ -201,7 +201,7 @@ const minimal = {
 /**
  * T-11-01-01: a money box's name could be quietly dropped from
  * {@link moneyBoxFields} without anyone noticing — the field stays
- * `option(string)` structurally, so a comma-grouped amount in a dropped box
+ * `or(option, string)` structurally, so a comma-grouped amount in a dropped box
  * would then validate as ok. One generated leaf per NAMED box supplies a
  * comma-grouped value to that box alone and asserts `validate` refuses,
  * built by mapping {@link moneyBoxFields} itself into `[field, assertion]`
@@ -286,7 +286,7 @@ export const proof = {
             assertEq(v.box3BenefitsPaid, undefined)
             assertEq(v.corrected, undefined)
         },
-        // DOC-12: `false` is not a member of `option(true)` — rejected
+        // DOC-12: `false` is not a member of `or(option, true)` — rejected
         // structurally, never accepted as "not corrected".
         correctedFalseRejected: () => {
             const [t] = validate({ ...minimal, corrected: false })

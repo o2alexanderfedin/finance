@@ -26,7 +26,7 @@
  * - **Box 2** is a CHECKBOX: *"Payer made direct sales totaling $5,000 or more
  *   of consumer products to recipient for resale."* It reports no dollar
  *   figure — the payer ticks it and reports the sales nowhere — and it follows
- *   DOC-12's checkbox convention (`option(true)`), so a `false` blob is
+ *   DOC-12's checkbox convention (`or(option, true)`), so a `false` blob is
  *   rejected structurally and absence is the only way to say "not checked".
  *
  *   **A ticked box 2 makes `fjs/schedule/c` REFUSE the whole return**, and
@@ -45,7 +45,7 @@
  * - **Box 3** is *"Reserved for future use"* on the current revision — the
  *   printed form's own inert box, exactly like Schedule 1's line 22. It is
  *   modeled for line-number completeness so a transcriber cannot mistake box
- *   4 for box 3, and it carries no type but `option(string)`; nothing reads
+ *   4 for box 3, and it carries no type but `or(option, string)`; nothing reads
  *   it, and it is refused when non-zero for the same reason every other
  *   unmodeled amount here is.
  * - **Boxes 5, 6 and 7** are the state block — state tax withheld, the
@@ -76,8 +76,8 @@
  *
  * @module
  */
-import { array, number, open, option, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
-import { validate as rttiValidate } from 'functionalscript/fjs/types/rtti/validate/module.f.mjs'
+import { array, number, open, option, or, string } from 'functionalscript/fjs/rtti/module.f.mjs'
+import { validate as rttiValidate } from 'functionalscript/fjs/rtti/validate/module.f.mjs'
 import { error, ok } from 'functionalscript/fjs/types/result/module.f.mjs'
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { centsFromString } from '../../exact/module.f.js'
@@ -86,8 +86,8 @@ import { formRevisionError } from '../form_revision/module.f.js'
 import { moneyFieldError } from '../money_field/module.f.js'
 
 /** @import { Result } from 'functionalscript/fjs/types/result/types.js' */
-/** @import { Ts, Unknown } from 'functionalscript/fjs/types/rtti/ts/types.js' */
-/** @import { ValidationError } from 'functionalscript/fjs/types/rtti/common/types.js' */
+/** @import { Ts, Unknown } from 'functionalscript/fjs/rtti/ts/types.js' */
+/** @import { ValidationError } from 'functionalscript/fjs/rtti/common/types.js' */
 /** @import { SubjectKey } from '../subject/module.f.js' */
 
 /**
@@ -112,9 +112,9 @@ export const mediaType = mediaTypeOf(dialect)
  */
 const stateEntry = open({
     state: string,
-    box5StateTaxWithheld: option(string),
-    box6StatePayerStateNumber: option(string),
-    box7StateIncome: option(string),
+    box5StateTaxWithheld: or(option, string),
+    box6StatePayerStateNumber: or(option, string),
+    box7StateIncome: or(option, string),
 })
 
 /**
@@ -129,14 +129,14 @@ export const oneZeroNineNineNecSchema = open({
     accountNumber: string,
     taxYear: number,
     formRevision: string,
-    corrected: option(true),
-    box1NonemployeeCompensation: option(string),
-    box2DirectSalesOfFiveThousandOrMore: option(true),
-    box3ReservedForFutureUse: option(string),
-    box4FederalIncomeTaxWithheld: option(string),
-    box5Through7: option(array(stateEntry)),
-    payerName: option(string),
-    recipientName: option(string),
+    corrected: or(option, true),
+    box1NonemployeeCompensation: or(option, string),
+    box2DirectSalesOfFiveThousandOrMore: or(option, true),
+    box3ReservedForFutureUse: or(option, string),
+    box4FederalIncomeTaxWithheld: or(option, string),
+    box5Through7: or(option, array(stateEntry)),
+    payerName: or(option, string),
+    recipientName: or(option, string),
 })
 
 /**
@@ -527,7 +527,7 @@ export const proof = {
      * Box 2 carries NO amount, and that is asserted rather than assumed: the
      * $5,000 in its printed caption is a threshold the PAYER applied, so a
      * blob putting a dollar string there is structurally rejected. Without
-     * this leaf, widening box 2 to `option(string)` — which would silently
+     * this leaf, widening box 2 to `or(option, string)` — which would silently
      * make it look like a money box that nothing sums — would pass.
      */
     box2CarriesNoAmount: () => {

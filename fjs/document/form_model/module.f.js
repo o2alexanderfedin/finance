@@ -24,7 +24,7 @@
  *
  * | JSON Schema node | Field kind | Renders as |
  * |---|---|---|
- * | `{ const: true }` | `checkbox` | a checkbox — the `option(true)` idiom, present-or-absent, never `false` |
+ * | `{ const: true }` | `checkbox` | a checkbox — the `or(option, true)` idiom, present-or-absent, never `false` |
  * | `{ const: 'vnd.fjs.w2' }` | `fixed` | nothing; the dialect tag is supplied, not asked |
  * | `{ type: 'string' }` | `text` | a text input |
  * | `{ type: 'number' }` | `number` | a number input |
@@ -306,7 +306,7 @@ export const proof = {
                 assert(fields.some(f => f.name === name), ['property without a field', name])
             }
         },
-        // One field of each kind, taken from a shipped schema. `option(true)`
+        // One field of each kind, taken from a shipped schema. `or(option, true)`
         // must reach a checkbox and not a text box: a text box would accept
         // the string `"false"`, which the validator refuses and which no
         // checkbox can produce.

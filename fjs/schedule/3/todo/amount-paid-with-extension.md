@@ -23,7 +23,7 @@ The engine has done exactly this three times already, on `vnd.fjs.return_profile
 `line26EstimatedTaxPayments` is the exact precedent, down to the shape of its guard, and
 this line copies it rather than inventing anything:
 
-1. `option(string)` on `returnProfileSchema` — money as a decimal `string`, never a JSON
+1. `or(option, string)` on `returnProfileSchema` — money as a decimal `string`, never a JSON
    number (AGENTS.md's first hard rule).
 2. The field name joins `moneyBoxFields`, so `checkReferences`' step 6 re-parses it
    through `moneyFieldError` and a comma-grouped or otherwise inexact amount is refused

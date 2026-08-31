@@ -300,7 +300,7 @@ Line 4b is NOT line 4a, and the difference is one stored election:
 The election is a standing status under §77, not a fact about this year's amounts — it may
 have been made in a prior year. So the dialect carries
 `commodityCreditCorporationLoanProceedsReportedAsIncomeUnderElection` as a DOC-12 checkbox
-(`option(true)`), and **absence is the safe reading**: no election means the market gain IS
+(`or(option, true)`), and **absence is the safe reading**: no election means the market gain IS
 taxable on line 4b, which is the higher-tax direction. That is precisely the test DOC-12's
 convention has to pass, and `grossReceiptsFullyReportedOnForms1099Nec` passes it the same way.
 

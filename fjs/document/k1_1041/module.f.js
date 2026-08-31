@@ -101,8 +101,8 @@
  *
  * @module
  */
-import { array, number, open, option, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
-import { validate as rttiValidate } from 'functionalscript/fjs/types/rtti/validate/module.f.mjs'
+import { array, number, open, option, or, string } from 'functionalscript/fjs/rtti/module.f.mjs'
+import { validate as rttiValidate } from 'functionalscript/fjs/rtti/validate/module.f.mjs'
 import { error, ok } from 'functionalscript/fjs/types/result/module.f.mjs'
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { centsFromString } from '../../exact/module.f.js'
@@ -113,8 +113,8 @@ import { codedEntry, codedBoxError, materialParticipationValues, materialPartici
 import { declaredMembers } from '../../document/base/module.f.js'
 
 /** @import { Result } from 'functionalscript/fjs/types/result/types.js' */
-/** @import { Ts, Unknown } from 'functionalscript/fjs/types/rtti/ts/types.js' */
-/** @import { ValidationError } from 'functionalscript/fjs/types/rtti/common/types.js' */
+/** @import { Ts, Unknown } from 'functionalscript/fjs/rtti/ts/types.js' */
+/** @import { ValidationError } from 'functionalscript/fjs/rtti/common/types.js' */
 /** @import { SubjectKey } from '../subject/module.f.js' */
 
 /**
@@ -163,41 +163,41 @@ export const k1EstateTrustSchema = open({
     taxYear: number,
     formRevision: string,
     // The two printed checkboxes above Part III's caption.
-    finalK1: option(true),
-    amendedK1: option(true),
-    payerName: option(string),
-    recipientName: option(string),
+    finalK1: or(option, true),
+    amendedK1: or(option, true),
+    payerName: or(option, string),
+    recipientName: or(option, string),
     // Part I, boxes C, D and E.
-    fiduciaryName: option(string),
-    boxDForm1041TWasFiled: option(true),
-    boxDForm1041TFiledDate: option(string),
-    boxEFinalForm1041: option(true),
+    fiduciaryName: or(option, string),
+    boxDForm1041TWasFiled: or(option, true),
+    boxDForm1041TFiledDate: or(option, string),
+    boxEFinalForm1041: or(option, true),
     // Part II, box H — a printed PAIR of checkboxes.
-    boxHDomesticBeneficiary: option(true),
-    boxHForeignBeneficiary: option(true),
+    boxHDomesticBeneficiary: or(option, true),
+    boxHForeignBeneficiary: or(option, true),
     // The one field that is not a printed box.
-    materialParticipation: option(string),
+    materialParticipation: or(option, string),
     // Part III, the fixed-caption money boxes: 1, 2a, 2b, 3, 4a, 4b, 4c, 5, 6,
     // 7, 8 and 10.
-    box1InterestIncome: option(string),
-    box2aOrdinaryDividends: option(string),
-    box2bQualifiedDividends: option(string),
-    box3NetShortTermCapitalGain: option(string),
-    box4aNetLongTermCapitalGain: option(string),
-    box4bTwentyEightPercentRateGain: option(string),
-    box4cUnrecapturedSection1250Gain: option(string),
-    box5OtherPortfolioAndNonbusinessIncome: option(string),
-    box6OrdinaryBusinessIncome: option(string),
-    box7NetRentalRealEstateIncome: option(string),
-    box8OtherRentalIncome: option(string),
-    box10EstateTaxDeduction: option(string),
+    box1InterestIncome: or(option, string),
+    box2aOrdinaryDividends: or(option, string),
+    box2bQualifiedDividends: or(option, string),
+    box3NetShortTermCapitalGain: or(option, string),
+    box4aNetLongTermCapitalGain: or(option, string),
+    box4bTwentyEightPercentRateGain: or(option, string),
+    box4cUnrecapturedSection1250Gain: or(option, string),
+    box5OtherPortfolioAndNonbusinessIncome: or(option, string),
+    box6OrdinaryBusinessIncome: or(option, string),
+    box7NetRentalRealEstateIncome: or(option, string),
+    box8OtherRentalIncome: or(option, string),
+    box10EstateTaxDeduction: or(option, string),
     // Part III, the CODED boxes — a code letter and an amount, repeated: 9, 11,
     // 12, 13 and 14.
-    box9DirectlyApportionedDeductions: option(array(codedEntry)),
-    box11FinalYearDeductions: option(array(codedEntry)),
-    box12AlternativeMinimumTaxItems: option(array(codedEntry)),
-    box13CreditsAndCreditRecapture: option(array(codedEntry)),
-    box14OtherInformation: option(array(codedEntry)),
+    box9DirectlyApportionedDeductions: or(option, array(codedEntry)),
+    box11FinalYearDeductions: or(option, array(codedEntry)),
+    box12AlternativeMinimumTaxItems: or(option, array(codedEntry)),
+    box13CreditsAndCreditRecapture: or(option, array(codedEntry)),
+    box14OtherInformation: or(option, array(codedEntry)),
 })
 
 /**

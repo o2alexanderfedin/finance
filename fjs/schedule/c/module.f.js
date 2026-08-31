@@ -1752,11 +1752,12 @@ export const proof = {
         // A 1099-NEC with NO box 1 contributes nothing and is not counted as a
         // source. Absent is not zero-valued: it is not present at all (DOC-11).
         aFormWithoutBoxOneContributesNoSource: () => {
+            const { box1NonemployeeCompensation: _boxOne, ...withoutBoxOne }
+                = necDoc('0.00')('sha256-nec-c').value
             const withholdingOnly = {
                 documentHash: 'sha256-nec-c',
                 value: {
-                    ...necDoc('0.00')('sha256-nec-c').value,
-                    box1NonemployeeCompensation: undefined,
+                    ...withoutBoxOne,
                     box4FederalIncomeTaxWithheld: '1200.00',
                 },
             }
@@ -2346,15 +2347,14 @@ export const proof = {
                 }],
             })).message
             assert(listed.includes('§280F'), ['Part V\'s refusal, verbatim', listed])
+            const { priorYearSection179CarryoverIsZero: _carryover, ...uncertifiedRegister }
+                = registerDoc('BUS-0001').value
             const uncertified = refusal(run({
                 nonemployeeCompensationForms: [necDoc('6000.00')('sha256-nec-1')],
                 businessExpenseForms: [businessDoc([])],
                 assetRegisters: [{
                     ...registerDoc('BUS-0001'),
-                    value: {
-                        ...registerDoc('BUS-0001').value,
-                        priorYearSection179CarryoverIsZero: undefined,
-                    },
+                    value: uncertifiedRegister,
                 }],
             })).message
             assert(uncertified.includes('line 10'), ['line 10\'s refusal, verbatim', uncertified])
@@ -2561,12 +2561,11 @@ export const proof = {
         // an explicit refusal. Without the assertion the schedule refuses,
         // naming the threshold and the field that fixes it.
         anAbsentAssertionRefusesNamingTheSixHundredDollarThreshold: () => {
+            const { grossReceiptsFullyReportedOnForms1099Nec: _assertion, ...withoutTheAssertion }
+                = businessDoc([]).value
             const withoutAssertion = {
                 documentHash: 'sha256-business-a',
-                value: {
-                    ...businessDoc([]).value,
-                    grossReceiptsFullyReportedOnForms1099Nec: undefined,
-                },
+                value: withoutTheAssertion,
             }
             const result = refusal(run({
                 nonemployeeCompensationForms: [necDoc('48000.00')('sha256-nec-a')],

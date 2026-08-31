@@ -72,7 +72,7 @@
  * would GRANT one they may not be.
  *
  * So the record's PRESENCE is what says the questions were answered, and
- * DOC-12's `option(true)` then says which way each was answered.
+ * DOC-12's `or(option, true)` then says which way each was answered.
  * `fjs/form8880` refuses — rather than computing either direction — when
  * qualifying contributions exist, the credit rate is non-zero, and no
  * eligibility record was supplied for the person who made them. An engine
@@ -104,7 +104,7 @@
  * them, and whichever it fell back to would be a guess worth up to $500 per
  * student.
  *
- * The four `option(true)` facts beside it are Form 8863 Part III's own lines
+ * The four `or(option, true)` facts beside it are Form 8863 Part III's own lines
  * 23 through 26, and their directions are NOT uniform — which is the printed
  * page's doing, not this dialect's. Three of the four are DISQUALIFIERS whose
  * printed question is answered "yes" by presence
@@ -156,16 +156,16 @@
  *
  * @module
  */
-import { array, number, open, option, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
-import { validate as rttiValidate } from 'functionalscript/fjs/types/rtti/validate/module.f.mjs'
+import { array, number, open, option, or, string } from 'functionalscript/fjs/rtti/module.f.mjs'
+import { validate as rttiValidate } from 'functionalscript/fjs/rtti/validate/module.f.mjs'
 import { error, ok } from 'functionalscript/fjs/types/result/module.f.mjs'
 import { assert, assertEq, assertNotNullish } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { base, mediaTypeOf } from '../base/module.f.js'
 import { moneyFieldError } from '../money_field/module.f.js'
 
 /** @import { Result } from 'functionalscript/fjs/types/result/types.js' */
-/** @import { Ts, Unknown } from 'functionalscript/fjs/types/rtti/ts/types.js' */
-/** @import { ValidationError } from 'functionalscript/fjs/types/rtti/common/types.js' */
+/** @import { Ts, Unknown } from 'functionalscript/fjs/rtti/ts/types.js' */
+/** @import { ValidationError } from 'functionalscript/fjs/rtti/common/types.js' */
 /** @import { SubjectKey } from '../subject/module.f.js' */
 
 /**
@@ -228,9 +228,9 @@ const retirementContributionEntry = open({
  */
 const saversCreditEligibilityEntry = open({
     individual: string,
-    attainedAgeEighteen: option(true),
-    wasAFullTimeStudent: option(true),
-    noTestingPeriodDistributions: option(true),
+    attainedAgeEighteen: or(option, true),
+    wasAFullTimeStudent: or(option, true),
+    noTestingPeriodDistributions: or(option, true),
 })
 
 /**
@@ -249,12 +249,12 @@ const educationStudentEntry = open({
     studentTin: string,
     studentName: string,
     credit: string,
-    qualifiedExpensesNotReportedOnForm1098T: option(string),
-    courseMaterialsNotPaidToTheInstitution: option(string),
-    enrolledAtLeastHalfTimeInADegreeProgram: option(true),
-    americanOpportunityClaimedForFourPriorYears: option(true),
-    completedFirstFourYearsOfPostsecondaryEducation: option(true),
-    convictedOfAFelonyDrugOffense: option(true),
+    qualifiedExpensesNotReportedOnForm1098T: or(option, string),
+    courseMaterialsNotPaidToTheInstitution: or(option, string),
+    enrolledAtLeastHalfTimeInADegreeProgram: or(option, true),
+    americanOpportunityClaimedForFourPriorYears: or(option, true),
+    completedFirstFourYearsOfPostsecondaryEducation: or(option, true),
+    convictedOfAFelonyDrugOffense: or(option, true),
 })
 
 /**
@@ -273,7 +273,7 @@ const educationStudentEntry = open({
  * pattern check here would refuse three printed answers, so the field carries
  * what the taxpayer would write on the paper.
  *
- * `householdEmployee` is column (d)'s Yes/No box, `option(true)` per DOC-12.
+ * `householdEmployee` is column (d)'s Yes/No box, `or(option, true)` per DOC-12.
  * Nothing on Form 2441 reads it — it is the trigger for Schedule H, which this
  * engine does not compute — and it is stored anyway because the printed line
  * requires an answer and a transcription that drops a printed box is a
@@ -283,7 +283,7 @@ const dependentCareProviderEntry = open({
     name: string,
     address: string,
     identifyingNumber: string,
-    householdEmployee: option(true),
+    householdEmployee: or(option, true),
     amountPaid: string,
 })
 
@@ -336,7 +336,7 @@ const dependentCareProviderEntry = open({
  * `fjs/form2441` applies that caution, so an absent `overAgeTwelveAndDisabled`
  * carries all three of "under 13", "over 12 and not disabled" and "nobody
  * asked" at once — and the engine granted a qualifying person in every one of
- * them. That is this dialect's own recorded rule about `option(true)` being
+ * them. That is this dialect's own recorded rule about `or(option, true)` being
  * violated in the direction it names as decisive
  * ({@link earnedIncomeCreditVocabularies}, in `fjs/return/profile`): *"Here the
  * wrong default GRANTS a credit."* A person wrongly counted moves §21(c)'s cap
@@ -344,7 +344,7 @@ const dependentCareProviderEntry = open({
  * owe back.
  *
  * So each of the printed page's two eligible populations gets its own
- * `option(true)`, absence of BOTH is *unstated* rather than a silent grant, and
+ * `or(option, true)`, absence of BOTH is *unstated* rather than a silent grant, and
  * `fjs/form2441` refuses by name — exactly as `fjs/form8863` refuses without
  * `filerAttainedAgeTwentyFourBeforeTheEndOfTheYear` and `fjs/form8880`
  * without a `saversCreditEligibility` record. A DATE OF BIRTH was the other
@@ -366,8 +366,8 @@ const dependentCareProviderEntry = open({
 const dependentCareQualifyingPersonEntry = open({
     name: string,
     tin: string,
-    overAgeTwelveAndDisabled: option(true),
-    underAgeThirteenWhenTheCareWasProvided: option(true),
+    overAgeTwelveAndDisabled: or(option, true),
+    underAgeThirteenWhenTheCareWasProvided: or(option, true),
     qualifiedExpensesIncurredAndPaid: string,
 })
 
@@ -385,16 +385,16 @@ export const creditsSchema = open({
     ...base(dialect),
     recipientTin: string,
     taxYear: number,
-    corrected: option(true),
-    retirementContributions: option(array(retirementContributionEntry)),
-    saversCreditEligibility: option(array(saversCreditEligibilityEntry)),
-    educationStudents: option(array(educationStudentEntry)),
+    corrected: or(option, true),
+    retirementContributions: or(option, array(retirementContributionEntry)),
+    saversCreditEligibility: or(option, array(saversCreditEligibilityEntry)),
+    educationStudents: or(option, array(educationStudentEntry)),
     // §25A(i)'s under-24 restriction on the REFUNDABLE American Opportunity
     // Credit — a fact about the FILER rather than about any one student,
     // which is why it sits at the top level beside the three arrays rather
     // than inside `educationStudents`. See this module's own docstring, "The
     // filer's own age".
-    filerAttainedAgeTwentyFourBeforeTheEndOfTheYear: option(true),
+    filerAttainedAgeTwentyFourBeforeTheEndOfTheYear: or(option, true),
     // ── Form 2441, TAX-38 ───────────────────────────────────────────────────
     //
     // The third Schedule 3 credit whose asserted half lives on this dialect,
@@ -409,8 +409,8 @@ export const creditsSchema = open({
     // field on this dialect and on `vnd.fjs.return_profile`: the two arrays
     // below are the printed form's own two tables, and the seven scalars are
     // seven separate printed lines rather than members of anything.
-    dependentCareProviders: option(array(dependentCareProviderEntry)),
-    dependentCareQualifyingPersons: option(array(dependentCareQualifyingPersonEntry)),
+    dependentCareProviders: or(option, array(dependentCareProviderEntry)),
+    dependentCareQualifyingPersons: or(option, array(dependentCareQualifyingPersonEntry)),
     // Line 16 — "the total of all qualified expenses incurred in 2025 for the
     // care of your qualifying person(s). It doesn't matter when the expenses
     // were paid." ABSENT reads as zero and NOT as "the same as column (d)",
@@ -418,29 +418,29 @@ export const creditsSchema = open({
     // zero here makes every dependent care benefit taxable. A filer who
     // cannot substantiate an expense cannot exclude a benefit against it, and
     // erring the other way would understate income.
-    dependentCareQualifiedExpensesIncurred: option(string),
+    dependentCareQualifiedExpensesIncurred: or(option, string),
     // Line 13 — an amount carried over from 2024 and used during 2025's grace
     // period (Notice 2005-42). Adds to the benefits being reconciled.
-    dependentCareGraceCarryoverUsed: option(string),
+    dependentCareGraceCarryoverUsed: or(option, string),
     // Line 14 — an amount forfeited, or permitted to be carried forward into
     // 2026. SUBTRACTS on line 15, which is why the printed line prints its own
     // parentheses; stored as a positive amount, negated where the form
     // subtracts it.
-    dependentCareForfeitedOrCarriedForward: option(string),
+    dependentCareForfeitedOrCarriedForward: or(option, string),
     // Line 22 — "Is any amount on line 12 or 13 from your sole proprietorship
     // or partnership?" `fjs/form2441` REFUSES a non-zero amount here rather
     // than computing line 24, because line 24's deductible benefits land on
     // Schedule C line 14, Schedule E line 19 or 28, or Schedule F line 15
     // (i2441 p5) and this engine would exclude the benefit from income
     // without ever deducting it on the business schedule.
-    dependentCareBenefitsFromSoleProprietorshipOrPartnership: option(string),
+    dependentCareBenefitsFromSoleProprietorshipOrPartnership: or(option, string),
     // Line 21's second sentence — "don't enter more than the maximum amount
     // allowed under your dependent care plan". A PLAN fact, not a statutory
     // one: §129(a)(2)(A)'s $5,000 is in `fjs/tax/params`, and this is the
     // taxpayer's own lower ceiling where their plan sets one. Absent means the
     // plan set none, which is safe in the one direction that matters — a plan
     // cannot pay out more than its own maximum, so box 10 already bounds it.
-    dependentCarePlanMaximumExclusion: option(string),
+    dependentCarePlanMaximumExclusion: or(option, string),
     // Form 2441 line B's printed checkbox, read in the NEGATIVE direction:
     // the box certifies that deemed income IS being entered, and this field
     // certifies that it is NOT needed. §21(d)(2) deems a student or disabled
@@ -450,13 +450,13 @@ export const creditsSchema = open({
     // actually binds and this certification is absent — and computes without
     // it when the limitation does not bind, because the deemed amount is a
     // floor and cannot then move any printed line.
-    dependentCareFilerWasNeitherAStudentNorDisabled: option(true),
+    dependentCareFilerWasNeitherAStudentNorDisabled: or(option, true),
     // Line 9b — "If you paid 2024 expenses in 2025, complete Worksheet A".
     // `fjs/form2441` REFUSES a non-zero amount: Worksheet A needs five 2024
     // figures (that year's Form 2441 lines 3 and 6, its adjusted gross income,
     // and both spouses' earned income) and no stored document carries a prior
     // year's Form 2441 at all.
-    dependentCarePriorYearExpensesPaidThisYear: option(string),
+    dependentCarePriorYearExpensesPaidThisYear: or(option, string),
 })
 
 /**
@@ -889,7 +889,7 @@ export const proof = {
         },
     },
     eligibilityFlags: {
-        // DOC-12: every yes/no fact is `option(true)`, so a stored `false` is
+        // DOC-12: every yes/no fact is `or(option, true)`, so a stored `false` is
         // structurally rejected and absence is the only way to say "no".
         // Asserted on all three, because all three are load-bearing:
         // `fjs/form8880` REFUSES without the first and denies the credit on
@@ -1334,7 +1334,7 @@ export const proof = {
                 ['the refusal must name the person and quote the printed sentence', v])
         },
         // THREE controls, because the refusal has to fire on exactly one of
-        // the four states of a pair of `option(true)`s. Hand-typed as four
+        // the four states of a pair of `or(option, true)`s. Hand-typed as four
         // rows rather than generated, so a state that stops being tested
         // fails the count rather than disappearing from a loop.
         theOtherThreeAgeAssertionStatesAreNotRefusedHere: () => {
@@ -1363,7 +1363,7 @@ export const proof = {
         // DOC-12 in both directions: an absent certification stays absent
         // rather than reading back as `false`, and `false` is REFUSED rather
         // than accepted as "not certified" — the same discipline every other
-        // `option(true)` on this dialect follows.
+        // `or(option, true)` on this dialect follows.
         theStudentOrDisabledCertificationIsOptionTrue: () => {
             const [absentT, absentV] = validate(minimal)
             assert(absentT === 'ok', ['expected ok', absentV])

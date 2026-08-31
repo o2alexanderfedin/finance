@@ -46,7 +46,7 @@
  *   stored verbatim like every other money box. This phase does not
  *   compute anything from them — they force the Schedule D Tax Worksheet
  *   or QDCGT's level-2d path, both Phase 12.1's job.
- * - Every checkbox is `option(true)` — DOC-12 — for `corrected` and
+ * - Every checkbox is `or(option, true)` — DOC-12 — for `corrected` and
  *   `box11FatcaFilingRequirement`. The printed "2nd TIN not." checkbox
  *   and VOID are filer-only and NOT modeled — same precedent as `1099r`
  *   and every existing dialect.
@@ -75,8 +75,8 @@
  *
  * @module
  */
-import { array, number, open, option, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
-import { validate as rttiValidate } from 'functionalscript/fjs/types/rtti/validate/module.f.mjs'
+import { array, number, open, option, or, string } from 'functionalscript/fjs/rtti/module.f.mjs'
+import { validate as rttiValidate } from 'functionalscript/fjs/rtti/validate/module.f.mjs'
 import { error, ok } from 'functionalscript/fjs/types/result/module.f.mjs'
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { isHash } from 'functionalscript/fjs/media/revision/module.f.mjs'
@@ -86,8 +86,8 @@ import { moneyFieldError } from '../money_field/module.f.js'
 import { centsFromString } from '../../exact/module.f.js'
 
 /** @import { Result } from 'functionalscript/fjs/types/result/types.js' */
-/** @import { Ts, Unknown } from 'functionalscript/fjs/types/rtti/ts/types.js' */
-/** @import { ValidationError } from 'functionalscript/fjs/types/rtti/common/types.js' */
+/** @import { Ts, Unknown } from 'functionalscript/fjs/rtti/ts/types.js' */
+/** @import { ValidationError } from 'functionalscript/fjs/rtti/common/types.js' */
 /** @import { QdcgtInput } from '../../tax/line16/qdcgt/module.f.js' */
 /** @import { SubjectKey } from '../subject/module.f.js' */
 
@@ -108,8 +108,8 @@ export const mediaType = mediaTypeOf(dialect)
  */
 const stateEntry = open({
     state: string,
-    stateIdNumber: option(string),
-    stateTaxWithheld: option(string),
+    stateIdNumber: or(option, string),
+    stateTaxWithheld: or(option, string),
 })
 
 /**
@@ -124,30 +124,30 @@ export const oneZeroNineNineDivSchema = open({
     accountNumber: string,
     taxYear: number,
     formRevision: string,
-    corrected: option(true),
+    corrected: or(option, true),
     sourceArtifactHash: string,
-    box1aTotalOrdinaryDividends: option(string),
-    box1bQualifiedDividends: option(string),
-    box2aTotalCapitalGainDistr: option(string),
-    box2bUnrecapSec1250Gain: option(string),
-    box2cSection1202Gain: option(string),
-    box2dCollectibles28PercentGain: option(string),
-    box2eSection897OrdinaryDividends: option(string),
-    box2fSection897CapitalGain: option(string),
-    box3NondividendDistributions: option(string),
-    box4FederalIncomeTaxWithheld: option(string),
-    box5Section199ADividends: option(string),
-    box6InvestmentExpenses: option(string),
-    box7ForeignTaxPaid: option(string),
-    box8ForeignCountryOrUsPossession: option(string),
-    box9CashLiquidationDistributions: option(string),
-    box10NoncashLiquidationDistributions: option(string),
-    box11FatcaFilingRequirement: option(true),
-    box12ExemptInterestDividends: option(string),
-    box13SpecifiedPrivateActivityBondInterestDividends: option(string),
-    stateLocal: option(array(stateEntry)),
-    payerName: option(string),
-    recipientName: option(string),
+    box1aTotalOrdinaryDividends: or(option, string),
+    box1bQualifiedDividends: or(option, string),
+    box2aTotalCapitalGainDistr: or(option, string),
+    box2bUnrecapSec1250Gain: or(option, string),
+    box2cSection1202Gain: or(option, string),
+    box2dCollectibles28PercentGain: or(option, string),
+    box2eSection897OrdinaryDividends: or(option, string),
+    box2fSection897CapitalGain: or(option, string),
+    box3NondividendDistributions: or(option, string),
+    box4FederalIncomeTaxWithheld: or(option, string),
+    box5Section199ADividends: or(option, string),
+    box6InvestmentExpenses: or(option, string),
+    box7ForeignTaxPaid: or(option, string),
+    box8ForeignCountryOrUsPossession: or(option, string),
+    box9CashLiquidationDistributions: or(option, string),
+    box10NoncashLiquidationDistributions: or(option, string),
+    box11FatcaFilingRequirement: or(option, true),
+    box12ExemptInterestDividends: or(option, string),
+    box13SpecifiedPrivateActivityBondInterestDividends: or(option, string),
+    stateLocal: or(option, array(stateEntry)),
+    payerName: or(option, string),
+    recipientName: or(option, string),
 })
 
 /**
@@ -314,7 +314,7 @@ const minimal = {
 /**
  * T-12-01-01: a money box's name could be quietly dropped from
  * {@link moneyBoxFields} without anyone noticing — the field stays
- * `option(string)` structurally, so a comma-grouped amount in a dropped box
+ * `or(option, string)` structurally, so a comma-grouped amount in a dropped box
  * would then validate as ok. One generated leaf per NAMED scalar box
  * supplies a comma-grouped value to that box alone and asserts `validate`
  * refuses, built by mapping {@link moneyBoxFields} itself into `[field,
@@ -405,7 +405,7 @@ export const proof = {
             assertEq(v.corrected, undefined)
             assertEq(v.stateLocal, undefined)
         },
-        // DOC-12: `false` is not a member of `option(true)` for either
+        // DOC-12: `false` is not a member of `or(option, true)` for either
         // checkbox field — rejected structurally, never accepted as "not
         // checked".
         falseFlagsRejected: () => {

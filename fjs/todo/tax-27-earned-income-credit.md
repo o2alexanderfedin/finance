@@ -18,12 +18,12 @@ The list is at the bottom, under "What a future phase must add". All five:
    `earnedIncomeCreditFullTimeStudent`,
    `earnedIncomeCreditPermanentAndTotalDisability`,
    `earnedIncomeCreditUnitedStatesResidency` and
-   `earnedIncomeCreditJointReturn`. **Not `option(true)`, against this file's
+   `earnedIncomeCreditJointReturn`. **Not `or(option, true)`, against this file's
    own suggestion**, and that is the one place Phase 32 departed from it: each
    is two or more EXACT STRINGS, following `fjs/document/business_expenses`'
-   SSTB-flag precedent, because under `option(true)` absence and a denial are
+   SSTB-flag precedent, because under `or(option, true)` absence and a denial are
    the same stored state and here the wrong default GRANTS the credit. This
-   file wrote *"Every one of these is `option(true)` under DOC-12 except the
+   file wrote *"Every one of these is `or(option, true)` under DOC-12 except the
    relationship"*; that was the wrong shape, for a reason the precedent that
    settles it had not yet established when this was written.
 2. **The filer-level widening** — `filerSocialSecurityNumber`,
@@ -170,7 +170,7 @@ worse than no EIC, which is the whole argument of this file in miniature.
 1. **A per-dependent widening of `vnd.fjs.return_profile`**: a checked
    `relationship` vocabulary, `wasAFullTimeStudent`, `permanentlyAndTotallyDisabled`,
    `livedWithTaxpayerInTheUnitedStatesForMoreThanHalfTheYear`, and
-   `filedAJointReturn`. Every one of these is `option(true)` under DOC-12
+   `filedAJointReturn`. Every one of these is `or(option, true)` under DOC-12
    except the relationship. Note that this edits a stored dialect and
    therefore moves every `programHash` that quotes it (PROV-03/PROV-05).
 2. **A filer-level widening**: the filer's own age (or an

@@ -237,7 +237,7 @@ don't"*. The 1040 instructions (p. 94) add that a QSEHRA counts as subsidized.
 **None of this appears on any information return.** No Form W-2 box says whether
 an employer *offered* a plan. So it is a certification —
 `notEligibleForAnySubsidizedEmployerHealthPlanInAnyMonth` on
-`vnd.fjs.return_profile`, `option(true)` per DOC-12 — with the precedent of
+`vnd.fjs.return_profile`, `or(option, true)` per DOC-12 — with the precedent of
 `movingExpensesArmedForcesPermanentChangeOfStation` (§217(g)) and Form 8962's
 `noDependentIsRequiredToFileAnIncomeTaxReturn`.
 

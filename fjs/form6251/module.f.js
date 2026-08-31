@@ -222,7 +222,6 @@ import { estateTrustAmtAdjustment } from './estate_trust/module.f.js'
 
 /** @import { FormThirtyNineTwentyOne } from '../document/form3921/module.f.js' */
 /** @import { K1EstateTrust } from '../document/k1_1041/module.f.js' */
-/** @import { CodedEntry } from '../document/k1_common/module.f.js' */
 /** @import { IndividualFilingStatus, TaxParamSet } from '../tax/params/module.f.js' */
 /** @import { PartThree, RegularPreferentialWorksheet } from './part3/module.f.js' */
 
@@ -1048,7 +1047,7 @@ const isoForm = hash => exercisePrice => fairMarketValue => shares => ({
  * A stored beneficiary's Schedule K-1 (Form 1041) carrying exactly the box 12
  * rows given, and no income box at all — these leaves are about line 2j, not
  * about Schedule E.
- * @type {(hash: string) => (box12: readonly CodedEntry[]) => Stored<K1EstateTrust>}
+ * @type {(hash: string) => (box12: NonNullable<K1EstateTrust['box12AlternativeMinimumTaxItems']>) => Stored<K1EstateTrust>}
  */
 const beneficiaryK1 = hash => box12 => ({
     documentHash: hash,
@@ -1769,14 +1768,17 @@ export const proof = {
         // written for box 5 alone would leave the other two silently
         // contributing a zero.
         aFormThreeNineTwoOneMissingABoxRefuses: () => {
-            /** @type {(overrides: Partial<FormThirtyNineTwentyOne>) => void} */
-            const expectRefusal = overrides => {
+            // The box is named rather than overridden, because the shape under
+            // test is an ABSENT box: it is DELETED from the fixture, not set
+            // to `undefined`. A key present with an `undefined` value is a
+            // different stored document, and it is not the one this leaf and
+            // the refusal it expects are about.
+            /** @type {(absentBox: 'box3ExercisePricePerShare' | 'box4FairMarketValuePerShareOnExerciseDate' | 'box5NumberOfSharesTransferred') => void} */
+            const expectRefusal = absentBox => {
                 const base = isoForm('doc-partial')('10.00')('25.00')('100')
-                const outcome = run({
-                    ...nothing,
-                    isoExerciseForms: [{ ...base, value: { ...base.value, ...overrides } }],
-                })
-                assert(outcome.kind === 'error', ['expected a refusal', overrides, outcome])
+                const { [absentBox]: _absent, ...value } = base.value
+                const outcome = run({ ...nothing, isoExerciseForms: [{ ...base, value }] })
+                assert(outcome.kind === 'error', ['expected a refusal', absentBox, outcome])
                 assert(outcome.message.includes('doc-partial'), ['name the document', outcome.message])
                 assert(
                     outcome.message.includes('box5NumberOfSharesTransferred'),
@@ -1785,9 +1787,9 @@ export const proof = {
                     outcome.message.includes('ABSENT'),
                     ['say WHY: an absent box is not a zero', outcome.message])
             }
-            expectRefusal({ box3ExercisePricePerShare: undefined })
-            expectRefusal({ box4FairMarketValuePerShareOnExerciseDate: undefined })
-            expectRefusal({ box5NumberOfSharesTransferred: undefined })
+            expectRefusal('box3ExercisePricePerShare')
+            expectRefusal('box4FairMarketValuePerShareOnExerciseDate')
+            expectRefusal('box5NumberOfSharesTransferred')
             // The control, in the same leaf: the unmodified fixture computes.
             assertEq(
                 expectOk(run({

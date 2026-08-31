@@ -83,7 +83,7 @@
  * Business` already uses — a string rather than a boolean precisely so a
  * serializer's `''` or a hand-edited `'true'` cannot become an assertion.
  *
- * ## The three certifications, and why each is `option(true)`
+ * ## The three certifications, and why each is `or(option, true)`
  *
  * DOC-12's checkbox convention: a stored `false` is structurally rejected and
  * absence is the only way to say "no", so a serializer that materializes every
@@ -117,8 +117,8 @@
  *
  * @module
  */
-import { array, number, open, option, string } from 'functionalscript/fjs/types/rtti/module.f.mjs'
-import { validate as rttiValidate } from 'functionalscript/fjs/types/rtti/validate/module.f.mjs'
+import { array, number, open, option, or, string } from 'functionalscript/fjs/rtti/module.f.mjs'
+import { validate as rttiValidate } from 'functionalscript/fjs/rtti/validate/module.f.mjs'
 import { error, ok } from 'functionalscript/fjs/types/result/module.f.mjs'
 import { assert, assertEq } from 'functionalscript/fjs/asserts/module.f.mjs'
 import { centsFromString } from '../../exact/module.f.js'
@@ -130,8 +130,8 @@ import {
 } from '../../form4562/macrs/module.f.js'
 
 /** @import { Result } from 'functionalscript/fjs/types/result/types.js' */
-/** @import { Ts, Unknown } from 'functionalscript/fjs/types/rtti/ts/types.js' */
-/** @import { ValidationError } from 'functionalscript/fjs/types/rtti/common/types.js' */
+/** @import { Ts, Unknown } from 'functionalscript/fjs/rtti/ts/types.js' */
+/** @import { ValidationError } from 'functionalscript/fjs/rtti/common/types.js' */
 /** @import { DepreciableAsset } from '../../form4562/module.f.js' */
 /** @import { SubjectKey } from '../subject/module.f.js' */
 
@@ -163,7 +163,7 @@ export const sectionOneSixtyEightKStatusValues = /** @type {const} */ ([
  * The end of one asset's history: the four facts Form 4797 needs that Form
  * 4562 never asked for.
  *
- * A NESTED optional block rather than four sibling `option(string)` fields, so
+ * A NESTED optional block rather than four sibling `or(option, string)` fields, so
  * that "all four or none" is a STRUCTURAL property of the schema instead of a
  * cross-field check that can be forgotten. Contrast `section168kStatus` and
  * `specialDepreciationAllowanceClaimed`, which genuinely are two independent
@@ -218,10 +218,10 @@ const registeredAsset = open({
     method: string,
     convention: string,
     section168kStatus: string,
-    specialDepreciationAllowanceClaimed: option(string),
-    section179ElectedCost: option(string),
-    listedProperty: option(true),
-    disposal: option(assetDisposal),
+    specialDepreciationAllowanceClaimed: or(option, string),
+    section179ElectedCost: or(option, string),
+    listedProperty: or(option, true),
+    disposal: or(option, assetDisposal),
 })
 
 /**
@@ -235,11 +235,11 @@ export const assetRegisterSchema = open({
     recipientTin: string,
     accountNumber: string,
     taxYear: number,
-    corrected: option(true),
+    corrected: or(option, true),
     businessOrActivity: string,
-    everyDepreciableAssetIsListed: option(true),
-    noDepreciablePropertyDisposedOfDuringTheYear: option(true),
-    priorYearSection179CarryoverIsZero: option(true),
+    everyDepreciableAssetIsListed: or(option, true),
+    noDepreciablePropertyDisposedOfDuringTheYear: or(option, true),
+    priorYearSection179CarryoverIsZero: or(option, true),
     assets: array(registeredAsset),
 })
 

@@ -212,7 +212,7 @@ So: **`vnd.fjs.rental_property`, one document per printed COLUMN.**
 | `otherTypeDescription` | line 1b list item *"8 Other (describe)"* | required exactly when `propertyType` is `other`; forbidden otherwise |
 | `physicalAddress` | line 1a, *"Physical address of each property (street, city, state, ZIP code)"* | required for every type but `royalties`; FORBIDDEN for `royalties` (i1040se p4: *"leave lines 1a and 2 blank"*) |
 | `fairRentalDays`, `personalUseDays` | line 2, *"Fair Rental Days" / "Personal Use Days"* | required for every type but `royalties`; forbidden for `royalties`. §280A turns on these two numbers and on nothing else |
-| `qualifiedJointVenture` | line 2's *"QJV"* checkbox | `option(true)`, DOC-12's checkbox convention |
+| `qualifiedJointVenture` | line 2's *"QJV"* checkbox | `or(option, true)`, DOC-12's checkbox convention |
 | `rentsReceived` | line 3, *"Rents received"* | required for every type but `royalties`; forbidden for `royalties` |
 | `royaltiesReceived` | line 4, *"Royalties received"* | required for `royalties`; forbidden otherwise |
 | `entries` | lines 5-17 and 19 | the expense ledger |
