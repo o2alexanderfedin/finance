@@ -1,11 +1,11 @@
 ---
 gsd_state_version: 1.0
-milestone: v5
-milestone_name: A Current Engine and a Filable Return
+milestone: v6
+milestone_name: A Current Engine, Actually Current
 status: planning
-stopped_at: Milestone v5 is open — requirements MAINT-09..13 and DOC-25 are defined and its seven-phase roadmap is written. Only Phase 38 is unblocked; 39 and 40 both need 0.47.0 in place and unlock when 38 lands, 41 follows both; 34, 35 and 36 carry forward from v4 still blocked on the owner.
-last_updated: "2026-08-27T09:11:52.000Z"
-last_activity: 2026-08-27
+stopped_at: "Milestone v6 is open — MAINT-14 is coined and the five carried-forward v5 IDs keep their phase numbers (39, 40, 41). Execution order is 42 -> 39 -> 40 -> 41; 34, 35 and 36 remain blocked on the owner. Nothing is planned yet: run /gsd-plan-phase 42 next."
+last_updated: "2026-08-31T06:51:35.086Z"
+last_activity: 2026-08-31
 progress:
   total_phases: 7
   completed_phases: 0
@@ -110,21 +110,10 @@ planned and `85` done against **88 and 88** on disk, and disk is checkable.
 
 ## Current Position
 
-Phase: none started. Milestone v5's roadmap is written — **38 is the only phase available now**;
-39 and 40 unlock when it lands, 41 after both, and 34, 35 and 36 wait on the owner.
+Phase: Not started (defining requirements)
 Plan: —
-
-*(These two lines read "38, 39, 40 and 41 are available now" until 2026-08-27, contradicting the
-roadmap's own order — `38 → (39 ∥ 40) → 41`, with both successors written in 0.47.0's `rest`/`open`
-vocabulary. An executor taking this file as the handoff would have started a dependent phase
-against 0.46.1 and written it twice.)*
-
-*(This block deliberately carries no `Status:`, `Stopped at:` or `Progress:` line. Those names
-belong to `## Session` above, which is the only block the tool reads: `stateExtractField` scopes to
-`## Session` whenever that heading exists and never looks here. A second `Status:` under this
-heading is not a second opinion, it is a line that silently does nothing — it read "Defining
-requirements" from 2026-08-27 while the header it was meant to correct still said `paused` from
-milestone v4.)*
+Status: Defining requirements
+Last activity: 2026-08-31 — Milestone v6 started
 
 ## Shipped outside the ledger — the accountant demo, 2026-08-21
 

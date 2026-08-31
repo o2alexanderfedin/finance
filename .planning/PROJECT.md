@@ -28,31 +28,30 @@ in CAS alongside the result it produced. Reproducibility, traceability, cost-fre
 over hypothetical inputs, and reports beyond the 1040 all follow from that one property —
 a new report is a new program, not new engine code.
 
-## Current Milestone: v5 A Current Engine and a Filable Return
+## Current Milestone: v6 A Current Engine, Actually Current
 
-**Goal:** Take `functionalscript` 0.47.0, close the write-path hole that leaves a stored
-document unchecked against its own dialect, and finish the three verification phases v4
-could not move without the owner in the room.
+**Goal:** Take `functionalscript` 0.48.0, and execute the v5 work whose diagnosis was written
+down and never carried out.
 
 **Target features:**
-- `functionalscript` 0.47.0 taken — 31 dialect registrations and 5 JSON-RPC response
-  schemas state `open()`, `McpConfig` carries `protocolVersions`
-- The MCP protocol-version gap retired: 0.47.0 negotiates, so the prose that calls it a
-  known upstream gap, the three references to a note deleted in `7244f81`, and the proof
-  that now passes for the wrong reason all go
-- A finance document is validated against its dialect **on the write path**, which is what
-  makes the open-versus-closed choice decide anything at all
-- 0.47.0's new capabilities adopted where they remove code here: `fjs web` in place of
-  `python3 -m http.server`, `path.escapes`, `toolResultStep`, `memoryRun`
-- A consumer-side migration report for Sergey, in the shape of
-  `.planning/reports/fjs-0.46.1-migration.md`
-- Phases 34, 35 and 36 carried forward from v4 at their original numbers — the
-  second-implementation cross-check, the filable `f1040.pdf`, and the conversational path
+- `functionalscript` 0.48.0 taken — `rtti` relocated to `fjs/rtti` across 140 import sites,
+  and `option` rewritten from a function to a union member at 596 call sites in 59 files,
+  with `toJsonSchema` byte-identical across the bump as the criterion that decides it
+- The MCP protocol-version gap actually retired: 0.47.0 closed the upstream half and this
+  repository never noticed, so the prose calling it a live gap, the three citations to a note
+  deleted in `7244f81`, and the proof that passes for the wrong reason all go
+- A finance document validated against its dialect **on the write path**, which is what makes
+  the open-versus-closed choice decide anything at all
+- 0.48.0's new capabilities adopted where they remove code here, and a consumer-side
+  migration report for Sergey
+- Phases 34, 35 and 36 still carried forward from v4 at their original numbers
 
-**Carried forward deliberately.** Phases 34–36 keep their numbers rather than being
-renumbered into a v5 sequence: 240 phase files, plus citations throughout REQUIREMENTS.md
-and ROADMAP.md, address them by number. Renumbering to make the ledger look regular is the
-same tidy lie the v4 section already refused for the accountant demo.
+**What v5 actually shipped.** MAINT-09 alone — 0.47.0 taken, in PR #139 (merge `14e6868`).
+Its record said `Pending` until v6 opened, which is the failure this milestone starts by
+correcting. MAINT-10, DOC-25 and MAINT-11/12/13 carry forward **at their original phase
+numbers**, 39, 40 and 41, on the same reasoning that kept 34–36: the citations that address a
+phase by number outnumber the tidiness of renumbering.
+
 
 ## Requirements
 
@@ -425,6 +424,7 @@ supersede rather than overwrite.
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
+| No backward compatibility until publication | The software is unpublished, so there are no older clients to serve and advertising a second MCP protocol revision buys nothing. `financeConfig` keeps one pinned revision; the negotiation proof builds its OWN two-entry `McpConfig`, which is all that is needed to tell negotiating from not — with one entry the counter-proposal equals the old unconditional pin, which is exactly why the v5 proof passed for the wrong reason (v6, MAINT-10) | — Pending |
 | The agent emits a program, not an answer | A generated number is opaque and unverifiable; a generated program is reviewable, re-runnable, diffable, and storable in CAS next to its result. This is what makes an LLM acceptable in front of tax math (PR #1) | — Pending |
 | MCP server executes FunctionalScript in content-addressable space | Follows from the above — something must run the emitted program, and running it over CAS keeps inputs, program, and output in one addressable space (PR #1) | — Pending |
 | Node first as the script runner, `fjs` later | Ships the capability without waiting on `fjs` to become self-hosting; the runner is swappable because the programs it runs are unchanged either way (PR #1) | — Pending |
