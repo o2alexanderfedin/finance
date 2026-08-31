@@ -1861,7 +1861,7 @@ ruling for why a phase without an ID is preferable to an ID invented to give it 
       Whether `financeConfig` should advertise more than one revision now that it can is
       part of this requirement, not a separate one.
 
-- [ ] **DOC-25** *(T3)*: **A finance document is validated against its dialect on the write
+- [x] **DOC-25** *(T3)*: **A finance document is validated against its dialect on the write
       path.** `fjs/todo/no-dialect-validation-on-the-write-path.md` records, verified by
       reading production code, that no step between `evo_add`/`cas_add` and the stored
       program's `route` checks a blob against its dialect: upstream `cas_add` classifies
@@ -1919,7 +1919,7 @@ ruling for why a phase without an ID is preferable to an ID invented to give it 
 |--------|------|-------|-----------|--------|
 | MAINT-09 | T3 | 38. Take FunctionalScript 0.47.0 | v5 | Complete |
 | MAINT-10 | T3 | 39. Retire the Protocol-Version Gap | v5 | Pending |
-| DOC-25 | T3 | 40. Validation on the Write Path | v5 | Pending |
+| DOC-25 | T3 | 40. Validation on the Write Path | v5 | Complete |
 | MAINT-11 | T3 | 41. New Capabilities and the Migration Report | v5 | Pending |
 | MAINT-12 | T3 | 41. New Capabilities and the Migration Report | v5 | Pending |
 | MAINT-13 | T3 | 41. New Capabilities and the Migration Report | v5 | Pending |
@@ -2282,7 +2282,7 @@ written against: 0.47.0 is superseded, so each phase reads 0.48.0's behaviour be
 |--------|------|-------|-----------|--------|
 | MAINT-14 | T3 | 42. Take FunctionalScript 0.48.0 | v6 | Complete |
 | MAINT-10 | T3 | 39. Retire the Protocol-Version Gap | v6 | Complete |
-| DOC-25 | T3 | 40. Validation on the Write Path | v6 | Pending |
+| DOC-25 | T3 | 40. Validation on the Write Path | v6 | Complete |
 | MAINT-11 | T3 | 41. New Capabilities and the Migration Report | v6 | Pending |
 | MAINT-12 | T3 | 41. New Capabilities and the Migration Report | v6 | Pending |
 | MAINT-13 | T3 | 41. New Capabilities and the Migration Report | v6 | Pending |

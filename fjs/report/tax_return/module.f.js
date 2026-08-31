@@ -132,14 +132,23 @@
  * and `detectFinance` (`fjs/media/dialects`), which does carry the per-dialect
  * checks, reaches production at exactly one site: `cas_refresh`'s read-only
  * count report (`fjs/server/module.f.js:170`). Nothing on the WRITE path
- * validates a finance document at all.
+ * validated a finance document at all.
  *
- * What holds today is that every producer calls its dialect's own `validate`
+ * What held then was that every producer calls its dialect's own `validate`
  * before storing — `tax-return-integration.test.js:373-384` does exactly that
  * for its seeds. That is a convention among callers, not an enforced
  * invariant, and calling it one was the defect. Recorded as
  * `fjs/todo/no-dialect-validation-on-the-write-path.md`; found by
  * `/gsd-audit-milestone` on 2026-08-20.
+ *
+ * **Closed 2026-08-31 (DOC-25, Phase 40).** `fjs/server/write_validation`
+ * fronts `cas_add` with the claimed dialect's own `match` — the predicate
+ * `detect` consults — so a payload claiming a dialect it does not satisfy is
+ * refused with nothing stored. The convention above is now backed by an
+ * invariant, and `casAddRefusesAMalformedDocumentAndStoresNothing` stores a
+ * bad blob without going through any producer to prove it. What is still NOT
+ * checked here is an undeclared member: the schemas stay `open`, and
+ * `fjs/document/base` records why and what that costs.
  *
  * ## The two document-set refusals
  *

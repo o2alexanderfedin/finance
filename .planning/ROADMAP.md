@@ -1115,7 +1115,7 @@ All five are closed with fixtures that assert the wrong answer beside the right 
 **Requirements**: MAINT-10 · **Tier**: T3 · **Status**: complete — milestone v6, 2026-08-31
 
 ### Phase 40: Validation on the Write Path
-**Requirements**: DOC-25 · **Tier**: T3 · **Status**: not started — carried forward to milestone v6 at this number
+**Requirements**: DOC-25 · **Tier**: T3 · **Status**: complete — milestone v6, 2026-08-31. Option 1 (the write boundary), not the note's preferred Option 2; the reason is in `fjs/todo/no-dialect-validation-on-the-write-path.md` under "How it was closed".
 
 ### Phase 41: New Capabilities and the Migration Report
 **Requirements**: MAINT-11, MAINT-12, MAINT-13 · **Tier**: T3 · **Status**: not started — carried forward to milestone v6 at this number
@@ -1429,7 +1429,7 @@ do not gate them; they run when the owner is in the room.
       4. Whether `financeConfig` advertises more than one revision now that it can is decided, and
          the reason is written beside the config rather than in this roadmap.
 
-- [ ] **Phase 40: Validation on the Write Path** - DOC-25. Verified by reading production code and
+- [x] **Phase 40: Validation on the Write Path** - DOC-25. Verified by reading production code and
       recorded in `fjs/todo/no-dialect-validation-on-the-write-path.md`: no step between
       `evo_add`/`cas_add` and a stored program's `route` checks a blob against its dialect. Upstream
       `cas_add` classifies against three upstream dialects, none of them a finance one, and

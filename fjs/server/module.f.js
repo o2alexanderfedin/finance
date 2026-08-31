@@ -83,6 +83,7 @@ import { collectRead } from 'functionalscript/fjs/cas/module.f.mjs'
 import { financeSchemaTool } from './finance_schema/module.f.js'
 import { financeTaxParamsTool } from './finance_tax_params/module.f.js'
 import { financeDocumentsListTool } from './finance_documents_list/module.f.js'
+import { validatingWrites } from './write_validation/module.f.js'
 import { fjsRunTool, placeJsModuleFixture } from './fjs_run/module.f.js'
 import { fjsCheck } from '../guest/check/module.f.js'
 import { detectFinance } from '../media/dialects/module.f.js'
@@ -232,7 +233,7 @@ export const fjsCheckTool = materializeHomeRoot => cas => toolEntry(
  * @type {(home: string) => (cacheKey: Key<Cache>) => McpHandlers<FileCasOperation | MemOp | Mkdir | WriteFile | Import>}
  */
 export const financeMcpHandlers = home => cacheKey => fromRegistry([
-    ...casToolRegistry(home)(cacheKey),
+    ...validatingWrites(casToolRegistry(home)(cacheKey)),
     ...evoToolRegistry(evo(fileCas(sha256)(home))(cacheKey)),
     casRefreshTool(fileCas(sha256)(home))(cacheKey),
     financeSchemaTool,
@@ -593,6 +594,66 @@ export const proof = {
             const init = asInitResult(initResponse)
             assertEq(init.result.protocolVersion, '2025-11-25')
             assertEq(init.result.serverInfo.name, 'finance-mcp')
+        },
+        // DOC-25. The dialect check is on the WRITE PATH, not merely in a
+        // helper: this drives the real `cas_add` tool through the composed
+        // registry and the stdio transport, with a malformed `vnd.fjs.w2`
+        // written out by hand — no producer, because every producer already
+        // calls `validate` and routing through one would test the convention
+        // instead of the invariant. `cas_list` is read back to show the
+        // refusal was BEFORE the store, not after it.
+        casAddRefusesAMalformedDocumentAndStoresNothing: () => {
+            const malformed = JSON.stringify({
+                dialect: 'vnd.fjs.w2',
+                employerEIN: '12-3456789',
+                employeeSSN: '123-45-6789',
+                controlNumber: 'ctl-0001',
+                taxYear: 2025,
+                formRevision: '2025',
+                // Money carries three decimals — the dialect's own semantic check.
+                box1WagesTipsOtherCompensation: '12.345',
+            })
+            const messages = [
+                initializeRequest,
+                initializedNotification,
+                { jsonrpc: '2.0', method: 'tools/call', id: 20, params: { name: 'cas_add', arguments: { content: malformed } } },
+                { jsonrpc: '2.0', method: 'tools/call', id: 21, params: { name: 'cas_list', arguments: {} } },
+            ]
+            const input = messages.map(m => JSON.stringify(m)).join('\n') + '\n'
+            const [state] = virtual({ ...emptyState, stdin: toBytes(input) })(financeMcpServer('/'))
+            const [, addResponse, listResponse] = responsesOf(state)
+            const add = asCallResultWithIsError(addResponse)
+            assertEq(add.result.isError, true)
+            const text = assertNotNullish(add.result.content[0], ['expected a content item', add]).text
+            assert(text.includes('vnd.fjs.w2'), ['the refusal must name the dialect', text])
+            assert(text.includes('Nothing was stored'), [text])
+            // Nothing reached the store: an empty listing is the whole point,
+            // since a refusal AFTER the write would leave the hash listed.
+            assertEq(asCallResult(listResponse).result.content[0]?.text, '')
+        },
+        // The same call with the money corrected stores — so the leaf above
+        // proves a refusal, not a `cas_add` that is broken for everything.
+        casAddStoresAWellFormedDocument: () => {
+            const wellFormed = JSON.stringify({
+                dialect: 'vnd.fjs.w2',
+                employerEIN: '12-3456789',
+                employeeSSN: '123-45-6789',
+                controlNumber: 'ctl-0001',
+                taxYear: 2025,
+                formRevision: '2025',
+                box1WagesTipsOtherCompensation: '50000.00',
+            })
+            const messages = [
+                initializeRequest,
+                initializedNotification,
+                { jsonrpc: '2.0', method: 'tools/call', id: 22, params: { name: 'cas_add', arguments: { content: wellFormed } } },
+            ]
+            const input = messages.map(m => JSON.stringify(m)).join('\n') + '\n'
+            const [state] = virtual({ ...emptyState, stdin: toBytes(input) })(financeMcpServer('/'))
+            const [, addResponse] = responsesOf(state)
+            const add = asCallResultWithIsError(addResponse)
+            assertEq(add.result.isError, undefined)
+            assert(assertNotNullish(add.result.content[0], ['expected a content item', add]).text.length > 0, 'expected a hash back')
         },
         // MAINT-10. The revision is NEGOTIATED, not pinned: a revision the
         // server advertises comes back as asked, and one it does not comes back
