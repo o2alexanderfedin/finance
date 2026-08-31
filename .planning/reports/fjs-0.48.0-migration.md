@@ -201,7 +201,8 @@ browser actually resolving the import graph.
 Recorded in `fjs/todo/upstream-web-vec-size-limit.md`, with the suggestion that streaming the body
 is the fix that removes the ceiling rather than raising it, and that **413 is arguably the wrong
 status** — 413 says the *request* was too large. Under the standing authority in §7 of AGENTS.md
-this is a candidate to take upstream directly.
+it was taken upstream directly, as
+[`functionalscript#1819`](https://github.com/functionalscript/functionalscript/issues/1819).
 
 The one-line command description, `Serve a directory over HTTP`, gives no hint of a 128 KiB
 ceiling; the module docstring's response table does state it. For a capability meant to replace a

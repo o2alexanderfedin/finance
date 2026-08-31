@@ -1,7 +1,7 @@
 # `fjs web` cannot serve a file larger than one `Vec` (131072 bytes)
 
 **Priority:** P2 — it blocks one adoption here; it does not affect anything shipped.
-**Status:** open
+**Status:** open — filed upstream as `functionalscript#1819` on 2026-08-31
 **Found:** 2026-08-31, executing MAINT-11 (Phase 41, milestone v6), against `functionalscript@0.48.0`
 
 ## What is true today
@@ -61,5 +61,11 @@ consumer needs to read *before* adopting the server, and it is currently accurat
 over: 128 KiB is a low ceiling for a static server, and nothing in the command's one-line
 description (`Serve a directory over HTTP`) hints at it.
 
-**This is a candidate to take upstream directly**, under the standing authority recorded in
-AGENTS.md. `functionalscript#1645` is the precedent for the shape of that request.
+**Taken upstream** under the standing authority recorded in AGENTS.md, as
+[`functionalscript#1819`](https://github.com/functionalscript/functionalscript/issues/1819)
+— every fact above re-verified against `0.48.0` before filing: line 461 reads as quoted,
+`maxLengthBytes` resolves to `131072n`, and eleven of the demo's modules are over it.
+`functionalscript#1645` was the precedent for the shape of the request.
+
+When it is answered, the swap this note blocks is one line in `demo/serve.sh`, and the
+comment there already names the line it becomes.
