@@ -472,6 +472,42 @@ const assertColumnBEqualsColumnCMinusColumnA = diff => {
     }
 }
 
+/** TEST-FIXTURE ONLY. Outside the cBase32 alphabet: not an address at all. */
+const notAnAddress = 'not-a-hash'
+
+/** TEST-FIXTURE ONLY. A legal cBase32 address with nothing stored behind it. */
+const decodableButAbsent = 'aaaaaaaa'
+
+/**
+ * TEST-FIXTURE ONLY. Every blob the unreadable-input table below needs,
+ * seeded once so the rows can be a plain table run against one store.
+ *
+ * `'not-a-hash'` is outside the cBase32 alphabet and does not decode;
+ * `'aaaaaaaa'` decodes perfectly well and simply addresses nothing, which
+ * are two different failures and reach two different messages.
+ * @type {(cas: Cas<FileCasOperation>) => Effect<FileCasOperation, {
+ *   readonly goodRun: string,
+ *   readonly notARunRecord: string,
+ *   readonly runToUndecodableResult: string,
+ *   readonly runToAbsentResult: string,
+ *   readonly runToUnshapedResult: string,
+ * }, never>}
+ */
+const seedUnreadableFixtures = cas => {
+    const wire = { interest: { value: '10.00', sources: [{ documentHash: 'sha256-doc', boxPath: 'box1InterestIncome', value: '10.00' }], rule: '1040 line 2b' } }
+    const run = okRun('sha256-program1')([])
+    return step(seedText(cas)(JSON.stringify(wire)), resultHash =>
+        step(seedText(cas)(JSON.stringify(run(resultHash))), goodRun =>
+            // Schema-shaped enough to be JSON, not enough to be a `Run`.
+            step(seedText(cas)('{"dialect":"vnd.fjs.run"}'), notARunRecord =>
+                step(seedText(cas)(JSON.stringify(run(notAnAddress))), runToUndecodableResult =>
+                    step(seedText(cas)(JSON.stringify(run(decodableButAbsent))), runToAbsentResult =>
+                        // `value` is a number here, so rtti refuses the record.
+                        step(seedText(cas)('{"interest":{"value":1000,"sources":[],"rule":"r"}}'), unshaped =>
+                            step(seedText(cas)(JSON.stringify(run(unshaped))), runToUnshapedResult =>
+                                pure(ok({ goodRun, notARunRecord, runToUndecodableResult, runToAbsentResult, runToUnshapedResult })))))))))
+}
+
 export const proof = {
     // Task 1 behavior #1: two same-program, same-args `ok` runs diff to
     // A/B/C with B = C - A exact. `'1000.00'`/`'1500.00'` are decimal-dollar
@@ -667,5 +703,99 @@ export const proof = {
         assertEq(newDeduction.columnC, '250.00')
         assertEq(newDeduction.sourcesC.length, 1)
         assertColumnBEqualsColumnCMinusColumnA(diff)
+    },
+    // ── Unreadable inputs ───────────────────────────────────────────────
+    //
+    // Every leaf above hands `amendmentDiff` two well-formed run records
+    // pointing at two well-formed result blobs. The refusal paths were
+    // reachable but never reached, and each is what this tool says to an
+    // accountant whose store has been moved, truncated, or hand-edited: a
+    // hash that is not an address, an address with nothing behind it, a
+    // blob that is not the record it claims to be. Every row asserts an
+    // error VALUE naming the offending hash — never a throw, and never a
+    // silent empty diff, which is the failure mode that would quietly
+    // report "nothing changed" about a return that did change.
+    unreadable: () => {
+        const cas = fileCas(sha256)('/amend/unreadable')
+        const [seeded, seedResult] = virtual(emptyState)(seedUnreadableFixtures(cas))
+        assert(seedResult[0] === 'ok', ['fixture seeding must succeed', seedResult])
+        const h = seedResult[1]
+        /** @type {readonly (readonly [string, string, string, readonly string[]])[]} */
+        const cases = [
+            ['run A’s hash is not an address',
+                notAnAddress, h.goodRun, ['could not read run A', 'not a decodable run hash', notAnAddress]],
+            ['run B’s hash is not an address',
+                h.goodRun, notAnAddress, ['could not read run B', 'not a decodable run hash', notAnAddress]],
+            ['run A’s hash addresses nothing',
+                decodableButAbsent, h.goodRun, ['could not read run A', 'run record not found', decodableButAbsent]],
+            ['run B’s hash addresses nothing',
+                h.goodRun, decodableButAbsent, ['could not read run B', 'run record not found', decodableButAbsent]],
+            ['the blob at run A’s hash is not a run record',
+                h.notARunRecord, h.goodRun, ['could not read run A', 'programHash']],
+            ['the result hash inside a run record is not an address',
+                h.runToUndecodableResult, h.goodRun, ['stored result is invalid', 'not a decodable result hash']],
+            ['the result hash inside a run record addresses nothing',
+                h.runToAbsentResult, h.goodRun, ['stored result is invalid', 'result blob not found']],
+            ['the blob at a run’s result hash is not ReportLine-shaped',
+                h.runToUnshapedResult, h.goodRun, ['stored result is invalid', 'not a ReportLine-shaped record']],
+        ]
+        assertEq(cases.length, 8, 'both hash positions, both failure kinds, at both levels')
+        for (const [label, runHashA, runHashB, fragments] of cases) {
+            const [, result] = virtual(seeded)(amendmentDiff(cas)(false)(runHashA)(runHashB))
+            assertEq(result[0], 'error', label)
+            assert(result[0] === 'error', [label, result])
+            for (const fragment of fragments) {
+                assert(result[1].includes(fragment), [label, fragment, result[1]])
+            }
+        }
+    },
+    // The mirror of `malformedStoredResult` above, which puts the bad line
+    // on side A every time: side B has its own guard, and a diff that
+    // refused only what it found on the left would report a clean
+    // amendment for a corrupted amended return.
+    malformedLineOnSideBIsRefusedToo: () => {
+        const cas = fileCas(sha256)('/amend/malformed-side-b')
+        const good = { interest: { value: '10.00', sources: [{ documentHash: 'sha256-doc', boxPath: 'box1InterestIncome', value: '10.00' }], rule: '1040 line 2b' } }
+        const bad = { interest: { value: 'not-a-number', sources: [{ documentHash: 'sha256-doc', boxPath: 'box1InterestIncome', value: '10.00' }], rule: '1040 line 2b' } }
+        const [, result] = virtual(emptyState)(
+            runOkDiffFixture(cas)('sha256-programA')([])(good)('sha256-programA')([])(bad)(false))
+        assertEq(result[0], 'error')
+        assert(result[0] === 'error', ['expected error, not a thrown value', result])
+        assert(result[1].includes('interest'), result[1])
+        assert(result[1].includes('not-a-number'), result[1])
+    },
+    // A line can be present on one side and absent from the other — a
+    // deduction dropped by the amendment, or one the amendment adds. The
+    // absent side has no stored line at all, and Form 1040-X still needs a
+    // figure in its column, so the diff reads the gap as $0.00 rather than
+    // omitting the line. Both directions, because the two are different
+    // code paths: one falls back on side A's lookup, the other on side B's.
+    aLinePresentOnOnlyOneSideReadsAsZeroOnTheOther: () => {
+        const cas = fileCas(sha256)('/amend/one-sided-lines')
+        const source = [{ documentHash: 'sha256-doc', boxPath: 'box1InterestIncome', value: '10.00' }]
+        const both = { interest: { value: '10.00', sources: source, rule: '1040 line 2b' } }
+        const alsoDividends = {
+            interest: { value: '10.00', sources: source, rule: '1040 line 2b' },
+            dividends: { value: '25.00', sources: source, rule: '1040 line 3b' },
+        }
+        /** @type {readonly (readonly [string, Readonly<Record<string, unknown>>, Readonly<Record<string, unknown>>, string, string, number, number])[]} */
+        const cases = [
+            ['dividends appear only in the amended run', both, alsoDividends, '0.00', '25.00', 0, 1],
+            ['dividends appear only in the original run', alsoDividends, both, '25.00', '0.00', 1, 0],
+        ]
+        assertEq(cases.length, 2, 'a line added by the amendment, and one it drops')
+        for (const [label, wireA, wireB, columnA, columnC, sourcesA, sourcesC] of cases) {
+            const [, result] = virtual(emptyState)(
+                runOkDiffFixture(cas)('sha256-programA')([])(wireA)('sha256-programA')([])(wireB)(false))
+            assert(result[0] === 'ok', [label, result])
+            const dividends = assertNotNullish(result[1]['dividends'], [label, 'the one-sided line must still appear'])
+            assertEq(dividends.columnA, columnA, label)
+            assertEq(dividends.columnC, columnC, label)
+            // The missing side contributes no citations either, which is the
+            // other half of reading an absent line as zero.
+            assertEq(dividends.sourcesA.length, sourcesA, label)
+            assertEq(dividends.sourcesC.length, sourcesC, label)
+            assertColumnBEqualsColumnCMinusColumnA(result[1])
+        }
     },
 }
