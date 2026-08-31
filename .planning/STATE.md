@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v6
 milestone_name: A Current Engine, Actually Current
-status: planning
-stopped_at: "Milestone v6 is open — MAINT-14 is coined and the five carried-forward v5 IDs keep their phase numbers (39, 40, 41). Execution order is 42 -> 39 -> 40 -> 41; 34, 35 and 36 remain blocked on the owner. Nothing is planned yet: run /gsd-plan-phase 42 next."
-last_updated: "2026-08-31T06:51:35.086Z"
+status: complete
+stopped_at: "Milestone v6 is COMPLETE for the four phases it owned, executed 42 -> 39 -> 40 -> 41 on 2026-08-31 as PRs #144, #145, #146, #147. Phase 42 took 0.48.0 with all 30 served schemas byte-identical; 39 retired the protocol-version gap and the proof that could not fail; 40 put dialect validation on the write path; 41 adopted toolResultStep, wrote the migration report, and filed ONE new upstream gap. THE ONE THING NOT DONE: MAINT-11's `fjs web` swap, blocked by a 131072-byte ceiling that eleven of the demo's files exceed - fjs/todo/upstream-web-vec-size-limit.md, and a candidate to take upstream under the standing authority written into AGENTS.md this milestone. Phases 34, 35 and 36 remain carried forward and blocked on the owner being in the room; they are the whole of what is left."
+last_updated: "2026-08-31T09:05:00.000Z"
 last_activity: 2026-08-31
 progress:
   total_phases: 7
-  completed_phases: 0
+  completed_phases: 4
   total_plans: 0
   completed_plans: 0
-  percent: 0
+  percent: 57
 ---
 
 # Project State
